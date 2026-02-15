@@ -32,6 +32,7 @@ import {
   applyIncomingDirectMessageUnread,
   markDirectMessageChannelRead,
 } from '@iconicedu/web/lib/sidebar/direct-message-unread';
+import { persistDirectMessageUnreadCount } from '@iconicedu/web/lib/sidebar/direct-message-unread-persistence';
 
 const AVATAR_BUCKET = 'public-avatars';
 const AVATAR_SIGNED_URL_TTL = 60 * 60;
@@ -111,18 +112,52 @@ export function SidebarShell({
 
   const sidebarProfile = sidebarData.user.profile;
   const sidebarAccount = sidebarData.user.account ?? null;
+  const sidebarOrgId = sidebarProfile.ids?.orgId;
+  const sidebarAccountId = sidebarData.user.account?.id ?? null;
 
   const computedOnboardingStep = React.useMemo(
     () => determineOnboardingStep(sidebarProfile, sidebarAccount),
     [sidebarProfile, sidebarAccount],
   );
 
+  const persistUnread = React.useCallback(
+    async (channelId: string, unreadCount: number, markRead = false) => {
+      if (!sidebarOrgId || !sidebarAccountId) {
+        return;
+      }
+      const { error } = await persistDirectMessageUnreadCount(supabase, {
+        orgId: sidebarOrgId,
+        accountId: sidebarAccountId,
+        channelId,
+        unreadCount,
+        markRead,
+      });
+      if (error) {
+        console.error('Failed to persist direct message unread count', error);
+      }
+    },
+    [sidebarOrgId, sidebarAccountId, supabase],
+  );
+
   React.useEffect(() => {
     if (!activeDirectMessageId) {
       return;
     }
+
+    const activeChannel = sidebarData.collections.directMessages.find(
+      (channel) => channel.ids.id === activeDirectMessageId,
+    );
+    const activeUnread = Math.max(
+      0,
+      activeChannel?.collections.readState?.unreadCount ?? 0,
+    );
+    if (activeUnread === 0) {
+      return;
+    }
+
     setSidebarData((prev) => markDirectMessageChannelRead(prev, activeDirectMessageId));
-  }, [activeDirectMessageId]);
+    void persistUnread(activeDirectMessageId, 0, true);
+  }, [activeDirectMessageId, sidebarData.collections.directMessages, persistUnread]);
 
   React.useEffect(() => {
     const orgId = sidebarProfile.ids?.orgId;
@@ -148,14 +183,28 @@ export function SidebarShell({
           return;
         }
 
-        setSidebarData((prev) =>
-          applyIncomingDirectMessageUnread(prev, {
+        setSidebarData((prev) => {
+          const next = applyIncomingDirectMessageUnread(prev, {
             channelId: row.channel_id,
             senderProfileId: row.sender_profile_id ?? null,
             currentProfileId: profileId,
             activeChannelId: activeDirectMessageId,
-          }),
-        );
+          });
+
+          const nextChannel = next.collections.directMessages.find(
+            (channel) => channel.ids.id === row.channel_id,
+          );
+          if (!nextChannel) {
+            return prev;
+          }
+
+          const nextUnread = Math.max(
+            0,
+            nextChannel.collections.readState?.unreadCount ?? 0,
+          );
+          void persistUnread(row.channel_id, nextUnread, nextUnread === 0);
+          return next;
+        });
       },
     );
     channel.subscribe();
@@ -163,7 +212,13 @@ export function SidebarShell({
     return () => {
       void channel.unsubscribe();
     };
-  }, [supabase, sidebarProfile.ids?.orgId, sidebarProfile.ids?.id, activeDirectMessageId]);
+  }, [
+    supabase,
+    sidebarProfile.ids?.orgId,
+    sidebarProfile.ids?.id,
+    activeDirectMessageId,
+    persistUnread,
+  ]);
 
   React.useEffect(() => {
     if (!sidebarProfile.ids?.id || !sidebarProfile.ids?.orgId) {

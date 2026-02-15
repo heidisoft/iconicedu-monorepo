@@ -92,4 +92,26 @@ describe('buildDirectMessageChannelsWithMessages', () => {
     expect(results).toHaveLength(1);
     expect(results[0]?.ids.id).toBe('dm-1');
   });
+
+  it('provides a default channel read state when no persisted row exists', async () => {
+    getChannelsByOrg.mockResolvedValue({
+      data: [{ id: 'dm-1', org_id: 'org-1', kind: 'dm', topic: 'DM', purpose: 'general' }],
+    });
+    getChannelParticipantsByChannelIds.mockResolvedValue({
+      data: [{ channel_id: 'dm-1', profile_id: 'profile-1' }],
+    });
+    getChannelCapabilitiesByChannelIds.mockResolvedValue({ data: [] });
+    getChannelReadStatesByAccountId.mockResolvedValue({ data: [] });
+    getProfilesByIds.mockResolvedValue({
+      data: [{ id: 'profile-1', org_id: 'org-1', account_id: 'account-1', display_name: 'User 1' }],
+    });
+
+    const [result] = await buildDirectMessageChannelsWithMessages({} as any, 'org-1', {
+      accountId: 'account-1',
+    });
+
+    expect(result?.collections.readState).toEqual(
+      expect.objectContaining({ channelId: 'dm-1', unreadCount: 0 }),
+    );
+  });
 });

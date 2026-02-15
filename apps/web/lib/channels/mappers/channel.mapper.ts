@@ -146,6 +146,13 @@ export function mapChannelReadStateRow(
     channelId: row.channel_id,
     lastReadMessageId: row.last_read_message_id ?? undefined,
     lastReadAt: row.last_read_at ?? undefined,
-    unreadCount: row.unread_count ?? undefined,
+    unreadCount: Math.max(0, row.unread_count ?? 0),
+  };
+}
+
+export function createDefaultChannelReadState(channelId: string): ChannelReadStateVM {
+  return {
+    channelId,
+    unreadCount: 0,
   };
 }

@@ -3,6 +3,7 @@ import type { ChannelVM, UserProfileVM } from '@iconicedu/shared-types';
 import type { ChannelRow, ChannelMemberRow } from '@iconicedu/shared-types';
 
 import {
+  createDefaultChannelReadState,
   mapChannelCapabilityRow,
   mapChannelReadStateRow,
   mapChannelRowToVM,
@@ -180,7 +181,8 @@ async function buildChannelsFromRows(
         media,
         files,
         capabilities: capabilities.length ? capabilities : undefined,
-        readState: readStateByChannel.get(row.id),
+        readState:
+          readStateByChannel.get(row.id) ?? createDefaultChannelReadState(row.id),
       });
     }),
   );
@@ -230,7 +232,9 @@ async function buildChannelFromRow(
     media,
     files,
     capabilities: capabilities.length ? capabilities : undefined,
-    readState: readStateRow ? mapChannelReadStateRow(readStateRow) : undefined,
+    readState: readStateRow
+      ? mapChannelReadStateRow(readStateRow)
+      : createDefaultChannelReadState(row.id),
   });
 }
 
