@@ -28,3 +28,32 @@ Running both MCP and the Next.js dev server gives you the rapid component previe
 
 - The MCP server reads the same `src/components` tree, so any component you add via `pnpm shadcn:add` appears in the MCP immediately after you refresh.
 - Use `pnpm shadcn:mcp --help` for CLI options (preview mode, port, theme tokens, etc.).
+
+## Workspace MCP servers (for AI tooling)
+
+This repo now includes a root `.mcp.json` with MCP servers that match the stack:
+
+- `filesystem`: safe file access scoped to this repo.
+- `git`: inspect commit history and diffs.
+- `postgres`: query the Supabase/Postgres database through `DATABASE_URL`.
+- `fetch`: read docs and external HTTP resources.
+- `nextjs`: Next.js framework/devtools MCP (`next-devtools-mcp`).
+- `shadcn`: shadcn MCP via `pnpm dlx shadcn@latest mcp`.
+- `prisma`: Prisma ORM MCP via `prisma mcp`.
+- `supabase`: Supabase hosted MCP over remote transport.
+- `playwright`: browser automation for UI checks (web app flows).
+
+### Prerequisites
+
+1. Set `DATABASE_URL` in your shell before starting your MCP client:
+   `export DATABASE_URL="postgresql://..."`
+2. Set `SUPABASE_ACCESS_TOKEN` if you want the Supabase hosted MCP:
+   `export SUPABASE_ACCESS_TOKEN="..."`
+3. Make sure Node and pnpm match project versions (`Node 20.18.1`, `pnpm 9.12.0`).
+4. Use an MCP-compatible client that reads `.mcp.json` from the workspace root.
+
+### Notes
+
+- `postgres` uses `DATABASE_URL`; if it is missing, that server will fail to start.
+- `nextjs` (`next-devtools-mcp`) is designed for modern Next.js setups and may expect Next.js 16+ features.
+- `playwright` requires local browser dependencies; run `npx playwright install` if needed.

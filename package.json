@@ -8,9 +8,6 @@
     "dev:mobile": "turbo run dev --filter=mobile",
     "dev:api": "turbo run dev --filter=api",
     "build": "turbo run build",
-    "build:prepublish-ui": "pnpm --filter @iconicedu/shared-types build && pnpm --filter @iconicedu/ui-web build",
-    "ci:upload-build-artifacts": "pnpm run build:prepublish-ui && node scripts/blob-upload-build-artifacts.mjs",
-    "vercel:build": "node scripts/blob-download-build-artifacts.mjs && pnpm turbo run build --filter=web",
     "lint": "turbo run lint",
     "test": "turbo run test",
     "format": "prettier --write ."
@@ -23,6 +20,7 @@
     "@types/react-dom": "^19.2.3",
     "@typescript-eslint/eslint-plugin": "^8.48.0",
     "@typescript-eslint/parser": "^8.48.0",
+    "@vercel/blob": "^2.0.1",
     "@vitejs/plugin-react": "^4.7.0",
     "eslint": "^9.39.1",
     "husky": "^9.1.7",
