@@ -113,7 +113,7 @@ export function SidebarShell({
   const sidebarProfile = sidebarData.user.profile;
   const sidebarAccount = sidebarData.user.account ?? null;
   const sidebarOrgId = sidebarProfile.ids?.orgId;
-  const sidebarAccountId = sidebarData.user.account?.id ?? null;
+  const sidebarAccountId = sidebarData.user.account?.id ?? sidebarProfile.ids?.accountId ?? null;
 
   const computedOnboardingStep = React.useMemo(
     () => determineOnboardingStep(sidebarProfile, sidebarAccount),
