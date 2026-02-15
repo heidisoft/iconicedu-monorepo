@@ -1,17 +1,16 @@
 'use client';
 
-import { MoreHorizontal, Plus, Share, StarOff, Trash2 } from 'lucide-react';
+import * as React from 'react';
+import { MoreHorizontal, Trash2 } from 'lucide-react';
 
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@iconicedu/ui-web/ui/dropdown-menu';
 import {
   SidebarGroup,
-  SidebarGroupAction,
   SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuAction,
@@ -20,10 +19,11 @@ import {
   useSidebar,
 } from '@iconicedu/ui-web/ui/sidebar';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
-import { Separator } from '@iconicedu/ui-web/ui/separator';
 import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import type { ChannelVM } from '@iconicedu/shared-types';
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
+import { getDirectMessageUnreadCount } from './sidebar-unread';
+import { cn } from '../../lib/utils';
 
 export function NavDirectMessages({
   dms,
@@ -35,14 +35,71 @@ export function NavDirectMessages({
   activeChannelId?: string | null;
 }) {
   const { isMobile } = useSidebar();
+  const totalUnreadCount = React.useMemo(() => getDirectMessageUnreadCount(dms), [dms]);
+  const sortedDirectMessages = React.useMemo(() => {
+    return dms
+      .map((channel, index) => ({ channel, index }))
+      .sort((a, b) => {
+        const aUnread = (a.channel.collections.readState?.unreadCount ?? 0) > 0;
+        const bUnread = (b.channel.collections.readState?.unreadCount ?? 0) > 0;
+        if (aUnread === bUnread) {
+          return a.index - b.index;
+        }
+        return aUnread ? -1 : 1;
+      })
+      .map(({ channel }) => channel);
+  }, [dms]);
+  const [shouldAnimateUnread, setShouldAnimateUnread] = React.useState(false);
+  const previousUnreadCountRef = React.useRef(totalUnreadCount);
+  const hasInitializedRef = React.useRef(false);
+
+  React.useEffect(() => {
+    if (!hasInitializedRef.current) {
+      previousUnreadCountRef.current = totalUnreadCount;
+      hasInitializedRef.current = true;
+      return;
+    }
+
+    if (totalUnreadCount <= previousUnreadCountRef.current) {
+      previousUnreadCountRef.current = totalUnreadCount;
+      return;
+    }
+
+    previousUnreadCountRef.current = totalUnreadCount;
+    setShouldAnimateUnread(true);
+
+    const timeout = window.setTimeout(() => {
+      setShouldAnimateUnread(false);
+    }, 1200);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [totalUnreadCount]);
+
   return (
     <SidebarGroup>
-      <SidebarGroupLabel className="uppercase">Direct Messages</SidebarGroupLabel>
+      <SidebarGroupLabel className="uppercase">
+        <span className="inline-flex items-center gap-2">
+          <span>Direct Messages</span>
+          {totalUnreadCount > 0 ? (
+            <Badge
+              data-unread-animated={shouldAnimateUnread ? 'true' : 'false'}
+              className={cn(
+                'h-4 px-1.5 text-[10px] bg-rose-500 text-white',
+                shouldAnimateUnread ? 'animate-pulse' : '',
+              )}
+            >
+              {totalUnreadCount}
+            </Badge>
+          ) : null}
+        </span>
+      </SidebarGroupLabel>
       {/* <SidebarGroupAction title="Add Project">
         <Plus /> <span className="sr-only">Add Project</span>
       </SidebarGroupAction> */}
       <SidebarMenu>
-        {dms.map((item) => {
+        {sortedDirectMessages.map((item) => {
           const isActive = item.ids.id === activeChannelId;
           const otherParticipant =
             item.collections.participants.find(

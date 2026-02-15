@@ -37,9 +37,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
   SidebarSeparator,
   useSidebar,
 } from '@iconicedu/ui-web/ui/sidebar';

@@ -28,6 +28,10 @@ import { createChildProfileAction } from '@iconicedu/web/app/actions/create-chil
 import { saveEducatorAvailabilityAction } from '@iconicedu/web/app/actions/educator-availability';
 import { upsertUserOnboardingStatusAction } from '@iconicedu/web/app/actions/onboarding-status';
 import { determineOnboardingStep } from '@iconicedu/web/lib/onboarding/determineOnboardingStep';
+import {
+  applyIncomingDirectMessageUnread,
+  markDirectMessageChannelRead,
+} from '@iconicedu/web/lib/sidebar/direct-message-unread';
 
 const AVATAR_BUCKET = 'public-avatars';
 const AVATAR_SIGNED_URL_TTL = 60 * 60;
@@ -98,6 +102,13 @@ export function SidebarShell({
     void router.push('/d');
   }, [router]);
 
+  const activeDirectMessageId = React.useMemo(() => {
+    if (!pathname || !pathname.startsWith('/d/dm/')) {
+      return null;
+    }
+    return pathname.split('/').pop() ?? null;
+  }, [pathname]);
+
   const sidebarProfile = sidebarData.user.profile;
   const sidebarAccount = sidebarData.user.account ?? null;
 
@@ -105,6 +116,54 @@ export function SidebarShell({
     () => determineOnboardingStep(sidebarProfile, sidebarAccount),
     [sidebarProfile, sidebarAccount],
   );
+
+  React.useEffect(() => {
+    if (!activeDirectMessageId) {
+      return;
+    }
+    setSidebarData((prev) => markDirectMessageChannelRead(prev, activeDirectMessageId));
+  }, [activeDirectMessageId]);
+
+  React.useEffect(() => {
+    const orgId = sidebarProfile.ids?.orgId;
+    const profileId = sidebarProfile.ids?.id;
+    if (!orgId || !profileId) {
+      return;
+    }
+
+    const channel = supabase.channel(`sidebar-dm-unread:${orgId}:${profileId}`);
+    channel.on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+        filter: `org_id=eq.${orgId}`,
+      },
+      (payload) => {
+        const row = payload.new as
+          | { channel_id?: string; sender_profile_id?: string | null }
+          | null;
+        if (!row?.channel_id) {
+          return;
+        }
+
+        setSidebarData((prev) =>
+          applyIncomingDirectMessageUnread(prev, {
+            channelId: row.channel_id,
+            senderProfileId: row.sender_profile_id ?? null,
+            currentProfileId: profileId,
+            activeChannelId: activeDirectMessageId,
+          }),
+        );
+      },
+    );
+    channel.subscribe();
+
+    return () => {
+      void channel.unsubscribe();
+    };
+  }, [supabase, sidebarProfile.ids?.orgId, sidebarProfile.ids?.id, activeDirectMessageId]);
 
   React.useEffect(() => {
     if (!sidebarProfile.ids?.id || !sidebarProfile.ids?.orgId) {
