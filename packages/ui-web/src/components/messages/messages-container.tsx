@@ -218,6 +218,20 @@ export function MessagesContainer({
     [messages, setThreadData, toggle],
   );
 
+  const syncParentThreadFromReply = useCallback(
+    (message: MessageVM) => {
+      const thread = message.social.thread;
+      const parentMessageId = thread?.parent.messageId;
+      if (!thread || !parentMessageId || parentMessageId === message.ids.id) {
+        return;
+      }
+      updateMessage(parentMessageId, {
+        social: { thread } as MessageVM['social'],
+      });
+    },
+    [updateMessage],
+  );
+
   const handleSendMessage = useCallback(
     (content: string) => {
       if (!senderProfile) return;
@@ -500,12 +514,15 @@ export function MessagesContainer({
             );
             if (exists) {
               updateMessage(event.message.ids.id, event.message);
+              syncParentThreadFromReply(event.message);
               return;
             }
             addMessage(event.message);
+            syncParentThreadFromReply(event.message);
           }
           if (event.type === 'message-updated') {
             updateMessage(event.message.ids.id, event.message);
+            syncParentThreadFromReply(event.message);
           }
           if (event.type === 'message-deleted') {
             deleteMessage(event.messageId);
@@ -548,6 +565,7 @@ export function MessagesContainer({
     channel.ids.id,
     addMessage,
     updateMessage,
+    syncParentThreadFromReply,
     deleteMessage,
     currentUserId,
     upsertTypingProfile,

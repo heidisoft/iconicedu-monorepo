@@ -25,6 +25,7 @@ vi.mock('@iconicedu/web/lib/supabase/client', () => ({
 describe('createSupabaseMessagesRealtimeClient', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it('emits typing events from broadcasts', () => {
@@ -68,6 +69,78 @@ describe('createSupabaseMessagesRealtimeClient', () => {
         type: 'broadcast',
         event: 'typing',
         payload: { profileId: 'profile-2', isTyping: false },
+      }),
+    );
+  });
+
+  it('refetches a message if another event arrives while the first fetch is pending', async () => {
+    let resolveFirstFetch: ((value: unknown) => void) | null = null;
+    const firstFetchPromise = new Promise((resolve) => {
+      resolveFirstFetch = resolve;
+    });
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(async () => firstFetchPromise)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          message: {
+            ids: { id: 'parent-1' },
+            social: { thread: { ids: { id: 'thread-1' } } },
+          },
+        }),
+      });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const onEvent = vi.fn();
+    const client = createSupabaseMessagesRealtimeClient();
+    client.subscribe({ orgId: 'org-1', channelId: 'channel-1', onEvent });
+
+    const threadHandler = channelOn.mock.calls.find(
+      (call) => call[0] === 'postgres_changes' && call[1]?.table === 'threads',
+    )?.[2] as ((payload: any) => void) | undefined;
+    const messageHandler = channelOn.mock.calls.find(
+      (call) => call[0] === 'postgres_changes' && call[1]?.table === 'messages',
+    )?.[2] as ((payload: any) => void) | undefined;
+
+    expect(threadHandler).toBeTypeOf('function');
+    expect(messageHandler).toBeTypeOf('function');
+
+    threadHandler?.({
+      eventType: 'INSERT',
+      new: { parent_message_id: 'parent-1' },
+      old: null,
+    });
+    messageHandler?.({
+      eventType: 'UPDATE',
+      new: { id: 'parent-1' },
+      old: null,
+    });
+
+    resolveFirstFetch?.({
+      ok: true,
+      json: async () => ({
+        success: true,
+        message: {
+          ids: { id: 'parent-1' },
+          social: {},
+        },
+      }),
+    });
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+    expect(onEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'message-updated',
+        message: expect.objectContaining({
+          ids: expect.objectContaining({ id: 'parent-1' }),
+          social: expect.objectContaining({
+            thread: expect.objectContaining({ ids: expect.objectContaining({ id: 'thread-1' }) }),
+          }),
+        }),
       }),
     );
   });

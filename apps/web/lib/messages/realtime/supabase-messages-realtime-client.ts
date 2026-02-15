@@ -36,29 +36,50 @@ export function createSupabaseMessagesRealtimeClient(): MessagesRealtimeClient {
       const channel = supabase.channel(`messages:${channelId}`);
       channelsById.set(channelId, channel);
       const pending = new Map<string, Promise<void>>();
+      const queued = new Map<string, 'added' | 'updated'>();
 
       const fetchMessage = async (messageId: string, type: 'added' | 'updated') => {
         if (!messageId) return;
+
         if (pending.has(messageId)) {
+          queued.set(messageId, type);
           await pending.get(messageId);
           return;
         }
+
         const task = (async () => {
-          const response = await fetch(`/d/messages/actions/detail?messageId=${messageId}`);
-          if (!response.ok) return;
-          const payload = (await response.json()) as {
-            success?: boolean;
-            message?: MessageVM;
-          };
-          if (!payload?.success || !payload.message) return;
-          onEvent({
-            type: type === 'added' ? 'message-added' : 'message-updated',
-            message: payload.message,
-          });
+          let nextType: 'added' | 'updated' | undefined = type;
+          while (nextType) {
+            const currentType = nextType;
+            nextType = undefined;
+
+            const response = await fetch(`/d/messages/actions/detail?messageId=${messageId}`);
+            if (response.ok) {
+              const payload = (await response.json()) as {
+                success?: boolean;
+                message?: MessageVM;
+              };
+              if (payload?.success && payload.message) {
+                onEvent({
+                  type: currentType === 'added' ? 'message-added' : 'message-updated',
+                  message: payload.message,
+                });
+              }
+            }
+
+            const queuedType = queued.get(messageId);
+            if (queuedType) {
+              queued.delete(messageId);
+              nextType = queuedType;
+            }
+          }
         })();
         pending.set(messageId, task);
-        await task;
-        pending.delete(messageId);
+        try {
+          await task;
+        } finally {
+          pending.delete(messageId);
+        }
       };
 
       channel.on(

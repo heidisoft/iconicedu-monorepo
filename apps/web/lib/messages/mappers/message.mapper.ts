@@ -122,7 +122,7 @@ export function mapMessageRowToVM(
 
   const social: MessageSocialVM = {
     reactions: input.reactions ?? [],
-    thread: input.thread,
+    ...(input.thread ? { thread: input.thread } : {}),
   };
 
   const base = {

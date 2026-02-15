@@ -147,7 +147,19 @@ export async function sendTextMessageAction(
     }
 
     if (threadId) {
+      const channelMembersResponse = await supabase
+        .from('channel_members')
+        .select('profile_id')
+        .eq('org_id', accountResponse.data.org_id)
+        .eq('channel_id', input.channelId)
+        .is('deleted_at', null);
+
+      if (channelMembersResponse.error) {
+        throw new Error(channelMembersResponse.error.message);
+      }
+
       const participants = [
+        ...(channelMembersResponse.data ?? []).map((member) => member.profile_id),
         parentMessage.sender_profile_id,
         profileResponse.data.id,
       ].filter(Boolean);

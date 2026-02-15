@@ -157,6 +157,12 @@ describe('sendTextMessageAction', () => {
     });
 
     const participantUpsert = vi.fn().mockResolvedValue({ error: null });
+    const channelMembersSelectChain: any = {};
+    channelMembersSelectChain.eq = vi.fn(() => channelMembersSelectChain);
+    channelMembersSelectChain.is = vi.fn(async () => ({
+      data: [{ profile_id: 'profile-parent' }, { profile_id: 'profile-2' }],
+      error: null,
+    }));
 
     supabase.from.mockImplementation((table: string) => {
       if (table === 'messages') {
@@ -178,6 +184,9 @@ describe('sendTextMessageAction', () => {
       if (table === 'thread_participants') {
         return { upsert: participantUpsert };
       }
+      if (table === 'channel_members') {
+        return { select: () => channelMembersSelectChain };
+      }
       return {};
     });
 
@@ -196,7 +205,14 @@ describe('sendTextMessageAction', () => {
 
     expect(threadInsert).toHaveBeenCalled();
     expect(messageUpdate).toHaveBeenCalled();
-    expect(participantUpsert).toHaveBeenCalled();
+    expect(participantUpsert).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ profile_id: 'profile-parent' }),
+        expect.objectContaining({ profile_id: 'profile-1' }),
+        expect.objectContaining({ profile_id: 'profile-2' }),
+      ]),
+      { onConflict: 'org_id,thread_id,profile_id' },
+    );
     expect(result).toEqual({ ids: { id: 'message-2', orgId: 'org-1' } });
   });
 
@@ -259,6 +275,12 @@ describe('sendTextMessageAction', () => {
       }),
     });
     const participantUpsert = vi.fn().mockResolvedValue({ error: null });
+    const channelMembersSelectChain: any = {};
+    channelMembersSelectChain.eq = vi.fn(() => channelMembersSelectChain);
+    channelMembersSelectChain.is = vi.fn(async () => ({
+      data: [{ profile_id: 'profile-parent' }, { profile_id: 'profile-3' }],
+      error: null,
+    }));
 
     supabase.from.mockImplementation((table: string) => {
       if (table === 'messages') {
@@ -280,6 +302,9 @@ describe('sendTextMessageAction', () => {
       if (table === 'thread_participants') {
         return { upsert: participantUpsert };
       }
+      if (table === 'channel_members') {
+        return { select: () => channelMembersSelectChain };
+      }
       return {};
     });
 
@@ -299,6 +324,14 @@ describe('sendTextMessageAction', () => {
 
     expect(threadSelectChain.maybeSingle).toHaveBeenCalled();
     expect(threadInsert).toHaveBeenCalled();
+    expect(participantUpsert).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ profile_id: 'profile-parent' }),
+        expect.objectContaining({ profile_id: 'profile-1' }),
+        expect.objectContaining({ profile_id: 'profile-3' }),
+      ]),
+      { onConflict: 'org_id,thread_id,profile_id' },
+    );
     expect(messageInsert).toHaveBeenCalledWith(
       expect.objectContaining({ thread_id: 'thread-2', thread_parent_id: 'parent-2' }),
     );

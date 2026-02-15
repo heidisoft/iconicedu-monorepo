@@ -8,16 +8,22 @@ import type { ChannelVM, UserProfileVM } from '@iconicedu/shared-types';
 const setCurrentUserId = vi.fn();
 const setCreateTextMessage = vi.fn();
 const setSendTextMessage = vi.fn();
+const addMessage = vi.fn();
+const updateMessage = vi.fn();
+const deleteMessage = vi.fn();
+const toggleReaction = vi.fn();
+const toggleSaved = vi.fn();
+const toggleHidden = vi.fn();
 
 vi.mock('../../hooks/use-messages', () => ({
   useMessages: () => ({
     messages: [],
-    addMessage: vi.fn(),
-    updateMessage: vi.fn(),
-    deleteMessage: vi.fn(),
-    toggleReaction: vi.fn(),
-    toggleSaved: vi.fn(),
-    toggleHidden: vi.fn(),
+    addMessage,
+    updateMessage,
+    deleteMessage,
+    toggleReaction,
+    toggleSaved,
+    toggleHidden,
   }),
 }));
 
@@ -165,5 +171,59 @@ describe('MessagesContainer', () => {
         }),
       );
     });
+  });
+
+  it('updates parent thread preview when a reply event is received', async () => {
+    const onEventHandlers: Array<(event: any) => void> = [];
+    const realtimeClient = {
+      subscribe: ({ onEvent }: { onEvent: (event: any) => void }) => {
+        onEventHandlers.push(onEvent);
+        return { unsubscribe: () => void 0 };
+      },
+      sendTyping: vi.fn(),
+    };
+
+    render(
+      <MessagesContainer
+        channel={channel}
+        currentUserId="profile-2"
+        realtimeClient={realtimeClient as any}
+      />,
+    );
+
+    const thread = {
+      ids: { id: 'thread-1', orgId: 'org-1' },
+      parent: { messageId: 'parent-1' },
+      stats: { messageCount: 2, lastReplyAt: new Date().toISOString() },
+      participants: [],
+    };
+
+    act(() => {
+      onEventHandlers.forEach((handler) =>
+        handler({
+          type: 'message-added',
+          message: {
+            ids: { id: 'reply-1', orgId: 'org-1' },
+            social: { reactions: [], thread },
+            core: {
+              type: 'text',
+              createdAt: new Date().toISOString(),
+              visibility: { type: 'all' },
+              sender: makeParticipant('profile-1', 'guardian'),
+            },
+            content: { text: 'reply' },
+          },
+        }),
+      );
+    });
+
+    expect(updateMessage).toHaveBeenCalledWith(
+      'parent-1',
+      expect.objectContaining({
+        social: expect.objectContaining({
+          thread: expect.objectContaining({ ids: expect.objectContaining({ id: 'thread-1' }) }),
+        }),
+      }),
+    );
   });
 });

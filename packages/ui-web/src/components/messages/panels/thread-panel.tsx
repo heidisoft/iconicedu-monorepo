@@ -11,6 +11,7 @@ import { useIsMobile } from '@iconicedu/ui-web/hooks/use-mobile';
 import { MessageInput } from '@iconicedu/ui-web/components/messages/message-input';
 import { ScrollArea } from '@iconicedu/ui-web/ui/scroll-area';
 import { ThreadMessageList } from '@iconicedu/ui-web/components/messages/shared/thread-message-list';
+import { resolveThreadAfterReply } from '@iconicedu/ui-web/components/messages/thread-reply.utils';
 
 interface ThreadPanelProps {
   intent: MessagesRightPanelIntent;
@@ -65,9 +66,10 @@ export function ThreadPanel({ intent }: ThreadPanelProps) {
   const isMobile = useIsMobile();
   const {
     getThreadData,
+    setThreadData,
+    open,
     createTextMessage,
     sendTextMessage,
-    appendThreadMessage,
     toggle,
     currentUserId,
     threadHandlers,
@@ -117,21 +119,15 @@ export function ThreadPanel({ intent }: ThreadPanelProps) {
         threadParentId: threadData.thread.parent.messageId ?? parentMessage?.ids.id,
       })) ?? createTextMessage?.(content);
     if (!message) return;
-    const updatedThread = {
-      ...threadData.thread,
-      stats: {
-        ...threadData.thread.stats,
-        messageCount: threadData.thread.stats.messageCount + 1,
-        lastReplyAt: new Date().toISOString(),
-      },
-    };
-    const messageWithThread = {
-      ...message,
-      social: {
-        ...message.social,
-        thread: updatedThread,
-      },
-    };
+    const now = new Date().toISOString();
+    const { thread: updatedThread, message: messageWithThread, wasRekeyed } =
+      resolveThreadAfterReply({
+        currentThread: threadData.thread,
+        sentMessage: message,
+        replyCount: replies.items.length + 1,
+        now,
+      });
+
     threadHandlers.onAddMessage?.(messageWithThread);
     threadHandlers.onUpdateMessage?.(threadData.thread.parent.messageId, {
       social: {
@@ -139,7 +135,21 @@ export function ThreadPanel({ intent }: ThreadPanelProps) {
         thread: updatedThread,
       },
     });
-    appendThreadMessage(intent.threadId, messageWithThread);
+
+    const replyExists = replies.items.some((reply) => reply.ids.id === messageWithThread.ids.id);
+    setThreadData(updatedThread, {
+      parentMessage,
+      replies: {
+        ...replies,
+        items: replyExists ? replies.items : [...replies.items, messageWithThread],
+        total: replies.total + (replyExists ? 0 : 1),
+      },
+    });
+
+    if (wasRekeyed) {
+      open({ key: 'thread', threadId: updatedThread.ids.id });
+    }
+
   };
   const onProfileClick = (userId: string) => toggle({ key: 'profile', userId });
 
