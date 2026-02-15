@@ -18,6 +18,8 @@ import {
   buildChannelById,
 } from '@iconicedu/web/lib/channels/builders/channel.builder';
 
+const INITIAL_MESSAGES_PAGE_SIZE = 40;
+
 export default async function Page({
   params,
 }: {
@@ -39,9 +41,11 @@ export default async function Page({
   const channel =
     (await buildChannelById(supabase, account.org_id, channelId, {
       accountId: account.id,
+      messagesLimit: INITIAL_MESSAGES_PAGE_SIZE,
     })) ??
     (await buildChannelByDmKey(supabase, account.org_id, channelId, {
       accountId: account.id,
+      messagesLimit: INITIAL_MESSAGES_PAGE_SIZE,
     }));
 
   if (!channel && currentProfileId) {

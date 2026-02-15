@@ -65,6 +65,43 @@ export async function getMessagesByChannelId(
     .order('created_at', { ascending: true });
 }
 
+export async function getMessagesPageByChannelId(
+  supabase: SupabaseClient,
+  orgId: string,
+  channelId: string,
+  options: {
+    limit: number;
+    beforeCreatedAt?: string | null;
+  },
+) {
+  const pageSize = Math.max(1, options.limit);
+  let query = supabase
+    .from<MessageRow>('messages')
+    .select(MESSAGE_SELECT)
+    .eq('org_id', orgId)
+    .eq('channel_id', channelId)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false })
+    .limit(pageSize + 1);
+
+  if (options.beforeCreatedAt) {
+    query = query.lt('created_at', options.beforeCreatedAt);
+  }
+
+  const response = await query;
+  const rows = response.data ?? [];
+  const hasMore = rows.length > pageSize;
+  const pageRowsDesc = hasMore ? rows.slice(0, pageSize) : rows;
+  const pageRowsAsc = [...pageRowsDesc].reverse();
+
+  return {
+    ...response,
+    data: pageRowsAsc,
+    hasMore,
+    nextCursor: pageRowsAsc[0]?.created_at ?? null,
+  };
+}
+
 export async function getMessageById(
   supabase: SupabaseClient,
   orgId: string,

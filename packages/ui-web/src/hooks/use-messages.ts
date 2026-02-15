@@ -8,6 +8,20 @@ export function useMessages(initialMessages: MessageVM[]) {
     setMessages((prev) => [...prev, message]);
   }, []);
 
+  const prependMessages = useCallback((olderMessages: MessageVM[]) => {
+    if (!olderMessages.length) {
+      return;
+    }
+    setMessages((prev) => {
+      const existingIds = new Set(prev.map((message) => message.ids.id));
+      const deduped = olderMessages.filter((message) => !existingIds.has(message.ids.id));
+      if (!deduped.length) {
+        return prev;
+      }
+      return [...deduped, ...prev];
+    });
+  }, []);
+
   const updateMessage = useCallback((id: string, updates: Partial<MessageVM>) => {
     setMessages((prev) =>
       prev.map((msg) =>
@@ -116,6 +130,7 @@ export function useMessages(initialMessages: MessageVM[]) {
   return {
     messages,
     addMessage,
+    prependMessages,
     updateMessage,
     deleteMessage,
     toggleReaction,

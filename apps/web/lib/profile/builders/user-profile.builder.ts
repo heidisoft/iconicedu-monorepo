@@ -12,6 +12,7 @@ import { resolveAvatarSource } from '@iconicedu/web/lib/profile/derive';
 import { createSignedAvatarUrl } from '@iconicedu/web/lib/profile/queries/avatar.query';
 import { getNotificationDefaults } from '@iconicedu/web/lib/profile/queries/notification-defaults.query';
 import { getPresence } from '@iconicedu/web/lib/profile/queries/presence.query';
+import { mapProfilePresenceRowToVM } from '@iconicedu/web/lib/profile/mappers/presence.mapper';
 import {
   getProfileByAccountId,
   getProfileById,
@@ -147,21 +148,7 @@ async function loadPresence(
   profileId: string,
 ): Promise<PresenceVM | null> {
   const { data } = await getPresence(supabase, orgId, profileId);
-  if (!data) {
-    return null;
-  }
-
-  return {
-    state: {
-      text: data.state_text,
-      emoji: data.state_emoji,
-      expiresAt: data.state_expires_at,
-    },
-    liveStatus: data.live_status ?? 'offline',
-    displayStatus: data.display_status ?? undefined,
-    lastSeenAt: data.last_seen_at,
-    presenceLoaded: data.presence_loaded ?? undefined,
-  };
+  return mapProfilePresenceRowToVM(data);
 }
 
 async function resolveAvatarUrl(

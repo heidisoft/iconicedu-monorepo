@@ -1,0 +1,117 @@
+import { describe, expect, it } from 'vitest';
+import type {
+  ChannelVM,
+  PresenceVM,
+  SidebarLeftDataVM,
+  UserProfileVM,
+} from '@iconicedu/shared-types';
+import {
+  applyPresenceToChannelParticipants,
+  applyPresenceToSidebarData,
+} from '@iconicedu/web/lib/presence/apply-presence';
+
+const makeProfile = (id: string): UserProfileVM =>
+  ({
+    ids: { id, orgId: 'org-1', accountId: `account-${id}` },
+    kind: 'guardian',
+    profile: {
+      displayName: `User ${id}`,
+      avatar: { source: 'seed', url: null },
+    },
+    prefs: {},
+    meta: {
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    },
+    ui: { themeKey: null },
+    joinedDate: '2026-01-01T00:00:00.000Z',
+    presence: null,
+  }) as unknown as UserProfileVM;
+
+const makeChannel = (): ChannelVM =>
+  ({
+    ids: { id: 'channel-1', orgId: 'org-1' },
+    basics: {
+      kind: 'dm',
+      topic: 'DM',
+      iconKey: null,
+      description: null,
+      visibility: 'private',
+      purpose: 'general',
+    },
+    lifecycle: {
+      status: 'active',
+      createdBy: 'profile-1',
+      createdAt: '2026-01-01T00:00:00.000Z',
+    },
+    postingPolicy: {
+      kind: 'members-only',
+      allowThreads: true,
+      allowReactions: true,
+    },
+    collections: {
+      participants: [makeProfile('profile-1'), makeProfile('profile-2')],
+      messages: { items: [], total: 0 },
+      media: { items: [], total: 0 },
+      files: { items: [], total: 0 },
+    },
+  }) as unknown as ChannelVM;
+
+const makeSidebarData = (): SidebarLeftDataVM =>
+  ({
+    user: {
+      profile: makeProfile('profile-1'),
+    },
+    navigation: { navMain: [], navSecondary: [] },
+    collections: {
+      directMessages: [makeChannel()],
+      learningSpaces: [],
+    },
+  }) as unknown as SidebarLeftDataVM;
+
+const busyPresence: PresenceVM = {
+  state: { text: 'Heads down', emoji: '🚫' },
+  liveStatus: 'busy',
+  displayStatus: 'busy',
+  presenceLoaded: true,
+};
+
+describe('apply presence helpers', () => {
+  it('applies presence to matching channel participant only', () => {
+    const channel = makeChannel();
+    const updated = applyPresenceToChannelParticipants(
+      channel,
+      'profile-2',
+      busyPresence,
+    );
+
+    expect(updated.collections.participants[0].presence).toBeNull();
+    expect(updated.collections.participants[1].presence?.liveStatus).toBe('busy');
+  });
+
+  it('returns original channel when profile is not a participant', () => {
+    const channel = makeChannel();
+    const updated = applyPresenceToChannelParticipants(
+      channel,
+      'profile-999',
+      busyPresence,
+    );
+
+    expect(updated).toBe(channel);
+  });
+
+  it('updates sidebar user profile and direct message participants', () => {
+    const sidebarData = makeSidebarData();
+    const updated = applyPresenceToSidebarData(
+      sidebarData,
+      'profile-1',
+      busyPresence,
+    );
+
+    expect(updated.user.profile.presence?.displayStatus).toBe('busy');
+    expect(
+      updated.collections.directMessages[0].collections.participants[0].presence
+        ?.liveStatus,
+    ).toBe('busy');
+  });
+});

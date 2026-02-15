@@ -11,11 +11,13 @@ import type {
   ChannelVM,
   EducatorProfileVM,
   GuardianProfileVM,
+  ISODateTime,
   MessageVM,
   MessagesRealtimeClient,
   MessageWriteClient,
   TextMessageVM,
   ThreadVM,
+  UUID,
   UserProfileVM,
 } from '@iconicedu/shared-types';
 
@@ -32,6 +34,8 @@ const isGuardianProfile = (profile: UserProfileVM): profile is GuardianProfileVM
 
 const isEducatorProfile = (profile: UserProfileVM): profile is EducatorProfileVM =>
   profile.kind === 'educator';
+
+const MESSAGES_PAGE_SIZE = 40;
 
 export function MessagesContainer({
   channel,
@@ -59,18 +63,39 @@ export function MessagesContainer({
     messageFilter,
     toggleMessageFilter,
   } = useMessagesState();
-  const channelMessages = channel.collections.messages?.items ?? [];
+  const channelMessages = useMemo(
+    () => channel.collections.messages?.items ?? [],
+    [channel.collections.messages],
+  );
   const {
     messages,
     addMessage,
+    prependMessages,
     updateMessage,
     deleteMessage,
     toggleReaction,
     toggleSaved,
     toggleHidden,
   } = useMessages(channelMessages);
+  const [isLoadingOlder, setIsLoadingOlder] = useState(false);
+  const [hasMoreOlderMessages, setHasMoreOlderMessages] = useState(
+    channelMessages.length >= MESSAGES_PAGE_SIZE,
+  );
+  const [oldestCursor, setOldestCursor] = useState<string | null>(
+    channelMessages[0]?.core.createdAt ?? null,
+  );
+  const [activitySignal, setActivitySignal] = useState(0);
+  const [lastReadMessageId, setLastReadMessageId] = useState<UUID | undefined>(
+    channel.collections.readState?.lastReadMessageId,
+  );
+  const [lastReadAt, setLastReadAt] = useState<ISODateTime | undefined>(
+    channel.collections.readState?.lastReadAt,
+  );
 
-  const participants = channel.collections.participants ?? [];
+  const participants = useMemo(
+    () => channel.collections.participants ?? [],
+    [channel.collections.participants],
+  );
   const fallbackParticipant = participants[0];
   const guardian = participants.find(isGuardianProfile) ?? fallbackParticipant;
   const educator =
@@ -119,6 +144,59 @@ export function MessagesContainer({
     }
   }, []);
 
+  const registerUserActivity = useCallback(() => {
+    setActivitySignal((prev) => prev + 1);
+  }, []);
+
+  const markChannelRead = useCallback(
+    (nextLastReadMessageId: UUID) => {
+      if (!nextLastReadMessageId || !channel.ids.id) {
+        return;
+      }
+      if (lastReadMessageId === nextLastReadMessageId) {
+        return;
+      }
+
+      const nextLastReadAt = new Date().toISOString();
+      setLastReadMessageId(nextLastReadMessageId);
+      setLastReadAt(nextLastReadAt);
+      window.dispatchEvent(
+        new CustomEvent('dm:mark-read', {
+          detail: {
+            channelId: channel.ids.id,
+            lastReadMessageId: nextLastReadMessageId,
+            lastReadAt: nextLastReadAt,
+          },
+        }),
+      );
+
+      const persistReadState = async () => {
+        try {
+          await window.fetch('/d/messages/actions/read-state', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              channelId: channel.ids.id,
+              lastReadMessageId: nextLastReadMessageId,
+            }),
+          });
+        } catch {
+          // best effort client sync
+        }
+      };
+      void persistReadState();
+    },
+    [channel.ids.id, lastReadMessageId],
+  );
+
+  const markLatestMessageReadFromInteraction = useCallback(() => {
+    const latestMessageId = messagesRef.current[messagesRef.current.length - 1]?.ids.id;
+    if (!latestMessageId) {
+      return;
+    }
+    markChannelRead(latestMessageId);
+  }, [markChannelRead]);
+
   const handleOpenThread = useCallback(
     (thread: ThreadVM, parentMessage: MessageVM) => {
       const threadMessages = messages
@@ -151,6 +229,8 @@ export function MessagesContainer({
   const handleSendMessage = useCallback(
     (content: string) => {
       if (!senderProfile) return;
+      registerUserActivity();
+      markLatestMessageReadFromInteraction();
       if (messageFilter) {
         toggleMessageFilter(messageFilter);
       }
@@ -199,6 +279,8 @@ export function MessagesContainer({
       channel.ids.id,
       messageWriteClient,
       currentUserId,
+      registerUserActivity,
+      markLatestMessageReadFromInteraction,
     ],
   );
 
@@ -210,6 +292,8 @@ export function MessagesContainer({
   );
 
   const handleTypingStart = useCallback(() => {
+    registerUserActivity();
+    markLatestMessageReadFromInteraction();
     if (!realtimeClient || !currentUserId) return;
     realtimeClient.sendTyping?.({
       orgId: channel.ids.orgId,
@@ -217,7 +301,14 @@ export function MessagesContainer({
       profileId: currentUserId,
       isTyping: true,
     });
-  }, [realtimeClient, currentUserId, channel.ids.orgId, channel.ids.id]);
+  }, [
+    registerUserActivity,
+    realtimeClient,
+    currentUserId,
+    channel.ids.orgId,
+    channel.ids.id,
+    markLatestMessageReadFromInteraction,
+  ]);
 
   const handleTypingStop = useCallback(() => {
     if (!realtimeClient || !currentUserId) return;
@@ -336,9 +427,67 @@ export function MessagesContainer({
   }, [messages]);
 
   useEffect(() => {
+    setHasMoreOlderMessages(channelMessages.length >= MESSAGES_PAGE_SIZE);
+    setOldestCursor(channelMessages[0]?.core.createdAt ?? null);
+  }, [channel.ids.id, channelMessages]);
+
+  useEffect(() => {
+    setLastReadMessageId(channel.collections.readState?.lastReadMessageId);
+  }, [channel.ids.id, channel.collections.readState?.lastReadMessageId]);
+  useEffect(() => {
+    setLastReadAt(channel.collections.readState?.lastReadAt);
+  }, [channel.ids.id, channel.collections.readState?.lastReadAt]);
+
+  const handleLoadOlderMessages = useCallback(async () => {
+    if (isLoadingOlder || !hasMoreOlderMessages || !oldestCursor) {
+      return false;
+    }
+    setIsLoadingOlder(true);
+    try {
+      const params = new URLSearchParams({
+        channelId: channel.ids.id,
+        before: oldestCursor,
+        limit: String(MESSAGES_PAGE_SIZE),
+      });
+      const response = await window.fetch(
+        `/d/messages/actions/channel-page?${params.toString()}`,
+      );
+      if (!response.ok) {
+        return false;
+      }
+      const payload = (await response.json()) as {
+        success?: boolean;
+        messages?: MessageVM[];
+        hasMore?: boolean;
+        nextCursor?: string | null;
+      };
+      if (!payload.success || !payload.messages?.length) {
+        setHasMoreOlderMessages(Boolean(payload.hasMore));
+        if (payload.nextCursor !== undefined) {
+          setOldestCursor(payload.nextCursor);
+        }
+        return false;
+      }
+      prependMessages(payload.messages);
+      setHasMoreOlderMessages(Boolean(payload.hasMore));
+      setOldestCursor(payload.nextCursor ?? payload.messages[0]?.core.createdAt ?? null);
+      return true;
+    } finally {
+      setIsLoadingOlder(false);
+    }
+  }, [
+    channel.ids.id,
+    hasMoreOlderMessages,
+    isLoadingOlder,
+    oldestCursor,
+    prependMessages,
+  ]);
+
+  useEffect(() => {
+    const typingTimeouts = typingTimeoutsRef.current;
     return () => {
-      typingTimeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
-      typingTimeoutsRef.current.clear();
+      typingTimeouts.forEach((timeoutId) => window.clearTimeout(timeoutId));
+      typingTimeouts.clear();
     };
   }, []);
 
@@ -516,7 +665,14 @@ export function MessagesContainer({
       onToggleSaved: handleToggleSaved,
       onToggleHidden: handleToggleHidden,
       currentUserId,
-      lastReadMessageId: channel.collections.readState?.lastReadMessageId,
+      lastReadMessageId,
+      lastReadAt,
+      hasMore: hasMoreOlderMessages,
+      isLoadingMore: isLoadingOlder,
+      onLoadMore: handleLoadOlderMessages,
+      initialScrollToBottom: true,
+      activitySignal,
+      onUnreadViewed: markChannelRead,
     }),
     [
       filteredMessages,
@@ -526,7 +682,13 @@ export function MessagesContainer({
       handleToggleSaved,
       handleToggleHidden,
       currentUserId,
-      channel.collections.readState?.lastReadMessageId,
+      lastReadMessageId,
+      lastReadAt,
+      hasMoreOlderMessages,
+      isLoadingOlder,
+      handleLoadOlderMessages,
+      activitySignal,
+      markChannelRead,
     ],
   );
 

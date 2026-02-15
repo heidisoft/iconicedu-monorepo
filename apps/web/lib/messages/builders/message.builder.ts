@@ -9,6 +9,7 @@ import type {
 
 import {
   getMessagesByChannelId,
+  getMessagesPageByChannelId,
   getMessageById,
   getMessageTextByMessageIds,
   getMessageImagesByMessageIds,
@@ -33,6 +34,8 @@ import { buildThreadById } from '@iconicedu/web/lib/messages/builders/thread.bui
 
 type MessageBuildOptions = {
   threadsById?: Map<string, ThreadVM>;
+  limit?: number;
+  beforeCreatedAt?: string | null;
 };
 
 export async function buildMessagesByChannelId(
@@ -41,32 +44,53 @@ export async function buildMessagesByChannelId(
   channelId: string,
   options: MessageBuildOptions = {},
 ): Promise<MessageVM[]> {
-  const messageResponse = await getMessagesByChannelId(supabase, orgId, channelId);
-  const rows = messageResponse.data ?? [];
+  const rows =
+    options.limit || options.beforeCreatedAt
+      ? (
+          await getMessagesPageByChannelId(supabase, orgId, channelId, {
+            limit: options.limit ?? 50,
+            beforeCreatedAt: options.beforeCreatedAt,
+          })
+        ).data ?? []
+      : (await getMessagesByChannelId(supabase, orgId, channelId)).data ?? [];
   if (!rows.length) {
     return [];
   }
+  return mapRowsToMessages(supabase, orgId, rows, options.threadsById);
+}
 
-  const messageIds = rows.map((row) => row.id);
-  const payloadsById = await loadPayloadsByMessageIds(supabase, orgId, rows);
-  const reactionsByMessageId = await loadReactionsByMessageIds(supabase, orgId, messageIds);
-  const profilesById = await resolveProfilesById(
-    supabase,
-    Array.from(new Set(rows.map((row) => row.sender_profile_id))),
-  );
+export async function buildMessagesPageByChannelId(
+  supabase: SupabaseClient,
+  orgId: string,
+  channelId: string,
+  options: {
+    limit: number;
+    beforeCreatedAt?: string | null;
+    threadsById?: Map<string, ThreadVM>;
+  },
+): Promise<{
+  messages: MessageVM[];
+  hasMore: boolean;
+  nextCursor: string | null;
+}> {
+  const response = await getMessagesPageByChannelId(supabase, orgId, channelId, {
+    limit: options.limit,
+    beforeCreatedAt: options.beforeCreatedAt,
+  });
+  const rows = response.data ?? [];
+  if (!rows.length) {
+    return {
+      messages: [],
+      hasMore: false,
+      nextCursor: null,
+    };
+  }
 
-  return rows.map((row) => {
-    const sender = profilesById.get(row.sender_profile_id);
-    if (!sender) {
-      return null;
-    }
-    return mapMessageRowToVM(row, {
-      sender,
-      payload: payloadsById.get(row.id) ?? null,
-      reactions: reactionsByMessageId.get(row.id) ?? [],
-      thread: row.thread_id ? options.threadsById?.get(row.thread_id) : undefined,
-    });
-  }).filter((message): message is MessageVM => Boolean(message));
+  return {
+    messages: await mapRowsToMessages(supabase, orgId, rows, options.threadsById),
+    hasMore: response.hasMore,
+    nextCursor: response.nextCursor,
+  };
 }
 
 export async function buildMessageById(
@@ -190,6 +214,36 @@ async function resolveProfilesById(
     }
   });
   return map;
+}
+
+async function mapRowsToMessages(
+  supabase: SupabaseClient,
+  orgId: string,
+  rows: MessageRow[],
+  threadsById?: Map<string, ThreadVM>,
+) {
+  const messageIds = rows.map((row) => row.id);
+  const payloadsById = await loadPayloadsByMessageIds(supabase, orgId, rows);
+  const reactionsByMessageId = await loadReactionsByMessageIds(supabase, orgId, messageIds);
+  const profilesById = await resolveProfilesById(
+    supabase,
+    Array.from(new Set(rows.map((row) => row.sender_profile_id))),
+  );
+
+  return rows
+    .map((row) => {
+      const sender = profilesById.get(row.sender_profile_id);
+      if (!sender) {
+        return null;
+      }
+      return mapMessageRowToVM(row, {
+        sender,
+        payload: payloadsById.get(row.id) ?? null,
+        reactions: reactionsByMessageId.get(row.id) ?? [],
+        thread: row.thread_id ? threadsById?.get(row.thread_id) : undefined,
+      });
+    })
+    .filter((message): message is MessageVM => Boolean(message));
 }
 
 function groupBy<T, K extends string>(

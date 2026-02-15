@@ -1,10 +1,9 @@
-import type { SidebarLeftDataVM } from '@iconicedu/shared-types';
+import type { ISODateTime, SidebarLeftDataVM, UUID } from '@iconicedu/shared-types';
 
 type IncomingMessageInput = {
-  channelId: string;
-  senderProfileId?: string | null;
-  currentProfileId: string;
-  activeChannelId?: string | null;
+  channelId: UUID;
+  senderProfileId?: UUID | null;
+  currentProfileId: UUID;
 };
 
 export function applyIncomingDirectMessageUnread(
@@ -23,7 +22,7 @@ export function applyIncomingDirectMessageUnread(
 
     changed = true;
     const currentUnread = Math.max(0, channel.collections.readState?.unreadCount ?? 0);
-    const nextUnread = input.activeChannelId === input.channelId ? 0 : currentUnread + 1;
+    const nextUnread = currentUnread + 1;
 
     return {
       ...channel,
@@ -52,7 +51,8 @@ export function applyIncomingDirectMessageUnread(
 
 export function markDirectMessageChannelRead(
   sidebarData: SidebarLeftDataVM,
-  channelId?: string | null,
+  channelId?: UUID | null,
+  input?: { lastReadMessageId?: UUID | null; lastReadAt?: ISODateTime | null },
 ): SidebarLeftDataVM {
   if (!channelId) {
     return sidebarData;
@@ -75,6 +75,10 @@ export function markDirectMessageChannelRead(
         ...channel.collections,
         readState: {
           ...channel.collections.readState,
+          lastReadMessageId:
+            input?.lastReadMessageId ??
+            channel.collections.readState?.lastReadMessageId,
+          lastReadAt: input?.lastReadAt ?? channel.collections.readState?.lastReadAt,
           unreadCount: 0,
         },
       },

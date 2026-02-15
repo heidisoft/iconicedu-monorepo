@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, waitFor, screen, act } from '@testing-library/react';
+import { render, waitFor, screen, act, fireEvent } from '@testing-library/react';
 import { vi } from 'vitest';
 
 import { MessagesContainer } from './messages-container';
@@ -40,8 +40,19 @@ vi.mock('./context/messages-state-provider', () => ({
 }));
 
 vi.mock('./message-list', () => ({
-  MessageList: ({ typingIndicator }: { typingIndicator?: React.ReactNode }) => (
-    <div>{typingIndicator}</div>
+  MessageList: ({
+    typingIndicator,
+    onUnreadViewed,
+  }: {
+    typingIndicator?: React.ReactNode;
+    onUnreadViewed?: (lastReadMessageId: string) => void;
+  }) => (
+    <div>
+      {typingIndicator}
+      <button type="button" onClick={() => onUnreadViewed?.('message-2')}>
+        mark-read
+      </button>
+    </div>
   ),
 }));
 
@@ -92,8 +103,13 @@ const channel: ChannelVM = {
 };
 
 describe('MessagesContainer', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true })));
+  });
+
   afterEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it('uses the provided currentUserId', async () => {
@@ -135,6 +151,23 @@ describe('MessagesContainer', () => {
     await waitFor(() => {
       expect(screen.getByText('User profile-1')).toBeInTheDocument();
       expect(screen.getAllByText(/User profile-1 is typing/i).length).toBeGreaterThan(0);
+    });
+  });
+
+  it('persists read-state when unread is viewed', async () => {
+    render(<MessagesContainer channel={channel} currentUserId="profile-2" />);
+
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: 'mark-read' }));
+    });
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        '/d/messages/actions/read-state',
+        expect.objectContaining({
+          method: 'POST',
+        }),
+      );
     });
   });
 });

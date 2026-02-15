@@ -28,6 +28,7 @@ describe('TypingIndicator', () => {
     render(<TypingIndicator profiles={[makeProfile('p1', 'Ava')]} />);
     expect(screen.getByText('Ava')).toBeInTheDocument();
     expect(screen.getAllByText(/Ava is typing/i).length).toBeGreaterThan(0);
+    expect(screen.getByRole('status')).toBeInTheDocument();
   });
 
   it('renders multiple names summary', () => {
@@ -42,7 +43,22 @@ describe('TypingIndicator', () => {
     );
     expect(screen.getByText('Ava and 2 others')).toBeInTheDocument();
     expect(
-      screen.getAllByText(/Ava, Kai, and 1 others are typing/i).length,
+      screen.getAllByText(/Ava, Kai, and 1 other are typing/i).length,
     ).toBeGreaterThan(0);
+  });
+
+  it('deduplicates repeated typing profiles', () => {
+    render(
+      <TypingIndicator
+        profiles={[
+          makeProfile('p1', 'Ava'),
+          makeProfile('p1', 'Ava'),
+          makeProfile('p2', 'Kai'),
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('Ava and 1 other')).toBeInTheDocument();
+    expect(screen.getAllByText(/Ava and Kai are typing/i).length).toBeGreaterThan(0);
   });
 });

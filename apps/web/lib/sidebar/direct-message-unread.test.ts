@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { SidebarLeftDataVM } from '@iconicedu/shared-types';
 
 import {
   applyIncomingDirectMessageUnread,
@@ -22,7 +23,7 @@ function makeSidebarData(unreadCount = 0) {
         },
       ],
     },
-  } as any;
+  } as unknown as SidebarLeftDataVM;
 }
 
 describe('direct message unread helpers', () => {
@@ -31,7 +32,6 @@ describe('direct message unread helpers', () => {
       channelId: 'dm-1',
       senderProfileId: 'profile-other',
       currentProfileId: 'profile-self',
-      activeChannelId: 'dm-2',
     });
 
     expect(updated.collections.directMessages[0].collections.readState.unreadCount).toBe(2);
@@ -43,26 +43,33 @@ describe('direct message unread helpers', () => {
       channelId: 'dm-1',
       senderProfileId: 'profile-self',
       currentProfileId: 'profile-self',
-      activeChannelId: 'dm-2',
     });
 
     expect(updated).toBe(initial);
   });
 
-  it('keeps active dm unread at zero when message arrives', () => {
+  it('increments unread count for receiver even if dm is open', () => {
     const updated = applyIncomingDirectMessageUnread(makeSidebarData(0), {
       channelId: 'dm-1',
       senderProfileId: 'profile-other',
       currentProfileId: 'profile-self',
-      activeChannelId: 'dm-1',
     });
 
-    expect(updated.collections.directMessages[0].collections.readState.unreadCount).toBe(0);
+    expect(updated.collections.directMessages[0].collections.readState.unreadCount).toBe(1);
   });
 
   it('marks active dm as read', () => {
-    const updated = markDirectMessageChannelRead(makeSidebarData(4), 'dm-1');
+    const updated = markDirectMessageChannelRead(makeSidebarData(4), 'dm-1', {
+      lastReadMessageId: 'message-4',
+      lastReadAt: '2026-02-15T00:00:00.000Z',
+    });
 
     expect(updated.collections.directMessages[0].collections.readState.unreadCount).toBe(0);
+    expect(updated.collections.directMessages[0].collections.readState.lastReadMessageId).toBe(
+      'message-4',
+    );
+    expect(updated.collections.directMessages[0].collections.readState.lastReadAt).toBe(
+      '2026-02-15T00:00:00.000Z',
+    );
   });
 });

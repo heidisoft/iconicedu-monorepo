@@ -20,10 +20,11 @@ export async function buildChannelMessages(
   supabase: SupabaseClient,
   orgId: string,
   channelId: string,
-  options: { threadsById?: Map<string, ThreadVM> } = {},
+  options: { threadsById?: Map<string, ThreadVM>; limit?: number } = {},
 ): Promise<MessageVM[]> {
   return buildMessagesByChannelId(supabase, orgId, channelId, {
     threadsById: options.threadsById,
+    limit: options.limit,
   });
 }
 

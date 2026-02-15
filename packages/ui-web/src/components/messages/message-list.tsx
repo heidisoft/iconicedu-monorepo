@@ -8,9 +8,12 @@ import {
 } from 'react';
 import { MessageItem } from '@iconicedu/ui-web/components/messages/message-item';
 import { EmptyMessagesState } from '@iconicedu/ui-web/components/messages/empty-state';
-import type { MessageVM, ThreadVM } from '@iconicedu/shared-types';
+import type { ISODateTime, MessageVM, ThreadVM, UUID } from '@iconicedu/shared-types';
 import { ScrollArea } from '@iconicedu/ui-web/ui/scroll-area';
 import { formatDateHeader } from '@iconicedu/ui-web/lib/message-utils';
+import { cn } from '@iconicedu/ui-web/lib/utils';
+import { findUnreadAnchorMessageId } from '@iconicedu/ui-web/components/messages/unread-indicator.utils';
+import { useUnreadIndicator } from '@iconicedu/ui-web/components/messages/hooks/use-unread-indicator';
 
 interface MessageListProps {
   messages: MessageVM[];
@@ -20,8 +23,15 @@ interface MessageListProps {
   onToggleSaved?: (messageId: string) => void;
   onToggleHidden?: (messageId: string) => void;
   currentUserId?: string;
-  lastReadMessageId?: string;
+  lastReadMessageId?: UUID;
+  lastReadAt?: ISODateTime;
   typingIndicator?: ReactNode;
+  initialScrollToBottom?: boolean;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
+  onLoadMore?: () => Promise<boolean> | boolean;
+  activitySignal?: number;
+  onUnreadViewed?: (lastReadMessageId: UUID) => void;
 }
 
 export interface MessageListRef {
@@ -39,11 +49,21 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
       onToggleHidden,
       currentUserId,
       lastReadMessageId,
+      lastReadAt,
       typingIndicator,
+      initialScrollToBottom = false,
+      hasMore = false,
+      isLoadingMore = false,
+      onLoadMore,
+      activitySignal = 0,
+      onUnreadViewed,
     },
     ref,
   ) => {
     const bottomRef = useRef<HTMLDivElement>(null);
+    const scrollAreaRootRef = useRef<HTMLDivElement>(null);
+    const isLoadingMoreRef = useRef(false);
+    const didInitialScrollRef = useRef(false);
     const messageCountRef = useRef(messages.length);
     const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
@@ -69,14 +89,123 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
       messageCountRef.current = messages.length;
     }, [messages, typingIndicator]);
 
+    useEffect(() => {
+      if (!initialScrollToBottom || didInitialScrollRef.current) {
+        return;
+      }
+      didInitialScrollRef.current = true;
+      window.requestAnimationFrame(() => {
+        bottomRef.current?.scrollIntoView({ behavior: 'auto' });
+      });
+    }, [initialScrollToBottom, messages.length]);
+
+    useEffect(() => {
+      isLoadingMoreRef.current = isLoadingMore;
+    }, [isLoadingMore]);
+
+    const sortedMessages = useMemo(
+      () =>
+        [...messages].sort(
+          (a, b) =>
+            new Date(a.core.createdAt).getTime() - new Date(b.core.createdAt).getTime(),
+        ),
+      [messages],
+    );
+
+    const unreadAnchorMessageId = useMemo(
+      () =>
+        findUnreadAnchorMessageId({
+          sortedMessages,
+          lastReadMessageId,
+          lastReadAt,
+          currentUserId,
+        }),
+      [sortedMessages, lastReadMessageId, lastReadAt, currentUserId],
+    );
+    const latestMessageId = sortedMessages[sortedMessages.length - 1]?.ids.id ?? null;
+    const {
+      dismissedUnreadAnchorId,
+      isUnreadDividerDismissing,
+      dismissUnreadDivider,
+    } = useUnreadIndicator({
+      unreadAnchorMessageId,
+      latestMessageId,
+      onUnreadViewed,
+    });
+
+    useEffect(() => {
+      if (!activitySignal) {
+        return;
+      }
+      dismissUnreadDivider();
+    }, [activitySignal, dismissUnreadDivider]);
+
+    useEffect(() => {
+      if (!unreadAnchorMessageId) {
+        return;
+      }
+
+      const onUserInteraction = () => {
+        dismissUnreadDivider();
+      };
+
+      window.addEventListener('pointerdown', onUserInteraction, { passive: true });
+      window.addEventListener('keydown', onUserInteraction);
+      window.addEventListener('wheel', onUserInteraction, { passive: true });
+      window.addEventListener('touchstart', onUserInteraction, { passive: true });
+
+      return () => {
+        window.removeEventListener('pointerdown', onUserInteraction);
+        window.removeEventListener('keydown', onUserInteraction);
+        window.removeEventListener('wheel', onUserInteraction);
+        window.removeEventListener('touchstart', onUserInteraction);
+      };
+    }, [unreadAnchorMessageId, dismissUnreadDivider]);
+
+    useEffect(() => {
+      const root = scrollAreaRootRef.current;
+      if (!root || !onLoadMore || !hasMore) {
+        return;
+      }
+      const viewport = root.querySelector('[data-slot="scroll-area-viewport"]') as
+        | HTMLDivElement
+        | null;
+      if (!viewport) {
+        return;
+      }
+
+      const maybeLoadMore = async () => {
+        if (viewport.scrollTop > 40 || isLoadingMoreRef.current) {
+          return;
+        }
+        const previousHeight = viewport.scrollHeight;
+        const previousTop = viewport.scrollTop;
+        isLoadingMoreRef.current = true;
+        const loaded = await onLoadMore();
+        window.requestAnimationFrame(() => {
+          if (!loaded) {
+            isLoadingMoreRef.current = false;
+            return;
+          }
+          const nextHeight = viewport.scrollHeight;
+          viewport.scrollTop = previousTop + (nextHeight - previousHeight);
+          isLoadingMoreRef.current = false;
+        });
+      };
+
+      const onScroll = () => {
+        void maybeLoadMore();
+        dismissUnreadDivider();
+      };
+      viewport.addEventListener('scroll', onScroll);
+      return () => {
+        viewport.removeEventListener('scroll', onScroll);
+      };
+    }, [hasMore, onLoadMore, dismissUnreadDivider]);
+
     const groupedMessages = useMemo(() => {
       const groups: { date: string; messages: MessageVM[] }[] = [];
       let currentDate = '';
-
-      const sortedMessages = [...messages].sort(
-        (a, b) =>
-          new Date(a.core.createdAt).getTime() - new Date(b.core.createdAt).getTime(),
-      );
 
       sortedMessages.forEach((message) => {
         const messageDate = formatDateHeader(message.core.createdAt);
@@ -89,10 +218,17 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
       });
 
       return groups;
-    }, [messages]);
+    }, [sortedMessages]);
 
     return (
-      <ScrollArea className="flex-1 min-h-0">
+      <ScrollArea ref={scrollAreaRootRef} className="flex-1 min-h-0">
+        {isLoadingMore ? (
+          <div className="sticky top-0 z-10 flex justify-center py-2">
+            <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground animate-pulse">
+              Loading messages...
+            </span>
+          </div>
+        ) : null}
         {messages.length === 0 ? (
           <div className="flex min-h-[70vh] w-full items-center justify-center">
             <EmptyMessagesState
@@ -110,13 +246,11 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
               </span>
               <div className="flex-1 border-t border-border" />
             </div>
-            {group.messages.map((message, index) => {
-              const previousMessage = index > 0 ? group.messages[index - 1] : null;
+            {group.messages.map((message) => {
               const showUnreadDivider =
-                !!lastReadMessageId &&
-                previousMessage?.ids.id === lastReadMessageId &&
-                message.ids.id !== lastReadMessageId;
-
+                unreadAnchorMessageId !== null &&
+                dismissedUnreadAnchorId !== unreadAnchorMessageId &&
+                message.ids.id === unreadAnchorMessageId;
               return (
                 <div
                   key={message.ids.id}
@@ -127,12 +261,17 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                   className="transition-all duration-300"
                 >
                   {showUnreadDivider && (
-                    <div className="relative my-6 flex items-center">
-                      <div className="flex-1 border-t-2 border-destructive" />
-                      <span className="mx-4 text-xs font-bold text-destructive bg-background px-3 py-1 rounded-full">
-                        NEW
+                    <div
+                      className={cn(
+                        'relative my-4 flex items-center transition-opacity duration-300',
+                        isUnreadDividerDismissing ? 'opacity-0' : 'opacity-100',
+                      )}
+                    >
+                      <div className="flex-1 border-t border-amber-300" />
+                      <span className="mx-4 text-xs font-medium text-amber-700 bg-background px-2">
+                        NEW MESSAGES
                       </span>
-                      <div className="flex-1 border-t-2 border-destructive" />
+                      <div className="flex-1 border-t border-amber-300" />
                     </div>
                   )}
                   <MessageItem
