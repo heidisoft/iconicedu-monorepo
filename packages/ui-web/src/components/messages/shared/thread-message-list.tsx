@@ -10,6 +10,7 @@ interface ThreadMessageListProps {
   onToggleReaction?: (messageId: string, emoji: string) => void;
   onToggleSaved?: (messageId: string) => void;
   onToggleHidden?: (messageId: string) => void;
+  onDelete?: (messageId: string) => void;
   currentUserId?: string;
   lastReadMessageId?: string;
   unreadCount?: number;
@@ -45,6 +46,7 @@ export const ThreadMessageList = memo(function ThreadMessageList({
   onToggleReaction,
   onToggleSaved,
   onToggleHidden,
+  onDelete,
   currentUserId,
   lastReadMessageId,
   unreadCount,
@@ -83,6 +85,7 @@ export const ThreadMessageList = memo(function ThreadMessageList({
               onToggleReaction={onToggleReaction}
               onToggleSaved={onToggleSaved}
               onToggleHidden={onToggleHidden}
+              onDelete={onDelete}
               currentUserId={currentUserId}
             />
             {index === 0 && messages.length > 1 && (

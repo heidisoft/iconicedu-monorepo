@@ -379,3 +379,53 @@ export async function toggleMessageReactionAction(
     throw new Error(insertCount.error.message);
   }
 }
+
+export async function deleteMessageAction(input: {
+  messageId: string;
+  orgId: string;
+}): Promise<void> {
+  const supabase = await createSupabaseServerClient();
+  const authUser = await requireAuthedUser(supabase);
+  const accountResponse = await getAccountByAuthUserId(supabase, authUser.id);
+
+  if (!accountResponse.data) {
+    throw new Error('Account not found');
+  }
+
+  if (input.orgId !== accountResponse.data.org_id) {
+    throw new Error('Invalid org');
+  }
+
+  const messageResponse = await supabase
+    .from('messages')
+    .select('id, org_id, sender_profile_id')
+    .eq('id', input.messageId)
+    .maybeSingle<{ id: string; org_id: string; sender_profile_id: string }>();
+
+  if (!messageResponse.data || messageResponse.data.org_id !== input.orgId) {
+    throw new Error('Message not found');
+  }
+
+  const profileResponse = await getProfileByAccountId(supabase, accountResponse.data.id);
+  if (!profileResponse.data) {
+    throw new Error('Profile not found');
+  }
+
+  if (messageResponse.data.sender_profile_id !== profileResponse.data.id) {
+    throw new Error('Unauthorized: You can only delete your own messages');
+  }
+
+  const now = new Date().toISOString();
+
+  const deleteResult = await supabase
+    .from('messages')
+    .update({
+      deleted_at: now,
+      deleted_by: profileResponse.data.id,
+    })
+    .eq('id', input.messageId);
+
+  if (deleteResult.error) {
+    throw new Error(deleteResult.error.message);
+  }
+}

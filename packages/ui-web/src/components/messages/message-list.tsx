@@ -22,6 +22,7 @@ interface MessageListProps {
   onToggleReaction?: (messageId: string, emoji: string) => void;
   onToggleSaved?: (messageId: string) => void;
   onToggleHidden?: (messageId: string) => void;
+  onDelete?: (messageId: string) => void;
   currentUserId?: string;
   lastReadMessageId?: UUID;
   lastReadAt?: ISODateTime;
@@ -46,6 +47,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
       onToggleReaction,
       onToggleSaved,
       onToggleHidden,
+      onDelete,
       currentUserId,
       lastReadMessageId,
       lastReadAt,
@@ -260,6 +262,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                     onToggleReaction={onToggleReaction}
                     onToggleSaved={onToggleSaved}
                     onToggleHidden={onToggleHidden}
+                    onDelete={onDelete}
                     currentUserId={currentUserId}
                   />
                 </div>

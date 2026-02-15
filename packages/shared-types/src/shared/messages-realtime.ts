@@ -44,7 +44,13 @@ export type MessageToggleReactionInput = {
   emoji: string;
 };
 
+export type MessageDeleteInput = {
+  orgId: string;
+  messageId: string;
+};
+
 export interface MessageWriteClient {
   sendTextMessage: (input: MessageSendTextInput) => Promise<MessageVM>;
   toggleReaction: (input: MessageToggleReactionInput) => Promise<void>;
+  deleteMessage: (input: MessageDeleteInput) => Promise<void>;
 }

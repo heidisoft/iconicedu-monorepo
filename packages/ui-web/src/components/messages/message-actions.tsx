@@ -14,6 +14,16 @@ import {
   DropdownMenuSeparator,
 } from '@iconicedu/ui-web/ui/dropdown-menu';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@iconicedu/ui-web/ui/alert-dialog';
+import {
   MessageCircle,
   MoreHorizontal,
   Bookmark,
@@ -35,6 +45,7 @@ interface MessageActionsProps {
   onAddReaction?: (emoji: string) => void;
   onToggleSaved?: () => void;
   onToggleHidden?: () => void;
+  onDelete?: () => void;
   isThreadReply?: boolean;
   onDropdownOpenChange?: (open: boolean) => void;
 }
@@ -45,10 +56,12 @@ export const MessageActions = memo(function MessageActions({
   onAddReaction,
   onToggleSaved,
   onToggleHidden,
+  onDelete,
   isThreadReply,
   onDropdownOpenChange,
 }: MessageActionsProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const handleDropdownOpenChange = useCallback(
     (open: boolean) => {
@@ -94,6 +107,21 @@ export const MessageActions = memo(function MessageActions({
     setIsDropdownOpen(false);
     onDropdownOpenChange?.(false);
   }, [onToggleHidden, onDropdownOpenChange]);
+
+  const handleDeleteClick = useCallback(() => {
+    setIsDeleteDialogOpen(true);
+    setIsDropdownOpen(false);
+    onDropdownOpenChange?.(false);
+  }, [onDropdownOpenChange]);
+
+  const handleConfirmDelete = useCallback(() => {
+    onDelete?.();
+    setIsDeleteDialogOpen(false);
+  }, [onDelete]);
+
+  const handleCancelDelete = useCallback(() => {
+    setIsDeleteDialogOpen(false);
+  }, []);
 
   return (
     <div className="absolute right-2 top-0 z-10 flex items-center gap-1 rounded-xl border bg-card px-1 py-1 shadow-md">
@@ -198,7 +226,7 @@ export const MessageActions = memo(function MessageActions({
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
-            onSelect={(e) => e.preventDefault()}
+            onClick={handleDeleteClick}
             className="py-2 text-destructive focus:text-destructive"
           >
             <Trash2 className="mr-2 h-4 w-4" />
@@ -206,6 +234,23 @@ export const MessageActions = memo(function MessageActions({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete message?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This message will be permanently deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleCancelDelete}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 });

@@ -48,6 +48,7 @@ interface MessageItemProps {
   onToggleSaved?: (messageId: string) => void;
   onToggleHidden?: (messageId: string) => void;
   onToggleImportant?: (messageId: string) => void;
+  onDelete?: (messageId: string) => void;
 }
 
 export const MessageItem = memo(function MessageItem({
@@ -60,6 +61,7 @@ export const MessageItem = memo(function MessageItem({
   onToggleSaved,
   onToggleHidden,
   onToggleImportant,
+  onDelete,
 }: MessageItemProps) {
   if (!isMessageVisibleToUser(message, currentUserId)) {
     return null;
@@ -81,6 +83,10 @@ export const MessageItem = memo(function MessageItem({
     onToggleImportant?.(message.ids.id);
   };
 
+  const handleDelete = () => {
+    onDelete?.(message.ids.id);
+  };
+
   const commonProps = {
     onOpenThread,
     isThreadReply,
@@ -89,6 +95,7 @@ export const MessageItem = memo(function MessageItem({
     onToggleSaved: handleToggleSaved,
     onToggleHidden: handleToggleHidden,
     onToggleImportant: handleToggleImportant,
+    onDelete: handleDelete,
   };
 
   if (isTextMessage(message)) {

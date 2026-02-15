@@ -17,6 +17,7 @@ export function LearningSpaceShell({
   currentUserProfile,
   sendTextMessage,
   toggleReaction,
+  deleteMessage,
 }: {
   channel: ChannelVM;
   learningSpace: LearningSpaceVM | null;
@@ -24,6 +25,7 @@ export function LearningSpaceShell({
   currentUserProfile?: UserProfileVM | null;
   sendTextMessage: (input: MessageSendTextInput) => Promise<MessageVM>;
   toggleReaction: (input: { orgId: string; messageId: string; emoji: string }) => Promise<void>;
+  deleteMessage: (input: { orgId: string; messageId: string }) => Promise<void>;
 }) {
   return (
     <MessagesShellClient
@@ -37,6 +39,7 @@ export function LearningSpaceShell({
       }}
       sendTextMessage={sendTextMessage}
       toggleReaction={toggleReaction}
+      deleteMessage={deleteMessage}
     />
   );
 }

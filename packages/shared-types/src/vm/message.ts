@@ -100,6 +100,7 @@ export interface ThreadPanelPropsVM {
     onToggleReaction?: (messageId: UUID, emoji: string) => void;
     onToggleSaved?: (messageId: UUID) => void;
     onToggleHidden?: (messageId: UUID) => void;
+    onDelete?: (messageId: UUID) => void;
   };
 
   readState?: ThreadReadStateVM;

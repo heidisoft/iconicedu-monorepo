@@ -30,6 +30,7 @@ const ThreadPanelContent = memo(function ThreadPanelContent({
     onToggleReaction,
     onToggleSaved,
     onToggleHidden,
+    onDelete,
   } = actions;
   const messages = parentMessage ? [parentMessage, ...replies.items] : replies.items;
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -51,6 +52,7 @@ const ThreadPanelContent = memo(function ThreadPanelContent({
           onToggleReaction={onToggleReaction}
           onToggleSaved={onToggleSaved}
           onToggleHidden={onToggleHidden}
+          onDelete={onDelete}
           currentUserId={currentUserId}
           lastReadMessageId={readState?.lastReadMessageId}
           unreadCount={readState?.unreadCount}
@@ -166,6 +168,7 @@ export function ThreadPanel({ intent }: ThreadPanelProps) {
           onToggleReaction: threadHandlers.onToggleReaction,
           onToggleSaved: threadHandlers.onToggleSaved,
           onToggleHidden: threadHandlers.onToggleHidden,
+          onDelete: threadHandlers.onDeleteMessage,
         }}
         currentUserId={currentUserId}
         readState={threadData.thread.readState}
@@ -183,6 +186,7 @@ export function ThreadPanel({ intent }: ThreadPanelProps) {
         onToggleReaction: threadHandlers.onToggleReaction,
         onToggleSaved: threadHandlers.onToggleSaved,
         onToggleHidden: threadHandlers.onToggleHidden,
+        onDelete: threadHandlers.onDeleteMessage,
       }}
       currentUserId={currentUserId}
       readState={threadData.thread.readState}

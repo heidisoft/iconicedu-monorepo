@@ -362,6 +362,24 @@ export function MessagesContainer({
     [toggleHidden],
   );
 
+  const handleDeleteMessage = useCallback(
+    async (messageId: string) => {
+      if (messageWriteClient) {
+        try {
+          await messageWriteClient.deleteMessage({
+            orgId: channel.ids.orgId,
+            messageId,
+          });
+        } catch (error) {
+          console.error('Failed to delete message:', error);
+          return;
+        }
+      }
+      deleteMessage(messageId);
+    },
+    [deleteMessage, messageWriteClient, channel.ids.orgId],
+  );
+
   const visibleMessages = useMemo(
     () =>
       messages.filter(
@@ -645,7 +663,7 @@ export function MessagesContainer({
     setThreadHandlers({
       onAddMessage: addMessage,
       onUpdateMessage: updateMessage,
-      onDeleteMessage: deleteMessage,
+      onDeleteMessage: handleDeleteMessage,
       onToggleReaction: handleToggleReaction,
       onToggleSaved: handleToggleSaved,
       onToggleHidden: handleToggleHidden,
@@ -653,7 +671,7 @@ export function MessagesContainer({
   }, [
     addMessage,
     updateMessage,
-    deleteMessage,
+    handleDeleteMessage,
     handleToggleReaction,
     handleToggleSaved,
     handleToggleHidden,
@@ -674,6 +692,7 @@ export function MessagesContainer({
       onToggleReaction: handleToggleReaction,
       onToggleSaved: handleToggleSaved,
       onToggleHidden: handleToggleHidden,
+      onDelete: handleDeleteMessage,
       currentUserId,
       lastReadMessageId,
       lastReadAt,
@@ -691,6 +710,7 @@ export function MessagesContainer({
       handleToggleReaction,
       handleToggleSaved,
       handleToggleHidden,
+      handleDeleteMessage,
       currentUserId,
       lastReadMessageId,
       lastReadAt,

@@ -29,6 +29,7 @@ export interface MessageBaseProps {
   onToggleReaction?: (emoji: string) => void;
   onToggleSaved?: () => void;
   onToggleHidden?: () => void;
+  onDelete?: () => void;
 }
 
 export const MessageBase = memo(function MessageBase({
@@ -41,6 +42,7 @@ export const MessageBase = memo(function MessageBase({
   onToggleReaction,
   onToggleSaved,
   onToggleHidden,
+  onDelete,
 }: MessageBaseProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -181,6 +183,7 @@ export const MessageBase = memo(function MessageBase({
           onAddReaction={handleToggleReaction}
           onToggleSaved={onToggleSaved}
           onToggleHidden={onToggleHidden}
+          onDelete={onDelete}
           isThreadReply={isThreadReply}
           onDropdownOpenChange={setIsDropdownOpen}
         />
