@@ -73,15 +73,21 @@ describe('NavDirectMessages', () => {
     );
   });
 
-  it('moves unread direct messages to the top while preserving relative order', () => {
+  it('sorts unread first, then by recent activity', () => {
     render(
       <SidebarProvider>
         <NavDirectMessages
           dms={[
-            makeDm('dm-read-a', 'account-self', 0),
-            makeDm('dm-unread-a', 'account-self', 2),
-            makeDm('dm-read-b', 'account-self', 0),
-            makeDm('dm-unread-b', 'account-self', 1),
+            makeDm('dm-read-old', 'account-self', 0, '2026-02-14T09:00:00.000Z'),
+            makeDm('dm-unread-low', 'account-self', 1, '2026-02-15T10:00:00.000Z'),
+            makeDm(
+              'dm-read-latest-message',
+              'account-self',
+              0,
+              '2026-02-15T08:00:00.000Z',
+              '2026-02-15T12:00:00.000Z',
+            ),
+            makeDm('dm-unread-high', 'account-self', 2, '2026-02-15T11:00:00.000Z'),
           ]}
           currentUserId="account-self"
         />
@@ -94,20 +100,36 @@ describe('NavDirectMessages', () => {
       .filter((href): href is string => Boolean(href && href.startsWith('/d/dm/')));
 
     expect(dmLinks).toEqual([
-      '/d/dm/dm-unread-a',
-      '/d/dm/dm-unread-b',
-      '/d/dm/dm-read-a',
-      '/d/dm/dm-read-b',
+      '/d/dm/dm-unread-high',
+      '/d/dm/dm-unread-low',
+      '/d/dm/dm-read-latest-message',
+      '/d/dm/dm-read-old',
     ]);
   });
 });
 
-function makeDm(id: string, currentUserId: string, unreadCount: number) {
+function makeDm(
+  id: string,
+  currentUserId: string,
+  unreadCount: number,
+  lastReadAt?: string,
+  lastMessageAt?: string,
+) {
   return {
     ids: { id },
     basics: { topic: `DM ${id}` },
     collections: {
-      readState: { unreadCount },
+      readState: { unreadCount, lastReadAt: lastReadAt ?? null },
+      messages: {
+        items: lastMessageAt
+          ? [
+              {
+                ids: { id: `${id}-msg`, orgId: 'org-1' },
+                core: { createdAt: lastMessageAt },
+              },
+            ]
+          : [],
+      },
       participants: [
         {
           ids: { accountId: currentUserId },

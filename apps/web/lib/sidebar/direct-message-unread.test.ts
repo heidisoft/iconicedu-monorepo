@@ -4,6 +4,7 @@ import type { SidebarLeftDataVM } from '@iconicedu/shared-types';
 import {
   applyIncomingDirectMessageUnread,
   markDirectMessageChannelRead,
+  touchDirectMessageChannelOrder,
 } from '@iconicedu/web/lib/sidebar/direct-message-unread';
 
 function makeSidebarData(unreadCount = 0) {
@@ -19,6 +20,32 @@ function makeSidebarData(unreadCount = 0) {
           ids: { id: 'dm-1' },
           collections: {
             readState: { unreadCount },
+          },
+        },
+      ],
+    },
+  } as unknown as SidebarLeftDataVM;
+}
+
+function makeSidebarDataWithTwoChannels() {
+  return {
+    user: {
+      profile: { ids: { id: 'profile-self', accountId: 'account-self' } },
+    },
+    navigation: { navMain: [], navSecondary: [] },
+    collections: {
+      learningSpaces: [],
+      directMessages: [
+        {
+          ids: { id: 'dm-1' },
+          collections: {
+            readState: { unreadCount: 0 },
+          },
+        },
+        {
+          ids: { id: 'dm-2' },
+          collections: {
+            readState: { unreadCount: 0 },
           },
         },
       ],
@@ -71,5 +98,13 @@ describe('direct message unread helpers', () => {
     expect(updated.collections.directMessages[0].collections.readState.lastReadAt).toBe(
       '2026-02-15T00:00:00.000Z',
     );
+  });
+
+  it('moves active channel to top on message activity', () => {
+    const updated = touchDirectMessageChannelOrder(makeSidebarDataWithTwoChannels(), 'dm-2');
+    expect(updated.collections.directMessages.map((channel) => channel.ids.id)).toEqual([
+      'dm-2',
+      'dm-1',
+    ]);
   });
 });

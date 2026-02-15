@@ -189,7 +189,7 @@ describe('MessageList', () => {
     expect(queryByText('NEW MESSAGES')).toBeInTheDocument();
 
     act(() => {
-      vi.advanceTimersByTime(300);
+      vi.advanceTimersByTime(1000);
     });
     expect(queryByText('NEW MESSAGES')).not.toBeInTheDocument();
     vi.useRealTimers();
@@ -241,7 +241,7 @@ describe('MessageList', () => {
     );
 
     act(() => {
-      vi.advanceTimersByTime(300);
+      vi.advanceTimersByTime(1000);
     });
 
     expect(onUnreadViewed).toHaveBeenCalledWith('message-newer');

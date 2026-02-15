@@ -49,6 +49,32 @@ export function applyIncomingDirectMessageUnread(
   };
 }
 
+export function touchDirectMessageChannelOrder(
+  sidebarData: SidebarLeftDataVM,
+  channelId?: UUID | null,
+): SidebarLeftDataVM {
+  if (!channelId) {
+    return sidebarData;
+  }
+
+  const current = sidebarData.collections.directMessages;
+  const index = current.findIndex((channel) => channel.ids.id === channelId);
+  if (index <= 0) {
+    return sidebarData;
+  }
+
+  const [target] = current.slice(index, index + 1);
+  const nextDirectMessages = [target, ...current.slice(0, index), ...current.slice(index + 1)];
+
+  return {
+    ...sidebarData,
+    collections: {
+      ...sidebarData.collections,
+      directMessages: nextDirectMessages,
+    },
+  };
+}
+
 export function markDirectMessageChannelRead(
   sidebarData: SidebarLeftDataVM,
   channelId?: UUID | null,

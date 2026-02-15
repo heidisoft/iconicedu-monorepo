@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { UUID } from '@iconicedu/shared-types';
 
-const UNREAD_DIVIDER_DISMISS_MS = 280;
+const UNREAD_DIVIDER_DISMISS_MS = 900;
 
 type UseUnreadIndicatorInput = {
   unreadAnchorMessageId: UUID | null;

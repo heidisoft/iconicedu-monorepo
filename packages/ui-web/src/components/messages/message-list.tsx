@@ -240,8 +240,10 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                   {showUnreadDivider && (
                     <div
                       className={cn(
-                        'relative my-4 flex items-center transition-opacity duration-300',
-                        isUnreadDividerDismissing ? 'opacity-0' : 'opacity-100',
+                        'relative my-4 flex items-center transition-all duration-900 ease-out',
+                        isUnreadDividerDismissing
+                          ? 'opacity-0 -translate-y-1'
+                          : 'opacity-100 translate-y-0',
                       )}
                     >
                       <div className="flex-1 border-t border-amber-300" />

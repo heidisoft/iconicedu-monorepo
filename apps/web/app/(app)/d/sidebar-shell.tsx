@@ -31,6 +31,7 @@ import { determineOnboardingStep } from '@iconicedu/web/lib/onboarding/determine
 import {
   applyIncomingDirectMessageUnread,
   markDirectMessageChannelRead,
+  touchDirectMessageChannelOrder,
 } from '@iconicedu/web/lib/sidebar/direct-message-unread';
 import { persistDirectMessageUnreadCount } from '@iconicedu/web/lib/sidebar/direct-message-unread-persistence';
 import { mapProfilePresenceRowToVM } from '@iconicedu/web/lib/profile/mappers/presence.mapper';
@@ -202,7 +203,8 @@ export function SidebarShell({
         }
 
         setSidebarData((prev) => {
-          const next = applyIncomingDirectMessageUnread(prev, {
+          const ordered = touchDirectMessageChannelOrder(prev, row.channel_id);
+          const next = applyIncomingDirectMessageUnread(ordered, {
             channelId: row.channel_id,
             senderProfileId: row.sender_profile_id ?? null,
             currentProfileId: profileId,

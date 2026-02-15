@@ -37,15 +37,42 @@ export function NavDirectMessages({
   const { isMobile } = useSidebar();
   const totalUnreadCount = React.useMemo(() => getDirectMessageUnreadCount(dms), [dms]);
   const sortedDirectMessages = React.useMemo(() => {
+    const getTimestamp = (value?: string | null) => {
+      if (!value) return 0;
+      const time = new Date(value).getTime();
+      return Number.isNaN(time) ? 0 : time;
+    };
+    const getLatestMessageTimestamp = (channel: ChannelVM) => {
+      const items = channel.collections.messages?.items ?? [];
+      let latest = 0;
+      items.forEach((message: ChannelVM['collections']['messages']['items'][number]) => {
+        const time = getTimestamp(message.core.createdAt);
+        if (time > latest) latest = time;
+      });
+      return latest;
+    };
+
     return dms
       .map((channel, index) => ({ channel, index }))
       .sort((a, b) => {
         const aUnread = (a.channel.collections.readState?.unreadCount ?? 0) > 0;
         const bUnread = (b.channel.collections.readState?.unreadCount ?? 0) > 0;
-        if (aUnread === bUnread) {
+        if (aUnread !== bUnread) {
+          return aUnread ? -1 : 1;
+        }
+
+        const aActivity = Math.max(
+          getLatestMessageTimestamp(a.channel),
+          getTimestamp(a.channel.collections.readState?.lastReadAt),
+        );
+        const bActivity = Math.max(
+          getLatestMessageTimestamp(b.channel),
+          getTimestamp(b.channel.collections.readState?.lastReadAt),
+        );
+        if (aActivity === bActivity) {
           return a.index - b.index;
         }
-        return aUnread ? -1 : 1;
+        return bActivity - aActivity;
       })
       .map(({ channel }) => channel);
   }, [dms]);
