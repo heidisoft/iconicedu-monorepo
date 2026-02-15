@@ -12,16 +12,17 @@ interface ThreadMessageListProps {
   onToggleHidden?: (messageId: string) => void;
   currentUserId?: string;
   lastReadMessageId?: string;
+  unreadCount?: number;
 }
 
-const UnreadDivider = memo(function UnreadDivider() {
+const UnreadDivider = memo(function UnreadDivider({ count }: { count?: number }) {
   return (
-    <div className="relative my-4 flex items-center px-2">
-      <div className="flex-1 border-t-2 border-destructive" />
-      <span className="mx-3 text-xs font-bold text-destructive bg-background px-3 py-1 rounded-full">
-        NEW
+    <div className="relative my-3 flex items-center px-2">
+      <div className="flex-1 border-t border-amber-300" />
+      <span className="mx-3 text-xs font-medium text-amber-700 bg-background px-2">
+        NEW MESSAGES{count && count > 0 ? ` (${count})` : ''}
       </span>
-      <div className="flex-1 border-t-2 border-destructive" />
+      <div className="flex-1 border-t border-amber-300" />
     </div>
   );
 });
@@ -46,23 +47,34 @@ export const ThreadMessageList = memo(function ThreadMessageList({
   onToggleHidden,
   currentUserId,
   lastReadMessageId,
+  unreadCount,
 }: ThreadMessageListProps) {
   const handleOpenThread = () => {
     // Nested threads not supported in this view
   };
 
+  const normalizedUnreadCount = Math.max(0, unreadCount ?? 0);
+  const fallbackUnreadStartIndex =
+    normalizedUnreadCount > 0
+      ? Math.max(1, messages.length - normalizedUnreadCount)
+      : -1;
+
   return (
     <>
       {messages.map((message, index) => {
         const previousMessage = index > 0 ? messages[index - 1] : null;
-        const showUnreadDivider =
+        const showUnreadDividerByReadAnchor =
           lastReadMessageId &&
           previousMessage?.ids.id === lastReadMessageId &&
           message.ids.id !== lastReadMessageId;
+        const showUnreadDividerByFallback =
+          !lastReadMessageId && fallbackUnreadStartIndex > 0 && index === fallbackUnreadStartIndex;
+        const showUnreadDivider =
+          showUnreadDividerByReadAnchor || showUnreadDividerByFallback;
 
         return (
           <div key={message.ids.id}>
-            {showUnreadDivider && <UnreadDivider />}
+            {showUnreadDivider && <UnreadDivider count={normalizedUnreadCount} />}
             <MessageItem
               message={message}
               onOpenThread={handleOpenThread}

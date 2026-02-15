@@ -5,6 +5,7 @@ import { buildMessageById } from '@iconicedu/web/lib/messages/builders/message.b
 const getMessageById = vi.fn();
 const buildUserProfileById = vi.fn();
 const mapMessageRowToVM = vi.fn();
+const buildThreadById = vi.fn();
 
 vi.mock('@iconicedu/web/lib/messages/queries/messages.query', () => ({
   getMessageById: (...args: unknown[]) => getMessageById(...args),
@@ -36,7 +37,7 @@ vi.mock('@iconicedu/web/lib/messages/mappers/message.mapper', () => ({
 }));
 
 vi.mock('@iconicedu/web/lib/messages/builders/thread.builder', () => ({
-  buildThreadById: vi.fn(async () => null),
+  buildThreadById: (...args: unknown[]) => buildThreadById(...args),
 }));
 
 describe('buildMessageById', () => {
@@ -70,5 +71,26 @@ describe('buildMessageById', () => {
       }),
     );
     expect(result).toEqual({ ids: { id: 'message-1', orgId: 'org-1' } });
+  });
+
+  it('loads thread read state with account context when thread exists', async () => {
+    const row = {
+      id: 'message-2',
+      org_id: 'org-1',
+      sender_profile_id: 'profile-1',
+      type: 'text',
+      thread_id: 'thread-1',
+      created_at: new Date().toISOString(),
+    };
+    getMessageById.mockResolvedValueOnce({ data: row });
+    buildUserProfileById.mockResolvedValueOnce({ ids: { id: 'profile-1', orgId: 'org-1' } });
+    buildThreadById.mockResolvedValueOnce({ ids: { id: 'thread-1', orgId: 'org-1' } });
+    mapMessageRowToVM.mockReturnValueOnce({ ids: { id: 'message-2', orgId: 'org-1' } });
+
+    await buildMessageById({} as any, 'org-1', 'message-2', { accountId: 'account-1' });
+
+    expect(buildThreadById).toHaveBeenCalledWith({} as any, 'org-1', 'thread-1', {
+      accountId: 'account-1',
+    });
   });
 });

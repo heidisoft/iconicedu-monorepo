@@ -40,6 +40,7 @@ export function ThreadSheet({
           onToggleHidden={onToggleHidden}
           currentUserId={currentUserId}
           lastReadMessageId={readState?.lastReadMessageId}
+          unreadCount={readState?.unreadCount}
         />
         <div ref={bottomRef} />
       </ScrollArea>

@@ -36,6 +36,7 @@ type MessageBuildOptions = {
   threadsById?: Map<string, ThreadVM>;
   limit?: number;
   beforeCreatedAt?: string | null;
+  accountId?: string;
 };
 
 export async function buildMessagesByChannelId(
@@ -109,7 +110,11 @@ export async function buildMessageById(
     loadPayloadsByMessageIds(supabase, orgId, [row]),
     loadReactionsByMessageIds(supabase, orgId, [row.id]),
     buildUserProfileById(supabase, row.sender_profile_id),
-    row.thread_id ? buildThreadById(supabase, orgId, row.thread_id) : Promise.resolve(null),
+    row.thread_id
+      ? buildThreadById(supabase, orgId, row.thread_id, {
+          accountId: options.accountId,
+        })
+      : Promise.resolve(null),
   ]);
 
   if (!sender) {

@@ -36,7 +36,9 @@ describe('GET /d/messages/actions/detail', () => {
       new Request('http://localhost/d/messages/actions/detail?messageId=message-1'),
     );
 
-    expect(buildMessageById).toHaveBeenCalledWith({}, 'org-1', 'message-1');
+    expect(buildMessageById).toHaveBeenCalledWith({}, 'org-1', 'message-1', {
+      accountId: 'account-1',
+    });
     expect(response.status).toBe(200);
     const payload = await response.json();
     expect(payload).toEqual({

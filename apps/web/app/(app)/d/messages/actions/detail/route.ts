@@ -30,6 +30,7 @@ export async function GET(request: Request) {
     supabase,
     accountResponse.data.org_id,
     messageId,
+    { accountId: accountResponse.data.id },
   );
 
   if (!message) {

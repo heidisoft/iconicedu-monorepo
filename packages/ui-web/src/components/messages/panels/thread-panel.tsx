@@ -53,6 +53,7 @@ const ThreadPanelContent = memo(function ThreadPanelContent({
           onToggleHidden={onToggleHidden}
           currentUserId={currentUserId}
           lastReadMessageId={readState?.lastReadMessageId}
+          unreadCount={readState?.unreadCount}
         />
         <div ref={bottomRef} />
       </ScrollArea>
