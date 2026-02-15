@@ -2,7 +2,7 @@ import type {
   AccountRow,
   FamilyLinkInviteRow,
   FamilyLinkRow,
-  FamilyRow,
+  ProfileRow,
 } from '@iconicedu/shared-types';
 
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
@@ -13,10 +13,16 @@ import {
   getFamilyInvitesByFamilyIds,
   getFamilyLinksByFamilyIds,
 } from '@iconicedu/web/lib/family/queries/families.query';
+import { getProfilesByAccountIds } from '@iconicedu/web/lib/profile/queries/profiles.query';
 
 export type AdminFamilyParticipant = {
   id: string;
   label: string;
+  name?: string | null;
+  email?: string | null;
+  avatarUrl?: string | null;
+  avatarSource?: string | null;
+  themeKey?: string | null;
 };
 
 export type AdminFamilyInviteSummary = {
@@ -39,15 +45,53 @@ export type AdminFamilyRow = {
   updatedAt: string;
 };
 
-function formatLabel(account?: AccountRow) {
-  if (!account) {
-    return 'Unknown account';
+function getProfileName(profile?: ProfileRow | null) {
+  if (!profile) {
+    return null;
   }
-  return (
-    account.email?.trim() ||
-    account.phone_e164 ||
-    `Account ${account.id.slice(0, 8)}`
-  );
+  const displayName = profile.display_name?.trim();
+  if (displayName) {
+    return displayName;
+  }
+  const fullName = [profile.first_name, profile.last_name]
+    .map((part) => part?.trim())
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+  return fullName || null;
+}
+
+function formatChildLabel(accountId: string, account?: AccountRow, profile?: ProfileRow | null) {
+  const profileName = getProfileName(profile);
+  if (profileName) {
+    return profileName;
+  }
+  const email = account?.email?.trim();
+  if (email) {
+    return `Draft (${email})`;
+  }
+  return `Draft account ${accountId.slice(0, 8)}`;
+}
+
+function buildGuardianParticipant(
+  accountId: string,
+  account?: AccountRow,
+  profile?: ProfileRow | null,
+): AdminFamilyParticipant {
+  const profileName = getProfileName(profile);
+  const email = account?.email?.trim();
+  const name = profileName || `Account ${accountId.slice(0, 8)}`;
+  const label = email ? `${name} (${email})` : name;
+
+  return {
+    id: accountId,
+    label,
+    name,
+    email: email ?? null,
+    avatarUrl: profile?.avatar_url ?? null,
+    avatarSource: profile?.avatar_source ?? null,
+    themeKey: profile?.ui_theme_key ?? null,
+  };
 }
 
 export async function getAdminFamilyRows(): Promise<AdminFamilyRow[]> {
@@ -81,6 +125,23 @@ export async function getAdminFamilyRows(): Promise<AdminFamilyRow[]> {
   const accountMap = new Map<string, AccountRow>();
   accounts.data?.forEach((account) => accountMap.set(account.id, account));
 
+  const { data: profiles } =
+    accountIds.size > 0
+      ? await getProfilesByAccountIds(supabase, ORG_ID, Array.from(accountIds))
+      : { data: [] as ProfileRow[] };
+  const guardianProfileByAccountId = new Map<string, ProfileRow>();
+  const childProfileByAccountId = new Map<string, ProfileRow>();
+  profiles?.forEach((profile) => {
+    if (profile.kind === 'guardian' && !guardianProfileByAccountId.has(profile.account_id)) {
+      guardianProfileByAccountId.set(profile.account_id, profile);
+      return;
+    }
+    if (profile.kind !== 'child' || childProfileByAccountId.has(profile.account_id)) {
+      return;
+    }
+    childProfileByAccountId.set(profile.account_id, profile);
+  });
+
   const { data: invites } = await getFamilyInvitesByFamilyIds(
     supabase,
     ORG_ID,
@@ -108,13 +169,25 @@ export async function getAdminFamilyRows(): Promise<AdminFamilyRow[]> {
     const childMap = new Map<string, AdminFamilyParticipant>();
 
     familyLinks.forEach((link) => {
-      guardianMap.set(link.guardian_account_id, {
-        id: link.guardian_account_id,
-        label: formatLabel(accountMap.get(link.guardian_account_id)),
-      });
+      guardianMap.set(
+        link.guardian_account_id,
+        buildGuardianParticipant(
+          link.guardian_account_id,
+          accountMap.get(link.guardian_account_id),
+          guardianProfileByAccountId.get(link.guardian_account_id),
+        ),
+      );
       childMap.set(link.child_account_id, {
         id: link.child_account_id,
-        label: formatLabel(accountMap.get(link.child_account_id)),
+        label: formatChildLabel(
+          link.child_account_id,
+          accountMap.get(link.child_account_id),
+          childProfileByAccountId.get(link.child_account_id),
+        ),
+        avatarUrl: childProfileByAccountId.get(link.child_account_id)?.avatar_url ?? null,
+        avatarSource:
+          childProfileByAccountId.get(link.child_account_id)?.avatar_source ?? null,
+        themeKey: childProfileByAccountId.get(link.child_account_id)?.ui_theme_key ?? null,
       });
     });
 

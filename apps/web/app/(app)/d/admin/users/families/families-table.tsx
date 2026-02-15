@@ -7,6 +7,7 @@ import {
   TableHeader,
   TableRow,
 } from '@iconicedu/ui-web';
+import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
 
 import type { AdminFamilyRow } from '@iconicedu/web/lib/admin/families';
 
@@ -55,11 +56,28 @@ export function FamiliesTable({ rows }: FamiliesTableProps) {
                 </TableCell>
                 <TableCell className="py-4">
                   {row.guardians.length ? (
-                    <div className="flex flex-col gap-1 text-xs">
+                    <div className="flex flex-col gap-2 text-xs">
                       {row.guardians.map((guardian) => (
-                        <span key={guardian.id} className="text-sm">
-                          {guardian.label}
-                        </span>
+                        <div key={guardian.id} className="min-w-0">
+                          <div className="flex items-center gap-2 text-sm">
+                            <AvatarWithStatus
+                              name={guardian.name ?? guardian.label}
+                              avatar={{
+                                source: guardian.avatarSource ? guardian.avatarSource : 'seed',
+                                url: guardian.avatarUrl ?? null,
+                                seed: guardian.avatarSource ? undefined : guardian.id,
+                              }}
+                              themeKey={guardian.themeKey ?? null}
+                              showStatus={false}
+                              sizeClassName="size-7"
+                              initialsLength={2}
+                            />
+                            <span className="truncate">{guardian.name ?? guardian.label}</span>
+                          </div>
+                          <p className="pl-9 text-xs text-muted-foreground">
+                            {guardian.email ?? '—'}
+                          </p>
+                        </div>
                       ))}
                     </div>
                   ) : (
@@ -70,9 +88,21 @@ export function FamiliesTable({ rows }: FamiliesTableProps) {
                   {row.children.length ? (
                     <div className="flex flex-col gap-1 text-xs">
                       {row.children.map((child) => (
-                        <span key={child.id} className="text-sm">
-                          {child.label}
-                        </span>
+                        <div key={child.id} className="flex items-center gap-2 text-sm">
+                          <AvatarWithStatus
+                            name={child.label}
+                            avatar={{
+                              source: child.avatarSource ? child.avatarSource : 'seed',
+                              url: child.avatarUrl ?? null,
+                              seed: child.avatarSource ? undefined : child.id,
+                            }}
+                            themeKey={child.themeKey ?? null}
+                            showStatus={false}
+                            sizeClassName="size-7"
+                            initialsLength={2}
+                          />
+                          <span>{child.label}</span>
+                        </div>
                       ))}
                     </div>
                   ) : (
