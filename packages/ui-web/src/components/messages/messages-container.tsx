@@ -221,7 +221,6 @@ export function MessagesContainer({
   const handleSendMessage = useCallback(
     (content: string) => {
       if (!senderProfile) return;
-      registerUserActivity();
       if (messageFilter) {
         toggleMessageFilter(messageFilter);
       }
@@ -270,7 +269,6 @@ export function MessagesContainer({
       channel.ids.id,
       messageWriteClient,
       currentUserId,
-      registerUserActivity,
     ],
   );
 
@@ -282,7 +280,6 @@ export function MessagesContainer({
   );
 
   const handleTypingStart = useCallback(() => {
-    registerUserActivity();
     if (!realtimeClient || !currentUserId) return;
     realtimeClient.sendTyping?.({
       orgId: channel.ids.orgId,
@@ -291,7 +288,6 @@ export function MessagesContainer({
       isTyping: true,
     });
   }, [
-    registerUserActivity,
     realtimeClient,
     currentUserId,
     channel.ids.orgId,
@@ -299,6 +295,10 @@ export function MessagesContainer({
   ]);
 
   const handleInputFocus = useCallback(() => {
+    registerUserActivity();
+  }, [registerUserActivity]);
+
+  const handleInputKeyDown = useCallback(() => {
     registerUserActivity();
   }, [registerUserActivity]);
 
@@ -579,7 +579,6 @@ export function MessagesContainer({
   useEffect(() => {
     if (!senderProfile) return;
     setSendTextMessage(async ({ content, threadId, threadParentId }) => {
-      registerUserActivity();
       if (messageWriteClient && currentUserId) {
         const created = await messageWriteClient.sendTextMessage({
           orgId: channel.ids.orgId,
@@ -622,7 +621,6 @@ export function MessagesContainer({
     messageWriteClient,
     currentUserId,
     addMessage,
-    registerUserActivity,
   ]);
 
   useEffect(() => {
@@ -704,6 +702,7 @@ export function MessagesContainer({
         onTypingStart={handleTypingStart}
         onTypingStop={handleTypingStop}
         onFocus={handleInputFocus}
+        onInputKeyDown={handleInputKeyDown}
       />
     </div>
   );

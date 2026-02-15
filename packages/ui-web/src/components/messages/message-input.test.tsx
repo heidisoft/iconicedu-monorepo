@@ -53,4 +53,16 @@ describe('MessageInput', () => {
 
     expect(onFocus).toHaveBeenCalledTimes(1);
   });
+
+  it('calls onInputKeyDown when user presses a key in textarea', () => {
+    const onInputKeyDown = vi.fn();
+    render(<MessageInput onSend={vi.fn()} onInputKeyDown={onInputKeyDown} />);
+
+    fireEvent.keyDown(screen.getByPlaceholderText('Write a message...'), {
+      key: 'a',
+      code: 'KeyA',
+    });
+
+    expect(onInputKeyDown).toHaveBeenCalledTimes(1);
+  });
 });

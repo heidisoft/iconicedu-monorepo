@@ -141,33 +141,6 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
     }, [activitySignal, dismissUnreadDivider]);
 
     useEffect(() => {
-      if (!unreadAnchorMessageId) {
-        return;
-      }
-
-      const root = scrollAreaRootRef.current;
-      if (!root) {
-        return;
-      }
-
-      const onUserInteraction = () => {
-        dismissUnreadDivider();
-      };
-
-      root.addEventListener('pointerdown', onUserInteraction, { passive: true });
-      root.addEventListener('keydown', onUserInteraction);
-      root.addEventListener('wheel', onUserInteraction, { passive: true });
-      root.addEventListener('touchstart', onUserInteraction, { passive: true });
-
-      return () => {
-        root.removeEventListener('pointerdown', onUserInteraction);
-        root.removeEventListener('keydown', onUserInteraction);
-        root.removeEventListener('wheel', onUserInteraction);
-        root.removeEventListener('touchstart', onUserInteraction);
-      };
-    }, [unreadAnchorMessageId, dismissUnreadDivider]);
-
-    useEffect(() => {
       const root = scrollAreaRootRef.current;
       if (!root || !onLoadMore || !hasMore) {
         return;
@@ -200,13 +173,12 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
 
       const onScroll = () => {
         void maybeLoadMore();
-        dismissUnreadDivider();
       };
       viewport.addEventListener('scroll', onScroll);
       return () => {
         viewport.removeEventListener('scroll', onScroll);
       };
-    }, [hasMore, onLoadMore, dismissUnreadDivider]);
+    }, [hasMore, onLoadMore]);
 
     const groupedMessages = useMemo(() => {
       const groups: { date: string; messages: MessageVM[] }[] = [];

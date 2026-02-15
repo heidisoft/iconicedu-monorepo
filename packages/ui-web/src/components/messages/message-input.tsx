@@ -30,6 +30,7 @@ interface MessageInputProps {
   onTypingStart?: () => void;
   onTypingStop?: () => void;
   onFocus?: () => void;
+  onInputKeyDown?: () => void;
 }
 
 const FormatButton = memo(function FormatButton({
@@ -62,6 +63,7 @@ export const MessageInput = memo(function MessageInput({
   onTypingStart,
   onTypingStop,
   onFocus,
+  onInputKeyDown,
 }: MessageInputProps) {
   const [content, setContent] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -93,12 +95,13 @@ export const MessageInput = memo(function MessageInput({
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
+      onInputKeyDown?.();
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         handleSend();
       }
     },
-    [handleSend],
+    [handleSend, onInputKeyDown],
   );
 
   const handleEmojiSelect = useCallback(
