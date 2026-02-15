@@ -189,14 +189,6 @@ export function MessagesContainer({
     [channel.ids.id, lastReadMessageId],
   );
 
-  const markLatestMessageReadFromInteraction = useCallback(() => {
-    const latestMessageId = messagesRef.current[messagesRef.current.length - 1]?.ids.id;
-    if (!latestMessageId) {
-      return;
-    }
-    markChannelRead(latestMessageId);
-  }, [markChannelRead]);
-
   const handleOpenThread = useCallback(
     (thread: ThreadVM, parentMessage: MessageVM) => {
       const threadMessages = messages
@@ -230,7 +222,6 @@ export function MessagesContainer({
     (content: string) => {
       if (!senderProfile) return;
       registerUserActivity();
-      markLatestMessageReadFromInteraction();
       if (messageFilter) {
         toggleMessageFilter(messageFilter);
       }
@@ -280,7 +271,6 @@ export function MessagesContainer({
       messageWriteClient,
       currentUserId,
       registerUserActivity,
-      markLatestMessageReadFromInteraction,
     ],
   );
 
@@ -292,6 +282,7 @@ export function MessagesContainer({
   );
 
   const handleTypingStart = useCallback(() => {
+    registerUserActivity();
     if (!realtimeClient || !currentUserId) return;
     realtimeClient.sendTyping?.({
       orgId: channel.ids.orgId,
@@ -300,6 +291,7 @@ export function MessagesContainer({
       isTyping: true,
     });
   }, [
+    registerUserActivity,
     realtimeClient,
     currentUserId,
     channel.ids.orgId,
@@ -307,8 +299,8 @@ export function MessagesContainer({
   ]);
 
   const handleInputFocus = useCallback(() => {
-    // Focus alone should not clear unread indicators.
-  }, []);
+    registerUserActivity();
+  }, [registerUserActivity]);
 
   const handleTypingStop = useCallback(() => {
     if (!realtimeClient || !currentUserId) return;
@@ -588,7 +580,6 @@ export function MessagesContainer({
     if (!senderProfile) return;
     setSendTextMessage(async ({ content, threadId, threadParentId }) => {
       registerUserActivity();
-      markLatestMessageReadFromInteraction();
       if (messageWriteClient && currentUserId) {
         const created = await messageWriteClient.sendTextMessage({
           orgId: channel.ids.orgId,
@@ -632,7 +623,6 @@ export function MessagesContainer({
     currentUserId,
     addMessage,
     registerUserActivity,
-    markLatestMessageReadFromInteraction,
   ]);
 
   useEffect(() => {

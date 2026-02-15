@@ -5,13 +5,13 @@ const UNREAD_DIVIDER_DISMISS_MS = 280;
 
 type UseUnreadIndicatorInput = {
   unreadAnchorMessageId: UUID | null;
-  latestMessageId: UUID | null;
+  latestIncomingMessageId: UUID | null;
   onUnreadViewed?: (lastReadMessageId: UUID) => void;
 };
 
 export function useUnreadIndicator({
   unreadAnchorMessageId,
-  latestMessageId,
+  latestIncomingMessageId,
   onUnreadViewed,
 }: UseUnreadIndicatorInput) {
   const dismissTimeoutRef = useRef<number | null>(null);
@@ -31,11 +31,11 @@ export function useUnreadIndicator({
 
     if (
       onUnreadViewed &&
-      latestMessageId &&
+      latestIncomingMessageId &&
       unreadViewNotifiedForAnchorRef.current !== unreadAnchorMessageId
     ) {
       unreadViewNotifiedForAnchorRef.current = unreadAnchorMessageId;
-      onUnreadViewed(latestMessageId);
+      onUnreadViewed(latestIncomingMessageId);
     }
 
     setIsUnreadDividerDismissing(true);
@@ -48,7 +48,7 @@ export function useUnreadIndicator({
     dismissedUnreadAnchorId,
     isUnreadDividerDismissing,
     onUnreadViewed,
-    latestMessageId,
+    latestIncomingMessageId,
   ]);
 
   useEffect(() => {

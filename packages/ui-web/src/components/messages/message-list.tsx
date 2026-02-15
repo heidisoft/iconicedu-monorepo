@@ -13,6 +13,7 @@ import { formatDateHeader } from '@iconicedu/ui-web/lib/message-utils';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import { findUnreadAnchorMessageId } from '@iconicedu/ui-web/components/messages/unread-indicator.utils';
 import { useUnreadIndicator } from '@iconicedu/ui-web/components/messages/hooks/use-unread-indicator';
+import { findLatestIncomingMessageId } from '@iconicedu/ui-web/components/messages/read-state.utils';
 
 interface MessageListProps {
   messages: MessageVM[];
@@ -118,14 +119,17 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
         }),
       [sortedMessages, lastReadMessageId, lastReadAt, currentUserId],
     );
-    const latestMessageId = sortedMessages[sortedMessages.length - 1]?.ids.id ?? null;
+    const latestIncomingMessageId = useMemo(
+      () => findLatestIncomingMessageId(sortedMessages, currentUserId),
+      [sortedMessages, currentUserId],
+    );
     const {
       dismissedUnreadAnchorId,
       isUnreadDividerDismissing,
       dismissUnreadDivider,
     } = useUnreadIndicator({
       unreadAnchorMessageId,
-      latestMessageId,
+      latestIncomingMessageId,
       onUnreadViewed,
     });
 
@@ -135,6 +139,33 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
       }
       dismissUnreadDivider();
     }, [activitySignal, dismissUnreadDivider]);
+
+    useEffect(() => {
+      if (!unreadAnchorMessageId) {
+        return;
+      }
+
+      const root = scrollAreaRootRef.current;
+      if (!root) {
+        return;
+      }
+
+      const onUserInteraction = () => {
+        dismissUnreadDivider();
+      };
+
+      root.addEventListener('pointerdown', onUserInteraction, { passive: true });
+      root.addEventListener('keydown', onUserInteraction);
+      root.addEventListener('wheel', onUserInteraction, { passive: true });
+      root.addEventListener('touchstart', onUserInteraction, { passive: true });
+
+      return () => {
+        root.removeEventListener('pointerdown', onUserInteraction);
+        root.removeEventListener('keydown', onUserInteraction);
+        root.removeEventListener('wheel', onUserInteraction);
+        root.removeEventListener('touchstart', onUserInteraction);
+      };
+    }, [unreadAnchorMessageId, dismissUnreadDivider]);
 
     useEffect(() => {
       const root = scrollAreaRootRef.current;
@@ -169,12 +200,13 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
 
       const onScroll = () => {
         void maybeLoadMore();
+        dismissUnreadDivider();
       };
       viewport.addEventListener('scroll', onScroll);
       return () => {
         viewport.removeEventListener('scroll', onScroll);
       };
-    }, [hasMore, onLoadMore]);
+    }, [hasMore, onLoadMore, dismissUnreadDivider]);
 
     const groupedMessages = useMemo(() => {
       const groups: { date: string; messages: MessageVM[] }[] = [];
