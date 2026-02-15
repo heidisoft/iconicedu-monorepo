@@ -20,6 +20,7 @@ import {
   Send,
   Mic,
   ImageIcon,
+  type LucideIcon,
 } from 'lucide-react';
 
 interface MessageInputProps {
@@ -28,13 +29,14 @@ interface MessageInputProps {
   sticky?: boolean;
   onTypingStart?: () => void;
   onTypingStop?: () => void;
+  onFocus?: () => void;
 }
 
 const FormatButton = memo(function FormatButton({
   icon: Icon,
   label,
 }: {
-  icon: any;
+  icon: LucideIcon;
   label: string;
 }) {
   return (
@@ -59,6 +61,7 @@ export const MessageInput = memo(function MessageInput({
   sticky = true,
   onTypingStart,
   onTypingStop,
+  onFocus,
 }: MessageInputProps) {
   const [content, setContent] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -109,7 +112,7 @@ export const MessageInput = memo(function MessageInput({
 
       setContent(newContent);
 
-      setTimeout(() => {
+      window.setTimeout(() => {
         textarea.focus();
         textarea.setSelectionRange(start + emoji.length, start + emoji.length);
       }, 0);
@@ -167,6 +170,7 @@ export const MessageInput = memo(function MessageInput({
             handleTyping(nextValue);
           }}
           onKeyDown={handleKeyDown}
+          onFocus={onFocus}
           placeholder={placeholder}
           className="min-h-[80px] resize-none border-0 bg-transparent px-3 py-2 text-base sm:text-sm focus-visible:ring-0 focus-visible:ring-offset-0"
         />

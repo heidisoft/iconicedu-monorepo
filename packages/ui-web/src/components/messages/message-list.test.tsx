@@ -42,20 +42,13 @@ describe('MessageList', () => {
     Element.prototype.scrollIntoView = vi.fn();
   });
 
-  it('renders the typing indicator when provided', () => {
-    const { getByText } = render(
-      <MessageList
-        messages={[baseMessage]}
-        onOpenThread={vi.fn() as unknown as (thread: ThreadVM, message: MessageVM) => void}
-        onProfileClick={vi.fn()}
-        typingIndicator={<div>Typing indicator</div>}
-      />,
-    );
+  it('scrolls to bottom when new messages are added', () => {
+    const newerMessage = {
+      ...baseMessage,
+      ids: { ...baseMessage.ids, id: 'message-2' },
+      core: { ...baseMessage.core, createdAt: '2026-02-16T10:00:00.000Z' },
+    } as MessageVM;
 
-    expect(getByText('Typing indicator')).toBeInTheDocument();
-  });
-
-  it('scrolls to bottom when typing indicator appears', () => {
     const { rerender } = render(
       <MessageList
         messages={[baseMessage]}
@@ -67,10 +60,9 @@ describe('MessageList', () => {
     act(() => {
       rerender(
         <MessageList
-          messages={[baseMessage]}
+          messages={[baseMessage, newerMessage]}
           onOpenThread={vi.fn() as unknown as (thread: ThreadVM, message: MessageVM) => void}
           onProfileClick={vi.fn()}
-          typingIndicator={<div>Typing indicator</div>}
         />,
       );
     });

@@ -44,4 +44,13 @@ describe('MessageInput', () => {
     expect(onTypingStart).toHaveBeenCalledTimes(1);
     expect(onTypingStop).toHaveBeenCalledTimes(1);
   });
+
+  it('calls onFocus when textarea receives focus', () => {
+    const onFocus = vi.fn();
+    render(<MessageInput onSend={vi.fn()} onFocus={onFocus} />);
+
+    fireEvent.focus(screen.getByPlaceholderText('Write a message...'));
+
+    expect(onFocus).toHaveBeenCalledTimes(1);
+  });
 });

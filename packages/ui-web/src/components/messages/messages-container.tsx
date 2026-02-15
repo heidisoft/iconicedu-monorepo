@@ -292,8 +292,6 @@ export function MessagesContainer({
   );
 
   const handleTypingStart = useCallback(() => {
-    registerUserActivity();
-    markLatestMessageReadFromInteraction();
     if (!realtimeClient || !currentUserId) return;
     realtimeClient.sendTyping?.({
       orgId: channel.ids.orgId,
@@ -302,13 +300,15 @@ export function MessagesContainer({
       isTyping: true,
     });
   }, [
-    registerUserActivity,
     realtimeClient,
     currentUserId,
     channel.ids.orgId,
     channel.ids.id,
-    markLatestMessageReadFromInteraction,
   ]);
+
+  const handleInputFocus = useCallback(() => {
+    // Focus alone should not clear unread indicators.
+  }, []);
 
   const handleTypingStop = useCallback(() => {
     if (!realtimeClient || !currentUserId) return;
@@ -587,6 +587,8 @@ export function MessagesContainer({
   useEffect(() => {
     if (!senderProfile) return;
     setSendTextMessage(async ({ content, threadId, threadParentId }) => {
+      registerUserActivity();
+      markLatestMessageReadFromInteraction();
       if (messageWriteClient && currentUserId) {
         const created = await messageWriteClient.sendTextMessage({
           orgId: channel.ids.orgId,
@@ -629,6 +631,8 @@ export function MessagesContainer({
     messageWriteClient,
     currentUserId,
     addMessage,
+    registerUserActivity,
+    markLatestMessageReadFromInteraction,
   ]);
 
   useEffect(() => {
@@ -697,12 +701,10 @@ export function MessagesContainer({
       <MessageList
         ref={messageListRef}
         {...messageListProps}
-        typingIndicator={
-          typingParticipants.length ? (
-            <TypingIndicator profiles={typingParticipants} variant="message" />
-          ) : null
-        }
       />
+      {typingParticipants.length ? (
+        <TypingIndicator profiles={typingParticipants} className="border-t border-border" />
+      ) : null}
       <MessageInput
         onSend={handleSendMessage}
         placeholder={`Message ${getProfileDisplayName(
@@ -711,6 +713,7 @@ export function MessagesContainer({
         )}`}
         onTypingStart={handleTypingStart}
         onTypingStop={handleTypingStop}
+        onFocus={handleInputFocus}
       />
     </div>
   );

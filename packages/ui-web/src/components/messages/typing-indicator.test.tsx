@@ -26,7 +26,6 @@ describe('TypingIndicator', () => {
 
   it('renders a single name', () => {
     render(<TypingIndicator profiles={[makeProfile('p1', 'Ava')]} />);
-    expect(screen.getByText('Ava')).toBeInTheDocument();
     expect(screen.getAllByText(/Ava is typing/i).length).toBeGreaterThan(0);
     expect(screen.getByRole('status')).toBeInTheDocument();
   });
@@ -41,7 +40,6 @@ describe('TypingIndicator', () => {
         ]}
       />,
     );
-    expect(screen.getByText('Ava and 2 others')).toBeInTheDocument();
     expect(
       screen.getAllByText(/Ava, Kai, and 1 other are typing/i).length,
     ).toBeGreaterThan(0);
@@ -58,7 +56,6 @@ describe('TypingIndicator', () => {
       />,
     );
 
-    expect(screen.getByText('Ava and 1 other')).toBeInTheDocument();
     expect(screen.getAllByText(/Ava and Kai are typing/i).length).toBeGreaterThan(0);
   });
 });

@@ -4,7 +4,6 @@ import {
   useImperativeHandle,
   forwardRef,
   useMemo,
-  type ReactNode,
 } from 'react';
 import { MessageItem } from '@iconicedu/ui-web/components/messages/message-item';
 import { EmptyMessagesState } from '@iconicedu/ui-web/components/messages/empty-state';
@@ -25,7 +24,6 @@ interface MessageListProps {
   currentUserId?: string;
   lastReadMessageId?: UUID;
   lastReadAt?: ISODateTime;
-  typingIndicator?: ReactNode;
   initialScrollToBottom?: boolean;
   hasMore?: boolean;
   isLoadingMore?: boolean;
@@ -50,7 +48,6 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
       currentUserId,
       lastReadMessageId,
       lastReadAt,
-      typingIndicator,
       initialScrollToBottom = false,
       hasMore = false,
       isLoadingMore = false,
@@ -82,12 +79,11 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
     }));
 
     useEffect(() => {
-      const typingVisible = Boolean(typingIndicator);
-      if (messages.length > messageCountRef.current || typingVisible) {
+      if (messages.length > messageCountRef.current) {
         bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
       }
       messageCountRef.current = messages.length;
-    }, [messages, typingIndicator]);
+    }, [messages]);
 
     useEffect(() => {
       if (!initialScrollToBottom || didInitialScrollRef.current) {
@@ -141,28 +137,6 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
     }, [activitySignal, dismissUnreadDivider]);
 
     useEffect(() => {
-      if (!unreadAnchorMessageId) {
-        return;
-      }
-
-      const onUserInteraction = () => {
-        dismissUnreadDivider();
-      };
-
-      window.addEventListener('pointerdown', onUserInteraction, { passive: true });
-      window.addEventListener('keydown', onUserInteraction);
-      window.addEventListener('wheel', onUserInteraction, { passive: true });
-      window.addEventListener('touchstart', onUserInteraction, { passive: true });
-
-      return () => {
-        window.removeEventListener('pointerdown', onUserInteraction);
-        window.removeEventListener('keydown', onUserInteraction);
-        window.removeEventListener('wheel', onUserInteraction);
-        window.removeEventListener('touchstart', onUserInteraction);
-      };
-    }, [unreadAnchorMessageId, dismissUnreadDivider]);
-
-    useEffect(() => {
       const root = scrollAreaRootRef.current;
       if (!root || !onLoadMore || !hasMore) {
         return;
@@ -195,13 +169,12 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
 
       const onScroll = () => {
         void maybeLoadMore();
-        dismissUnreadDivider();
       };
       viewport.addEventListener('scroll', onScroll);
       return () => {
         viewport.removeEventListener('scroll', onScroll);
       };
-    }, [hasMore, onLoadMore, dismissUnreadDivider]);
+    }, [hasMore, onLoadMore]);
 
     const groupedMessages = useMemo(() => {
       const groups: { date: string; messages: MessageVM[] }[] = [];
@@ -288,8 +261,6 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
             })}
           </div>
         ))}
-
-        {typingIndicator}
         <div ref={bottomRef} />
       </ScrollArea>
     );

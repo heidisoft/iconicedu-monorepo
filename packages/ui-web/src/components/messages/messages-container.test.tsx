@@ -41,14 +41,11 @@ vi.mock('./context/messages-state-provider', () => ({
 
 vi.mock('./message-list', () => ({
   MessageList: ({
-    typingIndicator,
     onUnreadViewed,
   }: {
-    typingIndicator?: React.ReactNode;
     onUnreadViewed?: (lastReadMessageId: string) => void;
   }) => (
     <div>
-      {typingIndicator}
       <button type="button" onClick={() => onUnreadViewed?.('message-2')}>
         mark-read
       </button>
@@ -149,7 +146,6 @@ describe('MessagesContainer', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('User profile-1')).toBeInTheDocument();
       expect(screen.getAllByText(/User profile-1 is typing/i).length).toBeGreaterThan(0);
     });
   });
