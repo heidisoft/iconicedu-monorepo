@@ -132,6 +132,81 @@ export function SidebarShell({
     void router.push('/d');
   }, [router]);
 
+  const handleStatusOverrideSave = React.useCallback(
+    async (input: {
+      status?: 'online' | 'away' | 'offline';
+      stateText?: string | null;
+      stateEmoji?: string | null;
+      stateExpiresAt?: string | null;
+      clearState?: boolean;
+    }) => {
+      const fallbackStatus =
+        sidebarData.user.profile.presence?.displayStatus === 'away'
+          ? 'away'
+          : sidebarData.user.profile.presence?.displayStatus === 'offline'
+            ? 'offline'
+            : 'online';
+      const response = await window.fetch('/d/actions/presence', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: input.status ?? fallbackStatus,
+          stateText: input.stateText,
+          stateEmoji: input.stateEmoji,
+          stateExpiresAt: input.stateExpiresAt,
+          clearState: input.clearState,
+        }),
+      });
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as
+          | { message?: string }
+          | null;
+        throw new Error(payload?.message || 'Unable to update status');
+      }
+
+      setSidebarData((prev) => {
+        const currentPresence = prev.user.profile.presence;
+        const nextPresence = {
+          state: input.clearState
+            ? {
+                text: null,
+                emoji: null,
+                expiresAt: null,
+              }
+            : {
+                text: input.stateText ?? null,
+                emoji: input.stateEmoji ?? null,
+                expiresAt: input.stateExpiresAt ?? null,
+              },
+          liveStatus:
+            currentPresence?.liveStatus ??
+            (fallbackStatus === 'offline'
+              ? 'offline'
+              : fallbackStatus === 'away'
+                ? 'away'
+                : 'online'),
+          displayStatus:
+            currentPresence?.displayStatus ??
+            (fallbackStatus === 'offline'
+              ? 'offline'
+              : fallbackStatus === 'away'
+                ? 'away'
+                : 'online'),
+          lastSeenAt: currentPresence?.lastSeenAt ?? new Date().toISOString(),
+          presenceLoaded: true,
+        } as const;
+
+        return applyPresenceToSidebarData(
+          prev,
+          prev.user.profile.ids.id,
+          nextPresence,
+        );
+      });
+      showSuccessToast('Status updated');
+    },
+    [sidebarData.user.profile.presence],
+  );
+
   const sidebarProfile = sidebarData.user.profile;
   const sidebarAccount = sidebarData.user.account ?? null;
   const sidebarOrgId = sidebarProfile.ids?.orgId;
@@ -1753,6 +1828,7 @@ export function SidebarShell({
       onEducatorProfileSave={handleEducatorProfileSave}
       onEducatorAvailabilitySave={handleEducatorAvailabilitySave}
       onStaffProfileSave={handleStaffProfileSave}
+      onStatusOverrideSave={handleStatusOverrideSave}
       adminSections={adminSections ?? undefined}
       />
       <SidebarInset>{children}</SidebarInset>

@@ -116,6 +116,7 @@ export function SidebarLeft({
   onEducatorProfileSave,
   onEducatorAvailabilitySave,
   onStaffProfileSave,
+  onStatusOverrideSave,
   adminSections,
   ...props
 }: React.ComponentProps<typeof Sidebar> & {
@@ -189,6 +190,13 @@ export function SidebarLeft({
   onEducatorAvailabilitySave?: (input: EducatorAvailabilityInput) => Promise<void> | void;
   adminSections?: AdminMenuSection[] | null;
   onStaffProfileSave?: (input: StaffProfileSaveInput) => Promise<void> | void;
+  onStatusOverrideSave?: (input: {
+    status?: 'online' | 'away' | 'offline';
+    stateText?: string | null;
+    stateEmoji?: string | null;
+    stateExpiresAt?: string | null;
+    clearState?: boolean;
+  }) => Promise<void> | void;
   onOnboardingComplete?: () => void;
 }) {
   const navMain: SidebarNavItem[] = data.navigation.navMain.map((item) => ({
@@ -602,6 +610,7 @@ export function SidebarLeft({
           onEducatorProfileSave={onEducatorProfileSave}
           onEducatorAvailabilitySave={onEducatorAvailabilitySave}
           onStaffProfileSave={onStaffProfileSave}
+          onStatusOverrideSave={onStatusOverrideSave}
         />
       </SidebarFooter>
     </Sidebar>

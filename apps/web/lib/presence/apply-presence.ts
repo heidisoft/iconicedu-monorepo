@@ -13,10 +13,14 @@ function applyRealtimeOnlineStatus(
   const currentPresence = profile.presence;
 
   if (isOnline) {
+    const nextDisplayStatus =
+      currentPresence?.displayStatus === 'busy' ? 'busy' : 'online';
+    const nextLiveStatus =
+      currentPresence?.displayStatus === 'busy' ? 'busy' : 'online';
     const nextPresence: PresenceVM = {
       state: currentPresence?.state ?? {},
-      liveStatus: 'online',
-      displayStatus: 'online',
+      liveStatus: nextLiveStatus,
+      displayStatus: nextDisplayStatus,
       lastSeenAt: currentPresence?.lastSeenAt ?? null,
       presenceLoaded: true,
     };

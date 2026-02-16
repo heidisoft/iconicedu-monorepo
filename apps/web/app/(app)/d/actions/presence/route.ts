@@ -14,6 +14,8 @@ type PresenceBody = {
   status?: PresenceConnectionStatus;
   stateText?: string | null;
   stateEmoji?: string | null;
+  stateExpiresAt?: string | null;
+  clearState?: boolean;
 };
 
 const VALID_STATUS: ReadonlySet<PresenceConnectionStatus> = new Set([
@@ -47,6 +49,21 @@ export async function POST(request: Request) {
   const status: PresenceConnectionStatus = VALID_STATUS.has(body.status ?? 'online')
     ? (body.status ?? 'online')
     : 'online';
+  const shouldClearState = body.clearState === true;
+  const hasStateText = Object.prototype.hasOwnProperty.call(body, 'stateText');
+  const hasStateEmoji = Object.prototype.hasOwnProperty.call(body, 'stateEmoji');
+  const hasStateExpiresAt = Object.prototype.hasOwnProperty.call(body, 'stateExpiresAt');
+
+  const parseOptionalDate = (value?: string | null) => {
+    if (!value?.trim()) {
+      return null;
+    }
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return null;
+    }
+    return parsed.toISOString();
+  };
 
   const supabase = await createSupabaseServerClient();
   const {
@@ -79,17 +96,33 @@ export async function POST(request: Request) {
 
   const now = new Date().toISOString();
   const serviceClient = createSupabaseServiceClient();
+  const upsertPayload: Record<string, unknown> = {
+    org_id: account.org_id,
+    profile_id: profile.id,
+    live_status: mapConnectionStatusToLiveStatus(status),
+    display_status: mapConnectionStatusToDisplayStatus(status),
+    last_seen_at: now,
+    presence_loaded: true,
+  };
+
+  if (shouldClearState) {
+    upsertPayload.state_text = null;
+    upsertPayload.state_emoji = null;
+    upsertPayload.state_expires_at = null;
+  } else {
+    if (hasStateText) {
+      upsertPayload.state_text = body.stateText?.trim() ? body.stateText.trim() : null;
+    }
+    if (hasStateEmoji) {
+      upsertPayload.state_emoji = body.stateEmoji?.trim() ? body.stateEmoji.trim() : null;
+    }
+    if (hasStateExpiresAt) {
+      upsertPayload.state_expires_at = parseOptionalDate(body.stateExpiresAt);
+    }
+  }
+
   const { error } = await serviceClient.from('profile_presence').upsert(
-    {
-      org_id: account.org_id,
-      profile_id: profile.id,
-      state_text: body.stateText ?? null,
-      state_emoji: body.stateEmoji ?? null,
-      live_status: mapConnectionStatusToLiveStatus(status),
-      display_status: mapConnectionStatusToDisplayStatus(status),
-      last_seen_at: now,
-      presence_loaded: true,
-    },
+    upsertPayload,
     { onConflict: 'org_id,profile_id' },
   );
 

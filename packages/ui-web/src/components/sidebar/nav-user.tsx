@@ -6,11 +6,11 @@ import {
   Bell,
   CalendarDays,
   ChevronsUpDown,
-  CreditCard,
+  Clock3,
   Lightbulb,
   LogOut,
+  Smile,
   SlidersHorizontal,
-  Sparkles,
   User,
   Users,
 } from 'lucide-react';
@@ -39,6 +39,22 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@iconicedu/ui-web/ui/dropdown-menu';
+import { Button } from '@iconicedu/ui-web/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@iconicedu/ui-web/ui/dialog';
+import { Input } from '@iconicedu/ui-web/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@iconicedu/ui-web/ui/select';
 import {
   SidebarMenu,
   SidebarMenuButton,
@@ -55,6 +71,13 @@ import type {
   ProfileAvatarRemoveInput,
   ProfileSaveInput,
 } from '@iconicedu/ui-web/components/sidebar/user-settings/profile-tab';
+import {
+  computeStatusExpiresAt,
+  STATUS_CLEAR_AFTER_OPTIONS,
+  STATUS_EMOJI_OPTIONS,
+  STATUS_PRESETS,
+  type StatusClearAfterOption,
+} from '@iconicedu/ui-web/components/sidebar/nav-user-status.utils';
 
 export function NavUser({
   profile,
@@ -78,6 +101,7 @@ export function NavUser({
   onEducatorProfileSave,
   onEducatorAvailabilitySave,
   onStaffProfileSave,
+  onStatusOverrideSave,
 }: {
   profile: UserProfileVM;
   account?: UserAccountVM | null;
@@ -148,6 +172,13 @@ export function NavUser({
   onEducatorProfileSave?: (input: EducatorProfileSaveInput) => Promise<void> | void;
   onEducatorAvailabilitySave?: (input: EducatorAvailabilityInput) => Promise<void> | void;
   onStaffProfileSave?: (input: StaffProfileSaveInput) => Promise<void> | void;
+  onStatusOverrideSave?: (input: {
+    status?: 'online' | 'away' | 'offline';
+    stateText?: string | null;
+    stateEmoji?: string | null;
+    stateExpiresAt?: string | null;
+    clearState?: boolean;
+  }) => Promise<void> | void;
   onOnboardingComplete?: () => void;
 }) {
   const { isMobile } = useSidebar();
@@ -157,6 +188,12 @@ export function NavUser({
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   const [settingsTab, setSettingsTab] = React.useState<UserSettingsTab>('account');
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
+  const [statusDialogOpen, setStatusDialogOpen] = React.useState(false);
+  const [statusText, setStatusText] = React.useState('');
+  const [statusEmoji, setStatusEmoji] = React.useState('');
+  const [statusClearAfter, setStatusClearAfter] = React.useState<StatusClearAfterOption>('never');
+  const [statusSaveError, setStatusSaveError] = React.useState<string | null>(null);
+  const [isSavingStatus, setIsSavingStatus] = React.useState(false);
 
   const openSettings = React.useCallback((tab: UserSettingsTab) => {
     setSettingsTab(tab);
@@ -187,6 +224,73 @@ export function NavUser({
     }
     setSettingsOpen(true);
   }, [onboardingStatus]);
+
+  React.useEffect(() => {
+    if (!statusDialogOpen) {
+      return;
+    }
+    setStatusText(profile.presence?.state?.text?.trim() ?? '');
+    setStatusEmoji(profile.presence?.state?.emoji?.trim() ?? '');
+    setStatusClearAfter(profile.presence?.state?.expiresAt ? 'today' : 'never');
+    setStatusSaveError(null);
+  }, [statusDialogOpen, profile.presence?.state?.emoji, profile.presence?.state?.expiresAt, profile.presence?.state?.text]);
+
+  const openStatusDialog = React.useCallback(() => {
+    setStatusDialogOpen(true);
+  }, []);
+
+  const handleSaveStatus = React.useCallback(async () => {
+    if (!onStatusOverrideSave) {
+      setStatusDialogOpen(false);
+      return;
+    }
+    const nextText = statusText.trim();
+    const nextEmoji = statusEmoji.trim();
+    const hasStatus = !!nextText || !!nextEmoji;
+    setIsSavingStatus(true);
+    setStatusSaveError(null);
+    try {
+      if (!hasStatus) {
+        await onStatusOverrideSave({ clearState: true });
+      } else {
+        await onStatusOverrideSave({
+          stateText: nextText || null,
+          stateEmoji: nextEmoji || null,
+          stateExpiresAt: computeStatusExpiresAt(statusClearAfter),
+        });
+      }
+      setStatusDialogOpen(false);
+    } catch (error) {
+      setStatusSaveError(error instanceof Error ? error.message : 'Unable to save status');
+    } finally {
+      setIsSavingStatus(false);
+    }
+  }, [onStatusOverrideSave, statusClearAfter, statusEmoji, statusText]);
+
+  const handleClearStatus = React.useCallback(async () => {
+    if (!onStatusOverrideSave) {
+      setStatusDialogOpen(false);
+      return;
+    }
+    setIsSavingStatus(true);
+    setStatusSaveError(null);
+    try {
+      await onStatusOverrideSave({ clearState: true });
+      setStatusDialogOpen(false);
+    } catch (error) {
+      setStatusSaveError(error instanceof Error ? error.message : 'Unable to clear status');
+    } finally {
+      setIsSavingStatus(false);
+    }
+  }, [onStatusOverrideSave]);
+
+  const currentStatusSummary = [
+    profile.presence?.state?.emoji?.trim(),
+    profile.presence?.state?.text?.trim(),
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .trim();
 
   return (
     <SidebarMenu>
@@ -241,6 +345,13 @@ export function NavUser({
                 </div>
               </div>
             </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuItem onSelect={openStatusDialog}>
+                <Smile />
+                {currentStatusSummary || 'Set a status'}
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem onSelect={() => openSettings('account')}>
@@ -315,6 +426,90 @@ export function NavUser({
         onboardingStep={onboardingStatus?.currentStep ?? null}
         onOnboardingComplete={onOnboardingComplete}
       />
+      <Dialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Set a status</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Select
+                value={statusEmoji || '__none__'}
+                onValueChange={(value) => setStatusEmoji(value === '__none__' ? '' : value)}
+              >
+                <SelectTrigger className="w-28">
+                  <SelectValue placeholder="Emoji" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">None</SelectItem>
+                  {STATUS_EMOJI_OPTIONS.map((emoji) => (
+                    <SelectItem key={emoji} value={emoji}>
+                      {emoji}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                placeholder="What's your status?"
+                value={statusText}
+                maxLength={80}
+                onChange={(event) => setStatusText(event.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              {STATUS_PRESETS.map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  className="hover:bg-accent w-full rounded-md px-2 py-1.5 text-left text-sm"
+                  onClick={() => {
+                    setStatusEmoji(preset.emoji);
+                    setStatusText(preset.text);
+                    setStatusClearAfter(preset.clearAfter);
+                  }}
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <span>{preset.emoji}</span>
+                    <span>{preset.label}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+            <div className="space-y-1">
+              <p className="text-muted-foreground inline-flex items-center gap-1 text-xs">
+                <Clock3 className="size-3" />
+                Clear after
+              </p>
+              <Select
+                value={statusClearAfter}
+                onValueChange={(value) => setStatusClearAfter(value as StatusClearAfterOption)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_CLEAR_AFTER_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {statusSaveError ? (
+              <p className="text-destructive text-xs">{statusSaveError}</p>
+            ) : null}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={handleClearStatus} disabled={isSavingStatus}>
+              Clear
+            </Button>
+            <Button onClick={handleSaveStatus} disabled={isSavingStatus}>
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       </SidebarMenuItem>
     </SidebarMenu>
   );

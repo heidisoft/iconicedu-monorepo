@@ -11,7 +11,8 @@ export function mapConnectionStatusToLiveStatus(
   status: PresenceConnectionStatus,
 ): LiveStatusVM {
   if (status === 'online') {
-    return 'online';
+    // DB enum does not include "online"; use an active live_status value.
+    return 'in_class';
   }
   if (status === 'away') {
     return 'away';

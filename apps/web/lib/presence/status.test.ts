@@ -11,7 +11,7 @@ import {
 
 describe('presence status helpers', () => {
   it('maps connection status to live/display status', () => {
-    expect(mapConnectionStatusToLiveStatus('online')).toBe('online');
+    expect(mapConnectionStatusToLiveStatus('online')).toBe('in_class');
     expect(mapConnectionStatusToLiveStatus('away')).toBe('away');
     expect(mapConnectionStatusToLiveStatus('offline')).toBe('offline');
     expect(mapConnectionStatusToDisplayStatus('online')).toBe('online');

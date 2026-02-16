@@ -128,6 +128,22 @@ describe('apply presence helpers', () => {
     expect(updated.collections.participants[1].presence?.liveStatus).toBe('online');
   });
 
+  it('preserves busy status when realtime shows profile online', () => {
+    const channel = makeChannel();
+    const withBusy = applyPresenceToChannelParticipants(
+      channel,
+      'profile-2',
+      busyPresence,
+    );
+    const updated = applyRealtimeOnlineProfilesToChannelParticipants(
+      withBusy,
+      new Set(['profile-2']),
+    );
+
+    expect(updated.collections.participants[1].presence?.displayStatus).toBe('busy');
+    expect(updated.collections.participants[1].presence?.liveStatus).toBe('busy');
+  });
+
   it('applies realtime online overlay across sidebar collections', () => {
     const sidebarData = makeSidebarData();
     const updated = applyRealtimeOnlineProfilesToSidebarData(

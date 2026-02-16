@@ -44,7 +44,7 @@ describe('mapProfilePresenceRowToVM', () => {
       profile_id: 'profile-1',
       live_status: 'online',
       display_status: 'online',
-      last_seen_at: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
+      last_seen_at: new Date(Date.now() - 12 * 60 * 1000).toISOString(),
     } as unknown as ProfilePresenceRow;
 
     const mapped = mapProfilePresenceRowToVM(row);
@@ -62,5 +62,24 @@ describe('mapProfilePresenceRowToVM', () => {
     } as unknown as ProfilePresenceRow;
 
     expect(mapProfilePresenceRowToVM(row)).toBeNull();
+  });
+
+  it('clears expired status override fields', () => {
+    const row = {
+      id: 'presence-1',
+      org_id: 'org-1',
+      profile_id: 'profile-1',
+      state_text: 'Working remotely',
+      state_emoji: '🏠',
+      state_expires_at: new Date(Date.now() - 60_000).toISOString(),
+      live_status: 'online',
+      display_status: 'online',
+      last_seen_at: new Date().toISOString(),
+    } as unknown as ProfilePresenceRow;
+
+    const mapped = mapProfilePresenceRowToVM(row);
+    expect(mapped?.state.text).toBeNull();
+    expect(mapped?.state.emoji).toBeNull();
+    expect(mapped?.state.expiresAt).toBeNull();
   });
 });

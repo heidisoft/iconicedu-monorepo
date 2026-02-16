@@ -59,7 +59,7 @@ describe('POST /d/actions/presence', () => {
       expect.objectContaining({
         org_id: 'org-1',
         profile_id: 'profile-1',
-        live_status: 'online',
+        live_status: 'in_class',
         display_status: 'online',
         presence_loaded: true,
       }),
@@ -88,8 +88,71 @@ describe('POST /d/actions/presence', () => {
     );
   });
 
+  it('does not clear status override fields when omitted', async () => {
+    upsert.mockResolvedValueOnce({ error: null });
+
+    await POST(
+      new Request('http://localhost/d/actions/presence', {
+        method: 'POST',
+        body: JSON.stringify({ status: 'online' }),
+      }),
+    );
+
+    const lastCall = upsert.mock.calls[upsert.mock.calls.length - 1] as
+      | [Record<string, unknown>]
+      | undefined;
+    const payload = (lastCall?.[0] ?? {}) as Record<string, unknown>;
+    expect(payload).not.toHaveProperty('state_text');
+    expect(payload).not.toHaveProperty('state_emoji');
+    expect(payload).not.toHaveProperty('state_expires_at');
+  });
+
+  it('persists explicit status override fields when provided', async () => {
+    upsert.mockResolvedValueOnce({ error: null });
+
+    await POST(
+      new Request('http://localhost/d/actions/presence', {
+        method: 'POST',
+        body: JSON.stringify({
+          stateText: 'In a meeting',
+          stateEmoji: '📅',
+          stateExpiresAt: '2026-02-16T12:00:00.000Z',
+        }),
+      }),
+    );
+
+    expect(upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        state_text: 'In a meeting',
+        state_emoji: '📅',
+        state_expires_at: '2026-02-16T12:00:00.000Z',
+      }),
+      { onConflict: 'org_id,profile_id' },
+    );
+  });
+
+  it('clears status override when clearState is true', async () => {
+    upsert.mockResolvedValueOnce({ error: null });
+
+    await POST(
+      new Request('http://localhost/d/actions/presence', {
+        method: 'POST',
+        body: JSON.stringify({ clearState: true }),
+      }),
+    );
+
+    expect(upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        state_text: null,
+        state_emoji: null,
+        state_expires_at: null,
+      }),
+      { onConflict: 'org_id,profile_id' },
+    );
+  });
+
   it('returns 401 when auth user is missing', async () => {
-    getUser.mockResolvedValueOnce({ data: { user: null } });
+    getUser.mockResolvedValueOnce({ data: { user: null } } as any);
 
     const response = await POST(
       new Request('http://localhost/d/actions/presence', {

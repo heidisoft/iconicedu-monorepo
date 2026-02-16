@@ -56,11 +56,19 @@ export function mapProfilePresenceRowToVM(
           ? 'away'
           : 'offline';
 
+  const now = Date.now();
+  const expiresAt = row.state_expires_at ?? null;
+  const expiresAtMs = expiresAt ? new Date(expiresAt).getTime() : NaN;
+  const isStateExpired =
+    !!expiresAt &&
+    !Number.isNaN(expiresAtMs) &&
+    expiresAtMs <= now;
+
   return {
     state: {
-      text: row.state_text,
-      emoji: row.state_emoji,
-      expiresAt: row.state_expires_at,
+      text: isStateExpired ? null : row.state_text,
+      emoji: isStateExpired ? null : row.state_emoji,
+      expiresAt: isStateExpired ? null : expiresAt,
     },
     liveStatus,
     displayStatus,
