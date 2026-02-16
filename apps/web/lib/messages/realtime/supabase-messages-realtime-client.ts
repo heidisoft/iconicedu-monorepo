@@ -167,6 +167,25 @@ export function createSupabaseMessagesRealtimeClient(): MessagesRealtimeClient {
         });
       });
 
+      channel.on('broadcast', { event: 'message-deleted' }, (payload) => {
+        const data = payload.payload as { messageId?: string } | undefined;
+        if (!data?.messageId) {
+          return;
+        }
+        onEvent({
+          type: 'message-deleted',
+          messageId: data.messageId,
+        });
+      });
+
+      channel.on('broadcast', { event: 'message-updated' }, (payload) => {
+        const data = payload.payload as { messageId?: string } | undefined;
+        if (!data?.messageId) {
+          return;
+        }
+        void fetchMessage(data.messageId, 'updated');
+      });
+
       channel.subscribe();
 
       return {
@@ -185,6 +204,24 @@ export function createSupabaseMessagesRealtimeClient(): MessagesRealtimeClient {
         type: 'broadcast',
         event: 'typing',
         payload: { profileId, isTyping },
+      });
+    },
+    broadcastMessageDeleted: async ({ channelId, messageId }) => {
+      const channel = channelsById.get(channelId);
+      if (!channel) return;
+      await channel.send({
+        type: 'broadcast',
+        event: 'message-deleted',
+        payload: { messageId },
+      });
+    },
+    broadcastMessageUpdated: async ({ channelId, messageId }) => {
+      const channel = channelsById.get(channelId);
+      if (!channel) return;
+      await channel.send({
+        type: 'broadcast',
+        event: 'message-updated',
+        payload: { messageId },
       });
     },
   };

@@ -369,14 +369,22 @@ export function MessagesContainer({
             messageId,
             isHidden: newHiddenState,
           });
+          // Update local state immediately for better UX
+          toggleHidden(messageId);
+          // Broadcast to all other clients via realtime
+          if (realtimeClient?.broadcastMessageUpdated) {
+            await realtimeClient.broadcastMessageUpdated({
+              channelId: channel.ids.id,
+              messageId,
+            });
+          }
         } catch (error) {
           console.error('Failed to toggle hidden message:', error);
           return;
         }
       }
-      toggleHidden(messageId);
     },
-    [toggleHidden, messageWriteClient, channel.ids.orgId, messages],
+    [messageWriteClient, channel.ids.orgId, channel.ids.id, realtimeClient, messages, toggleHidden],
   );
 
   const handleDeleteMessage = useCallback(
@@ -387,14 +395,22 @@ export function MessagesContainer({
             orgId: channel.ids.orgId,
             messageId,
           });
+          // Update local state immediately for better UX
+          deleteMessage(messageId);
+          // Broadcast to all other clients via realtime
+          if (realtimeClient?.broadcastMessageDeleted) {
+            await realtimeClient.broadcastMessageDeleted({
+              channelId: channel.ids.id,
+              messageId,
+            });
+          }
         } catch (error) {
           console.error('Failed to delete message:', error);
           return;
         }
       }
-      deleteMessage(messageId);
     },
-    [deleteMessage, messageWriteClient, channel.ids.orgId],
+    [messageWriteClient, channel.ids.orgId, channel.ids.id, realtimeClient, deleteMessage],
   );
 
   const visibleMessages = useMemo(

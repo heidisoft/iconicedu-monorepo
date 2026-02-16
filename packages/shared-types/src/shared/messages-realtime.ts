@@ -27,6 +27,14 @@ export interface MessagesRealtimeClient {
     profileId: string;
     isTyping: boolean;
   }) => Promise<void> | void;
+  broadcastMessageDeleted?: (input: {
+    channelId: string;
+    messageId: string;
+  }) => Promise<void> | void;
+  broadcastMessageUpdated?: (input: {
+    channelId: string;
+    messageId: string;
+  }) => Promise<void> | void;
 }
 
 export type MessageSendTextInput = {
