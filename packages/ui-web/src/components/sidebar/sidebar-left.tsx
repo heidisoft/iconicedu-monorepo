@@ -236,11 +236,14 @@ export function SidebarLeft({
     userProfile.kind === 'guardian'
       ? learningSpacesByChild.flatMap((entry) => entry.learningSpaces)
       : educatorLearningSpaces;
-  const currentUserAccountId = data.user.profile.ids.accountId;
+  const currentUserRef = {
+    accountId: data.user.profile.ids.accountId,
+    profileId: data.user.profile.ids.id,
+  };
   const hasDirectMessages = data.collections.directMessages.length > 0;
   const totalLearningSpacesUnread = getLearningSpaceUnreadCount(
     visibleLearningSpaces,
-    currentUserAccountId,
+    currentUserRef,
   );
 
   const activeLearningSpaceId = React.useMemo(() => {
@@ -353,7 +356,7 @@ export function SidebarLeft({
                       onOpenChange={() => undefined}
                       activeChannelId={activeLearningSpaceId}
                       isMobile={isMobile}
-                      currentUserId={currentUserAccountId}
+                      currentUser={currentUserRef}
                     />
                   );
                 })
@@ -368,7 +371,7 @@ export function SidebarLeft({
                     const isActive = activeLearningSpaceId === channel.ids.id;
                     const unreadCount = getLearningSpaceItemUnreadCountForUser(
                       space,
-                      currentUserAccountId,
+                      currentUserRef,
                     );
 
                     return (

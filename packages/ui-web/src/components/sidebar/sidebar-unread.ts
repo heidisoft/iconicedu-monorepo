@@ -1,5 +1,10 @@
 import type { ChannelVM, LearningSpaceVM } from '@iconicedu/shared-types';
 
+type CurrentUserRef = {
+  accountId?: string;
+  profileId?: string;
+};
+
 function getLatestMessage(channel: ChannelVM) {
   const messages = channel.collections.messages?.items ?? [];
   if (!messages.length) {
@@ -63,7 +68,7 @@ export function getLearningSpaceItemUnreadCount(space: LearningSpaceVM): number 
 
 export function getLearningSpaceItemUnreadCountForUser(
   space: LearningSpaceVM,
-  currentUserId?: string,
+  currentUser?: CurrentUserRef,
 ): number {
   const channels = getLearningSpaceChannels(space);
   const persistedUnread = channels.reduce((total, channel) => {
@@ -73,7 +78,7 @@ export function getLearningSpaceItemUnreadCountForUser(
     return persistedUnread;
   }
 
-  if (!currentUserId) {
+  if (!currentUser?.accountId && !currentUser?.profileId) {
     return 0;
   }
 
@@ -90,8 +95,11 @@ export function getLearningSpaceItemUnreadCountForUser(
       return total;
     }
 
-    const senderAccountId = latestMessage.core.sender?.ids.accountId;
-    if (!senderAccountId || senderAccountId === currentUserId) {
+    const senderIds = latestMessage.core.sender?.ids;
+    const isOwnMessage =
+      (Boolean(currentUser?.accountId) && senderIds?.accountId === currentUser.accountId) ||
+      (Boolean(currentUser?.profileId) && senderIds?.id === currentUser.profileId);
+    if (isOwnMessage) {
       return total;
     }
 
@@ -101,9 +109,9 @@ export function getLearningSpaceItemUnreadCountForUser(
 
 export function getLearningSpaceUnreadCount(
   learningSpaces: LearningSpaceVM[],
-  currentUserId?: string,
+  currentUser?: CurrentUserRef,
 ): number {
   return learningSpaces.reduce((total, space) => {
-    return total + getLearningSpaceItemUnreadCountForUser(space, currentUserId);
+    return total + getLearningSpaceItemUnreadCountForUser(space, currentUser);
   }, 0);
 }

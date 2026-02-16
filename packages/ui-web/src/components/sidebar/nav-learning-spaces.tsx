@@ -49,7 +49,7 @@ export function NavLearningSpaces({
   onOpenChange,
   activeChannelId,
   isMobile,
-  currentUserId,
+  currentUser,
 }: {
   learningSpaces: LearningSpaceVM[];
   title: string;
@@ -58,7 +58,7 @@ export function NavLearningSpaces({
   onOpenChange: (open: boolean) => void;
   activeChannelId?: string | null;
   isMobile: boolean;
-  currentUserId?: string;
+  currentUser?: { accountId?: string; profileId?: string };
 }) {
   return (
     <SidebarGroup className="py-0 group-data-[collapsible=icon]:hidden">
@@ -101,7 +101,7 @@ export function NavLearningSpaces({
                 const isActive = activeChannelId === channel.ids.id;
                 const unreadCount = getLearningSpaceItemUnreadCountForUser(
                   space,
-                  currentUserId,
+                  currentUser,
                 );
 
                 return (

@@ -119,7 +119,7 @@ describe('learning space unread helpers', () => {
           },
         },
       } as any,
-      'account-self',
+      { accountId: 'account-self', profileId: 'profile-self' },
     );
 
     expect(unread).toBe(1);
@@ -138,9 +138,35 @@ describe('learning space unread helpers', () => {
           },
         },
       ] as any,
-      'account-self',
+      { accountId: 'account-self', profileId: 'profile-self' },
     );
 
     expect(unread).toBe(6);
+  });
+
+  it('treats sender profile id as own message for educators when account id is missing', () => {
+    const unread = getLearningSpaceItemUnreadCountForUser(
+      {
+        channels: {
+          primaryChannel: {
+            collections: {
+              readState: { unreadCount: 0, lastReadAt: null, lastReadMessageId: null },
+              messages: {
+                items: [
+                  {
+                    core: {
+                      sender: { ids: { id: 'profile-educator' } },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        },
+      } as any,
+      { accountId: 'account-educator', profileId: 'profile-educator' },
+    );
+
+    expect(unread).toBe(0);
   });
 });
