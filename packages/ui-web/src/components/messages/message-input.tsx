@@ -27,6 +27,7 @@ interface MessageInputProps {
   onSend: (content: string) => void;
   placeholder?: string;
   sticky?: boolean;
+  readOnly?: boolean;
   onTypingStart?: () => void;
   onTypingStop?: () => void;
   onFocus?: () => void;
@@ -60,6 +61,7 @@ export const MessageInput = memo(function MessageInput({
   onSend,
   placeholder = 'Write a message...',
   sticky = true,
+  readOnly = false,
   onTypingStart,
   onTypingStop,
   onFocus,
@@ -84,6 +86,9 @@ export const MessageInput = memo(function MessageInput({
   }, [onTypingStop]);
 
   const handleSend = useCallback(() => {
+    if (readOnly) {
+      return;
+    }
     if (content.trim()) {
       onSend(content.trim());
       setContent('');
@@ -91,17 +96,20 @@ export const MessageInput = memo(function MessageInput({
       notifyTypingStop();
       textareaRef.current?.focus();
     }
-  }, [clearTypingTimeout, content, notifyTypingStop, onSend]);
+  }, [clearTypingTimeout, content, notifyTypingStop, onSend, readOnly]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
+      if (readOnly) {
+        return;
+      }
       onInputKeyDown?.();
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         handleSend();
       }
     },
-    [handleSend, onInputKeyDown],
+    [handleSend, onInputKeyDown, readOnly],
   );
 
   const handleEmojiSelect = useCallback(
@@ -125,6 +133,9 @@ export const MessageInput = memo(function MessageInput({
 
   const handleTyping = useCallback(
     (value: string) => {
+      if (readOnly) {
+        return;
+      }
       if (!value.trim()) {
         clearTypingTimeout();
         notifyTypingStop();
@@ -139,7 +150,7 @@ export const MessageInput = memo(function MessageInput({
         notifyTypingStop();
       }, 1800);
     },
-    [clearTypingTimeout, notifyTypingStop, onTypingStart],
+    [clearTypingTimeout, notifyTypingStop, onTypingStart, readOnly],
   );
 
   useEffect(() => {
@@ -167,6 +178,7 @@ export const MessageInput = memo(function MessageInput({
         <Textarea
           ref={textareaRef}
           value={content}
+          readOnly={readOnly}
           onChange={(e) => {
             const nextValue = e.target.value;
             setContent(nextValue);
@@ -202,7 +214,7 @@ export const MessageInput = memo(function MessageInput({
           <Button
             size="sm"
             onClick={handleSend}
-            disabled={!content.trim()}
+            disabled={readOnly || !content.trim()}
             className="h-8 gap-1.5"
           >
             <Send className="h-3.5 w-3.5" />

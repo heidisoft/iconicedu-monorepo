@@ -48,7 +48,7 @@ export const MessagesShell = memo(function MessagesShell(props: MessagesShellPro
   }, [props.panelRegistry]);
 
   return (
-    <MessagesStateProvider channel={channel}>
+    <MessagesStateProvider channel={channel} isReadOnly={props.readOnly}>
       <MessagesShellLayout {...props} registry={rightPanelRegistry} />
     </MessagesStateProvider>
   );

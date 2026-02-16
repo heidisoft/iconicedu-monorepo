@@ -50,6 +50,7 @@ export interface MessagesContainerProps {
   channel: ChannelVM;
   currentUserId?: string;
   currentUserProfile?: UserProfileVM | null;
+  readOnly?: boolean;
   realtimeClient?: MessagesRealtimeClient | null;
   messageWriteClient?: MessageWriteClient | null;
 }
@@ -66,6 +67,7 @@ export function MessagesContainer({
   channel,
   currentUserId: currentUserIdProp,
   currentUserProfile,
+  readOnly = false,
   realtimeClient,
   messageWriteClient,
 }: MessagesContainerProps) {
@@ -109,7 +111,6 @@ export function MessagesContainer({
   const [oldestCursor, setOldestCursor] = useState<string | null>(
     channelMessages[0]?.core.createdAt ?? null,
   );
-  const [activitySignal, setActivitySignal] = useState(0);
   const [lastReadMessageId, setLastReadMessageId] = useState<UUID | undefined>(
     channel.collections.readState?.lastReadMessageId,
   );
@@ -167,10 +168,6 @@ export function MessagesContainer({
       window.clearTimeout(existing);
       typingTimeoutsRef.current.delete(profileId);
     }
-  }, []);
-
-  const registerUserActivity = useCallback(() => {
-    setActivitySignal((prev) => prev + 1);
   }, []);
 
   const markChannelRead = useCallback(
@@ -259,6 +256,7 @@ export function MessagesContainer({
 
   const handleSendMessage = useCallback(
     (content: string) => {
+      if (readOnly) return;
       if (!senderProfile) return;
       if (messageFilter) {
         toggleMessageFilter(messageFilter);
@@ -308,6 +306,7 @@ export function MessagesContainer({
       channel.ids.id,
       messageWriteClient,
       currentUserId,
+      readOnly,
     ],
   );
 
@@ -319,6 +318,7 @@ export function MessagesContainer({
   );
 
   const handleTypingStart = useCallback(() => {
+    if (readOnly) return;
     if (!realtimeClient || !currentUserId) return;
     realtimeClient.sendTyping?.({
       orgId: channel.ids.orgId,
@@ -331,17 +331,11 @@ export function MessagesContainer({
     currentUserId,
     channel.ids.orgId,
     channel.ids.id,
+    readOnly,
   ]);
 
-  const handleInputFocus = useCallback(() => {
-    registerUserActivity();
-  }, [registerUserActivity]);
-
-  const handleInputKeyDown = useCallback(() => {
-    registerUserActivity();
-  }, [registerUserActivity]);
-
   const handleTypingStop = useCallback(() => {
+    if (readOnly) return;
     if (!realtimeClient || !currentUserId) return;
     realtimeClient.sendTyping?.({
       orgId: channel.ids.orgId,
@@ -349,10 +343,11 @@ export function MessagesContainer({
       profileId: currentUserId,
       isTyping: false,
     });
-  }, [realtimeClient, currentUserId, channel.ids.orgId, channel.ids.id]);
+  }, [realtimeClient, currentUserId, channel.ids.orgId, channel.ids.id, readOnly]);
 
   const handleToggleReaction = useCallback(
     (messageId: string, emoji: string) => {
+      if (readOnly) return;
       if (!currentUserId) return;
       toggleReaction(messageId, emoji, currentUserId);
       if (messageWriteClient) {
@@ -370,18 +365,20 @@ export function MessagesContainer({
         void persistReaction();
       }
     },
-    [toggleReaction, currentUserId, messageWriteClient, channel.ids.orgId],
+    [toggleReaction, currentUserId, messageWriteClient, channel.ids.orgId, readOnly],
   );
 
   const handleToggleSaved = useCallback(
     (messageId: string) => {
+      if (readOnly) return;
       toggleSaved(messageId);
     },
-    [toggleSaved],
+    [toggleSaved, readOnly],
   );
 
   const handleToggleHidden = useCallback(
     async (messageId: string) => {
+      if (readOnly) return;
       const message = messages.find((m) => m.ids.id === messageId);
       if (!message) return;
 
@@ -409,11 +406,20 @@ export function MessagesContainer({
         }
       }
     },
-    [messageWriteClient, channel.ids.orgId, channel.ids.id, realtimeClient, messages, toggleHidden],
+    [
+      messageWriteClient,
+      channel.ids.orgId,
+      channel.ids.id,
+      realtimeClient,
+      messages,
+      toggleHidden,
+      readOnly,
+    ],
   );
 
   const handleDeleteMessage = useCallback(
     async (messageId: string) => {
+      if (readOnly) return;
       if (messageWriteClient) {
         try {
           await messageWriteClient.deleteMessage({
@@ -435,7 +441,14 @@ export function MessagesContainer({
         }
       }
     },
-    [messageWriteClient, channel.ids.orgId, channel.ids.id, realtimeClient, deleteMessage],
+    [
+      messageWriteClient,
+      channel.ids.orgId,
+      channel.ids.id,
+      realtimeClient,
+      deleteMessage,
+      readOnly,
+    ],
   );
 
   const visibleMessages = useMemo(
@@ -649,6 +662,10 @@ export function MessagesContainer({
   ]);
 
   useEffect(() => {
+    if (readOnly) {
+      setCreateTextMessage(() => null);
+      return;
+    }
     if (!senderProfile) return;
     setCreateTextMessage(
       (content: string): TextMessageVM => ({
@@ -668,9 +685,13 @@ export function MessagesContainer({
         content: { text: content },
       }),
     );
-  }, [senderProfile, setCreateTextMessage, channel.ids.orgId]);
+  }, [senderProfile, setCreateTextMessage, channel.ids.orgId, readOnly]);
 
   useEffect(() => {
+    if (readOnly) {
+      setSendTextMessage(async () => null);
+      return;
+    }
     if (!senderProfile) return;
     setSendTextMessage(async ({ content, threadId, threadParentId }) => {
       if (messageWriteClient && currentUserId) {
@@ -715,16 +736,17 @@ export function MessagesContainer({
     messageWriteClient,
     currentUserId,
     addMessage,
+    readOnly,
   ]);
 
   useEffect(() => {
     setThreadHandlers({
       onAddMessage: addMessage,
       onUpdateMessage: updateMessage,
-      onDeleteMessage: handleDeleteMessage,
-      onToggleReaction: handleToggleReaction,
-      onToggleSaved: handleToggleSaved,
-      onToggleHidden: handleToggleHidden,
+      onDeleteMessage: readOnly ? undefined : handleDeleteMessage,
+      onToggleReaction: readOnly ? undefined : handleToggleReaction,
+      onToggleSaved: readOnly ? undefined : handleToggleSaved,
+      onToggleHidden: readOnly ? undefined : handleToggleHidden,
     });
   }, [
     addMessage,
@@ -734,6 +756,7 @@ export function MessagesContainer({
     handleToggleSaved,
     handleToggleHidden,
     setThreadHandlers,
+    readOnly,
   ]);
 
   useEffect(() => {
@@ -758,7 +781,6 @@ export function MessagesContainer({
       isLoadingMore: isLoadingOlder,
       onLoadMore: handleLoadOlderMessages,
       initialScrollToBottom: true,
-      activitySignal,
       onUnreadViewed: markChannelRead,
     }),
     [
@@ -775,7 +797,6 @@ export function MessagesContainer({
       hasMoreOlderMessages,
       isLoadingOlder,
       handleLoadOlderMessages,
-      activitySignal,
       markChannelRead,
     ],
   );
@@ -789,14 +810,18 @@ export function MessagesContainer({
       {typingParticipants.length ? (
         <TypingIndicator profiles={typingParticipants} className="border-t border-border" />
       ) : null}
-      <MessageInput
-        onSend={handleSendMessage}
-        placeholder={getMessageInputPlaceholder(channel, resolvedCurrentUserId)}
-        onTypingStart={handleTypingStart}
-        onTypingStop={handleTypingStop}
-        onFocus={handleInputFocus}
-        onInputKeyDown={handleInputKeyDown}
-      />
+      {readOnly ? (
+        <div className="border-t border-border px-4 py-3 text-xs text-muted-foreground">
+          Read-only supervised conversation
+        </div>
+      ) : (
+        <MessageInput
+          onSend={handleSendMessage}
+          placeholder={getMessageInputPlaceholder(channel, resolvedCurrentUserId)}
+          onTypingStart={handleTypingStart}
+          onTypingStop={handleTypingStop}
+        />
+      )}
     </div>
   );
 }

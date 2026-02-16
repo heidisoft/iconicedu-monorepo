@@ -134,7 +134,7 @@ describe('MessageList', () => {
     expect(queryByText('NEW MESSAGES')).not.toBeInTheDocument();
   });
 
-  it('keeps new messages divider visible until user interaction dismisses it', () => {
+  it('keeps new messages divider visible across in-page rerenders', () => {
     vi.useFakeTimers();
     const older = {
       ...baseMessage,
@@ -161,7 +161,6 @@ describe('MessageList', () => {
         onProfileClick={vi.fn()}
         lastReadMessageId="message-older"
         currentUserId="profile-1"
-        activitySignal={0}
       />,
     );
 
@@ -179,7 +178,6 @@ describe('MessageList', () => {
         onProfileClick={vi.fn()}
         lastReadMessageId="message-older"
         currentUserId="profile-1"
-        activitySignal={1}
       />,
     );
 
@@ -191,11 +189,11 @@ describe('MessageList', () => {
     act(() => {
       vi.advanceTimersByTime(1000);
     });
-    expect(queryByText('NEW MESSAGES')).not.toBeInTheDocument();
+    expect(queryByText('NEW MESSAGES')).toBeInTheDocument();
     vi.useRealTimers();
   });
 
-  it('calls unread viewed callback when divider is dismissed', () => {
+  it('resets divider after navigation remount when read state updates', () => {
     vi.useFakeTimers();
     const older = {
       ...baseMessage,
@@ -214,37 +212,28 @@ describe('MessageList', () => {
         },
       },
     } as MessageVM;
-    const onUnreadViewed = vi.fn();
-
-    const { rerender } = render(
+    const { queryByText, unmount } = render(
       <MessageList
         messages={[older, newer]}
         onOpenThread={vi.fn() as unknown as (thread: ThreadVM, message: MessageVM) => void}
         onProfileClick={vi.fn()}
         lastReadMessageId="message-older"
         currentUserId="profile-1"
-        activitySignal={0}
-        onUnreadViewed={onUnreadViewed}
       />,
     );
+    expect(queryByText('NEW MESSAGES')).toBeInTheDocument();
+    unmount();
 
-    rerender(
+    const { queryByText: queryAfterRemount } = render(
       <MessageList
         messages={[older, newer]}
         onOpenThread={vi.fn() as unknown as (thread: ThreadVM, message: MessageVM) => void}
         onProfileClick={vi.fn()}
-        lastReadMessageId="message-older"
+        lastReadMessageId="message-newer"
         currentUserId="profile-1"
-        activitySignal={1}
-        onUnreadViewed={onUnreadViewed}
       />,
     );
-
-    act(() => {
-      vi.advanceTimersByTime(1000);
-    });
-
-    expect(onUnreadViewed).toHaveBeenCalledWith('message-newer');
+    expect(queryAfterRemount('NEW MESSAGES')).not.toBeInTheDocument();
     vi.useRealTimers();
   });
 });

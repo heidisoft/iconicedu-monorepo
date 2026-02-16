@@ -65,4 +65,15 @@ describe('MessageInput', () => {
 
     expect(onInputKeyDown).toHaveBeenCalledTimes(1);
   });
+
+  it('does not send in read-only mode', () => {
+    const onSend = vi.fn();
+    render(<MessageInput onSend={onSend} readOnly />);
+
+    const textarea = screen.getByPlaceholderText('Write a message...');
+    fireEvent.change(textarea, { target: { value: 'Hello' } });
+    fireEvent.keyDown(textarea, { key: 'Enter', code: 'Enter' });
+
+    expect(onSend).not.toHaveBeenCalled();
+  });
 });

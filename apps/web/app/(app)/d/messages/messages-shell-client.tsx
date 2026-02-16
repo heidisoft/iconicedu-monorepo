@@ -21,6 +21,7 @@ type MessagesShellClientProps = {
   channel: ChannelVM;
   currentUserId?: string;
   currentUserProfile?: UserProfileVM | null;
+  readOnly?: boolean;
   panelRegistry?: Partial<
     MessagesRightPanelRegistry<ComponentType<{ intent: MessagesRightPanelIntent }>>
   >;
@@ -34,6 +35,7 @@ export function MessagesShellClient({
   channel,
   currentUserId,
   currentUserProfile,
+  readOnly = false,
   panelRegistry,
   sendTextMessage,
   toggleReaction,
@@ -105,6 +107,7 @@ export function MessagesShellClient({
       channel={channelState}
       currentUserId={currentUserId}
       currentUserProfile={currentUserProfile}
+      readOnly={readOnly}
       panelRegistry={panelRegistry}
       realtimeClient={realtimeClient}
       messageWriteClient={messageWriteClient}

@@ -15,6 +15,10 @@ vi.mock('@iconicedu/web/lib/messages/realtime/supabase-messages-realtime-client'
   createSupabaseMessagesRealtimeClient: () => realtimeClient,
 }));
 
+vi.mock('@iconicedu/web/lib/supabase/client', () => ({
+  createSupabaseBrowserClient: () => ({ channel: vi.fn(() => ({ on: vi.fn().mockReturnThis(), subscribe: vi.fn(), unsubscribe: vi.fn() })) }),
+}));
+
 describe('MessagesShellClient', () => {
   it('passes realtime and write clients to MessagesShell', () => {
     const sendTextMessage = vi.fn();
@@ -24,8 +28,12 @@ describe('MessagesShellClient', () => {
 
     render(
       <MessagesShellClient
-        channel={{ ids: { id: 'channel-1', orgId: 'org-1' } } as any}
+        channel={{
+          ids: { id: 'channel-1', orgId: 'org-1' },
+          collections: { participants: [] },
+        } as any}
         currentUserId="profile-1"
+        readOnly
         sendTextMessage={sendTextMessage}
         toggleReaction={toggleReaction}
         deleteMessage={deleteMessage}
@@ -38,6 +46,7 @@ describe('MessagesShellClient', () => {
         realtimeClient,
         messageWriteClient: { sendTextMessage, toggleReaction, deleteMessage, toggleHiddenMessage },
         currentUserId: 'profile-1',
+        readOnly: true,
       }),
     );
   });

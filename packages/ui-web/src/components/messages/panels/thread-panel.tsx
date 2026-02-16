@@ -17,13 +17,18 @@ interface ThreadPanelProps {
   intent: MessagesRightPanelIntent;
 }
 
+type ThreadPanelContentProps = ThreadPanelPropsVM & {
+  isReadOnly?: boolean;
+};
+
 const ThreadPanelContent = memo(function ThreadPanelContent({
   replies,
   parentMessage,
   actions,
   currentUserId,
   readState,
-}: ThreadPanelPropsVM) {
+  isReadOnly,
+}: ThreadPanelContentProps) {
   const {
     onSendReply,
     onProfileClick,
@@ -60,7 +65,13 @@ const ThreadPanelContent = memo(function ThreadPanelContent({
         <div ref={bottomRef} />
       </ScrollArea>
 
-      <MessageInput onSend={onSendReply} placeholder="Reply..." />
+      {isReadOnly ? (
+        <div className="border-t border-border px-4 py-3 text-xs text-muted-foreground">
+          Read-only supervised conversation
+        </div>
+      ) : (
+        <MessageInput onSend={onSendReply} placeholder="Reply..." />
+      )}
     </>
   );
 });
@@ -77,6 +88,7 @@ export function ThreadPanel({ intent }: ThreadPanelProps) {
     currentUserId,
     threadHandlers,
     messages,
+    isReadOnly,
   } = useMessagesState();
   if (intent.key !== 'thread') return null;
   const threadData = getThreadData(intent.threadId);
@@ -172,6 +184,7 @@ export function ThreadPanel({ intent }: ThreadPanelProps) {
         }}
         currentUserId={currentUserId}
         readState={threadData.thread.readState}
+        isReadOnly={isReadOnly}
       />
     );
   }
@@ -190,6 +203,7 @@ export function ThreadPanel({ intent }: ThreadPanelProps) {
       }}
       currentUserId={currentUserId}
       readState={threadData.thread.readState}
+      isReadOnly={isReadOnly}
     />
   );
 }

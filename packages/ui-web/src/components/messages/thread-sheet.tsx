@@ -10,7 +10,8 @@ export function ThreadSheet({
   actions,
   currentUserId,
   readState,
-}: ThreadPanelPropsVM) {
+  isReadOnly = false,
+}: ThreadPanelPropsVM & { isReadOnly?: boolean }) {
   const {
     onSendReply,
     onProfileClick,
@@ -46,7 +47,13 @@ export function ThreadSheet({
       </ScrollArea>
 
       <div className="flex-shrink-0 border-t border-border">
-        <MessageInput onSend={onSendReply} placeholder="Reply..." sticky={false} />
+        {isReadOnly ? (
+          <div className="px-4 py-3 text-xs text-muted-foreground">
+            Read-only supervised conversation
+          </div>
+        ) : (
+          <MessageInput onSend={onSendReply} placeholder="Reply..." sticky={false} />
+        )}
       </div>
     </div>
   );

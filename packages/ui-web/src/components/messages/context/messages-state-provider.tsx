@@ -21,6 +21,7 @@ type ThreadData = {
 
 interface MessagesStateContextValue {
   channel: ChannelVM;
+  isReadOnly: boolean;
   currentUserId: string;
   savedCount: number;
   homeworkCount: number;
@@ -93,9 +94,11 @@ const isSameIntent = (
 
 export function MessagesStateProvider({
   channel,
+  isReadOnly = false,
   children,
 }: {
   channel: ChannelVM;
+  isReadOnly?: boolean;
   children: React.ReactNode;
 }) {
   const [state, setState] = useState<MessagesRightSidebarState>({
@@ -210,6 +213,7 @@ export function MessagesStateProvider({
   const value = useMemo(
     () => ({
       channel,
+      isReadOnly,
       currentUserId,
       savedCount,
       homeworkCount,
@@ -241,6 +245,7 @@ export function MessagesStateProvider({
     }),
     [
       channel,
+      isReadOnly,
       currentUserId,
       savedCount,
       homeworkCount,

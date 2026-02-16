@@ -228,4 +228,9 @@ describe('MessagesContainer', () => {
       }),
     );
   });
+
+  it('renders read-only notice for supervised conversations', () => {
+    render(<MessagesContainer channel={channel} currentUserId="profile-2" readOnly />);
+    expect(screen.getByText('Read-only supervised conversation')).toBeInTheDocument();
+  });
 });

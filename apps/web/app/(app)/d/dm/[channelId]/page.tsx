@@ -66,6 +66,24 @@ export default async function Page({
     notFound();
   }
 
+  const participantAccountIds = new Set(
+    (channel.collections.participants ?? []).map((participant) => participant.ids.accountId),
+  );
+  const guardianChildAccountIds = new Set(
+    currentUserProfile?.kind === 'guardian'
+      ? (currentUserProfile.children?.items ?? []).map((child) => child.ids.accountId)
+      : [],
+  );
+  const hasGuardianInChannel = participantAccountIds.has(account.id);
+  const hasChildInChannel = Array.from(guardianChildAccountIds).some((childAccountId) =>
+    participantAccountIds.has(childAccountId),
+  );
+  const isSupervisedReadOnly =
+    currentUserProfile?.kind === 'guardian' &&
+    (channel.basics.kind === 'dm' || channel.basics.kind === 'group_dm') &&
+    !hasGuardianInChannel &&
+    hasChildInChannel;
+
   return (
     <div className="flex h-[calc(100vh-1.0rem)] flex-col">
       <DashboardHeader />
@@ -73,6 +91,7 @@ export default async function Page({
         channel={channel}
         currentUserId={profileResponse.data?.id ?? ''}
         currentUserProfile={currentUserProfile}
+        readOnly={isSupervisedReadOnly}
         sendTextMessage={sendTextMessageAction}
         toggleReaction={toggleMessageReactionAction}
         deleteMessage={deleteMessageAction}

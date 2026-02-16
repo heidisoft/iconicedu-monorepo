@@ -30,7 +30,6 @@ interface MessageListProps {
   hasMore?: boolean;
   isLoadingMore?: boolean;
   onLoadMore?: () => Promise<boolean> | boolean;
-  activitySignal?: number;
   onUnreadViewed?: (lastReadMessageId: UUID) => void;
 }
 
@@ -55,7 +54,6 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
       hasMore = false,
       isLoadingMore = false,
       onLoadMore,
-      activitySignal = 0,
       onUnreadViewed,
     },
     ref,
@@ -128,19 +126,11 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
     const {
       dismissedUnreadAnchorId,
       isUnreadDividerDismissing,
-      dismissUnreadDivider,
     } = useUnreadIndicator({
       unreadAnchorMessageId,
       latestIncomingMessageId,
       onUnreadViewed,
     });
-
-    useEffect(() => {
-      if (!activitySignal) {
-        return;
-      }
-      dismissUnreadDivider();
-    }, [activitySignal, dismissUnreadDivider]);
 
     useEffect(() => {
       const root = scrollAreaRootRef.current;

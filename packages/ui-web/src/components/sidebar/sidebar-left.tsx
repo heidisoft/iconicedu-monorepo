@@ -260,7 +260,8 @@ export function SidebarLeft({
     userProfile.kind === 'guardian'
       ? data.collections.directMessages.filter((dm) =>
           dm.collections.participants.some(
-            (participant) => participant.ids.accountId === userProfile.ids.accountId,
+            (participant: UserProfileVM) =>
+              participant.ids.accountId === userProfile.ids.accountId,
           ),
         )
       : data.collections.directMessages;
@@ -271,10 +272,12 @@ export function SidebarLeft({
             child,
             dms: data.collections.directMessages.filter((dm) => {
               const hasChild = dm.collections.participants.some(
-                (participant) => participant.ids.accountId === child.ids.accountId,
+                (participant: UserProfileVM) =>
+                  participant.ids.accountId === child.ids.accountId,
               );
               const hasGuardian = dm.collections.participants.some(
-                (participant) => participant.ids.accountId === userProfile.ids.accountId,
+                (participant: UserProfileVM) =>
+                  participant.ids.accountId === userProfile.ids.accountId,
               );
               return hasChild && !hasGuardian;
             }),
