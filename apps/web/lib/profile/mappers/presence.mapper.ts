@@ -4,8 +4,10 @@ import type {
   PresenceVM,
   ProfilePresenceRow,
 } from '@iconicedu/shared-types';
+import { deriveDisplayStatusFromPresenceRow } from '@iconicedu/web/lib/presence/status';
 
 const LIVE_STATUS_SET: ReadonlySet<LiveStatusVM> = new Set([
+  'online',
   'in_class',
   'teaching',
   'reviewing_work',
@@ -37,12 +39,22 @@ export function mapProfilePresenceRowToVM(
 
   const liveStatusRaw = row.live_status?.trim();
   const displayStatusRaw = row.display_status?.trim();
-  const liveStatus =
-    liveStatusRaw && isLiveStatus(liveStatusRaw) ? liveStatusRaw : 'offline';
-  const displayStatus =
+  const rawDisplayStatus =
     displayStatusRaw && isDisplayStatus(displayStatusRaw)
       ? displayStatusRaw
       : undefined;
+  const displayStatus = deriveDisplayStatusFromPresenceRow({
+    reportedStatus: rawDisplayStatus ?? null,
+    lastSeenAt: row.last_seen_at ?? null,
+  });
+  const liveStatus =
+    liveStatusRaw && isLiveStatus(liveStatusRaw)
+      ? liveStatusRaw
+      : displayStatus === 'online'
+        ? 'online'
+        : displayStatus === 'away'
+          ? 'away'
+          : 'offline';
 
   return {
     state: {

@@ -43,9 +43,14 @@ import { mapProfilePresenceRowToVM } from '@iconicedu/web/lib/profile/mappers/pr
 import { applyPresenceToSidebarData } from '@iconicedu/web/lib/presence/apply-presence';
 import type { ProfilePresenceRow } from '@iconicedu/shared-types';
 import { buildChannelById } from '@iconicedu/web/lib/channels/builders/channel.builder';
+import {
+  deriveConnectionStatusFromActivity,
+  PRESENCE_AWAY_AFTER_MS,
+} from '@iconicedu/web/lib/presence/status';
 
 const AVATAR_BUCKET = 'public-avatars';
 const AVATAR_SIGNED_URL_TTL = 60 * 60;
+const PRESENCE_HEARTBEAT_MS = 30 * 1000;
 
 const getToastMessageFromError = (error: unknown) =>
   error instanceof Error ? error.message : 'Something went wrong.';
@@ -437,6 +442,122 @@ export function SidebarShell({
       void channel.unsubscribe();
     };
   }, [supabase, sidebarProfile.ids?.orgId]);
+
+  React.useEffect(() => {
+    if (!sidebarProfile.ids?.id || !sidebarProfile.ids?.orgId) {
+      return;
+    }
+
+    const lastActivityAtRef = { current: Date.now() };
+    const lastPublishedStatusRef: { current: 'online' | 'away' | 'offline' | null } = {
+      current: null,
+    };
+    const lastOnlineHeartbeatAtRef = { current: 0 };
+    const publishPresence = async (
+      status: 'online' | 'away' | 'offline',
+      options?: { force?: boolean; keepalive?: boolean },
+    ) => {
+      const isHeartbeat =
+        status === 'online' &&
+        lastPublishedStatusRef.current === 'online' &&
+        !options?.force;
+      if (isHeartbeat && Date.now() - lastOnlineHeartbeatAtRef.current < PRESENCE_HEARTBEAT_MS) {
+        return;
+      }
+      if (!options?.force && status !== 'online' && lastPublishedStatusRef.current === status) {
+        return;
+      }
+
+      lastPublishedStatusRef.current = status;
+      if (status === 'online') {
+        lastOnlineHeartbeatAtRef.current = Date.now();
+      }
+
+      try {
+        await window.fetch('/d/actions/presence', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status }),
+          keepalive: options?.keepalive ?? false,
+        });
+      } catch {
+        // best effort presence sync
+      }
+    };
+
+    const computeStatus = (): 'online' | 'away' => {
+      const hasActiveWindow =
+        document.visibilityState === 'visible' &&
+        (typeof document.hasFocus !== 'function' || document.hasFocus());
+      return deriveConnectionStatusFromActivity({
+        lastActivityAt: lastActivityAtRef.current,
+        hasActiveWindow,
+      });
+    };
+
+    const handleActivity = () => {
+      lastActivityAtRef.current = Date.now();
+      if (computeStatus() === 'online') {
+        void publishPresence('online');
+      }
+    };
+
+    const handleVisibilityOrFocus = () => {
+      const status = computeStatus();
+      void publishPresence(status);
+    };
+
+    const handlePageHide = () => {
+      const payload = JSON.stringify({ status: 'offline' });
+      if (navigator.sendBeacon) {
+        const blob = new Blob([payload], { type: 'application/json' });
+        navigator.sendBeacon('/d/actions/presence', blob);
+      } else {
+        void publishPresence('offline', { force: true, keepalive: true });
+      }
+    };
+
+    const activityEvents: Array<keyof WindowEventMap> = [
+      'mousemove',
+      'mousedown',
+      'keydown',
+      'scroll',
+      'touchstart',
+    ];
+    activityEvents.forEach((eventName) => {
+      window.addEventListener(eventName, handleActivity, { passive: true });
+    });
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    window.addEventListener('blur', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('pagehide', handlePageHide);
+    window.addEventListener('beforeunload', handlePageHide);
+
+    void publishPresence(computeStatus(), { force: true });
+    const heartbeatTimer = window.setInterval(() => {
+      const status = computeStatus();
+      void publishPresence(status);
+      if (
+        status === 'away' &&
+        Date.now() - lastActivityAtRef.current >= PRESENCE_AWAY_AFTER_MS * 2
+      ) {
+        void publishPresence('offline', { force: true });
+      }
+    }, 15_000);
+
+    return () => {
+      window.clearInterval(heartbeatTimer);
+      activityEvents.forEach((eventName) => {
+        window.removeEventListener(eventName, handleActivity);
+      });
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      window.removeEventListener('blur', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('pagehide', handlePageHide);
+      window.removeEventListener('beforeunload', handlePageHide);
+      void publishPresence('offline', { force: true, keepalive: true });
+    };
+  }, [sidebarProfile.ids?.id, sidebarProfile.ids?.orgId]);
 
   React.useEffect(() => {
     if (!sidebarProfile.ids?.id || !sidebarProfile.ids?.orgId) {

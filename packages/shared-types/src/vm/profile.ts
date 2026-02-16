@@ -28,6 +28,7 @@ export type PresenceStateVM = {
 export type PresenceDisplayStatusVM = 'online' | 'idle' | 'busy' | 'away' | 'offline';
 
 export type LiveStatusVM =
+  | 'online'
   | 'in_class'
   | 'teaching'
   | 'reviewing_work'

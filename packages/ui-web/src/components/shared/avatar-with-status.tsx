@@ -20,6 +20,7 @@ const STATUS_COLORS: Record<PresenceDisplayStatusVM, string> = {
 };
 
 const LIVE_STATUS_TO_DISPLAY: Record<LiveStatusVM, PresenceDisplayStatusVM> = {
+  online: 'online',
   in_class: 'online',
   teaching: 'online',
   reviewing_work: 'idle',

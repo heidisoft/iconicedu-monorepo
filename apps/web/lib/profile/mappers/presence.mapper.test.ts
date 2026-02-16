@@ -12,7 +12,7 @@ describe('mapProfilePresenceRowToVM', () => {
       state_emoji: '📞',
       live_status: 'busy',
       display_status: 'busy',
-      last_seen_at: '2026-02-15T00:00:00.000Z',
+      last_seen_at: new Date().toISOString(),
       presence_loaded: true,
     } as unknown as ProfilePresenceRow;
 
@@ -35,6 +35,21 @@ describe('mapProfilePresenceRowToVM', () => {
     const mapped = mapProfilePresenceRowToVM(row);
     expect(mapped?.liveStatus).toBe('offline');
     expect(mapped?.displayStatus).toBe('busy');
+  });
+
+  it('falls back to away when online status is stale', () => {
+    const row = {
+      id: 'presence-1',
+      org_id: 'org-1',
+      profile_id: 'profile-1',
+      live_status: 'online',
+      display_status: 'online',
+      last_seen_at: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
+    } as unknown as ProfilePresenceRow;
+
+    const mapped = mapProfilePresenceRowToVM(row);
+    expect(mapped?.displayStatus).toBe('away');
+    expect(mapped?.liveStatus).toBe('online');
   });
 
   it('returns null when row is deleted', () => {
