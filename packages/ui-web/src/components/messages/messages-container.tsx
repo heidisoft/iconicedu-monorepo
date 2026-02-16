@@ -62,6 +62,7 @@ const isEducatorProfile = (profile: UserProfileVM): profile is EducatorProfileVM
   profile.kind === 'educator';
 
 const MESSAGES_PAGE_SIZE = 40;
+const READ_STATE_PERSIST_DEBOUNCE_MS = 220;
 
 export function MessagesContainer({
   channel,
@@ -73,6 +74,11 @@ export function MessagesContainer({
 }: MessagesContainerProps) {
   const messageListRef = useRef<MessageListRef>(null);
   const messagesRef = useRef<MessageVM[]>([]);
+  const lastPersistedReadMessageIdRef = useRef<UUID | null>(
+    channel.collections.readState?.lastReadMessageId ?? null,
+  );
+  const pendingReadMessageIdRef = useRef<UUID | null>(null);
+  const persistReadStateTimerRef = useRef<number | null>(null);
   const typingTimeoutsRef = useRef(new Map<string, number>());
   const [typingIds, setTypingIds] = useState<Set<string>>(new Set());
   const {
@@ -192,21 +198,35 @@ export function MessagesContainer({
         }),
       );
 
-      const persistReadState = async () => {
-        try {
-          await window.fetch('/d/messages/actions/read-state', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              channelId: channel.ids.id,
-              lastReadMessageId: nextLastReadMessageId,
-            }),
-          });
-        } catch {
-          // best effort client sync
+      pendingReadMessageIdRef.current = nextLastReadMessageId;
+      if (persistReadStateTimerRef.current) {
+        window.clearTimeout(persistReadStateTimerRef.current);
+      }
+      persistReadStateTimerRef.current = window.setTimeout(() => {
+        const readMessageId = pendingReadMessageIdRef.current;
+        if (!readMessageId || readMessageId === lastPersistedReadMessageIdRef.current) {
+          return;
         }
-      };
-      void persistReadState();
+
+        const persistReadState = async () => {
+          try {
+            const response = await window.fetch('/d/messages/actions/read-state', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                channelId: channel.ids.id,
+                lastReadMessageId: readMessageId,
+              }),
+            });
+            if (response.ok) {
+              lastPersistedReadMessageIdRef.current = readMessageId;
+            }
+          } catch {
+            // best effort client sync
+          }
+        };
+        void persistReadState();
+      }, READ_STATE_PERSIST_DEBOUNCE_MS);
     },
     [channel.ids.id, lastReadMessageId],
   );
@@ -579,8 +599,21 @@ export function MessagesContainer({
   ]);
 
   useEffect(() => {
+    if (persistReadStateTimerRef.current) {
+      window.clearTimeout(persistReadStateTimerRef.current);
+      persistReadStateTimerRef.current = null;
+    }
+    pendingReadMessageIdRef.current = null;
+    lastPersistedReadMessageIdRef.current =
+      channel.collections.readState?.lastReadMessageId ?? null;
+  }, [channel.ids.id, channel.collections.readState?.lastReadMessageId]);
+
+  useEffect(() => {
     const typingTimeouts = typingTimeoutsRef.current;
     return () => {
+      if (persistReadStateTimerRef.current) {
+        window.clearTimeout(persistReadStateTimerRef.current);
+      }
       typingTimeouts.forEach((timeoutId) => window.clearTimeout(timeoutId));
       typingTimeouts.clear();
     };

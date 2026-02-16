@@ -39,7 +39,9 @@ const baseMessage: MessageVM = {
 
 describe('MessageList', () => {
   beforeEach(() => {
+    vi.restoreAllMocks();
     Element.prototype.scrollIntoView = vi.fn();
+    vi.spyOn(document, 'hasFocus').mockReturnValue(true);
   });
 
   it('scrolls to bottom when new messages are added', () => {
@@ -235,5 +237,39 @@ describe('MessageList', () => {
     );
     expect(queryAfterRemount('NEW MESSAGES')).not.toBeInTheDocument();
     vi.useRealTimers();
+  });
+
+  it('calls unread viewed callback when newest incoming message is visible', () => {
+    const older = {
+      ...baseMessage,
+      ids: { ...baseMessage.ids, id: 'message-older' },
+      core: { ...baseMessage.core, createdAt: '2026-02-14T10:00:00.000Z' },
+    } as MessageVM;
+    const newer = {
+      ...baseMessage,
+      ids: { ...baseMessage.ids, id: 'message-newer' },
+      core: {
+        ...baseMessage.core,
+        createdAt: '2026-02-15T10:00:00.000Z',
+        sender: {
+          ...baseMessage.core.sender,
+          ids: { ...baseMessage.core.sender.ids, id: 'profile-2' },
+        },
+      },
+    } as MessageVM;
+    const onUnreadViewed = vi.fn();
+
+    render(
+      <MessageList
+        messages={[older, newer]}
+        onOpenThread={vi.fn() as unknown as (thread: ThreadVM, message: MessageVM) => void}
+        onProfileClick={vi.fn()}
+        lastReadMessageId="message-older"
+        currentUserId="profile-1"
+        onUnreadViewed={onUnreadViewed}
+      />,
+    );
+
+    expect(onUnreadViewed).toHaveBeenCalledWith('message-newer');
   });
 });

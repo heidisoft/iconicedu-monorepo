@@ -4,15 +4,14 @@ import {
   useImperativeHandle,
   forwardRef,
   useMemo,
+  useCallback,
 } from 'react';
 import { MessageItem } from '@iconicedu/ui-web/components/messages/message-item';
 import { EmptyMessagesState } from '@iconicedu/ui-web/components/messages/empty-state';
 import type { ISODateTime, MessageVM, ThreadVM, UUID } from '@iconicedu/shared-types';
 import { ScrollArea } from '@iconicedu/ui-web/ui/scroll-area';
 import { formatDateHeader } from '@iconicedu/ui-web/lib/message-utils';
-import { cn } from '@iconicedu/ui-web/lib/utils';
 import { findUnreadAnchorMessageId } from '@iconicedu/ui-web/components/messages/unread-indicator.utils';
-import { useUnreadIndicator } from '@iconicedu/ui-web/components/messages/hooks/use-unread-indicator';
 import { findLatestIncomingMessageId } from '@iconicedu/ui-web/components/messages/read-state.utils';
 
 interface MessageListProps {
@@ -64,6 +63,8 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
     const didInitialScrollRef = useRef(false);
     const messageCountRef = useRef(messages.length);
     const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+    const isNearBottomRef = useRef(false);
+    const lastNotifiedReadIdRef = useRef<UUID | null>(null);
 
     useImperativeHandle(ref, () => ({
       scrollToMessage: (messageId: string) => {
@@ -123,14 +124,53 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
       () => findLatestIncomingMessageId(sortedMessages, currentUserId),
       [sortedMessages, currentUserId],
     );
-    const {
-      dismissedUnreadAnchorId,
-      isUnreadDividerDismissing,
-    } = useUnreadIndicator({
-      unreadAnchorMessageId,
-      latestIncomingMessageId,
-      onUnreadViewed,
-    });
+
+    const isViewportNearBottom = useCallback((viewport: HTMLDivElement | null) => {
+      if (!viewport) {
+        return false;
+      }
+      const remaining = viewport.scrollHeight - (viewport.scrollTop + viewport.clientHeight);
+      return remaining <= 40;
+    }, []);
+
+    const maybeMarkUnreadAsViewed = useCallback(() => {
+      if (!onUnreadViewed || !unreadAnchorMessageId || !latestIncomingMessageId) {
+        return;
+      }
+      if (!isNearBottomRef.current) {
+        return;
+      }
+      if (typeof document !== 'undefined') {
+        if (document.visibilityState !== 'visible') {
+          return;
+        }
+        if (typeof document.hasFocus === 'function' && !document.hasFocus()) {
+          return;
+        }
+      }
+      if (lastNotifiedReadIdRef.current === latestIncomingMessageId) {
+        return;
+      }
+      lastNotifiedReadIdRef.current = latestIncomingMessageId;
+      onUnreadViewed(latestIncomingMessageId);
+    }, [latestIncomingMessageId, onUnreadViewed, unreadAnchorMessageId]);
+
+    useEffect(() => {
+      if (!unreadAnchorMessageId) {
+        lastNotifiedReadIdRef.current = null;
+      }
+    }, [unreadAnchorMessageId]);
+
+    useEffect(() => {
+      const viewport = scrollAreaRootRef.current?.querySelector(
+        '[data-slot="scroll-area-viewport"]',
+      ) as HTMLDivElement | null;
+      if (!viewport) {
+        return;
+      }
+      isNearBottomRef.current = isViewportNearBottom(viewport);
+      maybeMarkUnreadAsViewed();
+    }, [messages.length, isViewportNearBottom, maybeMarkUnreadAsViewed]);
 
     useEffect(() => {
       const root = scrollAreaRootRef.current;
@@ -145,6 +185,8 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
       }
 
       const maybeLoadMore = async () => {
+        isNearBottomRef.current = isViewportNearBottom(viewport);
+        maybeMarkUnreadAsViewed();
         if (viewport.scrollTop > 40 || isLoadingMoreRef.current) {
           return;
         }
@@ -170,7 +212,26 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
       return () => {
         viewport.removeEventListener('scroll', onScroll);
       };
-    }, [hasMore, onLoadMore]);
+    }, [hasMore, onLoadMore, isViewportNearBottom, maybeMarkUnreadAsViewed]);
+
+    useEffect(() => {
+      const viewport = scrollAreaRootRef.current?.querySelector(
+        '[data-slot="scroll-area-viewport"]',
+      ) as HTMLDivElement | null;
+      if (!viewport) {
+        return;
+      }
+      const handleWindowStateChange = () => {
+        isNearBottomRef.current = isViewportNearBottom(viewport);
+        maybeMarkUnreadAsViewed();
+      };
+      window.addEventListener('focus', handleWindowStateChange);
+      document.addEventListener('visibilitychange', handleWindowStateChange);
+      return () => {
+        window.removeEventListener('focus', handleWindowStateChange);
+        document.removeEventListener('visibilitychange', handleWindowStateChange);
+      };
+    }, [isViewportNearBottom, maybeMarkUnreadAsViewed]);
 
     const groupedMessages = useMemo(() => {
       const groups: { date: string; messages: MessageVM[] }[] = [];
@@ -217,9 +278,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
             </div>
             {group.messages.map((message) => {
               const showUnreadDivider =
-                unreadAnchorMessageId !== null &&
-                dismissedUnreadAnchorId !== unreadAnchorMessageId &&
-                message.ids.id === unreadAnchorMessageId;
+                unreadAnchorMessageId !== null && message.ids.id === unreadAnchorMessageId;
               return (
                 <div
                   key={message.ids.id}
@@ -230,14 +289,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                   className="transition-all duration-300"
                 >
                   {showUnreadDivider && (
-                    <div
-                      className={cn(
-                        'relative my-4 flex items-center transition-all duration-900 ease-out',
-                        isUnreadDividerDismissing
-                          ? 'opacity-0 -translate-y-1'
-                          : 'opacity-100 translate-y-0',
-                      )}
-                    >
+                    <div className="relative my-4 flex items-center">
                       <div className="flex-1 border-t border-yellow-200" />
                       <span className="mx-4 text-xs font-medium text-yellow-700 bg-background px-2">
                         NEW MESSAGES

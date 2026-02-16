@@ -30,12 +30,60 @@ export async function POST(request: Request) {
   }
 
   const now = new Date().toISOString();
+  const channelLookup = await supabase
+    .from('channels')
+    .select('id')
+    .eq('org_id', account.org_id)
+    .eq('id', channelId)
+    .is('deleted_at', null)
+    .maybeSingle<{ id: string }>();
+
+  if (channelLookup.error) {
+    return NextResponse.json(
+      { success: false, message: channelLookup.error.message },
+      { status: 500 },
+    );
+  }
+
+  if (!channelLookup.data) {
+    return NextResponse.json(
+      { success: false, message: 'Channel not found or access denied' },
+      { status: 403 },
+    );
+  }
+
+  const requestedLastReadMessageId = body?.lastReadMessageId ?? null;
+  if (requestedLastReadMessageId) {
+    const messageLookup = await supabase
+      .from('messages')
+      .select('id')
+      .eq('org_id', account.org_id)
+      .eq('channel_id', channelId)
+      .eq('id', requestedLastReadMessageId)
+      .is('deleted_at', null)
+      .maybeSingle<{ id: string }>();
+
+    if (messageLookup.error) {
+      return NextResponse.json(
+        { success: false, message: messageLookup.error.message },
+        { status: 500 },
+      );
+    }
+
+    if (!messageLookup.data) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid lastReadMessageId for channel' },
+        { status: 400 },
+      );
+    }
+  }
+
   const { error } = await supabase.from('channel_read_state').upsert(
     {
       org_id: account.org_id,
       account_id: account.id,
       channel_id: channelId,
-      last_read_message_id: body?.lastReadMessageId ?? null,
+      last_read_message_id: requestedLastReadMessageId,
       last_read_at: now,
       unread_count: 0,
     },
