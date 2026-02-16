@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 
 import { SidebarLeft } from './sidebar-left';
 import { SidebarProvider } from '../../ui/sidebar';
@@ -163,6 +163,116 @@ function makeGuardianData() {
   } as any;
 }
 
+function makeGuardianSupervisedDmData() {
+  return {
+    ...makeGuardianData(),
+    collections: {
+      ...makeGuardianData().collections,
+      directMessages: [
+        {
+          ids: { id: 'dm-guardian', orgId: 'org-1' },
+          basics: { topic: 'Guardian DM' },
+          collections: {
+            readState: { unreadCount: 0 },
+            messages: { items: [] },
+            participants: [
+              { ids: { id: 'profile-guardian', accountId: 'account-guardian' }, profile: { displayName: 'Parent One' } },
+              { ids: { id: 'profile-teacher', accountId: 'account-teacher' }, profile: { displayName: 'Teacher One' } },
+            ],
+          },
+        },
+        {
+          ids: { id: 'dm-child-1', orgId: 'org-1' },
+          basics: { topic: 'Child DM 1' },
+          collections: {
+            readState: { unreadCount: 2 },
+            messages: { items: [] },
+            participants: [
+              { ids: { id: 'profile-child-1', accountId: 'account-child-1' }, profile: { displayName: 'Child One' } },
+              { ids: { id: 'profile-other-1', accountId: 'account-other-1' }, profile: { displayName: 'Mentor One' } },
+            ],
+          },
+        },
+        {
+          ids: { id: 'dm-child-2', orgId: 'org-1' },
+          basics: { topic: 'Child DM 2' },
+          collections: {
+            readState: { unreadCount: 1 },
+            messages: { items: [] },
+            participants: [
+              { ids: { id: 'profile-child-2', accountId: 'account-child-2' }, profile: { displayName: 'Child Two' } },
+              { ids: { id: 'profile-other-2', accountId: 'account-other-2' }, profile: { displayName: 'Tutor Two' } },
+            ],
+          },
+        },
+      ],
+    },
+  } as any;
+}
+
+function makeStudentData() {
+  return {
+    navigation: {
+      navMain: [{ title: 'Home', url: '/d', icon: 'home' }],
+      navSecondary: [],
+    },
+    user: {
+      profile: {
+        kind: 'child',
+        ids: {
+          id: 'profile-student',
+          orgId: 'org-1',
+          accountId: 'account-student',
+        },
+        profile: {
+          displayName: 'Student One',
+          firstName: 'Student',
+          lastName: 'One',
+          avatar: { source: 'seed', seed: 'student' },
+        },
+        prefs: {},
+        meta: {},
+      },
+      account: { id: 'account-student', orgId: 'org-1', contacts: {} },
+    },
+    collections: {
+      learningSpaces: [
+        {
+          ids: { id: 'space-student-1', orgId: 'org-1' },
+          basics: { title: 'Student Algebra', subject: 'Math', iconKey: null },
+          channels: {
+            primaryChannel: {
+              ids: { id: 'channel-student-1', orgId: 'org-1' },
+              basics: { iconKey: null },
+              ui: {},
+              collections: {
+                readState: { unreadCount: 2 },
+                participants: [{ ids: { accountId: 'account-student' } }],
+              },
+            },
+          },
+        },
+        {
+          ids: { id: 'space-student-2', orgId: 'org-1' },
+          basics: { title: 'Other Space', subject: 'Science', iconKey: null },
+          channels: {
+            primaryChannel: {
+              ids: { id: 'channel-student-2', orgId: 'org-1' },
+              basics: { iconKey: null },
+              ui: {},
+              collections: {
+                readState: { unreadCount: 4 },
+                participants: [{ ids: { accountId: 'account-other' } }],
+              },
+            },
+          },
+        },
+      ],
+      directMessages: [],
+    },
+  } as any;
+}
+
 describe('SidebarLeft', () => {
   it('shows educator learning spaces on the sidebar', () => {
     render(
@@ -238,5 +348,37 @@ describe('SidebarLeft', () => {
       '/d/spaces/channel-physics',
     );
     expect(screen.getAllByText('1').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('shows student learning spaces with flat educator-style list', () => {
+    render(
+      <SidebarProvider>
+        <SidebarLeft data={makeStudentData()} />
+      </SidebarProvider>,
+    );
+
+    expect(screen.getByText('Learning spaces')).toBeInTheDocument();
+    expect(screen.getByText('Student Algebra')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Student Algebra/i })).toHaveAttribute(
+      'href',
+      '/d/spaces/channel-student-1',
+    );
+    expect(screen.queryByText('Other Space')).not.toBeInTheDocument();
+    expect(screen.getAllByText('2').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('shows supervised direct messages for guardian grouped by child', () => {
+    render(
+      <SidebarProvider>
+        <SidebarLeft data={makeGuardianSupervisedDmData()} />
+      </SidebarProvider>,
+    );
+
+    expect(screen.getByText('Supervised DMs')).toBeInTheDocument();
+    expect(screen.getByText('Mentor One')).toBeInTheDocument();
+    expect(screen.getByText('Tutor Two')).toBeInTheDocument();
+    const sectionHeader = screen.getByText('Supervised DMs').closest('div');
+    expect(sectionHeader).not.toBeNull();
+    expect(within(sectionHeader as HTMLElement).getByText('3')).toBeInTheDocument();
   });
 });

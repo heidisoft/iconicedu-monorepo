@@ -50,6 +50,7 @@ import {
 } from '@iconicedu/ui-web/ui/dropdown-menu';
 import { NavMain } from '@iconicedu/ui-web/components/sidebar/nav-main';
 import { NavDirectMessages } from '@iconicedu/ui-web/components/sidebar/nav-direct-messages';
+import { NavSupervisedDirectMessages } from '@iconicedu/ui-web/components/sidebar/nav-supervised-direct-messages';
 import { NavAdmin } from '@iconicedu/ui-web/components/sidebar/nav-admin';
 import type { AdminMenuSection } from '@iconicedu/shared-types';
 import { SiteLogoWithName } from '@iconicedu/ui-web/components/site-logo-wt-name';
@@ -76,6 +77,7 @@ import type {
 } from '@iconicedu/shared-types';
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
 import {
+  getDirectMessageItemUnreadCount,
   getLearningSpaceItemUnreadCountForUser,
   getLearningSpaceUnreadCount,
 } from '@iconicedu/ui-web/components/sidebar/sidebar-unread';
@@ -230,17 +232,65 @@ export function SidebarLeft({
           ),
         )
       : [];
+  const studentLearningSpaces =
+    userProfile.kind === 'child'
+      ? data.collections.learningSpaces.filter((space) =>
+          space.channels.primaryChannel.collections.participants.some(
+            (participant: UserProfileVM) =>
+              participant.ids.accountId === userProfile.ids.accountId ||
+              participant.ids.id === userProfile.ids.id,
+          ),
+        )
+      : [];
   const shouldShowLearningSpaces =
-    userProfile.kind === 'guardian' || userProfile.kind === 'educator';
+    userProfile.kind === 'guardian' ||
+    userProfile.kind === 'educator' ||
+    userProfile.kind === 'child';
+  const flatLearningSpaces =
+    userProfile.kind === 'educator' ? educatorLearningSpaces : studentLearningSpaces;
   const visibleLearningSpaces =
     userProfile.kind === 'guardian'
       ? learningSpacesByChild.flatMap((entry) => entry.learningSpaces)
-      : educatorLearningSpaces;
+      : flatLearningSpaces;
   const currentUserRef = {
     accountId: data.user.profile.ids.accountId,
     profileId: data.user.profile.ids.id,
   };
-  const hasDirectMessages = data.collections.directMessages.length > 0;
+  const ownDirectMessages =
+    userProfile.kind === 'guardian'
+      ? data.collections.directMessages.filter((dm) =>
+          dm.collections.participants.some(
+            (participant) => participant.ids.accountId === userProfile.ids.accountId,
+          ),
+        )
+      : data.collections.directMessages;
+  const supervisedDirectMessagesByChild =
+    userProfile.kind === 'guardian'
+      ? children
+          .map((child) => ({
+            child,
+            dms: data.collections.directMessages.filter((dm) => {
+              const hasChild = dm.collections.participants.some(
+                (participant) => participant.ids.accountId === child.ids.accountId,
+              );
+              const hasGuardian = dm.collections.participants.some(
+                (participant) => participant.ids.accountId === userProfile.ids.accountId,
+              );
+              return hasChild && !hasGuardian;
+            }),
+          }))
+          .filter(({ dms }) => dms.length > 0)
+      : [];
+  const hasDirectMessages = ownDirectMessages.length > 0;
+  const hasSupervisedDirectMessages = supervisedDirectMessagesByChild.length > 0;
+  const supervisedUnreadCount = supervisedDirectMessagesByChild.reduce((total, group) => {
+    return (
+      total +
+      group.dms.reduce((dmTotal, dm) => {
+        return dmTotal + getDirectMessageItemUnreadCount(dm, group.child.ids.accountId);
+      }, 0)
+    );
+  }, 0);
   const totalLearningSpacesUnread = getLearningSpaceUnreadCount(
     visibleLearningSpaces,
     currentUserRef,
@@ -364,7 +414,7 @@ export function SidebarLeft({
             ) : (
               <SidebarGroup className="py-0 group-data-[collapsible=icon]:hidden">
                 <SidebarMenu>
-                  {educatorLearningSpaces.map((space) => {
+                  {flatLearningSpaces.map((space) => {
                     const channel = space.channels.primaryChannel;
                     const iconKey = space.basics.iconKey ?? channel.basics.iconKey ?? null;
                     const Icon = getLearningSpaceIcon(iconKey, Languages);
@@ -416,10 +466,38 @@ export function SidebarLeft({
           <>
             <SidebarSeparator className="mx-2" />
             <NavDirectMessages
-              dms={data.collections.directMessages}
+              dms={ownDirectMessages}
               currentUserId={data.user.profile.ids.accountId}
               activeChannelId={activeDirectMessageId ?? null}
             />
+          </>
+        ) : null}
+        {hasSupervisedDirectMessages ? (
+          <>
+            <SidebarSeparator className="mx-2 group-data-[collapsible=icon]:hidden" />
+            <SidebarGroup className="pb-0">
+              <SidebarGroupLabel asChild className="uppercase">
+                <span className="inline-flex items-center gap-2">
+                  <span>Supervised DMs</span>
+                  {supervisedUnreadCount > 0 ? (
+                    <Badge className="h-4 px-1.5 text-[10px] bg-rose-500 text-white">
+                      {supervisedUnreadCount}
+                    </Badge>
+                  ) : null}
+                </span>
+              </SidebarGroupLabel>
+              <SidebarGroupContent />
+            </SidebarGroup>
+            {supervisedDirectMessagesByChild.map(({ child, dms }) => (
+              <NavSupervisedDirectMessages
+                key={child.ids.accountId}
+                child={child}
+                dms={dms}
+                isOpen={true}
+                onOpenChange={() => undefined}
+                activeChannelId={activeDirectMessageId ?? null}
+              />
+            ))}
           </>
         ) : null}
         <NavSecondary items={navSecondary} className="mt-auto" />

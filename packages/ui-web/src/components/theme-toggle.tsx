@@ -1,6 +1,6 @@
 'use client';
 
-import { Moon, Sun, Monitor } from 'lucide-react';
+import { Moon, Sun, SunMoon } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
 import { Button } from '@iconicedu/ui-web/ui/button';
@@ -30,7 +30,7 @@ export function ThemeToggle({ ...props }) {
         return Moon;
       case 'system':
       default:
-        return Monitor;
+        return SunMoon;
     }
   };
 

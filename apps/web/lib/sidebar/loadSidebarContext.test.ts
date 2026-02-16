@@ -1,11 +1,17 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { loadSidebarContext } from '@iconicedu/web/lib/sidebar/loadSidebarContext';
 
 const buildSidebarUser = vi.fn();
+const buildDirectMessageChannelsWithMessages = vi.fn();
 
 vi.mock('@iconicedu/web/lib/sidebar/user/buildSidebarUser', () => ({
   buildSidebarUser: (...args: unknown[]) => buildSidebarUser(...args),
+}));
+
+vi.mock('@iconicedu/web/lib/channels/builders/channel.builder', () => ({
+  buildDirectMessageChannelsWithMessages: (...args: unknown[]) =>
+    buildDirectMessageChannelsWithMessages(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/onboarding/determineOnboardingStep', () => ({
@@ -41,7 +47,14 @@ const makeChannel = (id: string, participantIds: string[]) =>
   }) as any;
 
 describe('loadSidebarContext', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    buildDirectMessageChannelsWithMessages.mockReset();
+    buildSidebarUser.mockReset();
+  });
+
   it('filters direct messages for guardians to only include their channels', async () => {
+    buildDirectMessageChannelsWithMessages.mockResolvedValueOnce([]);
     buildSidebarUser.mockResolvedValueOnce({
       accountVM: { ids: { id: 'account-1', orgId: 'org-1' } },
       profileVM: {
@@ -81,5 +94,58 @@ describe('loadSidebarContext', () => {
 
     expect(result.sidebarData.collections.directMessages).toHaveLength(1);
     expect(result.sidebarData.collections.directMessages[0].ids.id).toBe('dm-1');
+  });
+
+  it('includes child direct messages for guardians', async () => {
+    buildDirectMessageChannelsWithMessages.mockResolvedValueOnce([
+      makeChannel('dm-child', ['profile-child', 'profile-other']),
+    ]);
+    buildSidebarUser.mockResolvedValueOnce({
+      accountVM: { ids: { id: 'account-1', orgId: 'org-1' } },
+      profileVM: {
+        ids: { id: 'profile-1', orgId: 'org-1', accountId: 'account-1' },
+        kind: 'guardian',
+        children: {
+          items: [
+            { ids: { id: 'profile-child', orgId: 'org-1', accountId: 'account-child' } },
+          ],
+        },
+      },
+    });
+
+    const supabase = {
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            eq: () => ({
+              is: () => ({ data: [], error: null }),
+            }),
+          }),
+        }),
+      }),
+    } as any;
+
+    const baseSidebarData = {
+      navigation: { navMain: [], navSecondary: [] },
+      collections: {
+        learningSpaces: [],
+        directMessages: [makeChannel('dm-guardian', ['profile-1', 'profile-other'])],
+      },
+    };
+
+    const result = await loadSidebarContext(supabase, {
+      authUser: { id: 'auth-1' },
+      account: { id: 'account-1', org_id: 'org-1' },
+      baseSidebarData,
+    });
+
+    expect(buildDirectMessageChannelsWithMessages).toHaveBeenCalledWith(
+      supabase,
+      'org-1',
+      { accountId: 'account-child' },
+    );
+    expect(result.sidebarData.collections.directMessages.map((channel: any) => channel.ids.id)).toEqual(
+      expect.arrayContaining(['dm-guardian', 'dm-child']),
+    );
   });
 });

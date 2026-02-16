@@ -19,7 +19,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -51,7 +50,6 @@ import {
   RotateCw,
   Loader2,
 } from '@iconicedu/ui-web';
-import { cn } from '@iconicedu/ui-web/lib/utils';
 
 import { InviteUserDialog } from '@iconicedu/web/app/(app)/d/admin/users/invite-dialog';
 import type { AdminUserRow } from '@iconicedu/web/lib/admin/users';
@@ -89,6 +87,14 @@ export function UsersTable({ rows }: UsersTableProps) {
   const [loginLink, setLoginLink] = React.useState<string | null>(null);
   const [linkDialogOpen, setLinkDialogOpen] = React.useState(false);
   const [loginLinkLoading, setLoginLinkLoading] = React.useState(false);
+  const [editUser, setEditUser] = React.useState<UserRow | null>(null);
+  const [editForm, setEditForm] = React.useState({
+    email: '',
+    displayName: '',
+    firstName: '',
+    lastName: '',
+  });
+  const [editSaving, setEditSaving] = React.useState(false);
   const refreshing = isPending;
 
   const handleRefresh = () => {
@@ -169,6 +175,57 @@ export function UsersTable({ rows }: UsersTableProps) {
 
   const openDeleteDialog = (row: UserRow) => {
     setConfirmDeleteUser(row);
+  };
+
+  const openEditDialog = (row: UserRow) => {
+    setEditUser(row);
+    setEditForm({
+      email: row.email ?? '',
+      displayName: row.displayName ?? '',
+      firstName: row.firstName ?? '',
+      lastName: row.lastName ?? '',
+    });
+  };
+
+  const handleEditSave = async () => {
+    if (!editUser) {
+      return;
+    }
+
+    if (!editForm.email.trim()) {
+      toast.error('Email is required');
+      return;
+    }
+
+    setEditSaving(true);
+    try {
+      const response = await fetch('/d/admin/users/actions/update-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          accountId: editUser.id,
+          email: editForm.email,
+          displayName: editForm.displayName,
+          firstName: editForm.firstName,
+          lastName: editForm.lastName,
+        }),
+      });
+
+      const result = await response.json();
+      if (!result?.success) {
+        throw new Error(result?.message ?? 'Failed to update user');
+      }
+
+      toast.success('Profile updated');
+      setEditUser(null);
+      await router.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to update user.');
+    } finally {
+      setEditSaving(false);
+    }
   };
 
   const handleDelete = async () => {
@@ -432,7 +489,13 @@ export function UsersTable({ rows }: UsersTableProps) {
                         <MoreHorizontal className="size-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
+                      <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={() => openEditDialog(row)}
+                        disabled={Boolean(rowActionLoading) || deletingId === row.id}
+                      >
+                        <User className="size-3 mr-2" /> Edit profile
+                      </DropdownMenuItem>
                       {row.status === 'invited' && (
                         <DropdownMenuItem
                           onClick={() => handleRowInviteAction(row, 'invite')}
@@ -578,6 +641,76 @@ export function UsersTable({ rows }: UsersTableProps) {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={Boolean(editUser)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditUser(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-md space-y-4">
+          <DialogHeader>
+            <DialogTitle>Edit profile</DialogTitle>
+            <DialogDescription>
+              Update account email and profile name fields.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Email</p>
+              <Input
+                value={editForm.email}
+                onChange={(event) =>
+                  setEditForm((prev) => ({ ...prev, email: event.target.value }))
+                }
+                placeholder="email@example.com"
+                type="email"
+              />
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Display name</p>
+              <Input
+                value={editForm.displayName}
+                onChange={(event) =>
+                  setEditForm((prev) => ({ ...prev, displayName: event.target.value }))
+                }
+                placeholder="Display name"
+              />
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">First name</p>
+                <Input
+                  value={editForm.firstName}
+                  onChange={(event) =>
+                    setEditForm((prev) => ({ ...prev, firstName: event.target.value }))
+                  }
+                  placeholder="First name"
+                />
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Last name</p>
+                <Input
+                  value={editForm.lastName}
+                  onChange={(event) =>
+                    setEditForm((prev) => ({ ...prev, lastName: event.target.value }))
+                  }
+                  placeholder="Last name"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditUser(null)} disabled={editSaving}>
+              Cancel
+            </Button>
+            <Button onClick={handleEditSave} disabled={editSaving}>
+              {editSaving ? 'Saving…' : 'Save changes'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

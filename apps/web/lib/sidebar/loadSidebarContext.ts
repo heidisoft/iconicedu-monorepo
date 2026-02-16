@@ -18,6 +18,7 @@ import {
   upsertUserOnboardingStatus,
 } from '@iconicedu/web/lib/onboarding/queries/status.query';
 import { mapUserOnboardingStatusRowToVM } from '@iconicedu/web/lib/onboarding/mappers';
+import { buildDirectMessageChannelsWithMessages } from '@iconicedu/web/lib/channels/builders/channel.builder';
 
 export async function loadSidebarContext(
   supabase: SupabaseClient,
@@ -51,12 +52,12 @@ export async function loadSidebarContext(
 
   const directMessages =
     profileVM.kind === 'guardian'
-      ? input.baseSidebarData.collections.directMessages.filter((channel) =>
+      ? await resolveGuardianDirectMessages(supabase, input, profileVM)
+      : input.baseSidebarData.collections.directMessages.filter((channel) =>
           channel.collections.participants.some(
             (participant) => participant.ids.id === profileVM.ids.id,
           ),
-        )
-      : input.baseSidebarData.collections.directMessages;
+        );
 
   const computedStep = determineOnboardingStep(profileVM, accountVM);
   const statusResponse = await getUserOnboardingStatusByProfileId(
@@ -108,6 +109,53 @@ export async function loadSidebarContext(
     profileVM,
     onboardingStatus,
   };
+}
+
+async function resolveGuardianDirectMessages(
+  supabase: SupabaseClient,
+  input: {
+    account: { id: string; org_id: string };
+    baseSidebarData: Omit<SidebarLeftDataVM, 'user'>;
+  },
+  profileVM: Extract<UserProfileVM, { kind: 'guardian' }>,
+) {
+  const guardianChannels = input.baseSidebarData.collections.directMessages.filter((channel) =>
+    channel.collections.participants.some(
+      (participant) => participant.ids.id === profileVM.ids.id,
+    ),
+  );
+
+  const childAccountIds = (profileVM.children?.items ?? [])
+    .map((child) => child.ids.accountId)
+    .filter(Boolean);
+
+  if (!childAccountIds.length) {
+    return guardianChannels;
+  }
+
+  const childChannelLists = await Promise.all(
+    childAccountIds.map((accountId) =>
+      buildDirectMessageChannelsWithMessages(supabase, input.account.org_id, {
+        accountId,
+      }),
+    ),
+  );
+
+  const merged = new Map<string, (typeof guardianChannels)[number]>();
+  [...guardianChannels, ...childChannelLists.flat()].forEach((channel) => {
+    const existing = merged.get(channel.ids.id);
+    if (!existing) {
+      merged.set(channel.ids.id, channel);
+      return;
+    }
+    const existingUnread = Math.max(0, existing.collections.readState?.unreadCount ?? 0);
+    const nextUnread = Math.max(0, channel.collections.readState?.unreadCount ?? 0);
+    if (nextUnread > existingUnread) {
+      merged.set(channel.ids.id, channel);
+    }
+  });
+
+  return Array.from(merged.values());
 }
 
 async function autoAcceptPendingInvites(supabase: SupabaseClient, accountId: string) {

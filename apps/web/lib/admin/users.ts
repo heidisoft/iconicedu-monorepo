@@ -7,12 +7,16 @@ import { getProfileSummariesByAccountIds } from '@iconicedu/web/lib/profile/quer
 
 export type AdminUserRow = {
   id: string;
+  orgId: string;
   email?: string | null;
   phone?: string | null;
   status: 'active' | 'invited' | 'archived' | string;
   createdAt: string;
   lastSignInAt: string;
+  profileId?: string | null;
   displayName?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
   profileKind?: string | null;
   avatarUrl?: string | null;
   avatarSource?: string | null;
@@ -38,12 +42,16 @@ function mapAccountToRow(account: AccountRow, profile?: ProfileRow | null): Admi
     null;
   return {
     id: account.id,
+    orgId: account.org_id,
     email: account.email,
     phone: account.phone_e164 ?? null,
     status,
     createdAt: account.created_at,
     lastSignInAt: account.updated_at,
+    profileId: profile?.id ?? null,
     displayName: profileName ?? account.email,
+    firstName: profile?.first_name ?? null,
+    lastName: profile?.last_name ?? null,
     profileKind,
     avatarUrl: profile?.avatar_url ?? null,
     avatarSource: profile?.avatar_source ?? null,
