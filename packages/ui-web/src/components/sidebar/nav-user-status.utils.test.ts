@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { computeStatusExpiresAt } from './nav-user-status.utils';
+import {
+  computeStatusExpiresAt,
+  STATUS_EMOJI_OPTIONS,
+  STATUS_PRESETS,
+} from './nav-user-status.utils';
 
 describe('computeStatusExpiresAt', () => {
   it('returns null for never', () => {
@@ -22,5 +26,23 @@ describe('computeStatusExpiresAt', () => {
     const expected = new Date(now.getTime());
     expected.setHours(23, 59, 59, 999);
     expect(computeStatusExpiresAt('today', now)).toBe(expected.toISOString());
+  });
+});
+
+describe('status presets', () => {
+  it('exposes the expected education status preset list', () => {
+    expect(STATUS_PRESETS.map((preset) => preset.label)).toEqual([
+      'Online',
+      'In a class',
+      'Out of office',
+      'Commuting',
+      'Doing homework',
+    ]);
+  });
+
+  it('includes the updated emoji options', () => {
+    expect(STATUS_EMOJI_OPTIONS).toContain('🏫');
+    expect(STATUS_EMOJI_OPTIONS).toContain('📖');
+    expect(STATUS_EMOJI_OPTIONS).toContain('🧑‍🏫');
   });
 });

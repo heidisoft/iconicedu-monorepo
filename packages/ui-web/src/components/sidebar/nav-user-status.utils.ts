@@ -1,6 +1,15 @@
 export type StatusClearAfterOption = 'never' | '30m' | '1h' | '4h' | 'today' | 'week';
 
-export const STATUS_EMOJI_OPTIONS = ['🏠', '📅', '🚌', '🤒', '✈️', '📚', '☕', '🧠'] as const;
+export const STATUS_EMOJI_OPTIONS = [
+  '🟢',
+  '🧑‍🏫',
+  '🏫',
+  '🌴',
+  '🚗',
+  '📖',
+  '👨‍👩‍👧',
+  '🧑‍💼',
+] as const;
 
 export const STATUS_CLEAR_AFTER_OPTIONS: Array<{ value: StatusClearAfterOption; label: string }> = [
   { value: 'never', label: "Don't clear" },
@@ -17,10 +26,11 @@ export const STATUS_PRESETS: Array<{
   text: string;
   clearAfter: StatusClearAfterOption;
 }> = [
-  { label: 'In a meeting', emoji: '📅', text: 'In a meeting', clearAfter: '1h' },
-  { label: 'Commuting', emoji: '🚌', text: 'Commuting', clearAfter: '30m' },
-  { label: 'Out of office', emoji: '✈️', text: 'Out of office', clearAfter: 'today' },
-  { label: 'Working remotely', emoji: '🏠', text: 'Working remotely', clearAfter: 'today' },
+  { label: 'Online', emoji: '🟢', text: 'Online', clearAfter: 'never' },
+  { label: 'In a class', emoji: '🏫', text: 'In a class', clearAfter: '1h' },
+  { label: 'Out of office', emoji: '🌴', text: 'Out of office', clearAfter: 'today' },
+  { label: 'Commuting', emoji: '🚗', text: 'Commuting', clearAfter: '30m' },
+  { label: 'Doing homework', emoji: '📖', text: 'Doing homework', clearAfter: '4h' },
 ];
 
 export const computeStatusExpiresAt = (
