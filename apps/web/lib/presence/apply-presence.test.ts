@@ -7,6 +7,8 @@ import type {
 } from '@iconicedu/shared-types';
 import {
   applyPresenceToChannelParticipants,
+  applyRealtimeOnlineProfilesToChannelParticipants,
+  applyRealtimeOnlineProfilesToSidebarData,
   applyPresenceToSidebarData,
 } from '@iconicedu/web/lib/presence/apply-presence';
 
@@ -113,5 +115,30 @@ describe('apply presence helpers', () => {
       updated.collections.directMessages[0].collections.participants[0].presence
         ?.liveStatus,
     ).toBe('busy');
+  });
+
+  it('overrides participants to online from realtime presence', () => {
+    const channel = makeChannel();
+    const updated = applyRealtimeOnlineProfilesToChannelParticipants(
+      channel,
+      new Set(['profile-2']),
+    );
+
+    expect(updated.collections.participants[1].presence?.displayStatus).toBe('online');
+    expect(updated.collections.participants[1].presence?.liveStatus).toBe('online');
+  });
+
+  it('applies realtime online overlay across sidebar collections', () => {
+    const sidebarData = makeSidebarData();
+    const updated = applyRealtimeOnlineProfilesToSidebarData(
+      sidebarData,
+      new Set(['profile-1']),
+    );
+
+    expect(updated.user.profile.presence?.displayStatus).toBe('online');
+    expect(
+      updated.collections.directMessages[0].collections.participants[0].presence
+        ?.displayStatus,
+    ).toBe('online');
   });
 });

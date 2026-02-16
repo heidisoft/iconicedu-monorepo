@@ -3,17 +3,22 @@ import { describe, expect, it, vi } from 'vitest';
 import { POST } from '@iconicedu/web/app/(app)/d/actions/presence/route';
 
 const upsert = vi.fn();
+const getUser = vi.fn(async () => ({ data: { user: { id: 'auth-user' } } }));
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(() => ({
+    auth: {
+      getUser,
+    },
+  })),
+}));
+
+vi.mock('@iconicedu/web/lib/supabase/service', () => ({
+  createSupabaseServiceClient: vi.fn(() => ({
     from: () => ({
       upsert,
     }),
   })),
-}));
-
-vi.mock('@iconicedu/web/lib/auth/requireAuthedUser', () => ({
-  requireAuthedUser: vi.fn(async () => ({ id: 'auth-user' })),
 }));
 
 vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
@@ -81,5 +86,22 @@ describe('POST /d/actions/presence', () => {
       }),
       { onConflict: 'org_id,profile_id' },
     );
+  });
+
+  it('returns 401 when auth user is missing', async () => {
+    getUser.mockResolvedValueOnce({ data: { user: null } });
+
+    const response = await POST(
+      new Request('http://localhost/d/actions/presence', {
+        method: 'POST',
+        body: JSON.stringify({ status: 'online' }),
+      }),
+    );
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({
+      success: false,
+      message: 'Unauthorized',
+    });
   });
 });

@@ -40,9 +40,13 @@ import {
 import { upsertDirectMessageChannel } from '@iconicedu/web/lib/sidebar/direct-message-realtime';
 import { persistDirectMessageUnreadCount } from '@iconicedu/web/lib/sidebar/direct-message-unread-persistence';
 import { mapProfilePresenceRowToVM } from '@iconicedu/web/lib/profile/mappers/presence.mapper';
-import { applyPresenceToSidebarData } from '@iconicedu/web/lib/presence/apply-presence';
+import {
+  applyPresenceToSidebarData,
+  applyRealtimeOnlineProfilesToSidebarData,
+} from '@iconicedu/web/lib/presence/apply-presence';
 import type { ProfilePresenceRow } from '@iconicedu/shared-types';
 import { buildChannelById } from '@iconicedu/web/lib/channels/builders/channel.builder';
+import { extractOnlineProfileIdsFromPresenceState } from '@iconicedu/web/lib/presence/realtime-presence';
 import {
   deriveConnectionStatusFromActivity,
   PRESENCE_AWAY_AFTER_MS,
@@ -97,6 +101,7 @@ export function SidebarShell({
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
   const router = useRouter();
   const [sidebarData, setSidebarData] = React.useState(data);
+  const onlineProfileIdsRef = React.useRef<Set<string>>(new Set());
   const directMessageIdsRef = React.useRef(
     new Set(data.collections.directMessages.map((dm) => dm.ids.id)),
   );
@@ -414,6 +419,19 @@ export function SidebarShell({
     }
 
     const channel = supabase.channel(`sidebar-presence:${orgId}`);
+    const syncOnlineProfiles = () => {
+      const onlineProfileIds = extractOnlineProfileIdsFromPresenceState(
+        channel.presenceState?.() ?? {},
+      );
+      onlineProfileIdsRef.current = onlineProfileIds;
+      setSidebarData((prev) =>
+        applyRealtimeOnlineProfilesToSidebarData(prev, onlineProfileIds),
+      );
+    };
+
+    channel.on('presence', { event: 'sync' }, syncOnlineProfiles);
+    channel.on('presence', { event: 'join' }, syncOnlineProfiles);
+    channel.on('presence', { event: 'leave' }, syncOnlineProfiles);
     channel.on(
       'postgres_changes',
       {
@@ -433,15 +451,31 @@ export function SidebarShell({
         }
         const presence =
           payload.eventType === 'DELETE' ? null : mapProfilePresenceRowToVM(row);
-        setSidebarData((prev) => applyPresenceToSidebarData(prev, profileId, presence));
+        setSidebarData((prev) =>
+          applyRealtimeOnlineProfilesToSidebarData(
+            applyPresenceToSidebarData(prev, profileId, presence),
+            onlineProfileIdsRef.current,
+          ),
+        );
       },
     );
-    channel.subscribe();
+
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED' && sidebarProfile.ids?.id) {
+        void channel.track({
+          profile_id: sidebarProfile.ids.id,
+          online_at: new Date().toISOString(),
+        });
+      }
+    });
 
     return () => {
+      if (channel.untrack) {
+        void channel.untrack();
+      }
       void channel.unsubscribe();
     };
-  }, [supabase, sidebarProfile.ids?.orgId]);
+  }, [supabase, sidebarProfile.ids?.orgId, sidebarProfile.ids?.id]);
 
   React.useEffect(() => {
     if (!sidebarProfile.ids?.id || !sidebarProfile.ids?.orgId) {

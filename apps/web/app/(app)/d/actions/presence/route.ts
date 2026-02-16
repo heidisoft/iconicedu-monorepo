@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
-import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
+import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
 import {
@@ -49,7 +49,15 @@ export async function POST(request: Request) {
     : 'online';
 
   const supabase = await createSupabaseServerClient();
-  const authUser = await requireAuthedUser(supabase);
+  const {
+    data: { user: authUser },
+  } = await supabase.auth.getUser();
+  if (!authUser) {
+    return NextResponse.json(
+      { success: false, message: 'Unauthorized' },
+      { status: 401 },
+    );
+  }
   const accountResponse = await getAccountByAuthUserId(supabase, authUser.id);
   const account = accountResponse.data;
 
@@ -70,7 +78,8 @@ export async function POST(request: Request) {
   }
 
   const now = new Date().toISOString();
-  const { error } = await supabase.from('profile_presence').upsert(
+  const serviceClient = createSupabaseServiceClient();
+  const { error } = await serviceClient.from('profile_presence').upsert(
     {
       org_id: account.org_id,
       profile_id: profile.id,

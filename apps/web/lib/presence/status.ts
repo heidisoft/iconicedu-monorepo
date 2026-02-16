@@ -2,8 +2,10 @@ import type { LiveStatusVM, PresenceDisplayStatusVM } from '@iconicedu/shared-ty
 
 export type PresenceConnectionStatus = 'online' | 'away' | 'offline';
 
-export const PRESENCE_AWAY_AFTER_MS = 90 * 1000;
-export const PRESENCE_OFFLINE_AFTER_MS = 5 * 60 * 1000;
+// Slack-like defaults: auto-away after ~10m inactivity.
+export const PRESENCE_AWAY_AFTER_MS = 10 * 60 * 1000;
+// Consider connection stale/offline after a longer inactivity window.
+export const PRESENCE_OFFLINE_AFTER_MS = 30 * 60 * 1000;
 
 export function mapConnectionStatusToLiveStatus(
   status: PresenceConnectionStatus,
@@ -35,12 +37,13 @@ export function deriveConnectionStatusFromActivity(input: {
   hasActiveWindow: boolean;
 }): PresenceConnectionStatus {
   const now = input.now ?? Date.now();
-  if (!input.hasActiveWindow) {
-    return 'away';
-  }
   const idleForMs = Math.max(0, now - input.lastActivityAt);
   if (idleForMs >= PRESENCE_AWAY_AFTER_MS) {
     return 'away';
+  }
+  if (!input.hasActiveWindow) {
+    // Keep users online for a grace window; transition to away by idle timer.
+    return 'online';
   }
   return 'online';
 }

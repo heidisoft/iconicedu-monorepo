@@ -41,6 +41,13 @@ describe('presence status helpers', () => {
         lastActivityAt: now - 10_000,
         hasActiveWindow: false,
       }),
+    ).toBe('online');
+    expect(
+      deriveConnectionStatusFromActivity({
+        now,
+        lastActivityAt: now - PRESENCE_AWAY_AFTER_MS - 1,
+        hasActiveWindow: false,
+      }),
     ).toBe('away');
   });
 
