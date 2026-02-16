@@ -5,7 +5,10 @@
       "Bash(npx supabase:*)",
       "Bash(pnpm exec tsc:*)",
       "Bash(pnpm test)",
-      "Bash(pnpm test:*)"
+      "Bash(pnpm test:*)",
+      "Bash(pnpm --filter @iconicedu/ui-web test:*)",
+      "Bash(pnpm --filter @iconicedu/ui-web build:*)",
+      "Bash(pnpm tsc:*)"
     ]
   }
 }

@@ -24,13 +24,17 @@ describe('TypingIndicator', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('renders a single name', () => {
+  it('renders a single name with animated dots', () => {
     render(<TypingIndicator profiles={[makeProfile('p1', 'Ava')]} />);
     expect(screen.getAllByText(/Ava is typing/i).length).toBeGreaterThan(0);
     expect(screen.getByRole('status')).toBeInTheDocument();
+    // Verify animated dots are present (there should be 3 dots)
+    const container = screen.getByRole('status');
+    const dots = container.querySelectorAll('span[class*="animate"]');
+    expect(dots.length).toBe(3);
   });
 
-  it('renders multiple names summary', () => {
+  it('renders multiple names summary with animated dots', () => {
     render(
       <TypingIndicator
         profiles={[
@@ -43,6 +47,10 @@ describe('TypingIndicator', () => {
     expect(
       screen.getAllByText(/Ava, Kai, and 1 other are typing/i).length,
     ).toBeGreaterThan(0);
+    // Verify animated dots are present
+    const container = screen.getByRole('status');
+    const dots = container.querySelectorAll('span[class*="animate"]');
+    expect(dots.length).toBe(3);
   });
 
   it('deduplicates repeated typing profiles', () => {

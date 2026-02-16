@@ -27,7 +27,7 @@ function buildTypingLabel(names: string[]): string {
   }
   const subject = joinNamesForTyping(names);
   const verb = names.length === 1 ? 'is' : 'are';
-  return `${subject} ${verb} typing`;
+  return `${subject} ${verb} typing...`;
 }
 
 export const TypingIndicator = memo(function TypingIndicator({
@@ -47,6 +47,8 @@ export const TypingIndicator = memo(function TypingIndicator({
     [typingProfiles],
   );
   const label = useMemo(() => buildTypingLabel(names), [names]);
+  const subject = useMemo(() => joinNamesForTyping(names), [names]);
+  const verb = useMemo(() => (names.length === 1 ? 'is' : 'are'), [names.length]);
 
   if (!typingProfiles.length) {
     return null;
@@ -60,7 +62,16 @@ export const TypingIndicator = memo(function TypingIndicator({
       aria-atomic="true"
     >
       <span className="sr-only">{label}</span>
-      <span>{label}</span>
+      <span className="inline-flex items-center gap-1">
+        <span>
+          {subject} {verb} typing
+        </span>
+        <span className="inline-flex gap-0.5">
+          <span className="animate-[bounce_1.4s_ease-in-out_0s_infinite]">.</span>
+          <span className="animate-[bounce_1.4s_ease-in-out_0.2s_infinite]">.</span>
+          <span className="animate-[bounce_1.4s_ease-in-out_0.4s_infinite]">.</span>
+        </span>
+      </span>
     </div>
   );
 });

@@ -33,6 +33,14 @@ export function createSupabaseMessagesRealtimeClient(): MessagesRealtimeClient {
 
   return {
     subscribe: ({ orgId, channelId, onEvent }) => {
+      // Clean up existing subscription if any
+      const existing = channelsById.get(channelId);
+      if (existing) {
+        console.log(`[Realtime] Cleaning up existing subscription for messages:${channelId}`);
+        void existing.unsubscribe();
+        channelsById.delete(channelId);
+      }
+
       const channel = supabase.channel(`messages:${channelId}`);
       channelsById.set(channelId, channel);
       const pending = new Map<string, Promise<void>>();
@@ -64,11 +72,16 @@ export function createSupabaseMessagesRealtimeClient(): MessagesRealtimeClient {
                 message?: MessageVM;
               };
               if (payload?.success && payload.message) {
+                console.log(`[Realtime] Message ${currentType}: ${messageId}`);
                 onEvent({
                   type: currentType === 'added' ? 'message-added' : 'message-updated',
                   message: payload.message,
                 });
+              } else {
+                console.warn(`[Realtime] Invalid message payload for ${messageId}`, payload);
               }
+            } else {
+              console.error(`[Realtime] Failed to fetch message ${messageId}: ${response.status}`);
             }
 
             const queuedType = queued.get(messageId);
@@ -95,6 +108,7 @@ export function createSupabaseMessagesRealtimeClient(): MessagesRealtimeClient {
           filter: `channel_id=eq.${channelId}`,
         },
         (payload) => {
+          console.log(`[Realtime] Received ${payload.eventType} event for messages table`);
           if (payload.eventType === 'DELETE') {
             const messageId = (payload.old as { id?: string } | null)?.id;
             if (messageId) {
@@ -186,7 +200,41 @@ export function createSupabaseMessagesRealtimeClient(): MessagesRealtimeClient {
         void fetchMessage(data.messageId, 'updated');
       });
 
-      channel.subscribe();
+      let retryCount = 0;
+      const maxRetries = 3;
+
+      const attemptSubscribe = () => {
+        channel.subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            console.log(`[Realtime] Successfully subscribed to messages:${channelId}`);
+            retryCount = 0; // Reset on success
+          } else if (status === 'CHANNEL_ERROR') {
+            console.error(`[Realtime] Failed to subscribe to messages:${channelId}`, status);
+            if (retryCount < maxRetries) {
+              retryCount++;
+              console.log(`[Realtime] Retry attempt ${retryCount}/${maxRetries} for messages:${channelId}`);
+              setTimeout(() => {
+                void channel.unsubscribe();
+                attemptSubscribe();
+              }, 1000 * retryCount); // Exponential backoff
+            } else {
+              console.error(`[Realtime] Max retries reached for messages:${channelId}`);
+            }
+          } else if (status === 'TIMED_OUT') {
+            console.error(`[Realtime] Subscription timed out for messages:${channelId}`);
+            if (retryCount < maxRetries) {
+              retryCount++;
+              console.log(`[Realtime] Retry after timeout ${retryCount}/${maxRetries} for messages:${channelId}`);
+              setTimeout(() => {
+                void channel.unsubscribe();
+                attemptSubscribe();
+              }, 1000 * retryCount);
+            }
+          }
+        });
+      };
+
+      attemptSubscribe();
 
       return {
         unsubscribe: () => {
