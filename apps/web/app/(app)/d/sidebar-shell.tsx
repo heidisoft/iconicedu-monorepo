@@ -50,11 +50,14 @@ import { extractOnlineProfileIdsFromPresenceState } from '@iconicedu/web/lib/pre
 import {
   deriveConnectionStatusFromActivity,
   PRESENCE_AWAY_AFTER_MS,
+  type PresenceConnectionStatus,
 } from '@iconicedu/web/lib/presence/status';
+import { shouldPublishPresence } from '@iconicedu/web/lib/presence/publish-policy';
 
 const AVATAR_BUCKET = 'public-avatars';
 const AVATAR_SIGNED_URL_TTL = 60 * 60;
-const PRESENCE_HEARTBEAT_MS = 30 * 1000;
+const PRESENCE_HEARTBEAT_MS = 90 * 1000;
+const PRESENCE_STATUS_EVALUATION_MS = 30 * 1000;
 
 const getToastMessageFromError = (error: unknown) =>
   error instanceof Error ? error.message : 'Something went wrong.';
@@ -558,28 +561,30 @@ export function SidebarShell({
     }
 
     const lastActivityAtRef = { current: Date.now() };
-    const lastPublishedStatusRef: { current: 'online' | 'away' | 'offline' | null } = {
+    const lastPublishedStatusRef: { current: PresenceConnectionStatus | null } = {
       current: null,
     };
     const lastOnlineHeartbeatAtRef = { current: 0 };
     const publishPresence = async (
-      status: 'online' | 'away' | 'offline',
+      status: PresenceConnectionStatus,
       options?: { force?: boolean; keepalive?: boolean },
     ) => {
-      const isHeartbeat =
-        status === 'online' &&
-        lastPublishedStatusRef.current === 'online' &&
-        !options?.force;
-      if (isHeartbeat && Date.now() - lastOnlineHeartbeatAtRef.current < PRESENCE_HEARTBEAT_MS) {
-        return;
-      }
-      if (!options?.force && status !== 'online' && lastPublishedStatusRef.current === status) {
+      const now = Date.now();
+      const shouldPublish = shouldPublishPresence({
+        nextStatus: status,
+        lastPublishedStatus: lastPublishedStatusRef.current,
+        force: options?.force,
+        heartbeatMs: PRESENCE_HEARTBEAT_MS,
+        lastOnlineHeartbeatAt: lastOnlineHeartbeatAtRef.current,
+        now,
+      });
+      if (!shouldPublish) {
         return;
       }
 
       lastPublishedStatusRef.current = status;
       if (status === 'online') {
-        lastOnlineHeartbeatAtRef.current = Date.now();
+        lastOnlineHeartbeatAtRef.current = now;
       }
 
       try {
@@ -606,14 +611,14 @@ export function SidebarShell({
 
     const handleActivity = () => {
       lastActivityAtRef.current = Date.now();
-      if (computeStatus() === 'online') {
-        void publishPresence('online');
-      }
     };
 
-    const handleVisibilityOrFocus = () => {
-      const status = computeStatus();
-      void publishPresence(status);
+    const publishComputedStatus = () => {
+      const currentStatus = computeStatus();
+      const shouldSetOffline =
+        currentStatus === 'away' &&
+        Date.now() - lastActivityAtRef.current >= PRESENCE_AWAY_AFTER_MS * 2;
+      void publishPresence(shouldSetOffline ? 'offline' : currentStatus);
     };
 
     const handlePageHide = () => {
@@ -636,32 +641,25 @@ export function SidebarShell({
     activityEvents.forEach((eventName) => {
       window.addEventListener(eventName, handleActivity, { passive: true });
     });
-    window.addEventListener('focus', handleVisibilityOrFocus);
-    window.addEventListener('blur', handleVisibilityOrFocus);
-    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', publishComputedStatus);
+    window.addEventListener('blur', publishComputedStatus);
+    document.addEventListener('visibilitychange', publishComputedStatus);
     window.addEventListener('pagehide', handlePageHide);
     window.addEventListener('beforeunload', handlePageHide);
 
     void publishPresence(computeStatus(), { force: true });
     const heartbeatTimer = window.setInterval(() => {
-      const status = computeStatus();
-      void publishPresence(status);
-      if (
-        status === 'away' &&
-        Date.now() - lastActivityAtRef.current >= PRESENCE_AWAY_AFTER_MS * 2
-      ) {
-        void publishPresence('offline', { force: true });
-      }
-    }, 15_000);
+      publishComputedStatus();
+    }, PRESENCE_STATUS_EVALUATION_MS);
 
     return () => {
       window.clearInterval(heartbeatTimer);
       activityEvents.forEach((eventName) => {
         window.removeEventListener(eventName, handleActivity);
       });
-      window.removeEventListener('focus', handleVisibilityOrFocus);
-      window.removeEventListener('blur', handleVisibilityOrFocus);
-      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', publishComputedStatus);
+      window.removeEventListener('blur', publishComputedStatus);
+      document.removeEventListener('visibilitychange', publishComputedStatus);
       window.removeEventListener('pagehide', handlePageHide);
       window.removeEventListener('beforeunload', handlePageHide);
       void publishPresence('offline', { force: true, keepalive: true });
