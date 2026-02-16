@@ -18,13 +18,13 @@ vi.mock('../context/messages-state-provider', () => ({
             ids: { id: 'profile-1', orgId: 'org-1', accountId: 'account-1' },
             profile: { displayName: 'User 1', avatar: { url: null, source: 'seed' } },
             ui: { themeKey: null },
-            presence: null,
+            presence: { liveStatus: 'online', displayStatus: 'online', state: {} },
           },
           {
             ids: { id: 'profile-2', orgId: 'org-1', accountId: 'account-2' },
             profile: { displayName: 'User 2', avatar: { url: null, source: 'seed' } },
             ui: { themeKey: null },
-            presence: null,
+            presence: { liveStatus: 'online', displayStatus: 'online', state: {} },
           },
         ],
       },
@@ -41,5 +41,10 @@ describe('ChannelInfoPanel', () => {
       'href',
       '/d/dm/profile-2',
     );
+  });
+
+  it('hides online status indicators in members list', () => {
+    render(<ChannelInfoPanel intent={{ key: 'channel_info' }} />);
+    expect(screen.queryByLabelText('Status: online')).not.toBeInTheDocument();
   });
 });

@@ -80,7 +80,7 @@ export function ProfileContent({
           avatar={user.profile.avatar}
           presence={user.presence}
           themeKey={user.ui?.themeKey}
-          showStatus
+          showStatus={false}
           sizeClassName="h-20 w-20"
           statusClassName="bottom-1 right-1 h-4 w-4"
           fallbackClassName="text-2xl"

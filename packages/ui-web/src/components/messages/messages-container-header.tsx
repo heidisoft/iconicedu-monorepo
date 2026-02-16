@@ -87,11 +87,13 @@ const HeaderSubtitleItem = memo(function HeaderSubtitleItem({
 
 const HeaderTitle = memo(function HeaderTitle({
   title,
+  inlineStatusLabel,
   leading,
   onClick,
   ariaLabel,
 }: {
   title: string;
+  inlineStatusLabel?: string | null;
   leading: ReactNode;
   onClick?: () => void;
   ariaLabel?: string;
@@ -103,13 +105,25 @@ const HeaderTitle = memo(function HeaderTitle({
         <button
           type="button"
           onClick={onClick}
-          className="truncate text-sm font-semibold text-foreground hover:underline"
+          className="flex min-w-0 flex-col items-start text-sm font-semibold text-foreground hover:underline"
           aria-label={ariaLabel ?? title}
         >
-          {title}
+          <span className="truncate">{title}</span>
+          {inlineStatusLabel ? (
+            <span className="truncate text-xs font-normal text-muted-foreground">
+              {inlineStatusLabel}
+            </span>
+          ) : null}
         </button>
       ) : (
-        <span className="truncate text-sm font-semibold text-foreground">{title}</span>
+        <span className="flex min-w-0 flex-col items-start">
+          <span className="truncate text-sm font-semibold text-foreground">{title}</span>
+          {inlineStatusLabel ? (
+            <span className="truncate text-xs font-normal text-muted-foreground">
+              {inlineStatusLabel}
+            </span>
+          ) : null}
+        </span>
       )}
     </div>
   );
@@ -208,12 +222,13 @@ export const MessagesContainerHeader = memo(function MessagesContainerHeader({
           >
             <AvatarWithStatus
               name={otherParticipantName}
-            avatar={otherParticipant.profile.avatar}
-            presence={otherParticipant.presence}
-            themeKey={otherParticipant.ui?.themeKey}
-            sizeClassName="h-7 w-7"
-            initialsLength={1}
-          />
+              avatar={otherParticipant.profile.avatar}
+              presence={otherParticipant.presence}
+              showStatus={false}
+              themeKey={otherParticipant.ui?.themeKey}
+              sizeClassName="h-8 w-8"
+              initialsLength={1}
+            />
         </button>
       );
     }
@@ -234,8 +249,8 @@ export const MessagesContainerHeader = memo(function MessagesContainerHeader({
   ]);
 
   const subtitleItems: HeaderSubtitleItem[] = useMemo(
-    () =>
-      (channel.ui?.headerQuickMetaActions ?? []).map((item) => ({
+    () => {
+      const quickMetaItems = (channel.ui?.headerQuickMetaActions ?? []).map((item) => ({
         icon: HEADER_ICON_MAP[item.key],
         label:
           item.key === 'saved'
@@ -260,7 +275,10 @@ export const MessagesContainerHeader = memo(function MessagesContainerHeader({
             : item.key === 'session-summary'
               ? messageFilter === 'session-summary'
               : undefined,
-      })),
+      }));
+
+      return quickMetaItems;
+    },
     [
       channel.ui?.headerQuickMetaActions,
       savedCount,
@@ -271,11 +289,21 @@ export const MessagesContainerHeader = memo(function MessagesContainerHeader({
       messageFilter,
     ],
   );
+  const inlineStatusLabel = useMemo(() => {
+    if (channel.basics.kind !== 'dm') {
+      return null;
+    }
+    const statusText = otherParticipant?.presence?.state?.text?.trim();
+    const statusEmoji = otherParticipant?.presence?.state?.emoji?.trim();
+    const value = [statusEmoji, statusText].filter(Boolean).join(' ').trim();
+    return value || null;
+  }, [channel.basics.kind, otherParticipant?.presence?.state?.emoji, otherParticipant?.presence?.state?.text]);
 
   return (
     <div className="flex min-w-0 flex-col">
       <HeaderTitle
         title={title}
+        inlineStatusLabel={inlineStatusLabel}
         leading={leading}
         onClick={
           channel.basics.kind === 'dm' && otherParticipant

@@ -440,7 +440,7 @@ const LearningSpaceInfoPanelContent = memo(function LearningSpaceInfoPanelConten
                       sizeClassName="h-9 w-9"
                       initialsLength={1}
                       presence={member.presence}
-                      showStatus
+                      showStatus={false}
                     />
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-medium text-foreground">
