@@ -33,6 +33,10 @@ import {
   markDirectMessageChannelRead,
   touchDirectMessageChannelOrder,
 } from '@iconicedu/web/lib/sidebar/direct-message-unread';
+import {
+  applyIncomingLearningSpaceUnread,
+  markLearningSpaceChannelRead,
+} from '@iconicedu/web/lib/sidebar/learning-space-unread';
 import { upsertDirectMessageChannel } from '@iconicedu/web/lib/sidebar/direct-message-realtime';
 import { persistDirectMessageUnreadCount } from '@iconicedu/web/lib/sidebar/direct-message-unread-persistence';
 import { mapProfilePresenceRowToVM } from '@iconicedu/web/lib/profile/mappers/presence.mapper';
@@ -170,12 +174,16 @@ export function SidebarShell({
       }
       const lastReadMessageId = customEvent.detail?.lastReadMessageId;
       const lastReadAt = customEvent.detail?.lastReadAt;
-      setSidebarData((prev) =>
-        markDirectMessageChannelRead(prev, channelId, {
+      setSidebarData((prev) => {
+        const next = markDirectMessageChannelRead(prev, channelId, {
           lastReadMessageId,
           lastReadAt,
-        }),
-      );
+        });
+        return markLearningSpaceChannelRead(next, channelId, {
+          lastReadMessageId,
+          lastReadAt,
+        });
+      });
       void persistUnread(channelId, 0, {
         markRead: true,
         lastReadMessageId,
@@ -215,26 +223,53 @@ export function SidebarShell({
 
         setSidebarData((prev) => {
           const ordered = touchDirectMessageChannelOrder(prev, row.channel_id);
-          const next = applyIncomingDirectMessageUnread(ordered, {
+          const directNext = applyIncomingDirectMessageUnread(ordered, {
+            channelId: row.channel_id,
+            senderProfileId: row.sender_profile_id ?? null,
+            currentProfileId: profileId,
+          });
+          const next = applyIncomingLearningSpaceUnread(directNext, {
             channelId: row.channel_id,
             senderProfileId: row.sender_profile_id ?? null,
             currentProfileId: profileId,
           });
 
-          const nextChannel = next.collections.directMessages.find(
+          const nextDirectChannel = next.collections.directMessages.find(
             (channel) => channel.ids.id === row.channel_id,
           );
-          if (!nextChannel) {
-            return prev;
+          if (nextDirectChannel) {
+            const nextUnread = Math.max(
+              0,
+              nextDirectChannel.collections.readState?.unreadCount ?? 0,
+            );
+            void persistUnread(row.channel_id, nextUnread, {
+              markRead: nextUnread === 0,
+            });
+            return next;
           }
 
-          const nextUnread = Math.max(
-            0,
-            nextChannel.collections.readState?.unreadCount ?? 0,
+          const nextLearningSpaceChannel = next.collections.learningSpaces.find(
+            (space) =>
+              space.channels.primaryChannel.ids.id === row.channel_id ||
+              (space.channels.relatedChannels ?? []).some(
+                (channel) => channel.ids.id === row.channel_id,
+              ),
           );
-          void persistUnread(row.channel_id, nextUnread, {
-            markRead: nextUnread === 0,
-          });
+          const matchedLearningSpaceChannel =
+            nextLearningSpaceChannel?.channels.primaryChannel.ids.id === row.channel_id
+              ? nextLearningSpaceChannel.channels.primaryChannel
+              : (nextLearningSpaceChannel?.channels.relatedChannels ?? []).find(
+                  (channel) => channel.ids.id === row.channel_id,
+                );
+          if (matchedLearningSpaceChannel) {
+            const nextUnread = Math.max(
+              0,
+              matchedLearningSpaceChannel.collections.readState?.unreadCount ?? 0,
+            );
+            void persistUnread(row.channel_id, nextUnread, {
+              markRead: nextUnread === 0,
+            });
+          }
           return next;
         });
       },

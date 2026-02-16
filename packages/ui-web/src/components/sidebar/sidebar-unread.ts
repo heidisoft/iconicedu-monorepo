@@ -1,4 +1,4 @@
-import type { ChannelVM } from '@iconicedu/shared-types';
+import type { ChannelVM, LearningSpaceVM } from '@iconicedu/shared-types';
 
 function getLatestMessage(channel: ChannelVM) {
   const messages = channel.collections.messages?.items ?? [];
@@ -6,6 +6,11 @@ function getLatestMessage(channel: ChannelVM) {
     return null;
   }
   return messages[messages.length - 1] ?? null;
+}
+
+function getLearningSpaceChannels(space: LearningSpaceVM): ChannelVM[] {
+  const related = space.channels.relatedChannels ?? [];
+  return [space.channels.primaryChannel, ...related];
 }
 
 export function getDirectMessageItemUnreadCount(
@@ -47,5 +52,58 @@ export function getDirectMessageUnreadCount(
 ): number {
   return directMessages.reduce((total, channel) => {
     return total + getDirectMessageItemUnreadCount(channel, currentUserId);
+  }, 0);
+}
+
+export function getLearningSpaceItemUnreadCount(space: LearningSpaceVM): number {
+  return getLearningSpaceChannels(space).reduce((total, channel) => {
+    return total + Math.max(0, channel.collections.readState?.unreadCount ?? 0);
+  }, 0);
+}
+
+export function getLearningSpaceItemUnreadCountForUser(
+  space: LearningSpaceVM,
+  currentUserId?: string,
+): number {
+  const channels = getLearningSpaceChannels(space);
+  const persistedUnread = channels.reduce((total, channel) => {
+    return total + Math.max(0, channel.collections.readState?.unreadCount ?? 0);
+  }, 0);
+  if (persistedUnread > 0) {
+    return persistedUnread;
+  }
+
+  if (!currentUserId) {
+    return 0;
+  }
+
+  return channels.reduce((total, channel) => {
+    const hasReadMarkers =
+      Boolean(channel.collections.readState?.lastReadAt) ||
+      Boolean(channel.collections.readState?.lastReadMessageId);
+    if (hasReadMarkers) {
+      return total;
+    }
+
+    const latestMessage = getLatestMessage(channel);
+    if (!latestMessage) {
+      return total;
+    }
+
+    const senderAccountId = latestMessage.core.sender?.ids.accountId;
+    if (!senderAccountId || senderAccountId === currentUserId) {
+      return total;
+    }
+
+    return total + 1;
+  }, 0);
+}
+
+export function getLearningSpaceUnreadCount(
+  learningSpaces: LearningSpaceVM[],
+  currentUserId?: string,
+): number {
+  return learningSpaces.reduce((total, space) => {
+    return total + getLearningSpaceItemUnreadCountForUser(space, currentUserId);
   }, 0);
 }

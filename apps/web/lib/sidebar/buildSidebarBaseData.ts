@@ -13,7 +13,7 @@ export async function buildSidebarBaseData(
   accountId: string,
 ): Promise<SidebarBaseData> {
   const [learningSpaces, directMessages, supportChannelId] = await Promise.all([
-    buildLearningSpacesByOrg(supabase, orgId),
+    buildLearningSpacesByOrg(supabase, orgId, { accountId }),
     buildDirectMessageChannelsWithMessages(supabase, orgId, { accountId }),
     resolveSupportChannelId(supabase, orgId),
   ]);

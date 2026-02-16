@@ -34,21 +34,32 @@ type LearningSpaceRelations = {
   links: LearningSpaceLinkRow[];
 };
 
+type BuildLearningSpaceOptions = {
+  accountId?: string | null;
+};
+
 async function resolveChannels(
   supabase: SupabaseClient,
   orgId: string,
   rows: LearningSpaceChannelRow[],
+  options: BuildLearningSpaceOptions = {},
 ): Promise<{ primaryChannel: ChannelVM | null; relatedChannels: ChannelVM[] }> {
   const channels = (
     await Promise.all(
-      rows.map((row) => buildChannelById(supabase, orgId, row.channel_id)),
+      rows.map((row) =>
+        buildChannelById(supabase, orgId, row.channel_id, {
+          accountId: options.accountId ?? undefined,
+        }),
+      ),
     )
   ).filter((channel): channel is ChannelVM => Boolean(channel));
 
   const primaryRow = rows.find((row) => row.is_primary);
   const primaryChannel =
     (primaryRow &&
-      (await buildChannelById(supabase, orgId, primaryRow.channel_id))) ??
+      (await buildChannelById(supabase, orgId, primaryRow.channel_id, {
+        accountId: options.accountId ?? undefined,
+      }))) ??
     channels[0] ??
     null;
 
@@ -106,11 +117,13 @@ export async function buildLearningSpaceFromRow(
   row: LearningSpaceRow,
   relations: LearningSpaceRelations,
   scheduleId?: string | null,
+  options: BuildLearningSpaceOptions = {},
 ): Promise<LearningSpaceVM | null> {
   const { primaryChannel, relatedChannels } = await resolveChannels(
     supabase,
     row.org_id,
     relations.channels,
+    options,
   );
   if (!primaryChannel) {
     return null;
@@ -139,6 +152,7 @@ export async function buildLearningSpaceById(
   orgId: string,
   learningSpaceId: string,
   scheduleId?: string | null,
+  options: BuildLearningSpaceOptions = {},
 ): Promise<LearningSpaceVM | null> {
   const { data: learningSpace } = await getLearningSpaceById(
     supabase,
@@ -164,12 +178,14 @@ export async function buildLearningSpaceById(
       links: links.data ?? [],
     },
     scheduleId,
+    options,
   );
 }
 
 export async function buildLearningSpacesByOrg(
   supabase: SupabaseClient,
   orgId: string,
+  options: BuildLearningSpaceOptions = {},
 ): Promise<LearningSpaceVM[]> {
   const { data: learningSpaces } = await getLearningSpacesByOrg(supabase, orgId);
   if (!learningSpaces?.length) {
@@ -201,6 +217,8 @@ export async function buildLearningSpacesByOrg(
           participants: participantsBySpace.get(space.id) ?? [],
           links: linksBySpace.get(space.id) ?? [],
         },
+        undefined,
+        options,
       ),
     ),
   );
@@ -212,6 +230,7 @@ export async function buildLearningSpaceByChannelId(
   supabase: SupabaseClient,
   orgId: string,
   channelId: string,
+  options: BuildLearningSpaceOptions = {},
 ): Promise<LearningSpaceVM | null> {
   const channelResponse = await getLearningSpaceChannelByChannelId(
     supabase,
@@ -235,6 +254,7 @@ export async function buildLearningSpaceByChannelId(
     orgId,
     channelRow.learning_space_id,
     scheduleId,
+    options,
   );
 }
 

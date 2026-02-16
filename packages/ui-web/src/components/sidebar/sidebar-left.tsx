@@ -57,6 +57,7 @@ import { Empty } from '@iconicedu/ui-web/ui/empty';
 import { EmptyContent } from '@iconicedu/ui-web/ui/empty';
 import { ThemedIconBadge } from '@iconicedu/ui-web/components/shared/themed-icon';
 import { getLearningSpaceIcon } from '@iconicedu/ui-web/lib/icons';
+import { Badge } from '@iconicedu/ui-web/ui/badge';
 import type {
   ChildProfileSaveInput,
   ChildProfileVM,
@@ -74,6 +75,10 @@ import type {
   UserProfileVM,
 } from '@iconicedu/shared-types';
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
+import {
+  getLearningSpaceItemUnreadCountForUser,
+  getLearningSpaceUnreadCount,
+} from '@iconicedu/ui-web/components/sidebar/sidebar-unread';
 
 const ICONS = {
   home: Home,
@@ -210,7 +215,8 @@ export function SidebarLeft({
     learningSpaces: data.collections.learningSpaces.filter((space) =>
       space.channels.primaryChannel.collections.participants.some(
         (participant: UserProfileVM) =>
-          participant.ids.accountId === child.ids.accountId,
+          participant.ids.accountId === child.ids.accountId ||
+          participant.ids.id === child.ids.id,
       ),
     ),
   }));
@@ -219,12 +225,23 @@ export function SidebarLeft({
       ? data.collections.learningSpaces.filter((space) =>
           space.channels.primaryChannel.collections.participants.some(
             (participant: UserProfileVM) =>
-              participant.ids.accountId === userProfile.ids.accountId,
+              participant.ids.accountId === userProfile.ids.accountId ||
+              participant.ids.id === userProfile.ids.id,
           ),
         )
       : [];
   const shouldShowLearningSpaces =
     userProfile.kind === 'guardian' || userProfile.kind === 'educator';
+  const visibleLearningSpaces =
+    userProfile.kind === 'guardian'
+      ? learningSpacesByChild.flatMap((entry) => entry.learningSpaces)
+      : educatorLearningSpaces;
+  const currentUserAccountId = data.user.profile.ids.accountId;
+  const hasDirectMessages = data.collections.directMessages.length > 0;
+  const totalLearningSpacesUnread = getLearningSpaceUnreadCount(
+    visibleLearningSpaces,
+    currentUserAccountId,
+  );
 
   const activeLearningSpaceId = React.useMemo(() => {
     if (!activePath) return null;
@@ -240,23 +257,6 @@ export function SidebarLeft({
     }
     return null;
   }, [activePath]);
-  const activeChildId = React.useMemo(() => {
-    if (!activeLearningSpaceId) return null;
-    const match = learningSpacesByChild.find(({ learningSpaces }) =>
-      learningSpaces.some(
-        (space) => space.channels.primaryChannel.ids.id === activeLearningSpaceId,
-      ),
-    );
-    return match?.child.ids.accountId ?? null;
-  }, [activeLearningSpaceId, learningSpacesByChild]);
-  const [openChildId, setOpenChildId] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    if (activeChildId) {
-      setOpenChildId(activeChildId);
-    }
-  }, [activeChildId]);
-
   const { isMobile } = useSidebar();
   return (
     <Sidebar variant="inset" {...props} collapsible="icon">
@@ -286,7 +286,14 @@ export function SidebarLeft({
             <SidebarSeparator className="mx-2 group-data-[collapsible=icon]:hidden" />
             <SidebarGroup className="pb-0">
               <SidebarGroupLabel asChild className="uppercase">
-                <span>Learning spaces</span>
+                <span className="inline-flex items-center gap-2">
+                  <span>Learning spaces</span>
+                  {totalLearningSpacesUnread > 0 ? (
+                    <Badge className="h-4 px-1.5 text-[10px] bg-rose-500 text-white">
+                      {totalLearningSpacesUnread}
+                    </Badge>
+                  ) : null}
+                </span>
               </SidebarGroupLabel>
               {userProfile.kind === 'guardian' ? (
                 <DropdownMenu>
@@ -336,25 +343,17 @@ export function SidebarLeft({
                 </SidebarGroup>
               ) : (
                 learningSpacesByChild.map(({ child, learningSpaces }) => {
-                  const hasLearningSpaces = learningSpaces.length > 0;
-                  const shouldOpenForChild = hasLearningSpaces
-                    ? openChildId === child.ids.accountId
-                    : true;
                   return (
                     <NavLearningSpaces
                       key={child.ids.accountId}
                       title={getProfileDisplayName(child.profile)}
                       participant={child}
                       learningSpaces={learningSpaces}
-                      isOpen={shouldOpenForChild}
-                      onOpenChange={(nextOpen) => {
-                        if (!hasLearningSpaces) {
-                          return;
-                        }
-                        setOpenChildId(nextOpen ? child.ids.accountId : null);
-                      }}
+                      isOpen={true}
+                      onOpenChange={() => undefined}
                       activeChannelId={activeLearningSpaceId}
                       isMobile={isMobile}
+                      currentUserId={currentUserAccountId}
                     />
                   );
                 })
@@ -367,6 +366,10 @@ export function SidebarLeft({
                     const iconKey = space.basics.iconKey ?? channel.basics.iconKey ?? null;
                     const Icon = getLearningSpaceIcon(iconKey, Languages);
                     const isActive = activeLearningSpaceId === channel.ids.id;
+                    const unreadCount = getLearningSpaceItemUnreadCountForUser(
+                      space,
+                      currentUserAccountId,
+                    );
 
                     return (
                       <SidebarMenuItem key={space.ids.id} className="py-0.5">
@@ -391,6 +394,11 @@ export function SidebarLeft({
                                 {space.basics.subject ?? 'General'}
                               </div>
                             </div>
+                            {unreadCount > 0 ? (
+                              <Badge className="ml-auto h-5 px-1.5 text-[10px]">
+                                {unreadCount}
+                              </Badge>
+                            ) : null}
                           </a>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
@@ -401,12 +409,16 @@ export function SidebarLeft({
             )}
           </>
         ) : null}
-        <SidebarSeparator className="mx-2" />
-        <NavDirectMessages
-          dms={data.collections.directMessages}
-          currentUserId={data.user.profile.ids.accountId}
-          activeChannelId={activeDirectMessageId ?? null}
-        />
+        {hasDirectMessages ? (
+          <>
+            <SidebarSeparator className="mx-2" />
+            <NavDirectMessages
+              dms={data.collections.directMessages}
+              currentUserId={data.user.profile.ids.accountId}
+              activeChannelId={activeDirectMessageId ?? null}
+            />
+          </>
+        ) : null}
         <NavSecondary items={navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>

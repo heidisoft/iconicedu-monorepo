@@ -3,6 +3,9 @@ import { describe, expect, it } from 'vitest';
 import {
   getDirectMessageItemUnreadCount,
   getDirectMessageUnreadCount,
+  getLearningSpaceItemUnreadCount,
+  getLearningSpaceItemUnreadCountForUser,
+  getLearningSpaceUnreadCount,
 } from './sidebar-unread';
 
 describe('getDirectMessageUnreadCount', () => {
@@ -74,5 +77,70 @@ describe('getDirectMessageUnreadCount', () => {
     );
 
     expect(unread).toBe(0);
+  });
+});
+
+describe('learning space unread helpers', () => {
+  it('sums unread counts across learning spaces', () => {
+    const total = getLearningSpaceUnreadCount([
+      { channels: { primaryChannel: { collections: { readState: { unreadCount: 2 } } } } },
+      { channels: { primaryChannel: { collections: { readState: { unreadCount: 3 } } } } },
+      { channels: { primaryChannel: { collections: { readState: null } } } },
+    ] as any);
+
+    expect(total).toBe(5);
+  });
+
+  it('ignores negative unread counts for learning spaces', () => {
+    const unread = getLearningSpaceItemUnreadCount({
+      channels: { primaryChannel: { collections: { readState: { unreadCount: -7 } } } },
+    } as any);
+
+    expect(unread).toBe(0);
+  });
+
+  it('falls back to one unread for first incoming learning space message', () => {
+    const unread = getLearningSpaceItemUnreadCountForUser(
+      {
+        channels: {
+          primaryChannel: {
+            collections: {
+              readState: { unreadCount: 0, lastReadAt: null, lastReadMessageId: null },
+              messages: {
+                items: [
+                  {
+                    core: {
+                      sender: { ids: { accountId: 'account-other' } },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        },
+      } as any,
+      'account-self',
+    );
+
+    expect(unread).toBe(1);
+  });
+
+  it('aggregates unread across primary and related channels', () => {
+    const unread = getLearningSpaceUnreadCount(
+      [
+        {
+          channels: {
+            primaryChannel: { collections: { readState: { unreadCount: 2 } } },
+            relatedChannels: [
+              { collections: { readState: { unreadCount: 1 } } },
+              { collections: { readState: { unreadCount: 3 } } },
+            ],
+          },
+        },
+      ] as any,
+      'account-self',
+    );
+
+    expect(unread).toBe(6);
   });
 });

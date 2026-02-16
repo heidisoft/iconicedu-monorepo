@@ -38,6 +38,8 @@ import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-wit
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
 import { ThemedIconBadge } from '@iconicedu/ui-web/components/shared/themed-icon';
 import { getLearningSpaceIcon } from '@iconicedu/ui-web/lib/icons';
+import { Badge } from '@iconicedu/ui-web/ui/badge';
+import { getLearningSpaceItemUnreadCountForUser } from './sidebar-unread';
 
 export function NavLearningSpaces({
   learningSpaces,
@@ -47,6 +49,7 @@ export function NavLearningSpaces({
   onOpenChange,
   activeChannelId,
   isMobile,
+  currentUserId,
 }: {
   learningSpaces: LearningSpaceVM[];
   title: string;
@@ -55,6 +58,7 @@ export function NavLearningSpaces({
   onOpenChange: (open: boolean) => void;
   activeChannelId?: string | null;
   isMobile: boolean;
+  currentUserId?: string;
 }) {
   return (
     <SidebarGroup className="py-0 group-data-[collapsible=icon]:hidden">
@@ -95,6 +99,10 @@ export function NavLearningSpaces({
                 const iconKey = space.basics.iconKey ?? channel.basics.iconKey ?? null;
                 const Icon: LucideIcon = getLearningSpaceIcon(iconKey, Languages);
                 const isActive = activeChannelId === channel.ids.id;
+                const unreadCount = getLearningSpaceItemUnreadCountForUser(
+                  space,
+                  currentUserId,
+                );
 
                 return (
                   <SidebarMenuItem key={space.ids.id} className="py-0.5">
@@ -119,11 +127,16 @@ export function NavLearningSpaces({
                             {space.basics.subject ?? 'General'}
                           </div>
                         </div>
+                        {unreadCount > 0 ? (
+                          <Badge className="ml-auto h-5 px-1.5 text-[10px]">
+                            {unreadCount}
+                          </Badge>
+                        ) : null}
                       </a>
                     </SidebarMenuButton>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <SidebarMenuAction>
+                        <SidebarMenuAction showOnHover>
                           <MoreHorizontal />
                           <span className="sr-only">More</span>
                         </SidebarMenuAction>
