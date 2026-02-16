@@ -55,6 +55,8 @@ import type { AdminMenuSection } from '@iconicedu/shared-types';
 import { SiteLogoWithName } from '@iconicedu/ui-web/components/site-logo-wt-name';
 import { Empty } from '@iconicedu/ui-web/ui/empty';
 import { EmptyContent } from '@iconicedu/ui-web/ui/empty';
+import { ThemedIconBadge } from '@iconicedu/ui-web/components/shared/themed-icon';
+import { getLearningSpaceIcon } from '@iconicedu/ui-web/lib/icons';
 import type {
   ChildProfileSaveInput,
   ChildProfileVM,
@@ -212,6 +214,17 @@ export function SidebarLeft({
       ),
     ),
   }));
+  const educatorLearningSpaces =
+    userProfile.kind === 'educator'
+      ? data.collections.learningSpaces.filter((space) =>
+          space.channels.primaryChannel.collections.participants.some(
+            (participant: UserProfileVM) =>
+              participant.ids.accountId === userProfile.ids.accountId,
+          ),
+        )
+      : [];
+  const shouldShowLearningSpaces =
+    userProfile.kind === 'guardian' || userProfile.kind === 'educator';
 
   const activeLearningSpaceId = React.useMemo(() => {
     if (!activePath) return null;
@@ -268,80 +281,123 @@ export function SidebarLeft({
             />
           </>
         ) : null}
-        {userProfile.kind === 'guardian' ? (
+        {shouldShowLearningSpaces ? (
           <>
             <SidebarSeparator className="mx-2 group-data-[collapsible=icon]:hidden" />
             <SidebarGroup className="pb-0">
               <SidebarGroupLabel asChild className="uppercase">
                 <span>Learning spaces</span>
               </SidebarGroupLabel>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <SidebarGroupAction title="Learning space actions">
-                    <MoreHorizontal />
-                    <span className="sr-only">Learning space actions</span>
-                  </SidebarGroupAction>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  className="w-56"
-                  side={isMobile ? 'bottom' : 'right'}
-                  align={isMobile ? 'end' : 'start'}
-                >
-                  <DropdownMenuItem>
-                    <UserPlus className="text-muted-foreground" />
-                    <span>Add child</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <MessageSquarePlus className="text-muted-foreground" />
-                    <span>Request tutoring</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem>
-                    <Settings className="text-muted-foreground" />
-                    <span>Manage learning spaces</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {userProfile.kind === 'guardian' ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <SidebarGroupAction title="Learning space actions">
+                      <MoreHorizontal />
+                      <span className="sr-only">Learning space actions</span>
+                    </SidebarGroupAction>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    className="w-56"
+                    side={isMobile ? 'bottom' : 'right'}
+                    align={isMobile ? 'end' : 'start'}
+                  >
+                    <DropdownMenuItem>
+                      <UserPlus className="text-muted-foreground" />
+                      <span>Add child</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem>
+                      <MessageSquarePlus className="text-muted-foreground" />
+                      <span>Request tutoring</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem>
+                      <Settings className="text-muted-foreground" />
+                      <span>Manage learning spaces</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : null}
               <SidebarGroupContent />
             </SidebarGroup>
-            {learningSpacesByChild.length === 0 ? (
-              <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-                <SidebarGroupContent>
-                  <Empty>
-                    <EmptyContent>
-                      <div className="flex">
-                        <Button size="lg">
-                          <UserPlus /> Add a Child
-                        </Button>
-                      </div>
-                    </EmptyContent>
-                  </Empty>
-                </SidebarGroupContent>
-              </SidebarGroup>
+            {userProfile.kind === 'guardian' ? (
+              learningSpacesByChild.length === 0 ? (
+                <SidebarGroup className="group-data-[collapsible=icon]:hidden">
+                  <SidebarGroupContent>
+                    <Empty>
+                      <EmptyContent>
+                        <div className="flex">
+                          <Button size="lg">
+                            <UserPlus /> Add a Child
+                          </Button>
+                        </div>
+                      </EmptyContent>
+                    </Empty>
+                  </SidebarGroupContent>
+                </SidebarGroup>
+              ) : (
+                learningSpacesByChild.map(({ child, learningSpaces }) => {
+                  const hasLearningSpaces = learningSpaces.length > 0;
+                  const shouldOpenForChild = hasLearningSpaces
+                    ? openChildId === child.ids.accountId
+                    : true;
+                  return (
+                    <NavLearningSpaces
+                      key={child.ids.accountId}
+                      title={getProfileDisplayName(child.profile)}
+                      participant={child}
+                      learningSpaces={learningSpaces}
+                      isOpen={shouldOpenForChild}
+                      onOpenChange={(nextOpen) => {
+                        if (!hasLearningSpaces) {
+                          return;
+                        }
+                        setOpenChildId(nextOpen ? child.ids.accountId : null);
+                      }}
+                      activeChannelId={activeLearningSpaceId}
+                      isMobile={isMobile}
+                    />
+                  );
+                })
+              )
             ) : (
-              learningSpacesByChild.map(({ child, learningSpaces }) => {
-                const hasLearningSpaces = learningSpaces.length > 0;
-                const shouldOpenForChild = hasLearningSpaces
-                  ? openChildId === child.ids.accountId
-                  : true;
-                return (
-                  <NavLearningSpaces
-                    key={child.ids.accountId}
-                    title={getProfileDisplayName(child.profile)}
-                    child={child}
-                    learningSpaces={learningSpaces}
-                    isOpen={shouldOpenForChild}
-                    onOpenChange={(nextOpen) => {
-                      if (!hasLearningSpaces) {
-                        return;
-                      }
-                      setOpenChildId(nextOpen ? child.ids.accountId : null);
-                    }}
-                    activeChannelId={activeLearningSpaceId}
-                    isMobile={isMobile}
-                  />
-                );
-              })
+              <SidebarGroup className="py-0 group-data-[collapsible=icon]:hidden">
+                <SidebarMenu>
+                  {educatorLearningSpaces.map((space) => {
+                    const channel = space.channels.primaryChannel;
+                    const iconKey = space.basics.iconKey ?? channel.basics.iconKey ?? null;
+                    const Icon = getLearningSpaceIcon(iconKey, Languages);
+                    const isActive = activeLearningSpaceId === channel.ids.id;
+
+                    return (
+                      <SidebarMenuItem key={space.ids.id} className="py-0.5">
+                        <SidebarMenuButton
+                          asChild
+                          tooltip={space.basics.title}
+                          isActive={isActive}
+                          className="px-2.5"
+                        >
+                          <a href={`/d/spaces/${channel.ids.id}`}>
+                            <ThemedIconBadge
+                              icon={Icon}
+                              themeKey={channel.ui?.themeKey ?? null}
+                              size="md"
+                              className="shrink-0 rounded-full"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-sm font-medium">
+                                {space.basics.title}
+                              </div>
+                              <div className="truncate text-xs text-muted-foreground">
+                                {space.basics.subject ?? 'General'}
+                              </div>
+                            </div>
+                          </a>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
+                </SidebarMenu>
+              </SidebarGroup>
             )}
           </>
         ) : null}

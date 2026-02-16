@@ -22,7 +22,10 @@ import { Badge } from '@iconicedu/ui-web/ui/badge';
 import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import type { ChannelVM } from '@iconicedu/shared-types';
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
-import { getDirectMessageUnreadCount } from './sidebar-unread';
+import {
+  getDirectMessageItemUnreadCount,
+  getDirectMessageUnreadCount,
+} from './sidebar-unread';
 import { cn } from '../../lib/utils';
 
 export function NavDirectMessages({
@@ -35,7 +38,10 @@ export function NavDirectMessages({
   activeChannelId?: string | null;
 }) {
   const { isMobile } = useSidebar();
-  const totalUnreadCount = React.useMemo(() => getDirectMessageUnreadCount(dms), [dms]);
+  const totalUnreadCount = React.useMemo(
+    () => getDirectMessageUnreadCount(dms, currentUserId),
+    [dms, currentUserId],
+  );
   const sortedDirectMessages = React.useMemo(() => {
     const getTimestamp = (value?: string | null) => {
       if (!value) return 0;
@@ -132,9 +138,15 @@ export function NavDirectMessages({
             item.collections.participants.find(
               (participant) => participant.ids.accountId !== currentUserId,
             ) ?? item.collections.participants[0];
+          const messageItems = item.collections.messages?.items ?? [];
+          const latestMessage = messageItems[messageItems.length - 1];
+          const senderFallbackProfile = latestMessage?.core.sender?.profile;
           const fallback = item.basics.topic ?? 'User';
-          const name = getProfileDisplayName(otherParticipant?.profile, fallback);
-          const unreadCount = item.collections.readState?.unreadCount ?? 0;
+          const name = getProfileDisplayName(
+            otherParticipant?.profile ?? senderFallbackProfile,
+            fallback,
+          );
+          const unreadCount = getDirectMessageItemUnreadCount(item, currentUserId);
           return (
             <SidebarMenuItem key={item.ids.id} className="py-1">
               <SidebarMenuButton

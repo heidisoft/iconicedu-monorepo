@@ -33,10 +33,12 @@ import {
   markDirectMessageChannelRead,
   touchDirectMessageChannelOrder,
 } from '@iconicedu/web/lib/sidebar/direct-message-unread';
+import { upsertDirectMessageChannel } from '@iconicedu/web/lib/sidebar/direct-message-realtime';
 import { persistDirectMessageUnreadCount } from '@iconicedu/web/lib/sidebar/direct-message-unread-persistence';
 import { mapProfilePresenceRowToVM } from '@iconicedu/web/lib/profile/mappers/presence.mapper';
 import { applyPresenceToSidebarData } from '@iconicedu/web/lib/presence/apply-presence';
 import type { ProfilePresenceRow } from '@iconicedu/shared-types';
+import { buildChannelById } from '@iconicedu/web/lib/channels/builders/channel.builder';
 
 const AVATAR_BUCKET = 'public-avatars';
 const AVATAR_SIGNED_URL_TTL = 60 * 60;
@@ -86,6 +88,9 @@ export function SidebarShell({
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
   const router = useRouter();
   const [sidebarData, setSidebarData] = React.useState(data);
+  const directMessageIdsRef = React.useRef(
+    new Set(data.collections.directMessages.map((dm) => dm.ids.id)),
+  );
   const [onboardingStatus, setOnboardingStatus] = React.useState<UserOnboardingStatusVM | null>(
     initialOnboardingStatus ?? null,
   );
@@ -93,6 +98,12 @@ export function SidebarShell({
   React.useEffect(() => {
     setSidebarData(data);
   }, [data]);
+
+  React.useEffect(() => {
+    directMessageIdsRef.current = new Set(
+      sidebarData.collections.directMessages.map((dm) => dm.ids.id),
+    );
+  }, [sidebarData.collections.directMessages]);
 
   React.useEffect(() => {
     setOnboardingStatus(initialOnboardingStatus ?? null);
@@ -248,58 +259,75 @@ export function SidebarShell({
       return;
     }
 
-    const channel = supabase.channel(`sidebar-dm-updates:${orgId}:${accountId}`);
+    const channel = supabase.channel(`sidebar-dm-updates:${orgId}:${profileId}`);
+    const pendingChannelFetches = new Set<string>();
 
-    // Listen for new DM channels
+    const addOrRefreshDmChannel = async (
+      channelId: string,
+      senderProfileId?: string | null,
+    ) => {
+      if (pendingChannelFetches.has(channelId)) {
+        return;
+      }
+      pendingChannelFetches.add(channelId);
+
+      try {
+        const nextChannel = await buildChannelById(supabase, orgId, channelId, {
+          accountId,
+          messagesLimit: 50,
+        });
+        if (!nextChannel) {
+          return;
+        }
+
+        if (nextChannel.basics.kind !== 'dm' && nextChannel.basics.kind !== 'group_dm') {
+          return;
+        }
+
+        const minimumUnreadCount =
+          senderProfileId && senderProfileId !== profileId ? 1 : 0;
+        const persistedUnread = Math.max(
+          0,
+          nextChannel.collections.readState?.unreadCount ?? 0,
+        );
+        const nextUnreadCount = Math.max(minimumUnreadCount, persistedUnread);
+
+        setSidebarData((prev) =>
+          upsertDirectMessageChannel(prev, nextChannel, {
+            minimumUnreadCount,
+            moveToTop: true,
+          }),
+        );
+
+        if (nextUnreadCount > 0) {
+          void persistUnread(channelId, nextUnreadCount);
+        }
+      } finally {
+        pendingChannelFetches.delete(channelId);
+      }
+    };
+
     channel.on(
       'postgres_changes',
       {
         event: 'INSERT',
         schema: 'public',
-        table: 'channels',
-        filter: `org_id=eq.${orgId}`,
+        table: 'channel_members',
+        filter: `profile_id=eq.${profileId}`,
       },
       async (payload) => {
-        const row = payload.new as { id?: string; kind?: string } | null;
-        if (!row?.id || (row.kind !== 'dm' && row.kind !== 'group_dm')) {
-          console.log('[Sidebar] Ignoring non-DM channel insert:', row?.kind);
+        const row = payload.new as {
+          channel_id?: string;
+        } | null;
+
+        if (!row?.channel_id) {
           return;
         }
 
-        console.log('[Sidebar] New DM channel detected:', row.id);
-
-        // Fetch the full channel data with participants
-        const { data: channelData, error: channelError } = await supabase
-          .from('channels')
-          .select(`
-            *,
-            participants:channel_members!inner(profile_id)
-          `)
-          .eq('id', row.id)
-          .eq('org_id', orgId)
-          .single();
-
-        if (channelError || !channelData) {
-          console.error('[Sidebar] Failed to fetch new DM channel:', channelError);
-          return;
-        }
-
-        // Check if current user is a participant
-        const participants = (channelData as any).participants as Array<{ profile_id: string }>;
-        const isParticipant = participants.some((p: { profile_id: string }) => p.profile_id === profileId);
-
-        if (!isParticipant) {
-          console.log('[Sidebar] User is not a participant in channel:', row.id);
-          return;
-        }
-
-        console.log('[Sidebar] Refreshing sidebar for new DM channel:', row.id);
-        // Refresh the page to get the full channel data with proper formatting
-        router.refresh();
+        await addOrRefreshDmChannel(row.channel_id, null);
       },
     );
 
-    // Listen for new messages in DM channels
     channel.on(
       'postgres_changes',
       {
@@ -310,90 +338,34 @@ export function SidebarShell({
       },
       async (payload) => {
         const row = payload.new as {
-          id?: string;
           channel_id?: string;
-          sender_profile_id?: string;
+          sender_profile_id?: string | null;
         } | null;
 
-        if (!row?.channel_id || !row?.id) {
+        if (!row?.channel_id) {
           return;
         }
 
-        // Don't refresh for own messages (they're handled by optimistic updates)
-        if (row.sender_profile_id === profileId) {
+        const existsInSidebar = directMessageIdsRef.current.has(row.channel_id);
+        if (existsInSidebar) {
           return;
         }
 
-        console.log('[Sidebar] New message detected in channel:', row.channel_id);
-
-        // Check if this is a DM channel and if user is a participant
-        const { data: channelData, error: channelError } = await supabase
-          .from('channels')
-          .select(`
-            id,
-            kind,
-            participants:channel_members!inner(profile_id, account_id)
-          `)
-          .eq('id', row.channel_id)
-          .eq('org_id', orgId)
-          .single();
-
-        if (channelError || !channelData) {
-          console.log('[Sidebar] Could not fetch channel for message:', row.channel_id);
-          return;
-        }
-
-        const channel = channelData as any;
-
-        // Only process DM channels
-        if (channel.kind !== 'dm' && channel.kind !== 'group_dm') {
-          return;
-        }
-
-        // Check if current user is a participant
-        const participants = channel.participants as Array<{
-          profile_id: string;
-          account_id: string;
-        }>;
-        const isParticipant = participants.some(
-          (p: { account_id: string }) => p.account_id === accountId
-        );
-
-        if (!isParticipant) {
-          return;
-        }
-
-        // Check if this channel is already in the sidebar
-        const channelInSidebar = sidebarData.collections.directMessages.some(
-          (dm) => dm.ids.id === row.channel_id
-        );
-
-        if (channelInSidebar) {
-          console.log('[Sidebar] Channel already in sidebar, skipping refresh');
-          return;
-        }
-
-        console.log('[Sidebar] New message in DM channel not in sidebar, refreshing:', row.channel_id);
-        // Refresh to show the DM channel with the new message
-        router.refresh();
+        await addOrRefreshDmChannel(row.channel_id, row.sender_profile_id ?? null);
       },
     );
-
-    channel.subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        console.log(`[Sidebar] Successfully subscribed to DM updates`);
-      } else if (status === 'CHANNEL_ERROR') {
-        console.error(`[Sidebar] Failed to subscribe to DM updates`);
-      } else if (status === 'TIMED_OUT') {
-        console.error(`[Sidebar] DM updates subscription timed out`);
-      }
-    });
+    channel.subscribe();
 
     return () => {
-      console.log('[Sidebar] Unsubscribing from DM updates');
       void channel.unsubscribe();
     };
-  }, [supabase, sidebarProfile.ids?.orgId, sidebarProfile.ids?.id, sidebarProfile.ids?.accountId, router, sidebarData.collections.directMessages]);
+  }, [
+    supabase,
+    sidebarProfile.ids?.orgId,
+    sidebarProfile.ids?.id,
+    sidebarProfile.ids?.accountId,
+    persistUnread,
+  ]);
 
   React.useEffect(() => {
     const orgId = sidebarProfile.ids?.orgId;

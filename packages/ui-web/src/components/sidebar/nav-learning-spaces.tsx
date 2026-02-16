@@ -9,7 +9,7 @@ import {
   StarOff,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import type { LearningSpaceVM, SidebarChildVM } from '@iconicedu/shared-types';
+import type { LearningSpaceVM, UserProfileVM } from '@iconicedu/shared-types';
 
 import {
   Collapsible,
@@ -42,7 +42,7 @@ import { getLearningSpaceIcon } from '@iconicedu/ui-web/lib/icons';
 export function NavLearningSpaces({
   learningSpaces,
   title,
-  child,
+  participant,
   isOpen,
   onOpenChange,
   activeChannelId,
@@ -50,7 +50,7 @@ export function NavLearningSpaces({
 }: {
   learningSpaces: LearningSpaceVM[];
   title: string;
-  child: SidebarChildVM;
+  participant: Pick<UserProfileVM, 'ids' | 'profile' | 'ui'>;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   activeChannelId?: string | null;
@@ -62,9 +62,9 @@ export function NavLearningSpaces({
         <CollapsibleTrigger asChild>
           <SidebarGroupLabel className="flex cursor-pointer items-center gap-2 rounded-md rounded-b-none px-2 py-1 uppercase">
             <AvatarWithStatus
-              name={getProfileDisplayName(child.profile)}
+              name={getProfileDisplayName(participant.profile)}
               showStatus={false}
-              themeKey={child.ui?.themeKey ?? null}
+              themeKey={participant.ui?.themeKey ?? null}
               sizeClassName="size-5"
               fallbackClassName={cn('text-[10px] font-semibold leading-none uppercase')}
               initialsLength={1}

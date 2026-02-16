@@ -106,6 +106,48 @@ describe('NavDirectMessages', () => {
       '/d/dm/dm-read-old',
     ]);
   });
+
+  it('shows participant name and unread badge for a brand-new DM before read state persists', () => {
+    render(
+      <SidebarProvider>
+        <NavDirectMessages
+          dms={[
+            {
+              ids: { id: 'dm-new' },
+              basics: { topic: null },
+              collections: {
+                readState: { unreadCount: 0, lastReadAt: null, lastReadMessageId: null },
+                participants: [],
+                messages: {
+                  items: [
+                    {
+                      ids: { id: 'msg-1', orgId: 'org-1' },
+                      core: {
+                        createdAt: '2026-02-16T10:00:00.000Z',
+                        sender: {
+                          ids: { accountId: 'account-other' },
+                          profile: {
+                            displayName: 'Brand New Person',
+                            firstName: 'Brand',
+                            lastName: 'New',
+                            avatar: { source: 'seed', seed: 'brand-new' },
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            } as any,
+          ]}
+          currentUserId="account-self"
+        />
+      </SidebarProvider>,
+    );
+
+    expect(screen.getByText('Brand New Person')).toBeInTheDocument();
+    expect(screen.getAllByText('1')).toHaveLength(2);
+  });
 });
 
 function makeDm(
