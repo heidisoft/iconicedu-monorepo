@@ -12,8 +12,8 @@
   },
   "private": true,
   "scripts": {
-    "build": "tsc -p tsconfig.json && tailwindcss -c tailwind.config.ts -i ./src/styles/global.css -o ./dist/ui-web.css --minify",
-    "tailwind:build": "tailwindcss -c tailwind.config.ts -i ./src/styles/global.css -o ./dist/ui-web.css",
+    "build": "tsc -p tsconfig.json && pnpm exec tailwindcss -c tailwind.config.ts -i ./src/styles/global.css -o ./dist/ui-web.css --minify",
+    "tailwind:build": "pnpm exec tailwindcss -c tailwind.config.ts -i ./src/styles/global.css -o ./dist/ui-web.css",
     "tailwind:watch": "node ./scripts/watch-tailwind.js",
     "dev": "tsc -p tsconfig.json --watch & pnpm run tailwind:watch",
     "test": "vitest run",

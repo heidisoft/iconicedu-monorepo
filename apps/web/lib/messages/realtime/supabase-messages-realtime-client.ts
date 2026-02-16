@@ -54,6 +54,10 @@ export function createSupabaseMessagesRealtimeClient(): MessagesRealtimeClient {
             nextType = undefined;
 
             const response = await fetch(`/d/messages/actions/detail?messageId=${messageId}`);
+            if (response.status === 404 && currentType === 'updated') {
+              onEvent({ type: 'message-deleted', messageId });
+              continue;
+            }
             if (response.ok) {
               const payload = (await response.json()) as {
                 success?: boolean;
@@ -105,7 +109,9 @@ export function createSupabaseMessagesRealtimeClient(): MessagesRealtimeClient {
               return;
             }
           }
-          const messageId = (payload.new as { id?: string } | null)?.id;
+          const messageId =
+            (payload.new as { id?: string } | null)?.id ??
+            (payload.old as { id?: string } | null)?.id;
           void fetchMessage(messageId ?? '', payload.eventType === 'INSERT' ? 'added' : 'updated');
         },
       );

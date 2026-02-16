@@ -36,9 +36,11 @@ let shouldRunAgain = false;
 
 function runTailwind() {
   return new Promise((resolve, reject) => {
-    const child = spawn('tailwindcss', tailwindArgs, {
+    // Use pnpm exec to ensure we use the locally installed tailwindcss
+    const child = spawn('pnpm', ['exec', 'tailwindcss', ...tailwindArgs], {
       stdio: 'inherit',
       cwd: process.cwd(),
+      shell: true,
     });
 
     child.on('close', (code) => {

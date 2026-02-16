@@ -97,6 +97,39 @@ describe('createSupabaseMessagesRealtimeClient', () => {
     });
   });
 
+  it('emits message-deleted when update detail fetch returns 404', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: false,
+        status: 404,
+      })),
+    );
+
+    const client = createSupabaseMessagesRealtimeClient();
+    const onEvent = vi.fn();
+    client.subscribe({ orgId: 'org-1', channelId: 'channel-1', onEvent });
+
+    const messagesHandler = channelOn.mock.calls.find(
+      (call) => call[0] === 'postgres_changes' && call[1]?.table === 'messages',
+    )?.[2] as ((payload: any) => void) | undefined;
+
+    expect(messagesHandler).toBeTypeOf('function');
+
+    messagesHandler?.({
+      eventType: 'UPDATE',
+      new: null,
+      old: { id: 'message-2' },
+    });
+
+    await vi.waitFor(() => {
+      expect(onEvent).toHaveBeenCalledWith({
+        type: 'message-deleted',
+        messageId: 'message-2',
+      });
+    });
+  });
+
   it('refetches a message if another event arrives while the first fetch is pending', async () => {
     let resolveFirstFetch: ((value: unknown) => void) | null = null;
     const firstFetchPromise = new Promise((resolve) => {
