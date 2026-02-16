@@ -21,6 +21,31 @@ import type {
   UserProfileVM,
 } from '@iconicedu/shared-types';
 
+function getMessageInputPlaceholder(
+  channel: ChannelVM,
+  currentUserId: string | null,
+): string {
+  const { kind, topic } = channel.basics;
+  const participants = channel.collections.participants;
+
+  if (kind === 'dm') {
+    // For direct messages, show the other person's name
+    const otherPerson = participants.find((p) => p.ids.id !== currentUserId);
+    if (otherPerson) {
+      return `Message ${getProfileDisplayName(otherPerson.profile, 'User')}`;
+    }
+    return 'Message User';
+  }
+
+  if (kind === 'group_dm') {
+    // For group DMs, show "this conversation"
+    return 'Message this conversation';
+  }
+
+  // For channels, show the channel topic/name
+  return `Message #${topic || 'channel'}`;
+}
+
 export interface MessagesContainerProps {
   channel: ChannelVM;
   currentUserId?: string;
@@ -766,10 +791,7 @@ export function MessagesContainer({
       ) : null}
       <MessageInput
         onSend={handleSendMessage}
-        placeholder={`Message ${getProfileDisplayName(
-          educator?.profile,
-          channel.basics.topic ?? 'User',
-        )}`}
+        placeholder={getMessageInputPlaceholder(channel, resolvedCurrentUserId)}
         onTypingStart={handleTypingStart}
         onTypingStop={handleTypingStop}
         onFocus={handleInputFocus}

@@ -1,6 +1,6 @@
 # AGENTS.md - IconicEdu Monorepo Architecture Guide
 
-**Last Updated:** 2026-02-15
+**Last Updated:** 2026-02-16
 **Purpose:** Comprehensive guide for AI agents and developers to understand the IconicEdu codebase architecture, domain models, and TypeScript interfaces.
 
 ---
@@ -1122,6 +1122,24 @@ TextMessageVM | ImageMessageVM | ... (narrowed type)
    - Each package should have an `index.ts` that re-exports public API
    - Consumers import from package root: `import { MessageVM } from '@iconicedu/shared-types'`
 
+### Testing Requirements
+
+**CRITICAL: Every time a file is modified, unit tests MUST be updated or created.**
+
+- When creating a new file, add corresponding test file (`.test.ts` or `.test.tsx`)
+- When modifying existing code, update existing tests to reflect changes
+- When adding new functions or components, add new test cases
+- Follow existing test patterns in the codebase
+- Ensure tests cover edge cases and error conditions
+- Run tests before committing changes: `pnpm test`
+
+**Test Coverage Standards:**
+- All utility functions must have unit tests
+- All builders and mappers must have unit tests
+- All React components should have basic rendering tests
+- All server actions should have integration tests
+- Aim for meaningful test coverage, not just high percentages
+
 ### Testing Patterns
 
 1. **Test builders and mappers**
@@ -1337,4 +1355,4 @@ function handleMessage(message: MessageVM) {
 
 **End of AGENTS.md**
 
-*This document should be updated as the architecture evolves. Last updated: 2026-02-15*
+*This document should be updated as the architecture evolves. Last updated: 2026-02-16*
