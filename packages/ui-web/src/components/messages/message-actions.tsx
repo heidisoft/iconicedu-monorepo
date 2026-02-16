@@ -223,14 +223,13 @@ export const MessageActions = memo(function MessageActions({
             <Copy className="mr-2 h-4 w-4" />
             <span>Copy text</span>
           </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={handleHideClick} className="py-2">
-            <EyeOff className="mr-2 h-4 w-4" />
-            <span>Hide message</span>
-          </DropdownMenuItem>
           {isOwnMessage && (
             <>
               <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleHideClick} className="py-2">
+                <EyeOff className="mr-2 h-4 w-4" />
+                <span>Hide message</span>
+              </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={handleDeleteClick}
                 className="py-2 text-destructive focus:text-destructive"

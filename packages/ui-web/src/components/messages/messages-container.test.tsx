@@ -14,11 +14,13 @@ const deleteMessage = vi.fn();
 const toggleReaction = vi.fn();
 const toggleSaved = vi.fn();
 const toggleHidden = vi.fn();
+const prependMessages = vi.fn();
 
 vi.mock('../../hooks/use-messages', () => ({
-  useMessages: () => ({
-    messages: [],
+  useMessages: (initialMessages: any[]) => ({
+    messages: initialMessages,
     addMessage,
+    prependMessages,
     updateMessage,
     deleteMessage,
     toggleReaction,

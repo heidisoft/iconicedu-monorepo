@@ -49,8 +49,15 @@ export type MessageDeleteInput = {
   messageId: string;
 };
 
+export type MessageToggleHiddenInput = {
+  orgId: string;
+  messageId: string;
+  isHidden: boolean;
+};
+
 export interface MessageWriteClient {
   sendTextMessage: (input: MessageSendTextInput) => Promise<MessageVM>;
   toggleReaction: (input: MessageToggleReactionInput) => Promise<void>;
   deleteMessage: (input: MessageDeleteInput) => Promise<void>;
+  toggleHiddenMessage: (input: MessageToggleHiddenInput) => Promise<void>;
 }

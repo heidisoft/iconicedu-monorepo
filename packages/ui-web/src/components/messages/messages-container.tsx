@@ -356,10 +356,27 @@ export function MessagesContainer({
   );
 
   const handleToggleHidden = useCallback(
-    (messageId: string) => {
+    async (messageId: string) => {
+      const message = messages.find((m) => m.ids.id === messageId);
+      if (!message) return;
+
+      const newHiddenState = !message.state?.isHidden;
+
+      if (messageWriteClient) {
+        try {
+          await messageWriteClient.toggleHiddenMessage({
+            orgId: channel.ids.orgId,
+            messageId,
+            isHidden: newHiddenState,
+          });
+        } catch (error) {
+          console.error('Failed to toggle hidden message:', error);
+          return;
+        }
+      }
       toggleHidden(messageId);
     },
-    [toggleHidden],
+    [toggleHidden, messageWriteClient, channel.ids.orgId, messages],
   );
 
   const handleDeleteMessage = useCallback(

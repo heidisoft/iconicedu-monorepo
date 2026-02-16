@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { DashboardHeader } from '@iconicedu/ui-web';
-import { sendTextMessageAction, toggleMessageReactionAction, deleteMessageAction } from '@iconicedu/web/app/actions/messages';
+import { sendTextMessageAction, toggleMessageReactionAction, deleteMessageAction, toggleHiddenMessageAction } from '@iconicedu/web/app/actions/messages';
 import { MessagesShellClient } from '@iconicedu/web/app/(app)/d/messages/messages-shell-client';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
@@ -48,6 +48,7 @@ export default async function Page({
         sendTextMessage={sendTextMessageAction}
         toggleReaction={toggleMessageReactionAction}
         deleteMessage={deleteMessageAction}
+        toggleHiddenMessage={toggleHiddenMessageAction}
       />
     </div>
   );

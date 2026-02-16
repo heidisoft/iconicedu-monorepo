@@ -18,6 +18,7 @@ export function LearningSpaceShell({
   sendTextMessage,
   toggleReaction,
   deleteMessage,
+  toggleHiddenMessage,
 }: {
   channel: ChannelVM;
   learningSpace: LearningSpaceVM | null;
@@ -26,6 +27,7 @@ export function LearningSpaceShell({
   sendTextMessage: (input: MessageSendTextInput) => Promise<MessageVM>;
   toggleReaction: (input: { orgId: string; messageId: string; emoji: string }) => Promise<void>;
   deleteMessage: (input: { orgId: string; messageId: string }) => Promise<void>;
+  toggleHiddenMessage: (input: { orgId: string; messageId: string; isHidden: boolean }) => Promise<void>;
 }) {
   return (
     <MessagesShellClient
@@ -40,6 +42,7 @@ export function LearningSpaceShell({
       sendTextMessage={sendTextMessage}
       toggleReaction={toggleReaction}
       deleteMessage={deleteMessage}
+      toggleHiddenMessage={toggleHiddenMessage}
     />
   );
 }

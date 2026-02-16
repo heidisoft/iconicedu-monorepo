@@ -15,15 +15,22 @@ vi.mock('@iconicedu/web/app/(app)/d/messages/messages-shell-client', () => ({
 }));
 
 describe('LearningSpaceShell', () => {
-  it('forwards currentUserId to MessagesShell', () => {
+  it('forwards currentUserId and message actions to MessagesShell', () => {
+    const sendTextMessage = vi.fn();
+    const toggleReaction = vi.fn();
+    const deleteMessage = vi.fn();
+    const toggleHiddenMessage = vi.fn();
+
     render(
       <LearningSpaceShell
         channel={{ ids: { id: 'channel-1', orgId: 'org-1' } } as any}
         learningSpace={null}
         currentUserId="profile-1"
         currentUserProfile={{ ids: { id: 'profile-1', orgId: 'org-1', accountId: 'account-1' } } as any}
-        sendTextMessage={vi.fn()}
-        toggleReaction={vi.fn()}
+        sendTextMessage={sendTextMessage}
+        toggleReaction={toggleReaction}
+        deleteMessage={deleteMessage}
+        toggleHiddenMessage={toggleHiddenMessage}
       />,
     );
 
@@ -31,6 +38,10 @@ describe('LearningSpaceShell', () => {
       expect.objectContaining({
         currentUserId: 'profile-1',
         currentUserProfile: { ids: { id: 'profile-1', orgId: 'org-1', accountId: 'account-1' } },
+        sendTextMessage,
+        toggleReaction,
+        deleteMessage,
+        toggleHiddenMessage,
       }),
     );
   });

@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { DashboardHeader } from '@iconicedu/ui-web';
 import { LearningSpaceShell } from '@iconicedu/web/app/(app)/d/spaces/[channelId]/learning-space-shell';
-import { sendTextMessageAction, toggleMessageReactionAction, deleteMessageAction } from '@iconicedu/web/app/actions/messages';
+import { sendTextMessageAction, toggleMessageReactionAction, deleteMessageAction, toggleHiddenMessageAction } from '@iconicedu/web/app/actions/messages';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
 import { getOrCreateAccount } from '@iconicedu/web/lib/accounts/getOrCreateAccount';
@@ -55,6 +55,7 @@ export default async function Page({
         sendTextMessage={sendTextMessageAction}
         toggleReaction={toggleMessageReactionAction}
         deleteMessage={deleteMessageAction}
+        toggleHiddenMessage={toggleHiddenMessageAction}
       />
     </div>
   );

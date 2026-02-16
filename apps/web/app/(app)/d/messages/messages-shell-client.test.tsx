@@ -19,6 +19,8 @@ describe('MessagesShellClient', () => {
   it('passes realtime and write clients to MessagesShell', () => {
     const sendTextMessage = vi.fn();
     const toggleReaction = vi.fn();
+    const deleteMessage = vi.fn();
+    const toggleHiddenMessage = vi.fn();
 
     render(
       <MessagesShellClient
@@ -26,13 +28,15 @@ describe('MessagesShellClient', () => {
         currentUserId="profile-1"
         sendTextMessage={sendTextMessage}
         toggleReaction={toggleReaction}
+        deleteMessage={deleteMessage}
+        toggleHiddenMessage={toggleHiddenMessage}
       />,
     );
 
     expect(messagesShellMock).toHaveBeenCalledWith(
       expect.objectContaining({
         realtimeClient,
-        messageWriteClient: { sendTextMessage, toggleReaction },
+        messageWriteClient: { sendTextMessage, toggleReaction, deleteMessage, toggleHiddenMessage },
         currentUserId: 'profile-1',
       }),
     );

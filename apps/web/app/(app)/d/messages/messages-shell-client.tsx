@@ -27,6 +27,7 @@ type MessagesShellClientProps = {
   sendTextMessage: (input: MessageSendTextInput) => Promise<MessageVM>;
   toggleReaction: (input: { orgId: string; messageId: string; emoji: string }) => Promise<void>;
   deleteMessage: (input: { orgId: string; messageId: string }) => Promise<void>;
+  toggleHiddenMessage: (input: { orgId: string; messageId: string; isHidden: boolean }) => Promise<void>;
 };
 
 export function MessagesShellClient({
@@ -37,13 +38,14 @@ export function MessagesShellClient({
   sendTextMessage,
   toggleReaction,
   deleteMessage,
+  toggleHiddenMessage,
 }: MessagesShellClientProps) {
   const [channelState, setChannelState] = useState(channel);
   const presenceClient = useMemo(() => createSupabaseBrowserClient(), []);
   const realtimeClient = useMemo(() => createSupabaseMessagesRealtimeClient(), []);
   const messageWriteClient = useMemo(
-    () => ({ sendTextMessage, toggleReaction, deleteMessage }),
-    [sendTextMessage, toggleReaction, deleteMessage],
+    () => ({ sendTextMessage, toggleReaction, deleteMessage, toggleHiddenMessage }),
+    [sendTextMessage, toggleReaction, deleteMessage, toggleHiddenMessage],
   );
 
   useEffect(() => {

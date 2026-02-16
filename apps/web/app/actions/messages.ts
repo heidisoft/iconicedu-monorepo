@@ -434,3 +434,54 @@ export async function deleteMessageAction(input: {
     throw new Error(deleteResult.error.message);
   }
 }
+
+export async function toggleHiddenMessageAction(input: {
+  messageId: string;
+  orgId: string;
+  isHidden: boolean;
+}): Promise<void> {
+  const supabase = await createSupabaseServerClient();
+  const authUser = await requireAuthedUser(supabase);
+  const accountResponse = await getAccountByAuthUserId(supabase, authUser.id);
+
+  if (!accountResponse.data) {
+    throw new Error('Account not found');
+  }
+
+  if (input.orgId !== accountResponse.data.org_id) {
+    throw new Error('Invalid org');
+  }
+
+  const messageResponse = await supabase
+    .from('messages')
+    .select('id, org_id, sender_profile_id')
+    .eq('id', input.messageId)
+    .maybeSingle<{ id: string; org_id: string; sender_profile_id: string }>();
+
+  if (!messageResponse.data || messageResponse.data.org_id !== input.orgId) {
+    throw new Error('Message not found');
+  }
+
+  const profileResponse = await getProfileByAccountId(supabase, accountResponse.data.id);
+  if (!profileResponse.data) {
+    throw new Error('Profile not found');
+  }
+
+  if (messageResponse.data.sender_profile_id !== profileResponse.data.id) {
+    throw new Error('Unauthorized: You can only hide your own messages');
+  }
+
+  const updateResult = await supabase
+    .from('messages')
+    .update({
+      is_hidden: input.isHidden,
+    })
+    .eq('id', input.messageId)
+    .eq('org_id', input.orgId)
+    .eq('sender_profile_id', profileResponse.data.id)
+    .is('deleted_at', null);
+
+  if (updateResult.error) {
+    throw new Error(updateResult.error.message);
+  }
+}

@@ -67,6 +67,7 @@ export const MessageBase = memo(function MessageBase({
   }, [message, onOpenThread]);
 
   const senderName = getProfileDisplayName(message.core.sender.profile);
+  const isOwnMessage = currentUserId === message.core.sender.ids.id;
 
   if (message.state?.isHidden) {
     return (
@@ -105,7 +106,7 @@ export const MessageBase = memo(function MessageBase({
               </Tooltip>
             </TooltipProvider>
           </div>
-          <HiddenMessagePlaceholder onUnhide={onToggleHidden!} />
+          <HiddenMessagePlaceholder onUnhide={onToggleHidden} canUnhide={isOwnMessage} />
         </div>
       </div>
     );

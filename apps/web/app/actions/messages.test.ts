@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { deleteMessageAction, sendTextMessageAction } from '@iconicedu/web/app/actions/messages';
+import { deleteMessageAction, sendTextMessageAction, toggleHiddenMessageAction } from '@iconicedu/web/app/actions/messages';
 
 const mapMessageRowToVM = vi.fn();
 const buildUserProfileById = vi.fn();
@@ -510,5 +510,86 @@ describe('deleteMessageAction', () => {
     expect(deleteUpdateChain.eq).toHaveBeenCalledWith('org_id', 'org-1');
     expect(deleteUpdateChain.eq).toHaveBeenCalledWith('sender_profile_id', 'profile-1');
     expect(deleteUpdateChain.is).toHaveBeenCalledWith('deleted_at', null);
+  });
+});
+
+describe('toggleHiddenMessageAction', () => {
+  it('toggles message hidden state after ownership checks', async () => {
+    const supabase = {
+      auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
+      from: vi.fn(),
+    };
+    const { createSupabaseServerClient } = await import(
+      '@iconicedu/web/lib/supabase/server'
+    );
+    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
+      supabase,
+    );
+
+    const selectChain: any = {};
+    selectChain.eq = vi.fn(() => selectChain);
+    selectChain.maybeSingle = vi.fn(async () => ({
+      data: { id: 'message-1', org_id: 'org-1', sender_profile_id: 'profile-1' },
+    }));
+
+    const hiddenUpdateChain: any = {};
+    hiddenUpdateChain.eq = vi.fn(() => hiddenUpdateChain);
+    hiddenUpdateChain.is = vi.fn(async () => ({ error: null }));
+    const updateMessage = vi.fn(() => hiddenUpdateChain);
+
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'messages') {
+        return { select: () => selectChain, update: updateMessage };
+      }
+      return {};
+    });
+
+    await toggleHiddenMessageAction({ orgId: 'org-1', messageId: 'message-1', isHidden: true });
+
+    expect(updateMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        is_hidden: true,
+      }),
+    );
+    expect(hiddenUpdateChain.eq).toHaveBeenCalledWith('id', 'message-1');
+    expect(hiddenUpdateChain.eq).toHaveBeenCalledWith('org_id', 'org-1');
+    expect(hiddenUpdateChain.eq).toHaveBeenCalledWith('sender_profile_id', 'profile-1');
+    expect(hiddenUpdateChain.is).toHaveBeenCalledWith('deleted_at', null);
+  });
+
+  it('throws error if user is not the message owner', async () => {
+    const supabase = {
+      auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
+      from: vi.fn(),
+    };
+    const { createSupabaseServerClient } = await import(
+      '@iconicedu/web/lib/supabase/server'
+    );
+    const { getProfileByAccountId } = await import(
+      '@iconicedu/web/lib/profile/queries/profiles.query'
+    );
+    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
+      supabase,
+    );
+    (getProfileByAccountId as unknown as { mockResolvedValueOnce: (value: any) => void }).mockResolvedValueOnce(
+      { data: { id: 'profile-2' } },
+    );
+
+    const selectChain: any = {};
+    selectChain.eq = vi.fn(() => selectChain);
+    selectChain.maybeSingle = vi.fn(async () => ({
+      data: { id: 'message-1', org_id: 'org-1', sender_profile_id: 'profile-1' },
+    }));
+
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'messages') {
+        return { select: () => selectChain };
+      }
+      return {};
+    });
+
+    await expect(
+      toggleHiddenMessageAction({ orgId: 'org-1', messageId: 'message-1', isHidden: true }),
+    ).rejects.toThrow('Unauthorized: You can only hide your own messages');
   });
 });
