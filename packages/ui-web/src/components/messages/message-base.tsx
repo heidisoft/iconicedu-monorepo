@@ -30,6 +30,7 @@ export interface MessageBaseProps {
   onToggleSaved?: () => void;
   onToggleHidden?: () => void;
   onDelete?: () => void;
+  currentUserId?: UUID;
 }
 
 export const MessageBase = memo(function MessageBase({
@@ -43,6 +44,7 @@ export const MessageBase = memo(function MessageBase({
   onToggleSaved,
   onToggleHidden,
   onDelete,
+  currentUserId,
 }: MessageBaseProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -186,6 +188,7 @@ export const MessageBase = memo(function MessageBase({
           onDelete={onDelete}
           isThreadReply={isThreadReply}
           onDropdownOpenChange={setIsDropdownOpen}
+          currentUserId={currentUserId}
         />
       )}
     </div>

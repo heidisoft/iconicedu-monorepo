@@ -1,12 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { sendTextMessageAction } from '@iconicedu/web/app/actions/messages';
+import { deleteMessageAction, sendTextMessageAction } from '@iconicedu/web/app/actions/messages';
 
 const mapMessageRowToVM = vi.fn();
 const buildUserProfileById = vi.fn();
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
+}));
+vi.mock('@iconicedu/web/lib/supabase/service', () => ({
+  createSupabaseServiceClient: vi.fn(),
 }));
 
 vi.mock('@iconicedu/web/lib/auth/requireAuthedUser', () => ({
@@ -446,5 +449,66 @@ describe('toggleMessageReactionAction', () => {
 
     expect(deleteReaction).toHaveBeenCalled();
     expect(deleteCount).toHaveBeenCalled();
+  });
+});
+
+describe('deleteMessageAction', () => {
+  it('soft deletes using service client after ownership checks', async () => {
+    const supabase = {
+      auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
+      from: vi.fn(),
+    };
+    const serviceSupabase = {
+      from: vi.fn(),
+    };
+    const { createSupabaseServerClient } = await import(
+      '@iconicedu/web/lib/supabase/server'
+    );
+    const { createSupabaseServiceClient } = await import(
+      '@iconicedu/web/lib/supabase/service'
+    );
+    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
+      supabase,
+    );
+    (createSupabaseServiceClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
+      serviceSupabase,
+    );
+
+    const selectChain: any = {};
+    selectChain.eq = vi.fn(() => selectChain);
+    selectChain.maybeSingle = vi.fn(async () => ({
+      data: { id: 'message-1', org_id: 'org-1', sender_profile_id: 'profile-1' },
+    }));
+
+    const deleteUpdateChain: any = {};
+    deleteUpdateChain.eq = vi.fn(() => deleteUpdateChain);
+    deleteUpdateChain.is = vi.fn(async () => ({ error: null }));
+    const updateMessage = vi.fn(() => deleteUpdateChain);
+
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'messages') {
+        return { select: () => selectChain };
+      }
+      return {};
+    });
+    serviceSupabase.from.mockImplementation((table: string) => {
+      if (table === 'messages') {
+        return { update: updateMessage };
+      }
+      return {};
+    });
+
+    await deleteMessageAction({ orgId: 'org-1', messageId: 'message-1' });
+
+    expect(updateMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        deleted_at: expect.any(String),
+        deleted_by: 'profile-1',
+      }),
+    );
+    expect(deleteUpdateChain.eq).toHaveBeenCalledWith('id', 'message-1');
+    expect(deleteUpdateChain.eq).toHaveBeenCalledWith('org_id', 'org-1');
+    expect(deleteUpdateChain.eq).toHaveBeenCalledWith('sender_profile_id', 'profile-1');
+    expect(deleteUpdateChain.is).toHaveBeenCalledWith('deleted_at', null);
   });
 });

@@ -7,6 +7,7 @@ import type {
 } from '@iconicedu/shared-types';
 
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
+import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
 import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
@@ -385,6 +386,7 @@ export async function deleteMessageAction(input: {
   orgId: string;
 }): Promise<void> {
   const supabase = await createSupabaseServerClient();
+  const serviceSupabase = createSupabaseServiceClient();
   const authUser = await requireAuthedUser(supabase);
   const accountResponse = await getAccountByAuthUserId(supabase, authUser.id);
 
@@ -417,13 +419,16 @@ export async function deleteMessageAction(input: {
 
   const now = new Date().toISOString();
 
-  const deleteResult = await supabase
+  const deleteResult = await serviceSupabase
     .from('messages')
     .update({
       deleted_at: now,
       deleted_by: profileResponse.data.id,
     })
-    .eq('id', input.messageId);
+    .eq('id', input.messageId)
+    .eq('org_id', input.orgId)
+    .eq('sender_profile_id', profileResponse.data.id)
+    .is('deleted_at', null);
 
   if (deleteResult.error) {
     throw new Error(deleteResult.error.message);

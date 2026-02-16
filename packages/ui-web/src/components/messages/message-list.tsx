@@ -248,11 +248,11 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                           : 'opacity-100 translate-y-0',
                       )}
                     >
-                      <div className="flex-1 border-t border-amber-300" />
-                      <span className="mx-4 text-xs font-medium text-amber-700 bg-background px-2">
+                      <div className="flex-1 border-t border-yellow-200" />
+                      <span className="mx-4 text-xs font-medium text-yellow-700 bg-background px-2">
                         NEW MESSAGES
                       </span>
-                      <div className="flex-1 border-t border-amber-300" />
+                      <div className="flex-1 border-t border-yellow-200" />
                     </div>
                   )}
                   <MessageItem

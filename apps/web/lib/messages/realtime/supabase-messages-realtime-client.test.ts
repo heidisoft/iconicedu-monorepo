@@ -73,6 +73,30 @@ describe('createSupabaseMessagesRealtimeClient', () => {
     );
   });
 
+  it('emits message-deleted when a message is soft deleted', () => {
+    const client = createSupabaseMessagesRealtimeClient();
+    const onEvent = vi.fn();
+
+    client.subscribe({ orgId: 'org-1', channelId: 'channel-1', onEvent });
+
+    const messagesHandler = channelOn.mock.calls.find(
+      (call) => call[0] === 'postgres_changes' && call[1]?.table === 'messages',
+    )?.[2] as ((payload: any) => void) | undefined;
+
+    expect(messagesHandler).toBeTypeOf('function');
+
+    messagesHandler?.({
+      eventType: 'UPDATE',
+      new: { id: 'message-1', deleted_at: '2026-02-16T00:00:00.000Z' },
+      old: null,
+    });
+
+    expect(onEvent).toHaveBeenCalledWith({
+      type: 'message-deleted',
+      messageId: 'message-1',
+    });
+  });
+
   it('refetches a message if another event arrives while the first fetch is pending', async () => {
     let resolveFirstFetch: ((value: unknown) => void) | null = null;
     const firstFetchPromise = new Promise((resolve) => {

@@ -1,12 +1,12 @@
 'use client';
 
-import { Moon, Sun } from 'lucide-react';
+import { Moon, Sun, Monitor } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
 import { Button } from '@iconicedu/ui-web/ui/button';
 
 export function ThemeToggle({ ...props }) {
-  const { resolvedTheme, setTheme, theme } = useTheme();
+  const { setTheme, theme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -20,11 +20,30 @@ export function ThemeToggle({ ...props }) {
     }
   }, [setTheme, theme]);
 
-  const current = resolvedTheme ?? 'system';
-  const Icon = current === 'dark' ? Sun : Moon;
+  const currentTheme = theme ?? 'system';
+
+  const getIcon = () => {
+    switch (currentTheme) {
+      case 'light':
+        return Sun;
+      case 'dark':
+        return Moon;
+      case 'system':
+      default:
+        return Monitor;
+    }
+  };
+
+  const Icon = getIcon();
 
   const handleToggle = () => {
-    const nextTheme = current === 'dark' ? 'light' : 'dark';
+    // Cycle: system → light → dark → system
+    const nextTheme =
+      currentTheme === 'system'
+        ? 'light'
+        : currentTheme === 'light'
+          ? 'dark'
+          : 'system';
     setTheme(nextTheme);
   };
 
@@ -32,7 +51,7 @@ export function ThemeToggle({ ...props }) {
     <Button
       variant="ghost"
       className="relative p-0 size-9"
-      aria-label="Toggle theme"
+      aria-label={`Toggle theme (current: ${currentTheme})`}
       onClick={handleToggle}
       {...props}
     >

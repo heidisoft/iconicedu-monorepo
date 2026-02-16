@@ -19,11 +19,11 @@ interface ThreadMessageListProps {
 const UnreadDivider = memo(function UnreadDivider({ count }: { count?: number }) {
   return (
     <div className="relative my-3 flex items-center px-2">
-      <div className="flex-1 border-t border-amber-300" />
-      <span className="mx-3 text-xs font-medium text-amber-700 bg-background px-2">
+      <div className="flex-1 border-t border-yellow-200" />
+      <span className="mx-3 text-xs font-medium text-yellow-700 bg-background px-2">
         NEW MESSAGES{count && count > 0 ? ` (${count})` : ''}
       </span>
-      <div className="flex-1 border-t border-amber-300" />
+      <div className="flex-1 border-t border-yellow-200" />
     </div>
   );
 });

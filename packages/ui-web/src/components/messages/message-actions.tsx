@@ -48,6 +48,7 @@ interface MessageActionsProps {
   onDelete?: () => void;
   isThreadReply?: boolean;
   onDropdownOpenChange?: (open: boolean) => void;
+  currentUserId?: string;
 }
 
 export const MessageActions = memo(function MessageActions({
@@ -59,6 +60,7 @@ export const MessageActions = memo(function MessageActions({
   onDelete,
   isThreadReply,
   onDropdownOpenChange,
+  currentUserId,
 }: MessageActionsProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -122,6 +124,8 @@ export const MessageActions = memo(function MessageActions({
   const handleCancelDelete = useCallback(() => {
     setIsDeleteDialogOpen(false);
   }, []);
+
+  const isOwnMessage = currentUserId === message.core.sender.ids.id;
 
   return (
     <div className="absolute right-2 top-0 z-10 flex items-center gap-1 rounded-xl border bg-card px-1 py-1 shadow-md">
@@ -224,14 +228,18 @@ export const MessageActions = memo(function MessageActions({
             <EyeOff className="mr-2 h-4 w-4" />
             <span>Hide message</span>
           </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={handleDeleteClick}
-            className="py-2 text-destructive focus:text-destructive"
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            <span>Delete</span>
-          </DropdownMenuItem>
+          {isOwnMessage && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={handleDeleteClick}
+                className="py-2 text-destructive focus:text-destructive"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                <span>Delete</span>
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 

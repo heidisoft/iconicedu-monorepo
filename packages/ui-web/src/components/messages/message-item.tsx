@@ -96,6 +96,7 @@ export const MessageItem = memo(function MessageItem({
     onToggleHidden: handleToggleHidden,
     onToggleImportant: handleToggleImportant,
     onDelete: handleDelete,
+    currentUserId,
   };
 
   if (isTextMessage(message)) {

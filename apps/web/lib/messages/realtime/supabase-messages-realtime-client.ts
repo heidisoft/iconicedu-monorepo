@@ -98,6 +98,13 @@ export function createSupabaseMessagesRealtimeClient(): MessagesRealtimeClient {
             }
             return;
           }
+          if (payload.eventType === 'UPDATE') {
+            const updated = payload.new as { id?: string; deleted_at?: string | null } | null;
+            if (updated?.id && updated.deleted_at) {
+              onEvent({ type: 'message-deleted', messageId: updated.id });
+              return;
+            }
+          }
           const messageId = (payload.new as { id?: string } | null)?.id;
           void fetchMessage(messageId ?? '', payload.eventType === 'INSERT' ? 'added' : 'updated');
         },

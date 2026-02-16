@@ -22,3 +22,4 @@ build
 supabase/.temp
 .d.ts.
 .d.ts.map
+.temp
