@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, expect, it } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 
 import { SidebarLeft } from './sidebar-left';
 import { SidebarProvider } from '../../ui/sidebar';
@@ -99,8 +99,8 @@ function makeGuardianData() {
                 accountId: 'account-child-1',
               },
               profile: {
-                displayName: 'Child One',
-                firstName: 'Child',
+                displayName: 'Aiden One',
+                firstName: 'Aiden',
                 lastName: 'One',
                 avatar: { source: 'seed', seed: 'child-1' },
               },
@@ -113,8 +113,8 @@ function makeGuardianData() {
                 accountId: 'account-child-2',
               },
               profile: {
-                displayName: 'Child Two',
-                firstName: 'Child',
+                displayName: 'Bella Two',
+                firstName: 'Bella',
                 lastName: 'Two',
                 avatar: { source: 'seed', seed: 'child-2' },
               },
@@ -380,5 +380,34 @@ describe('SidebarLeft', () => {
     const sectionHeader = screen.getByText('Supervised DMs').closest('div');
     expect(sectionHeader).not.toBeNull();
     expect(within(sectionHeader as HTMLElement).getByText('3')).toBeInTheDocument();
+  });
+
+  it('toggles parent learning spaces groups', () => {
+    render(
+      <SidebarProvider>
+        <SidebarLeft data={makeGuardianData()} />
+      </SidebarProvider>,
+    );
+
+    expect(screen.getByText('Reading')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Aiden'));
+    expect(screen.queryByText('Reading')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('Aiden'));
+    expect(screen.getByText('Reading')).toBeInTheDocument();
+  });
+
+  it('toggles parent supervised dm groups', () => {
+    render(
+      <SidebarProvider>
+        <SidebarLeft data={makeGuardianSupervisedDmData()} />
+      </SidebarProvider>,
+    );
+
+    expect(screen.getByText('Mentor One')).toBeInTheDocument();
+    const aidenLabels = screen.getAllByText('Aiden');
+    fireEvent.click(aidenLabels[1]);
+    expect(screen.queryByText('Mentor One')).not.toBeInTheDocument();
+    fireEvent.click(screen.getAllByText('Aiden')[1]);
+    expect(screen.getByText('Mentor One')).toBeInTheDocument();
   });
 });

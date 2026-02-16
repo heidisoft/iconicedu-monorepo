@@ -298,6 +298,70 @@ export function SidebarLeft({
     visibleLearningSpaces,
     currentUserRef,
   );
+  const [guardianLearningSpaceOpenState, setGuardianLearningSpaceOpenState] = React.useState<
+    Record<string, boolean>
+  >({});
+  const [guardianSupervisedDmOpenState, setGuardianSupervisedDmOpenState] = React.useState<
+    Record<string, boolean>
+  >({});
+  const guardianLearningSpaceChildAccountIds = React.useMemo(
+    () => children.map((child) => child.ids.accountId),
+    [children],
+  );
+  const guardianLearningSpaceChildAccountIdsKey = React.useMemo(
+    () => guardianLearningSpaceChildAccountIds.join('|'),
+    [guardianLearningSpaceChildAccountIds],
+  );
+  const guardianSupervisedChildAccountIds = React.useMemo(
+    () => supervisedDirectMessagesByChild.map(({ child }) => child.ids.accountId),
+    [supervisedDirectMessagesByChild],
+  );
+  const guardianSupervisedChildAccountIdsKey = React.useMemo(
+    () => guardianSupervisedChildAccountIds.join('|'),
+    [guardianSupervisedChildAccountIds],
+  );
+
+  React.useEffect(() => {
+    if (userProfile.kind !== 'guardian') {
+      return;
+    }
+    setGuardianLearningSpaceOpenState((prev) => {
+      const next: Record<string, boolean> = {};
+      guardianLearningSpaceChildAccountIds.forEach((accountId) => {
+        next[accountId] = prev[accountId] ?? true;
+      });
+      const prevKeys = Object.keys(prev);
+      const nextKeys = Object.keys(next);
+      if (
+        prevKeys.length === nextKeys.length &&
+        nextKeys.every((key) => prev[key] === next[key])
+      ) {
+        return prev;
+      }
+      return next;
+    });
+  }, [userProfile.kind, guardianLearningSpaceChildAccountIds, guardianLearningSpaceChildAccountIdsKey]);
+
+  React.useEffect(() => {
+    if (userProfile.kind !== 'guardian') {
+      return;
+    }
+    setGuardianSupervisedDmOpenState((prev) => {
+      const next: Record<string, boolean> = {};
+      guardianSupervisedChildAccountIds.forEach((accountId) => {
+        next[accountId] = prev[accountId] ?? true;
+      });
+      const prevKeys = Object.keys(prev);
+      const nextKeys = Object.keys(next);
+      if (
+        prevKeys.length === nextKeys.length &&
+        nextKeys.every((key) => prev[key] === next[key])
+      ) {
+        return prev;
+      }
+      return next;
+    });
+  }, [userProfile.kind, guardianSupervisedChildAccountIds, guardianSupervisedChildAccountIdsKey]);
 
   const activeLearningSpaceId = React.useMemo(() => {
     if (!activePath) return null;
@@ -405,8 +469,13 @@ export function SidebarLeft({
                       title={getProfileDisplayName(child.profile)}
                       participant={child}
                       learningSpaces={learningSpaces}
-                      isOpen={true}
-                      onOpenChange={() => undefined}
+                      isOpen={guardianLearningSpaceOpenState[child.ids.accountId] ?? true}
+                      onOpenChange={(open) =>
+                        setGuardianLearningSpaceOpenState((prev) => ({
+                          ...prev,
+                          [child.ids.accountId]: open,
+                        }))
+                      }
                       activeChannelId={activeLearningSpaceId}
                       isMobile={isMobile}
                       currentUser={currentUserRef}
@@ -496,8 +565,13 @@ export function SidebarLeft({
                 key={child.ids.accountId}
                 child={child}
                 dms={dms}
-                isOpen={true}
-                onOpenChange={() => undefined}
+                isOpen={guardianSupervisedDmOpenState[child.ids.accountId] ?? true}
+                onOpenChange={(open) =>
+                  setGuardianSupervisedDmOpenState((prev) => ({
+                    ...prev,
+                    [child.ids.accountId]: open,
+                  }))
+                }
                 activeChannelId={activeDirectMessageId ?? null}
               />
             ))}
