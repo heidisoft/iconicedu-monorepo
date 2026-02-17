@@ -379,7 +379,7 @@ describe('SidebarLeft', () => {
     expect(screen.getByText('Tutor Two')).toBeInTheDocument();
     const sectionHeader = screen.getByText('Supervised DMs').closest('div');
     expect(sectionHeader).not.toBeNull();
-    expect(within(sectionHeader as HTMLElement).getByText('3')).toBeInTheDocument();
+    expect(within(sectionHeader as HTMLElement).queryByText('3')).not.toBeInTheDocument();
   });
 
   it('toggles parent learning spaces groups', () => {

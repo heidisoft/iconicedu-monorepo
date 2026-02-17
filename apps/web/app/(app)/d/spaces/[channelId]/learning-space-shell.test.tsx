@@ -38,10 +38,32 @@ describe('LearningSpaceShell', () => {
       expect.objectContaining({
         currentUserId: 'profile-1',
         currentUserProfile: { ids: { id: 'profile-1', orgId: 'org-1', accountId: 'account-1' } },
+        readOnly: false,
         sendTextMessage,
         toggleReaction,
         deleteMessage,
         toggleHiddenMessage,
+      }),
+    );
+  });
+
+  it('forwards readOnly to MessagesShell', () => {
+    render(
+      <LearningSpaceShell
+        channel={{ ids: { id: 'channel-1', orgId: 'org-1' } } as any}
+        learningSpace={null}
+        currentUserId="profile-1"
+        readOnly
+        sendTextMessage={vi.fn()}
+        toggleReaction={vi.fn()}
+        deleteMessage={vi.fn()}
+        toggleHiddenMessage={vi.fn()}
+      />,
+    );
+
+    expect(messagesShellMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        readOnly: true,
       }),
     );
   });

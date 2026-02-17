@@ -9,6 +9,7 @@ import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profil
 import { buildUserProfileById } from '@iconicedu/web/lib/profile/builders/user-profile.builder';
 import { ORG_ID } from '@iconicedu/web/lib/data/ids';
 import { buildChannelById } from '@iconicedu/web/lib/channels/builders/channel.builder';
+import { isStaffObserverReadOnlyChannel } from '@iconicedu/web/lib/channels/read-only';
 
 const INITIAL_MESSAGES_PAGE_SIZE = 40;
 
@@ -37,6 +38,7 @@ export default async function Page({
   if (!channel) {
     notFound();
   }
+  const isStaffReadOnly = isStaffObserverReadOnlyChannel(channel, account.id, currentUserProfile);
 
   return (
     <div className="flex h-[calc(100vh-1.0rem)] flex-col">
@@ -45,6 +47,7 @@ export default async function Page({
         channel={channel}
         currentUserId={profileResponse.data?.id ?? ''}
         currentUserProfile={currentUserProfile}
+        readOnly={isStaffReadOnly}
         sendTextMessage={sendTextMessageAction}
         toggleReaction={toggleMessageReactionAction}
         deleteMessage={deleteMessageAction}

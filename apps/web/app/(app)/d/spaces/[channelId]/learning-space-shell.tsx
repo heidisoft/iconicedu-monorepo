@@ -15,6 +15,7 @@ export function LearningSpaceShell({
   learningSpace,
   currentUserId,
   currentUserProfile,
+  readOnly = false,
   sendTextMessage,
   toggleReaction,
   deleteMessage,
@@ -24,6 +25,7 @@ export function LearningSpaceShell({
   learningSpace: LearningSpaceVM | null;
   currentUserId?: string;
   currentUserProfile?: UserProfileVM | null;
+  readOnly?: boolean;
   sendTextMessage: (input: MessageSendTextInput) => Promise<MessageVM>;
   toggleReaction: (input: { orgId: string; messageId: string; emoji: string }) => Promise<void>;
   deleteMessage: (input: { orgId: string; messageId: string }) => Promise<void>;
@@ -34,6 +36,7 @@ export function LearningSpaceShell({
       channel={channel}
       currentUserId={currentUserId}
       currentUserProfile={currentUserProfile}
+      readOnly={readOnly}
       panelRegistry={{
         channel_info: (props) => (
           <LearningSpaceInfoPanel {...props} learningSpace={learningSpace} />

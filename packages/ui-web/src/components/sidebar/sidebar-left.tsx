@@ -77,7 +77,6 @@ import type {
 } from '@iconicedu/shared-types';
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
 import {
-  getDirectMessageItemUnreadCount,
   getLearningSpaceItemUnreadCountForUser,
   getLearningSpaceUnreadCount,
 } from '@iconicedu/ui-web/components/sidebar/sidebar-unread';
@@ -294,14 +293,6 @@ export function SidebarLeft({
       : [];
   const hasDirectMessages = ownDirectMessages.length > 0;
   const hasSupervisedDirectMessages = supervisedDirectMessagesByChild.length > 0;
-  const supervisedUnreadCount = supervisedDirectMessagesByChild.reduce((total, group) => {
-    return (
-      total +
-      group.dms.reduce((dmTotal, dm) => {
-        return dmTotal + getDirectMessageItemUnreadCount(dm, group.child.ids.accountId);
-      }, 0)
-    );
-  }, 0);
   const totalLearningSpacesUnread = getLearningSpaceUnreadCount(
     visibleLearningSpaces,
     currentUserRef,
@@ -559,11 +550,6 @@ export function SidebarLeft({
               <SidebarGroupLabel asChild className="uppercase">
                 <span className="inline-flex items-center gap-2">
                   <span>Supervised DMs</span>
-                  {supervisedUnreadCount > 0 ? (
-                    <Badge className="h-4 px-1.5 text-[10px] bg-rose-500 text-white">
-                      {supervisedUnreadCount}
-                    </Badge>
-                  ) : null}
                 </span>
               </SidebarGroupLabel>
               <SidebarGroupContent />

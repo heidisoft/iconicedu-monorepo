@@ -131,4 +131,34 @@ describe('d/dm/[channelId] page', () => {
       }),
     );
   });
+
+  it('enables read-only mode for staff observing a dm they do not participate in', async () => {
+    buildChannelByIdMock.mockResolvedValueOnce({
+      ids: { id: 'channel-1', orgId: 'org-1' },
+      basics: { kind: 'dm' },
+      collections: {
+        participants: [
+          { ids: { accountId: 'account-2' } },
+          { ids: { accountId: 'account-3' } },
+        ],
+      },
+    });
+    buildChannelByDmKeyMock.mockResolvedValueOnce(null);
+    const { buildUserProfileById } = await import(
+      '@iconicedu/web/lib/profile/builders/user-profile.builder'
+    );
+    vi.mocked(buildUserProfileById).mockResolvedValueOnce({
+      kind: 'staff',
+      ids: { id: 'profile-1', orgId: 'org-1', accountId: 'account-1' },
+    } as any);
+
+    const element = await Page({ params: Promise.resolve({ channelId: 'channel-1' }) });
+    render(element as React.ReactElement);
+
+    expect(messagesShellMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        readOnly: true,
+      }),
+    );
+  });
 });

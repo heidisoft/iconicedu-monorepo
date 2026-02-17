@@ -5,7 +5,6 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 
 import type { ChannelVM, ChildProfileVM } from '@iconicedu/shared-types';
 import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
-import { Badge } from '@iconicedu/ui-web/ui/badge';
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
 import {
   Collapsible,
@@ -19,7 +18,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@iconicedu/ui-web/ui/sidebar';
-import { getDirectMessageItemUnreadCount } from './sidebar-unread';
 
 export function NavSupervisedDirectMessages({
   child,
@@ -61,7 +59,6 @@ export function NavSupervisedDirectMessages({
                 ) ?? item.collections.participants[0];
               const fallback = item.basics.topic ?? 'User';
               const name = getProfileDisplayName(otherParticipant?.profile, fallback);
-              const unreadCount = getDirectMessageItemUnreadCount(item, child.ids.accountId);
 
               return (
                 <SidebarMenuItem key={item.ids.id} className="py-1">
@@ -84,11 +81,6 @@ export function NavSupervisedDirectMessages({
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-medium">{name}</div>
                       </div>
-                      {unreadCount > 0 ? (
-                        <Badge className="ml-auto h-5 px-1.5 text-[10px] group-data-[collapsible=icon]:hidden">
-                          {unreadCount}
-                        </Badge>
-                      ) : null}
                     </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

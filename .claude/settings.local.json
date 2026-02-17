@@ -9,7 +9,10 @@
       "Bash(pnpm --filter @iconicedu/ui-web test:*)",
       "Bash(pnpm --filter @iconicedu/ui-web build:*)",
       "Bash(pnpm tsc:*)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "Bash(pnpm build:*)",
+      "Bash(npx tsc:*)",
+      "Bash(find:*)"
     ]
   }
 }

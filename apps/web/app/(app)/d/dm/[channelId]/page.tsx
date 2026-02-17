@@ -17,6 +17,7 @@ import {
   buildChannelByDmKey,
   buildChannelById,
 } from '@iconicedu/web/lib/channels/builders/channel.builder';
+import { isStaffObserverReadOnlyChannel } from '@iconicedu/web/lib/channels/read-only';
 
 const INITIAL_MESSAGES_PAGE_SIZE = 40;
 
@@ -83,6 +84,7 @@ export default async function Page({
     (channel.basics.kind === 'dm' || channel.basics.kind === 'group_dm') &&
     !hasGuardianInChannel &&
     hasChildInChannel;
+  const isStaffReadOnly = isStaffObserverReadOnlyChannel(channel, account.id, currentUserProfile);
 
   return (
     <div className="flex h-[calc(100vh-1.0rem)] flex-col">
@@ -91,7 +93,7 @@ export default async function Page({
         channel={channel}
         currentUserId={profileResponse.data?.id ?? ''}
         currentUserProfile={currentUserProfile}
-        readOnly={isSupervisedReadOnly}
+        readOnly={isSupervisedReadOnly || isStaffReadOnly}
         sendTextMessage={sendTextMessageAction}
         toggleReaction={toggleMessageReactionAction}
         deleteMessage={deleteMessageAction}

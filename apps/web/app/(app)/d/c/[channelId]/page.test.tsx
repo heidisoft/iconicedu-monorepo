@@ -5,6 +5,7 @@ import { render } from '@testing-library/react';
 import Page from '@iconicedu/web/app/(app)/d/c/[channelId]/page';
 
 const messagesShellMock = vi.fn(() => null);
+const buildChannelByIdMock = vi.fn();
 
 vi.mock('@iconicedu/ui-web', () => ({
   DashboardHeader: () => null,
@@ -17,6 +18,8 @@ vi.mock('@iconicedu/web/app/(app)/d/messages/messages-shell-client', () => ({
 vi.mock('@iconicedu/web/app/actions/messages', () => ({
   sendTextMessageAction: vi.fn(),
   toggleMessageReactionAction: vi.fn(),
+  deleteMessageAction: vi.fn(),
+  toggleHiddenMessageAction: vi.fn(),
 }));
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
@@ -40,15 +43,49 @@ vi.mock('@iconicedu/web/lib/profile/builders/user-profile.builder', () => ({
 }));
 
 vi.mock('@iconicedu/web/lib/channels/builders/channel.builder', () => ({
-  buildChannelById: vi.fn(async () => ({ ids: { id: 'channel-1', orgId: 'org-1' } })),
+  buildChannelById: (...args: unknown[]) => buildChannelByIdMock(...args),
 }));
 
 describe('d/c/[channelId] page', () => {
   it('passes currentUserId to MessagesShell', async () => {
+    buildChannelByIdMock.mockResolvedValueOnce({
+      ids: { id: 'channel-1', orgId: 'org-1' },
+      collections: {
+        participants: [{ ids: { accountId: 'account-1' } }],
+      },
+    });
     const element = await Page({ params: Promise.resolve({ channelId: 'channel-1' }) });
     render(element as React.ReactElement);
     expect(messagesShellMock).toHaveBeenCalledWith(
-      expect.objectContaining({ currentUserId: 'profile-1', currentUserProfile: { ids: { id: 'profile-1', orgId: 'org-1' } } }),
+      expect.objectContaining({
+        currentUserId: 'profile-1',
+        currentUserProfile: { ids: { id: 'profile-1', orgId: 'org-1' } },
+        readOnly: false,
+      }),
+    );
+  });
+
+  it('enables read-only mode for staff who are not channel participants', async () => {
+    const { buildUserProfileById } = await import(
+      '@iconicedu/web/lib/profile/builders/user-profile.builder'
+    );
+    vi.mocked(buildUserProfileById).mockResolvedValueOnce({
+      kind: 'staff',
+      ids: { id: 'profile-1', orgId: 'org-1', accountId: 'account-1' },
+    } as any);
+    buildChannelByIdMock.mockResolvedValueOnce({
+      ids: { id: 'channel-1', orgId: 'org-1' },
+      collections: {
+        participants: [{ ids: { accountId: 'account-2' } }],
+      },
+    });
+
+    const element = await Page({ params: Promise.resolve({ channelId: 'channel-1' }) });
+    render(element as React.ReactElement);
+    expect(messagesShellMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        readOnly: true,
+      }),
     );
   });
 });
