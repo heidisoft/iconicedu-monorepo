@@ -9,7 +9,7 @@ import type {
   LearningSpaceRow,
   UserProfileVM,
 } from '@iconicedu/shared-types';
-import type { RecurrenceFormData } from '@iconicedu/ui-web/lib/recurrence-types';
+import type { RecurrenceFormData, WeekdayVM } from '@iconicedu/ui-web/lib/recurrence-types';
 
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
@@ -121,8 +121,22 @@ export async function getLearningSpaceDetail(learningSpaceId: string) {
   } satisfies LearningSpaceDetail;
 }
 
+const VALID_WEEKDAYS: Set<WeekdayVM> = new Set([
+  'MO',
+  'TU',
+  'WE',
+  'TH',
+  'FR',
+  'SA',
+  'SU',
+]);
+
+function isWeekday(value: string): value is WeekdayVM {
+  return VALID_WEEKDAYS.has(value as WeekdayVM);
+}
+
 async function buildSchedulesForForm(
-  supabase: ReturnType<typeof createSupabaseServerClient>,
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
   orgId: string,
   schedules: ClassScheduleRow[],
 ): Promise<RecurrenceFormData[]> {
@@ -164,10 +178,10 @@ async function buildSchedulesForForm(
       : Promise.resolve({ data: [] as ClassScheduleRecurrenceOverrideRow[] }),
   ]);
 
-  if (exceptionsResponse.error) {
+  if ('error' in exceptionsResponse && exceptionsResponse.error) {
     throw new Error(exceptionsResponse.error.message);
   }
-  if (overridesResponse.error) {
+  if ('error' in overridesResponse && overridesResponse.error) {
     throw new Error(overridesResponse.error.message);
   }
 
@@ -193,7 +207,7 @@ async function buildSchedulesForForm(
       } satisfies RecurrenceFormData;
     }
 
-    const byWeekday = recurrence.byday ?? undefined;
+    const byWeekday = recurrence.byday?.filter(isWeekday) ?? undefined;
     const weekdayTimes = byWeekday?.map((day) => ({
       day: day as 'MO' | 'TU' | 'WE' | 'TH' | 'FR' | 'SA' | 'SU',
       time: getTimeFromISO(schedule.start_at),

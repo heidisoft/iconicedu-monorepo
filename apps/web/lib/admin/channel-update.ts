@@ -195,7 +195,7 @@ async function replaceChannelCapabilities(
 }
 
 async function ensureDeleted(
-  request: Promise<{ error: { message: string } | null }>,
+  request: PromiseLike<{ error: { message: string } | null }>,
 ) {
   const { error } = await request;
   if (error) {

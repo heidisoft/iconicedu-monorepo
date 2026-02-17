@@ -16,11 +16,12 @@ export async function getActivityFeedItemsByOrg(
   orgId: string,
 ) {
   return supabase
-    .from<ActivityFeedItemRow>('activity_feed_items')
+    .from('activity_feed_items')
     .select(ACTIVITY_FEED_ITEM_SELECT)
     .eq('org_id', orgId)
     .is('deleted_at', null)
-    .order('occurred_at', { ascending: false });
+    .order('occurred_at', { ascending: false })
+    .returns<ActivityFeedItemRow[]>();
 }
 
 export async function getActivityFeedItemsByOrgAndTab(
@@ -29,12 +30,13 @@ export async function getActivityFeedItemsByOrgAndTab(
   tabKey: string,
 ) {
   return supabase
-    .from<ActivityFeedItemRow>('activity_feed_items')
+    .from('activity_feed_items')
     .select(ACTIVITY_FEED_ITEM_SELECT)
     .eq('org_id', orgId)
     .eq('tab_key', tabKey)
     .is('deleted_at', null)
-    .order('occurred_at', { ascending: false });
+    .order('occurred_at', { ascending: false })
+    .returns<ActivityFeedItemRow[]>();
 }
 
 export async function getActivityFeedSectionsByOrg(
@@ -42,10 +44,11 @@ export async function getActivityFeedSectionsByOrg(
   orgId: string,
 ) {
   return supabase
-    .from<ActivityFeedSectionRow>('activity_feed_sections')
+    .from('activity_feed_sections')
     .select(ACTIVITY_FEED_SECTION_SELECT)
     .eq('org_id', orgId)
-    .order('created_at', { ascending: true });
+    .order('created_at', { ascending: true })
+    .returns<ActivityFeedSectionRow[]>();
 }
 
 export async function getActivityFeedGroupMembersByGroupIds(
@@ -58,9 +61,10 @@ export async function getActivityFeedGroupMembersByGroupIds(
   }
 
   return supabase
-    .from<ActivityFeedGroupMemberRow>('activity_feed_group_members')
+    .from('activity_feed_group_members')
     .select(ACTIVITY_FEED_GROUP_MEMBER_SELECT)
     .eq('org_id', orgId)
     .in('group_id', groupIds)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .returns<ActivityFeedGroupMemberRow[]>();
 }

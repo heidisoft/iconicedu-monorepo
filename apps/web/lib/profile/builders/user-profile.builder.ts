@@ -1,4 +1,5 @@
 import type {
+  FamilyLinkInviteRow,
   NotificationDefaultsVM,
   NotificationPreferenceVM,
   PresenceVM,
@@ -24,7 +25,6 @@ import { buildStaffProfile } from '@iconicedu/web/lib/profile/builders/staff.bui
 import { getGuardianFamilyInvites } from '@iconicedu/web/lib/profile/queries/family-link-invites.query';
 import {
   mapFamilyLinkInviteRowToVM,
-  type FamilyLinkInviteRow,
 } from '@iconicedu/web/lib/family/queries/invite.query';
 
 type BuildUserProfileOptions = {

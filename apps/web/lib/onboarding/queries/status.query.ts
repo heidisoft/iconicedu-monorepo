@@ -16,7 +16,7 @@ export interface UpsertUserOnboardingStatusInput {
 export async function getUserOnboardingStatusByProfileId(
   supabase: SupabaseClient,
   profileId: string,
-): Promise<PostgrestSingleResponse<UserOnboardingStatusRow>> {
+): Promise<PostgrestSingleResponse<UserOnboardingStatusRow | null>> {
   return supabase
     .from('user_onboarding_status')
     .select('*')
@@ -29,7 +29,7 @@ export async function getUserOnboardingStatusByProfileId(
 export async function upsertUserOnboardingStatus(
   supabase: SupabaseClient,
   input: UpsertUserOnboardingStatusInput,
-): Promise<PostgrestSingleResponse<UserOnboardingStatusRow>> {
+): Promise<PostgrestSingleResponse<UserOnboardingStatusRow | null>> {
   return supabase
     .from('user_onboarding_status')
     .upsert(

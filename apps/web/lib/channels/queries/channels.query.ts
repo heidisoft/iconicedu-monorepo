@@ -15,11 +15,12 @@ import {
 
 export async function getChannelsByOrg(supabase: SupabaseClient, orgId: string) {
   return supabase
-    .from<ChannelRow>('channels')
+    .from('channels')
     .select(CHANNEL_SELECT)
     .eq('org_id', orgId)
     .is('deleted_at', null)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .returns<ChannelRow[]>();
 }
 
 export async function getChannelById(
@@ -28,12 +29,12 @@ export async function getChannelById(
   channelId: string,
 ) {
   return supabase
-    .from<ChannelRow>('channels')
+    .from('channels')
     .select(CHANNEL_SELECT)
     .eq('org_id', orgId)
     .eq('id', channelId)
     .is('deleted_at', null)
-    .maybeSingle();
+    .maybeSingle<ChannelRow>();
 }
 
 export async function getChannelByDmKey(
@@ -42,12 +43,12 @@ export async function getChannelByDmKey(
   dmKey: string,
 ) {
   return supabase
-    .from<ChannelRow>('channels')
+    .from('channels')
     .select(CHANNEL_SELECT)
     .eq('org_id', orgId)
     .eq('dm_key', dmKey)
     .is('deleted_at', null)
-    .maybeSingle();
+    .maybeSingle<ChannelRow>();
 }
 
 export async function getChannelParticipantsByChannelIds(
@@ -60,11 +61,12 @@ export async function getChannelParticipantsByChannelIds(
   }
 
   return supabase
-    .from<ChannelMemberRow>('channel_members')
+    .from('channel_members')
     .select(CHANNEL_MEMBER_SELECT)
     .eq('org_id', orgId)
     .in('channel_id', channelIds)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .returns<ChannelMemberRow[]>();
 }
 
 export async function getChannelCapabilitiesByChannelIds(
@@ -77,11 +79,12 @@ export async function getChannelCapabilitiesByChannelIds(
   }
 
   return supabase
-    .from<ChannelCapabilityRow>('channel_capabilities')
+    .from('channel_capabilities')
     .select(CHANNEL_CAPABILITY_SELECT)
     .eq('org_id', orgId)
     .in('channel_id', channelIds)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .returns<ChannelCapabilityRow[]>();
 }
 
 export async function getChannelReadStatesByAccountId(
@@ -90,8 +93,9 @@ export async function getChannelReadStatesByAccountId(
   accountId: string,
 ) {
   return supabase
-    .from<ChannelReadStateRow>('channel_read_state')
+    .from('channel_read_state')
     .select(CHANNEL_READ_STATE_SELECT)
     .eq('org_id', orgId)
-    .eq('account_id', accountId);
+    .eq('account_id', accountId)
+    .returns<ChannelReadStateRow[]>();
 }

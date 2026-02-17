@@ -1,8 +1,10 @@
 import { createServerClient } from '@supabase/ssr';
-import { cookies, type RequestCookies } from 'next/headers';
+import { cookies } from 'next/headers';
+
+type CookieStore = Awaited<ReturnType<typeof cookies>>;
 
 type CreateSupabaseServerClientOptions = {
-  cookieStore?: RequestCookies;
+  cookieStore?: CookieStore;
   allowCookieModification?: boolean;
 };
 
@@ -27,13 +29,13 @@ export const createSupabaseServerClient = async ({
         return resolvedCookieStore.get(name)?.value;
       },
       set(name, value, options) {
-        if (!allowCookieModification) {
+        if (!allowCookieModification || !('set' in resolvedCookieStore)) {
           return;
         }
         resolvedCookieStore.set({ name, value, ...options });
       },
       remove(name, options) {
-        if (!allowCookieModification) {
+        if (!allowCookieModification || !('set' in resolvedCookieStore)) {
           return;
         }
         resolvedCookieStore.set({ name, value: '', ...options, maxAge: 0 });

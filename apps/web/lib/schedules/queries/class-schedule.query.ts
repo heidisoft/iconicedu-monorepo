@@ -20,11 +20,12 @@ export async function getClassSchedulesByOrg(
   orgId: string,
 ) {
   return supabase
-    .from<ClassScheduleRow>('class_schedules')
+    .from('class_schedules')
     .select(CLASS_SCHEDULE_SELECT)
     .eq('org_id', orgId)
     .is('deleted_at', null)
-    .order('start_at', { ascending: true });
+    .order('start_at', { ascending: true })
+    .returns<ClassScheduleRow[]>();
 }
 
 export async function getClassSchedulesByIds(
@@ -37,12 +38,13 @@ export async function getClassSchedulesByIds(
   }
 
   return supabase
-    .from<ClassScheduleRow>('class_schedules')
+    .from('class_schedules')
     .select(CLASS_SCHEDULE_SELECT)
     .eq('org_id', orgId)
     .in('id', scheduleIds)
     .is('deleted_at', null)
-    .order('start_at', { ascending: true });
+    .order('start_at', { ascending: true })
+    .returns<ClassScheduleRow[]>();
 }
 
 export async function getClassScheduleParticipantsByScheduleIds(
@@ -55,10 +57,11 @@ export async function getClassScheduleParticipantsByScheduleIds(
   }
 
   return supabase
-    .from<ClassScheduleParticipantRow>('class_schedule_participants')
+    .from('class_schedule_participants')
     .select(CLASS_SCHEDULE_PARTICIPANT_SELECT)
     .eq('org_id', orgId)
-    .in('schedule_id', scheduleIds);
+    .in('schedule_id', scheduleIds)
+    .returns<ClassScheduleParticipantRow[]>();
 }
 
 export async function getClassScheduleRecurrencesByScheduleIds(
@@ -71,11 +74,12 @@ export async function getClassScheduleRecurrencesByScheduleIds(
   }
 
   return supabase
-    .from<ClassScheduleRecurrenceRow>('class_schedule_recurrence')
+    .from('class_schedule_recurrence')
     .select(CLASS_SCHEDULE_RECURRENCE_SELECT)
     .eq('org_id', orgId)
     .in('schedule_id', scheduleIds)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .returns<ClassScheduleRecurrenceRow[]>();
 }
 
 export async function getClassScheduleRecurrenceExceptionsByRecurrenceIds(
@@ -88,10 +92,11 @@ export async function getClassScheduleRecurrenceExceptionsByRecurrenceIds(
   }
 
   return supabase
-    .from<ClassScheduleRecurrenceExceptionRow>('class_schedule_recurrence_exceptions')
+    .from('class_schedule_recurrence_exceptions')
     .select(CLASS_SCHEDULE_RECURRENCE_EXCEPTION_SELECT)
     .eq('org_id', orgId)
-    .in('recurrence_id', recurrenceIds);
+    .in('recurrence_id', recurrenceIds)
+    .returns<ClassScheduleRecurrenceExceptionRow[]>();
 }
 
 export async function getClassScheduleRecurrenceOverridesByRecurrenceIds(
@@ -104,8 +109,9 @@ export async function getClassScheduleRecurrenceOverridesByRecurrenceIds(
   }
 
   return supabase
-    .from<ClassScheduleRecurrenceOverrideRow>('class_schedule_recurrence_overrides')
+    .from('class_schedule_recurrence_overrides')
     .select(CLASS_SCHEDULE_RECURRENCE_OVERRIDE_SELECT)
     .eq('org_id', orgId)
-    .in('recurrence_id', recurrenceIds);
+    .in('recurrence_id', recurrenceIds)
+    .returns<ClassScheduleRecurrenceOverrideRow[]>();
 }

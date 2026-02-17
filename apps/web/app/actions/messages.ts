@@ -30,6 +30,8 @@ export async function sendTextMessageAction(
   if (!profileResponse.data) {
     throw new Error('Profile not found');
   }
+  const accountOrgId = accountResponse.data.org_id;
+  const currentProfileId = profileResponse.data.id;
 
   if (input.orgId !== accountResponse.data.org_id) {
     throw new Error('Invalid org');
@@ -40,14 +42,15 @@ export async function sendTextMessageAction(
 
   const now = new Date().toISOString();
   let threadId = input.threadId ?? null;
-  let parentMessage: {
+  type ParentMessage = {
     id: string;
     org_id: string;
     channel_id: string;
     sender_profile_id: string;
     thread_id?: string | null;
     type: string;
-  } | null = null;
+  };
+  let parentMessage: ParentMessage | null = null;
   let threadCreated = false;
 
   if (input.threadParentId) {
@@ -55,7 +58,7 @@ export async function sendTextMessageAction(
       .from('messages')
       .select('id, org_id, channel_id, sender_profile_id, thread_id, type')
       .eq('id', input.threadParentId)
-      .maybeSingle<typeof parentMessage>();
+      .maybeSingle<ParentMessage>();
 
     parentMessage = parentResponse.data ?? null;
 
@@ -162,16 +165,16 @@ export async function sendTextMessageAction(
       const participants = [
         ...(channelMembersResponse.data ?? []).map((member) => member.profile_id),
         parentMessage.sender_profile_id,
-        profileResponse.data.id,
+        currentProfileId,
       ].filter(Boolean);
-      const participantRows = Array.from(new Set(participants)).map((profileId) => ({
-        org_id: accountResponse.data.org_id,
+      const participantRows = Array.from(new Set(participants)).map((participantProfileId) => ({
+        org_id: accountOrgId,
         thread_id: threadId as string,
-        profile_id: profileId,
+        profile_id: participantProfileId,
         created_at: now,
-        created_by: profileResponse.data.id,
+        created_by: currentProfileId,
         updated_at: now,
-        updated_by: profileResponse.data.id,
+        updated_by: currentProfileId,
       }));
 
       const participantInsert = await supabase

@@ -84,7 +84,7 @@ export function mapBaseProfile(
       updatedAt: profileRow.updated_at,
     },
     ui: {
-      themeKey: resolveThemeKey(profileRow.ui_theme_key),
+      themeKey: resolveThemeKey(profileRow.ui_theme_key ?? null),
     },
   };
 }

@@ -62,10 +62,10 @@ export async function getChannelDetail(channelId: string): Promise<ChannelDetail
     getChannelCapabilitiesByChannelIds(supabase, orgId, [channelId]),
   ]);
 
-  if (membersResponse.error) {
+  if ('error' in membersResponse && membersResponse.error) {
     throw new Error(membersResponse.error.message);
   }
-  if (capabilitiesResponse.error) {
+  if ('error' in capabilitiesResponse && capabilitiesResponse.error) {
     throw new Error(capabilitiesResponse.error.message);
   }
 

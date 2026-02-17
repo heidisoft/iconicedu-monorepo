@@ -69,7 +69,11 @@ export async function loadChildProfiles(
   const profilesWithAvatar = await Promise.all(
     profiles.data.map(async (row) => ({
       row,
-      avatarUrl: await resolveAvatarUrl(supabase, row.avatar_source, row.avatar_url),
+      avatarUrl: await resolveAvatarUrl(
+        supabase,
+        row.avatar_source,
+        row.avatar_url ?? null,
+      ),
     })),
   );
 

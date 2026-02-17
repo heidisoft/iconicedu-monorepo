@@ -12,6 +12,41 @@ import {
 } from '@iconicedu/web/lib/profile/queries/educator.query';
 import { parseGradeLevel } from '@iconicedu/shared-types';
 
+function normalizeCertifications(
+  raw: unknown[] | null | undefined,
+): EducatorProfileVM['certifications'] {
+  if (!Array.isArray(raw)) {
+    return null;
+  }
+
+  const items = raw
+    .map((item) => {
+      if (!item || typeof item !== 'object') {
+        return null;
+      }
+      const record = item as Record<string, unknown>;
+      const name = typeof record.name === 'string' ? record.name.trim() : '';
+      if (!name) {
+        return null;
+      }
+      const issuer = typeof record.issuer === 'string' ? record.issuer : undefined;
+      const year = typeof record.year === 'number' ? record.year : undefined;
+      return { name, issuer, year };
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
+
+  return items.length ? items : null;
+}
+
+function normalizeIdentityVerificationStatus(
+  raw: string | null | undefined,
+): EducatorProfileVM['identityVerificationStatus'] {
+  if (raw === 'unverified' || raw === 'pending' || raw === 'verified') {
+    return raw;
+  }
+  return null;
+}
+
 export async function buildEducatorProfile(
   supabase: SupabaseClient,
   baseProfile: Omit<UserProfileVM, 'kind'>,
@@ -49,10 +84,12 @@ export async function buildEducatorProfile(
     gradesSupported: gradeLevels,
     education: educator.data?.education ?? null,
     experienceYears: educator.data?.experience_years ?? null,
-    certifications: educator.data?.certifications ?? null,
+    certifications: normalizeCertifications(educator.data?.certifications),
     joinedDate: educator.data?.joined_date ?? profileRow.created_at,
     ageGroupsComfortableWith: educator.data?.age_groups_comfortable_with ?? null,
-    identityVerificationStatus: educator.data?.identity_verification_status ?? null,
+    identityVerificationStatus: normalizeIdentityVerificationStatus(
+      educator.data?.identity_verification_status,
+    ),
     curriculumTags: tags.data?.map((row) => row.tag) ?? null,
     badges: badges.data?.map((row) => row.badge) ?? null,
     averageRating: educator.data?.average_rating ?? null,

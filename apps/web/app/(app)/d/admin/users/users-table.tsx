@@ -53,6 +53,7 @@ import {
 
 import { InviteUserDialog } from '@iconicedu/web/app/(app)/d/admin/users/invite-dialog';
 import type { AdminUserRow } from '@iconicedu/web/lib/admin/users';
+import type { AvatarSource, ThemeKey } from '@iconicedu/shared-types';
 
 export type UserRow = AdminUserRow;
 
@@ -62,7 +63,9 @@ type UsersTableProps = {
   rows: AdminUserRow[];
 };
 
-const STATUS_BADGE_VARIANTS: Record<string, string> = {
+type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline' | 'ghost' | 'link';
+
+const STATUS_BADGE_VARIANTS: Record<string, BadgeVariant> = {
   active: 'default',
   invited: 'outline',
   archived: 'destructive',
@@ -429,11 +432,14 @@ export function UsersTable({ rows }: UsersTableProps) {
                     <AvatarWithStatus
                       name={displayName}
                       avatar={{
-                        source: row.avatarSource ? row.avatarSource : 'seed',
+                        source: resolveAvatarSource(row.avatarSource),
                         url: row.avatarUrl ?? null,
-                        seed: row.avatarSource ? undefined : row.email ?? undefined,
+                        seed:
+                          resolveAvatarSource(row.avatarSource) === 'seed'
+                            ? row.email ?? undefined
+                            : undefined,
                       }}
-                      themeKey={row.themeKey ?? null}
+                      themeKey={resolveThemeKey(row.themeKey)}
                       showStatus={false}
                       sizeClassName="size-8"
                       initialsLength={2}
@@ -483,9 +489,14 @@ export function UsersTable({ rows }: UsersTableProps) {
                   )}
                 </TableCell>
                 <TableCell>
-                  <DropdownMenu disabled={deletingId === row.id}>
+                  <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="px-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="px-2"
+                        disabled={deletingId === row.id}
+                      >
                         <MoreHorizontal className="size-4" />
                       </Button>
                     </DropdownMenuTrigger>
@@ -715,4 +726,18 @@ export function UsersTable({ rows }: UsersTableProps) {
       </Dialog>
     </div>
   );
+}
+
+function resolveAvatarSource(value?: string | null): AvatarSource {
+  if (value === 'upload' || value === 'external') {
+    return value;
+  }
+  return 'seed';
+}
+
+function resolveThemeKey(value?: string | null): ThemeKey | null {
+  if (!value) {
+    return null;
+  }
+  return value as ThemeKey;
 }

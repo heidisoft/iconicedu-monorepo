@@ -123,7 +123,7 @@ export async function getActiveParticipantProfiles(): Promise<UserProfileVM[]> {
     (profilesByAccountId.get(account.id) ?? []).map((profile) =>
       mapProfileToUserProfile(
         profile,
-        account.email,
+        account.email ?? null,
         profile.kind === 'child'
           ? guardianNamesByChildAccountId.get(profile.account_id) ?? null
           : null,

@@ -45,7 +45,7 @@ async function cleanupCreatedRecords(context: CreationCleanupContext) {
     familyId,
   } = context;
 
-  const run = async (description: string, fn: () => Promise<void>) => {
+  const run = async (description: string, fn: () => unknown) => {
     try {
       await fn();
     } catch (error) {
@@ -248,7 +248,7 @@ export async function createChildProfileAction(
 
     if (existingProfile) {
       const { data, error } = await serviceClient
-        .from<ProfileRow>('profiles')
+        .from('profiles')
         .update(profilePayload)
         .eq('id', existingProfile.id)
         .select('*')
@@ -261,7 +261,7 @@ export async function createChildProfileAction(
       profileRow = data;
     } else {
       const { data, error } = await serviceClient
-        .from<ProfileRow>('profiles')
+        .from('profiles')
         .insert(profilePayload)
         .select('*')
         .single();
@@ -348,7 +348,7 @@ export async function createChildProfileAction(
 
     if (existingChildProfile) {
       const { error } = await serviceClient
-        .from<ChildProfileRow>('child_profiles')
+        .from('child_profiles')
         .update(childProfilePayload)
         .match({
           org_id: guardianAccount.org_id,
@@ -393,7 +393,7 @@ export async function createChildProfileAction(
 
     if (existingGrade) {
       const { error } = await serviceClient
-        .from<ChildProfileGradeLevelRow>('child_profile_grade_level')
+        .from('child_profile_grade_level')
         .update(childGradePayload)
         .eq('id', existingGrade.id);
 

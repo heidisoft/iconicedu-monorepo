@@ -1,4 +1,4 @@
-import type { UserProfileVM } from '@iconicedu/shared-types';
+import { GradeLevel, type UserProfileVM } from '@iconicedu/shared-types';
 
 const STAFF_SUPPORT_WEEKLY_AVAILABILITY = {
   Mon: [9, 10, 11, 12, 13, 14, 15, 16],
@@ -114,7 +114,7 @@ export const CHILD_TEVIN_PROFILE: UserProfileVM = {
   ui: {
     themeKey: 'blue',
   },
-  gradeLevel: { id: 5, label: 'Grade 5' },
+  gradeLevel: GradeLevel.Grade5,
   birthYear: 2014,
   schoolName: 'River Glen Elementary',
   schoolYear: '2024-2025',
@@ -180,7 +180,7 @@ export const CHILD_TEHARA_PROFILE: UserProfileVM = {
   ui: {
     themeKey: 'rose',
   },
-  gradeLevel: { id: 4, label: 'Grade 4' },
+  gradeLevel: GradeLevel.Grade4,
   birthYear: 2015,
   schoolName: 'River Glen Elementary',
   schoolYear: '2024-2025',
@@ -246,7 +246,7 @@ export const CHILD_MAYA_PROFILE: UserProfileVM = {
   ui: {
     themeKey: 'amber',
   },
-  gradeLevel: { id: 3, label: 'Grade 3' },
+  gradeLevel: GradeLevel.Grade3,
   birthYear: 2016,
   schoolName: 'River Glen Elementary',
   schoolYear: '2024-2025',
@@ -412,8 +412,8 @@ export const EDUCATOR_PRIYA_PROFILE: UserProfileVM = {
   headline: 'Middle school math specialist',
   subjects: ['Math', 'Algebra'],
   gradesSupported: [
-    { id: 5, label: 'Grade 5' },
-    { id: 6, label: 'Grade 6' },
+    GradeLevel.Grade5,
+    GradeLevel.Grade6,
   ],
   education: 'M.S. Mathematics Education, University of Illinois',
   experienceYears: 8,
@@ -488,8 +488,8 @@ export const EDUCATOR_ELENA_PROFILE: UserProfileVM = {
   headline: 'Creative writing coach',
   subjects: ['ELA', 'Writing'],
   gradesSupported: [
-    { id: 4, label: 'Grade 4' },
-    { id: 5, label: 'Grade 5' },
+    GradeLevel.Grade4,
+    GradeLevel.Grade5,
   ],
   education: 'B.A. English Literature, NYU',
   experienceYears: 6,
@@ -561,8 +561,8 @@ export const EDUCATOR_LUCAS_PROFILE: UserProfileVM = {
   headline: 'Inquiry-based science educator',
   subjects: ['Science', 'STEM'],
   gradesSupported: [
-    { id: 4, label: 'Grade 4' },
-    { id: 5, label: 'Grade 5' },
+    GradeLevel.Grade4,
+    GradeLevel.Grade5,
   ],
   education: 'B.S. Biology, University of Colorado',
   experienceYears: 7,
@@ -634,8 +634,8 @@ export const EDUCATOR_MISHAN_PROFILE: UserProfileVM = {
   headline: 'Chess strategy coach',
   subjects: ['Chess', 'Critical Thinking'],
   gradesSupported: [
-    { id: 3, label: 'Grade 3' },
-    { id: 5, label: 'Grade 5' },
+    GradeLevel.Grade3,
+    GradeLevel.Grade5,
   ],
   education: 'FIDE Instructor',
   experienceYears: 10,
@@ -707,8 +707,8 @@ export const EDUCATOR_AVA_PROFILE: UserProfileVM = {
   headline: 'Upper elementary math tutor',
   subjects: ['Math', 'Problem Solving'],
   gradesSupported: [
-    { id: 5, label: 'Grade 5' },
-    { id: 6, label: 'Grade 6' },
+    GradeLevel.Grade5,
+    GradeLevel.Grade6,
   ],
   education: 'B.S. Applied Mathematics, UC Davis',
   experienceYears: 5,

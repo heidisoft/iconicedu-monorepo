@@ -1,5 +1,6 @@
 import type {
   ActivityFeedItemVM,
+  ActivityFeedLeafItemVM,
   ActivityFeedVM,
   ActivityFeedTabVM,
   InboxTabKeyVM,
@@ -69,7 +70,7 @@ async function loadActivityFeedActors(
   supabase: SupabaseClient,
   orgId: string,
   itemRows: Array<{ actor_profile_id?: string | null }>,
-) {
+): Promise<Map<string, ActivityFeedItemVM['refs']['actor']>> {
   const actorIds = Array.from(
     new Set(itemRows.map((row) => row.actor_profile_id).filter(Boolean)),
   ) as string[];
@@ -80,7 +81,7 @@ async function loadActivityFeedActors(
 
   const profilesResponse = await getProfilesByIds(supabase, orgId, actorIds);
   const profileRows = profilesResponse.data ?? [];
-  const actorEntries = await Promise.all(
+  const actorEntries: Array<[string, ActivityFeedItemVM['refs']['actor']]> = await Promise.all(
     profileRows.map(async (row) => [
       row.id,
       await buildUserProfileFromRow(supabase, row),
@@ -128,8 +129,8 @@ async function attachGroupMembers(
     const members = memberIds
       .map((memberId) => itemMap.get(memberId))
       .filter(
-        (member): member is ActivityFeedItemVM =>
-          Boolean(member) && member.kind === 'leaf',
+        (member): member is ActivityFeedLeafItemVM =>
+          member !== undefined && member.kind === 'leaf',
       );
 
     memberIds.forEach((memberId) => groupedMemberIds.add(memberId));

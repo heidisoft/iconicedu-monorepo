@@ -1,15 +1,29 @@
-import type { ConnectionVM, ChildProfileVM, UserProfileVM } from '@iconicedu/shared-types';
+import type {
+  ConnectionVM,
+  ChildProfileVM,
+  GuardianProfileVM,
+  UserProfileVM,
+} from '@iconicedu/shared-types';
 import type { ProfileRow } from '@iconicedu/shared-types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { getGuardianFamilyLinks, getGuardianProfile } from '@iconicedu/web/lib/profile/queries/guardian.query';
 import { loadChildProfiles } from '@iconicedu/web/lib/profile/builders/load-child-profiles';
 
+function normalizeSessionNotesVisibility(
+  raw: string | null | undefined,
+): 'private' | 'shared' | null {
+  if (raw === 'private' || raw === 'shared') {
+    return raw;
+  }
+  return null;
+}
+
 export async function buildGuardianProfile(
   supabase: SupabaseClient,
   baseProfile: Omit<UserProfileVM, 'kind'>,
   profileRow: ProfileRow,
-): Promise<UserProfileVM> {
+): Promise<GuardianProfileVM> {
   const guardian = await getGuardianProfile(supabase, profileRow.id);
   const familyLinks = await getGuardianFamilyLinks(
     supabase,
@@ -35,6 +49,8 @@ export async function buildGuardianProfile(
     kind: 'guardian',
     children: childrenConnection,
     joinedDate: guardian.data?.joined_date ?? profileRow.created_at,
-    sessionNotesVisibility: guardian.data?.session_notes_visibility ?? null,
+    sessionNotesVisibility: normalizeSessionNotesVisibility(
+      guardian.data?.session_notes_visibility,
+    ),
   };
 }

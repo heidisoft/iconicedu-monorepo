@@ -570,7 +570,6 @@ async function insertClassScheduleRecurrence(
     schedule_id: payload.scheduleId,
     frequency: payload.rule.frequency,
     interval: payload.rule.interval ?? null,
-    byday: rruleFields.byday,
     count: payload.rule.count ?? null,
     until: payload.rule.until ?? null,
     timezone: payload.timezone ?? payload.rule.timezone ?? null,

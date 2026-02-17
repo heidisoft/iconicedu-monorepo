@@ -8,11 +8,12 @@ export async function getLearningSpacesByOrg(
   orgId: string,
 ) {
   return supabase
-    .from<LearningSpaceRow>('learning_spaces')
+    .from('learning_spaces')
     .select(LEARNING_SPACE_SELECT)
     .eq('org_id', orgId)
     .is('deleted_at', null)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .returns<LearningSpaceRow[]>();
 }
 
 export async function getLearningSpacesByIds(
@@ -25,11 +26,12 @@ export async function getLearningSpacesByIds(
   }
 
   return supabase
-    .from<LearningSpaceRow>('learning_spaces')
+    .from('learning_spaces')
     .select(LEARNING_SPACE_SELECT)
     .eq('org_id', orgId)
     .in('id', learningSpaceIds)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .returns<LearningSpaceRow[]>();
 }
 
 export async function getLearningSpaceById(
@@ -37,7 +39,7 @@ export async function getLearningSpaceById(
   learningSpaceId: string,
 ) {
   return supabase
-    .from<LearningSpaceRow>('learning_spaces')
+    .from('learning_spaces')
     .select(LEARNING_SPACE_SELECT)
     .eq('id', learningSpaceId)
     .is('deleted_at', null)

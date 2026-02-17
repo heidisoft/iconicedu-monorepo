@@ -21,11 +21,12 @@ export async function getLearningSpaceChannelsByLearningSpaceIds(
   }
 
   return supabase
-    .from<LearningSpaceChannelRow>('learning_space_channels')
+    .from('learning_space_channels')
     .select(LEARNING_SPACE_CHANNEL_SELECT)
     .eq('org_id', orgId)
     .in('learning_space_id', learningSpaceIds)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .returns<LearningSpaceChannelRow[]>();
 }
 
 export async function getLearningSpaceChannelByChannelId(
@@ -34,7 +35,7 @@ export async function getLearningSpaceChannelByChannelId(
   channelId: string,
 ) {
   return supabase
-    .from<LearningSpaceChannelRow>('learning_space_channels')
+    .from('learning_space_channels')
     .select(LEARNING_SPACE_CHANNEL_SELECT)
     .eq('org_id', orgId)
     .eq('channel_id', channelId)
@@ -52,11 +53,12 @@ export async function getLearningSpaceParticipantsByLearningSpaceIds(
   }
 
   return supabase
-    .from<LearningSpaceParticipantRow>('learning_space_participants')
+    .from('learning_space_participants')
     .select(LEARNING_SPACE_PARTICIPANT_SELECT)
     .eq('org_id', orgId)
     .in('learning_space_id', learningSpaceIds)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .returns<LearningSpaceParticipantRow[]>();
 }
 
 export async function getLearningSpaceLinksByLearningSpaceIds(
@@ -69,9 +71,10 @@ export async function getLearningSpaceLinksByLearningSpaceIds(
   }
 
   return supabase
-    .from<LearningSpaceLinkRow>('learning_space_links')
+    .from('learning_space_links')
     .select(LEARNING_SPACE_LINK_SELECT)
     .eq('org_id', orgId)
     .in('learning_space_id', learningSpaceIds)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .returns<LearningSpaceLinkRow[]>();
 }

@@ -28,6 +28,7 @@ export async function replaceLearningSpaceLinks(
   if (!profileResponse.data) {
     throw new Error('Profile not found');
   }
+  const profileId = profileResponse.data.id;
 
   const orgId = accountResponse.data.org_id;
   const now = new Date().toISOString();
@@ -66,9 +67,9 @@ export async function replaceLearningSpaceLinks(
     status: link.status,
     hidden: link.hidden,
     created_at: now,
-    created_by: profileResponse.data.id,
+    created_by: profileId,
     updated_at: now,
-    updated_by: profileResponse.data.id,
+    updated_by: profileId,
   }));
 
   const { data, error } = await serviceClient
@@ -84,7 +85,7 @@ export async function replaceLearningSpaceLinks(
 }
 
 async function ensureDeleted(
-  request: Promise<{ error: { message: string } | null }>,
+  request: PromiseLike<{ error: { message: string } | null }>,
 ) {
   const { error } = await request;
   if (error) {

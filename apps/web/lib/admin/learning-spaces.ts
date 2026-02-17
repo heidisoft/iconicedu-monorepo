@@ -279,7 +279,10 @@ function formatScheduleItems(
   schedule: Pick<ClassScheduleRow, 'start_at' | 'timezone'>,
   recurrence?: Pick<ClassScheduleRecurrenceRow, 'byday' | 'timezone'> | null,
 ) {
-  const time = formatTimeShort(new Date(schedule.start_at), recurrence?.timezone ?? schedule.timezone);
+  const time = formatTimeShort(
+    new Date(schedule.start_at),
+    recurrence?.timezone ?? schedule.timezone ?? undefined,
+  );
   const weekdays = recurrence?.byday?.length
     ? recurrence.byday.map((day) => WEEKDAY_LABELS[day] ?? day)
     : [

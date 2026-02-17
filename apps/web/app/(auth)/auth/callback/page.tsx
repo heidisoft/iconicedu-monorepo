@@ -5,6 +5,18 @@ import { useRouter } from 'next/navigation';
 
 import { createSupabaseBrowserClient } from '@iconicedu/web/lib/supabase/client';
 
+type SupportedOtpType = 'magiclink' | 'invite' | 'signup';
+
+function resolveOtpType(value?: string | null): SupportedOtpType {
+  if (value === 'magiclink' || value === 'invite' || value === 'signup') {
+    return value;
+  }
+  if (value === 'invitation') {
+    return 'invite';
+  }
+  return 'invite';
+}
+
 export default function CallbackPage() {
   const router = useRouter();
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
@@ -13,11 +25,7 @@ export default function CallbackPage() {
     const searchParams = new URLSearchParams(window.location.search);
     const code = searchParams.get('code');
     const token = searchParams.get('token');
-    const type = (searchParams.get('type') ?? undefined) as
-      | 'magiclink'
-      | 'invitation'
-      | 'signup'
-      | undefined;
+    const type = resolveOtpType(searchParams.get('type'));
     const isEducatorFlow = searchParams.get('educator') === '1';
 
     const hashParams = new URLSearchParams(
@@ -64,8 +72,8 @@ export default function CallbackPage() {
 
       if (token) {
         await supabase.auth.verifyOtp({
-          token,
-          type: type ?? 'invite',
+          token_hash: token,
+          type,
         });
         await activateAccount();
 

@@ -1,17 +1,28 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import type {
-  AdminUserAttributes,
-  AuthMFAAdminDeleteFactorParams,
-  AuthMFAAdminDeleteFactorResponse,
-  AuthMFAAdminListFactorsParams,
-  AuthMFAAdminListFactorsResponse,
-  CreateOAuthClientParams,
-  GenerateLinkParams,
-  OAuthClientListResponse,
-  OAuthClientResponse,
-  UpdateOAuthClientParams,
-  UserResponse,
-} from '@supabase/auth-js'
+
+type SupabaseAuthAdmin = SupabaseClient['auth']['admin']
+
+export type AdminUserAttributes = Parameters<SupabaseAuthAdmin['createUser']>[0]
+export type GenerateLinkParams = Parameters<SupabaseAuthAdmin['generateLink']>[0]
+export type AuthMFAAdminListFactorsParams = Parameters<
+  SupabaseAuthAdmin['mfa']['listFactors']
+>[0]
+export type AuthMFAAdminDeleteFactorParams = Parameters<
+  SupabaseAuthAdmin['mfa']['deleteFactor']
+>[0]
+export type AuthMFAAdminListFactorsResponse = Awaited<
+  ReturnType<SupabaseAuthAdmin['mfa']['listFactors']>
+>
+export type AuthMFAAdminDeleteFactorResponse = Awaited<
+  ReturnType<SupabaseAuthAdmin['mfa']['deleteFactor']>
+>
+export type CreateOAuthClientParams = Parameters<
+  SupabaseAuthAdmin['oauth']['createClient']
+>[0]
+export type UpdateOAuthClientParams = Parameters<
+  SupabaseAuthAdmin['oauth']['updateClient']
+>[1]
+export type AdminSignOutScope = Parameters<SupabaseAuthAdmin['signOut']>[1]
 
 export type AuthAdminServiceOptions = {
   supabaseUrl?: string
@@ -19,7 +30,7 @@ export type AuthAdminServiceOptions = {
   client?: SupabaseClient
 }
 
-const throwMissingConfig = () => {
+const throwMissingConfig = (): never => {
   throw new Error(
     'Supabase admin configuration is missing. Ensure NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set.',
   )
@@ -40,7 +51,10 @@ export class AuthAdminService {
       throwMissingConfig()
     }
 
-    const client = createClient(supabaseUrl, serviceRoleKey, {
+    const resolvedSupabaseUrl = supabaseUrl
+    const resolvedServiceRoleKey = serviceRoleKey
+
+    const client = createClient(resolvedSupabaseUrl!, resolvedServiceRoleKey!, {
       auth: { persistSession: false },
     })
 
@@ -85,7 +99,7 @@ export class AuthAdminService {
     return this.client.auth.admin.generateLink(params)
   }
 
-  signOutUser(jwt: string, scope?: string) {
+  signOutUser(jwt: string, scope?: AdminSignOutScope) {
     return this.client.auth.admin.signOut(jwt, scope)
   }
 

@@ -36,13 +36,13 @@ export function mapAccountRowToVM(
       phoneE164: accountRow?.phone_e164 ?? null,
       whatsappE164: accountRow?.whatsapp_e164 ?? null,
       emailVerified:
-        accountRow?.email_verified ?? (accountRow?.email_verified_at ? true : null),
+        accountRow?.email_verified ?? (accountRow?.email_verified_at ? true : undefined),
       emailVerifiedAt: accountRow?.email_verified_at ?? null,
       phoneVerified:
-        accountRow?.phone_verified ?? (accountRow?.phone_verified_at ? true : null),
+        accountRow?.phone_verified ?? (accountRow?.phone_verified_at ? true : undefined),
       phoneVerifiedAt: accountRow?.phone_verified_at ?? null,
       whatsappVerified:
-        accountRow?.whatsapp_verified ?? (accountRow?.whatsapp_verified_at ? true : null),
+        accountRow?.whatsapp_verified ?? (accountRow?.whatsapp_verified_at ? true : undefined),
       whatsappVerifiedAt: accountRow?.whatsapp_verified_at ?? null,
       preferredContactChannels: (accountRow?.preferred_contact_channels as Array<
         'email' | 'sms' | 'whatsapp'

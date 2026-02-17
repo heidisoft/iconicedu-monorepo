@@ -53,8 +53,8 @@ export async function insertAccountForAuthUser(
       preferred_contact_channels: ['email'],
       status: 'active',
     })
-    .select('id, org_id')
-    .single();
+    .select(ACCOUNT_SELECT)
+    .single<AccountRow>();
 }
 
 export async function getAccountById(supabase: SupabaseClient, accountId: string) {

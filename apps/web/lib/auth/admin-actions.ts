@@ -3,6 +3,13 @@
 import { revalidatePath } from 'next/cache';
 
 import { createAuthAdminService } from '@iconicedu/web/lib/auth/admin';
+import type {
+  AdminSignOutScope,
+  AdminUserAttributes,
+  AuthMFAAdminDeleteFactorResponse,
+  AuthMFAAdminListFactorsResponse,
+  GenerateLinkParams,
+} from '@iconicedu/web/lib/auth/admin';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import {
   deleteAccountById,
@@ -10,16 +17,6 @@ import {
 } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { deleteProfilesByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
 import { deleteFamilyLinksByGuardianAccountId } from '@iconicedu/web/lib/family/queries/families.query';
-
-import type {
-  AdminUserAttributes,
-  AuthMFAAdminDeleteFactorParams,
-  AuthMFAAdminDeleteFactorResponse,
-  AuthMFAAdminListFactorsResponse,
-  CreateOAuthClientParams,
-  GenerateLinkParams,
-  UpdateOAuthClientParams,
-} from '@supabase/auth-js';
 
 const AUTH_ADMIN_PATH = '/d/admin/auth';
 
@@ -229,7 +226,7 @@ export async function generateEmailLinkAction(payload: GenerateLinkPayload) {
   return runAction('generate-link', (service) => service.generateEmailLink(params));
 }
 
-type SignOutPayload = { jwt: string; scope?: string };
+type SignOutPayload = { jwt: string; scope?: AdminSignOutScope };
 
 export async function signOutUserAction(payload: SignOutPayload) {
   return runAction('sign-out-user', (service) =>
@@ -258,8 +255,14 @@ type OAuthClientPayload = {
   name?: string;
   redirectUris?: string;
   scopes?: string;
-  description?: string;
 };
+
+function parseRedirectUris(value: string): string[] {
+  return value
+    .split(/[\n,]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
 
 export async function listOAuthClientsAction(options?: {
   page?: number;
@@ -278,12 +281,19 @@ export async function createOAuthClientAction(payload: OAuthClientPayload) {
   if (!payload.redirectUris) {
     throw new Error('redirectUris is required');
   }
+  const redirectUris = parseRedirectUris(payload.redirectUris);
+  if (!redirectUris.length) {
+    throw new Error('At least one redirect URI is required');
+  }
+  if (!payload.name?.trim()) {
+    throw new Error('name is required');
+  }
+  const clientName = payload.name.trim();
   return runAction('create-oauth-client', (service) =>
     service.createOAuthClient({
-      name: payload.name,
-      redirectUris: payload.redirectUris,
-      scopes: payload.scopes,
-      description: payload.description,
+      client_name: clientName,
+      redirect_uris: redirectUris,
+      scope: payload.scopes,
     }),
   );
 }
@@ -291,12 +301,14 @@ export async function createOAuthClientAction(payload: OAuthClientPayload) {
 export async function updateOAuthClientAction(
   payload: OAuthClientPayload & { clientId: string },
 ) {
+  const redirectUris = payload.redirectUris
+    ? parseRedirectUris(payload.redirectUris)
+    : undefined;
+
   return runAction('update-oauth-client', (service) =>
     service.updateOAuthClient(payload.clientId, {
-      name: payload.name,
-      redirectUris: payload.redirectUris,
-      scopes: payload.scopes,
-      description: payload.description,
+      client_name: payload.name?.trim() || undefined,
+      redirect_uris: redirectUris?.length ? redirectUris : undefined,
     }),
   );
 }

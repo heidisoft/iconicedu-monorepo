@@ -257,8 +257,11 @@ async function loadParticipantsByChannel(
   const profilesResponse = await getProfilesByIds(supabase, orgId, profileIds);
   const profileRows = profilesResponse.data ?? [];
 
-  const profileVMs = await Promise.all(
-    profileRows.map(async (row) => [row.id, await buildUserProfileFromRow(supabase, row)]),
+  const profileVMs: Array<[string, UserProfileVM]> = await Promise.all(
+    profileRows.map(async (row) => [
+      row.id,
+      await buildUserProfileFromRow(supabase, row),
+    ] as [string, UserProfileVM]),
   );
   const profileVMMap = new Map(profileVMs);
 

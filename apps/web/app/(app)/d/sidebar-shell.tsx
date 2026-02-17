@@ -4,12 +4,14 @@ import * as React from 'react';
 import type { ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import type {
+  ContactChannelVM,
   ChildProfileSaveInput,
   ChildProfileVM,
   EducatorAvailabilityInput,
   EducatorProfileSaveInput,
   FamilyLinkInviteRole,
   GradeLevel,
+  NotificationChannelVM,
   SidebarLeftDataVM,
   StaffProfileSaveInput,
   ThemeKey,
@@ -67,6 +69,40 @@ const showSuccessToast = (title: string, description?: string) =>
 
 const showErrorToast = (title: string, error: unknown) =>
   toast.error(`${title}: ${getToastMessageFromError(error)}`);
+
+const normalizeContactChannels = (
+  channels?: string[] | null,
+): ContactChannelVM[] | null | undefined => {
+  if (channels === undefined) {
+    return undefined;
+  }
+  if (channels === null) {
+    return null;
+  }
+  const allowed: ContactChannelVM[] = ['email', 'sms', 'whatsapp'];
+  return channels.filter((channel): channel is ContactChannelVM =>
+    allowed.includes(channel as ContactChannelVM),
+  );
+};
+
+const normalizeThemeKey = (value?: string | null): ThemeKey | null | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === null || value.trim() === '') {
+    return null;
+  }
+  return value as ThemeKey;
+};
+
+const normalizeNotificationChannels = (
+  channels: string[],
+): NotificationChannelVM[] => {
+  const allowed: NotificationChannelVM[] = ['push', 'email', 'sms', 'whatsapp'];
+  return channels.filter((channel): channel is NotificationChannelVM =>
+    allowed.includes(channel as NotificationChannelVM),
+  );
+};
 
 const getPreferenceSuccessMessage = (input: {
   timezone?: string;
@@ -213,7 +249,8 @@ export function SidebarShell({
   const sidebarProfile = sidebarData.user.profile;
   const sidebarAccount = sidebarData.user.account ?? null;
   const sidebarOrgId = sidebarProfile.ids?.orgId;
-  const sidebarAccountId = sidebarData.user.account?.id ?? sidebarProfile.ids?.accountId ?? null;
+  const sidebarAccountId =
+    sidebarData.user.account?.ids?.id ?? sidebarProfile.ids?.accountId ?? null;
 
   const computedOnboardingStep = React.useMemo(
     () => determineOnboardingStep(sidebarProfile, sidebarAccount),
@@ -308,29 +345,30 @@ export function SidebarShell({
         if (!row?.channel_id) {
           return;
         }
+        const channelId = row.channel_id;
 
         setSidebarData((prev) => {
-          const ordered = touchDirectMessageChannelOrder(prev, row.channel_id);
+          const ordered = touchDirectMessageChannelOrder(prev, channelId);
           const directNext = applyIncomingDirectMessageUnread(ordered, {
-            channelId: row.channel_id,
+            channelId,
             senderProfileId: row.sender_profile_id ?? null,
             currentProfileId: profileId,
           });
           const next = applyIncomingLearningSpaceUnread(directNext, {
-            channelId: row.channel_id,
+            channelId,
             senderProfileId: row.sender_profile_id ?? null,
             currentProfileId: profileId,
           });
 
           const nextDirectChannel = next.collections.directMessages.find(
-            (channel) => channel.ids.id === row.channel_id,
+            (channel) => channel.ids.id === channelId,
           );
           if (nextDirectChannel) {
             const nextUnread = Math.max(
               0,
               nextDirectChannel.collections.readState?.unreadCount ?? 0,
             );
-            void persistUnread(row.channel_id, nextUnread, {
+            void persistUnread(channelId, nextUnread, {
               markRead: nextUnread === 0,
             });
             return next;
@@ -338,23 +376,23 @@ export function SidebarShell({
 
           const nextLearningSpaceChannel = next.collections.learningSpaces.find(
             (space) =>
-              space.channels.primaryChannel.ids.id === row.channel_id ||
+              space.channels.primaryChannel.ids.id === channelId ||
               (space.channels.relatedChannels ?? []).some(
-                (channel) => channel.ids.id === row.channel_id,
+                (channel) => channel.ids.id === channelId,
               ),
           );
           const matchedLearningSpaceChannel =
-            nextLearningSpaceChannel?.channels.primaryChannel.ids.id === row.channel_id
+            nextLearningSpaceChannel?.channels.primaryChannel.ids.id === channelId
               ? nextLearningSpaceChannel.channels.primaryChannel
               : (nextLearningSpaceChannel?.channels.relatedChannels ?? []).find(
-                  (channel) => channel.ids.id === row.channel_id,
+                  (channel) => channel.ids.id === channelId,
                 );
           if (matchedLearningSpaceChannel) {
             const nextUnread = Math.max(
               0,
               matchedLearningSpaceChannel.collections.readState?.unreadCount ?? 0,
             );
-            void persistUnread(row.channel_id, nextUnread, {
+            void persistUnread(channelId, nextUnread, {
               markRead: nextUnread === 0,
             });
           }
@@ -599,7 +637,7 @@ export function SidebarShell({
       }
     };
 
-    const computeStatus = (): 'online' | 'away' => {
+    const computeStatus = (): PresenceConnectionStatus => {
       const hasActiveWindow =
         document.visibilityState === 'visible' &&
         (typeof document.hasFocus !== 'function' || document.hasFocus());
@@ -710,7 +748,7 @@ export function SidebarShell({
     async (input: {
       profileId: string;
       orgId: string;
-      displayName: string;
+      displayName: string | null;
       firstName: string;
       lastName: string;
       bio?: string | null;
@@ -742,7 +780,7 @@ export function SidebarShell({
                   ...profile,
                   profile: {
                     ...profile.profile,
-                    displayName: input.displayName,
+                    displayName: input.displayName ?? '',
                     firstName: input.firstName,
                     lastName: input.lastName,
                     bio: input.bio ?? null,
@@ -759,7 +797,7 @@ export function SidebarShell({
                     ...child,
                     profile: {
                       ...child.profile,
-                      displayName: input.displayName,
+                      displayName: input.displayName ?? '',
                       firstName: input.firstName,
                       lastName: input.lastName,
                     },
@@ -985,8 +1023,8 @@ export function SidebarShell({
             user: {
               ...prev.user,
               profile: {
-                ...profile,
-                gradeLevel: gradeId,
+              ...profile,
+                gradeLevel: input.gradeId ?? null,
                 gradeLabel: input.gradeLabel ?? gradeId,
                 birthYear: input.birthYear ?? null,
                 schoolName: input.schoolName ?? null,
@@ -1363,7 +1401,9 @@ export function SidebarShell({
           updates.whatsapp_verified_at = input.whatsappVerified ? now : null;
         }
         if (input.preferredContactChannels !== undefined) {
-          updates.preferred_contact_channels = input.preferredContactChannels;
+          updates.preferred_contact_channels = normalizeContactChannels(
+            input.preferredContactChannels,
+          );
         }
 
         const { error } = await supabase
@@ -1415,7 +1455,7 @@ export function SidebarShell({
                         : prev.user.account.contacts.whatsappVerifiedAt,
                     preferredContactChannels:
                       input.preferredContactChannels !== undefined
-                        ? input.preferredContactChannels
+                        ? normalizeContactChannels(input.preferredContactChannels)
                         : prev.user.account.contacts.preferredContactChannels,
                   },
                 }
@@ -1506,7 +1546,7 @@ export function SidebarShell({
                 ...prev.user.profile.ui,
                 themeKey:
                   input.themeKey !== undefined
-                    ? input.themeKey
+                    ? normalizeThemeKey(input.themeKey)
                     : prev.user.profile.ui?.themeKey,
               },
             },
@@ -1530,6 +1570,7 @@ export function SidebarShell({
       channels: string[];
     }) => {
       try {
+        const channels = normalizeNotificationChannels(input.channels);
         const { error } = await supabase
           .from('notification_preferences')
           .upsert(
@@ -1537,7 +1578,7 @@ export function SidebarShell({
               org_id: input.orgId,
               profile_id: input.profileId,
               pref_key: input.prefKey,
-              channels: input.channels,
+              channels,
               muted: null,
             },
             { onConflict: 'org_id,profile_id,pref_key' },
@@ -1561,7 +1602,7 @@ export function SidebarShell({
                   notificationDefaults: {
                     ...currentDefaults,
                     [input.prefKey]: {
-                      channels: input.channels,
+                      channels,
                       muted: existing?.muted ?? null,
                     },
                   },
@@ -1638,16 +1679,21 @@ export function SidebarShell({
         invitedEmail: input.invitedEmail,
         invitedRole: input.invitedRole,
       });
-      setSidebarData((prev) => ({
-        ...prev,
-        user: {
-          ...prev.user,
-          profile: {
-            ...prev.user.profile,
-            familyInvites: [...(prev.user.profile.familyInvites ?? []), invite],
+      setSidebarData((prev) => {
+        if (prev.user.profile.kind !== 'guardian') {
+          return prev;
+        }
+        return {
+          ...prev,
+          user: {
+            ...prev.user,
+            profile: {
+              ...prev.user.profile,
+              familyInvites: [...(prev.user.profile.familyInvites ?? []), invite],
+            },
           },
-        },
-      }));
+        };
+      });
       return invite;
     },
     [],
@@ -1656,18 +1702,23 @@ export function SidebarShell({
   const handleFamilyInviteRemove = React.useCallback(
     async (input: { inviteId: string }) => {
       await revokeFamilyInviteAction({ inviteId: input.inviteId });
-      setSidebarData((prev) => ({
-        ...prev,
-        user: {
-          ...prev.user,
-          profile: {
-            ...prev.user.profile,
-            familyInvites: (prev.user.profile.familyInvites ?? []).filter(
-              (invite) => invite.id !== input.inviteId,
-            ),
+      setSidebarData((prev) => {
+        if (prev.user.profile.kind !== 'guardian') {
+          return prev;
+        }
+        return {
+          ...prev,
+          user: {
+            ...prev.user,
+            profile: {
+              ...prev.user.profile,
+              familyInvites: (prev.user.profile.familyInvites ?? []).filter(
+                (invite) => invite.id !== input.inviteId,
+              ),
+            },
           },
-        },
-      }));
+        };
+      });
     },
     [],
   );

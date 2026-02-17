@@ -12,11 +12,12 @@ export async function getFamiliesByOrg(
   orgId: string,
 ) {
   return supabase
-    .from<FamilyRow>('families')
+    .from('families')
     .select(FAMILY_SELECT)
     .eq('org_id', orgId)
     .is('deleted_at', null)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .returns<FamilyRow[]>();
 }
 
 export async function getFamilyById(
@@ -25,7 +26,7 @@ export async function getFamilyById(
   familyId: string,
 ) {
   return supabase
-    .from<FamilyRow>('families')
+    .from('families')
     .select(FAMILY_SELECT)
     .eq('org_id', orgId)
     .eq('id', familyId)
@@ -42,11 +43,12 @@ export async function getFamilyLinksByFamilyIds(
     return { data: [] as FamilyLinkRow[] };
   }
   return supabase
-    .from<FamilyLinkRow>('family_links')
+    .from('family_links')
     .select(FAMILY_LINK_SELECT)
     .in('family_id', familyIds)
     .eq('org_id', orgId)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .returns<FamilyLinkRow[]>();
 }
 
 export async function getFamilyLinksByOrg(
@@ -54,10 +56,11 @@ export async function getFamilyLinksByOrg(
   orgId: string,
 ) {
   return supabase
-    .from<FamilyLinkRow>('family_links')
+    .from('family_links')
     .select(FAMILY_LINK_SELECT)
     .eq('org_id', orgId)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .returns<FamilyLinkRow[]>();
 }
 
 export async function deleteFamilyLinksByGuardianAccountId(
@@ -81,10 +84,11 @@ export async function getFamilyInvitesByFamilyIds(
     return { data: [] as FamilyLinkInviteRow[] };
   }
   return supabase
-    .from<FamilyLinkInviteRow>('family_link_invites')
+    .from('family_link_invites')
     .select(FAMILY_INVITE_SELECT)
     .in('family_id', familyIds)
     .eq('org_id', orgId)
     .is('deleted_at', null)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .returns<FamilyLinkInviteRow[]>();
 }

@@ -1,5 +1,16 @@
-import type { MessagePayloadRecordVM } from '@iconicedu/shared-types';
 import { MESSAGE_IDS, ORG_ID } from '@iconicedu/web/lib/data/ids';
+
+type MessagePayloadRecordVM = {
+  ids: {
+    id: string;
+    orgId: string;
+    messageId: string;
+  };
+  type: string;
+  payload: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+};
 
 export const MESSAGE_PAYLOAD_RECORDS: MessagePayloadRecordVM[] = [
   {

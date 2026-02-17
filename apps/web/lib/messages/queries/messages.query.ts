@@ -57,12 +57,13 @@ export async function getMessagesByChannelId(
   channelId: string,
 ) {
   return supabase
-    .from<MessageRow>('messages')
+    .from('messages')
     .select(MESSAGE_SELECT)
     .eq('org_id', orgId)
     .eq('channel_id', channelId)
     .is('deleted_at', null)
-    .order('created_at', { ascending: true });
+    .order('created_at', { ascending: true })
+    .returns<MessageRow[]>();
 }
 
 export async function getMessagesPageByChannelId(
@@ -76,7 +77,7 @@ export async function getMessagesPageByChannelId(
 ) {
   const pageSize = Math.max(1, options.limit);
   let query = supabase
-    .from<MessageRow>('messages')
+    .from('messages')
     .select(MESSAGE_SELECT)
     .eq('org_id', orgId)
     .eq('channel_id', channelId)
@@ -89,7 +90,7 @@ export async function getMessagesPageByChannelId(
   }
 
   const response = await query;
-  const rows = response.data ?? [];
+  const rows = (response.data ?? []) as unknown as MessageRow[];
   const hasMore = rows.length > pageSize;
   const pageRowsDesc = hasMore ? rows.slice(0, pageSize) : rows;
   const pageRowsAsc = [...pageRowsDesc].reverse();
@@ -108,12 +109,12 @@ export async function getMessageById(
   messageId: string,
 ) {
   return supabase
-    .from<MessageRow>('messages')
+    .from('messages')
     .select(MESSAGE_SELECT)
     .eq('org_id', orgId)
     .eq('id', messageId)
     .is('deleted_at', null)
-    .maybeSingle();
+    .maybeSingle<MessageRow>();
 }
 
 export async function getMessagesByChannelIds(
@@ -126,12 +127,13 @@ export async function getMessagesByChannelIds(
   }
 
   return supabase
-    .from<MessageRow>('messages')
+    .from('messages')
     .select(MESSAGE_SELECT)
     .eq('org_id', orgId)
     .in('channel_id', channelIds)
     .is('deleted_at', null)
-    .order('created_at', { ascending: true });
+    .order('created_at', { ascending: true })
+    .returns<MessageRow[]>();
 }
 
 export async function getThreadsByChannelId(
@@ -140,11 +142,12 @@ export async function getThreadsByChannelId(
   channelId: string,
 ) {
   return supabase
-    .from<ThreadRow>('threads')
+    .from('threads')
     .select(THREAD_SELECT)
     .eq('org_id', orgId)
     .eq('channel_id', channelId)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .returns<ThreadRow[]>();
 }
 
 export async function getThreadById(
@@ -153,12 +156,12 @@ export async function getThreadById(
   threadId: string,
 ) {
   return supabase
-    .from<ThreadRow>('threads')
+    .from('threads')
     .select(THREAD_SELECT)
     .eq('org_id', orgId)
     .eq('id', threadId)
     .is('deleted_at', null)
-    .maybeSingle();
+    .maybeSingle<ThreadRow>();
 }
 
 export async function getThreadParticipantsByThreadIds(
@@ -171,11 +174,12 @@ export async function getThreadParticipantsByThreadIds(
   }
 
   return supabase
-    .from<ThreadParticipantRow>('thread_participants')
+    .from('thread_participants')
     .select(THREAD_PARTICIPANT_SELECT)
     .eq('org_id', orgId)
     .in('thread_id', threadIds)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .returns<ThreadParticipantRow[]>();
 }
 
 export async function getThreadReadStatesByAccountId(
@@ -184,11 +188,12 @@ export async function getThreadReadStatesByAccountId(
   accountId: string,
 ) {
   return supabase
-    .from<ThreadReadStateRow>('thread_read_state')
+    .from('thread_read_state')
     .select(THREAD_READ_STATE_SELECT)
     .eq('org_id', orgId)
     .eq('account_id', accountId)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .returns<ThreadReadStateRow[]>();
 }
 
 export async function getMessageReactionsByMessageIds(
@@ -201,11 +206,12 @@ export async function getMessageReactionsByMessageIds(
   }
 
   return supabase
-    .from<MessageReactionRow>('message_reactions')
+    .from('message_reactions')
     .select(MESSAGE_REACTION_SELECT)
     .eq('org_id', orgId)
     .in('message_id', messageIds)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .returns<MessageReactionRow[]>();
 }
 
 export async function getMessageReactionCountsByMessageIds(
@@ -218,11 +224,12 @@ export async function getMessageReactionCountsByMessageIds(
   }
 
   return supabase
-    .from<MessageReactionCountRow>('message_reaction_counts')
+    .from('message_reaction_counts')
     .select(MESSAGE_REACTION_COUNT_SELECT)
     .eq('org_id', orgId)
     .in('message_id', messageIds)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .returns<MessageReactionCountRow[]>();
 }
 
 export async function getMessageTextByMessageIds(
@@ -235,11 +242,12 @@ export async function getMessageTextByMessageIds(
   }
 
   return supabase
-    .from<MessageTextRow>('message_text')
+    .from('message_text')
     .select(MESSAGE_TEXT_SELECT)
     .eq('org_id', orgId)
     .in('message_id', messageIds)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .returns<MessageTextRow[]>();
 }
 
 export async function getMessageImagesByMessageIds(
@@ -252,11 +260,12 @@ export async function getMessageImagesByMessageIds(
   }
 
   return supabase
-    .from<MessageImageRow>('message_image')
+    .from('message_image')
     .select(MESSAGE_IMAGE_SELECT)
     .eq('org_id', orgId)
     .in('message_id', messageIds)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .returns<MessageImageRow[]>();
 }
 
 export async function getMessageFilesByMessageIds(
@@ -269,11 +278,12 @@ export async function getMessageFilesByMessageIds(
   }
 
   return supabase
-    .from<MessageFileRow>('message_file')
+    .from('message_file')
     .select(MESSAGE_FILE_SELECT)
     .eq('org_id', orgId)
     .in('message_id', messageIds)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .returns<MessageFileRow[]>();
 }
 
 export async function getMessageDesignFileUpdatesByMessageIds(
@@ -286,11 +296,12 @@ export async function getMessageDesignFileUpdatesByMessageIds(
   }
 
   return supabase
-    .from<MessageDesignFileUpdateRow>('message_design_file_update')
+    .from('message_design_file_update')
     .select(MESSAGE_DESIGN_FILE_UPDATE_SELECT)
     .eq('org_id', orgId)
     .in('message_id', messageIds)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .returns<MessageDesignFileUpdateRow[]>();
 }
 
 export async function getMessagePaymentRemindersByMessageIds(
@@ -303,11 +314,12 @@ export async function getMessagePaymentRemindersByMessageIds(
   }
 
   return supabase
-    .from<MessagePaymentReminderRow>('message_payment_reminder')
+    .from('message_payment_reminder')
     .select(MESSAGE_PAYMENT_REMINDER_SELECT)
     .eq('org_id', orgId)
     .in('message_id', messageIds)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .returns<MessagePaymentReminderRow[]>();
 }
 
 export async function getMessageEventRemindersByMessageIds(
@@ -320,11 +332,12 @@ export async function getMessageEventRemindersByMessageIds(
   }
 
   return supabase
-    .from<MessageEventReminderRow>('message_event_reminder')
+    .from('message_event_reminder')
     .select(MESSAGE_EVENT_REMINDER_SELECT)
     .eq('org_id', orgId)
     .in('message_id', messageIds)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .returns<MessageEventReminderRow[]>();
 }
 
 export async function getMessageFeedbackRequestsByMessageIds(
@@ -337,11 +350,12 @@ export async function getMessageFeedbackRequestsByMessageIds(
   }
 
   return supabase
-    .from<MessageFeedbackRequestRow>('message_feedback_request')
+    .from('message_feedback_request')
     .select(MESSAGE_FEEDBACK_REQUEST_SELECT)
     .eq('org_id', orgId)
     .in('message_id', messageIds)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .returns<MessageFeedbackRequestRow[]>();
 }
 
 export async function getMessageLessonAssignmentsByMessageIds(
@@ -354,11 +368,12 @@ export async function getMessageLessonAssignmentsByMessageIds(
   }
 
   return supabase
-    .from<MessageLessonAssignmentRow>('message_lesson_assignment')
+    .from('message_lesson_assignment')
     .select(MESSAGE_LESSON_ASSIGNMENT_SELECT)
     .eq('org_id', orgId)
     .in('message_id', messageIds)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .returns<MessageLessonAssignmentRow[]>();
 }
 
 export async function getMessageProgressUpdatesByMessageIds(
@@ -371,11 +386,12 @@ export async function getMessageProgressUpdatesByMessageIds(
   }
 
   return supabase
-    .from<MessageProgressUpdateRow>('message_progress_update')
+    .from('message_progress_update')
     .select(MESSAGE_PROGRESS_UPDATE_SELECT)
     .eq('org_id', orgId)
     .in('message_id', messageIds)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .returns<MessageProgressUpdateRow[]>();
 }
 
 export async function getMessageSessionBookingsByMessageIds(
@@ -388,11 +404,12 @@ export async function getMessageSessionBookingsByMessageIds(
   }
 
   return supabase
-    .from<MessageSessionBookingRow>('message_session_booking')
+    .from('message_session_booking')
     .select(MESSAGE_SESSION_BOOKING_SELECT)
     .eq('org_id', orgId)
     .in('message_id', messageIds)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .returns<MessageSessionBookingRow[]>();
 }
 
 export async function getMessageSessionCompletesByMessageIds(
@@ -405,11 +422,12 @@ export async function getMessageSessionCompletesByMessageIds(
   }
 
   return supabase
-    .from<MessageSessionCompleteRow>('message_session_complete')
+    .from('message_session_complete')
     .select(MESSAGE_SESSION_COMPLETE_SELECT)
     .eq('org_id', orgId)
     .in('message_id', messageIds)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .returns<MessageSessionCompleteRow[]>();
 }
 
 export async function getMessageSessionSummariesByMessageIds(
@@ -422,11 +440,12 @@ export async function getMessageSessionSummariesByMessageIds(
   }
 
   return supabase
-    .from<MessageSessionSummaryRow>('message_session_summary')
+    .from('message_session_summary')
     .select(MESSAGE_SESSION_SUMMARY_SELECT)
     .eq('org_id', orgId)
     .in('message_id', messageIds)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .returns<MessageSessionSummaryRow[]>();
 }
 
 export async function getMessageHomeworkSubmissionsByMessageIds(
@@ -439,11 +458,12 @@ export async function getMessageHomeworkSubmissionsByMessageIds(
   }
 
   return supabase
-    .from<MessageHomeworkSubmissionRow>('message_homework_submission')
+    .from('message_homework_submission')
     .select(MESSAGE_HOMEWORK_SUBMISSION_SELECT)
     .eq('org_id', orgId)
     .in('message_id', messageIds)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .returns<MessageHomeworkSubmissionRow[]>();
 }
 
 export async function getMessageLinkPreviewsByMessageIds(
@@ -456,11 +476,12 @@ export async function getMessageLinkPreviewsByMessageIds(
   }
 
   return supabase
-    .from<MessageLinkPreviewRow>('message_link_preview')
+    .from('message_link_preview')
     .select(MESSAGE_LINK_PREVIEW_SELECT)
     .eq('org_id', orgId)
     .in('message_id', messageIds)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .returns<MessageLinkPreviewRow[]>();
 }
 
 export async function getMessageAudioRecordingsByMessageIds(
@@ -473,11 +494,12 @@ export async function getMessageAudioRecordingsByMessageIds(
   }
 
   return supabase
-    .from<MessageAudioRecordingRow>('message_audio_recording')
+    .from('message_audio_recording')
     .select(MESSAGE_AUDIO_RECORDING_SELECT)
     .eq('org_id', orgId)
     .in('message_id', messageIds)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .returns<MessageAudioRecordingRow[]>();
 }
 
 export async function getChannelFilesByChannelIds(
@@ -490,11 +512,12 @@ export async function getChannelFilesByChannelIds(
   }
 
   return supabase
-    .from<ChannelFileRow>('channel_files')
+    .from('channel_files')
     .select(CHANNEL_FILE_SELECT)
     .eq('org_id', orgId)
     .in('channel_id', channelIds)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .returns<ChannelFileRow[]>();
 }
 
 export async function getChannelMediaByChannelIds(
@@ -507,9 +530,10 @@ export async function getChannelMediaByChannelIds(
   }
 
   return supabase
-    .from<ChannelMediaRow>('channel_media')
+    .from('channel_media')
     .select(CHANNEL_MEDIA_SELECT)
     .eq('org_id', orgId)
     .in('channel_id', channelIds)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .returns<ChannelMediaRow[]>();
 }

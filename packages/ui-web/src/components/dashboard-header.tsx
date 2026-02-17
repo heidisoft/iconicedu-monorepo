@@ -5,9 +5,13 @@ import { SidebarTrigger } from '@iconicedu/ui-web/ui/sidebar';
 import { SiteLogo } from '@iconicedu/ui-web/components/site-logo';
 import { ThemeToggle } from '@iconicedu/ui-web/components/theme-toggle';
 
-export function DashboardHeader({ className, ...props }: React.ComponentProps<'div'>) {
+type DashboardHeaderProps = React.ComponentProps<'div'> & {
+  title?: string;
+  description?: string;
+};
+
+export function DashboardHeader({ className, title, description, ...props }: DashboardHeaderProps) {
   const isMobile = useIsMobile();
-  const { title } = props as { title?: string };
   return (
     <header className="flex h-(--header-height) shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
       <div className="flex w-full items-end px-4 lg:gap-2 lg:px-6">
@@ -17,6 +21,9 @@ export function DashboardHeader({ className, ...props }: React.ComponentProps<'d
             <>
               <Separator orientation="vertical" className="m-2" />
               <h1 className="text-base font-medium">{title}</h1>
+              {description ? (
+                <p className="text-xs text-muted-foreground hidden lg:block">{description}</p>
+              ) : null}
             </>
           )}
         </div>

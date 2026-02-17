@@ -30,6 +30,7 @@ export function applyIncomingDirectMessageUnread(
         ...channel.collections,
         readState: {
           ...channel.collections.readState,
+          channelId: channel.ids.id,
           unreadCount: nextUnread,
         },
       },
@@ -101,6 +102,7 @@ export function markDirectMessageChannelRead(
         ...channel.collections,
         readState: {
           ...channel.collections.readState,
+          channelId: channel.ids.id,
           lastReadMessageId:
             input?.lastReadMessageId ??
             channel.collections.readState?.lastReadMessageId,

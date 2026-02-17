@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { getFamilyInviteAdminClient } from '@iconicedu/web/lib/family/queries/invite.query';
 import { ORG_ID } from '@iconicedu/web/lib/data/ids';
 import { pickRandomThemeKey } from '@iconicedu/web/lib/profile/constants/theme';
+import { resolveSignupDisplayName } from '@iconicedu/web/lib/auth/resolve-signup-display-name';
 
 type EducatorSignupInput = {
   email: string;
@@ -13,27 +14,11 @@ type EducatorSignupInput = {
   displayName?: string;
 };
 
-export function resolveSignupDisplayName(input: {
-  displayName?: string;
-  firstName: string;
-  lastName: string;
-}): string {
-  const displayName = input.displayName?.trim() ?? '';
-  if (displayName) {
-    return displayName;
-  }
-  const firstName = input.firstName.trim();
-  const lastName = input.lastName.trim();
-  if (!lastName) {
-    return firstName;
-  }
-  return `${firstName} ${lastName.charAt(0).toUpperCase()}.`;
-}
-
 export async function educatorSignupAction(input: EducatorSignupInput) {
   const adminClient = getFamilyInviteAdminClient();
 
-  const { data: user, error: createUserError } = await adminClient.auth.admin.createUser({
+  const { data: createUserData, error: createUserError } =
+    await adminClient.auth.admin.createUser({
     email: input.email,
     password: input.password,
     user_metadata: {
@@ -41,8 +26,9 @@ export async function educatorSignupAction(input: EducatorSignupInput) {
     },
     email_confirm: true,
   });
+  const createdUser = createUserData?.user ?? null;
 
-  if (createUserError || !user) {
+  if (createUserError || !createdUser) {
     throw createUserError ?? new Error('Unable to create educator user.');
   }
 
@@ -50,11 +36,11 @@ export async function educatorSignupAction(input: EducatorSignupInput) {
     .from('accounts')
     .insert({
       org_id: ORG_ID,
-      auth_user_id: user.id,
+      auth_user_id: createdUser.id,
       email: input.email,
       status: 'active',
-      created_by: user.id,
-      updated_by: user.id,
+      created_by: createdUser.id,
+      updated_by: createdUser.id,
     })
     .select('id')
     .single();
@@ -77,8 +63,8 @@ export async function educatorSignupAction(input: EducatorSignupInput) {
     timezone: 'UTC',
     locale: 'en-US',
     status: 'active',
-    created_by: user.id,
-    updated_by: user.id,
+    created_by: createdUser.id,
+    updated_by: createdUser.id,
   });
 
   if (profileError) {

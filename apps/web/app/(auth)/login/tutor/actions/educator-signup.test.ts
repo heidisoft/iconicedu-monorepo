@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveSignupDisplayName } from './educator-signup';
+import { resolveSignupDisplayName } from '@iconicedu/web/lib/auth/resolve-signup-display-name';
 
 describe('resolveSignupDisplayName', () => {
   it('uses provided display name when present', () => {

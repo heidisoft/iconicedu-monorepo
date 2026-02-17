@@ -11,7 +11,23 @@ import type {
   RecurrenceOverrideVM,
   RecurrenceRuleVM,
   RecurrenceVM,
+  WeekdayVM,
 } from '@iconicedu/shared-types';
+import { resolveThemeKey } from '@iconicedu/web/lib/profile/derive';
+
+const VALID_WEEKDAYS: Set<WeekdayVM> = new Set([
+  'MO',
+  'TU',
+  'WE',
+  'TH',
+  'FR',
+  'SA',
+  'SU',
+]);
+
+function isWeekday(value: string): value is WeekdayVM {
+  return VALID_WEEKDAYS.has(value as WeekdayVM);
+}
 
 export function mapClassScheduleParticipantRow(
   row: ClassScheduleParticipantRow,
@@ -22,7 +38,7 @@ export function mapClassScheduleParticipantRow(
     status: row.status as ClassScheduleParticipantVM['status'] | undefined,
     displayName: row.display_name ?? undefined,
     avatarUrl: row.avatar_url ?? null,
-    themeKey: row.theme_key ?? null,
+    themeKey: resolveThemeKey(row.theme_key ?? null),
   };
 }
 
@@ -50,7 +66,7 @@ export function mapClassScheduleRecurrenceRow(
     rule: {
       frequency: row.frequency as RecurrenceRuleVM['frequency'],
       interval: row.interval ?? undefined,
-      byWeekday: row.byday ?? undefined,
+      byWeekday: row.byday?.filter(isWeekday) ?? undefined,
       count: row.count ?? undefined,
       until: row.until ?? undefined,
       timezone: row.timezone ?? undefined,
@@ -104,7 +120,7 @@ export function mapClassScheduleRow(
     timezone: row.timezone ?? undefined,
     status: row.status as ClassScheduleVM['status'],
     visibility: row.visibility as ClassScheduleVM['visibility'],
-    themeKey: row.theme_key ?? null,
+    themeKey: resolveThemeKey(row.theme_key ?? null),
     participants: input.participants,
     source,
     recurrence: input.recurrence ?? undefined,

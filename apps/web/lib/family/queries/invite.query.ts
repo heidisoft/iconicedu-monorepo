@@ -67,11 +67,14 @@ async function ensureInvitedAccountForRole(options: {
     throw new Error('Invited email is required.');
   }
 
-  const existingAccount = await getAccountByEmail(
+  const { data: existingAccount, error: existingAccountError } = await getAccountByEmail(
     options.adminClient,
     options.orgId,
     normalizedEmail,
   );
+  if (existingAccountError) {
+    throw existingAccountError;
+  }
   const displayName =
     options.kind === 'child' ? 'Invited child' : 'Invited guardian';
   const uiThemeKey = options.kind === 'guardian' ? pickRandomThemeKey() : 'teal';

@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { AccountRow } from '@iconicedu/shared-types';
+import type { AccountRow, FamilyLinkInviteRow } from '@iconicedu/shared-types';
 
 import {
   getAccountByAuthUserId,
@@ -9,7 +9,7 @@ import {
   updateAccountAuthUserId,
   getAccountById,
 } from '@iconicedu/web/lib/accounts/queries/accounts.query';
-import { findFamilyInviteForAccount, type FamilyLinkInviteRow } from '@iconicedu/web/lib/family/queries/invite.query';
+import { findFamilyInviteForAccount } from '@iconicedu/web/lib/family/queries/invite.query';
 
 export async function getOrCreateAccount(
   supabase: SupabaseClient,
@@ -33,11 +33,14 @@ export async function getOrCreateAccount(
   }
 
   if (normalizedEmail) {
-    const invitedAccount = await getAccountByEmail(
+    const { data: invitedAccount, error: invitedAccountError } = await getAccountByEmail(
       supabase,
       input.orgId,
       normalizedEmail,
     );
+    if (invitedAccountError) {
+      throw invitedAccountError;
+    }
     if (invitedAccount?.id) {
       const { data: updatedAccount, error: updateError } = await updateAccountAuthUserId(
         supabase,

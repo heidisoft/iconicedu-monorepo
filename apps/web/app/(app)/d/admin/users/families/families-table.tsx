@@ -8,6 +8,7 @@ import {
   TableRow,
 } from '@iconicedu/ui-web';
 import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
+import type { AvatarSource, ThemeKey } from '@iconicedu/shared-types';
 
 import type { AdminFamilyRow } from '@iconicedu/web/lib/admin/families';
 
@@ -63,11 +64,13 @@ export function FamiliesTable({ rows }: FamiliesTableProps) {
                             <AvatarWithStatus
                               name={guardian.name ?? guardian.label}
                               avatar={{
-                                source: guardian.avatarSource ? guardian.avatarSource : 'seed',
+                                source: resolveAvatarSource(guardian.avatarSource),
                                 url: guardian.avatarUrl ?? null,
-                                seed: guardian.avatarSource ? undefined : guardian.id,
+                                seed: resolveAvatarSource(guardian.avatarSource) === 'seed'
+                                  ? guardian.id
+                                  : undefined,
                               }}
-                              themeKey={guardian.themeKey ?? null}
+                              themeKey={resolveThemeKey(guardian.themeKey)}
                               showStatus={false}
                               sizeClassName="size-7"
                               initialsLength={2}
@@ -92,11 +95,13 @@ export function FamiliesTable({ rows }: FamiliesTableProps) {
                           <AvatarWithStatus
                             name={child.label}
                             avatar={{
-                              source: child.avatarSource ? child.avatarSource : 'seed',
+                              source: resolveAvatarSource(child.avatarSource),
                               url: child.avatarUrl ?? null,
-                              seed: child.avatarSource ? undefined : child.id,
+                              seed: resolveAvatarSource(child.avatarSource) === 'seed'
+                                ? child.id
+                                : undefined,
                             }}
-                            themeKey={child.themeKey ?? null}
+                            themeKey={resolveThemeKey(child.themeKey)}
                             showStatus={false}
                             sizeClassName="size-7"
                             initialsLength={2}
@@ -148,4 +153,18 @@ export function FamiliesTable({ rows }: FamiliesTableProps) {
       </div>
     </div>
   );
+}
+
+function resolveAvatarSource(value?: string | null): AvatarSource {
+  if (value === 'upload' || value === 'external') {
+    return value;
+  }
+  return 'seed';
+}
+
+function resolveThemeKey(value?: string | null): ThemeKey | null {
+  if (!value) {
+    return null;
+  }
+  return value as ThemeKey;
 }

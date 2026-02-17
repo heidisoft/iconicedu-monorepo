@@ -4,6 +4,15 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { getStaffProfile, getStaffSpecialties } from '@iconicedu/web/lib/profile/queries/staff.query';
 
+function normalizePermissionsScope(
+  raw: string | null | undefined,
+): StaffProfileVM['permissionsScope'] {
+  if (raw === 'limited' || raw === 'standard' || raw === 'elevated') {
+    return raw;
+  }
+  return null;
+}
+
 export async function buildStaffProfile(
   supabase: SupabaseClient,
   baseProfile: Omit<UserProfileVM, 'kind'>,
@@ -20,7 +29,7 @@ export async function buildStaffProfile(
     department: staff.data?.department ?? null,
     managerStaffId: staff.data?.manager_staff_id ?? null,
     jobTitle: staff.data?.job_title ?? null,
-    permissionsScope: staff.data?.permissions_scope ?? null,
+    permissionsScope: normalizePermissionsScope(staff.data?.permissions_scope),
     specialties: specialties.data?.map((row) => row.specialty) ?? null,
     weeklyAvailability: staff.data?.weekly_availability ?? null,
   };

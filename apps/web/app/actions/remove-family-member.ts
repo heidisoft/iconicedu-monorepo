@@ -32,10 +32,9 @@ export async function removeFamilyMemberAction(
 
   const accountResult = await getAccountById(serviceClient, input.childAccountId);
   const childAccount = accountResult.data;
-  const shouldHardDeleteAccount =
-    Boolean(childAccount) &&
-    !childAccount.email_verified &&
-    !childAccount.auth_user_id;
+  const shouldHardDeleteAccount = childAccount
+    ? !childAccount.email_verified && !childAccount.auth_user_id
+    : false;
 
   const linkMatch = {
     org_id: guardianAccount.org_id,

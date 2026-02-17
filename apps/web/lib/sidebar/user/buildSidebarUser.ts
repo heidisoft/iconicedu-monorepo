@@ -1,4 +1,5 @@
 import type {
+  FamilyLinkInviteRow,
   NotificationDefaultsVM,
   NotificationPreferenceVM,
   PresenceVM,
@@ -35,7 +36,6 @@ import { getGuardianFamilyInvites } from '@iconicedu/web/lib/profile/queries/fam
 import {
   findFamilyInviteForAccount,
   mapFamilyLinkInviteRowToVM,
-  type FamilyLinkInviteRow,
 } from '@iconicedu/web/lib/family/queries/invite.query';
 
 export async function buildSidebarUser(
