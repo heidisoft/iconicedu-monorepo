@@ -31,6 +31,7 @@ export * from '@iconicedu/ui-web/ui/label';
 export * from '@iconicedu/ui-web/ui/switch';
 export * from '@iconicedu/ui-web/ui/field';
 export * from '@iconicedu/ui-web/ui/scroll-area';
+export * from '@iconicedu/ui-web/ui/empty';
 export * from '@iconicedu/ui-web/providers/theme-provider';
 export * from '@iconicedu/ui-web/ui/badge';
 export * from '@iconicedu/ui-web/ui/alert-dialog';

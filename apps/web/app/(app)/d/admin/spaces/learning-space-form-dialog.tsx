@@ -325,7 +325,6 @@ export function LearningSpaceFormDialog({
                         Icon <span className="text-destructive">*</span>
                       </FieldLabel>
                       <Select
-                        id="ls-icon"
                         value={formState.iconKey}
                         onValueChange={(value) =>
                           updateFormState({ iconKey: value as LearningSpaceIconKey })
@@ -381,7 +380,6 @@ export function LearningSpaceFormDialog({
                     <Field>
                       <FieldLabel htmlFor="ls-subject">Subject</FieldLabel>
                       <Select
-                        id="ls-subject"
                         value={formState.subject}
                         onValueChange={(value) => updateFormState({ subject: value })}
                       >
@@ -405,7 +403,6 @@ export function LearningSpaceFormDialog({
                         Kind <span className="text-destructive">*</span>
                       </FieldLabel>
                       <Select
-                        id="ls-kind"
                         value={formState.kind}
                         onValueChange={(value) => updateFormState({ kind: value })}
                       >

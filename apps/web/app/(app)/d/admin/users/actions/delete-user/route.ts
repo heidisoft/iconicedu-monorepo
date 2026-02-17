@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { deleteUserAction } from '@iconicedu/web/app/(app)/d/admin/auth/actions';
+import { deleteUserAction } from '@iconicedu/web/lib/auth/admin-actions';
 import { getFamilyInviteAdminClient } from '@iconicedu/web/lib/family/queries/invite.query';
 
 type DeleteRequestBody = {

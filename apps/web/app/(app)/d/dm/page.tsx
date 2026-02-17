@@ -16,10 +16,11 @@ import {
 import { ensureDirectMessageChannel } from '@iconicedu/web/lib/channels/actions/ensure-direct-message-channel';
 
 type DmPageProps = {
-  searchParams?: { id?: string; channelId?: string; userId?: string };
+  searchParams?: Promise<{ id?: string; channelId?: string; userId?: string }>;
 };
 
 export default async function Page({ searchParams }: DmPageProps) {
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const supabase = await createSupabaseServerClient();
   const authUser = await requireAuthedUser(supabase);
   const { account } = await getOrCreateAccount(supabase, {
@@ -30,7 +31,10 @@ export default async function Page({ searchParams }: DmPageProps) {
   const profileResponse = await getProfileByAccountId(supabase, account.id);
   const currentProfileId = profileResponse.data?.id ?? null;
   const requestedId =
-    searchParams?.channelId ?? searchParams?.userId ?? searchParams?.id ?? null;
+    resolvedSearchParams?.channelId ??
+    resolvedSearchParams?.userId ??
+    resolvedSearchParams?.id ??
+    null;
   let targetChannelId: string | null = null;
 
   if (requestedId) {

@@ -1,9 +1,6 @@
-import { Public_Sans } from 'next/font/google';
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import '@iconicedu/ui-web/styles.css';
 import { ThemeProvider, Toaster } from '@iconicedu/ui-web';
-
-const fontSans = Public_Sans({ subsets: ['latin'], variable: '--font-sans' });
 
 export const metadata = {
   title: 'ICONIC EDU',
@@ -12,7 +9,16 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning className={fontSans.variable}>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      style={
+        {
+          ['--font-sans' as string]:
+            'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+        } as CSSProperties
+      }
+    >
       <body className="bg-background text-foreground">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           {children}

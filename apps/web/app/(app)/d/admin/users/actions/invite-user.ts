@@ -2,7 +2,6 @@
 
 import type { AccountRow } from '@iconicedu/shared-types';
 import { headers } from 'next/headers';
-import { z } from 'zod';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
@@ -20,10 +19,7 @@ import {
 import { getFamilyInviteAdminClient } from '@iconicedu/web/lib/family/queries/invite.query';
 import { pickRandomThemeKey } from '@iconicedu/web/lib/profile/constants/theme';
 
-const INVITE_SCHEMA = z.object({
-  email: z.string().trim().email(),
-  profileKind: z.enum(['guardian', 'staff', 'educator', 'child']),
-});
+const VALID_PROFILE_KINDS = new Set(['guardian', 'staff', 'educator', 'child']);
 
 type InviteUserResult = {
   email: string;
@@ -51,10 +47,18 @@ async function resolveBaseUrl() {
 export async function inviteAdminUserAction(
   formData: FormData,
 ): Promise<InviteUserResult> {
-  const parsed = INVITE_SCHEMA.parse({
-    email: formData.get('email'),
-    profileKind: formData.get('profileKind'),
-  });
+  const emailInput = String(formData.get('email') ?? '').trim();
+  const profileKindInput = String(formData.get('profileKind') ?? '').trim();
+  if (!emailInput || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput)) {
+    throw new Error('Valid email is required.');
+  }
+  if (!VALID_PROFILE_KINDS.has(profileKindInput)) {
+    throw new Error('Valid profile kind is required.');
+  }
+  const parsed = {
+    email: emailInput,
+    profileKind: profileKindInput as 'guardian' | 'staff' | 'educator' | 'child',
+  };
   const mode = (formData.get('mode') as 'invite' | 'link') ?? 'link';
   const linkType = (formData.get('linkType') as 'invite' | 'magiclink') ?? 'invite';
 
@@ -178,7 +182,7 @@ export async function inviteAdminUserAction(
       throw inviteError;
     }
 
-    const actionLink = inviteData?.properties?.action_link ?? inviteData?.action_link ?? redirectTo;
+    const actionLink = inviteData?.properties?.action_link ?? redirectTo;
 
     await reconcileInvitedAccount({
       client: adminClient,
@@ -195,9 +199,9 @@ export async function inviteAdminUserAction(
     };
   }
 
-  const { data: otpData, error: otpError } = await adminClient.auth.signInWithOtp({
+  const { error: otpError } = await adminClient.auth.signInWithOtp({
     email: normalizedEmail,
-    emailRedirectTo: redirectTo,
+    options: { emailRedirectTo: redirectTo },
   });
 
   if (otpError) {
@@ -216,7 +220,7 @@ export async function inviteAdminUserAction(
   }
 
   const actionLink =
-    generatedLink?.properties?.action_link ?? generatedLink?.action_link ?? redirectTo;
+    generatedLink?.properties?.action_link ?? redirectTo;
   if (!actionLink) {
     throw new Error('Supabase did not return an invite action link.');
   }

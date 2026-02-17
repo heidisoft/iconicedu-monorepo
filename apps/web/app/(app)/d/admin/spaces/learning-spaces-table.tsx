@@ -35,6 +35,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@iconicedu/ui-web/ui/tooltip';
 import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import { getLearningSpaceIcon } from '@iconicedu/ui-web/lib/icons';
+import type { ThemeKey } from '@iconicedu/shared-types';
 
 import type { AdminLearningSpaceRow } from '@iconicedu/web/lib/admin/learning-spaces';
 
@@ -186,7 +187,7 @@ export function LearningSpacesTable({ rows, onEdit }: LearningSpacesTableProps) 
                                 source: participant.avatarUrl ? 'upload' : 'seed',
                                 url: participant.avatarUrl ?? null,
                               }}
-                              themeKey={participant.themeKey ?? null}
+                              themeKey={(participant.themeKey as ThemeKey | null) ?? null}
                               showStatus={false}
                               sizeClassName="size-8"
                               initialsLength={2}
