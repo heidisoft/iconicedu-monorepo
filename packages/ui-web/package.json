@@ -12,7 +12,10 @@
   },
   "private": true,
   "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "build": "tsc -p tsconfig.json && pnpm exec tailwindcss -c tailwind.config.ts -i ./src/styles/global.css -o ./dist/ui-web.css --minify",
+    "build:ci": "pnpm run typecheck && pnpm run build",
+    "lint": "eslint src --ext .ts,.tsx",
     "tailwind:build": "pnpm exec tailwindcss -c tailwind.config.ts -i ./src/styles/global.css -o ./dist/ui-web.css",
     "tailwind:watch": "node ./scripts/watch-tailwind.js",
     "dev": "tsc -p tsconfig.json --watch & pnpm run tailwind:watch",

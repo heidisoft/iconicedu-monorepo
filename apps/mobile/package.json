@@ -4,10 +4,14 @@
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
+    "dev": "expo start --clear",
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "build": "pnpm run typecheck",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint app src --ext .ts,.tsx",
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch"
   },

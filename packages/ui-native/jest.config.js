@@ -10,7 +10,7 @@ module.exports = {
     '^@iconicedu/shared-types$': '<rootDir>/../shared-types/src/index.ts',
     '^@iconicedu/shared-types/(.*)$': '<rootDir>/../shared-types/src/$1',
   },
-  setupFilesAfterSetup: [],
+  setupFilesAfterEnv: [],
   collectCoverageFrom: [
     'src/components/**/*.{ts,tsx}',
     'src/utils/**/*.{ts,tsx}',

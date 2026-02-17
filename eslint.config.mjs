@@ -21,6 +21,11 @@ const base = {
       document: 'readonly',
       process: 'readonly',
       console: 'readonly',
+      fetch: 'readonly',
+      navigator: 'readonly',
+      setTimeout: 'readonly',
+      clearTimeout: 'readonly',
+      React: 'readonly',
     },
   },
   plugins: {
@@ -61,10 +66,17 @@ export default [
   {
     ignores: ['**/node_modules/**', '**/.next/**', '**/dist/**', 'apps/web/next-env.d.ts'],
   },
-  withProject(['**/*.{ts,tsx,js,jsx}'], path.join(__dirname, 'tsconfig.json')),
+  {
+    ...base,
+    files: ['**/*.{ts,tsx,js,jsx}'],
+  },
   withProject(
     ['apps/web/**/*.{ts,tsx,js,jsx}'],
     path.join(__dirname, 'apps/web/tsconfig.json')
+  ),
+  withProject(
+    ['apps/mobile/**/*.{ts,tsx,js,jsx}'],
+    path.join(__dirname, 'apps/mobile/tsconfig.eslint.json')
   ),
   withProject(
     ['apps/api/**/*.{ts,tsx,js,jsx}'],
@@ -76,7 +88,7 @@ export default [
   ),
   withProject(
     ['packages/ui-native/**/*.{ts,tsx,js,jsx}'],
-    path.join(__dirname, 'packages/ui-native/tsconfig.json')
+    path.join(__dirname, 'packages/ui-native/tsconfig.eslint.json')
   ),
   withProject(
     ['packages/utils/**/*.{ts,tsx,js,jsx}'],
@@ -86,4 +98,28 @@ export default [
     ['packages/shared-types/**/*.{ts,tsx,js,jsx}'],
     path.join(__dirname, 'packages/shared-types/tsconfig.json')
   ),
+  {
+    files: [
+      '**/*.test.{ts,tsx,js,jsx}',
+      '**/*.spec.{ts,tsx,js,jsx}',
+      '**/__tests__/**/*.{ts,tsx,js,jsx}',
+    ],
+    languageOptions: {
+      globals: {
+        describe: 'readonly',
+        it: 'readonly',
+        test: 'readonly',
+        expect: 'readonly',
+        beforeEach: 'readonly',
+        afterEach: 'readonly',
+        beforeAll: 'readonly',
+        afterAll: 'readonly',
+        jest: 'readonly',
+      },
+    },
+    rules: {
+      'no-undef': 'off',
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
 ];
