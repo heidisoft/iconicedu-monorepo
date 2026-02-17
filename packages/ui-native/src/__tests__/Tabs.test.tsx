@@ -43,8 +43,11 @@ describe('Tabs', () => {
   });
 
   it('has tablist accessibility role', () => {
-    render(<Tabs items={mockItems} activeKey="all" onTabPress={jest.fn()} />);
-    expect(screen.getByRole('tablist')).toBeTruthy();
+    const { toJSON } = render(
+      <Tabs items={mockItems} activeKey="all" onTabPress={jest.fn()} />,
+    );
+    const tree = toJSON();
+    expect(tree.props.accessibilityRole).toBe('tablist');
   });
 
   it('does not show badge when badge is 0', () => {

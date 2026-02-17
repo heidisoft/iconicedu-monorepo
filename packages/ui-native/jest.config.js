@@ -3,6 +3,7 @@ const jestExpoPreset = require('jest-expo/jest-preset');
 
 module.exports = {
   ...jestExpoPreset,
+  resolver: require.resolve('./jest.resolver.js'),
   testMatch: ['**/__tests__/**/*.test.{ts,tsx}'],
   setupFiles: [
     // 1. React Native's jest setup (mocks NativeModules, etc.)

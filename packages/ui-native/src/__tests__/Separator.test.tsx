@@ -19,7 +19,7 @@ describe('Separator', () => {
   });
 
   it('has none accessibility role', () => {
-    render(<Separator />);
-    expect(screen.getByRole('none')).toBeTruthy();
+    const { toJSON } = render(<Separator />);
+    expect(toJSON().props.accessibilityRole).toBe('none');
   });
 });

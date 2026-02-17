@@ -17,7 +17,12 @@
       "Bash(pnpm install:*)",
       "Bash(pnpm jest:*)",
       "Bash(pnpm --filter @iconicedu/ui-native test:*)",
-      "Bash(node -e:*)"
+      "Bash(node -e:*)",
+      "Bash(pnpm --filter mobile test)",
+      "Bash(pnpm --filter mobile add:*)",
+      "Bash(pnpm typecheck:*)",
+      "Bash(pnpm --filter web test)",
+      "Bash(pnpm lint:*)"
     ]
   }
 }

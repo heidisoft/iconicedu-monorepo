@@ -1,9 +1,16 @@
 module.exports = function (api) {
   api.cache(true);
+
+  const isTest = process.env.NODE_ENV === 'test';
+
   return {
-    presets: ['babel-preset-expo'],
+    presets: [
+      'babel-preset-expo',
+      // NativeWind babel preset requires native worklets plugin
+      // which is not available in the jest test environment
+      ...(isTest ? [] : ['nativewind/babel']),
+    ],
     plugins: [
-      'nativewind/babel',
       [
         'module-resolver',
         {
