@@ -30,10 +30,17 @@ export type AdminLearningSpaceRow = LearningSpaceRow & {
 };
 
 function getProfileDisplayName(profile: ProfileRow) {
-  const display = profile.display_name?.trim();
+  const display = profile.display_name?.trim() ?? '';
   if (display) return display;
-  const fallback = [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim();
-  return fallback || 'Unknown';
+  const first = profile.first_name?.trim() ?? '';
+  const last = profile.last_name?.trim() ?? '';
+  if (first && last) {
+    return `${first} ${last.charAt(0).toUpperCase()}.`;
+  }
+  if (first) {
+    return first;
+  }
+  return 'Unknown';
 }
 
 export async function getAdminLearningSpaceRows(): Promise<AdminLearningSpaceRow[]> {

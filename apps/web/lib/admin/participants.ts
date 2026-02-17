@@ -14,9 +14,18 @@ type GuardianNameMap = Map<string, string[]>;
 
 function getDisplayName(profile: ProfileRow) {
   const name = profile.display_name?.trim();
-  if (name) return name;
-  const fallback = [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim();
-  return fallback || null;
+  if (name) {
+    return name;
+  }
+  const first = profile.first_name?.trim() ?? '';
+  const last = profile.last_name?.trim() ?? '';
+  if (first && last) {
+    return `${first} ${last.charAt(0).toUpperCase()}.`;
+  }
+  if (first) {
+    return first;
+  }
+  return null;
 }
 
 function mapProfileToUserProfile(

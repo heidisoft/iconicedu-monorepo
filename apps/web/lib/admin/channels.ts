@@ -20,6 +20,26 @@ export type AdminChannelRow = ChannelRow & {
   participantDetails?: ChannelParticipantDetail[];
 };
 
+function toDisplayName(input: {
+  firstName?: string | null;
+  lastName?: string | null;
+  displayName?: string | null;
+}) {
+  const display = input.displayName?.trim() ?? '';
+  if (display) {
+    return display;
+  }
+  const first = input.firstName?.trim() ?? '';
+  const last = input.lastName?.trim() ?? '';
+  if (first && last) {
+    return `${first} ${last.charAt(0).toUpperCase()}.`;
+  }
+  if (first) {
+    return first;
+  }
+  return 'User';
+}
+
 export function filterDirectMessageChannels(rows: AdminChannelRow[]) {
   return rows.filter((row) => row.kind === 'dm' || row.kind === 'group_dm');
 }
@@ -65,7 +85,11 @@ export async function getAdminChannelRows(): Promise<AdminChannelRow[]> {
       .filter(Boolean)
       .map((profile) => ({
         id: profile!.ids.id,
-        displayName: profile!.profile.displayName,
+        displayName: toDisplayName({
+          firstName: profile!.profile.firstName,
+          lastName: profile!.profile.lastName,
+          displayName: profile!.profile.displayName,
+        }),
         kind: profile!.kind,
         avatarUrl: profile!.profile.avatar.url ?? null,
         themeKey: profile!.ui?.themeKey ?? null,

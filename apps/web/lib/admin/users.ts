@@ -32,14 +32,14 @@ function mapAccountToRow(account: AccountRow, profile?: ProfileRow | null): Admi
         ? 'invited'
         : 'active';
   const profileKind = profile?.kind ?? null;
+  const displayName = profile?.display_name?.trim() ?? '';
+  const first = profile?.first_name?.trim() ?? '';
+  const last = profile?.last_name?.trim() ?? '';
   const profileName =
-    profile?.display_name?.trim() ||
-    [profile?.first_name, profile?.last_name]
-      .map((part) => part?.trim())
-      .filter(Boolean)
-      .join(' ')
-      .trim() ||
-    null;
+    (displayName ||
+      (first && last
+      ? `${first} ${last.charAt(0).toUpperCase()}.`
+      : first || null));
   return {
     id: account.id,
     orgId: account.org_id,

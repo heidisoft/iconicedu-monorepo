@@ -7,6 +7,26 @@ import type { ProfileRow } from '@iconicedu/shared-types';
 
 import { resolveAvatarSource, resolveThemeKey } from '@iconicedu/web/lib/profile/derive';
 
+function formatDisplayName(input: {
+  firstName?: string | null;
+  lastName?: string | null;
+  displayName?: string | null;
+}): string {
+  const display = input.displayName?.trim() ?? '';
+  if (display) {
+    return display;
+  }
+  const first = input.firstName?.trim() ?? '';
+  const last = input.lastName?.trim() ?? '';
+  if (first && last) {
+    return `${first} ${last.charAt(0).toUpperCase()}.`;
+  }
+  if (first) {
+    return first;
+  }
+  return '';
+}
+
 export function mapBaseProfile(
   profileRow: ProfileRow,
   input: {
@@ -23,7 +43,11 @@ export function mapBaseProfile(
       accountId: profileRow.account_id,
     },
     profile: {
-      displayName: profileRow.display_name ?? '',
+      displayName: formatDisplayName({
+        firstName: profileRow.first_name,
+        lastName: profileRow.last_name,
+        displayName: profileRow.display_name,
+      }),
       email: input.accountEmail ?? null,
       firstName: profileRow.first_name,
       lastName: profileRow.last_name,

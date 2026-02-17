@@ -77,8 +77,7 @@ export default function EducatorAuthClient() {
         password: signupState.password,
         firstName: signupState.firstName,
         lastName: signupState.lastName,
-        displayName:
-          signupState.displayName || `${signupState.firstName} ${signupState.lastName}`,
+        displayName: signupState.displayName,
       });
       setSignupMessage('Educator account created. Please log in with the same email.');
       setSignupState({

@@ -17,6 +17,7 @@ import {
 } from '@iconicedu/ui-web/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@iconicedu/ui-web/ui/popover';
 import type { UserProfileVM } from '@iconicedu/shared-types';
+import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
 
 const ROLE_LABELS: Record<UserProfileVM['kind'], string> = {
   guardian: 'Parent',
@@ -81,13 +82,7 @@ function getInitials(name: string) {
 }
 
 function getDisplayName(user: UserProfileVM) {
-  const name = user.profile.displayName?.trim();
-  if (name) return name;
-  const fallback = [user.profile.firstName, user.profile.lastName]
-    .filter(Boolean)
-    .join(' ')
-    .trim();
-  return fallback || 'Unknown';
+  return getProfileDisplayName(user.profile, 'Unknown');
 }
 
 export function ParticipantSelector({

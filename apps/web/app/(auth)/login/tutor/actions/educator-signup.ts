@@ -13,6 +13,23 @@ type EducatorSignupInput = {
   displayName?: string;
 };
 
+export function resolveSignupDisplayName(input: {
+  displayName?: string;
+  firstName: string;
+  lastName: string;
+}): string {
+  const displayName = input.displayName?.trim() ?? '';
+  if (displayName) {
+    return displayName;
+  }
+  const firstName = input.firstName.trim();
+  const lastName = input.lastName.trim();
+  if (!lastName) {
+    return firstName;
+  }
+  return `${firstName} ${lastName.charAt(0).toUpperCase()}.`;
+}
+
 export async function educatorSignupAction(input: EducatorSignupInput) {
   const adminClient = getFamilyInviteAdminClient();
 
@@ -50,8 +67,7 @@ export async function educatorSignupAction(input: EducatorSignupInput) {
     org_id: ORG_ID,
     account_id: account.id,
     kind: 'educator',
-    display_name:
-      input.displayName?.trim() || `${input.firstName} ${input.lastName}`.trim(),
+    display_name: resolveSignupDisplayName(input),
     first_name: input.firstName,
     last_name: input.lastName,
     avatar_source: 'seed',

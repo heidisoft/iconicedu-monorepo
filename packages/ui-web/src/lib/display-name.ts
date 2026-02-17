@@ -5,6 +5,22 @@ export type ProfileNameInfo = {
 };
 
 const normalize = (value?: string | null) => value?.trim() ?? '';
+const firstChar = (value: string) => value.charAt(0).toUpperCase();
+
+function formatFirstAndLastInitial(firstName?: string | null, lastName?: string | null): string {
+  const first = normalize(firstName);
+  const last = normalize(lastName);
+  if (!first && !last) {
+    return '';
+  }
+  if (!first) {
+    return last;
+  }
+  if (!last) {
+    return first;
+  }
+  return `${first} ${firstChar(last)}.`;
+}
 
 export function getProfileDisplayName(info?: ProfileNameInfo | null, fallback = 'User'): string {
   if (!info) {
@@ -14,9 +30,9 @@ export function getProfileDisplayName(info?: ProfileNameInfo | null, fallback = 
   if (displayName) {
     return displayName;
   }
-  const parts = [normalize(info.firstName), normalize(info.lastName)].filter(Boolean);
-  if (parts.length) {
-    return parts.join(' ');
+  const fromNames = formatFirstAndLastInitial(info.firstName, info.lastName);
+  if (fromNames) {
+    return fromNames;
   }
   return fallback;
 }

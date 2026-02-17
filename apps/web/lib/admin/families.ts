@@ -53,12 +53,15 @@ function getProfileName(profile?: ProfileRow | null) {
   if (displayName) {
     return displayName;
   }
-  const fullName = [profile.first_name, profile.last_name]
-    .map((part) => part?.trim())
-    .filter(Boolean)
-    .join(' ')
-    .trim();
-  return fullName || null;
+  const first = profile.first_name?.trim() ?? '';
+  const last = profile.last_name?.trim() ?? '';
+  if (first && last) {
+    return `${first} ${last.charAt(0).toUpperCase()}.`;
+  }
+  if (first) {
+    return first;
+  }
+  return null;
 }
 
 function formatChildLabel(accountId: string, account?: AccountRow, profile?: ProfileRow | null) {
