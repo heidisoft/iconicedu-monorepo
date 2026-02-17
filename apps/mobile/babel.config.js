@@ -9,6 +9,8 @@ module.exports = function (api) {
         {
           alias: {
             '@iconicedu/ui-native': '../../packages/ui-native/src',
+            '@iconicedu/shared-types': '../../packages/shared-types/src',
+            '@/': './src/',
           },
         },
       ],

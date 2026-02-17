@@ -6,21 +6,21 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@iconicedu/web/*": ["../web/*"],
-      "@iconicedu/web": ["../web"],
-      "@iconicedu/api/*": ["../api/src/*"],
-      "@iconicedu/api": ["../api/src"],
+      "@/*": ["./src/*"],
       "@iconicedu/mobile/*": ["./*"],
       "@iconicedu/mobile": ["."],
-      "@iconicedu/ui-web/*": ["../../packages/ui-web/src/*"],
-      "@iconicedu/ui-web": ["../../packages/ui-web/src"],
       "@iconicedu/ui-native/*": ["../../packages/ui-native/src/*"],
+      "@iconicedu/ui-native": ["../../packages/ui-native/src"],
       "@iconicedu/shared-types/*": ["../../packages/shared-types/src/*"],
+      "@iconicedu/shared-types": ["../../packages/shared-types/src"],
       "@iconicedu/utils/*": ["../../packages/utils/src/*"]
     }
   },
-  "include": [
-    "app/**/*",
-    "src/**/*"
+  "include": ["app/**/*", "src/**/*", "*.ts", "*.tsx"],
+  "exclude": [
+    "node_modules",
+    "**/__tests__/**",
+    "**/*.test.ts",
+    "**/*.test.tsx"
   ]
 }

@@ -3,26 +3,23 @@
     "name": "IconicEdu Mobile",
     "slug": "iconicedu-mobile",
     "version": "0.1.0",
-    "sdkVersion": "52.0.0",
+    "sdkVersion": "54.0.0",
     "orientation": "portrait",
-    "platforms": [
-      "ios",
-      "android",
-      "web"
-    ],
+    "scheme": "iconicedu",
+    "platforms": ["ios", "android"],
     "updates": {
       "enabled": true
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.iconicedu.mobile"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png"
-      }
+      },
+      "package": "com.iconicedu.mobile"
     },
-    "web": {
-      "bundler": "metro"
-    }
+    "plugins": ["expo-router", "expo-secure-store"]
   }
 }

@@ -1,20 +1,25 @@
-import React from 'react';
-import { SafeAreaView, Text, View } from 'react-native';
-import { Button } from '@iconicedu/ui-native';
+import React, { useEffect } from 'react';
+import { ActivityIndicator } from 'react-native';
+import { useRouter } from 'expo-router';
+import { StyledView } from '@iconicedu/ui-native';
+import { useAuth } from '@/providers/auth-provider';
 
-export default function Home() {
+export default function Index() {
+  const { session, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (loading) return;
+    if (session) {
+      router.replace('/(app)/(tabs)');
+    } else {
+      router.replace('/(auth)/login');
+    }
+  }, [session, loading, router]);
+
   return (
-    <SafeAreaView className="flex-1 bg-slate-950">
-      <View className="flex-1 px-4 pt-10 gap-4">
-        <Text className="text-xl font-semibold text-white">ICONIC EDU</Text>
-        <Text className="text-sm text-slate-300">
-          Guardian and child companion app. Wire Supabase auth to enable sign-in.
-        </Text>
-        <View className="flex-row gap-3 mt-4">
-          <Button label="Sign in as Parent" />
-          <Button label="Student" variant="secondary" />
-        </View>
-      </View>
-    </SafeAreaView>
+    <StyledView className="flex-1 items-center justify-center bg-slate-950">
+      <ActivityIndicator size="large" color="#4a65e8" />
+    </StyledView>
   );
 }
