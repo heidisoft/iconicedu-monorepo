@@ -18,6 +18,7 @@ import {
 } from '@iconicedu/web/lib/profile/queries/profiles.query';
 import { getFamilyInviteAdminClient } from '@iconicedu/web/lib/family/queries/invite.query';
 import { pickRandomThemeKey } from '@iconicedu/web/lib/profile/constants/theme';
+import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
 
 const VALID_PROFILE_KINDS = new Set(['guardian', 'staff', 'educator', 'child']);
 
@@ -41,7 +42,7 @@ async function resolveBaseUrl() {
   if (forwardedHost) {
     return `${protocol}://${forwardedHost}`;
   }
-  return process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+  return resolveAppUrl();
 }
 
 export async function inviteAdminUserAction(

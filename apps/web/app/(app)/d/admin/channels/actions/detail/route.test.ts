@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { POST } from '@iconicedu/web/app/(app)/d/admin/channels/actions/detail/route';
+import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
 
 const getChannelDetail = vi.fn();
+const APP_URL = resolveAppUrl();
 
 vi.mock('@iconicedu/web/lib/admin/channel-detail', () => ({
   getChannelDetail: (id: string) => getChannelDetail(id),
@@ -11,7 +13,7 @@ vi.mock('@iconicedu/web/lib/admin/channel-detail', () => ({
 describe('POST /d/admin/channels/actions/detail', () => {
   it('returns 400 when channelId is missing', async () => {
     const response = await POST(
-      new Request('http://localhost', {
+      new Request(, {
         method: 'POST',
         body: JSON.stringify({}),
       }),
@@ -26,7 +28,7 @@ describe('POST /d/admin/channels/actions/detail', () => {
     getChannelDetail.mockResolvedValueOnce({ ids: { id: 'channel-1', orgId: 'org-1' } });
 
     const response = await POST(
-      new Request('http://localhost', {
+      new Request(, {
         method: 'POST',
         body: JSON.stringify({ channelId: 'channel-1' }),
       }),

@@ -12,7 +12,12 @@
       "Bash(xargs:*)",
       "Bash(pnpm build:*)",
       "Bash(npx tsc:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(pnpm build:packages:*)",
+      "Bash(pnpm install:*)",
+      "Bash(pnpm jest:*)",
+      "Bash(pnpm --filter @iconicedu/ui-native test:*)",
+      "Bash(node -e:*)"
     ]
   }
 }

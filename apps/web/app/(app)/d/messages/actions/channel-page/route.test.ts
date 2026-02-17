@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { GET } from '@iconicedu/web/app/(app)/d/messages/actions/channel-page/route';
+import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
 
 const buildMessagesPageByChannelId = vi.fn();
+const APP_URL = resolveAppUrl();
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(() => ({})),
@@ -24,7 +26,7 @@ vi.mock('@iconicedu/web/lib/messages/builders/message.builder', () => ({
 describe('GET /d/messages/actions/channel-page', () => {
   it('returns 400 when channelId is missing', async () => {
     const response = await GET(
-      new Request('http://localhost/d/messages/actions/channel-page'),
+      new Request(),
     );
     expect(response.status).toBe(400);
     const payload = await response.json();
@@ -40,7 +42,7 @@ describe('GET /d/messages/actions/channel-page', () => {
 
     const response = await GET(
       new Request(
-        'http://localhost/d/messages/actions/channel-page?channelId=channel-1&before=2026-02-15T11:00:00.000Z&limit=40',
+        ,
       ),
     );
 

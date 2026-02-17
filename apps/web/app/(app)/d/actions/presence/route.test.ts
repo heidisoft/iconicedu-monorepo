@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { POST } from '@iconicedu/web/app/(app)/d/actions/presence/route';
+import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
 
 const upsert = vi.fn();
 const getUser = vi.fn(async () => ({ data: { user: { id: 'auth-user' } } }));
+const APP_URL = resolveAppUrl();
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(() => ({
@@ -32,7 +34,7 @@ vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
 describe('POST /d/actions/presence', () => {
   it('returns 400 for invalid json body', async () => {
     const response = await POST(
-      new Request('http://localhost/d/actions/presence', {
+      new Request(, {
         method: 'POST',
         body: '{invalid',
       }),
@@ -49,7 +51,7 @@ describe('POST /d/actions/presence', () => {
     upsert.mockResolvedValueOnce({ error: null });
 
     const response = await POST(
-      new Request('http://localhost/d/actions/presence', {
+      new Request(, {
         method: 'POST',
         body: JSON.stringify({}),
       }),
@@ -73,7 +75,7 @@ describe('POST /d/actions/presence', () => {
     upsert.mockResolvedValueOnce({ error: null });
 
     await POST(
-      new Request('http://localhost/d/actions/presence', {
+      new Request(, {
         method: 'POST',
         body: JSON.stringify({ status: 'away' }),
       }),
@@ -92,7 +94,7 @@ describe('POST /d/actions/presence', () => {
     upsert.mockResolvedValueOnce({ error: null });
 
     await POST(
-      new Request('http://localhost/d/actions/presence', {
+      new Request(, {
         method: 'POST',
         body: JSON.stringify({ status: 'online' }),
       }),
@@ -111,7 +113,7 @@ describe('POST /d/actions/presence', () => {
     upsert.mockResolvedValueOnce({ error: null });
 
     await POST(
-      new Request('http://localhost/d/actions/presence', {
+      new Request(, {
         method: 'POST',
         body: JSON.stringify({
           stateText: 'In a meeting',
@@ -135,7 +137,7 @@ describe('POST /d/actions/presence', () => {
     upsert.mockResolvedValueOnce({ error: null });
 
     await POST(
-      new Request('http://localhost/d/actions/presence', {
+      new Request(, {
         method: 'POST',
         body: JSON.stringify({ clearState: true }),
       }),
@@ -155,7 +157,7 @@ describe('POST /d/actions/presence', () => {
     getUser.mockResolvedValueOnce({ data: { user: null } } as any);
 
     const response = await POST(
-      new Request('http://localhost/d/actions/presence', {
+      new Request(, {
         method: 'POST',
         body: JSON.stringify({ status: 'online' }),
       }),

@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { GET } from '@iconicedu/web/app/(app)/d/messages/actions/detail/route';
+import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
 
 const buildMessageById = vi.fn();
+const APP_URL = resolveAppUrl();
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(() => ({})),
@@ -22,7 +24,7 @@ vi.mock('@iconicedu/web/lib/messages/builders/message.builder', () => ({
 
 describe('GET /d/messages/actions/detail', () => {
   it('returns 400 when messageId is missing', async () => {
-    const response = await GET(new Request('http://localhost/d/messages/actions/detail'));
+    const response = await GET(new Request());
 
     expect(response.status).toBe(400);
     const payload = await response.json();
@@ -33,7 +35,7 @@ describe('GET /d/messages/actions/detail', () => {
     buildMessageById.mockResolvedValueOnce({ ids: { id: 'message-1', orgId: 'org-1' } });
 
     const response = await GET(
-      new Request('http://localhost/d/messages/actions/detail?messageId=message-1'),
+      new Request(),
     );
 
     expect(buildMessageById).toHaveBeenCalledWith({}, 'org-1', 'message-1', {

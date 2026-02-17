@@ -3,9 +3,23 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "start": "nest start",
+    "build": "prisma generate && nest build",
+    "dev": "nest start --watch",
+    "start": "node dist/main",
     "start:dev": "nest start --watch",
-    "build": "prisma generate && nest build"
+    "start:debug": "nest start --debug --watch",
+    "start:prod": "node dist/main",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "test": "jest --passWithNoTests",
+    "test:watch": "jest --watch",
+    "test:e2e": "jest --config ./test/jest-e2e.json --passWithNoTests",
+    "clean": "rm -rf dist",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio"
   },
   "dependencies": {
     "@iconicedu/shared-types": "workspace:*",

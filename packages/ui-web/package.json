@@ -12,17 +12,19 @@
   },
   "private": true,
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json --noEmit",
     "build": "tsc -p tsconfig.json && pnpm exec tailwindcss -c tailwind.config.ts -i ./src/styles/global.css -o ./dist/ui-web.css --minify",
-    "build:ci": "pnpm run typecheck && pnpm run build",
-    "lint": "eslint src --ext .ts,.tsx",
-    "tailwind:build": "pnpm exec tailwindcss -c tailwind.config.ts -i ./src/styles/global.css -o ./dist/ui-web.css",
-    "tailwind:watch": "node ./scripts/watch-tailwind.js",
     "dev": "tsc -p tsconfig.json --watch & pnpm run tailwind:watch",
+    "start": "pnpm run dev",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src --ext .ts,.tsx",
+    "lint:fix": "eslint src --ext .ts,.tsx --fix",
     "test": "vitest run",
     "test:watch": "vitest",
-    "shadcn:add": "pnpm dlx shadcn@latest add",
-    "shadcn:mcp": "pnpm dlx shadcn@latest mcp"
+    "test:coverage": "vitest run --coverage",
+    "tailwind:build": "pnpm exec tailwindcss -c tailwind.config.ts -i ./src/styles/global.css -o ./dist/ui-web.css",
+    "tailwind:watch": "node ./scripts/watch-tailwind.js",
+    "clean": "rm -rf dist",
+    "shadcn:add": "pnpm dlx shadcn@latest add"
   },
   "peerDependencies": {
     "react": "^19.1.1",

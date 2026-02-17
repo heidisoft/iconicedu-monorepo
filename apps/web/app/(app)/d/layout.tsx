@@ -10,6 +10,7 @@ import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
 import { getOrCreateAccount } from '@iconicedu/web/lib/accounts/getOrCreateAccount';
 import { loadSidebarContext } from '@iconicedu/web/lib/sidebar/loadSidebarContext';
 import { buildSidebarBaseData } from '@iconicedu/web/lib/sidebar/buildSidebarBaseData';
+import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
 
 export default async function Layout({ children }: { children: ReactNode }) {
   const supabase = await createSupabaseServerClient();
@@ -29,7 +30,7 @@ export default async function Layout({ children }: { children: ReactNode }) {
     overrideCookie?.value === 'educator' ? 'educator' : undefined;
   const profileKindOverrideFromReferer =
     referer?.includes('/login/tutor') &&
-    new URL(referer, 'http://localhost').searchParams.get('educator') === '1'
+    new URL(referer, resolveAppUrl()).searchParams.get('educator') === '1'
       ? 'educator'
       : undefined;
   const profileKindOverride = profileKindOverrideFromCookie ?? profileKindOverrideFromReferer;

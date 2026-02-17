@@ -1,9 +1,11 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import { POST } from '@iconicedu/web/app/(app)/d/admin/users/actions/update-user/route';
+import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
 
 const updateUserById = vi.fn();
 const getFamilyInviteAdminClient = vi.fn();
+const APP_URL = resolveAppUrl();
 
 vi.mock('@iconicedu/web/lib/family/queries/invite.query', () => ({
   getFamilyInviteAdminClient: () => getFamilyInviteAdminClient(),
@@ -16,7 +18,7 @@ describe('POST /d/admin/users/actions/update-user', () => {
 
   it('returns 400 when accountId is missing', async () => {
     const response = await POST(
-      new Request('http://localhost', {
+      new Request(, {
         method: 'POST',
         body: JSON.stringify({ email: 'user@example.com' }),
       }),
@@ -31,7 +33,7 @@ describe('POST /d/admin/users/actions/update-user', () => {
 
   it('returns 400 when email is invalid', async () => {
     const response = await POST(
-      new Request('http://localhost', {
+      new Request(, {
         method: 'POST',
         body: JSON.stringify({ accountId: 'account-1', email: 'bad-email' }),
       }),
@@ -99,7 +101,7 @@ describe('POST /d/admin/users/actions/update-user', () => {
     updateUserById.mockResolvedValue({ error: null });
 
     const response = await POST(
-      new Request('http://localhost', {
+      new Request(, {
         method: 'POST',
         body: JSON.stringify({
           accountId: 'account-1',
@@ -172,7 +174,7 @@ describe('POST /d/admin/users/actions/update-user', () => {
     });
 
     const response = await POST(
-      new Request('http://localhost', {
+      new Request(, {
         method: 'POST',
         body: JSON.stringify({
           accountId: 'account-1',

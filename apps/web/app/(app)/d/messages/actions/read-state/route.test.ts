@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { POST } from '@iconicedu/web/app/(app)/d/messages/actions/read-state/route';
+import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
 
 const upsert = vi.fn();
 const channelMaybeSingle = vi.fn();
 const messageMaybeSingle = vi.fn();
+const APP_URL = resolveAppUrl();
 
 const buildSelectChain = (maybeSingleMock: ReturnType<typeof vi.fn>) => ({
   eq: vi.fn(() => buildSelectChain(maybeSingleMock)),
@@ -47,7 +49,7 @@ vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
 describe('POST /d/messages/actions/read-state', () => {
   it('returns 400 when channelId is missing', async () => {
     const response = await POST(
-      new Request('http://localhost/d/messages/actions/read-state', {
+      new Request(, {
         method: 'POST',
         body: JSON.stringify({}),
       }),
@@ -66,7 +68,7 @@ describe('POST /d/messages/actions/read-state', () => {
     upsert.mockResolvedValueOnce({ error: null });
 
     const response = await POST(
-      new Request('http://localhost/d/messages/actions/read-state', {
+      new Request(, {
         method: 'POST',
         body: JSON.stringify({
           channelId: 'channel-1',
@@ -93,7 +95,7 @@ describe('POST /d/messages/actions/read-state', () => {
     channelMaybeSingle.mockResolvedValueOnce({ data: null, error: null });
 
     const response = await POST(
-      new Request('http://localhost/d/messages/actions/read-state', {
+      new Request(, {
         method: 'POST',
         body: JSON.stringify({
           channelId: 'channel-1',
@@ -113,7 +115,7 @@ describe('POST /d/messages/actions/read-state', () => {
     messageMaybeSingle.mockResolvedValueOnce({ data: null, error: null });
 
     const response = await POST(
-      new Request('http://localhost/d/messages/actions/read-state', {
+      new Request(, {
         method: 'POST',
         body: JSON.stringify({
           channelId: 'channel-1',

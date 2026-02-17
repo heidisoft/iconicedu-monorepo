@@ -2,8 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { ChannelCreatePayload } from '@iconicedu/shared-types';
 import { POST } from '@iconicedu/web/app/(app)/d/admin/channels/actions/create/route';
+import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
 
 const createAdminChannel = vi.fn();
+const APP_URL = resolveAppUrl();
 
 vi.mock('@iconicedu/web/lib/admin/channel-create', () => ({
   createAdminChannel: (input: unknown) => createAdminChannel(input),
@@ -12,7 +14,7 @@ vi.mock('@iconicedu/web/lib/admin/channel-create', () => ({
 describe('POST /d/admin/channels/actions/create', () => {
   it('returns 400 when topic is missing', async () => {
     const response = await POST(
-      new Request('http://localhost', {
+      new Request(, {
         method: 'POST',
         body: JSON.stringify({}),
       }),
@@ -46,7 +48,7 @@ describe('POST /d/admin/channels/actions/create', () => {
     };
 
     const response = await POST(
-      new Request('http://localhost', {
+      new Request(, {
         method: 'POST',
         body: JSON.stringify(payload),
       }),
