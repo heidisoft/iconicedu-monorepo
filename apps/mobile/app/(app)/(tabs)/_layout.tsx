@@ -1,6 +1,7 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Text } from 'react-native';
+import { NAV_THEME } from '@iconicedu/ui-native';
 
 function TabIcon({ label, focused }: { label: string; focused: boolean }) {
   const icons: Record<string, string> = {
@@ -23,15 +24,15 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: '#0f172a',
-          borderTopColor: '#1e293b',
+          backgroundColor: NAV_THEME.dark.background,
+          borderTopColor: NAV_THEME.dark.border,
           borderTopWidth: 1,
           height: 85,
           paddingBottom: 30,
           paddingTop: 8,
         },
-        tabBarActiveTintColor: '#4a65e8',
-        tabBarInactiveTintColor: '#64748b',
+        tabBarActiveTintColor: NAV_THEME.dark.primary,
+        tabBarInactiveTintColor: NAV_THEME.dark.mutedForeground,
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: '600',

@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { Avatar, StyledView, StyledText } from '@iconicedu/ui-native';
+import { View, Text } from 'react-native';
+import { Avatar } from '@iconicedu/ui-native';
 
 type MessageSender = {
   id: string;
@@ -50,7 +51,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   const text = message.content?.text ?? '';
 
   return (
-    <StyledView
+    <View
       className={`flex-row gap-2 px-4 py-1 ${isOwn ? 'justify-end' : 'justify-start'}`}
     >
       {!isOwn && showSender && (
@@ -60,41 +61,41 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           size="sm"
         />
       )}
-      {!isOwn && !showSender && <StyledView className="w-8" />}
+      {!isOwn && !showSender && <View className="w-8" />}
 
-      <StyledView
+      <View
         className={`max-w-[75%] rounded-2xl px-3 py-2 ${
-          isOwn ? 'rounded-br-sm bg-brand-600' : 'rounded-bl-sm bg-slate-800'
+          isOwn ? 'rounded-br-sm bg-primary' : 'rounded-bl-sm bg-secondary'
         }`}
       >
         {!isOwn && showSender && (
-          <StyledText className="mb-0.5 text-xs font-semibold text-brand-400">
+          <Text className="mb-0.5 text-xs font-semibold text-primary">
             {senderName}
-          </StyledText>
+          </Text>
         )}
 
         {message.type === 'text' && text ? (
-          <StyledText className="text-sm text-white">{text}</StyledText>
+          <Text className={`text-sm ${isOwn ? 'text-primary-foreground' : 'text-foreground'}`}>{text}</Text>
         ) : message.type === 'image' ? (
-          <StyledText className="text-sm italic text-slate-300">
+          <Text className="text-sm italic text-muted-foreground">
             [Image]
-          </StyledText>
+          </Text>
         ) : message.type === 'file' ? (
-          <StyledText className="text-sm italic text-slate-300">
+          <Text className="text-sm italic text-muted-foreground">
             [File]
-          </StyledText>
+          </Text>
         ) : (
-          <StyledText className="text-sm italic text-slate-400">
+          <Text className="text-sm italic text-muted-foreground">
             [{message.type}]
-          </StyledText>
+          </Text>
         )}
 
-        <StyledText
-          className={`mt-0.5 text-[10px] ${isOwn ? 'text-brand-200' : 'text-slate-500'}`}
+        <Text
+          className={`mt-0.5 text-[10px] ${isOwn ? 'text-primary-foreground/60' : 'text-muted-foreground'}`}
         >
           {time}
-        </StyledText>
-      </StyledView>
-    </StyledView>
+        </Text>
+      </View>
+    </View>
   );
 };

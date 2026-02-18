@@ -1,10 +1,6 @@
 import React from 'react';
-import {
-  StyledView,
-  StyledText,
-  StyledPressable,
-} from '@iconicedu/ui-native/utils/styled';
-import { cn } from '@iconicedu/ui-native/utils/cn';
+import { View, Text, Pressable } from 'react-native';
+import { cn } from '@iconicedu/ui-native/lib/utils';
 
 export type ScreenHeaderProps = {
   title: string;
@@ -23,36 +19,36 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
   onBack,
   className,
 }) => (
-  <StyledView
+  <View
     className={cn(
-      'flex-row items-center gap-3 border-b border-slate-800 bg-slate-950 px-4 pb-3 pt-2',
+      'flex-row items-center gap-3 border-b border-border bg-background px-4 pb-3 pt-2',
       className,
     )}
   >
     {onBack && (
-      <StyledPressable
+      <Pressable
         onPress={onBack}
         className="active:opacity-70"
         accessibilityRole="button"
         accessibilityLabel="Go back"
       >
-        <StyledText className="text-2xl text-brand-500">{'‹'}</StyledText>
-      </StyledPressable>
+        <Text className="text-2xl text-primary">{'‹'}</Text>
+      </Pressable>
     )}
     {leading}
-    <StyledView className="min-w-0 flex-1">
-      <StyledText
-        className="text-base font-semibold text-white"
+    <View className="min-w-0 flex-1">
+      <Text
+        className="text-base font-semibold text-foreground"
         numberOfLines={1}
       >
         {title}
-      </StyledText>
+      </Text>
       {subtitle && (
-        <StyledText className="text-xs text-slate-400" numberOfLines={1}>
+        <Text className="text-xs text-muted-foreground" numberOfLines={1}>
           {subtitle}
-        </StyledText>
+        </Text>
       )}
-    </StyledView>
-    {trailing && <StyledView className="shrink-0">{trailing}</StyledView>}
-  </StyledView>
+    </View>
+    {trailing && <View className="shrink-0">{trailing}</View>}
+  </View>
 );

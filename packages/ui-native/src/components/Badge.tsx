@@ -1,24 +1,44 @@
 import React from 'react';
-import { StyledView, StyledText } from '@iconicedu/ui-native/utils/styled';
-import { cn } from '@iconicedu/ui-native/utils/cn';
+import { View, Text } from 'react-native';
+import { cva, type VariantProps } from 'class-variance-authority';
+import { cn } from '@iconicedu/ui-native/lib/utils';
 
-type BadgeVariant = 'default' | 'success' | 'warning' | 'error' | 'info';
+const badgeVariants = cva('items-center justify-center rounded-full', {
+  variants: {
+    variant: {
+      default: 'bg-secondary',
+      success: 'bg-success',
+      warning: 'bg-warning',
+      destructive: 'bg-destructive',
+      info: 'bg-info',
+    },
+  },
+  defaultVariants: {
+    variant: 'default',
+  },
+});
 
-export type BadgeProps = {
+const badgeTextVariants = cva('text-[10px] font-bold', {
+  variants: {
+    variant: {
+      default: 'text-secondary-foreground',
+      success: 'text-success-foreground',
+      warning: 'text-warning-foreground',
+      destructive: 'text-destructive-foreground',
+      info: 'text-info-foreground',
+    },
+  },
+  defaultVariants: {
+    variant: 'default',
+  },
+});
+
+export type BadgeProps = VariantProps<typeof badgeVariants> & {
   count?: number;
   label?: string;
-  variant?: BadgeVariant;
   maxCount?: number;
   dot?: boolean;
   className?: string;
-};
-
-const variantStyles: Record<BadgeVariant, string> = {
-  default: 'bg-slate-600',
-  success: 'bg-green-600',
-  warning: 'bg-yellow-600',
-  error: 'bg-red-600',
-  info: 'bg-blue-600',
 };
 
 export const Badge: React.FC<BadgeProps> = ({
@@ -31,10 +51,10 @@ export const Badge: React.FC<BadgeProps> = ({
 }) => {
   if (dot) {
     return (
-      <StyledView
+      <View
         className={cn(
           'h-2 w-2 rounded-full',
-          variantStyles[variant],
+          badgeVariants({ variant }),
           className,
         )}
         accessibilityLabel="New notification"
@@ -53,17 +73,19 @@ export const Badge: React.FC<BadgeProps> = ({
   if (displayText === undefined) return null;
 
   return (
-    <StyledView
+    <View
       className={cn(
-        'items-center justify-center rounded-full px-2 py-0.5',
-        variantStyles[variant],
+        badgeVariants({ variant }),
+        'px-2 py-0.5',
         className,
       )}
       accessibilityLabel={`${displayText} notifications`}
     >
-      <StyledText className="text-[10px] font-bold text-white">
+      <Text className={cn(badgeTextVariants({ variant }))}>
         {displayText}
-      </StyledText>
-    </StyledView>
+      </Text>
+    </View>
   );
 };
+
+export { badgeVariants, badgeTextVariants };

@@ -1,7 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { type TextInputProps } from 'react-native';
-import { StyledView, StyledText, StyledTextInput } from '@iconicedu/ui-native/utils/styled';
-import { cn } from '@iconicedu/ui-native/utils/cn';
+import { View, Text, TextInput, type TextInputProps } from 'react-native';
+import { cn } from '@iconicedu/ui-native/lib/utils';
 
 export type InputProps = TextInputProps & {
   label?: string;
@@ -40,21 +39,20 @@ export const Input: React.FC<InputProps> = ({
   );
 
   return (
-    <StyledView className={cn('gap-1.5', containerClassName)}>
+    <View className={cn('gap-1.5', containerClassName)}>
       {label && (
-        <StyledText className="text-sm font-medium text-slate-300">
+        <Text className="text-sm font-medium text-muted-foreground">
           {label}
-        </StyledText>
+        </Text>
       )}
-      <StyledTextInput
+      <TextInput
         className={cn(
-          'rounded-xl border px-4 py-3 text-base text-white',
-          focused ? 'border-brand-500' : 'border-slate-700',
-          error ? 'border-red-500' : undefined,
-          'bg-slate-900',
+          'rounded-xl border px-4 py-3 text-base text-foreground bg-card',
+          focused ? 'border-ring' : 'border-input',
+          error && 'border-destructive',
           className,
         )}
-        placeholderTextColor="#64748b"
+        placeholderTextColor="#a1a1aa"
         onFocus={handleFocus}
         onBlur={handleBlur}
         accessibilityLabel={label}
@@ -62,11 +60,11 @@ export const Input: React.FC<InputProps> = ({
         {...rest}
       />
       {error && (
-        <StyledText className="text-xs text-red-400">{error}</StyledText>
+        <Text className="text-xs text-destructive">{error}</Text>
       )}
       {helperText && !error && (
-        <StyledText className="text-xs text-slate-500">{helperText}</StyledText>
+        <Text className="text-xs text-muted-foreground">{helperText}</Text>
       )}
-    </StyledView>
+    </View>
   );
 };

@@ -1,16 +1,15 @@
 import React, { useMemo, useState } from 'react';
-import { FlatList, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   Typography,
   SearchBar,
-  StyledView,
-  StyledText,
   Avatar,
   ListItem,
   EmptyState,
   Separator,
   Chip,
+  NAV_THEME,
 } from '@iconicedu/ui-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAccount } from '@/hooks/use-account';
@@ -38,16 +37,16 @@ export default function SpacesListScreen() {
   }, [spaces, search]);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#020617' }}>
-      <StyledView className="gap-3 px-4 pb-2 pt-2">
+    <SafeAreaView style={{ flex: 1, backgroundColor: NAV_THEME.dark.background }}>
+      <View className="gap-3 px-4 pb-2 pt-2">
         <Typography variant="h3">Learning Spaces</Typography>
         <SearchBar value={search} onChangeText={setSearch} />
-      </StyledView>
+      </View>
 
       {isLoading ? (
-        <StyledView className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="#4a65e8" />
-        </StyledView>
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="large" color={NAV_THEME.dark.primary} />
+        </View>
       ) : (
         <FlatList
           data={filteredSpaces}
@@ -58,7 +57,7 @@ export default function SpacesListScreen() {
           ItemSeparatorComponent={() => <Separator className="ml-14" />}
           ListEmptyComponent={
             <EmptyState
-              icon={<StyledText className="text-4xl">📚</StyledText>}
+              icon={<Text className="text-4xl">📚</Text>}
               title="No learning spaces"
               description="Your learning spaces will appear here"
             />

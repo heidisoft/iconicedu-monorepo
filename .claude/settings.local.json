@@ -22,7 +22,10 @@
       "Bash(pnpm --filter mobile add:*)",
       "Bash(pnpm typecheck:*)",
       "Bash(pnpm --filter web test)",
-      "Bash(pnpm lint:*)"
+      "Bash(pnpm lint:*)",
+      "WebFetch(domain:reactnativereusables.com)",
+      "Bash(npm view:*)",
+      "Bash(pnpm --filter @iconicedu/ui-native build:*)"
     ]
   }
 }

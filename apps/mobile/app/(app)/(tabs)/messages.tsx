@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { FlatList, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   Typography,
@@ -8,10 +8,9 @@ import {
   Avatar,
   Badge,
   Tabs as TabBar,
-  StyledView,
-  StyledText,
   EmptyState,
   Separator,
+  NAV_THEME,
 } from '@iconicedu/ui-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAccount } from '@/hooks/use-account';
@@ -60,17 +59,17 @@ export default function MessagesScreen() {
   const isLoading = activeTab === 'dms' ? dmsLoading : channelsLoading;
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#020617' }}>
-      <StyledView className="gap-3 px-4 pb-2 pt-2">
+    <SafeAreaView style={{ flex: 1, backgroundColor: NAV_THEME.dark.background }}>
+      <View className="gap-3 px-4 pb-2 pt-2">
         <Typography variant="h3">Messages</Typography>
         <SearchBar value={search} onChangeText={setSearch} />
         <TabBar items={tabs} activeKey={activeTab} onTabPress={setActiveTab} />
-      </StyledView>
+      </View>
 
       {isLoading ? (
-        <StyledView className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="#4a65e8" />
-        </StyledView>
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="large" color={NAV_THEME.dark.primary} />
+        </View>
       ) : activeTab === 'dms' ? (
         <FlatList
           data={filteredDms}
@@ -81,7 +80,7 @@ export default function MessagesScreen() {
           ItemSeparatorComponent={() => <Separator className="ml-14" />}
           ListEmptyComponent={
             <EmptyState
-              icon={<StyledText className="text-4xl">💬</StyledText>}
+              icon={<Text className="text-4xl">💬</Text>}
               title="No direct messages"
               description="Start a conversation with someone"
             />
@@ -116,7 +115,7 @@ export default function MessagesScreen() {
           ItemSeparatorComponent={() => <Separator className="ml-14" />}
           ListEmptyComponent={
             <EmptyState
-              icon={<StyledText className="text-4xl">📢</StyledText>}
+              icon={<Text className="text-4xl">📢</Text>}
               title="No channels"
               description="Channels you join will appear here"
             />

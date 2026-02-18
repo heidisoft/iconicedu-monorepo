@@ -1,11 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { KeyboardAvoidingView, Platform } from 'react-native';
-import {
-  StyledView,
-  StyledTextInput,
-  IconButton,
-  StyledText,
-} from '@iconicedu/ui-native';
+import { View, Text, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { IconButton } from '@iconicedu/ui-native';
 
 type MessageInputProps = {
   onSend: (text: string) => void;
@@ -32,27 +27,27 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={90}
     >
-      <StyledView className="flex-row items-end gap-2 border-t border-slate-800 bg-slate-950 px-4 pb-8 pt-3">
-        <StyledTextInput
-          className="max-h-24 min-h-[40px] flex-1 rounded-2xl bg-slate-800 px-4 py-2.5 text-sm text-white"
+      <View className="flex-row items-end gap-2 border-t border-border bg-background px-4 pb-8 pt-3">
+        <TextInput
+          className="max-h-24 min-h-[40px] flex-1 rounded-2xl bg-secondary px-4 py-2.5 text-sm text-foreground"
           value={text}
           onChangeText={setText}
           placeholder={placeholder}
-          placeholderTextColor="#64748b"
+          placeholderTextColor="#a1a1aa"
           multiline
           editable={!disabled}
           accessibilityLabel="Message input"
         />
         <IconButton
-          icon={<StyledText className="text-lg text-white">{'➤'}</StyledText>}
+          icon={<Text className="text-lg text-primary-foreground">{'➤'}</Text>}
           label="Send message"
           variant="default"
-          size="md"
+          size="default"
           onPress={handleSend}
           disabled={!text.trim() || disabled}
-          className="bg-brand-600"
+          className="bg-primary"
         />
-      </StyledView>
+      </View>
     </KeyboardAvoidingView>
   );
 };

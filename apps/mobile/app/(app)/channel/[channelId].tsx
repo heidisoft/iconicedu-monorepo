@@ -1,7 +1,7 @@
 import React, { useCallback } from 'react';
-import { ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ScreenHeader, StyledView, Avatar } from '@iconicedu/ui-native';
+import { ScreenHeader, Avatar, NAV_THEME } from '@iconicedu/ui-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAccount } from '@/hooks/use-account';
 import { useMessages } from '@/hooks/use-messages';
@@ -30,7 +30,7 @@ export default function ChannelConversationScreen() {
   if (!channelId) return null;
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#020617' }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: NAV_THEME.dark.background }} edges={['top']}>
       <ScreenHeader
         title="Channel"
         leading={<Avatar name="#" size="sm" />}
@@ -38,11 +38,11 @@ export default function ChannelConversationScreen() {
       />
 
       {isLoading ? (
-        <StyledView className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="#4a65e8" />
-        </StyledView>
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="large" color={NAV_THEME.dark.primary} />
+        </View>
       ) : (
-        <StyledView className="flex-1">
+        <View className="flex-1">
           <MessageList
             messages={messages ?? []}
             currentProfileId={profileId}
@@ -50,7 +50,7 @@ export default function ChannelConversationScreen() {
           />
           <TypingIndicator typingUsers={[]} />
           <MessageInput onSend={handleSend} />
-        </StyledView>
+        </View>
       )}
     </SafeAreaView>
   );

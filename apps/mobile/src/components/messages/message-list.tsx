@@ -1,6 +1,6 @@
 import React, { useCallback, useRef } from 'react';
-import { FlatList, ActivityIndicator } from 'react-native';
-import { StyledView } from '@iconicedu/ui-native';
+import { View, FlatList, ActivityIndicator } from 'react-native';
+import { NAV_THEME } from '@iconicedu/ui-native';
 import { MessageItem, type MessageItemData } from './message-item';
 
 type MessageListProps = {
@@ -51,9 +51,9 @@ export const MessageList: React.FC<MessageListProps> = ({
       onEndReachedThreshold={0.3}
       ListFooterComponent={
         loading ? (
-          <StyledView className="items-center py-4">
-            <ActivityIndicator size="small" color="#4a65e8" />
-          </StyledView>
+          <View className="items-center py-4">
+            <ActivityIndicator size="small" color={NAV_THEME.dark.primary} />
+          </View>
         ) : null
       }
       maintainVisibleContentPosition={{

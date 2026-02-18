@@ -1,36 +1,40 @@
 import React, { useMemo } from 'react';
-import { type ImageSourcePropType } from 'react-native';
-import { StyledView, StyledText, StyledImage } from '@iconicedu/ui-native/utils/styled';
-import { cn } from '@iconicedu/ui-native/utils/cn';
+import { View, Text, Image, type ImageSourcePropType } from 'react-native';
+import { cva, type VariantProps } from 'class-variance-authority';
+import { cn } from '@iconicedu/ui-native/lib/utils';
 import type { PresenceDisplayStatusVM } from '@iconicedu/shared-types';
 
-type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+const avatarVariants = cva('relative rounded-full bg-muted items-center justify-center', {
+  variants: {
+    size: {
+      xs: 'h-6 w-6',
+      sm: 'h-8 w-8',
+      md: 'h-10 w-10',
+      lg: 'h-12 w-12',
+      xl: 'h-16 w-16',
+    },
+  },
+  defaultVariants: {
+    size: 'md',
+  },
+});
 
-export type AvatarProps = {
-  src?: string | null;
-  name?: string;
-  size?: AvatarSize;
-  status?: PresenceDisplayStatusVM;
-  className?: string;
-};
+const avatarTextVariants = cva('font-semibold text-muted-foreground', {
+  variants: {
+    size: {
+      xs: 'text-[10px]',
+      sm: 'text-xs',
+      md: 'text-sm',
+      lg: 'text-base',
+      xl: 'text-xl',
+    },
+  },
+  defaultVariants: {
+    size: 'md',
+  },
+});
 
-const sizeStyles: Record<AvatarSize, string> = {
-  xs: 'h-6 w-6',
-  sm: 'h-8 w-8',
-  md: 'h-10 w-10',
-  lg: 'h-12 w-12',
-  xl: 'h-16 w-16',
-};
-
-const textSizeStyles: Record<AvatarSize, string> = {
-  xs: 'text-[10px]',
-  sm: 'text-xs',
-  md: 'text-sm',
-  lg: 'text-base',
-  xl: 'text-xl',
-};
-
-const statusDotSize: Record<AvatarSize, string> = {
+const statusDotSize: Record<string, string> = {
   xs: 'h-1.5 w-1.5',
   sm: 'h-2 w-2',
   md: 'h-2.5 w-2.5',
@@ -39,11 +43,11 @@ const statusDotSize: Record<AvatarSize, string> = {
 };
 
 const statusColors: Record<PresenceDisplayStatusVM, string> = {
-  online: 'bg-green-500',
-  idle: 'bg-yellow-500',
-  busy: 'bg-red-500',
-  away: 'bg-gray-400',
-  offline: 'bg-gray-600',
+  online: 'bg-success',
+  idle: 'bg-warning',
+  busy: 'bg-destructive',
+  away: 'bg-muted-foreground',
+  offline: 'bg-muted',
 };
 
 function getInitials(name?: string): string {
@@ -52,6 +56,16 @@ function getInitials(name?: string): string {
   if (parts.length === 1) return parts[0]![0]!.toUpperCase();
   return (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase();
 }
+
+type AvatarSize = NonNullable<VariantProps<typeof avatarVariants>['size']>;
+
+export type AvatarProps = {
+  src?: string | null;
+  name?: string;
+  size?: AvatarSize;
+  status?: PresenceDisplayStatusVM;
+  className?: string;
+};
 
 export const Avatar: React.FC<AvatarProps> = ({
   src,
@@ -63,37 +77,32 @@ export const Avatar: React.FC<AvatarProps> = ({
   const initials = useMemo(() => getInitials(name), [name]);
 
   return (
-    <StyledView className={cn('relative', className)}>
+    <View className={cn('relative', className)}>
       {src ? (
-        <StyledImage
+        <Image
           source={{ uri: src } as ImageSourcePropType}
-          className={cn(sizeStyles[size], 'rounded-full bg-slate-700')}
+          className={cn(avatarVariants({ size }))}
           accessibilityLabel={name ?? 'Avatar'}
         />
       ) : (
-        <StyledView
-          className={cn(
-            sizeStyles[size],
-            'items-center justify-center rounded-full bg-slate-700',
-          )}
+        <View
+          className={cn(avatarVariants({ size }))}
           accessibilityLabel={name ?? 'Avatar'}
         >
-          <StyledText
-            className={cn('font-semibold text-slate-300', textSizeStyles[size])}
-          >
+          <Text className={cn(avatarTextVariants({ size }))}>
             {initials}
-          </StyledText>
-        </StyledView>
+          </Text>
+        </View>
       )}
       {status && status !== 'offline' && (
-        <StyledView
+        <View
           className={cn(
-            'absolute bottom-0 right-0 rounded-full border-2 border-slate-950',
+            'absolute bottom-0 right-0 rounded-full border-2 border-background',
             statusDotSize[size],
             statusColors[status],
           )}
         />
       )}
-    </StyledView>
+    </View>
   );
 };

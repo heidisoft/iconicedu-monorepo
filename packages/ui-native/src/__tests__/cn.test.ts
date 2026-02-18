@@ -1,4 +1,4 @@
-import { cn } from '../utils/cn';
+import { cn } from '../lib/utils';
 
 describe('cn', () => {
   it('merges class strings', () => {

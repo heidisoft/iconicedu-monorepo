@@ -1,48 +1,54 @@
-import React from 'react';
-import { type TextProps } from 'react-native';
-import { StyledText } from '@iconicedu/ui-native/utils/styled';
-import { cn } from '@iconicedu/ui-native/utils/cn';
+import React, { useContext } from 'react';
+import { Text, type TextProps } from 'react-native';
+import { cva, type VariantProps } from 'class-variance-authority';
+import { cn, TextClassContext } from '@iconicedu/ui-native/lib/utils';
 
-type TextVariant =
-  | 'h1'
-  | 'h2'
-  | 'h3'
-  | 'h4'
-  | 'body'
-  | 'body-sm'
-  | 'caption'
-  | 'label'
-  | 'muted';
+const typographyVariants = cva('', {
+  variants: {
+    variant: {
+      h1: 'text-3xl font-bold text-foreground',
+      h2: 'text-2xl font-semibold text-foreground',
+      h3: 'text-xl font-semibold text-foreground',
+      h4: 'text-lg font-medium text-foreground',
+      body: 'text-base text-foreground',
+      'body-sm': 'text-sm text-foreground',
+      caption: 'text-xs text-muted-foreground',
+      label: 'text-sm font-medium text-muted-foreground',
+      muted: 'text-sm text-muted-foreground',
+    },
+  },
+  defaultVariants: {
+    variant: 'body',
+  },
+});
 
-export type TypographyProps = TextProps & {
-  variant?: TextVariant;
-  className?: string;
-  children: React.ReactNode;
-};
-
-const variantStyles: Record<TextVariant, string> = {
-  h1: 'text-3xl font-bold text-white',
-  h2: 'text-2xl font-semibold text-white',
-  h3: 'text-xl font-semibold text-white',
-  h4: 'text-lg font-medium text-white',
-  body: 'text-base text-slate-200',
-  'body-sm': 'text-sm text-slate-200',
-  caption: 'text-xs text-slate-400',
-  label: 'text-sm font-medium text-slate-300',
-  muted: 'text-sm text-slate-500',
-};
+export type TypographyProps = TextProps &
+  VariantProps<typeof typographyVariants> & {
+    className?: string;
+    children: React.ReactNode;
+  };
 
 export const Typography: React.FC<TypographyProps> = ({
   variant = 'body',
   className,
   children,
   ...rest
-}) => (
-  <StyledText
-    className={cn(variantStyles[variant], className)}
-    accessibilityRole={variant.startsWith('h') ? 'header' : 'text'}
-    {...rest}
-  >
-    {children}
-  </StyledText>
-);
+}) => {
+  const textClass = useContext(TextClassContext);
+
+  return (
+    <Text
+      className={cn(
+        typographyVariants({ variant }),
+        textClass,
+        className,
+      )}
+      accessibilityRole={variant?.startsWith('h') ? 'header' : 'text'}
+      {...rest}
+    >
+      {children}
+    </Text>
+  );
+};
+
+export { typographyVariants };

@@ -1,11 +1,6 @@
 import React from 'react';
-import { type PressableProps } from 'react-native';
-import {
-  StyledPressable,
-  StyledView,
-  StyledText,
-} from '@iconicedu/ui-native/utils/styled';
-import { cn } from '@iconicedu/ui-native/utils/cn';
+import { Pressable, View, Text, type PressableProps } from 'react-native';
+import { cn } from '@iconicedu/ui-native/lib/utils';
 
 export type ListItemProps = PressableProps & {
   leading?: React.ReactNode;
@@ -25,10 +20,10 @@ export const ListItem: React.FC<ListItemProps> = ({
   className,
   ...rest
 }) => (
-  <StyledPressable
+  <Pressable
     className={cn(
-      'flex-row items-center gap-3 rounded-xl px-3 py-2.5 active:bg-slate-800/50',
-      active && 'bg-slate-800',
+      'flex-row items-center gap-3 rounded-xl px-3 py-2.5 active:bg-accent/50',
+      active && 'bg-accent',
       className,
     )}
     accessibilityRole="button"
@@ -36,23 +31,23 @@ export const ListItem: React.FC<ListItemProps> = ({
     accessibilityState={{ selected: active }}
     {...rest}
   >
-    {leading && <StyledView className="shrink-0">{leading}</StyledView>}
-    <StyledView className="min-w-0 flex-1 gap-0.5">
-      <StyledText
+    {leading && <View className="shrink-0">{leading}</View>}
+    <View className="min-w-0 flex-1 gap-0.5">
+      <Text
         className={cn(
           'text-sm font-medium',
-          active ? 'text-white' : 'text-slate-200',
+          active ? 'text-foreground' : 'text-foreground',
         )}
         numberOfLines={1}
       >
         {title}
-      </StyledText>
+      </Text>
       {subtitle && (
-        <StyledText className="text-xs text-slate-400" numberOfLines={1}>
+        <Text className="text-xs text-muted-foreground" numberOfLines={1}>
           {subtitle}
-        </StyledText>
+        </Text>
       )}
-    </StyledView>
-    {trailing && <StyledView className="shrink-0">{trailing}</StyledView>}
-  </StyledPressable>
+    </View>
+    {trailing && <View className="shrink-0">{trailing}</View>}
+  </Pressable>
 );

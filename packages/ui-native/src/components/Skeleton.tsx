@@ -47,7 +47,7 @@ export const Skeleton: React.FC<SkeletonProps> = ({
     return () => animation.stop();
   }, [opacity]);
 
-  const classes = ['bg-slate-700', roundedStyles[rounded], className]
+  const classes = ['bg-muted', roundedStyles[rounded], className]
     .filter(Boolean)
     .join(' ');
 

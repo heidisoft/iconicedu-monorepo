@@ -1,7 +1,6 @@
 import React from 'react';
-import { type ViewProps } from 'react-native';
-import { StyledView, StyledText } from '@iconicedu/ui-native/utils/styled';
-import { cn } from '@iconicedu/ui-native/utils/cn';
+import { View, Text, type ViewProps } from 'react-native';
+import { cn } from '@iconicedu/ui-native/lib/utils';
 
 export type CardProps = ViewProps & {
   className?: string;
@@ -34,15 +33,15 @@ export type CardFooterProps = ViewProps & {
 };
 
 export const Card: React.FC<CardProps> = ({ className, children, ...rest }) => (
-  <StyledView
+  <View
     className={cn(
-      'rounded-2xl border border-slate-800 bg-slate-900 p-4',
+      'rounded-2xl border border-border bg-card p-4',
       className,
     )}
     {...rest}
   >
     {children}
-  </StyledView>
+  </View>
 );
 
 export const CardHeader: React.FC<CardHeaderProps> = ({
@@ -50,27 +49,27 @@ export const CardHeader: React.FC<CardHeaderProps> = ({
   children,
   ...rest
 }) => (
-  <StyledView className={cn('gap-1.5 pb-3', className)} {...rest}>
+  <View className={cn('gap-1.5 pb-3', className)} {...rest}>
     {children}
-  </StyledView>
+  </View>
 );
 
 export const CardTitle: React.FC<CardTitleProps> = ({
   className,
   children,
 }) => (
-  <StyledText className={cn('text-lg font-semibold text-white', className)}>
+  <Text className={cn('text-lg font-semibold text-card-foreground', className)}>
     {children}
-  </StyledText>
+  </Text>
 );
 
 export const CardDescription: React.FC<CardDescriptionProps> = ({
   className,
   children,
 }) => (
-  <StyledText className={cn('text-sm text-slate-400', className)}>
+  <Text className={cn('text-sm text-muted-foreground', className)}>
     {children}
-  </StyledText>
+  </Text>
 );
 
 export const CardContent: React.FC<CardContentProps> = ({
@@ -78,9 +77,9 @@ export const CardContent: React.FC<CardContentProps> = ({
   children,
   ...rest
 }) => (
-  <StyledView className={className} {...rest}>
+  <View className={className} {...rest}>
     {children}
-  </StyledView>
+  </View>
 );
 
 export const CardFooter: React.FC<CardFooterProps> = ({
@@ -88,10 +87,10 @@ export const CardFooter: React.FC<CardFooterProps> = ({
   children,
   ...rest
 }) => (
-  <StyledView
+  <View
     className={cn('flex-row items-center pt-3', className)}
     {...rest}
   >
     {children}
-  </StyledView>
+  </View>
 );

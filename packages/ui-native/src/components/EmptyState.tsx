@@ -1,6 +1,6 @@
 import React from 'react';
-import { StyledView, StyledText } from '@iconicedu/ui-native/utils/styled';
-import { cn } from '@iconicedu/ui-native/utils/cn';
+import { View, Text } from 'react-native';
+import { cn } from '@iconicedu/ui-native/lib/utils';
 
 export type EmptyStateProps = {
   icon?: React.ReactNode;
@@ -17,22 +17,22 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   action,
   className,
 }) => (
-  <StyledView
+  <View
     className={cn(
       'flex-1 items-center justify-center gap-3 px-8 py-12',
       className,
     )}
     accessibilityRole="text"
   >
-    {icon && <StyledView className="mb-2">{icon}</StyledView>}
-    <StyledText className="text-center text-lg font-semibold text-white">
+    {icon && <View className="mb-2">{icon}</View>}
+    <Text className="text-center text-lg font-semibold text-foreground">
       {title}
-    </StyledText>
+    </Text>
     {description && (
-      <StyledText className="text-center text-sm text-slate-400">
+      <Text className="text-center text-sm text-muted-foreground">
         {description}
-      </StyledText>
+      </Text>
     )}
-    {action && <StyledView className="mt-4">{action}</StyledView>}
-  </StyledView>
+    {action && <View className="mt-4">{action}</View>}
+  </View>
 );

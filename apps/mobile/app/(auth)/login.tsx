@@ -1,12 +1,12 @@
 import React, { useState, useCallback } from 'react';
-import { KeyboardAvoidingView, Platform } from 'react-native';
+import { View, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   Button,
   Input,
   Typography,
-  StyledView,
   Separator,
+  NAV_THEME,
 } from '@iconicedu/ui-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/providers/auth-provider';
@@ -43,22 +43,22 @@ export default function LoginScreen() {
   }, [email, signInWithOtp, router]);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#020617' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: NAV_THEME.dark.background }}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
-        <StyledView className="flex-1 justify-center px-6 gap-6">
-          <StyledView className="items-center gap-2">
+        <View className="flex-1 justify-center px-6 gap-6">
+          <View className="items-center gap-2">
             <Typography variant="h1" className="text-center">
               IconicEdu
             </Typography>
             <Typography variant="muted" className="text-center">
               Sign in to your account
             </Typography>
-          </StyledView>
+          </View>
 
-          <StyledView className="gap-4">
+          <View className="gap-4">
             <Input
               label="Email"
               placeholder="you@example.com"
@@ -72,7 +72,7 @@ export default function LoginScreen() {
             />
 
             {status && (
-              <Typography variant="body-sm" className="text-green-400">
+              <Typography variant="body-sm" className="text-success">
                 {status}
               </Typography>
             )}
@@ -83,15 +83,15 @@ export default function LoginScreen() {
               loading={loading}
               size="lg"
             />
-          </StyledView>
+          </View>
 
-          <StyledView className="flex-row items-center gap-4">
+          <View className="flex-row items-center gap-4">
             <Separator className="flex-1" />
             <Typography variant="caption">or</Typography>
             <Separator className="flex-1" />
-          </StyledView>
+          </View>
 
-          <StyledView className="gap-3">
+          <View className="gap-3">
             <Button
               label="Continue with Google"
               variant="outline"
@@ -104,8 +104,8 @@ export default function LoginScreen() {
               size="lg"
               onPress={() => {}}
             />
-          </StyledView>
-        </StyledView>
+          </View>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

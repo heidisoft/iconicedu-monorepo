@@ -1,17 +1,16 @@
 import React, { useState, useCallback } from 'react';
-import { KeyboardAvoidingView, Platform, TextInput } from 'react-native';
+import { View, KeyboardAvoidingView, Platform, TextInput } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   Button,
   Typography,
-  StyledView,
+  NAV_THEME,
 } from '@iconicedu/ui-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/providers/auth-provider';
 
 const OTP_LENGTH = 6;
 
-// Use plain TextInput with type cast for className since StyledTextInput doesn't support ref
 type TextInputWithClassName = React.ComponentProps<typeof TextInput> & { className?: string };
 const StyledCodeInput = TextInput as React.ComponentType<TextInputWithClassName>;
 
@@ -53,27 +52,27 @@ export default function OtpScreen() {
   }, [email, signInWithOtp]);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#020617' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: NAV_THEME.dark.background }}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
-        <StyledView className="flex-1 justify-center px-6 gap-6">
-          <StyledView className="items-center gap-2">
+        <View className="flex-1 justify-center px-6 gap-6">
+          <View className="items-center gap-2">
             <Typography variant="h2" className="text-center">
               Check your email
             </Typography>
             <Typography variant="muted" className="text-center">
               We sent a verification code to
             </Typography>
-            <Typography variant="body-sm" className="text-center text-white">
+            <Typography variant="body-sm" className="text-center text-foreground">
               {email}
             </Typography>
-          </StyledView>
+          </View>
 
-          <StyledView className="items-center gap-4">
+          <View className="items-center gap-4">
             <StyledCodeInput
-              className="w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-4 text-center text-2xl font-bold tracking-[12px] text-white"
+              className="w-full rounded-xl border border-input bg-card px-4 py-4 text-center text-2xl font-bold tracking-[12px] text-foreground"
               value={code}
               onChangeText={(text: string) => {
                 const cleaned = text.replace(/\D/g, '').slice(0, OTP_LENGTH);
@@ -86,11 +85,11 @@ export default function OtpScreen() {
             />
 
             {error && (
-              <Typography variant="body-sm" className="text-red-400">
+              <Typography variant="body-sm" className="text-destructive">
                 {error}
               </Typography>
             )}
-          </StyledView>
+          </View>
 
           <Button
             label="Verify"
@@ -100,7 +99,7 @@ export default function OtpScreen() {
             disabled={code.length !== OTP_LENGTH}
           />
 
-          <StyledView className="flex-row items-center justify-center gap-1">
+          <View className="flex-row items-center justify-center gap-1">
             <Typography variant="muted">Didn't get a code?</Typography>
             <Button
               label="Resend"
@@ -108,14 +107,14 @@ export default function OtpScreen() {
               size="sm"
               onPress={handleResend}
             />
-          </StyledView>
+          </View>
 
           <Button
             label="Back to Login"
             variant="ghost"
             onPress={() => router.back()}
           />
-        </StyledView>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

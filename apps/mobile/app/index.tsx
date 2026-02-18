@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
-import { ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
-import { StyledView } from '@iconicedu/ui-native';
+import { NAV_THEME } from '@iconicedu/ui-native';
 import { useAuth } from '@/providers/auth-provider';
 
 export default function Index() {
@@ -18,8 +18,8 @@ export default function Index() {
   }, [session, loading, router]);
 
   return (
-    <StyledView className="flex-1 items-center justify-center bg-slate-950">
-      <ActivityIndicator size="large" color="#4a65e8" />
-    </StyledView>
+    <View className="flex-1 items-center justify-center bg-background">
+      <ActivityIndicator size="large" color={NAV_THEME.dark.primary} />
+    </View>
   );
 }

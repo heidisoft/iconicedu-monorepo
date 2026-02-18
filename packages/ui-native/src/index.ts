@@ -16,7 +16,13 @@ export * from '@iconicedu/ui-native/components/ScreenHeader';
 export * from '@iconicedu/ui-native/components/Tabs';
 
 // Utilities
-export { cn } from '@iconicedu/ui-native/utils/cn';
+export { cn, TextClassContext } from '@iconicedu/ui-native/lib/utils';
+
+// Constants
+export { NAV_THEME } from '@iconicedu/ui-native/lib/constants';
+
+// Deprecated re-exports for backward compatibility
+export { colors } from '@iconicedu/ui-native/constants/colors';
 export {
   StyledView,
   StyledText,
@@ -26,6 +32,3 @@ export {
   StyledImage,
   StyledFlatList,
 } from '@iconicedu/ui-native/utils/styled';
-
-// Constants
-export { colors } from '@iconicedu/ui-native/constants/colors';

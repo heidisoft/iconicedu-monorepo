@@ -1,11 +1,6 @@
 import React from 'react';
-import {
-  StyledView,
-  StyledText,
-  StyledPressable,
-  StyledScrollView,
-} from '@iconicedu/ui-native/utils/styled';
-import { cn } from '@iconicedu/ui-native/utils/cn';
+import { View, Text, Pressable, ScrollView } from 'react-native';
+import { cn } from '@iconicedu/ui-native/lib/utils';
 
 export type TabItem = {
   key: string;
@@ -31,55 +26,55 @@ export const Tabs: React.FC<TabsProps> = ({
   const content = items.map((item) => {
     const isActive = item.key === activeKey;
     return (
-      <StyledPressable
+      <Pressable
         key={item.key}
         onPress={() => onTabPress(item.key)}
         className={cn(
           'flex-row items-center gap-1.5 border-b-2 px-4 pb-3 pt-2',
-          isActive ? 'border-brand-500' : 'border-transparent',
+          isActive ? 'border-primary' : 'border-transparent',
         )}
         accessibilityRole="tab"
         accessibilityLabel={item.label}
         accessibilityState={{ selected: isActive }}
       >
-        <StyledText
+        <Text
           className={cn(
             'text-sm font-medium',
-            isActive ? 'text-white' : 'text-slate-400',
+            isActive ? 'text-foreground' : 'text-muted-foreground',
           )}
         >
           {item.label}
-        </StyledText>
+        </Text>
         {item.badge !== undefined && item.badge > 0 && (
-          <StyledView className="items-center justify-center rounded-full bg-brand-600 px-1.5 py-0.5">
-            <StyledText className="text-[10px] font-bold text-white">
+          <View className="items-center justify-center rounded-full bg-primary px-1.5 py-0.5">
+            <Text className="text-[10px] font-bold text-primary-foreground">
               {item.badge > 99 ? '99+' : item.badge}
-            </StyledText>
-          </StyledView>
+            </Text>
+          </View>
         )}
-      </StyledPressable>
+      </Pressable>
     );
   });
 
   if (scrollable) {
     return (
-      <StyledScrollView
+      <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        className={cn('border-b border-slate-800', className)}
+        className={cn('border-b border-border', className)}
         accessibilityRole="tablist"
       >
         {content}
-      </StyledScrollView>
+      </ScrollView>
     );
   }
 
   return (
-    <StyledView
-      className={cn('flex-row border-b border-slate-800', className)}
+    <View
+      className={cn('flex-row border-b border-border', className)}
       accessibilityRole="tablist"
     >
       {content}
-    </StyledView>
+    </View>
   );
 };

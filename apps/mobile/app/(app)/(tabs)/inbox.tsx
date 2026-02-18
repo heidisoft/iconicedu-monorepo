@@ -1,15 +1,16 @@
 import React from 'react';
-import { Typography, EmptyState, StyledView, StyledText } from '@iconicedu/ui-native';
+import { View, Text } from 'react-native';
+import { Typography, EmptyState, NAV_THEME } from '@iconicedu/ui-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function InboxScreen() {
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#020617' }}>
-      <StyledView className="border-b border-slate-800 px-4 pb-3 pt-2">
+    <SafeAreaView style={{ flex: 1, backgroundColor: NAV_THEME.dark.background }}>
+      <View className="border-b border-border px-4 pb-3 pt-2">
         <Typography variant="h3">Inbox</Typography>
-      </StyledView>
+      </View>
       <EmptyState
-        icon={<StyledText className="text-4xl">📥</StyledText>}
+        icon={<Text className="text-4xl">📥</Text>}
         title="All caught up"
         description="Your notifications and activity feed will appear here."
       />

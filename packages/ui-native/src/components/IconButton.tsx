@@ -1,45 +1,49 @@
 import React from 'react';
-import { type PressableProps } from 'react-native';
-import { StyledPressable } from '@iconicedu/ui-native/utils/styled';
-import { cn } from '@iconicedu/ui-native/utils/cn';
+import { Pressable, type PressableProps } from 'react-native';
+import { cva, type VariantProps } from 'class-variance-authority';
+import { cn } from '@iconicedu/ui-native/lib/utils';
 
-type IconButtonVariant = 'default' | 'ghost' | 'outline';
-type IconButtonSize = 'sm' | 'md' | 'lg';
+const iconButtonVariants = cva(
+  'items-center justify-center rounded-full active:opacity-70',
+  {
+    variants: {
+      variant: {
+        default: 'bg-secondary',
+        ghost: 'bg-transparent',
+        outline: 'border border-border bg-transparent',
+      },
+      size: {
+        sm: 'h-8 w-8',
+        default: 'h-10 w-10',
+        lg: 'h-12 w-12',
+      },
+    },
+    defaultVariants: {
+      variant: 'default',
+      size: 'default',
+    },
+  },
+);
 
-export type IconButtonProps = PressableProps & {
-  icon: React.ReactNode;
-  variant?: IconButtonVariant;
-  size?: IconButtonSize;
-  label: string;
-  className?: string;
-};
-
-const variantStyles: Record<IconButtonVariant, string> = {
-  default: 'bg-slate-800',
-  ghost: 'bg-transparent',
-  outline: 'border border-slate-700 bg-transparent',
-};
-
-const sizeStyles: Record<IconButtonSize, string> = {
-  sm: 'h-8 w-8',
-  md: 'h-10 w-10',
-  lg: 'h-12 w-12',
-};
+export type IconButtonProps = PressableProps &
+  VariantProps<typeof iconButtonVariants> & {
+    icon: React.ReactNode;
+    label: string;
+    className?: string;
+  };
 
 export const IconButton: React.FC<IconButtonProps> = ({
   icon,
   variant = 'default',
-  size = 'md',
+  size = 'default',
   label,
   className,
   disabled,
   ...rest
 }) => (
-  <StyledPressable
+  <Pressable
     className={cn(
-      'items-center justify-center rounded-full active:opacity-70',
-      variantStyles[variant],
-      sizeStyles[size],
+      iconButtonVariants({ variant, size }),
       disabled && 'opacity-50',
       className,
     )}
@@ -50,5 +54,7 @@ export const IconButton: React.FC<IconButtonProps> = ({
     {...rest}
   >
     {icon}
-  </StyledPressable>
+  </Pressable>
 );
+
+export { iconButtonVariants };

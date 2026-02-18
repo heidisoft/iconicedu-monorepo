@@ -1,17 +1,15 @@
 import React from 'react';
-import { ScrollView } from 'react-native';
+import { View, Text, Pressable, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   Typography,
-  StyledView,
   Card,
   CardHeader,
   CardTitle,
   CardDescription,
   Button,
   Avatar,
-  StyledPressable,
-  StyledText,
+  NAV_THEME,
 } from '@iconicedu/ui-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/providers/auth-provider';
@@ -57,18 +55,18 @@ export default function HomeScreen() {
   const router = useRouter();
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#020617' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: NAV_THEME.dark.background }}>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 24 }}>
-        <StyledView className="flex-row items-center justify-between">
-          <StyledView className="gap-1">
+        <View className="flex-row items-center justify-between">
+          <View className="gap-1">
             <Typography variant="h3">
               Welcome back
             </Typography>
             <Typography variant="muted">
               {user?.email}
             </Typography>
-          </StyledView>
-          <StyledPressable
+          </View>
+          <Pressable
             onPress={() => router.push('/(app)/profile')}
             accessibilityLabel="Open profile"
           >
@@ -77,30 +75,30 @@ export default function HomeScreen() {
               size="lg"
               status="online"
             />
-          </StyledPressable>
-        </StyledView>
+          </Pressable>
+        </View>
 
-        <StyledView className="gap-3">
+        <View className="gap-3">
           <Typography variant="label">Quick Navigation</Typography>
-          <StyledView className="flex-row flex-wrap gap-3">
+          <View className="flex-row flex-wrap gap-3">
             {quickNavItems.map((item) => (
-              <StyledPressable
+              <Pressable
                 key={item.label}
                 onPress={() => router.push(item.route as never)}
-                className="w-[48%] rounded-2xl border border-slate-800 bg-slate-900 p-4 active:bg-slate-800"
+                className="w-[48%] rounded-2xl border border-border bg-card p-4 active:bg-accent"
                 accessibilityLabel={item.label}
               >
-                <StyledText className="mb-2 text-2xl">{item.icon}</StyledText>
-                <StyledText className="text-sm font-semibold text-white">
+                <Text className="mb-2 text-2xl">{item.icon}</Text>
+                <Text className="text-sm font-semibold text-foreground">
                   {item.label}
-                </StyledText>
-                <StyledText className="mt-0.5 text-xs text-slate-400">
+                </Text>
+                <Text className="mt-0.5 text-xs text-muted-foreground">
                   {item.description}
-                </StyledText>
-              </StyledPressable>
+                </Text>
+              </Pressable>
             ))}
-          </StyledView>
-        </StyledView>
+          </View>
+        </View>
 
         <Card>
           <CardHeader>

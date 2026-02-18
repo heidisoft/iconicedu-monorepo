@@ -1,12 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { type TextInputProps } from 'react-native';
-import {
-  StyledView,
-  StyledText,
-  StyledTextInput,
-  StyledPressable,
-} from '@iconicedu/ui-native/utils/styled';
-import { cn } from '@iconicedu/ui-native/utils/cn';
+import { View, Text, TextInput, Pressable, type TextInputProps } from 'react-native';
+import { cn } from '@iconicedu/ui-native/lib/utils';
 
 export type SearchBarProps = Omit<TextInputProps, 'value' | 'onChangeText'> & {
   value: string;
@@ -33,15 +27,15 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   }, [onChangeText, onCancel]);
 
   return (
-    <StyledView className={cn('flex-row items-center gap-2', className)}>
-      <StyledView className="flex-1 flex-row items-center rounded-xl bg-slate-800 px-3 py-2.5">
-        <StyledText className="mr-2 text-slate-400">{'🔍'}</StyledText>
-        <StyledTextInput
-          className="flex-1 text-sm text-white"
+    <View className={cn('flex-row items-center gap-2', className)}>
+      <View className="flex-1 flex-row items-center rounded-xl bg-muted px-3 py-2.5">
+        <Text className="mr-2 text-muted-foreground">{'🔍'}</Text>
+        <TextInput
+          className="flex-1 text-sm text-foreground"
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
-          placeholderTextColor="#64748b"
+          placeholderTextColor="#a1a1aa"
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           returnKeyType="search"
@@ -51,22 +45,22 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           {...rest}
         />
         {value.length > 0 && (
-          <StyledPressable
+          <Pressable
             onPress={() => onChangeText('')}
             accessibilityLabel="Clear search"
           >
-            <StyledText className="text-slate-400">{'✕'}</StyledText>
-          </StyledPressable>
+            <Text className="text-muted-foreground">{'✕'}</Text>
+          </Pressable>
         )}
-      </StyledView>
+      </View>
       {(showCancel || focused) && onCancel && (
-        <StyledPressable
+        <Pressable
           onPress={handleCancel}
           accessibilityLabel="Cancel search"
         >
-          <StyledText className="text-sm text-brand-500">Cancel</StyledText>
-        </StyledPressable>
+          <Text className="text-sm text-primary">Cancel</Text>
+        </Pressable>
       )}
-    </StyledView>
+    </View>
   );
 };
