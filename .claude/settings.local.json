@@ -25,7 +25,9 @@
       "Bash(pnpm lint:*)",
       "WebFetch(domain:reactnativereusables.com)",
       "Bash(npm view:*)",
-      "Bash(pnpm --filter @iconicedu/ui-native build:*)"
+      "Bash(pnpm --filter @iconicedu/ui-native build:*)",
+      "Bash(pnpm --filter mobile list:*)",
+      "Bash(npx expo start:*)"
     ]
   }
 }

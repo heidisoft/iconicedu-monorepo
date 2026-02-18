@@ -6,17 +6,39 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
-      "@iconicedu/mobile/*": ["./*"],
-      "@iconicedu/mobile": ["."],
-      "@iconicedu/ui-native/*": ["../../packages/ui-native/src/*"],
-      "@iconicedu/ui-native": ["../../packages/ui-native/src"],
-      "@iconicedu/shared-types/*": ["../../packages/shared-types/src/*"],
-      "@iconicedu/shared-types": ["../../packages/shared-types/src"],
-      "@iconicedu/utils/*": ["../../packages/utils/src/*"]
+      "@/*": [
+        "./src/*"
+      ],
+      "@iconicedu/mobile/*": [
+        "./*"
+      ],
+      "@iconicedu/mobile": [
+        "."
+      ],
+      "@iconicedu/ui-native/*": [
+        "../../packages/ui-native/src/*"
+      ],
+      "@iconicedu/ui-native": [
+        "../../packages/ui-native/src"
+      ],
+      "@iconicedu/shared-types/*": [
+        "../../packages/shared-types/src/*"
+      ],
+      "@iconicedu/shared-types": [
+        "../../packages/shared-types/src"
+      ],
+      "@iconicedu/utils/*": [
+        "../../packages/utils/src/*"
+      ]
     }
   },
-  "include": ["app/**/*", "src/**/*", "*.ts", "*.tsx"],
+  "include": [
+    "app/**/*",
+    "src/**/*",
+    "*.ts",
+    "*.tsx",
+    "nativewind-env.d.ts"
+  ],
   "exclude": [
     "node_modules",
     "**/__tests__/**",
