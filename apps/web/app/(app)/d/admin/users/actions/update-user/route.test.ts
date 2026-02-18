@@ -18,7 +18,7 @@ describe('POST /d/admin/users/actions/update-user', () => {
 
   it('returns 400 when accountId is missing', async () => {
     const response = await POST(
-      new Request(, {
+      new Request(`${APP_URL}/d/admin/users/actions/update-user`, {
         method: 'POST',
         body: JSON.stringify({ email: 'user@example.com' }),
       }),
@@ -33,7 +33,7 @@ describe('POST /d/admin/users/actions/update-user', () => {
 
   it('returns 400 when email is invalid', async () => {
     const response = await POST(
-      new Request(, {
+      new Request(`${APP_URL}/d/admin/users/actions/update-user`, {
         method: 'POST',
         body: JSON.stringify({ accountId: 'account-1', email: 'bad-email' }),
       }),
@@ -101,7 +101,7 @@ describe('POST /d/admin/users/actions/update-user', () => {
     updateUserById.mockResolvedValue({ error: null });
 
     const response = await POST(
-      new Request(, {
+      new Request(`${APP_URL}/d/admin/users/actions/update-user`, {
         method: 'POST',
         body: JSON.stringify({
           accountId: 'account-1',
@@ -174,7 +174,7 @@ describe('POST /d/admin/users/actions/update-user', () => {
     });
 
     const response = await POST(
-      new Request(, {
+      new Request(`${APP_URL}/d/admin/users/actions/update-user`, {
         method: 'POST',
         body: JSON.stringify({
           accountId: 'account-1',

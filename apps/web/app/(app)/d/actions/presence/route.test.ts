@@ -34,7 +34,7 @@ vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
 describe('POST /d/actions/presence', () => {
   it('returns 400 for invalid json body', async () => {
     const response = await POST(
-      new Request(, {
+      new Request(`${APP_URL}/d/actions/presence`, {
         method: 'POST',
         body: '{invalid',
       }),
@@ -51,7 +51,7 @@ describe('POST /d/actions/presence', () => {
     upsert.mockResolvedValueOnce({ error: null });
 
     const response = await POST(
-      new Request(, {
+      new Request(`${APP_URL}/d/actions/presence`, {
         method: 'POST',
         body: JSON.stringify({}),
       }),
@@ -75,7 +75,7 @@ describe('POST /d/actions/presence', () => {
     upsert.mockResolvedValueOnce({ error: null });
 
     await POST(
-      new Request(, {
+      new Request(`${APP_URL}/d/actions/presence`, {
         method: 'POST',
         body: JSON.stringify({ status: 'away' }),
       }),
@@ -94,7 +94,7 @@ describe('POST /d/actions/presence', () => {
     upsert.mockResolvedValueOnce({ error: null });
 
     await POST(
-      new Request(, {
+      new Request(`${APP_URL}/d/actions/presence`, {
         method: 'POST',
         body: JSON.stringify({ status: 'online' }),
       }),
@@ -113,7 +113,7 @@ describe('POST /d/actions/presence', () => {
     upsert.mockResolvedValueOnce({ error: null });
 
     await POST(
-      new Request(, {
+      new Request(`${APP_URL}/d/actions/presence`, {
         method: 'POST',
         body: JSON.stringify({
           stateText: 'In a meeting',
@@ -137,7 +137,7 @@ describe('POST /d/actions/presence', () => {
     upsert.mockResolvedValueOnce({ error: null });
 
     await POST(
-      new Request(, {
+      new Request(`${APP_URL}/d/actions/presence`, {
         method: 'POST',
         body: JSON.stringify({ clearState: true }),
       }),
@@ -157,7 +157,7 @@ describe('POST /d/actions/presence', () => {
     getUser.mockResolvedValueOnce({ data: { user: null } } as any);
 
     const response = await POST(
-      new Request(, {
+      new Request(`${APP_URL}/d/actions/presence`, {
         method: 'POST',
         body: JSON.stringify({ status: 'online' }),
       }),

@@ -14,7 +14,7 @@ vi.mock('@iconicedu/web/lib/admin/channel-create', () => ({
 describe('POST /d/admin/channels/actions/create', () => {
   it('returns 400 when topic is missing', async () => {
     const response = await POST(
-      new Request(, {
+      new Request(`${APP_URL}/d/admin/channels/actions/create`, {
         method: 'POST',
         body: JSON.stringify({}),
       }),
@@ -48,7 +48,7 @@ describe('POST /d/admin/channels/actions/create', () => {
     };
 
     const response = await POST(
-      new Request(, {
+      new Request(`${APP_URL}/d/admin/channels/actions/create`, {
         method: 'POST',
         body: JSON.stringify(payload),
       }),

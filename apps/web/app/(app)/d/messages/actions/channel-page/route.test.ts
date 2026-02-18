@@ -26,7 +26,7 @@ vi.mock('@iconicedu/web/lib/messages/builders/message.builder', () => ({
 describe('GET /d/messages/actions/channel-page', () => {
   it('returns 400 when channelId is missing', async () => {
     const response = await GET(
-      new Request(),
+      new Request(`${APP_URL}/d/messages/actions/channel-page`),
     );
     expect(response.status).toBe(400);
     const payload = await response.json();
@@ -42,7 +42,7 @@ describe('GET /d/messages/actions/channel-page', () => {
 
     const response = await GET(
       new Request(
-        ,
+        `${APP_URL}/d/messages/actions/channel-page?channelId=channel-1&before=2026-02-15T11%3A00%3A00.000Z&limit=40`,
       ),
     );
 

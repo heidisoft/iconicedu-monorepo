@@ -49,7 +49,7 @@ vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
 describe('POST /d/messages/actions/read-state', () => {
   it('returns 400 when channelId is missing', async () => {
     const response = await POST(
-      new Request(, {
+      new Request(`${APP_URL}/d/messages/actions/read-state`, {
         method: 'POST',
         body: JSON.stringify({}),
       }),
@@ -68,7 +68,7 @@ describe('POST /d/messages/actions/read-state', () => {
     upsert.mockResolvedValueOnce({ error: null });
 
     const response = await POST(
-      new Request(, {
+      new Request(`${APP_URL}/d/messages/actions/read-state`, {
         method: 'POST',
         body: JSON.stringify({
           channelId: 'channel-1',
@@ -95,7 +95,7 @@ describe('POST /d/messages/actions/read-state', () => {
     channelMaybeSingle.mockResolvedValueOnce({ data: null, error: null });
 
     const response = await POST(
-      new Request(, {
+      new Request(`${APP_URL}/d/messages/actions/read-state`, {
         method: 'POST',
         body: JSON.stringify({
           channelId: 'channel-1',
@@ -115,7 +115,7 @@ describe('POST /d/messages/actions/read-state', () => {
     messageMaybeSingle.mockResolvedValueOnce({ data: null, error: null });
 
     const response = await POST(
-      new Request(, {
+      new Request(`${APP_URL}/d/messages/actions/read-state`, {
         method: 'POST',
         body: JSON.stringify({
           channelId: 'channel-1',

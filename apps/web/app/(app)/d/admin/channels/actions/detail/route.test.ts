@@ -13,7 +13,7 @@ vi.mock('@iconicedu/web/lib/admin/channel-detail', () => ({
 describe('POST /d/admin/channels/actions/detail', () => {
   it('returns 400 when channelId is missing', async () => {
     const response = await POST(
-      new Request(, {
+      new Request(`${APP_URL}/d/admin/channels/actions/detail`, {
         method: 'POST',
         body: JSON.stringify({}),
       }),
@@ -28,7 +28,7 @@ describe('POST /d/admin/channels/actions/detail', () => {
     getChannelDetail.mockResolvedValueOnce({ ids: { id: 'channel-1', orgId: 'org-1' } });
 
     const response = await POST(
-      new Request(, {
+      new Request(`${APP_URL}/d/admin/channels/actions/detail`, {
         method: 'POST',
         body: JSON.stringify({ channelId: 'channel-1' }),
       }),

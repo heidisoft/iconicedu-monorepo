@@ -24,7 +24,7 @@ vi.mock('@iconicedu/web/lib/messages/builders/message.builder', () => ({
 
 describe('GET /d/messages/actions/detail', () => {
   it('returns 400 when messageId is missing', async () => {
-    const response = await GET(new Request());
+    const response = await GET(new Request(`${APP_URL}/d/messages/actions/detail`));
 
     expect(response.status).toBe(400);
     const payload = await response.json();
@@ -35,7 +35,7 @@ describe('GET /d/messages/actions/detail', () => {
     buildMessageById.mockResolvedValueOnce({ ids: { id: 'message-1', orgId: 'org-1' } });
 
     const response = await GET(
-      new Request(),
+      new Request(`${APP_URL}/d/messages/actions/detail?messageId=message-1`),
     );
 
     expect(buildMessageById).toHaveBeenCalledWith({}, 'org-1', 'message-1', {

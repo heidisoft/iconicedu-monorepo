@@ -15,7 +15,7 @@ vi.mock('@iconicedu/web/lib/admin/channel-update', () => ({
 describe('POST /d/admin/channels/actions/update', () => {
   it('returns 400 when channelId is missing', async () => {
     const response = await POST(
-      new Request(, {
+      new Request(`${APP_URL}/d/admin/channels/actions/update`, {
         method: 'POST',
         body: JSON.stringify({ payload: {} }),
       }),
@@ -52,7 +52,7 @@ describe('POST /d/admin/channels/actions/update', () => {
     updateChannelFromPayload.mockResolvedValueOnce(undefined);
 
     const response = await POST(
-      new Request(, {
+      new Request(`${APP_URL}/d/admin/channels/actions/update`, {
         method: 'POST',
         body: JSON.stringify({ channelId: 'channel-1', payload }),
       }),
