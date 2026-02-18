@@ -9,8 +9,8 @@ import {
   SlidersHorizontal,
   User,
   Users,
+  type LucideIcon,
 } from 'lucide-react';
-import type { ComponentType, SVGProps } from 'react';
 import type { OnboardingStep as SharedOnboardingStep } from '@iconicedu/shared-types';
 
 export type UserSettingsTab =
@@ -30,7 +30,7 @@ export type OnboardingStep = SharedOnboardingStep;
 export const SETTINGS_TABS: Array<{
   value: UserSettingsTab;
   label: string;
-  icon: ComponentType<SVGProps<SVGSVGElement>>;
+  icon: LucideIcon;
 }> = [
   { value: 'account', label: 'Account', icon: BadgeCheck },
   { value: 'profile', label: 'Profile', icon: User },
