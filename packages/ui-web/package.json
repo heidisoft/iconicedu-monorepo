@@ -12,7 +12,7 @@
   },
   "private": true,
   "scripts": {
-    "build": "tsc -p tsconfig.json && pnpm exec tailwindcss -c tailwind.config.ts -i ./src/styles/global.css -o ./dist/ui-web.css --minify",
+    "build": "tsc -p tsconfig.json && node ../../node_modules/@tailwindcss/cli/dist/index.mjs -i ./src/styles/global.css -o ./dist/ui-web.css --minify",
     "dev": "tsc -p tsconfig.json --watch & pnpm run tailwind:watch",
     "start": "pnpm run dev",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -21,7 +21,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "tailwind:build": "pnpm exec tailwindcss -c tailwind.config.ts -i ./src/styles/global.css -o ./dist/ui-web.css",
+    "tailwind:build": "node ../../node_modules/@tailwindcss/cli/dist/index.mjs -i ./src/styles/global.css -o ./dist/ui-web.css",
     "tailwind:watch": "node ./scripts/watch-tailwind.js",
     "clean": "rm -rf dist",
     "shadcn:add": "pnpm dlx shadcn@latest add"

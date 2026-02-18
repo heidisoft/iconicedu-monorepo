@@ -23,24 +23,25 @@ function loadChokidar() {
 const chokidar = loadChokidar();
 
 const tailwindArgs = [
-  '-c',
-  'tailwind.config.ts',
   '-i',
   './src/styles/global.css',
   '-o',
   './dist/ui-web.css',
 ];
 
+const tailwindCliPath = path.resolve(
+  __dirname,
+  '../../../node_modules/@tailwindcss/cli/dist/index.mjs',
+);
+
 let isBuilding = false;
 let shouldRunAgain = false;
 
 function runTailwind() {
   return new Promise((resolve, reject) => {
-    // Use pnpm exec to ensure we use the locally installed tailwindcss
-    const child = spawn('pnpm', ['exec', 'tailwindcss', ...tailwindArgs], {
+    const child = spawn(process.execPath, [tailwindCliPath, ...tailwindArgs], {
       stdio: 'inherit',
       cwd: process.cwd(),
-      shell: true,
     });
 
     child.on('close', (code) => {

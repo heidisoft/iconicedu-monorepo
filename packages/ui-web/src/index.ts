@@ -54,6 +54,8 @@ export * from '@iconicedu/ui-web/components/class-schedule/class-schedule-header
 export * from '@iconicedu/ui-web/components/class-schedule/class-schedule-container';
 export * from '@iconicedu/ui-web/components/class-schedule/week-view';
 export * from '@iconicedu/ui-web/components/class-schedule/day-view';
+export * from '@iconicedu/ui-web/components/marketing/marketing-header';
+export * from '@iconicedu/ui-web/components/marketing/marketing-home-page';
 export { Toaster } from '@iconicedu/ui-web/ui/sonner';
 export { toast } from 'sonner';
 export * from '@iconicedu/ui-web/lib/icons';
