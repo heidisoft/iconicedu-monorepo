@@ -11,6 +11,17 @@ import { cn } from "@iconicedu/ui-web/lib/utils"
 import { Button, buttonVariants } from "@iconicedu/ui-web/ui/button"
 import { ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon } from "lucide-react"
 
+function assignElementRef<T>(ref: unknown, value: T | null) {
+  if (typeof ref === "function") {
+    ;(ref as (instance: T | null) => void)(value)
+    return
+  }
+
+  if (ref && typeof ref === "object" && "current" in (ref as Record<string, unknown>)) {
+    ;(ref as { current: T | null }).current = value
+  }
+}
+
 function Calendar({
   className,
   classNames,
@@ -135,7 +146,7 @@ function Calendar({
           return (
             <div
               data-slot="calendar"
-              ref={rootRef}
+              ref={(node) => assignElementRef<HTMLDivElement>(rootRef, node)}
               className={cn(className)}
               {...props}
             />
