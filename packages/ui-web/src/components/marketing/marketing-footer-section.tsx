@@ -8,7 +8,8 @@ export function MarketingFooterSection() {
           <div>
             <p className="text-lg font-semibold">ICONIC Academy</p>
             <p className="mt-2 text-sm text-foreground/75">
-              Communication-first education designed for measurable student growth.
+              Elite 1-on-1 education designed for measurable academic success. Where
+              strong foundations create brighter futures.
             </p>
           </div>
           {FOOTER_LINK_GROUPS.map((group) => (

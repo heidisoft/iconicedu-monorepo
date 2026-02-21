@@ -41,8 +41,8 @@ export const LEARNING_AREAS = [
 ] as const;
 
 export const TRUST_STATS = [
-  { value: '4.9/5', label: 'Average parent rating' },
-  { value: '36M+', label: 'Learning sessions completed' },
+  { value: '4.9/5', label: 'Trusted by parents who see real results' },
+  { value: '100+', label: 'Students and educators from around the world.' },
   { value: '24/7', label: 'Flexible scheduling options' },
 ] as const;
 
