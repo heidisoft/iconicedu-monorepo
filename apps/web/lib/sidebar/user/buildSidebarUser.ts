@@ -13,6 +13,7 @@ import { mapAccountRowToVM, mapUserRoles } from '@iconicedu/web/lib/accounts/map
 import { mapBaseProfile } from '@iconicedu/web/lib/profile/mappers/base-profile.mapper';
 import {
   deriveProfileKind,
+  profileKindFromRoleKey,
   resolveAvatarSource,
   resolveExternalAvatarUrl,
 } from '@iconicedu/web/lib/profile/derive';
@@ -74,8 +75,14 @@ export async function buildSidebarUser(
       accountId: account.id,
       email: user.email ?? null,
     }));
+  const accountPrimaryRoleKind = accountRow.data?.primary_role
+    ? profileKindFromRoleKey(accountRow.data.primary_role)
+    : null;
   const derivedKind =
-    profileKindOverride ?? inviteRow?.invited_role ?? deriveProfileKind(userRoles);
+    profileKindOverride ??
+    inviteRow?.invited_role ??
+    accountPrimaryRoleKind ??
+    deriveProfileKind(userRoles);
 
   if (!profileRow) {
     const upserted = await upsertProfileForAccount(supabase, {

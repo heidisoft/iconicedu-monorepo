@@ -9,6 +9,7 @@ export interface IdsBaseVM {
 
 export type AvatarSource = 'seed' | 'upload' | 'external';
 export type AccountStatus = 'active' | 'invited' | 'suspended' | 'deleted';
+export type AccountRoleStatus = 'unassigned' | 'active' | 'pending' | 'blocked';
 export type ThemeKey =
   | 'slate'
   | 'gray'

@@ -5,6 +5,7 @@ import { Button } from '@iconicedu/ui-web';
 import { LoginForm } from '@iconicedu/ui-web';
 import { createSupabaseBrowserClient } from '@iconicedu/web/lib/supabase/client';
 import { educatorSignupAction } from '@iconicedu/web/app/(auth)/login/tutor/actions/educator-signup';
+import { trackAuthTelemetry } from '@iconicedu/web/lib/telemetry/auth-events';
 
 export default function EducatorAuthClient() {
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
@@ -24,6 +25,7 @@ export default function EducatorAuthClient() {
   const handleEmailLogin = async (email: string) => {
     setErrorMessage(null);
     setStatusMessage(null);
+    await trackAuthTelemetry('auth_start_email', { roleIntent: 'educator' });
     const redirectTo = `${window.location.origin}/auth/callback?educator=1`;
 
     const { error } = await supabase.auth.signInWithOtp({
@@ -38,12 +40,16 @@ export default function EducatorAuthClient() {
       return;
     }
 
+    await trackAuthTelemetry('auth_magiclink_sent', { roleIntent: 'educator' });
     setStatusMessage('Check your email for a login link.');
   };
 
   const handleOAuthLogin = async (provider: 'apple' | 'google') => {
     setErrorMessage(null);
     setStatusMessage(null);
+    if (provider === 'google') {
+      await trackAuthTelemetry('auth_start_google', { roleIntent: 'educator' });
+    }
     const redirectTo = `${window.location.origin}/auth/callback?educator=1`;
 
     const { error } = await supabase.auth.signInWithOAuth({

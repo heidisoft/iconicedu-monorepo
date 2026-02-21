@@ -1,4 +1,10 @@
-import type { AccountStatus, ISODateTime, UUID } from '@iconicedu/shared-types/shared/shared';
+import type {
+  AccountRoleStatus,
+  AccountStatus,
+  ISODateTime,
+  UUID,
+} from '@iconicedu/shared-types/shared/shared';
+import type { RoleKey } from '@iconicedu/shared-types/vm/roles';
 
 export interface AccountRow {
   id: UUID;
@@ -15,6 +21,9 @@ export interface AccountRow {
   whatsapp_verified_at?: ISODateTime | null;
   preferred_contact_channels?: string[] | null;
   status: AccountStatus;
+  primary_role?: RoleKey | null;
+  role_status?: AccountRoleStatus | null;
+  onboarding_completed_at?: ISODateTime | null;
   created_at: ISODateTime;
   created_by?: UUID | null;
   updated_at: ISODateTime;

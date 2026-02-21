@@ -58,7 +58,20 @@ export function deriveProfileKind(userRoles: UserRoleVM[]): UserProfileVM['kind'
   if (roleKey === 'child') return 'child';
   if (roleKey === 'staff') return 'staff';
   if (roleKey === 'admin' || roleKey === 'owner') return 'staff';
-  return 'guardian';
+  if (roleKey === 'guardian') return 'guardian';
+  return 'system';
+}
+
+export function profileKindFromRoleKey(
+  roleKey: RoleKey | null | undefined,
+): UserProfileVM['kind'] {
+  if (roleKey === 'educator') return 'educator';
+  if (roleKey === 'child') return 'child';
+  if (roleKey === 'staff' || roleKey === 'admin' || roleKey === 'owner') {
+    return 'staff';
+  }
+  if (roleKey === 'guardian') return 'guardian';
+  return 'system';
 }
 
 export function resolveAvatarSource(value: string | null): AvatarSource {

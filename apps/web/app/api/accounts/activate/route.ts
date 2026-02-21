@@ -5,6 +5,8 @@ import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service
 import { ORG_ID } from '@iconicedu/web/lib/data/ids';
 import { getOrCreateAccount } from '@iconicedu/web/lib/accounts/getOrCreateAccount';
 import { updateAccountStatus } from '@iconicedu/web/lib/accounts/queries/accounts.query';
+import { getUserRoles } from '@iconicedu/web/lib/profile/queries/roles.query';
+import { buildAuthOnboardingState } from '@iconicedu/web/lib/onboarding/auth-state';
 
 export async function POST() {
   const sessionSupabase = await createSupabaseServerClient();
@@ -23,15 +25,24 @@ export async function POST() {
       authEmail: data.user.email ?? null,
     });
 
-    await updateAccountStatus(
+    const statusResponse = await updateAccountStatus(
       serviceSupabase,
       account.id,
-    ORG_ID,
+      ORG_ID,
       'active',
       data.user.id,
     );
+    const activeAccount = statusResponse.data ?? account;
+    const rolesResponse = await getUserRoles(serviceSupabase, account.id, ORG_ID);
+    if (rolesResponse.error) {
+      throw rolesResponse.error;
+    }
+    const onboarding = buildAuthOnboardingState(activeAccount, rolesResponse.data ?? []);
 
-    return NextResponse.json({ status: 'active' });
+    return NextResponse.json({
+      status: 'active',
+      onboarding,
+    });
   } catch (error) {
     console.error('activate-account', error);
     return NextResponse.json(

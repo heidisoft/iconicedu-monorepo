@@ -152,6 +152,32 @@ export async function updateAccountStatus(
     .maybeSingle<AccountRow>();
 }
 
+export async function updateAccountRoleState(
+  supabase: SupabaseClient,
+  input: {
+    accountId: string;
+    orgId: string;
+    primaryRole: AccountRow['primary_role'] | null;
+    roleStatus: NonNullable<AccountRow['role_status']>;
+    onboardingCompletedAt?: string | null;
+    updatedBy?: string | null;
+  },
+) {
+  return supabase
+    .from('accounts')
+    .update({
+      primary_role: input.primaryRole,
+      role_status: input.roleStatus,
+      onboarding_completed_at: input.onboardingCompletedAt ?? null,
+      updated_by: input.updatedBy ?? null,
+    })
+    .eq('id', input.accountId)
+    .eq('org_id', input.orgId)
+    .is('deleted_at', null)
+    .select(ACCOUNT_SELECT)
+    .maybeSingle<AccountRow>();
+}
+
 export async function deleteAccountById(
   supabase: SupabaseClient,
   accountId: string,

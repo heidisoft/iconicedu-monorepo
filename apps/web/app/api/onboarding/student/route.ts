@@ -1,0 +1,183 @@
+import { createHash } from 'crypto';
+import { NextResponse } from 'next/server';
+
+import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
+import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
+import { ORG_ID } from '@iconicedu/web/lib/data/ids';
+import { getOrCreateAccount } from '@iconicedu/web/lib/accounts/getOrCreateAccount';
+import { getUserRoles, upsertUserRole } from '@iconicedu/web/lib/profile/queries/roles.query';
+import { getProfileByAccountId, upsertProfileForAccount } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import { updateAccountRoleState } from '@iconicedu/web/lib/accounts/queries/accounts.query';
+import { buildAuthOnboardingState } from '@iconicedu/web/lib/onboarding/auth-state';
+
+type StudentAccessCodeRow = {
+  id: string;
+  org_id: string;
+  family_id: string | null;
+  guardian_account_id: string | null;
+  status: string;
+  expires_at: string | null;
+  max_uses: number;
+  uses: number;
+};
+
+function hashInviteCode(input: string): string {
+  return createHash('sha256').update(input).digest('hex');
+}
+
+export async function POST(request: Request) {
+  const body = (await request.json().catch(() => null)) as { inviteCode?: unknown } | null;
+  const inviteCode = typeof body?.inviteCode === 'string' ? body.inviteCode.trim() : '';
+
+  if (!inviteCode) {
+    return NextResponse.json(
+      { success: false, message: 'Invite code is required' },
+      { status: 400 },
+    );
+  }
+
+  const sessionSupabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await sessionSupabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+  }
+
+  const serviceSupabase = createSupabaseServiceClient();
+  const { account } = await getOrCreateAccount(serviceSupabase, {
+    orgId: ORG_ID,
+    authUserId: user.id,
+    authEmail: user.email ?? null,
+  });
+
+  const inviteHash = hashInviteCode(inviteCode);
+  const { data: inviteCodeRow, error: codeError } = await serviceSupabase
+    .from('student_access_codes')
+    .select('id, org_id, family_id, guardian_account_id, status, expires_at, max_uses, uses')
+    .eq('org_id', ORG_ID)
+    .eq('code_hash', inviteHash)
+    .is('deleted_at', null)
+    .maybeSingle<StudentAccessCodeRow>();
+
+  if (codeError) {
+    return NextResponse.json({ success: false, message: codeError.message }, { status: 500 });
+  }
+
+  if (!inviteCodeRow || inviteCodeRow.status !== 'active') {
+    return NextResponse.json({ success: false, message: 'Invalid invite code' }, { status: 400 });
+  }
+
+  if (
+    inviteCodeRow.expires_at &&
+    new Date(inviteCodeRow.expires_at).getTime() < Date.now()
+  ) {
+    return NextResponse.json({ success: false, message: 'Invite code has expired' }, { status: 400 });
+  }
+
+  if (inviteCodeRow.uses >= inviteCodeRow.max_uses) {
+    return NextResponse.json({ success: false, message: 'Invite code has already been used' }, { status: 400 });
+  }
+
+  const now = new Date().toISOString();
+
+  if (inviteCodeRow.family_id && inviteCodeRow.guardian_account_id) {
+    const linkResponse = await serviceSupabase.from('family_links').upsert(
+      {
+        org_id: ORG_ID,
+        family_id: inviteCodeRow.family_id,
+        guardian_account_id: inviteCodeRow.guardian_account_id,
+        child_account_id: account.id,
+        relation: 'guardian',
+        permissions_scope: null,
+        created_by: user.id,
+        updated_by: user.id,
+      },
+      { onConflict: 'org_id,family_id,guardian_account_id,child_account_id' },
+    );
+
+    if (linkResponse.error) {
+      return NextResponse.json(
+        { success: false, message: linkResponse.error.message },
+        { status: 500 },
+      );
+    }
+  }
+
+  const currentProfile = await getProfileByAccountId(serviceSupabase, account.id);
+  if (!currentProfile.data || currentProfile.data.kind !== 'child') {
+    const profileResponse = await upsertProfileForAccount(serviceSupabase, {
+      orgId: account.org_id,
+      accountId: account.id,
+      kind: 'child',
+      displayName: currentProfile.data?.display_name ?? null,
+      avatarSource: currentProfile.data?.avatar_source ?? 'seed',
+      avatarUrl: currentProfile.data?.avatar_url ?? null,
+      avatarSeed: currentProfile.data?.avatar_seed ?? account.id,
+      timezone: currentProfile.data?.timezone ?? 'UTC',
+      locale: currentProfile.data?.locale ?? 'en-US',
+      status: currentProfile.data?.status ?? 'active',
+      uiThemeKey: currentProfile.data?.ui_theme_key ?? 'teal',
+    });
+    if (profileResponse.error) {
+      return NextResponse.json(
+        { success: false, message: profileResponse.error.message },
+        { status: 500 },
+      );
+    }
+  }
+
+  const roleResponse = await upsertUserRole(serviceSupabase, {
+    orgId: account.org_id,
+    accountId: account.id,
+    roleKey: 'child',
+    assignedBy: user.id,
+  });
+  if (roleResponse.error) {
+    return NextResponse.json({ success: false, message: roleResponse.error.message }, { status: 500 });
+  }
+
+  const usageResponse = await serviceSupabase
+    .from('student_access_codes')
+    .update({
+      uses: inviteCodeRow.uses + 1,
+      status: inviteCodeRow.uses + 1 >= inviteCodeRow.max_uses ? 'used' : inviteCodeRow.status,
+      updated_at: now,
+    })
+    .eq('id', inviteCodeRow.id)
+    .eq('org_id', ORG_ID);
+  if (usageResponse.error) {
+    return NextResponse.json({ success: false, message: usageResponse.error.message }, { status: 500 });
+  }
+
+  const accountRoleResponse = await updateAccountRoleState(serviceSupabase, {
+    accountId: account.id,
+    orgId: account.org_id,
+    primaryRole: 'child',
+    roleStatus: 'active',
+    onboardingCompletedAt: now,
+    updatedBy: user.id,
+  });
+  if (accountRoleResponse.error || !accountRoleResponse.data) {
+    return NextResponse.json(
+      {
+        success: false,
+        message: accountRoleResponse.error?.message ?? 'Unable to update account role',
+      },
+      { status: 500 },
+    );
+  }
+
+  const rolesResponse = await getUserRoles(serviceSupabase, account.id, account.org_id);
+  if (rolesResponse.error) {
+    return NextResponse.json({ success: false, message: rolesResponse.error.message }, { status: 500 });
+  }
+
+  const onboarding = buildAuthOnboardingState(
+    accountRoleResponse.data,
+    rolesResponse.data ?? [],
+  );
+
+  return NextResponse.json({ success: true, onboarding });
+}

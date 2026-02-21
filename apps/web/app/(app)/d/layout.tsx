@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
 import { SidebarProvider } from '@iconicedu/ui-web';
 import { cookies, headers } from 'next/headers';
 
@@ -34,6 +35,14 @@ export default async function Layout({ children }: { children: ReactNode }) {
     authUserId: authUser.id,
     authEmail: authUser.email ?? null,
   });
+
+  if (!account.primary_role || !account.onboarding_completed_at || account.role_status === 'unassigned') {
+    redirect('/auth/callback?resume=1');
+  }
+
+  if (account.role_status === 'pending' || account.role_status === 'blocked') {
+    redirect('/login/pending-access');
+  }
 
   const headerStore = await headers();
   const referer = headerStore.get('referer');
