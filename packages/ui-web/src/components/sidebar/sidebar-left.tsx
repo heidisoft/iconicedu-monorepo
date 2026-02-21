@@ -53,7 +53,7 @@ import { NavDirectMessages } from '@iconicedu/ui-web/components/sidebar/nav-dire
 import { NavSupervisedDirectMessages } from '@iconicedu/ui-web/components/sidebar/nav-supervised-direct-messages';
 import { NavAdmin } from '@iconicedu/ui-web/components/sidebar/nav-admin';
 import type { AdminMenuSection } from '@iconicedu/shared-types';
-import { SiteLogoWithName } from '@iconicedu/ui-web/components/site-logo-wt-name';
+import { SiteLogoWithName } from '@iconicedu/ui-web/components/branding/site-logo-wt-name';
 import { Empty } from '@iconicedu/ui-web/ui/empty';
 import { EmptyContent } from '@iconicedu/ui-web/ui/empty';
 import { ThemedIconBadge } from '@iconicedu/ui-web/components/shared/themed-icon';

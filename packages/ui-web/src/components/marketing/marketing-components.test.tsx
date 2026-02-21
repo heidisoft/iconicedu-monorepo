@@ -8,6 +8,8 @@ describe('marketing components', () => {
   it('renders marketing header navigation and cta', () => {
     render(<MarketingHeader />);
 
+    expect(screen.getByText('ICONIC Academy')).toBeInTheDocument();
+    expect(screen.getByText('Turn effort into outcomes')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '#home');
     expect(screen.getByRole('link', { name: 'Get Started' })).toHaveAttribute('href', '/login');
   });

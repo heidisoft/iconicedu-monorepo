@@ -1,4 +1,4 @@
-import { SiteLogo } from '@iconicedu/ui-web/components/site-logo';
+import { SiteLogo } from '@iconicedu/ui-web/components/branding/site-logo';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 
 export function SiteLogoWithName({ className }: { className?: string }) {

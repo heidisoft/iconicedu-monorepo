@@ -2,7 +2,7 @@
 import { useIsMobile } from '@iconicedu/ui-web/hooks/use-mobile';
 import { Separator } from '@iconicedu/ui-web/ui/separator';
 import { SidebarTrigger } from '@iconicedu/ui-web/ui/sidebar';
-import { SiteLogo } from '@iconicedu/ui-web/components/site-logo';
+import { SiteLogo } from '@iconicedu/ui-web/components/branding/site-logo';
 import { ThemeToggle } from '@iconicedu/ui-web/components/theme-toggle';
 
 type DashboardHeaderProps = React.ComponentProps<'div'> & {

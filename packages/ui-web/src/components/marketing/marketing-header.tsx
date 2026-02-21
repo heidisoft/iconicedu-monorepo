@@ -1,5 +1,5 @@
 import { Button } from '@iconicedu/ui-web/ui/button';
-import { SiteLogo } from '@iconicedu/ui-web/components/site-logo';
+import { SiteLogoWithName } from '@iconicedu/ui-web/components/branding/site-logo-wt-name';
 
 const NAV_ITEMS = [
   { label: 'Home', href: '#home' },
@@ -14,10 +14,7 @@ export function MarketingHeader() {
     <header className="sticky top-0 z-50 bg-background/80 backdrop-blur">
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 py-5 sm:px-6 lg:px-8">
         <a href="/" className="flex items-center gap-2 text-xl font-bold">
-          <span className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <SiteLogo className="!size-6" />
-          </span>
-          <span className="text-primary">ICONIC Academy</span>
+          <SiteLogoWithName />
         </a>
 
         <div className="hidden items-center gap-8 md:flex">

@@ -7,7 +7,7 @@ import {
   InputOTPSeparator,
   InputOTPSlot,
 } from '@iconicedu/ui-web/ui/input-otp';
-import { SiteLogo } from '@iconicedu/ui-web/components/site-logo';
+import { SiteLogo } from '@iconicedu/ui-web/components/branding/site-logo';
 
 export function OTPForm({ className, ...props }: React.ComponentProps<'div'>) {
   return (

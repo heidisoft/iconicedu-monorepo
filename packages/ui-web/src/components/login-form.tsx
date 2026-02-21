@@ -11,7 +11,7 @@ import {
   FieldSeparator,
 } from '@iconicedu/ui-web/ui/field';
 import { Input } from '@iconicedu/ui-web/ui/input';
-import { SiteLogo } from '@iconicedu/ui-web/components/site-logo';
+import { SiteLogo } from '@iconicedu/ui-web/components/branding/site-logo';
 
 type OAuthProvider = 'apple' | 'google';
 
