@@ -1,4 +1,5 @@
 import { MarketingHeroHeadline } from './marketing-hero-headline';
+import { MarketingHeroPatternBackground } from './marketing-hero-pattern-background';
 import { TRUST_INDICATORS } from './marketing.constants';
 
 export function MarketingHeroSection() {
@@ -7,16 +8,7 @@ export function MarketingHeroSection() {
       id="home"
       className="relative min-h-screen overflow-hidden bg-gradient-to-b from-emerald-50/70 via-background to-background px-4 pb-16 pt-0 dark:from-emerald-950/25 dark:via-background dark:to-background"
     >
-      <div
-        className="pointer-events-none absolute inset-0"
-        aria-hidden="true"
-        data-testid="hero-background"
-      >
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(16,185,129,0.18),transparent_38%),radial-gradient(circle_at_82%_14%,rgba(34,197,94,0.14),transparent_36%)] dark:bg-[radial-gradient(circle_at_18%_18%,rgba(16,185,129,0.26),transparent_40%),radial-gradient(circle_at_82%_14%,rgba(34,197,94,0.22),transparent_38%)]" />
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(16,185,129,0.12)_1px,transparent_1px),linear-gradient(to_bottom,rgba(16,185,129,0.12)_1px,transparent_1px)] bg-[size:44px_44px] [mask-image:radial-gradient(circle_at_center,black,transparent_84%)] dark:bg-[linear-gradient(to_right,rgba(16,185,129,0.2)_1px,transparent_1px),linear-gradient(to_bottom,rgba(16,185,129,0.2)_1px,transparent_1px)]" />
-        <div className="absolute -left-14 top-1/3 h-72 w-72 rounded-full bg-emerald-300/24 blur-3xl dark:bg-emerald-500/22" />
-        <div className="absolute -right-14 top-1/4 h-64 w-64 rounded-full bg-lime-300/20 blur-3xl dark:bg-lime-500/18" />
-      </div>
+      <MarketingHeroPatternBackground />
       <div className="relative z-10 mx-auto max-w-6xl pt-20">
         <div className="mb-12 text-center">
           <MarketingHeroHeadline />

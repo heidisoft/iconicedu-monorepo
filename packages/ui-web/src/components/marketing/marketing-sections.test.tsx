@@ -16,6 +16,7 @@ describe('marketing sections', () => {
     ).toBeInTheDocument();
     expect(container.querySelector('section#home')).toHaveClass('from-emerald-50/70');
     expect(screen.getByTestId('hero-background')).toBeInTheDocument();
+    expect(screen.getByTestId('hero-pattern-cluster')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Start your journey now' })).toHaveAttribute(
       'href',
       '/login',
