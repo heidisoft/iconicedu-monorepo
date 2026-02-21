@@ -13,7 +13,7 @@ export function MarketingHeroSection() {
         data-testid="hero-background"
       >
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(16,185,129,0.18),transparent_38%),radial-gradient(circle_at_82%_14%,rgba(34,197,94,0.14),transparent_36%)] dark:bg-[radial-gradient(circle_at_18%_18%,rgba(16,185,129,0.26),transparent_40%),radial-gradient(circle_at_82%_14%,rgba(34,197,94,0.22),transparent_38%)]" />
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(16,185,129,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(16,185,129,0.05)_1px,transparent_1px)] bg-[size:48px_48px] [mask-image:radial-gradient(circle_at_center,black,transparent_78%)] dark:bg-[linear-gradient(to_right,rgba(16,185,129,0.1)_1px,transparent_1px),linear-gradient(to_bottom,rgba(16,185,129,0.1)_1px,transparent_1px)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(16,185,129,0.12)_1px,transparent_1px),linear-gradient(to_bottom,rgba(16,185,129,0.12)_1px,transparent_1px)] bg-[size:44px_44px] [mask-image:radial-gradient(circle_at_center,black,transparent_84%)] dark:bg-[linear-gradient(to_right,rgba(16,185,129,0.2)_1px,transparent_1px),linear-gradient(to_bottom,rgba(16,185,129,0.2)_1px,transparent_1px)]" />
         <div className="absolute -left-14 top-1/3 h-72 w-72 rounded-full bg-emerald-300/24 blur-3xl dark:bg-emerald-500/22" />
         <div className="absolute -right-14 top-1/4 h-64 w-64 rounded-full bg-lime-300/20 blur-3xl dark:bg-lime-500/18" />
       </div>
@@ -25,7 +25,7 @@ export function MarketingHeroSection() {
             confidence, master new skills, and build a lifelong love of learning at
             their own pace.
           </p>
-          <div className="mx-auto max-w-3xl rounded-3xl border border-border/60 bg-background p-8 shadow-sm md:p-12">
+          <div className="mx-auto max-w-3xl rounded-3xl border border-border/60 bg-background p-8 shadow-sm dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:shadow-emerald-950/20 md:p-12">
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
               <a
                 href="/login"
@@ -35,7 +35,7 @@ export function MarketingHeroSection() {
               </a>
               <a
                 href="/login/tutor"
-                className="inline-flex min-h-12 items-center justify-center rounded-full border border-border bg-background px-8 py-3 text-sm font-semibold text-foreground transition hover:bg-muted"
+                className="inline-flex min-h-12 items-center justify-center rounded-full border border-border bg-background px-8 py-3 text-sm font-semibold text-foreground transition hover:bg-muted dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:hover:bg-emerald-900/35"
               >
                 Become a Tutor
               </a>
