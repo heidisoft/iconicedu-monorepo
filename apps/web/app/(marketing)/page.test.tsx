@@ -19,8 +19,8 @@ describe('marketing home page', () => {
   it('shows learning area pills and footer navigation links', () => {
     render(<HomePage />);
 
-    expect(screen.getByText('Mathematics')).toBeInTheDocument();
-    expect(screen.getByText('Homework Help')).toBeInTheDocument();
+    expect(screen.getByText('Math')).toBeInTheDocument();
+    expect(screen.getByText('Competition Prep')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Programs' })).toHaveAttribute('href', '#subjects');
     expect(screen.getByRole('link', { name: 'Privacy' })).toHaveAttribute('href', '/privacy');
   });
