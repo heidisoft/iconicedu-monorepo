@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { Metadata } from 'next';
 import { SidebarProvider } from '@iconicedu/ui-web';
 import { cookies, headers } from 'next/headers';
 
@@ -11,6 +12,18 @@ import { getOrCreateAccount } from '@iconicedu/web/lib/accounts/getOrCreateAccou
 import { loadSidebarContext } from '@iconicedu/web/lib/sidebar/loadSidebarContext';
 import { buildSidebarBaseData } from '@iconicedu/web/lib/sidebar/buildSidebarBaseData';
 import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
+
+export const metadata: Metadata = {
+  title: {
+    default: 'Dashboard | ICONIC Academy',
+    template: '%s | ICONIC Academy Dashboard',
+  },
+  description: 'ICONIC Academy learner dashboard for classes, messages, and progress tracking.',
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 export default async function Layout({ children }: { children: ReactNode }) {
   const supabase = await createSupabaseServerClient();
