@@ -11,7 +11,7 @@ export function MarketingHeroPatternBackground() {
         className="absolute right-[-4rem] top-[-3rem] h-[90%] w-[82%]"
         data-testid="hero-pattern-cluster"
       >
-        <div className="absolute -left-[72%] top-[0%] grid grid-cols-3 gap-2 md:-left-[10%] md:top-[4%]">
+        <div className="absolute -left-[80%] top-[0%] grid grid-cols-3 gap-2 md:-left-[10%] md:top-[4%]">
           <div className="h-[4.5rem] w-[4.5rem] rounded-full bg-emerald-500/90" />
           <div className="h-[4.5rem] w-[4.5rem] rounded-full bg-emerald-300/90" />
           <div className="h-[4.5rem] w-[4.5rem] rounded-full bg-emerald-200/90" />
