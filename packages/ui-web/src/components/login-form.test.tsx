@@ -1,5 +1,6 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 import { LoginForm } from './login-form';
 
@@ -29,5 +30,25 @@ describe('LoginForm', () => {
     expect(screen.getByRole('status')).toHaveTextContent(
       'Check your inbox for a secure link.',
     );
+  });
+
+  it('shows loading state when sending secure link', async () => {
+    let resolveLogin: (() => void) | null = null;
+    const onEmailLogin = () =>
+      new Promise<void>((resolve) => {
+        resolveLogin = resolve;
+      });
+    const user = userEvent.setup();
+    render(<LoginForm onEmailLogin={onEmailLogin} />);
+
+    await user.type(screen.getByLabelText('Email'), 'parent@example.com');
+    await user.click(screen.getByRole('button', { name: 'Send secure link' }));
+
+    expect(screen.getByRole('button', { name: /Sending secure link/i })).toBeDisabled();
+    expect(document.querySelector('.animate-spin')).toBeInTheDocument();
+
+    await act(async () => {
+      resolveLogin?.();
+    });
   });
 });

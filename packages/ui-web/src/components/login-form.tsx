@@ -12,6 +12,7 @@ import {
 } from '@iconicedu/ui-web/ui/field';
 import { Input } from '@iconicedu/ui-web/ui/input';
 import { SiteLogo } from '@iconicedu/ui-web/components/branding/site-logo';
+import { Loader2 } from 'lucide-react';
 
 type OAuthProvider = 'apple' | 'google';
 
@@ -117,8 +118,20 @@ export function LoginForm({
             ) : null}
           </Field>
           <Field>
-            <Button type="submit" variant="secondary" disabled={isSubmitting}>
-              Send secure link
+            <Button
+              type="submit"
+              variant="secondary"
+              disabled={isSubmitting}
+              className="hover:bg-primary/90 hover:text-primary-foreground"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Sending secure link...
+                </>
+              ) : (
+                'Send secure link'
+              )}
             </Button>
           </Field>
           <div className="space-y-1 text-center text-xs text-muted-foreground">
