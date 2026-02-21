@@ -14,10 +14,10 @@ export function MarketingHeroSection() {
           <MarketingHeroHeadline />
           <p className="mx-auto mb-10 max-w-2xl text-lg text-muted-foreground">
             Personalized learning paths for K-12 students. Help your child gain
-            confidence, master new skills, and build a lifelong love of learning at
-            their own pace.
+            confidence, master new skills, and build a lifelong love of learning at their
+            own pace.
           </p>
-          <div className="mx-auto max-w-3xl rounded-3xl border border-border/60 bg-background p-8 shadow-sm dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:shadow-emerald-950/20 md:p-12">
+          <div className="mx-auto max-w-3xl rounded-3xl border border-border/60 bg-primary/25 p-8 shadow-sm dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:shadow-emerald-950/20 md:p-12">
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
               <a
                 href="/login"
@@ -32,7 +32,7 @@ export function MarketingHeroSection() {
                 Become a Tutor
               </a>
             </div>
-            <div className="mt-5 grid gap-2 text-sm text-muted-foreground sm:grid-cols-3">
+            <div className="mt-5 grid gap-2 text-sm sm:grid-cols-3">
               {TRUST_INDICATORS.map((item) => (
                 <p key={item.text} className="flex items-center justify-center gap-2">
                   <span className="font-semibold text-primary">{item.icon}</span>

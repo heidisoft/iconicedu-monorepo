@@ -33,8 +33,12 @@ export function MarketingHeader() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button asChild className="rounded-full px-6">
-            <a href="/login">Get Started</a>
+          <Button
+            variant={'outline'}
+            asChild
+            className="rounded-full px-6 bg-transparent border-emerald-500/70 text-emerald-700 hover:bg-emerald-100/70 hover:border-emerald-500"
+          >
+            <a href="/login">Log In</a>
           </Button>
           <ThemeToggle />
         </div>
