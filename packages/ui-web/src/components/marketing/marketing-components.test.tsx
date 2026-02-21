@@ -1,15 +1,23 @@
 import React from 'react';
+import { vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
 import { MarketingHeader } from './marketing-header';
 import { MarketingHomePage } from './marketing-home-page';
 
+vi.mock('next-themes', () => ({
+  useTheme: () => ({
+    theme: 'system',
+    setTheme: vi.fn(),
+  }),
+}));
+
 describe('marketing components', () => {
   it('renders marketing header navigation and cta', () => {
-    render(<MarketingHeader />);
+    const { container } = render(<MarketingHeader />);
 
-    expect(screen.getByText('ICONIC Academy')).toBeInTheDocument();
-    expect(screen.getByText('Turn effort into outcomes')).toBeInTheDocument();
+    expect(container.querySelector('svg')?.getAttribute('viewBox')).toBe('0 0 215.11 77.39');
+    expect(screen.getByRole('button', { name: 'Toggle theme (current: system)' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '#home');
     expect(screen.getByRole('link', { name: 'Get Started' })).toHaveAttribute('href', '/login');
   });

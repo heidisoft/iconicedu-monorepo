@@ -1,5 +1,6 @@
 import { Button } from '@iconicedu/ui-web/ui/button';
-import { SiteLogoWithName } from '@iconicedu/ui-web/components/branding/site-logo-wt-name';
+import { SiteLogoFull } from '@iconicedu/ui-web/components/branding/site-logo-full';
+import { ThemeToggle } from '@iconicedu/ui-web/components/theme-toggle';
 
 const NAV_ITEMS = [
   { label: 'Home', href: '#home' },
@@ -13,8 +14,10 @@ export function MarketingHeader() {
   return (
     <header className="sticky top-0 z-50 bg-background/80 backdrop-blur">
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 py-5 sm:px-6 lg:px-8">
-        <a href="/" className="flex items-center gap-2 text-xl font-bold">
-          <SiteLogoWithName />
+        <a href="/" className="flex items-center gap-2 text-xl font-bold text-foreground">
+          <span className="flex items-center justify-center rounded-lg">
+            <SiteLogoFull className="h-10 w-auto sm:h-12" />
+          </span>
         </a>
 
         <div className="hidden items-center gap-8 md:flex">
@@ -29,9 +32,12 @@ export function MarketingHeader() {
           ))}
         </div>
 
-        <Button asChild className="rounded-full px-6">
-          <a href="/login">Get Started</a>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button asChild className="rounded-full px-6">
+            <a href="/login">Get Started</a>
+          </Button>
+          <ThemeToggle />
+        </div>
       </nav>
     </header>
   );

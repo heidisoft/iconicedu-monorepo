@@ -19,7 +19,7 @@ describe('SiteLogo', () => {
 });
 
 describe('SiteLogoFull', () => {
-  it('uses a unique gradient id for each rendered instance', () => {
+  it('uses unique gradient ids and keeps all fill references valid', () => {
     const { container } = render(
       <>
         <SiteLogoFull />
@@ -28,17 +28,32 @@ describe('SiteLogoFull', () => {
     );
 
     const gradients = Array.from(container.querySelectorAll('linearGradient'));
-    expect(gradients).toHaveLength(2);
+    expect(gradients).toHaveLength(16);
 
     const gradientIds = gradients.map((gradient) => gradient.getAttribute('id'));
-    expect(gradientIds[0]).toBeTruthy();
-    expect(gradientIds[1]).toBeTruthy();
-    expect(gradientIds[0]).not.toEqual(gradientIds[1]);
+    expect(gradientIds.every(Boolean)).toBe(true);
+    expect(new Set(gradientIds).size).toBe(gradientIds.length);
 
     const fills = Array.from(container.querySelectorAll('path[fill^="url(#"]')).map((path) =>
       path.getAttribute('fill'),
     );
-    expect(fills).toEqual([`url(#${gradientIds[0]})`, `url(#${gradientIds[1]})`]);
+    expect(fills).toHaveLength(16);
+    for (const fill of fills) {
+      expect(fill).toBeTruthy();
+      const fillId = fill?.replace('url(#', '').replace(')', '');
+      expect(gradientIds).toContain(fillId);
+    }
+  });
+
+  it('defaults to proportional sizing and theme-aware fill', () => {
+    const { container } = render(<SiteLogoFull />);
+
+    const svg = container.querySelector('svg');
+    expect(svg).toHaveClass('h-8');
+    expect(svg).toHaveClass('w-auto');
+
+    const baseLayer = container.querySelector('g[data-name="Layer 1"]');
+    expect(baseLayer?.getAttribute('fill')).toBe('currentColor');
   });
 });
 
