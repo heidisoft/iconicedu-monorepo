@@ -11,7 +11,7 @@ export function MarketingHeroPatternBackground() {
         className="absolute right-[-4rem] top-[-3rem] h-[90%] w-[82%]"
         data-testid="hero-pattern-cluster"
       >
-        <div className="absolute -left-[72%] top-[0%] grid grid-cols-3 gap-2 md:left-[0%]">
+        <div className="absolute -left-[72%] top-[0%] grid grid-cols-3 gap-2 md:-left-[10%] md:top-[4%]">
           <div className="h-[4.5rem] w-[4.5rem] rounded-full bg-emerald-500/90" />
           <div className="h-[4.5rem] w-[4.5rem] rounded-full bg-emerald-300/90" />
           <div className="h-[4.5rem] w-[4.5rem] rounded-full bg-emerald-200/90" />
@@ -20,12 +20,12 @@ export function MarketingHeroPatternBackground() {
           <div className="h-[4.5rem] w-[4.5rem] rounded-tl-[4rem] rounded-br-[4rem] bg-emerald-500/85" />
         </div>
 
-        <div className="absolute right-[1%] top-[3%] h-40 w-40 rounded-full border-[26px] border-emerald-500/90 dark:border-emerald-400/75">
+        <div className="absolute right-[1%] top-[3%] h-40 w-40 rounded-full border-[26px] border-emerald-500/90 dark:border-emerald-400/75 md:right-[10%] md:top-[10%]">
           <div className="absolute inset-6 rounded-full bg-slate-800/90 dark:bg-slate-900/90" />
         </div>
 
         {/* <div className="absolute right-[0%] top-[22%] h-64 w-64 bg-[conic-gradient(from_225deg,rgba(51,65,85,0.94)_0_50%,rgba(16,185,129,0.86)_50%_100%)] dark:bg-[conic-gradient(from_225deg,rgba(15,23,42,0.96)_0_50%,rgba(5,150,105,0.78)_50%_100%)]" /> */}
-        <div className="absolute right-[0%] top-[30%] h-32 w-32 rotate-45 border-[18px] border-slate-200/85 dark:border-slate-700/70" />
+        <div className="absolute right-[0%] top-[30%] h-32 w-32 rotate-45 border-[18px] border-slate-200/85 dark:border-slate-700/70 md:right-[30%] md:top-[40%]" />
 
         {/* <div className="absolute right-[2%] top-[46%] h-52 w-52 rounded-full border-[38px] border-emerald-500/86 dark:border-emerald-500/74">
           <div className="absolute inset-8 rounded-full bg-slate-800/90 dark:bg-slate-900/90" />
