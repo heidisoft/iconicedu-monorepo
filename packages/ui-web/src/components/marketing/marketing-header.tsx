@@ -12,7 +12,7 @@ const NAV_ITEMS = [
 
 export function MarketingHeader() {
   return (
-    <header className="sticky top-0 z-50 border-b border-emerald-100/70 bg-emerald-50/70 backdrop-blur dark:border-emerald-900/40 dark:bg-emerald-950/20">
+    <header className="sticky top-0 z-50 border-b border-emerald-100/70 bg-emerald-50/70 backdrop-blur dark:border-emerald-800/55 dark:bg-gradient-to-b dark:from-emerald-950/45 dark:to-emerald-950/30 dark:shadow-[inset_0_-1px_0_rgba(16,185,129,0.18)]">
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 py-5 sm:px-6 lg:px-8">
         <a href="/" className="flex items-center gap-2 text-xl font-bold text-foreground">
           <span className="flex items-center justify-center rounded-lg">
