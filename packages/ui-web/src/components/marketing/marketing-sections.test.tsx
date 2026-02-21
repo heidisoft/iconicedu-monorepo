@@ -9,11 +9,12 @@ import { MarketingTrustStatsSection } from './marketing-trust-stats-section';
 
 describe('marketing sections', () => {
   it('renders hero section CTAs', () => {
-    render(<MarketingHeroSection />);
+    const { container } = render(<MarketingHeroSection />);
 
     expect(
       screen.getByRole('heading', { name: /It's time to unlock your .* potential/i }),
     ).toBeInTheDocument();
+    expect(container.querySelector('section#home')).toHaveClass('from-emerald-50/70');
     expect(screen.getByTestId('hero-background')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Start your journey now' })).toHaveAttribute(
       'href',

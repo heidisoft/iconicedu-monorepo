@@ -16,6 +16,7 @@ describe('marketing components', () => {
   it('renders marketing header navigation and cta', () => {
     const { container } = render(<MarketingHeader />);
 
+    expect(container.querySelector('header')).toHaveClass('bg-emerald-50/70');
     expect(container.querySelector('svg')?.getAttribute('viewBox')).toBe('0 0 215.11 77.39');
     expect(screen.getByRole('button', { name: 'Toggle theme (current: system)' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '#home');
