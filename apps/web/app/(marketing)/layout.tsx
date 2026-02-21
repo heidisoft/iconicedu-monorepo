@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type { Metadata } from 'next';
 import { MarketingHeader } from '@iconicedu/ui-web';
+import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 
 export const metadata: Metadata = {
   title: 'ICONIC Academy | Personalized Online Tutoring for K-12',
@@ -39,10 +40,15 @@ export const metadata: Metadata = {
   },
 };
 
-export default function SiteLayout({ children }: { children: ReactNode }) {
+export default async function SiteLayout({ children }: { children: ReactNode }) {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   return (
     <>
-      <MarketingHeader />
+      <MarketingHeader isAuthenticated={Boolean(user)} />
       <main>{children}</main>
     </>
   );

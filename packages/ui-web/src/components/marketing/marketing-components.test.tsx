@@ -20,7 +20,13 @@ describe('marketing components', () => {
     expect(container.querySelector('svg')?.getAttribute('viewBox')).toBe('0 0 215.11 77.39');
     expect(screen.getByRole('button', { name: 'Toggle theme (current: system)' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '#home');
-    expect(screen.getByRole('link', { name: 'Get Started' })).toHaveAttribute('href', '/login');
+    expect(screen.getByRole('link', { name: 'Log In' })).toHaveAttribute('href', '/login');
+  });
+
+  it('renders dashboard cta when user is authenticated', () => {
+    render(<MarketingHeader isAuthenticated />);
+
+    expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '/d');
   });
 
   it('renders marketing home page with primary cta and footer links', () => {

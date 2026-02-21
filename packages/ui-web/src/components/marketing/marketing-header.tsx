@@ -10,7 +10,14 @@ const NAV_ITEMS = [
   { label: 'About', href: '#about' },
 ] as const;
 
-export function MarketingHeader() {
+type MarketingHeaderProps = {
+  isAuthenticated?: boolean;
+};
+
+export function MarketingHeader({ isAuthenticated = false }: MarketingHeaderProps) {
+  const ctaLabel = isAuthenticated ? 'Dashboard' : 'Log In';
+  const ctaHref = isAuthenticated ? '/d' : '/login';
+
   return (
     <header className="sticky top-0 z-50 border-b border-emerald-100/70 bg-emerald-50/70 backdrop-blur dark:border-emerald-800/55 dark:bg-emerald-950/30">
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 py-5 sm:px-6 lg:px-8">
@@ -38,7 +45,7 @@ export function MarketingHeader() {
             asChild
             className="rounded-full px-6 bg-transparent border-emerald-500/70 text-emerald-700 hover:bg-emerald-100/70 hover:border-emerald-500"
           >
-            <a href="/login">Log In</a>
+            <a href={ctaHref}>{ctaLabel}</a>
           </Button>
           <ThemeToggle />
         </div>
