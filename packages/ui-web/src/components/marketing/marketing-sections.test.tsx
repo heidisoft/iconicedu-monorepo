@@ -23,11 +23,14 @@ describe('marketing sections', () => {
     );
   });
 
-  it('renders subjects section pills', () => {
+  it('renders subjects carousel', () => {
     render(<MarketingSubjectsSection />);
 
-    expect(screen.getByText('Mathematics')).toBeInTheDocument();
-    expect(screen.getByText('Homework Help')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Hero subjects carousel' })).toBeInTheDocument();
+    expect(screen.getByText('Math')).toBeInTheDocument();
+    expect(screen.getByText('Competition Prep')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Previous slide' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Next slide' })).toBeInTheDocument();
   });
 
   it('renders trust stats section cards', () => {

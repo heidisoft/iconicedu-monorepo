@@ -50,7 +50,7 @@ export function MarketingHeroHeadline() {
           <span className="block text-foreground">It&apos;s time to</span>
           <span className="mt-2 flex flex-wrap items-center justify-center gap-3 md:gap-4">
             <span className="text-foreground">unlock your</span>
-            <span className="inline-flex items-center gap-2 rounded-4xl bg-primary/15 px-4 py-1 text-primary border border-border/60 dark:border-emerald-900/50">
+            <span className="text-2xl md:text-5xl inline-flex items-center gap-2 rounded-4xl bg-primary/15 px-4 py-1 text-primary border border-border/60 dark:border-emerald-900/50">
               <span>🎓</span>
               <span className="font-semibold text-primary">child&apos;s</span>
             </span>

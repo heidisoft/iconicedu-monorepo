@@ -92,9 +92,9 @@ export const FOOTER_LINK_GROUPS = [
 ] as const;
 
 export const TRUST_INDICATORS = [
-  { icon: '✓', text: 'Used by 500K+ families' },
-  { icon: '✓', text: 'Trusted by educators' },
-  { icon: '✓', text: 'No credit card needed' },
+  { icon: '✓', text: 'Aligned with School Curriculum' },
+  { icon: '✓', text: 'Personalized 1-on-1 Instruction' },
+  { icon: '✓', text: 'Certified & Experienced Teachers' },
 ] as const;
 
 export const TYPE_SPEED_MS = 80;

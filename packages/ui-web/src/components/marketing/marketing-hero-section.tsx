@@ -34,7 +34,7 @@ export function MarketingHeroSection() {
             </div>
             <div className="mt-5 grid gap-2 text-sm sm:grid-cols-3">
               {TRUST_INDICATORS.map((item) => (
-                <p key={item.text} className="flex items-center justify-center gap-2">
+                <p key={item.text} className="flex justify-center gap-2">
                   <span className="font-semibold text-primary">{item.icon}</span>
                   <span>{item.text}</span>
                 </p>
