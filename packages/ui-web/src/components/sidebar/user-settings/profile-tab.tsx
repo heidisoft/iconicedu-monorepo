@@ -38,6 +38,7 @@ import {
 import { ChevronIcon } from '@iconicedu/ui-web/components/sidebar/user-settings/components/chevron-icon';
 import { useSequentialHighlight } from '@iconicedu/ui-web/components/sidebar/user-settings/hooks/use-sequential-highlight';
 import { resolveProfileDisplayNameForSave } from '@iconicedu/ui-web/components/sidebar/user-settings/profile-tab.utils';
+import { getProfileFullName } from '@iconicedu/ui-web/lib/display-name';
 
 type ProfileTabProps = {
   profile: UserProfileVM;
@@ -357,10 +358,7 @@ export function ProfileTab({
     ? null
     : (avatarPreview ?? profileBlock.avatar.url ?? null);
   const hasAvatar = Boolean(profileBlock.avatar.url ?? avatarPreview) && !avatarRemoved;
-  const fallbackName =
-    profileBlock.displayName?.trim() ||
-    `${profileBlock.firstName ?? ''} ${profileBlock.lastName ?? ''}`.trim() ||
-    'User';
+  const fallbackName = getProfileFullName(profileBlock);
   const avatarInitials = fallbackName
     .split(' ')
     .map((part) => part[0])
@@ -384,7 +382,7 @@ export function ProfileTab({
           <UserSettingsTabSection
             icon={<User className="h-5 w-5" />}
             title="Profile details"
-            subtitle={profileBlock.displayName}
+            subtitle={getProfileFullName(profileBlock)}
             open={expandProfileDetails ? true : profileDetailsOpen}
             onOpenChange={(nextOpen) => {
               if (expandProfileDetails) return;

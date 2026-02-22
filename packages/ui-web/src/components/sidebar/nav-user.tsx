@@ -29,7 +29,7 @@ import type {
   UserAccountVM,
   UserProfileVM,
 } from '@iconicedu/shared-types';
-import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
+import { getProfileFullName } from '@iconicedu/ui-web/lib/display-name';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -183,7 +183,7 @@ export function NavUser({
   onOnboardingComplete?: () => void;
 }) {
   const { isMobile } = useSidebar();
-  const profileDisplayName = getProfileDisplayName(profile.profile);
+  const profileDisplayName = getProfileFullName(profile.profile);
   const secondaryLabel =
     account?.contacts.email ?? profile.prefs.locale ?? profile.prefs.timezone ?? '';
   const [settingsOpen, setSettingsOpen] = React.useState(false);

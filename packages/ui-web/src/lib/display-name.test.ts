@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getProfileDisplayName } from './display-name';
+import { getProfileDisplayName, getProfileFullName } from './display-name';
 
 describe('getProfileDisplayName', () => {
   it('uses display name as-is when available', () => {
@@ -29,5 +29,37 @@ describe('getProfileDisplayName', () => {
         lastName: 'Johnson',
       }),
     ).toBe('Maya J.');
+  });
+});
+
+describe('getProfileFullName', () => {
+  it('uses first and last name when available', () => {
+    expect(
+      getProfileFullName({
+        firstName: 'Sara',
+        lastName: 'Parras',
+        displayName: 'Sara P.',
+      }),
+    ).toBe('Sara Parras');
+  });
+
+  it('falls back to first name when last name is missing', () => {
+    expect(
+      getProfileFullName({
+        firstName: 'Sara',
+        lastName: null,
+        displayName: 'Sara P.',
+      }),
+    ).toBe('Sara');
+  });
+
+  it('falls back to display name when first/last are missing', () => {
+    expect(
+      getProfileFullName({
+        firstName: null,
+        lastName: null,
+        displayName: 'Existing Name',
+      }),
+    ).toBe('Existing Name');
   });
 });

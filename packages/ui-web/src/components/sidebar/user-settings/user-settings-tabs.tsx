@@ -18,7 +18,7 @@ import { Separator } from '@iconicedu/ui-web/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@iconicedu/ui-web/ui/tabs';
 import { useSidebar } from '@iconicedu/ui-web/ui/sidebar';
 import { cn } from '@iconicedu/ui-web/lib/utils';
-import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
+import { getProfileDisplayName, getProfileFullName } from '@iconicedu/ui-web/lib/display-name';
 import { AccountTab, type AccountSectionKey } from '@iconicedu/ui-web/components/sidebar/user-settings/account-tab';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { FamilyTab } from '@iconicedu/ui-web/components/sidebar/user-settings/family-tab';
@@ -165,7 +165,7 @@ export function UserSettingsTabs({
 }: UserSettingsTabsProps) {
   const { isMobile } = useSidebar();
   const profileBlock = profile.profile;
-  const profileDisplayName = getProfileDisplayName(profileBlock);
+  const profileFullName = getProfileFullName(profileBlock);
   const prefs = profile.prefs;
   const contacts = account?.contacts;
   const email = contacts?.email ?? '';
@@ -268,7 +268,7 @@ export function UserSettingsTabs({
       id: profile.ids.id,
       profileId: profile.ids.id,
       orgId: profile.ids.orgId,
-      name: profileDisplayName,
+      name: profileFullName,
       firstName: profileBlock.firstName ?? undefined,
       lastName: profileBlock.lastName ?? undefined,
       bio: profileBlock.bio ?? undefined,
@@ -309,7 +309,7 @@ export function UserSettingsTabs({
   }, [
     profile.ids.id,
     profileBlock.avatar,
-    profileDisplayName,
+    profileFullName,
     contacts?.email,
     profile.ui?.themeKey,
     guardianChildren,
