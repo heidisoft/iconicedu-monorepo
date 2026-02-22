@@ -40,7 +40,7 @@ export default async function OrgLoginPage({
     if (accountResponse.data?.org_id) {
       redirect(await resolveOrgDashboardPath(serviceSupabase, accountResponse.data.org_id));
     }
-    redirect(`/auth/callback?resume=1&org=${org.slug}&intent=login`);
+    redirect(`/${org.slug}/get-started`);
   }
 
   return (

@@ -14,6 +14,7 @@ import { UserSettingsTabSection } from '@iconicedu/ui-web/components/sidebar/use
 import { Checkbox } from '@iconicedu/ui-web/ui/checkbox';
 import { BorderBeam } from '@iconicedu/ui-web/ui/border-beam';
 import { useSequentialHighlight } from '@iconicedu/ui-web/components/sidebar/user-settings/hooks/use-sequential-highlight';
+import { getPhoneValidationError } from '@iconicedu/ui-web/components/sidebar/user-settings/account-tab.utils';
 
 export type AccountSectionKey = 'email' | 'phone' | 'whatsapp';
 
@@ -176,15 +177,15 @@ export function AccountTab({
     }
     const trimmedPhone = phoneInputValue.trim();
     const parsed = trimmedPhone ? parsePhoneNumberFromString(trimmedPhone) : undefined;
-    if (!trimmedPhone && !isChildAccount) {
-      setPhoneError('Please enter your phone number.');
-      return;
-    }
-    if (trimmedPhone && !parsed?.isValid()) {
-      setPhoneError('Enter a valid international number (e.g. +1 415 555 0100).');
+    const validationError = getPhoneValidationError(phoneInputValue, {
+      required: !isChildAccount,
+    });
+    if (validationError) {
+      setPhoneError(validationError);
       return;
     }
     setIsPhoneSaving(true);
+    setPhoneError(null);
     try {
       await onAccountUpdate({
         accountId,
@@ -355,6 +356,10 @@ export function AccountTab({
                         if (formatted) {
                           setPhoneValue(formatted);
                         }
+                        const validationError = getPhoneValidationError(phoneInputValue, {
+                          required: !isChildAccount,
+                        });
+                        setPhoneError(validationError);
                       }}
                       onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
                         setPhoneValue(formatPhoneInput(event.target.value));
@@ -375,6 +380,9 @@ export function AccountTab({
                   We’ll send a verification code by text. Include your country code (e.g.
                   +1, +44, +61).
                 </div>
+                {phoneError ? (
+                  <div className="text-xs text-destructive">{phoneError}</div>
+                ) : null}
               </div>
               {contacts?.phoneVerified ? (
                 <div className="sm:col-span-2 flex items-center justify-between rounded-xl border border-border/60 px-4 py-3">

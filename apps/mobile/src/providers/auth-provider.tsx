@@ -7,21 +7,43 @@ import React, {
   useMemo,
 } from 'react';
 import { type Session, type User } from '@supabase/supabase-js';
+import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '@/lib/supabase/client';
+
+// Explicit path is required — bare `iconicedu://` does not match Supabase's `iconicedu://**` glob.
+// Ensure `iconicedu://auth-callback` (or `iconicedu://**`) is in
+// Supabase → Auth → URL Configuration → Redirect URLs.
+const GOOGLE_REDIRECT_URI = 'iconicedu://auth-callback';
+
+// Required for iOS Safari View Controller / Android Chrome Custom Tab to complete the session
+WebBrowser.maybeCompleteAuthSession();
 
 type AuthState = {
   session: Session | null;
   user: User | null;
   loading: boolean;
   signInWithOtp: (email: string) => Promise<{ error: string | null }>;
-  verifyOtp: (
-    email: string,
-    token: string,
-  ) => Promise<{ error: string | null }>;
+  verifyOtp: (email: string, token: string) => Promise<{ error: string | null }>;
+  signInWithGoogle: () => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
+
+/** Check that the signed-in user has an account row with an org assigned. */
+async function checkOrgAssignment(userId: string): Promise<string | null> {
+  const { data: account } = await supabase
+    .from('accounts')
+    .select('org_id')
+    .eq('auth_user_id', userId)
+    .maybeSingle();
+
+  if (!account?.org_id) {
+    await supabase.auth.signOut();
+    return 'Your account is not linked to an organisation. Please contact your administrator.';
+  }
+  return null;
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -42,18 +64,96 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
+  /** Send a sign-in OTP. Only works for accounts that already exist. */
   const signInWithOtp = useCallback(async (email: string) => {
-    const { error } = await supabase.auth.signInWithOtp({ email });
-    return { error: error?.message ?? null };
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: false },
+    });
+
+    if (error) {
+      const msg = error.message.toLowerCase();
+      if (
+        msg.includes('signups not allowed') ||
+        msg.includes('user not found') ||
+        error.status === 422 ||
+        error.status === 400
+      ) {
+        return { error: 'No account found with this email address. Visit www.iconicedu.lk to sign up before logging in to the app.' };
+      }
+      return { error: error.message };
+    }
+
+    return { error: null };
   }, []);
 
+  /** Verify OTP code and confirm org membership before allowing access. */
   const verifyOtp = useCallback(async (email: string, token: string) => {
-    const { error } = await supabase.auth.verifyOtp({
+    const { data, error } = await supabase.auth.verifyOtp({
       email,
       token,
       type: 'email',
     });
-    return { error: error?.message ?? null };
+
+    if (error) return { error: error.message };
+
+    if (data.user) {
+      const orgError = await checkOrgAssignment(data.user.id);
+      if (orgError) return { error: orgError };
+    }
+
+    return { error: null };
+  }, []);
+
+  /**
+   * Sign in with Google via Supabase OAuth (implicit flow).
+   * Opens Safari View Controller (iOS) / Chrome Custom Tab (Android).
+   * Supabase returns access_token + refresh_token in the URL hash.
+   */
+  const signInWithGoogle = useCallback(async () => {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: GOOGLE_REDIRECT_URI,
+        skipBrowserRedirect: true,
+      },
+    });
+
+    if (error || !data.url) {
+      return { error: error?.message ?? 'Could not start Google sign-in.' };
+    }
+
+    const browserResult = await WebBrowser.openAuthSessionAsync(data.url, GOOGLE_REDIRECT_URI);
+
+    if (browserResult.type !== 'success') {
+      return { error: null };
+    }
+
+    // Implicit flow: tokens arrive in the URL hash fragment
+    const url = browserResult.url;
+    const fragment = url.includes('#') ? url.split('#')[1] : url.split('?')[1] ?? '';
+    const params = new URLSearchParams(fragment);
+    const accessToken = params.get('access_token');
+    const refreshToken = params.get('refresh_token');
+
+    if (!accessToken) {
+      return { error: 'Sign-in failed. No token received.' };
+    }
+
+    const { error: sessionError } = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken ?? '',
+    });
+
+    if (sessionError) return { error: sessionError.message };
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const orgError = await checkOrgAssignment(user.id);
+      if (orgError) return { error: orgError };
+    }
+
+    return { error: null };
   }, []);
 
   const signOut = useCallback(async () => {
@@ -67,9 +167,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       signInWithOtp,
       verifyOtp,
+      signInWithGoogle,
       signOut,
     }),
-    [session, loading, signInWithOtp, verifyOtp, signOut],
+    [session, loading, signInWithOtp, verifyOtp, signInWithGoogle, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

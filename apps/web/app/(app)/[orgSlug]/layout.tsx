@@ -13,6 +13,7 @@ import { loadSidebarContext } from '@iconicedu/web/lib/sidebar/loadSidebarContex
 import { buildSidebarBaseData } from '@iconicedu/web/lib/sidebar/buildSidebarBaseData';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
 import { resolveOrgDashboardPath } from '@iconicedu/web/lib/org/resolve-dashboard-path';
+import { shouldRedirectToAuthResume } from '@iconicedu/web/app/(app)/[orgSlug]/layout-auth-gate';
 
 export const metadata: Metadata = {
   title: {
@@ -53,7 +54,7 @@ export default async function Layout({
     redirect(destination);
   }
 
-  if (!account.primary_role || !account.onboarding_completed_at || account.role_status === 'unassigned') {
+  if (shouldRedirectToAuthResume(account)) {
     redirect('/auth/callback?resume=1');
   }
 

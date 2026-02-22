@@ -1,48 +1,23 @@
-import React from 'react';
+import React, { useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   ScrollView,
   StyleSheet,
-  Switch,
   Alert,
-  Modal,
-  TouchableOpacity,
-  Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, Circle } from 'react-native-svg';
-import { SectionCard, SettingsRow } from '@iconicedu/ui-native';
+import { useRouter } from 'expo-router';
+import { SettingsRow } from '@iconicedu/ui-native';
 import { useAuth } from '@/providers/auth-provider';
 import { useTheme } from '@/providers/theme-provider';
-import type { AppColors, ThemeMode } from '@/lib/theme';
+import { useAccount } from '@/hooks/use-account';
+import { useProfile } from '@/hooks/use-profile';
+import type { AppColors } from '@/lib/theme';
 
-function makeStyles(C: AppColors) {
-  return StyleSheet.create({
-    safe:         { flex: 1, backgroundColor: C.pageBg },
-    scroll:       { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 48, gap: 14 },
-    pageTitle:    { fontSize: 28, fontWeight: '800', color: C.text, letterSpacing: -0.5, textAlign: 'center', marginBottom: 2 },
-    card:         { borderRadius: 16, borderWidth: 1, borderColor: C.border, overflow: 'hidden' },
-    profileRow:   { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 18 },
-    avatarWrap:   { width: 56, height: 56, borderRadius: 28, backgroundColor: C.teal, alignItems: 'center', justifyContent: 'center' },
-    avatarTxt:    { color: C.tealFg, fontWeight: '800', fontSize: 22 },
-    profileInfo:  { flex: 1, gap: 3 },
-    profileName:  { fontSize: 17, fontWeight: '700', color: C.text },
-    profileEmail: { fontSize: 13, color: C.textMuted },
-    divider:      { height: 1, backgroundColor: C.border, marginLeft: 60 },
-    version:      { textAlign: 'center', fontSize: 12, color: C.textFaint, marginTop: 4 },
-    // Appearance modal
-    overlay:      { flex: 1, backgroundColor: C.modalOverlay, justifyContent: 'flex-end' },
-    sheet:        { backgroundColor: C.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 12, paddingBottom: 40 },
-    sheetHandle:  { width: 36, height: 4, borderRadius: 2, backgroundColor: C.border, alignSelf: 'center', marginBottom: 20 },
-    sheetTitle:   { fontSize: 17, fontWeight: '700', color: C.text, textAlign: 'center', marginBottom: 16 },
-    modeRow:      { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 24, gap: 14 },
-    modeLabel:    { flex: 1, fontSize: 16, color: C.text, fontWeight: '500' },
-    modeSub:      { fontSize: 13, color: C.textMuted },
-  });
-}
+// ─── Icons ────────────────────────────────────────────────────────────────────
 
-// ── SVG icons ─────────────────────────────────────────────────────────────────
 function UserIcon({ color }: { color: string }) {
   return (
     <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
@@ -51,20 +26,11 @@ function UserIcon({ color }: { color: string }) {
     </Svg>
   );
 }
-function GearIcon({ color }: { color: string }) {
+function MailIcon({ color }: { color: string }) {
   return (
     <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-      <Circle cx={12} cy={12} r={3} stroke={color} strokeWidth={1.8} />
-      <Path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"
-        stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
-}
-function BellIcon({ color }: { color: string }) {
-  return (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-      <Path d="M18 8C18 6.4 17.37 4.87 16.24 3.76C15.13 2.63 13.6 2 12 2C10.4 2 8.87 2.63 7.76 3.76C6.63 4.87 6 6.4 6 8C6 15 3 17 3 17H21C21 17 18 15 18 8Z" stroke={color} strokeWidth={1.8} strokeLinejoin="round" strokeLinecap="round" />
-      <Path d="M13.73 21C13.55 21.3 13.3 21.55 13 21.72C12.7 21.89 12.35 21.97 12 21.97C11.65 21.97 11.3 21.89 11 21.72C10.7 21.55 10.45 21.3 10.27 21" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M4 4H20C21.1 4 22 4.9 22 6V18C22 19.1 21.1 20 20 20H4C2.9 20 2 19.1 2 18V6C2 4.9 2.9 4 4 4Z" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M22 6L12 13L2 6" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }
@@ -76,12 +42,29 @@ function AppearanceIcon({ color }: { color: string }) {
     </Svg>
   );
 }
-function HelpIcon({ color }: { color: string }) {
+function MapPinIcon({ color }: { color: string }) {
   return (
     <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-      <Circle cx={12} cy={12} r={10} stroke={color} strokeWidth={1.8} />
-      <Path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-      <Path d="M12 17h.01" stroke={color} strokeWidth={2} strokeLinecap="round" />
+      <Path d="M21 10C21 17 12 23 12 23C12 23 3 17 3 10C3 7.61305 3.94821 5.32387 5.63604 3.63604C7.32387 1.94821 9.61305 1 12 1C14.3869 1 16.6761 1.94821 18.364 3.63604C20.0518 5.32387 21 7.61305 21 10Z" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+      <Circle cx={12} cy={10} r={3} stroke={color} strokeWidth={1.8} />
+    </Svg>
+  );
+}
+function BellIcon({ color }: { color: string }) {
+  return (
+    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+      <Path d="M18 8C18 6.4 17.37 4.87 16.24 3.76C15.13 2.63 13.6 2 12 2C10.4 2 8.87 2.63 7.76 3.76C6.63 4.87 6 6.4 6 8C6 15 3 17 3 17H21C21 17 18 15 18 8Z" stroke={color} strokeWidth={1.8} strokeLinejoin="round" strokeLinecap="round" />
+      <Path d="M13.73 21C13.55 21.3 13.3 21.55 13 21.72C12.7 21.89 12.35 21.97 12 21.97C11.65 21.97 11.3 21.89 11 21.72C10.7 21.55 10.45 21.3 10.27 21" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+function UsersIcon({ color }: { color: string }) {
+  return (
+    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+      <Path d="M17 21V19C17 17.9391 16.5786 16.9217 15.8284 16.1716C15.0783 15.4214 14.0609 15 13 15H5C3.93913 15 2.92172 15.4214 2.17157 16.1716C1.42143 16.9217 1 17.9391 1 19V21" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+      <Circle cx={9} cy={7} r={4} stroke={color} strokeWidth={1.8} />
+      <Path d="M23 21V19C22.9993 18.1137 22.7044 17.2528 22.1614 16.5523C21.6184 15.8519 20.8581 15.3516 20 15.13" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M16 3.13C16.8604 3.3503 17.623 3.8507 18.1676 4.55231C18.7122 5.25392 19.0078 6.11683 19.0078 7.005C19.0078 7.89317 18.7122 8.75608 18.1676 9.45769C17.623 10.1593 16.8604 10.6597 16 10.88" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }
@@ -101,47 +84,82 @@ function LogoutIcon({ color }: { color: string }) {
     </Svg>
   );
 }
-function CheckIcon({ color }: { color: string }) {
-  return (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-      <Path d="M20 6L9 17L4 12" stroke={color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+const ROLE_LABELS: Record<string, string> = {
+  educator: 'Educator',
+  guardian: 'Parent / Guardian',
+  child:    'Student',
+  staff:    'Staff',
+  admin:    'Admin',
+  owner:    'Owner',
+};
+
+function makeStyles(C: AppColors) {
+  return StyleSheet.create({
+    safe:         { flex: 1, backgroundColor: C.pageBg },
+    header:       { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 10 },
+    pageTitle:    { fontSize: 28, fontWeight: '800', color: C.text, letterSpacing: -0.5 },
+    scroll:       { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 48, gap: 20 },
+
+    // Profile card
+    profileCard:  { borderRadius: 16, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, overflow: 'hidden' },
+    profileRow:   { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 18 },
+    avatarWrap:   { width: 56, height: 56, borderRadius: 28, backgroundColor: C.teal, alignItems: 'center', justifyContent: 'center' },
+    avatarTxt:    { color: C.tealFg, fontWeight: '800', fontSize: 22 },
+    profileInfo:  { flex: 1, gap: 3 },
+    profileName:  { fontSize: 17, fontWeight: '700', color: C.text },
+    profileEmail: { fontSize: 13, color: C.textMuted },
+    profileKind:  { fontSize: 12, color: C.teal, fontWeight: '600', marginTop: 2 },
+
+    // Section
+    sectionLabel: { fontSize: 12, fontWeight: '700', color: C.textFaint, textTransform: 'uppercase', letterSpacing: 0.8, paddingHorizontal: 4, marginBottom: -8 },
+    card:         { borderRadius: 14, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, overflow: 'hidden' },
+    divider:      { height: 1, backgroundColor: C.border, marginLeft: 60 },
+    version:      { textAlign: 'center', fontSize: 12, color: C.textFaint, marginTop: 4 },
+  });
 }
 
-const MODE_OPTIONS: { value: ThemeMode; label: string; sub: string }[] = [
-  { value: 'system', label: 'System',  sub: 'Follow device setting' },
-  { value: 'light',  label: 'Light',   sub: 'Always light' },
-  { value: 'dark',   label: 'Dark',    sub: 'Always dark' },
-];
+// ─── Screen ───────────────────────────────────────────────────────────────────
 
-// ── Screen ────────────────────────────────────────────────────────────────────
 export default function AccountScreen() {
   const { user, signOut } = useAuth();
-  const { colors, mode, setMode } = useTheme();
-  const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
-  const [showAppearance, setShowAppearance] = React.useState(false);
-  const s = React.useMemo(() => makeStyles(colors), [colors]);
+  const { colors } = useTheme();
+  const { data: account } = useAccount();
+  const { data: profile } = useProfile();
+  const router = useRouter();
 
-  const displayName = user?.email?.split('@')[0] ?? 'User';
+  const s = useMemo(() => makeStyles(colors), [colors]);
+
+  const acc = account as Record<string, unknown> | undefined;
+  const prof = profile as Record<string, unknown> | undefined;
+
+  const displayName =
+    (prof?.display_name as string) ??
+    (prof?.first_name as string) ??
+    user?.email?.split('@')[0] ??
+    'User';
   const initial = displayName[0]?.toUpperCase() ?? 'U';
+  const profileKind = (prof?.kind as string) ?? (acc?.primary_role as string);
+  const isGuardian = profileKind === 'guardian';
 
-  function handleSignOut() {
+  const handleSignOut = useCallback(() => {
     Alert.alert('Sign out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Sign out', style: 'destructive', onPress: signOut },
     ]);
-  }
-
-  const modeLabel = MODE_OPTIONS.find((o) => o.value === mode)?.label ?? 'System';
+  }, [signOut]);
 
   return (
     <SafeAreaView style={s.safe}>
-      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-        <Text style={s.pageTitle}>Profile</Text>
+      <View style={s.header}>
+        <Text style={s.pageTitle}>Account</Text>
+      </View>
 
+      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         {/* Profile card */}
-        <SectionCard variant="white" padding={0} style={[s.card, { backgroundColor: colors.card }]}>
+        <View style={s.profileCard}>
           <View style={s.profileRow}>
             <View style={s.avatarWrap}>
               <Text style={s.avatarTxt}>{initial}</Text>
@@ -149,49 +167,89 @@ export default function AccountScreen() {
             <View style={s.profileInfo}>
               <Text style={s.profileName}>{displayName}</Text>
               <Text style={s.profileEmail}>{user?.email ?? ''}</Text>
+              {!!profileKind && (
+                <Text style={s.profileKind}>
+                  {ROLE_LABELS[profileKind] ?? profileKind}
+                </Text>
+              )}
             </View>
           </View>
-        </SectionCard>
+        </View>
 
-        {/* Settings list */}
-        <SectionCard variant="white" padding={0} style={[s.card, { backgroundColor: colors.card }]}>
-          <SettingsRow icon={<UserIcon color={colors.textMuted} />}       label="Personal"         labelColor={colors.text} chevronColor={colors.textFaint} onPress={() => {}} />
-          <View style={s.divider} />
-          <SettingsRow icon={<GearIcon color={colors.textMuted} />}       label="General"          labelColor={colors.text} chevronColor={colors.textFaint} onPress={() => {}} />
+        {/* Personal */}
+        <Text style={s.sectionLabel}>Personal</Text>
+        <View style={s.card}>
+          <SettingsRow
+            icon={<UserIcon color={colors.textMuted} />}
+            label="Profile"
+            labelColor={colors.text}
+            chevronColor={colors.textFaint}
+            onPress={() => router.push('/(app)/settings/profile' as never)}
+          />
           <View style={s.divider} />
           <SettingsRow
-            icon={<BellIcon color={colors.textMuted} />}
-            label="Push Notifications"
+            icon={<MapPinIcon color={colors.textMuted} />}
+            label="Location"
             labelColor={colors.text}
-            hideChevron
-            trailing={
-              <Switch
-                value={notificationsEnabled}
-                onValueChange={setNotificationsEnabled}
-                trackColor={{ false: colors.switchTrackOff, true: colors.teal }}
-                thumbColor="#ffffff"
-              />
-            }
+            chevronColor={colors.textFaint}
+            onPress={() => router.push('/(app)/settings/location' as never)}
+          />
+        </View>
+
+        {/* Account */}
+        <Text style={s.sectionLabel}>Account</Text>
+        <View style={s.card}>
+          <SettingsRow
+            icon={<MailIcon color={colors.textMuted} />}
+            label="Contact & Security"
+            labelColor={colors.text}
+            chevronColor={colors.textFaint}
+            onPress={() => router.push('/(app)/settings/account-info' as never)}
           />
           <View style={s.divider} />
           <SettingsRow
             icon={<AppearanceIcon color={colors.textMuted} />}
-            label="Appearance"
+            label="Preferences"
             labelColor={colors.text}
             chevronColor={colors.textFaint}
-            onPress={() => setShowAppearance(true)}
-            trailing={
-              <Text style={{ fontSize: 13, color: colors.textMuted, marginRight: 4 }}>{modeLabel}</Text>
-            }
+            onPress={() => router.push('/(app)/settings/preferences' as never)}
           />
           <View style={s.divider} />
-          <SettingsRow icon={<HelpIcon color={colors.textMuted} />}       label="Help"             labelColor={colors.text} chevronColor={colors.textFaint} onPress={() => {}} />
+          <SettingsRow
+            icon={<BellIcon color={colors.textMuted} />}
+            label="Notifications"
+            labelColor={colors.text}
+            chevronColor={colors.textFaint}
+            onPress={() => router.push('/(app)/settings/notifications' as never)}
+          />
           <View style={s.divider} />
-          <SettingsRow icon={<ShieldIcon color={colors.textMuted} />}     label="Privacy & Data"   labelColor={colors.text} chevronColor={colors.textFaint} onPress={() => {}} />
-        </SectionCard>
+          <SettingsRow
+            icon={<ShieldIcon color={colors.textMuted} />}
+            label="Privacy & Data"
+            labelColor={colors.text}
+            chevronColor={colors.textFaint}
+            onPress={() => {}}
+          />
+        </View>
+
+        {/* Family — guardian only */}
+        {isGuardian && (
+          <>
+            <Text style={s.sectionLabel}>Family</Text>
+            <View style={s.card}>
+              <SettingsRow
+                icon={<UsersIcon color={colors.textMuted} />}
+                label="Family"
+                labelColor={colors.text}
+                chevronColor={colors.textFaint}
+                onPress={() => router.push('/(app)/settings/family' as never)}
+              />
+            </View>
+          </>
+        )}
 
         {/* Sign out */}
-        <SectionCard variant="white" padding={0} style={[s.card, { backgroundColor: colors.card }]}>
+        <View style={s.card}>
           <SettingsRow
             icon={<LogoutIcon color={colors.red} />}
             label="Sign out"
@@ -199,43 +257,10 @@ export default function AccountScreen() {
             hideChevron
             labelColor={colors.red}
           />
-        </SectionCard>
+        </View>
 
         <Text style={s.version}>IconicEdu v0.1.0</Text>
       </ScrollView>
-
-      {/* Appearance bottom sheet */}
-      <Modal
-        visible={showAppearance}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowAppearance(false)}
-      >
-        <Pressable style={s.overlay} onPress={() => setShowAppearance(false)}>
-          <Pressable onPress={(e) => e.stopPropagation()}>
-            <View style={s.sheet}>
-              <View style={s.sheetHandle} />
-              <Text style={s.sheetTitle}>Appearance</Text>
-              {MODE_OPTIONS.map((opt, i) => (
-                <React.Fragment key={opt.value}>
-                  {i > 0 && <View style={{ height: 1, backgroundColor: colors.border, marginHorizontal: 24 }} />}
-                  <TouchableOpacity
-                    style={s.modeRow}
-                    onPress={() => { setMode(opt.value); setShowAppearance(false); }}
-                    activeOpacity={0.7}
-                  >
-                    <View style={{ gap: 2, flex: 1 }}>
-                      <Text style={s.modeLabel}>{opt.label}</Text>
-                      <Text style={s.modeSub}>{opt.sub}</Text>
-                    </View>
-                    {mode === opt.value && <CheckIcon color={colors.teal} />}
-                  </TouchableOpacity>
-                </React.Fragment>
-              ))}
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
     </SafeAreaView>
   );
 }

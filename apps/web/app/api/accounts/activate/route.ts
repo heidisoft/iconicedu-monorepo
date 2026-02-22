@@ -2,8 +2,17 @@ import { NextResponse } from 'next/server';
 
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
-import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
-import { updateAccountStatus } from '@iconicedu/web/lib/accounts/queries/accounts.query';
+import {
+  getAccountByAuthUserId,
+  getAccountByEmail,
+  insertAccountForAuthUser,
+  updateAccountAuthUserId,
+  updateAccountStatus,
+} from '@iconicedu/web/lib/accounts/queries/accounts.query';
+import {
+  getProfileByAccountId,
+  insertProfileForAccount,
+} from '@iconicedu/web/lib/profile/queries/profiles.query';
 import { getUserRoles } from '@iconicedu/web/lib/profile/queries/roles.query';
 import { buildAuthOnboardingState } from '@iconicedu/web/lib/onboarding/auth-state';
 import { getOrgBySlug } from '@iconicedu/web/lib/org/queries/org.query';
@@ -22,7 +31,7 @@ async function resolveOrgLoginPath(orgId: string): Promise<string> {
   const serviceSupabase = createSupabaseServiceClient();
   const dashboardPath = await resolveOrgDashboardPath(serviceSupabase, orgId);
   if (dashboardPath === '/get-started') {
-    return '/login';
+    return '/iconic-academy/login';
   }
   return `${dashboardPath}/login`;
 }
@@ -55,7 +64,7 @@ export async function POST(request: Request) {
           onboarding: {
             requiresOrgSetup: false,
             requiresRoleSelection: false,
-            destination: '/login',
+            destination: '/iconic-academy/login',
           },
         });
       }
@@ -68,6 +77,70 @@ export async function POST(request: Request) {
       data.user.id,
     );
     let account = existingAccountResponse.data ?? null;
+
+    if (!account) {
+      if (requestedOrgId && intent === 'get-started') {
+        const normalizedEmail = data.user.email?.trim().toLowerCase() ?? null;
+        if (normalizedEmail) {
+          const invitedAccountResponse = await getAccountByEmail(
+            serviceSupabase,
+            requestedOrgId,
+            normalizedEmail,
+          );
+          if (invitedAccountResponse.error) {
+            throw invitedAccountResponse.error;
+          }
+          if (invitedAccountResponse.data?.id) {
+            const linkedAccountResponse = await updateAccountAuthUserId(
+              serviceSupabase,
+              invitedAccountResponse.data.id,
+              data.user.id,
+            );
+            if (linkedAccountResponse.error) {
+              throw linkedAccountResponse.error;
+            }
+            account = linkedAccountResponse.data ?? invitedAccountResponse.data;
+          }
+        }
+
+        if (!account) {
+          const insertResponse = await insertAccountForAuthUser(serviceSupabase, {
+            orgId: requestedOrgId,
+            authUserId: data.user.id,
+            email: data.user.email?.trim().toLowerCase() ?? null,
+          });
+          if (insertResponse.error || !insertResponse.data) {
+            throw insertResponse.error ?? new Error('Unable to create account for organization');
+          }
+          account = insertResponse.data;
+        }
+      }
+    }
+
+    if (account && requestedOrgId && intent === 'get-started') {
+      const profileResponse = await getProfileByAccountId(serviceSupabase, account.id);
+      if (profileResponse.error) {
+        throw profileResponse.error;
+      }
+      if (!profileResponse.data) {
+        const insertProfileResponse = await insertProfileForAccount(serviceSupabase, {
+          orgId: account.org_id,
+          accountId: account.id,
+          kind: 'guardian',
+          displayName: null,
+          avatarSource: 'seed',
+          avatarUrl: null,
+          avatarSeed: account.id,
+          timezone: 'UTC',
+          locale: 'en-US',
+          status: 'active',
+          uiThemeKey: 'teal',
+        });
+        if (insertProfileResponse.error) {
+          throw insertProfileResponse.error;
+        }
+      }
+    }
 
     if (!account) {
       const destination = requestedOrgSlug
@@ -124,12 +197,12 @@ export async function POST(request: Request) {
     const onboarding = buildAuthOnboardingState(activeAccount, rolesResponse.data ?? []);
     if (onboarding.requiresRoleSelection) {
       onboarding.requiresRoleSelection = false;
-      onboarding.destination = await resolveOrgLoginPath(activeAccount.org_id);
-    } else if (onboarding.destination === '/dashboard') {
       onboarding.destination =
         intent === 'get-started'
-          ? await resolveOrgLoginPath(activeAccount.org_id)
-          : await resolveOrgDashboardPath(serviceSupabase, activeAccount.org_id);
+          ? await resolveOrgDashboardPath(serviceSupabase, activeAccount.org_id)
+          : await resolveOrgLoginPath(activeAccount.org_id);
+    } else if (onboarding.destination === '/dashboard') {
+      onboarding.destination = await resolveOrgDashboardPath(serviceSupabase, activeAccount.org_id);
     }
 
     return NextResponse.json({

@@ -70,7 +70,7 @@ export const FOOTER_LINK_GROUPS = [
     links: [
       { label: 'Programs', href: '#subjects' },
       { label: 'How It Works', href: '#how-it-works' },
-      { label: 'Become a Tutor', href: '/login' },
+      { label: 'Become a Tutor', href: '/iconic-academy/login' },
     ],
   },
   {

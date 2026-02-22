@@ -5,7 +5,6 @@ import { headers } from 'next/headers';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
-import { ORG_ID } from '@iconicedu/web/lib/data/ids';
 import {
   getAccountByAuthUserId,
   getAccountByEmail,
@@ -19,6 +18,11 @@ import {
 import { getFamilyInviteAdminClient } from '@iconicedu/web/lib/family/queries/invite.query';
 import { pickRandomThemeKey } from '@iconicedu/web/lib/profile/constants/theme';
 import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
+import { getOrgById } from '@iconicedu/web/lib/org/queries/org.query';
+import {
+  buildOrgInviteRedirectUrl,
+  ensureOrgCallbackRedirect,
+} from '@iconicedu/web/app/(app)/[orgSlug]/admin/users/actions/invite-user.utils';
 
 const VALID_PROFILE_KINDS = new Set(['guardian', 'staff', 'educator', 'child']);
 
@@ -27,12 +31,6 @@ type InviteUserResult = {
   inviteUrl: string;
   actionLink?: string | null;
 };
-
-function buildRedirectUrl(profileKind: string, baseUrl: string) {
-  const sanitizedBase = baseUrl.replace(/\/$/, '');
-  const params = new URLSearchParams({ profileKind });
-  return `${sanitizedBase}/auth/callback?${params.toString()}`;
-}
 
 async function resolveBaseUrl() {
   const headerStore = await headers();
@@ -74,13 +72,22 @@ export async function inviteAdminUserAction(
   if (!accountResponse.data) {
     throw new Error('Account record not found');
   }
+  const orgId = accountResponse.data.org_id;
 
   const adminClient = getFamilyInviteAdminClient();
   const normalizedEmail = parsed.email.toLowerCase();
+  const orgResponse = await getOrgById(adminClient, orgId);
+  if (orgResponse.error) {
+    throw orgResponse.error;
+  }
+  if (!orgResponse.data?.slug) {
+    throw new Error('Unable to resolve organization slug for invite redirect.');
+  }
+  const orgSlug = orgResponse.data.slug;
 
   const existingAccountResponse = await getAccountByEmail(
     adminClient,
-    ORG_ID,
+    orgId,
     normalizedEmail,
   );
 
@@ -94,7 +101,7 @@ export async function inviteAdminUserAction(
     const { data: insertedAccount, error: insertError } = await insertInvitedAccount(
       adminClient,
       {
-        orgId: ORG_ID,
+        orgId,
         email: normalizedEmail,
         createdBy: accountResponse.data.id,
       },
@@ -119,7 +126,7 @@ export async function inviteAdminUserAction(
     const { error: statusError } = await updateAccountStatus(
       adminClient,
       targetAccount.id,
-      ORG_ID,
+      orgId,
       'invited',
       accountResponse.data.id,
     );
@@ -130,7 +137,7 @@ export async function inviteAdminUserAction(
   }
 
   const { error: upsertError } = await upsertProfileForAccount(adminClient, {
-    orgId: ORG_ID,
+    orgId,
     accountId: targetAccount.id,
     kind: parsed.profileKind,
     avatarSource: 'seed',
@@ -144,7 +151,7 @@ export async function inviteAdminUserAction(
 
   if (upsertError?.code === '42P10') {
     const { error: insertError } = await insertProfileForAccount(adminClient, {
-      orgId: ORG_ID,
+      orgId,
       accountId: targetAccount.id,
       kind: parsed.profileKind,
       avatarSource: 'seed',
@@ -165,11 +172,17 @@ export async function inviteAdminUserAction(
   }
 
   const redirectOverride = formData.get('redirectTo') as string | null;
-
+  const baseUrl = await resolveBaseUrl();
+  const defaultRedirectTo = buildOrgInviteRedirectUrl({
+    baseUrl,
+    profileKind: parsed.profileKind,
+    orgSlug,
+    intent: 'login',
+  });
   const redirectTo =
     redirectOverride && redirectOverride.trim()
-      ? redirectOverride
-      : buildRedirectUrl(parsed.profileKind, await resolveBaseUrl());
+      ? ensureOrgCallbackRedirect(redirectOverride, orgSlug, 'login')
+      : defaultRedirectTo;
 
   if (mode === 'invite') {
     const { data: inviteData, error: inviteError } =
@@ -187,7 +200,7 @@ export async function inviteAdminUserAction(
 
     await reconcileInvitedAccount({
       client: adminClient,
-      orgId: ORG_ID,
+      orgId,
       accountId: targetAccount.id,
       email: normalizedEmail,
       updatedBy: accountResponse.data.id,

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,20 +11,45 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/providers/auth-provider';
-
-const C = {
-  bg: '#ffffff',
-  teal: '#2dd4a8',
-  tealFg: '#042f2e',
-  dark: '#0f172a',
-  gray: '#64748b',
-  grayLight: '#94a3b8',
-  border: '#e2e8f0',
-  inputBg: '#f8fafc',
-  red: '#ef4444',
-} as const;
+import { useTheme } from '@/providers/theme-provider';
+import type { AppColors } from '@/lib/theme';
 
 const OTP_LENGTH = 6;
+
+function makeStyles(C: AppColors) {
+  return StyleSheet.create({
+    safe:        { flex: 1, backgroundColor: C.bg },
+    flex:        { flex: 1 },
+    content:     { flex: 1, paddingHorizontal: 24, paddingTop: 24, gap: 20 },
+
+    back:        { alignSelf: 'flex-start', marginBottom: 8 },
+    backTxt:     { fontSize: 15, fontWeight: '600', color: C.textMuted },
+
+    heading:     { fontSize: 36, fontWeight: '800', color: C.text, lineHeight: 44, letterSpacing: -0.5 },
+    sub:         { fontSize: 15, color: C.textMuted, lineHeight: 23 },
+    email:       { color: C.text, fontWeight: '600' },
+
+    field:       { gap: 6 },
+    label:       { fontSize: 13, fontWeight: '500', color: C.textMuted },
+    codeInput:   {
+      backgroundColor: C.inputBg,
+      borderWidth: 1.5, borderColor: C.border,
+      borderRadius: 12, paddingHorizontal: 16, paddingVertical: 16,
+      fontSize: 28, fontWeight: '700', color: C.text,
+      letterSpacing: 14, textAlign: 'center',
+    },
+    codeInputErr:{ borderColor: C.red },
+    errorTxt:    { fontSize: 12, color: C.red, marginTop: 2 },
+
+    cta:         { backgroundColor: C.teal, borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
+    ctaDim:      { opacity: 0.45 },
+    ctaTxt:      { color: C.tealFg, fontSize: 16, fontWeight: '700', letterSpacing: 0.2 },
+
+    resendRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+    resendHint:  { fontSize: 14, color: C.textFaint },
+    resendLink:  { fontSize: 14, fontWeight: '700', color: C.text },
+  });
+}
 
 export default function OtpScreen() {
   const { email } = useLocalSearchParams<{ email: string }>();
@@ -33,6 +58,8 @@ export default function OtpScreen() {
   const [error, setError] = useState<string | null>(null);
   const { verifyOtp, signInWithOtp } = useAuth();
   const router = useRouter();
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
 
   const handleVerify = useCallback(async () => {
     if (code.length !== OTP_LENGTH) {
@@ -91,7 +118,7 @@ export default function OtpScreen() {
               maxLength={OTP_LENGTH}
               autoFocus
               placeholder="000000"
-              placeholderTextColor={C.grayLight}
+              placeholderTextColor={colors.textFaint}
               accessibilityLabel="Verification code"
             />
             {error && <Text style={s.errorTxt}>{error}</Text>}
@@ -119,36 +146,3 @@ export default function OtpScreen() {
     </SafeAreaView>
   );
 }
-
-const s = StyleSheet.create({
-  safe:        { flex: 1, backgroundColor: C.bg },
-  flex:        { flex: 1 },
-  content:     { flex: 1, paddingHorizontal: 24, paddingTop: 24, gap: 20 },
-
-  back:        { alignSelf: 'flex-start', marginBottom: 8 },
-  backTxt:     { fontSize: 15, fontWeight: '600', color: C.gray },
-
-  heading:     { fontSize: 36, fontWeight: '800', color: C.dark, lineHeight: 44, letterSpacing: -0.5 },
-  sub:         { fontSize: 15, color: C.gray, lineHeight: 23 },
-  email:       { color: C.dark, fontWeight: '600' },
-
-  field:       { gap: 6 },
-  label:       { fontSize: 13, fontWeight: '500', color: C.gray },
-  codeInput:   {
-    backgroundColor: C.inputBg,
-    borderWidth: 1.5, borderColor: C.border,
-    borderRadius: 12, paddingHorizontal: 16, paddingVertical: 16,
-    fontSize: 28, fontWeight: '700', color: C.dark,
-    letterSpacing: 14, textAlign: 'center',
-  },
-  codeInputErr:{ borderColor: C.red },
-  errorTxt:    { fontSize: 12, color: C.red, marginTop: 2 },
-
-  cta:         { backgroundColor: C.teal, borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
-  ctaDim:      { opacity: 0.45 },
-  ctaTxt:      { color: C.tealFg, fontSize: 16, fontWeight: '700', letterSpacing: 0.2 },
-
-  resendRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-  resendHint:  { fontSize: 14, color: C.grayLight },
-  resendLink:  { fontSize: 14, fontWeight: '700', color: C.dark },
-});

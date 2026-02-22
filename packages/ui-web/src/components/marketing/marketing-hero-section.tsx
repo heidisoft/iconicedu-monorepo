@@ -20,13 +20,13 @@ export function MarketingHeroSection() {
           <div className="mx-auto max-w-3xl rounded-3xl border border-border/60 bg-primary/25 p-8 shadow-sm dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:shadow-emerald-950/20 md:p-12">
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
               <a
-                href="/login"
+                href="/iconic-academy/login"
                 className="inline-flex min-h-12 items-center justify-center rounded-full bg-primary px-8 py-3 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
               >
                 Start your journey now
               </a>
               <a
-                href="/login"
+                href="/iconic-academy/login"
                 className="inline-flex min-h-12 items-center justify-center rounded-full border border-border bg-background px-8 py-3 text-sm font-semibold text-foreground transition hover:bg-muted dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:hover:bg-emerald-900/35"
               >
                 Become a Tutor

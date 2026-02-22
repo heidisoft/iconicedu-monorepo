@@ -3,7 +3,9 @@ import type {
   UserProfileBlockVM,
   ChannelVM,
   LearningSpaceVM,
+  MessageVM,
 } from '@iconicedu/shared-types';
+import { mapRowToMessageVM, type RawMessageRow } from './map-row-to-vm';
 
 export const queryKeys = {
   profile: (profileId: string) => ['profile', profileId] as const,
@@ -18,6 +20,12 @@ export const queryKeys = {
     ['inbox', orgId, profileId] as const,
   sidebar: (orgId: string, profileId: string) =>
     ['sidebar', orgId, profileId] as const,
+  notificationPrefs: (orgId: string, profileId: string) =>
+    ['notificationPrefs', orgId, profileId] as const,
+  familyLinks: (orgId: string, accountId: string) =>
+    ['familyLinks', orgId, accountId] as const,
+  childProfiles: (orgId: string, accountIds: string[]) =>
+    ['childProfiles', orgId, accountIds] as const,
 } as const;
 
 export async function fetchUserAccount() {
@@ -119,6 +127,40 @@ export async function fetchLearningSpaces(orgId: string) {
     .in('status', ['active', 'paused'])
     .order('updated_at', { ascending: false });
 
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function fetchNotificationPreferences(orgId: string, profileId: string) {
+  const { data, error } = await supabase
+    .from('notification_preferences')
+    .select('*')
+    .eq('org_id', orgId)
+    .eq('profile_id', profileId)
+    .is('deleted_at', null);
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function fetchFamilyLinks(orgId: string, guardianAccountId: string) {
+  const { data, error } = await supabase
+    .from('family_links')
+    .select('*')
+    .eq('org_id', orgId)
+    .eq('guardian_account_id', guardianAccountId)
+    .is('deleted_at', null);
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function fetchProfilesByAccountIds(orgId: string, accountIds: string[]) {
+  if (!accountIds.length) return [];
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, account_id, display_name, first_name, last_name, avatar_seed, kind')
+    .eq('org_id', orgId)
+    .in('account_id', accountIds)
+    .is('deleted_at', null);
   if (error) throw error;
   return data ?? [];
 }

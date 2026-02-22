@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
 
 import { AuthEntryForm } from '@iconicedu/web/app/(auth)/shared/auth-entry-form';
 import { createSupabaseBrowserClient } from '@iconicedu/web/lib/supabase/client';
@@ -21,7 +22,14 @@ export function resolveOrgLoginCallbackUrl(orgSlug: string): string {
   return callbackUrl.toString();
 }
 
+export function shouldRedirectToOrgGetStarted(
+  eligibility: { eligible?: boolean; reason?: string } | null,
+): boolean {
+  return !eligibility?.eligible && eligibility?.reason === 'missing_account';
+}
+
 export default function OrgLoginClient({ orgSlug, orgName }: OrgLoginClientProps) {
+  const router = useRouter();
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
   const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
@@ -41,10 +49,14 @@ export default function OrgLoginClient({ orgSlug, orgName }: OrgLoginClientProps
     });
 
     const eligibilityBody = (await eligibilityResponse.json().catch(() => null)) as
-      | { eligible?: boolean; message?: string }
+      | { eligible?: boolean; reason?: string; message?: string }
       | null;
 
     if (!eligibilityResponse.ok || !eligibilityBody?.eligible) {
+      if (shouldRedirectToOrgGetStarted(eligibilityBody)) {
+        router.replace(`/${orgSlug}/get-started`);
+        return;
+      }
       setErrorMessage(
         eligibilityBody?.message ??
           'No existing account found for this organization. Use Get started instead.',

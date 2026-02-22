@@ -20,3 +20,13 @@ export async function getOrgBySlug(supabase: SupabaseClient, slug: string) {
     .is('deleted_at', null)
     .maybeSingle<OrgRow>();
 }
+
+export async function getDefaultOrg(supabase: SupabaseClient) {
+  return supabase
+    .from('orgs')
+    .select(ORG_SELECT)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle<OrgRow>();
+}

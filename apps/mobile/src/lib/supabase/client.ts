@@ -21,5 +21,8 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
+    // Implicit flow avoids PKCE code-verifier storage race conditions in React Native.
+    // The redirect URL hash contains access_token + refresh_token directly.
+    flowType: 'implicit',
   },
 });

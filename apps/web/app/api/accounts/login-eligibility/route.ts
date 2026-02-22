@@ -59,6 +59,7 @@ export async function POST(request: Request) {
   if (!accountResponse.data || accountResponse.data.status === 'deleted') {
     return NextResponse.json({
       eligible: false,
+      reason: 'missing_account',
       message: 'No existing account found for this organization. Use Get started instead.',
     });
   }
@@ -66,6 +67,7 @@ export async function POST(request: Request) {
   if (accountResponse.data.status === 'suspended') {
     return NextResponse.json({
       eligible: false,
+      reason: 'suspended',
       message: 'This account is suspended. Contact support for help.',
     });
   }

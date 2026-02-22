@@ -36,7 +36,7 @@ export function MarketingHowItWorksSection() {
           </p>
           <div className="mt-4 flex flex-col gap-3 sm:flex-row">
             <a
-              href="/login"
+              href="/iconic-academy/login"
               className="inline-flex min-h-11 items-center justify-center rounded-full bg-primary px-6 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
             >
               Explore and sign up

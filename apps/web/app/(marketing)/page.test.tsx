@@ -12,7 +12,7 @@ describe('marketing home page', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Start your journey now' })).toHaveAttribute(
       'href',
-      '/login',
+      '/iconic-academy/login',
     );
   });
 

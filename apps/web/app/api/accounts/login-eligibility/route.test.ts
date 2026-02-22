@@ -59,6 +59,7 @@ describe('POST /api/accounts/login-eligibility', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
       eligible: false,
+      reason: 'missing_account',
       message: 'No existing account found for this organization. Use Get started instead.',
     });
   });

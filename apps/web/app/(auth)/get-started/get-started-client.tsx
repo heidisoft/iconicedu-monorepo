@@ -6,18 +6,31 @@ import { Button, Input, Label } from '@iconicedu/ui-web';
 
 import { normalizeOrgSlug } from '@iconicedu/web/lib/org/slug';
 
+export function shouldSyncSlugFromName(isSlugManuallyEdited: boolean, currentSlug: string): boolean {
+  return !isSlugManuallyEdited || !currentSlug.trim();
+}
+
 export default function GetStartedClient() {
   const router = useRouter();
   const [orgName, setOrgName] = React.useState('');
   const [orgSlug, setOrgSlug] = React.useState('');
+  const [isSlugManuallyEdited, setIsSlugManuallyEdited] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
   const handleNameChange = (value: string) => {
     setOrgName(value);
-    if (!orgSlug.trim()) {
-      setOrgSlug(normalizeOrgSlug(value));
-    }
+    setOrgSlug((currentSlug) =>
+      shouldSyncSlugFromName(isSlugManuallyEdited, currentSlug)
+        ? normalizeOrgSlug(value)
+        : currentSlug,
+    );
+  };
+
+  const handleSlugChange = (value: string) => {
+    const normalizedSlug = normalizeOrgSlug(value);
+    setOrgSlug(normalizedSlug);
+    setIsSlugManuallyEdited(normalizedSlug.length > 0);
   };
 
   const handleSubmit = async () => {
@@ -57,11 +70,13 @@ export default function GetStartedClient() {
 
       if (!response.ok || !body?.success) {
         setErrorMessage(body?.message ?? 'Unable to create organization.');
+        setIsSubmitting(false);
         return;
       }
 
       router.replace(body.onboarding?.destination ?? '/get-started');
-    } finally {
+    } catch {
+      setErrorMessage('Unable to create organization.');
       setIsSubmitting(false);
     }
   };
@@ -96,7 +111,7 @@ export default function GetStartedClient() {
         <Input
           id="orgSlug"
           value={orgSlug}
-          onChange={(event) => setOrgSlug(normalizeOrgSlug(event.target.value))}
+          onChange={(event) => handleSlugChange(event.target.value)}
           placeholder="iconic-academy"
         />
         <p className="text-xs text-muted-foreground">

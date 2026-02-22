@@ -135,6 +135,16 @@ export function buildCollapsedChildSectionState(
   };
 }
 
+export function buildChildInviteDraft(email?: string | null): {
+  role: FamilyLinkInviteRole;
+  email: string;
+} {
+  return {
+    role: 'child',
+    email: email?.trim() ?? '',
+  };
+}
+
 export function FamilyTab({
   familyMembers,
   profileThemes,
@@ -299,6 +309,14 @@ export function FamilyTab({
     },
     [],
   );
+
+  const openChildInviteWithoutEmail = React.useCallback(() => {
+    const draft = buildChildInviteDraft('');
+    setInviteRole(draft.role);
+    setInviteEmail(draft.email);
+    setInviteError('Add the child email, then send invite to create account.');
+    setIsInviteOpen(true);
+  }, []);
 
   const handleRemoveInvite = React.useCallback(
     async (id: string) => {
@@ -1042,6 +1060,10 @@ export function FamilyTab({
                             We have {member.email} on file, but they still need to create
                             a login.
                           </p>
+                          <p>
+                            Keep this email current so the invite links the login to this
+                            child profile correctly.
+                          </p>
                           <Button
                             variant="ghost"
                             size="xs"
@@ -1049,6 +1071,23 @@ export function FamilyTab({
                             onClick={() => prepareInviteForEmail(member.email!, 'child')}
                           >
                             Send invite to create account
+                          </Button>
+                        </div>
+                      ) : null}
+                      {isChildMember && !member.email && !member.hasAuthAccount ? (
+                        <div className="space-y-1 rounded-lg border border-dashed border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs text-amber-900 dark:text-amber-200">
+                          <p>This child profile does not have an email yet.</p>
+                          <p>
+                            Add the child&apos;s email first, then send an invite so their
+                            login links to this profile correctly.
+                          </p>
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            className="px-2 text-sm font-medium text-primary underline-offset-4 hover:underline"
+                            onClick={openChildInviteWithoutEmail}
+                          >
+                            Add email and send invite
                           </Button>
                         </div>
                       ) : null}

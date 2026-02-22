@@ -164,7 +164,7 @@ export function SidebarShell({
 
   const handleLogout = React.useCallback(async () => {
     await supabase.auth.signOut();
-    window.location.assign('/login');
+    window.location.assign('/');
   }, [supabase]);
 
   const dashboardBasePath = React.useMemo(() => {

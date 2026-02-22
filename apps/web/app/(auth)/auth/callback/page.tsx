@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 
+import { shouldSkipCallbackRun } from '@iconicedu/web/app/(auth)/auth/callback/callback-run-guard';
 import { createSupabaseBrowserClient } from '@iconicedu/web/lib/supabase/client';
 import { trackAuthTelemetry } from '@iconicedu/web/lib/telemetry/auth-events';
 
@@ -146,7 +147,7 @@ export default function CallbackPage() {
             router.replace(fallbackPath);
             return;
           }
-          router.replace('/login');
+          router.replace('/iconic-academy/login');
           return;
         }
 
@@ -157,6 +158,11 @@ export default function CallbackPage() {
         setPageError('Unable to complete login. Please try again.');
       }
     };
+
+    const callbackRunKey = `auth-callback:${window.location.search}:${window.location.hash}`;
+    if (shouldSkipCallbackRun(window.sessionStorage, callbackRunKey)) {
+      return;
+    }
 
     void finish();
   }, [router, supabase]);

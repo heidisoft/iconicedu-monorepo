@@ -19,7 +19,7 @@ describe('marketing sections', () => {
     expect(screen.getByTestId('hero-pattern-cluster')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Start your journey now' })).toHaveAttribute(
       'href',
-      '/login',
+      '/iconic-academy/login',
     );
   });
 
@@ -46,7 +46,7 @@ describe('marketing sections', () => {
     expect(screen.getByText('One platform for students, parents, and educators')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Explore and sign up' })).toHaveAttribute(
       'href',
-      '/login',
+      '/iconic-academy/login',
     );
   });
 

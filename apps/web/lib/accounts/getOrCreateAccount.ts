@@ -81,7 +81,7 @@ export async function getOrCreateAccount(
   });
 
   if (error || !inserted) {
-    redirect('/login');
+    redirect('/iconic-academy/login');
   }
 
   const invite = await findFamilyInviteForAccount({

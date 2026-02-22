@@ -22,6 +22,10 @@ import {
 } from '@iconicedu/ui-web/components/sidebar/user-settings/constants';
 import { BorderBeam } from '@iconicedu/ui-web/ui/border-beam';
 import { useSequentialHighlight } from '@iconicedu/ui-web/components/sidebar/user-settings/hooks/use-sequential-highlight';
+import {
+  isLocationComplete,
+  normalizeReverseGeocodeAddress,
+} from '@iconicedu/ui-web/components/sidebar/user-settings/location-tab.utils';
 
 type LocationRequiredField = 'city' | 'region' | 'postal';
 const LOCATION_REQUIRED_FIELDS: LocationRequiredField[] = ['city', 'region', 'postal'];
@@ -178,23 +182,47 @@ export function LocationTab({
             throw new Error('Unable to determine your location.');
           }
           const data = (await response.json()) as { address?: Record<string, string> };
-          const address = data.address ?? {};
-          const newCountry = (address.country_code ?? '').toUpperCase();
-          if (newCountry) {
-            const match = countries.find((entry) => entry.isoCode === newCountry);
-            setCountryValue(match?.isoCode ?? newCountry);
+          const normalized = normalizeReverseGeocodeAddress(data.address ?? {}, countries);
+
+          if (normalized.countryCode) {
+            const match = countries.find((entry) => entry.isoCode === normalized.countryCode);
+            setCountryValue(match?.isoCode ?? normalized.countryCode);
           }
-          const city =
-            address.city ?? address.town ?? address.village ?? address.county ?? '';
-          setCityValue(city);
-          const region = address.state ?? address.region ?? '';
-          setRegionValue(region);
-          setPostalValue(address.postcode ?? '');
+          setCityValue(normalized.city);
+          setRegionValue(normalized.region);
+          setPostalValue(normalized.postalCode);
+          setStreetValue((current) => current || normalized.streetAddress || '');
           setFieldErrors({});
+
+          if (
+            onLocationContinue &&
+            isLocationComplete({
+              countryCode: normalized.countryCode,
+              city: normalized.city,
+              region: normalized.region,
+              postalCode: normalized.postalCode,
+            })
+          ) {
+            setIsSaving(true);
+            await onLocationContinue({
+              city: normalized.city,
+              region: normalized.region,
+              postalCode: normalized.postalCode,
+              countryCode: normalized.countryCode,
+              countryName: normalized.countryName,
+              streetAddress: normalized.streetAddress ?? undefined,
+            });
+            setLocationError(null);
+          } else if (onLocationContinue) {
+            setLocationError(
+              'Location found. Please complete any missing fields, then click Save.',
+            );
+          }
         } catch (error) {
           console.error(error);
           setLocationError('Unable to determine your location.');
         } finally {
+          setIsSaving(false);
           setIsPickingLocation(false);
         }
       },
@@ -204,7 +232,7 @@ export function LocationTab({
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
     );
-  }, [countries]);
+  }, [countries, onLocationContinue]);
 
   const handleLocationContinue = React.useCallback(async () => {
     if (!onLocationContinue) {

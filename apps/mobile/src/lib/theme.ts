@@ -20,23 +20,23 @@ export const lightColors = {
 };
 
 export const darkColors: typeof lightColors = {
-  pageBg:     '#0f172a',
-  bg:         '#1e293b',
-  card:       '#1e293b',
-  text:       '#f8fafc',
-  textMuted:  '#94a3b8',
-  textFaint:  '#64748b',
-  border:     '#334155',
-  inputBg:    '#1e293b',
+  pageBg:     '#000000',  // iOS systemGroupedBackground
+  bg:         '#1C1C1E',  // iOS systemBackground
+  card:       '#1C1C1E',  // iOS secondarySystemBackground
+  text:       '#FFFFFF',  // iOS label
+  textMuted:  '#8E8E93',  // iOS secondaryLabel
+  textFaint:  '#48484A',  // iOS tertiaryLabel
+  border:     '#38383A',  // iOS separator
+  inputBg:    '#2C2C2E',  // iOS tertiarySystemBackground (elevated input)
   teal:       '#2dd4a8',
   tealFg:     '#042f2e',
   tealBg:     '#0d2b22',
   red:        '#f87171',
-  tabBg:      '#0f172a',
-  tabBorder:  '#1e293b',
+  tabBg:      '#1C1C1E',
+  tabBorder:  '#38383A',
   tabActive:  '#2dd4a8',
-  tabInactive:'#64748b',
-  switchTrackOff: '#334155',
+  tabInactive:'#636366',  // iOS quaternaryLabel
+  switchTrackOff: '#39393D',
   modalOverlay:   'rgba(0,0,0,0.6)',
 };
 
