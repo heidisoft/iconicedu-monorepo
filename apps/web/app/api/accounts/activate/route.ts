@@ -203,6 +203,12 @@ export async function POST(request: Request) {
           activeAccount.org_id,
         );
       }
+    } else if (onboarding.destination === '/login/pending-access') {
+      const loginPath = await resolveOrgLoginPath(
+        serviceSupabase,
+        activeAccount.org_id,
+      );
+      onboarding.destination = `${loginPath}/pending-access`;
     } else if (onboarding.destination === '/dashboard') {
       onboarding.destination = await resolveOrgDashboardPath(serviceSupabase, activeAccount.org_id);
     }

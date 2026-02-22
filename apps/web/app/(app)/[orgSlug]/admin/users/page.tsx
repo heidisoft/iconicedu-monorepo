@@ -30,7 +30,7 @@ export default async function AdminUsersPage({
 
   return (
     <div className="flex flex-1 flex-col">
-      <DashboardHeader title="Users" description="Enrolled accounts" />
+      <DashboardHeader title="Users" description="" />
       <div className="flex flex-1 flex-col gap-4 p-4">
         <UsersTable rows={rows} />
       </div>

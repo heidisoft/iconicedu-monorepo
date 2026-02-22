@@ -15,6 +15,7 @@ import {
 } from '@iconicedu/web/lib/profile/queries/profiles.query';
 import { buildAuthOnboardingState } from '@iconicedu/web/lib/onboarding/auth-state';
 import { resolveOrgDashboardPath } from '@iconicedu/web/lib/org/resolve-dashboard-path';
+import { resolveOrgLoginPath } from '@iconicedu/web/lib/org/resolve-auth-path';
 import { getDefaultOrg, getOrgBySlug } from '@iconicedu/web/lib/org/queries/org.query';
 
 type RoleChoice = 'parent' | 'educator' | 'student' | 'staff';
@@ -211,7 +212,13 @@ export async function POST(request: Request) {
     accountRoleStateResponse.data,
     rolesResponse.data ?? [],
   );
-  if (onboarding.destination === '/dashboard') {
+  if (onboarding.destination === '/login/pending-access') {
+    const loginPath = await resolveOrgLoginPath(
+      serviceSupabase,
+      accountRoleStateResponse.data.org_id,
+    );
+    onboarding.destination = `${loginPath}/pending-access`;
+  } else if (onboarding.destination === '/dashboard') {
     onboarding.destination = await resolveOrgDashboardPath(
       serviceSupabase,
       accountRoleStateResponse.data.org_id,

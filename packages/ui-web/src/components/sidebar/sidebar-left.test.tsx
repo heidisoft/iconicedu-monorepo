@@ -273,6 +273,54 @@ function makeStudentData() {
   } as any;
 }
 
+function makeEducatorWithoutLearningSpacesData() {
+  return {
+    navigation: {
+      navMain: [{ title: 'Home', url: '/d', icon: 'home' }],
+      navSecondary: [],
+    },
+    user: {
+      profile: {
+        kind: 'educator',
+        ids: {
+          id: 'profile-educator',
+          orgId: 'org-1',
+          accountId: 'account-educator',
+        },
+        profile: {
+          displayName: 'Educator One',
+          firstName: 'Educator',
+          lastName: 'One',
+          avatar: { source: 'seed', seed: 'educator' },
+        },
+        prefs: {},
+        meta: {},
+      },
+      account: { id: 'account-educator', orgId: 'org-1', contacts: {} },
+    },
+    collections: {
+      learningSpaces: [
+        {
+          ids: { id: 'space-other', orgId: 'org-1' },
+          basics: { title: 'Other Space', subject: 'Science', iconKey: null },
+          channels: {
+            primaryChannel: {
+              ids: { id: 'channel-other', orgId: 'org-1' },
+              basics: { iconKey: null },
+              ui: {},
+              collections: {
+                readState: { unreadCount: 0 },
+                participants: [{ ids: { accountId: 'account-other' } }],
+              },
+            },
+          },
+        },
+      ],
+      directMessages: [],
+    },
+  } as any;
+}
+
 describe('SidebarLeft', () => {
   it('shows an organization switcher below the header when user belongs to multiple orgs', () => {
     const data = makeData();
@@ -409,6 +457,17 @@ describe('SidebarLeft', () => {
     );
     expect(screen.queryByText('Other Space')).not.toBeInTheDocument();
     expect(screen.getAllByText('2').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('hides learning spaces for educators without assigned spaces', () => {
+    render(
+      <SidebarProvider>
+        <SidebarLeft data={makeEducatorWithoutLearningSpacesData()} />
+      </SidebarProvider>,
+    );
+
+    expect(screen.queryByText('Learning spaces')).not.toBeInTheDocument();
+    expect(screen.queryByText('Other Space')).not.toBeInTheDocument();
   });
 
   it('shows supervised direct messages for guardian grouped by child', () => {

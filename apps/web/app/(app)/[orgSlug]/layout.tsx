@@ -59,7 +59,7 @@ export default async function Layout({
   }
 
   if (account.role_status === 'pending' || account.role_status === 'blocked') {
-    redirect('/login/pending-access');
+    redirect(`/${orgSlug}/login/pending-access`);
   }
 
   const cookieStore = await cookies();

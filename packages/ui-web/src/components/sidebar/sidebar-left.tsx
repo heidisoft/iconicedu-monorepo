@@ -293,7 +293,7 @@ export function SidebarLeft({
       : [];
   const shouldShowLearningSpaces =
     userProfile.kind === 'guardian' ||
-    userProfile.kind === 'educator' ||
+    (userProfile.kind === 'educator' && educatorLearningSpaces.length > 0) ||
     userProfile.kind === 'child';
   const flatLearningSpaces =
     userProfile.kind === 'educator' ? educatorLearningSpaces : studentLearningSpaces;

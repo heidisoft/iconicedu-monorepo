@@ -44,13 +44,13 @@ function makeStyles(C: AppColors) {
     },
     sideTxt: { fontSize: 18, lineHeight: 22 },
 
-    // Pill input
+    // Slack-style rectangular input
     inputWrap: {
       flex: 1,
       flexDirection: 'row',
       alignItems: 'flex-end',
       backgroundColor: C.inputBg,
-      borderRadius: 22,
+      borderRadius: 8,
       borderWidth: 1,
       borderColor: C.border,
       paddingHorizontal: 14,

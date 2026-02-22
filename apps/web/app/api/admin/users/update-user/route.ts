@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
+import type { AccountRoleStatus, RoleKey } from '@iconicedu/shared-types';
 
 import { getFamilyInviteAdminClient } from '@iconicedu/web/lib/family/queries/invite.query';
+import { upsertUserRole } from '@iconicedu/web/lib/profile/queries/roles.query';
 
 type UpdateUserRequestBody = {
   accountId?: string;
@@ -8,6 +10,8 @@ type UpdateUserRequestBody = {
   displayName?: string;
   firstName?: string;
   lastName?: string;
+  primaryRole?: string;
+  roleStatus?: string;
 };
 
 const normalizeNullableField = (value?: string) => {
@@ -18,6 +22,38 @@ const normalizeNullableField = (value?: string) => {
 const isValidEmail = (value: string) =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
+const ALLOWED_PRIMARY_ROLES: RoleKey[] = [
+  'owner',
+  'admin',
+  'educator',
+  'guardian',
+  'child',
+  'staff',
+];
+const ALLOWED_ROLE_STATUSES: AccountRoleStatus[] = [
+  'unassigned',
+  'active',
+  'pending',
+  'blocked',
+];
+
+const normalizePrimaryRole = (value?: string): RoleKey | null => {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized || normalized === 'unassigned') {
+    return null;
+  }
+  return ALLOWED_PRIMARY_ROLES.includes(normalized as RoleKey)
+    ? (normalized as RoleKey)
+    : null;
+};
+
+const normalizeRoleStatus = (value?: string): AccountRoleStatus => {
+  const normalized = value?.trim().toLowerCase();
+  return ALLOWED_ROLE_STATUSES.includes(normalized as AccountRoleStatus)
+    ? (normalized as AccountRoleStatus)
+    : 'unassigned';
+};
+
 export async function POST(request: Request) {
   const body = (await request.json()) as UpdateUserRequestBody;
   const accountId = body.accountId?.trim();
@@ -25,6 +61,8 @@ export async function POST(request: Request) {
   const normalizedDisplayName = normalizeNullableField(body.displayName);
   const normalizedFirstName = normalizeNullableField(body.firstName);
   const normalizedLastName = normalizeNullableField(body.lastName);
+  const normalizedPrimaryRole = normalizePrimaryRole(body.primaryRole);
+  const normalizedRoleStatus = normalizeRoleStatus(body.roleStatus);
 
   if (!accountId) {
     return NextResponse.json(
@@ -94,7 +132,11 @@ export async function POST(request: Request) {
 
   const { error: accountUpdateError } = await adminClient
     .from('accounts')
-    .update({ email: normalizedEmail })
+    .update({
+      email: normalizedEmail,
+      primary_role: normalizedPrimaryRole,
+      role_status: normalizedRoleStatus,
+    })
     .eq('id', account.id)
     .eq('org_id', account.org_id);
 
@@ -134,6 +176,21 @@ export async function POST(request: Request) {
       { success: false, message: profileUpdateError.message },
       { status: 500 },
     );
+  }
+
+  if (normalizedPrimaryRole && normalizedRoleStatus === 'active') {
+    const roleResponse = await upsertUserRole(adminClient, {
+      orgId: account.org_id,
+      accountId: account.id,
+      roleKey: normalizedPrimaryRole,
+      assignedBy: account.auth_user_id ?? null,
+    });
+    if (roleResponse.error) {
+      return NextResponse.json(
+        { success: false, message: roleResponse.error.message },
+        { status: 500 },
+      );
+    }
   }
 
   return NextResponse.json({ success: true });

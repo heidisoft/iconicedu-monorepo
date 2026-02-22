@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -52,6 +52,7 @@ import {
 } from '@iconicedu/ui-web';
 
 import { InviteUserDialog } from '@iconicedu/web/app/(app)/[orgSlug]/admin/users/invite-dialog';
+import { buildAdminUserDmPath } from '@iconicedu/web/app/(app)/[orgSlug]/admin/users/users-table.utils';
 import type { AdminUserRow } from '@iconicedu/web/lib/admin/users';
 import type { AvatarSource, ThemeKey } from '@iconicedu/shared-types';
 
@@ -81,9 +82,25 @@ const PROFILE_ICON_MAP: Record<string, React.ComponentType<{ className?: string 
 };
 
 const PAGE_SIZES = [10, 25, 50];
+const ROLE_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: 'guardian', label: 'Parent' },
+  { value: 'educator', label: 'Tutor' },
+  { value: 'child', label: 'Student' },
+  { value: 'staff', label: 'Staff' },
+  { value: 'admin', label: 'Admin' },
+  { value: 'owner', label: 'Owner' },
+];
+
+const ROLE_STATUS_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: 'unassigned', label: 'Unassigned' },
+  { value: 'pending', label: 'Pending review' },
+  { value: 'active', label: 'Approved' },
+  { value: 'blocked', label: 'Blocked' },
+];
 
 export function UsersTable({ rows }: UsersTableProps) {
   const router = useRouter();
+  const params = useParams<{ orgSlug?: string | string[] }>();
   const [isPending, startTransition] = React.useTransition();
   const [confirmDeleteUser, setConfirmDeleteUser] = React.useState<UserRow | null>(null);
   const [rowActionLoading, setRowActionLoading] = React.useState<string | null>(null);
@@ -96,6 +113,8 @@ export function UsersTable({ rows }: UsersTableProps) {
     displayName: '',
     firstName: '',
     lastName: '',
+    primaryRole: 'unassigned',
+    roleStatus: 'unassigned',
   });
   const [editSaving, setEditSaving] = React.useState(false);
   const refreshing = isPending;
@@ -175,6 +194,8 @@ export function UsersTable({ rows }: UsersTableProps) {
   };
 
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
+  const rawOrgSlug = params?.orgSlug;
+  const orgSlug = Array.isArray(rawOrgSlug) ? rawOrgSlug[0] : rawOrgSlug;
 
   const openDeleteDialog = (row: UserRow) => {
     setConfirmDeleteUser(row);
@@ -187,7 +208,21 @@ export function UsersTable({ rows }: UsersTableProps) {
       displayName: row.displayName ?? '',
       firstName: row.firstName ?? '',
       lastName: row.lastName ?? '',
+      primaryRole: row.primaryRole ?? 'unassigned',
+      roleStatus: row.roleStatus ?? 'unassigned',
     });
+  };
+
+  const handleStartDirectMessage = (row: UserRow) => {
+    if (!orgSlug) {
+      toast.error('Unable to open DM from this page.');
+      return;
+    }
+    if (!row.profileId) {
+      toast.error('This user does not have a profile yet. Invite or activate them first.');
+      return;
+    }
+    router.push(buildAdminUserDmPath(orgSlug, row.profileId));
   };
 
   const handleEditSave = async () => {
@@ -213,6 +248,8 @@ export function UsersTable({ rows }: UsersTableProps) {
           displayName: editForm.displayName,
           firstName: editForm.firstName,
           lastName: editForm.lastName,
+          primaryRole: editForm.primaryRole,
+          roleStatus: editForm.roleStatus,
         }),
       });
 
@@ -495,6 +532,7 @@ export function UsersTable({ rows }: UsersTableProps) {
                         variant="outline"
                         size="sm"
                         className="px-2"
+                        aria-label={`Actions for ${displayName}`}
                         disabled={deletingId === row.id}
                       >
                         <MoreHorizontal className="size-4" />
@@ -506,6 +544,16 @@ export function UsersTable({ rows }: UsersTableProps) {
                         disabled={Boolean(rowActionLoading) || deletingId === row.id}
                       >
                         <User className="size-3 mr-2" /> Edit profile
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleStartDirectMessage(row)}
+                        disabled={
+                          Boolean(rowActionLoading) ||
+                          deletingId === row.id ||
+                          !row.profileId
+                        }
+                      >
+                        <Users className="size-3 mr-2" /> Send direct message
                       </DropdownMenuItem>
                       {row.status === 'invited' && (
                         <DropdownMenuItem
@@ -711,6 +759,49 @@ export function UsersTable({ rows }: UsersTableProps) {
                   }
                   placeholder="Last name"
                 />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Role</p>
+                <Select
+                  value={editForm.primaryRole}
+                  onValueChange={(value) =>
+                    setEditForm((prev) => ({ ...prev, primaryRole: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {ROLE_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Role approval status</p>
+                <Select
+                  value={editForm.roleStatus}
+                  onValueChange={(value) =>
+                    setEditForm((prev) => ({ ...prev, roleStatus: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ROLE_STATUS_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </div>
