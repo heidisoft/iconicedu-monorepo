@@ -141,7 +141,7 @@ export const ThreadSheet: React.FC<ThreadSheetProps> = ({
               <MessageItem
                 message={parentMessage}
                 isOwn={parentMessage.core.sender.ids.id === currentProfileId}
-                showSender
+                isGroupStart
                 colors={colors}
               />
             </View>
@@ -170,7 +170,7 @@ export const ThreadSheet: React.FC<ThreadSheetProps> = ({
                   <MessageItem
                     message={item}
                     isOwn={item.core.sender.ids.id === currentProfileId}
-                    showSender
+                    isGroupStart
                     colors={colors}
                   />
                 )}

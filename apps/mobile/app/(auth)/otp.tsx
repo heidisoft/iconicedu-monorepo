@@ -81,12 +81,6 @@ export default function OtpScreen() {
     // (local read, no network hang) to determine where to send the user.
     try {
       const status = await fetchOnboardingStatus();
-      if (!status.isRoleAllowed) {
-        await signOut();
-        setError('This app is only for students, parents, and educators. Admin accounts must use the web dashboard.');
-        setLoading(false);
-        return;
-      }
       if (!status.isComplete) {
         router.replace('/(auth)/profile-setup');
       } else {

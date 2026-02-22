@@ -322,7 +322,7 @@ export async function fetchProfilesByAccountIds(orgId: string, accountIds: strin
   return data ?? [];
 }
 
-const MOBILE_ALLOWED_ROLES = new Set(['educator', 'guardian', 'child']);
+const MOBILE_ALLOWED_ROLES = new Set(['educator', 'guardian', 'child', 'staff', 'admin', 'system']);
 
 export type DayAvailability = Record<string, Array<{ start: string; end: string }>>;
 
@@ -484,8 +484,7 @@ async function _doFetchOnboardingStatus(): Promise<OnboardingStatus> {
     hasRoleData &&
     hasAvailability;
 
-  // Mobile app is for educators, parents (guardians) and students (children) only.
-  // If role is not yet assigned (null), allow through so wizard can collect it.
+  // All roles are allowed on mobile. Unknown/null roles pass through so the wizard can collect them.
   const isRoleAllowed = kind === null || MOBILE_ALLOWED_ROLES.has(kind);
 
   return {

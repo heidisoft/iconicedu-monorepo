@@ -33,9 +33,7 @@ export default function AppLayout() {
         staleTime: 5 * 60 * 1000,
       })
       .then((status) => {
-        if (!status.isRoleAllowed) {
-          signOut();
-        } else if (!status.isComplete) {
+        if (!status.isComplete) {
           router.replace('/(auth)/profile-setup');
         }
       })

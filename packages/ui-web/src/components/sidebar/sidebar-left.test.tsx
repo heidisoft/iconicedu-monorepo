@@ -360,7 +360,7 @@ describe('SidebarLeft', () => {
       </SidebarProvider>,
     );
 
-    expect(screen.queryByText('Learning spaces')).not.toBeInTheDocument();
+    expect(screen.getByText('Learning spaces')).toBeInTheDocument();
     expect(screen.getByText('Algebra 1')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Algebra 1/i })).toHaveAttribute(
       'href',

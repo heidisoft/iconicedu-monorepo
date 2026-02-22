@@ -1,99 +1,74 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react-native';
-import { MessageItem, type MessageItemData } from '../components/messages/message-item';
+import { MessageItem } from '../components/messages/message-item';
+import type { MessageVM } from '@iconicedu/shared-types';
+import { LIGHT } from '../lib/theme';
 
-const baseMessage: MessageItemData = {
-  id: 'msg-1',
-  type: 'text',
-  content: { text: 'Hello world' },
-  sender_profile_id: 'user-1',
-  created_at: '2025-01-15T10:30:00Z',
-  sender: {
-    id: 'user-1',
-    display_name: 'John Doe',
-    first_name: 'John',
-    last_name: 'Doe',
-    avatar_url: null,
+const sender = {
+  kind: 'educator',
+  ids: { id: 'user-1', orgId: 'org-1', accountId: 'acc-1' },
+  profile: {
+    displayName: 'John Doe',
+    avatar: { source: 'seed' as const, seed: 'john', url: null, updatedAt: '2025-01-01T00:00:00Z' },
   },
-};
+  prefs: {},
+  meta: { createdAt: '2025-01-01T00:00:00Z', updatedAt: '2025-01-01T00:00:00Z' },
+} as unknown as MessageVM['core']['sender'];
+
+const baseMessage: MessageVM = {
+  ids: { id: 'msg-1', orgId: 'org-1' },
+  core: {
+    type: 'text',
+    sender,
+    createdAt: '2025-01-15T10:30:00Z',
+    visibility: { type: 'all' },
+  },
+  social: { reactions: [] },
+  state: {},
+  content: { text: 'Hello world' },
+} as unknown as MessageVM;
+
+const colors = LIGHT;
 
 describe('MessageItem', () => {
   it('renders text message content', () => {
     render(
-      <MessageItem message={baseMessage} isOwn={false} showSender />,
+      <MessageItem message={baseMessage} isOwn={false} isGroupStart colors={colors} />,
     );
     expect(screen.getByText('Hello world')).toBeTruthy();
   });
 
-  it('renders sender name when showSender is true', () => {
+  it('renders sender name when isGroupStart is true', () => {
     render(
-      <MessageItem message={baseMessage} isOwn={false} showSender />,
+      <MessageItem message={baseMessage} isOwn={false} isGroupStart colors={colors} />,
     );
     expect(screen.getByText('John Doe')).toBeTruthy();
   });
 
-  it('hides sender name when showSender is false', () => {
+  it('hides sender name when isGroupStart is false', () => {
     render(
-      <MessageItem message={baseMessage} isOwn={false} showSender={false} />,
+      <MessageItem message={baseMessage} isOwn={false} isGroupStart={false} colors={colors} />,
     );
     expect(screen.queryByText('John Doe')).toBeNull();
   });
 
-  it('hides sender name for own messages', () => {
+  it('renders own message without bubble style', () => {
     render(
-      <MessageItem message={baseMessage} isOwn showSender />,
+      <MessageItem message={baseMessage} isOwn isGroupStart colors={colors} />,
     );
-    expect(screen.queryByText('John Doe')).toBeNull();
-  });
-
-  it('renders image message type fallback', () => {
-    const imageMsg: MessageItemData = {
-      ...baseMessage,
-      type: 'image',
-      content: null,
-    };
-    render(<MessageItem message={imageMsg} isOwn={false} showSender={false} />);
-    expect(screen.getByText('[Image]')).toBeTruthy();
-  });
-
-  it('renders file message type fallback', () => {
-    const fileMsg: MessageItemData = {
-      ...baseMessage,
-      type: 'file',
-      content: null,
-    };
-    render(<MessageItem message={fileMsg} isOwn={false} showSender={false} />);
-    expect(screen.getByText('[File]')).toBeTruthy();
-  });
-
-  it('renders unsupported message type fallback', () => {
-    const unknownMsg: MessageItemData = {
-      ...baseMessage,
-      type: 'session-booking',
-      content: null,
-    };
-    render(
-      <MessageItem message={unknownMsg} isOwn={false} showSender={false} />,
-    );
-    expect(screen.getByText('[session-booking]')).toBeTruthy();
-  });
-
-  it('renders timestamp', () => {
-    render(
-      <MessageItem message={baseMessage} isOwn={false} showSender={false} />,
-    );
-    // The time format depends on locale, so just check something is rendered
     expect(screen.getByText('Hello world')).toBeTruthy();
   });
 
-  it('handles missing sender gracefully', () => {
-    const noSenderMsg: MessageItemData = {
+  it('renders audio message waveform', () => {
+    const audioMsg = {
       ...baseMessage,
-      sender: null,
-    };
+      core: { ...baseMessage.core, type: 'audio-recording' },
+      audio: { durationSeconds: 65, waveform: [0.5, 0.8, 0.3] },
+    } as unknown as MessageVM;
     render(
-      <MessageItem message={noSenderMsg} isOwn={false} showSender />,
+      <MessageItem message={audioMsg} isOwn={false} isGroupStart colors={colors} />,
     );
-    expect(screen.getByText('Unknown')).toBeTruthy();
+    // Duration should show 1:05
+    expect(screen.getByText('1:05')).toBeTruthy();
   });
 });

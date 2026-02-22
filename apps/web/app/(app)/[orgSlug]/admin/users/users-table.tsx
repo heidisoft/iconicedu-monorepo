@@ -49,6 +49,7 @@ import {
   MoreHorizontal,
   RotateCw,
   Loader2,
+  MessageCircle,
 } from '@iconicedu/ui-web';
 
 import { InviteUserDialog } from '@iconicedu/web/app/(app)/[orgSlug]/admin/users/invite-dialog';
@@ -64,7 +65,13 @@ type UsersTableProps = {
   rows: AdminUserRow[];
 };
 
-type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline' | 'ghost' | 'link';
+type BadgeVariant =
+  | 'default'
+  | 'secondary'
+  | 'destructive'
+  | 'outline'
+  | 'ghost'
+  | 'link';
 
 const STATUS_BADGE_VARIANTS: Record<string, BadgeVariant> = {
   active: 'default',
@@ -219,7 +226,9 @@ export function UsersTable({ rows }: UsersTableProps) {
       return;
     }
     if (!row.profileId) {
-      toast.error('This user does not have a profile yet. Invite or activate them first.');
+      toast.error(
+        'This user does not have a profile yet. Invite or activate them first.',
+      );
       return;
     }
     router.push(buildAdminUserDmPath(orgSlug, row.profileId));
@@ -412,177 +421,178 @@ export function UsersTable({ rows }: UsersTableProps) {
         )}
         <Table className="min-w-full">
           <TableHeader>
-          <TableRow>
-            <TableHead>
-              <button
-                type="button"
-                className="flex items-center"
-                onClick={() => handleSort('name')}
-              >
-                Name {renderSortIndicator('name')}
-              </button>
-            </TableHead>
-            <TableHead>
-              <button
-                type="button"
-                className="flex items-center"
-                onClick={() => handleSort('email')}
-              >
-                Email {renderSortIndicator('email')}
-              </button>
-            </TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>
-              <button
-                type="button"
-                className="flex items-center"
-                onClick={() => handleSort('status')}
-              >
-                Status {renderSortIndicator('status')}
-              </button>
-            </TableHead>
-            <TableHead>
-              <button
-                type="button"
-                className="flex items-center"
-                onClick={() => handleSort('joined')}
-              >
-                Joined {renderSortIndicator('joined')}
-              </button>
-            </TableHead>
-            <TableHead>Last seen</TableHead>
-            <TableHead>Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {visibleRows.map((row) => {
-            const displayName = row.displayName || row.email || 'Unnamed';
-            const Icon =
-              PROFILE_ICON_MAP[row.profileKind ?? 'default'] ?? PROFILE_ICON_MAP.default;
-            return (
-              <TableRow
-                key={row.id}
-                data-deleting={deletingId === row.id ? 'true' : 'false'}
-              >
-                <TableCell>
-                  <div className="flex items-center gap-3">
-                    <AvatarWithStatus
-                      name={displayName}
-                      avatar={{
-                        source: resolveAvatarSource(row.avatarSource),
-                        url: row.avatarUrl ?? null,
-                        seed:
-                          resolveAvatarSource(row.avatarSource) === 'seed'
-                            ? row.email ?? undefined
-                            : undefined,
-                      }}
-                      themeKey={resolveThemeKey(row.themeKey)}
-                      showStatus={false}
-                      sizeClassName="size-8"
-                      initialsLength={2}
-                    />
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold capitalize">{displayName}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {row.phone ?? row.email ?? '—'}
-                      </p>
+            <TableRow>
+              <TableHead>
+                <button
+                  type="button"
+                  className="flex items-center"
+                  onClick={() => handleSort('name')}
+                >
+                  Name {renderSortIndicator('name')}
+                </button>
+              </TableHead>
+              <TableHead>
+                <button
+                  type="button"
+                  className="flex items-center"
+                  onClick={() => handleSort('email')}
+                >
+                  Email {renderSortIndicator('email')}
+                </button>
+              </TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>
+                <button
+                  type="button"
+                  className="flex items-center"
+                  onClick={() => handleSort('status')}
+                >
+                  Status {renderSortIndicator('status')}
+                </button>
+              </TableHead>
+              <TableHead>
+                <button
+                  type="button"
+                  className="flex items-center"
+                  onClick={() => handleSort('joined')}
+                >
+                  Joined {renderSortIndicator('joined')}
+                </button>
+              </TableHead>
+              <TableHead>Last seen</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {visibleRows.map((row) => {
+              const displayName = row.displayName || row.email || 'Unnamed';
+              const Icon =
+                PROFILE_ICON_MAP[row.profileKind ?? 'default'] ??
+                PROFILE_ICON_MAP.default;
+              return (
+                <TableRow
+                  key={row.id}
+                  data-deleting={deletingId === row.id ? 'true' : 'false'}
+                >
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <AvatarWithStatus
+                        name={displayName}
+                        avatar={{
+                          source: resolveAvatarSource(row.avatarSource),
+                          url: row.avatarUrl ?? null,
+                          seed:
+                            resolveAvatarSource(row.avatarSource) === 'seed'
+                              ? (row.email ?? undefined)
+                              : undefined,
+                        }}
+                        themeKey={resolveThemeKey(row.themeKey)}
+                        showStatus={false}
+                        sizeClassName="size-8"
+                        initialsLength={2}
+                      />
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold capitalize">{displayName}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {row.phone ?? row.email ?? '—'}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <p className="text-sm">{row.email ?? '—'}</p>
-                  <p className="text-xs text-muted-foreground">{row.phone ?? '—'}</p>
-                </TableCell>
-                <TableCell>
-                  <div className="inline-flex items-center gap-2 text-sm capitalize">
-                    <Icon className="size-4 text-muted-foreground" aria-hidden />
-                    {row.profileKind ?? 'account'}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge
-                    variant={STATUS_BADGE_VARIANTS[row.status] ?? 'ghost'}
-                    className="text-xs capitalize"
-                  >
-                    {row.status}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  {row.createdAt ? (
-                    <p className="text-sm">
-                      {new Date(row.createdAt).toLocaleDateString()}
-                    </p>
-                  ) : (
-                    <span className="text-sm text-muted-foreground">—</span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  {row.lastSignInAt ? (
-                    <p className="text-sm">
-                      {new Date(row.lastSignInAt).toLocaleDateString()}
-                    </p>
-                  ) : (
-                    <span className="text-sm text-muted-foreground">n/a</span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="px-2"
-                        aria-label={`Actions for ${displayName}`}
-                        disabled={deletingId === row.id}
-                      >
-                        <MoreHorizontal className="size-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
+                  </TableCell>
+                  <TableCell>
+                    <p className="text-sm">{row.email ?? '—'}</p>
+                    <p className="text-xs text-muted-foreground">{row.phone ?? '—'}</p>
+                  </TableCell>
+                  <TableCell>
+                    <div className="inline-flex items-center gap-2 text-sm capitalize">
+                      <Icon className="size-4 text-muted-foreground" aria-hidden />
+                      {row.profileKind ?? 'account'}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={STATUS_BADGE_VARIANTS[row.status] ?? 'ghost'}
+                      className="text-xs capitalize"
+                    >
+                      {row.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {row.createdAt ? (
+                      <p className="text-sm">
+                        {new Date(row.createdAt).toLocaleDateString()}
+                      </p>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {row.lastSignInAt ? (
+                      <p className="text-sm">
+                        {new Date(row.lastSignInAt).toLocaleDateString()}
+                      </p>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">n/a</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="px-2"
+                          aria-label={`Actions for ${displayName}`}
+                          disabled={deletingId === row.id}
+                        >
+                          <MoreHorizontal className="size-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => openEditDialog(row)}
-                        disabled={Boolean(rowActionLoading) || deletingId === row.id}
-                      >
-                        <User className="size-3 mr-2" /> Edit profile
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => handleStartDirectMessage(row)}
-                        disabled={
-                          Boolean(rowActionLoading) ||
-                          deletingId === row.id ||
-                          !row.profileId
-                        }
-                      >
-                        <Users className="size-3 mr-2" /> Send direct message
-                      </DropdownMenuItem>
-                      {row.status === 'invited' && (
                         <DropdownMenuItem
-                          onClick={() => handleRowInviteAction(row, 'invite')}
+                          onClick={() => openEditDialog(row)}
                           disabled={Boolean(rowActionLoading) || deletingId === row.id}
                         >
-                          <Copy className="size-3 mr-2" /> Resend invite
+                          <User className="size-3 mr-2" /> Edit profile
                         </DropdownMenuItem>
-                      )}
-                      <DropdownMenuItem
-                        onClick={() => handleRowInviteAction(row, 'link')}
-                        disabled={Boolean(rowActionLoading) || deletingId === row.id}
-                      >
-                        <Copy className="size-3 mr-2" /> Generate a login link
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => openDeleteDialog(row)}
-                        disabled={deletingId === row.id}
-                      >
-                        <Trash2 className="size-3 mr-2" />
-                        {deletingId === row.id ? 'Deleting…' : 'Delete'}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
+                        <DropdownMenuItem
+                          onClick={() => handleStartDirectMessage(row)}
+                          disabled={
+                            Boolean(rowActionLoading) ||
+                            deletingId === row.id ||
+                            !row.profileId
+                          }
+                        >
+                          <MessageCircle className="size-3 mr-2" /> Send message
+                        </DropdownMenuItem>
+                        {row.status === 'invited' && (
+                          <DropdownMenuItem
+                            onClick={() => handleRowInviteAction(row, 'invite')}
+                            disabled={Boolean(rowActionLoading) || deletingId === row.id}
+                          >
+                            <Copy className="size-3 mr-2" /> Resend invite
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem
+                          onClick={() => handleRowInviteAction(row, 'link')}
+                          disabled={Boolean(rowActionLoading) || deletingId === row.id}
+                        >
+                          <Copy className="size-3 mr-2" /> Generate a login link
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => openDeleteDialog(row)}
+                          disabled={deletingId === row.id}
+                        >
+                          <Trash2 className="size-3 mr-2" />
+                          {deletingId === row.id ? 'Deleting…' : 'Delete'}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
         </Table>
       </div>
       <AlertDialog
@@ -806,7 +816,11 @@ export function UsersTable({ rows }: UsersTableProps) {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setEditUser(null)} disabled={editSaving}>
+            <Button
+              variant="ghost"
+              onClick={() => setEditUser(null)}
+              disabled={editSaving}
+            >
               Cancel
             </Button>
             <Button onClick={handleEditSave} disabled={editSaving}>

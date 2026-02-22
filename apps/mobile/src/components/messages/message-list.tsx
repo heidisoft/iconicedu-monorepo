@@ -98,8 +98,8 @@ export const MessageList: React.FC<MessageListProps> = ({
   const flatListRef = useRef<FlatList>(null);
   const { colors } = useTheme();
 
-  // Build items with date separators injected (oldest-first order)
-  const listData = useMemo(() => buildListData(messages), [messages]);
+  // Build items newest-first so inverted FlatList renders newest at the bottom
+  const listData = useMemo(() => [...buildListData(messages)].reverse(), [messages]);
 
   const renderItem = useCallback(
     ({ item, index }: { item: MessageListItem; index: number }) => {

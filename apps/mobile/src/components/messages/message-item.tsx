@@ -264,8 +264,8 @@ function SessionCompleteBar({ message, colors, s }: { message: SessionCompleteMe
 function makeStyles(colors: AppColors) {
   return StyleSheet.create({
     // Slack two-column row
-    row:          { flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 2 },
-    rowGroupStart: { paddingTop: 10 },
+    row:          { flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 4 },
+    rowGroupStart: { paddingTop: 14 },
 
     // Left column — 44px (avatar or empty spacer)
     leftCol:  { width: 44, alignItems: 'center', paddingTop: 2, flexShrink: 0 },
