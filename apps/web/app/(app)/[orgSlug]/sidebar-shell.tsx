@@ -1865,8 +1865,11 @@ export function SidebarShell({
           .from(AVATAR_BUCKET)
           .createSignedUrl(path, AVATAR_SIGNED_URL_TTL);
 
-        if (signedError || !signedData?.signedUrl) {
-          throw new Error('Unable to create a signed photo URL.');
+        const signedOrPublicUrl = signedData?.signedUrl
+          ? signedData.signedUrl
+          : supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path).data.publicUrl;
+        if ((signedError && !signedOrPublicUrl) || !signedOrPublicUrl) {
+          throw new Error('Unable to create a profile photo URL.');
         }
 
         const updatedAt = new Date().toISOString();
@@ -1895,7 +1898,7 @@ export function SidebarShell({
                 avatar: {
                   ...prev.user.profile.profile.avatar,
                   source: 'upload',
-                  url: signedData.signedUrl,
+                  url: signedOrPublicUrl,
                   updatedAt,
                 },
               },

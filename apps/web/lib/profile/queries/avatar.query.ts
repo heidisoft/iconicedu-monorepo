@@ -10,3 +10,10 @@ export async function createSignedAvatarUrl(
     .from(AVATAR_BUCKET)
     .createSignedUrl(avatarPath, AVATAR_SIGNED_URL_TTL);
 }
+
+export function createPublicAvatarUrl(
+  supabase: SupabaseClient,
+  avatarPath: string,
+) {
+  return supabase.storage.from(AVATAR_BUCKET).getPublicUrl(avatarPath);
+}

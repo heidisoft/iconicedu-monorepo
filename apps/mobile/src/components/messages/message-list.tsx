@@ -30,7 +30,7 @@ function formatDateHeader(iso: string): string {
 type DateSeparatorItem = { _type: 'date-separator'; dateKey: string; label: string };
 type MessageListItem = MessageVM | DateSeparatorItem;
 
-function buildListData(messages: MessageVM[]): MessageListItem[] {
+export function buildListData(messages: MessageVM[]): MessageListItem[] {
   // Messages arrive oldest-first; the FlatList is inverted so it renders
   // newest at the bottom. We insert date separators between groups.
   const items: MessageListItem[] = [];

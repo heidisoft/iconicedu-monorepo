@@ -15,7 +15,6 @@ import { TypingIndicator } from '@/components/messages/typing-indicator';
 import { ConversationHeader } from '@/components/messages/conversation-header';
 import { MessageActionsSheet } from '@/components/messages/message-actions-sheet';
 import { ThreadSheet } from '@/components/messages/thread-sheet';
-import { DEMO_MESSAGE_MAP, DEMO_PROFILE_ID, DEMO_RILEY_PROFILE, DEMO_ORG_ID } from '@/lib/dummy-messages';
 
 export default function ChannelConversationScreen() {
   const { channelId, topic } = useLocalSearchParams<{ channelId: string; topic?: string }>();
@@ -24,35 +23,22 @@ export default function ChannelConversationScreen() {
   const { data: profile } = useProfile();
   const { colors } = useTheme();
 
-  const isDemo = channelId?.startsWith('demo-') ?? false;
-
-  const profileId = isDemo
-    ? DEMO_PROFILE_ID
-    : ((profile as Record<string, unknown> | undefined)?.id as string ?? '');
-  const orgId = isDemo ? DEMO_ORG_ID : (account?.org_id ?? '');
+  const profileId = (profile as Record<string, unknown> | undefined)?.id as string ?? '';
+  const orgId = account?.org_id ?? '';
   const senderName =
     ((profile as Record<string, unknown> | undefined)?.display_name as string | undefined) ??
     ((profile as Record<string, unknown> | undefined)?.first_name as string | undefined) ??
     'Me';
 
-  // ── Demo local messages state ──
-  const [localMessages, setLocalMessages] = useState<MessageVM[]>(
-    () => isDemo ? (DEMO_MESSAGE_MAP[channelId ?? ''] ?? []) : [],
-  );
-
-  // ── Real messages ──
   const {
-    data: realMessages,
+    data: messages,
     isLoading,
     loadMore,
     toggleReaction,
-  } = useMessages(isDemo ? '' : (channelId ?? ''), profileId);
+  } = useMessages(channelId ?? '', profileId);
 
-  const messages = isDemo ? localMessages : (realMessages ?? []);
-
-  // ── Typing indicator ──
   const { typingUsers, broadcastTyping } = useTyping(
-    isDemo ? '' : (channelId ?? ''),
+    channelId ?? '',
     senderName,
     profileId,
   );
@@ -78,63 +64,23 @@ export default function ChannelConversationScreen() {
   // ── Send message ──
   const handleSend = useCallback(
     async (text: string) => {
-      if (isDemo) {
-        const newMsg = {
-          ids: { id: `demo-msg-${Date.now()}`, orgId: DEMO_ORG_ID },
-          core: {
-            type: 'text',
-            sender: DEMO_RILEY_PROFILE,
-            createdAt: new Date().toISOString(),
-            visibility: { type: 'all' },
-          },
-          social: { reactions: [] },
-          state: {},
-          content: { text },
-        } as unknown as MessageVM;
-        setLocalMessages((prev) => [...prev, newMsg]);
-        return;
-      }
       if (!channelId || !profileId || !orgId) return;
       await sendTextMessage(channelId, profileId, orgId, text);
     },
-    [isDemo, channelId, profileId, orgId],
+    [channelId, profileId, orgId],
   );
 
   // ── Delete message ──
   const handleDelete = useCallback(async (messageId: string) => {
-    if (isDemo) {
-      setLocalMessages((prev) => prev.filter((m) => m.ids.id !== messageId));
-      return;
-    }
     await deleteMessage(messageId);
-  }, [isDemo]);
+  }, []);
 
   // ── Reaction toggle ──
   const handleReactionToggle = useCallback(
     async (messageId: string, emoji: string) => {
-      if (isDemo) {
-        setLocalMessages((prev) =>
-          prev.map((msg) => {
-            if (msg.ids.id !== messageId) return msg;
-            const reactions = msg.social?.reactions ?? [];
-            const existing = reactions.find((r) => r.emoji === emoji);
-            const newReactions = existing
-              ? reactions
-                  .map((r) =>
-                    r.emoji === emoji
-                      ? { ...r, count: r.reactedByMe ? r.count - 1 : r.count + 1, reactedByMe: !r.reactedByMe }
-                      : r,
-                  )
-                  .filter((r) => r.count > 0)
-              : [...reactions, { emoji, count: 1, reactedByMe: true }];
-            return { ...msg, social: { ...msg.social, reactions: newReactions } } as unknown as MessageVM;
-          }),
-        );
-        return;
-      }
       await toggleReaction(messageId, emoji);
     },
-    [isDemo, toggleReaction],
+    [toggleReaction],
   );
 
   if (!channelId) return null;
@@ -150,10 +96,10 @@ export default function ChannelConversationScreen() {
       />
       <View style={[styles.flex, { backgroundColor: colors.pageBg }]}>
         <MessageList
-          messages={messages}
+          messages={messages ?? []}
           currentProfileId={profileId}
-          onLoadMore={isDemo ? undefined : loadMore}
-          loading={isDemo ? false : isLoading}
+          onLoadMore={loadMore}
+          loading={isLoading}
           onMessageLongPress={handleLongPress}
           onReactionToggle={handleReactionToggle}
           onThreadOpen={handleThreadOpen}
@@ -162,7 +108,7 @@ export default function ChannelConversationScreen() {
         <MessageInput
           onSend={handleSend}
           placeholder={`Message #${topic ?? ''}…`}
-          onTypingChange={isDemo ? undefined : broadcastTyping}
+          onTypingChange={broadcastTyping}
         />
       </View>
 

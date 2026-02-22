@@ -2,9 +2,8 @@ import type { ChildProfileVM, GradeLevel, UserProfileVM } from '@iconicedu/share
 import type { ChildProfileGradeLevelRow, ChildProfileRow, ProfileRow } from '@iconicedu/shared-types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+import { resolveProfileAvatarUrl } from '@iconicedu/web/lib/profile/avatar-url';
 import { mapBaseProfile } from '@iconicedu/web/lib/profile/mappers/base-profile.mapper';
-import { resolveAvatarSource } from '@iconicedu/web/lib/profile/derive';
-import { createSignedAvatarUrl } from '@iconicedu/web/lib/profile/queries/avatar.query';
 import { getChildProfilesDetails } from '@iconicedu/web/lib/profile/queries/child.query';
 import { getChildProfilesByAccountIds } from '@iconicedu/web/lib/profile/queries/profiles.query';
 import { getAccountsByIds } from '@iconicedu/web/lib/accounts/queries/accounts.query';
@@ -15,20 +14,7 @@ async function resolveAvatarUrl(
   avatarSource: string,
   avatarUrl: string | null,
 ) {
-  if (!avatarUrl) {
-    return null;
-  }
-
-  if (resolveAvatarSource(avatarSource) !== 'upload') {
-    return avatarUrl;
-  }
-
-  const { data, error } = await createSignedAvatarUrl(supabase, avatarUrl);
-  if (error) {
-    return null;
-  }
-
-  return data?.signedUrl ?? null;
+  return resolveProfileAvatarUrl(supabase, avatarSource, avatarUrl);
 }
 
 export async function loadChildProfiles(

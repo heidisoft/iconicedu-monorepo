@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react-native';
 import { MessageItem } from '../components/messages/message-item';
 import type { MessageVM } from '@iconicedu/shared-types';
-import { LIGHT } from '../lib/theme';
+import { lightColors as LIGHT } from '../lib/theme';
 
 const sender = {
   kind: 'educator',

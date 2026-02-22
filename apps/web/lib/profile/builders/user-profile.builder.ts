@@ -9,8 +9,7 @@ import type { ProfileRow } from '@iconicedu/shared-types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { mapBaseProfile } from '@iconicedu/web/lib/profile/mappers/base-profile.mapper';
-import { resolveAvatarSource } from '@iconicedu/web/lib/profile/derive';
-import { createSignedAvatarUrl } from '@iconicedu/web/lib/profile/queries/avatar.query';
+import { resolveProfileAvatarUrl } from '@iconicedu/web/lib/profile/avatar-url';
 import { getNotificationDefaults } from '@iconicedu/web/lib/profile/queries/notification-defaults.query';
 import { getPresence } from '@iconicedu/web/lib/profile/queries/presence.query';
 import { mapProfilePresenceRowToVM } from '@iconicedu/web/lib/profile/mappers/presence.mapper';
@@ -156,18 +155,5 @@ async function resolveAvatarUrl(
   avatarSource: string,
   avatarUrl: string | null,
 ): Promise<string | null> {
-  if (!avatarUrl) {
-    return null;
-  }
-
-  if (resolveAvatarSource(avatarSource) !== 'upload') {
-    return avatarUrl;
-  }
-
-  const { data, error } = await createSignedAvatarUrl(supabase, avatarUrl);
-  if (error) {
-    return null;
-  }
-
-  return data?.signedUrl ?? null;
+  return resolveProfileAvatarUrl(supabase, avatarSource, avatarUrl);
 }

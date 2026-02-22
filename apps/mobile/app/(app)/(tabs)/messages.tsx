@@ -18,11 +18,6 @@ import { useChannels } from '@/hooks/use-channels';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 import type { ChannelListItem } from '@/lib/api/queries';
-import {
-  DEMO_DM_CHANNELS,
-  DEMO_CHANNEL_LIST,
-} from '@/lib/dummy-messages';
-
 type Tab = 'all' | 'dms' | 'channels';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -217,8 +212,8 @@ export default function MessagesScreen() {
     setRefreshing(false);
   }, [refetchDms, refetchChannels]);
 
-  const allDms = useMemo(() => [...DEMO_DM_CHANNELS, ...(dms ?? [])], [dms]);
-  const allChannels = useMemo(() => [...DEMO_CHANNEL_LIST, ...(channels ?? [])], [channels]);
+  const allDms = useMemo(() => dms ?? [], [dms]);
+  const allChannels = useMemo(() => channels ?? [], [channels]);
 
   const allItems = useMemo(() =>
     [...allDms, ...allChannels].sort((a, b) => {

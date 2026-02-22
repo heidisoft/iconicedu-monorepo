@@ -10,6 +10,7 @@ import type { AccountRow, ProfileRow } from '@iconicedu/shared-types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { mapAccountRowToVM, mapUserRoles } from '@iconicedu/web/lib/accounts/mappers/account.mapper';
+import { resolveProfileAvatarUrl } from '@iconicedu/web/lib/profile/avatar-url';
 import { mapBaseProfile } from '@iconicedu/web/lib/profile/mappers/base-profile.mapper';
 import {
   deriveProfileKind,
@@ -17,7 +18,6 @@ import {
   resolveAvatarSource,
   resolveExternalAvatarUrl,
 } from '@iconicedu/web/lib/profile/derive';
-import { createSignedAvatarUrl } from '@iconicedu/web/lib/profile/queries/avatar.query';
 import { getAccountById } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { getNotificationDefaults } from '@iconicedu/web/lib/profile/queries/notification-defaults.query';
 import { getPresence } from '@iconicedu/web/lib/profile/queries/presence.query';
@@ -249,18 +249,5 @@ async function resolveAvatarUrl(
   avatarSource: string,
   avatarUrl: string | null,
 ): Promise<string | null> {
-  if (!avatarUrl) {
-    return null;
-  }
-
-  if (resolveAvatarSource(avatarSource) !== 'upload') {
-    return avatarUrl;
-  }
-
-  const { data, error } = await createSignedAvatarUrl(supabase, avatarUrl);
-  if (error) {
-    return null;
-  }
-
-  return data?.signedUrl ?? null;
+  return resolveProfileAvatarUrl(supabase, avatarSource, avatarUrl);
 }

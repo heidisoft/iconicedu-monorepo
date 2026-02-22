@@ -1354,6 +1354,133 @@ function handleMessage(message: MessageVM) {
 
 ---
 
+## 📱 Mobile App — Testing Guide
+
+**Last Updated:** 2026-02-22
+
+### Framework & Setup
+
+- **Runner:** `jest-expo` — version must match Expo SDK (SDK 54 → `jest-expo@54`)
+- **Library:** `@testing-library/react-native`
+- **Config:** `apps/mobile/jest.config.js`
+- **Test location:** `apps/mobile/src/__tests__/`
+- **Pattern:** `**/__tests__/**/*.test.{ts,tsx}`
+
+### Rule: Write Tests for Every Touched File
+
+When modifying any source file in `apps/mobile/src/` or `apps/mobile/app/`, add or update its test. Current coverage:
+
+| Source file | Test file |
+|---|---|
+| `src/components/messages/message-item.tsx` | `src/__tests__/message-item.test.tsx` |
+| `src/components/messages/message-list.tsx` | `src/__tests__/message-list.test.tsx` |
+| `src/components/messages/message-input.tsx` | `src/__tests__/message-input.test.tsx` |
+| `src/lib/dummy-messages.ts` | `src/__tests__/dummy-messages.test.ts` |
+| `src/providers/auth-provider.tsx` | `src/__tests__/auth-provider.test.tsx` |
+
+### Imports
+
+```ts
+// Colors — use lightColors (exported name is `lightColors`, not LIGHT)
+import { lightColors } from '@/lib/theme';
+
+// Shared types
+import type { MessageVM } from '@iconicedu/shared-types';
+
+// Components
+import { render, screen, fireEvent } from '@testing-library/react-native';
+```
+
+### Mocking Patterns
+
+**Supabase client:**
+```ts
+jest.mock('../lib/supabase/client', () => ({
+  supabase: {
+    auth: { getSession: jest.fn(), onAuthStateChange: jest.fn().mockReturnValue({ data: { subscription: { unsubscribe: jest.fn() } } }) },
+    from: jest.fn().mockReturnValue({ select: jest.fn().mockReturnThis(), eq: jest.fn().mockReturnThis(), maybeSingle: jest.fn() }),
+  },
+}));
+```
+
+**Theme provider (when component calls `useTheme`):**
+```ts
+jest.mock('../providers/theme-provider', () => ({
+  useTheme: () => ({ colors: require('../lib/theme').lightColors }),
+}));
+```
+
+**Expo Router:**
+```ts
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn() }),
+  useLocalSearchParams: () => ({ channelId: 'demo-ch', topic: 'Test' }),
+}));
+```
+
+### Building test MessageVM objects
+
+```ts
+function makeSender(id: string, name = 'Sender') {
+  return {
+    kind: 'educator',
+    ids: { id, orgId: 'org-1', accountId: `acc-${id}` },
+    profile: {
+      displayName: name,
+      avatar: { source: 'seed' as const, seed: id, url: null, updatedAt: '' },
+    },
+    prefs: {},
+    meta: { createdAt: '', updatedAt: '' },
+  } as unknown as MessageVM['core']['sender'];
+}
+
+function makeMsg(id: string, senderId: string, createdAt: string): MessageVM {
+  return {
+    ids: { id, orgId: 'org-1' },
+    core: { type: 'text', sender: makeSender(senderId), createdAt, visibility: { type: 'all' } },
+    social: { reactions: [] },
+    state: {},
+    content: { text: `msg-${id}` },
+  } as unknown as MessageVM;
+}
+```
+
+### Running tests
+
+```bash
+# All mobile tests
+pnpm --filter mobile test
+
+# Watch mode
+pnpm --filter mobile exec jest --watch
+
+# Single file
+pnpm --filter mobile exec jest src/__tests__/message-list.test.tsx
+```
+
+### Key Mobile Architecture Notes
+
+#### Demo mode (messages)
+- Channel IDs starting with `demo-` bypass Supabase — no network calls.
+- Demo screens keep local `useState` initialized from `DEMO_MESSAGE_MAP`.
+- New demo messages are built with `DEMO_RILEY_PROFILE` as sender.
+- `DEMO_PROFILE_ID` identifies the viewer's own messages for "isOwn" detection.
+- Both `dm/[channelId].tsx` and `channel/[channelId].tsx` share the same pattern.
+
+#### Message list ordering
+- `buildListData(messages)` produces date separators + messages in **oldest-first** order.
+- `MessageList` reverses the array before passing to the inverted `FlatList` so `data[0]` = newest renders at the bottom (closest to the input bar).
+- `isGroupStart` is computed per message by walking `data[index + 1]` (the older message visually above it).
+- A new group starts when: sender changes OR time gap > 5 minutes.
+- Own messages participate in grouping the same as others (no special treatment).
+
+#### Login eligibility
+- All user kinds (`educator`, `guardian`, `child`, `staff`, `admin`, `system`) are allowed on mobile.
+- The `MOBILE_ALLOWED_ROLES` set in `src/lib/api/queries.ts` controls this.
+- Unknown/null roles pass through so the profile wizard can collect the role.
+
+---
+
 **End of AGENTS.md**
 
-*This document should be updated as the architecture evolves. Last updated: 2026-02-16*
+*This document should be updated as the architecture evolves. Last updated: 2026-02-22*
