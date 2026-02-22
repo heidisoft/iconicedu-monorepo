@@ -2,14 +2,32 @@ import { NextResponse } from 'next/server';
 
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
-import { getOrCreateAccount } from '@iconicedu/web/lib/accounts/getOrCreateAccount';
 import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { updateAccountStatus } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { getUserRoles } from '@iconicedu/web/lib/profile/queries/roles.query';
 import { buildAuthOnboardingState } from '@iconicedu/web/lib/onboarding/auth-state';
+import { getOrgBySlug } from '@iconicedu/web/lib/org/queries/org.query';
 import { resolveOrgDashboardPath } from '@iconicedu/web/lib/org/resolve-dashboard-path';
 
-export async function POST() {
+type ActivationIntent = 'login' | 'get-started' | null;
+
+function parseIntent(value: string | null): ActivationIntent {
+  if (value === 'login' || value === 'get-started') {
+    return value;
+  }
+  return null;
+}
+
+async function resolveOrgLoginPath(orgId: string): Promise<string> {
+  const serviceSupabase = createSupabaseServiceClient();
+  const dashboardPath = await resolveOrgDashboardPath(serviceSupabase, orgId);
+  if (dashboardPath === '/d') {
+    return '/login';
+  }
+  return `${dashboardPath}/login`;
+}
+
+export async function POST(request: Request) {
   const sessionSupabase = await createSupabaseServerClient();
   const { data } = await sessionSupabase.auth.getUser();
 
@@ -18,8 +36,33 @@ export async function POST() {
   }
 
   const serviceSupabase = createSupabaseServiceClient();
+  const { searchParams } = new URL(request.url);
+  const orgSlugParam = searchParams.get('org')?.trim().toLowerCase() ?? '';
+  const orgSlug = orgSlugParam || null;
+  const intent = parseIntent(searchParams.get('intent'));
 
   try {
+    let requestedOrgId: string | null = null;
+    let requestedOrgSlug: string | null = null;
+    if (orgSlug) {
+      const orgResponse = await getOrgBySlug(serviceSupabase, orgSlug);
+      if (orgResponse.error) {
+        throw orgResponse.error;
+      }
+      if (!orgResponse.data) {
+        return NextResponse.json({
+          status: 'invalid_org',
+          onboarding: {
+            requiresOrgSetup: false,
+            requiresRoleSelection: false,
+            destination: '/login',
+          },
+        });
+      }
+      requestedOrgId = orgResponse.data.id;
+      requestedOrgSlug = orgResponse.data.slug;
+    }
+
     const existingAccountResponse = await getAccountByAuthUserId(
       serviceSupabase,
       data.user.id,
@@ -27,35 +70,39 @@ export async function POST() {
     let account = existingAccountResponse.data ?? null;
 
     if (!account) {
-      const { data: firstOrg, error: firstOrgError } = await serviceSupabase
-        .from('orgs')
-        .select('id')
-        .is('deleted_at', null)
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .maybeSingle<{ id: string }>();
-
-      if (firstOrgError) {
-        throw firstOrgError;
-      }
-
-      if (!firstOrg?.id) {
-        return NextResponse.json({
-          status: 'needs_org_setup',
-          onboarding: {
-            requiresOrgSetup: true,
-            requiresRoleSelection: false,
-            destination: null,
-          },
-        });
-      }
-
-      const created = await getOrCreateAccount(serviceSupabase, {
-        orgId: firstOrg.id,
-        authUserId: data.user.id,
-        authEmail: data.user.email ?? null,
+      const destination = requestedOrgSlug
+        ? `/${requestedOrgSlug}/get-started`
+        : '/get-started';
+      return NextResponse.json({
+        status: 'needs_org_setup',
+        onboarding: {
+          requiresOrgSetup: true,
+          requiresRoleSelection: false,
+          destination,
+        },
       });
-      account = created.account;
+    }
+
+    if (requestedOrgId && account.org_id !== requestedOrgId) {
+      return NextResponse.json({
+        status: 'active',
+        onboarding: {
+          requiresOrgSetup: false,
+          requiresRoleSelection: false,
+          destination: await resolveOrgLoginPath(account.org_id),
+        },
+      });
+    }
+
+    if (!account) {
+      return NextResponse.json({
+        status: 'needs_org_setup',
+        onboarding: {
+          requiresOrgSetup: true,
+          requiresRoleSelection: false,
+          destination: '/get-started',
+        },
+      });
     }
 
     const statusResponse = await updateAccountStatus(
@@ -75,11 +122,14 @@ export async function POST() {
       throw rolesResponse.error;
     }
     const onboarding = buildAuthOnboardingState(activeAccount, rolesResponse.data ?? []);
-    if (onboarding.destination === '/d') {
-      onboarding.destination = await resolveOrgDashboardPath(
-        serviceSupabase,
-        activeAccount.org_id,
-      );
+    if (onboarding.requiresRoleSelection) {
+      onboarding.requiresRoleSelection = false;
+      onboarding.destination = await resolveOrgLoginPath(activeAccount.org_id);
+    } else if (onboarding.destination === '/d') {
+      onboarding.destination =
+        intent === 'get-started'
+          ? await resolveOrgLoginPath(activeAccount.org_id)
+          : await resolveOrgDashboardPath(serviceSupabase, activeAccount.org_id);
     }
 
     return NextResponse.json({

@@ -1,6 +1,6 @@
 import type { AccountRow, UserRoleRow } from '@iconicedu/shared-types';
 
-type AuthOnboardingDestination = '/d' | '/login/pending-access';
+type AuthOnboardingDestination = string;
 
 export interface AuthOnboardingState {
   primaryRole: AccountRow['primary_role'] | null;

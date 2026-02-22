@@ -73,7 +73,7 @@ export function ChannelsTable({ rows, onEdit }: ChannelsTableProps) {
   const handleDelete = async (row: AdminChannelRow) => {
     setDeletingId(row.id);
     try {
-      const response = await fetch('/d/admin/channels/actions/delete', {
+      const response = await fetch('/api/admin/channels/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ channelId: row.id }),
@@ -96,7 +96,7 @@ export function ChannelsTable({ rows, onEdit }: ChannelsTableProps) {
   const handleArchive = async (row: AdminChannelRow) => {
     setArchivingId(row.id);
     try {
-      const response = await fetch('/d/admin/channels/actions/archive', {
+      const response = await fetch('/api/admin/channels/archive', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ channelId: row.id }),
@@ -118,7 +118,7 @@ export function ChannelsTable({ rows, onEdit }: ChannelsTableProps) {
   const handleUnarchive = async (row: AdminChannelRow) => {
     setUnarchivingId(row.id);
     try {
-      const response = await fetch('/d/admin/channels/actions/unarchive', {
+      const response = await fetch('/api/admin/channels/unarchive', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ channelId: row.id }),

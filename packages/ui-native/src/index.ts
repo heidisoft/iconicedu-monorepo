@@ -15,6 +15,8 @@ export * from '@iconicedu/ui-native/components/SearchBar';
 export * from '@iconicedu/ui-native/components/Chip';
 export * from '@iconicedu/ui-native/components/ScreenHeader';
 export * from '@iconicedu/ui-native/components/Tabs';
+export * from '@iconicedu/ui-native/components/SectionCard';
+export * from '@iconicedu/ui-native/components/SettingsRow';
 
 // Utilities
 export { cn, TextClassContext } from '@iconicedu/ui-native/lib/utils';

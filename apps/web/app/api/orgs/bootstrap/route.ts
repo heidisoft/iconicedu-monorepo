@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { getOrCreateAccount } from '@iconicedu/web/lib/accounts/getOrCreateAccount';
+import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import {
   getUserRoles,
   upsertUserRole,
@@ -52,21 +53,19 @@ export async function POST(request: Request) {
   }
 
   const serviceSupabase = createSupabaseServiceClient();
-  const { count: orgCount, error: orgCountError } = await serviceSupabase
-    .from('orgs')
-    .select('id', { count: 'exact', head: true })
-    .is('deleted_at', null);
-
-  if (orgCountError) {
+  const accountResponse = await getAccountByAuthUserId(serviceSupabase, user.id);
+  if (accountResponse.error) {
     return NextResponse.json(
-      { success: false, message: orgCountError.message },
+      { success: false, message: accountResponse.error.message },
       { status: 500 },
     );
   }
-
-  if ((orgCount ?? 0) > 0) {
+  if (accountResponse.data?.org_id) {
     return NextResponse.json(
-      { success: false, message: 'Organization already exists.' },
+      {
+        success: false,
+        message: 'Your account is already assigned to an organization. Org creation is restricted.',
+      },
       { status: 409 },
     );
   }

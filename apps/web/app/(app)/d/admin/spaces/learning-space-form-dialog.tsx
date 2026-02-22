@@ -244,7 +244,7 @@ export function LearningSpaceFormDialog({
     setIsSaving(true);
     try {
       const endpoint =
-        mode === 'edit' ? '/d/admin/spaces/actions/update' : '/d/admin/spaces/actions/create';
+        mode === 'edit' ? '/api/admin/spaces/update' : '/api/admin/spaces/create';
       const body =
         mode === 'edit'
           ? JSON.stringify({ learningSpaceId: editingId, payload })

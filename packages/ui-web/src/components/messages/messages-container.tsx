@@ -210,7 +210,7 @@ export function MessagesContainer({
 
         const persistReadState = async () => {
           try {
-            const response = await window.fetch('/d/messages/actions/read-state', {
+            const response = await window.fetch('/api/messages/read-state', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -565,7 +565,7 @@ export function MessagesContainer({
         limit: String(MESSAGES_PAGE_SIZE),
       });
       const response = await window.fetch(
-        `/d/messages/actions/channel-page?${params.toString()}`,
+        `/api/messages/channel-page?${params.toString()}`,
       );
       if (!response.ok) {
         return false;

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ChannelCreatePayload } from '@iconicedu/shared-types';
-import { POST } from '@iconicedu/web/app/(app)/d/admin/channels/actions/update/route';
+import { POST } from '@iconicedu/web/app/api/admin/channels/update/route';
 import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
 
 const updateChannelFromPayload = vi.fn();
@@ -12,10 +12,10 @@ vi.mock('@iconicedu/web/lib/admin/channel-update', () => ({
     updateChannelFromPayload(id, payload),
 }));
 
-describe('POST /d/admin/channels/actions/update', () => {
+describe('POST /api/admin/channels/update', () => {
   it('returns 400 when channelId is missing', async () => {
     const response = await POST(
-      new Request(`${APP_URL}/d/admin/channels/actions/update`, {
+      new Request(`${APP_URL}/api/admin/channels/update`, {
         method: 'POST',
         body: JSON.stringify({ payload: {} }),
       }),
@@ -52,7 +52,7 @@ describe('POST /d/admin/channels/actions/update', () => {
     updateChannelFromPayload.mockResolvedValueOnce(undefined);
 
     const response = await POST(
-      new Request(`${APP_URL}/d/admin/channels/actions/update`, {
+      new Request(`${APP_URL}/api/admin/channels/update`, {
         method: 'POST',
         body: JSON.stringify({ channelId: 'channel-1', payload }),
       }),

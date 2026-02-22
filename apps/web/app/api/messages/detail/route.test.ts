@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { GET } from '@iconicedu/web/app/(app)/d/messages/actions/detail/route';
+import { GET } from '@iconicedu/web/app/api/messages/detail/route';
 import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
 
 const buildMessageById = vi.fn();
@@ -22,9 +22,9 @@ vi.mock('@iconicedu/web/lib/messages/builders/message.builder', () => ({
   buildMessageById: (...args: unknown[]) => buildMessageById(...args),
 }));
 
-describe('GET /d/messages/actions/detail', () => {
+describe('GET /api/messages/detail', () => {
   it('returns 400 when messageId is missing', async () => {
-    const response = await GET(new Request(`${APP_URL}/d/messages/actions/detail`));
+    const response = await GET(new Request(`${APP_URL}/api/messages/detail`));
 
     expect(response.status).toBe(400);
     const payload = await response.json();
@@ -35,7 +35,7 @@ describe('GET /d/messages/actions/detail', () => {
     buildMessageById.mockResolvedValueOnce({ ids: { id: 'message-1', orgId: 'org-1' } });
 
     const response = await GET(
-      new Request(`${APP_URL}/d/messages/actions/detail?messageId=message-1`),
+      new Request(`${APP_URL}/api/messages/detail?messageId=message-1`),
     );
 
     expect(buildMessageById).toHaveBeenCalledWith({}, 'org-1', 'message-1', {

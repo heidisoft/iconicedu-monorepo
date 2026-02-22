@@ -40,7 +40,7 @@ export function LearningSpacesDashboard({ rows }: LearningSpacesDashboardProps) 
 
   const loadParticipants = React.useCallback(async () => {
     try {
-      const response = await fetch('/d/admin/spaces/actions/participants', {
+      const response = await fetch('/api/admin/spaces/participants', {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -102,7 +102,7 @@ export function LearningSpacesDashboard({ rows }: LearningSpacesDashboardProps) 
 
   const handleEdit = async (row: LearningSpacesDashboardProps['rows'][number]) => {
     try {
-      const response = await fetch('/d/admin/spaces/actions/detail', {
+      const response = await fetch('/api/admin/spaces/detail', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ learningSpaceId: row.id }),

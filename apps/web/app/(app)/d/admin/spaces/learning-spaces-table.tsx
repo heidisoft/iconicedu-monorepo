@@ -55,7 +55,7 @@ export function LearningSpacesTable({ rows, onEdit }: LearningSpacesTableProps) 
   const handleDelete = async (row: AdminLearningSpaceRow) => {
     setDeletingId(row.id);
     try {
-      const response = await fetch('/d/admin/spaces/actions/delete', {
+      const response = await fetch('/api/admin/spaces/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ learningSpaceId: row.id }),
@@ -80,7 +80,7 @@ export function LearningSpacesTable({ rows, onEdit }: LearningSpacesTableProps) 
   const handleArchive = async (row: AdminLearningSpaceRow) => {
     setArchivingId(row.id);
     try {
-      const response = await fetch('/d/admin/spaces/actions/archive', {
+      const response = await fetch('/api/admin/spaces/archive', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ learningSpaceId: row.id }),
@@ -104,7 +104,7 @@ export function LearningSpacesTable({ rows, onEdit }: LearningSpacesTableProps) 
   const handleUnarchive = async (row: AdminLearningSpaceRow) => {
     setUnarchivingId(row.id);
     try {
-      const response = await fetch('/d/admin/spaces/actions/unarchive', {
+      const response = await fetch('/api/admin/spaces/unarchive', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ learningSpaceId: row.id }),

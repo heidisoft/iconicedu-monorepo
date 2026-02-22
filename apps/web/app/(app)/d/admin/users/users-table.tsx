@@ -202,7 +202,7 @@ export function UsersTable({ rows }: UsersTableProps) {
 
     setEditSaving(true);
     try {
-      const response = await fetch('/d/admin/users/actions/update-user', {
+      const response = await fetch('/api/admin/users/update-user', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -237,7 +237,7 @@ export function UsersTable({ rows }: UsersTableProps) {
     }
     setDeletingId(confirmDeleteUser.id);
     try {
-      const response = await fetch('/d/admin/users/actions/delete-user', {
+      const response = await fetch('/api/admin/users/delete-user', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -280,7 +280,7 @@ export function UsersTable({ rows }: UsersTableProps) {
       const redirectTo = `${window.location.origin.replace(/\/$/, '')}/auth/callback?profileKind=${encodeURIComponent(
         row.profileKind ?? 'guardian',
       )}`;
-      const response = await fetch('/d/admin/users/actions/invite-row', {
+      const response = await fetch('/api/admin/users/invite-row', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

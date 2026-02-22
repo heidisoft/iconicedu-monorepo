@@ -185,7 +185,7 @@ export function SidebarShell({
           : sidebarData.user.profile.presence?.displayStatus === 'offline'
             ? 'offline'
             : 'online';
-      const response = await window.fetch('/d/actions/presence', {
+      const response = await window.fetch('/api/presence', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -626,7 +626,7 @@ export function SidebarShell({
       }
 
       try {
-        await window.fetch('/d/actions/presence', {
+        await window.fetch('/api/presence', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ status }),
@@ -663,7 +663,7 @@ export function SidebarShell({
       const payload = JSON.stringify({ status: 'offline' });
       if (navigator.sendBeacon) {
         const blob = new Blob([payload], { type: 'application/json' });
-        navigator.sendBeacon('/d/actions/presence', blob);
+        navigator.sendBeacon('/api/presence', blob);
       } else {
         void publishPresence('offline', { force: true, keepalive: true });
       }

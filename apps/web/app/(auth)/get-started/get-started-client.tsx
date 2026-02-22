@@ -69,10 +69,16 @@ export default function GetStartedClient() {
   return (
     <div className="w-full max-w-md space-y-6 rounded-3xl border border-border/60 bg-background p-6 shadow-sm">
       <div className="space-y-1">
-        <h1 className="text-xl font-semibold">Set up your organization</h1>
+        <h1 className="text-xl font-semibold">Create organization (Admin only)</h1>
         <p className="text-sm text-muted-foreground">
-          You are the first user. Create your org to continue.
+          No organization is currently assigned to your account. Create one only if you are the
+          responsible administrator for this workspace.
         </p>
+      </div>
+
+      <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200">
+        This action creates a new organization owner context. Do not continue if your team already
+        has an existing organization.
       </div>
 
       <div className="grid gap-2">
@@ -102,7 +108,7 @@ export default function GetStartedClient() {
 
       <div className="flex justify-end">
         <Button type="button" onClick={handleSubmit} disabled={isSubmitting}>
-          {isSubmitting ? 'Creating…' : 'Create organization'}
+          {isSubmitting ? 'Creating organization…' : 'Create organization as admin'}
         </Button>
       </div>
     </div>

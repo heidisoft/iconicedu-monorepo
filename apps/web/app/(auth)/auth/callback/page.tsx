@@ -5,10 +5,6 @@ import { useRouter } from 'next/navigation';
 
 import { createSupabaseBrowserClient } from '@iconicedu/web/lib/supabase/client';
 import { trackAuthTelemetry } from '@iconicedu/web/lib/telemetry/auth-events';
-import {
-  RoleOnboardingModal,
-  type RoleOnboardingSubmitInput,
-} from '@iconicedu/web/app/(auth)/auth/callback/role-onboarding-modal';
 
 type SupportedOtpType = 'magiclink' | 'invite' | 'signup';
 
@@ -25,7 +21,6 @@ function resolveOtpType(value?: string | null): SupportedOtpType {
 export default function CallbackPage() {
   const router = useRouter();
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
-  const [showRoleModal, setShowRoleModal] = React.useState(false);
   const [loadingMessage, setLoadingMessage] = React.useState('Logging you in…');
   const [pageError, setPageError] = React.useState<string | null>(null);
 
@@ -35,6 +30,12 @@ export default function CallbackPage() {
     const token = searchParams.get('token');
     const type = resolveOtpType(searchParams.get('type'));
     const isEducatorFlow = searchParams.get('educator') === '1';
+    const requestedOrgSlug = searchParams.get('org')?.trim().toLowerCase() ?? '';
+    const authIntentRaw = searchParams.get('intent');
+    const authIntent =
+      authIntentRaw === 'login' || authIntentRaw === 'get-started'
+        ? authIntentRaw
+        : null;
 
     const hashParams = new URLSearchParams(
       window.location.hash.startsWith('#') ? window.location.hash.slice(1) : window.location.hash,
@@ -44,7 +45,17 @@ export default function CallbackPage() {
 
     const activateAccount = async () => {
       try {
-        const response = await fetch('/api/accounts/activate', {
+        const activationParams = new URLSearchParams();
+        if (requestedOrgSlug) {
+          activationParams.set('org', requestedOrgSlug);
+        }
+        if (authIntent) {
+          activationParams.set('intent', authIntent);
+        }
+        const activationPath = activationParams.size
+          ? `/api/accounts/activate?${activationParams.toString()}`
+          : '/api/accounts/activate';
+        const response = await fetch(activationPath, {
           method: 'POST',
           credentials: 'same-origin',
         });
@@ -71,12 +82,17 @@ export default function CallbackPage() {
       destination: string | null;
     } | null) => {
       if (onboarding?.requiresOrgSetup) {
-        router.replace('/get-started');
+        router.replace(
+          onboarding.destination ??
+            (requestedOrgSlug ? `/${requestedOrgSlug}/get-started` : '/get-started'),
+        );
         return;
       }
       if (onboarding?.requiresRoleSelection) {
-        setLoadingMessage('Complete onboarding to continue');
-        setShowRoleModal(true);
+        router.replace(
+          onboarding.destination ??
+            (requestedOrgSlug ? `/${requestedOrgSlug}/login` : '/get-started'),
+        );
         return;
       }
       router.replace(onboarding?.destination ?? '/d');
@@ -122,6 +138,14 @@ export default function CallbackPage() {
 
         const { data } = await supabase.auth.getUser();
         if (!data.user) {
+          if (requestedOrgSlug) {
+            const fallbackPath =
+              authIntent === 'get-started'
+                ? `/${requestedOrgSlug}/get-started`
+                : `/${requestedOrgSlug}/login`;
+            router.replace(fallbackPath);
+            return;
+          }
           router.replace('/login');
           return;
         }
@@ -137,66 +161,9 @@ export default function CallbackPage() {
     void finish();
   }, [router, supabase]);
 
-  const handleRoleSubmit = async (
-    input: RoleOnboardingSubmitInput,
-  ): Promise<{ success: boolean; message?: string }> => {
-    await trackAuthTelemetry('onboarding_role_selected', { role: input.role });
-    if (input.role === 'student') {
-      const response = await fetch('/api/onboarding/student', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({ inviteCode: input.inviteCode }),
-      });
-      if (!response.ok) {
-        const errorBody = (await response.json().catch(() => null)) as
-          | { message?: string }
-          | null;
-        await trackAuthTelemetry('onboarding_invitecode_submitted', {
-          success: false,
-        });
-        return {
-          success: false,
-          message: errorBody?.message ?? 'Invalid invite code.',
-        };
-      }
-      await trackAuthTelemetry('onboarding_invitecode_submitted', { success: true });
-      const successBody = (await response.json().catch(() => null)) as
-        | { onboarding?: { destination?: string | null } }
-        | null;
-      router.replace(successBody?.onboarding?.destination ?? '/d');
-      return { success: true };
-    }
-
-    const response = await fetch('/api/onboarding/role', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'same-origin',
-      body: JSON.stringify({
-        role: input.role,
-      }),
-    });
-    const body = (await response.json().catch(() => null)) as
-      | {
-          success?: boolean;
-          message?: string;
-          onboarding?: { destination?: string | null };
-        }
-      | null;
-
-    if (!response.ok || !body?.success) {
-      return { success: false, message: body?.message ?? 'Unable to complete role setup.' };
-    }
-
-    const destination = body.onboarding?.destination ?? '/d';
-    router.replace(destination);
-    return { success: true };
-  };
-
   return (
     <div className="bg-background flex min-h-screen items-center justify-center">
       <p className="text-sm text-muted-foreground">{pageError ?? loadingMessage}</p>
-      <RoleOnboardingModal open={showRoleModal} onSubmit={handleRoleSubmit} />
     </div>
   );
 }

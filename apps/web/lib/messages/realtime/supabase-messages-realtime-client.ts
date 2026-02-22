@@ -61,7 +61,7 @@ export function createSupabaseMessagesRealtimeClient(): MessagesRealtimeClient {
             const currentType = nextType;
             nextType = undefined;
 
-            const response = await fetch(`/d/messages/actions/detail?messageId=${messageId}`);
+            const response = await fetch(`/api/messages/detail?messageId=${messageId}`);
             if (response.status === 404 && currentType === 'updated') {
               onEvent({ type: 'message-deleted', messageId });
               continue;

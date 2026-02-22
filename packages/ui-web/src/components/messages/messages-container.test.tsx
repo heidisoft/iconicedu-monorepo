@@ -167,7 +167,7 @@ describe('MessagesContainer', () => {
 
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
-        '/d/messages/actions/read-state',
+        '/api/messages/read-state',
         expect.objectContaining({
           method: 'POST',
         }),

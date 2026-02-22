@@ -7,7 +7,7 @@ const APP_URL = resolveAppUrl();
 const {
   mockGetUser,
   mockFrom,
-  mockOrgCountIs,
+  mockGetAccountByAuthUserId,
   mockOrgSlugMaybeSingle,
   mockOrgInsertSingle,
   mockGetOrCreateAccount,
@@ -18,7 +18,7 @@ const {
 } = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
   mockFrom: vi.fn(),
-  mockOrgCountIs: vi.fn(),
+  mockGetAccountByAuthUserId: vi.fn(),
   mockOrgSlugMaybeSingle: vi.fn(),
   mockOrgInsertSingle: vi.fn(),
   mockGetOrCreateAccount: vi.fn(),
@@ -44,13 +44,14 @@ vi.mock('@iconicedu/web/lib/accounts/getOrCreateAccount', () => ({
   getOrCreateAccount: mockGetOrCreateAccount,
 }));
 
+vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
+  getAccountByAuthUserId: mockGetAccountByAuthUserId,
+  updateAccountRoleState: mockUpdateAccountRoleState,
+}));
+
 vi.mock('@iconicedu/web/lib/profile/queries/roles.query', () => ({
   getUserRoles: mockGetUserRoles,
   upsertUserRole: mockUpsertUserRole,
-}));
-
-vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
-  updateAccountRoleState: mockUpdateAccountRoleState,
 }));
 
 vi.mock('@iconicedu/web/lib/org/resolve-dashboard-path', () => ({
@@ -61,7 +62,7 @@ describe('POST /api/orgs/bootstrap', () => {
   beforeEach(() => {
     mockGetUser.mockReset();
     mockFrom.mockReset();
-    mockOrgCountIs.mockReset();
+    mockGetAccountByAuthUserId.mockReset();
     mockOrgSlugMaybeSingle.mockReset();
     mockOrgInsertSingle.mockReset();
     mockGetOrCreateAccount.mockReset();
@@ -88,6 +89,7 @@ describe('POST /api/orgs/bootstrap', () => {
     mockGetUser.mockResolvedValueOnce({
       data: { user: { id: 'auth-1', email: 'owner@example.com' } },
     });
+    mockGetAccountByAuthUserId.mockResolvedValueOnce({ data: null, error: null });
     mockResolveOrgDashboardPath.mockResolvedValueOnce('/iconic-academy');
     mockGetOrCreateAccount.mockResolvedValueOnce({
       account: { id: 'account-1', org_id: 'org-1' },
@@ -124,11 +126,6 @@ describe('POST /api/orgs/bootstrap', () => {
       }
       return {
         select: vi.fn((columns: string, options?: { head?: boolean }) => {
-          if (options?.head) {
-            return {
-              is: mockOrgCountIs,
-            };
-          }
           return {
             eq: vi.fn(() => ({
               is: vi.fn(() => ({
@@ -144,7 +141,6 @@ describe('POST /api/orgs/bootstrap', () => {
         })),
       };
     });
-    mockOrgCountIs.mockResolvedValueOnce({ count: 0, error: null });
     mockOrgSlugMaybeSingle.mockResolvedValueOnce({ data: null, error: null });
     mockOrgInsertSingle.mockResolvedValueOnce({
       data: { id: 'org-1', name: 'ICONIC Academy', slug: 'iconic-academy' },
@@ -163,5 +159,25 @@ describe('POST /api/orgs/bootstrap', () => {
     expect(body.success).toBe(true);
     expect(body.org.slug).toBe('iconic-academy');
     expect(body.onboarding.destination).toBe('/iconic-academy');
+  });
+
+  it('returns 409 when auth user already has an assigned organization', async () => {
+    mockGetUser.mockResolvedValueOnce({
+      data: { user: { id: 'auth-1', email: 'owner@example.com' } },
+    });
+    mockGetAccountByAuthUserId.mockResolvedValueOnce({
+      data: { id: 'account-1', org_id: 'org-1' },
+      error: null,
+    });
+
+    const response = await POST(
+      new Request(`${APP_URL}/api/orgs/bootstrap`, {
+        method: 'POST',
+        body: JSON.stringify({ name: 'ICONIC Academy', slug: 'iconic-academy' }),
+      }),
+    );
+
+    expect(response.status).toBe(409);
+    expect((await response.json()).message).toContain('already assigned');
   });
 });

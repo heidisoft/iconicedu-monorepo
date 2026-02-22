@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { POST } from '@iconicedu/web/app/(app)/d/messages/actions/read-state/route';
+import { POST } from '@iconicedu/web/app/api/messages/read-state/route';
 import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
 
 const upsert = vi.fn();
@@ -46,10 +46,10 @@ vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
   getAccountByAuthUserId: vi.fn(async () => ({ data: { id: 'account-1', org_id: 'org-1' } })),
 }));
 
-describe('POST /d/messages/actions/read-state', () => {
+describe('POST /api/messages/read-state', () => {
   it('returns 400 when channelId is missing', async () => {
     const response = await POST(
-      new Request(`${APP_URL}/d/messages/actions/read-state`, {
+      new Request(`${APP_URL}/api/messages/read-state`, {
         method: 'POST',
         body: JSON.stringify({}),
       }),
@@ -68,7 +68,7 @@ describe('POST /d/messages/actions/read-state', () => {
     upsert.mockResolvedValueOnce({ error: null });
 
     const response = await POST(
-      new Request(`${APP_URL}/d/messages/actions/read-state`, {
+      new Request(`${APP_URL}/api/messages/read-state`, {
         method: 'POST',
         body: JSON.stringify({
           channelId: 'channel-1',
@@ -95,7 +95,7 @@ describe('POST /d/messages/actions/read-state', () => {
     channelMaybeSingle.mockResolvedValueOnce({ data: null, error: null });
 
     const response = await POST(
-      new Request(`${APP_URL}/d/messages/actions/read-state`, {
+      new Request(`${APP_URL}/api/messages/read-state`, {
         method: 'POST',
         body: JSON.stringify({
           channelId: 'channel-1',
@@ -115,7 +115,7 @@ describe('POST /d/messages/actions/read-state', () => {
     messageMaybeSingle.mockResolvedValueOnce({ data: null, error: null });
 
     const response = await POST(
-      new Request(`${APP_URL}/d/messages/actions/read-state`, {
+      new Request(`${APP_URL}/api/messages/read-state`, {
         method: 'POST',
         body: JSON.stringify({
           channelId: 'channel-1',

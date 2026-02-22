@@ -1,9 +1,11 @@
 import React, { useEffect } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import { useAuth } from '@/providers/auth-provider';
+import { useTheme } from '@/providers/theme-provider';
 
 export default function AppLayout() {
   const { session, loading } = useAuth();
+  const { colors } = useTheme();
   const router = useRouter();
 
   useEffect(() => {
@@ -18,7 +20,7 @@ export default function AppLayout() {
     <Stack
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: '#020617' },
+        contentStyle: { backgroundColor: colors.pageBg },
       }}
     />
   );

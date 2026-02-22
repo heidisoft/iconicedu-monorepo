@@ -98,7 +98,7 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
 
   const loadParticipants = React.useCallback(async () => {
     try {
-      const response = await fetch('/d/admin/channels/actions/participants', {
+      const response = await fetch('/api/admin/channels/participants', {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -199,7 +199,7 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
 
   const handleEdit = async (row: AdminChannelRow) => {
     try {
-      const response = await fetch('/d/admin/channels/actions/detail', {
+      const response = await fetch('/api/admin/channels/detail', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ channelId: row.id }),
@@ -254,8 +254,8 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
       };
       const endpoint =
         dialogMode === 'edit'
-          ? '/d/admin/channels/actions/update'
-          : '/d/admin/channels/actions/create';
+          ? '/api/admin/channels/update'
+          : '/api/admin/channels/create';
       const body =
         dialogMode === 'edit'
           ? JSON.stringify({ channelId: editingId, payload: createPayload })
