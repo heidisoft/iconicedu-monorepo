@@ -16,7 +16,10 @@ import {
   SelectValue,
 } from '@iconicedu/ui-web/ui/select';
 import { UserSettingsTabSection } from '@iconicedu/ui-web/components/sidebar/user-settings/components/user-settings-tab-section';
-import { postalExamples } from '@iconicedu/ui-web/components/sidebar/user-settings/constants';
+import {
+  postalExamples,
+  SOFT_ACCENT_PICK_BUTTON_CLASSNAME,
+} from '@iconicedu/ui-web/components/sidebar/user-settings/constants';
 import { BorderBeam } from '@iconicedu/ui-web/ui/border-beam';
 import { useSequentialHighlight } from '@iconicedu/ui-web/components/sidebar/user-settings/hooks/use-sequential-highlight';
 
@@ -462,7 +465,7 @@ export function LocationTab({
                   <Button
                     size="sm"
                     variant="outline"
-                    className="relative"
+                    className={SOFT_ACCENT_PICK_BUTTON_CLASSNAME}
                     onClick={handlePickLocation}
                     disabled={isPickingLocation}
                   >

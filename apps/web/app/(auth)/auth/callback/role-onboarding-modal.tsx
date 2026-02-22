@@ -12,12 +12,11 @@ import {
   Label,
 } from '@iconicedu/ui-web';
 
-type RoleSelection = 'parent' | 'educator' | 'student' | 'staff';
+type RoleSelection = 'parent' | 'educator' | 'student';
 
 export interface RoleOnboardingSubmitInput {
   role: RoleSelection;
   inviteCode?: string;
-  staffAccessCode?: string;
 }
 
 type RoleOnboardingModalProps = {
@@ -36,26 +35,20 @@ const ROLE_OPTIONS: Array<{
     description: 'Set up your family learning space and continue immediately.',
   },
   {
-    value: 'educator',
-    title: 'Educator',
-    description: 'Request educator access. We review each request before activation.',
-  },
-  {
     value: 'student',
     title: 'Student',
     description: 'Join your learning space with your invite or join code.',
   },
   {
-    value: 'staff',
-    title: 'Staff',
-    description: 'Restricted access. Staff code or approved domain is required.',
+    value: 'educator',
+    title: 'Tutor',
+    description: 'Request tutor access. We review each request before activation.',
   },
 ];
 
 export function RoleOnboardingModal({ open, onSubmit }: RoleOnboardingModalProps) {
   const [selectedRole, setSelectedRole] = React.useState<RoleSelection | null>(null);
   const [inviteCode, setInviteCode] = React.useState('');
-  const [staffAccessCode, setStaffAccessCode] = React.useState('');
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
@@ -76,7 +69,6 @@ export function RoleOnboardingModal({ open, onSubmit }: RoleOnboardingModalProps
       const result = await onSubmit({
         role: selectedRole,
         inviteCode: selectedRole === 'student' ? inviteCode : undefined,
-        staffAccessCode: selectedRole === 'staff' ? staffAccessCode : undefined,
       });
       if (!result.success) {
         setErrorMessage(result.message ?? 'Unable to complete onboarding.');
@@ -132,21 +124,9 @@ export function RoleOnboardingModal({ open, onSubmit }: RoleOnboardingModalProps
           </div>
         ) : null}
 
-        {selectedRole === 'staff' ? (
-          <div className="grid gap-2">
-            <Label htmlFor="staffAccessCode">Staff access code (if provided)</Label>
-            <Input
-              id="staffAccessCode"
-              value={staffAccessCode}
-              onChange={(event) => setStaffAccessCode(event.target.value)}
-              placeholder="Enter staff access code"
-            />
-          </div>
-        ) : null}
-
         {selectedRole === 'educator' ? (
           <p className="rounded-2xl border border-amber-300/50 bg-amber-100/40 px-3 py-2 text-xs text-amber-900 dark:border-amber-600/40 dark:bg-amber-900/30 dark:text-amber-100">
-            Educator access is reviewed. You can continue now, and we&apos;ll notify you when
+            Tutor access is reviewed. You can continue now, and we&apos;ll notify you when
             approval is complete.
           </p>
         ) : null}

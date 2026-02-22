@@ -27,7 +27,19 @@
       "Bash(npm view:*)",
       "Bash(pnpm --filter @iconicedu/ui-native build:*)",
       "Bash(pnpm --filter mobile list:*)",
-      "Bash(npx expo start:*)"
+      "Bash(npx expo start:*)",
+      "Bash(python3:*)",
+      "Bash(# Check what version of expo-splash-screen expo@54 was compatible with grep -r \"\"expo-splash-screen\"\" /Users/hwanigasooriya/Workspace/hobby/iconicedu-monorepo/node_modules/expo/package.json # Check if expo-splash-screen was installed anywhere as transitive dep find /Users/hwanigasooriya/Workspace/hobby/iconicedu-monorepo/node_modules -name \"\"package.json\"\" -path \"\"*/expo-splash-screen/package.json\"\")",
+      "Bash(head -5 grep \"ExpoSplashScreen\\\\|internalPreventAutoHide\" /Users/hwanigasooriya/Workspace/hobby/iconicedu-monorepo/apps/mobile/ios/Podfile.lock)",
+      "Bash(pnpm patch-commit:*)",
+      "Bash(npx expo run:ios:*)",
+      "Bash(xcode-select:*)",
+      "Bash(xcrun xcodebuild:*)",
+      "Read(//Applications/Xcode.app/**)",
+      "Bash(sudo xcode-select:*)",
+      "Bash(xcodebuild:*)",
+      "Bash(# Check what RN version expo''s own deps reference python3 -c \"\" import json try: d = json.load\\(open\\(''/Users/hwanigasooriya/Workspace/hobby/iconicedu-monorepo/node_modules/react-native/package.json''\\)\\) print\\(''installed react-native:'', d[''version'']\\) print\\(''react peer:'', d.get\\(''peerDependencies'', {}\\).get\\(''react'', ''n/a''\\)\\) except: pass \"\" # Check what SDK 54''s bundledNativeModules says about RN python3 -c \"\" import json, os p = ''/Users/hwanigasooriya/Workspace/hobby/iconicedu-monorepo/node_modules/expo/bundledNativeModules.json'' if os.path.exists\\(p\\): d = json.load\\(open\\(p\\)\\) print\\(''react-native in bundledNativeModules:'', d.get\\(''react-native'', ''not found''\\)\\) else: print\\(''no bundledNativeModules.json''\\) \"\" # Find the canonical RN version expo uses find /Users/hwanigasooriya/Workspace/hobby/iconicedu-monorepo/node_modules/expo -name \"\"*.json\"\" -maxdepth 2 | xargs grep -l ''\"\"react-native\"\"'')",
+      "Bash(pnpm exec expo prebuild:*)"
     ]
   }
 }

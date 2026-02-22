@@ -7,7 +7,10 @@ export type ProfileNameInfo = {
 const normalize = (value?: string | null) => value?.trim() ?? '';
 const firstChar = (value: string) => value.charAt(0).toUpperCase();
 
-function formatFirstAndLastInitial(firstName?: string | null, lastName?: string | null): string {
+export function formatFirstAndLastInitial(
+  firstName?: string | null,
+  lastName?: string | null,
+): string {
   const first = normalize(firstName);
   const last = normalize(lastName);
   if (!first && !last) {

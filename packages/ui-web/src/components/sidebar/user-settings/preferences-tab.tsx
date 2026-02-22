@@ -23,7 +23,11 @@ import {
   SelectValue,
 } from '@iconicedu/ui-web/ui/select';
 import { UserSettingsTabSection } from '@iconicedu/ui-web/components/sidebar/user-settings/components/user-settings-tab-section';
-import { languageOptions, localeOptions } from '@iconicedu/ui-web/components/sidebar/user-settings/constants';
+import {
+  languageOptions,
+  localeOptions,
+  SOFT_ACCENT_PICK_BUTTON_CLASSNAME,
+} from '@iconicedu/ui-web/components/sidebar/user-settings/constants';
 import { useSequentialHighlight } from '@iconicedu/ui-web/components/sidebar/user-settings/hooks/use-sequential-highlight';
 import { BorderBeam } from '@iconicedu/ui-web/ui/border-beam';
 
@@ -408,7 +412,7 @@ export function PreferencesTab({
                       }
                     }}
                     disabled={!browserTimezone}
-                    className="relative z-10"
+                    className={SOFT_ACCENT_PICK_BUTTON_CLASSNAME}
                   >
                     Pick timezone for me
                   </Button>

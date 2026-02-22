@@ -52,8 +52,9 @@ export default function CallbackPage() {
         const body = (await response.json().catch(() => null)) as
           | {
               onboarding?: {
+                requiresOrgSetup?: boolean;
                 requiresRoleSelection: boolean;
-                destination: '/d' | '/login/pending-access' | null;
+                destination: string | null;
               };
             }
           | null;
@@ -65,9 +66,14 @@ export default function CallbackPage() {
     };
 
     const applyOnboardingState = async (onboarding: {
+      requiresOrgSetup?: boolean;
       requiresRoleSelection: boolean;
-      destination: '/d' | '/login/pending-access' | null;
+      destination: string | null;
     } | null) => {
+      if (onboarding?.requiresOrgSetup) {
+        router.replace('/get-started');
+        return;
+      }
       if (onboarding?.requiresRoleSelection) {
         setLoadingMessage('Complete onboarding to continue');
         setShowRoleModal(true);
@@ -155,7 +161,10 @@ export default function CallbackPage() {
         };
       }
       await trackAuthTelemetry('onboarding_invitecode_submitted', { success: true });
-      router.replace('/d');
+      const successBody = (await response.json().catch(() => null)) as
+        | { onboarding?: { destination?: string | null } }
+        | null;
+      router.replace(successBody?.onboarding?.destination ?? '/d');
       return { success: true };
     }
 
@@ -165,14 +174,13 @@ export default function CallbackPage() {
       credentials: 'same-origin',
       body: JSON.stringify({
         role: input.role,
-        staffAccessCode: input.staffAccessCode,
       }),
     });
     const body = (await response.json().catch(() => null)) as
       | {
           success?: boolean;
           message?: string;
-          onboarding?: { destination?: '/d' | '/login/pending-access' | null };
+          onboarding?: { destination?: string | null };
         }
       | null;
 

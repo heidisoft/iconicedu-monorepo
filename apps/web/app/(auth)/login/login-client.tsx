@@ -6,6 +6,10 @@ import { createSupabaseBrowserClient } from '@iconicedu/web/lib/supabase/client'
 import { trackAuthTelemetry } from '@iconicedu/web/lib/telemetry/auth-events';
 
 export default function LoginClient() {
+  const callbackUrl =
+    typeof window === 'undefined'
+      ? '/auth/callback'
+      : `${window.location.origin}/auth/callback`;
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
   const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
@@ -17,7 +21,7 @@ export default function LoginClient() {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: callbackUrl,
       },
     });
 
@@ -39,7 +43,7 @@ export default function LoginClient() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: callbackUrl,
       },
     });
 

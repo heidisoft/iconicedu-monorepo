@@ -37,6 +37,7 @@ import {
 } from '@iconicedu/ui-web/ui/select';
 import { ChevronIcon } from '@iconicedu/ui-web/components/sidebar/user-settings/components/chevron-icon';
 import { useSequentialHighlight } from '@iconicedu/ui-web/components/sidebar/user-settings/hooks/use-sequential-highlight';
+import { resolveProfileDisplayNameForSave } from '@iconicedu/ui-web/components/sidebar/user-settings/profile-tab.utils';
 
 type ProfileTabProps = {
   profile: UserProfileVM;
@@ -227,8 +228,12 @@ export function ProfileTab({
 
       setIsSaving(true);
       try {
-        const resolvedDisplayName =
-          trimmedDisplayName || `${trimmedFirstName} ${trimmedLastName}`.trim();
+        const resolvedDisplayName = resolveProfileDisplayNameForSave({
+          firstName: trimmedFirstName,
+          lastName: trimmedLastName,
+          displayName: trimmedDisplayName,
+          isOnboarding: expandProfileDetails,
+        });
 
         await onProfileSave({
           profileId: profile.ids.id,

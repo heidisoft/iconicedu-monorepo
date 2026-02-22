@@ -64,6 +64,9 @@ export const PROFILE_THEME_OPTIONS = [
   { value: 'rose', label: 'Rose' },
 ];
 
+export const SOFT_ACCENT_PICK_BUTTON_CLASSNAME =
+  'relative z-10 border-primary/25 bg-primary/5 text-primary hover:bg-primary/10 hover:text-primary';
+
 export { localeOptions, languageOptions } from '@iconicedu/ui-web/components/sidebar/user-settings/constants/preferences';
 export { notificationChannelOptions } from '@iconicedu/ui-web/components/sidebar/user-settings/constants/notifications';
 export { postalExamples } from '@iconicedu/ui-web/components/sidebar/user-settings/constants/location';

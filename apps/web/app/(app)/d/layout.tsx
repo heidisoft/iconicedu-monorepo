@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { SidebarProvider } from '@iconicedu/ui-web';
-import { cookies, headers } from 'next/headers';
+import { cookies } from 'next/headers';
 
 import { SidebarShell } from '@iconicedu/web/app/(app)/d/sidebar-shell';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
@@ -12,7 +12,6 @@ import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
 import { getOrCreateAccount } from '@iconicedu/web/lib/accounts/getOrCreateAccount';
 import { loadSidebarContext } from '@iconicedu/web/lib/sidebar/loadSidebarContext';
 import { buildSidebarBaseData } from '@iconicedu/web/lib/sidebar/buildSidebarBaseData';
-import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
 
 export const metadata: Metadata = {
   title: {
@@ -44,18 +43,11 @@ export default async function Layout({ children }: { children: ReactNode }) {
     redirect('/login/pending-access');
   }
 
-  const headerStore = await headers();
-  const referer = headerStore.get('referer');
   const cookieStore = await cookies();
   const overrideCookie = cookieStore.get('profile_kind_override');
   const profileKindOverrideFromCookie =
     overrideCookie?.value === 'educator' ? 'educator' : undefined;
-  const profileKindOverrideFromReferer =
-    referer?.includes('/login/tutor') &&
-    new URL(referer, resolveAppUrl()).searchParams.get('educator') === '1'
-      ? 'educator'
-      : undefined;
-  const profileKindOverride = profileKindOverrideFromCookie ?? profileKindOverrideFromReferer;
+  const profileKindOverride = profileKindOverrideFromCookie;
 
   const baseSidebarData = await buildSidebarBaseData(
     supabase,

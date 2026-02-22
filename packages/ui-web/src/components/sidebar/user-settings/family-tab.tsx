@@ -125,6 +125,16 @@ type FamilyTabProps = {
   guardianEmail?: string | null;
 };
 
+export function buildCollapsedChildSectionState(
+  previous: Record<string, boolean>,
+  childProfileId: string,
+): Record<string, boolean> {
+  return {
+    ...previous,
+    [childProfileId]: false,
+  };
+}
+
 export function FamilyTab({
   familyMembers,
   profileThemes,
@@ -412,10 +422,9 @@ export function FamilyTab({
       toast.success('Child profile submitted');
       handleDialogReset();
       if (createdChild?.ids?.id) {
-        setExpandedChildSections((prev) => ({
-          ...prev,
-          [createdChild.ids.id]: true,
-        }));
+        setExpandedChildSections((prev) =>
+          buildCollapsedChildSectionState(prev, createdChild.ids.id),
+        );
       }
       setIsDialogOpen(false);
     } catch (error) {

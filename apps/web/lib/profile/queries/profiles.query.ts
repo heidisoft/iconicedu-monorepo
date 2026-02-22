@@ -97,6 +97,34 @@ export async function insertProfileForAccount(
     .single<ProfileRow>();
 }
 
+export async function updateProfileForAccount(
+  supabase: SupabaseClient,
+  payload: ProfileInsertPayload & { profileId: string },
+) {
+  return supabase
+    .from('profiles')
+    .update({
+      org_id: payload.orgId,
+      account_id: payload.accountId,
+      kind: payload.kind,
+      display_name: payload.displayName ?? null,
+      first_name: null,
+      last_name: null,
+      avatar_source: payload.avatarSource,
+      avatar_url: payload.avatarUrl,
+      avatar_seed: payload.avatarSeed,
+      timezone: payload.timezone,
+      locale: payload.locale,
+      status: payload.status,
+      ui_theme_key: payload.uiThemeKey,
+    })
+    .eq('id', payload.profileId)
+    .eq('org_id', payload.orgId)
+    .is('deleted_at', null)
+    .select(PROFILE_SELECT)
+    .maybeSingle<ProfileRow>();
+}
+
 export async function updateProfileAvatar(
   supabase: SupabaseClient,
   payload: {

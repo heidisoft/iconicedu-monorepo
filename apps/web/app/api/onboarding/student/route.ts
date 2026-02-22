@@ -6,9 +6,14 @@ import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service
 import { ORG_ID } from '@iconicedu/web/lib/data/ids';
 import { getOrCreateAccount } from '@iconicedu/web/lib/accounts/getOrCreateAccount';
 import { getUserRoles, upsertUserRole } from '@iconicedu/web/lib/profile/queries/roles.query';
-import { getProfileByAccountId, upsertProfileForAccount } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import {
+  getProfileByAccountId,
+  insertProfileForAccount,
+  updateProfileForAccount,
+} from '@iconicedu/web/lib/profile/queries/profiles.query';
 import { updateAccountRoleState } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { buildAuthOnboardingState } from '@iconicedu/web/lib/onboarding/auth-state';
+import { resolveOrgDashboardPath } from '@iconicedu/web/lib/org/resolve-dashboard-path';
 
 type StudentAccessCodeRow = {
   id: string;
@@ -106,20 +111,27 @@ export async function POST(request: Request) {
   }
 
   const currentProfile = await getProfileByAccountId(serviceSupabase, account.id);
+  const profilePayload = {
+    orgId: account.org_id,
+    accountId: account.id,
+    kind: 'child',
+    displayName: currentProfile.data?.display_name ?? null,
+    avatarSource: currentProfile.data?.avatar_source ?? 'seed',
+    avatarUrl: currentProfile.data?.avatar_url ?? null,
+    avatarSeed: currentProfile.data?.avatar_seed ?? account.id,
+    timezone: currentProfile.data?.timezone ?? 'UTC',
+    locale: currentProfile.data?.locale ?? 'en-US',
+    status: currentProfile.data?.status ?? 'active',
+    uiThemeKey: currentProfile.data?.ui_theme_key ?? 'teal',
+  } as const;
+
   if (!currentProfile.data || currentProfile.data.kind !== 'child') {
-    const profileResponse = await upsertProfileForAccount(serviceSupabase, {
-      orgId: account.org_id,
-      accountId: account.id,
-      kind: 'child',
-      displayName: currentProfile.data?.display_name ?? null,
-      avatarSource: currentProfile.data?.avatar_source ?? 'seed',
-      avatarUrl: currentProfile.data?.avatar_url ?? null,
-      avatarSeed: currentProfile.data?.avatar_seed ?? account.id,
-      timezone: currentProfile.data?.timezone ?? 'UTC',
-      locale: currentProfile.data?.locale ?? 'en-US',
-      status: currentProfile.data?.status ?? 'active',
-      uiThemeKey: currentProfile.data?.ui_theme_key ?? 'teal',
-    });
+    const profileResponse = currentProfile.data
+      ? await updateProfileForAccount(serviceSupabase, {
+          profileId: currentProfile.data.id,
+          ...profilePayload,
+        })
+      : await insertProfileForAccount(serviceSupabase, profilePayload);
     if (profileResponse.error) {
       return NextResponse.json(
         { success: false, message: profileResponse.error.message },
@@ -178,6 +190,12 @@ export async function POST(request: Request) {
     accountRoleResponse.data,
     rolesResponse.data ?? [],
   );
+  if (onboarding.destination === '/d') {
+    onboarding.destination = await resolveOrgDashboardPath(
+      serviceSupabase,
+      accountRoleResponse.data.org_id,
+    );
+  }
 
   return NextResponse.json({ success: true, onboarding });
 }

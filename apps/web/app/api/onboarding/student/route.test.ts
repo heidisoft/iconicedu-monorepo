@@ -10,19 +10,23 @@ const {
   mockGetOrCreateAccount,
   mockFrom,
   mockGetProfileByAccountId,
-  mockUpsertProfileForAccount,
+  mockInsertProfileForAccount,
+  mockUpdateProfileForAccount,
   mockUpsertUserRole,
   mockUpdateAccountRoleState,
   mockGetUserRoles,
+  mockResolveOrgDashboardPath,
 } = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
   mockGetOrCreateAccount: vi.fn(),
   mockFrom: vi.fn(),
   mockGetProfileByAccountId: vi.fn(),
-  mockUpsertProfileForAccount: vi.fn(),
+  mockInsertProfileForAccount: vi.fn(),
+  mockUpdateProfileForAccount: vi.fn(),
   mockUpsertUserRole: vi.fn(),
   mockUpdateAccountRoleState: vi.fn(),
   mockGetUserRoles: vi.fn(),
+  mockResolveOrgDashboardPath: vi.fn(),
 }));
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
@@ -45,7 +49,8 @@ vi.mock('@iconicedu/web/lib/accounts/getOrCreateAccount', () => ({
 
 vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
   getProfileByAccountId: mockGetProfileByAccountId,
-  upsertProfileForAccount: mockUpsertProfileForAccount,
+  insertProfileForAccount: mockInsertProfileForAccount,
+  updateProfileForAccount: mockUpdateProfileForAccount,
 }));
 
 vi.mock('@iconicedu/web/lib/profile/queries/roles.query', () => ({
@@ -55,6 +60,10 @@ vi.mock('@iconicedu/web/lib/profile/queries/roles.query', () => ({
 
 vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
   updateAccountRoleState: mockUpdateAccountRoleState,
+}));
+
+vi.mock('@iconicedu/web/lib/org/resolve-dashboard-path', () => ({
+  resolveOrgDashboardPath: mockResolveOrgDashboardPath,
 }));
 
 describe('POST /api/onboarding/student', () => {
@@ -110,6 +119,7 @@ describe('POST /api/onboarding/student', () => {
     const now = new Date().toISOString();
     const inviteCode = 'JOIN-123';
     const inviteHash = createHash('sha256').update(inviteCode).digest('hex');
+    mockResolveOrgDashboardPath.mockResolvedValueOnce('/iconic-academy');
     mockGetUser.mockResolvedValueOnce({ data: { user: { id: 'auth-1', email: 'student@example.com' } } });
     mockGetOrCreateAccount.mockResolvedValueOnce({
       account: { id: 'account-1', org_id: 'org-1' },
@@ -155,7 +165,7 @@ describe('POST /api/onboarding/student', () => {
       }));
 
     mockGetProfileByAccountId.mockResolvedValueOnce({ data: null });
-    mockUpsertProfileForAccount.mockResolvedValueOnce({ error: null });
+    mockInsertProfileForAccount.mockResolvedValueOnce({ error: null });
     mockUpsertUserRole.mockResolvedValueOnce({ error: null });
     mockUpdateAccountRoleState.mockResolvedValueOnce({
       error: null,
@@ -192,6 +202,6 @@ describe('POST /api/onboarding/student', () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.success).toBe(true);
-    expect(body.onboarding.destination).toBe('/d');
+    expect(body.onboarding.destination).toBe('/iconic-academy');
   });
 });

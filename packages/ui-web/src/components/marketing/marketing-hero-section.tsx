@@ -6,7 +6,7 @@ export function MarketingHeroSection() {
   return (
     <section
       id="home"
-      className="relative min-h-screen overflow-hidden bg-gradient-to-b from-emerald-50/70 via-background to-background px-4 pb-16 pt-0 dark:from-emerald-950/25 dark:via-background dark:to-background"
+      className="relative overflow-hidden bg-gradient-to-b from-emerald-50/70 via-background to-background px-4 pb-16 pt-0 dark:from-emerald-950/25 dark:via-background dark:to-background"
     >
       <MarketingHeroPatternBackground />
       <div className="relative z-10 mx-auto max-w-6xl pt-20">
@@ -26,7 +26,7 @@ export function MarketingHeroSection() {
                 Start your journey now
               </a>
               <a
-                href="/login/tutor"
+                href="/login"
                 className="inline-flex min-h-12 items-center justify-center rounded-full border border-border bg-background px-8 py-3 text-sm font-semibold text-foreground transition hover:bg-muted dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:hover:bg-emerald-900/35"
               >
                 Become a Tutor
