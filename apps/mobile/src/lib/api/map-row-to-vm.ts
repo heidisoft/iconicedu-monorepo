@@ -28,8 +28,7 @@ function buildSenderProfile(
 ): UserProfileVM {
   const displayName =
     sender.display_name ??
-    [sender.first_name, sender.last_name].filter(Boolean).join(' ') ||
-    'Unknown';
+    ([sender.first_name, sender.last_name].filter(Boolean).join(' ') || 'Unknown');
 
   return {
     ids: { id: sender.id, orgId, accountId: '' },

@@ -128,7 +128,9 @@ function GoogleIcon() {
 // ─── Styles ────────────────────────────────────────────────────────────────────
 
 function makeStyles(C: AppColors) {
-  return StyleSheet.create({
+  return {
+    placeholderColor: C.textFaint,
+    ...StyleSheet.create({
     safe:     { flex: 1, backgroundColor: C.bg },
     flex:     { flex: 1 },
     scroll:   { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 8, gap: 20, justifyContent: 'center' },
@@ -146,7 +148,7 @@ function makeStyles(C: AppColors) {
       borderRadius: 12, paddingHorizontal: 14,
     },
     inputErr: { borderColor: C.red },
-    input:    { flex: 1, fontSize: 15, color: C.text, paddingVertical: 14 },
+    input:    { flex: 1, fontSize: 15, color: C.text, paddingVertical: 14, letterSpacing: 0 },
     clearBtn: {
       width: 24, height: 24, borderRadius: 12,
       backgroundColor: C.textFaint,
@@ -175,7 +177,8 @@ function makeStyles(C: AppColors) {
 
     terms:    { paddingHorizontal: 24, paddingBottom: 24, fontSize: 12, color: C.textFaint, textAlign: 'center', lineHeight: 18 },
     termsLink:{ color: C.text, fontWeight: '700' },
-  });
+    }),
+  };
 }
 
 // ─── Screen ────────────────────────────────────────────────────────────────────
@@ -257,7 +260,7 @@ export default function LoginScreen() {
                 autoCapitalize="none"
                 autoComplete="email"
                 placeholder="you@example.com"
-                placeholderTextColor={colors.textFaint}
+                placeholderTextColor={s.placeholderColor}
                 editable={!loading}
                 returnKeyType="done"
                 onSubmitEditing={handleLogin}

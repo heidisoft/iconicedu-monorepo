@@ -11,6 +11,7 @@ import type {
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getFamilyInviteAdminClient, ensureFamilyForGuardian } from '@iconicedu/web/lib/family/queries/invite.query';
 import { loadChildProfiles } from '@iconicedu/web/lib/profile/builders/load-child-profiles';
+import { buildChildDisplayName } from '@iconicedu/web/lib/profile/display-name';
 import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 
@@ -205,7 +206,7 @@ export async function createChildProfileAction(
       });
     cleanupContext.childAccountId = childAccount.id;
     cleanupContext.accountCreated = accountCreated;
-    const displayNameValue = `${input.firstName.trim()} ${input.lastName.trim()}`.trim();
+    const displayNameValue = buildChildDisplayName(input.firstName, input.lastName);
 
     const profilePayload = {
       org_id: guardianAccount.org_id,

@@ -44,6 +44,11 @@ import {
 import {
   USER_SETTINGS_TAB_TRIGGER_CLASS,
 } from '@iconicedu/ui-web/components/sidebar/user-settings/user-settings.theme';
+import {
+  dedupeChildMembersByEmail,
+  filterInvitesWithExistingAccounts,
+  formatChildName,
+} from '@iconicedu/ui-web/components/sidebar/user-settings/user-settings-tabs.utils';
 
 export type UserSettingsTabsProps = {
   value: UserSettingsTab;
@@ -92,6 +97,7 @@ export type UserSettingsTabsProps = {
   onFamilyInviteCreate?: (input: {
     invitedRole: FamilyLinkInviteRole;
     invitedEmail: string;
+    targetAccountId?: string;
   }) => Promise<FamilyLinkInviteVM> | void;
   onFamilyInviteRemove?: (input: { inviteId: string }) => Promise<void> | void;
   onChildProfileCreate?: (input: {
@@ -280,13 +286,17 @@ export function UserSettingsTabs({
         id: childProfile.ids.id,
         profileId: childProfile.ids.id,
         orgId: childProfile.ids.orgId,
-        name: getProfileDisplayName(childProfile.profile, 'Child'),
+        name: formatChildName(
+          childProfile.profile.firstName,
+          childProfile.profile.lastName,
+          getProfileDisplayName(childProfile.profile, 'Child'),
+        ),
         firstName: childProfile.profile.firstName ?? undefined,
         lastName: childProfile.profile.lastName ?? undefined,
         bio: childProfile.profile.bio ?? undefined,
         email: childProfile.accountEmail ?? undefined,
         avatar: childProfile.profile.avatar ?? null,
-        roleLabel: 'Child',
+        roleLabel: 'Supervised child',
         canRemove: true,
         isChild: true,
         themeKey: childProfile.ui?.themeKey ?? 'teal',
@@ -295,7 +305,7 @@ export function UserSettingsTabs({
       });
     });
 
-    return members;
+    return dedupeChildMembersByEmail(members);
   }, [
     profile.ids.id,
     profileBlock.avatar,
@@ -304,6 +314,12 @@ export function UserSettingsTabs({
     profile.ui?.themeKey,
     guardianChildren,
   ]);
+  const filteredFamilyInvites = React.useMemo(() => {
+    if (profile.kind !== 'guardian') {
+      return [];
+    }
+    return filterInvitesWithExistingAccounts(profile.familyInvites ?? [], familyMembers);
+  }, [familyMembers, profile]);
   const availableTabs = SETTINGS_TABS.filter((tab) => {
     if (tab.value === 'student-profile') {
       return profile.kind === 'child';
@@ -502,9 +518,7 @@ export function UserSettingsTabs({
               profileThemeOptions={PROFILE_THEME_OPTIONS}
               setProfileThemes={setProfileThemes}
               showOnboardingToast={isFamilyOnboarding}
-              initialInvites={
-                profile.kind === 'guardian' ? (profile.familyInvites ?? []) : []
-              }
+              initialInvites={filteredFamilyInvites}
               onInviteCreate={onFamilyInviteCreate}
               onInviteRemove={onFamilyInviteRemove}
               onProfileSave={onProfileSave}

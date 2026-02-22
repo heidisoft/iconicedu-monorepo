@@ -1,27 +1,26 @@
 import React, { useCallback } from 'react';
-import { View } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ScreenHeader, Avatar } from '@iconicedu/ui-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAccount } from '@/hooks/use-account';
+import { useMessages } from '@/hooks/use-messages';
 import { sendTextMessage } from '@/lib/api/queries';
 import { useTheme } from '@/providers/theme-provider';
 import { MessageList } from '@/components/messages/message-list';
 import { MessageInput } from '@/components/messages/message-input';
 import { TypingIndicator } from '@/components/messages/typing-indicator';
-import { DEMO_MATH_MESSAGES, DEMO_PROFILE_ID } from '@/lib/dummy-messages';
+import { ConversationHeader } from '@/components/messages/conversation-header';
 
 export default function ChannelConversationScreen() {
-  const { channelId } = useLocalSearchParams<{ channelId: string }>();
+  const { channelId, topic } = useLocalSearchParams<{ channelId: string; topic?: string }>();
   const router = useRouter();
   const { data: account } = useAccount();
   const { colors } = useTheme();
 
-  const profileId = account?.default_profile_id ?? DEMO_PROFILE_ID;
+  const profileId = account?.default_profile_id ?? '';
   const orgId = account?.org_id ?? '';
 
-  // Using dummy data — real API data will be wired after adding a DB-row → MessageVM layer
-  const messages = DEMO_MATH_MESSAGES;
+  const { data: messages, isLoading, loadMore } = useMessages(channelId ?? '');
 
   const handleSend = useCallback(
     async (text: string) => {
@@ -34,20 +33,27 @@ export default function ChannelConversationScreen() {
   if (!channelId) return null;
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.pageBg }} edges={['top']}>
-      <ScreenHeader
-        title="Channel"
-        leading={<Avatar name="#" size="sm" />}
+    <SafeAreaView style={[styles.safe, { backgroundColor: colors.pageBg }]} edges={['top']}>
+      <ConversationHeader
+        title={topic ?? 'Channel'}
+        kind="channel"
         onBack={() => router.back()}
       />
-      <View style={{ flex: 1, backgroundColor: colors.pageBg }}>
+      <View style={[styles.flex, { backgroundColor: colors.pageBg }]}>
         <MessageList
-          messages={messages}
+          messages={messages ?? []}
           currentProfileId={profileId}
+          onLoadMore={loadMore}
+          loading={isLoading}
         />
         <TypingIndicator typingUsers={[]} />
-        <MessageInput onSend={handleSend} />
+        <MessageInput onSend={handleSend} placeholder={`Message #${topic ?? ''}…`} />
       </View>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  safe: { flex: 1 },
+  flex: { flex: 1 },
+});

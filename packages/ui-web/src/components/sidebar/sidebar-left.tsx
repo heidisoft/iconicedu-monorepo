@@ -200,6 +200,7 @@ export function SidebarLeft({
   onFamilyInviteCreate?: (input: {
     invitedRole: FamilyLinkInviteRole;
     invitedEmail: string;
+    targetAccountId?: string;
   }) => Promise<FamilyLinkInviteVM> | void;
   onFamilyInviteRemove?: (input: { inviteId: string }) => Promise<void> | void;
   onFamilyMemberRemove?: (input: { childAccountId: string }) => Promise<void> | void;

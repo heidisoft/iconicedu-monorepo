@@ -152,6 +152,7 @@ export function NavUser({
   onFamilyInviteCreate?: (input: {
     invitedRole: FamilyLinkInviteRole;
     invitedEmail: string;
+    targetAccountId?: string;
   }) => Promise<FamilyLinkInviteVM> | void;
   onFamilyInviteRemove?: (input: { inviteId: string }) => Promise<void> | void;
   onChildProfileCreate?: (input: {

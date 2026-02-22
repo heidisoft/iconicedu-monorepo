@@ -69,6 +69,7 @@ export async function sendFamilyInviteAction(input: {
   invitedRole: FamilyLinkInviteRole;
   invitedEmail: string;
   invitedPhoneE164?: string | null;
+  targetAccountId?: string;
 }): Promise<FamilyLinkInviteVM> {
   const { supabase, accountId, orgId } = await resolveGuardianContext();
   const insertedInvite = await createFamilyInvite({
@@ -78,6 +79,7 @@ export async function sendFamilyInviteAction(input: {
     invitedRole: input.invitedRole,
     invitedEmail: input.invitedEmail,
     invitedPhoneE164: input.invitedPhoneE164 ?? null,
+    targetAccountId: input.targetAccountId,
     createdByAccountId: accountId,
   });
   return mapFamilyLinkInviteRowToVM(insertedInvite);

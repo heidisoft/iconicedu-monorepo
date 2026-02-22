@@ -96,6 +96,7 @@ type FamilyTabProps = {
   onInviteCreate?: (input: {
     invitedRole: FamilyLinkInviteRole;
     invitedEmail: string;
+    targetAccountId?: string;
   }) => Promise<FamilyLinkInviteVM> | void;
   onInviteRemove?: (input: { inviteId: string }) => Promise<void> | void;
   onProfileSave?: (input: ProfileSaveInput) => Promise<void> | void;
@@ -145,6 +146,37 @@ export function buildChildInviteDraft(email?: string | null): {
   };
 }
 
+export function buildChildDisplayName(firstName: string, lastName: string): string {
+  const first = firstName.trim();
+  const lastInitial = lastName.trim().charAt(0).toUpperCase();
+
+  if (!first) {
+    return '';
+  }
+
+  if (!lastInitial) {
+    return first;
+  }
+
+  return `${first} ${lastInitial}`;
+}
+
+export function resolveFamilyInviteErrorMessage(error: unknown): string {
+  const raw =
+    error instanceof Error ? error.message : typeof error === 'string' ? error : '';
+  const normalized = raw.trim().toLowerCase();
+
+  if (normalized.includes('already been registered')) {
+    return 'This email already has an account. Ask them to sign in from your organization login page with this same email, then retry the invite only if needed.';
+  }
+
+  if (raw.trim()) {
+    return raw.trim();
+  }
+
+  return 'Unable to send invite right now. Please try again.';
+}
+
 export function FamilyTab({
   familyMembers,
   profileThemes,
@@ -185,6 +217,9 @@ export function FamilyTab({
   const [isInviteOpen, setIsInviteOpen] = React.useState(false);
   const [inviteRole, setInviteRole] = React.useState<FamilyLinkInviteRole>('child');
   const [inviteEmail, setInviteEmail] = React.useState('');
+  const [inviteTargetAccountId, setInviteTargetAccountId] = React.useState<string | null>(
+    null,
+  );
   const [inviteError, setInviteError] = React.useState<string | null>(null);
   const [invites, setInvites] = React.useState<FamilyLinkInviteVM[]>(initialInvites);
   const [isInviteSaving, setIsInviteSaving] = React.useState(false);
@@ -282,38 +317,44 @@ export function FamilyTab({
       const invite = await onInviteCreate({
         invitedRole: inviteRole,
         invitedEmail: trimmedEmail,
+        targetAccountId: inviteTargetAccountId ?? undefined,
       });
       if (!invite) {
         throw new Error('Unable to send invite.');
       }
       setInvites((prev) => [...prev, invite]);
       setInviteEmail('');
+      setInviteTargetAccountId(null);
       setInviteRole('child');
       setInviteError(null);
       setIsInviteOpen(false);
       toast.success('Invitation sent');
     } catch (error) {
       console.error(error);
-      setInviteError(INVITE_SAVE_ERROR);
-      toast.error(INVITE_SAVE_ERROR);
+      const message = resolveFamilyInviteErrorMessage(error);
+      setInviteError(message);
+      toast.error(message);
     } finally {
       setIsInviteSaving(false);
     }
-  }, [inviteEmail, inviteRole, isInviteSaving, onInviteCreate]);
+  }, [inviteEmail, inviteRole, inviteTargetAccountId, isInviteSaving, onInviteCreate]);
 
   const prepareInviteForEmail = React.useCallback(
-    (email: string, role: FamilyLinkInviteRole) => {
+    (email: string, role: FamilyLinkInviteRole, targetAccountId?: string | null) => {
       setInviteRole(role);
       setInviteEmail(email);
+      setInviteTargetAccountId(targetAccountId ?? null);
+      setInviteError(null);
       setIsInviteOpen(true);
     },
     [],
   );
 
-  const openChildInviteWithoutEmail = React.useCallback(() => {
+  const openChildInviteWithoutEmail = React.useCallback((targetAccountId?: string | null) => {
     const draft = buildChildInviteDraft('');
     setInviteRole(draft.role);
     setInviteEmail(draft.email);
+    setInviteTargetAccountId(targetAccountId ?? null);
     setInviteError('Add the child email, then send invite to create account.');
     setIsInviteOpen(true);
   }, []);
@@ -419,8 +460,10 @@ export function FamilyTab({
     }
     setIsCreatingChild(true);
     try {
-      const displayNameValue =
-        `${newChildFirstName.trim()} ${newChildLastName.trim()}`.trim();
+      const displayNameValue = buildChildDisplayName(
+        newChildFirstName,
+        newChildLastName,
+      );
       const createdChild = await onChildProfileCreate({
         orgId,
         displayName: displayNameValue,
@@ -1068,7 +1111,13 @@ export function FamilyTab({
                             variant="ghost"
                             size="xs"
                             className="px-2 text-sm font-medium text-primary underline-offset-4 hover:underline"
-                            onClick={() => prepareInviteForEmail(member.email!, 'child')}
+                            onClick={() =>
+                              prepareInviteForEmail(
+                                member.email!,
+                                'child',
+                                member.accountId ?? null,
+                              )
+                            }
                           >
                             Send invite to create account
                           </Button>
@@ -1085,7 +1134,7 @@ export function FamilyTab({
                             variant="ghost"
                             size="xs"
                             className="px-2 text-sm font-medium text-primary underline-offset-4 hover:underline"
-                            onClick={openChildInviteWithoutEmail}
+                            onClick={() => openChildInviteWithoutEmail(member.accountId ?? null)}
                           >
                             Add email and send invite
                           </Button>

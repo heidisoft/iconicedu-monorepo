@@ -32,16 +32,22 @@ const AuthContext = createContext<AuthState | null>(null);
 
 /** Check that the signed-in user has an account row with an org assigned. */
 async function checkOrgAssignment(userId: string): Promise<string | null> {
-  const { data: account } = await supabase
+  const { data: account, error } = await supabase
     .from('accounts')
     .select('org_id')
     .eq('auth_user_id', userId)
     .maybeSingle();
 
-  if (!account?.org_id) {
+  // If the query itself errors (e.g. RLS blocked before session propagated),
+  // do not sign the user out — let them through and surface data errors later.
+  if (error) return null;
+
+  // Row found but org not assigned — genuine configuration problem.
+  if (account && !account.org_id) {
     await supabase.auth.signOut();
     return 'Your account is not linked to an organisation. Please contact your administrator.';
   }
+
   return null;
 }
 
@@ -96,6 +102,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     if (error) return { error: error.message };
+
+    // Explicitly commit the session so the SecureStore adapter has the tokens
+    // persisted before the subsequent accounts query (avoids RLS race condition).
+    if (data.session) {
+      await supabase.auth.setSession({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+      });
+    }
 
     if (data.user) {
       const orgError = await checkOrgAssignment(data.user.id);

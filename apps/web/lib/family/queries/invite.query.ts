@@ -14,6 +14,7 @@ import {
   getAccountByEmail,
   insertInvitedAccount,
 } from '@iconicedu/web/lib/accounts/queries/accounts.query';
+import { resolveFamilyInviteRedirectUrl } from '@iconicedu/web/lib/family/queries/invite-redirect';
 
 export const FAMILY_INVITE_EXPIRATION_DAYS = 7;
 
@@ -27,6 +28,7 @@ type CreateFamilyInviteOptions = EnsureFamilyOptions & {
   invitedRole: FamilyLinkInviteRole;
   invitedEmail: string;
   invitedPhoneE164?: string | null;
+  targetAccountId?: string;
   createdByAccountId: string;
   expiresInDays?: number;
   maxUses?: number;
@@ -181,13 +183,61 @@ export async function createFamilyInvite(options: CreateFamilyInviteOptions) {
     options.invitedRole === 'child' ? 'child' : 'guardian';
   const adminClient = getFamilyInviteAdminClient();
 
-  const invitedAccount = await ensureInvitedAccountForRole({
-    adminClient,
-    orgId: options.orgId,
-    invitedEmail: normalizedEmail,
-    createdByAccountId: options.createdByAccountId,
-    kind: invitedKind,
-  });
+  let invitedAccount: AccountRow;
+
+  if (options.targetAccountId) {
+    const { data: targetAccount, error: targetAccountError } = await adminClient
+      .from('accounts')
+      .select('*')
+      .eq('id', options.targetAccountId)
+      .eq('org_id', options.orgId)
+      .is('deleted_at', null)
+      .maybeSingle<AccountRow>();
+    if (targetAccountError) {
+      throw targetAccountError;
+    }
+    if (!targetAccount) {
+      throw new Error('Unable to resolve target account for invite.');
+    }
+    const { data: updatedAccount, error: updateError } = await adminClient
+      .from('accounts')
+      .update({
+        email: normalizedEmail,
+        status: 'invited',
+        updated_by: options.createdByAccountId,
+      })
+      .eq('id', targetAccount.id)
+      .eq('org_id', options.orgId)
+      .is('deleted_at', null)
+      .select('*')
+      .single<AccountRow>();
+    if (updateError || !updatedAccount) {
+      throw updateError ?? new Error('Unable to update invited account email.');
+    }
+
+    await upsertProfileForAccount(adminClient, {
+      orgId: options.orgId,
+      accountId: updatedAccount.id,
+      kind: invitedKind,
+      displayName: null,
+      avatarSource: 'seed',
+      avatarUrl: null,
+      avatarSeed: updatedAccount.id,
+      timezone: 'UTC',
+      locale: 'en-US',
+      status: 'invited',
+      uiThemeKey: invitedKind === 'guardian' ? pickRandomThemeKey() : 'teal',
+    });
+    invitedAccount = updatedAccount;
+  } else {
+    invitedAccount = await ensureInvitedAccountForRole({
+      adminClient,
+      orgId: options.orgId,
+      invitedEmail: normalizedEmail,
+      createdByAccountId: options.createdByAccountId,
+      kind: invitedKind,
+    });
+  }
 
   const familyId = await ensureFamilyForGuardian({
     supabase: options.supabase,
@@ -196,8 +246,12 @@ export async function createFamilyInvite(options: CreateFamilyInviteOptions) {
   });
 
   if (!invitedAccount.auth_user_id) {
+    const redirectTo = resolveFamilyInviteRedirectUrl();
     const { error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
       normalizedEmail,
+      {
+        redirectTo,
+      },
     );
 
     if (inviteError) {

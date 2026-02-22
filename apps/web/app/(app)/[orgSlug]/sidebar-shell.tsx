@@ -1682,10 +1682,15 @@ export function SidebarShell({
  );
 
   const handleFamilyInviteCreate = React.useCallback(
-    async (input: { invitedEmail: string; invitedRole: FamilyLinkInviteRole }) => {
+    async (input: {
+      invitedEmail: string;
+      invitedRole: FamilyLinkInviteRole;
+      targetAccountId?: string;
+    }) => {
       const invite = await sendFamilyInviteAction({
         invitedEmail: input.invitedEmail,
         invitedRole: input.invitedRole,
+        targetAccountId: input.targetAccountId,
       });
       setSidebarData((prev) => {
         if (prev.user.profile.kind !== 'guardian') {

@@ -11,12 +11,11 @@ import type {
   HomeworkSubmissionMessageVM,
   FileMessageVM,
   AudioRecordingMessageVM,
+  ReactionVM,
 } from '@iconicedu/shared-types';
 import type { AppColors } from '@/lib/theme';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -28,8 +27,8 @@ function formatDate(iso: string): string {
 
 function formatFileSize(bytes?: number): string {
   if (!bytes) return '';
-  if (bytes < 1048576) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / 1048576).toFixed(1)} MB`;
+  if (bytes < 1_048_576) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / 1_048_576).toFixed(1)} MB`;
 }
 
 function getAvatarUrl(message: MessageVM): string | null {
@@ -37,32 +36,66 @@ function getAvatarUrl(message: MessageVM): string | null {
   return avatar?.url ?? null;
 }
 
-// ---------------------------------------------------------------------------
-// Shared style type
-// ---------------------------------------------------------------------------
-
 type S = ReturnType<typeof makeStyles>;
 
-// ---------------------------------------------------------------------------
-// Bubble sub-renderers
-// ---------------------------------------------------------------------------
+// ─── Reaction pills ───────────────────────────────────────────────────────────
 
-function TextBubble({
-  text, isOwn, time, colors, s,
-}: { text: string; isOwn: boolean; time: string; colors: AppColors; s: S }) {
+function ReactionRow({ reactions, colors }: { reactions: ReactionVM[]; colors: AppColors }) {
+  if (!reactions.length) return null;
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+      {reactions.map((r) => (
+        <View
+          key={r.emoji}
+          style={{
+            flexDirection: 'row', alignItems: 'center', gap: 4,
+            backgroundColor: r.reactedByMe ? colors.tealBg : colors.inputBg,
+            borderWidth: 1,
+            borderColor: r.reactedByMe ? colors.teal : colors.border,
+            borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3,
+          }}
+        >
+          <Text style={{ fontSize: 13 }}>{r.emoji}</Text>
+          <Text style={{ fontSize: 12, color: r.reactedByMe ? colors.teal : colors.textMuted, fontWeight: '600' }}>
+            {r.count}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// ─── Sender header (for "others" messages) ────────────────────────────────────
+
+function SenderHeader({ name, time, avatarUrl, colors, s }: {
+  name: string; time: string; avatarUrl: string | null; colors: AppColors; s: S;
+}) {
+  return (
+    <View style={s.senderHeader}>
+      <Avatar name={name} src={avatarUrl} size="sm" />
+      <Text style={[s.senderName, { color: colors.teal }]}>{name}</Text>
+      <Text style={[s.senderTime, { color: colors.textFaint }]}>{time}</Text>
+    </View>
+  );
+}
+
+// ─── Bubble sub-renderers ─────────────────────────────────────────────────────
+
+function TextBubble({ text, isOwn, colors, s }: {
+  text: string; isOwn: boolean; colors: AppColors; s: S;
+}) {
   return (
     <View style={[s.bubble, isOwn ? s.bubbleOwn : s.bubbleOther]}>
-      <Text style={{ fontSize: 15, lineHeight: 22, color: isOwn ? colors.tealFg : colors.text }}>{text}</Text>
-      <Text style={{ fontSize: 10, marginTop: 2, alignSelf: 'flex-end', color: isOwn ? 'rgba(4,47,46,0.55)' : colors.textFaint }}>
-        {time}
+      <Text style={{ fontSize: 15, lineHeight: 22, color: isOwn ? colors.tealFg : colors.text }}>
+        {text}
       </Text>
     </View>
   );
 }
 
-function FileBubble({
-  message, isOwn, time, colors, s,
-}: { message: FileMessageVM; isOwn: boolean; time: string; colors: AppColors; s: S }) {
+function FileBubble({ message, isOwn, colors, s }: {
+  message: FileMessageVM; isOwn: boolean; colors: AppColors; s: S;
+}) {
   const { attachment, content } = message;
   return (
     <View style={[s.bubble, isOwn ? s.bubbleOwn : s.bubbleOther]}>
@@ -87,32 +120,24 @@ function FileBubble({
           </Text>
         </View>
       </TouchableOpacity>
-      <Text style={{ fontSize: 10, marginTop: 4, alignSelf: 'flex-end', color: isOwn ? 'rgba(4,47,46,0.55)' : colors.textFaint }}>
-        {time}
-      </Text>
     </View>
   );
 }
 
-function ImageBubble({
-  isOwn, time, colors, s,
-}: { isOwn: boolean; time: string; colors: AppColors; s: S }) {
+function ImageBubble({ isOwn, colors, s }: { isOwn: boolean; colors: AppColors; s: S }) {
   return (
     <View style={[s.bubble, isOwn ? s.bubbleOwn : s.bubbleOther, { padding: 0, overflow: 'hidden' }]}>
       <View style={{ width: 200, height: 150, backgroundColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
         <Text style={{ fontSize: 32 }}>🖼</Text>
         <Text style={{ fontSize: 11, color: colors.textFaint, marginTop: 4 }}>Image</Text>
       </View>
-      <Text style={{ fontSize: 10, margin: 6, alignSelf: 'flex-end', color: isOwn ? 'rgba(4,47,46,0.55)' : colors.textFaint }}>
-        {time}
-      </Text>
     </View>
   );
 }
 
-function AudioBubble({
-  message, isOwn, time, colors, s,
-}: { message: AudioRecordingMessageVM; isOwn: boolean; time: string; colors: AppColors; s: S }) {
+function AudioBubble({ message, isOwn, colors, s }: {
+  message: AudioRecordingMessageVM; isOwn: boolean; colors: AppColors; s: S;
+}) {
   const { audio } = message;
   const mins = Math.floor(audio.durationSeconds / 60);
   const secs = audio.durationSeconds % 60;
@@ -127,29 +152,20 @@ function AudioBubble({
       <View style={{ flex: 1, gap: 4 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, height: 24 }}>
           {waveform.map((v, i) => (
-            <View
-              key={i}
-              style={{
-                width: 3,
-                height: Math.max(4, v * 24),
-                backgroundColor: isOwn ? colors.tealFg : colors.teal,
-                borderRadius: 2,
-              }}
-            />
+            <View key={i} style={{
+              width: 3, height: Math.max(4, v * 24),
+              backgroundColor: isOwn ? colors.tealFg : colors.teal,
+              borderRadius: 2,
+            }} />
           ))}
         </View>
         <Text style={{ color: isOwn ? 'rgba(4,47,46,0.7)' : colors.textFaint, fontSize: 11 }}>{duration}</Text>
       </View>
-      <Text style={{ fontSize: 10, alignSelf: 'flex-end', color: isOwn ? 'rgba(4,47,46,0.55)' : colors.textFaint }}>
-        {time}
-      </Text>
     </View>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Card sub-renderers
-// ---------------------------------------------------------------------------
+// ─── Card sub-renderers ───────────────────────────────────────────────────────
 
 function CardHeader({ emoji, label, tag, colors, s }: {
   emoji: string; label: string; tag?: string; colors: AppColors; s: S;
@@ -167,18 +183,14 @@ function CardHeader({ emoji, label, tag, colors, s }: {
   );
 }
 
-function AssignmentCard({ message, colors, s }: {
-  message: LessonAssignmentMessageVM; colors: AppColors; s: S;
-}) {
+function AssignmentCard({ message, colors, s }: { message: LessonAssignmentMessageVM; colors: AppColors; s: S }) {
   const { assignment } = message;
   const diffColor = { beginner: '#22c55e', intermediate: '#f59e0b', advanced: '#ef4444' }[assignment.difficulty ?? 'intermediate'] ?? colors.textMuted;
-
   return (
     <View style={[s.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
       <CardHeader emoji="📚" label="Assignment" tag={assignment.subject} colors={colors} s={s} />
       <Text style={[s.cardTitle, { color: colors.text }]}>{assignment.title}</Text>
       <Text style={[s.cardDesc, { color: colors.textMuted }]}>{assignment.description}</Text>
-
       <View style={s.cardMeta}>
         <Text style={[s.metaChip, { color: colors.textMuted }]}>📅 Due {formatDate(assignment.dueAt)}</Text>
         {!!assignment.estimatedDuration && (
@@ -186,11 +198,10 @@ function AssignmentCard({ message, colors, s }: {
         )}
         {!!assignment.difficulty && (
           <Text style={[s.metaChip, { color: diffColor, fontWeight: '600' }]}>
-            {assignment.difficulty.charAt(0).toUpperCase() + assignment.difficulty.slice(1)}
+            {assignment.difficulty[0]!.toUpperCase() + assignment.difficulty.slice(1)}
           </Text>
         )}
       </View>
-
       {assignment.attachments?.map((att, i) => (
         <View key={i} style={[s.attachRow, { borderColor: colors.border }]}>
           <Text style={{ fontSize: 14 }}>📎</Text>
@@ -201,9 +212,7 @@ function AssignmentCard({ message, colors, s }: {
   );
 }
 
-function SessionSummaryCard({ message, colors, s }: {
-  message: SessionSummaryMessageVM; colors: AppColors; s: S;
-}) {
+function SessionSummaryCard({ message, colors, s }: { message: SessionSummaryMessageVM; colors: AppColors; s: S }) {
   const { session } = message;
   return (
     <View style={[s.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
@@ -213,40 +222,30 @@ function SessionSummaryCard({ message, colors, s }: {
         {formatDate(session.startAt)}{session.durationMinutes ? ` · ${session.durationMinutes} min` : ''}
       </Text>
       <Text style={[s.cardDesc, { color: colors.textMuted }]}>{session.summary}</Text>
-
       {!!session.highlights?.length && (
         <View style={{ marginTop: 10 }}>
           <Text style={[s.sectionLabel, { color: colors.text }]}>Highlights</Text>
-          {session.highlights.map((h, i) => (
-            <Text key={i} style={[s.listItem, { color: colors.textMuted }]}>✓ {h}</Text>
-          ))}
+          {session.highlights.map((h, i) => <Text key={i} style={[s.listItem, { color: colors.textMuted }]}>✓ {h}</Text>)}
         </View>
       )}
-
       {!!session.nextSteps?.length && (
         <View style={{ marginTop: 8 }}>
           <Text style={[s.sectionLabel, { color: colors.text }]}>Next Steps</Text>
-          {session.nextSteps.map((step, i) => (
-            <Text key={i} style={[s.listItem, { color: colors.textMuted }]}>→ {step}</Text>
-          ))}
+          {session.nextSteps.map((step, i) => <Text key={i} style={[s.listItem, { color: colors.textMuted }]}>→ {step}</Text>)}
         </View>
       )}
     </View>
   );
 }
 
-function ProgressCard({ message, colors, s }: {
-  message: ProgressUpdateMessageVM; colors: AppColors; s: S;
-}) {
+function ProgressCard({ message, colors, s }: { message: ProgressUpdateMessageVM; colors: AppColors; s: S }) {
   const { progress } = message;
   const target = progress.targetValue ?? Math.max(progress.currentValue * 1.3, 100);
   const currRatio = Math.min(progress.currentValue / target, 1);
-
   return (
     <View style={[s.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
       <CardHeader emoji="📈" label="Progress Update" tag={progress.subject} colors={colors} s={s} />
       <Text style={[s.cardTitle, { color: colors.text }]}>{progress.metric}</Text>
-
       <View style={{ marginVertical: 10 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
           <Text style={{ color: colors.textMuted, fontSize: 13 }}>Before: {progress.previousValue}%</Text>
@@ -259,7 +258,6 @@ function ProgressCard({ message, colors, s }: {
           <Text style={{ color: colors.textFaint, fontSize: 11, marginTop: 4 }}>Target: {progress.targetValue}%</Text>
         )}
       </View>
-
       <View style={[s.improvementBadge, { backgroundColor: colors.tealBg }]}>
         <Text style={{ color: colors.teal, fontWeight: '700', fontSize: 13 }}>+{progress.improvement} improvement</Text>
       </View>
@@ -268,9 +266,7 @@ function ProgressCard({ message, colors, s }: {
   );
 }
 
-function EventCard({ message, colors, s }: {
-  message: EventReminderMessageVM; colors: AppColors; s: S;
-}) {
+function EventCard({ message, colors, s }: { message: EventReminderMessageVM; colors: AppColors; s: S }) {
   const { event } = message;
   return (
     <View style={[s.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
@@ -280,9 +276,7 @@ function EventCard({ message, colors, s }: {
         {formatDate(event.startAt)} · {formatTime(event.startAt)}
         {event.endAt ? ` – ${formatTime(event.endAt)}` : ''}
       </Text>
-      {!!event.location && (
-        <Text style={[s.metaChip, { color: colors.textMuted }]}>📍 {event.location}</Text>
-      )}
+      {!!event.location && <Text style={[s.metaChip, { color: colors.textMuted }]}>📍 {event.location}</Text>}
       {!!event.meetingLink && (
         <TouchableOpacity
           style={[s.joinBtn, { backgroundColor: colors.teal }]}
@@ -295,49 +289,30 @@ function EventCard({ message, colors, s }: {
   );
 }
 
-function HomeworkCard({ message, colors, s }: {
-  message: HomeworkSubmissionMessageVM; colors: AppColors; s: S;
-}) {
+function HomeworkCard({ message, colors, s }: { message: HomeworkSubmissionMessageVM; colors: AppColors; s: S }) {
   const { homework } = message;
-  const statusColor =
-    homework.status === 'graded' ? '#22c55e'
-    : homework.status === 'needs-revision' ? '#f59e0b'
-    : colors.teal;
-  const statusLabel = {
-    submitted: '✓ Submitted',
-    graded: '✓ Graded',
-    'needs-revision': '⚠ Needs Revision',
-  }[homework.status];
-
+  const statusColor = homework.status === 'graded' ? '#22c55e' : homework.status === 'needs-revision' ? '#f59e0b' : colors.teal;
+  const statusLabel = { submitted: '✓ Submitted', graded: '✓ Graded', 'needs-revision': '⚠ Needs Revision' }[homework.status];
   return (
     <View style={[s.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
       <CardHeader emoji="📝" label="Homework Submitted" colors={colors} s={s} />
       <Text style={[s.cardTitle, { color: colors.text }]}>{homework.assignmentTitle}</Text>
-
       <View style={[s.statusBadge, { backgroundColor: statusColor + '22' }]}>
         <Text style={{ color: statusColor, fontWeight: '600', fontSize: 12 }}>{statusLabel}</Text>
       </View>
-
       {homework.attachments.map((att, i) => (
         <View key={i} style={[s.attachRow, { borderColor: colors.border }]}>
           <Text style={{ fontSize: 14 }}>{att.type === 'image' ? '🖼' : '📎'}</Text>
           <Text style={[s.attachName, { color: colors.text }]} numberOfLines={1}>{att.name}</Text>
         </View>
       ))}
-
-      {!!homework.grade && (
-        <Text style={[s.metaChip, { color: colors.textMuted, marginTop: 6 }]}>Grade: {homework.grade}</Text>
-      )}
-      {!!homework.feedback && (
-        <Text style={[s.cardDesc, { color: colors.textMuted }]}>{homework.feedback}</Text>
-      )}
+      {!!homework.grade && <Text style={[s.metaChip, { color: colors.textMuted, marginTop: 6 }]}>Grade: {homework.grade}</Text>}
+      {!!homework.feedback && <Text style={[s.cardDesc, { color: colors.textMuted }]}>{homework.feedback}</Text>}
     </View>
   );
 }
 
-function SessionCompleteBar({ message, colors, s }: {
-  message: SessionCompleteMessageVM; colors: AppColors; s: S;
-}) {
+function SessionCompleteBar({ message, colors, s }: { message: SessionCompleteMessageVM; colors: AppColors; s: S }) {
   return (
     <View style={s.sessionCompleteRow}>
       <View style={[s.sessionCompleteLine, { backgroundColor: colors.border }]} />
@@ -357,26 +332,30 @@ function SessionCompleteBar({ message, colors, s }: {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Styles factory
-// ---------------------------------------------------------------------------
+// ─── Styles factory ───────────────────────────────────────────────────────────
 
 function makeStyles(colors: AppColors) {
   return StyleSheet.create({
-    outerRow:    { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingHorizontal: 12, paddingVertical: 3 },
-    outerRowOwn: { flexDirection: 'row-reverse' },
+    // Outer wrappers
+    outerRow:     { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingHorizontal: 12, paddingVertical: 2 },
+    outerRowOwn:  { flexDirection: 'row-reverse' },
     avatarSpacer: { width: 32, height: 32 },
 
-    bubble:      { maxWidth: '78%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 },
-    bubbleOther: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderBottomLeftRadius: 4 },
-    bubbleOwn:   { backgroundColor: colors.teal, borderBottomRightRadius: 4 },
+    // Sender header row (for others)
+    senderHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, marginBottom: 2 },
+    senderName:   { fontSize: 14, fontWeight: '700', flex: 1 },
+    senderTime:   { fontSize: 12 },
 
-    senderName: { fontSize: 12, fontWeight: '600', color: colors.teal, paddingLeft: 52, marginBottom: 1 },
+    // Timestamp below own bubbles
+    ownTime:      { fontSize: 10, textAlign: 'right', paddingRight: 12, marginTop: 2, marginBottom: 4 },
 
-    cardRow:        { paddingHorizontal: 12, paddingVertical: 6 },
-    cardSenderRow:  { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
-    cardSenderName: { fontSize: 13, fontWeight: '600', color: colors.text, flex: 1 },
-    cardSenderTime: { fontSize: 11, color: colors.textFaint },
+    // Bubbles
+    bubble:       { maxWidth: '78%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 },
+    bubbleOther:  { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderBottomLeftRadius: 4 },
+    bubbleOwn:    { backgroundColor: colors.teal, borderBottomRightRadius: 4 },
+
+    // Card rows
+    cardRow:        { paddingHorizontal: 12, paddingVertical: 4 },
 
     card:            { borderWidth: 1, borderRadius: 16, padding: 14, gap: 4 },
     cardHeader:      { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
@@ -401,10 +380,8 @@ function makeStyles(colors: AppColors) {
     progressTrack:    { height: 8, borderRadius: 4, overflow: 'hidden' },
     progressFill:     { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 4 },
     improvementBadge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start', marginTop: 4 },
-
-    statusBadge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start', marginTop: 4 },
-
-    joinBtn: { borderRadius: 10, paddingVertical: 10, alignItems: 'center', marginTop: 10 },
+    statusBadge:      { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start', marginTop: 4 },
+    joinBtn:          { borderRadius: 10, paddingVertical: 10, alignItems: 'center', marginTop: 10 },
 
     sessionCompleteRow:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, gap: 10 },
     sessionCompleteLine:   { flex: 1, height: 1 },
@@ -414,24 +391,15 @@ function makeStyles(colors: AppColors) {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Card vs. bubble classification
-// ---------------------------------------------------------------------------
+// ─── Card vs bubble classification ───────────────────────────────────────────
 
 const CARD_TYPES = new Set([
-  'lesson-assignment',
-  'session-summary',
-  'progress-update',
-  'event-reminder',
-  'homework-submission',
-  'feedback-request',
-  'session-booking',
-  'payment-reminder',
+  'lesson-assignment', 'session-summary', 'progress-update',
+  'event-reminder', 'homework-submission', 'feedback-request',
+  'session-booking', 'payment-reminder',
 ]);
 
-// ---------------------------------------------------------------------------
-// Main component
-// ---------------------------------------------------------------------------
+// ─── Main component ───────────────────────────────────────────────────────────
 
 export type MessageItemProps = {
   message: MessageVM;
@@ -446,53 +414,38 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isOwn, showSe
   const senderName = message.core.sender.profile.displayName;
   const avatarUrl = getAvatarUrl(message);
   const time = formatTime(message.core.createdAt);
+  const reactions = message.social?.reactions ?? [];
 
-  // Session complete: full-width centered divider
+  // ── session-complete: full-width centred divider ──
   if (type === 'session-complete') {
     return <SessionCompleteBar message={message as SessionCompleteMessageVM} colors={colors} s={s} />;
   }
 
-  // Structured card types
+  // ── Structured card types ──
   if (CARD_TYPES.has(type)) {
     return (
       <View style={s.cardRow}>
         {showSender && (
-          <View style={s.cardSenderRow}>
-            <Avatar name={senderName} src={avatarUrl} size="sm" />
-            <Text style={s.cardSenderName}>{senderName}</Text>
-            <Text style={s.cardSenderTime}>{time}</Text>
-          </View>
+          <SenderHeader name={senderName} time={time} avatarUrl={avatarUrl} colors={colors} s={s} />
         )}
 
-        {type === 'lesson-assignment' && (
-          <AssignmentCard message={message as LessonAssignmentMessageVM} colors={colors} s={s} />
-        )}
-        {type === 'session-summary' && (
-          <SessionSummaryCard message={message as SessionSummaryMessageVM} colors={colors} s={s} />
-        )}
-        {type === 'progress-update' && (
-          <ProgressCard message={message as ProgressUpdateMessageVM} colors={colors} s={s} />
-        )}
-        {type === 'event-reminder' && (
-          <EventCard message={message as EventReminderMessageVM} colors={colors} s={s} />
-        )}
-        {type === 'homework-submission' && (
-          <HomeworkCard message={message as HomeworkSubmissionMessageVM} colors={colors} s={s} />
-        )}
+        {type === 'lesson-assignment' && <AssignmentCard message={message as LessonAssignmentMessageVM} colors={colors} s={s} />}
+        {type === 'session-summary'   && <SessionSummaryCard message={message as SessionSummaryMessageVM} colors={colors} s={s} />}
+        {type === 'progress-update'   && <ProgressCard message={message as ProgressUpdateMessageVM} colors={colors} s={s} />}
+        {type === 'event-reminder'    && <EventCard message={message as EventReminderMessageVM} colors={colors} s={s} />}
+        {type === 'homework-submission' && <HomeworkCard message={message as HomeworkSubmissionMessageVM} colors={colors} s={s} />}
 
-        {!showSender && (
-          <Text style={{ fontSize: 10, color: colors.textFaint, textAlign: 'right', marginTop: 4 }}>
-            {time}
-          </Text>
-        )}
+        <ReactionRow reactions={reactions} colors={colors} />
       </View>
     );
   }
 
-  // Bubble types: text, file, image, audio-recording
+  // ── Bubble types: text, file, image, audio-recording ──
   return (
-    <View>
-      {!isOwn && showSender && <Text style={s.senderName}>{senderName}</Text>}
+    <View style={{ marginBottom: reactions.length ? 0 : 2 }}>
+      {!isOwn && showSender && (
+        <SenderHeader name={senderName} time={time} avatarUrl={avatarUrl} colors={colors} s={s} />
+      )}
       <View style={[s.outerRow, isOwn && s.outerRowOwn]}>
         {!isOwn && (
           showSender
@@ -500,20 +453,26 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isOwn, showSe
             : <View style={s.avatarSpacer} />
         )}
         {type === 'file'
-          ? <FileBubble message={message as FileMessageVM} isOwn={isOwn} time={time} colors={colors} s={s} />
+          ? <FileBubble message={message as FileMessageVM} isOwn={isOwn} colors={colors} s={s} />
           : type === 'audio-recording'
-          ? <AudioBubble message={message as AudioRecordingMessageVM} isOwn={isOwn} time={time} colors={colors} s={s} />
+          ? <AudioBubble message={message as AudioRecordingMessageVM} isOwn={isOwn} colors={colors} s={s} />
           : type === 'image'
-          ? <ImageBubble isOwn={isOwn} time={time} colors={colors} s={s} />
+          ? <ImageBubble isOwn={isOwn} colors={colors} s={s} />
           : <TextBubble
               text={(message as { content?: { text?: string } }).content?.text ?? ''}
               isOwn={isOwn}
-              time={time}
               colors={colors}
               s={s}
             />
         }
       </View>
+      {/* Timestamp below own bubbles; reactions below all */}
+      {isOwn && <Text style={[s.ownTime, { color: colors.textFaint }]}>{time}</Text>}
+      {reactions.length > 0 && (
+        <View style={{ paddingHorizontal: isOwn ? 12 : 52, paddingBottom: 4 }}>
+          <ReactionRow reactions={reactions} colors={colors} />
+        </View>
+      )}
     </View>
   );
 };

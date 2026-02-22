@@ -83,6 +83,7 @@ type UserSettingsDialogProps = {
   onFamilyInviteCreate?: (input: {
     invitedRole: FamilyLinkInviteRole;
     invitedEmail: string;
+    targetAccountId?: string;
   }) => Promise<FamilyLinkInviteVM> | void;
   onFamilyInviteRemove?: (input: { inviteId: string }) => Promise<void> | void;
   onLocationSave?: (input: {

@@ -55,53 +55,140 @@ export async function fetchProfile(profileId: string) {
   return data;
 }
 
-export async function fetchDirectMessages(orgId: string, profileId: string) {
+export type ChannelListItem = {
+  id: string;
+  org_id: string;
+  topic: string | null;
+  description: string | null;
+  kind: string;
+  updated_at: string;
+  unread_count: number;
+  last_message_text: string | null;
+  last_message_at: string | null;
+  last_message_sender: string | null;
+};
+
+export async function fetchDirectMessages(
+  orgId: string,
+  profileId: string,
+): Promise<ChannelListItem[]> {
   const { data, error } = await supabase
     .from('channels')
     .select(
       `
-      *,
+      id, org_id, topic, description, kind, updated_at,
       channel_participants!inner(profile_id),
-      messages(id, content, created_at, sender_profile_id)
+      channel_read_state(unread_count),
+      last_msg:messages(id, content, created_at, sender:profiles!sender_profile_id(display_name, first_name, last_name))
     `,
     )
     .eq('org_id', orgId)
     .eq('kind', 'dm')
     .eq('channel_participants.profile_id', profileId)
     .eq('status', 'active')
+    .is('deleted_at', null)
     .order('updated_at', { ascending: false });
 
   if (error) throw error;
-  return data ?? [];
+
+  return (data ?? []).map((ch) => {
+    const msgs = (ch.last_msg ?? []) as Array<{
+      id: string;
+      content: Record<string, unknown> | null;
+      created_at: string;
+      sender: { display_name: string | null; first_name: string | null; last_name: string | null } | null;
+    }>;
+    // last_msg comes unsorted – pick the most recent by created_at
+    const last = msgs.reduce<typeof msgs[number] | null>((acc, m) =>
+      !acc || m.created_at > acc.created_at ? m : acc, null);
+
+    const readState = (ch.channel_read_state as Array<{ unread_count: number | null }> | null)?.[0];
+
+    return {
+      id: ch.id,
+      org_id: ch.org_id,
+      topic: ch.topic,
+      description: ch.description,
+      kind: ch.kind,
+      updated_at: ch.updated_at,
+      unread_count: readState?.unread_count ?? 0,
+      last_message_text: last
+        ? String(last.content?.text ?? '') || null
+        : null,
+      last_message_at: last?.created_at ?? null,
+      last_message_sender: last?.sender
+        ? (last.sender.display_name ??
+            ([last.sender.first_name, last.sender.last_name].filter(Boolean).join(' ') || null))
+        : null,
+    };
+  });
 }
 
-export async function fetchChannels(orgId: string) {
+export async function fetchChannels(orgId: string): Promise<ChannelListItem[]> {
   const { data, error } = await supabase
     .from('channels')
-    .select('*')
+    .select(
+      `
+      id, org_id, topic, description, kind, updated_at,
+      channel_read_state(unread_count),
+      last_msg:messages(id, content, created_at, sender:profiles!sender_profile_id(display_name, first_name, last_name))
+    `,
+    )
     .eq('org_id', orgId)
     .eq('kind', 'channel')
     .eq('status', 'active')
+    .is('deleted_at', null)
     .order('updated_at', { ascending: false });
 
   if (error) throw error;
-  return data ?? [];
+
+  return (data ?? []).map((ch) => {
+    const msgs = (ch.last_msg ?? []) as Array<{
+      id: string;
+      content: Record<string, unknown> | null;
+      created_at: string;
+      sender: { display_name: string | null; first_name: string | null; last_name: string | null } | null;
+    }>;
+    const last = msgs.reduce<typeof msgs[number] | null>((acc, m) =>
+      !acc || m.created_at > acc.created_at ? m : acc, null);
+
+    const readState = (ch.channel_read_state as Array<{ unread_count: number | null }> | null)?.[0];
+
+    return {
+      id: ch.id,
+      org_id: ch.org_id,
+      topic: ch.topic,
+      description: ch.description,
+      kind: ch.kind,
+      updated_at: ch.updated_at,
+      unread_count: readState?.unread_count ?? 0,
+      last_message_text: last
+        ? String(last.content?.text ?? '') || null
+        : null,
+      last_message_at: last?.created_at ?? null,
+      last_message_sender: last?.sender
+        ? (last.sender.display_name ??
+            ([last.sender.first_name, last.sender.last_name].filter(Boolean).join(' ') || null))
+        : null,
+    };
+  });
 }
+
+const MESSAGE_SELECT = `
+  id, org_id, channel_id, sender_profile_id, type, content, created_at, updated_at,
+  sender:profiles!sender_profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed)
+`;
 
 export async function fetchChannelMessages(
   channelId: string,
   limit = 40,
   before?: string,
-) {
+): Promise<MessageVM[]> {
   let query = supabase
     .from('messages')
-    .select(
-      `
-      *,
-      sender:profiles!sender_profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed)
-    `,
-    )
+    .select(MESSAGE_SELECT)
     .eq('channel_id', channelId)
+    .is('deleted_at', null)
     .order('created_at', { ascending: false })
     .limit(limit);
 
@@ -111,7 +198,7 @@ export async function fetchChannelMessages(
 
   const { data, error } = await query;
   if (error) throw error;
-  return (data ?? []).reverse();
+  return (data ?? []).reverse().map((row) => mapRowToMessageVM(row as RawMessageRow));
 }
 
 export async function fetchLearningSpaces(orgId: string) {

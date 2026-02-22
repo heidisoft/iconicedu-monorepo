@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildChildInviteDraft, buildCollapsedChildSectionState } from './family-tab';
+import {
+  buildChildDisplayName,
+  buildChildInviteDraft,
+  buildCollapsedChildSectionState,
+  resolveFamilyInviteErrorMessage,
+} from './family-tab';
 
 describe('buildCollapsedChildSectionState', () => {
   it('keeps previously tracked sections and closes the created child section', () => {
@@ -32,5 +37,35 @@ describe('buildChildInviteDraft', () => {
       role: 'child',
       email: '',
     });
+  });
+});
+
+describe('buildChildDisplayName', () => {
+  it('returns first name with last initial only', () => {
+    expect(buildChildDisplayName('Maya', 'Johnson')).toBe('Maya J');
+  });
+
+  it('omits last initial when last name is missing', () => {
+    expect(buildChildDisplayName('Maya', '')).toBe('Maya');
+  });
+});
+
+describe('resolveFamilyInviteErrorMessage', () => {
+  it('returns guidance for already-registered email errors', () => {
+    expect(
+      resolveFamilyInviteErrorMessage(
+        new Error('A user with this email address has already been registered'),
+      ),
+    ).toContain('already has an account');
+  });
+
+  it('returns raw error message when available', () => {
+    expect(resolveFamilyInviteErrorMessage(new Error('Custom error'))).toBe('Custom error');
+  });
+
+  it('returns fallback for unknown errors', () => {
+    expect(resolveFamilyInviteErrorMessage(null)).toBe(
+      'Unable to send invite right now. Please try again.',
+    );
   });
 });
