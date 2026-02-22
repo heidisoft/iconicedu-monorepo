@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
   AccountRow,
   SidebarLeftDataVM,
+  SidebarOrganizationSwitchItemVM,
   UserAccountVM,
   UserOnboardingStatusVM,
   UserProfileVM,
@@ -11,7 +12,10 @@ import type { FamilyLinkInviteRow } from '@iconicedu/shared-types';
 
 import { acceptFamilyInvite } from '@iconicedu/web/lib/family/queries/invite.query';
 import { buildSidebarUser } from '@iconicedu/web/lib/sidebar/user/buildSidebarUser';
-import { getAccountById } from '@iconicedu/web/lib/accounts/queries/accounts.query';
+import {
+  getAccountById,
+  getAccountsByAuthUserId,
+} from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { determineOnboardingStep } from '@iconicedu/web/lib/onboarding/determineOnboardingStep';
 import {
   getUserOnboardingStatusByProfileId,
@@ -19,6 +23,7 @@ import {
 } from '@iconicedu/web/lib/onboarding/queries/status.query';
 import { mapUserOnboardingStatusRowToVM } from '@iconicedu/web/lib/onboarding/mappers';
 import { buildDirectMessageChannelsWithMessages } from '@iconicedu/web/lib/channels/builders/channel.builder';
+import { getOrgsByIds } from '@iconicedu/web/lib/org/queries/org.query';
 
 export async function loadSidebarContext(
   supabase: SupabaseClient,
@@ -58,6 +63,11 @@ export async function loadSidebarContext(
             (participant) => participant.ids.id === profileVM.ids.id,
           ),
         );
+  const organizations = await resolveSidebarOrganizations(
+    supabase,
+    input.authUser.id,
+    input.account.org_id,
+  );
 
   const computedStep = determineOnboardingStep(profileVM, accountVM);
   const statusResponse = await getUserOnboardingStatusByProfileId(
@@ -104,11 +114,52 @@ export async function loadSidebarContext(
         ...input.baseSidebarData.collections,
         directMessages,
       },
+      organizations,
     },
     accountVM,
     profileVM,
     onboardingStatus,
   };
+}
+
+async function resolveSidebarOrganizations(
+  supabase: SupabaseClient,
+  authUserId: string,
+  currentOrgId: string,
+): Promise<SidebarOrganizationSwitchItemVM[]> {
+  const accountsResponse = await getAccountsByAuthUserId(supabase, authUserId);
+  if (!accountsResponse.data?.length) {
+    return [];
+  }
+
+  const uniqueOrgIds = Array.from(
+    new Set(accountsResponse.data.map((account) => account.org_id).filter(Boolean)),
+  );
+  if (!uniqueOrgIds.length) {
+    return [];
+  }
+
+  const orgsResponse = await getOrgsByIds(supabase, uniqueOrgIds);
+  const orgById = new Map((orgsResponse.data ?? []).map((org) => [org.id, org]));
+
+  const dedupedByOrg = new Map<string, SidebarOrganizationSwitchItemVM>();
+  for (const account of accountsResponse.data) {
+    const org = orgById.get(account.org_id);
+    if (!org || dedupedByOrg.has(org.id)) {
+      continue;
+    }
+    dedupedByOrg.set(org.id, {
+      id: org.id,
+      name: org.name,
+      slug: org.slug,
+      url: `/${org.slug}`,
+      isCurrent: org.id === currentOrgId,
+    });
+  }
+
+  return Array.from(dedupedByOrg.values()).sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
+  );
 }
 
 async function resolveGuardianDirectMessages(

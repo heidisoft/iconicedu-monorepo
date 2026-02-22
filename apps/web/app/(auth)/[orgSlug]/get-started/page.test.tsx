@@ -5,7 +5,7 @@ import Page from '@iconicedu/web/app/(auth)/[orgSlug]/get-started/page';
 const redirectMock = vi.fn();
 const notFoundMock = vi.fn();
 const buildOrgBySlugMock = vi.fn();
-const getAccountByAuthUserIdMock = vi.fn();
+const getAccountByAuthUserIdInOrgMock = vi.fn();
 const resolveOrgDashboardPathMock = vi.fn(async () => '/iconic-academy');
 const getUserMock = vi.fn();
 
@@ -25,7 +25,7 @@ vi.mock('@iconicedu/web/lib/org/builders/org.builder', () => ({
 }));
 
 vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
-  getAccountByAuthUserId: (...args: unknown[]) => getAccountByAuthUserIdMock(...args),
+  getAccountByAuthUserIdInOrg: (...args: unknown[]) => getAccountByAuthUserIdInOrgMock(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/org/resolve-dashboard-path', () => ({
@@ -50,7 +50,7 @@ describe('org get-started page', () => {
   it('redirects authenticated users without org account to global get-started', async () => {
     buildOrgBySlugMock.mockResolvedValueOnce({ id: 'org-1', slug: 'iconic-academy', name: 'ICONIC' });
     getUserMock.mockResolvedValueOnce({ data: { user: { id: 'user-1' } } });
-    getAccountByAuthUserIdMock.mockResolvedValueOnce({ data: null });
+    getAccountByAuthUserIdInOrgMock.mockResolvedValueOnce({ data: null });
 
     await expect(
       Page({ params: Promise.resolve({ orgSlug: 'iconic-academy' }) }),

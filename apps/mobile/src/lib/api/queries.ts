@@ -79,6 +79,10 @@ export type ChannelListItem = {
   last_message_text: string | null;
   last_message_at: string | null;
   last_message_sender: string | null;
+  /** Learning space subject emoji, e.g. "📐". Populated in demo mode and future API. */
+  icon_emoji?: string | null;
+  /** Primary student name this space is for, e.g. "Tevin". Populated in demo mode. */
+  student_name?: string | null;
 };
 
 export async function fetchDirectMessages(
@@ -188,12 +192,14 @@ export async function fetchChannels(orgId: string): Promise<ChannelListItem[]> {
 }
 
 const MESSAGE_SELECT = `
-  id, org_id, channel_id, sender_profile_id, type, content, created_at, updated_at,
-  sender:profiles!sender_profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed)
+  id, org_id, channel_id, sender_profile_id, type, content, created_at, updated_at, thread_parent_id,
+  sender:profiles!sender_profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed),
+  reactions:message_reactions(emoji, profile_id)
 `;
 
 export async function fetchChannelMessages(
   channelId: string,
+  currentProfileId = '',
   limit = 40,
   before?: string,
 ): Promise<MessageVM[]> {
@@ -202,6 +208,7 @@ export async function fetchChannelMessages(
     .select(MESSAGE_SELECT)
     .eq('channel_id', channelId)
     .is('deleted_at', null)
+    .is('thread_parent_id', null)
     .order('created_at', { ascending: false })
     .limit(limit);
 
@@ -211,7 +218,57 @@ export async function fetchChannelMessages(
 
   const { data, error } = await query;
   if (error) throw error;
-  return (data ?? []).reverse().map((row) => mapRowToMessageVM(row as RawMessageRow));
+  return (data ?? []).reverse().map((row) => mapRowToMessageVM(row as RawMessageRow, currentProfileId));
+}
+
+export async function fetchThreadMessages(
+  threadParentId: string,
+  currentProfileId = '',
+): Promise<MessageVM[]> {
+  const { data, error } = await supabase
+    .from('messages')
+    .select(MESSAGE_SELECT)
+    .eq('thread_parent_id', threadParentId)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []).map((row) => mapRowToMessageVM(row as RawMessageRow, currentProfileId));
+}
+
+export async function toggleReaction(
+  messageId: string,
+  profileId: string,
+  emoji: string,
+): Promise<void> {
+  const { data: existing } = await supabase
+    .from('message_reactions')
+    .select('id')
+    .eq('message_id', messageId)
+    .eq('profile_id', profileId)
+    .eq('emoji', emoji)
+    .maybeSingle();
+
+  if (existing) {
+    await supabase
+      .from('message_reactions')
+      .delete()
+      .eq('message_id', messageId)
+      .eq('profile_id', profileId)
+      .eq('emoji', emoji);
+  } else {
+    await supabase
+      .from('message_reactions')
+      .insert({ message_id: messageId, profile_id: profileId, emoji });
+  }
+}
+
+export async function deleteMessage(messageId: string): Promise<void> {
+  const { error } = await supabase
+    .from('messages')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', messageId);
+  if (error) throw error;
 }
 
 export async function fetchLearningSpaces(orgId: string) {
@@ -395,7 +452,7 @@ async function _doFetchOnboardingStatus(): Promise<OnboardingStatus> {
   let hasRoleData = true;
   if (kind === 'child' && profileId) {
     const { data: gradeRows } = await supabase
-      .from('child_profile_grade_levels')
+      .from('child_profile_grade_level')
       .select('grade_id')
       .eq('profile_id', profileId)
       .limit(1);
@@ -492,9 +549,9 @@ export async function saveStudentStep(
   if (profileError) throw profileError;
 
   if (gradeLevel) {
-    await supabase.from('child_profile_grade_levels').delete().eq('profile_id', profileId);
+    await supabase.from('child_profile_grade_level').delete().eq('profile_id', profileId);
     const { error: gradeError } = await supabase
-      .from('child_profile_grade_levels')
+      .from('child_profile_grade_level')
       .insert({ profile_id: profileId, org_id: orgId, grade_id: gradeLevel });
     if (gradeError) throw gradeError;
   }

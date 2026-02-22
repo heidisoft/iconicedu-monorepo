@@ -274,6 +274,37 @@ function makeStudentData() {
 }
 
 describe('SidebarLeft', () => {
+  it('shows an organization switcher below the header when user belongs to multiple orgs', () => {
+    const data = makeData();
+    data.organizations = [
+      {
+        id: 'org-1',
+        name: 'ICONIC Academy',
+        slug: 'iconic-academy',
+        url: '/iconic-academy',
+        isCurrent: true,
+      },
+      {
+        id: 'org-2',
+        name: 'Second Campus',
+        slug: 'second-campus',
+        url: '/second-campus',
+        isCurrent: false,
+      },
+    ];
+
+    render(
+      <SidebarProvider>
+        <SidebarLeft data={data} />
+      </SidebarProvider>,
+    );
+
+    expect(screen.getByText('Organization')).toBeInTheDocument();
+    const trigger = screen.getByRole('button', { name: /ICONIC Academy/i });
+    fireEvent.click(trigger);
+    expect(screen.getByText('Second Campus')).toBeInTheDocument();
+  });
+
   it('shows educator learning spaces on the sidebar', () => {
     render(
       <SidebarProvider>

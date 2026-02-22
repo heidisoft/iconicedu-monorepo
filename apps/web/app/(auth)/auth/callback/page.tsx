@@ -37,6 +37,7 @@ export default function CallbackPage() {
       authIntentRaw === 'login' || authIntentRaw === 'get-started'
         ? authIntentRaw
         : null;
+    const fallbackAuthPath = requestedOrgSlug ? `/${requestedOrgSlug}/login` : '/get-started';
 
     const hashParams = new URLSearchParams(
       window.location.hash.startsWith('#') ? window.location.hash.slice(1) : window.location.hash,
@@ -85,18 +86,18 @@ export default function CallbackPage() {
       if (onboarding?.requiresOrgSetup) {
         router.replace(
           onboarding.destination ??
-            (requestedOrgSlug ? `/${requestedOrgSlug}/get-started` : '/get-started'),
+            (requestedOrgSlug ? `/${requestedOrgSlug}/get-started` : fallbackAuthPath),
         );
         return;
       }
       if (onboarding?.requiresRoleSelection) {
         router.replace(
           onboarding.destination ??
-            (requestedOrgSlug ? `/${requestedOrgSlug}/login` : '/get-started'),
+            fallbackAuthPath,
         );
         return;
       }
-      router.replace(onboarding?.destination ?? '/get-started');
+      router.replace(onboarding?.destination ?? fallbackAuthPath);
     };
 
     const finish = async () => {
@@ -144,10 +145,10 @@ export default function CallbackPage() {
               authIntent === 'get-started'
                 ? `/${requestedOrgSlug}/get-started`
                 : `/${requestedOrgSlug}/login`;
-            router.replace(fallbackPath);
-            return;
-          }
-          router.replace('/iconic-academy/login');
+          router.replace(fallbackPath);
+          return;
+        }
+          router.replace(fallbackAuthPath);
           return;
         }
 

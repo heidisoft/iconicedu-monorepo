@@ -30,3 +30,16 @@ export async function getDefaultOrg(supabase: SupabaseClient) {
     .limit(1)
     .maybeSingle<OrgRow>();
 }
+
+export async function getOrgsByIds(supabase: SupabaseClient, orgIds: string[]) {
+  if (!orgIds.length) {
+    return { data: [] as OrgRow[] };
+  }
+
+  return supabase
+    .from('orgs')
+    .select(ORG_SELECT)
+    .in('id', orgIds)
+    .is('deleted_at', null)
+    .returns<OrgRow[]>();
+}

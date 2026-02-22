@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Linking } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Pressable, Linking } from 'react-native';
 import { Avatar } from '@iconicedu/ui-native';
 import type {
   MessageVM,
@@ -40,13 +40,22 @@ type S = ReturnType<typeof makeStyles>;
 
 // ─── Reaction pills ───────────────────────────────────────────────────────────
 
-function ReactionRow({ reactions, colors }: { reactions: ReactionVM[]; colors: AppColors }) {
+type ReactionRowProps = {
+  reactions: ReactionVM[];
+  colors: AppColors;
+  messageId: string;
+  onReactionToggle?: (messageId: string, emoji: string) => void;
+};
+
+function ReactionRow({ reactions, colors, messageId, onReactionToggle }: ReactionRowProps) {
   if (!reactions.length) return null;
   return (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
       {reactions.map((r) => (
-        <View
+        <TouchableOpacity
           key={r.emoji}
+          onPress={() => onReactionToggle?.(messageId, r.emoji)}
+          activeOpacity={0.75}
           style={{
             flexDirection: 'row', alignItems: 'center', gap: 4,
             backgroundColor: r.reactedByMe ? colors.tealBg : colors.inputBg,
@@ -59,9 +68,23 @@ function ReactionRow({ reactions, colors }: { reactions: ReactionVM[]; colors: A
           <Text style={{ fontSize: 12, color: r.reactedByMe ? colors.teal : colors.textMuted, fontWeight: '600' }}>
             {r.count}
           </Text>
-        </View>
+        </TouchableOpacity>
       ))}
     </View>
+  );
+}
+
+// ─── Thread indicator ─────────────────────────────────────────────────────────
+
+function ThreadIndicator({ colors, onPress }: {
+  colors: AppColors; onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={{ marginTop: 4 }}>
+      <Text style={{ fontSize: 12, color: colors.teal, fontWeight: '600' }}>
+        💬 Reply in thread
+      </Text>
+    </TouchableOpacity>
   );
 }
 
@@ -355,7 +378,7 @@ function makeStyles(colors: AppColors) {
     bubbleOwn:    { backgroundColor: colors.teal, borderBottomRightRadius: 4 },
 
     // Card rows
-    cardRow:        { paddingHorizontal: 12, paddingVertical: 4 },
+    cardRow: { paddingHorizontal: 12, paddingVertical: 4 },
 
     card:            { borderWidth: 1, borderRadius: 16, padding: 14, gap: 4 },
     cardHeader:      { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
@@ -406,15 +429,28 @@ export type MessageItemProps = {
   isOwn: boolean;
   showSender: boolean;
   colors: AppColors;
+  onLongPress?: (message: MessageVM) => void;
+  onReactionToggle?: (messageId: string, emoji: string) => void;
+  onThreadOpen?: (message: MessageVM) => void;
 };
 
-export const MessageItem: React.FC<MessageItemProps> = ({ message, isOwn, showSender, colors }) => {
+export const MessageItem: React.FC<MessageItemProps> = ({
+  message,
+  isOwn,
+  showSender,
+  colors,
+  onLongPress,
+  onReactionToggle,
+  onThreadOpen,
+}) => {
   const s = useMemo(() => makeStyles(colors), [colors]);
   const type = message.core.type;
   const senderName = message.core.sender.profile.displayName;
   const avatarUrl = getAvatarUrl(message);
   const time = formatTime(message.core.createdAt);
   const reactions = message.social?.reactions ?? [];
+  // thread_parent_id stored on the VM as a custom field
+  const threadParentId = (message as { threadParentId?: string }).threadParentId;
 
   // ── session-complete: full-width centred divider ──
   if (type === 'session-complete') {
@@ -424,7 +460,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isOwn, showSe
   // ── Structured card types ──
   if (CARD_TYPES.has(type)) {
     return (
-      <View style={s.cardRow}>
+      <Pressable
+        onLongPress={() => onLongPress?.(message)}
+        delayLongPress={350}
+        style={s.cardRow}
+      >
         {showSender && (
           <SenderHeader name={senderName} time={time} avatarUrl={avatarUrl} colors={colors} s={s} />
         )}
@@ -435,14 +475,29 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isOwn, showSe
         {type === 'event-reminder'    && <EventCard message={message as EventReminderMessageVM} colors={colors} s={s} />}
         {type === 'homework-submission' && <HomeworkCard message={message as HomeworkSubmissionMessageVM} colors={colors} s={s} />}
 
-        <ReactionRow reactions={reactions} colors={colors} />
-      </View>
+        {reactions.length > 0 && (
+          <ReactionRow
+            reactions={reactions}
+            colors={colors}
+            messageId={message.ids.id}
+            onReactionToggle={onReactionToggle}
+          />
+        )}
+        {/* Thread reply button — only for top-level messages */}
+        {!threadParentId && onThreadOpen && (
+          <ThreadIndicator colors={colors} onPress={() => onThreadOpen(message)} />
+        )}
+      </Pressable>
     );
   }
 
   // ── Bubble types: text, file, image, audio-recording ──
   return (
-    <View style={{ marginBottom: reactions.length ? 0 : 2 }}>
+    <Pressable
+      onLongPress={() => onLongPress?.(message)}
+      delayLongPress={350}
+      style={{ marginBottom: reactions.length ? 0 : 2 }}
+    >
       {!isOwn && showSender && (
         <SenderHeader name={senderName} time={time} avatarUrl={avatarUrl} colors={colors} s={s} />
       )}
@@ -466,13 +521,28 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isOwn, showSe
             />
         }
       </View>
-      {/* Timestamp below own bubbles; reactions below all */}
+
+      {/* Timestamp below own bubbles */}
       {isOwn && <Text style={[s.ownTime, { color: colors.textFaint }]}>{time}</Text>}
+
+      {/* Reactions */}
       {reactions.length > 0 && (
         <View style={{ paddingHorizontal: isOwn ? 12 : 52, paddingBottom: 4 }}>
-          <ReactionRow reactions={reactions} colors={colors} />
+          <ReactionRow
+            reactions={reactions}
+            colors={colors}
+            messageId={message.ids.id}
+            onReactionToggle={onReactionToggle}
+          />
         </View>
       )}
-    </View>
+
+      {/* Thread reply link — only for top-level messages */}
+      {!threadParentId && onThreadOpen && (
+        <View style={{ paddingHorizontal: isOwn ? 12 : 52, paddingBottom: 2 }}>
+          <ThreadIndicator colors={colors} onPress={() => onThreadOpen(message)} />
+        </View>
+      )}
+    </Pressable>
   );
 };

@@ -161,23 +161,84 @@ describe('POST /api/orgs/bootstrap', () => {
     expect(body.onboarding.destination).toBe('/iconic-academy');
   });
 
-  it('returns 409 when auth user already has an assigned organization', async () => {
+  it('allows an authenticated user to create another organization', async () => {
+    const now = new Date().toISOString();
     mockGetUser.mockResolvedValueOnce({
       data: { user: { id: 'auth-1', email: 'owner@example.com' } },
     });
-    mockGetAccountByAuthUserId.mockResolvedValueOnce({
-      data: { id: 'account-1', org_id: 'org-1' },
+    mockResolveOrgDashboardPath.mockResolvedValueOnce('/second-org');
+    mockGetOrCreateAccount.mockResolvedValueOnce({
+      account: { id: 'account-2', org_id: 'org-2' },
+    });
+    mockUpsertUserRole.mockResolvedValueOnce({ error: null });
+    mockUpdateAccountRoleState.mockResolvedValueOnce({
+      error: null,
+      data: {
+        id: 'account-2',
+        org_id: 'org-2',
+        primary_role: 'owner',
+        role_status: 'active',
+        onboarding_completed_at: now,
+      },
+    });
+    mockGetUserRoles.mockResolvedValueOnce({
+      error: null,
+      data: [
+        {
+          id: 'role-2',
+          org_id: 'org-2',
+          account_id: 'account-2',
+          role_key: 'owner',
+          assigned_at: now,
+          created_at: now,
+          updated_at: now,
+        },
+      ],
+    });
+    mockFrom.mockImplementation((table: string) => {
+      if (table !== 'orgs') {
+        throw new Error(`Unexpected table ${table}`);
+      }
+      return {
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            is: vi.fn(() => ({
+              maybeSingle: mockOrgSlugMaybeSingle,
+            })),
+          })),
+        })),
+        insert: vi.fn(() => ({
+          select: vi.fn(() => ({
+            single: mockOrgInsertSingle,
+          })),
+        })),
+      };
+    });
+    mockOrgSlugMaybeSingle.mockResolvedValueOnce({ data: null, error: null });
+    mockOrgInsertSingle.mockResolvedValueOnce({
+      data: { id: 'org-2', name: 'Second Org', slug: 'second-org' },
       error: null,
     });
 
     const response = await POST(
       new Request(`${APP_URL}/api/orgs/bootstrap`, {
         method: 'POST',
-        body: JSON.stringify({ name: 'ICONIC Academy', slug: 'iconic-academy' }),
+        body: JSON.stringify({ name: 'Second Org', slug: 'second-org' }),
       }),
     );
 
-    expect(response.status).toBe(409);
-    expect((await response.json()).message).toContain('already assigned');
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.success).toBe(true);
+    expect(body.org.slug).toBe('second-org');
+    expect(body.onboarding.destination).toBe('/second-org');
+    expect(mockGetOrCreateAccount).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        orgId: 'org-2',
+        authUserId: 'auth-1',
+        authEmail: 'owner@example.com',
+      }),
+    );
   });
 });

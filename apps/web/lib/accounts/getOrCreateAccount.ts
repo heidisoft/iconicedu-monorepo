@@ -1,9 +1,8 @@
-import { redirect } from 'next/navigation';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { AccountRow, FamilyLinkInviteRow } from '@iconicedu/shared-types';
 
 import {
-  getAccountByAuthUserId,
+  getAccountByAuthUserIdInOrg,
   getAccountByEmail,
   insertAccountForAuthUser,
   updateAccountAuthUserId,
@@ -15,21 +14,22 @@ export async function getOrCreateAccount(
   supabase: SupabaseClient,
   input: { orgId: string; authUserId: string; authEmail?: string | null },
 ): Promise<{ account: AccountRow; invite: FamilyLinkInviteRow | null }> {
-  const { data: account } = await getAccountByAuthUserId(
+  const { data: accountInOrg } = await getAccountByAuthUserIdInOrg(
     supabase,
     input.authUserId,
+    input.orgId,
   );
 
   const normalizedEmail = input.authEmail?.trim().toLowerCase();
 
-  if (account) {
+  if (accountInOrg) {
     const invite = await findFamilyInviteForAccount({
       supabase,
       orgId: input.orgId,
-      accountId: account.id,
+      accountId: accountInOrg.id,
       email: normalizedEmail,
     });
-    return { account, invite };
+    return { account: accountInOrg, invite };
   }
 
   if (normalizedEmail) {
@@ -81,7 +81,7 @@ export async function getOrCreateAccount(
   });
 
   if (error || !inserted) {
-    redirect('/iconic-academy/login');
+    throw error ?? new Error('Unable to create account');
   }
 
   const invite = await findFamilyInviteForAccount({

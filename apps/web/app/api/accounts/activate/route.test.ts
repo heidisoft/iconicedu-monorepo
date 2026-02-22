@@ -7,6 +7,7 @@ const APP_URL = resolveAppUrl();
 const {
   mockSessionGetUser,
   mockGetAccountByAuthUserId,
+  mockGetAccountByAuthUserIdInOrg,
   mockGetAccountByEmail,
   mockInsertAccountForAuthUser,
   mockUpdateAccountAuthUserId,
@@ -19,6 +20,7 @@ const {
 } = vi.hoisted(() => ({
   mockSessionGetUser: vi.fn(),
   mockGetAccountByAuthUserId: vi.fn(),
+  mockGetAccountByAuthUserIdInOrg: vi.fn(),
   mockGetAccountByEmail: vi.fn(),
   mockInsertAccountForAuthUser: vi.fn(),
   mockUpdateAccountAuthUserId: vi.fn(),
@@ -46,6 +48,7 @@ vi.mock('@iconicedu/web/lib/supabase/service', () => ({
 
 vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
   getAccountByAuthUserId: mockGetAccountByAuthUserId,
+  getAccountByAuthUserIdInOrg: mockGetAccountByAuthUserIdInOrg,
   getAccountByEmail: mockGetAccountByEmail,
   insertAccountForAuthUser: mockInsertAccountForAuthUser,
   updateAccountAuthUserId: mockUpdateAccountAuthUserId,
@@ -73,6 +76,7 @@ describe('POST /api/accounts/activate', () => {
   beforeEach(() => {
     mockSessionGetUser.mockReset();
     mockGetAccountByAuthUserId.mockReset();
+    mockGetAccountByAuthUserIdInOrg.mockReset();
     mockGetAccountByEmail.mockReset();
     mockInsertAccountForAuthUser.mockReset();
     mockUpdateAccountAuthUserId.mockReset();
@@ -157,7 +161,7 @@ describe('POST /api/accounts/activate', () => {
       data: { id: 'org-9', slug: 'iconic-academy' },
       error: null,
     });
-    mockGetAccountByAuthUserId.mockResolvedValueOnce({ data: null });
+    mockGetAccountByAuthUserIdInOrg.mockResolvedValueOnce({ data: null });
 
     const response = await POST(
       new Request(`${APP_URL}/api/accounts/activate?org=iconic-academy&intent=login`, {
@@ -179,7 +183,7 @@ describe('POST /api/accounts/activate', () => {
       data: { id: 'org-1', slug: 'iconic-academy' },
       error: null,
     });
-    mockGetAccountByAuthUserId.mockResolvedValueOnce({ data: null });
+    mockGetAccountByAuthUserIdInOrg.mockResolvedValueOnce({ data: null });
     mockGetAccountByEmail.mockResolvedValueOnce({ data: null, error: null });
     mockInsertAccountForAuthUser.mockResolvedValueOnce({
       data: { id: 'account-new', org_id: 'org-1' },

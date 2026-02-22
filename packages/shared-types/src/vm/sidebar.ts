@@ -4,6 +4,7 @@ import type { ChannelVM } from '@iconicedu/shared-types/vm/channel';
 import type { UserAccountVM } from '@iconicedu/shared-types/vm/account';
 import type { LearningSpaceVM } from '@iconicedu/shared-types/vm/learning-space';
 import type { FamilyLinkVM, FamilyVM } from '@iconicedu/shared-types/vm/family';
+import type { UUID } from '@iconicedu/shared-types/shared/shared';
 
 export type SidebarIconKey =
   | 'home'
@@ -68,10 +69,20 @@ export interface SidebarCollectionsVM {
   directMessages: ChannelVM[];
 }
 
+export interface SidebarOrganizationSwitchItemVM {
+  id: UUID;
+  name: string;
+  slug: string;
+  url: string;
+  isCurrent: boolean;
+}
+
 export interface SidebarLeftDataVM {
   user: SidebarUserVM;
 
   navigation: SidebarPrimaryNavVM;
 
   collections: SidebarCollectionsVM;
+
+  organizations?: SidebarOrganizationSwitchItemVM[];
 }

@@ -1,16 +1,20 @@
-import React, { useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import type { MessageVM } from '@iconicedu/shared-types';
 import { useAccount } from '@/hooks/use-account';
 import { useProfile } from '@/hooks/use-profile';
 import { useMessages } from '@/hooks/use-messages';
-import { sendTextMessage } from '@/lib/api/queries';
+import { useTyping } from '@/hooks/use-typing';
+import { sendTextMessage, deleteMessage } from '@/lib/api/queries';
 import { useTheme } from '@/providers/theme-provider';
 import { MessageList } from '@/components/messages/message-list';
 import { MessageInput } from '@/components/messages/message-input';
 import { TypingIndicator } from '@/components/messages/typing-indicator';
 import { ConversationHeader } from '@/components/messages/conversation-header';
+import { MessageActionsSheet } from '@/components/messages/message-actions-sheet';
+import { ThreadSheet } from '@/components/messages/thread-sheet';
 import { DEMO_MESSAGE_MAP, DEMO_PROFILE_ID } from '@/lib/dummy-messages';
 
 export default function ChannelConversationScreen() {
@@ -22,22 +26,75 @@ export default function ChannelConversationScreen() {
 
   const isDemo = channelId?.startsWith('demo-') ?? false;
 
-  const profileId = isDemo ? DEMO_PROFILE_ID : ((profile as Record<string, unknown> | undefined)?.id as string ?? '');
+  const profileId = isDemo
+    ? DEMO_PROFILE_ID
+    : ((profile as Record<string, unknown> | undefined)?.id as string ?? '');
   const orgId = account?.org_id ?? '';
+  const senderName =
+    ((profile as Record<string, unknown> | undefined)?.display_name as string | undefined) ??
+    ((profile as Record<string, unknown> | undefined)?.first_name as string | undefined) ??
+    'Me';
 
-  // Skip API for demo channels — they have no real DB row
-  const { data: realMessages, isLoading, loadMore } = useMessages(isDemo ? '' : (channelId ?? ''));
+  // ── Messages ──
+  const {
+    data: realMessages,
+    isLoading,
+    loadMore,
+    toggleReaction,
+  } = useMessages(isDemo ? '' : (channelId ?? ''), profileId);
   const messages = isDemo ? (DEMO_MESSAGE_MAP[channelId ?? ''] ?? []) : (realMessages ?? []);
 
+  // ── Typing indicator ──
+  const { typingUsers, broadcastTyping } = useTyping(
+    isDemo ? '' : (channelId ?? ''),
+    senderName,
+    profileId,
+  );
+
+  // ── Long-press actions sheet state ──
+  const [actionsMessage, setActionsMessage] = useState<MessageVM | null>(null);
+  const [actionsVisible, setActionsVisible] = useState(false);
+
+  const handleLongPress = useCallback((msg: MessageVM) => {
+    setActionsMessage(msg);
+    setActionsVisible(true);
+  }, []);
+
+  // ── Thread sheet state ──
+  const [threadMessage, setThreadMessage] = useState<MessageVM | null>(null);
+  const [threadVisible, setThreadVisible] = useState(false);
+
+  const handleThreadOpen = useCallback((msg: MessageVM) => {
+    setThreadMessage(msg);
+    setThreadVisible(true);
+  }, []);
+
+  // ── Send message ──
   const handleSend = useCallback(
-    async (text: string) => {
+    async (text: string, threadParentId?: string) => {
       if (isDemo || !channelId || !profileId || !orgId) return;
-      await sendTextMessage(channelId, profileId, orgId, text);
+      await sendTextMessage(channelId, profileId, orgId, text, threadParentId);
     },
     [isDemo, channelId, profileId, orgId],
   );
 
+  // ── Delete message ──
+  const handleDelete = useCallback(async (messageId: string) => {
+    await deleteMessage(messageId);
+  }, []);
+
+  // ── Reaction toggle ──
+  const handleReactionToggle = useCallback(
+    async (messageId: string, emoji: string) => {
+      if (isDemo) return;
+      await toggleReaction(messageId, emoji);
+    },
+    [isDemo, toggleReaction],
+  );
+
   if (!channelId) return null;
+
+  const isOwnMessage = (msg: MessageVM) => msg.core.sender.ids.id === profileId;
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.pageBg }]} edges={['top']}>
@@ -52,10 +109,38 @@ export default function ChannelConversationScreen() {
           currentProfileId={profileId}
           onLoadMore={isDemo ? undefined : loadMore}
           loading={isDemo ? false : isLoading}
+          onMessageLongPress={handleLongPress}
+          onReactionToggle={handleReactionToggle}
+          onThreadOpen={handleThreadOpen}
         />
-        <TypingIndicator typingUsers={[]} />
-        <MessageInput onSend={handleSend} placeholder={`Message #${topic ?? ''}…`} disabled={isDemo} />
+        <TypingIndicator typingUsers={typingUsers} />
+        <MessageInput
+          onSend={handleSend}
+          placeholder={`Message #${topic ?? ''}…`}
+          disabled={isDemo}
+          onTypingChange={broadcastTyping}
+        />
       </View>
+
+      {/* Long-press actions sheet */}
+      <MessageActionsSheet
+        visible={actionsVisible}
+        message={actionsMessage}
+        isOwn={actionsMessage ? isOwnMessage(actionsMessage) : false}
+        onClose={() => setActionsVisible(false)}
+        onReact={handleReactionToggle}
+        onThread={handleThreadOpen}
+        onDelete={handleDelete}
+      />
+
+      {/* Thread sheet */}
+      <ThreadSheet
+        visible={threadVisible}
+        parentMessage={threadMessage}
+        currentProfileId={profileId}
+        onClose={() => setThreadVisible(false)}
+        onSend={handleSend}
+      />
     </SafeAreaView>
   );
 }

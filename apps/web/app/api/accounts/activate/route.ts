@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import {
   getAccountByAuthUserId,
+  getAccountByAuthUserIdInOrg,
   getAccountByEmail,
   insertAccountForAuthUser,
   updateAccountAuthUserId,
@@ -17,6 +18,10 @@ import { getUserRoles } from '@iconicedu/web/lib/profile/queries/roles.query';
 import { buildAuthOnboardingState } from '@iconicedu/web/lib/onboarding/auth-state';
 import { getOrgBySlug } from '@iconicedu/web/lib/org/queries/org.query';
 import { resolveOrgDashboardPath } from '@iconicedu/web/lib/org/resolve-dashboard-path';
+import {
+  resolveDefaultOrgLoginPath,
+  resolveOrgLoginPath,
+} from '@iconicedu/web/lib/org/resolve-auth-path';
 
 type ActivationIntent = 'login' | 'get-started' | null;
 
@@ -25,15 +30,6 @@ function parseIntent(value: string | null): ActivationIntent {
     return value;
   }
   return null;
-}
-
-async function resolveOrgLoginPath(orgId: string): Promise<string> {
-  const serviceSupabase = createSupabaseServiceClient();
-  const dashboardPath = await resolveOrgDashboardPath(serviceSupabase, orgId);
-  if (dashboardPath === '/get-started') {
-    return '/iconic-academy/login';
-  }
-  return `${dashboardPath}/login`;
 }
 
 export async function POST(request: Request) {
@@ -59,12 +55,13 @@ export async function POST(request: Request) {
         throw orgResponse.error;
       }
       if (!orgResponse.data) {
+        const fallbackDestination = await resolveDefaultOrgLoginPath(serviceSupabase);
         return NextResponse.json({
           status: 'invalid_org',
           onboarding: {
             requiresOrgSetup: false,
             requiresRoleSelection: false,
-            destination: '/iconic-academy/login',
+            destination: fallbackDestination,
           },
         });
       }
@@ -72,11 +69,21 @@ export async function POST(request: Request) {
       requestedOrgSlug = orgResponse.data.slug;
     }
 
-    const existingAccountResponse = await getAccountByAuthUserId(
-      serviceSupabase,
-      data.user.id,
-    );
-    let account = existingAccountResponse.data ?? null;
+    let account = null;
+    if (requestedOrgId) {
+      const requestedOrgAccountResponse = await getAccountByAuthUserIdInOrg(
+        serviceSupabase,
+        data.user.id,
+        requestedOrgId,
+      );
+      account = requestedOrgAccountResponse.data ?? null;
+    } else {
+      const existingAccountResponse = await getAccountByAuthUserId(
+        serviceSupabase,
+        data.user.id,
+      );
+      account = existingAccountResponse.data ?? null;
+    }
 
     if (!account) {
       if (requestedOrgId && intent === 'get-started') {
@@ -156,17 +163,6 @@ export async function POST(request: Request) {
       });
     }
 
-    if (requestedOrgId && account.org_id !== requestedOrgId) {
-      return NextResponse.json({
-        status: 'active',
-        onboarding: {
-          requiresOrgSetup: false,
-          requiresRoleSelection: false,
-          destination: await resolveOrgLoginPath(account.org_id),
-        },
-      });
-    }
-
     if (!account) {
       return NextResponse.json({
         status: 'needs_org_setup',
@@ -197,10 +193,10 @@ export async function POST(request: Request) {
     const onboarding = buildAuthOnboardingState(activeAccount, rolesResponse.data ?? []);
     if (onboarding.requiresRoleSelection) {
       onboarding.requiresRoleSelection = false;
-      onboarding.destination =
+        onboarding.destination =
         intent === 'get-started'
           ? await resolveOrgDashboardPath(serviceSupabase, activeAccount.org_id)
-          : await resolveOrgLoginPath(activeAccount.org_id);
+          : await resolveOrgLoginPath(serviceSupabase, activeAccount.org_id);
     } else if (onboarding.destination === '/dashboard') {
       onboarding.destination = await resolveOrgDashboardPath(serviceSupabase, activeAccount.org_id);
     }

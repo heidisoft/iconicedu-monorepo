@@ -79,6 +79,9 @@ type MessageListProps = {
   currentProfileId: string;
   onLoadMore?: () => void;
   loading?: boolean;
+  onMessageLongPress?: (message: MessageVM) => void;
+  onReactionToggle?: (messageId: string, emoji: string) => void;
+  onThreadOpen?: (message: MessageVM) => void;
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -88,6 +91,9 @@ export const MessageList: React.FC<MessageListProps> = ({
   currentProfileId,
   onLoadMore,
   loading = false,
+  onMessageLongPress,
+  onReactionToggle,
+  onThreadOpen,
 }) => {
   const flatListRef = useRef<FlatList>(null);
   const { colors } = useTheme();
@@ -121,10 +127,13 @@ export const MessageList: React.FC<MessageListProps> = ({
           isOwn={isOwn}
           showSender={showSender}
           colors={colors}
+          onLongPress={onMessageLongPress}
+          onReactionToggle={onReactionToggle}
+          onThreadOpen={onThreadOpen}
         />
       );
     },
-    [currentProfileId, listData, colors],
+    [currentProfileId, listData, colors, onMessageLongPress, onReactionToggle, onThreadOpen],
   );
 
   const keyExtractor = useCallback((item: MessageListItem) => {

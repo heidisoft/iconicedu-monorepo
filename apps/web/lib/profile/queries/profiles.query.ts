@@ -76,6 +76,34 @@ export async function insertProfileForAccount(
   supabase: SupabaseClient,
   payload: ProfileInsertPayload,
 ) {
+  const upsertResponse = await supabase
+    .from('profiles')
+    .upsert(
+      {
+        org_id: payload.orgId,
+        account_id: payload.accountId,
+        kind: payload.kind,
+        display_name: payload.displayName ?? null,
+        first_name: null,
+        last_name: null,
+        avatar_source: payload.avatarSource,
+        avatar_url: payload.avatarUrl,
+        avatar_seed: payload.avatarSeed,
+        timezone: payload.timezone,
+        locale: payload.locale,
+        status: payload.status,
+        ui_theme_key: payload.uiThemeKey,
+      },
+      { onConflict: 'org_id,account_id' },
+    )
+    .select(PROFILE_SELECT)
+    .single<ProfileRow>();
+
+  // Fallback for environments that don't have the expected unique constraint.
+  if (upsertResponse.error?.code !== '42P10') {
+    return upsertResponse;
+  }
+
   return supabase
     .from('profiles')
     .insert({

@@ -4,6 +4,8 @@ import { loadSidebarContext } from '@iconicedu/web/lib/sidebar/loadSidebarContex
 
 const buildSidebarUser = vi.fn();
 const buildDirectMessageChannelsWithMessages = vi.fn();
+const getAccountsByAuthUserId = vi.fn();
+const getOrgsByIds = vi.fn();
 
 vi.mock('@iconicedu/web/lib/sidebar/user/buildSidebarUser', () => ({
   buildSidebarUser: (...args: unknown[]) => buildSidebarUser(...args),
@@ -29,10 +31,15 @@ vi.mock('@iconicedu/web/lib/onboarding/mappers', () => ({
 
 vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
   getAccountById: vi.fn(async () => ({ data: { id: 'account-1', org_id: 'org-1' } })),
+  getAccountsByAuthUserId: (...args: unknown[]) => getAccountsByAuthUserId(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/family/queries/invite.query', () => ({
   acceptFamilyInvite: vi.fn(),
+}));
+
+vi.mock('@iconicedu/web/lib/org/queries/org.query', () => ({
+  getOrgsByIds: (...args: unknown[]) => getOrgsByIds(...args),
 }));
 
 const makeChannel = (id: string, participantIds: string[]) =>
@@ -51,6 +58,10 @@ describe('loadSidebarContext', () => {
     vi.clearAllMocks();
     buildDirectMessageChannelsWithMessages.mockReset();
     buildSidebarUser.mockReset();
+    getAccountsByAuthUserId.mockReset();
+    getOrgsByIds.mockReset();
+    getAccountsByAuthUserId.mockResolvedValue({ data: [] });
+    getOrgsByIds.mockResolvedValue({ data: [] });
   });
 
   it('filters direct messages for guardians to only include their channels', async () => {
@@ -147,5 +158,65 @@ describe('loadSidebarContext', () => {
     expect(result.sidebarData.collections.directMessages.map((channel: any) => channel.ids.id)).toEqual(
       expect.arrayContaining(['dm-guardian', 'dm-child']),
     );
+  });
+
+  it('adds organization switcher items from all auth-user accounts', async () => {
+    buildSidebarUser.mockResolvedValueOnce({
+      accountVM: { ids: { id: 'account-1', orgId: 'org-1' } },
+      profileVM: {
+        ids: { id: 'profile-1', orgId: 'org-1', accountId: 'account-1' },
+        kind: 'guardian',
+      },
+    });
+    getAccountsByAuthUserId.mockResolvedValueOnce({
+      data: [
+        { org_id: 'org-2' },
+        { org_id: 'org-1' },
+      ],
+    });
+    getOrgsByIds.mockResolvedValueOnce({
+      data: [
+        { id: 'org-1', name: 'ICONIC Academy', slug: 'iconic-academy' },
+        { id: 'org-2', name: 'Second Campus', slug: 'second-campus' },
+      ],
+    });
+
+    const supabase = {
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            eq: () => ({
+              is: () => ({ data: [], error: null }),
+            }),
+          }),
+        }),
+      }),
+    } as any;
+
+    const result = await loadSidebarContext(supabase, {
+      authUser: { id: 'auth-1' },
+      account: { id: 'account-1', org_id: 'org-1' },
+      baseSidebarData: {
+        navigation: { navMain: [], navSecondary: [] },
+        collections: { learningSpaces: [], directMessages: [] },
+      } as any,
+    });
+
+    expect(result.sidebarData.organizations).toEqual([
+      {
+        id: 'org-1',
+        name: 'ICONIC Academy',
+        slug: 'iconic-academy',
+        url: '/iconic-academy',
+        isCurrent: true,
+      },
+      {
+        id: 'org-2',
+        name: 'Second Campus',
+        slug: 'second-campus',
+        url: '/second-campus',
+        isCurrent: false,
+      },
+    ]);
   });
 });

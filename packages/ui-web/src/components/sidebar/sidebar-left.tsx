@@ -2,8 +2,11 @@
 
 import * as React from 'react';
 import {
+  Building2,
   Calendar,
+  Check,
   ChefHat,
+  ChevronDown,
   Earth,
   Home,
   Inbox,
@@ -420,6 +423,10 @@ export function SidebarLeft({
     return null;
   }, [activePath]);
   const { isMobile } = useSidebar();
+  const organizations = data.organizations ?? [];
+  const currentOrganization =
+    organizations.find((org) => org.isCurrent) ?? organizations[0] ?? null;
+
   return (
     <Sidebar variant="inset" {...props} collapsible="icon">
       <SidebarHeader>
@@ -431,6 +438,52 @@ export function SidebarLeft({
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
+      {organizations.length > 1 && currentOrganization ? (
+        <>
+          <SidebarSeparator className="mx-2" />
+          <SidebarGroup className="pt-1 pb-0 group-data-[collapsible=icon]:hidden">
+            <SidebarGroupLabel className="px-2 py-1 text-[10px] uppercase tracking-wide">
+              Organization
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="hover:bg-sidebar-accent/60 mt-1 h-9 w-full justify-between rounded-lg px-2.5"
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      <Building2 className="size-4 shrink-0" />
+                      <span className="truncate text-sm">{currentOrganization.name}</span>
+                    </span>
+                    <ChevronDown className="text-muted-foreground size-4 shrink-0" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" side={isMobile ? 'bottom' : 'right'}>
+                  {organizations.map((org) => (
+                    <DropdownMenuItem
+                      key={org.id}
+                      onSelect={() => {
+                        if (org.isCurrent || typeof window === 'undefined') {
+                          return;
+                        }
+                        window.location.assign(org.url);
+                      }}
+                    >
+                      <span className="flex min-w-0 items-center gap-2">
+                        <Building2 className="text-muted-foreground size-4 shrink-0" />
+                        <span className="truncate">{org.name}</span>
+                      </span>
+                      {org.isCurrent ? <Check className="ml-auto size-4" /> : null}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+          <SidebarSeparator className="mx-2 mt-2 group-data-[collapsible=icon]:hidden" />
+        </>
+      ) : null}
       <SidebarContent>
         <NavMain items={navMain} />
         {userProfile.kind === 'staff' && (adminSections?.length ?? 0) > 0 ? (

@@ -1,4 +1,4 @@
-import type { MessageVM, UserProfileVM } from '@iconicedu/shared-types';
+import type { MessageVM, UserProfileVM, ReactionVM } from '@iconicedu/shared-types';
 
 // Raw shape returned by Supabase when selecting * from messages + sender join.
 // The `content` JSONB column stores the type-specific payload inline
@@ -12,6 +12,8 @@ export type RawMessageRow = {
   content: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
+  thread_parent_id?: string | null;
+  reactions?: Array<{ emoji: string; profile_id: string }> | null;
   sender: {
     id: string;
     display_name: string | null;
@@ -44,10 +46,33 @@ function buildSenderProfile(
   } as unknown as UserProfileVM;
 }
 
-export function mapRowToMessageVM(row: RawMessageRow): MessageVM {
+function buildReactions(
+  rawReactions: Array<{ emoji: string; profile_id: string }> | null | undefined,
+  currentProfileId: string,
+): ReactionVM[] {
+  if (!rawReactions?.length) return [];
+
+  // Group reactions by emoji
+  const grouped = new Map<string, string[]>();
+  for (const r of rawReactions) {
+    const existing = grouped.get(r.emoji) ?? [];
+    existing.push(r.profile_id);
+    grouped.set(r.emoji, existing);
+  }
+
+  return Array.from(grouped.entries()).map(([emoji, profileIds]) => ({
+    emoji,
+    count: profileIds.length,
+    reactedByMe: currentProfileId ? profileIds.includes(currentProfileId) : false,
+    sampleUserIds: profileIds.slice(0, 5),
+  }));
+}
+
+export function mapRowToMessageVM(row: RawMessageRow, currentProfileId = ''): MessageVM {
   const c = row.content ?? {};
   const sender = buildSenderProfile(row.sender, row.org_id);
   const previewText = String(c.text ?? '');
+  const reactions = buildReactions(row.reactions, currentProfileId);
 
   const base = {
     ids: { id: row.id, orgId: row.org_id },
@@ -57,7 +82,8 @@ export function mapRowToMessageVM(row: RawMessageRow): MessageVM {
       createdAt: row.created_at,
       visibility: { type: 'all' as const },
     },
-    social: { reactions: [] },
+    social: { reactions },
+    ...(row.thread_parent_id ? { threadParentId: row.thread_parent_id } : {}),
   };
 
   // Each rich type stores its full payload object inside the content JSONB column.

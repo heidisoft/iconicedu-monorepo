@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 
 import OrgLoginClient from '@iconicedu/web/app/(auth)/[orgSlug]/login/org-login-client';
-import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
+import { getAccountByAuthUserIdInOrg } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { resolveOrgDashboardPath } from '@iconicedu/web/lib/org/resolve-dashboard-path';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
@@ -36,7 +36,11 @@ export default async function OrgLoginPage({
   } = await sessionSupabase.auth.getUser();
 
   if (user) {
-    const accountResponse = await getAccountByAuthUserId(serviceSupabase, user.id);
+    const accountResponse = await getAccountByAuthUserIdInOrg(
+      serviceSupabase,
+      user.id,
+      org.id,
+    );
     if (accountResponse.data?.org_id) {
       redirect(await resolveOrgDashboardPath(serviceSupabase, accountResponse.data.org_id));
     }

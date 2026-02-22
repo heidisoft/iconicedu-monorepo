@@ -37,6 +37,35 @@ export async function getAccountByAuthUserId(
     .select(ACCOUNT_SELECT)
     .eq('auth_user_id', authUserId)
     .is('deleted_at', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle<AccountRow>();
+}
+
+export async function getAccountsByAuthUserId(
+  supabase: SupabaseClient,
+  authUserId: string,
+) {
+  return supabase
+    .from('accounts')
+    .select(ACCOUNT_SELECT)
+    .eq('auth_user_id', authUserId)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: true })
+    .returns<AccountRow[]>();
+}
+
+export async function getAccountByAuthUserIdInOrg(
+  supabase: SupabaseClient,
+  authUserId: string,
+  orgId: string,
+) {
+  return supabase
+    .from('accounts')
+    .select(ACCOUNT_SELECT)
+    .eq('auth_user_id', authUserId)
+    .eq('org_id', orgId)
+    .is('deleted_at', null)
     .maybeSingle<AccountRow>();
 }
 

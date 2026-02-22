@@ -74,7 +74,7 @@ export default function GetStartedClient() {
         return;
       }
 
-      router.replace(body.onboarding?.destination ?? '/get-started');
+      router.replace(body.onboarding?.destination ?? '/');
     } catch {
       setErrorMessage('Unable to create organization.');
       setIsSubmitting(false);
