@@ -24,9 +24,13 @@ function mkProfile(
 
 /** The viewer profile ID used to determine "own" messages in demo mode */
 export const DEMO_PROFILE_ID = 'c7d4a3c8-4c9a-4b2a-9a25-32bf0f5d2c01';
+/** The demo org ID */
+export const DEMO_ORG_ID = ORG;
 
 // ─── Profiles ─────────────────────────────────────────────────────────────────
 const RILEY   = mkProfile('guardian', 'c7d4a3c8-4c9a-4b2a-9a25-32bf0f5d2c01', '411bd6fd-47f6-429b-ad87-d504487fd086', 'Riley Morgan',   'riley-morgan');
+/** The demo viewer profile (Riley Morgan) — use when creating new demo messages */
+export { RILEY as DEMO_RILEY_PROFILE };
 const PRIYA   = mkProfile('educator', 'f1a2b3c4-d5e6-4f70-8a9b-1c2d3e4f5a60', 'b8d8af5f-8e2f-4b0e-9fb1-2a4cfd2a1d01', 'Priya Nair',     'priya-nair');
 const ELENA   = mkProfile('educator', 'a1b2c3d4-e5f6-4a70-9b8c-2d3e4f5a6b70', '2fd71a22-1d0a-4b6f-8c2a-7c0b51a7c8c2', 'Elena Brooks',   'elena-brooks');
 const LUCAS   = mkProfile('educator', 'b2c3d4e5-f6a7-4b80-8c9d-3e4f5a6b7c80', '9c0a2d15-6b8d-4c6c-9a0d-0b7c2a4e6f13', 'Lucas Choi',     'lucas-choi');

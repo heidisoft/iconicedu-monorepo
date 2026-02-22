@@ -36,6 +36,14 @@ function getAvatarUrl(message: MessageVM): string | null {
   return avatar?.url ?? null;
 }
 
+// Deterministic color per sender name (Slack-style)
+const NAME_COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#ef4444'];
+function senderColor(name: string): string {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return NAME_COLORS[h % NAME_COLORS.length];
+}
+
 type S = ReturnType<typeof makeStyles>;
 
 // ─── Reaction pills ───────────────────────────────────────────────────────────
@@ -76,115 +84,11 @@ function ReactionRow({ reactions, colors, messageId, onReactionToggle }: Reactio
 
 // ─── Thread indicator ─────────────────────────────────────────────────────────
 
-function ThreadIndicator({ colors, onPress }: {
-  colors: AppColors; onPress: () => void;
-}) {
+function ThreadIndicator({ colors, onPress }: { colors: AppColors; onPress: () => void }) {
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={{ marginTop: 4 }}>
-      <Text style={{ fontSize: 12, color: colors.teal, fontWeight: '600' }}>
-        💬 Reply in thread
-      </Text>
+      <Text style={{ fontSize: 12, color: colors.teal, fontWeight: '600' }}>💬 Reply in thread</Text>
     </TouchableOpacity>
-  );
-}
-
-// ─── Sender header (for "others" messages) ────────────────────────────────────
-
-function SenderHeader({ name, time, avatarUrl, colors, s }: {
-  name: string; time: string; avatarUrl: string | null; colors: AppColors; s: S;
-}) {
-  return (
-    <View style={s.senderHeader}>
-      <Avatar name={name} src={avatarUrl} size="sm" />
-      <Text style={[s.senderName, { color: colors.teal }]}>{name}</Text>
-      <Text style={[s.senderTime, { color: colors.textFaint }]}>{time}</Text>
-    </View>
-  );
-}
-
-// ─── Bubble sub-renderers ─────────────────────────────────────────────────────
-
-function TextBubble({ text, isOwn, colors, s }: {
-  text: string; isOwn: boolean; colors: AppColors; s: S;
-}) {
-  return (
-    <View style={[s.bubble, isOwn ? s.bubbleOwn : s.bubbleOther]}>
-      <Text style={{ fontSize: 15, lineHeight: 22, color: isOwn ? colors.tealFg : colors.text }}>
-        {text}
-      </Text>
-    </View>
-  );
-}
-
-function FileBubble({ message, isOwn, colors, s }: {
-  message: FileMessageVM; isOwn: boolean; colors: AppColors; s: S;
-}) {
-  const { attachment, content } = message;
-  return (
-    <View style={[s.bubble, isOwn ? s.bubbleOwn : s.bubbleOther]}>
-      {!!content?.text && (
-        <Text style={{ fontSize: 15, lineHeight: 22, color: isOwn ? colors.tealFg : colors.text, marginBottom: 8 }}>
-          {content.text}
-        </Text>
-      )}
-      <TouchableOpacity
-        style={[s.fileRow, { borderColor: colors.border }]}
-        onPress={() => Linking.openURL(attachment.url).catch(() => null)}
-      >
-        <View style={[s.fileIcon, { backgroundColor: colors.tealBg }]}>
-          <Text style={{ fontSize: 18 }}>📎</Text>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 13, fontWeight: '600', color: isOwn ? colors.tealFg : colors.text }} numberOfLines={1}>
-            {attachment.name}
-          </Text>
-          <Text style={{ fontSize: 11, marginTop: 2, color: isOwn ? 'rgba(4,47,46,0.55)' : colors.textFaint }}>
-            {formatFileSize(attachment.size)}
-          </Text>
-        </View>
-      </TouchableOpacity>
-    </View>
-  );
-}
-
-function ImageBubble({ isOwn, colors, s }: { isOwn: boolean; colors: AppColors; s: S }) {
-  return (
-    <View style={[s.bubble, isOwn ? s.bubbleOwn : s.bubbleOther, { padding: 0, overflow: 'hidden' }]}>
-      <View style={{ width: 200, height: 150, backgroundColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
-        <Text style={{ fontSize: 32 }}>🖼</Text>
-        <Text style={{ fontSize: 11, color: colors.textFaint, marginTop: 4 }}>Image</Text>
-      </View>
-    </View>
-  );
-}
-
-function AudioBubble({ message, isOwn, colors, s }: {
-  message: AudioRecordingMessageVM; isOwn: boolean; colors: AppColors; s: S;
-}) {
-  const { audio } = message;
-  const mins = Math.floor(audio.durationSeconds / 60);
-  const secs = audio.durationSeconds % 60;
-  const duration = `${mins}:${String(secs).padStart(2, '0')}`;
-  const waveform = audio.waveform ?? [0.3, 0.5, 0.4, 0.7, 0.6, 0.5, 0.4, 0.8, 0.5, 0.3];
-
-  return (
-    <View style={[s.bubble, isOwn ? s.bubbleOwn : s.bubbleOther, { flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
-      <View style={[s.playBtn, { backgroundColor: isOwn ? colors.tealFg : colors.teal }]}>
-        <Text style={{ color: isOwn ? colors.teal : colors.tealFg, fontSize: 12, fontWeight: '700' }}>▶</Text>
-      </View>
-      <View style={{ flex: 1, gap: 4 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, height: 24 }}>
-          {waveform.map((v, i) => (
-            <View key={i} style={{
-              width: 3, height: Math.max(4, v * 24),
-              backgroundColor: isOwn ? colors.tealFg : colors.teal,
-              borderRadius: 2,
-            }} />
-          ))}
-        </View>
-        <Text style={{ color: isOwn ? 'rgba(4,47,46,0.7)' : colors.textFaint, fontSize: 11 }}>{duration}</Text>
-      </View>
-    </View>
   );
 }
 
@@ -359,28 +263,38 @@ function SessionCompleteBar({ message, colors, s }: { message: SessionCompleteMe
 
 function makeStyles(colors: AppColors) {
   return StyleSheet.create({
-    // Outer wrappers
-    outerRow:     { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingHorizontal: 12, paddingVertical: 2 },
-    outerRowOwn:  { flexDirection: 'row-reverse' },
-    avatarSpacer: { width: 32, height: 32 },
+    // Slack two-column row
+    row:          { flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 2 },
+    rowGroupStart: { paddingTop: 10 },
 
-    // Sender header row (for others)
-    senderHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, marginBottom: 2 },
-    senderName:   { fontSize: 14, fontWeight: '700', flex: 1 },
-    senderTime:   { fontSize: 12 },
+    // Left column — 44px (avatar or empty spacer)
+    leftCol:  { width: 44, alignItems: 'center', paddingTop: 2, flexShrink: 0 },
 
-    // Timestamp below own bubbles
-    ownTime:      { fontSize: 10, textAlign: 'right', paddingRight: 12, marginTop: 2, marginBottom: 4 },
+    // Right column
+    rightCol: { flex: 1, gap: 2 },
 
-    // Bubbles
-    bubble:       { maxWidth: '78%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 },
-    bubbleOther:  { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderBottomLeftRadius: 4 },
-    bubbleOwn:    { backgroundColor: colors.teal, borderBottomRightRadius: 4 },
+    // Sender name + timestamp header (group start only)
+    nameRow:    { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginBottom: 1 },
+    senderName: { fontSize: 15, fontWeight: '700' },
+    msgTime:    { fontSize: 12, color: colors.textFaint },
 
-    // Card rows
-    cardRow: { paddingHorizontal: 12, paddingVertical: 4 },
+    // Plain text content (no bubble background)
+    textContent: { fontSize: 15, lineHeight: 22, color: colors.text },
 
-    card:            { borderWidth: 1, borderRadius: 16, padding: 14, gap: 4 },
+    // File attachment
+    fileWrap: { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 10, marginTop: 2 },
+    fileRow:  { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    fileIcon: { width: 36, height: 36, borderRadius: 8, backgroundColor: colors.tealBg, alignItems: 'center', justifyContent: 'center' },
+
+    // Audio player
+    audioWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 10, marginTop: 2 },
+    playBtn:   { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+
+    // Image placeholder
+    imagePlaceholder: { width: 200, height: 150, borderRadius: 10, backgroundColor: colors.border, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
+
+    // Structured cards
+    card:            { borderWidth: 1, borderRadius: 16, padding: 14, gap: 4, marginTop: 2 },
     cardHeader:      { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
     cardHeaderLabel: { fontSize: 13, fontWeight: '700', flex: 1 },
     subjectTag:      { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 },
@@ -391,21 +305,15 @@ function makeStyles(colors: AppColors) {
     metaChip:        { fontSize: 12 },
     sectionLabel:    { fontSize: 12, fontWeight: '700', marginBottom: 4 },
     listItem:        { fontSize: 13, lineHeight: 20 },
-
-    attachRow:  { flexDirection: 'row', alignItems: 'center', gap: 8, borderTopWidth: 1, paddingTop: 8, marginTop: 8 },
-    attachName: { flex: 1, fontSize: 12, fontWeight: '500' },
-
-    fileRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 10, padding: 10, marginVertical: 4 },
-    fileIcon: { width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-
-    playBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-
-    progressTrack:    { height: 8, borderRadius: 4, overflow: 'hidden' },
-    progressFill:     { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 4 },
+    attachRow:       { flexDirection: 'row', alignItems: 'center', gap: 8, borderTopWidth: 1, paddingTop: 8, marginTop: 8 },
+    attachName:      { flex: 1, fontSize: 12, fontWeight: '500' },
+    joinBtn:         { borderRadius: 10, paddingVertical: 10, alignItems: 'center', marginTop: 10 },
+    statusBadge:     { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start', marginTop: 4 },
+    progressTrack:   { height: 8, borderRadius: 4, overflow: 'hidden' },
+    progressFill:    { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 4 },
     improvementBadge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start', marginTop: 4 },
-    statusBadge:      { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start', marginTop: 4 },
-    joinBtn:          { borderRadius: 10, paddingVertical: 10, alignItems: 'center', marginTop: 10 },
 
+    // Session complete divider
     sessionCompleteRow:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, gap: 10 },
     sessionCompleteLine:   { flex: 1, height: 1 },
     sessionCompleteCenter: { alignItems: 'center', gap: 4 },
@@ -414,7 +322,7 @@ function makeStyles(colors: AppColors) {
   });
 }
 
-// ─── Card vs bubble classification ───────────────────────────────────────────
+// ─── Card type set ────────────────────────────────────────────────────────────
 
 const CARD_TYPES = new Set([
   'lesson-assignment', 'session-summary', 'progress-update',
@@ -427,7 +335,7 @@ const CARD_TYPES = new Set([
 export type MessageItemProps = {
   message: MessageVM;
   isOwn: boolean;
-  showSender: boolean;
+  isGroupStart: boolean;
   colors: AppColors;
   onLongPress?: (message: MessageVM) => void;
   onReactionToggle?: (messageId: string, emoji: string) => void;
@@ -437,7 +345,7 @@ export type MessageItemProps = {
 export const MessageItem: React.FC<MessageItemProps> = ({
   message,
   isOwn,
-  showSender,
+  isGroupStart,
   colors,
   onLongPress,
   onReactionToggle,
@@ -449,31 +357,102 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   const avatarUrl = getAvatarUrl(message);
   const time = formatTime(message.core.createdAt);
   const reactions = message.social?.reactions ?? [];
-  // thread_parent_id stored on the VM as a custom field
   const threadParentId = (message as { threadParentId?: string }).threadParentId;
+  const nameColor = isOwn ? colors.teal : senderColor(senderName);
 
   // ── session-complete: full-width centred divider ──
   if (type === 'session-complete') {
     return <SessionCompleteBar message={message as SessionCompleteMessageVM} colors={colors} s={s} />;
   }
 
-  // ── Structured card types ──
-  if (CARD_TYPES.has(type)) {
-    return (
-      <Pressable
-        onLongPress={() => onLongPress?.(message)}
-        delayLongPress={350}
-        style={s.cardRow}
-      >
-        {showSender && (
-          <SenderHeader name={senderName} time={time} avatarUrl={avatarUrl} colors={colors} s={s} />
+  const renderContent = () => {
+    if (CARD_TYPES.has(type)) {
+      return (
+        <>
+          {type === 'lesson-assignment'   && <AssignmentCard message={message as LessonAssignmentMessageVM} colors={colors} s={s} />}
+          {type === 'session-summary'     && <SessionSummaryCard message={message as SessionSummaryMessageVM} colors={colors} s={s} />}
+          {type === 'progress-update'     && <ProgressCard message={message as ProgressUpdateMessageVM} colors={colors} s={s} />}
+          {type === 'event-reminder'      && <EventCard message={message as EventReminderMessageVM} colors={colors} s={s} />}
+          {type === 'homework-submission' && <HomeworkCard message={message as HomeworkSubmissionMessageVM} colors={colors} s={s} />}
+        </>
+      );
+    }
+    if (type === 'file') {
+      const fm = message as FileMessageVM;
+      return (
+        <View style={s.fileWrap}>
+          {!!fm.content?.text && (
+            <Text style={[s.textContent, { marginBottom: 8 }]}>{fm.content.text}</Text>
+          )}
+          <TouchableOpacity
+            style={s.fileRow}
+            onPress={() => Linking.openURL(fm.attachment.url).catch(() => null)}
+          >
+            <View style={s.fileIcon}><Text style={{ fontSize: 18 }}>📎</Text></View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text }} numberOfLines={1}>{fm.attachment.name}</Text>
+              <Text style={{ fontSize: 11, marginTop: 2, color: colors.textFaint }}>{formatFileSize(fm.attachment.size)}</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    if (type === 'audio-recording') {
+      const am = message as AudioRecordingMessageVM;
+      const mins = Math.floor(am.audio.durationSeconds / 60);
+      const secs = am.audio.durationSeconds % 60;
+      const duration = `${mins}:${String(secs).padStart(2, '0')}`;
+      const waveform = am.audio.waveform ?? [0.3, 0.5, 0.4, 0.7, 0.6, 0.5, 0.4, 0.8, 0.5, 0.3];
+      return (
+        <View style={s.audioWrap}>
+          <View style={[s.playBtn, { backgroundColor: colors.teal }]}>
+            <Text style={{ color: colors.tealFg, fontSize: 12, fontWeight: '700' }}>▶</Text>
+          </View>
+          <View style={{ flex: 1, gap: 4 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, height: 24 }}>
+              {waveform.map((v, i) => (
+                <View key={i} style={{ width: 3, height: Math.max(4, v * 24), backgroundColor: colors.teal, borderRadius: 2 }} />
+              ))}
+            </View>
+            <Text style={{ color: colors.textFaint, fontSize: 11 }}>{duration}</Text>
+          </View>
+        </View>
+      );
+    }
+    if (type === 'image') {
+      return (
+        <View style={s.imagePlaceholder}>
+          <Text style={{ fontSize: 32 }}>🖼</Text>
+          <Text style={{ fontSize: 11, color: colors.textFaint, marginTop: 4 }}>Image</Text>
+        </View>
+      );
+    }
+    // Default: plain text
+    const text = (message as { content?: { text?: string } }).content?.text ?? '';
+    return <Text style={s.textContent}>{text}</Text>;
+  };
+
+  return (
+    <Pressable
+      onLongPress={() => onLongPress?.(message)}
+      delayLongPress={350}
+      style={[s.row, isGroupStart && s.rowGroupStart]}
+    >
+      {/* Left column: avatar for group start, empty spacer for continuations */}
+      <View style={s.leftCol}>
+        {isGroupStart && <Avatar name={senderName} src={avatarUrl} size="sm" />}
+      </View>
+
+      {/* Right column */}
+      <View style={s.rightCol}>
+        {isGroupStart && (
+          <View style={s.nameRow}>
+            <Text style={[s.senderName, { color: nameColor }]}>{senderName}</Text>
+            <Text style={s.msgTime}>{time}</Text>
+          </View>
         )}
 
-        {type === 'lesson-assignment' && <AssignmentCard message={message as LessonAssignmentMessageVM} colors={colors} s={s} />}
-        {type === 'session-summary'   && <SessionSummaryCard message={message as SessionSummaryMessageVM} colors={colors} s={s} />}
-        {type === 'progress-update'   && <ProgressCard message={message as ProgressUpdateMessageVM} colors={colors} s={s} />}
-        {type === 'event-reminder'    && <EventCard message={message as EventReminderMessageVM} colors={colors} s={s} />}
-        {type === 'homework-submission' && <HomeworkCard message={message as HomeworkSubmissionMessageVM} colors={colors} s={s} />}
+        {renderContent()}
 
         {reactions.length > 0 && (
           <ReactionRow
@@ -483,66 +462,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             onReactionToggle={onReactionToggle}
           />
         )}
-        {/* Thread reply button — only for top-level messages */}
+
         {!threadParentId && onThreadOpen && (
           <ThreadIndicator colors={colors} onPress={() => onThreadOpen(message)} />
         )}
-      </Pressable>
-    );
-  }
-
-  // ── Bubble types: text, file, image, audio-recording ──
-  return (
-    <Pressable
-      onLongPress={() => onLongPress?.(message)}
-      delayLongPress={350}
-      style={{ marginBottom: reactions.length ? 0 : 2 }}
-    >
-      {!isOwn && showSender && (
-        <SenderHeader name={senderName} time={time} avatarUrl={avatarUrl} colors={colors} s={s} />
-      )}
-      <View style={[s.outerRow, isOwn && s.outerRowOwn]}>
-        {!isOwn && (
-          showSender
-            ? <Avatar name={senderName} src={avatarUrl} size="sm" />
-            : <View style={s.avatarSpacer} />
-        )}
-        {type === 'file'
-          ? <FileBubble message={message as FileMessageVM} isOwn={isOwn} colors={colors} s={s} />
-          : type === 'audio-recording'
-          ? <AudioBubble message={message as AudioRecordingMessageVM} isOwn={isOwn} colors={colors} s={s} />
-          : type === 'image'
-          ? <ImageBubble isOwn={isOwn} colors={colors} s={s} />
-          : <TextBubble
-              text={(message as { content?: { text?: string } }).content?.text ?? ''}
-              isOwn={isOwn}
-              colors={colors}
-              s={s}
-            />
-        }
       </View>
-
-      {/* Timestamp below own bubbles */}
-      {isOwn && <Text style={[s.ownTime, { color: colors.textFaint }]}>{time}</Text>}
-
-      {/* Reactions */}
-      {reactions.length > 0 && (
-        <View style={{ paddingHorizontal: isOwn ? 12 : 52, paddingBottom: 4 }}>
-          <ReactionRow
-            reactions={reactions}
-            colors={colors}
-            messageId={message.ids.id}
-            onReactionToggle={onReactionToggle}
-          />
-        </View>
-      )}
-
-      {/* Thread reply link — only for top-level messages */}
-      {!threadParentId && onThreadOpen && (
-        <View style={{ paddingHorizontal: isOwn ? 12 : 52, paddingBottom: 2 }}>
-          <ThreadIndicator colors={colors} onPress={() => onThreadOpen(message)} />
-        </View>
-      )}
     </Pressable>
   );
 };

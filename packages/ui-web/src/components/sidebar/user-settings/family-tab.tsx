@@ -350,14 +350,16 @@ export function FamilyTab({
     [],
   );
 
-  const openChildInviteWithoutEmail = React.useCallback((targetAccountId?: string | null) => {
-    const draft = buildChildInviteDraft('');
-    setInviteRole(draft.role);
-    setInviteEmail(draft.email);
-    setInviteTargetAccountId(targetAccountId ?? null);
-    setInviteError('Add the child email, then send invite to create account.');
-    setIsInviteOpen(true);
-  }, []);
+  const openChildInviteWithoutEmail = React.useCallback(
+    (targetAccountId?: string | null) => {
+      const draft = buildChildInviteDraft('');
+      setInviteRole(draft.role);
+      setInviteEmail(draft.email);
+      setInviteTargetAccountId(targetAccountId ?? null);
+      setIsInviteOpen(true);
+    },
+    [],
+  );
 
   const handleRemoveInvite = React.useCallback(
     async (id: string) => {
@@ -460,10 +462,7 @@ export function FamilyTab({
     }
     setIsCreatingChild(true);
     try {
-      const displayNameValue = buildChildDisplayName(
-        newChildFirstName,
-        newChildLastName,
-      );
+      const displayNameValue = buildChildDisplayName(newChildFirstName, newChildLastName);
       const createdChild = await onChildProfileCreate({
         orgId,
         displayName: displayNameValue,
@@ -647,7 +646,8 @@ export function FamilyTab({
                     </DialogTrigger>
                   </TooltipTrigger>
                   <TooltipContent className="text-xs text-muted-foreground">
-                    Add more kids to keep their learning profiles aligned and monitored in one place.
+                    Add more kids to keep their learning profiles aligned and monitored in
+                    one place.
                   </TooltipContent>
                 </Tooltip>
               ) : (
@@ -684,12 +684,12 @@ export function FamilyTab({
                       <div className="relative rounded-full overflow-hidden">
                         {showFirstNameBeam ? (
                           <BorderBeam
-                      size={52}
-                      initialOffset={8}
-                      borderWidth={2}
-                      className="from-transparent via-amber-700 to-transparent"
-                      transition={{ type: 'spring', stiffness: 60, damping: 20 }}
-                    />
+                            size={52}
+                            initialOffset={8}
+                            borderWidth={2}
+                            className="from-transparent via-amber-700 to-transparent"
+                            transition={{ type: 'spring', stiffness: 60, damping: 20 }}
+                          />
                         ) : null}
                         <Input
                           id="new-first-name"
@@ -706,12 +706,12 @@ export function FamilyTab({
                       <div className="relative rounded-full overflow-hidden">
                         {showLastNameBeam ? (
                           <BorderBeam
-                      size={52}
-                      initialOffset={8}
-                      borderWidth={2}
-                      className="from-transparent via-amber-700 to-transparent"
-                      transition={{ type: 'spring', stiffness: 60, damping: 20 }}
-                    />
+                            size={52}
+                            initialOffset={8}
+                            borderWidth={2}
+                            className="from-transparent via-amber-700 to-transparent"
+                            transition={{ type: 'spring', stiffness: 60, damping: 20 }}
+                          />
                         ) : null}
                         <Input
                           id="new-last-name"
@@ -729,12 +729,12 @@ export function FamilyTab({
                       <div className="relative w-full rounded-full overflow-hidden">
                         {showGradeBeam ? (
                           <BorderBeam
-                      size={52}
-                      initialOffset={8}
-                      borderWidth={2}
-                      className="from-transparent via-amber-700 to-transparent"
-                      transition={{ type: 'spring', stiffness: 60, damping: 20 }}
-                    />
+                            size={52}
+                            initialOffset={8}
+                            borderWidth={2}
+                            className="from-transparent via-amber-700 to-transparent"
+                            transition={{ type: 'spring', stiffness: 60, damping: 20 }}
+                          />
                         ) : null}
                         <Select
                           value={newChildGrade}
@@ -759,12 +759,12 @@ export function FamilyTab({
                       <div className="relative w-full rounded-full overflow-hidden">
                         {showBirthYearBeam ? (
                           <BorderBeam
-                      size={52}
-                      initialOffset={8}
-                      borderWidth={2}
-                      className="from-transparent via-amber-700 to-transparent"
-                      transition={{ type: 'spring', stiffness: 60, damping: 20 }}
-                    />
+                            size={52}
+                            initialOffset={8}
+                            borderWidth={2}
+                            className="from-transparent via-amber-700 to-transparent"
+                            transition={{ type: 'spring', stiffness: 60, damping: 20 }}
+                          />
                         ) : null}
                         <Select
                           value={newChildBirthYear}
@@ -807,7 +807,7 @@ export function FamilyTab({
                       <p className="text-xs text-destructive">{newChildEmailError}</p>
                     ) : null}
                     {newChildEmail.trim() ? (
-                    <div className="space-y-1 text-xs text-foreground border p-2 rounded-xl">
+                      <div className="space-y-1 text-xs text-foreground border p-2 rounded-xl">
                         <p className="text-[11px]">
                           <ShieldAlert className="inline-block mr-1 w-3 h-3" />
                           If the student is 13 years or older, they can have their own
@@ -842,35 +842,35 @@ export function FamilyTab({
                   </div>
                 </div>
                 <DialogFooter className="mt-4 flex justify-end gap-2">
-                {showPostOnboardingTooltips ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <DialogClose asChild>
-                        <Button size="sm" variant="ghost">
-                          Cancel
-                        </Button>
-                      </DialogClose>
-                    </TooltipTrigger>
-                    <TooltipContent className="text-xs text-muted-foreground">
-                      Click here to return to the dashboard once you’re done.
-                    </TooltipContent>
-                  </Tooltip>
-                ) : (
-                  <DialogClose asChild>
-                    <Button size="sm" variant="ghost">
-                      Cancel
-                    </Button>
-                  </DialogClose>
-                )}
+                  {showPostOnboardingTooltips ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <DialogClose asChild>
+                          <Button size="sm" variant="ghost">
+                            Cancel
+                          </Button>
+                        </DialogClose>
+                      </TooltipTrigger>
+                      <TooltipContent className="text-xs text-muted-foreground">
+                        Click here to return to the dashboard once you’re done.
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    <DialogClose asChild>
+                      <Button size="sm" variant="ghost">
+                        Cancel
+                      </Button>
+                    </DialogClose>
+                  )}
                   <div className="relative inline-flex rounded-full">
                     {showCreateActionBeam ? (
                       <BorderBeam
-                      size={26}
-                      initialOffset={8}
-                      borderWidth={2}
-                      className="from-transparent via-amber-700 to-transparent"
-                      transition={{ type: 'spring', stiffness: 60, damping: 20 }}
-                    />
+                        size={26}
+                        initialOffset={8}
+                        borderWidth={2}
+                        className="from-transparent via-amber-700 to-transparent"
+                        transition={{ type: 'spring', stiffness: 60, damping: 20 }}
+                      />
                     ) : null}
                     <Button
                       size="sm"
@@ -895,8 +895,7 @@ export function FamilyTab({
                 <DialogHeader>
                   <DialogTitle>Invite a family member</DialogTitle>
                   <DialogDescription>
-                    Select whether the invite is for a guardian or child, then provide
-                    their email address. Invitations can be revoked afterwards.
+                    Add the child email, then send invite to create account.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
@@ -937,32 +936,35 @@ export function FamilyTab({
                       }}
                       placeholder="guardian@example.com"
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Add the child email, then send invite to create account.
+                    </p>
                     {inviteError ? (
                       <p className="text-xs text-destructive">{inviteError}</p>
                     ) : null}
                   </div>
                 </div>
                 <DialogFooter className="mt-4 flex justify-end gap-2">
-                {showPostOnboardingTooltips ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <DialogClose asChild>
-                        <Button type="button" size="sm" variant="ghost">
-                          Cancel
-                        </Button>
-                      </DialogClose>
-                    </TooltipTrigger>
-                    <TooltipContent className="text-xs text-muted-foreground">
-                      Click here to return to the family dashboard at any time.
-                    </TooltipContent>
-                  </Tooltip>
-                ) : (
-                  <DialogClose asChild>
-                    <Button type="button" size="sm" variant="ghost">
-                      Cancel
-                    </Button>
-                  </DialogClose>
-                )}
+                  {showPostOnboardingTooltips ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <DialogClose asChild>
+                          <Button type="button" size="sm" variant="ghost">
+                            Cancel
+                          </Button>
+                        </DialogClose>
+                      </TooltipTrigger>
+                      <TooltipContent className="text-xs text-muted-foreground">
+                        Click here to return to the family dashboard at any time.
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    <DialogClose asChild>
+                      <Button type="button" size="sm" variant="ghost">
+                        Cancel
+                      </Button>
+                    </DialogClose>
+                  )}
                   <Button size="sm" onClick={handleInviteSave} disabled={isInviteSaving}>
                     {isInviteSaving ? 'Sending...' : 'Send invite'}
                   </Button>
@@ -1134,7 +1136,9 @@ export function FamilyTab({
                             variant="ghost"
                             size="xs"
                             className="px-2 text-sm font-medium text-primary underline-offset-4 hover:underline"
-                            onClick={() => openChildInviteWithoutEmail(member.accountId ?? null)}
+                            onClick={() =>
+                              openChildInviteWithoutEmail(member.accountId ?? null)
+                            }
                           >
                             Add email and send invite
                           </Button>

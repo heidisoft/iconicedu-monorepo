@@ -4,6 +4,7 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 
 import { shouldSkipCallbackRun } from '@iconicedu/web/app/(auth)/auth/callback/callback-run-guard';
+import { RoleOnboardingModal } from '@iconicedu/web/app/(auth)/auth/callback/role-onboarding-modal';
 import { createSupabaseBrowserClient } from '@iconicedu/web/lib/supabase/client';
 import { trackAuthTelemetry } from '@iconicedu/web/lib/telemetry/auth-events';
 
@@ -24,6 +25,11 @@ export default function CallbackPage() {
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
   const [loadingMessage, setLoadingMessage] = React.useState('Logging you in…');
   const [pageError, setPageError] = React.useState<string | null>(null);
+  const [roleOnboardingState, setRoleOnboardingState] = React.useState<{
+    orgSlug: string | null;
+    fallbackDestination: string;
+    intent: 'login' | 'get-started' | null;
+  } | null>(null);
 
   React.useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
@@ -91,10 +97,16 @@ export default function CallbackPage() {
         return;
       }
       if (onboarding?.requiresRoleSelection) {
-        router.replace(
-          onboarding.destination ??
-            fallbackAuthPath,
-        );
+        if (authIntent === 'get-started') {
+          setLoadingMessage('Complete setup to continue…');
+          setRoleOnboardingState({
+            orgSlug: requestedOrgSlug || null,
+            fallbackDestination: onboarding.destination ?? fallbackAuthPath,
+            intent: authIntent,
+          });
+          return;
+        }
+        router.replace(onboarding.destination ?? fallbackAuthPath);
         return;
       }
       router.replace(onboarding?.destination ?? fallbackAuthPath);
@@ -171,6 +183,82 @@ export default function CallbackPage() {
   return (
     <div className="bg-background flex min-h-screen items-center justify-center">
       <p className="text-sm text-muted-foreground">{pageError ?? loadingMessage}</p>
+      {roleOnboardingState ? (
+        <RoleOnboardingModal
+          open
+          onSubmit={async ({ role, inviteCode }) => {
+            try {
+              const search = new URLSearchParams();
+              if (roleOnboardingState.orgSlug) {
+                search.set('org', roleOnboardingState.orgSlug);
+              }
+              const endpoint =
+                role === 'student'
+                  ? `/api/onboarding/student${search.toString() ? `?${search.toString()}` : ''}`
+                  : `/api/onboarding/role${search.toString() ? `?${search.toString()}` : ''}`;
+              const body = role === 'student' ? { inviteCode } : { role };
+
+              if (role === 'student') {
+                await trackAuthTelemetry('onboarding_invitecode_submitted', {
+                  success: false,
+                  stage: 'attempt',
+                  orgSlug: roleOnboardingState.orgSlug,
+                });
+              }
+
+              const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify(body),
+              });
+              const payload = (await response.json().catch(() => null)) as
+                | { success?: boolean; message?: string; onboarding?: { destination?: string | null } }
+                | null;
+
+              if (!response.ok || !payload?.success) {
+                if (role === 'student') {
+                  await trackAuthTelemetry('onboarding_invitecode_submitted', {
+                    success: false,
+                    stage: 'result',
+                    orgSlug: roleOnboardingState.orgSlug,
+                  });
+                }
+                return {
+                  success: false,
+                  message: payload?.message ?? 'Unable to complete onboarding.',
+                };
+              }
+
+              await trackAuthTelemetry('onboarding_role_selected', {
+                role,
+                orgSlug: roleOnboardingState.orgSlug,
+                intent: roleOnboardingState.intent,
+              });
+
+              if (role === 'student') {
+                await trackAuthTelemetry('onboarding_invitecode_submitted', {
+                  success: true,
+                  stage: 'result',
+                  orgSlug: roleOnboardingState.orgSlug,
+                });
+              }
+
+              const nextDestination =
+                payload.onboarding?.destination ??
+                roleOnboardingState.fallbackDestination;
+              router.replace(nextDestination);
+              return { success: true };
+            } catch (error) {
+              console.error('Failed to complete role onboarding', error);
+              return {
+                success: false,
+                message: 'Unable to complete onboarding. Please try again.',
+              };
+            }
+          }}
+        />
+      ) : null}
     </div>
   );
 }

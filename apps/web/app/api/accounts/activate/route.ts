@@ -192,11 +192,17 @@ export async function POST(request: Request) {
     }
     const onboarding = buildAuthOnboardingState(activeAccount, rolesResponse.data ?? []);
     if (onboarding.requiresRoleSelection) {
-      onboarding.requiresRoleSelection = false;
-        onboarding.destination =
-        intent === 'get-started'
-          ? await resolveOrgDashboardPath(serviceSupabase, activeAccount.org_id)
-          : await resolveOrgLoginPath(serviceSupabase, activeAccount.org_id);
+      if (intent === 'get-started') {
+        onboarding.destination = requestedOrgSlug
+          ? `/${requestedOrgSlug}/get-started`
+          : '/get-started';
+      } else {
+        onboarding.requiresRoleSelection = false;
+        onboarding.destination = await resolveOrgLoginPath(
+          serviceSupabase,
+          activeAccount.org_id,
+        );
+      }
     } else if (onboarding.destination === '/dashboard') {
       onboarding.destination = await resolveOrgDashboardPath(serviceSupabase, activeAccount.org_id);
     }

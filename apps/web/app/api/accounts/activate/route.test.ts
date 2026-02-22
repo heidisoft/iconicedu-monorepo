@@ -174,8 +174,7 @@ describe('POST /api/accounts/activate', () => {
     expect(body.onboarding.destination).toBe('/iconic-academy/get-started');
   });
 
-  it('creates org-scoped account for org get-started intent when account is missing', async () => {
-    const now = new Date().toISOString();
+  it('creates org-scoped account and requires role selection for org get-started', async () => {
     mockSessionGetUser.mockResolvedValueOnce({
       data: { user: { id: 'auth-1', email: 'new@example.com' } },
     });
@@ -198,26 +197,15 @@ describe('POST /api/accounts/activate', () => {
       data: {
         id: 'account-new',
         org_id: 'org-1',
-        primary_role: 'guardian',
-        role_status: 'active',
-        onboarding_completed_at: now,
+        primary_role: null,
+        role_status: 'unassigned',
+        onboarding_completed_at: null,
       },
     });
     mockGetUserRoles.mockResolvedValueOnce({
       error: null,
-      data: [
-        {
-          id: 'role-1',
-          org_id: 'org-1',
-          account_id: 'account-new',
-          role_key: 'guardian',
-          assigned_at: now,
-          created_at: now,
-          updated_at: now,
-        },
-      ],
+      data: [],
     });
-    mockResolveOrgDashboardPath.mockResolvedValueOnce('/iconic-academy');
 
     const response = await POST(
       new Request(`${APP_URL}/api/accounts/activate?org=iconic-academy&intent=get-started`, {
@@ -227,8 +215,8 @@ describe('POST /api/accounts/activate', () => {
     const body = await response.json();
     expect(response.status).toBe(200);
     expect(body.status).toBe('active');
-    expect(body.onboarding.requiresRoleSelection).toBe(false);
-    expect(body.onboarding.destination).toBe('/iconic-academy');
+    expect(body.onboarding.requiresRoleSelection).toBe(true);
+    expect(body.onboarding.destination).toBe('/iconic-academy/get-started');
     expect(mockInsertAccountForAuthUser).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({

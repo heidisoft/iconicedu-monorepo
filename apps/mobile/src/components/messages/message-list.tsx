@@ -117,15 +117,21 @@ export const MessageList: React.FC<MessageListProps> = ({
       }
 
       const isOwn = item.core.sender.ids.id === currentProfileId;
-      const showSender =
-        !isOwn &&
-        (!prevMsg || prevMsg.core.sender.ids.id !== item.core.sender.ids.id);
+
+      // A new group starts if: different sender, no prev message, or >5 min gap
+      const timeDiffMinutes = prevMsg
+        ? (new Date(item.core.createdAt).getTime() - new Date(prevMsg.core.createdAt).getTime()) / 60_000
+        : Infinity;
+      const isGroupStart =
+        !prevMsg ||
+        prevMsg.core.sender.ids.id !== item.core.sender.ids.id ||
+        timeDiffMinutes > 5;
 
       return (
         <MessageItem
           message={item}
           isOwn={isOwn}
-          showSender={showSender}
+          isGroupStart={isGroupStart}
           colors={colors}
           onLongPress={onMessageLongPress}
           onReactionToggle={onReactionToggle}
