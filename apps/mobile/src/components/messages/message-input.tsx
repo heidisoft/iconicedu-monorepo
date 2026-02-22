@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
-import { IconButton } from '@iconicedu/ui-native';
+import { View, Text, TextInput, KeyboardAvoidingView, Platform, TouchableOpacity, StyleSheet } from 'react-native';
+import { useTheme } from '@/providers/theme-provider';
 
 type MessageInputProps = {
   onSend: (text: string) => void;
@@ -10,10 +10,11 @@ type MessageInputProps = {
 
 export const MessageInput: React.FC<MessageInputProps> = ({
   onSend,
-  placeholder = 'Type a message...',
+  placeholder = 'Type a message…',
   disabled = false,
 }) => {
   const [text, setText] = useState('');
+  const { colors } = useTheme();
 
   const handleSend = useCallback(() => {
     const trimmed = text.trim();
@@ -22,32 +23,73 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     setText('');
   }, [text, onSend]);
 
+  const canSend = text.trim().length > 0 && !disabled;
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={90}
     >
-      <View className="flex-row items-end gap-2 border-t border-border bg-background px-4 pb-8 pt-3">
+      <View
+        style={[
+          styles.row,
+          { borderTopColor: colors.border, backgroundColor: colors.bg },
+        ]}
+      >
         <TextInput
-          className="max-h-24 min-h-[40px] flex-1 rounded-2xl bg-secondary px-4 py-2.5 text-sm text-foreground"
+          style={[
+            styles.input,
+            { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text },
+          ]}
           value={text}
           onChangeText={setText}
           placeholder={placeholder}
-          placeholderTextColor="#a1a1aa"
+          placeholderTextColor={colors.textFaint}
           multiline
           editable={!disabled}
           accessibilityLabel="Message input"
         />
-        <IconButton
-          icon={<Text className="text-lg text-primary-foreground">{'➤'}</Text>}
-          label="Send message"
-          variant="default"
-          size="default"
+        <TouchableOpacity
+          style={[styles.sendBtn, { backgroundColor: canSend ? colors.teal : colors.inputBg }]}
           onPress={handleSend}
-          disabled={!text.trim() || disabled}
-          className="bg-primary"
-        />
+          disabled={!canSend}
+          accessibilityLabel="Send message"
+          accessibilityRole="button"
+        >
+          <Text style={{ color: canSend ? colors.tealFg : colors.textFaint, fontSize: 16, fontWeight: '700' }}>
+            ➤
+          </Text>
+        </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
 };
+
+const styles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8,
+    borderTopWidth: 1,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 24,
+  },
+  input: {
+    flex: 1,
+    minHeight: 40,
+    maxHeight: 96,
+    borderRadius: 20,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    fontSize: 15,
+  },
+  sendBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});

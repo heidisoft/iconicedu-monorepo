@@ -95,7 +95,7 @@ export default function CallbackPage() {
         );
         return;
       }
-      router.replace(onboarding?.destination ?? '/d');
+      router.replace(onboarding?.destination ?? '/get-started');
     };
 
     const finish = async () => {

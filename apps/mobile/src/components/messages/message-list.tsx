@@ -1,10 +1,11 @@
 import React, { useCallback, useRef } from 'react';
 import { View, FlatList, ActivityIndicator } from 'react-native';
-import { NAV_THEME } from '@iconicedu/ui-native';
-import { MessageItem, type MessageItemData } from './message-item';
+import type { MessageVM } from '@iconicedu/shared-types';
+import { useTheme } from '@/providers/theme-provider';
+import { MessageItem } from './message-item';
 
 type MessageListProps = {
-  messages: MessageItemData[];
+  messages: MessageVM[];
   currentProfileId: string;
   onLoadMore?: () => void;
   loading?: boolean;
@@ -17,27 +18,29 @@ export const MessageList: React.FC<MessageListProps> = ({
   loading = false,
 }) => {
   const flatListRef = useRef<FlatList>(null);
+  const { colors } = useTheme();
 
   const renderItem = useCallback(
-    ({ item, index }: { item: MessageItemData; index: number }) => {
-      const isOwn = item.sender_profile_id === currentProfileId;
-      const prevMessage = index > 0 ? messages[index - 1] : null;
+    ({ item, index }: { item: MessageVM; index: number }) => {
+      const isOwn = item.core.sender.ids.id === currentProfileId;
+      const prev = index > 0 ? messages[index - 1] : null;
       const showSender =
         !isOwn &&
-        (!prevMessage ||
-          prevMessage.sender_profile_id !== item.sender_profile_id);
+        (!prev || prev.core.sender.ids.id !== item.core.sender.ids.id);
 
       return (
-        <MessageItem message={item} isOwn={isOwn} showSender={showSender} />
+        <MessageItem
+          message={item}
+          isOwn={isOwn}
+          showSender={showSender}
+          colors={colors}
+        />
       );
     },
-    [currentProfileId, messages],
+    [currentProfileId, messages, colors],
   );
 
-  const keyExtractor = useCallback(
-    (item: MessageItemData) => item.id,
-    [],
-  );
+  const keyExtractor = useCallback((item: MessageVM) => item.ids.id, []);
 
   return (
     <FlatList
@@ -51,14 +54,12 @@ export const MessageList: React.FC<MessageListProps> = ({
       onEndReachedThreshold={0.3}
       ListFooterComponent={
         loading ? (
-          <View className="items-center py-4">
-            <ActivityIndicator size="small" color={NAV_THEME.dark.primary} />
+          <View style={{ alignItems: 'center', paddingVertical: 16 }}>
+            <ActivityIndicator size="small" color={colors.teal} />
           </View>
         ) : null
       }
-      maintainVisibleContentPosition={{
-        minIndexForVisible: 0,
-      }}
+      maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
     />
   );
 };

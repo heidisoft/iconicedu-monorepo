@@ -5,6 +5,7 @@ import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
 import { getOrCreateAccount } from '@iconicedu/web/lib/accounts/getOrCreateAccount';
 import { ORG_ID } from '@iconicedu/web/lib/data/ids';
 import { buildLearningSpaceChannelsWithMessages } from '@iconicedu/web/lib/channels/builders/channel.builder';
+import { resolveOrgDashboardPath } from '@iconicedu/web/lib/org/resolve-dashboard-path';
 
 export default async function Page() {
   const supabase = await createSupabaseServerClient();
@@ -14,6 +15,7 @@ export default async function Page() {
     authUserId: authUser.id,
     authEmail: authUser.email ?? null,
   });
+  const dashboardPath = await resolveOrgDashboardPath(supabase, account.org_id);
   const channels = await buildLearningSpaceChannelsWithMessages(supabase, account.org_id, {
     accountId: account.id,
   });
@@ -23,5 +25,5 @@ export default async function Page() {
     return null;
   }
 
-  redirect(`/d/spaces/${firstChannel.ids.id}`);
+  redirect(`${dashboardPath}/spaces/${firstChannel.ids.id}`);
 }

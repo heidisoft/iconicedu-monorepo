@@ -1,5 +1,5 @@
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import Page from '@iconicedu/web/app/(app)/d/dm/page';
 
@@ -34,6 +34,7 @@ vi.mock('@iconicedu/web/lib/channels/actions/ensure-direct-message-channel', () 
 const buildChannelByIdMock = vi.fn();
 const buildChannelByDmKeyMock = vi.fn();
 const buildDirectMessageChannelsWithMessagesMock = vi.fn();
+const resolveOrgDashboardPathMock = vi.fn(async () => '/iconic-academy');
 
 vi.mock('@iconicedu/web/lib/channels/builders/channel.builder', () => ({
   buildChannelById: (...args: unknown[]) => buildChannelByIdMock(...args),
@@ -42,14 +43,23 @@ vi.mock('@iconicedu/web/lib/channels/builders/channel.builder', () => ({
     buildDirectMessageChannelsWithMessagesMock(...args),
 }));
 
+vi.mock('@iconicedu/web/lib/org/resolve-dashboard-path', () => ({
+  resolveOrgDashboardPath: (...args: unknown[]) => resolveOrgDashboardPathMock(...args),
+}));
+
 describe('d/dm page', () => {
+  beforeEach(() => {
+    resolveOrgDashboardPathMock.mockClear();
+    resolveOrgDashboardPathMock.mockResolvedValue('/iconic-academy');
+  });
+
   it('redirects to a provided dm channel id when it exists', async () => {
     buildChannelByIdMock.mockResolvedValueOnce({
       ids: { id: 'channel-9' },
       basics: { kind: 'dm' },
     });
     await Page({ searchParams: { channelId: 'channel-9' } });
-    expect(redirectMock).toHaveBeenCalledWith('/d/dm/channel-9');
+    expect(redirectMock).toHaveBeenCalledWith('/iconic-academy/dm/channel-9');
   });
 
   it('creates a dm channel when given a user id', async () => {
@@ -58,6 +68,6 @@ describe('d/dm page', () => {
     ensureDmMock.mockResolvedValueOnce({ channelId: 'channel-new' });
     await Page({ searchParams: { userId: 'profile-2' } });
     expect(ensureDmMock).toHaveBeenCalled();
-    expect(redirectMock).toHaveBeenCalledWith('/d/dm/channel-new');
+    expect(redirectMock).toHaveBeenCalledWith('/iconic-academy/dm/channel-new');
   });
 });

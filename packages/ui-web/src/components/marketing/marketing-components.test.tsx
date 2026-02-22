@@ -26,7 +26,7 @@ describe('marketing components', () => {
   it('renders dashboard cta when user is authenticated', () => {
     render(<MarketingHeader isAuthenticated />);
 
-    expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '/d');
+    expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '/get-started');
   });
 
   it('renders marketing home page with primary cta and footer links', () => {

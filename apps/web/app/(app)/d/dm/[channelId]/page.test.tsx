@@ -1,5 +1,5 @@
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from '@testing-library/react';
 
 import Page from '@iconicedu/web/app/(app)/d/dm/[channelId]/page';
@@ -10,6 +10,7 @@ const notFoundMock = vi.fn();
 const ensureDmMock = vi.fn();
 const buildChannelByIdMock = vi.fn();
 const buildChannelByDmKeyMock = vi.fn();
+const resolveOrgDashboardPathMock = vi.fn(async () => '/iconic-academy');
 
 vi.mock('next/navigation', () => ({
   notFound: () => {
@@ -67,7 +68,16 @@ vi.mock('@iconicedu/web/lib/channels/actions/ensure-direct-message-channel', () 
   ensureDirectMessageChannel: (...args: unknown[]) => ensureDmMock(...args),
 }));
 
+vi.mock('@iconicedu/web/lib/org/resolve-dashboard-path', () => ({
+  resolveOrgDashboardPath: (...args: unknown[]) => resolveOrgDashboardPathMock(...args),
+}));
+
 describe('d/dm/[channelId] page', () => {
+  beforeEach(() => {
+    resolveOrgDashboardPathMock.mockClear();
+    resolveOrgDashboardPathMock.mockResolvedValue('/iconic-academy');
+  });
+
   it('passes currentUserId to MessagesShell', async () => {
     buildChannelByIdMock.mockResolvedValueOnce({
       ids: { id: 'channel-1', orgId: 'org-1' },
@@ -96,7 +106,7 @@ describe('d/dm/[channelId] page', () => {
     ).rejects.toThrow('NEXT_REDIRECT');
 
     expect(ensureDmMock).toHaveBeenCalled();
-    expect(redirectMock).toHaveBeenCalledWith('/d/dm/channel-new');
+    expect(redirectMock).toHaveBeenCalledWith('/iconic-academy/dm/channel-new');
   });
 
   it('enables read-only mode for supervised guardian dm channels', async () => {

@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   AlertDialog,
@@ -50,10 +50,20 @@ const STATUS_BADGE_VARIANTS: Record<string, 'secondary' | 'outline' | 'ghost'> =
   archived: 'outline',
 };
 
-function getChannelHref(row: AdminChannelRow) {
+function resolveDashboardBasePath(pathname: string | null): string {
+  const firstSegment = pathname?.split('/').filter(Boolean)[0];
+  if (!firstSegment || firstSegment === 'd') {
+    return '/d';
+  }
+  return `/${firstSegment}`;
+}
+
+function getChannelHref(row: AdminChannelRow, dashboardBasePath: string) {
   const isLearningSpace =
     row.purpose === 'learning-space' || row.primary_entity_kind === 'learning_space';
-  return isLearningSpace ? `/d/spaces/${row.id}` : `/d/c/${row.id}`;
+  return isLearningSpace
+    ? `${dashboardBasePath}/spaces/${row.id}`
+    : `${dashboardBasePath}/c/${row.id}`;
 }
 
 function formatType(row: AdminChannelRow) {
@@ -64,6 +74,11 @@ function formatType(row: AdminChannelRow) {
 
 export function ChannelsTable({ rows, onEdit }: ChannelsTableProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  const dashboardBasePath = React.useMemo(
+    () => resolveDashboardBasePath(pathname),
+    [pathname],
+  );
   const [confirmDeleteRow, setConfirmDeleteRow] =
     React.useState<AdminChannelRow | null>(null);
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
@@ -171,7 +186,7 @@ export function ChannelsTable({ rows, onEdit }: ChannelsTableProps) {
                     </div>
                     <div className="min-w-0">
                       <Link
-                        href={getChannelHref(row)}
+                        href={getChannelHref(row, dashboardBasePath)}
                         className="text-sm font-semibold hover:underline"
                       >
                         {row.topic}

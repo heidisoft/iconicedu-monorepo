@@ -1,8 +1,14 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
+import { vi } from 'vitest';
 
 import { ChannelsTable } from '@iconicedu/web/app/(app)/d/admin/channels/channels-table';
 import type { AdminChannelRow } from '@iconicedu/web/lib/admin/channels';
+
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/iconic-academy/admin/channels',
+  useRouter: () => ({ refresh: vi.fn() }),
+}));
 
 const baseRow: AdminChannelRow = {
   id: 'channel-1',
@@ -52,9 +58,9 @@ describe('ChannelsTable', () => {
     render(<ChannelsTable rows={[baseRow, learningSpaceRow]} onEdit={() => undefined} />);
 
     const generalLink = screen.getByRole('link', { name: 'General' });
-    expect(generalLink).toHaveAttribute('href', '/d/c/channel-1');
+    expect(generalLink).toHaveAttribute('href', '/iconic-academy/c/channel-1');
 
     const learningSpaceLink = screen.getByRole('link', { name: 'Algebra' });
-    expect(learningSpaceLink).toHaveAttribute('href', '/d/spaces/channel-2');
+    expect(learningSpaceLink).toHaveAttribute('href', '/iconic-academy/spaces/channel-2');
   });
 });

@@ -167,9 +167,17 @@ export function SidebarShell({
     window.location.assign('/login');
   }, [supabase]);
 
+  const dashboardBasePath = React.useMemo(() => {
+    const firstSegment = pathname?.split('/').filter(Boolean)[0];
+    if (!firstSegment || firstSegment === 'd') {
+      return '/d';
+    }
+    return `/${firstSegment}`;
+  }, [pathname]);
+
   const handleOnboardingComplete = React.useCallback(() => {
-    void router.push('/d');
-  }, [router]);
+    void router.push(dashboardBasePath);
+  }, [dashboardBasePath, router]);
 
   const handleStatusOverrideSave = React.useCallback(
     async (input: {

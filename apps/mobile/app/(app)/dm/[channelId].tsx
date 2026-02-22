@@ -1,23 +1,27 @@
 import React, { useCallback } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ScreenHeader, Avatar, NAV_THEME } from '@iconicedu/ui-native';
+import { ScreenHeader, Avatar } from '@iconicedu/ui-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAccount } from '@/hooks/use-account';
-import { useMessages } from '@/hooks/use-messages';
 import { sendTextMessage } from '@/lib/api/queries';
+import { useTheme } from '@/providers/theme-provider';
 import { MessageList } from '@/components/messages/message-list';
 import { MessageInput } from '@/components/messages/message-input';
 import { TypingIndicator } from '@/components/messages/typing-indicator';
+import { DEMO_DM_MESSAGES, DEMO_PROFILE_ID } from '@/lib/dummy-messages';
 
 export default function DmConversationScreen() {
   const { channelId } = useLocalSearchParams<{ channelId: string }>();
   const router = useRouter();
   const { data: account } = useAccount();
-  const { data: messages, isLoading, loadMore } = useMessages(channelId ?? '');
+  const { colors } = useTheme();
 
-  const profileId = account?.default_profile_id ?? '';
+  const profileId = account?.default_profile_id ?? DEMO_PROFILE_ID;
   const orgId = account?.org_id ?? '';
+
+  // Using dummy data — real API data will be wired after adding a DB-row → MessageVM layer
+  const messages = DEMO_DM_MESSAGES;
 
   const handleSend = useCallback(
     async (text: string) => {
@@ -30,28 +34,20 @@ export default function DmConversationScreen() {
   if (!channelId) return null;
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: NAV_THEME.dark.background }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.pageBg }} edges={['top']}>
       <ScreenHeader
         title="Direct Message"
         leading={<Avatar name="DM" size="sm" />}
         onBack={() => router.back()}
       />
-
-      {isLoading ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color={NAV_THEME.dark.primary} />
-        </View>
-      ) : (
-        <View className="flex-1">
-          <MessageList
-            messages={messages ?? []}
-            currentProfileId={profileId}
-            onLoadMore={loadMore}
-          />
-          <TypingIndicator typingUsers={[]} />
-          <MessageInput onSend={handleSend} />
-        </View>
-      )}
+      <View style={{ flex: 1, backgroundColor: colors.pageBg }}>
+        <MessageList
+          messages={messages}
+          currentProfileId={profileId}
+        />
+        <TypingIndicator typingUsers={[]} />
+        <MessageInput onSend={handleSend} />
+      </View>
     </SafeAreaView>
   );
 }

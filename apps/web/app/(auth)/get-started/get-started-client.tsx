@@ -60,7 +60,7 @@ export default function GetStartedClient() {
         return;
       }
 
-      router.replace(body.onboarding?.destination ?? '/d');
+      router.replace(body.onboarding?.destination ?? '/get-started');
     } finally {
       setIsSubmitting(false);
     }

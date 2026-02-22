@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   AlertDialog,
@@ -46,6 +46,14 @@ type LearningSpacesTableProps = {
 
 export function LearningSpacesTable({ rows, onEdit }: LearningSpacesTableProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  const dashboardBasePath = React.useMemo(() => {
+    const firstSegment = pathname?.split('/').filter(Boolean)[0];
+    if (!firstSegment || firstSegment === 'd') {
+      return '/d';
+    }
+    return `/${firstSegment}`;
+  }, [pathname]);
   const [confirmDeleteRow, setConfirmDeleteRow] =
     React.useState<AdminLearningSpaceRow | null>(null);
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
@@ -156,7 +164,7 @@ export function LearningSpacesTable({ rows, onEdit }: LearningSpacesTableProps) 
                       <div className="min-w-0">
                         {row.primaryChannelId ? (
                           <Link
-                            href={`/d/spaces/${row.primaryChannelId}`}
+                            href={`${dashboardBasePath}/spaces/${row.primaryChannelId}`}
                             className="text-sm font-semibold hover:underline"
                           >
                             {row.title}

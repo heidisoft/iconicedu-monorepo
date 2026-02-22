@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
 import { getOrCreateAccount } from '@iconicedu/web/lib/accounts/getOrCreateAccount';
 import { ORG_ID } from '@iconicedu/web/lib/data/ids';
+import { resolveOrgDashboardPath } from '@iconicedu/web/lib/org/resolve-dashboard-path';
 import {
   buildChannelById,
   buildChannelByDmKey,
@@ -28,6 +29,7 @@ export default async function Page({ searchParams }: DmPageProps) {
     authUserId: authUser.id,
     authEmail: authUser.email ?? null,
   });
+  const dashboardPath = await resolveOrgDashboardPath(supabase, account.org_id);
   const profileResponse = await getProfileByAccountId(supabase, account.id);
   const currentProfileId = profileResponse.data?.id ?? null;
   const requestedId =
@@ -86,5 +88,5 @@ export default async function Page({ searchParams }: DmPageProps) {
     targetChannelId = firstChannel.ids.id;
   }
 
-  redirect(`/d/dm/${targetChannelId}`);
+  redirect(`${dashboardPath}/dm/${targetChannelId}`);
 }

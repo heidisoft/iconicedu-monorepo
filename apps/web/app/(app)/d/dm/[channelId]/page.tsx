@@ -13,6 +13,7 @@ import {
 import { buildUserProfileById } from '@iconicedu/web/lib/profile/builders/user-profile.builder';
 import { ensureDirectMessageChannel } from '@iconicedu/web/lib/channels/actions/ensure-direct-message-channel';
 import { ORG_ID } from '@iconicedu/web/lib/data/ids';
+import { resolveOrgDashboardPath } from '@iconicedu/web/lib/org/resolve-dashboard-path';
 import {
   buildChannelByDmKey,
   buildChannelById,
@@ -34,6 +35,7 @@ export default async function Page({
     authUserId: authUser.id,
     authEmail: authUser.email ?? null,
   });
+  const dashboardPath = await resolveOrgDashboardPath(supabase, account.org_id);
   const profileResponse = await getProfileByAccountId(supabase, account.id);
   const currentProfileId = profileResponse.data?.id ?? null;
   const currentUserProfile = profileResponse.data
@@ -59,7 +61,7 @@ export default async function Page({
         currentProfileId,
         dmProfile.id,
       );
-      redirect(`/d/dm/${resolvedChannelId}`);
+      redirect(`${dashboardPath}/dm/${resolvedChannelId}`);
     }
   }
 
