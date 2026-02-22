@@ -13,6 +13,7 @@ import {
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAccount } from '@/hooks/use-account';
+import { useProfile } from '@/hooks/use-profile';
 import { useDirectMessages } from '@/hooks/use-direct-messages';
 import { useChannels } from '@/hooks/use-channels';
 import { useTheme } from '@/providers/theme-provider';
@@ -194,12 +195,13 @@ export default function MessagesScreen() {
   const [activeTab, setActiveTab] = useState<'dms' | 'channels'>('dms');
   const [search, setSearch] = useState('');
   const { data: account } = useAccount();
+  const { data: profile } = useProfile();
   const { colors } = useTheme();
   const router = useRouter();
   const s = useMemo(() => makeStyles(colors), [colors]);
 
   const orgId = account?.org_id ?? '';
-  const profileId = account?.default_profile_id ?? '';
+  const profileId = (profile as Record<string, unknown> | undefined)?.id as string ?? '';
 
   const { data: dms, isLoading: dmsLoading, refetch: refetchDms } = useDirectMessages(orgId, profileId);
   const { data: channels, isLoading: channelsLoading, refetch: refetchChannels } = useChannels(orgId);

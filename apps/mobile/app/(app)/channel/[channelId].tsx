@@ -3,6 +3,7 @@ import { View, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAccount } from '@/hooks/use-account';
+import { useProfile } from '@/hooks/use-profile';
 import { useMessages } from '@/hooks/use-messages';
 import { sendTextMessage } from '@/lib/api/queries';
 import { useTheme } from '@/providers/theme-provider';
@@ -16,11 +17,12 @@ export default function ChannelConversationScreen() {
   const { channelId, topic } = useLocalSearchParams<{ channelId: string; topic?: string }>();
   const router = useRouter();
   const { data: account } = useAccount();
+  const { data: profile } = useProfile();
   const { colors } = useTheme();
 
   const isDemo = channelId?.startsWith('demo-') ?? false;
 
-  const profileId = isDemo ? DEMO_PROFILE_ID : (account?.default_profile_id ?? '');
+  const profileId = isDemo ? DEMO_PROFILE_ID : ((profile as Record<string, unknown> | undefined)?.id as string ?? '');
   const orgId = account?.org_id ?? '';
 
   // Skip API for demo channels — they have no real DB row

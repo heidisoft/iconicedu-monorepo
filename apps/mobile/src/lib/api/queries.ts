@@ -55,6 +55,19 @@ export async function fetchProfile(profileId: string) {
   return data;
 }
 
+/** Fetch the profile belonging to a given account (profiles.account_id → accounts.id). */
+export async function fetchProfileByAccountId(accountId: string) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('account_id', accountId)
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data ?? null;
+}
+
 export type ChannelListItem = {
   id: string;
   org_id: string;
@@ -267,6 +280,10 @@ export type OnboardingStatus = {
     lastName: string;
     phone: string;
     timezone: string;
+    city: string;
+    region: string;
+    postalCode: string;
+    countryCode: string;
   };
 };
 
@@ -278,7 +295,7 @@ export async function fetchOnboardingStatus(): Promise<OnboardingStatus> {
 
   const { data: account, error: accountError } = await supabase
     .from('accounts')
-    .select('id, org_id, default_profile_id, onboarding_completed_at, primary_role, phone_e164')
+    .select('id, org_id, onboarding_completed_at, primary_role, phone_e164')
     .eq('auth_user_id', user.id)
     .single();
 
@@ -288,59 +305,83 @@ export async function fetchOnboardingStatus(): Promise<OnboardingStatus> {
   }
   if (!account) throw new Error('No account found for this user');
 
+  // Profiles are linked via account_id on the profiles table (not the other way around)
+  let profileId: string | null = null;
   let profileKind: string | null = null;
   let firstName = '';
   let lastName = '';
   let timezone = '';
+  let city = '';
+  let region = '';
+  let postalCode = '';
+  let countryCode = '';
 
-  if (account.default_profile_id) {
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('kind, first_name, last_name, timezone')
-      .eq('id', account.default_profile_id)
-      .single();
-    if (profileError) console.warn('[onboarding] profile fetch error:', profileError);
-    if (profile) {
-      profileKind = profile.kind ?? null;
-      firstName = profile.first_name ?? '';
-      lastName = profile.last_name ?? '';
-      timezone = profile.timezone ?? '';
-    }
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id, kind, first_name, last_name, timezone, city, region, postal_code, country_code')
+    .eq('account_id', account.id)
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  if (profileError) console.warn('[onboarding] profile fetch error:', profileError);
+  if (profile) {
+    profileId   = profile.id;
+    profileKind = profile.kind ?? null;
+    firstName   = profile.first_name ?? '';
+    lastName    = profile.last_name ?? '';
+    timezone    = profile.timezone ?? '';
+    city        = (profile as Record<string, unknown>).city as string ?? '';
+    region      = (profile as Record<string, unknown>).region as string ?? '';
+    postalCode  = (profile as Record<string, unknown>).postal_code as string ?? '';
+    countryCode = (profile as Record<string, unknown>).country_code as string ?? '';
   }
 
-  // Mirror web's determineOnboardingStep required-field checks:
-  //   - first + last name must be set
-  //   - timezone must be set and not 'UTC'
-  //   - phone required for non-child users
-  const hasName = !!firstName.trim() && !!lastName.trim();
-  const hasTimezone = !!timezone.trim() && timezone.trim() !== 'UTC';
   const kind = profileKind ?? account.primary_role ?? null;
+
+  // Mirror web's determineOnboardingStep required-field checks:
+  const hasName     = !!firstName.trim() && !!lastName.trim();
+  const hasTimezone = !!timezone.trim() && timezone.trim() !== 'UTC';
+  const hasLocation = !!city.trim() && !!region.trim();
   const requiresPhone = kind !== 'child';
-  const hasPhone = !!(account.phone_e164?.trim());
-  const isComplete = hasName && hasTimezone && (!requiresPhone || hasPhone);
+  const hasPhone    = !!(account.phone_e164?.trim());
+
+  // Role-specific checks (child: grade set; educator: subject set)
+  let hasRoleData = true;
+  if (kind === 'child' && profileId) {
+    const { data: gradeRows } = await supabase
+      .from('child_profile_grade_levels')
+      .select('grade_id')
+      .eq('profile_id', profileId)
+      .limit(1);
+    hasRoleData = (gradeRows?.length ?? 0) > 0;
+  } else if (kind === 'educator' && profileId) {
+    const { data: subjectRows } = await supabase
+      .from('educator_profile_subjects')
+      .select('subject')
+      .eq('profile_id', profileId)
+      .limit(1);
+    hasRoleData = (subjectRows?.length ?? 0) > 0;
+  }
+
+  const isComplete =
+    hasName &&
+    hasTimezone &&
+    hasLocation &&
+    (!requiresPhone || hasPhone) &&
+    hasRoleData;
 
   // Mobile app is for educators, parents (guardians) and students (children) only.
   // If role is not yet assigned (null), allow through so wizard can collect it.
   const isRoleAllowed = kind === null || MOBILE_ALLOWED_ROLES.has(kind);
 
   console.log('[onboarding] status:', {
-    kind,
-    hasName,
-    hasTimezone,
-    hasPhone,
-    requiresPhone,
-    isComplete,
-    isRoleAllowed,
-    firstName,
-    lastName,
-    timezone,
-    phone: account.phone_e164,
+    kind, hasName, hasTimezone, hasLocation, hasPhone, requiresPhone, hasRoleData, isComplete, isRoleAllowed,
   });
 
   return {
     isComplete,
     isRoleAllowed,
-    profileId: account.default_profile_id,
+    profileId,
     accountId: account.id,
     orgId: account.org_id,
     primaryRole: account.primary_role ?? null,
@@ -350,6 +391,10 @@ export async function fetchOnboardingStatus(): Promise<OnboardingStatus> {
       lastName,
       phone: account.phone_e164 ?? '',
       timezone,
+      city,
+      region,
+      postalCode,
+      countryCode,
     },
   };
 }
@@ -401,7 +446,26 @@ export async function saveStudentStep(
   }
 }
 
-export async function saveEducatorSubjectsStep(
+export async function saveLocationStep(
+  profileId: string,
+  city: string,
+  region: string,
+  postalCode: string,
+  countryCode: string,
+) {
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      city: city.trim() || null,
+      region: region.trim() || null,
+      postal_code: postalCode.trim() || null,
+      country_code: countryCode || null,
+    } as Record<string, unknown>)
+    .eq('id', profileId);
+  if (error) throw error;
+}
+
+export async function saveEducatorProfileStep(
   profileId: string,
   orgId: string,
   subjects: string[],
@@ -412,6 +476,15 @@ export async function saveEducatorSubjectsStep(
     const { error } = await supabase.from('educator_profile_subjects').insert(rows);
     if (error) throw error;
   }
+}
+
+/** @deprecated use saveEducatorProfileStep */
+export async function saveEducatorSubjectsStep(
+  profileId: string,
+  orgId: string,
+  subjects: string[],
+) {
+  return saveEducatorProfileStep(profileId, orgId, subjects);
 }
 
 export async function completeOnboarding(accountId: string) {
