@@ -11,6 +11,7 @@ export async function buildSidebarBaseData(
   supabase: SupabaseClient,
   orgId: string,
   accountId: string,
+  dashboardBasePath: string,
 ): Promise<SidebarBaseData> {
   const [learningSpaces, directMessages, supportChannelId] = await Promise.all([
     buildLearningSpacesByOrg(supabase, orgId, { accountId }),
@@ -22,7 +23,7 @@ export async function buildSidebarBaseData(
     ? [
         {
           title: 'Support',
-          url: `/d/c/${supportChannelId}`,
+          url: `${dashboardBasePath}/c/${supportChannelId}`,
           icon: 'life-buoy' as const,
         },
       ]
@@ -33,17 +34,17 @@ export async function buildSidebarBaseData(
       navMain: [
         {
           title: 'Home',
-          url: '/d',
+          url: dashboardBasePath,
           icon: 'home',
         },
         {
           title: 'Class schedule',
-          url: '/d/class-schedule',
+          url: `${dashboardBasePath}/class-schedule`,
           icon: 'class-schedule',
         },
         {
           title: 'Inbox',
-          url: '/d/inbox',
+          url: `${dashboardBasePath}/inbox`,
           icon: 'inbox',
         },
       ],

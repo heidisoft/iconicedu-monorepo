@@ -4,9 +4,9 @@ import { notFound, redirect } from 'next/navigation';
 import { SidebarProvider } from '@iconicedu/ui-web';
 import { cookies } from 'next/headers';
 
-import { SidebarShell } from '@iconicedu/web/app/(app)/d/sidebar-shell';
+import { SidebarShell } from '@iconicedu/web/app/(app)/[orgSlug]/sidebar-shell';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
-import { ADMIN_MENU_SECTIONS } from '@iconicedu/web/lib/data/admin-menu-sections';
+import { buildAdminMenuSections } from '@iconicedu/web/lib/data/admin-menu-sections';
 import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
 import { getOrCreateAccount } from '@iconicedu/web/lib/accounts/getOrCreateAccount';
 import { loadSidebarContext } from '@iconicedu/web/lib/sidebar/loadSidebarContext';
@@ -71,6 +71,7 @@ export default async function Layout({
     supabase,
     account.org_id,
     account.id,
+    `/${orgSlug}`,
   );
   const { sidebarData, onboardingStatus } = await loadSidebarContext(supabase, {
     authUser,
@@ -85,7 +86,7 @@ export default async function Layout({
       <SidebarShell
         data={sidebarData}
         initialOnboardingStatus={onboardingStatus}
-        adminSections={ADMIN_MENU_SECTIONS}
+        adminSections={buildAdminMenuSections(`/${orgSlug}`)}
       >
         {children}
       </SidebarShell>

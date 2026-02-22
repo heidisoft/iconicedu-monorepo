@@ -15,17 +15,17 @@ export const SIDEBAR_LEFT_DATA: SidebarLeftDataVM = {
     navMain: [
       {
         title: 'Home',
-        url: '/d',
+        url: '/iconic-academy',
         icon: 'home',
       },
       {
         title: 'Class schedule',
-        url: '/d/class-schedule',
+        url: '/iconic-academy/class-schedule',
         icon: 'class-schedule',
       },
       {
         title: 'Inbox',
-        url: '/d/inbox',
+        url: '/iconic-academy/inbox',
         icon: 'inbox',
         count: 3,
       },
@@ -33,7 +33,7 @@ export const SIDEBAR_LEFT_DATA: SidebarLeftDataVM = {
     navSecondary: [
       {
         title: 'Support',
-        url: `/d/c/${CHANNEL_IDS.support}`,
+        url: `/iconic-academy/c/${CHANNEL_IDS.support}`,
         icon: 'life-buoy',
       },
     ],

@@ -63,6 +63,6 @@ export function buildAuthOnboardingState(
     roleStatus,
     onboardingCompletedAt,
     requiresRoleSelection: false,
-    destination: '/d',
+    destination: '/dashboard',
   };
 }

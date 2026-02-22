@@ -43,7 +43,7 @@ const MATH_HOMEWORK_ACTIVITY: ActivityFeedItemVM = {
     actionButton: {
       label: 'View homework',
       variant: 'default',
-      href: `/d/spaces/${CHANNEL_IDS.mathSpace}`,
+      href: `/iconic-academy/spaces/${CHANNEL_IDS.mathSpace}`,
     },
   },
   state: { importance: 'normal', isRead: false },
@@ -164,7 +164,7 @@ const SYSTEM_PAYMENT_ACTIVITY: ActivityFeedItemVM = {
     actionButton: {
       label: 'Update billing',
       variant: 'default',
-      href: '/d',
+      href: '/iconic-academy',
     },
   },
   state: { importance: 'important', isRead: false },

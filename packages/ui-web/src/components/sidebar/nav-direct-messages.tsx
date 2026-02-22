@@ -32,7 +32,7 @@ export function NavDirectMessages({
   dms,
   currentUserId,
   activeChannelId,
-  dashboardBasePath = '/d',
+  dashboardBasePath = '/',
 }: {
   dms: ChannelVM[];
   currentUserId: string;

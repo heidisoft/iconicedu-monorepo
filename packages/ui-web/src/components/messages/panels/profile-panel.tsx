@@ -4,6 +4,7 @@ import type { MessagesRightPanelIntent, UserProfileVM } from '@iconicedu/shared-
 import { ProfileContent, ProfileSheet } from '@iconicedu/ui-web/components/messages/profile-sheet';
 import { useMessagesState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
 import { useIsMobile } from '@iconicedu/ui-web/hooks/use-mobile';
+import { resolveDashboardBasePathFromWindow } from '@iconicedu/ui-web/lib/dashboard-base-path';
 
 interface ProfilePanelProps {
   intent: MessagesRightPanelIntent;
@@ -21,7 +22,8 @@ export function ProfilePanel({ intent }: ProfilePanelProps) {
     channel.basics.kind === 'dm'
       ? () => {
           if (typeof window !== 'undefined') {
-            window.location.href = `/d/dm/${channel.ids.id}`;
+            const dashboardBasePath = resolveDashboardBasePathFromWindow();
+            window.location.href = `${dashboardBasePath}/dm/${channel.ids.id}`;
           }
         }
       : undefined;

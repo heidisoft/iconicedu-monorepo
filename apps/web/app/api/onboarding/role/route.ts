@@ -170,7 +170,7 @@ export async function POST(request: Request) {
     accountRoleStateResponse.data,
     rolesResponse.data ?? [],
   );
-  if (onboarding.destination === '/d') {
+  if (onboarding.destination === '/dashboard') {
     onboarding.destination = await resolveOrgDashboardPath(
       serviceSupabase,
       accountRoleStateResponse.data.org_id,

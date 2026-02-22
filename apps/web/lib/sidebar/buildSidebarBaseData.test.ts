@@ -29,7 +29,12 @@ describe('buildSidebarBaseData', () => {
       data: [{ id: 'support-1', purpose: 'support' }],
     });
 
-    const result = await buildSidebarBaseData({} as any, 'org-1', 'account-1');
+    const result = await buildSidebarBaseData(
+      {} as any,
+      'org-1',
+      'account-1',
+      '/iconic-academy',
+    );
 
     expect(buildLearningSpacesByOrg).toHaveBeenCalledWith(
       expect.anything(),
@@ -43,6 +48,6 @@ describe('buildSidebarBaseData', () => {
     );
     expect(result.collections.learningSpaces).toHaveLength(1);
     expect(result.collections.directMessages).toHaveLength(1);
-    expect(result.navigation.navSecondary[0]?.url).toBe('/d/c/support-1');
+    expect(result.navigation.navSecondary[0]?.url).toBe('/iconic-academy/c/support-1');
   });
 });

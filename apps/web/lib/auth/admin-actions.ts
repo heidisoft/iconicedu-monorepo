@@ -19,7 +19,7 @@ import { deleteProfilesByAccountId } from '@iconicedu/web/lib/profile/queries/pr
 import { deleteFamilyLinksByGuardianAccountId } from '@iconicedu/web/lib/family/queries/families.query';
 import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
 
-const AUTH_ADMIN_PATH = '/d/admin/auth';
+const AUTH_ADMIN_PATH = '/admin/auth';
 
 const APP_URL = resolveAppUrl();
 const DEFAULT_AUTH_CALLBACK_URL = `${APP_URL}/auth/callback`;

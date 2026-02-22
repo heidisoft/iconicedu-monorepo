@@ -37,6 +37,7 @@ import {
   DropdownMenuTrigger,
 } from '@iconicedu/ui-web/ui/dropdown-menu';
 import { getLearningSpaceIcon } from '@iconicedu/ui-web/lib/icons';
+import { resolveDashboardBasePathFromWindow } from '@iconicedu/ui-web/lib/dashboard-base-path';
 
 interface LearningSpaceInfoPanelProps {
   intent: MessagesRightPanelIntent;
@@ -116,6 +117,7 @@ const LearningSpaceInfoPanelContent = memo(function LearningSpaceInfoPanelConten
 }) {
   const { channel, toggle, messageFilter, toggleMessageFilter, currentUserId } =
     useMessagesState();
+  const dashboardBasePath = resolveDashboardBasePathFromWindow();
   const isMobile = useIsMobile();
   const themeKey = channel.ui?.themeKey ?? null;
   const infoPanel = channel.ui?.infoPanel;
@@ -342,7 +344,7 @@ const LearningSpaceInfoPanelContent = memo(function LearningSpaceInfoPanelConten
               String(scheduleDate.getMonth() + 1).padStart(2, '0'),
               String(scheduleDate.getDate()).padStart(2, '0'),
             ].join('-');
-            const calendarUrl = `/d/class-schedule?view=day&date=${dateParam}`;
+            const calendarUrl = `${dashboardBasePath}/class-schedule?view=day&date=${dateParam}`;
 
             const shiftDate = (date: Date, offset: number) => {
               const next = new Date(date);
@@ -469,7 +471,7 @@ const LearningSpaceInfoPanelContent = memo(function LearningSpaceInfoPanelConten
                         className="h-8 w-8 shrink-0 text-muted-foreground hover:bg-primary/15 hover:text-primary"
                         aria-label={`Message ${memberName}`}
                       >
-                        <a href={`/d/dm/${dmTargetId}`}>
+                        <a href={`${dashboardBasePath}/dm/${dmTargetId}`}>
                           <MessageCircle className="h-4 w-4" />
                         </a>
                       </Button>

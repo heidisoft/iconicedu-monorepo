@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { ADMIN_MENU_SECTIONS } from '@iconicedu/web/lib/data/admin-menu-sections';
+import { buildAdminMenuSections } from '@iconicedu/web/lib/data/admin-menu-sections';
 
-describe('ADMIN_MENU_SECTIONS', () => {
+describe('buildAdminMenuSections', () => {
   it('does not include announcements or support in channels menu', () => {
-    const channelsSection = ADMIN_MENU_SECTIONS.find(
+    const sections = buildAdminMenuSections('/iconic-academy');
+    const channelsSection = sections.find(
       (section) => section.title === 'Channels',
     );
     expect(channelsSection).toBeDefined();

@@ -50,7 +50,7 @@ describe('buildAuthOnboardingState', () => {
     );
 
     expect(state.requiresRoleSelection).toBe(false);
-    expect(state.destination).toBe('/d');
+    expect(state.destination).toBe('/dashboard');
   });
 
   it('routes pending users to pending access page', () => {

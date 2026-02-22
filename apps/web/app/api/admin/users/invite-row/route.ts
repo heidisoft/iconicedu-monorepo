@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { inviteAdminUserAction } from '@iconicedu/web/app/(app)/d/admin/users/actions/invite-user';
+import { inviteAdminUserAction } from '@iconicedu/web/app/(app)/[orgSlug]/admin/users/actions/invite-user';
 import { getFamilyInviteAdminClient } from '@iconicedu/web/lib/family/queries/invite.query';
 
 type RowInviteRequest = {

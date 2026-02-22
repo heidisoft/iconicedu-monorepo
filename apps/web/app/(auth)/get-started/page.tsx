@@ -10,7 +10,7 @@ import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service
 async function resolveOrgLoginPath(orgId: string): Promise<string> {
   const serviceSupabase = createSupabaseServiceClient();
   const dashboardPath = await resolveOrgDashboardPath(serviceSupabase, orgId);
-  if (dashboardPath === '/d') {
+  if (dashboardPath === '/get-started') {
     return '/login';
   }
   return `${dashboardPath}/login`;

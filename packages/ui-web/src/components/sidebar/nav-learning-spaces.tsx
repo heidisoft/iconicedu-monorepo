@@ -50,7 +50,7 @@ export function NavLearningSpaces({
   activeChannelId,
   isMobile,
   currentUser,
-  dashboardBasePath = '/d',
+  dashboardBasePath = '/',
 }: {
   learningSpaces: LearningSpaceVM[];
   title: string;

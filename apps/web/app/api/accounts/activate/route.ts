@@ -21,7 +21,7 @@ function parseIntent(value: string | null): ActivationIntent {
 async function resolveOrgLoginPath(orgId: string): Promise<string> {
   const serviceSupabase = createSupabaseServiceClient();
   const dashboardPath = await resolveOrgDashboardPath(serviceSupabase, orgId);
-  if (dashboardPath === '/d') {
+  if (dashboardPath === '/get-started') {
     return '/login';
   }
   return `${dashboardPath}/login`;
@@ -125,7 +125,7 @@ export async function POST(request: Request) {
     if (onboarding.requiresRoleSelection) {
       onboarding.requiresRoleSelection = false;
       onboarding.destination = await resolveOrgLoginPath(activeAccount.org_id);
-    } else if (onboarding.destination === '/d') {
+    } else if (onboarding.destination === '/dashboard') {
       onboarding.destination =
         intent === 'get-started'
           ? await resolveOrgLoginPath(activeAccount.org_id)

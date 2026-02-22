@@ -22,6 +22,7 @@ import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
 import { ThemedIconBadge } from '@iconicedu/ui-web/components/shared/themed-icon';
 import { MediaFilesPanel } from '@iconicedu/ui-web/components/messages/shared/media-files-panel';
 import { useMessagesState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
+import { resolveDashboardBasePathFromWindow } from '@iconicedu/ui-web/lib/dashboard-base-path';
 
 interface ChannelInfoPanelProps {
   intent: MessagesRightPanelIntent;
@@ -42,6 +43,7 @@ const CHANNEL_ICON_MAP = {
 
 const ChannelInfoPanelContent = memo(function ChannelInfoPanelContent() {
   const { channel, currentUserId } = useMessagesState();
+  const dashboardBasePath = resolveDashboardBasePathFromWindow();
   const infoPanel = channel.ui?.infoPanel;
   const showMembers = infoPanel?.showMembers ?? true;
   const iconKey = channel.basics.iconKey ?? 'sparkles';
@@ -126,7 +128,7 @@ const ChannelInfoPanelContent = memo(function ChannelInfoPanelContent() {
                         className="h-8 w-8 shrink-0 text-muted-foreground hover:bg-primary/15 hover:text-primary"
                         aria-label={`Message ${memberName}`}
                       >
-                        <a href={`/d/dm/${dmTargetId}`}>
+                        <a href={`${dashboardBasePath}/dm/${dmTargetId}`}>
                           <MessageCircle className="h-4 w-4" />
                         </a>
                       </Button>

@@ -95,18 +95,18 @@ const ICONS = {
 
 function resolveDashboardBasePath(activePath?: string | null): string {
   const firstSegment = activePath?.split('/').filter(Boolean)[0];
-  if (!firstSegment || firstSegment === 'd') {
-    return '/d';
+  if (!firstSegment) {
+    return '/';
   }
   return `/${firstSegment}`;
 }
 
 function normalizeDashboardUrl(url: string, dashboardBasePath: string): string {
-  if (url === '/d') {
+  if (url === '/dashboard') {
     return dashboardBasePath;
   }
-  if (url.startsWith('/d/')) {
-    return `${dashboardBasePath}${url.slice(2)}`;
+  if (url.startsWith('/dashboard/')) {
+    return `${dashboardBasePath}${url.slice('/dashboard'.length)}`;
   }
   return url;
 }

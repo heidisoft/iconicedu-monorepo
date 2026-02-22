@@ -25,7 +25,7 @@ export function NavSupervisedDirectMessages({
   isOpen,
   onOpenChange,
   activeChannelId,
-  dashboardBasePath = '/d',
+  dashboardBasePath = '/',
 }: {
   child: ChildProfileVM;
   dms: ChannelVM[];
