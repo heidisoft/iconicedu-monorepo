@@ -267,6 +267,8 @@ export async function fetchProfilesByAccountIds(orgId: string, accountIds: strin
 
 const MOBILE_ALLOWED_ROLES = new Set(['educator', 'guardian', 'child']);
 
+export type DayAvailability = Record<string, Array<{ start: string; end: string }>>;
+
 export type OnboardingStatus = {
   isComplete: boolean;
   isRoleAllowed: boolean;
@@ -275,6 +277,15 @@ export type OnboardingStatus = {
   orgId: string | null;
   primaryRole: string | null;
   profileKind: string | null;
+  flags: {
+    hasName: boolean;
+    hasTimezone: boolean;
+    hasLocation: boolean;
+    hasPhone: boolean;
+    requiresPhone: boolean;
+    hasRoleData: boolean;
+    hasAvailability: boolean;
+  };
   prefill: {
     firstName: string;
     lastName: string;
@@ -287,23 +298,58 @@ export type OnboardingStatus = {
   };
 };
 
-export async function fetchOnboardingStatus(): Promise<OnboardingStatus> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export function fetchOnboardingStatus(): Promise<OnboardingStatus> {
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(
+      () => reject(new Error('Account lookup timed out. Please check your connection and try again.')),
+      12_000,
+    ),
+  );
+  return Promise.race([_doFetchOnboardingStatus(), timeout]);
+}
+
+async function _doFetchOnboardingStatus(): Promise<OnboardingStatus> {
+  // getSession() reads from SecureStore — no network request, no hang risk.
+  // getUser() verifies with the auth server over the network and can hang indefinitely.
+  const { data: { session } } = await supabase.auth.getSession();
+  const user = session?.user;
   if (!user) throw new Error('Not authenticated');
 
-  const { data: account, error: accountError } = await supabase
+  // Try to find account by auth_user_id first
+  const { data: accountByAuthId, error: accountError } = await supabase
     .from('accounts')
     .select('id, org_id, onboarding_completed_at, primary_role, phone_e164')
     .eq('auth_user_id', user.id)
-    .single();
+    .maybeSingle();
 
   if (accountError) {
     console.error('[onboarding] account fetch error:', accountError);
     throw accountError;
   }
-  if (!account) throw new Error('No account found for this user');
+
+  let account = accountByAuthId;
+
+  // Fallback: if account isn't linked yet, try to find it by email and link it.
+  // This handles the case where the account was pre-created by an admin but
+  // auth_user_id was never set (activate endpoint normally does this on web).
+  if (!account && user.email) {
+    const { data: accountByEmail } = await supabase
+      .from('accounts')
+      .select('id, org_id, onboarding_completed_at, primary_role, phone_e164')
+      .eq('email', user.email.trim().toLowerCase())
+      .maybeSingle();
+
+    if (accountByEmail) {
+      // Attempt to link this auth user to the account (requires RLS to allow it)
+      await supabase
+        .from('accounts')
+        .update({ auth_user_id: user.id })
+        .eq('id', accountByEmail.id);
+      account = accountByEmail;
+    }
+  }
+
+  if (!account) throw new Error('No account found for this user. Please contact your administrator.');
 
   // Profiles are linked via account_id on the profiles table (not the other way around)
   let profileId: string | null = null;
@@ -345,7 +391,7 @@ export async function fetchOnboardingStatus(): Promise<OnboardingStatus> {
   const requiresPhone = kind !== 'child';
   const hasPhone    = !!(account.phone_e164?.trim());
 
-  // Role-specific checks (child: grade set; educator: subject set)
+  // Role-specific checks (child: grade set; educator: subjects + grade levels set)
   let hasRoleData = true;
   if (kind === 'child' && profileId) {
     const { data: gradeRows } = await supabase
@@ -355,12 +401,22 @@ export async function fetchOnboardingStatus(): Promise<OnboardingStatus> {
       .limit(1);
     hasRoleData = (gradeRows?.length ?? 0) > 0;
   } else if (kind === 'educator' && profileId) {
-    const { data: subjectRows } = await supabase
-      .from('educator_profile_subjects')
-      .select('subject')
+    const [{ data: subjectRows }, { data: gradeRows }] = await Promise.all([
+      supabase.from('educator_profile_subjects').select('subject').eq('profile_id', profileId).limit(1),
+      supabase.from('educator_profile_grade_levels').select('grade_id').eq('profile_id', profileId).limit(1),
+    ]);
+    hasRoleData = (subjectRows?.length ?? 0) > 0 && (gradeRows?.length ?? 0) > 0;
+  }
+
+  // Availability check for educators
+  let hasAvailability = kind !== 'educator';
+  if (kind === 'educator' && profileId) {
+    const { data: availRows } = await supabase
+      .from('educator_availabilities')
+      .select('profile_id')
       .eq('profile_id', profileId)
       .limit(1);
-    hasRoleData = (subjectRows?.length ?? 0) > 0;
+    hasAvailability = (availRows?.length ?? 0) > 0;
   }
 
   const isComplete =
@@ -368,15 +424,12 @@ export async function fetchOnboardingStatus(): Promise<OnboardingStatus> {
     hasTimezone &&
     hasLocation &&
     (!requiresPhone || hasPhone) &&
-    hasRoleData;
+    hasRoleData &&
+    hasAvailability;
 
   // Mobile app is for educators, parents (guardians) and students (children) only.
   // If role is not yet assigned (null), allow through so wizard can collect it.
   const isRoleAllowed = kind === null || MOBILE_ALLOWED_ROLES.has(kind);
-
-  console.log('[onboarding] status:', {
-    kind, hasName, hasTimezone, hasLocation, hasPhone, requiresPhone, hasRoleData, isComplete, isRoleAllowed,
-  });
 
   return {
     isComplete,
@@ -386,6 +439,7 @@ export async function fetchOnboardingStatus(): Promise<OnboardingStatus> {
     orgId: account.org_id,
     primaryRole: account.primary_role ?? null,
     profileKind,
+    flags: { hasName, hasTimezone, hasLocation, hasPhone, requiresPhone, hasRoleData, hasAvailability },
     prefill: {
       firstName,
       lastName,
@@ -469,22 +523,39 @@ export async function saveEducatorProfileStep(
   profileId: string,
   orgId: string,
   subjects: string[],
+  gradeLevels: string[],
 ) {
+  // Save subjects
   await supabase.from('educator_profile_subjects').delete().eq('profile_id', profileId);
   if (subjects.length > 0) {
-    const rows = subjects.map((subject) => ({ profile_id: profileId, org_id: orgId, subject }));
-    const { error } = await supabase.from('educator_profile_subjects').insert(rows);
+    const subjectRows = subjects.map((subject) => ({ profile_id: profileId, org_id: orgId, subject }));
+    const { error } = await supabase.from('educator_profile_subjects').insert(subjectRows);
+    if (error) throw error;
+  }
+
+  // Save grade levels
+  await supabase.from('educator_profile_grade_levels').delete().eq('profile_id', profileId);
+  if (gradeLevels.length > 0) {
+    const gradeRows = gradeLevels.map((grade_id) => ({ profile_id: profileId, org_id: orgId, grade_id }));
+    const { error } = await supabase.from('educator_profile_grade_levels').insert(gradeRows);
     if (error) throw error;
   }
 }
 
-/** @deprecated use saveEducatorProfileStep */
-export async function saveEducatorSubjectsStep(
+export async function saveEducatorAvailabilityStep(
   profileId: string,
   orgId: string,
-  subjects: string[],
+  classTypes: string[],
+  weeklyCommitment: number | null,
+  availability: DayAvailability,
 ) {
-  return saveEducatorProfileStep(profileId, orgId, subjects);
+  const { error } = await supabase
+    .from('educator_availabilities')
+    .upsert(
+      { profile_id: profileId, org_id: orgId, class_types: classTypes, weekly_commitment: weeklyCommitment, availability },
+      { onConflict: 'profile_id' },
+    );
+  if (error) throw error;
 }
 
 export async function completeOnboarding(accountId: string) {

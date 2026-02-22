@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,8 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/providers/auth-provider';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 import {
@@ -23,7 +24,9 @@ import {
   saveLocationStep,
   saveStudentStep,
   saveEducatorProfileStep,
+  saveEducatorAvailabilityStep,
   completeOnboarding,
+  type OnboardingStatus,
 } from '@/lib/api/queries';
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
@@ -110,6 +113,22 @@ const EDUCATOR_SUBJECTS = [
   'Mindfulness & SEL', 'Language Studies', 'Career Readiness',
 ];
 
+const CLASS_TYPES = [
+  { id: 'online',     label: 'Online' },
+  { id: 'in_person',  label: 'In-Person' },
+  { id: 'hybrid',     label: 'Hybrid' },
+];
+
+const DAYS_OF_WEEK = [
+  { id: 'monday',    short: 'Mon' },
+  { id: 'tuesday',   short: 'Tue' },
+  { id: 'wednesday', short: 'Wed' },
+  { id: 'thursday',  short: 'Thu' },
+  { id: 'friday',    short: 'Fri' },
+  { id: 'saturday',  short: 'Sat' },
+  { id: 'sunday',    short: 'Sun' },
+];
+
 const CURRENT_YEAR = new Date().getFullYear();
 const BIRTH_YEARS = Array.from({ length: 30 }, (_, i) => CURRENT_YEAR - 4 - i);
 
@@ -121,13 +140,17 @@ type WizardStepId =
   | 'timezone'
   | 'location'
   | 'student-profile'
-  | 'educator-profile';
+  | 'educator-profile'
+  | 'educator-availability';
 
 function buildSteps(profileKind: string | null, primaryRole: string | null): WizardStepId[] {
   const steps: WizardStepId[] = ['name', 'phone', 'timezone', 'location'];
   const kind = profileKind ?? primaryRole;
   if (kind === 'child') steps.push('student-profile');
-  else if (kind === 'educator') steps.push('educator-profile');
+  else if (kind === 'educator') {
+    steps.push('educator-profile');
+    steps.push('educator-availability');
+  }
   // guardian: universal steps cover requirements; family management handled separately
   return steps;
 }
@@ -161,7 +184,12 @@ const STEP_META: Record<WizardStepId, { title: string; subtitle: string; emoji: 
   'educator-profile': {
     emoji: '📚',
     title: 'Your teaching profile',
-    subtitle: 'Tell us what subjects you specialise in so students can find you.',
+    subtitle: 'Tell us what subjects and grade levels you specialise in.',
+  },
+  'educator-availability': {
+    emoji: '🗓️',
+    title: 'Your availability',
+    subtitle: 'Let students know when you\'re available and how you like to teach.',
   },
 };
 
@@ -261,6 +289,47 @@ function makeStyles(C: AppColors) {
         borderRadius: 20, borderWidth: 1,
       },
       chipTxt: { fontSize: 14, fontWeight: '500' as const },
+
+      sectionLabel: {
+        fontSize: 13, fontWeight: '700' as const, color: C.text,
+        marginBottom: 10, marginTop: 4,
+      },
+      sectionHint: { fontSize: 12, color: C.textFaint, marginBottom: 12 },
+
+      dayRow: {
+        flexDirection: 'row' as const, alignItems: 'center' as const,
+        paddingHorizontal: 14, paddingVertical: 12,
+        backgroundColor: C.inputBg, borderRadius: 12,
+        borderWidth: 1, borderColor: C.border, marginBottom: 8,
+        gap: 10,
+      },
+      dayRowActive: { backgroundColor: C.tealBg, borderColor: C.teal },
+      dayToggle: {
+        width: 24, height: 24, borderRadius: 12,
+        borderWidth: 2, borderColor: C.border,
+        alignItems: 'center' as const, justifyContent: 'center' as const,
+      },
+      dayToggleActive: { backgroundColor: C.teal, borderColor: C.teal },
+      dayToggleTxt: { fontSize: 13, color: '#ffffff', fontWeight: '700' as const },
+      dayLabel: { flex: 1, fontSize: 15, color: C.text, fontWeight: '500' as const },
+      dayLabelActive: { color: C.teal },
+      timeRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 8 },
+      timeInput: {
+        backgroundColor: C.pageBg, borderRadius: 8,
+        borderWidth: 1, borderColor: C.teal,
+        paddingHorizontal: 10, paddingVertical: 6,
+        fontSize: 13, color: C.text, width: 60, textAlign: 'center' as const,
+      },
+      timeSep: { fontSize: 13, color: C.textMuted },
+
+      numberInputRow: {
+        flexDirection: 'row' as const, alignItems: 'center' as const,
+        backgroundColor: C.inputBg, borderRadius: 14,
+        borderWidth: 1, borderColor: C.border,
+        paddingHorizontal: 16, marginBottom: 8, minHeight: 52, gap: 10,
+      },
+      numberInput: { flex: 1, fontSize: 16, color: C.text, paddingVertical: 14 },
+      numberUnit: { fontSize: 14, color: C.textMuted },
 
       errorTxt: { fontSize: 13, color: '#ef4444', textAlign: 'center' as const, marginBottom: 12 },
 
@@ -549,23 +618,29 @@ function StudentProfileStep({ birthYear, setBirthYear, grade, setGrade, s }: {
   );
 }
 
-function EducatorProfileStep({ subjects, setSubjects, s, colors }: {
-  subjects: string[]; setSubjects: (v: string[]) => void; s: S; colors: AppColors;
+function EducatorProfileStep({
+  subjects, setSubjects, gradeLevels, setGradeLevels, s, colors,
+}: {
+  subjects: string[]; setSubjects: (v: string[]) => void;
+  gradeLevels: string[]; setGradeLevels: (v: string[]) => void;
+  s: S; colors: AppColors;
 }) {
-  const toggle = useCallback((subject: string) => {
-    setSubjects(
-      subjects.includes(subject)
-        ? subjects.filter((x) => x !== subject)
-        : [...subjects, subject],
-    );
+  const toggleSubject = useCallback((subject: string) => {
+    setSubjects(subjects.includes(subject)
+      ? subjects.filter((x) => x !== subject)
+      : [...subjects, subject]);
   }, [subjects, setSubjects]);
+
+  const toggleGrade = useCallback((grade: string) => {
+    setGradeLevels(gradeLevels.includes(grade)
+      ? gradeLevels.filter((x) => x !== grade)
+      : [...gradeLevels, grade]);
+  }, [gradeLevels, setGradeLevels]);
 
   return (
     <>
-      <Text style={s.label}>Subjects you teach</Text>
-      <Text style={[s.inputHint, { marginTop: 0, marginBottom: 16 }]}>
-        Select all that apply. You can update these later.
-      </Text>
+      <Text style={s.sectionLabel}>Subjects you teach</Text>
+      <Text style={s.sectionHint}>Select all that apply. You can update these later.</Text>
       <View style={s.chipsRow}>
         {EDUCATOR_SUBJECTS.map((subject) => {
           const sel = subjects.includes(subject);
@@ -579,7 +654,7 @@ function EducatorProfileStep({ subjects, setSubjects, s, colors }: {
                   borderColor: sel ? colors.teal : colors.border,
                 },
               ]}
-              onPress={() => toggle(subject)}
+              onPress={() => toggleSubject(subject)}
             >
               {sel && <Text style={{ color: colors.teal, fontSize: 13 }}>✓ </Text>}
               <Text style={[s.chipTxt, { color: sel ? colors.teal : colors.textMuted }]}>{subject}</Text>
@@ -587,7 +662,133 @@ function EducatorProfileStep({ subjects, setSubjects, s, colors }: {
           );
         })}
       </View>
-      <Text style={s.inputHint}>At least one subject is required to continue.</Text>
+
+      <Text style={[s.sectionLabel, { marginTop: 8 }]}>Grade levels you teach</Text>
+      <Text style={s.sectionHint}>Select all grade levels you're comfortable teaching.</Text>
+      {GRADE_OPTIONS.map((item) => {
+        const sel = gradeLevels.includes(item.value);
+        return (
+          <TouchableOpacity
+            key={item.value}
+            style={[s.listItem, sel && s.listItemSelected]}
+            onPress={() => toggleGrade(item.value)}
+          >
+            <Text style={[s.listItemTxt, sel && s.listItemSelectedTxt]}>{item.label}</Text>
+            {sel && <Text style={s.listCheck}>✓</Text>}
+          </TouchableOpacity>
+        );
+      })}
+      <Text style={s.inputHint}>At least one subject and one grade level are required.</Text>
+    </>
+  );
+}
+
+function EducatorAvailabilityStep({
+  classTypes, setClassTypes, weeklyHours, setWeeklyHours, daySlots, setDaySlots, s, colors,
+}: {
+  classTypes: string[]; setClassTypes: (v: string[]) => void;
+  weeklyHours: string; setWeeklyHours: (v: string) => void;
+  daySlots: Record<string, { start: string; end: string }>;
+  setDaySlots: (v: Record<string, { start: string; end: string }>) => void;
+  s: S; colors: AppColors;
+}) {
+  const toggleClassType = useCallback((id: string) => {
+    setClassTypes(classTypes.includes(id)
+      ? classTypes.filter((x) => x !== id)
+      : [...classTypes, id]);
+  }, [classTypes, setClassTypes]);
+
+  const toggleDay = useCallback((dayId: string) => {
+    if (daySlots[dayId]) {
+      const next = { ...daySlots };
+      delete next[dayId];
+      setDaySlots(next);
+    } else {
+      setDaySlots({ ...daySlots, [dayId]: { start: '09:00', end: '17:00' } });
+    }
+  }, [daySlots, setDaySlots]);
+
+  const updateTime = useCallback((dayId: string, field: 'start' | 'end', value: string) => {
+    setDaySlots({ ...daySlots, [dayId]: { ...daySlots[dayId], [field]: value } });
+  }, [daySlots, setDaySlots]);
+
+  return (
+    <>
+      <Text style={s.sectionLabel}>How do you teach?</Text>
+      <View style={[s.chipsRow, { marginBottom: 20 }]}>
+        {CLASS_TYPES.map((ct) => {
+          const sel = classTypes.includes(ct.id);
+          return (
+            <TouchableOpacity
+              key={ct.id}
+              style={[
+                s.chip,
+                {
+                  backgroundColor: sel ? colors.tealBg : colors.inputBg,
+                  borderColor: sel ? colors.teal : colors.border,
+                },
+              ]}
+              onPress={() => toggleClassType(ct.id)}
+            >
+              {sel && <Text style={{ color: colors.teal, fontSize: 13 }}>✓ </Text>}
+              <Text style={[s.chipTxt, { color: sel ? colors.teal : colors.textMuted }]}>{ct.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      <Text style={s.sectionLabel}>Weekly commitment <Text style={s.sectionHint}>(optional)</Text></Text>
+      <View style={s.numberInputRow}>
+        <TextInput
+          style={s.numberInput} value={weeklyHours}
+          onChangeText={(v) => setWeeklyHours(v.replace(/\D/g, ''))}
+          placeholder="e.g. 10" placeholderTextColor={s.placeholderColor}
+          keyboardType="number-pad" maxLength={3}
+        />
+        <Text style={s.numberUnit}>hours / week</Text>
+      </View>
+
+      <Text style={[s.sectionLabel, { marginTop: 4 }]}>Available days & times</Text>
+      <Text style={s.sectionHint}>Toggle a day to set your available hours for that day.</Text>
+      {DAYS_OF_WEEK.map((day) => {
+        const isOn = !!daySlots[day.id];
+        return (
+          <View key={day.id} style={[s.dayRow, isOn && s.dayRowActive]}>
+            <TouchableOpacity
+              style={[s.dayToggle, isOn && s.dayToggleActive]}
+              onPress={() => toggleDay(day.id)}
+              hitSlop={8}
+            >
+              {isOn && <Text style={s.dayToggleTxt}>✓</Text>}
+            </TouchableOpacity>
+            <Text style={[s.dayLabel, isOn && s.dayLabelActive]}>{day.short}</Text>
+            {isOn && (
+              <View style={s.timeRow}>
+                <TextInput
+                  style={s.timeInput}
+                  value={daySlots[day.id].start}
+                  onChangeText={(v) => updateTime(day.id, 'start', v)}
+                  placeholder="09:00"
+                  placeholderTextColor={s.placeholderColor}
+                  keyboardType="numbers-and-punctuation"
+                  maxLength={5}
+                />
+                <Text style={s.timeSep}>–</Text>
+                <TextInput
+                  style={s.timeInput}
+                  value={daySlots[day.id].end}
+                  onChangeText={(v) => updateTime(day.id, 'end', v)}
+                  placeholder="17:00"
+                  placeholderTextColor={s.placeholderColor}
+                  keyboardType="numbers-and-punctuation"
+                  maxLength={5}
+                />
+              </View>
+            )}
+          </View>
+        );
+      })}
+      <Text style={[s.inputHint, { marginTop: 4 }]}>Select at least one teaching format and one available day.</Text>
     </>
   );
 }
@@ -599,8 +800,14 @@ export default function ProfileSetupScreen() {
   const { colors } = useTheme();
   const s = useMemo(() => makeStyles(colors), [colors]);
   const queryClient = useQueryClient();
+  const { session } = useAuth();
 
-  // Form state
+  // Redirect to login if somehow reached without a session
+  useEffect(() => {
+    if (!session) router.replace('/(auth)/login');
+  }, [session, router]);
+
+  // Form state — universal
   const [firstName, setFirstName]     = useState('');
   const [lastName, setLastName]       = useState('');
   const [phone, setPhone]             = useState('');
@@ -611,18 +818,47 @@ export default function ProfileSetupScreen() {
   const [region, setRegion]           = useState('');
   const [postalCode, setPostalCode]   = useState('');
   const [countryCode, setCountryCode] = useState('LK');
+
+  // Student-specific
   const [birthYear, setBirthYear]     = useState('');
   const [grade, setGrade]             = useState<string | null>(null);
+
+  // Educator-specific
   const [subjects, setSubjects]       = useState<string[]>([]);
+  const [gradeLevels, setGradeLevels] = useState<string[]>([]);
+  const [classTypes, setClassTypes]   = useState<string[]>([]);
+  const [weeklyHours, setWeeklyHours] = useState('');
+  const [daySlots, setDaySlots]       = useState<Record<string, { start: string; end: string }>>({});
 
   const [stepIdx, setStepIdx] = useState(0);
   const [error, setError]     = useState<string | null>(null);
 
-  const { data: onboarding, isLoading: statusLoading } = useQuery({
-    queryKey: ['onboarding-status'],
-    queryFn: fetchOnboardingStatus,
-    staleTime: 0,
-  });
+  // Synchronously seed from the TanStack Query cache (populated by OTP screen).
+  // If cache is cold this is null and statusLoading starts true.
+  const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(() =>
+    queryClient.getQueryData<OnboardingStatus>(['onboarding-status']) ?? null,
+  );
+  const [statusLoading, setStatusLoading] = useState(() =>
+    !queryClient.getQueryData(['onboarding-status']),
+  );
+
+  // Kick off a network fetch only when the cache is cold or stale.
+  useEffect(() => {
+    queryClient
+      .fetchQuery({
+        queryKey: ['onboarding-status'],
+        queryFn: fetchOnboardingStatus,
+        staleTime: 5 * 60 * 1000,
+      })
+      .then((data) => {
+        setOnboarding(data);
+        setStatusLoading(false);
+      })
+      .catch(() => {
+        setStatusLoading(false);
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const kind = onboarding?.profileKind ?? onboarding?.primaryRole ?? null;
 
@@ -633,9 +869,12 @@ export default function ProfileSetupScreen() {
   const currentStep = steps[stepIdx] as WizardStepId | undefined;
   const isLastStep = stepIdx === steps.length - 1;
 
-  // Pre-populate from DB
+  // Pre-populate from DB and jump to the first incomplete step (runs once after data loads)
+  const initializedRef = useRef(false);
   useEffect(() => {
-    if (!onboarding?.prefill) return;
+    if (!onboarding || initializedRef.current) return;
+    initializedRef.current = true;
+
     const p = onboarding.prefill;
     if (p.firstName)                        setFirstName(p.firstName);
     if (p.lastName)                         setLastName(p.lastName);
@@ -645,7 +884,30 @@ export default function ProfileSetupScreen() {
     if (p.region)                           setRegion(p.region);
     if (p.postalCode)                       setPostalCode(p.postalCode);
     if (p.countryCode)                      setCountryCode(p.countryCode);
-  }, [onboarding]);
+
+    // Jump directly to the first incomplete step
+    const f = onboarding.flags;
+    const onboardingKind = onboarding.profileKind ?? onboarding.primaryRole ?? null;
+    let targetIdx = 0;
+
+    if (!f.hasName) {
+      targetIdx = steps.indexOf('name');
+    } else if (f.requiresPhone && !f.hasPhone) {
+      targetIdx = steps.indexOf('phone');
+    } else if (!f.hasTimezone) {
+      targetIdx = steps.indexOf('timezone');
+    } else if (!f.hasLocation) {
+      targetIdx = steps.indexOf('location');
+    } else if (!f.hasRoleData) {
+      const roleStep = steps.find((step) => step === 'student-profile' || step === 'educator-profile');
+      if (roleStep) targetIdx = steps.indexOf(roleStep);
+    } else if (onboardingKind === 'educator' && !f.hasAvailability) {
+      const availIdx = steps.indexOf('educator-availability');
+      if (availIdx !== -1) targetIdx = availIdx;
+    }
+
+    if (targetIdx > 0) setStepIdx(targetIdx);
+  }, [onboarding, steps]);
 
   const { mutate: advance, isPending: saving } = useMutation({
     mutationFn: async ({ isSkip, isLast }: { isSkip: boolean; isLast: boolean }) => {
@@ -667,7 +929,20 @@ export default function ProfileSetupScreen() {
             birthYear ? parseInt(birthYear, 10) : null, grade,
           );
         } else if (currentStep === 'educator-profile') {
-          await saveEducatorProfileStep(onboarding.profileId, onboarding.orgId ?? '', subjects);
+          await saveEducatorProfileStep(
+            onboarding.profileId, onboarding.orgId ?? '', subjects, gradeLevels,
+          );
+        } else if (currentStep === 'educator-availability') {
+          const availability: Record<string, Array<{ start: string; end: string }>> = {};
+          Object.entries(daySlots).forEach(([day, slot]) => {
+            availability[day] = [slot];
+          });
+          await saveEducatorAvailabilityStep(
+            onboarding.profileId, onboarding.orgId ?? '',
+            classTypes,
+            weeklyHours ? parseInt(weeklyHours, 10) : null,
+            availability,
+          );
         }
       }
       if (isLast) await completeOnboarding(onboarding.accountId);
@@ -693,15 +968,16 @@ export default function ProfileSetupScreen() {
   const canNext = useMemo(() => {
     if (saving) return false;
     switch (currentStep) {
-      case 'name':             return !!firstName.trim() && !!lastName.trim();
-      case 'phone':            return kind === 'child' || !!phone.trim();
-      case 'timezone':         return !!timezone && timezone !== 'UTC';
-      case 'location':         return !!city.trim() && !!region.trim() && !!countryCode;
-      case 'student-profile':  return !!grade;
-      case 'educator-profile': return subjects.length > 0;
-      default:                 return true;
+      case 'name':                  return !!firstName.trim() && !!lastName.trim();
+      case 'phone':                 return kind === 'child' || !!phone.trim();
+      case 'timezone':              return !!timezone && timezone !== 'UTC';
+      case 'location':              return !!city.trim() && !!region.trim() && !!countryCode;
+      case 'student-profile':       return !!grade;
+      case 'educator-profile':      return subjects.length > 0 && gradeLevels.length > 0;
+      case 'educator-availability': return classTypes.length > 0 && Object.keys(daySlots).length > 0;
+      default:                      return true;
     }
-  }, [saving, currentStep, firstName, lastName, phone, timezone, city, region, countryCode, grade, subjects, kind]);
+  }, [saving, currentStep, firstName, lastName, phone, timezone, city, region, countryCode, grade, subjects, gradeLevels, classTypes, daySlots, kind]);
 
   const handleNext = useCallback(() => {
     setError(null);
@@ -725,11 +1001,19 @@ export default function ProfileSetupScreen() {
         if (!grade) { setError('Please select your grade level to continue.'); return; }
         break;
       case 'educator-profile':
-        if (subjects.length === 0) { setError('Please select at least one subject.'); return; }
+        if (subjects.length === 0)   { setError('Please select at least one subject.'); return; }
+        if (gradeLevels.length === 0) { setError('Please select at least one grade level.'); return; }
+        break;
+      case 'educator-availability':
+        if (classTypes.length === 0)         { setError('Please select at least one teaching format.'); return; }
+        if (Object.keys(daySlots).length === 0) { setError('Please select at least one available day.'); return; }
         break;
     }
     advance({ isSkip: false, isLast: isLastStep });
-  }, [currentStep, firstName, lastName, phone, timezone, city, region, countryCode, grade, subjects, kind, advance, isLastStep]);
+  }, [
+    currentStep, firstName, lastName, phone, timezone, city, region, countryCode,
+    grade, subjects, gradeLevels, classTypes, daySlots, kind, advance, isLastStep,
+  ]);
 
   const handleSkip = useCallback(() => {
     setError(null);
@@ -814,7 +1098,19 @@ export default function ProfileSetupScreen() {
             />
           )}
           {currentStep === 'educator-profile' && (
-            <EducatorProfileStep subjects={subjects} setSubjects={setSubjects} s={s} colors={colors} />
+            <EducatorProfileStep
+              subjects={subjects} setSubjects={setSubjects}
+              gradeLevels={gradeLevels} setGradeLevels={setGradeLevels}
+              s={s} colors={colors}
+            />
+          )}
+          {currentStep === 'educator-availability' && (
+            <EducatorAvailabilityStep
+              classTypes={classTypes} setClassTypes={setClassTypes}
+              weeklyHours={weeklyHours} setWeeklyHours={setWeeklyHours}
+              daySlots={daySlots} setDaySlots={setDaySlots}
+              s={s} colors={colors}
+            />
           )}
 
           {!!error && <Text style={s.errorTxt}>{error}</Text>}

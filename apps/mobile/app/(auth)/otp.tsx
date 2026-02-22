@@ -12,6 +12,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/providers/auth-provider';
 import { useTheme } from '@/providers/theme-provider';
+import { fetchOnboardingStatus } from '@/lib/api/queries';
 import type { AppColors } from '@/lib/theme';
 
 const OTP_LENGTH = 6;
@@ -56,7 +57,7 @@ export default function OtpScreen() {
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { verifyOtp, signInWithOtp } = useAuth();
+  const { verifyOtp, signInWithOtp, signOut } = useAuth();
   const router = useRouter();
   const { colors } = useTheme();
   const s = useMemo(() => makeStyles(colors), [colors]);
@@ -68,14 +69,34 @@ export default function OtpScreen() {
     }
     setLoading(true);
     setError(null);
+
     const { error: verifyError } = await verifyOtp(email ?? '', code);
     if (verifyError) {
       setError(verifyError);
       setLoading(false);
       return;
     }
-    router.replace('/(app)/(tabs)');
-  }, [code, email, verifyOtp, router]);
+
+    // Session is now stored in SecureStore. fetchOnboardingStatus uses getSession()
+    // (local read, no network hang) to determine where to send the user.
+    try {
+      const status = await fetchOnboardingStatus();
+      if (!status.isRoleAllowed) {
+        await signOut();
+        setError('This app is only for students, parents, and educators. Admin accounts must use the web dashboard.');
+        setLoading(false);
+        return;
+      }
+      if (!status.isComplete) {
+        router.replace('/(auth)/profile-setup');
+      } else {
+        router.replace('/(app)/(tabs)');
+      }
+    } catch {
+      // On error, fall through to app — (app)/_layout will re-check on mount.
+      router.replace('/(app)/(tabs)');
+    }
+  }, [code, email, verifyOtp, signOut, router]);
 
   const handleResend = useCallback(async () => {
     if (!email) return;
