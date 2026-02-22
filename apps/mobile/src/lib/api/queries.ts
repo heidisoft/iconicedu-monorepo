@@ -34,9 +34,10 @@ export async function fetchUserAccount() {
   } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
+  // Include the linked profile so callers don't need a second round-trip.
   const { data: account, error } = await supabase
     .from('accounts')
-    .select('*')
+    .select('*, profile:profiles!account_id(id, display_name, first_name, last_name, avatar_seed)')
     .eq('auth_user_id', user.id)
     .single();
 
@@ -68,6 +69,14 @@ export async function fetchProfileByAccountId(accountId: string) {
   return data ?? null;
 }
 
+export type DmParticipant = {
+  id: string;
+  display_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  avatar_seed: string | null;
+};
+
 export type ChannelListItem = {
   id: string;
   org_id: string;
@@ -79,66 +88,78 @@ export type ChannelListItem = {
   last_message_text: string | null;
   last_message_at: string | null;
   last_message_sender: string | null;
-  /** Learning space subject emoji, e.g. "📐". Populated in demo mode and future API. */
+  /** Learning space subject emoji, e.g. "📐". */
   icon_emoji?: string | null;
-  /** Primary student name this space is for, e.g. "Tevin". Populated in demo mode. */
+  /** Primary student name this space is for. */
   student_name?: string | null;
+  /** DM channel participants (other people, self excluded). */
+  participants?: DmParticipant[];
 };
 
 export async function fetchDirectMessages(
   orgId: string,
-  profileId: string,
+  myProfileId: string,
 ): Promise<ChannelListItem[]> {
-  const { data, error } = await supabase
+  if (!myProfileId) return [];
+
+  // Step 1: get channel IDs where the logged-in user is a member
+  // Uses channel_members (the correct table — mirrors web's channel_members table)
+  const { data: myMemberships, error: myError } = await supabase
+    .from('channel_members')
+    .select('channel_id')
+    .eq('profile_id', myProfileId)
+    .eq('org_id', orgId)
+    .is('deleted_at', null);
+
+  if (myError) throw myError;
+  if (!myMemberships || myMemberships.length === 0) return [];
+
+  const userChannelIds = myMemberships.map((m) => m.channel_id);
+
+  // Step 2: fetch only DM channels among the user's memberships
+  const { data: chRows, error: chError } = await supabase
     .from('channels')
-    .select(
-      `
-      id, org_id, topic, description, kind, updated_at,
-      channel_participants!inner(profile_id),
-      channel_read_state(unread_count),
-      last_msg:messages(id, content, created_at, sender:profiles!sender_profile_id(display_name, first_name, last_name))
-    `,
-    )
+    .select('id, org_id, topic, description, kind, updated_at')
+    .in('id', userChannelIds)
     .eq('org_id', orgId)
     .eq('kind', 'dm')
-    .eq('channel_participants.profile_id', profileId)
     .eq('status', 'active')
     .is('deleted_at', null)
     .order('updated_at', { ascending: false });
 
-  if (error) throw error;
+  if (chError) throw chError;
+  if (!chRows || chRows.length === 0) return [];
 
-  return (data ?? []).map((ch) => {
-    const msgs = (ch.last_msg ?? []) as Array<{
-      id: string;
-      content: Record<string, unknown> | null;
-      created_at: string;
-      sender: { display_name: string | null; first_name: string | null; last_name: string | null } | null;
-    }>;
-    // last_msg comes unsorted – pick the most recent by created_at
-    const last = msgs.reduce<typeof msgs[number] | null>((acc, m) =>
-      !acc || m.created_at > acc.created_at ? m : acc, null);
+  // Step 3: fetch all members for those channels to build name/avatar display
+  const { data: memberRows } = await supabase
+    .from('channel_members')
+    .select('channel_id, profile_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_seed)')
+    .in('channel_id', chRows.map((c) => c.id))
+    .is('deleted_at', null);
 
-    const readState = (ch.channel_read_state as Array<{ unread_count: number | null }> | null)?.[0];
+  // Build channelId → DmParticipant[] map, excluding self
+  const participantMap = new Map<string, DmParticipant[]>();
+  for (const member of memberRows ?? []) {
+    const profile = member.profile as DmParticipant | null;
+    if (!profile || profile.id === myProfileId) continue;
+    const list = participantMap.get(member.channel_id) ?? [];
+    list.push(profile);
+    participantMap.set(member.channel_id, list);
+  }
 
-    return {
-      id: ch.id,
-      org_id: ch.org_id,
-      topic: ch.topic,
-      description: ch.description,
-      kind: ch.kind,
-      updated_at: ch.updated_at,
-      unread_count: readState?.unread_count ?? 0,
-      last_message_text: last
-        ? String(last.content?.text ?? '') || null
-        : null,
-      last_message_at: last?.created_at ?? null,
-      last_message_sender: last?.sender
-        ? (last.sender.display_name ??
-            ([last.sender.first_name, last.sender.last_name].filter(Boolean).join(' ') || null))
-        : null,
-    };
-  });
+  return chRows.map((ch) => ({
+    id: ch.id,
+    org_id: ch.org_id,
+    topic: ch.topic ?? null,
+    description: ch.description ?? null,
+    kind: ch.kind,
+    updated_at: ch.updated_at,
+    unread_count: 0,
+    last_message_text: null,
+    last_message_at: null,
+    last_message_sender: null,
+    participants: participantMap.get(ch.id) ?? [],
+  }));
 }
 
 export async function fetchChannels(orgId: string): Promise<ChannelListItem[]> {
@@ -276,16 +297,103 @@ export async function fetchLearningSpaces(orgId: string) {
     .from('learning_spaces')
     .select(
       `
-      *,
-      primary_channel:channels!primary_channel_id(*)
+      id, org_id, kind, status, title, icon_key, subject, description, updated_at,
+      learning_space_channels(channel_id, is_primary, channel:channels!channel_id(*))
     `,
     )
     .eq('org_id', orgId)
     .in('status', ['active', 'paused'])
+    .is('deleted_at', null)
     .order('updated_at', { ascending: false });
 
   if (error) throw error;
   return data ?? [];
+}
+
+/** Emoji icon for each learning space icon_key (Lucide icon keys mapped to emoji equivalents). */
+const SPACE_ICON_EMOJI: Record<string, string> = {
+  'square-pi': '📐',
+  'languages': '🌐',
+  'chef-hat': '👨‍🍳',
+  'earth': '🌍',
+  'sparkles': '✨',
+  'book-open': '📖',
+  'flask-conical': '🧪',
+  'music': '🎵',
+  'palette': '🎨',
+  'dumbbell': '🏋️',
+};
+
+/**
+ * Fetches learning space primary channels for the messages tab, scoped to
+ * spaces the logged-in user participates in.
+ * Mirrors web's learning_space_participants filtering pattern.
+ */
+export async function fetchLearningSpaceChannels(
+  orgId: string,
+  myProfileId: string,
+): Promise<ChannelListItem[]> {
+  if (!myProfileId) return [];
+
+  // Step 1: get learning space IDs where the user is a participant
+  // Uses learning_space_participants (mirrors web's getLearningSpaceParticipantsByLearningSpaceIds)
+  const { data: mySpaces, error: spError } = await supabase
+    .from('learning_space_participants')
+    .select('learning_space_id')
+    .eq('profile_id', myProfileId)
+    .eq('org_id', orgId)
+    .is('deleted_at', null);
+
+  if (spError) throw spError;
+  if (!mySpaces || mySpaces.length === 0) return [];
+
+  const userSpaceIds = mySpaces.map((s) => s.learning_space_id);
+
+  // Step 2: fetch primary channels for those learning spaces
+  const { data, error } = await supabase
+    .from('learning_space_channels')
+    .select(
+      `
+      channel_id,
+      space:learning_spaces!learning_space_id(id, title, icon_key, subject, status, deleted_at),
+      channel:channels!channel_id(id, org_id, updated_at)
+      `,
+    )
+    .eq('org_id', orgId)
+    .eq('is_primary', true)
+    .in('learning_space_id', userSpaceIds)
+    .is('deleted_at', null);
+
+  if (error) throw error;
+
+  type Row = typeof data extends (infer R)[] | null ? R : never;
+  const toSpace = (r: Row) => r.space as { id: string; title: string; icon_key: string | null; subject: string | null; status: string; deleted_at: string | null } | null;
+  const toChannel = (r: Row) => r.channel as { id: string; org_id: string; updated_at: string } | null;
+
+  return (data ?? [])
+    .filter((row) => {
+      const sp = toSpace(row);
+      const ch = toChannel(row);
+      return sp && ch && !sp.deleted_at && (sp.status === 'active' || sp.status === 'paused');
+    })
+    .map((row) => {
+      const sp = toSpace(row)!;
+      const ch = toChannel(row)!;
+      return {
+        id: ch.id,
+        org_id: ch.org_id,
+        topic: sp.title,
+        description: sp.subject ?? null,
+        kind: 'channel' as const,
+        updated_at: ch.updated_at,
+        unread_count: 0,
+        last_message_text: null,
+        last_message_at: null,
+        last_message_sender: null,
+        icon_emoji: SPACE_ICON_EMOJI[sp.icon_key ?? ''] ?? null,
+        student_name: null,
+      };
+    });
 }
 
 export async function fetchNotificationPreferences(orgId: string, profileId: string) {

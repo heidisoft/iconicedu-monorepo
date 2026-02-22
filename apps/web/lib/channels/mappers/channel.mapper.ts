@@ -113,6 +113,7 @@ export function mapChannelRowToVM(
       ? {
           defaultRightPanelOpen: true,
           defaultRightPanelKey: 'channel_info',
+          themeKey: row.ui_theme_key ?? null,
         }
       : undefined,
   };

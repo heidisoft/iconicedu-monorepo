@@ -41,6 +41,7 @@ export async function updateChannelFromPayload(
     visibility: payload.basics.visibility,
     purpose: payload.basics.purpose,
     kind: payload.basics.kind,
+    themeKey: payload.ui?.themeKey ?? 'teal',
     status: payload.lifecycle?.status ?? 'active',
     postingPolicyKind: payload.postingPolicy.kind,
     allowThreads: payload.postingPolicy.allowThreads ?? true,
@@ -75,6 +76,7 @@ type UpdateChannelPayload = {
   visibility: string;
   purpose: string;
   kind: string;
+  themeKey: string;
   status: string;
   postingPolicyKind: string;
   allowThreads: boolean;
@@ -93,6 +95,7 @@ async function updateChannel(supabase: SupabaseClient, payload: UpdateChannelPay
       visibility: payload.visibility,
       purpose: payload.purpose,
       kind: payload.kind,
+      ui_theme_key: payload.themeKey,
       status: payload.status,
       posting_policy_kind: payload.postingPolicyKind,
       allow_threads: payload.allowThreads,

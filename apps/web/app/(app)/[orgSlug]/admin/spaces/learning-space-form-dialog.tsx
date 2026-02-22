@@ -30,6 +30,7 @@ import {
   SelectLabel,
   SelectTrigger,
   SelectValue,
+  ChannelUiDefaultsSettingsSection,
   toast,
   ResourceLinksEditor,
   ParticipantSelector,
@@ -46,6 +47,7 @@ import type { RecurrenceFormData } from '@iconicedu/ui-web/lib/recurrence-types'
 import type {
   LearningSpaceCreatePayload,
   LearningSpaceLinkVM,
+  ThemeKey,
   UserProfileVM,
 } from '@iconicedu/shared-types';
 
@@ -116,6 +118,9 @@ type LearningSpaceFormDialogProps = {
       subject?: string | null;
       description?: string | null;
     };
+    settings?: {
+      themeKey?: ThemeKey | null;
+    } | null;
     participants: UserProfileVM[];
     resources: LearningSpaceLinkVM[];
     schedules: RecurrenceFormData[];
@@ -129,6 +134,7 @@ type LearningSpaceFormState = {
   subject: string;
   description: string;
   iconKey: LearningSpaceIconKey;
+  themeKey: ThemeKey;
   participants: UserProfileVM[];
   resources: LearningSpaceLinkVM[];
   schedules: RecurrenceFormData[];
@@ -163,6 +169,7 @@ export function LearningSpaceFormDialog({
       subject: '',
       description: '',
       iconKey: DEFAULT_LEARNING_SPACE_ICON_KEY,
+      themeKey: 'teal',
       participants: [],
       resources: [],
       schedules: [],
@@ -191,6 +198,7 @@ export function LearningSpaceFormDialog({
         description: initialData.basics.description ?? '',
         iconKey:
           (initialData.basics.iconKey ?? DEFAULT_LEARNING_SPACE_ICON_KEY) as LearningSpaceIconKey,
+        themeKey: (initialData.settings?.themeKey ?? 'teal') as ThemeKey,
         participants: initialData.participants ?? [],
         resources: initialData.resources ?? [],
         schedules: normalizeSchedules(initialData.schedules ?? []),
@@ -235,6 +243,9 @@ export function LearningSpaceFormDialog({
         iconKey: formState.iconKey,
         subject: formState.subject || null,
         description: formState.description.trim() || null,
+      },
+      settings: {
+        themeKey: formState.themeKey ?? null,
       },
       participants: mapParticipantsToPayload(formState.participants),
       resources: mapLinksToPayload(formState.resources),
@@ -492,6 +503,16 @@ export function LearningSpaceFormDialog({
                     }
                   />
                 </FieldSet>
+                <FieldSeparator />
+                <ChannelUiDefaultsSettingsSection
+                  legend="Settings"
+                  themeSelectId="ls-theme-key"
+                  description="Sets the accent color used across this learning space message UI."
+                  uiDefaults={{ themeKey: formState.themeKey }}
+                  onUiDefaultsChange={(updates) =>
+                    updateFormState({ themeKey: (updates.themeKey ?? 'teal') as ThemeKey })
+                  }
+                />
               </form>
               <ScrollBar orientation="vertical" className="right-2" />
             </ScrollArea>

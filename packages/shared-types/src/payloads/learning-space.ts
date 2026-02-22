@@ -1,4 +1,4 @@
-import type { IANATimezone, ISODateTime } from '@iconicedu/shared-types/shared/shared';
+import type { IANATimezone, ISODateTime, ThemeKey } from '@iconicedu/shared-types/shared/shared';
 import type { RecurrenceFrequencyVM, WeekdayVM } from '@iconicedu/shared-types/vm/class-schedule';
 
 export type LearningSpaceScheduleWeekdayTimePayload = {
@@ -60,6 +60,9 @@ export type LearningSpaceCreatePayload = {
     subject?: string | null;
     description?: string | null;
   };
+  settings?: {
+    themeKey?: ThemeKey | null;
+  } | null;
   participants: LearningSpaceParticipantPayload[];
   resources?: LearningSpaceResourcePayload[] | null;
   schedules?: LearningSpaceSchedulePayload[] | null;

@@ -15,6 +15,7 @@ export const CHANNEL_SELECT =
     'allow_reactions',
     'primary_entity_kind',
     'primary_entity_id',
+    'ui_theme_key',
     'created_by_profile_id',
     'created_at',
     'archived_at',

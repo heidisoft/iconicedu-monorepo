@@ -38,6 +38,7 @@ export * from '@iconicedu/ui-web/ui/alert-dialog';
 export * from '@iconicedu/ui-web/ui/card';
 export * from '@iconicedu/ui-web/components/dashboard-header';
 export * from '@iconicedu/ui-web/components/participant-selector';
+export * from '@iconicedu/ui-web/components/admin/channel-ui-defaults-settings-section';
 export * from '@iconicedu/ui-web/components/recurrence-form';
 export * from '@iconicedu/ui-web/components/recurrence-scheduler';
 export * from '@iconicedu/ui-web/components/resource-links-editor';

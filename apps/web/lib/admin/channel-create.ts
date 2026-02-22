@@ -41,6 +41,7 @@ export async function createAdminChannel(payload: ChannelCreatePayload) {
     icon_key: payload.basics.iconKey ?? null,
     visibility: payload.basics.visibility,
     purpose: payload.basics.purpose,
+    ui_theme_key: payload.ui?.themeKey ?? 'teal',
     status,
     posting_policy_kind: payload.postingPolicy.kind,
     allow_threads: payload.postingPolicy.allowThreads ?? true,

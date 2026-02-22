@@ -39,6 +39,9 @@ describe('POST /api/admin/channels/update', () => {
         visibility: 'private',
         purpose: 'general',
       },
+      ui: {
+        themeKey: 'teal',
+      },
       postingPolicy: {
         kind: 'members-only',
         allowThreads: true,

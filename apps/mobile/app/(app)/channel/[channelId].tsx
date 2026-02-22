@@ -4,7 +4,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { MessageVM } from '@iconicedu/shared-types';
 import { useAccount } from '@/hooks/use-account';
-import { useProfile } from '@/hooks/use-profile';
 import { useMessages } from '@/hooks/use-messages';
 import { useTyping } from '@/hooks/use-typing';
 import { sendTextMessage, deleteMessage } from '@/lib/api/queries';
@@ -20,14 +19,16 @@ export default function ChannelConversationScreen() {
   const { channelId, topic } = useLocalSearchParams<{ channelId: string; topic?: string }>();
   const router = useRouter();
   const { data: account } = useAccount();
-  const { data: profile } = useProfile();
   const { colors } = useTheme();
 
-  const profileId = (profile as Record<string, unknown> | undefined)?.id as string ?? '';
   const orgId = account?.org_id ?? '';
+  // Profile is joined in fetchUserAccount — no extra round-trip needed
+  const profileArr = ((account as Record<string, unknown> | undefined)
+    ?.profile as Array<{ id: string; display_name: string | null; first_name: string | null }> | null);
+  const profileId = profileArr?.[0]?.id ?? '';
   const senderName =
-    ((profile as Record<string, unknown> | undefined)?.display_name as string | undefined) ??
-    ((profile as Record<string, unknown> | undefined)?.first_name as string | undefined) ??
+    profileArr?.[0]?.display_name?.trim() ||
+    profileArr?.[0]?.first_name?.trim() ||
     'Me';
 
   const {

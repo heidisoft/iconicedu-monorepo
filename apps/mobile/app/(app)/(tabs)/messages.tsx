@@ -12,12 +12,12 @@ import {
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAccount } from '@/hooks/use-account';
-import { useProfile } from '@/hooks/use-profile';
 import { useDirectMessages } from '@/hooks/use-direct-messages';
-import { useChannels } from '@/hooks/use-channels';
+import { useLearningSpaceChannels } from '@/hooks/use-learning-space-channels';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
-import type { ChannelListItem } from '@/lib/api/queries';
+import type { ChannelListItem, DmParticipant } from '@/lib/api/queries';
+
 type Tab = 'all' | 'dms' | 'channels';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -33,11 +33,19 @@ function formatListTime(iso: string | null): string {
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
-function getInitials(topic: string | null): string {
-  const t = (topic ?? '?').trim();
+function getInitials(name: string | null): string {
+  const t = (name ?? '?').trim();
   const words = t.split(/\s+/);
   if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
   return t[0]?.toUpperCase() ?? '?';
+}
+
+function participantName(p: DmParticipant): string {
+  return (
+    p.display_name?.trim() ||
+    [p.first_name, p.last_name].filter(Boolean).join(' ').trim() ||
+    'Unknown'
+  );
 }
 
 const AVATAR_COLORS = ['#5B8DEF', '#E07B54', '#6CC070', '#A86CC1', '#E0A854', '#54B8C4', '#E06C8A'];
@@ -54,11 +62,9 @@ function makeStyles(C: AppColors) {
     safe:   { flex: 1, backgroundColor: C.bg },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
-    // Header — matches Inbox exactly
     header: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 12 },
     title:  { fontSize: 30, fontWeight: '800', color: C.text, letterSpacing: -0.5 },
 
-    // Full-width underline tab bar — matches Inbox exactly
     tabBar:        { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: C.border },
     tab:           { flex: 1, paddingVertical: 12, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent', marginBottom: -1 },
     tabActive:     { borderBottomColor: C.teal },
@@ -68,7 +74,6 @@ function makeStyles(C: AppColors) {
     tabBadge:      { minWidth: 18, height: 18, borderRadius: 9, backgroundColor: '#ef4444', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
     tabBadgeText:  { fontSize: 10, fontWeight: '700', color: '#ffffff' },
 
-    // Card row — matches Inbox itemOuter + itemWrap pattern
     itemOuter: { marginHorizontal: 16 },
     itemWrap:  {
       borderRadius: 14,
@@ -80,21 +85,24 @@ function makeStyles(C: AppColors) {
       overflow: 'hidden',
     },
     itemRow:   { flexDirection: 'row', alignItems: 'center', gap: 14 },
-
-    // Separator between cards — matches Inbox
     separator: { height: 10 },
 
-    // DM avatar: colored circle with initials
-    avatarWrap:    { position: 'relative', flexShrink: 0 },
-    avatarCircle:  { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
-    avatarTxt:     { color: '#fff', fontWeight: '700', fontSize: 18, letterSpacing: 0.3 },
-    onlineDot:     { position: 'absolute', bottom: 1, right: 1, width: 13, height: 13, borderRadius: 7, backgroundColor: '#22c55e', borderWidth: 2, borderColor: C.card },
+    // ── DM avatar — single person ──────────────────────────────────────────────
+    avatarWrap:   { position: 'relative', width: 52, height: 52, flexShrink: 0 },
+    avatarCircle: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
+    avatarTxt:    { color: '#fff', fontWeight: '700', fontSize: 18, letterSpacing: 0.3 },
+    onlineDot:    { position: 'absolute', bottom: 1, right: 1, width: 13, height: 13, borderRadius: 7, backgroundColor: '#22c55e', borderWidth: 2, borderColor: C.card },
 
-    // Channel avatar: teal-tinted rounded square with emoji (matches Inbox icon style)
+    // ── DM avatar — group (stacked) ────────────────────────────────────────────
+    groupWrap:    { width: 52, height: 52, flexShrink: 0, position: 'relative' },
+    groupBack:    { position: 'absolute', right: 0, bottom: 0, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: C.card },
+    groupFront:   { position: 'absolute', left: 0, top: 0, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: C.card },
+    groupTxt:     { color: '#fff', fontWeight: '700', fontSize: 13 },
+
+    // ── Learning space avatar ──────────────────────────────────────────────────
     channelAvatar: { width: 52, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexShrink: 0, backgroundColor: C.tealBg, borderWidth: StyleSheet.hairlineWidth, borderColor: C.border },
     channelEmoji:  { fontSize: 24 },
 
-    // Row content
     content:          { flex: 1, gap: 4 },
     topRow:           { flexDirection: 'row', alignItems: 'center', gap: 4 },
     rowName:          { flex: 1, fontSize: 15, fontWeight: '700', color: C.text },
@@ -105,16 +113,58 @@ function makeStyles(C: AppColors) {
     rowPreviewUnread: { color: C.text, fontWeight: '600' },
     forStudent:       { fontWeight: '600', color: C.teal },
 
-    // Unread badge — right side of preview
     badge:    { minWidth: 20, height: 20, borderRadius: 10, backgroundColor: C.teal, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
     badgeTxt: { color: C.tealFg, fontSize: 11, fontWeight: '700' },
 
-    // Empty state — matches Inbox
     emptyWrap:  { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingBottom: 60 },
     emptyIcon:  { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
     emptyTitle: { fontSize: 18, fontWeight: '700' },
     emptyDesc:  { fontSize: 14, textAlign: 'center', paddingHorizontal: 40, lineHeight: 21 },
   });
+}
+
+// ─── DM avatar ────────────────────────────────────────────────────────────────
+
+function DmAvatar({
+  participants,
+  fallbackId,
+  s,
+  colors,
+}: {
+  participants: DmParticipant[];
+  fallbackId: string;
+  s: ReturnType<typeof makeStyles>;
+  colors: AppColors;
+}) {
+  const isGroup = participants.length > 1;
+
+  if (isGroup) {
+    const [back, front] = participants;
+    return (
+      <View style={s.groupWrap}>
+        <View style={[s.groupBack, { backgroundColor: avatarColor(back!.id) }]}>
+          <Text style={s.groupTxt}>{getInitials(participantName(back!))}</Text>
+        </View>
+        <View style={[s.groupFront, { backgroundColor: avatarColor(front!.id) }]}>
+          <Text style={s.groupTxt}>{getInitials(participantName(front!))}</Text>
+        </View>
+      </View>
+    );
+  }
+
+  const person = participants[0];
+  const name = person ? participantName(person) : null;
+  const color = avatarColor(person?.id ?? fallbackId);
+
+  return (
+    <View style={s.avatarWrap}>
+      <View style={[s.avatarCircle, { backgroundColor: color }]}>
+        <Text style={s.avatarTxt}>{getInitials(name)}</Text>
+      </View>
+      {/* Online dot — presence tracking can be layered on top later */}
+      <View style={s.onlineDot} />
+    </View>
+  );
 }
 
 // ─── Row component ────────────────────────────────────────────────────────────
@@ -131,14 +181,19 @@ function ChannelRow({
   colors: AppColors;
 }) {
   const isDm = item.kind === 'dm';
-  const name = item.topic ?? (isDm ? 'Direct Message' : 'Channel');
+  const participants = item.participants ?? [];
+
+  // DM display name: participant name(s) or fallback to topic
+  const name = isDm
+    ? (participants.length > 0
+        ? participants.map(participantName).join(', ')
+        : (item.topic ?? 'Direct Message'))
+    : (item.topic ?? 'Channel');
+
   const text = item.last_message_text;
   const time = formatListTime(item.last_message_at ?? item.updated_at);
   const unread = item.unread_count ?? 0;
   const hasUnread = unread > 0;
-  const bgColor = avatarColor(item.id);
-
-  // For learning spaces: prefix preview with "For Tevin · " in teal
   const studentName = !isDm ? item.student_name : null;
   const previewText = text ?? item.description ?? '';
 
@@ -149,17 +204,21 @@ function ChannelRow({
         style={({ pressed }) => [s.itemWrap, pressed && { backgroundColor: colors.inputBg }]}
       >
         <View style={s.itemRow}>
-          {/* Avatar: emoji tile for channels, colored initials circle + online dot for DMs */}
-          {!isDm && item.icon_emoji ? (
+          {/* Avatar */}
+          {isDm ? (
+            <DmAvatar
+              participants={participants}
+              fallbackId={item.id}
+              s={s}
+              colors={colors}
+            />
+          ) : item.icon_emoji ? (
             <View style={s.channelAvatar}>
               <Text style={s.channelEmoji}>{item.icon_emoji}</Text>
             </View>
           ) : (
-            <View style={s.avatarWrap}>
-              <View style={[s.avatarCircle, { backgroundColor: bgColor }]}>
-                <Text style={s.avatarTxt}>{getInitials(name)}</Text>
-              </View>
-              <View style={s.onlineDot} />
+            <View style={s.channelAvatar}>
+              <Text style={s.channelEmoji}>📚</Text>
             </View>
           )}
 
@@ -193,17 +252,18 @@ function ChannelRow({
 
 export default function MessagesScreen() {
   const [activeTab, setActiveTab] = useState<Tab>('all');
-  const { data: account } = useAccount();
-  const { data: profile } = useProfile();
+  const { data: account, isLoading: accountLoading } = useAccount();
   const { colors } = useTheme();
   const router = useRouter();
   const s = useMemo(() => makeStyles(colors), [colors]);
 
   const orgId = account?.org_id ?? '';
-  const profileId = (profile as Record<string, unknown> | undefined)?.id as string ?? '';
+  // Profile ID comes from the account query (profile joined in fetchUserAccount)
+  const myProfileId =
+    ((account as Record<string, unknown> | undefined)?.profile as Array<{ id: string }> | null)?.[0]?.id ?? '';
 
-  const { data: dms, isLoading: dmsLoading, refetch: refetchDms } = useDirectMessages(orgId, profileId);
-  const { data: channels, isLoading: channelsLoading, refetch: refetchChannels } = useChannels(orgId);
+  const { data: dms, isLoading: dmsLoading, refetch: refetchDms } = useDirectMessages(orgId, myProfileId);
+  const { data: channels, isLoading: channelsLoading, refetch: refetchChannels } = useLearningSpaceChannels(orgId, myProfileId);
 
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(async () => {
@@ -228,33 +288,30 @@ export default function MessagesScreen() {
     activeTab === 'dms' ? allDms :
     allChannels;
 
-  // Unread counts for tab badges
   const unreadAll      = useMemo(() => allItems.reduce((n, i) => n + (i.unread_count ?? 0), 0), [allItems]);
   const unreadDms      = useMemo(() => allDms.reduce((n, i) => n + (i.unread_count ?? 0), 0), [allDms]);
   const unreadChannels = useMemo(() => allChannels.reduce((n, i) => n + (i.unread_count ?? 0), 0), [allChannels]);
 
   const TABS: { key: Tab; label: string; count: number }[] = [
-    { key: 'all',      label: 'All',              count: unreadAll },
-    { key: 'dms',      label: 'Direct Messages',  count: unreadDms },
-    { key: 'channels', label: 'Learning Spaces',  count: unreadChannels },
+    { key: 'all',      label: 'All',             count: unreadAll },
+    { key: 'dms',      label: 'Direct Messages', count: unreadDms },
+    { key: 'channels', label: 'Learning Spaces', count: unreadChannels },
   ];
 
-  const isLoading = dmsLoading || channelsLoading;
+  const isLoading = accountLoading || dmsLoading || channelsLoading;
 
   const emptyConfig = {
-    all:      { icon: '💬', title: 'No messages yet',      desc: 'Your conversations will appear here' },
-    dms:      { icon: '💬', title: 'No direct messages',   desc: 'Start a conversation with a tutor or educator' },
-    channels: { icon: '📚', title: 'No learning spaces',   desc: 'Channels you join will appear here' },
+    all:      { icon: '💬', title: 'No messages yet',    desc: 'Your conversations will appear here' },
+    dms:      { icon: '💬', title: 'No direct messages', desc: 'Start a conversation with a tutor or educator' },
+    channels: { icon: '📚', title: 'No learning spaces', desc: 'Channels you join will appear here' },
   }[activeTab];
 
   return (
     <SafeAreaView style={s.safe}>
-      {/* Header */}
       <View style={s.header}>
         <Text style={s.title}>Messages</Text>
       </View>
 
-      {/* Full-width underline tab bar */}
       <View style={s.tabBar}>
         {TABS.map(({ key, label, count }) => {
           const isActive = activeTab === key;
@@ -303,14 +360,20 @@ export default function MessagesScreen() {
               item={item}
               s={s}
               colors={colors}
-              onPress={() =>
+              onPress={() => {
+                // For DMs pass participant names as the title; for channels pass topic
+                const displayTitle = item.kind === 'dm'
+                  ? ((item.participants ?? []).length > 0
+                      ? (item.participants ?? []).map(participantName).join(', ')
+                      : (item.topic ?? 'Direct Message'))
+                  : (item.topic ?? 'Channel');
                 router.push({
                   pathname: item.kind === 'dm'
                     ? '/(app)/dm/[channelId]'
                     : '/(app)/channel/[channelId]',
-                  params: { channelId: item.id, topic: item.topic ?? '' },
-                } as never)
-              }
+                  params: { channelId: item.id, topic: displayTitle },
+                } as never);
+              }}
             />
           )}
         />

@@ -5,6 +5,7 @@ import { sendTextMessageAction, toggleMessageReactionAction, deleteMessageAction
 import { buildChannelById } from '@iconicedu/web/lib/channels/builders/channel.builder';
 import { isStaffObserverReadOnlyChannel } from '@iconicedu/web/lib/channels/read-only';
 import { buildLearningSpaceByChannelId } from '@iconicedu/web/lib/spaces/builders/learning-space.builder';
+import { LEARNING_SPACE_MESSAGES_SECTION_TITLE } from '@iconicedu/web/app/(app)/[orgSlug]/spaces/[channelId]/page.constants';
 import {
   getDashboardAccountContext,
   getDashboardProfileContext,
@@ -40,7 +41,7 @@ export default async function Page({
 
   return (
     <div className="flex h-[calc(100vh-1.0rem)] flex-col">
-      <DashboardHeader />
+      <DashboardHeader title={LEARNING_SPACE_MESSAGES_SECTION_TITLE} />
       <LearningSpaceShell
         channel={channel}
         learningSpace={learningSpace}

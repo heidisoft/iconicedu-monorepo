@@ -32,6 +32,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  ChannelUiDefaultsSettingsSection,
 } from '@iconicedu/ui-web';
 
 import type { AdminChannelRow } from '@iconicedu/web/lib/admin/channels';
@@ -43,6 +44,7 @@ import type {
   ChannelVisibility,
   ChannelCreatePayload,
   ChannelPostingPolicyVM,
+  ThemeKey,
   UserProfileVM,
 } from '@iconicedu/shared-types';
 import { ChannelsTable } from '@iconicedu/web/app/(app)/[orgSlug]/admin/channels/channels-table';
@@ -60,6 +62,7 @@ type CreateChannelFormState = {
   kind: string;
   purpose: string;
   visibility: string;
+  themeKey: ThemeKey;
   status: ChannelStatus;
   postingPolicyKind: ChannelPostingPolicyVM['kind'];
   allowThreads: boolean;
@@ -88,6 +91,7 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
     kind: 'channel',
     purpose: 'general',
     visibility: 'private',
+    themeKey: 'teal',
     status: 'active',
     postingPolicyKind: 'members-only',
     allowThreads: true,
@@ -169,6 +173,7 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
       kind: 'channel',
       purpose: 'general',
       visibility: 'private',
+      themeKey: 'teal',
       status: 'active',
       postingPolicyKind: 'members-only',
       allowThreads: true,
@@ -188,6 +193,7 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
       kind: detail.basics.kind,
       purpose: detail.basics.purpose,
       visibility: detail.basics.visibility,
+      themeKey: (detail.ui?.themeKey ?? 'teal') as ThemeKey,
       status: detail.lifecycle.status,
       postingPolicyKind: detail.postingPolicy.kind,
       allowThreads: detail.postingPolicy.allowThreads ?? true,
@@ -239,6 +245,9 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
           description: formState.description.trim() || null,
           visibility: formState.visibility as ChannelVisibility,
           purpose: formState.purpose as ChannelPurpose,
+        },
+        ui: {
+          themeKey: formState.themeKey ?? null,
         },
         postingPolicy: {
           kind: formState.postingPolicyKind,
@@ -436,7 +445,7 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
                       <Checkbox
                         checked={formState.allowThreads}
                         onCheckedChange={(checked) =>
-                          updateFormState({ allowThreads: Boolean(checked) })
+                          updateFormState({ allowThreads: checked === true })
                         }
                       />
                       Allow threads
@@ -445,7 +454,7 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
                       <Checkbox
                         checked={formState.allowReactions}
                         onCheckedChange={(checked) =>
-                          updateFormState({ allowReactions: Boolean(checked) })
+                          updateFormState({ allowReactions: checked === true })
                         }
                       />
                       Allow reactions
@@ -498,7 +507,7 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
                             checked={formState.capabilities.includes(capability)}
                             onCheckedChange={(checked) =>
                               updateFormState({
-                                capabilities: Boolean(checked)
+                                capabilities: checked === true
                                   ? formState.capabilities.includes(capability)
                                     ? formState.capabilities
                                     : [...formState.capabilities, capability]
@@ -513,6 +522,14 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
                   </div>
                 </FieldGroup>
               </FieldSet>
+              <FieldSeparator />
+              <ChannelUiDefaultsSettingsSection
+                themeSelectId="channel-theme-key"
+                uiDefaults={{ themeKey: formState.themeKey }}
+                onUiDefaultsChange={(updates) =>
+                  updateFormState({ themeKey: (updates.themeKey ?? 'teal') as ThemeKey })
+                }
+              />
               {createError ? (
                 <p className="text-sm text-destructive">{createError}</p>
               ) : null}

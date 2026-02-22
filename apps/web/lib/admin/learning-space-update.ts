@@ -91,6 +91,7 @@ export async function updateLearningSpaceFromPayload(
     topic: payload.basics.title,
     description: payload.basics.description ?? null,
     iconKey: payload.basics.iconKey ?? null,
+    uiThemeKey: payload.settings?.themeKey ?? null,
     updatedBy: actorProfileId,
     updatedAt: now,
   });
@@ -127,6 +128,7 @@ export async function updateLearningSpaceFromPayload(
     createdAt: now,
     title: payload.basics.title,
     description: payload.basics.description ?? null,
+    themeKey: payload.settings?.themeKey ?? null,
     participants: payload.participants,
     schedules: payload.schedules ?? [],
   });
@@ -174,6 +176,7 @@ type UpdateChannelPayload = {
   topic: string;
   description: string | null;
   iconKey: string | null;
+  uiThemeKey: string | null;
   updatedBy: string;
   updatedAt: string;
 };
@@ -185,6 +188,7 @@ async function updateChannel(supabase: SupabaseClient, payload: UpdateChannelPay
       topic: payload.topic,
       description: payload.description,
       icon_key: payload.iconKey,
+      ui_theme_key: payload.uiThemeKey,
       updated_at: payload.updatedAt,
       updated_by: payload.updatedBy,
     })
@@ -352,6 +356,7 @@ type ReplaceSchedulesPayload = {
   createdAt: string;
   title: string;
   description: string | null;
+  themeKey?: string | null;
   participants: LearningSpaceParticipantPayload[];
   schedules: LearningSpaceCreatePayload['schedules'];
 };
@@ -386,6 +391,7 @@ async function replaceLearningSpaceSchedules(
     createdAt: payload.createdAt,
     title: payload.title,
     description: payload.description,
+    themeKey: payload.themeKey ?? null,
     participants: payload.participants,
     schedules: payload.schedules ?? [],
   });

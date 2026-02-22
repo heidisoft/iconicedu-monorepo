@@ -88,6 +88,7 @@ export async function createLearningSpaceFromPayload(
     topic: payload.basics.title,
     description: payload.basics.description ?? null,
     iconKey: payload.basics.iconKey ?? null,
+    uiThemeKey: payload.settings?.themeKey ?? null,
     primaryEntityId: learningSpaceId,
     createdByProfileId: actorProfileId,
     createdAt: now,
@@ -141,6 +142,7 @@ export async function createLearningSpaceFromPayload(
     createdAt: now,
     title: payload.basics.title,
     description: payload.basics.description ?? null,
+    themeKey: payload.settings?.themeKey ?? null,
     participants: payload.participants,
     schedules: payload.schedules ?? [],
   });
@@ -190,6 +192,7 @@ type ChannelInsertPayload = {
   topic: string;
   iconKey: string | null;
   description: string | null;
+  uiThemeKey: string | null;
   primaryEntityId: string;
   createdByProfileId: string;
   createdAt: string;
@@ -209,6 +212,7 @@ async function insertChannel(supabase: SupabaseClient, payload: ChannelInsertPay
     posting_policy_kind: 'members-only',
     allow_threads: true,
     allow_reactions: true,
+    ui_theme_key: payload.uiThemeKey,
     primary_entity_kind: 'learning_space',
     primary_entity_id: payload.primaryEntityId,
     created_by_profile_id: payload.createdByProfileId,
@@ -411,6 +415,7 @@ type ClassScheduleInsertPayload = {
   createdAt: string;
   title: string;
   description: string | null;
+  themeKey?: string | null;
   participants: LearningSpaceParticipantPayload[];
   schedules: LearningSpaceSchedulePayload[];
 };
@@ -448,7 +453,7 @@ export async function insertClassSchedules(
       timezone: schedule.timezone,
       status: 'scheduled',
       visibility: 'class-members',
-      theme_key: null,
+      theme_key: payload.themeKey ?? null,
       source_kind: 'class_session',
       source_learning_space_id: payload.learningSpaceId,
       source_channel_id: payload.channelId,

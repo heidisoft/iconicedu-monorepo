@@ -1,0 +1,2 @@
+export const LEARNING_SPACE_MESSAGES_SECTION_TITLE = 'Messages';
+

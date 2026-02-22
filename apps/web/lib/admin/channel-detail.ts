@@ -1,6 +1,7 @@
 import type {
   ChannelCapabilityVM,
   ChannelPostingPolicyVM,
+  ThemeKey,
   UserProfileVM,
 } from '@iconicedu/shared-types';
 
@@ -22,6 +23,9 @@ export type ChannelDetail = {
     description: string | null;
     visibility: string;
     purpose: string;
+  };
+  ui: {
+    themeKey: ThemeKey | null;
   };
   postingPolicy: ChannelPostingPolicyVM;
   lifecycle: {
@@ -91,6 +95,9 @@ export async function getChannelDetail(channelId: string): Promise<ChannelDetail
       description: channelResponse.data.description ?? null,
       visibility: channelResponse.data.visibility,
       purpose: channelResponse.data.purpose,
+    },
+    ui: {
+      themeKey: (channelResponse.data.ui_theme_key ?? null) as ThemeKey | null,
     },
     postingPolicy: {
       kind: (channelResponse.data.posting_policy_kind ??

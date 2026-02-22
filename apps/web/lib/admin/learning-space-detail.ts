@@ -25,6 +25,9 @@ export type LearningSpaceDetail = {
     subject: string | null;
     description: string | null;
   };
+  settings: {
+    themeKey: string | null;
+  };
   participants: UserProfileVM[];
   resources: LearningSpaceLinkVM[];
   schedules: RecurrenceFormData[];
@@ -63,7 +66,7 @@ export async function getLearningSpaceDetail(learningSpaceId: string) {
     throw new Error('Learning space not found');
   }
 
-  const [participantsResponse, linksResponse, schedulesResponse] = await Promise.all([
+  const [participantsResponse, linksResponse, schedulesResponse, channelLinksResponse] = await Promise.all([
     supabase
       .from('learning_space_participants')
       .select('*')
@@ -85,6 +88,14 @@ export async function getLearningSpaceDetail(learningSpaceId: string) {
       .eq('source_learning_space_id', learningSpaceId)
       .is('deleted_at', null)
       .returns<ClassScheduleRow[]>(),
+    supabase
+      .from('learning_space_channels')
+      .select('channel_id')
+      .eq('org_id', orgId)
+      .eq('learning_space_id', learningSpaceId)
+      .eq('is_primary', true)
+      .is('deleted_at', null)
+      .maybeSingle<{ channel_id: string }>(),
   ]);
 
   if (participantsResponse.error) {
@@ -95,6 +106,26 @@ export async function getLearningSpaceDetail(learningSpaceId: string) {
   }
   if (schedulesResponse.error) {
     throw new Error(schedulesResponse.error.message);
+  }
+  if (channelLinksResponse.error) {
+    throw new Error(channelLinksResponse.error.message);
+  }
+
+  const primaryChannelId = channelLinksResponse.data?.channel_id ?? null;
+  let channelThemeKey: string | null = null;
+  if (primaryChannelId) {
+    const { data: channel, error: channelError } = await supabase
+      .from('channels')
+      .select('ui_theme_key')
+      .eq('org_id', orgId)
+      .eq('id', primaryChannelId)
+      .is('deleted_at', null)
+      .maybeSingle<{ ui_theme_key?: string | null }>();
+
+    if (channelError) {
+      throw new Error(channelError.message);
+    }
+    channelThemeKey = channel?.ui_theme_key ?? null;
   }
 
   const participantProfiles = await Promise.all(
@@ -114,6 +145,9 @@ export async function getLearningSpaceDetail(learningSpaceId: string) {
       iconKey: learningSpace.icon_key ?? null,
       subject: learningSpace.subject ?? null,
       description: learningSpace.description ?? null,
+    },
+    settings: {
+      themeKey: channelThemeKey,
     },
     participants,
     resources: (linksResponse.data ?? []).map(mapLearningSpaceLinkRow),
