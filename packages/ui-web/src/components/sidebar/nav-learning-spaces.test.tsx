@@ -60,4 +60,48 @@ describe('NavLearningSpaces', () => {
     expect(screen.getByText('3')).toBeInTheDocument();
     expect(screen.queryByText('0')).not.toBeInTheDocument();
   });
+
+  it('uses org-scoped base path when provided', () => {
+    render(
+      <SidebarProvider>
+        <NavLearningSpaces
+          title="Child One"
+          participant={{
+            ids: { id: 'profile-child', orgId: 'org-1', accountId: 'account-child' },
+            profile: {
+              displayName: 'Child One',
+              firstName: 'Child',
+              lastName: 'One',
+              avatar: { source: 'seed', seed: 'child-1' },
+            },
+            ui: {},
+          } as any}
+          isOpen={true}
+          onOpenChange={() => undefined}
+          activeChannelId={null}
+          isMobile={false}
+          dashboardBasePath="/iconic-academy"
+          learningSpaces={[
+            {
+              ids: { id: 'space-1', orgId: 'org-1' },
+              basics: { title: 'Reading', subject: 'English', iconKey: null },
+              channels: {
+                primaryChannel: {
+                  ids: { id: 'channel-1', orgId: 'org-1' },
+                  basics: { iconKey: null },
+                  ui: {},
+                  collections: { readState: { unreadCount: 0 } },
+                },
+              },
+            },
+          ] as any}
+        />
+      </SidebarProvider>,
+    );
+
+    expect(screen.getByRole('link', { name: /Reading/i })).toHaveAttribute(
+      'href',
+      '/iconic-academy/spaces/channel-1',
+    );
+  });
 });

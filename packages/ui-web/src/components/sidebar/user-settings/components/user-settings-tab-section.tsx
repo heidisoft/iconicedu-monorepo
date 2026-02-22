@@ -7,7 +7,11 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@iconicedu/ui-web/ui/collapsible';
-import { Separator } from '@iconicedu/ui-web/ui/separator';
+import { cn } from '@iconicedu/ui-web/lib/utils';
+import {
+  USER_SETTINGS_SECTION_ICON_CLASS,
+  USER_SETTINGS_SECTION_SURFACE_CLASS,
+} from '@iconicedu/ui-web/components/sidebar/user-settings/user-settings.theme';
 
 type UserSettingsTabSectionProps = {
   title: React.ReactNode;
@@ -35,7 +39,6 @@ export function UserSettingsTabSection({
   onOpenChange,
   children,
   footer,
-  showSeparator = true,
   className,
   contentClassName,
   disabled = false,
@@ -50,7 +53,7 @@ export function UserSettingsTabSection({
   return (
     <>
       <Collapsible
-        className={`rounded-2xl w-full ${className ?? ''}`}
+        className={cn('w-full', USER_SETTINGS_SECTION_SURFACE_CLASS, className)}
         open={open}
         defaultOpen={defaultOpen}
         onOpenChange={handleOpenChange}
@@ -58,9 +61,12 @@ export function UserSettingsTabSection({
         <CollapsibleTrigger
           disabled={disabled}
           aria-disabled={disabled}
-          className={`group flex w-full items-center gap-3 py-3 text-left transition ${disabled ? 'cursor-not-allowed opacity-70' : ''}`}
+          className={cn(
+            'group flex w-full items-center gap-3 py-3 text-left transition',
+            disabled && 'cursor-not-allowed opacity-70',
+          )}
         >
-          <span className="flex h-10 w-10 items-center justify-center rounded-full border bg-muted/40 text-foreground">
+          <span className={USER_SETTINGS_SECTION_ICON_CLASS}>
             {icon}
           </span>
           <div className="flex-1">
@@ -83,7 +89,6 @@ export function UserSettingsTabSection({
           {footer ? <div className="pt-4">{footer}</div> : null}
         </CollapsibleContent>
       </Collapsible>
-      {showSeparator ? <Separator /> : null}
     </>
   );
 }

@@ -93,6 +93,24 @@ const ICONS = {
   send: Send,
 } as const;
 
+function resolveDashboardBasePath(activePath?: string | null): string {
+  const firstSegment = activePath?.split('/').filter(Boolean)[0];
+  if (!firstSegment || firstSegment === 'd') {
+    return '/d';
+  }
+  return `/${firstSegment}`;
+}
+
+function normalizeDashboardUrl(url: string, dashboardBasePath: string): string {
+  if (url === '/d') {
+    return dashboardBasePath;
+  }
+  if (url.startsWith('/d/')) {
+    return `${dashboardBasePath}${url.slice(2)}`;
+  }
+  return url;
+}
+
 export function SidebarLeft({
   data,
   activePath,
@@ -198,20 +216,40 @@ export function SidebarLeft({
   }) => Promise<void> | void;
   onOnboardingComplete?: () => void;
 }) {
+  const dashboardBasePath = React.useMemo(
+    () => resolveDashboardBasePath(activePath),
+    [activePath],
+  );
   const navMain: SidebarNavItem[] = data.navigation.navMain.map((item) => ({
     ...item,
+    url: normalizeDashboardUrl(item.url, dashboardBasePath),
     icon: ICONS[item.icon],
     isActive:
-      item.url === '/d'
-        ? activePath === item.url
-        : (activePath?.startsWith(item.url) ?? false),
+      normalizeDashboardUrl(item.url, dashboardBasePath) === dashboardBasePath
+        ? activePath === dashboardBasePath
+        : (activePath?.startsWith(normalizeDashboardUrl(item.url, dashboardBasePath)) ??
+            false),
   }));
   const navSecondary: SidebarSecondaryItem[] = data.navigation.navSecondary.map(
     (item) => ({
       ...item,
+      url: normalizeDashboardUrl(item.url, dashboardBasePath),
       icon: ICONS[item.icon],
-      isActive: activePath ? activePath.startsWith(item.url) : false,
+      isActive: activePath
+        ? activePath.startsWith(normalizeDashboardUrl(item.url, dashboardBasePath))
+        : false,
     }),
+  );
+  const normalizedAdminSections = React.useMemo(
+    () =>
+      (adminSections ?? []).map((section) => ({
+        ...section,
+        links: section.links.map((link) => ({
+          ...link,
+          url: normalizeDashboardUrl(link.url, dashboardBasePath),
+        })),
+      })),
+    [adminSections, dashboardBasePath],
   );
   const userProfile = data.user.profile;
   const children: ChildProfileVM[] =
@@ -364,15 +402,17 @@ export function SidebarLeft({
 
   const activeLearningSpaceId = React.useMemo(() => {
     if (!activePath) return null;
-    if (activePath.startsWith('/d/spaces/')) {
-      return activePath.split('/').pop() ?? null;
+    const pathSegments = activePath.split('/').filter(Boolean);
+    if (pathSegments[1] === 'spaces') {
+      return pathSegments[2] ?? null;
     }
     return null;
   }, [activePath]);
   const activeDirectMessageId = React.useMemo(() => {
     if (!activePath) return null;
-    if (activePath.startsWith('/d/dm/')) {
-      return activePath.split('/').pop() ?? null;
+    const pathSegments = activePath.split('/').filter(Boolean);
+    if (pathSegments[1] === 'dm') {
+      return pathSegments[2] ?? null;
     }
     return null;
   }, [activePath]);
@@ -395,7 +435,7 @@ export function SidebarLeft({
             <SidebarSeparator className="mx-2" />
             <NavAdmin
               className="mt-1 space-y-1"
-              sections={adminSections ?? []}
+              sections={normalizedAdminSections}
               activePath={activePath ?? undefined}
             />
           </>
@@ -478,6 +518,7 @@ export function SidebarLeft({
                       activeChannelId={activeLearningSpaceId}
                       isMobile={isMobile}
                       currentUser={currentUserRef}
+                      dashboardBasePath={dashboardBasePath}
                     />
                   );
                 })
@@ -500,10 +541,10 @@ export function SidebarLeft({
                         <SidebarMenuButton
                           asChild
                           tooltip={space.basics.title}
-                          isActive={isActive}
-                          className="px-2.5"
-                        >
-                          <a href={`/d/spaces/${channel.ids.id}`}>
+                        isActive={isActive}
+                        className="px-2.5"
+                      >
+                          <a href={`${dashboardBasePath}/spaces/${channel.ids.id}`}>
                             <ThemedIconBadge
                               icon={Icon}
                               themeKey={channel.ui?.themeKey ?? null}
@@ -540,6 +581,7 @@ export function SidebarLeft({
               dms={ownDirectMessages}
               currentUserId={data.user.profile.ids.accountId}
               activeChannelId={activeDirectMessageId ?? null}
+              dashboardBasePath={dashboardBasePath}
             />
           </>
         ) : null}
@@ -567,6 +609,7 @@ export function SidebarLeft({
                   }))
                 }
                 activeChannelId={activeDirectMessageId ?? null}
+                dashboardBasePath={dashboardBasePath}
               />
             ))}
           </>

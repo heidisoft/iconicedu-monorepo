@@ -32,10 +32,12 @@ export function NavDirectMessages({
   dms,
   currentUserId,
   activeChannelId,
+  dashboardBasePath = '/d',
 }: {
   dms: ChannelVM[];
   currentUserId: string;
   activeChannelId?: string | null;
+  dashboardBasePath?: string;
 }) {
   const { isMobile } = useSidebar();
   const totalUnreadCount = React.useMemo(
@@ -154,7 +156,7 @@ export function NavDirectMessages({
                 isActive={isActive}
                 className="px-2.5 group-data-[collapsible=icon]:px-0"
               >
-                <a href={`/d/dm/${item.ids.id}`}>
+                <a href={`${dashboardBasePath}/dm/${item.ids.id}`}>
                   <AvatarWithStatus
                     name={name}
                     avatar={otherParticipant?.profile.avatar}

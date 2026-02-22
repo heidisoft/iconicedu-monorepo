@@ -50,6 +50,7 @@ export function NavLearningSpaces({
   activeChannelId,
   isMobile,
   currentUser,
+  dashboardBasePath = '/d',
 }: {
   learningSpaces: LearningSpaceVM[];
   title: string;
@@ -59,6 +60,7 @@ export function NavLearningSpaces({
   activeChannelId?: string | null;
   isMobile: boolean;
   currentUser?: { accountId?: string; profileId?: string };
+  dashboardBasePath?: string;
 }) {
   return (
     <SidebarGroup className="py-0 group-data-[collapsible=icon]:hidden">
@@ -112,7 +114,7 @@ export function NavLearningSpaces({
                       isActive={isActive}
                       className="px-2.5"
                     >
-                      <a href={`/d/spaces/${channel.ids.id}`}>
+                      <a href={`${dashboardBasePath}/spaces/${channel.ids.id}`}>
                         <ThemedIconBadge
                           icon={Icon}
                           themeKey={channel.ui?.themeKey ?? null}

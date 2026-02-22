@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   StyleSheet,
   Pressable,
+  RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -61,8 +62,15 @@ export default function MessagesScreen() {
   const orgId = account?.org_id ?? '';
   const profileId = account?.default_profile_id ?? '';
 
-  const { data: dms, isLoading: dmsLoading } = useDirectMessages(orgId, profileId);
-  const { data: channels, isLoading: channelsLoading } = useChannels(orgId);
+  const { data: dms, isLoading: dmsLoading, refetch: refetchDms } = useDirectMessages(orgId, profileId);
+  const { data: channels, isLoading: channelsLoading, refetch: refetchChannels } = useChannels(orgId);
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([refetchDms(), refetchChannels()]);
+    setRefreshing(false);
+  }, [refetchDms, refetchChannels]);
 
   const filteredDms = useMemo(() => {
     if (!dms) return [];
@@ -133,6 +141,7 @@ export default function MessagesScreen() {
           data={data}
           keyExtractor={(item) => (item as Record<string, unknown>).id as string}
           contentContainerStyle={{ flexGrow: 1, paddingBottom: 16 }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.teal} />}
           ItemSeparatorComponent={() => <View style={s.separator} />}
           ListEmptyComponent={
             <View style={s.empty}>

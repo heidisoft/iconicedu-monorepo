@@ -41,6 +41,9 @@ import {
   SETTINGS_TABS,
   type UserSettingsTab,
 } from '@iconicedu/ui-web/components/sidebar/user-settings/constants';
+import {
+  USER_SETTINGS_TAB_TRIGGER_CLASS,
+} from '@iconicedu/ui-web/components/sidebar/user-settings/user-settings.theme';
 
 export type UserSettingsTabsProps = {
   value: UserSettingsTab;
@@ -357,7 +360,7 @@ export function UserSettingsTabs({
                 <TabsTrigger
                   key={tab.value}
                   value={tab.value}
-                  className="gap-2 after:hidden data-[state=active]:bg-muted/50"
+                  className={USER_SETTINGS_TAB_TRIGGER_CLASS}
                 >
                   <Icon className="size-4" />
                   {tab.label}

@@ -25,12 +25,14 @@ export function NavSupervisedDirectMessages({
   isOpen,
   onOpenChange,
   activeChannelId,
+  dashboardBasePath = '/d',
 }: {
   child: ChildProfileVM;
   dms: ChannelVM[];
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   activeChannelId?: string | null;
+  dashboardBasePath?: string;
 }) {
   return (
     <SidebarGroup className="py-0 group-data-[collapsible=icon]:hidden">
@@ -67,7 +69,7 @@ export function NavSupervisedDirectMessages({
                     isActive={isActive}
                     className="px-2.5 group-data-[collapsible=icon]:px-0"
                   >
-                    <a href={`/d/dm/${item.ids.id}`}>
+                    <a href={`${dashboardBasePath}/dm/${item.ids.id}`}>
                       <AvatarWithStatus
                         name={name}
                         avatar={otherParticipant?.profile.avatar}

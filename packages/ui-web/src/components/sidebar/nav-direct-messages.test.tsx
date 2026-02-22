@@ -148,6 +148,23 @@ describe('NavDirectMessages', () => {
     expect(screen.getByText('Brand New Person')).toBeInTheDocument();
     expect(screen.getAllByText('1')).toHaveLength(2);
   });
+
+  it('uses org-scoped base path when provided', () => {
+    render(
+      <SidebarProvider>
+        <NavDirectMessages
+          dms={[makeDm('dm-1', 'account-self', 0)]}
+          currentUserId="account-self"
+          dashboardBasePath="/iconic-academy"
+        />
+      </SidebarProvider>,
+    );
+
+    expect(screen.getByRole('link', { name: /User dm-1/i })).toHaveAttribute(
+      'href',
+      '/iconic-academy/dm/dm-1',
+    );
+  });
 });
 
 function makeDm(

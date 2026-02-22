@@ -23,6 +23,10 @@ import type {
 import { ResponsiveDialog } from '@iconicedu/ui-web/components/shared/responsive-dialog';
 import { UserSettingsTabs } from '@iconicedu/ui-web/components/sidebar/user-settings/user-settings-tabs';
 import { OnboardingStep, type UserSettingsTab } from '@iconicedu/ui-web/components/sidebar/user-settings/constants';
+import {
+  USER_SETTINGS_DIALOG_SURFACE_CLASS,
+  USER_SETTINGS_DRAWER_SURFACE_CLASS,
+} from '@iconicedu/ui-web/components/sidebar/user-settings/user-settings.theme';
 
 export const ONBOARDING_STEP_TO_TAB: Record<OnboardingStep, UserSettingsTab> = {
   'account-phone': 'account',
@@ -255,8 +259,14 @@ export function UserSettingsDialog({
       onOpenChange={handleOpenChange}
       title="Settings"
       description="Manage account, billing, and notification preferences."
-      dialogContentClassName="h-[85vh] max-w-[calc(100vw-32px)] p-0 sm:max-w-[680px]"
-      drawerContentClassName="h-[85vh] w-full max-w-none flex flex-col overflow-hidden bg-background p-0 rounded-t-xl before:inset-0 before:rounded-t-xl"
+      dialogContentClassName={cn(
+        'h-[85vh] max-w-[calc(100vw-32px)] p-0 sm:max-w-[680px]',
+        USER_SETTINGS_DIALOG_SURFACE_CLASS,
+      )}
+      drawerContentClassName={cn(
+        'h-[85vh] w-full max-w-none flex flex-col overflow-hidden p-0 rounded-t-xl before:inset-0 before:rounded-t-xl',
+        USER_SETTINGS_DRAWER_SURFACE_CLASS,
+      )}
       dialogHeaderClassName="p-6"
       drawerHeaderClassName="items-start"
       containerClassName="h-full"

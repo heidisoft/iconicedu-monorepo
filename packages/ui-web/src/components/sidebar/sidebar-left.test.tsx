@@ -293,6 +293,19 @@ describe('SidebarLeft', () => {
     expect(screen.queryByText('Direct Messages')).not.toBeInTheDocument();
   });
 
+  it('renders slug-based links when active path is org scoped', () => {
+    render(
+      <SidebarProvider>
+        <SidebarLeft data={makeData()} activePath="/iconic-academy/spaces/channel-1" />
+      </SidebarProvider>,
+    );
+
+    expect(screen.getByRole('link', { name: /Algebra 1/i })).toHaveAttribute(
+      'href',
+      '/iconic-academy/spaces/channel-1',
+    );
+  });
+
   it('keeps all parent learning spaces expanded', () => {
     render(
       <SidebarProvider>
