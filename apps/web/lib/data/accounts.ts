@@ -1,5 +1,5 @@
 import type { UserAccountVM } from '@iconicedu/shared-types';
-import { ACCOUNT_IDS, ORG_ID } from '@iconicedu/web/lib/data/ids';
+import { ACCOUNT_IDS, DEMO_ORG_ID } from '@iconicedu/web/lib/data/ids';
 import {
   CHILD_MAYA_ROLE,
   CHILD_TEHARA_ROLE,
@@ -14,7 +14,7 @@ import {
 } from '@iconicedu/web/lib/data/roles';
 
 export const GUARDIAN_ACCOUNT: UserAccountVM = {
-  ids: { id: ACCOUNT_IDS.guardianRiley, orgId: ORG_ID },
+  ids: { id: ACCOUNT_IDS.guardianRiley, orgId: DEMO_ORG_ID },
   contacts: {
     email: 'riley.morgan@iconic.edu',
     phoneE164: '+14085551234',
@@ -38,7 +38,7 @@ export const GUARDIAN_ACCOUNT: UserAccountVM = {
 };
 
 export const CHILD_TEVIN_ACCOUNT: UserAccountVM = {
-  ids: { id: ACCOUNT_IDS.childTevin, orgId: ORG_ID },
+  ids: { id: ACCOUNT_IDS.childTevin, orgId: DEMO_ORG_ID },
   contacts: {
     email: 'tevin.morgan@iconic.edu',
     emailVerified: true,
@@ -57,7 +57,7 @@ export const CHILD_TEVIN_ACCOUNT: UserAccountVM = {
 };
 
 export const CHILD_TEHARA_ACCOUNT: UserAccountVM = {
-  ids: { id: ACCOUNT_IDS.childTehara, orgId: ORG_ID },
+  ids: { id: ACCOUNT_IDS.childTehara, orgId: DEMO_ORG_ID },
   contacts: {
     email: 'tehara.morgan@iconic.edu',
     emailVerified: false,
@@ -76,7 +76,7 @@ export const CHILD_TEHARA_ACCOUNT: UserAccountVM = {
 };
 
 export const CHILD_MAYA_ACCOUNT: UserAccountVM = {
-  ids: { id: ACCOUNT_IDS.childMaya, orgId: ORG_ID },
+  ids: { id: ACCOUNT_IDS.childMaya, orgId: DEMO_ORG_ID },
   contacts: {
     email: 'maya.morgan@iconic.edu',
     emailVerified: true,
@@ -95,7 +95,7 @@ export const CHILD_MAYA_ACCOUNT: UserAccountVM = {
 };
 
 export const EDUCATOR_PRIYA_ACCOUNT: UserAccountVM = {
-  ids: { id: ACCOUNT_IDS.educatorPriya, orgId: ORG_ID },
+  ids: { id: ACCOUNT_IDS.educatorPriya, orgId: DEMO_ORG_ID },
   contacts: {
     email: 'priya.nair@iconic.edu',
     phoneE164: '+14155550111',
@@ -117,7 +117,7 @@ export const EDUCATOR_PRIYA_ACCOUNT: UserAccountVM = {
 };
 
 export const EDUCATOR_ELENA_ACCOUNT: UserAccountVM = {
-  ids: { id: ACCOUNT_IDS.educatorElena, orgId: ORG_ID },
+  ids: { id: ACCOUNT_IDS.educatorElena, orgId: DEMO_ORG_ID },
   contacts: {
     email: 'elena.brooks@iconic.edu',
     phoneE164: '+14155550222',
@@ -139,7 +139,7 @@ export const EDUCATOR_ELENA_ACCOUNT: UserAccountVM = {
 };
 
 export const EDUCATOR_LUCAS_ACCOUNT: UserAccountVM = {
-  ids: { id: ACCOUNT_IDS.educatorLucas, orgId: ORG_ID },
+  ids: { id: ACCOUNT_IDS.educatorLucas, orgId: DEMO_ORG_ID },
   contacts: {
     email: 'lucas.choi@iconic.edu',
     phoneE164: '+14155550333',
@@ -161,7 +161,7 @@ export const EDUCATOR_LUCAS_ACCOUNT: UserAccountVM = {
 };
 
 export const EDUCATOR_MISHAN_ACCOUNT: UserAccountVM = {
-  ids: { id: ACCOUNT_IDS.educatorMishan, orgId: ORG_ID },
+  ids: { id: ACCOUNT_IDS.educatorMishan, orgId: DEMO_ORG_ID },
   contacts: {
     email: 'mishan.perera@iconic.edu',
     phoneE164: '+14155550444',
@@ -183,7 +183,7 @@ export const EDUCATOR_MISHAN_ACCOUNT: UserAccountVM = {
 };
 
 export const EDUCATOR_AVA_ACCOUNT: UserAccountVM = {
-  ids: { id: ACCOUNT_IDS.educatorAva, orgId: ORG_ID },
+  ids: { id: ACCOUNT_IDS.educatorAva, orgId: DEMO_ORG_ID },
   contacts: {
     email: 'ava.patel@iconic.edu',
     phoneE164: '+14155550555',
@@ -205,7 +205,7 @@ export const EDUCATOR_AVA_ACCOUNT: UserAccountVM = {
 };
 
 export const STAFF_SUPPORT_ACCOUNT: UserAccountVM = {
-  ids: { id: ACCOUNT_IDS.staffSupport, orgId: ORG_ID },
+  ids: { id: ACCOUNT_IDS.staffSupport, orgId: DEMO_ORG_ID },
   contacts: {
     email: 'support@iconic.edu',
     phoneE164: '+14155550666',

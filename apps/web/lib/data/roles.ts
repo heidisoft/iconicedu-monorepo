@@ -1,5 +1,5 @@
 import type { UserRoleVM } from '@iconicedu/shared-types';
-import { ACCOUNT_IDS, ORG_ID } from '@iconicedu/web/lib/data/ids';
+import { ACCOUNT_IDS, DEMO_ORG_ID } from '@iconicedu/web/lib/data/ids';
 
 export const ROLE_IDS = {
   guardian: '0b1c2d3e-4f50-41a2-9b3c-4d5e6f7a8b90',
@@ -15,7 +15,7 @@ export const ROLE_IDS = {
 } as const;
 
 export const GUARDIAN_ROLE: UserRoleVM = {
-  ids: { id: ROLE_IDS.guardian, orgId: ORG_ID },
+  ids: { id: ROLE_IDS.guardian, orgId: DEMO_ORG_ID },
   roleKey: 'guardian',
   audit: {
     assignedAt: '2025-01-05T14:10:00.000Z',
@@ -23,7 +23,7 @@ export const GUARDIAN_ROLE: UserRoleVM = {
 };
 
 export const CHILD_TEVIN_ROLE: UserRoleVM = {
-  ids: { id: ROLE_IDS.childTevin, orgId: ORG_ID },
+  ids: { id: ROLE_IDS.childTevin, orgId: DEMO_ORG_ID },
   roleKey: 'child',
   audit: {
     assignedAt: '2025-01-06T10:15:00.000Z',
@@ -31,7 +31,7 @@ export const CHILD_TEVIN_ROLE: UserRoleVM = {
 };
 
 export const CHILD_TEHARA_ROLE: UserRoleVM = {
-  ids: { id: ROLE_IDS.childTehara, orgId: ORG_ID },
+  ids: { id: ROLE_IDS.childTehara, orgId: DEMO_ORG_ID },
   roleKey: 'child',
   audit: {
     assignedAt: '2025-01-06T10:20:00.000Z',
@@ -39,7 +39,7 @@ export const CHILD_TEHARA_ROLE: UserRoleVM = {
 };
 
 export const CHILD_MAYA_ROLE: UserRoleVM = {
-  ids: { id: ROLE_IDS.childMaya, orgId: ORG_ID },
+  ids: { id: ROLE_IDS.childMaya, orgId: DEMO_ORG_ID },
   roleKey: 'child',
   audit: {
     assignedAt: '2025-01-06T10:25:00.000Z',
@@ -47,7 +47,7 @@ export const CHILD_MAYA_ROLE: UserRoleVM = {
 };
 
 export const EDUCATOR_PRIYA_ROLE: UserRoleVM = {
-  ids: { id: ROLE_IDS.educatorPriya, orgId: ORG_ID },
+  ids: { id: ROLE_IDS.educatorPriya, orgId: DEMO_ORG_ID },
   roleKey: 'educator',
   audit: {
     assignedAt: '2024-09-12T12:00:00.000Z',
@@ -55,7 +55,7 @@ export const EDUCATOR_PRIYA_ROLE: UserRoleVM = {
 };
 
 export const EDUCATOR_ELENA_ROLE: UserRoleVM = {
-  ids: { id: ROLE_IDS.educatorElena, orgId: ORG_ID },
+  ids: { id: ROLE_IDS.educatorElena, orgId: DEMO_ORG_ID },
   roleKey: 'educator',
   audit: {
     assignedAt: '2024-09-12T12:05:00.000Z',
@@ -63,7 +63,7 @@ export const EDUCATOR_ELENA_ROLE: UserRoleVM = {
 };
 
 export const EDUCATOR_LUCAS_ROLE: UserRoleVM = {
-  ids: { id: ROLE_IDS.educatorLucas, orgId: ORG_ID },
+  ids: { id: ROLE_IDS.educatorLucas, orgId: DEMO_ORG_ID },
   roleKey: 'educator',
   audit: {
     assignedAt: '2024-09-12T12:10:00.000Z',
@@ -71,7 +71,7 @@ export const EDUCATOR_LUCAS_ROLE: UserRoleVM = {
 };
 
 export const EDUCATOR_MISHAN_ROLE: UserRoleVM = {
-  ids: { id: ROLE_IDS.educatorMishan, orgId: ORG_ID },
+  ids: { id: ROLE_IDS.educatorMishan, orgId: DEMO_ORG_ID },
   roleKey: 'educator',
   audit: {
     assignedAt: '2024-09-12T12:15:00.000Z',
@@ -79,7 +79,7 @@ export const EDUCATOR_MISHAN_ROLE: UserRoleVM = {
 };
 
 export const EDUCATOR_AVA_ROLE: UserRoleVM = {
-  ids: { id: ROLE_IDS.educatorAva, orgId: ORG_ID },
+  ids: { id: ROLE_IDS.educatorAva, orgId: DEMO_ORG_ID },
   roleKey: 'educator',
   audit: {
     assignedAt: '2024-09-12T12:20:00.000Z',
@@ -87,7 +87,7 @@ export const EDUCATOR_AVA_ROLE: UserRoleVM = {
 };
 
 export const STAFF_SUPPORT_ROLE: UserRoleVM = {
-  ids: { id: ROLE_IDS.staffSupport, orgId: ORG_ID },
+  ids: { id: ROLE_IDS.staffSupport, orgId: DEMO_ORG_ID },
   roleKey: 'staff',
   audit: {
     assignedAt: '2024-08-20T09:00:00.000Z',

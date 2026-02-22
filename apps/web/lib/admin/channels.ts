@@ -1,5 +1,4 @@
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
-import { ORG_ID } from '@iconicedu/web/lib/data/ids';
 import type { ChannelRow, ChannelMemberRow, UserProfileVM } from '@iconicedu/shared-types';
 import {
   getChannelsByOrg,
@@ -44,9 +43,13 @@ export function filterDirectMessageChannels(rows: AdminChannelRow[]) {
   return rows.filter((row) => row.kind === 'dm' || row.kind === 'group_dm');
 }
 
-export async function getAdminChannelRows(): Promise<AdminChannelRow[]> {
+export async function getAdminChannelRows(orgId: string): Promise<AdminChannelRow[]> {
+  if (!orgId) {
+    return [];
+  }
+
   const supabase = await createSupabaseServerClient();
-  const { data: channels } = await getChannelsByOrg(supabase, ORG_ID);
+  const { data: channels } = await getChannelsByOrg(supabase, orgId);
 
   if (!channels?.length) {
     return [];
@@ -55,7 +58,7 @@ export async function getAdminChannelRows(): Promise<AdminChannelRow[]> {
   const channelIds = channels.map((row) => row.id);
   const membersResponse = await getChannelParticipantsByChannelIds(
     supabase,
-    ORG_ID,
+    orgId,
     channelIds,
   );
   const members = membersResponse.data ?? [];
@@ -103,7 +106,7 @@ export async function getAdminChannelRows(): Promise<AdminChannelRow[]> {
   });
 }
 
-export async function getAdminDirectMessageRows(): Promise<AdminChannelRow[]> {
-  const rows = await getAdminChannelRows();
+export async function getAdminDirectMessageRows(orgId: string): Promise<AdminChannelRow[]> {
+  const rows = await getAdminChannelRows(orgId);
   return filterDirectMessageChannels(rows);
 }

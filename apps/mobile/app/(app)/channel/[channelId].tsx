@@ -10,6 +10,7 @@ import { MessageList } from '@/components/messages/message-list';
 import { MessageInput } from '@/components/messages/message-input';
 import { TypingIndicator } from '@/components/messages/typing-indicator';
 import { ConversationHeader } from '@/components/messages/conversation-header';
+import { DEMO_MESSAGE_MAP, DEMO_PROFILE_ID } from '@/lib/dummy-messages';
 
 export default function ChannelConversationScreen() {
   const { channelId, topic } = useLocalSearchParams<{ channelId: string; topic?: string }>();
@@ -17,17 +18,21 @@ export default function ChannelConversationScreen() {
   const { data: account } = useAccount();
   const { colors } = useTheme();
 
-  const profileId = account?.default_profile_id ?? '';
+  const isDemo = channelId?.startsWith('demo-') ?? false;
+
+  const profileId = isDemo ? DEMO_PROFILE_ID : (account?.default_profile_id ?? '');
   const orgId = account?.org_id ?? '';
 
-  const { data: messages, isLoading, loadMore } = useMessages(channelId ?? '');
+  // Skip API for demo channels — they have no real DB row
+  const { data: realMessages, isLoading, loadMore } = useMessages(isDemo ? '' : (channelId ?? ''));
+  const messages = isDemo ? (DEMO_MESSAGE_MAP[channelId ?? ''] ?? []) : (realMessages ?? []);
 
   const handleSend = useCallback(
     async (text: string) => {
-      if (!channelId || !profileId || !orgId) return;
+      if (isDemo || !channelId || !profileId || !orgId) return;
       await sendTextMessage(channelId, profileId, orgId, text);
     },
-    [channelId, profileId, orgId],
+    [isDemo, channelId, profileId, orgId],
   );
 
   if (!channelId) return null;
@@ -41,13 +46,13 @@ export default function ChannelConversationScreen() {
       />
       <View style={[styles.flex, { backgroundColor: colors.pageBg }]}>
         <MessageList
-          messages={messages ?? []}
+          messages={messages}
           currentProfileId={profileId}
-          onLoadMore={loadMore}
-          loading={isLoading}
+          onLoadMore={isDemo ? undefined : loadMore}
+          loading={isDemo ? false : isLoading}
         />
         <TypingIndicator typingUsers={[]} />
-        <MessageInput onSend={handleSend} placeholder={`Message #${topic ?? ''}…`} />
+        <MessageInput onSend={handleSend} placeholder={`Message #${topic ?? ''}…`} disabled={isDemo} />
       </View>
     </SafeAreaView>
   );

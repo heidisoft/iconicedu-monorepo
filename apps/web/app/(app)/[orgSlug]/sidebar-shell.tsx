@@ -430,10 +430,33 @@ export function SidebarShell({
 
     const channel = supabase.channel(`sidebar-dm-updates:${orgId}:${profileId}`);
     const pendingChannelFetches = new Set<string>();
+    const retryTimers = new Set<number>();
+    const exhaustedChannelIds = new Set<string>();
+    const maxRetryAttempts = 10;
+    const scheduleRetry = (
+      channelId: string,
+      senderProfileId: string | null | undefined,
+      attempt: number,
+    ) => {
+      if (attempt > maxRetryAttempts) {
+        if (!exhaustedChannelIds.has(channelId)) {
+          exhaustedChannelIds.add(channelId);
+          router.refresh();
+        }
+        return;
+      }
+      const retryDelayMs = Math.min(250 * attempt, 2500);
+      const timer = window.setTimeout(() => {
+        retryTimers.delete(timer);
+        void addOrRefreshDmChannel(channelId, senderProfileId, attempt);
+      }, retryDelayMs);
+      retryTimers.add(timer);
+    };
 
     const addOrRefreshDmChannel = async (
       channelId: string,
       senderProfileId?: string | null,
+      attempt = 0,
     ) => {
       if (pendingChannelFetches.has(channelId)) {
         return;
@@ -446,10 +469,20 @@ export function SidebarShell({
           messagesLimit: 50,
         });
         if (!nextChannel) {
+          scheduleRetry(channelId, senderProfileId, attempt + 1);
           return;
         }
 
         if (nextChannel.basics.kind !== 'dm' && nextChannel.basics.kind !== 'group_dm') {
+          return;
+        }
+
+        const hasMessages = (nextChannel.collections.messages?.items?.length ?? 0) > 0;
+        const existsInSidebar = directMessageIdsRef.current.has(channelId);
+        if (!hasMessages && !existsInSidebar) {
+          if (senderProfileId) {
+            scheduleRetry(channelId, senderProfileId, attempt + 1);
+          }
           return;
         }
 
@@ -475,6 +508,64 @@ export function SidebarShell({
         pendingChannelFetches.delete(channelId);
       }
     };
+
+    const syncDirectMessageMemberships = async () => {
+      const { data, error } = await supabase
+        .from('channel_members')
+        .select('channel_id')
+        .eq('org_id', orgId)
+        .eq('profile_id', profileId);
+
+      if (error || !data?.length) {
+        return;
+      }
+
+      const candidateChannelIds = Array.from(
+        new Set(
+          data
+            .map((row: { channel_id?: string | null }) => row.channel_id ?? null)
+            .filter((value): value is string => Boolean(value)),
+        ),
+      );
+
+      await Promise.all(
+        candidateChannelIds
+          .filter((channelId) => !directMessageIdsRef.current.has(channelId))
+          .map((channelId) => addOrRefreshDmChannel(channelId, null)),
+      );
+    };
+
+    void syncDirectMessageMemberships();
+    const membershipSyncInterval = window.setInterval(() => {
+      void syncDirectMessageMemberships();
+    }, 4000);
+
+    channel.on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'channels',
+        filter: `org_id=eq.${orgId}`,
+      },
+      async (payload) => {
+        const row = payload.new as {
+          id?: string;
+          kind?: string | null;
+        } | null;
+
+        if (!row?.id) {
+          return;
+        }
+
+        const kind = row.kind?.toLowerCase();
+        if (kind !== 'dm' && kind !== 'group_dm') {
+          return;
+        }
+
+        await addOrRefreshDmChannel(row.id, null);
+      },
+    );
 
     channel.on(
       'postgres_changes',
@@ -514,18 +605,18 @@ export function SidebarShell({
         if (!row?.channel_id) {
           return;
         }
-
-        const existsInSidebar = directMessageIdsRef.current.has(row.channel_id);
-        if (existsInSidebar) {
-          return;
-        }
-
         await addOrRefreshDmChannel(row.channel_id, row.sender_profile_id ?? null);
       },
     );
     channel.subscribe();
 
     return () => {
+      window.clearInterval(membershipSyncInterval);
+      retryTimers.forEach((timer) => {
+        window.clearTimeout(timer);
+      });
+      retryTimers.clear();
+      exhaustedChannelIds.clear();
       void channel.unsubscribe();
     };
   }, [
@@ -534,6 +625,7 @@ export function SidebarShell({
     sidebarProfile.ids?.id,
     sidebarProfile.ids?.accountId,
     persistUnread,
+    router,
   ]);
 
   React.useEffect(() => {

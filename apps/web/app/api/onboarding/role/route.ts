@@ -2,17 +2,20 @@ import { NextResponse } from 'next/server';
 
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
-import { ORG_ID } from '@iconicedu/web/lib/data/ids';
 import { getOrCreateAccount } from '@iconicedu/web/lib/accounts/getOrCreateAccount';
+import {
+  getAccountByAuthUserId,
+  updateAccountRoleState,
+} from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { getUserRoles, upsertUserRole } from '@iconicedu/web/lib/profile/queries/roles.query';
 import {
   getProfileByAccountId,
   insertProfileForAccount,
   updateProfileForAccount,
 } from '@iconicedu/web/lib/profile/queries/profiles.query';
-import { updateAccountRoleState } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { buildAuthOnboardingState } from '@iconicedu/web/lib/onboarding/auth-state';
 import { resolveOrgDashboardPath } from '@iconicedu/web/lib/org/resolve-dashboard-path';
+import { getDefaultOrg, getOrgBySlug } from '@iconicedu/web/lib/org/queries/org.query';
 
 type RoleChoice = 'parent' | 'educator' | 'student' | 'staff';
 
@@ -43,6 +46,30 @@ function isStaffAccessCodeValid(code: string | null | undefined): boolean {
   return code?.trim() === expected;
 }
 
+async function resolveOrgIdForUser(input: {
+  serviceSupabase: ReturnType<typeof createSupabaseServiceClient>;
+  authUserId: string;
+  orgSlug?: string | null;
+}): Promise<string | null> {
+  if (input.orgSlug) {
+    const orgResponse = await getOrgBySlug(input.serviceSupabase, input.orgSlug);
+    if (orgResponse.data?.id) {
+      return orgResponse.data.id;
+    }
+  }
+
+  const accountResponse = await getAccountByAuthUserId(
+    input.serviceSupabase,
+    input.authUserId,
+  );
+  if (accountResponse.data?.org_id) {
+    return accountResponse.data.org_id;
+  }
+
+  const defaultOrgResponse = await getDefaultOrg(input.serviceSupabase);
+  return defaultOrgResponse.data?.id ?? null;
+}
+
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as
     | { role?: unknown; staffAccessCode?: unknown }
@@ -69,9 +96,23 @@ export async function POST(request: Request) {
   }
 
   const serviceSupabase = createSupabaseServiceClient();
+  const requestUrl = new URL(request.url);
+  const orgSlug = requestUrl.searchParams.get('org');
+  const orgId = await resolveOrgIdForUser({
+    serviceSupabase,
+    authUserId: user.id,
+    orgSlug,
+  });
+
+  if (!orgId) {
+    return NextResponse.json(
+      { success: false, message: 'No organization found for onboarding' },
+      { status: 400 },
+    );
+  }
 
   const { account } = await getOrCreateAccount(serviceSupabase, {
-    orgId: ORG_ID,
+    orgId,
     authUserId: user.id,
     authEmail: user.email ?? null,
   });

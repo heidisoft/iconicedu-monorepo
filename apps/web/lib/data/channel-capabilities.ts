@@ -1,11 +1,11 @@
 import type { ChannelCapabilityRecordVM } from '@iconicedu/shared-types';
-import { CHANNEL_IDS, ORG_ID } from '@iconicedu/web/lib/data/ids';
+import { CHANNEL_IDS, DEMO_ORG_ID } from '@iconicedu/web/lib/data/ids';
 
 export const CHANNEL_CAPABILITY_RECORDS: ChannelCapabilityRecordVM[] = [
   {
     ids: {
       id: '64a8c0d1-1d2e-4c3f-8a51-9b1e2f3a4b5c',
-      orgId: ORG_ID,
+      orgId: DEMO_ORG_ID,
       channelId: CHANNEL_IDS.mathSpace,
     },
     capability: 'has_schedule',
@@ -15,7 +15,7 @@ export const CHANNEL_CAPABILITY_RECORDS: ChannelCapabilityRecordVM[] = [
   {
     ids: {
       id: '75b9d1e2-2e3f-4d40-9b62-ac2f3a4b5c6d',
-      orgId: ORG_ID,
+      orgId: DEMO_ORG_ID,
       channelId: CHANNEL_IDS.mathSpace,
     },
     capability: 'has_homework',
@@ -25,7 +25,7 @@ export const CHANNEL_CAPABILITY_RECORDS: ChannelCapabilityRecordVM[] = [
   {
     ids: {
       id: '86cae2f3-3f40-4e51-8c73-bd3f4a5b6c7e',
-      orgId: ORG_ID,
+      orgId: DEMO_ORG_ID,
       channelId: CHANNEL_IDS.elaSpace,
     },
     capability: 'has_summaries',
@@ -35,7 +35,7 @@ export const CHANNEL_CAPABILITY_RECORDS: ChannelCapabilityRecordVM[] = [
   {
     ids: {
       id: '97dbf304-4051-4f62-9d84-ce4f5a6b7c8f',
-      orgId: ORG_ID,
+      orgId: DEMO_ORG_ID,
       channelId: CHANNEL_IDS.scienceSpace,
     },
     capability: 'has_schedule',
@@ -45,7 +45,7 @@ export const CHANNEL_CAPABILITY_RECORDS: ChannelCapabilityRecordVM[] = [
   {
     ids: {
       id: 'a8ec0415-5162-4063-8e95-df5a6b7c8d90',
-      orgId: ORG_ID,
+      orgId: DEMO_ORG_ID,
       channelId: CHANNEL_IDS.scienceSpace,
     },
     capability: 'has_homework',

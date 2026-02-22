@@ -3,17 +3,20 @@ import { NextResponse } from 'next/server';
 
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
-import { ORG_ID } from '@iconicedu/web/lib/data/ids';
 import { getOrCreateAccount } from '@iconicedu/web/lib/accounts/getOrCreateAccount';
+import {
+  getAccountByAuthUserId,
+  updateAccountRoleState,
+} from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { getUserRoles, upsertUserRole } from '@iconicedu/web/lib/profile/queries/roles.query';
 import {
   getProfileByAccountId,
   insertProfileForAccount,
   updateProfileForAccount,
 } from '@iconicedu/web/lib/profile/queries/profiles.query';
-import { updateAccountRoleState } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { buildAuthOnboardingState } from '@iconicedu/web/lib/onboarding/auth-state';
 import { resolveOrgDashboardPath } from '@iconicedu/web/lib/org/resolve-dashboard-path';
+import { getDefaultOrg, getOrgBySlug } from '@iconicedu/web/lib/org/queries/org.query';
 
 type StudentAccessCodeRow = {
   id: string;
@@ -28,6 +31,30 @@ type StudentAccessCodeRow = {
 
 function hashInviteCode(input: string): string {
   return createHash('sha256').update(input).digest('hex');
+}
+
+async function resolveOrgIdForUser(input: {
+  serviceSupabase: ReturnType<typeof createSupabaseServiceClient>;
+  authUserId: string;
+  orgSlug?: string | null;
+}): Promise<string | null> {
+  if (input.orgSlug) {
+    const orgResponse = await getOrgBySlug(input.serviceSupabase, input.orgSlug);
+    if (orgResponse.data?.id) {
+      return orgResponse.data.id;
+    }
+  }
+
+  const accountResponse = await getAccountByAuthUserId(
+    input.serviceSupabase,
+    input.authUserId,
+  );
+  if (accountResponse.data?.org_id) {
+    return accountResponse.data.org_id;
+  }
+
+  const defaultOrgResponse = await getDefaultOrg(input.serviceSupabase);
+  return defaultOrgResponse.data?.id ?? null;
 }
 
 export async function POST(request: Request) {
@@ -51,8 +78,23 @@ export async function POST(request: Request) {
   }
 
   const serviceSupabase = createSupabaseServiceClient();
+  const requestUrl = new URL(request.url);
+  const orgSlug = requestUrl.searchParams.get('org');
+  const orgId = await resolveOrgIdForUser({
+    serviceSupabase,
+    authUserId: user.id,
+    orgSlug,
+  });
+
+  if (!orgId) {
+    return NextResponse.json(
+      { success: false, message: 'No organization found for onboarding' },
+      { status: 400 },
+    );
+  }
+
   const { account } = await getOrCreateAccount(serviceSupabase, {
-    orgId: ORG_ID,
+    orgId,
     authUserId: user.id,
     authEmail: user.email ?? null,
   });
@@ -61,7 +103,7 @@ export async function POST(request: Request) {
   const { data: inviteCodeRow, error: codeError } = await serviceSupabase
     .from('student_access_codes')
     .select('id, org_id, family_id, guardian_account_id, status, expires_at, max_uses, uses')
-    .eq('org_id', ORG_ID)
+    .eq('org_id', account.org_id)
     .eq('code_hash', inviteHash)
     .is('deleted_at', null)
     .maybeSingle<StudentAccessCodeRow>();
@@ -90,7 +132,7 @@ export async function POST(request: Request) {
   if (inviteCodeRow.family_id && inviteCodeRow.guardian_account_id) {
     const linkResponse = await serviceSupabase.from('family_links').upsert(
       {
-        org_id: ORG_ID,
+        org_id: account.org_id,
         family_id: inviteCodeRow.family_id,
         guardian_account_id: inviteCodeRow.guardian_account_id,
         child_account_id: account.id,
@@ -158,7 +200,7 @@ export async function POST(request: Request) {
       updated_at: now,
     })
     .eq('id', inviteCodeRow.id)
-    .eq('org_id', ORG_ID);
+    .eq('org_id', account.org_id);
   if (usageResponse.error) {
     return NextResponse.json({ success: false, message: usageResponse.error.message }, { status: 500 });
   }

@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server';
 
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
-import { ORG_ID } from '@iconicedu/web/lib/data/ids';
 import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
+import { getDefaultOrg, getOrgBySlug } from '@iconicedu/web/lib/org/queries/org.query';
 
 const ALLOWED_EVENTS = new Set([
   'auth_start_google',
@@ -28,6 +28,12 @@ export async function POST(request: Request) {
     body?.payload && typeof body.payload === 'object' && !Array.isArray(body.payload)
       ? body.payload
       : null;
+  const requestUrl = new URL(request.url);
+  const orgSlugFromQuery = requestUrl.searchParams.get('org');
+  const orgSlugFromPayload =
+    payload && 'orgSlug' in payload && typeof payload.orgSlug === 'string'
+      ? payload.orgSlug.trim()
+      : '';
 
   const sessionSupabase = await createSupabaseServerClient();
   const {
@@ -36,13 +42,35 @@ export async function POST(request: Request) {
 
   const serviceSupabase = createSupabaseServiceClient();
   let accountId: string | null = null;
+  let orgId: string | null = null;
   if (user?.id) {
     const accountResponse = await getAccountByAuthUserId(serviceSupabase, user.id);
     accountId = accountResponse.data?.id ?? null;
+    orgId = accountResponse.data?.org_id ?? null;
+  }
+
+  if (!orgId) {
+    const slug = orgSlugFromQuery?.trim() || orgSlugFromPayload;
+    if (slug) {
+      const orgResponse = await getOrgBySlug(serviceSupabase, slug);
+      orgId = orgResponse.data?.id ?? null;
+    }
+  }
+
+  if (!orgId) {
+    const defaultOrgResponse = await getDefaultOrg(serviceSupabase);
+    orgId = defaultOrgResponse.data?.id ?? null;
+  }
+
+  if (!orgId) {
+    return NextResponse.json(
+      { success: false, message: 'No organization found for telemetry event' },
+      { status: 400 },
+    );
   }
 
   const insertResponse = await serviceSupabase.from('auth_telemetry_events').insert({
-    org_id: ORG_ID,
+    org_id: orgId,
     account_id: accountId,
     auth_user_id: user?.id ?? null,
     event_key: event,

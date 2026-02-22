@@ -298,6 +298,8 @@ export function SidebarLeft({
     userProfile.kind === 'guardian'
       ? learningSpacesByChild.flatMap((entry) => entry.learningSpaces)
       : flatLearningSpaces;
+  const shouldShowLearningSpacesLabel =
+    userProfile.kind === 'guardian' || visibleLearningSpaces.length === 0;
   const currentUserRef = {
     accountId: data.user.profile.ids.accountId,
     profileId: data.user.profile.ids.id,
@@ -445,16 +447,18 @@ export function SidebarLeft({
           <>
             <SidebarSeparator className="mx-2 group-data-[collapsible=icon]:hidden" />
             <SidebarGroup className="pb-0">
-              <SidebarGroupLabel asChild className="uppercase">
-                <span className="inline-flex items-center gap-2">
-                  <span>Learning spaces</span>
-                  {totalLearningSpacesUnread > 0 ? (
-                    <Badge className="h-4 px-1.5 text-[10px] bg-rose-500 text-white">
-                      {totalLearningSpacesUnread}
-                    </Badge>
-                  ) : null}
-                </span>
-              </SidebarGroupLabel>
+              {shouldShowLearningSpacesLabel ? (
+                <SidebarGroupLabel asChild className="uppercase">
+                  <span className="inline-flex items-center gap-2">
+                    <span>Learning spaces</span>
+                    {totalLearningSpacesUnread > 0 ? (
+                      <Badge className="h-4 px-1.5 text-[10px] bg-rose-500 text-white">
+                        {totalLearningSpacesUnread}
+                      </Badge>
+                    ) : null}
+                  </span>
+                </SidebarGroupLabel>
+              ) : null}
               {userProfile.kind === 'guardian' ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

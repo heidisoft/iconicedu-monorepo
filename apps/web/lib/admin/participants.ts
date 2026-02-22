@@ -1,7 +1,6 @@
 import type { UserProfileVM, ProfileRow } from '@iconicedu/shared-types';
 
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
-import { ORG_ID } from '@iconicedu/web/lib/data/ids';
 import { mapBaseProfile } from '@iconicedu/web/lib/profile/mappers/base-profile.mapper';
 import { getAccountsByOrgId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import {
@@ -76,9 +75,13 @@ function mapProfileToUserProfile(
   }
 }
 
-export async function getActiveParticipantProfiles(): Promise<UserProfileVM[]> {
+export async function getActiveParticipantProfiles(orgId: string): Promise<UserProfileVM[]> {
+  if (!orgId) {
+    return [];
+  }
+
   const supabase = await createSupabaseServerClient();
-  const { data: accounts } = await getAccountsByOrgId(supabase, ORG_ID, {
+  const { data: accounts } = await getAccountsByOrgId(supabase, orgId, {
     status: 'active',
   });
 
@@ -89,9 +92,9 @@ export async function getActiveParticipantProfiles(): Promise<UserProfileVM[]> {
   const accountIds = accounts.map((account) => account.id);
   const [{ data: profiles }, { data: guardianProfiles }, { data: familyLinks }] =
     await Promise.all([
-      getProfilesByAccountIds(supabase, ORG_ID, accountIds),
-      getProfilesByKind(supabase, ORG_ID, 'guardian'),
-      getFamilyLinksByOrg(supabase, ORG_ID),
+      getProfilesByAccountIds(supabase, orgId, accountIds),
+      getProfilesByKind(supabase, orgId, 'guardian'),
+      getFamilyLinksByOrg(supabase, orgId),
     ]);
 
   const guardianNameByAccountId: GuardianNameMap = new Map();

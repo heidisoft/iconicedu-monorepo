@@ -252,6 +252,177 @@ export async function fetchProfilesByAccountIds(orgId: string, accountIds: strin
   return data ?? [];
 }
 
+const MOBILE_ALLOWED_ROLES = new Set(['educator', 'guardian', 'child']);
+
+export type OnboardingStatus = {
+  isComplete: boolean;
+  isRoleAllowed: boolean;
+  profileId: string | null;
+  accountId: string | null;
+  orgId: string | null;
+  primaryRole: string | null;
+  profileKind: string | null;
+  prefill: {
+    firstName: string;
+    lastName: string;
+    phone: string;
+    timezone: string;
+  };
+};
+
+export async function fetchOnboardingStatus(): Promise<OnboardingStatus> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { data: account, error: accountError } = await supabase
+    .from('accounts')
+    .select('id, org_id, default_profile_id, onboarding_completed_at, primary_role, phone_e164')
+    .eq('auth_user_id', user.id)
+    .single();
+
+  if (accountError) {
+    console.error('[onboarding] account fetch error:', accountError);
+    throw accountError;
+  }
+  if (!account) throw new Error('No account found for this user');
+
+  let profileKind: string | null = null;
+  let firstName = '';
+  let lastName = '';
+  let timezone = '';
+
+  if (account.default_profile_id) {
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('kind, first_name, last_name, timezone')
+      .eq('id', account.default_profile_id)
+      .single();
+    if (profileError) console.warn('[onboarding] profile fetch error:', profileError);
+    if (profile) {
+      profileKind = profile.kind ?? null;
+      firstName = profile.first_name ?? '';
+      lastName = profile.last_name ?? '';
+      timezone = profile.timezone ?? '';
+    }
+  }
+
+  // Mirror web's determineOnboardingStep required-field checks:
+  //   - first + last name must be set
+  //   - timezone must be set and not 'UTC'
+  //   - phone required for non-child users
+  const hasName = !!firstName.trim() && !!lastName.trim();
+  const hasTimezone = !!timezone.trim() && timezone.trim() !== 'UTC';
+  const kind = profileKind ?? account.primary_role ?? null;
+  const requiresPhone = kind !== 'child';
+  const hasPhone = !!(account.phone_e164?.trim());
+  const isComplete = hasName && hasTimezone && (!requiresPhone || hasPhone);
+
+  // Mobile app is for educators, parents (guardians) and students (children) only.
+  // If role is not yet assigned (null), allow through so wizard can collect it.
+  const isRoleAllowed = kind === null || MOBILE_ALLOWED_ROLES.has(kind);
+
+  console.log('[onboarding] status:', {
+    kind,
+    hasName,
+    hasTimezone,
+    hasPhone,
+    requiresPhone,
+    isComplete,
+    isRoleAllowed,
+    firstName,
+    lastName,
+    timezone,
+    phone: account.phone_e164,
+  });
+
+  return {
+    isComplete,
+    isRoleAllowed,
+    profileId: account.default_profile_id,
+    accountId: account.id,
+    orgId: account.org_id,
+    primaryRole: account.primary_role ?? null,
+    profileKind,
+    prefill: {
+      firstName,
+      lastName,
+      phone: account.phone_e164 ?? '',
+      timezone,
+    },
+  };
+}
+
+// ─── Wizard step saves ─────────────────────────────────────────────────────────
+
+export async function saveNameStep(profileId: string, firstName: string, lastName: string) {
+  const displayName = `${firstName.trim()} ${lastName.trim()}`.trim();
+  const { error } = await supabase
+    .from('profiles')
+    .update({ first_name: firstName.trim(), last_name: lastName.trim(), display_name: displayName })
+    .eq('id', profileId);
+  if (error) throw error;
+}
+
+export async function savePhoneStep(accountId: string, phone: string) {
+  const { error } = await supabase
+    .from('accounts')
+    .update({ phone_e164: phone.trim() || null })
+    .eq('id', accountId);
+  if (error) throw error;
+}
+
+export async function saveTimezoneStep(profileId: string, timezone: string) {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ timezone })
+    .eq('id', profileId);
+  if (error) throw error;
+}
+
+export async function saveStudentStep(
+  profileId: string,
+  orgId: string,
+  birthYear: number | null,
+  gradeLevel: string | null,
+) {
+  const { error: profileError } = await supabase
+    .from('child_profiles')
+    .upsert({ profile_id: profileId, org_id: orgId, birth_year: birthYear }, { onConflict: 'profile_id' });
+  if (profileError) throw profileError;
+
+  if (gradeLevel) {
+    await supabase.from('child_profile_grade_levels').delete().eq('profile_id', profileId);
+    const { error: gradeError } = await supabase
+      .from('child_profile_grade_levels')
+      .insert({ profile_id: profileId, org_id: orgId, grade_id: gradeLevel });
+    if (gradeError) throw gradeError;
+  }
+}
+
+export async function saveEducatorSubjectsStep(
+  profileId: string,
+  orgId: string,
+  subjects: string[],
+) {
+  await supabase.from('educator_profile_subjects').delete().eq('profile_id', profileId);
+  if (subjects.length > 0) {
+    const rows = subjects.map((subject) => ({ profile_id: profileId, org_id: orgId, subject }));
+    const { error } = await supabase.from('educator_profile_subjects').insert(rows);
+    if (error) throw error;
+  }
+}
+
+export async function completeOnboarding(accountId: string) {
+  const { error } = await supabase
+    .from('accounts')
+    .update({ onboarding_completed_at: new Date().toISOString() })
+    .eq('id', accountId)
+    .is('onboarding_completed_at', null);
+  if (error) throw error;
+}
+
 export async function sendTextMessage(
   channelId: string,
   senderProfileId: string,

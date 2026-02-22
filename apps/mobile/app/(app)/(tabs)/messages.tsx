@@ -18,6 +18,10 @@ import { useChannels } from '@/hooks/use-channels';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 import type { ChannelListItem } from '@/lib/api/queries';
+import {
+  DEMO_DM_CHANNELS,
+  DEMO_CHANNEL_LIST,
+} from '@/lib/dummy-messages';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -208,17 +212,17 @@ export default function MessagesScreen() {
   }, [refetchDms, refetchChannels]);
 
   const filteredDms = useMemo(() => {
-    if (!dms) return [];
-    if (!search) return dms;
+    const allDms = [...DEMO_DM_CHANNELS, ...(dms ?? [])];
+    if (!search) return allDms;
     const q = search.toLowerCase();
-    return dms.filter((dm) => (dm.topic ?? '').toLowerCase().includes(q));
+    return allDms.filter((dm) => (dm.topic ?? '').toLowerCase().includes(q));
   }, [dms, search]);
 
   const filteredChannels = useMemo(() => {
-    if (!channels) return [];
-    if (!search) return channels;
+    const allChannels = [...DEMO_CHANNEL_LIST, ...(channels ?? [])];
+    if (!search) return allChannels;
     const q = search.toLowerCase();
-    return channels.filter((ch) => (ch.topic ?? '').toLowerCase().includes(q));
+    return allChannels.filter((ch) => (ch.topic ?? '').toLowerCase().includes(q));
   }, [channels, search]);
 
   const isLoading = activeTab === 'dms' ? dmsLoading : channelsLoading;

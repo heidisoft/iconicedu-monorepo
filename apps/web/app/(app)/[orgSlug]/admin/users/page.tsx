@@ -1,8 +1,11 @@
 import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 
 import { DashboardHeader } from '@iconicedu/ui-web';
 
 import { getAdminUserRows } from '@iconicedu/web/lib/admin/users';
+import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
+import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { UsersTable } from '@iconicedu/web/app/(app)/[orgSlug]/admin/users/users-table';
 
 export const metadata: Metadata = {
@@ -10,8 +13,20 @@ export const metadata: Metadata = {
   description: 'Manage enrolled users, families, educators, and staff.',
 };
 
-export default async function AdminUsersPage() {
-  const rows = await getAdminUserRows();
+export default async function AdminUsersPage({
+  params,
+}: {
+  params: Promise<{ orgSlug: string }>;
+}) {
+  const { orgSlug } = await params;
+  const supabase = await createSupabaseServerClient();
+  const org = await buildOrgBySlug(supabase, orgSlug);
+
+  if (!org) {
+    notFound();
+  }
+
+  const rows = await getAdminUserRows(org.id);
 
   return (
     <div className="flex flex-1 flex-col">

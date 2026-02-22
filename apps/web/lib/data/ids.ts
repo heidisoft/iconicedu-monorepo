@@ -1,4 +1,4 @@
-export const ORG_ID = 'b3a5f6e3-2f6a-4c12-9d3a-1f1f1b0a6f1a';
+export const DEMO_ORG_ID = 'b3a5f6e3-2f6a-4c12-9d3a-1f1f1b0a6f1a';
 
 export const ACCOUNT_IDS = {
   system: '0f7c5b31-5f7b-4b43-9a7f-8b6c3f94b2a1',

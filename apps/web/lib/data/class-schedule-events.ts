@@ -3,7 +3,7 @@ import {
   CHANNEL_IDS,
   CLASS_SCHEDULE_IDS,
   LEARNING_SPACE_IDS,
-  ORG_ID,
+  DEMO_ORG_ID,
   RECURRENCE_IDS,
 } from '@iconicedu/web/lib/data/ids';
 import {
@@ -17,7 +17,7 @@ import {
 } from '@iconicedu/web/lib/data/profiles';
 
 export const MATH_SCHEDULE_EVENT: ClassScheduleVM = {
-  ids: { id: CLASS_SCHEDULE_IDS.math, orgId: ORG_ID },
+  ids: { id: CLASS_SCHEDULE_IDS.math, orgId: DEMO_ORG_ID },
   title: 'Math: Foundations & Fluency',
   description: 'Weekly math session focused on number sense and fluency.',
   location: 'Zoom',
@@ -30,7 +30,7 @@ export const MATH_SCHEDULE_EVENT: ClassScheduleVM = {
   themeKey: 'emerald',
   participants: [
     {
-      ids: { id: EDUCATOR_PRIYA_PROFILE.ids.id, orgId: ORG_ID },
+      ids: { id: EDUCATOR_PRIYA_PROFILE.ids.id, orgId: DEMO_ORG_ID },
       role: 'educator',
       status: 'accepted',
       displayName: EDUCATOR_PRIYA_PROFILE.profile.displayName,
@@ -38,7 +38,7 @@ export const MATH_SCHEDULE_EVENT: ClassScheduleVM = {
       themeKey: EDUCATOR_PRIYA_PROFILE.ui?.themeKey ?? null,
     },
     {
-      ids: { id: CHILD_TEVIN_PROFILE.ids.id, orgId: ORG_ID },
+      ids: { id: CHILD_TEVIN_PROFILE.ids.id, orgId: DEMO_ORG_ID },
       role: 'child',
       status: 'accepted',
       displayName: CHILD_TEVIN_PROFILE.profile.displayName,
@@ -52,7 +52,7 @@ export const MATH_SCHEDULE_EVENT: ClassScheduleVM = {
     channelId: CHANNEL_IDS.mathSpace,
   },
   recurrence: {
-    ids: { id: RECURRENCE_IDS.math, orgId: ORG_ID },
+    ids: { id: RECURRENCE_IDS.math, orgId: DEMO_ORG_ID },
     rule: {
       frequency: 'weekly',
       interval: 1,
@@ -85,7 +85,7 @@ export const MATH_SCHEDULE_EVENT: ClassScheduleVM = {
 };
 
 export const SCIENCE_SCHEDULE_EVENT: ClassScheduleVM = {
-  ids: { id: CLASS_SCHEDULE_IDS.science, orgId: ORG_ID },
+  ids: { id: CLASS_SCHEDULE_IDS.science, orgId: DEMO_ORG_ID },
   title: 'Science Lab Explorers',
   description: 'Hands-on experiments and guided inquiry.',
   location: 'Zoom',
@@ -98,7 +98,7 @@ export const SCIENCE_SCHEDULE_EVENT: ClassScheduleVM = {
   themeKey: 'sky',
   participants: [
     {
-      ids: { id: EDUCATOR_LUCAS_PROFILE.ids.id, orgId: ORG_ID },
+      ids: { id: EDUCATOR_LUCAS_PROFILE.ids.id, orgId: DEMO_ORG_ID },
       role: 'educator',
       status: 'accepted',
       displayName: EDUCATOR_LUCAS_PROFILE.profile.displayName,
@@ -106,7 +106,7 @@ export const SCIENCE_SCHEDULE_EVENT: ClassScheduleVM = {
       themeKey: EDUCATOR_LUCAS_PROFILE.ui?.themeKey ?? null,
     },
     {
-      ids: { id: CHILD_TEHARA_PROFILE.ids.id, orgId: ORG_ID },
+      ids: { id: CHILD_TEHARA_PROFILE.ids.id, orgId: DEMO_ORG_ID },
       role: 'child',
       status: 'accepted',
       displayName: CHILD_TEHARA_PROFILE.profile.displayName,
@@ -120,7 +120,7 @@ export const SCIENCE_SCHEDULE_EVENT: ClassScheduleVM = {
     channelId: CHANNEL_IDS.scienceSpace,
   },
   recurrence: {
-    ids: { id: RECURRENCE_IDS.science, orgId: ORG_ID },
+    ids: { id: RECURRENCE_IDS.science, orgId: DEMO_ORG_ID },
     rule: {
       frequency: 'weekly',
       interval: 1,
@@ -145,7 +145,7 @@ export const SCIENCE_SCHEDULE_EVENT: ClassScheduleVM = {
 };
 
 export const ELA_SCHEDULE_EVENT: ClassScheduleVM = {
-  ids: { id: CLASS_SCHEDULE_IDS.ela, orgId: ORG_ID },
+  ids: { id: CLASS_SCHEDULE_IDS.ela, orgId: DEMO_ORG_ID },
   title: 'ELA: Writing Workshop',
   description: 'Crafting narratives and improving clarity.',
   location: 'Zoom',
@@ -158,7 +158,7 @@ export const ELA_SCHEDULE_EVENT: ClassScheduleVM = {
   themeKey: 'violet',
   participants: [
     {
-      ids: { id: EDUCATOR_ELENA_PROFILE.ids.id, orgId: ORG_ID },
+      ids: { id: EDUCATOR_ELENA_PROFILE.ids.id, orgId: DEMO_ORG_ID },
       role: 'educator',
       status: 'accepted',
       displayName: EDUCATOR_ELENA_PROFILE.profile.displayName,
@@ -166,7 +166,7 @@ export const ELA_SCHEDULE_EVENT: ClassScheduleVM = {
       themeKey: EDUCATOR_ELENA_PROFILE.ui?.themeKey ?? null,
     },
     {
-      ids: { id: CHILD_MAYA_PROFILE.ids.id, orgId: ORG_ID },
+      ids: { id: CHILD_MAYA_PROFILE.ids.id, orgId: DEMO_ORG_ID },
       role: 'child',
       status: 'accepted',
       displayName: CHILD_MAYA_PROFILE.profile.displayName,
@@ -180,7 +180,7 @@ export const ELA_SCHEDULE_EVENT: ClassScheduleVM = {
     channelId: CHANNEL_IDS.elaSpace,
   },
   recurrence: {
-    ids: { id: RECURRENCE_IDS.ela, orgId: ORG_ID },
+    ids: { id: RECURRENCE_IDS.ela, orgId: DEMO_ORG_ID },
     rule: {
       frequency: 'weekly',
       interval: 1,
@@ -206,7 +206,7 @@ export const ELA_SCHEDULE_EVENT: ClassScheduleVM = {
 };
 
 export const CHESS_SCHEDULE_EVENT: ClassScheduleVM = {
-  ids: { id: CLASS_SCHEDULE_IDS.chess, orgId: ORG_ID },
+  ids: { id: CLASS_SCHEDULE_IDS.chess, orgId: DEMO_ORG_ID },
   title: 'Chess Strategy Lab',
   description: 'Build opening strategies and tactical awareness.',
   location: 'Zoom',
@@ -219,7 +219,7 @@ export const CHESS_SCHEDULE_EVENT: ClassScheduleVM = {
   themeKey: 'amber',
   participants: [
     {
-      ids: { id: EDUCATOR_MISHAN_PROFILE.ids.id, orgId: ORG_ID },
+      ids: { id: EDUCATOR_MISHAN_PROFILE.ids.id, orgId: DEMO_ORG_ID },
       role: 'educator',
       status: 'accepted',
       displayName: EDUCATOR_MISHAN_PROFILE.profile.displayName,
@@ -227,7 +227,7 @@ export const CHESS_SCHEDULE_EVENT: ClassScheduleVM = {
       themeKey: EDUCATOR_MISHAN_PROFILE.ui?.themeKey ?? null,
     },
     {
-      ids: { id: CHILD_TEVIN_PROFILE.ids.id, orgId: ORG_ID },
+      ids: { id: CHILD_TEVIN_PROFILE.ids.id, orgId: DEMO_ORG_ID },
       role: 'child',
       status: 'accepted',
       displayName: CHILD_TEVIN_PROFILE.profile.displayName,
@@ -241,7 +241,7 @@ export const CHESS_SCHEDULE_EVENT: ClassScheduleVM = {
     channelId: CHANNEL_IDS.chessSpace,
   },
   recurrence: {
-    ids: { id: RECURRENCE_IDS.chess, orgId: ORG_ID },
+    ids: { id: RECURRENCE_IDS.chess, orgId: DEMO_ORG_ID },
     rule: {
       frequency: 'weekly',
       interval: 1,

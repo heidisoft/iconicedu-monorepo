@@ -9,13 +9,13 @@ const STAFF_SUPPORT_WEEKLY_AVAILABILITY = {
   Sat: [],
   Sun: [],
 };
-import { ACCOUNT_IDS, ORG_ID, PROFILE_IDS } from '@iconicedu/web/lib/data/ids';
+import { ACCOUNT_IDS, DEMO_ORG_ID, PROFILE_IDS } from '@iconicedu/web/lib/data/ids';
 
 export const SYSTEM_PROFILE: UserProfileVM = {
   kind: 'system',
   ids: {
     id: PROFILE_IDS.system,
-    orgId: ORG_ID,
+    orgId: DEMO_ORG_ID,
     accountId: ACCOUNT_IDS.system,
   },
   profile: {
@@ -64,7 +64,7 @@ export const CHILD_TEVIN_PROFILE: UserProfileVM = {
   kind: 'child',
   ids: {
     id: PROFILE_IDS.childTevin,
-    orgId: ORG_ID,
+    orgId: DEMO_ORG_ID,
     accountId: ACCOUNT_IDS.childTevin,
   },
   profile: {
@@ -130,7 +130,7 @@ export const CHILD_TEHARA_PROFILE: UserProfileVM = {
   kind: 'child',
   ids: {
     id: PROFILE_IDS.childTehara,
-    orgId: ORG_ID,
+    orgId: DEMO_ORG_ID,
     accountId: ACCOUNT_IDS.childTehara,
   },
   profile: {
@@ -196,7 +196,7 @@ export const CHILD_MAYA_PROFILE: UserProfileVM = {
   kind: 'child',
   ids: {
     id: PROFILE_IDS.childMaya,
-    orgId: ORG_ID,
+    orgId: DEMO_ORG_ID,
     accountId: ACCOUNT_IDS.childMaya,
   },
   profile: {
@@ -262,7 +262,7 @@ export const GUARDIAN_RILEY_PROFILE: UserProfileVM = {
   kind: 'guardian',
   ids: {
     id: PROFILE_IDS.guardianRiley,
-    orgId: ORG_ID,
+    orgId: DEMO_ORG_ID,
     accountId: ACCOUNT_IDS.guardianRiley,
   },
   profile: {
@@ -359,7 +359,7 @@ export const EDUCATOR_PRIYA_PROFILE: UserProfileVM = {
   kind: 'educator',
   ids: {
     id: PROFILE_IDS.educatorPriya,
-    orgId: ORG_ID,
+    orgId: DEMO_ORG_ID,
     accountId: ACCOUNT_IDS.educatorPriya,
   },
   profile: {
@@ -435,7 +435,7 @@ export const EDUCATOR_ELENA_PROFILE: UserProfileVM = {
   kind: 'educator',
   ids: {
     id: PROFILE_IDS.educatorElena,
-    orgId: ORG_ID,
+    orgId: DEMO_ORG_ID,
     accountId: ACCOUNT_IDS.educatorElena,
   },
   profile: {
@@ -508,7 +508,7 @@ export const EDUCATOR_LUCAS_PROFILE: UserProfileVM = {
   kind: 'educator',
   ids: {
     id: PROFILE_IDS.educatorLucas,
-    orgId: ORG_ID,
+    orgId: DEMO_ORG_ID,
     accountId: ACCOUNT_IDS.educatorLucas,
   },
   profile: {
@@ -581,7 +581,7 @@ export const EDUCATOR_MISHAN_PROFILE: UserProfileVM = {
   kind: 'educator',
   ids: {
     id: PROFILE_IDS.educatorMishan,
-    orgId: ORG_ID,
+    orgId: DEMO_ORG_ID,
     accountId: ACCOUNT_IDS.educatorMishan,
   },
   profile: {
@@ -654,7 +654,7 @@ export const EDUCATOR_AVA_PROFILE: UserProfileVM = {
   kind: 'educator',
   ids: {
     id: PROFILE_IDS.educatorAva,
-    orgId: ORG_ID,
+    orgId: DEMO_ORG_ID,
     accountId: ACCOUNT_IDS.educatorAva,
   },
   profile: {
@@ -727,7 +727,7 @@ export const STAFF_SUPPORT_PROFILE: UserProfileVM = {
   kind: 'staff',
   ids: {
     id: PROFILE_IDS.staffSupport,
-    orgId: ORG_ID,
+    orgId: DEMO_ORG_ID,
     accountId: ACCOUNT_IDS.staffSupport,
   },
   profile: {

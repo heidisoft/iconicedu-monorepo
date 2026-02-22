@@ -1,5 +1,5 @@
 import type { ChannelMediaItemVM } from '@iconicedu/shared-types';
-import { CHANNEL_IDS, MEDIA_IDS, MESSAGE_IDS, ORG_ID } from '@iconicedu/web/lib/data/ids';
+import { CHANNEL_IDS, MEDIA_IDS, MESSAGE_IDS, DEMO_ORG_ID } from '@iconicedu/web/lib/data/ids';
 import {
   CHILD_TEVIN_PROFILE,
   EDUCATOR_PRIYA_PROFILE,
@@ -9,7 +9,7 @@ export const MATH_CHANNEL_MEDIA: ChannelMediaItemVM[] = [
   {
     ids: {
       id: MEDIA_IDS.mathPhoto,
-      orgId: ORG_ID,
+      orgId: DEMO_ORG_ID,
       channelId: CHANNEL_IDS.mathSpace,
     },
     messageId: MESSAGE_IDS.mathHomeworkSubmit,
@@ -27,7 +27,7 @@ export const DM_PRIYA_MEDIA: ChannelMediaItemVM[] = [
   {
     ids: {
       id: MEDIA_IDS.dmPriyaScreenshot,
-      orgId: ORG_ID,
+      orgId: DEMO_ORG_ID,
       channelId: CHANNEL_IDS.dmPriya,
     },
     messageId: MESSAGE_IDS.dmPriya2,

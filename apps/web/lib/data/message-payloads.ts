@@ -1,4 +1,4 @@
-import { MESSAGE_IDS, ORG_ID } from '@iconicedu/web/lib/data/ids';
+import { MESSAGE_IDS, DEMO_ORG_ID } from '@iconicedu/web/lib/data/ids';
 
 type MessagePayloadRecordVM = {
   ids: {
@@ -16,7 +16,7 @@ export const MESSAGE_PAYLOAD_RECORDS: MessagePayloadRecordVM[] = [
   {
     ids: {
       id: 'f1b2c3d4-1111-4b2c-8d3e-9f0a1b2c3d4e',
-      orgId: ORG_ID,
+      orgId: DEMO_ORG_ID,
       messageId: MESSAGE_IDS.mathWelcome,
     },
     type: 'text',
@@ -29,7 +29,7 @@ export const MESSAGE_PAYLOAD_RECORDS: MessagePayloadRecordVM[] = [
   {
     ids: {
       id: 'f2c3d4e5-2222-4c3d-9e4f-0a1b2c3d4e5f',
-      orgId: ORG_ID,
+      orgId: DEMO_ORG_ID,
       messageId: MESSAGE_IDS.mathHomework,
     },
     type: 'lesson-assignment',
@@ -45,7 +45,7 @@ export const MESSAGE_PAYLOAD_RECORDS: MessagePayloadRecordVM[] = [
   {
     ids: {
       id: 'f3d4e5f6-3333-4d4e-8f5a-1b2c3d4e5f60',
-      orgId: ORG_ID,
+      orgId: DEMO_ORG_ID,
       messageId: MESSAGE_IDS.scienceResource,
     },
     type: 'file',
@@ -61,7 +61,7 @@ export const MESSAGE_PAYLOAD_RECORDS: MessagePayloadRecordVM[] = [
   {
     ids: {
       id: 'f4e5f607-4444-4e5f-9a6b-2c3d4e5f6071',
-      orgId: ORG_ID,
+      orgId: DEMO_ORG_ID,
       messageId: MESSAGE_IDS.elaHomework,
     },
     type: 'lesson-assignment',

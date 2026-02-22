@@ -1,5 +1,4 @@
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
-import { ORG_ID } from '@iconicedu/web/lib/data/ids';
 import type {
   ClassScheduleRow,
   ClassScheduleRecurrenceRow,
@@ -43,9 +42,13 @@ function getProfileDisplayName(profile: ProfileRow) {
   return 'Unknown';
 }
 
-export async function getAdminLearningSpaceRows(): Promise<AdminLearningSpaceRow[]> {
+export async function getAdminLearningSpaceRows(orgId: string): Promise<AdminLearningSpaceRow[]> {
+  if (!orgId) {
+    return [];
+  }
+
   const supabase = await createSupabaseServerClient();
-  const { data } = await getLearningSpacesByOrg(supabase, ORG_ID);
+  const { data } = await getLearningSpacesByOrg(supabase, orgId);
 
   if (!data?.length) {
     return [];
@@ -53,12 +56,12 @@ export async function getAdminLearningSpaceRows(): Promise<AdminLearningSpaceRow
 
   const learningSpaceIds = data.map((row) => row.id);
   const [participantsResponse, channelsResponse, schedulesResponse] = await Promise.all([
-    getLearningSpaceParticipantsByLearningSpaceIds(supabase, ORG_ID, learningSpaceIds),
-    getLearningSpaceChannelsByLearningSpaceIds(supabase, ORG_ID, learningSpaceIds),
+    getLearningSpaceParticipantsByLearningSpaceIds(supabase, orgId, learningSpaceIds),
+    getLearningSpaceChannelsByLearningSpaceIds(supabase, orgId, learningSpaceIds),
     supabase
       .from('class_schedules')
       .select('id, source_learning_space_id, start_at, timezone')
-      .eq('org_id', ORG_ID)
+      .eq('org_id', orgId)
       .in('source_learning_space_id', learningSpaceIds)
       .is('deleted_at', null)
       .returns<ClassScheduleRow[]>(),
@@ -74,7 +77,7 @@ export async function getAdminLearningSpaceRows(): Promise<AdminLearningSpaceRow
         .select(
           'schedule_id, frequency, interval, count, until, timezone, raw_rrule, bysecond, byminute, byhour, byday, bymonthday, byyearday, byweekno, bymonth, bysetpos, wkst',
         )
-        .eq('org_id', ORG_ID)
+        .eq('org_id', orgId)
         .in('schedule_id', scheduleIds)
         .is('deleted_at', null)
         .returns<ClassScheduleRecurrenceRow[]>()
@@ -107,7 +110,7 @@ export async function getAdminLearningSpaceRows(): Promise<AdminLearningSpaceRow
   });
 
   const profileIds = Array.from(new Set(participants.map((row) => row.profile_id)));
-  const { data: profiles } = await getProfilesByIds(supabase, ORG_ID, profileIds);
+  const { data: profiles } = await getProfilesByIds(supabase, orgId, profileIds);
   const profilesById = new Map(
     (profiles ?? []).map((profile) => [profile.id, profile]),
   );

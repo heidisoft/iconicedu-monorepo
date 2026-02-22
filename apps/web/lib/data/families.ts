@@ -1,15 +1,15 @@
 import type { FamilyLinkVM, FamilyVM } from '@iconicedu/shared-types';
-import { ACCOUNT_IDS, FAMILY_IDS, FAMILY_LINK_IDS, ORG_ID } from '@iconicedu/web/lib/data/ids';
+import { ACCOUNT_IDS, FAMILY_IDS, FAMILY_LINK_IDS, DEMO_ORG_ID } from '@iconicedu/web/lib/data/ids';
 
 export const MORGAN_FAMILY: FamilyVM = {
-  ids: { id: FAMILY_IDS.morganFamily, orgId: ORG_ID },
+  ids: { id: FAMILY_IDS.morganFamily, orgId: DEMO_ORG_ID },
   displayName: 'Morgan Family',
 };
 
 export const FAMILY_LINK_RILEY_TEVIN: FamilyLinkVM = {
   ids: {
     id: FAMILY_LINK_IDS.rileyTevin,
-    orgId: ORG_ID,
+    orgId: DEMO_ORG_ID,
     familyId: FAMILY_IDS.morganFamily,
   },
   accounts: {
@@ -23,7 +23,7 @@ export const FAMILY_LINK_RILEY_TEVIN: FamilyLinkVM = {
 export const FAMILY_LINK_RILEY_TEHARA: FamilyLinkVM = {
   ids: {
     id: FAMILY_LINK_IDS.rileyTehara,
-    orgId: ORG_ID,
+    orgId: DEMO_ORG_ID,
     familyId: FAMILY_IDS.morganFamily,
   },
   accounts: {
@@ -37,7 +37,7 @@ export const FAMILY_LINK_RILEY_TEHARA: FamilyLinkVM = {
 export const FAMILY_LINK_RILEY_MAYA: FamilyLinkVM = {
   ids: {
     id: FAMILY_LINK_IDS.rileyMaya,
-    orgId: ORG_ID,
+    orgId: DEMO_ORG_ID,
     familyId: FAMILY_IDS.morganFamily,
   },
   accounts: {

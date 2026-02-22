@@ -24,7 +24,9 @@ vi.mock('@iconicedu/web/lib/supabase/service', () => ({
 }));
 
 vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
-  getAccountByAuthUserId: vi.fn(async () => ({ data: { id: 'account-1' } })),
+  getAccountByAuthUserId: vi.fn(async () => ({
+    data: { id: 'account-1', org_id: 'org-1' },
+  })),
 }));
 
 describe('POST /api/telemetry/auth', () => {

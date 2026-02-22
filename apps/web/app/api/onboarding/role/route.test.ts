@@ -7,6 +7,7 @@ const APP_URL = resolveAppUrl();
 const {
   mockGetUser,
   mockGetOrCreateAccount,
+  mockGetAccountByAuthUserId,
   mockGetProfileByAccountId,
   mockInsertProfileForAccount,
   mockUpdateProfileForAccount,
@@ -17,6 +18,7 @@ const {
 } = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
   mockGetOrCreateAccount: vi.fn(),
+  mockGetAccountByAuthUserId: vi.fn(),
   mockGetProfileByAccountId: vi.fn(),
   mockInsertProfileForAccount: vi.fn(),
   mockUpdateProfileForAccount: vi.fn(),
@@ -54,6 +56,7 @@ vi.mock('@iconicedu/web/lib/profile/queries/roles.query', () => ({
 }));
 
 vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
+  getAccountByAuthUserId: mockGetAccountByAuthUserId,
   updateAccountRoleState: mockUpdateAccountRoleState,
 }));
 
@@ -79,6 +82,7 @@ describe('POST /api/onboarding/role', () => {
 
   it('returns 403 when staff validation fails', async () => {
     mockGetUser.mockResolvedValueOnce({ data: { user: { id: 'auth-1', email: 'user@example.com' } } });
+    mockGetAccountByAuthUserId.mockResolvedValueOnce({ data: { id: 'account-1', org_id: 'org-1' } });
     mockGetOrCreateAccount.mockResolvedValueOnce({
       account: { id: 'account-1', org_id: 'org-1' },
     });
@@ -101,6 +105,7 @@ describe('POST /api/onboarding/role', () => {
     const now = new Date().toISOString();
     mockResolveOrgDashboardPath.mockResolvedValueOnce('/iconic-academy');
     mockGetUser.mockResolvedValueOnce({ data: { user: { id: 'auth-1', email: 'parent@example.com' } } });
+    mockGetAccountByAuthUserId.mockResolvedValueOnce({ data: { id: 'account-1', org_id: 'org-1' } });
     mockGetOrCreateAccount.mockResolvedValueOnce({
       account: { id: 'account-1', org_id: 'org-1' },
     });

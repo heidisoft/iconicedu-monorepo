@@ -61,7 +61,7 @@ export function useMessages(channelId: string) {
     const olderMessages = await fetchChannelMessages(
       channelId,
       40,
-      oldest.created_at,
+      oldest.core.createdAt,
     );
 
     queryClient.setQueryData(

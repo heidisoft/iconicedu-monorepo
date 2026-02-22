@@ -4,7 +4,7 @@ import {
   CHANNEL_IDS,
   FILE_IDS,
   LEARNING_SPACE_IDS,
-  ORG_ID,
+  DEMO_ORG_ID,
 } from '@iconicedu/web/lib/data/ids';
 import {
   EDUCATOR_ELENA_PROFILE,
@@ -16,7 +16,7 @@ import {
 
 const MATH_HOMEWORK_ACTIVITY: ActivityFeedItemVM = {
   kind: 'leaf',
-  ids: { id: ACTIVITY_IDS.mathHomework, orgId: ORG_ID },
+  ids: { id: ACTIVITY_IDS.mathHomework, orgId: DEMO_ORG_ID },
   timestamps: {
     occurredAt: '2025-12-19T17:30:00.000Z',
     createdAt: '2025-12-19T17:35:00.000Z',
@@ -51,7 +51,7 @@ const MATH_HOMEWORK_ACTIVITY: ActivityFeedItemVM = {
 
 const MATH_HOMEWORK_SUBMIT_ACTIVITY: ActivityFeedItemVM = {
   kind: 'leaf',
-  ids: { id: ACTIVITY_IDS.mathHomeworkSubmit, orgId: ORG_ID },
+  ids: { id: ACTIVITY_IDS.mathHomeworkSubmit, orgId: DEMO_ORG_ID },
   timestamps: {
     occurredAt: '2025-12-20T19:40:00.000Z',
     createdAt: '2025-12-20T19:42:00.000Z',
@@ -79,7 +79,7 @@ const MATH_HOMEWORK_SUBMIT_ACTIVITY: ActivityFeedItemVM = {
 
 const SCIENCE_FILE_ACTIVITY: ActivityFeedItemVM = {
   kind: 'leaf',
-  ids: { id: ACTIVITY_IDS.scienceFile, orgId: ORG_ID },
+  ids: { id: ACTIVITY_IDS.scienceFile, orgId: DEMO_ORG_ID },
   timestamps: {
     occurredAt: '2025-12-19T18:45:00.000Z',
     createdAt: '2025-12-19T18:46:00.000Z',
@@ -110,7 +110,7 @@ const SCIENCE_FILE_ACTIVITY: ActivityFeedItemVM = {
 
 const ELA_SUMMARY_ACTIVITY: ActivityFeedItemVM = {
   kind: 'leaf',
-  ids: { id: ACTIVITY_IDS.elaSummary, orgId: ORG_ID },
+  ids: { id: ACTIVITY_IDS.elaSummary, orgId: DEMO_ORG_ID },
   timestamps: {
     occurredAt: '2025-12-18T19:20:00.000Z',
     createdAt: '2025-12-18T19:21:00.000Z',
@@ -140,7 +140,7 @@ const ELA_SUMMARY_ACTIVITY: ActivityFeedItemVM = {
 
 const SYSTEM_PAYMENT_ACTIVITY: ActivityFeedItemVM = {
   kind: 'leaf',
-  ids: { id: ACTIVITY_IDS.systemPayment, orgId: ORG_ID },
+  ids: { id: ACTIVITY_IDS.systemPayment, orgId: DEMO_ORG_ID },
   timestamps: {
     occurredAt: '2025-12-17T14:00:00.000Z',
     createdAt: '2025-12-17T14:01:00.000Z',
@@ -172,7 +172,7 @@ const SYSTEM_PAYMENT_ACTIVITY: ActivityFeedItemVM = {
 
 const GROUPED_HOMEWORK_ACTIVITY: ActivityFeedItemVM = {
   kind: 'group',
-  ids: { id: ACTIVITY_IDS.groupHomework, orgId: ORG_ID },
+  ids: { id: ACTIVITY_IDS.groupHomework, orgId: DEMO_ORG_ID },
   timestamps: {
     occurredAt: '2025-12-20T21:00:00.000Z',
     createdAt: '2025-12-20T21:01:00.000Z',
@@ -222,7 +222,7 @@ const GROUPED_HOMEWORK_ACTIVITY: ActivityFeedItemVM = {
     items: [
       {
         kind: 'leaf',
-        ids: { id: ACTIVITY_IDS.groupHomework1, orgId: ORG_ID },
+        ids: { id: ACTIVITY_IDS.groupHomework1, orgId: DEMO_ORG_ID },
         timestamps: {
           occurredAt: '2025-12-20T20:50:00.000Z',
           createdAt: '2025-12-20T20:55:00.000Z',
@@ -249,7 +249,7 @@ const GROUPED_HOMEWORK_ACTIVITY: ActivityFeedItemVM = {
       },
       {
         kind: 'leaf',
-        ids: { id: ACTIVITY_IDS.groupHomework2, orgId: ORG_ID },
+        ids: { id: ACTIVITY_IDS.groupHomework2, orgId: DEMO_ORG_ID },
         timestamps: {
           occurredAt: '2025-12-20T20:52:00.000Z',
           createdAt: '2025-12-20T20:56:00.000Z',

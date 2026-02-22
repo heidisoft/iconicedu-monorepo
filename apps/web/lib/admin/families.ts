@@ -6,7 +6,6 @@ import type {
 } from '@iconicedu/shared-types';
 
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
-import { ORG_ID } from '@iconicedu/web/lib/data/ids';
 import { getAccountsByIds } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import {
   getFamiliesByOrg,
@@ -97,10 +96,14 @@ function buildGuardianParticipant(
   };
 }
 
-export async function getAdminFamilyRows(): Promise<AdminFamilyRow[]> {
+export async function getAdminFamilyRows(orgId: string): Promise<AdminFamilyRow[]> {
+  if (!orgId) {
+    return [];
+  }
+
   const supabase = await createSupabaseServerClient();
 
-  const { data: families } = await getFamiliesByOrg(supabase, ORG_ID);
+  const { data: families } = await getFamiliesByOrg(supabase, orgId);
 
   if (!families?.length) {
     return [];
@@ -110,7 +113,7 @@ export async function getAdminFamilyRows(): Promise<AdminFamilyRow[]> {
 
   const { data: links } = await getFamilyLinksByFamilyIds(
     supabase,
-    ORG_ID,
+    orgId,
     familyIds,
   );
 
@@ -122,7 +125,7 @@ export async function getAdminFamilyRows(): Promise<AdminFamilyRow[]> {
 
   const accounts =
     accountIds.size > 0
-      ? await getAccountsByIds(supabase, ORG_ID, Array.from(accountIds))
+      ? await getAccountsByIds(supabase, orgId, Array.from(accountIds))
       : { data: [] as AccountRow[] };
 
   const accountMap = new Map<string, AccountRow>();
@@ -130,7 +133,7 @@ export async function getAdminFamilyRows(): Promise<AdminFamilyRow[]> {
 
   const { data: profiles } =
     accountIds.size > 0
-      ? await getProfilesByAccountIds(supabase, ORG_ID, Array.from(accountIds))
+      ? await getProfilesByAccountIds(supabase, orgId, Array.from(accountIds))
       : { data: [] as ProfileRow[] };
   const guardianProfileByAccountId = new Map<string, ProfileRow>();
   const childProfileByAccountId = new Map<string, ProfileRow>();
@@ -147,7 +150,7 @@ export async function getAdminFamilyRows(): Promise<AdminFamilyRow[]> {
 
   const { data: invites } = await getFamilyInvitesByFamilyIds(
     supabase,
-    ORG_ID,
+    orgId,
     familyIds,
   );
 

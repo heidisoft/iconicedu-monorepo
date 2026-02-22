@@ -1,5 +1,5 @@
 import type { MessageVM, ThreadVM } from '@iconicedu/shared-types';
-import { CHANNEL_IDS, MESSAGE_IDS, ORG_ID, THREAD_IDS } from '@iconicedu/web/lib/data/ids';
+import { CHANNEL_IDS, MESSAGE_IDS, DEMO_ORG_ID, THREAD_IDS } from '@iconicedu/web/lib/data/ids';
 import {
   CHILD_MAYA_PROFILE,
   CHILD_TEHARA_PROFILE,
@@ -15,7 +15,7 @@ import {
 } from '@iconicedu/web/lib/data/profiles';
 
 const THREAD_MATH_FEEDBACK: ThreadVM = {
-  ids: { id: THREAD_IDS.mathFeedback, orgId: ORG_ID },
+  ids: { id: THREAD_IDS.mathFeedback, orgId: DEMO_ORG_ID },
   parent: {
     messageId: MESSAGE_IDS.mathHomework,
     snippet: 'Complete problems 1-10 in the worksheet.',
@@ -37,7 +37,7 @@ const THREAD_MATH_FEEDBACK: ThreadVM = {
 };
 
 const THREAD_ELA_HOMEWORK: ThreadVM = {
-  ids: { id: THREAD_IDS.elaHomework, orgId: ORG_ID },
+  ids: { id: THREAD_IDS.elaHomework, orgId: DEMO_ORG_ID },
   parent: {
     messageId: MESSAGE_IDS.elaHomework,
     snippet: 'Draft a short story using the prompt provided.',
@@ -60,7 +60,7 @@ const THREAD_ELA_HOMEWORK: ThreadVM = {
 
 export const MATH_CHANNEL_MESSAGES: MessageVM[] = [
   {
-    ids: { id: MESSAGE_IDS.mathWelcome, orgId: ORG_ID },
+    ids: { id: MESSAGE_IDS.mathWelcome, orgId: DEMO_ORG_ID },
     core: {
       type: 'text',
       sender: GUARDIAN_RILEY_PROFILE,
@@ -79,7 +79,7 @@ export const MATH_CHANNEL_MESSAGES: MessageVM[] = [
     },
   },
   {
-    ids: { id: MESSAGE_IDS.mathHomework, orgId: ORG_ID },
+    ids: { id: MESSAGE_IDS.mathHomework, orgId: DEMO_ORG_ID },
     core: {
       type: 'lesson-assignment',
       sender: EDUCATOR_PRIYA_PROFILE,
@@ -113,7 +113,7 @@ export const MATH_CHANNEL_MESSAGES: MessageVM[] = [
     },
   },
   {
-    ids: { id: MESSAGE_IDS.mathHomeworkSubmit, orgId: ORG_ID },
+    ids: { id: MESSAGE_IDS.mathHomeworkSubmit, orgId: DEMO_ORG_ID },
     core: {
       type: 'homework-submission',
       sender: CHILD_TEVIN_PROFILE,
@@ -148,7 +148,7 @@ export const MATH_CHANNEL_MESSAGES: MessageVM[] = [
     },
   },
   {
-    ids: { id: MESSAGE_IDS.mathFeedbackRequest, orgId: ORG_ID },
+    ids: { id: MESSAGE_IDS.mathFeedbackRequest, orgId: DEMO_ORG_ID },
     core: {
       type: 'feedback-request',
       sender: EDUCATOR_PRIYA_PROFILE,
@@ -169,7 +169,7 @@ export const MATH_CHANNEL_MESSAGES: MessageVM[] = [
     },
   },
   {
-    ids: { id: MESSAGE_IDS.mathProgress, orgId: ORG_ID },
+    ids: { id: MESSAGE_IDS.mathProgress, orgId: DEMO_ORG_ID },
     core: {
       type: 'progress-update',
       sender: EDUCATOR_PRIYA_PROFILE,
@@ -194,7 +194,7 @@ export const MATH_CHANNEL_MESSAGES: MessageVM[] = [
     },
   },
   {
-    ids: { id: MESSAGE_IDS.mathSessionSummary, orgId: ORG_ID },
+    ids: { id: MESSAGE_IDS.mathSessionSummary, orgId: DEMO_ORG_ID },
     core: {
       type: 'session-summary',
       sender: EDUCATOR_PRIYA_PROFILE,
@@ -216,7 +216,7 @@ export const MATH_CHANNEL_MESSAGES: MessageVM[] = [
     },
   },
   {
-    ids: { id: MESSAGE_IDS.mathSessionComplete, orgId: ORG_ID },
+    ids: { id: MESSAGE_IDS.mathSessionComplete, orgId: DEMO_ORG_ID },
     core: {
       type: 'session-complete',
       sender: SYSTEM_PROFILE,
@@ -239,7 +239,7 @@ export const MATH_CHANNEL_MESSAGES: MessageVM[] = [
 
 export const SCIENCE_CHANNEL_MESSAGES: MessageVM[] = [
   {
-    ids: { id: MESSAGE_IDS.scienceWelcome, orgId: ORG_ID },
+    ids: { id: MESSAGE_IDS.scienceWelcome, orgId: DEMO_ORG_ID },
     core: {
       type: 'text',
       sender: EDUCATOR_LUCAS_PROFILE,
@@ -255,7 +255,7 @@ export const SCIENCE_CHANNEL_MESSAGES: MessageVM[] = [
     },
   },
   {
-    ids: { id: MESSAGE_IDS.scienceResource, orgId: ORG_ID },
+    ids: { id: MESSAGE_IDS.scienceResource, orgId: DEMO_ORG_ID },
     core: {
       type: 'file',
       sender: EDUCATOR_LUCAS_PROFILE,
@@ -279,7 +279,7 @@ export const SCIENCE_CHANNEL_MESSAGES: MessageVM[] = [
 
 export const ELA_CHANNEL_MESSAGES: MessageVM[] = [
   {
-    ids: { id: MESSAGE_IDS.elaWelcome, orgId: ORG_ID },
+    ids: { id: MESSAGE_IDS.elaWelcome, orgId: DEMO_ORG_ID },
     core: {
       type: 'text',
       sender: EDUCATOR_ELENA_PROFILE,
@@ -295,7 +295,7 @@ export const ELA_CHANNEL_MESSAGES: MessageVM[] = [
     },
   },
   {
-    ids: { id: MESSAGE_IDS.elaSummary, orgId: ORG_ID },
+    ids: { id: MESSAGE_IDS.elaSummary, orgId: DEMO_ORG_ID },
     core: {
       type: 'session-summary',
       sender: EDUCATOR_ELENA_PROFILE,
@@ -317,7 +317,7 @@ export const ELA_CHANNEL_MESSAGES: MessageVM[] = [
     },
   },
   {
-    ids: { id: MESSAGE_IDS.elaHomework, orgId: ORG_ID },
+    ids: { id: MESSAGE_IDS.elaHomework, orgId: DEMO_ORG_ID },
     core: {
       type: 'lesson-assignment',
       sender: EDUCATOR_ELENA_PROFILE,
@@ -354,7 +354,7 @@ export const ELA_CHANNEL_MESSAGES: MessageVM[] = [
 
 export const CHESS_CHANNEL_MESSAGES: MessageVM[] = [
   {
-    ids: { id: MESSAGE_IDS.chessWelcome, orgId: ORG_ID },
+    ids: { id: MESSAGE_IDS.chessWelcome, orgId: DEMO_ORG_ID },
     core: {
       type: 'text',
       sender: EDUCATOR_MISHAN_PROFILE,
@@ -370,7 +370,7 @@ export const CHESS_CHANNEL_MESSAGES: MessageVM[] = [
     },
   },
   {
-    ids: { id: MESSAGE_IDS.chessEventReminder, orgId: ORG_ID },
+    ids: { id: MESSAGE_IDS.chessEventReminder, orgId: DEMO_ORG_ID },
     core: {
       type: 'event-reminder',
       sender: EDUCATOR_MISHAN_PROFILE,
@@ -396,7 +396,7 @@ export const CHESS_CHANNEL_MESSAGES: MessageVM[] = [
 
 export const DM_PRIYA_MESSAGES: MessageVM[] = [
   {
-    ids: { id: MESSAGE_IDS.dmPriya1, orgId: ORG_ID },
+    ids: { id: MESSAGE_IDS.dmPriya1, orgId: DEMO_ORG_ID },
     core: {
       type: 'text',
       sender: GUARDIAN_RILEY_PROFILE,
@@ -408,7 +408,7 @@ export const DM_PRIYA_MESSAGES: MessageVM[] = [
     content: { text: 'Hi Priya, quick question about the fractions worksheet.' },
   },
   {
-    ids: { id: MESSAGE_IDS.dmPriya2, orgId: ORG_ID },
+    ids: { id: MESSAGE_IDS.dmPriya2, orgId: DEMO_ORG_ID },
     core: {
       type: 'image',
       sender: EDUCATOR_PRIYA_PROFILE,
@@ -430,7 +430,7 @@ export const DM_PRIYA_MESSAGES: MessageVM[] = [
 
 export const DM_ELENA_MESSAGES: MessageVM[] = [
   {
-    ids: { id: MESSAGE_IDS.dmElena1, orgId: ORG_ID },
+    ids: { id: MESSAGE_IDS.dmElena1, orgId: DEMO_ORG_ID },
     core: {
       type: 'file',
       sender: EDUCATOR_ELENA_PROFILE,
@@ -452,7 +452,7 @@ export const DM_ELENA_MESSAGES: MessageVM[] = [
 
 export const DM_LUCAS_MESSAGES: MessageVM[] = [
   {
-    ids: { id: MESSAGE_IDS.dmLucas1, orgId: ORG_ID },
+    ids: { id: MESSAGE_IDS.dmLucas1, orgId: DEMO_ORG_ID },
     core: {
       type: 'text',
       sender: EDUCATOR_LUCAS_PROFILE,
@@ -467,7 +467,7 @@ export const DM_LUCAS_MESSAGES: MessageVM[] = [
 
 export const DM_MISHAN_MESSAGES: MessageVM[] = [
   {
-    ids: { id: MESSAGE_IDS.dmMishan1, orgId: ORG_ID },
+    ids: { id: MESSAGE_IDS.dmMishan1, orgId: DEMO_ORG_ID },
     core: {
       type: 'audio-recording',
       sender: EDUCATOR_MISHAN_PROFILE,
@@ -489,7 +489,7 @@ export const DM_MISHAN_MESSAGES: MessageVM[] = [
 
 export const DM_AVA_MESSAGES: MessageVM[] = [
   {
-    ids: { id: MESSAGE_IDS.dmAva1, orgId: ORG_ID },
+    ids: { id: MESSAGE_IDS.dmAva1, orgId: DEMO_ORG_ID },
     core: {
       type: 'text',
       sender: EDUCATOR_AVA_PROFILE,
@@ -504,7 +504,7 @@ export const DM_AVA_MESSAGES: MessageVM[] = [
 
 export const SUPPORT_CHANNEL_MESSAGES: MessageVM[] = [
   {
-    ids: { id: MESSAGE_IDS.supportWelcome, orgId: ORG_ID },
+    ids: { id: MESSAGE_IDS.supportWelcome, orgId: DEMO_ORG_ID },
     core: {
       type: 'text',
       sender: STAFF_SUPPORT_PROFILE,
@@ -518,7 +518,7 @@ export const SUPPORT_CHANNEL_MESSAGES: MessageVM[] = [
     },
   },
   {
-    ids: { id: MESSAGE_IDS.supportReply, orgId: ORG_ID },
+    ids: { id: MESSAGE_IDS.supportReply, orgId: DEMO_ORG_ID },
     core: {
       type: 'text',
       sender: GUARDIAN_RILEY_PROFILE,

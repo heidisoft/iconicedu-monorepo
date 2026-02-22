@@ -8,6 +8,7 @@ const APP_URL = resolveAppUrl();
 const {
   mockGetUser,
   mockGetOrCreateAccount,
+  mockGetAccountByAuthUserId,
   mockFrom,
   mockGetProfileByAccountId,
   mockInsertProfileForAccount,
@@ -19,6 +20,7 @@ const {
 } = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
   mockGetOrCreateAccount: vi.fn(),
+  mockGetAccountByAuthUserId: vi.fn(),
   mockFrom: vi.fn(),
   mockGetProfileByAccountId: vi.fn(),
   mockInsertProfileForAccount: vi.fn(),
@@ -59,6 +61,7 @@ vi.mock('@iconicedu/web/lib/profile/queries/roles.query', () => ({
 }));
 
 vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
+  getAccountByAuthUserId: mockGetAccountByAuthUserId,
   updateAccountRoleState: mockUpdateAccountRoleState,
 }));
 
@@ -84,6 +87,9 @@ describe('POST /api/onboarding/student', () => {
 
   it('returns 400 when invite code is invalid', async () => {
     mockGetUser.mockResolvedValueOnce({ data: { user: { id: 'auth-1', email: 'student@example.com' } } });
+    mockGetAccountByAuthUserId.mockResolvedValueOnce({
+      data: { id: 'account-1', org_id: 'org-1' },
+    });
     mockGetOrCreateAccount.mockResolvedValueOnce({
       account: { id: 'account-1', org_id: 'org-1' },
     });
@@ -121,6 +127,9 @@ describe('POST /api/onboarding/student', () => {
     const inviteHash = createHash('sha256').update(inviteCode).digest('hex');
     mockResolveOrgDashboardPath.mockResolvedValueOnce('/iconic-academy');
     mockGetUser.mockResolvedValueOnce({ data: { user: { id: 'auth-1', email: 'student@example.com' } } });
+    mockGetAccountByAuthUserId.mockResolvedValueOnce({
+      data: { id: 'account-1', org_id: 'org-1' },
+    });
     mockGetOrCreateAccount.mockResolvedValueOnce({
       account: { id: 'account-1', org_id: 'org-1' },
     });

@@ -1,5 +1,5 @@
 import type { ChannelVM } from '@iconicedu/shared-types';
-import { CHANNEL_IDS, LEARNING_SPACE_IDS, ORG_ID } from '@iconicedu/web/lib/data/ids';
+import { CHANNEL_IDS, LEARNING_SPACE_IDS, DEMO_ORG_ID } from '@iconicedu/web/lib/data/ids';
 import {
   CHILD_MAYA_PROFILE,
   CHILD_TEHARA_PROFILE,
@@ -34,7 +34,7 @@ import {
 import { DM_PRIYA_MEDIA, MATH_CHANNEL_MEDIA } from '@iconicedu/web/lib/data/channel-media';
 
 const mathChannel: ChannelVM = {
-  ids: { id: CHANNEL_IDS.mathSpace, orgId: ORG_ID },
+  ids: { id: CHANNEL_IDS.mathSpace, orgId: DEMO_ORG_ID },
   basics: {
     kind: 'channel',
     topic: 'Math Foundations',
@@ -109,7 +109,7 @@ const mathChannel: ChannelVM = {
 };
 
 const scienceChannel: ChannelVM = {
-  ids: { id: CHANNEL_IDS.scienceSpace, orgId: ORG_ID },
+  ids: { id: CHANNEL_IDS.scienceSpace, orgId: DEMO_ORG_ID },
   basics: {
     kind: 'channel',
     topic: 'Science Lab Explorers',
@@ -177,7 +177,7 @@ const scienceChannel: ChannelVM = {
 };
 
 const elaChannel: ChannelVM = {
-  ids: { id: CHANNEL_IDS.elaSpace, orgId: ORG_ID },
+  ids: { id: CHANNEL_IDS.elaSpace, orgId: DEMO_ORG_ID },
   basics: {
     kind: 'channel',
     topic: 'Writing Workshop',
@@ -246,7 +246,7 @@ const elaChannel: ChannelVM = {
 };
 
 const chessChannel: ChannelVM = {
-  ids: { id: CHANNEL_IDS.chessSpace, orgId: ORG_ID },
+  ids: { id: CHANNEL_IDS.chessSpace, orgId: DEMO_ORG_ID },
   basics: {
     kind: 'channel',
     topic: 'Chess Strategy Lab',
@@ -311,7 +311,7 @@ const chessChannel: ChannelVM = {
 };
 
 const dmPriyaChannel: ChannelVM = {
-  ids: { id: CHANNEL_IDS.dmPriya, orgId: ORG_ID },
+  ids: { id: CHANNEL_IDS.dmPriya, orgId: DEMO_ORG_ID },
   basics: {
     kind: 'dm',
     topic: 'Priya Nair',
@@ -352,7 +352,7 @@ const dmPriyaChannel: ChannelVM = {
 };
 
 const dmElenaChannel: ChannelVM = {
-  ids: { id: CHANNEL_IDS.dmElena, orgId: ORG_ID },
+  ids: { id: CHANNEL_IDS.dmElena, orgId: DEMO_ORG_ID },
   basics: {
     kind: 'dm',
     topic: 'Elena Brooks',
@@ -396,7 +396,7 @@ const dmElenaChannel: ChannelVM = {
 };
 
 const dmLucasChannel: ChannelVM = {
-  ids: { id: CHANNEL_IDS.dmLucas, orgId: ORG_ID },
+  ids: { id: CHANNEL_IDS.dmLucas, orgId: DEMO_ORG_ID },
   basics: {
     kind: 'dm',
     topic: 'Lucas Choi',
@@ -437,7 +437,7 @@ const dmLucasChannel: ChannelVM = {
 };
 
 const dmMishanChannel: ChannelVM = {
-  ids: { id: CHANNEL_IDS.dmMishan, orgId: ORG_ID },
+  ids: { id: CHANNEL_IDS.dmMishan, orgId: DEMO_ORG_ID },
   basics: {
     kind: 'dm',
     topic: 'Mishan Perera',
@@ -478,7 +478,7 @@ const dmMishanChannel: ChannelVM = {
 };
 
 const dmAvaChannel: ChannelVM = {
-  ids: { id: CHANNEL_IDS.dmAva, orgId: ORG_ID },
+  ids: { id: CHANNEL_IDS.dmAva, orgId: DEMO_ORG_ID },
   basics: {
     kind: 'dm',
     topic: 'Ava Patel',
@@ -519,7 +519,7 @@ const dmAvaChannel: ChannelVM = {
 };
 
 const supportChannel: ChannelVM = {
-  ids: { id: CHANNEL_IDS.support, orgId: ORG_ID },
+  ids: { id: CHANNEL_IDS.support, orgId: DEMO_ORG_ID },
   basics: {
     kind: 'channel',
     topic: 'Support',

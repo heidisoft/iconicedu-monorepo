@@ -1,4 +1,5 @@
 import type { MessageVM, UserProfileVM } from '@iconicedu/shared-types';
+import type { ChannelListItem } from '@/lib/api/queries';
 
 const ORG = 'org-demo';
 
@@ -160,3 +161,54 @@ export const DEMO_CHESS_MESSAGES: MessageVM[] = [
     },
   },
 ] as MessageVM[];
+
+// ─── Demo channel list items (for the messages tab when DB is empty) ──────────
+
+export const DEMO_DM_CHANNEL: ChannelListItem = {
+  id: 'demo-dm-priya',
+  org_id: ORG,
+  topic: 'Priya S.',
+  description: 'Math tutor',
+  kind: 'dm',
+  updated_at: '2025-12-18T17:25:00.000Z',
+  unread_count: 2,
+  last_message_text: 'Absolutely! Fraction bars or physical manipulatives are perfect.',
+  last_message_at: '2025-12-18T17:25:00.000Z',
+  last_message_sender: 'Priya S.',
+};
+
+export const DEMO_MATH_CHANNEL: ChannelListItem = {
+  id: 'demo-channel-math',
+  org_id: ORG,
+  topic: 'Math Foundations',
+  description: 'Fractions & number lines',
+  kind: 'channel',
+  updated_at: '2025-12-21T18:20:00.000Z',
+  unread_count: 0,
+  last_message_text: 'Session complete.',
+  last_message_at: '2025-12-21T18:20:00.000Z',
+  last_message_sender: 'ICONIC System',
+};
+
+export const DEMO_CHESS_CHANNEL: ChannelListItem = {
+  id: 'demo-channel-chess',
+  org_id: ORG,
+  topic: 'Chess Strategy Lab',
+  description: 'Openings & tactical patterns',
+  kind: 'channel',
+  updated_at: '2025-12-18T20:10:00.000Z',
+  unread_count: 1,
+  last_message_text: 'Reminder: Chess Strategy Lab this Friday.',
+  last_message_at: '2025-12-18T20:10:00.000Z',
+  last_message_sender: 'Mishan K.',
+};
+
+/** Map demo channelId → demo messages, used by conversation screens */
+export const DEMO_MESSAGE_MAP: Record<string, MessageVM[]> = {
+  'demo-dm-priya': DEMO_DM_MESSAGES,
+  'demo-channel-math': DEMO_MATH_MESSAGES,
+  'demo-channel-chess': DEMO_CHESS_MESSAGES,
+};
+
+export const DEMO_DM_CHANNELS: ChannelListItem[] = [DEMO_DM_CHANNEL];
+export const DEMO_CHANNEL_LIST: ChannelListItem[] = [DEMO_MATH_CHANNEL, DEMO_CHESS_CHANNEL];

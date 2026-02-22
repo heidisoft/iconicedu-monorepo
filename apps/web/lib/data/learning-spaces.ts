@@ -1,5 +1,5 @@
 import type { LearningSpaceVM } from '@iconicedu/shared-types';
-import { CHANNEL_IDS, LEARNING_SPACE_IDS, ORG_ID } from '@iconicedu/web/lib/data/ids';
+import { CHANNEL_IDS, LEARNING_SPACE_IDS, DEMO_ORG_ID } from '@iconicedu/web/lib/data/ids';
 import {
   CHILD_MAYA_PROFILE,
   CHILD_TEHARA_PROFILE,
@@ -20,7 +20,7 @@ import { LEARNING_SPACE_CHANNELS_BY_ID } from '@iconicedu/web/lib/data/channel-m
 
 export const LEARNING_SPACES: LearningSpaceVM[] = [
   {
-    ids: { id: LEARNING_SPACE_IDS.math, orgId: ORG_ID },
+    ids: { id: LEARNING_SPACE_IDS.math, orgId: DEMO_ORG_ID },
     basics: {
       kind: 'one_on_one',
       status: 'active',
@@ -69,7 +69,7 @@ export const LEARNING_SPACES: LearningSpaceVM[] = [
     ],
   },
   {
-    ids: { id: LEARNING_SPACE_IDS.science, orgId: ORG_ID },
+    ids: { id: LEARNING_SPACE_IDS.science, orgId: DEMO_ORG_ID },
     basics: {
       kind: 'one_on_one',
       status: 'active',
@@ -118,7 +118,7 @@ export const LEARNING_SPACES: LearningSpaceVM[] = [
     ],
   },
   {
-    ids: { id: LEARNING_SPACE_IDS.ela, orgId: ORG_ID },
+    ids: { id: LEARNING_SPACE_IDS.ela, orgId: DEMO_ORG_ID },
     basics: {
       kind: 'one_on_one',
       status: 'active',
@@ -167,7 +167,7 @@ export const LEARNING_SPACES: LearningSpaceVM[] = [
     ],
   },
   {
-    ids: { id: LEARNING_SPACE_IDS.chess, orgId: ORG_ID },
+    ids: { id: LEARNING_SPACE_IDS.chess, orgId: DEMO_ORG_ID },
     basics: {
       kind: 'one_on_one',
       status: 'active',
