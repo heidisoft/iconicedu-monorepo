@@ -21,6 +21,7 @@ import type {
   UUID,
   UserProfileVM,
 } from '@iconicedu/shared-types';
+import { Loader2 } from 'lucide-react';
 
 function getMessageInputPlaceholder(
   channel: ChannelVM,
@@ -112,6 +113,7 @@ export function MessagesContainer({
     toggleHidden,
   } = useMessages(channelMessages);
   const [isLoadingOlder, setIsLoadingOlder] = useState(false);
+  const [networkRequestCount, setNetworkRequestCount] = useState(0);
   const [hasMoreOlderMessages, setHasMoreOlderMessages] = useState(
     channelMessages.length >= MESSAGES_PAGE_SIZE,
   );
@@ -124,6 +126,16 @@ export function MessagesContainer({
   const [lastReadAt, setLastReadAt] = useState<ISODateTime | undefined>(
     channel.collections.readState?.lastReadAt,
   );
+  const isNetworkBusy = networkRequestCount > 0;
+
+  const runWithNetworkActivity = useCallback(async <T,>(operation: () => Promise<T>) => {
+    setNetworkRequestCount((count) => count + 1);
+    try {
+      return await operation();
+    } finally {
+      setNetworkRequestCount((count) => Math.max(0, count - 1));
+    }
+  }, []);
 
   const participants = useMemo(
     () => channel.collections.participants ?? [],
@@ -211,14 +223,16 @@ export function MessagesContainer({
 
         const persistReadState = async () => {
           try {
-            const response = await window.fetch('/api/messages/read-state', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                channelId: channel.ids.id,
-                lastReadMessageId: readMessageId,
+            const response = await runWithNetworkActivity(() =>
+              window.fetch('/api/messages/read-state', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  channelId: channel.ids.id,
+                  lastReadMessageId: readMessageId,
+                }),
               }),
-            });
+            );
             if (response.ok) {
               lastPersistedReadMessageIdRef.current = readMessageId;
             }
@@ -229,7 +243,7 @@ export function MessagesContainer({
         void persistReadState();
       }, READ_STATE_PERSIST_DEBOUNCE_MS);
     },
-    [channel.ids.id, lastReadMessageId],
+    [channel.ids.id, lastReadMessageId, runWithNetworkActivity],
   );
 
   const handleOpenThread = useCallback(
@@ -253,7 +267,9 @@ export function MessagesContainer({
             threadId: thread.ids.id,
             parentMessageId: parentMessage.ids.id,
           });
-          const response = await window.fetch(`/api/messages/thread?${params.toString()}`);
+          const response = await runWithNetworkActivity(() =>
+            window.fetch(`/api/messages/thread?${params.toString()}`),
+          );
           if (response.ok) {
             const payload = (await response.json()) as {
               success?: boolean;
@@ -280,6 +296,15 @@ export function MessagesContainer({
         },
         parentMessage,
       });
+
+      const isDraftThreadOnly =
+        thread.parent.messageId === parentMessage.ids.id &&
+        resolvedReplies.length === 0 &&
+        (thread.stats?.messageCount ?? 0) <= 1;
+      if (isDraftThreadOnly) {
+        return;
+      }
+
       updateMessage(parentMessage.ids.id, {
         social: {
           ...(parentMessage.social ?? { reactions: [] }),
@@ -287,7 +312,7 @@ export function MessagesContainer({
         } as MessageVM['social'],
       });
     },
-    [addMessage, messages, setThreadData, updateMessage],
+    [addMessage, messages, runWithNetworkActivity, setThreadData, updateMessage],
   );
 
   const syncParentThreadFromReply = useCallback(
@@ -313,12 +338,14 @@ export function MessagesContainer({
       }
       const sendMessage = async () => {
         if (messageWriteClient && currentUserId) {
-          const created = await messageWriteClient.sendTextMessage({
-            orgId: channel.ids.orgId,
-            channelId: channel.ids.id,
-            senderProfileId: currentUserId,
-            content,
-          });
+          const created = await runWithNetworkActivity(() =>
+            messageWriteClient.sendTextMessage({
+              orgId: channel.ids.orgId,
+              channelId: channel.ids.id,
+              senderProfileId: currentUserId,
+              content,
+            }),
+          );
           const exists = messagesRef.current.some(
             (message) => message.ids.id === created.ids.id,
           );
@@ -343,7 +370,7 @@ export function MessagesContainer({
           },
           content: { text: content },
         };
-        addMessage(newMessage);
+      addMessage(newMessage);
       };
       void sendMessage();
     },
@@ -357,6 +384,7 @@ export function MessagesContainer({
       messageWriteClient,
       currentUserId,
       readOnly,
+      runWithNetworkActivity,
     ],
   );
 
@@ -367,14 +395,16 @@ export function MessagesContainer({
       if (!trimmed) return;
 
       const createdMessage = messageWriteClient && currentUserId
-        ? await messageWriteClient.sendTextMessage({
-            orgId: channel.ids.orgId,
-            channelId: channel.ids.id,
-            senderProfileId: currentUserId,
-            content: trimmed,
-            threadId: thread.ids.id,
-            threadParentId: thread.parent.messageId ?? parentMessage.ids.id,
-          })
+        ? await runWithNetworkActivity(() =>
+            messageWriteClient.sendTextMessage({
+              orgId: channel.ids.orgId,
+              channelId: channel.ids.id,
+              senderProfileId: currentUserId,
+              content: trimmed,
+              threadId: thread.ids.id,
+              threadParentId: thread.parent.messageId ?? parentMessage.ids.id,
+            }),
+          )
         : ({
             ids: { id: `reply-${Date.now()}`, orgId: channel.ids.orgId },
             core: {
@@ -431,6 +461,7 @@ export function MessagesContainer({
       channel.ids.id,
       addMessage,
       updateMessage,
+      runWithNetworkActivity,
     ],
   );
 
@@ -477,11 +508,13 @@ export function MessagesContainer({
       if (messageWriteClient) {
         const persistReaction = async () => {
           try {
-            await messageWriteClient.toggleReaction({
-              orgId: channel.ids.orgId,
-              messageId,
-              emoji,
-            });
+            await runWithNetworkActivity(() =>
+              messageWriteClient.toggleReaction({
+                orgId: channel.ids.orgId,
+                messageId,
+                emoji,
+              }),
+            );
           } catch {
             toggleReaction(messageId, emoji, currentUserId);
           }
@@ -489,7 +522,14 @@ export function MessagesContainer({
         void persistReaction();
       }
     },
-    [toggleReaction, currentUserId, messageWriteClient, channel.ids.orgId, readOnly],
+    [
+      toggleReaction,
+      currentUserId,
+      messageWriteClient,
+      channel.ids.orgId,
+      readOnly,
+      runWithNetworkActivity,
+    ],
   );
 
   const handleToggleSaved = useCallback(
@@ -510,18 +550,22 @@ export function MessagesContainer({
 
       if (messageWriteClient) {
         try {
-          await messageWriteClient.toggleHiddenMessage({
-            orgId: channel.ids.orgId,
-            messageId,
-            isHidden: newHiddenState,
-          });
+          await runWithNetworkActivity(() =>
+            messageWriteClient.toggleHiddenMessage({
+              orgId: channel.ids.orgId,
+              messageId,
+              isHidden: newHiddenState,
+            }),
+          );
           // Update local state immediately for better UX
           toggleHidden(messageId);
           // Broadcast to all other clients via realtime
           if (realtimeClient?.broadcastMessageUpdated) {
-            await realtimeClient.broadcastMessageUpdated({
-              channelId: channel.ids.id,
-              messageId,
+            await runWithNetworkActivity(async () => {
+              await realtimeClient.broadcastMessageUpdated?.({
+                channelId: channel.ids.id,
+                messageId,
+              });
             });
           }
         } catch (error) {
@@ -538,6 +582,7 @@ export function MessagesContainer({
       messages,
       toggleHidden,
       readOnly,
+      runWithNetworkActivity,
     ],
   );
 
@@ -546,17 +591,21 @@ export function MessagesContainer({
       if (readOnly) return;
       if (messageWriteClient) {
         try {
-          await messageWriteClient.deleteMessage({
-            orgId: channel.ids.orgId,
-            messageId,
-          });
+          await runWithNetworkActivity(() =>
+            messageWriteClient.deleteMessage({
+              orgId: channel.ids.orgId,
+              messageId,
+            }),
+          );
           // Update local state immediately for better UX
           deleteMessage(messageId);
           // Broadcast to all other clients via realtime
           if (realtimeClient?.broadcastMessageDeleted) {
-            await realtimeClient.broadcastMessageDeleted({
-              channelId: channel.ids.id,
-              messageId,
+            await runWithNetworkActivity(async () => {
+              await realtimeClient.broadcastMessageDeleted?.({
+                channelId: channel.ids.id,
+                messageId,
+              });
             });
           }
         } catch (error) {
@@ -572,6 +621,7 @@ export function MessagesContainer({
       realtimeClient,
       deleteMessage,
       readOnly,
+      runWithNetworkActivity,
     ],
   );
 
@@ -668,8 +718,8 @@ export function MessagesContainer({
         before: oldestCursor,
         limit: String(MESSAGES_PAGE_SIZE),
       });
-      const response = await window.fetch(
-        `/api/messages/channel-page?${params.toString()}`,
+      const response = await runWithNetworkActivity(() =>
+        window.fetch(`/api/messages/channel-page?${params.toString()}`),
       );
       if (!response.ok) {
         return false;
@@ -700,6 +750,7 @@ export function MessagesContainer({
     isLoadingOlder,
     oldestCursor,
     prependMessages,
+    runWithNetworkActivity,
   ]);
 
   useEffect(() => {
@@ -945,7 +996,13 @@ export function MessagesContainer({
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-1 min-w-0 flex-col">
+    <div className="relative flex h-full min-h-0 flex-1 min-w-0 flex-col">
+      {isNetworkBusy ? (
+        <div className="pointer-events-none absolute right-4 top-3 z-30 inline-flex items-center gap-2 rounded-full border border-border/80 bg-background/90 px-3 py-1 text-xs text-muted-foreground shadow-sm backdrop-blur">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          Syncing...
+        </div>
+      ) : null}
       <MessageList
         ref={messageListRef}
         {...messageListProps}
@@ -963,6 +1020,7 @@ export function MessagesContainer({
           placeholder={getMessageInputPlaceholder(channel, resolvedCurrentUserId)}
           onTypingStart={handleTypingStart}
           onTypingStop={handleTypingStop}
+          isLoading={isNetworkBusy}
         />
       )}
     </div>

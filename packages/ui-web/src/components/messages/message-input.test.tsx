@@ -76,4 +76,16 @@ describe('MessageInput', () => {
 
     expect(onSend).not.toHaveBeenCalled();
   });
+
+  it('shows loading state and prevents send while loading', () => {
+    const onSend = vi.fn();
+    render(<MessageInput onSend={onSend} isLoading />);
+
+    const textarea = screen.getByPlaceholderText('Write a message...');
+    fireEvent.change(textarea, { target: { value: 'Hello' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Sending...' }));
+
+    expect(onSend).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Sending...' })).toBeDisabled();
+  });
 });

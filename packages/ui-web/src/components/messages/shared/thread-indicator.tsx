@@ -2,7 +2,7 @@ import { memo } from 'react';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircleMore } from 'lucide-react';
 import type { ThreadVM } from '@iconicedu/shared-types';
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
 
@@ -25,7 +25,7 @@ export const ThreadIndicator = memo(function ThreadIndicator({
       onClick={onClick}
       className="mt-1 h-7 w-fit gap-2 rounded-full border border-border bg-background/60 px-3 text-primary hover:bg-muted hover:text-primary"
     >
-      <MessageCircle className="h-4 w-4" />
+      <MessageCircleMore className="h-4 w-4" />
       <span className="text-[13px] font-semibold tracking-tight leading-none">
         {thread.stats.messageCount}{' '}
       </span>

@@ -16,8 +16,36 @@ import { ReactionBar } from '@iconicedu/ui-web/components/messages/shared/reacti
 import { ThreadIndicator } from '@iconicedu/ui-web/components/messages/shared/thread-indicator';
 import { VisibilityBadge } from '@iconicedu/ui-web/components/messages/shared/visibility-badge';
 import { HiddenMessagePlaceholder } from '@iconicedu/ui-web/components/messages/shared/hidden-message-placeholder';
-import { MessageActions } from '@iconicedu/ui-web/components/messages/message-actions';
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
+import { Button } from '@iconicedu/ui-web/ui/button';
+import { EmojiPicker } from '@iconicedu/ui-web/components/messages/emoji-picker';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@iconicedu/ui-web/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@iconicedu/ui-web/ui/alert-dialog';
+import {
+  Bookmark,
+  Copy,
+  EyeOff,
+  Forward,
+  MessageCircleReply,
+  MoreHorizontal,
+  SmilePlus,
+  Trash2,
+} from 'lucide-react';
 
 export interface MessageBaseProps {
   message: MessageVM;
@@ -46,8 +74,11 @@ export const MessageBase = memo(function MessageBase({
   onDelete,
   currentUserId,
 }: MessageBaseProps) {
-  const [isHovered, setIsHovered] = useState(false);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+
+  const senderName = getProfileDisplayName(message.core.sender.profile);
+  const isOwnMessage = currentUserId === message.core.sender.ids.id;
+  const senderLabel = isOwnMessage ? 'You' : senderName;
 
   const handleProfileClick = useCallback(() => {
     onProfileClick(message.core.sender.ids.id);
@@ -63,12 +94,77 @@ export const MessageBase = memo(function MessageBase({
   const handleThreadClick = useCallback(() => {
     if (message.social.thread) {
       onOpenThread(message.social.thread, message);
+      return;
     }
-  }, [message, onOpenThread]);
 
-  const senderName = getProfileDisplayName(message.core.sender.profile);
-  const isOwnMessage = currentUserId === message.core.sender.ids.id;
-  const senderLabel = isOwnMessage ? 'You' : senderName;
+    const snippet =
+      'content' in message && message.content?.text ? message.content.text : null;
+    const newThread: ThreadVM = {
+      ids: { id: message.ids.id, orgId: message.ids.orgId },
+      parent: {
+        messageId: message.ids.id,
+        snippet,
+        authorId: message.core.sender.ids.id,
+        authorName: senderName,
+      },
+      stats: {
+        messageCount: 1,
+        lastReplyAt: new Date().toISOString(),
+      },
+      participants: [message.core.sender],
+    };
+
+    onOpenThread(newThread, message);
+  }, [message, onOpenThread, senderName]);
+
+  const handleDeleteClick = useCallback(() => {
+    setIsDeleteDialogOpen(true);
+  }, []);
+
+  const handleConfirmDelete = useCallback(() => {
+    onDelete?.();
+    setIsDeleteDialogOpen(false);
+  }, [onDelete]);
+
+  const handleCancelDelete = useCallback(() => {
+    setIsDeleteDialogOpen(false);
+  }, []);
+
+  const actionsMenu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="More actions">
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" sideOffset={8} className="w-48 z-[100]">
+        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="py-2">
+          <Forward className="mr-2 h-4 w-4" />
+          <span>Forward</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="py-2">
+          <Copy className="mr-2 h-4 w-4" />
+          <span>Copy text</span>
+        </DropdownMenuItem>
+        {isOwnMessage ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={onToggleHidden} className="py-2">
+              <EyeOff className="mr-2 h-4 w-4" />
+              <span>Hide message</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={handleDeleteClick}
+              className="py-2 text-destructive focus:text-destructive"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              <span>Delete</span>
+            </DropdownMenuItem>
+          </>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
   if (message.state?.isHidden) {
     return (
@@ -157,12 +253,6 @@ export const MessageBase = memo(function MessageBase({
         isOwnMessage ? 'justify-end' : 'justify-start',
         className,
       )}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => {
-        if (!isDropdownOpen) {
-          setIsHovered(false);
-        }
-      }}
       data-message-id={message.ids.id}
     >
       <div
@@ -194,6 +284,21 @@ export const MessageBase = memo(function MessageBase({
           >
             {isOwnMessage ? (
               <>
+                {actionsMenu}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={onToggleSaved}
+                  aria-label={message.state?.isSaved ? 'Unsave message' : 'Save message'}
+                >
+                  <Bookmark
+                    className={cn(
+                      'h-4 w-4',
+                      message.state?.isSaved && 'fill-primary text-primary',
+                    )}
+                  />
+                </Button>
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -233,6 +338,21 @@ export const MessageBase = memo(function MessageBase({
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={onToggleSaved}
+                  aria-label={message.state?.isSaved ? 'Unsave message' : 'Save message'}
+                >
+                  <Bookmark
+                    className={cn(
+                      'h-4 w-4',
+                      message.state?.isSaved && 'fill-primary text-primary',
+                    )}
+                  />
+                </Button>
+                {actionsMenu}
               </>
             )}
             <VisibilityBadge message={message} />
@@ -252,31 +372,11 @@ export const MessageBase = memo(function MessageBase({
             >
               {children}
             </div>
-
-            {(isHovered || isDropdownOpen) && (
-              <MessageActions
-                message={message}
-                onOpenThread={onOpenThread}
-                onAddReaction={handleToggleReaction}
-                onToggleSaved={onToggleSaved}
-                onToggleHidden={onToggleHidden}
-                onDelete={onDelete}
-                isThreadReply={isThreadReply}
-                onDropdownOpenChange={setIsDropdownOpen}
-                currentUserId={currentUserId}
-                className={cn(
-                  'top-0 z-20 -translate-y-1/2',
-                  isOwnMessage
-                    ? 'left-0 right-auto -translate-x-1/2'
-                    : 'right-0 left-auto translate-x-1/2',
-                )}
-              />
-            )}
           </div>
 
           <div
             className={cn(
-              'mt-2 flex flex-wrap gap-2',
+              'mt-2 flex flex-wrap items-center gap-2',
               isOwnMessage ? 'justify-end' : 'justify-start',
             )}
           >
@@ -285,16 +385,59 @@ export const MessageBase = memo(function MessageBase({
               onToggleReaction={handleToggleReaction}
             />
 
-            {message.social.thread && !isThreadReply && (
-              <ThreadIndicator
-                thread={message.social.thread}
-                onClick={handleThreadClick}
-                unreadCount={message.social.thread.readState?.unreadCount}
-              />
-            )}
+            <EmojiPicker onEmojiSelect={handleToggleReaction}>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 rounded-full border border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label="Add emoji"
+              >
+                <SmilePlus className="h-4 w-4" />
+              </Button>
+            </EmojiPicker>
+
+            {!isThreadReply ? (
+              message.social.thread ? (
+                <ThreadIndicator
+                  thread={message.social.thread}
+                  onClick={handleThreadClick}
+                  unreadCount={message.social.thread.readState?.unreadCount}
+                />
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleThreadClick}
+                  className="h-7 w-7 rounded-full border border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  aria-label="Reply"
+                >
+                  <MessageCircleReply className="h-4 w-4" />
+                </Button>
+              )
+            ) : null}
           </div>
         </div>
       </div>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete message?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This message will be permanently deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleCancelDelete}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 });

@@ -36,7 +36,7 @@ export const ReactionBar = memo(function ReactionBar({
       }`}
     >
       <div className="overflow-visible">
-        <div className="flex flex-wrap gap-1.5 pb-1 pt-1">
+        <div className="flex flex-wrap items-center gap-1.5">
           {reactions.map((reaction, index) => {
             const isUserReaction = reaction.reactedByMe ?? false;
             return (

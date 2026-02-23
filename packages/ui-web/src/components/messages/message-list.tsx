@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { MessageItem } from '@iconicedu/ui-web/components/messages/message-item';
 import { EmptyMessagesState } from '@iconicedu/ui-web/components/messages/empty-state';
+import { ReactionBar } from '@iconicedu/ui-web/components/messages/shared/reaction-bar';
 import type { ISODateTime, MessageVM, ThreadVM, UUID } from '@iconicedu/shared-types';
 import { ScrollArea } from '@iconicedu/ui-web/ui/scroll-area';
 import { formatDateHeader, formatTime } from '@iconicedu/ui-web/lib/message-utils';
@@ -16,8 +17,28 @@ import { findUnreadAnchorMessageId } from '@iconicedu/ui-web/components/messages
 import { findLatestIncomingMessageId } from '@iconicedu/ui-web/components/messages/read-state.utils';
 import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
+import { cn } from '@iconicedu/ui-web/lib/utils';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { Input } from '@iconicedu/ui-web/ui/input';
+import { EmojiPicker } from '@iconicedu/ui-web/components/messages/emoji-picker';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@iconicedu/ui-web/ui/dropdown-menu';
+import {
+  Bookmark,
+  Copy,
+  EyeOff,
+  Forward,
+  Loader2,
+  MessageCircleReply,
+  MoreHorizontal,
+  SmilePlus,
+  Trash2,
+} from 'lucide-react';
 import {
   buildThreadRepliesByParent,
   getInlineReplyPreview,
@@ -92,6 +113,9 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
     >({});
     const [draftByParent, setDraftByParent] = useState<Record<UUID, string>>({});
     const [loadingThreadsByParent, setLoadingThreadsByParent] = useState<
+      Record<UUID, boolean>
+    >({});
+    const [sendingReplyByParent, setSendingReplyByParent] = useState<
       Record<UUID, boolean>
     >({});
 
@@ -326,8 +350,13 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
         const parentId = parentMessage.ids.id;
         const content = (draftByParent[parentId] ?? '').trim();
         if (!content) return;
-        await onSendThreadReply?.(parentMessage, thread, content);
-        setDraftByParent((prev) => ({ ...prev, [parentId]: '' }));
+        setSendingReplyByParent((prev) => ({ ...prev, [parentId]: true }));
+        try {
+          await onSendThreadReply?.(parentMessage, thread, content);
+          setDraftByParent((prev) => ({ ...prev, [parentId]: '' }));
+        } finally {
+          setSendingReplyByParent((prev) => ({ ...prev, [parentId]: false }));
+        }
       },
       [draftByParent, onSendThreadReply],
     );
@@ -408,6 +437,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                           )}
                           {(threadRepliesByParent.get(message.ids.id) ?? []).map((reply) => {
                             const senderName = getProfileDisplayName(reply.core.sender.profile);
+                            const isOwnReply = currentUserId === reply.core.sender.ids.id;
                             return (
                               <div key={reply.ids.id} className="flex items-start gap-3">
                                 <AvatarWithStatus
@@ -420,27 +450,110 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                   initialsLength={1}
                                 />
                                 <div className="min-w-0">
-                                  <div className="flex items-center gap-3">
+                                  <div className="flex items-center gap-2">
                                     <span className="text-sm font-semibold leading-none text-foreground">
                                       {senderName}
                                     </span>
                                     <span className="text-xs leading-none text-muted-foreground">
                                       {formatTime(reply.core.createdAt)}
                                     </span>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6"
+                                      onClick={() => onToggleSaved?.(reply.ids.id)}
+                                      aria-label={
+                                        reply.state?.isSaved ? 'Unsave message' : 'Save message'
+                                      }
+                                    >
+                                      <Bookmark
+                                        className={cn(
+                                          'h-3.5 w-3.5',
+                                          reply.state?.isSaved && 'fill-primary text-primary',
+                                        )}
+                                      />
+                                    </Button>
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-6 w-6"
+                                          aria-label="More actions"
+                                        >
+                                          <MoreHorizontal className="h-3.5 w-3.5" />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent
+                                        align="end"
+                                        sideOffset={8}
+                                        className="w-44 z-[100]"
+                                      >
+                                        <DropdownMenuItem
+                                          onSelect={(e) => e.preventDefault()}
+                                          className="py-2"
+                                        >
+                                          <Forward className="mr-2 h-4 w-4" />
+                                          <span>Forward</span>
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                          onSelect={(e) => e.preventDefault()}
+                                          className="py-2"
+                                        >
+                                          <Copy className="mr-2 h-4 w-4" />
+                                          <span>Copy text</span>
+                                        </DropdownMenuItem>
+                                        {isOwnReply ? (
+                                          <>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem
+                                              onClick={() => onToggleHidden?.(reply.ids.id)}
+                                              className="py-2"
+                                            >
+                                              <EyeOff className="mr-2 h-4 w-4" />
+                                              <span>Hide message</span>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                              onClick={() => onDelete?.(reply.ids.id)}
+                                              className="py-2 text-destructive focus:text-destructive"
+                                            >
+                                              <Trash2 className="mr-2 h-4 w-4" />
+                                              <span>Delete</span>
+                                            </DropdownMenuItem>
+                                          </>
+                                        ) : null}
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
                                   </div>
                                   <p className="mt-1 text-sm leading-relaxed text-foreground/85 break-words">
                                     {getInlineReplyPreview(reply)}
                                   </p>
+                                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                                    <ReactionBar
+                                      reactions={reply.social.reactions}
+                                      onToggleReaction={(emoji) =>
+                                        onToggleReaction?.(reply.ids.id, emoji)
+                                      }
+                                    />
+                                    <EmojiPicker
+                                      onEmojiSelect={(emoji) =>
+                                        onToggleReaction?.(reply.ids.id, emoji)
+                                      }
+                                    >
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-7 w-7 rounded-full border border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                        aria-label="Add emoji"
+                                      >
+                                        <SmilePlus className="h-4 w-4" />
+                                      </Button>
+                                    </EmojiPicker>
+                                  </div>
                                 </div>
                               </div>
                             );
                           })}
-                          {!loadingThreadsByParent[message.ids.id] &&
-                            (threadRepliesByParent.get(message.ids.id)?.length ?? 0) === 0 && (
-                              <p className="text-sm text-muted-foreground">
-                                No replies yet.
-                              </p>
-                            )}
                           {!isReadOnly && (
                             <form
                               className="pt-1"
@@ -461,16 +574,28 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                   }
                                   placeholder="Reply in thread..."
                                   className="h-9 rounded-full"
+                                  disabled={sendingReplyByParent[message.ids.id]}
                                 />
                                 <Button
                                   type="submit"
                                   size="sm"
                                   className="rounded-full"
                                   disabled={
-                                    !(draftByParent[message.ids.id] ?? '').trim().length
+                                    !(draftByParent[message.ids.id] ?? '').trim().length ||
+                                    Boolean(sendingReplyByParent[message.ids.id])
                                   }
                                 >
-                                  Send
+                                  {sendingReplyByParent[message.ids.id] ? (
+                                    <>
+                                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                                      Saving...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <MessageCircleReply className="mr-1.5 h-3.5 w-3.5" />
+                                      Reply
+                                    </>
+                                  )}
                                 </Button>
                               </div>
                             </form>

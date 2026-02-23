@@ -18,6 +18,7 @@ import {
   Smile,
   Paperclip,
   Send,
+  Loader2,
   Mic,
   ImageIcon,
   type LucideIcon,
@@ -32,6 +33,7 @@ interface MessageInputProps {
   onTypingStop?: () => void;
   onFocus?: () => void;
   onInputKeyDown?: () => void;
+  isLoading?: boolean;
 }
 
 const FormatButton = memo(function FormatButton({
@@ -66,6 +68,7 @@ export const MessageInput = memo(function MessageInput({
   onTypingStop,
   onFocus,
   onInputKeyDown,
+  isLoading = false,
 }: MessageInputProps) {
   const [content, setContent] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -86,7 +89,7 @@ export const MessageInput = memo(function MessageInput({
   }, [onTypingStop]);
 
   const handleSend = useCallback(() => {
-    if (readOnly) {
+    if (readOnly || isLoading) {
       return;
     }
     if (content.trim()) {
@@ -96,11 +99,11 @@ export const MessageInput = memo(function MessageInput({
       notifyTypingStop();
       textareaRef.current?.focus();
     }
-  }, [clearTypingTimeout, content, notifyTypingStop, onSend, readOnly]);
+  }, [clearTypingTimeout, content, isLoading, notifyTypingStop, onSend, readOnly]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
-      if (readOnly) {
+      if (readOnly || isLoading) {
         return;
       }
       onInputKeyDown?.();
@@ -109,7 +112,7 @@ export const MessageInput = memo(function MessageInput({
         handleSend();
       }
     },
-    [handleSend, onInputKeyDown, readOnly],
+    [handleSend, isLoading, onInputKeyDown, readOnly],
   );
 
   const handleEmojiSelect = useCallback(
@@ -214,11 +217,20 @@ export const MessageInput = memo(function MessageInput({
           <Button
             size="sm"
             onClick={handleSend}
-            disabled={readOnly || !content.trim()}
+            disabled={readOnly || isLoading || !content.trim()}
             className="h-8 gap-1.5"
           >
-            <Send className="h-3.5 w-3.5" />
-            Send
+            {isLoading ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Sending...
+              </>
+            ) : (
+              <>
+                <Send className="h-3.5 w-3.5" />
+                Send
+              </>
+            )}
           </Button>
         </div>
       </div>

@@ -319,6 +319,7 @@ async function loadReactions(
 type RawThreadRow = {
   id: string;
   org_id: string;
+  channel_id: string;
   parent_message_id: string;
   snippet: string | null;
   author_id: string | null;
@@ -344,7 +345,7 @@ async function loadThreads(
 
   const { data: threadRows, error: threadError } = await supabase
     .from('threads')
-    .select('id, org_id, parent_message_id, snippet, author_id, author_name, message_count, last_reply_at, created_at')
+    .select('id, org_id, channel_id, parent_message_id, snippet, author_id, author_name, message_count, last_reply_at, created_at')
     .in('parent_message_id', parentMessageIds);
 
   if (threadError) {
@@ -976,9 +977,107 @@ export async function sendTextMessage(
   orgId: string,
   text: string,
   threadParentId?: string,
-  threadId?: string,  // threads.id — set when replying so messages.thread_id is populated
+  threadId?: string,  // threads.id — set when replying to existing thread
 ) {
-  // Insert the messages row first (no content column — schema uses type-specific tables)
+  const now = new Date().toISOString();
+  let resolvedThreadId = threadId;
+
+  // ── Thread lifecycle (replies only) ──────────────────────────────────────
+  if (threadParentId) {
+    if (!resolvedThreadId) {
+      // ─ New thread: fetch parent message context, then create threads row ─
+      const [{ data: parentMsg }, { data: parentText }] = await Promise.all([
+        supabase
+          .from('messages')
+          .select('sender_profile_id, sender:profiles!sender_profile_id(display_name, first_name, last_name)')
+          .eq('id', threadParentId)
+          .maybeSingle(),
+        supabase
+          .from('message_text')
+          .select('payload')
+          .eq('message_id', threadParentId)
+          .maybeSingle(),
+      ]);
+
+      type ParentSenderShape = { display_name: string | null; first_name: string | null; last_name: string | null };
+      const parentSenderProfileId =
+        (parentMsg as { sender_profile_id?: string } | null)?.sender_profile_id ?? null;
+      const parentSender =
+        (parentMsg as { sender?: ParentSenderShape } | null)?.sender ?? null;
+      const authorName =
+        parentSender?.display_name?.trim() ||
+        [parentSender?.first_name, parentSender?.last_name].filter(Boolean).join(' ') ||
+        null;
+      // Use parent message text as snippet (thread context); fall back to reply text
+      const snippet =
+        ((parentText?.payload as Record<string, unknown> | null)?.text as string | undefined)
+          ?.slice(0, 100) ?? text.slice(0, 100);
+
+      // Create the threads row (mirrors web's sendTextMessageAction)
+      const { data: newThread, error: threadError } = await supabase
+        .from('threads')
+        .insert({
+          org_id: orgId,
+          channel_id: channelId,
+          parent_message_id: threadParentId,
+          snippet,
+          author_id: parentSenderProfileId,
+          author_name: authorName,
+          message_count: 1,
+          last_reply_at: now,
+        })
+        .select('id')
+        .single();
+
+      if (threadError) throw threadError;
+      resolvedThreadId = newThread.id;
+
+      // Update parent message thread_id FK so loadThreads can find it
+      await supabase
+        .from('messages')
+        .update({ thread_id: resolvedThreadId })
+        .eq('id', threadParentId);
+
+      // Add participants: parent author + reply sender (deduped)
+      const participantIds = Array.from(
+        new Set([senderProfileId, ...(parentSenderProfileId ? [parentSenderProfileId] : [])]),
+      );
+      await supabase
+        .from('thread_participants')
+        .upsert(
+          participantIds.map((profileId) => ({
+            thread_id: resolvedThreadId!,
+            org_id: orgId,
+            profile_id: profileId,
+          })),
+          { ignoreDuplicates: true },
+        );
+    } else {
+      // ─ Existing thread: increment message_count, update last_reply_at, upsert participant ─
+      const { data: threadRow } = await supabase
+        .from('threads')
+        .select('message_count')
+        .eq('id', resolvedThreadId)
+        .single();
+
+      await supabase
+        .from('threads')
+        .update({
+          message_count: (threadRow?.message_count ?? 0) + 1,
+          last_reply_at: now,
+        })
+        .eq('id', resolvedThreadId);
+
+      await supabase
+        .from('thread_participants')
+        .upsert(
+          [{ thread_id: resolvedThreadId, org_id: orgId, profile_id: senderProfileId }],
+          { ignoreDuplicates: true },
+        );
+    }
+  }
+
+  // ── Insert the message row ───────────────────────────────────────────────
   const { data: msg, error: msgError } = await supabase
     .from('messages')
     .insert({
@@ -987,14 +1086,14 @@ export async function sendTextMessage(
       org_id: orgId,
       type: 'text',
       thread_parent_id: threadParentId ?? null,
-      ...(threadId ? { thread_id: threadId } : {}),
+      ...(resolvedThreadId ? { thread_id: resolvedThreadId } : {}),
     })
     .select('id')
     .single();
 
   if (msgError) throw msgError;
 
-  // Insert the text payload into message_text
+  // ── Insert the text payload ──────────────────────────────────────────────
   const { error: textError } = await supabase
     .from('message_text')
     .insert({
