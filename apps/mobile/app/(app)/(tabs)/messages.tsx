@@ -204,11 +204,15 @@ function ChannelRow({
     : (item.topic ?? 'Channel');
 
   const text = item.last_message_text;
+  const sender = item.last_message_sender;
   const time = formatListTime(item.last_message_at ?? item.updated_at);
   const unread = item.unread_count ?? 0;
   const hasUnread = unread > 0;
   const studentName = !isDm ? item.student_name : null;
-  const previewText = text ?? item.description ?? '';
+  // For channels prefix the sender name ("Alice: Hey there"); for DMs it's obvious who sent it
+  const previewText = text
+    ? (!isDm && sender ? `${sender}: ${text}` : text)
+    : (item.description ?? '');
 
   return (
     <View style={s.itemOuter}>

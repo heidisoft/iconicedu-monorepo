@@ -171,19 +171,113 @@ export async function fetchDirectMessages(
     participantMap.set(member.channel_id, list);
   }
 
-  return chRows.map((ch) => ({
-    id: ch.id,
-    org_id: ch.org_id,
-    topic: ch.topic ?? null,
-    description: ch.description ?? null,
-    kind: ch.kind,
-    updated_at: ch.updated_at,
-    unread_count: 0,
-    last_message_text: null,
-    last_message_at: null,
-    last_message_sender: null,
-    participants: participantMap.get(ch.id) ?? [],
-  }));
+  const lastMessages = await fetchLastMessages(chRows.map((ch) => ch.id));
+
+  return chRows.map((ch) => {
+    const last = lastMessages.get(ch.id);
+    return {
+      id: ch.id,
+      org_id: ch.org_id,
+      topic: ch.topic ?? null,
+      description: ch.description ?? null,
+      kind: ch.kind,
+      updated_at: ch.updated_at,
+      unread_count: 0,
+      last_message_text: last?.text ?? null,
+      last_message_at: last?.at ?? null,
+      last_message_sender: last?.sender ?? null,
+      participants: participantMap.get(ch.id) ?? [],
+    };
+  });
+}
+
+// ─── Shared preview helper ────────────────────────────────────────────────────
+
+type LastMessageInfo = { text: string | null; at: string | null; sender: string | null };
+
+const PREVIEW_LABELS: Record<string, string> = {
+  'image':                '🖼 Image',
+  'file':                 '📎 File',
+  'audio-recording':      '🎙 Voice message',
+  'lesson-assignment':    '📚 Assignment',
+  'homework-submission':  '📝 Homework submitted',
+  'progress-update':      '📈 Progress update',
+  'event-reminder':       '📅 Event reminder',
+  'session-summary':      '📋 Session summary',
+  'session-complete':     '✓ Session complete',
+  'session-booking':      '🗓 Session booked',
+  'payment-reminder':     '💳 Payment reminder',
+  'feedback-request':     '💬 Feedback request',
+};
+
+/**
+ * Batch-fetch the most recent message preview for a list of channel IDs.
+ * Two queries: one for the latest message row per channel, one for text payloads.
+ */
+async function fetchLastMessages(channelIds: string[]): Promise<Map<string, LastMessageInfo>> {
+  if (!channelIds.length) return new Map();
+
+  type MsgRow = {
+    id: string;
+    channel_id: string;
+    type: string;
+    created_at: string;
+    sender: { display_name: string | null; first_name: string | null; last_name: string | null } | null;
+  };
+
+  // Fetch recent top-level messages (no thread replies), ordered newest-first.
+  // Limit heuristic: 3 per channel gives enough headroom to find the latest per channel in JS.
+  const { data: msgRows } = await supabase
+    .from('messages')
+    .select('id, channel_id, type, created_at, sender:profiles!sender_profile_id(display_name, first_name, last_name)')
+    .in('channel_id', channelIds)
+    .is('deleted_at', null)
+    .is('thread_parent_id', null)
+    .order('created_at', { ascending: false })
+    .limit(channelIds.length * 3);
+
+  if (!msgRows?.length) return new Map();
+
+  const rows = msgRows as MsgRow[];
+
+  // Pick the newest per channel (already DESC ordered)
+  const latestByChannel = new Map<string, MsgRow>();
+  for (const row of rows) {
+    if (!latestByChannel.has(row.channel_id)) {
+      latestByChannel.set(row.channel_id, row);
+    }
+  }
+
+  // For text messages, fetch the actual payload text
+  const textMessageIds = Array.from(latestByChannel.values())
+    .filter((r) => r.type === 'text')
+    .map((r) => r.id);
+
+  const textByMessageId = new Map<string, string>();
+  if (textMessageIds.length) {
+    const { data: textRows } = await supabase
+      .from('message_text')
+      .select('message_id, payload')
+      .in('message_id', textMessageIds);
+    for (const t of textRows ?? []) {
+      const text = ((t.payload as Record<string, unknown>)?.text as string | undefined)?.trim();
+      if (text) textByMessageId.set(t.message_id, text);
+    }
+  }
+
+  const result = new Map<string, LastMessageInfo>();
+  for (const [channelId, row] of latestByChannel) {
+    const text = row.type === 'text'
+      ? (textByMessageId.get(row.id) ?? null)
+      : (PREVIEW_LABELS[row.type] ?? null);
+    const s = row.sender;
+    const sender = s
+      ? (s.display_name?.trim() || [s.first_name, s.last_name].filter(Boolean).join(' ') || null)
+      : null;
+    result.set(channelId, { text, at: row.created_at, sender });
+  }
+
+  return result;
 }
 
 export async function fetchChannels(orgId: string): Promise<ChannelListItem[]> {
@@ -192,8 +286,7 @@ export async function fetchChannels(orgId: string): Promise<ChannelListItem[]> {
     .select(
       `
       id, org_id, topic, description, kind, updated_at,
-      channel_read_state(unread_count),
-      last_msg:messages(id, content, created_at, sender:profiles!sender_profile_id(display_name, first_name, last_name))
+      channel_read_state(unread_count)
     `,
     )
     .eq('org_id', orgId)
@@ -203,19 +296,13 @@ export async function fetchChannels(orgId: string): Promise<ChannelListItem[]> {
     .order('updated_at', { ascending: false });
 
   if (error) throw error;
+  if (!data?.length) return [];
 
-  return (data ?? []).map((ch) => {
-    const msgs = (ch.last_msg ?? []) as Array<{
-      id: string;
-      content: Record<string, unknown> | null;
-      created_at: string;
-      sender: { display_name: string | null; first_name: string | null; last_name: string | null } | null;
-    }>;
-    const last = msgs.reduce<typeof msgs[number] | null>((acc, m) =>
-      !acc || m.created_at > acc.created_at ? m : acc, null);
+  const lastMessages = await fetchLastMessages(data.map((ch) => ch.id));
 
+  return data.map((ch) => {
     const readState = (ch.channel_read_state as Array<{ unread_count: number | null }> | null)?.[0];
-
+    const last = lastMessages.get(ch.id);
     return {
       id: ch.id,
       org_id: ch.org_id,
@@ -224,14 +311,9 @@ export async function fetchChannels(orgId: string): Promise<ChannelListItem[]> {
       kind: ch.kind,
       updated_at: ch.updated_at,
       unread_count: readState?.unread_count ?? 0,
-      last_message_text: last
-        ? String(last.content?.text ?? '') || null
-        : null,
-      last_message_at: last?.created_at ?? null,
-      last_message_sender: last?.sender
-        ? (last.sender.display_name ??
-            ([last.sender.first_name, last.sender.last_name].filter(Boolean).join(' ') || null))
-        : null,
+      last_message_text: last?.text ?? null,
+      last_message_at: last?.at ?? null,
+      last_message_sender: last?.sender ?? null,
     };
   });
 }
@@ -481,11 +563,14 @@ export async function fetchThreadMessages(
   currentProfileId = '',
   currentAccountId = '',
 ): Promise<MessageVM[]> {
-  // Try thread_id first (web-aligned — replies have thread_id → threads.id)
+  // Try thread_id first (web-aligned — replies have thread_id → threads.id).
+  // Exclude the parent message itself: sendTextMessage sets thread_id on the parent
+  // too (as a FK link), so without this filter it would appear twice in the thread.
   let { data: rows, error } = await supabase
     .from('messages')
     .select(BASE_MESSAGE_SELECT)
     .eq('thread_id', threadId)
+    .neq('id', parentMessageId)
     .is('deleted_at', null)
     .order('created_at', { ascending: true });
 
@@ -495,6 +580,7 @@ export async function fetchThreadMessages(
       .from('messages')
       .select(BASE_MESSAGE_SELECT)
       .eq('thread_parent_id', parentMessageId)
+      .neq('id', parentMessageId)
       .is('deleted_at', null)
       .order('created_at', { ascending: true }));
   }
@@ -632,7 +718,7 @@ export async function fetchLearningSpaceChannels(
   const toSpace = (r: Row) => r.space as { id: string; title: string; icon_key: string | null; subject: string | null; status: string; deleted_at: string | null } | null;
   const toChannel = (r: Row) => r.channel as { id: string; org_id: string; updated_at: string } | null;
 
-  return (data ?? [])
+  const items = (data ?? [])
     .filter((row) => {
       const sp = toSpace(row);
       const ch = toChannel(row);
@@ -649,13 +735,25 @@ export async function fetchLearningSpaceChannels(
         kind: 'channel' as const,
         updated_at: ch.updated_at,
         unread_count: 0,
-        last_message_text: null,
-        last_message_at: null,
-        last_message_sender: null,
+        last_message_text: null as string | null,
+        last_message_at: null as string | null,
+        last_message_sender: null as string | null,
         icon_emoji: SPACE_ICON_EMOJI[sp.icon_key ?? ''] ?? null,
         student_name: null,
       };
     });
+
+  const lastMessages = await fetchLastMessages(items.map((i) => i.id));
+
+  return items.map((item) => {
+    const last = lastMessages.get(item.id);
+    return {
+      ...item,
+      last_message_text: last?.text ?? null,
+      last_message_at: last?.at ?? null,
+      last_message_sender: last?.sender ?? null,
+    };
+  });
 }
 
 export async function fetchNotificationPreferences(orgId: string, profileId: string) {

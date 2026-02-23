@@ -422,6 +422,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                       Boolean(message.social.thread) &&
                       message.social.thread?.parent.messageId !== message.ids.id
                     }
+                    isReadOnly={isReadOnly}
                     onProfileClick={onProfileClick}
                     onToggleReaction={onToggleReaction}
                     onToggleSaved={onToggleSaved}
@@ -479,6 +480,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                       variant="ghost"
                                       size="icon"
                                       className="h-6 w-6"
+                                      disabled={isReadOnly}
                                       onClick={() => onToggleSaved?.(reply.ids.id)}
                                       aria-label={
                                         reply.state?.isSaved
@@ -552,26 +554,47 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                     {getInlineReplyPreview(reply)}
                                   </p>
                                   <div className="mt-2 flex flex-wrap items-center gap-2">
-                                    <ReactionBar
-                                      reactions={reply.social.reactions}
-                                      onToggleReaction={(emoji) =>
-                                        onToggleReaction?.(reply.ids.id, emoji)
-                                      }
-                                    />
-                                    <EmojiPicker
-                                      onEmojiSelect={(emoji) =>
-                                        onToggleReaction?.(reply.ids.id, emoji)
-                                      }
+                                    <div
+                                      className={cn(
+                                        isReadOnly && 'pointer-events-none opacity-60',
+                                      )}
                                     >
+                                      <ReactionBar
+                                        reactions={reply.social.reactions}
+                                        onToggleReaction={
+                                          isReadOnly
+                                            ? undefined
+                                            : (emoji) =>
+                                                onToggleReaction?.(reply.ids.id, emoji)
+                                        }
+                                      />
+                                    </div>
+                                    {isReadOnly ? (
                                       <Button
                                         variant="ghost"
                                         size="icon"
-                                        className="h-7 w-7 rounded-full border border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                        disabled
+                                        className="h-7 w-7 rounded-full border border-border bg-background/60 text-muted-foreground"
                                         aria-label="Add emoji"
                                       >
                                         <SmilePlus className="h-4 w-4" />
                                       </Button>
-                                    </EmojiPicker>
+                                    ) : (
+                                      <EmojiPicker
+                                        onEmojiSelect={(emoji) =>
+                                          onToggleReaction?.(reply.ids.id, emoji)
+                                        }
+                                      >
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-7 w-7 rounded-full border border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                          aria-label="Add emoji"
+                                        >
+                                          <SmilePlus className="h-4 w-4" />
+                                        </Button>
+                                      </EmojiPicker>
+                                    )}
                                   </div>
                                 </div>
                               </div>

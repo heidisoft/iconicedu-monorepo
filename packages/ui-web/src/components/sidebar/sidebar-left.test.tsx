@@ -442,14 +442,14 @@ describe('SidebarLeft', () => {
     expect(screen.getAllByText('1').length).toBeGreaterThanOrEqual(2);
   });
 
-  it('shows student learning spaces with flat educator-style list', () => {
+  it('shows student learning spaces with section header when assigned spaces exist', () => {
     render(
       <SidebarProvider>
         <SidebarLeft data={makeStudentData()} />
       </SidebarProvider>,
     );
 
-    expect(screen.queryByText('Learning spaces')).not.toBeInTheDocument();
+    expect(screen.getByText('Learning spaces')).toBeInTheDocument();
     expect(screen.getByText('Student Algebra')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Student Algebra/i })).toHaveAttribute(
       'href',

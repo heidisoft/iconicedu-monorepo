@@ -54,6 +54,7 @@ const ThreadPanelContent = memo(function ThreadPanelContent({
         <ThreadMessageList
           messages={messages}
           onProfileClick={onProfileClick}
+          isReadOnly={isReadOnly}
           onToggleReaction={onToggleReaction}
           onToggleSaved={onToggleSaved}
           onToggleHidden={onToggleHidden}

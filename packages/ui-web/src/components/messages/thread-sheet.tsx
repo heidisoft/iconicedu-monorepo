@@ -36,6 +36,7 @@ export function ThreadSheet({
         <ThreadMessageList
           messages={messages}
           onProfileClick={onProfileClick}
+          isReadOnly={isReadOnly}
           onToggleReaction={onToggleReaction}
           onToggleSaved={onToggleSaved}
           onToggleHidden={onToggleHidden}

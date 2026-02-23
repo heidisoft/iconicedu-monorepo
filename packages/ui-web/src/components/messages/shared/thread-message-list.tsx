@@ -7,6 +7,7 @@ import { MessageItem } from '@iconicedu/ui-web/components/messages/message-item'
 interface ThreadMessageListProps {
   messages: MessageVM[];
   onProfileClick: (userId: string) => void;
+  isReadOnly?: boolean;
   onToggleReaction?: (messageId: string, emoji: string) => void;
   onToggleSaved?: (messageId: string) => void;
   onToggleHidden?: (messageId: string) => void;
@@ -43,6 +44,7 @@ const ReplyDivider = memo(function ReplyDivider({ count }: { count: number }) {
 export const ThreadMessageList = memo(function ThreadMessageList({
   messages,
   onProfileClick,
+  isReadOnly = false,
   onToggleReaction,
   onToggleSaved,
   onToggleHidden,
@@ -81,6 +83,7 @@ export const ThreadMessageList = memo(function ThreadMessageList({
               message={message}
               onOpenThread={handleOpenThread}
               isThreadReply={index > 0}
+              isReadOnly={isReadOnly}
               onProfileClick={onProfileClick}
               onToggleReaction={onToggleReaction}
               onToggleSaved={onToggleSaved}

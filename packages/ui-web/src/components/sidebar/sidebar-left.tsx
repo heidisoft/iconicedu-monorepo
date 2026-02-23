@@ -302,7 +302,9 @@ export function SidebarLeft({
       ? learningSpacesByChild.flatMap((entry) => entry.learningSpaces)
       : flatLearningSpaces;
   const shouldShowLearningSpacesLabel =
-    userProfile.kind === 'guardian' || userProfile.kind === 'educator';
+    userProfile.kind === 'guardian' ||
+    userProfile.kind === 'educator' ||
+    (userProfile.kind === 'child' && studentLearningSpaces.length > 0);
   const currentUserRef = {
     accountId: data.user.profile.ids.accountId,
     profileId: data.user.profile.ids.id,

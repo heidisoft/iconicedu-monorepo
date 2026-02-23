@@ -42,6 +42,7 @@ interface MessageItemProps {
   message: MessageVM;
   onOpenThread: (thread: ThreadVM, parentMessage: MessageVM) => void | Promise<void>;
   isThreadReply?: boolean;
+  isReadOnly?: boolean;
   currentUserId?: UUID;
   onProfileClick: (userId: UUID) => void;
   onToggleReaction?: (messageId: string, emoji: string) => void;
@@ -55,6 +56,7 @@ export const MessageItem = memo(function MessageItem({
   message,
   onOpenThread,
   isThreadReply = false,
+  isReadOnly = false,
   currentUserId = 'user-1',
   onProfileClick,
   onToggleReaction,
@@ -90,6 +92,7 @@ export const MessageItem = memo(function MessageItem({
   const commonProps = {
     onOpenThread,
     isThreadReply,
+    isReadOnly,
     onProfileClick,
     onToggleReaction: handleToggleReaction,
     onToggleSaved: handleToggleSaved,

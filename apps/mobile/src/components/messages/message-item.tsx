@@ -554,9 +554,12 @@ function makeStyles(colors: AppColors) {
     sessionCompleteTitle:  { fontSize: 12, fontWeight: '600', textAlign: 'center', maxWidth: 160 },
 
     // ── Inline thread expansion ────────────────────────────────────────────────
-    inlineThread:  { flexDirection: 'row', marginTop: 6 },
-    threadLine:    { width: 2, borderRadius: 1, alignSelf: 'stretch', marginLeft: 2, marginRight: 8 },
-    inlineReplies: { flex: 1 },
+    inlineThread:    { flexDirection: 'row', marginTop: 6 },
+    // For own (right-aligned) messages: push thread to the right half so it
+    // sits beneath the bubble rather than spanning the full content column.
+    inlineThreadOwn: { alignSelf: 'stretch', marginLeft: '25%' },
+    threadLine:      { width: 2, borderRadius: 1, alignSelf: 'stretch', marginLeft: 2, marginRight: 8 },
+    inlineReplies:   { flex: 1 },
   });
 }
 
@@ -742,7 +745,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             threadExpanded={threadExpanded}
           />
           {threadExpanded && (
-            <View style={[s.inlineThread, isOwn && { alignSelf: 'stretch' }]}>
+            <View style={[s.inlineThread, isOwn && s.inlineThreadOwn]}>
               <View style={[s.threadLine, { backgroundColor: colors.border }]} />
               <View style={s.inlineReplies}>
                 {threadLoading ? (
@@ -804,7 +807,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 
         {/* Inline thread replies */}
         {threadExpanded && (
-          <View style={[s.inlineThread, isOwn && { alignSelf: 'stretch' }]}>
+          <View style={[s.inlineThread, isOwn && s.inlineThreadOwn]}>
             <View style={[s.threadLine, { backgroundColor: colors.border }]} />
             <View style={s.inlineReplies}>
               {threadLoading ? (

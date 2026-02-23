@@ -51,6 +51,7 @@ export interface MessageBaseProps {
   message: MessageVM;
   onOpenThread: (thread: ThreadVM, parentMessage: MessageVM) => void | Promise<void>;
   isThreadReply?: boolean;
+  isReadOnly?: boolean;
   children?: ReactNode;
   className?: string;
   onProfileClick: (userId: UUID) => void;
@@ -65,6 +66,7 @@ export const MessageBase = memo(function MessageBase({
   message,
   onOpenThread,
   isThreadReply = false,
+  isReadOnly = false,
   children,
   className,
   onProfileClick,
@@ -79,6 +81,7 @@ export const MessageBase = memo(function MessageBase({
   const senderName = getProfileDisplayName(message.core.sender.profile);
   const isOwnMessage = currentUserId === message.core.sender.ids.id;
   const senderLabel = isOwnMessage ? 'You' : senderName;
+  const isInteractionDisabled = Boolean(isReadOnly);
 
   const handleProfileClick = useCallback(() => {
     onProfileClick(message.core.sender.ids.id);
@@ -86,12 +89,14 @@ export const MessageBase = memo(function MessageBase({
 
   const handleToggleReaction = useCallback(
     (emoji: string) => {
+      if (isInteractionDisabled) return;
       onToggleReaction?.(emoji);
     },
-    [onToggleReaction],
+    [isInteractionDisabled, onToggleReaction],
   );
 
   const handleThreadClick = useCallback(() => {
+    if (isInteractionDisabled) return;
     if (message.social.thread) {
       onOpenThread(message.social.thread, message);
       return;
@@ -115,7 +120,7 @@ export const MessageBase = memo(function MessageBase({
     };
 
     onOpenThread(newThread, message);
-  }, [message, onOpenThread, senderName]);
+  }, [isInteractionDisabled, message, onOpenThread, senderName]);
 
   const handleDeleteClick = useCallback(() => {
     setIsDeleteDialogOpen(true);
@@ -289,6 +294,7 @@ export const MessageBase = memo(function MessageBase({
                   size="icon"
                   className="h-7 w-7"
                   onClick={onToggleSaved}
+                  disabled={isInteractionDisabled}
                   aria-label={message.state?.isSaved ? 'Unsave message' : 'Save message'}
                 >
                   <Bookmark
@@ -343,6 +349,7 @@ export const MessageBase = memo(function MessageBase({
                   size="icon"
                   className="h-7 w-7"
                   onClick={onToggleSaved}
+                  disabled={isInteractionDisabled}
                   aria-label={message.state?.isSaved ? 'Unsave message' : 'Save message'}
                 >
                   <Bookmark
@@ -380,21 +387,35 @@ export const MessageBase = memo(function MessageBase({
               isOwnMessage ? 'justify-end' : 'justify-start',
             )}
           >
-            <ReactionBar
-              reactions={message.social.reactions}
-              onToggleReaction={handleToggleReaction}
-            />
+            <div className={cn(isInteractionDisabled && 'pointer-events-none opacity-60')}>
+              <ReactionBar
+                reactions={message.social.reactions}
+                onToggleReaction={isInteractionDisabled ? undefined : handleToggleReaction}
+              />
+            </div>
 
-            <EmojiPicker onEmojiSelect={handleToggleReaction}>
+            {isInteractionDisabled ? (
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 rounded-full border border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                disabled
+                className="h-7 w-7 rounded-full border border-border bg-background/60 text-muted-foreground"
                 aria-label="Add emoji"
               >
                 <SmilePlus className="h-4 w-4" />
               </Button>
-            </EmojiPicker>
+            ) : (
+              <EmojiPicker onEmojiSelect={handleToggleReaction}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 rounded-full border border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  aria-label="Add emoji"
+                >
+                  <SmilePlus className="h-4 w-4" />
+                </Button>
+              </EmojiPicker>
+            )}
 
             {!isThreadReply ? (
               message.social.thread ? (
@@ -408,6 +429,7 @@ export const MessageBase = memo(function MessageBase({
                   variant="ghost"
                   size="icon"
                   onClick={handleThreadClick}
+                  disabled={isInteractionDisabled}
                   className="h-7 w-7 rounded-full border border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground"
                   aria-label="Reply"
                 >
