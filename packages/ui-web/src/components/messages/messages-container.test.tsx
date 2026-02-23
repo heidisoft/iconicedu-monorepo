@@ -113,6 +113,7 @@ describe('MessagesContainer', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.clearAllMocks();
     vi.unstubAllGlobals();
   });
@@ -155,6 +156,44 @@ describe('MessagesContainer', () => {
 
     await waitFor(() => {
       expect(screen.getAllByText(/User profile-1 is typing/i).length).toBeGreaterThan(0);
+    });
+  });
+
+  it('hides typing indicator a few seconds after typing stops', async () => {
+    vi.useFakeTimers();
+    const onEventHandlers: Array<(event: any) => void> = [];
+    const realtimeClient = {
+      subscribe: ({ onEvent }: { onEvent: (event: any) => void }) => {
+        onEventHandlers.push(onEvent);
+        return { unsubscribe: () => void 0 };
+      },
+      sendTyping: vi.fn(),
+    };
+
+    render(
+      <MessagesContainer
+        channel={channel}
+        currentUserId="profile-2"
+        realtimeClient={realtimeClient as any}
+      />,
+    );
+
+    act(() => {
+      onEventHandlers.forEach((handler) =>
+        handler({ type: 'typing-start', profileId: 'profile-1' }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/User profile-1 is typing/i).length).toBeGreaterThan(0);
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(4100);
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText(/User profile-1 is typing/i)).not.toBeInTheDocument();
     });
   });
 

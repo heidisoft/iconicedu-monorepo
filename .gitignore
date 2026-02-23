@@ -23,3 +23,6 @@ supabase/.temp
 .d.ts.
 .d.ts.map
 .temp
+playwright-report
+test-results
+apps/web/playwright/.auth

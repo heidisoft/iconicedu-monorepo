@@ -24,10 +24,32 @@ describe('MessageInput', () => {
     expect(onTypingStop).not.toHaveBeenCalled();
 
     act(() => {
-      vi.advanceTimersByTime(2000);
+      vi.advanceTimersByTime(3100);
     });
 
     expect(onTypingStop).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends typing keepalive while user continues typing', () => {
+    vi.useFakeTimers();
+    const onTypingStart = vi.fn();
+    render(<MessageInput onSend={vi.fn()} onTypingStart={onTypingStart} onTypingStop={vi.fn()} />);
+
+    const textarea = screen.getByPlaceholderText('Write a message...');
+    fireEvent.change(textarea, { target: { value: 'H' } });
+    expect(onTypingStart).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+    fireEvent.change(textarea, { target: { value: 'He' } });
+    expect(onTypingStart).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      vi.advanceTimersByTime(700);
+    });
+    fireEvent.change(textarea, { target: { value: 'Hel' } });
+    expect(onTypingStart).toHaveBeenCalledTimes(2);
   });
 
   it('stops typing when content is cleared', () => {

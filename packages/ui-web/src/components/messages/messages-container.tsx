@@ -65,6 +65,7 @@ const isEducatorProfile = (profile: UserProfileVM): profile is EducatorProfileVM
 
 const MESSAGES_PAGE_SIZE = 40;
 const READ_STATE_PERSIST_DEBOUNCE_MS = 220;
+const TYPING_REMOTE_TIMEOUT_MS = 4000;
 
 export function MessagesContainer({
   channel,
@@ -811,7 +812,7 @@ export function MessagesContainer({
             const timeoutId = window.setTimeout(() => {
               upsertTypingProfile(event.profileId, false);
               typingTimeoutsRef.current.delete(event.profileId);
-            }, 2600);
+            }, TYPING_REMOTE_TIMEOUT_MS);
             typingTimeoutsRef.current.set(event.profileId, timeoutId);
           }
           if (event.type === 'typing-stop') {

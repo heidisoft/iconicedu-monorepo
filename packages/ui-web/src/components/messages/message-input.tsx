@@ -24,6 +24,9 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
+const TYPING_STOP_DELAY_MS = 3000;
+const TYPING_KEEPALIVE_THROTTLE_MS = 1200;
+
 interface MessageInputProps {
   onSend: (content: string) => void;
   placeholder?: string;
@@ -74,6 +77,7 @@ export const MessageInput = memo(function MessageInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const typingTimeoutRef = useRef<number | null>(null);
   const isTypingRef = useRef(false);
+  const lastTypingSignalAtRef = useRef<number>(0);
 
   const clearTypingTimeout = useCallback(() => {
     if (typingTimeoutRef.current) {
@@ -144,14 +148,19 @@ export const MessageInput = memo(function MessageInput({
         notifyTypingStop();
         return;
       }
+      const now = Date.now();
       if (!isTypingRef.current) {
         isTypingRef.current = true;
+        lastTypingSignalAtRef.current = now;
+        onTypingStart?.();
+      } else if (now - lastTypingSignalAtRef.current >= TYPING_KEEPALIVE_THROTTLE_MS) {
+        lastTypingSignalAtRef.current = now;
         onTypingStart?.();
       }
       clearTypingTimeout();
       typingTimeoutRef.current = window.setTimeout(() => {
         notifyTypingStop();
-      }, 1800);
+      }, TYPING_STOP_DELAY_MS);
     },
     [clearTypingTimeout, notifyTypingStop, onTypingStart, readOnly],
   );
