@@ -118,6 +118,10 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
     const [sendingReplyByParent, setSendingReplyByParent] = useState<
       Record<UUID, boolean>
     >({});
+    const [threadComposerWidthByParent, setThreadComposerWidthByParent] = useState<
+      Record<UUID, number>
+    >({});
+    const latestReplyTextRefs = useRef<Record<string, HTMLParagraphElement | null>>({});
 
     useImperativeHandle(ref, () => ({
       scrollToMessage: (messageId: string) => {
@@ -361,6 +365,26 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
       [draftByParent, onSendThreadReply],
     );
 
+    useEffect(() => {
+      const nextWidths: Record<UUID, number> = {};
+      Object.entries(latestReplyTextRefs.current).forEach(([parentId, element]) => {
+        if (!element) return;
+        const measured = element.offsetWidth;
+        if (!measured) return;
+        const width = Math.max(220, Math.min(640, measured + 88));
+        nextWidths[parentId] = width;
+      });
+      setThreadComposerWidthByParent((prev) => {
+        const prevKeys = Object.keys(prev);
+        const nextKeys = Object.keys(nextWidths);
+        if (prevKeys.length === nextKeys.length) {
+          const unchanged = nextKeys.every((key) => prev[key] === nextWidths[key]);
+          if (unchanged) return prev;
+        }
+        return nextWidths;
+      });
+    }, [threadRepliesByParent, expandedThreadsByParent, messages.length]);
+
     return (
       <ScrollArea ref={scrollAreaRootRef} className="flex-1 min-h-0">
         {isLoadingMore ? (
@@ -390,6 +414,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
             {group.messages.map((message) => {
               const showUnreadDivider =
                 unreadAnchorMessageId !== null && message.ids.id === unreadAnchorMessageId;
+              const isParentRightAligned = currentUserId === message.core.sender.ids.id;
               const inlineThread =
                 openedThreadByParent[message.ids.id] ?? message.social.thread;
               const isInlineThreadExpanded =
@@ -427,19 +452,32 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                     currentUserId={currentUserId}
                   />
                   {isInlineThreadExpanded && (
-                      <div className="pl-10 pr-2 pb-2">
-                        <div className="ml-4 border-l-2 border-border/60 pl-5 space-y-4">
+                      <div
+                        className={cn(
+                          'pb-2 pl-10 pr-2',
+                        )}
+                      >
+                        <div
+                          className={cn(
+                            'ml-4 border-l-2 border-border/60 pl-5 space-y-4',
+                            isParentRightAligned ? 'md:ml-[50%] md:max-w-[50%]' : '',
+                          )}
+                        >
                           {loadingThreadsByParent[message.ids.id] && (
                             <div className="inline-flex items-center gap-2 rounded-full bg-muted/50 px-3 py-1 text-xs text-muted-foreground">
                               <span className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground/70" />
                               Loading replies...
                             </div>
                           )}
-                          {(threadRepliesByParent.get(message.ids.id) ?? []).map((reply) => {
+                          {(threadRepliesByParent.get(message.ids.id) ?? []).map((reply, index, items) => {
                             const senderName = getProfileDisplayName(reply.core.sender.profile);
                             const isOwnReply = currentUserId === reply.core.sender.ids.id;
+                            const isLatestReply = index === items.length - 1;
                             return (
-                              <div key={reply.ids.id} className="flex items-start gap-3">
+                              <div
+                                key={reply.ids.id}
+                                className="flex w-full items-start gap-3"
+                              >
                                 <AvatarWithStatus
                                   name={senderName}
                                   avatar={reply.core.sender.profile.avatar}
@@ -525,7 +563,13 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                       </DropdownMenuContent>
                                     </DropdownMenu>
                                   </div>
-                                  <p className="mt-1 text-sm leading-relaxed text-foreground/85 break-words">
+                                  <p
+                                    className="mt-1 text-sm leading-relaxed text-foreground/85 break-words text-left"
+                                    ref={(element) => {
+                                      if (!isLatestReply) return;
+                                      latestReplyTextRefs.current[message.ids.id] = element;
+                                    }}
+                                  >
                                     {getInlineReplyPreview(reply)}
                                   </p>
                                   <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -573,7 +617,14 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                     )
                                   }
                                   placeholder="Reply in thread..."
-                                  className="h-9 rounded-full"
+                                  className={cn(
+                                    'h-9 rounded-full',
+                                  )}
+                                  style={
+                                    threadComposerWidthByParent[message.ids.id]
+                                      ? { width: `${threadComposerWidthByParent[message.ids.id]}px` }
+                                      : undefined
+                                  }
                                   disabled={sendingReplyByParent[message.ids.id]}
                                 />
                                 <Button
