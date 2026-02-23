@@ -32,7 +32,7 @@ function SidebarHeader({
   return (
     <div className="flex w-full items-center justify-between gap-3">
       <div className="min-w-0">
-        <div className="truncate text-sm font-semibold text-foreground">{title}</div>
+        <div className="truncate text-lg font-semibold text-foreground">{title}</div>
         {subtitle ? (
           <div className="truncate text-xs text-muted-foreground">{subtitle}</div>
         ) : null}
@@ -93,8 +93,8 @@ export function MessagesSidebar({
           : 'transition-[width,opacity,transform] duration-200 motion-reduce:transition-none data-[state=closed]:w-0 data-[state=closed]:pointer-events-none data-[state=closed]:opacity-0 data-[state=closed]:translate-x-4 data-[state=open]:w-[360px] data-[state=open]:opacity-100 data-[state=open]:translate-x-0',
       )}
     >
-      <Card className="flex h-full w-full min-h-0 flex-col rounded-none border-0 border-l border-border pb-0 pt-2">
-        <CardHeader className="border-b border-border px-4 pb-2!">
+      <Card className="flex h-full w-full min-h-0 flex-col rounded-none border-0 border-l border-border p-0">
+        <CardHeader className="min-h-16 border-b border-border px-4 py-3!">
           <SidebarHeader title={title} subtitle={subtitle} onClose={onClose} />
         </CardHeader>
         <CardContent className="flex min-h-0 flex-1 flex-col p-0">

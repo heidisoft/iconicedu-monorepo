@@ -2,31 +2,37 @@
 
 import { memo, useMemo, useEffect, useRef } from 'react';
 import type { ComponentType } from 'react';
-import type { MessagesContainerProps } from '@iconicedu/ui-web/components/messages/messages-container';
-import { MessagesContainer } from '@iconicedu/ui-web/components/messages/messages-container';
-import { MessagesContainerHeader } from '@iconicedu/ui-web/components/messages/messages-container-header';
-import { MessagesContainerHeaderActions } from '@iconicedu/ui-web/components/messages/messages-container-header-actions';
+import type { MessagesContainerProps } from './messages-container';
+import { MessagesContainer } from './messages-container';
+import { MessagesContainerHeader } from './messages-container-header';
+import { MessagesContainerHeaderActions } from './messages-container-header-actions';
 import {
   MessagesStateProvider,
   useMessagesState,
-} from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
-import { MessagesRightSidebarRegion } from '@iconicedu/ui-web/components/messages/messages-right-sidebar-region';
-import { ChannelInfoPanel } from '@iconicedu/ui-web/components/messages/panels/channel-info-panel';
-import { ProfilePanel } from '@iconicedu/ui-web/components/messages/panels/profile-panel';
-import { SavedPanel } from '@iconicedu/ui-web/components/messages/panels/saved-panel';
+} from './context/messages-state-provider';
+import { MessagesRightSidebarRegion } from './messages-right-sidebar-region';
+import { ChannelInfoPanel } from './panels/channel-info-panel';
+import { ProfilePanel } from './panels/profile-panel';
+import { SavedPanel } from './panels/saved-panel';
 import type {
   MessagesRightPanelRegistry,
   MessagesRightPanelIntent,
 } from '@iconicedu/shared-types';
-import { useHasHydrated, useIsMobile } from '@iconicedu/ui-web/hooks/use-mobile';
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@iconicedu/ui-web/ui/resizable';
+import { useHasHydrated, useIsMobile } from '../../hooks/use-mobile';
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from '../../ui/resizable';
 
 interface MessagesRightPanelProps {
   intent: MessagesRightPanelIntent;
 }
 
 type MessagesShellProps = MessagesContainerProps & {
-  panelRegistry?: Partial<MessagesRightPanelRegistry<ComponentType<MessagesRightPanelProps>>>;
+  panelRegistry?: Partial<
+    MessagesRightPanelRegistry<ComponentType<MessagesRightPanelProps>>
+  >;
 };
 
 export const MessagesShell = memo(function MessagesShell(props: MessagesShellProps) {
@@ -82,6 +88,13 @@ const MessagesShellLayout = memo(function MessagesShellLayout({
     state.isOpen,
   ]);
 
+  const messagesHeader = (
+    <header className="flex min-h-16 items-center justify-between gap-3 border-b border-border px-4 py-3">
+      <MessagesContainerHeader channel={props.channel} />
+      <MessagesContainerHeaderActions />
+    </header>
+  );
+
   const mainContent = (
     <div className="flex min-h-0 flex-1 min-w-0 flex-col">
       <MessagesContainer {...props} />
@@ -95,10 +108,7 @@ const MessagesShellLayout = memo(function MessagesShellLayout({
   if (isMobile) {
     return (
       <div className="flex h-full min-h-0 flex-col">
-        <header className="flex min-h-16 items-center justify-between gap-3 border-b border-border px-4 py-3">
-          <MessagesContainerHeader channel={props.channel} />
-          <MessagesContainerHeaderActions />
-        </header>
+        {messagesHeader}
         <div className="flex flex-1 overflow-hidden">
           {mainContent}
           <MessagesRightSidebarRegion registry={registry} />
@@ -109,10 +119,6 @@ const MessagesShellLayout = memo(function MessagesShellLayout({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="flex min-h-16 items-center justify-between gap-3 border-b border-border px-4 py-3">
-        <MessagesContainerHeader channel={props.channel} />
-        <MessagesContainerHeaderActions />
-      </header>
       <div className="flex flex-1 overflow-hidden">
         <ResizablePanelGroup direction="horizontal" className="flex-1 min-w-0 min-h-0">
           <ResizablePanel
@@ -120,6 +126,7 @@ const MessagesShellLayout = memo(function MessagesShellLayout({
             minSize={50}
             className="min-w-0 min-h-0 flex flex-col"
           >
+            {messagesHeader}
             {mainContent}
           </ResizablePanel>
           {state.isOpen ? (

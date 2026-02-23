@@ -109,7 +109,13 @@ const channel: ChannelVM = {
 
 describe('MessagesContainer', () => {
   beforeEach(() => {
-    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ success: true, files: [] }),
+      })),
+    );
   });
 
   afterEach(() => {
@@ -271,5 +277,51 @@ describe('MessagesContainer', () => {
   it('renders read-only notice for supervised conversations', () => {
     render(<MessagesContainer channel={channel} currentUserId="profile-2" readOnly />);
     expect(screen.getByText('Read-only supervised conversation')).toBeInTheDocument();
+  });
+
+  it('loads files asynchronously when files tab is opened', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes('/api/messages/channel-files')) {
+          return {
+            ok: true,
+            json: async () => ({
+              success: true,
+              files: [
+                {
+                  ids: { id: 'file-1', orgId: 'org-1', channelId: 'channel-1' },
+                  kind: 'file',
+                  name: 'Worksheet.pdf',
+                  url: 'https://example.com/worksheet.pdf',
+                  mimeType: 'application/pdf',
+                  size: 2048,
+                  createdAt: '2026-02-22T10:00:00.000Z',
+                },
+              ],
+            }),
+          } as Response;
+        }
+        return {
+          ok: true,
+          json: async () => ({ success: true }),
+        } as Response;
+      }),
+    );
+
+    render(<MessagesContainer channel={channel} currentUserId="profile-2" />);
+
+    fireEvent.click(screen.getByRole('tab', { name: /files/i }));
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/messages/channel-files?channelId=channel-1'),
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Worksheet.pdf')).toBeInTheDocument();
+    });
   });
 });

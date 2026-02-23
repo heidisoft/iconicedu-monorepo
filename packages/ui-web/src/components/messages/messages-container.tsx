@@ -8,7 +8,10 @@ import { useMessages } from '@iconicedu/ui-web/hooks/use-messages';
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
 import { useMessagesState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
 import { resolveThreadAfterReply } from '@iconicedu/ui-web/components/messages/thread-reply.utils';
+import { Tabs, TabsList, TabsTrigger } from '../../ui/tabs';
+import { ScrollArea } from '../../ui/scroll-area';
 import type {
+  ChannelFileItemVM,
   ChannelVM,
   EducatorProfileVM,
   GuardianProfileVM,
@@ -21,7 +24,8 @@ import type {
   UUID,
   UserProfileVM,
 } from '@iconicedu/shared-types';
-import { Loader2 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { FileText, Loader2, MessageCircle } from 'lucide-react';
 
 function getMessageInputPlaceholder(
   channel: ChannelVM,
@@ -66,6 +70,24 @@ const isEducatorProfile = (profile: UserProfileVM): profile is EducatorProfileVM
 const MESSAGES_PAGE_SIZE = 40;
 const READ_STATE_PERSIST_DEBOUNCE_MS = 220;
 const TYPING_REMOTE_TIMEOUT_MS = 4000;
+type ContainerTab = 'messages' | 'files';
+type ContainerTabDefinition = {
+  key: ContainerTab;
+  label: string;
+  icon: LucideIcon;
+};
+const CONTAINER_TABS: ContainerTabDefinition[] = [
+  { key: 'messages', label: 'Messages', icon: MessageCircle },
+  { key: 'files', label: 'Files', icon: FileText },
+];
+
+function formatFileSize(size?: number | null): string {
+  if (!size || size <= 0) return 'Unknown size';
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  if (size < 1024 * 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(size / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
 
 export function MessagesContainer({
   channel,
@@ -118,6 +140,10 @@ export function MessagesContainer({
   const [hasMoreOlderMessages, setHasMoreOlderMessages] = useState(
     channelMessages.length >= MESSAGES_PAGE_SIZE,
   );
+  const [activeTab, setActiveTab] = useState<ContainerTab>('messages');
+  const [loadedFiles, setLoadedFiles] = useState<ChannelFileItemVM[] | null>(null);
+  const [isLoadingFiles, setIsLoadingFiles] = useState(false);
+  const [filesLoadError, setFilesLoadError] = useState<string | null>(null);
   const [oldestCursor, setOldestCursor] = useState<string | null>(
     channelMessages[0]?.core.createdAt ?? null,
   );
@@ -128,6 +154,7 @@ export function MessagesContainer({
     channel.collections.readState?.lastReadAt,
   );
   const isNetworkBusy = networkRequestCount > 0;
+  const filesForDisplay = loadedFiles ?? [];
 
   const runWithNetworkActivity = useCallback(async <T,>(operation: () => Promise<T>) => {
     setNetworkRequestCount((count) => count + 1);
@@ -702,6 +729,13 @@ export function MessagesContainer({
   }, [channel.ids.id, channelMessages]);
 
   useEffect(() => {
+    setActiveTab('messages');
+    setLoadedFiles(null);
+    setFilesLoadError(null);
+    setIsLoadingFiles(false);
+  }, [channel.ids.id]);
+
+  useEffect(() => {
     setLastReadMessageId(channel.collections.readState?.lastReadMessageId);
   }, [channel.ids.id, channel.collections.readState?.lastReadMessageId]);
   useEffect(() => {
@@ -954,6 +988,53 @@ export function MessagesContainer({
     });
   }, [setScrollToMessage]);
 
+  useEffect(() => {
+    if (activeTab !== 'files' || loadedFiles) {
+      return;
+    }
+    let isCancelled = false;
+    const loadFiles = async () => {
+      setIsLoadingFiles(true);
+      setFilesLoadError(null);
+      try {
+        const params = new URLSearchParams({ channelId: channel.ids.id });
+        const response = await runWithNetworkActivity(() =>
+          window.fetch(`/api/messages/channel-files?${params.toString()}`),
+        );
+        if (!response.ok) {
+          throw new Error('Failed to load files');
+        }
+        const payload = (await response.json()) as {
+          success?: boolean;
+          files?: ChannelFileItemVM[];
+        };
+        if (!payload.success) {
+          throw new Error('Failed to load files');
+        }
+        if (!isCancelled) {
+          const files = payload.files ?? [];
+          files.sort(
+            (a, b) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+          );
+          setLoadedFiles(files);
+        }
+      } catch {
+        if (!isCancelled) {
+          setFilesLoadError('Unable to load files right now.');
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoadingFiles(false);
+        }
+      }
+    };
+    void loadFiles();
+    return () => {
+      isCancelled = true;
+    };
+  }, [activeTab, channel.ids.id, loadedFiles, runWithNetworkActivity]);
+
   const messageListProps = useMemo(
     () => ({
       messages: filteredMessages,
@@ -1004,25 +1085,100 @@ export function MessagesContainer({
           Syncing...
         </div>
       ) : null}
-      <MessageList
-        ref={messageListRef}
-        {...messageListProps}
-      />
-      {typingParticipants.length ? (
-        <TypingIndicator profiles={typingParticipants} className="border-t border-border" />
-      ) : null}
-      {readOnly ? (
-        <div className="border-t border-border px-4 py-3 text-xs text-muted-foreground">
-          Read-only supervised conversation
-        </div>
+      <div className="border-b border-border px-4">
+        <Tabs
+          value={activeTab}
+          onValueChange={(value) => {
+            if (CONTAINER_TABS.some((tab) => tab.key === value)) {
+              setActiveTab(value as ContainerTab);
+            }
+          }}
+          className="gap-0"
+        >
+          <TabsList variant="line" className="h-12 p-0">
+            {CONTAINER_TABS.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <TabsTrigger
+                  key={tab.key}
+                  value={tab.key}
+                  className="w-auto flex-none px-1.5"
+                >
+                  <Icon className="h-4 w-4" />
+                  {tab.label}
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+        </Tabs>
+      </div>
+      {activeTab === 'messages' ? (
+        <>
+          <MessageList
+            ref={messageListRef}
+            {...messageListProps}
+          />
+          {typingParticipants.length ? (
+            <TypingIndicator profiles={typingParticipants} className="border-t border-border" />
+          ) : null}
+          {readOnly ? (
+            <div className="border-t border-border px-4 py-3 text-xs text-muted-foreground">
+              Read-only supervised conversation
+            </div>
+          ) : (
+            <MessageInput
+              onSend={handleSendMessage}
+              placeholder={getMessageInputPlaceholder(channel, resolvedCurrentUserId)}
+              onTypingStart={handleTypingStart}
+              onTypingStop={handleTypingStop}
+              isLoading={isNetworkBusy}
+            />
+          )}
+        </>
       ) : (
-        <MessageInput
-          onSend={handleSendMessage}
-          placeholder={getMessageInputPlaceholder(channel, resolvedCurrentUserId)}
-          onTypingStart={handleTypingStart}
-          onTypingStop={handleTypingStop}
-          isLoading={isNetworkBusy}
-        />
+        <ScrollArea className="min-h-0 flex-1">
+          <div className="space-y-2 p-4">
+            {isLoadingFiles ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading files...
+              </div>
+            ) : null}
+            {!isLoadingFiles && filesLoadError ? (
+              <p className="text-sm text-muted-foreground">{filesLoadError}</p>
+            ) : null}
+            {!isLoadingFiles && !filesLoadError && filesForDisplay.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No files yet.</p>
+            ) : null}
+            {!isLoadingFiles && !filesLoadError
+              ? filesForDisplay.map((item) => (
+                  <a
+                    key={item.ids.id}
+                    href={item.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-muted/40"
+                  >
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                      <FileText className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-foreground">
+                        {item.name}
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {item.kind === 'design-file'
+                          ? item.tool ?? 'Design file'
+                          : item.mimeType ?? 'File'}
+                        {' • '}
+                        {formatFileSize(item.size)}
+                      </p>
+                    </div>
+                  </a>
+                ))
+              : null}
+          </div>
+        </ScrollArea>
       )}
     </div>
   );
