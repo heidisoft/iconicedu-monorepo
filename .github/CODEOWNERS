@@ -1,0 +1,33 @@
+# CODEOWNERS — auto-assigns reviewers based on changed file paths.
+# Syntax: <pattern>  <owner> [<owner> ...]
+# Owners can be GitHub usernames (@user), team handles (@org/team), or emails.
+# Last matching pattern wins.
+#
+# Docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# ── Default owner for everything not matched below ───────────────────────────
+*                           @hwanigasooriya
+
+# ── Apps ─────────────────────────────────────────────────────────────────────
+apps/web/                   @hwanigasooriya
+apps/mobile/                @hwanigasooriya
+apps/api/                   @hwanigasooriya
+
+# ── Shared packages ───────────────────────────────────────────────────────────
+packages/shared-types/      @hwanigasooriya
+packages/ui-web/            @hwanigasooriya
+packages/ui-native/         @hwanigasooriya
+
+# ── Database ─────────────────────────────────────────────────────────────────
+supabase/                   @hwanigasooriya
+apps/api/prisma/            @hwanigasooriya
+
+# ── CI / infrastructure ───────────────────────────────────────────────────────
+.github/                    @hwanigasooriya
+turbo.json                  @hwanigasooriya
+pnpm-workspace.yaml         @hwanigasooriya
+package.json                @hwanigasooriya
+
+# ── Documentation ────────────────────────────────────────────────────────────
+docs/                       @hwanigasooriya
+*.md                        @hwanigasooriya

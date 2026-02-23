@@ -1,0 +1,50 @@
+# EditorConfig — https://editorconfig.org
+# Ensures consistent formatting across editors (VS Code, WebStorm, vim, etc.)
+
+root = true
+
+# ── Defaults for all files ────────────────────────────────────────────────────
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 2
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+# ── TypeScript / JavaScript / JSX / TSX ──────────────────────────────────────
+[*.{ts,tsx,js,jsx,mjs,cjs}]
+indent_size = 2
+
+# ── JSON ──────────────────────────────────────────────────────────────────────
+[*.json]
+indent_size = 2
+
+# ── CSS / SCSS ────────────────────────────────────────────────────────────────
+[*.{css,scss}]
+indent_size = 2
+
+# ── Markdown ──────────────────────────────────────────────────────────────────
+[*.md]
+trim_trailing_whitespace = false  # Trailing spaces are significant in Markdown
+
+# ── YAML ──────────────────────────────────────────────────────────────────────
+[*.{yml,yaml}]
+indent_size = 2
+
+# ── SQL ───────────────────────────────────────────────────────────────────────
+[*.sql]
+indent_size = 2
+
+# ── Prisma ────────────────────────────────────────────────────────────────────
+[*.prisma]
+indent_size = 2
+
+# ── Shell scripts ─────────────────────────────────────────────────────────────
+[*.sh]
+indent_style = space
+indent_size = 2
+
+# ── Makefile (tabs required) ──────────────────────────────────────────────────
+[Makefile]
+indent_style = tab

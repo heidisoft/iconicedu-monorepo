@@ -1,0 +1,65 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+---
+
+## [Unreleased]
+
+### Added
+
+- PR template, issue templates, and GitHub Actions CI workflow
+- `SECURITY.md`, `CODE_OF_CONDUCT.md`, `CHANGELOG.md`
+- `docs/setup.md` — full local environment setup guide with Supabase instructions
+- `docs/contributing.md` — branch naming, commit conventions, PR process
+- `docs/best-practices.md` — TypeScript, monorepo, web, mobile, and database conventions
+- `docs/deployment.md` — Vercel (web), EAS (mobile), and API deployment guides
+- `docs/database.md` — schema overview, migration workflow, RLS patterns
+- `docs/architecture.md` — high-level system architecture and data flow
+- `docs/packages.md` — documentation for each shared package
+- `docs/adr/` — Architecture Decision Records
+- `.env.*.example` files for all apps
+- `.editorconfig` for consistent editor settings
+- `.github/CODEOWNERS` for automatic reviewer assignment
+- Facebook Messenger-style animated emoji picker in mobile message actions
+- Save, Copy text, Forward, Hide, and Delete actions in mobile message actions sheet
+- Account status set to `active` after successful mobile login (OTP and Google)
+- Avatar images shown for DM participants in the messages list
+- Last message preview text in the messages/channels list
+- Inline thread replies for right-aligned (own) messages pushed to right with 25% left margin
+- Parent message excluded from thread replies list
+
+### Changed
+
+- `README.md` rewritten as a lean hub document with accurate versions and quick-start
+- Expo SDK upgraded to 54 (React Native 0.81.5, React 19.1.0)
+- Mobile auth migrated to `expo-secure-store` for token persistence
+
+### Fixed
+
+- `fetchChannels` broken join on non-existent `content` column replaced with `fetchLastMessages` helper
+- Thread replies duplicating the parent message (added `.neq('id', parentMessageId)` filter)
+- Mobile inline thread alignment for own messages
+
+---
+
+## [0.1.0] — 2026-01-01
+
+### Added
+
+- Initial monorepo setup with Turborepo, pnpm workspaces
+- `apps/web` — Next.js 15 web application with Supabase SSR
+- `apps/mobile` — Expo 54 mobile application with Expo Router
+- `apps/api` — NestJS 11 API with Prisma 7
+- `packages/ui-web` — Web UI component library (shadcn/Radix + Tailwind)
+- `packages/ui-native` — Native UI component library (NativeWind v4)
+- `packages/shared-types` — Shared VMs, rows, payloads, and enums
+- `packages/utils` — Shared utility functions
+- Supabase schema with RLS for all tables
+- Multi-role model: guardians, educators, children, advisors, staff
+- Real-time messaging (channels, DMs, spaces, threads)
+- Scheduling and session management
+- Homework submission workflow
+- Progress tracking and reporting
