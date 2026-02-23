@@ -190,7 +190,8 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
       if (!viewport) {
         return false;
       }
-      const remaining = viewport.scrollHeight - (viewport.scrollTop + viewport.clientHeight);
+      const remaining =
+        viewport.scrollHeight - (viewport.scrollTop + viewport.clientHeight);
       return remaining <= 40;
     }, []);
 
@@ -238,9 +239,9 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
       if (!root || !onLoadMore || !hasMore) {
         return;
       }
-      const viewport = root.querySelector('[data-slot="scroll-area-viewport"]') as
-        | HTMLDivElement
-        | null;
+      const viewport = root.querySelector(
+        '[data-slot="scroll-area-viewport"]',
+      ) as HTMLDivElement | null;
       if (!viewport) {
         return;
       }
@@ -389,7 +390,8 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
             </div>
             {group.messages.map((message) => {
               const showUnreadDivider =
-                unreadAnchorMessageId !== null && message.ids.id === unreadAnchorMessageId;
+                unreadAnchorMessageId !== null &&
+                message.ids.id === unreadAnchorMessageId;
               const isParentRightAligned = currentUserId === message.core.sender.ids.id;
               const inlineThread =
                 openedThreadByParent[message.ids.id] ?? message.social.thread;
@@ -428,25 +430,28 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                     currentUserId={currentUserId}
                   />
                   {isInlineThreadExpanded && (
+                    <div
+                      className={cn(
+                        'pb-2 pl-10 pr-2 animate-in fade-in-0 slide-in-from-top-1 duration-200',
+                      )}
+                    >
                       <div
                         className={cn(
-                          'pb-2 pl-10 pr-2',
+                          'ml-4 border-l-2 border-border/60 pl-5 space-y-1',
+                          isParentRightAligned ? 'md:ml-[50%] md:max-w-[50%]' : '',
                         )}
                       >
-                        <div
-                          className={cn(
-                            'ml-4 border-l-2 border-border/60 pl-5 space-y-4',
-                            isParentRightAligned ? 'md:ml-[50%] md:max-w-[50%]' : '',
-                          )}
-                        >
-                          {loadingThreadsByParent[message.ids.id] && (
-                            <div className="inline-flex items-center gap-2 rounded-full bg-muted/50 px-3 py-1 text-xs text-muted-foreground">
-                              <span className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground/70" />
-                              Loading replies...
-                            </div>
-                          )}
-                          {(threadRepliesByParent.get(message.ids.id) ?? []).map((reply) => {
-                            const senderName = getProfileDisplayName(reply.core.sender.profile);
+                        {loadingThreadsByParent[message.ids.id] && (
+                          <div className="inline-flex items-center gap-2 rounded-full bg-muted/50 px-3 py-1 text-xs text-muted-foreground">
+                            <span className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground/70" />
+                            Loading replies...
+                          </div>
+                        )}
+                        {(threadRepliesByParent.get(message.ids.id) ?? []).map(
+                          (reply) => {
+                            const senderName = getProfileDisplayName(
+                              reply.core.sender.profile,
+                            );
                             const isOwnReply = currentUserId === reply.core.sender.ids.id;
                             return (
                               <div
@@ -476,13 +481,16 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                       className="h-6 w-6"
                                       onClick={() => onToggleSaved?.(reply.ids.id)}
                                       aria-label={
-                                        reply.state?.isSaved ? 'Unsave message' : 'Save message'
+                                        reply.state?.isSaved
+                                          ? 'Unsave message'
+                                          : 'Save message'
                                       }
                                     >
                                       <Bookmark
                                         className={cn(
                                           'h-3.5 w-3.5',
-                                          reply.state?.isSaved && 'fill-primary text-primary',
+                                          reply.state?.isSaved &&
+                                            'fill-primary text-primary',
                                         )}
                                       />
                                     </Button>
@@ -520,7 +528,9 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                           <>
                                             <DropdownMenuSeparator />
                                             <DropdownMenuItem
-                                              onClick={() => onToggleHidden?.(reply.ids.id)}
+                                              onClick={() =>
+                                                onToggleHidden?.(reply.ids.id)
+                                              }
                                               className="py-2"
                                             >
                                               <EyeOff className="mr-2 h-4 w-4" />
@@ -566,59 +576,60 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                 </div>
                               </div>
                             );
-                          })}
-                          {!isReadOnly && (
-                            <form
-                              className="pt-1"
-                              onSubmit={(event) => {
-                                event.preventDefault();
-                                if (!inlineThread) return;
-                                void handleSendInlineReply(message, inlineThread);
-                              }}
-                            >
-                              <div className="flex items-center gap-2">
-                                <Input
-                                  value={draftByParent[message.ids.id] ?? ''}
-                                  onChange={(event) =>
-                                    handleThreadDraftChange(
-                                      message.ids.id,
-                                      event.target.value,
-                                    )
-                                  }
-                                  placeholder="Reply in thread..."
-                                  className={cn(
-                                    'h-9 rounded-full w-full',
-                                    !isParentRightAligned && 'md:w-1/2',
-                                  )}
-                                  disabled={sendingReplyByParent[message.ids.id]}
-                                />
-                                <Button
-                                  type="submit"
-                                  size="sm"
-                                  className="rounded-full"
-                                  disabled={
-                                    !(draftByParent[message.ids.id] ?? '').trim().length ||
-                                    Boolean(sendingReplyByParent[message.ids.id])
-                                  }
-                                >
-                                  {sendingReplyByParent[message.ids.id] ? (
-                                    <>
-                                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                                      Saving...
-                                    </>
-                                  ) : (
-                                    <>
-                                      <MessageCircleReply className="mr-1.5 h-3.5 w-3.5" />
-                                      Reply
-                                    </>
-                                  )}
-                                </Button>
-                              </div>
-                            </form>
-                          )}
-                        </div>
+                          },
+                        )}
+                        {!isReadOnly && (
+                          <form
+                            className="pt-1"
+                            onSubmit={(event) => {
+                              event.preventDefault();
+                              if (!inlineThread) return;
+                              void handleSendInlineReply(message, inlineThread);
+                            }}
+                          >
+                            <div className="flex items-center gap-2">
+                              <Input
+                                value={draftByParent[message.ids.id] ?? ''}
+                                onChange={(event) =>
+                                  handleThreadDraftChange(
+                                    message.ids.id,
+                                    event.target.value,
+                                  )
+                                }
+                                placeholder="Reply in thread..."
+                                className={cn(
+                                  'h-9 rounded-full w-full',
+                                  !isParentRightAligned && 'md:w-1/2',
+                                )}
+                                disabled={sendingReplyByParent[message.ids.id]}
+                              />
+                              <Button
+                                type="submit"
+                                size="sm"
+                                className="rounded-full"
+                                disabled={
+                                  !(draftByParent[message.ids.id] ?? '').trim().length ||
+                                  Boolean(sendingReplyByParent[message.ids.id])
+                                }
+                              >
+                                {sendingReplyByParent[message.ids.id] ? (
+                                  <>
+                                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                                    Saving...
+                                  </>
+                                ) : (
+                                  <>
+                                    <MessageCircleReply className="mr-1.5 h-3.5 w-3.5" />
+                                    Reply
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          </form>
+                        )}
                       </div>
-                    )}
+                    </div>
+                  )}
                 </div>
               );
             })}

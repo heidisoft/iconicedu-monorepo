@@ -284,7 +284,6 @@ export const MessageBase = memo(function MessageBase({
           >
             {isOwnMessage ? (
               <>
-                {actionsMenu}
                 <Button
                   variant="ghost"
                   size="icon"
@@ -299,6 +298,7 @@ export const MessageBase = memo(function MessageBase({
                     )}
                   />
                 </Button>
+                {actionsMenu}
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>

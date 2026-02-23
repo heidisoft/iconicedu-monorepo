@@ -139,7 +139,6 @@ export async function sendTextMessageAction(
         .from('messages')
         .update({
           thread_id: threadId,
-          thread_parent_id: parentMessage.id,
           updated_at: now,
           updated_by: profileResponse.data.id,
         })
