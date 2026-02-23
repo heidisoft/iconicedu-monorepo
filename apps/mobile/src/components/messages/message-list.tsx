@@ -79,6 +79,8 @@ type MessageListProps = {
   currentProfileId: string;
   onLoadMore?: () => void;
   loading?: boolean;
+  refreshing?: boolean;
+  onRefresh?: () => void;
   onMessageLongPress?: (message: MessageVM) => void;
   onReactionToggle?: (messageId: string, emoji: string) => void;
   onThreadOpen?: (message: MessageVM) => void;
@@ -91,6 +93,8 @@ export const MessageList: React.FC<MessageListProps> = ({
   currentProfileId,
   onLoadMore,
   loading = false,
+  refreshing = false,
+  onRefresh,
   onMessageLongPress,
   onReactionToggle,
   onThreadOpen,
@@ -169,6 +173,8 @@ export const MessageList: React.FC<MessageListProps> = ({
       keyExtractor={keyExtractor}
       inverted
       contentContainerStyle={{ paddingVertical: 8, flexGrow: 1 }}
+      onRefresh={onRefresh}
+      refreshing={refreshing}
       onEndReached={onLoadMore}
       onEndReachedThreshold={0.3}
       ListFooterComponent={

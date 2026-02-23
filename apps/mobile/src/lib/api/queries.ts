@@ -387,7 +387,8 @@ export async function fetchChannelMessages(
     loadThreadStats(messageIds),
   ]);
 
-  return typedRows.reverse().map((row) =>
+  // Reverse a copy (oldest→newest) without mutating the typed rows array.
+  return [...typedRows].reverse().map((row) =>
     mapRowToMessageVM(
       row,
       payloadMap.get(row.id) ?? null,

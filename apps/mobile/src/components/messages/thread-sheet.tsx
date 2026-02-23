@@ -22,6 +22,7 @@ type ThreadSheetProps = {
   visible: boolean;
   parentMessage: MessageVM | null;
   currentProfileId: string;
+  currentAccountId: string;
   onClose: () => void;
   onSend: (text: string, threadParentId: string) => Promise<void>;
 };
@@ -71,6 +72,7 @@ export const ThreadSheet: React.FC<ThreadSheetProps> = ({
   visible,
   parentMessage,
   currentProfileId,
+  currentAccountId,
   onClose,
   onSend,
 }) => {
@@ -83,7 +85,7 @@ export const ThreadSheet: React.FC<ThreadSheetProps> = ({
     if (!parentMessage) return;
     setLoading(true);
     try {
-      const data = await fetchThreadMessages(parentMessage.ids.id, currentProfileId);
+      const data = await fetchThreadMessages(parentMessage.ids.id, currentProfileId, currentAccountId);
       setReplies(data);
     } catch {
       // silently fail — show empty state

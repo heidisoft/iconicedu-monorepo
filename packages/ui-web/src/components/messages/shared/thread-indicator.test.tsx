@@ -41,4 +41,3 @@ describe('ThreadIndicator', () => {
     expect(screen.queryByText('New')).not.toBeInTheDocument();
   });
 });
-

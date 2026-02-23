@@ -36,7 +36,7 @@ export const ReactionBar = memo(function ReactionBar({
       }`}
     >
       <div className="overflow-visible">
-        <div className="flex flex-wrap gap-1 pb-1 pt-1">
+        <div className="flex flex-wrap gap-1.5 pb-1 pt-1">
           {reactions.map((reaction, index) => {
             const isUserReaction = reaction.reactedByMe ?? false;
             return (
@@ -47,18 +47,20 @@ export const ReactionBar = memo(function ReactionBar({
                       variant="ghost"
                       size="sm"
                       onClick={() => handleReactionClick(reaction.emoji)}
-                      className={`h-6 min-w-[2.5rem] px-2 text-xs border-muted-foreground/20 transition-all duration-200 hover:scale-110 hover:shadow-md ${
+                      className={`h-7 min-w-[2.4rem] rounded-full border px-2 text-[12px] leading-none border-muted-foreground/20 transition-all duration-200 hover:scale-[1.03] ${
                         isUserReaction
                           ? 'bg-primary/10 text-primary border-primary/20'
-                          : ''
+                          : 'bg-background/60 text-foreground'
                       }`}
                       style={{
                         animationDelay: `${index * ANIMATION_DELAYS.REACTION_STAGGER}ms`,
                       }}
                       aria-label={`${reaction.emoji} reaction, ${reaction.count} ${reaction.count === 1 ? 'person' : 'people'}`}
                     >
-                      <span className="mr-1">{reaction.emoji}</span>
-                      <span className="text-xs font-medium">{reaction.count}</span>
+                      <span className="mr-1 text-[13px] leading-none">{reaction.emoji}</span>
+                      <span className="text-[13px] font-semibold tracking-tight leading-none">
+                        {reaction.count}
+                      </span>
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>

@@ -41,6 +41,8 @@ export default function ChannelConversationScreen() {
   const {
     data: messages,
     isLoading,
+    isRefetching,
+    refetch,
     loadMore,
     toggleReaction,
   } = useMessages(channelId ?? '', profileId, accountId);
@@ -74,9 +76,9 @@ export default function ChannelConversationScreen() {
 
   // ── Send message ──
   const handleSend = useCallback(
-    async (text: string) => {
+    async (text: string, threadParentId?: string) => {
       if (!channelId || !profileId || !orgId) return;
-      await sendTextMessage(channelId, profileId, orgId, text);
+      await sendTextMessage(channelId, profileId, orgId, text, threadParentId);
     },
     [channelId, profileId, orgId],
   );
@@ -118,6 +120,8 @@ export default function ChannelConversationScreen() {
           currentProfileId={profileId}
           onLoadMore={loadMore}
           loading={isLoading}
+          refreshing={isRefetching}
+          onRefresh={refetch}
           onMessageLongPress={handleLongPress}
           onReactionToggle={handleReactionToggle}
           onThreadOpen={handleThreadOpen}
@@ -156,6 +160,7 @@ export default function ChannelConversationScreen() {
         visible={threadVisible}
         parentMessage={threadMessage}
         currentProfileId={profileId}
+        currentAccountId={accountId}
         onClose={() => setThreadVisible(false)}
         onSend={handleSend}
       />

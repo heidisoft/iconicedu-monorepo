@@ -167,7 +167,7 @@ export const MessageBase = memo(function MessageBase({
     >
       <div
         className={cn(
-          'flex w-full max-w-[min(78ch,85%)] items-start gap-3',
+          'relative flex w-full max-w-[min(78ch,85%)] items-start gap-3',
           isOwnMessage ? 'flex-row-reverse' : 'flex-row',
         )}
       >
@@ -185,7 +185,7 @@ export const MessageBase = memo(function MessageBase({
           />
         </button>
 
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 w-fit max-w-[78ch]">
           <div
             className={cn(
               'mb-2 flex items-center gap-2',
@@ -243,7 +243,7 @@ export const MessageBase = memo(function MessageBase({
 
           <div
             className={cn(
-              'w-full rounded-[12px] px-5 py-4 shadow-sm',
+              'inline-block w-fit max-w-full rounded-[12px] px-3 py-2',
               isOwnMessage
                 ? 'bg-primary/22 text-foreground'
                 : 'bg-muted/45 text-foreground',

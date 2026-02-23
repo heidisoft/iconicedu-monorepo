@@ -4,7 +4,6 @@ import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-wit
 import { Badge } from '@iconicedu/ui-web/ui/badge';
 import { MessageCircle } from 'lucide-react';
 import type { ThreadVM } from '@iconicedu/shared-types';
-import { formatThreadTime } from '@iconicedu/ui-web/lib/message-utils';
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
 
 interface ThreadIndicatorProps {
@@ -18,16 +17,19 @@ export const ThreadIndicator = memo(function ThreadIndicator({
   onClick,
   unreadCount = 0,
 }: ThreadIndicatorProps) {
+  const participantPreview = thread.participants.slice(0, 2);
   return (
     <Button
       variant="ghost"
       size="sm"
       onClick={onClick}
-      className="mt-1 h-auto w-fit gap-2 rounded-xl border border-border bg-muted/30 px-3 py-1.5 text-sm text-primary hover:bg-muted hover:text-primary"
+      className="mt-1 h-7 w-fit gap-2 rounded-full border border-border bg-background/60 px-3 text-primary hover:bg-muted hover:text-primary"
     >
-      <MessageCircle className="h-3.5 w-3.5" />
-      <span className="font-medium">
+      <MessageCircle className="h-4 w-4" />
+      <span className="text-[13px] font-semibold tracking-tight leading-none">
         {thread.stats.messageCount}{' '}
+      </span>
+      <span className="text-[12px] font-semibold leading-none">
         {thread.stats.messageCount === 1 ? 'reply' : 'replies'}
       </span>
       {unreadCount > 0 && (
@@ -41,7 +43,7 @@ export const ThreadIndicator = memo(function ThreadIndicator({
         </Badge>
       )}
       <div className="flex -space-x-2">
-        {thread.participants.slice(0, 3).map((participant) => {
+        {participantPreview.map((participant) => {
           const participantName = getProfileDisplayName(participant.profile);
           return (
             <AvatarWithStatus
@@ -50,16 +52,13 @@ export const ThreadIndicator = memo(function ThreadIndicator({
               avatar={participant.profile.avatar}
               themeKey={participant.ui?.themeKey}
               showStatus={false}
-              sizeClassName="h-5 w-5 border-2 border-background"
-              fallbackClassName="text-[10px]"
+              sizeClassName="h-6 w-6 border-2 border-background"
+              fallbackClassName="text-[11px]"
               initialsLength={1}
             />
           );
         })}
       </div>
-      <span className="text-xs text-muted-foreground">
-        {formatThreadTime(thread.stats.lastReplyAt)}
-      </span>
     </Button>
   );
 });

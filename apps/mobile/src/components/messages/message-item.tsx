@@ -133,19 +133,8 @@ function ReactionRow({ reactions, colors, messageId, onReactionToggle }: Reactio
 
 // ─── Thread reply pill ────────────────────────────────────────────────────────
 
-function formatRelativeTime(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diffMs / 60_000);
-  if (mins < 1) return '0m ago';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
-
 function ThreadReplyPill({ thread, colors, onPress }: { thread: ThreadVM; colors: AppColors; onPress: () => void }) {
   const count = thread.stats.messageCount;
-  const timeAgo = formatRelativeTime(thread.stats.lastReplyAt);
   const participants = thread.participants.slice(0, 3);
 
   return (
@@ -153,11 +142,10 @@ function ThreadReplyPill({ thread, colors, onPress }: { thread: ThreadVM; colors
       onPress={onPress}
       activeOpacity={0.75}
       style={{
-        flexDirection: 'row', alignItems: 'center', gap: 8,
-        backgroundColor: colors.inputBg,
+        flexDirection: 'row', alignItems: 'center', gap: 6,
+        backgroundColor: colors.card,
         borderWidth: 1, borderColor: colors.border,
         borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6,
-        alignSelf: 'flex-start',
       }}
     >
       {/* Speech bubble icon */}
@@ -210,8 +198,6 @@ function ThreadReplyPill({ thread, colors, onPress }: { thread: ThreadVM; colors
         </View>
       )}
 
-      {/* Time since last reply */}
-      <Text style={{ fontSize: 12, color: colors.textMuted }}>{timeAgo}</Text>
     </TouchableOpacity>
   );
 }
@@ -387,8 +373,8 @@ function SessionCompleteBar({ message, colors, s }: { message: SessionCompleteMe
 
 function makeStyles(colors: AppColors) {
   return StyleSheet.create({
-    // ── Outer row: avatar + content, aligned to bottom ────────────────────────
-    row:          { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingVertical: 3, gap: 8 },
+    // ── Outer row: avatar + content, aligned to top ──────────────────────────
+    row:          { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 12, paddingVertical: 3, gap: 8 },
     rowOwn:       { flexDirection: 'row-reverse' },
     rowGroupStart: { paddingTop: 12 },
 
@@ -403,7 +389,6 @@ function makeStyles(colors: AppColors) {
     nameRow:    { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginBottom: 2 },
     senderName: { fontSize: 14, fontWeight: '700' },
     msgTime:    { fontSize: 11, color: colors.textFaint },
-    msgTimeOwn: { color: 'rgba(255,255,255,0.6)' },
 
     // ── Message bubble ────────────────────────────────────────────────────────
     bubble: {
@@ -414,14 +399,6 @@ function makeStyles(colors: AppColors) {
     },
     bubbleOther: {
       backgroundColor: colors.card,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: colors.border,
-      // Slight shadow for depth
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.06,
-      shadowRadius: 3,
-      elevation: 1,
     },
     bubbleOwn: {
       backgroundColor: colors.teal,
@@ -600,9 +577,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         <View style={[s.contentCol, isOwn && s.contentColOwn]}>
           {isGroupStart && (
             <View style={s.nameRow}>
-              <Text style={[s.senderName, { color: isOwn ? colors.teal : senderColor(senderDisplayName) }]}>
-                {isOwn ? 'You' : senderDisplayName}
-              </Text>
+              {!isOwn && (
+                <Text style={[s.senderName, { color: senderColor(senderDisplayName) }]}>
+                  {senderDisplayName}
+                </Text>
+              )}
               <Text style={s.msgTime}>{time}</Text>
             </View>
           )}
@@ -642,16 +621,19 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 
       {/* Content column */}
       <View style={[s.contentCol, isOwn && s.contentColOwn]}>
+        {/* Name + time above bubble */}
+        {isGroupStart && (
+          <View style={s.nameRow}>
+            {!isOwn && (
+              <Text style={[s.senderName, { color: senderColor(senderDisplayName) }]}>
+                {senderDisplayName}
+              </Text>
+            )}
+            <Text style={s.msgTime}>{time}</Text>
+          </View>
+        )}
         {/* Bubble */}
         <View style={[s.bubble, isOwn ? s.bubbleOwn : s.bubbleOther]}>
-          {isGroupStart && (
-            <View style={s.nameRow}>
-              <Text style={[s.senderName, { color: isOwn ? 'rgba(255,255,255,0.75)' : senderColor(senderDisplayName) }]}>
-                {isOwn ? 'You' : senderDisplayName}
-              </Text>
-              <Text style={[s.msgTime, isOwn && s.msgTimeOwn]}>{time}</Text>
-            </View>
-          )}
           {renderBubbleContent()}
         </View>
 
