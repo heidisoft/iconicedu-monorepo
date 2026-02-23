@@ -118,10 +118,6 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
     const [sendingReplyByParent, setSendingReplyByParent] = useState<
       Record<UUID, boolean>
     >({});
-    const [threadComposerWidthByParent, setThreadComposerWidthByParent] = useState<
-      Record<UUID, number>
-    >({});
-    const latestReplyTextRefs = useRef<Record<string, HTMLParagraphElement | null>>({});
 
     useImperativeHandle(ref, () => ({
       scrollToMessage: (messageId: string) => {
@@ -365,26 +361,6 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
       [draftByParent, onSendThreadReply],
     );
 
-    useEffect(() => {
-      const nextWidths: Record<UUID, number> = {};
-      Object.entries(latestReplyTextRefs.current).forEach(([parentId, element]) => {
-        if (!element) return;
-        const measured = element.offsetWidth;
-        if (!measured) return;
-        const width = Math.max(220, Math.min(640, measured + 88));
-        nextWidths[parentId] = width;
-      });
-      setThreadComposerWidthByParent((prev) => {
-        const prevKeys = Object.keys(prev);
-        const nextKeys = Object.keys(nextWidths);
-        if (prevKeys.length === nextKeys.length) {
-          const unchanged = nextKeys.every((key) => prev[key] === nextWidths[key]);
-          if (unchanged) return prev;
-        }
-        return nextWidths;
-      });
-    }, [threadRepliesByParent, expandedThreadsByParent, messages.length]);
-
     return (
       <ScrollArea ref={scrollAreaRootRef} className="flex-1 min-h-0">
         {isLoadingMore ? (
@@ -469,10 +445,9 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                               Loading replies...
                             </div>
                           )}
-                          {(threadRepliesByParent.get(message.ids.id) ?? []).map((reply, index, items) => {
+                          {(threadRepliesByParent.get(message.ids.id) ?? []).map((reply) => {
                             const senderName = getProfileDisplayName(reply.core.sender.profile);
                             const isOwnReply = currentUserId === reply.core.sender.ids.id;
-                            const isLatestReply = index === items.length - 1;
                             return (
                               <div
                                 key={reply.ids.id}
@@ -563,13 +538,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                       </DropdownMenuContent>
                                     </DropdownMenu>
                                   </div>
-                                  <p
-                                    className="mt-1 text-sm leading-relaxed text-foreground/85 break-words text-left"
-                                    ref={(element) => {
-                                      if (!isLatestReply) return;
-                                      latestReplyTextRefs.current[message.ids.id] = element;
-                                    }}
-                                  >
+                                  <p className="mt-1 text-sm leading-relaxed text-foreground/85 break-words text-left">
                                     {getInlineReplyPreview(reply)}
                                   </p>
                                   <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -618,13 +587,9 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                   }
                                   placeholder="Reply in thread..."
                                   className={cn(
-                                    'h-9 rounded-full',
+                                    'h-9 rounded-full w-full',
+                                    !isParentRightAligned && 'md:w-1/2',
                                   )}
-                                  style={
-                                    threadComposerWidthByParent[message.ids.id]
-                                      ? { width: `${threadComposerWidthByParent[message.ids.id]}px` }
-                                      : undefined
-                                  }
                                   disabled={sendingReplyByParent[message.ids.id]}
                                 />
                                 <Button
