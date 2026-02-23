@@ -14,14 +14,21 @@ import { TypingIndicator } from '@/components/messages/typing-indicator';
 import { ConversationHeader } from '@/components/messages/conversation-header';
 import { MessageActionsSheet } from '@/components/messages/message-actions-sheet';
 import { ThreadSheet } from '@/components/messages/thread-sheet';
+import { ChannelInfoSheet } from '@/components/messages/channel-info-sheet';
 
 export default function DmConversationScreen() {
-  const { channelId, topic } = useLocalSearchParams<{ channelId: string; topic?: string }>();
+  const { channelId, topic, avatarSeed, subtitle } = useLocalSearchParams<{
+    channelId: string;
+    topic?: string;
+    avatarSeed?: string;
+    subtitle?: string;
+  }>();
   const router = useRouter();
   const { data: account } = useAccount();
   const { colors } = useTheme();
 
   const orgId = account?.org_id ?? '';
+  const accountId = (account as Record<string, unknown> | undefined)?.id as string ?? '';
   // Profile is joined in fetchUserAccount — no extra round-trip needed
   const profileArr = ((account as Record<string, unknown> | undefined)
     ?.profile as Array<{ id: string; display_name: string | null; first_name: string | null }> | null);
@@ -36,13 +43,16 @@ export default function DmConversationScreen() {
     isLoading,
     loadMore,
     toggleReaction,
-  } = useMessages(channelId ?? '', profileId);
+  } = useMessages(channelId ?? '', profileId, accountId);
 
   const { typingUsers, broadcastTyping } = useTyping(
     channelId ?? '',
     senderName,
     profileId,
   );
+
+  // ── Info sheet state ──
+  const [infoVisible, setInfoVisible] = useState(false);
 
   // ── Long-press actions sheet state ──
   const [actionsMessage, setActionsMessage] = useState<MessageVM | null>(null);
@@ -92,8 +102,11 @@ export default function DmConversationScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.pageBg }]} edges={['top']}>
       <ConversationHeader
         title={topic ?? 'Direct Message'}
+        subtitle={subtitle ?? 'Direct Message'}
         kind="dm"
+        avatarSeed={avatarSeed}
         onBack={() => router.back()}
+        onMore={() => setInfoVisible(true)}
       />
       <KeyboardAvoidingView
         style={[styles.flex, { backgroundColor: colors.pageBg }]}
@@ -116,6 +129,16 @@ export default function DmConversationScreen() {
           onTypingChange={broadcastTyping}
         />
       </KeyboardAvoidingView>
+
+      {/* Info sheet */}
+      <ChannelInfoSheet
+        visible={infoVisible}
+        title={topic ?? 'Direct Message'}
+        subtitle={subtitle}
+        kind="dm"
+        avatarSeed={avatarSeed}
+        onClose={() => setInfoVisible(false)}
+      />
 
       {/* Long-press actions sheet */}
       <MessageActionsSheet

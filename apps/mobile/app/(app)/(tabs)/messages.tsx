@@ -361,17 +361,19 @@ export default function MessagesScreen() {
               s={s}
               colors={colors}
               onPress={() => {
-                // For DMs pass participant names as the title; for channels pass topic
-                const displayTitle = item.kind === 'dm'
-                  ? ((item.participants ?? []).length > 0
-                      ? (item.participants ?? []).map(participantName).join(', ')
+                const isDm = item.kind === 'dm';
+                const participants = item.participants ?? [];
+                const displayTitle = isDm
+                  ? (participants.length > 0
+                      ? participants.map(participantName).join(', ')
                       : (item.topic ?? 'Direct Message'))
                   : (item.topic ?? 'Channel');
+                const avatarSeed = isDm ? (participants[0]?.id ?? '') : '';
+                const iconEmoji = !isDm ? (item.icon_emoji ?? '') : '';
+                const subtitle = isDm ? 'Direct Message' : (item.description ?? '');
                 router.push({
-                  pathname: item.kind === 'dm'
-                    ? '/(app)/dm/[channelId]'
-                    : '/(app)/channel/[channelId]',
-                  params: { channelId: item.id, topic: displayTitle },
+                  pathname: isDm ? '/(app)/dm/[channelId]' : '/(app)/channel/[channelId]',
+                  params: { channelId: item.id, topic: displayTitle, avatarSeed, iconEmoji, subtitle },
                 } as never);
               }}
             />

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { View, Text, FlatList, ActivityIndicator, StyleSheet } from 'react-native';
 import type { MessageVM } from '@iconicedu/shared-types';
 import { useTheme } from '@/providers/theme-provider';
@@ -101,6 +101,20 @@ export const MessageList: React.FC<MessageListProps> = ({
   // Build items newest-first so inverted FlatList renders newest at the bottom
   const listData = useMemo(() => [...buildListData(messages)].reverse(), [messages]);
 
+  // Scroll to the newest message (offset 0 in an inverted list = visual bottom)
+  // when a new message is appended. Loading older messages prepends to the front
+  // and leaves messages[last].id unchanged, so those don't trigger a scroll.
+  const lastMessageIdRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const newLastId = messages[messages.length - 1]?.ids.id;
+    if (newLastId && newLastId !== lastMessageIdRef.current) {
+      requestAnimationFrame(() => {
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+      });
+    }
+    lastMessageIdRef.current = newLastId;
+  }, [messages]);
+
   const renderItem = useCallback(
     ({ item, index }: { item: MessageListItem; index: number }) => {
       if (isDateSeparator(item)) {
@@ -164,7 +178,6 @@ export const MessageList: React.FC<MessageListProps> = ({
           </View>
         ) : null
       }
-      maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
     />
   );
 };

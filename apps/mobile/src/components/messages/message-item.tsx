@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Pressable, Linking } from 'react-native';
-import { Avatar } from '@iconicedu/ui-native';
+import { View, Text, Image, StyleSheet, TouchableOpacity, Pressable, Linking } from 'react-native';
 import type {
   MessageVM,
+  ThreadVM,
   LessonAssignmentMessageVM,
   SessionSummaryMessageVM,
   SessionCompleteMessageVM,
@@ -31,10 +31,59 @@ function formatFileSize(bytes?: number): string {
   return `${(bytes / 1_048_576).toFixed(1)} MB`;
 }
 
-function getAvatarUrl(message: MessageVM): string | null {
-  const avatar = (message.core.sender.profile as { avatar?: { url?: string | null } }).avatar;
-  return avatar?.url ?? null;
+type AvatarInfo = { url: string | null; seed: string };
+
+function getAvatarInfo(message: MessageVM): AvatarInfo {
+  const profile = message.core.sender.profile as {
+    avatar?: { source?: string; url?: string | null; seed?: string | null };
+  };
+  const avatar = profile.avatar;
+  const url = avatar?.source === 'url' ? (avatar.url ?? null) : null;
+  const seed = avatar?.source === 'seed'
+    ? (avatar.seed ?? message.core.sender.ids.id)
+    : message.core.sender.ids.id;
+  return { url, seed };
 }
+
+// ─── Inline avatar (avoids NativeWind sizing issues on Image) ─────────────────
+
+const AVATAR_SIZE = 36;
+const AVATAR_COLORS = ['#5B8DEF', '#E07B54', '#6CC070', '#A86CC1', '#E0A854', '#54B8C4', '#E06C8A'];
+
+function avatarBgColor(seed: string): string {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  return AVATAR_COLORS[h % AVATAR_COLORS.length];
+}
+
+function getInitials(name: string): string {
+  const words = name.trim().split(/\s+/);
+  if (words.length >= 2) return (words[0]![0]! + words[1]![0]!).toUpperCase();
+  return name[0]?.toUpperCase() ?? '?';
+}
+
+function MessageAvatar({ name, src, seed }: { name: string; src: string | null; seed: string }) {
+  if (src) {
+    return (
+      <Image
+        source={{ uri: src }}
+        style={avatarStyles.img}
+        accessibilityLabel={name}
+      />
+    );
+  }
+  return (
+    <View style={[avatarStyles.circle, { backgroundColor: avatarBgColor(seed) }]}>
+      <Text style={avatarStyles.initials}>{getInitials(name)}</Text>
+    </View>
+  );
+}
+
+const avatarStyles = StyleSheet.create({
+  img:      { width: AVATAR_SIZE, height: AVATAR_SIZE, borderRadius: AVATAR_SIZE / 2 },
+  circle:   { width: AVATAR_SIZE, height: AVATAR_SIZE, borderRadius: AVATAR_SIZE / 2, alignItems: 'center', justifyContent: 'center' },
+  initials: { color: '#fff', fontSize: 13, fontWeight: '700', letterSpacing: 0.3 },
+});
 
 // Deterministic color per sender name (Slack-style)
 const NAME_COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#ef4444'];
@@ -58,7 +107,7 @@ type ReactionRowProps = {
 function ReactionRow({ reactions, colors, messageId, onReactionToggle }: ReactionRowProps) {
   if (!reactions.length) return null;
   return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 2 }}>
       {reactions.map((r) => (
         <TouchableOpacity
           key={r.emoji}
@@ -82,12 +131,87 @@ function ReactionRow({ reactions, colors, messageId, onReactionToggle }: Reactio
   );
 }
 
-// ─── Thread indicator ─────────────────────────────────────────────────────────
+// ─── Thread reply pill ────────────────────────────────────────────────────────
 
-function ThreadIndicator({ colors, onPress }: { colors: AppColors; onPress: () => void }) {
+function formatRelativeTime(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diffMs / 60_000);
+  if (mins < 1) return '0m ago';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+function ThreadReplyPill({ thread, colors, onPress }: { thread: ThreadVM; colors: AppColors; onPress: () => void }) {
+  const count = thread.stats.messageCount;
+  const timeAgo = formatRelativeTime(thread.stats.lastReplyAt);
+  const participants = thread.participants.slice(0, 3);
+
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={{ marginTop: 4 }}>
-      <Text style={{ fontSize: 12, color: colors.teal, fontWeight: '600' }}>💬 Reply in thread</Text>
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.75}
+      style={{
+        flexDirection: 'row', alignItems: 'center', gap: 8,
+        backgroundColor: colors.inputBg,
+        borderWidth: 1, borderColor: colors.border,
+        borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6,
+        alignSelf: 'flex-start',
+      }}
+    >
+      {/* Speech bubble icon */}
+      <Text style={{ fontSize: 14, color: colors.teal }}>💬</Text>
+
+      {/* Reply count */}
+      <Text style={{ fontSize: 13, color: colors.teal, fontWeight: '600' }}>
+        {count} {count === 1 ? 'reply' : 'replies'}
+      </Text>
+
+      {/* Overlapping participant avatars */}
+      {participants.length > 0 && (
+        <View style={{ flexDirection: 'row' }}>
+          {participants.map((p, i) => {
+            const name = p.profile.displayName;
+            const avatarProfile = p.profile as { avatar?: { source?: string; url?: string | null; seed?: string | null } };
+            const src = avatarProfile.avatar?.source === 'url' ? (avatarProfile.avatar.url ?? null) : null;
+            const seed = avatarProfile.avatar?.source === 'seed'
+              ? (avatarProfile.avatar.seed ?? p.ids.id)
+              : p.ids.id;
+            return src ? (
+              <Image
+                key={p.ids.id}
+                source={{ uri: src }}
+                style={{
+                  width: 22, height: 22, borderRadius: 11,
+                  borderWidth: 2, borderColor: colors.inputBg,
+                  marginLeft: i > 0 ? -8 : 0,
+                  zIndex: participants.length - i,
+                }}
+              />
+            ) : (
+              <View
+                key={p.ids.id}
+                style={{
+                  width: 22, height: 22, borderRadius: 11,
+                  backgroundColor: avatarBgColor(seed),
+                  alignItems: 'center', justifyContent: 'center',
+                  borderWidth: 2, borderColor: colors.inputBg,
+                  marginLeft: i > 0 ? -8 : 0,
+                  zIndex: participants.length - i,
+                }}
+              >
+                <Text style={{ color: '#fff', fontSize: 8, fontWeight: '700', letterSpacing: 0 }}>
+                  {getInitials(name)[0]}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      )}
+
+      {/* Time since last reply */}
+      <Text style={{ fontSize: 12, color: colors.textMuted }}>{timeAgo}</Text>
     </TouchableOpacity>
   );
 }
@@ -263,38 +387,64 @@ function SessionCompleteBar({ message, colors, s }: { message: SessionCompleteMe
 
 function makeStyles(colors: AppColors) {
   return StyleSheet.create({
-    // Slack two-column row
-    row:          { flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 4 },
-    rowGroupStart: { paddingTop: 14 },
+    // ── Outer row: avatar + content, aligned to bottom ────────────────────────
+    row:          { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingVertical: 3, gap: 8 },
+    rowOwn:       { flexDirection: 'row-reverse' },
+    rowGroupStart: { paddingTop: 12 },
 
-    // Left column — 44px (avatar or empty spacer)
-    leftCol:  { width: 44, alignItems: 'center', paddingTop: 2, flexShrink: 0 },
+    // ── Avatar slot (always 36px to reserve space) ───────────────────────────
+    avatarSlot:   { width: 36, flexShrink: 0, alignItems: 'center' },
 
-    // Right column
-    rightCol: { flex: 1, gap: 2 },
+    // ── Content column ────────────────────────────────────────────────────────
+    contentCol:    { flex: 1, alignItems: 'flex-start', gap: 4 },
+    contentColOwn: { alignItems: 'flex-end' },
 
-    // Sender name + timestamp header (group start only)
-    nameRow:    { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginBottom: 1 },
-    senderName: { fontSize: 15, fontWeight: '700' },
-    msgTime:    { fontSize: 12, color: colors.textFaint },
+    // ── Name + time row (inside bubble) ──────────────────────────────────────
+    nameRow:    { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginBottom: 2 },
+    senderName: { fontSize: 14, fontWeight: '700' },
+    msgTime:    { fontSize: 11, color: colors.textFaint },
+    msgTimeOwn: { color: 'rgba(255,255,255,0.6)' },
 
-    // Plain text content (no bubble background)
-    textContent: { fontSize: 15, lineHeight: 22, color: colors.text },
+    // ── Message bubble ────────────────────────────────────────────────────────
+    bubble: {
+      maxWidth: '85%',
+      borderRadius: 18,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+    },
+    bubbleOther: {
+      backgroundColor: colors.card,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.border,
+      // Slight shadow for depth
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.06,
+      shadowRadius: 3,
+      elevation: 1,
+    },
+    bubbleOwn: {
+      backgroundColor: colors.teal,
+    },
 
-    // File attachment
-    fileWrap: { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 10, marginTop: 2 },
+    // ── Text inside bubble ────────────────────────────────────────────────────
+    textContent:    { fontSize: 15, lineHeight: 22, color: colors.text },
+    textContentOwn: { color: '#fff' },
+
+    // ── File attachment (inside bubble for others, inverted for own) ──────────
+    fileWrap: { gap: 8 },
     fileRow:  { flexDirection: 'row', alignItems: 'center', gap: 10 },
     fileIcon: { width: 36, height: 36, borderRadius: 8, backgroundColor: colors.tealBg, alignItems: 'center', justifyContent: 'center' },
 
-    // Audio player
-    audioWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 10, marginTop: 2 },
+    // ── Audio player ──────────────────────────────────────────────────────────
+    audioRow:  { flexDirection: 'row', alignItems: 'center', gap: 10 },
     playBtn:   { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
 
-    // Image placeholder
-    imagePlaceholder: { width: 200, height: 150, borderRadius: 10, backgroundColor: colors.border, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
+    // ── Image placeholder ─────────────────────────────────────────────────────
+    imagePlaceholder: { width: 200, height: 150, borderRadius: 10, backgroundColor: colors.border, alignItems: 'center', justifyContent: 'center' },
 
-    // Structured cards
-    card:            { borderWidth: 1, borderRadius: 16, padding: 14, gap: 4, marginTop: 2 },
+    // ── Structured cards (self-contained, no outer bubble) ────────────────────
+    card:            { borderWidth: 1, borderRadius: 16, padding: 14, gap: 4 },
     cardHeader:      { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
     cardHeaderLabel: { fontSize: 13, fontWeight: '700', flex: 1 },
     subjectTag:      { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 },
@@ -313,7 +463,7 @@ function makeStyles(colors: AppColors) {
     progressFill:    { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 4 },
     improvementBadge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start', marginTop: 4 },
 
-    // Session complete divider
+    // ── Session complete divider ───────────────────────────────────────────────
     sessionCompleteRow:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, gap: 10 },
     sessionCompleteLine:   { flex: 1, height: 1 },
     sessionCompleteCenter: { alignItems: 'center', gap: 4 },
@@ -353,36 +503,30 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 }) => {
   const s = useMemo(() => makeStyles(colors), [colors]);
   const type = message.core.type;
-  const senderName = message.core.sender.profile.displayName;
-  const avatarUrl = getAvatarUrl(message);
+  const senderDisplayName = message.core.sender.profile.displayName;
+  const { url: avatarUrl, seed: avatarSeed } = getAvatarInfo(message);
   const time = formatTime(message.core.createdAt);
   const reactions = message.social?.reactions ?? [];
   const threadParentId = (message as { threadParentId?: string }).threadParentId;
-  const nameColor = isOwn ? colors.teal : senderColor(senderName);
+  const thread = !threadParentId ? (message.social?.thread ?? null) : null;
+  const isCard = CARD_TYPES.has(type);
 
-  // ── session-complete: full-width centred divider ──
+  // session-complete: full-width centred divider, no bubble
   if (type === 'session-complete') {
     return <SessionCompleteBar message={message as SessionCompleteMessageVM} colors={colors} s={s} />;
   }
 
-  const renderContent = () => {
-    if (CARD_TYPES.has(type)) {
-      return (
-        <>
-          {type === 'lesson-assignment'   && <AssignmentCard message={message as LessonAssignmentMessageVM} colors={colors} s={s} />}
-          {type === 'session-summary'     && <SessionSummaryCard message={message as SessionSummaryMessageVM} colors={colors} s={s} />}
-          {type === 'progress-update'     && <ProgressCard message={message as ProgressUpdateMessageVM} colors={colors} s={s} />}
-          {type === 'event-reminder'      && <EventCard message={message as EventReminderMessageVM} colors={colors} s={s} />}
-          {type === 'homework-submission' && <HomeworkCard message={message as HomeworkSubmissionMessageVM} colors={colors} s={s} />}
-        </>
-      );
-    }
+  // ── Content inside bubble (or card) ──────────────────────────────────────
+
+  const renderBubbleContent = () => {
     if (type === 'file') {
       const fm = message as FileMessageVM;
       return (
         <View style={s.fileWrap}>
           {!!fm.content?.text && (
-            <Text style={[s.textContent, { marginBottom: 8 }]}>{fm.content.text}</Text>
+            <Text style={[s.textContent, isOwn && s.textContentOwn, { marginBottom: 6 }]}>
+              {fm.content.text}
+            </Text>
           )}
           <TouchableOpacity
             style={s.fileRow}
@@ -390,35 +534,42 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           >
             <View style={s.fileIcon}><Text style={{ fontSize: 18 }}>📎</Text></View>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text }} numberOfLines={1}>{fm.attachment.name}</Text>
-              <Text style={{ fontSize: 11, marginTop: 2, color: colors.textFaint }}>{formatFileSize(fm.attachment.size)}</Text>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: isOwn ? '#fff' : colors.text }} numberOfLines={1}>
+                {fm.attachment.name}
+              </Text>
+              <Text style={{ fontSize: 11, marginTop: 2, color: isOwn ? 'rgba(255,255,255,0.6)' : colors.textFaint }}>
+                {formatFileSize(fm.attachment.size)}
+              </Text>
             </View>
           </TouchableOpacity>
         </View>
       );
     }
+
     if (type === 'audio-recording') {
       const am = message as AudioRecordingMessageVM;
       const mins = Math.floor(am.audio.durationSeconds / 60);
       const secs = am.audio.durationSeconds % 60;
       const duration = `${mins}:${String(secs).padStart(2, '0')}`;
       const waveform = am.audio.waveform ?? [0.3, 0.5, 0.4, 0.7, 0.6, 0.5, 0.4, 0.8, 0.5, 0.3];
+      const waveColor = isOwn ? 'rgba(255,255,255,0.8)' : colors.teal;
       return (
-        <View style={s.audioWrap}>
-          <View style={[s.playBtn, { backgroundColor: colors.teal }]}>
-            <Text style={{ color: colors.tealFg, fontSize: 12, fontWeight: '700' }}>▶</Text>
+        <View style={s.audioRow}>
+          <View style={[s.playBtn, { backgroundColor: isOwn ? 'rgba(255,255,255,0.25)' : colors.teal }]}>
+            <Text style={{ color: isOwn ? '#fff' : colors.tealFg, fontSize: 12, fontWeight: '700' }}>▶</Text>
           </View>
           <View style={{ flex: 1, gap: 4 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, height: 24 }}>
               {waveform.map((v, i) => (
-                <View key={i} style={{ width: 3, height: Math.max(4, v * 24), backgroundColor: colors.teal, borderRadius: 2 }} />
+                <View key={i} style={{ width: 3, height: Math.max(4, v * 24), backgroundColor: waveColor, borderRadius: 2 }} />
               ))}
             </View>
-            <Text style={{ color: colors.textFaint, fontSize: 11 }}>{duration}</Text>
+            <Text style={{ color: isOwn ? 'rgba(255,255,255,0.6)' : colors.textFaint, fontSize: 11 }}>{duration}</Text>
           </View>
         </View>
       );
     }
+
     if (type === 'image') {
       return (
         <View style={s.imagePlaceholder}>
@@ -427,33 +578,84 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         </View>
       );
     }
+
     // Default: plain text
     const text = (message as { content?: { text?: string } }).content?.text ?? '';
-    return <Text style={s.textContent}>{text}</Text>;
+    return <Text style={[s.textContent, isOwn && s.textContentOwn]}>{text}</Text>;
   };
+
+  // ── Card messages (lesson-assignment, session-summary, etc.) ──────────────
+  // Cards manage their own visual styling; we just align them correctly.
+
+  if (isCard) {
+    return (
+      <Pressable
+        onLongPress={() => onLongPress?.(message)}
+        delayLongPress={350}
+        style={[s.row, isOwn && s.rowOwn, isGroupStart && s.rowGroupStart]}
+      >
+        <View style={s.avatarSlot}>
+          {isGroupStart && <MessageAvatar name={senderDisplayName} src={avatarUrl} seed={avatarSeed} />}
+        </View>
+        <View style={[s.contentCol, isOwn && s.contentColOwn]}>
+          {isGroupStart && (
+            <View style={s.nameRow}>
+              <Text style={[s.senderName, { color: isOwn ? colors.teal : senderColor(senderDisplayName) }]}>
+                {isOwn ? 'You' : senderDisplayName}
+              </Text>
+              <Text style={s.msgTime}>{time}</Text>
+            </View>
+          )}
+          {type === 'lesson-assignment'   && <AssignmentCard message={message as LessonAssignmentMessageVM} colors={colors} s={s} />}
+          {type === 'session-summary'     && <SessionSummaryCard message={message as SessionSummaryMessageVM} colors={colors} s={s} />}
+          {type === 'progress-update'     && <ProgressCard message={message as ProgressUpdateMessageVM} colors={colors} s={s} />}
+          {type === 'event-reminder'      && <EventCard message={message as EventReminderMessageVM} colors={colors} s={s} />}
+          {type === 'homework-submission' && <HomeworkCard message={message as HomeworkSubmissionMessageVM} colors={colors} s={s} />}
+          {reactions.length > 0 && (
+            <ReactionRow
+              reactions={reactions}
+              colors={colors}
+              messageId={message.ids.id}
+              onReactionToggle={onReactionToggle}
+            />
+          )}
+          {thread && onThreadOpen && (
+            <ThreadReplyPill thread={thread} colors={colors} onPress={() => onThreadOpen(message)} />
+          )}
+        </View>
+      </Pressable>
+    );
+  }
+
+  // ── Bubble messages (text, file, audio, image) ────────────────────────────
 
   return (
     <Pressable
       onLongPress={() => onLongPress?.(message)}
       delayLongPress={350}
-      style={[s.row, isGroupStart && s.rowGroupStart]}
+      style={[s.row, isOwn && s.rowOwn, isGroupStart && s.rowGroupStart]}
     >
-      {/* Left column: avatar for group start, empty spacer for continuations */}
-      <View style={s.leftCol}>
-        {isGroupStart && <Avatar name={senderName} src={avatarUrl} size="sm" />}
+      {/* Avatar slot */}
+      <View style={s.avatarSlot}>
+        {isGroupStart && <MessageAvatar name={senderDisplayName} src={avatarUrl} seed={avatarSeed} />}
       </View>
 
-      {/* Right column */}
-      <View style={s.rightCol}>
-        {isGroupStart && (
-          <View style={s.nameRow}>
-            <Text style={[s.senderName, { color: nameColor }]}>{senderName}</Text>
-            <Text style={s.msgTime}>{time}</Text>
-          </View>
-        )}
+      {/* Content column */}
+      <View style={[s.contentCol, isOwn && s.contentColOwn]}>
+        {/* Bubble */}
+        <View style={[s.bubble, isOwn ? s.bubbleOwn : s.bubbleOther]}>
+          {isGroupStart && (
+            <View style={s.nameRow}>
+              <Text style={[s.senderName, { color: isOwn ? 'rgba(255,255,255,0.75)' : senderColor(senderDisplayName) }]}>
+                {isOwn ? 'You' : senderDisplayName}
+              </Text>
+              <Text style={[s.msgTime, isOwn && s.msgTimeOwn]}>{time}</Text>
+            </View>
+          )}
+          {renderBubbleContent()}
+        </View>
 
-        {renderContent()}
-
+        {/* Reactions below bubble */}
         {reactions.length > 0 && (
           <ReactionRow
             reactions={reactions}
@@ -463,8 +665,9 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           />
         )}
 
-        {!threadParentId && onThreadOpen && (
-          <ThreadIndicator colors={colors} onPress={() => onThreadOpen(message)} />
+        {/* Thread reply pill */}
+        {thread && onThreadOpen && (
+          <ThreadReplyPill thread={thread} colors={colors} onPress={() => onThreadOpen(message)} />
         )}
       </View>
     </Pressable>

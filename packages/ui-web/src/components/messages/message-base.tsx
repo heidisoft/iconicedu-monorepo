@@ -68,45 +68,83 @@ export const MessageBase = memo(function MessageBase({
 
   const senderName = getProfileDisplayName(message.core.sender.profile);
   const isOwnMessage = currentUserId === message.core.sender.ids.id;
+  const senderLabel = isOwnMessage ? 'You' : senderName;
 
   if (message.state?.isHidden) {
     return (
-      <div className="group relative flex items-start gap-3 rounded-xl px-2 py-1.5">
-        <button
-          onClick={handleProfileClick}
-          className="flex-shrink-0 transition-opacity hover:opacity-80"
-          aria-label={`View ${senderName}'s profile`}
+      <div
+        className={cn(
+          'group relative flex w-full items-start gap-3 px-2 py-1.5',
+          isOwnMessage ? 'justify-end' : 'justify-start',
+        )}
+      >
+        <div
+          className={cn(
+            'flex w-full max-w-[min(78ch,85%)] items-start gap-3',
+            isOwnMessage ? 'flex-row-reverse' : 'flex-row',
+          )}
         >
+          <button
+            onClick={handleProfileClick}
+            className="flex-shrink-0 transition-opacity hover:opacity-80"
+            aria-label={`View ${senderName}'s profile`}
+          >
             <AvatarWithStatus
               name={senderName}
               avatar={message.core.sender.profile.avatar}
-            themeKey={message.core.sender.ui?.themeKey}
-            sizeClassName="h-9 w-9"
-            initialsLength={1}
-          />
-        </button>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap mb-1">
-            <button
-              onClick={handleProfileClick}
-              className="text-sm font-semibold text-foreground hover:underline"
+              themeKey={message.core.sender.ui?.themeKey}
+              sizeClassName="h-9 w-9"
+              initialsLength={1}
+            />
+          </button>
+          <div className="flex-1 min-w-0">
+            <div
+              className={cn(
+                'mb-1 flex items-center gap-2',
+                isOwnMessage ? 'justify-end' : 'justify-start',
+              )}
             >
-                  {senderName}
-            </button>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
+              {isOwnMessage ? (
+                <>
                   <span className="text-xs text-muted-foreground cursor-default">
                     {formatTime(message.core.createdAt)}
                   </span>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{formatFullDate(message.core.createdAt)}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+                  <button
+                    onClick={handleProfileClick}
+                    className="text-sm font-semibold text-primary hover:underline"
+                  >
+                    {senderLabel}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={handleProfileClick}
+                    className="text-sm font-semibold text-primary hover:underline"
+                  >
+                    {senderLabel}
+                  </button>
+                  <span className="text-xs text-muted-foreground cursor-default">
+                    {formatTime(message.core.createdAt)}
+                  </span>
+                </>
+              )}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="sr-only">{formatTime(message.core.createdAt)}</span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{formatFullDate(message.core.createdAt)}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            <HiddenMessagePlaceholder
+              onUnhide={onToggleHidden}
+              canUnhide={isOwnMessage}
+            />
           </div>
-          <HiddenMessagePlaceholder onUnhide={onToggleHidden} canUnhide={isOwnMessage} />
         </div>
       </div>
     );
@@ -115,7 +153,8 @@ export const MessageBase = memo(function MessageBase({
   return (
     <div
       className={cn(
-        'group relative flex items-start gap-3 rounded-xl px-4 py-2 transition-colors hover:bg-muted/50',
+        'group relative flex w-full items-start gap-3 px-2 py-2 transition-colors',
+        isOwnMessage ? 'justify-end' : 'justify-start',
         className,
       )}
       onMouseEnter={() => setIsHovered(true)}
@@ -126,57 +165,113 @@ export const MessageBase = memo(function MessageBase({
       }}
       data-message-id={message.ids.id}
     >
-      <button
-        onClick={handleProfileClick}
-        className="flex-shrink-0 transition-opacity hover:opacity-80"
-          aria-label={`View ${senderName}'s profile`}
+      <div
+        className={cn(
+          'flex w-full max-w-[min(78ch,85%)] items-start gap-3',
+          isOwnMessage ? 'flex-row-reverse' : 'flex-row',
+        )}
       >
+        <button
+          onClick={handleProfileClick}
+          className="flex-shrink-0 transition-opacity hover:opacity-80"
+          aria-label={`View ${senderName}'s profile`}
+        >
           <AvatarWithStatus
             name={senderName}
             avatar={message.core.sender.profile.avatar}
-          themeKey={message.core.sender.ui?.themeKey}
-          sizeClassName="h-9 w-9"
-          initialsLength={1}
-        />
-      </button>
-
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={handleProfileClick}
-            className="text-sm font-semibold text-foreground hover:underline"
-          >
-            {senderName}
-          </button>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="text-xs text-muted-foreground cursor-default">
-                  {formatTime(message.core.createdAt)}
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{formatFullDate(message.core.createdAt)}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          <VisibilityBadge message={message} />
-          {message.state?.isEdited && (
-            <span className="text-[10px] text-muted-foreground">(edited)</span>
-          )}
-        </div>
-
-        {children}
-
-          <ReactionBar reactions={message.social.reactions} onToggleReaction={handleToggleReaction} />
-
-        {message.social.thread && !isThreadReply && (
-          <ThreadIndicator
-            thread={message.social.thread}
-            onClick={handleThreadClick}
-            unreadCount={message.social.thread.readState?.unreadCount}
+            themeKey={message.core.sender.ui?.themeKey}
+            sizeClassName="h-9 w-9"
+            initialsLength={1}
           />
-        )}
+        </button>
+
+        <div className="min-w-0 flex-1">
+          <div
+            className={cn(
+              'mb-2 flex items-center gap-2',
+              isOwnMessage ? 'justify-end' : 'justify-start',
+            )}
+          >
+            {isOwnMessage ? (
+              <>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="cursor-default text-xs text-muted-foreground/90">
+                        {formatTime(message.core.createdAt)}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{formatFullDate(message.core.createdAt)}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <button
+                  onClick={handleProfileClick}
+                  className="text-sm font-semibold text-muted-foreground/80 hover:underline"
+                >
+                  {senderLabel}
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={handleProfileClick}
+                  className="text-sm font-semibold text-primary hover:underline"
+                >
+                  {senderLabel}
+                </button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="cursor-default text-xs text-muted-foreground/90">
+                        {formatTime(message.core.createdAt)}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{formatFullDate(message.core.createdAt)}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </>
+            )}
+            <VisibilityBadge message={message} />
+            {message.state?.isEdited && (
+              <span className={cn('text-[10px]', 'text-muted-foreground')}>(edited)</span>
+            )}
+          </div>
+
+          <div
+            className={cn(
+              'w-full rounded-[12px] px-5 py-4 shadow-sm',
+              isOwnMessage
+                ? 'bg-primary/22 text-foreground'
+                : 'bg-muted/45 text-foreground',
+            )}
+          >
+            {children}
+          </div>
+
+          <div
+            className={cn(
+              'mt-2 flex flex-wrap gap-2',
+              isOwnMessage ? 'justify-end' : 'justify-start',
+            )}
+          >
+            <ReactionBar
+              reactions={message.social.reactions}
+              onToggleReaction={handleToggleReaction}
+            />
+
+            {message.social.thread && !isThreadReply && (
+              <ThreadIndicator
+                thread={message.social.thread}
+                onClick={handleThreadClick}
+                unreadCount={message.social.thread.readState?.unreadCount}
+              />
+            )}
+          </div>
+        </div>
       </div>
 
       {(isHovered || isDropdownOpen) && (

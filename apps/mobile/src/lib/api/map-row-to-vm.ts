@@ -1,19 +1,17 @@
-import type { MessageVM, UserProfileVM, ReactionVM } from '@iconicedu/shared-types';
+import type { MessageVM, UserProfileVM, ReactionVM, ThreadVM } from '@iconicedu/shared-types';
 
-// Raw shape returned by Supabase when selecting * from messages + sender join.
-// The `content` JSONB column stores the type-specific payload inline
-// (text messages store { text }, rich types store their full payload object).
+// Raw shape returned by Supabase when selecting from messages + sender join.
+// The messages table has NO `content` column — payloads live in separate
+// type-specific tables (message_text, message_image, etc.) with a `payload` jsonb column.
 export type RawMessageRow = {
   id: string;
   org_id: string;
   channel_id: string;
   sender_profile_id: string;
   type: string;
-  content: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
   thread_parent_id?: string | null;
-  reactions?: Array<{ emoji: string; profile_id: string }> | null;
   sender: {
     id: string;
     display_name: string | null;
@@ -24,8 +22,16 @@ export type RawMessageRow = {
   };
 };
 
-function buildSenderProfile(
-  sender: RawMessageRow['sender'],
+export type RawSenderProfile = RawMessageRow['sender'];
+
+export type ThreadStats = {
+  messageCount: number;
+  lastReplyAt: string;
+  participants: RawSenderProfile[];
+};
+
+export function buildSenderProfile(
+  sender: RawSenderProfile,
   orgId: string,
 ): UserProfileVM {
   const displayName =
@@ -46,33 +52,35 @@ function buildSenderProfile(
   } as unknown as UserProfileVM;
 }
 
-function buildReactions(
-  rawReactions: Array<{ emoji: string; profile_id: string }> | null | undefined,
-  currentProfileId: string,
-): ReactionVM[] {
-  if (!rawReactions?.length) return [];
-
-  // Group reactions by emoji
-  const grouped = new Map<string, string[]>();
-  for (const r of rawReactions) {
-    const existing = grouped.get(r.emoji) ?? [];
-    existing.push(r.profile_id);
-    grouped.set(r.emoji, existing);
-  }
-
-  return Array.from(grouped.entries()).map(([emoji, profileIds]) => ({
-    emoji,
-    count: profileIds.length,
-    reactedByMe: currentProfileId ? profileIds.includes(currentProfileId) : false,
-    sampleUserIds: profileIds.slice(0, 5),
-  }));
-}
-
-export function mapRowToMessageVM(row: RawMessageRow, currentProfileId = ''): MessageVM {
-  const c = row.content ?? {};
+/**
+ * Map a raw messages row + its payload (from the type-specific table) + reactions
+ * into a MessageVM. Callers are responsible for fetching and passing the payload
+ * and reactions separately (multi-step query pattern mirrors apps/web/lib/messages/).
+ * Pass threadStats for top-level messages to populate social.thread.
+ */
+export function mapRowToMessageVM(
+  row: RawMessageRow,
+  payload: Record<string, unknown> | null,
+  reactions: ReactionVM[],
+  threadStats?: ThreadStats,
+): MessageVM {
+  const c = payload ?? {};
   const sender = buildSenderProfile(row.sender, row.org_id);
   const previewText = String(c.text ?? '');
-  const reactions = buildReactions(row.reactions, currentProfileId);
+
+  const thread: ThreadVM | undefined = threadStats
+    ? {
+        ids: { id: row.id, orgId: row.org_id },
+        parent: { messageId: row.id },
+        stats: {
+          messageCount: threadStats.messageCount,
+          lastReplyAt: threadStats.lastReplyAt,
+        },
+        participants: threadStats.participants.map((p) =>
+          buildSenderProfile(p, row.org_id),
+        ),
+      }
+    : undefined;
 
   const base = {
     ids: { id: row.id, orgId: row.org_id },
@@ -82,13 +90,11 @@ export function mapRowToMessageVM(row: RawMessageRow, currentProfileId = ''): Me
       createdAt: row.created_at,
       visibility: { type: 'all' as const },
     },
-    social: { reactions },
+    social: { reactions, ...(thread ? { thread } : {}) },
     ...(row.thread_parent_id ? { threadParentId: row.thread_parent_id } : {}),
   };
 
-  // Each rich type stores its full payload object inside the content JSONB column.
-  // For text messages the mobile inserts `content: { text }` directly.
-  // For web-created rich messages, content holds the nested payload key.
+  // The payload object IS the full type-specific payload (from message_text.payload etc.)
   switch (row.type) {
     case 'text':
       return { ...base, content: { text: previewText } } as MessageVM;
@@ -97,81 +103,81 @@ export function mapRowToMessageVM(row: RawMessageRow, currentProfileId = ''): Me
       return {
         ...base,
         content: { text: previewText },
-        assignment: c.assignment ?? c,
+        assignment: c,
       } as MessageVM;
 
     case 'homework-submission':
       return {
         ...base,
         content: { text: previewText },
-        homework: c.homework ?? c,
+        homework: c,
       } as MessageVM;
 
     case 'progress-update':
       return {
         ...base,
         content: { text: previewText },
-        progress: c.progress ?? c,
+        progress: c,
       } as MessageVM;
 
     case 'event-reminder':
       return {
         ...base,
         content: { text: previewText },
-        event: c.event ?? c,
+        event: c,
       } as MessageVM;
 
     case 'session-summary':
       return {
         ...base,
         content: { text: previewText },
-        session: c.session ?? c,
+        session: c,
       } as MessageVM;
 
     case 'session-complete':
       return {
         ...base,
         content: { text: previewText },
-        session: c.session ?? c,
+        session: c,
       } as MessageVM;
 
     case 'session-booking':
       return {
         ...base,
         content: { text: previewText },
-        booking: c.booking ?? c,
+        booking: c,
       } as MessageVM;
 
     case 'payment-reminder':
       return {
         ...base,
         content: { text: previewText },
-        payment: c.payment ?? c,
+        payment: c,
       } as MessageVM;
 
     case 'feedback-request':
       return {
         ...base,
         content: { text: previewText },
-        feedback: c.feedback ?? c,
+        feedback: c,
       } as MessageVM;
 
     case 'image':
       return {
         ...base,
         content: { text: previewText },
-        attachment: c.attachment ?? c,
+        attachment: c,
       } as MessageVM;
 
     case 'file':
       return {
         ...base,
         content: { text: previewText },
-        attachment: c.attachment ?? c,
+        attachment: c,
       } as MessageVM;
 
     case 'audio-recording':
-      return { ...base, audio: c.audio ?? c } as MessageVM;
+      return { ...base, audio: c } as MessageVM;
 
     default:
       return { ...base, content: { text: previewText } } as MessageVM;

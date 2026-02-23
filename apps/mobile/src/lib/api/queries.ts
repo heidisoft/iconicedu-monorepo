@@ -4,8 +4,9 @@ import type {
   ChannelVM,
   LearningSpaceVM,
   MessageVM,
+  ReactionVM,
 } from '@iconicedu/shared-types';
-import { mapRowToMessageVM, type RawMessageRow } from './map-row-to-vm';
+import { mapRowToMessageVM, type RawMessageRow, type ThreadStats, type RawSenderProfile } from './map-row-to-vm';
 
 export const queryKeys = {
   profile: (profileId: string) => ['profile', profileId] as const,
@@ -212,21 +213,157 @@ export async function fetchChannels(orgId: string): Promise<ChannelListItem[]> {
   });
 }
 
-const MESSAGE_SELECT = `
-  id, org_id, channel_id, sender_profile_id, type, content, created_at, updated_at, thread_parent_id,
-  sender:profiles!sender_profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed),
-  reactions:message_reactions(emoji, profile_id)
+// messages table has no `content` column — payloads are in type-specific tables.
+// Only select columns that actually exist on the messages table.
+const BASE_MESSAGE_SELECT = `
+  id, org_id, channel_id, sender_profile_id, type, created_at, updated_at, thread_parent_id,
+  sender:profiles!sender_profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed)
 `;
+
+/** message type → payload table name */
+const TYPE_TABLE: Record<string, string> = {
+  'text':                 'message_text',
+  'image':                'message_image',
+  'file':                 'message_file',
+  'audio-recording':      'message_audio_recording',
+  'lesson-assignment':    'message_lesson_assignment',
+  'homework-submission':  'message_homework_submission',
+  'progress-update':      'message_progress_update',
+  'event-reminder':       'message_event_reminder',
+  'session-summary':      'message_session_summary',
+  'session-complete':     'message_session_complete',
+  'session-booking':      'message_session_booking',
+  'payment-reminder':     'message_payment_reminder',
+  'feedback-request':     'message_feedback_request',
+};
+
+/** Batch-fetch payloads from type-specific tables, grouped by message_id. */
+async function loadPayloads(
+  rows: Array<{ id: string; type: string }>,
+): Promise<Map<string, Record<string, unknown>>> {
+  const byType = new Map<string, string[]>();
+  for (const row of rows) {
+    const bucket = byType.get(row.type) ?? [];
+    bucket.push(row.id);
+    byType.set(row.type, bucket);
+  }
+
+  const payloadMap = new Map<string, Record<string, unknown>>();
+  const fetches: Promise<void>[] = [];
+
+  for (const [type, ids] of byType) {
+    const table = TYPE_TABLE[type];
+    if (!table) continue;
+    fetches.push(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (supabase as any)
+        .from(table)
+        .select('message_id, payload')
+        .in('message_id', ids)
+        .is('deleted_at', null)
+        .then(({ data }: { data: Array<{ message_id: string; payload: Record<string, unknown> }> | null }) => {
+          for (const row of data ?? []) {
+            payloadMap.set(row.message_id, row.payload);
+          }
+        }),
+    );
+  }
+
+  await Promise.all(fetches);
+  return payloadMap;
+}
+
+/** Fetch message_reactions rows and group into ReactionVM[] per message_id. */
+async function loadReactions(
+  messageIds: string[],
+  currentAccountId: string,
+): Promise<Map<string, ReactionVM[]>> {
+  if (!messageIds.length) return new Map();
+
+  const { data: reactionRows } = await supabase
+    .from('message_reactions')
+    .select('message_id, emoji, account_id')
+    .in('message_id', messageIds)
+    .is('deleted_at', null);
+
+  const grouped = new Map<string, Array<{ emoji: string; account_id: string }>>();
+  for (const r of (reactionRows ?? []) as Array<{ message_id: string; emoji: string; account_id: string }>) {
+    const bucket = grouped.get(r.message_id) ?? [];
+    bucket.push({ emoji: r.emoji, account_id: r.account_id });
+    grouped.set(r.message_id, bucket);
+  }
+
+  const result = new Map<string, ReactionVM[]>();
+  for (const [messageId, rawReactions] of grouped) {
+    const byEmoji = new Map<string, string[]>();
+    for (const r of rawReactions) {
+      const accounts = byEmoji.get(r.emoji) ?? [];
+      accounts.push(r.account_id);
+      byEmoji.set(r.emoji, accounts);
+    }
+    result.set(
+      messageId,
+      Array.from(byEmoji.entries()).map(([emoji, accountIds]) => ({
+        emoji,
+        count: accountIds.length,
+        reactedByMe: currentAccountId ? accountIds.includes(currentAccountId) : false,
+        sampleUserIds: accountIds.slice(0, 5),
+      })),
+    );
+  }
+  return result;
+}
+
+/** Fetch thread reply stats (count, last reply time, unique participants) for a set of parent message IDs. */
+async function loadThreadStats(
+  parentMessageIds: string[],
+): Promise<Map<string, ThreadStats>> {
+  if (!parentMessageIds.length) return new Map();
+
+  const { data: replyRows } = await supabase
+    .from('messages')
+    .select(
+      'thread_parent_id, created_at, sender:profiles!sender_profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed)',
+    )
+    .in('thread_parent_id', parentMessageIds)
+    .is('deleted_at', null);
+
+  const result = new Map<string, ThreadStats>();
+
+  for (const reply of (replyRows ?? []) as Array<{
+    thread_parent_id: string;
+    created_at: string;
+    sender: RawSenderProfile | null;
+  }>) {
+    if (!reply.sender) continue;
+    const entry = result.get(reply.thread_parent_id) ?? {
+      messageCount: 0,
+      lastReplyAt: '',
+      participants: [] as RawSenderProfile[],
+    };
+    entry.messageCount++;
+    if (!entry.lastReplyAt || reply.created_at > entry.lastReplyAt) {
+      entry.lastReplyAt = reply.created_at;
+    }
+    if (!entry.participants.find((p) => p.id === reply.sender!.id)) {
+      entry.participants.push(reply.sender);
+    }
+    result.set(reply.thread_parent_id, entry);
+  }
+
+  return result;
+}
 
 export async function fetchChannelMessages(
   channelId: string,
   currentProfileId = '',
+  currentAccountId = '',
   limit = 40,
   before?: string,
 ): Promise<MessageVM[]> {
   let query = supabase
     .from('messages')
-    .select(MESSAGE_SELECT)
+    .select(BASE_MESSAGE_SELECT)
     .eq('channel_id', channelId)
     .is('deleted_at', null)
     .is('thread_parent_id', null)
@@ -237,36 +374,71 @@ export async function fetchChannelMessages(
     query = query.lt('created_at', before);
   }
 
-  const { data, error } = await query;
+  const { data: rows, error } = await query;
   if (error) throw error;
-  return (data ?? []).reverse().map((row) => mapRowToMessageVM(row as RawMessageRow, currentProfileId));
+  if (!rows || rows.length === 0) return [];
+
+  const typedRows = rows as RawMessageRow[];
+  const messageIds = typedRows.map((r) => r.id);
+
+  const [payloadMap, reactionMap, threadStatsMap] = await Promise.all([
+    loadPayloads(typedRows),
+    loadReactions(messageIds, currentAccountId),
+    loadThreadStats(messageIds),
+  ]);
+
+  return typedRows.reverse().map((row) =>
+    mapRowToMessageVM(
+      row,
+      payloadMap.get(row.id) ?? null,
+      reactionMap.get(row.id) ?? [],
+      threadStatsMap.get(row.id),
+    ),
+  );
 }
 
 export async function fetchThreadMessages(
   threadParentId: string,
   currentProfileId = '',
+  currentAccountId = '',
 ): Promise<MessageVM[]> {
-  const { data, error } = await supabase
+  const { data: rows, error } = await supabase
     .from('messages')
-    .select(MESSAGE_SELECT)
+    .select(BASE_MESSAGE_SELECT)
     .eq('thread_parent_id', threadParentId)
     .is('deleted_at', null)
     .order('created_at', { ascending: true });
 
   if (error) throw error;
-  return (data ?? []).map((row) => mapRowToMessageVM(row as RawMessageRow, currentProfileId));
+  if (!rows || rows.length === 0) return [];
+
+  const typedRows = rows as RawMessageRow[];
+  const messageIds = typedRows.map((r) => r.id);
+
+  const [payloadMap, reactionMap] = await Promise.all([
+    loadPayloads(typedRows),
+    loadReactions(messageIds, currentAccountId),
+  ]);
+
+  return typedRows.map((row) =>
+    mapRowToMessageVM(
+      row,
+      payloadMap.get(row.id) ?? null,
+      reactionMap.get(row.id) ?? [],
+    ),
+  );
 }
 
 export async function toggleReaction(
   messageId: string,
-  profileId: string,
+  accountId: string,
   emoji: string,
 ): Promise<void> {
   const { data: existing } = await supabase
     .from('message_reactions')
     .select('id')
     .eq('message_id', messageId)
-    .eq('profile_id', profileId)
+    .eq('account_id', accountId)
     .eq('emoji', emoji)
     .maybeSingle();
 
@@ -275,12 +447,12 @@ export async function toggleReaction(
       .from('message_reactions')
       .delete()
       .eq('message_id', messageId)
-      .eq('profile_id', profileId)
+      .eq('account_id', accountId)
       .eq('emoji', emoji);
   } else {
     await supabase
       .from('message_reactions')
-      .insert({ message_id: messageId, profile_id: profileId, emoji });
+      .insert({ message_id: messageId, account_id: accountId, emoji });
   }
 }
 
@@ -738,19 +910,30 @@ export async function sendTextMessage(
   text: string,
   threadParentId?: string,
 ) {
-  const { data, error } = await supabase
+  // Insert the messages row first (no content column — schema uses type-specific tables)
+  const { data: msg, error: msgError } = await supabase
     .from('messages')
     .insert({
       channel_id: channelId,
       sender_profile_id: senderProfileId,
       org_id: orgId,
       type: 'text',
-      content: { text },
       thread_parent_id: threadParentId ?? null,
     })
-    .select()
+    .select('id')
     .single();
 
-  if (error) throw error;
-  return data;
+  if (msgError) throw msgError;
+
+  // Insert the text payload into message_text
+  const { error: textError } = await supabase
+    .from('message_text')
+    .insert({
+      message_id: msg.id,
+      org_id: orgId,
+      payload: { text },
+    });
+
+  if (textError) throw textError;
+  return msg;
 }
