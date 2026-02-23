@@ -1,4 +1,5 @@
 import type {
+  ChannelUiDefaultsVM,
   ChannelCapabilityVM,
   ChannelPostingPolicyVM,
   ThemeKey,
@@ -24,7 +25,7 @@ export type ChannelDetail = {
     visibility: string;
     purpose: string;
   };
-  ui: {
+  ui: ChannelUiDefaultsVM & {
     themeKey: ThemeKey | null;
   };
   postingPolicy: ChannelPostingPolicyVM;
@@ -98,6 +99,10 @@ export async function getChannelDetail(channelId: string): Promise<ChannelDetail
     },
     ui: {
       themeKey: (channelResponse.data.ui_theme_key ?? null) as ThemeKey | null,
+      ...(channelResponse.data.ui_defaults &&
+      typeof channelResponse.data.ui_defaults === 'object'
+        ? (channelResponse.data.ui_defaults as Partial<ChannelUiDefaultsVM>)
+        : {}),
     },
     postingPolicy: {
       kind: (channelResponse.data.posting_policy_kind ??

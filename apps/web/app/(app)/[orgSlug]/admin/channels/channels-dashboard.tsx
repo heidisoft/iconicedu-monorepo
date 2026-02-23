@@ -44,7 +44,7 @@ import type {
   ChannelVisibility,
   ChannelCreatePayload,
   ChannelPostingPolicyVM,
-  ThemeKey,
+  ChannelUiDefaultsVM,
   UserProfileVM,
 } from '@iconicedu/shared-types';
 import { ChannelsTable } from '@iconicedu/web/app/(app)/[orgSlug]/admin/channels/channels-table';
@@ -62,7 +62,7 @@ type CreateChannelFormState = {
   kind: string;
   purpose: string;
   visibility: string;
-  themeKey: ThemeKey;
+  uiDefaults: ChannelUiDefaultsVM;
   status: ChannelStatus;
   postingPolicyKind: ChannelPostingPolicyVM['kind'];
   allowThreads: boolean;
@@ -70,6 +70,22 @@ type CreateChannelFormState = {
   participants: UserProfileVM[];
   capabilities: ChannelCapabilityVM[];
 };
+
+function createDefaultChannelUiDefaults(): ChannelUiDefaultsVM {
+  return {
+    themeKey: 'teal',
+    defaultRightPanelOpen: true,
+    defaultRightPanelKey: 'channel_info',
+    infoPanel: {
+      showHeader: true,
+      showDetails: true,
+      showMedia: true,
+      showMembers: true,
+      showQuickActions: true,
+      showHiddenQuickActions: false,
+    },
+  };
+}
 
 export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
   const router = useRouter();
@@ -91,7 +107,7 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
     kind: 'channel',
     purpose: 'general',
     visibility: 'private',
-    themeKey: 'teal',
+    uiDefaults: createDefaultChannelUiDefaults(),
     status: 'active',
     postingPolicyKind: 'members-only',
     allowThreads: true,
@@ -173,7 +189,7 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
       kind: 'channel',
       purpose: 'general',
       visibility: 'private',
-      themeKey: 'teal',
+      uiDefaults: createDefaultChannelUiDefaults(),
       status: 'active',
       postingPolicyKind: 'members-only',
       allowThreads: true,
@@ -193,7 +209,11 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
       kind: detail.basics.kind,
       purpose: detail.basics.purpose,
       visibility: detail.basics.visibility,
-      themeKey: (detail.ui?.themeKey ?? 'teal') as ThemeKey,
+      uiDefaults: {
+        ...createDefaultChannelUiDefaults(),
+        ...(detail.ui ?? {}),
+        themeKey: detail.ui?.themeKey ?? 'teal',
+      },
       status: detail.lifecycle.status,
       postingPolicyKind: detail.postingPolicy.kind,
       allowThreads: detail.postingPolicy.allowThreads ?? true,
@@ -247,7 +267,8 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
           purpose: formState.purpose as ChannelPurpose,
         },
         ui: {
-          themeKey: formState.themeKey ?? null,
+          ...formState.uiDefaults,
+          themeKey: formState.uiDefaults.themeKey ?? null,
         },
         postingPolicy: {
           kind: formState.postingPolicyKind,
@@ -525,9 +546,18 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
               <FieldSeparator />
               <ChannelUiDefaultsSettingsSection
                 themeSelectId="channel-theme-key"
-                uiDefaults={{ themeKey: formState.themeKey }}
+                uiDefaults={formState.uiDefaults}
                 onUiDefaultsChange={(updates) =>
-                  updateFormState({ themeKey: (updates.themeKey ?? 'teal') as ThemeKey })
+                  updateFormState({
+                    uiDefaults: {
+                      ...formState.uiDefaults,
+                      ...updates,
+                      infoPanel: {
+                        ...(formState.uiDefaults.infoPanel ?? {}),
+                        ...(updates.infoPanel ?? {}),
+                      },
+                    },
+                  })
                 }
               />
               {createError ? (

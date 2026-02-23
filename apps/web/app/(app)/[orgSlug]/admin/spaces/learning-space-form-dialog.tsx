@@ -45,6 +45,7 @@ import {
 } from '@iconicedu/ui-web/lib/icons';
 import type { RecurrenceFormData } from '@iconicedu/ui-web/lib/recurrence-types';
 import type {
+  ChannelUiDefaultsVM,
   LearningSpaceCreatePayload,
   LearningSpaceLinkVM,
   ThemeKey,
@@ -120,6 +121,7 @@ type LearningSpaceFormDialogProps = {
     };
     settings?: {
       themeKey?: ThemeKey | null;
+      uiDefaults?: ChannelUiDefaultsVM | null;
     } | null;
     participants: UserProfileVM[];
     resources: LearningSpaceLinkVM[];
@@ -134,11 +136,27 @@ type LearningSpaceFormState = {
   subject: string;
   description: string;
   iconKey: LearningSpaceIconKey;
-  themeKey: ThemeKey;
+  uiDefaults: ChannelUiDefaultsVM;
   participants: UserProfileVM[];
   resources: LearningSpaceLinkVM[];
   schedules: RecurrenceFormData[];
 };
+
+function createDefaultChannelUiDefaults(): ChannelUiDefaultsVM {
+  return {
+    themeKey: 'teal',
+    defaultRightPanelOpen: true,
+    defaultRightPanelKey: 'channel_info',
+    infoPanel: {
+      showHeader: true,
+      showDetails: true,
+      showMedia: true,
+      showMembers: true,
+      showQuickActions: true,
+      showHiddenQuickActions: false,
+    },
+  };
+}
 
 export function LearningSpaceFormDialog({
   participantOptions = [],
@@ -169,7 +187,7 @@ export function LearningSpaceFormDialog({
       subject: '',
       description: '',
       iconKey: DEFAULT_LEARNING_SPACE_ICON_KEY,
-      themeKey: 'teal',
+      uiDefaults: createDefaultChannelUiDefaults(),
       participants: [],
       resources: [],
       schedules: [],
@@ -198,7 +216,11 @@ export function LearningSpaceFormDialog({
         description: initialData.basics.description ?? '',
         iconKey:
           (initialData.basics.iconKey ?? DEFAULT_LEARNING_SPACE_ICON_KEY) as LearningSpaceIconKey,
-        themeKey: (initialData.settings?.themeKey ?? 'teal') as ThemeKey,
+        uiDefaults: {
+          ...createDefaultChannelUiDefaults(),
+          ...(initialData.settings?.uiDefaults ?? {}),
+          themeKey: (initialData.settings?.themeKey ?? 'teal') as ThemeKey,
+        },
         participants: initialData.participants ?? [],
         resources: initialData.resources ?? [],
         schedules: normalizeSchedules(initialData.schedules ?? []),
@@ -245,7 +267,8 @@ export function LearningSpaceFormDialog({
         description: formState.description.trim() || null,
       },
       settings: {
-        themeKey: formState.themeKey ?? null,
+        themeKey: formState.uiDefaults.themeKey ?? null,
+        uiDefaults: formState.uiDefaults,
       },
       participants: mapParticipantsToPayload(formState.participants),
       resources: mapLinksToPayload(formState.resources),
@@ -508,9 +531,18 @@ export function LearningSpaceFormDialog({
                   legend="Settings"
                   themeSelectId="ls-theme-key"
                   description="Sets the accent color used across this learning space message UI."
-                  uiDefaults={{ themeKey: formState.themeKey }}
+                  uiDefaults={formState.uiDefaults}
                   onUiDefaultsChange={(updates) =>
-                    updateFormState({ themeKey: (updates.themeKey ?? 'teal') as ThemeKey })
+                    updateFormState({
+                      uiDefaults: {
+                        ...formState.uiDefaults,
+                        ...updates,
+                        infoPanel: {
+                          ...(formState.uiDefaults.infoPanel ?? {}),
+                          ...(updates.infoPanel ?? {}),
+                        },
+                      },
+                    })
                   }
                 />
               </form>

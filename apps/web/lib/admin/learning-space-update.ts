@@ -7,6 +7,7 @@ import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/acco
 import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
 import { insertClassSchedules } from '@iconicedu/web/lib/admin/learning-space-create';
 import type {
+  ChannelUiDefaultsVM,
   LearningSpaceCreatePayload,
   LearningSpaceParticipantPayload,
   LearningSpaceResourcePayload,
@@ -92,6 +93,7 @@ export async function updateLearningSpaceFromPayload(
     description: payload.basics.description ?? null,
     iconKey: payload.basics.iconKey ?? null,
     uiThemeKey: payload.settings?.themeKey ?? null,
+    uiDefaults: payload.settings?.uiDefaults ?? null,
     updatedBy: actorProfileId,
     updatedAt: now,
   });
@@ -177,6 +179,7 @@ type UpdateChannelPayload = {
   description: string | null;
   iconKey: string | null;
   uiThemeKey: string | null;
+  uiDefaults: ChannelUiDefaultsVM | null | undefined;
   updatedBy: string;
   updatedAt: string;
 };
@@ -189,6 +192,7 @@ async function updateChannel(supabase: SupabaseClient, payload: UpdateChannelPay
       description: payload.description,
       icon_key: payload.iconKey,
       ui_theme_key: payload.uiThemeKey,
+      ui_defaults: payload.uiDefaults ?? null,
       updated_at: payload.updatedAt,
       updated_by: payload.updatedBy,
     })

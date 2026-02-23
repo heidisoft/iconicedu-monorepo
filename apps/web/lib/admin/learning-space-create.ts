@@ -6,6 +6,7 @@ import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service
 import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
 import type {
+  ChannelUiDefaultsVM,
   LearningSpaceCreatePayload,
   LearningSpaceParticipantPayload,
   LearningSpaceResourcePayload,
@@ -89,6 +90,7 @@ export async function createLearningSpaceFromPayload(
     description: payload.basics.description ?? null,
     iconKey: payload.basics.iconKey ?? null,
     uiThemeKey: payload.settings?.themeKey ?? null,
+    uiDefaults: payload.settings?.uiDefaults ?? null,
     primaryEntityId: learningSpaceId,
     createdByProfileId: actorProfileId,
     createdAt: now,
@@ -193,6 +195,7 @@ type ChannelInsertPayload = {
   iconKey: string | null;
   description: string | null;
   uiThemeKey: string | null;
+  uiDefaults: ChannelUiDefaultsVM | null | undefined;
   primaryEntityId: string;
   createdByProfileId: string;
   createdAt: string;
@@ -213,6 +216,7 @@ async function insertChannel(supabase: SupabaseClient, payload: ChannelInsertPay
     allow_threads: true,
     allow_reactions: true,
     ui_theme_key: payload.uiThemeKey,
+    ui_defaults: payload.uiDefaults ?? null,
     primary_entity_kind: 'learning_space',
     primary_entity_id: payload.primaryEntityId,
     created_by_profile_id: payload.createdByProfileId,

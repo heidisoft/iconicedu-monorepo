@@ -1,4 +1,5 @@
 import type {
+  ChannelUiDefaultsVM,
   ClassScheduleRecurrenceExceptionRow,
   ClassScheduleRecurrenceOverrideRow,
   ClassScheduleRecurrenceRow,
@@ -7,6 +8,7 @@ import type {
   LearningSpaceLinkVM,
   LearningSpaceParticipantRow,
   LearningSpaceRow,
+  ThemeKey,
   UserProfileVM,
 } from '@iconicedu/shared-types';
 import type { RecurrenceFormData, WeekdayVM } from '@iconicedu/ui-web/lib/recurrence-types';
@@ -26,7 +28,8 @@ export type LearningSpaceDetail = {
     description: string | null;
   };
   settings: {
-    themeKey: string | null;
+    themeKey: ThemeKey | null;
+    uiDefaults?: ChannelUiDefaultsVM | null;
   };
   participants: UserProfileVM[];
   resources: LearningSpaceLinkVM[];
@@ -112,20 +115,25 @@ export async function getLearningSpaceDetail(learningSpaceId: string) {
   }
 
   const primaryChannelId = channelLinksResponse.data?.channel_id ?? null;
-  let channelThemeKey: string | null = null;
+  let channelThemeKey: ThemeKey | null = null;
+  let channelUiDefaults: ChannelUiDefaultsVM | null = null;
   if (primaryChannelId) {
     const { data: channel, error: channelError } = await supabase
       .from('channels')
-      .select('ui_theme_key')
+      .select('ui_theme_key, ui_defaults')
       .eq('org_id', orgId)
       .eq('id', primaryChannelId)
       .is('deleted_at', null)
-      .maybeSingle<{ ui_theme_key?: string | null }>();
+      .maybeSingle<{ ui_theme_key?: string | null; ui_defaults?: unknown }>();
 
     if (channelError) {
       throw new Error(channelError.message);
     }
-    channelThemeKey = channel?.ui_theme_key ?? null;
+    channelThemeKey = (channel?.ui_theme_key ?? null) as ThemeKey | null;
+    channelUiDefaults =
+      channel?.ui_defaults && typeof channel.ui_defaults === 'object'
+        ? (channel.ui_defaults as ChannelUiDefaultsVM)
+        : null;
   }
 
   const participantProfiles = await Promise.all(
@@ -148,6 +156,7 @@ export async function getLearningSpaceDetail(learningSpaceId: string) {
     },
     settings: {
       themeKey: channelThemeKey,
+      uiDefaults: channelUiDefaults,
     },
     participants,
     resources: (linksResponse.data ?? []).map(mapLearningSpaceLinkRow),

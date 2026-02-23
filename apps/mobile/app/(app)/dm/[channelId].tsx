@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { MessageVM } from '@iconicedu/shared-types';
@@ -95,7 +95,11 @@ export default function DmConversationScreen() {
         kind="dm"
         onBack={() => router.back()}
       />
-      <View style={[styles.flex, { backgroundColor: colors.pageBg }]}>
+      <KeyboardAvoidingView
+        style={[styles.flex, { backgroundColor: colors.pageBg }]}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
+      >
         <MessageList
           messages={messages ?? []}
           currentProfileId={profileId}
@@ -111,7 +115,7 @@ export default function DmConversationScreen() {
           placeholder={`Message ${topic ?? ''}…`}
           onTypingChange={broadcastTyping}
         />
-      </View>
+      </KeyboardAvoidingView>
 
       {/* Long-press actions sheet */}
       <MessageActionsSheet

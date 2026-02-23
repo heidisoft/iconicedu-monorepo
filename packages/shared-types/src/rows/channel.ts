@@ -17,6 +17,7 @@ export interface ChannelRow {
   primary_entity_kind?: string | null;
   primary_entity_id?: UUID | null;
   ui_theme_key?: string | null;
+  ui_defaults?: Record<string, unknown> | null;
   created_by_profile_id?: UUID | null;
   created_at: ISODateTime;
   archived_at?: ISODateTime | null;

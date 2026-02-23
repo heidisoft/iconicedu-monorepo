@@ -1,13 +1,12 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
   TextInput,
-  KeyboardAvoidingView,
-  Platform,
   TouchableOpacity,
   StyleSheet,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 import { EmojiPicker } from './emoji-picker';
@@ -19,63 +18,90 @@ type MessageInputProps = {
   onTypingChange?: () => void;
 };
 
-function makeStyles(C: AppColors) {
+function makeStyles(C: AppColors, bottomInset: number) {
   return StyleSheet.create({
-    avoid: {},
-    row: {
+    bar: {
       flexDirection: 'row',
       alignItems: 'flex-end',
-      gap: 8,
+      gap: 10,
       paddingHorizontal: 12,
       paddingTop: 10,
-      paddingBottom: Platform.OS === 'ios' ? 24 : 12,
-      borderTopWidth: 1,
-      borderTopColor: C.border,
+      // Respect home-indicator inset; keyboard hides it so insets.bottom → 0 when open
+      paddingBottom: Math.max(bottomInset, 12),
       backgroundColor: C.bg,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: C.border,
     },
 
-    // Emoji / attachment button (left)
-    sideBtn: {
-      width: 36, height: 36, borderRadius: 18,
-      backgroundColor: C.inputBg,
-      borderWidth: 1, borderColor: C.border,
-      alignItems: 'center', justifyContent: 'center',
-      marginBottom: 2,
+    // "+" attachment button — left of pill
+    addBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: C.card,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: C.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 0,
     },
-    sideTxt: { fontSize: 18, lineHeight: 22 },
+    addTxt: {
+      fontSize: 24,
+      lineHeight: 28,
+      color: C.textMuted,
+      fontWeight: '300',
+      includeFontPadding: false,
+    },
 
-    // Slack-style rectangular input
-    inputWrap: {
+    // Pill input row
+    pill: {
       flex: 1,
       flexDirection: 'row',
       alignItems: 'flex-end',
       backgroundColor: C.inputBg,
-      borderRadius: 8,
-      borderWidth: 1,
+      borderRadius: 22,
+      borderWidth: StyleSheet.hairlineWidth,
       borderColor: C.border,
-      paddingHorizontal: 14,
-      paddingVertical: 0,
+      paddingLeft: 16,
+      paddingRight: 6,
+      paddingVertical: 8,
       minHeight: 40,
     },
     input: {
       flex: 1,
       fontSize: 15,
       color: C.text,
-      paddingTop: Platform.OS === 'ios' ? 10 : 8,
-      paddingBottom: Platform.OS === 'ios' ? 10 : 8,
-      maxHeight: 100,
+      lineHeight: 20,
+      maxHeight: 120,
+      paddingVertical: 0,
     },
 
-    // Send / Mic button (right)
-    actionBtn: {
-      width: 36, height: 36, borderRadius: 18,
-      alignItems: 'center', justifyContent: 'center',
-      marginBottom: 2,
+    // Smiley inside pill — right side
+    emojiBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: 4,
     },
-    sendBtn:  { backgroundColor: C.teal },
-    micBtn:   { backgroundColor: C.inputBg, borderWidth: 1, borderColor: C.border },
-    sendTxt:  { color: C.tealFg, fontSize: 15, fontWeight: '700' },
-    micTxt:   { fontSize: 16, color: C.textMuted },
+    emojiTxt: { fontSize: 20 },
+
+    // Send button — right of pill (only shown when text present)
+    sendBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: C.teal,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    sendTxt: {
+      color: C.tealFg,
+      fontSize: 20,
+      fontWeight: '700',
+      includeFontPadding: false,
+    },
   });
 }
 
@@ -88,7 +114,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const [text, setText] = useState('');
   const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
   const { colors } = useTheme();
-  const s = React.useMemo(() => makeStyles(colors), [colors]);
+  const insets = useSafeAreaInsets();
+  const inputRef = useRef<TextInput>(null);
+  const s = React.useMemo(() => makeStyles(colors, insets.bottom), [colors, insets.bottom]);
 
   const handleSend = useCallback(async () => {
     const trimmed = text.trim();
@@ -107,63 +135,61 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
   const handleEmojiSelect = useCallback((emoji: string) => {
     setText((prev) => prev + emoji);
+    inputRef.current?.focus();
   }, []);
 
   const canSend = text.trim().length > 0 && !disabled;
 
   return (
     <>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={90}
-        style={s.avoid}
-      >
-        <View style={s.row}>
-          {/* Emoji picker button */}
+      <View style={s.bar}>
+        {/* + Attachment button */}
+        <TouchableOpacity
+          style={s.addBtn}
+          disabled={disabled}
+          activeOpacity={0.7}
+          accessibilityLabel="Add attachment"
+        >
+          <Text style={s.addTxt}>+</Text>
+        </TouchableOpacity>
+
+        {/* Pill: text input + smiley */}
+        <View style={s.pill}>
+          <TextInput
+            ref={inputRef}
+            style={s.input}
+            value={text}
+            onChangeText={handleChangeText}
+            placeholder={placeholder ?? 'Type your message'}
+            placeholderTextColor={colors.textFaint}
+            multiline
+            editable={!disabled}
+            accessibilityLabel="Message input"
+          />
           <TouchableOpacity
-            style={s.sideBtn}
+            style={s.emojiBtn}
             disabled={disabled}
+            activeOpacity={0.7}
             onPress={() => setEmojiPickerVisible(true)}
             accessibilityLabel="Open emoji picker"
           >
-            <Text style={s.sideTxt}>😊</Text>
+            <Text style={s.emojiTxt}>😊</Text>
           </TouchableOpacity>
-
-          {/* Pill text input */}
-          <View style={s.inputWrap}>
-            <TextInput
-              style={s.input}
-              value={text}
-              onChangeText={handleChangeText}
-              placeholder={placeholder ?? 'Message…'}
-              placeholderTextColor={colors.textFaint}
-              multiline
-              editable={!disabled}
-              accessibilityLabel="Message input"
-            />
-          </View>
-
-          {/* Send when text present, mic otherwise */}
-          {canSend ? (
-            <TouchableOpacity
-              style={[s.actionBtn, s.sendBtn]}
-              onPress={handleSend}
-              accessibilityLabel="Send message"
-            >
-              <Text style={s.sendTxt}>↑</Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              style={[s.actionBtn, s.micBtn]}
-              accessibilityLabel="Voice message"
-            >
-              <Text style={s.micTxt}>🎙</Text>
-            </TouchableOpacity>
-          )}
         </View>
-      </KeyboardAvoidingView>
 
-      {/* Emoji picker modal */}
+        {/* Send button — appears when text is present */}
+        {canSend && (
+          <TouchableOpacity
+            style={s.sendBtn}
+            onPress={handleSend}
+            activeOpacity={0.8}
+            accessibilityLabel="Send message"
+          >
+            <Text style={s.sendTxt}>↑</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
       <EmojiPicker
         visible={emojiPickerVisible}
         onClose={() => setEmojiPickerVisible(false)}

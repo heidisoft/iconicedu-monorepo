@@ -16,6 +16,7 @@ export const CHANNEL_SELECT =
     'primary_entity_kind',
     'primary_entity_id',
     'ui_theme_key',
+    'ui_defaults',
     'created_by_profile_id',
     'created_at',
     'archived_at',

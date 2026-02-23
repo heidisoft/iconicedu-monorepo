@@ -14,7 +14,66 @@ import type {
   ChannelCapabilityVM,
   UserProfileVM,
   EntityRefVM,
+  ChannelUiDefaultsVM,
 } from '@iconicedu/shared-types';
+import { resolveThemeKey } from '@iconicedu/web/lib/profile/derive';
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function parseUiDefaults(
+  uiDefaultsValue: unknown,
+): Partial<ChannelUiDefaultsVM> | null {
+  if (!isRecord(uiDefaultsValue)) {
+    return null;
+  }
+
+  const parsed: Partial<ChannelUiDefaultsVM> = {};
+
+  parsed.themeKey =
+    resolveThemeKey(
+      typeof uiDefaultsValue.themeKey === 'string' ? uiDefaultsValue.themeKey : null,
+    ) ?? null;
+
+  if (typeof uiDefaultsValue.defaultRightPanelOpen === 'boolean') {
+    parsed.defaultRightPanelOpen = uiDefaultsValue.defaultRightPanelOpen;
+  }
+
+  if (
+    typeof uiDefaultsValue.defaultRightPanelKey === 'string' &&
+    (uiDefaultsValue.defaultRightPanelKey === 'channel_info' ||
+      uiDefaultsValue.defaultRightPanelKey === 'saved')
+  ) {
+    parsed.defaultRightPanelKey = uiDefaultsValue.defaultRightPanelKey;
+  }
+
+  if (isRecord(uiDefaultsValue.infoPanel)) {
+    const infoPanel: NonNullable<ChannelUiDefaultsVM['infoPanel']> = {};
+    const infoPanelValue = uiDefaultsValue.infoPanel;
+    if (typeof infoPanelValue.showHeader === 'boolean') {
+      infoPanel.showHeader = infoPanelValue.showHeader;
+    }
+    if (typeof infoPanelValue.showDetails === 'boolean') {
+      infoPanel.showDetails = infoPanelValue.showDetails;
+    }
+    if (typeof infoPanelValue.showMedia === 'boolean') {
+      infoPanel.showMedia = infoPanelValue.showMedia;
+    }
+    if (typeof infoPanelValue.showMembers === 'boolean') {
+      infoPanel.showMembers = infoPanelValue.showMembers;
+    }
+    if (typeof infoPanelValue.showQuickActions === 'boolean') {
+      infoPanel.showQuickActions = infoPanelValue.showQuickActions;
+    }
+    if (typeof infoPanelValue.showHiddenQuickActions === 'boolean') {
+      infoPanel.showHiddenQuickActions = infoPanelValue.showHiddenQuickActions;
+    }
+    parsed.infoPanel = infoPanel;
+  }
+
+  return parsed;
+}
 
 export function mapChannelRowToMiniVM(
   row: ChannelRow,
@@ -69,6 +128,21 @@ export function mapChannelRowToVM(
         : null;
 
   const dm: ChannelDmVM | undefined = row.dm_key ? { dmKey: row.dm_key } : undefined;
+  const parsedUiDefaults = parseUiDefaults(row.ui_defaults);
+  const channelUiDefaults: ChannelUiDefaultsVM | undefined =
+    parsedUiDefaults || row.ui_theme_key || isLearningSpace
+      ? {
+          ...(parsedUiDefaults ?? {}),
+          themeKey:
+            resolveThemeKey(row.ui_theme_key ?? null) ??
+            parsedUiDefaults?.themeKey ??
+            null,
+          defaultRightPanelOpen:
+            parsedUiDefaults?.defaultRightPanelOpen ?? (isLearningSpace ? true : undefined),
+          defaultRightPanelKey:
+            parsedUiDefaults?.defaultRightPanelKey ?? (isLearningSpace ? 'channel_info' : undefined),
+        }
+      : undefined;
 
   return {
     ids: { id: row.id, orgId: row.org_id },
@@ -109,13 +183,7 @@ export function mapChannelRowToVM(
       },
       readState: input.readState,
     },
-    ui: isLearningSpace
-      ? {
-          defaultRightPanelOpen: true,
-          defaultRightPanelKey: 'channel_info',
-          themeKey: row.ui_theme_key ?? null,
-        }
-      : undefined,
+    ui: channelUiDefaults,
   };
 }
 

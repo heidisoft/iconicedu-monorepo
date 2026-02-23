@@ -22,6 +22,14 @@ describe('mapChannelRowToVM', () => {
       primary_entity_kind: 'learning_space',
       primary_entity_id: 'space-1',
       ui_theme_key: 'sky',
+      ui_defaults: {
+        defaultRightPanelOpen: false,
+        defaultRightPanelKey: 'saved',
+        infoPanel: {
+          showMembers: false,
+          showMedia: false,
+        },
+      },
       created_by_profile_id: 'profile-1',
       created_at: '2026-01-01T00:00:00.000Z',
       archived_at: null,
@@ -40,8 +48,9 @@ describe('mapChannelRowToVM', () => {
       capabilities: [],
     });
 
-    expect(channel.ui?.defaultRightPanelKey).toBe('channel_info');
+    expect(channel.ui?.defaultRightPanelOpen).toBe(false);
+    expect(channel.ui?.defaultRightPanelKey).toBe('saved');
+    expect(channel.ui?.infoPanel?.showMembers).toBe(false);
     expect(channel.ui?.themeKey).toBe('sky');
   });
 });
-
