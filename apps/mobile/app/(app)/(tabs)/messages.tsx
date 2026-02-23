@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
+  Image,
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
@@ -142,12 +143,20 @@ function DmAvatar({
     const [back, front] = participants;
     return (
       <View style={s.groupWrap}>
-        <View style={[s.groupBack, { backgroundColor: avatarColor(back!.id) }]}>
-          <Text style={s.groupTxt}>{getInitials(participantName(back!))}</Text>
-        </View>
-        <View style={[s.groupFront, { backgroundColor: avatarColor(front!.id) }]}>
-          <Text style={s.groupTxt}>{getInitials(participantName(front!))}</Text>
-        </View>
+        {back!.avatar_url ? (
+          <Image source={{ uri: back!.avatar_url }} style={s.groupBack} accessibilityLabel={participantName(back!)} />
+        ) : (
+          <View style={[s.groupBack, { backgroundColor: avatarColor(back!.id) }]}>
+            <Text style={s.groupTxt}>{getInitials(participantName(back!))}</Text>
+          </View>
+        )}
+        {front!.avatar_url ? (
+          <Image source={{ uri: front!.avatar_url }} style={s.groupFront} accessibilityLabel={participantName(front!)} />
+        ) : (
+          <View style={[s.groupFront, { backgroundColor: avatarColor(front!.id) }]}>
+            <Text style={s.groupTxt}>{getInitials(participantName(front!))}</Text>
+          </View>
+        )}
       </View>
     );
   }
@@ -158,9 +167,13 @@ function DmAvatar({
 
   return (
     <View style={s.avatarWrap}>
-      <View style={[s.avatarCircle, { backgroundColor: color }]}>
-        <Text style={s.avatarTxt}>{getInitials(name)}</Text>
-      </View>
+      {person?.avatar_url ? (
+        <Image source={{ uri: person.avatar_url }} style={s.avatarCircle} accessibilityLabel={name ?? undefined} />
+      ) : (
+        <View style={[s.avatarCircle, { backgroundColor: color }]}>
+          <Text style={s.avatarTxt}>{getInitials(name)}</Text>
+        </View>
+      )}
       {/* Online dot — presence tracking can be layered on top later */}
       <View style={s.onlineDot} />
     </View>

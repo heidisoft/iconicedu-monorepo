@@ -6,15 +6,16 @@ import {
 } from '@iconicedu/web/app/(app)/[orgSlug]/admin/users/actions/invite-user.utils';
 
 describe('invite-user redirect helpers', () => {
-  it('builds callback url with org slug and login intent', () => {
+  it('builds callback url with org slug and get-started intent', () => {
     const url = buildOrgInviteRedirectUrl({
       baseUrl: 'https://app.example.com',
       profileKind: 'guardian',
       orgSlug: 'iconic-academy',
+      intent: 'get-started',
     });
 
     expect(url).toBe(
-      'https://app.example.com/auth/callback?profileKind=guardian&org=iconic-academy&intent=login',
+      'https://app.example.com/auth/callback?profileKind=guardian&org=iconic-academy&intent=get-started',
     );
   });
 
@@ -22,17 +23,17 @@ describe('invite-user redirect helpers', () => {
     const url = ensureOrgCallbackRedirect(
       'https://app.example.com/auth/callback?profileKind=staff',
       'acme-org',
-      'login',
+      'get-started',
     );
 
     expect(url).toContain('/auth/callback?');
     expect(url).toContain('org=acme-org');
-    expect(url).toContain('intent=login');
+    expect(url).toContain('intent=get-started');
   });
 
   it('leaves non-callback redirects unchanged', () => {
     expect(
-      ensureOrgCallbackRedirect('https://app.example.com/welcome', 'acme-org', 'login'),
+      ensureOrgCallbackRedirect('https://app.example.com/welcome', 'acme-org', 'get-started'),
     ).toBe('https://app.example.com/welcome');
   });
 });

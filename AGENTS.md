@@ -1123,6 +1123,17 @@ TextMessageVM | ImageMessageVM | ... (narrowed type)
    - Each package should have an `index.ts` that re-exports public API
    - Consumers import from package root: `import { MessageVM } from '@iconicedu/shared-types'`
 
+### Animation Guidelines
+
+1. **Use smooth animations for user interactions (Web + Mobile)**
+   - For both `apps/web` and `apps/mobile`, transitions and action feedback should use smooth, subtle animations.
+   - Apply this to UI state changes such as expand/collapse, modal/sheet open-close, hover/press feedback, loading/saving states, and route/screen transitions where appropriate.
+
+2. **Keep motion practical and accessible**
+   - Prefer short, non-distracting timings and easing.
+   - Avoid abrupt jumps when content appears/disappears.
+   - Respect reduced-motion preferences when platform support is available.
+
 ### Testing Requirements
 
 **CRITICAL: Every time a file is modified, unit tests MUST be updated or created.**

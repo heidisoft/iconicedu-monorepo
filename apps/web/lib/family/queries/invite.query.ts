@@ -15,6 +15,7 @@ import {
   insertInvitedAccount,
 } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { resolveFamilyInviteRedirectUrl } from '@iconicedu/web/lib/family/queries/invite-redirect';
+import { getOrgById } from '@iconicedu/web/lib/org/queries/org.query';
 
 export const FAMILY_INVITE_EXPIRATION_DAYS = 7;
 
@@ -246,7 +247,14 @@ export async function createFamilyInvite(options: CreateFamilyInviteOptions) {
   });
 
   if (!invitedAccount.auth_user_id) {
-    const redirectTo = resolveFamilyInviteRedirectUrl();
+    const orgResponse = await getOrgById(adminClient, options.orgId);
+    if (orgResponse.error) {
+      throw orgResponse.error;
+    }
+    if (!orgResponse.data?.slug) {
+      throw new Error('Unable to resolve organization slug for family invite redirect.');
+    }
+    const redirectTo = resolveFamilyInviteRedirectUrl(orgResponse.data.slug);
     const { error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
       normalizedEmail,
       {

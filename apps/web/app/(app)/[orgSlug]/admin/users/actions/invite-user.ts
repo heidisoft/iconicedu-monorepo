@@ -177,11 +177,11 @@ export async function inviteAdminUserAction(
     baseUrl,
     profileKind: parsed.profileKind,
     orgSlug,
-    intent: 'login',
+    intent: 'get-started',
   });
   const redirectTo =
     redirectOverride && redirectOverride.trim()
-      ? ensureOrgCallbackRedirect(redirectOverride, orgSlug, 'login')
+      ? ensureOrgCallbackRedirect(redirectOverride, orgSlug, 'get-started')
       : defaultRedirectTo;
 
   if (mode === 'invite') {

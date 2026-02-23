@@ -16,7 +16,7 @@ export function buildOrgInviteRedirectUrl(input: {
 export function ensureOrgCallbackRedirect(
   redirectTo: string,
   orgSlug: string,
-  intent: 'login' | 'get-started' = 'login',
+  intent: 'login' | 'get-started' = 'get-started',
 ): string {
   const trimmed = redirectTo.trim();
   if (!trimmed) {

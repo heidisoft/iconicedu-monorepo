@@ -139,10 +139,10 @@ export function LearningSpacesTable({ rows, onEdit }: LearningSpacesTableProps) 
 
   return (
     <div className="w-full border-y border-border bg-card">
-      <Table className="min-w-full">
+      <Table className="min-w-full table-fixed">
         <TableHeader>
           <TableRow>
-            <TableHead>Title</TableHead>
+            <TableHead className="w-[32rem] whitespace-normal">Title</TableHead>
             <TableHead>Participants</TableHead>
             <TableHead>Schedule</TableHead>
             <TableHead>Status</TableHead>
@@ -153,7 +153,7 @@ export function LearningSpacesTable({ rows, onEdit }: LearningSpacesTableProps) 
         <TableBody>
           {rows.map((row) => (
             <TableRow key={row.id} className="border-b border-border/60 last:border-b-0">
-              <TableCell>
+              <TableCell className="w-[32rem] whitespace-normal align-top">
                 {(() => {
                   const TitleIcon = getLearningSpaceIcon(row.icon_key);
                   return (
@@ -161,19 +161,21 @@ export function LearningSpacesTable({ rows, onEdit }: LearningSpacesTableProps) 
                       <div className="flex size-8 items-center justify-center rounded-full border border-border bg-muted">
                         <TitleIcon className="size-4 text-muted-foreground" />
                       </div>
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         {row.primaryChannelId ? (
                           <Link
                             href={`${dashboardBasePath}/spaces/${row.primaryChannelId}`}
-                            className="text-sm font-semibold hover:underline"
+                            className="text-sm font-semibold hover:underline whitespace-normal break-words"
                           >
                             {row.title}
                           </Link>
                         ) : (
-                          <p className="text-sm font-semibold">{row.title}</p>
+                          <p className="text-sm font-semibold whitespace-normal break-words">
+                            {row.title}
+                          </p>
                         )}
                         {row.description && (
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-muted-foreground whitespace-normal break-words">
                             {row.description}
                           </p>
                         )}

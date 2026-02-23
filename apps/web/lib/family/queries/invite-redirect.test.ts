@@ -11,9 +11,11 @@ vi.mock('@iconicedu/web/lib/config/app-url', () => ({
 }));
 
 describe('resolveFamilyInviteRedirectUrl', () => {
-  it('appends /auth/callback to app url', () => {
+  it('builds org-scoped callback redirect with get-started intent', () => {
     mockResolveAppUrl.mockReturnValueOnce('http://localhost:3000');
 
-    expect(resolveFamilyInviteRedirectUrl()).toBe('http://localhost:3000/auth/callback');
+    expect(resolveFamilyInviteRedirectUrl('iconic-academy')).toBe(
+      'http://localhost:3000/auth/callback?org=iconic-academy&intent=get-started',
+    );
   });
 });

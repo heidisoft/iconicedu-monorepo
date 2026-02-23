@@ -9,6 +9,7 @@ import React, {
 import { type Session, type User } from '@supabase/supabase-js';
 import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '@/lib/supabase/client';
+import { activateAccount } from '@/lib/api/queries';
 
 // Explicit path is required — bare `iconicedu://` does not match Supabase's `iconicedu://**` glob.
 // Ensure `iconicedu://auth-callback` (or `iconicedu://**`) is in
@@ -117,6 +118,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (orgError) return { error: orgError };
     }
 
+    // Mark account as active, mirroring web's /api/accounts/activate step.
+    await activateAccount();
+
     return { error: null };
   }, []);
 
@@ -167,6 +171,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const orgError = await checkOrgAssignment(user.id);
       if (orgError) return { error: orgError };
     }
+
+    // Mark account as active, mirroring web's /api/accounts/activate step.
+    await activateAccount();
 
     return { error: null };
   }, []);

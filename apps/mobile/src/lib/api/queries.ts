@@ -30,6 +30,27 @@ export const queryKeys = {
     ['childProfiles', orgId, accountIds] as const,
 } as const;
 
+/**
+ * Mark the current user's account as 'active' after a successful login.
+ * Mirrors the web's POST /api/accounts/activate status update step.
+ * Non-throwing — a failed update is logged but never blocks the auth flow.
+ */
+export async function activateAccount(): Promise<void> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.user?.id) return;
+
+  const { error } = await supabase
+    .from('accounts')
+    .update({ status: 'active' })
+    .eq('auth_user_id', session.user.id);
+
+  if (error) {
+    console.warn('[activateAccount] failed to set status=active:', error.message);
+  }
+}
+
 export async function fetchUserAccount() {
   const {
     data: { user },
@@ -76,6 +97,7 @@ export type DmParticipant = {
   display_name: string | null;
   first_name: string | null;
   last_name: string | null;
+  avatar_url: string | null;
   avatar_seed: string | null;
 };
 
@@ -135,7 +157,7 @@ export async function fetchDirectMessages(
   // Step 3: fetch all members for those channels to build name/avatar display
   const { data: memberRows } = await supabase
     .from('channel_members')
-    .select('channel_id, profile_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_seed)')
+    .select('channel_id, profile_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed)')
     .in('channel_id', chRows.map((c) => c.id))
     .is('deleted_at', null);
 
