@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   Modal,
   View,
@@ -7,11 +7,16 @@ import {
   Pressable,
   StyleSheet,
   Share,
+  Alert,
+  Animated,
 } from 'react-native';
 import type { MessageVM } from '@iconicedu/shared-types';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
-import { EmojiPicker, QUICK_EMOJIS } from './emoji-picker';
+import { EmojiPicker } from './emoji-picker';
+
+// Facebook Messenger-style quick reactions
+const QUICK_REACTIONS = ['❤️', '😂', '😮', '😢', '😡', '👍'];
 
 type MessageActionsSheetProps = {
   visible: boolean;
@@ -21,59 +26,122 @@ type MessageActionsSheetProps = {
   onReact: (messageId: string, emoji: string) => void;
   onThread: (message: MessageVM) => void;
   onDelete: (messageId: string) => void;
+  onSave?: (messageId: string, saved: boolean) => void;
+  onHide?: (messageId: string) => void;
 };
+
+// ─── Animated reaction bubble (Facebook Messenger style) ──────────────────────
+
+function ReactionBubble({
+  emoji,
+  onPress,
+  colors,
+}: {
+  emoji: string;
+  onPress: (e: string) => void;
+  colors: AppColors;
+}) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const handlePress = useCallback(() => {
+    // Trigger callback immediately, animate simultaneously
+    onPress(emoji);
+    Animated.sequence([
+      Animated.spring(scale, {
+        toValue: 1.5,
+        useNativeDriver: true,
+        damping: 4,
+        stiffness: 350,
+      }),
+      Animated.spring(scale, {
+        toValue: 1,
+        useNativeDriver: true,
+        damping: 10,
+        stiffness: 200,
+      }),
+    ]).start();
+  }, [emoji, onPress, scale]);
+
+  return (
+    <TouchableOpacity onPress={handlePress} activeOpacity={0.75}>
+      <Animated.View
+        style={[
+          bubbleStyles.bubble,
+          { backgroundColor: colors.inputBg, borderColor: colors.border },
+          { transform: [{ scale }] },
+        ]}
+      >
+        <Text style={bubbleStyles.emoji}>{emoji}</Text>
+      </Animated.View>
+    </TouchableOpacity>
+  );
+}
+
+const bubbleStyles = StyleSheet.create({
+  bubble: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emoji: { fontSize: 26 },
+});
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
 function makeStyles(C: AppColors) {
   return StyleSheet.create({
     overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
     sheet: {
-      backgroundColor: C.bg,
-      borderTopLeftRadius: 20,
-      borderTopRightRadius: 20,
+      backgroundColor: C.pageBg,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
       paddingBottom: 40,
     },
     handle: {
-      width: 40, height: 4, borderRadius: 2,
+      width: 36, height: 4, borderRadius: 2,
       backgroundColor: C.border,
-      alignSelf: 'center', marginTop: 10, marginBottom: 16,
+      alignSelf: 'center', marginTop: 10, marginBottom: 20,
     },
 
-    // Quick reactions
+    // Reaction row
     reactionsRow: {
       flexDirection: 'row',
-      paddingHorizontal: 20,
-      paddingBottom: 16,
-      borderBottomWidth: 1,
+      paddingHorizontal: 16,
+      paddingBottom: 18,
+      borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: C.border,
       justifyContent: 'space-around',
       alignItems: 'center',
     },
-    reactionBtn: {
+    moreEmojiBtn: {
       width: 46, height: 46, borderRadius: 23,
       backgroundColor: C.inputBg,
       borderWidth: 1, borderColor: C.border,
       alignItems: 'center', justifyContent: 'center',
     },
-    reactionEmoji: { fontSize: 22 },
-    moreBtn: {
-      width: 46, height: 46, borderRadius: 23,
-      backgroundColor: C.inputBg,
-      borderWidth: 1, borderColor: C.border,
-      alignItems: 'center', justifyContent: 'center',
-    },
-    moreTxt: { fontSize: 22, color: C.textMuted, lineHeight: 26 },
+    moreTxt: { fontSize: 20, color: C.textMuted, fontWeight: '700', lineHeight: 24 },
 
-    // Action list
+    // Action items
     actionItem: {
       flexDirection: 'row', alignItems: 'center', gap: 14,
-      paddingHorizontal: 20, paddingVertical: 16,
+      paddingHorizontal: 20, paddingVertical: 15,
     },
-    actionIcon: { fontSize: 18, width: 26, textAlign: 'center' },
-    actionTxt: { fontSize: 15, color: C.text, flex: 1 },
+    actionIcon: { fontSize: 20, width: 28, textAlign: 'center' },
+    actionLabel: { fontSize: 16, color: C.text },
+    savedLabel: { fontSize: 16, color: C.teal, fontWeight: '600' },
     destructive: { color: '#ef4444' },
-    divider: { height: 1, backgroundColor: C.border },
+    divider: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: C.border,
+      marginHorizontal: 20,
+    },
   });
 }
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export const MessageActionsSheet: React.FC<MessageActionsSheetProps> = ({
   visible,
@@ -83,10 +151,18 @@ export const MessageActionsSheet: React.FC<MessageActionsSheetProps> = ({
   onReact,
   onThread,
   onDelete,
+  onSave,
+  onHide,
 }) => {
   const { colors } = useTheme();
   const s = React.useMemo(() => makeStyles(colors), [colors]);
   const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  // Sync saved state when the message changes
+  useEffect(() => {
+    setSaved((message?.state as { isSaved?: boolean } | undefined)?.isSaved ?? false);
+  }, [message?.ids.id]);
 
   const handleReact = useCallback(
     (emoji: string) => {
@@ -97,30 +173,65 @@ export const MessageActionsSheet: React.FC<MessageActionsSheetProps> = ({
     [message, onReact, onClose],
   );
 
-  const handleShare = useCallback(async () => {
-    const text = (message as { content?: { text?: string } })?.content?.text ?? '';
-    if (text) await Share.share({ message: text });
-    onClose();
-  }, [message, onClose]);
-
   const handleThread = useCallback(() => {
     if (!message) return;
     onThread(message);
     onClose();
   }, [message, onThread, onClose]);
 
+  const handleSave = useCallback(() => {
+    if (!message) return;
+    const next = !saved;
+    setSaved(next);
+    onSave?.(message.ids.id, next);
+    onClose();
+  }, [message, saved, onSave, onClose]);
+
+  const handleCopyText = useCallback(async () => {
+    const text = (message as { content?: { text?: string } })?.content?.text ?? '';
+    if (text) {
+      await Share.share({ message: text });
+    }
+    onClose();
+  }, [message, onClose]);
+
+  const handleForward = useCallback(async () => {
+    const text = (message as { content?: { text?: string } })?.content?.text ?? '';
+    if (text) {
+      await Share.share({ message: text });
+    } else {
+      onClose();
+    }
+  }, [message, onClose]);
+
+  const handleHide = useCallback(() => {
+    if (!message) return;
+    onHide?.(message.ids.id);
+    onClose();
+  }, [message, onHide, onClose]);
+
   const handleDelete = useCallback(() => {
     if (!message) return;
-    onDelete(message.ids.id);
-    onClose();
+    Alert.alert(
+      'Delete message?',
+      'This action cannot be undone. This message will be permanently deleted.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            onDelete(message.ids.id);
+            onClose();
+          },
+        },
+      ],
+    );
   }, [message, onDelete, onClose]);
 
   const textContent = (message as { content?: { text?: string } })?.content?.text ?? '';
 
   if (!message) return null;
-
-  // Show 6 quick reactions (first 6 of QUICK_EMOJIS) + "+" for full picker
-  const quickSix = QUICK_EMOJIS.slice(0, 6);
 
   return (
     <>
@@ -136,42 +247,58 @@ export const MessageActionsSheet: React.FC<MessageActionsSheetProps> = ({
             <View style={s.sheet}>
               <View style={s.handle} />
 
-              {/* Quick reaction row */}
+              {/* Facebook Messenger-style animated quick reactions */}
               <View style={s.reactionsRow}>
-                {quickSix.map((e) => (
-                  <TouchableOpacity key={e} style={s.reactionBtn} onPress={() => handleReact(e)}>
-                    <Text style={s.reactionEmoji}>{e}</Text>
-                  </TouchableOpacity>
+                {QUICK_REACTIONS.map((e) => (
+                  <ReactionBubble key={e} emoji={e} onPress={handleReact} colors={colors} />
                 ))}
-                <TouchableOpacity style={s.moreBtn} onPress={() => setEmojiPickerVisible(true)}>
-                  <Text style={s.moreTxt}>+</Text>
+                <TouchableOpacity style={s.moreEmojiBtn} onPress={() => setEmojiPickerVisible(true)}>
+                  <Text style={s.moreTxt}>＋</Text>
                 </TouchableOpacity>
               </View>
 
-              {/* Thread reply */}
+              {/* Reply in thread */}
               <TouchableOpacity style={s.actionItem} onPress={handleThread}>
                 <Text style={s.actionIcon}>💬</Text>
-                <Text style={s.actionTxt}>Reply in thread</Text>
+                <Text style={s.actionLabel}>Reply in thread</Text>
               </TouchableOpacity>
 
-              {/* Share/copy text — only for text messages */}
+              {/* Save / Unsave */}
+              <TouchableOpacity style={s.actionItem} onPress={handleSave}>
+                <Text style={s.actionIcon}>🔖</Text>
+                <Text style={saved ? s.savedLabel : s.actionLabel}>
+                  {saved ? 'Saved' : 'Save message'}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Copy text + Forward — text messages only */}
               {!!textContent && (
                 <>
                   <View style={s.divider} />
-                  <TouchableOpacity style={s.actionItem} onPress={handleShare}>
+                  <TouchableOpacity style={s.actionItem} onPress={handleCopyText}>
                     <Text style={s.actionIcon}>📋</Text>
-                    <Text style={s.actionTxt}>Share text</Text>
+                    <Text style={s.actionLabel}>Copy text</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={s.actionItem} onPress={handleForward}>
+                    <Text style={s.actionIcon}>↪️</Text>
+                    <Text style={s.actionLabel}>Forward</Text>
                   </TouchableOpacity>
                 </>
               )}
 
-              {/* Delete — own messages only */}
+              {/* Own message destructive actions */}
               {isOwn && (
                 <>
                   <View style={s.divider} />
+                  {!!onHide && (
+                    <TouchableOpacity style={s.actionItem} onPress={handleHide}>
+                      <Text style={s.actionIcon}>🙈</Text>
+                      <Text style={s.actionLabel}>Hide message</Text>
+                    </TouchableOpacity>
+                  )}
                   <TouchableOpacity style={s.actionItem} onPress={handleDelete}>
                     <Text style={[s.actionIcon, s.destructive]}>🗑</Text>
-                    <Text style={[s.actionTxt, s.destructive]}>Delete message</Text>
+                    <Text style={[s.actionLabel, s.destructive]}>Delete message</Text>
                   </TouchableOpacity>
                 </>
               )}
@@ -180,7 +307,7 @@ export const MessageActionsSheet: React.FC<MessageActionsSheetProps> = ({
         </Pressable>
       </Modal>
 
-      {/* Full emoji picker — shown on top of actions sheet */}
+      {/* Full emoji picker sheet */}
       <EmojiPicker
         visible={emojiPickerVisible}
         onClose={() => setEmojiPickerVisible(false)}

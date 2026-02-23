@@ -96,11 +96,11 @@ export const MessageBase = memo(function MessageBase({
   );
 
   const handleThreadClick = useCallback(() => {
-    if (isInteractionDisabled) return;
     if (message.social.thread) {
       onOpenThread(message.social.thread, message);
       return;
     }
+    if (isInteractionDisabled) return;
 
     const snippet =
       'content' in message && message.content?.text ? message.content.text : null;

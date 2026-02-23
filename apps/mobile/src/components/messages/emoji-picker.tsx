@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   Modal,
   View,
@@ -13,8 +13,9 @@ import type { AppColors } from '@/lib/theme';
 
 export const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥', '✅', '🙏'];
 
-const EMOJI_CATEGORIES: { label: string; emojis: string[] }[] = [
+const EMOJI_CATEGORIES: { icon: string; label: string; emojis: string[] }[] = [
   {
+    icon: '😊',
     label: 'Smileys',
     emojis: [
       '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇',
@@ -23,6 +24,7 @@ const EMOJI_CATEGORIES: { label: string; emojis: string[] }[] = [
     ],
   },
   {
+    icon: '👍',
     label: 'Gestures',
     emojis: [
       '👍', '👎', '👏', '🙌', '🤝', '🤜', '🤛', '✊', '👊', '🤚',
@@ -30,6 +32,7 @@ const EMOJI_CATEGORIES: { label: string; emojis: string[] }[] = [
     ],
   },
   {
+    icon: '❤️',
     label: 'Hearts',
     emojis: [
       '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💕',
@@ -37,6 +40,7 @@ const EMOJI_CATEGORIES: { label: string; emojis: string[] }[] = [
     ],
   },
   {
+    icon: '📚',
     label: 'Education',
     emojis: [
       '📚', '📖', '✏️', '📝', '📒', '📓', '📔', '📕', '📗', '📘',
@@ -45,6 +49,7 @@ const EMOJI_CATEGORIES: { label: string; emojis: string[] }[] = [
     ],
   },
   {
+    icon: '🎉',
     label: 'Celebrate',
     emojis: [
       '🎉', '🎊', '🎈', '🎁', '🥳', '🎂', '🍾', '🥂', '🎆', '🎇',
@@ -63,52 +68,60 @@ function makeStyles(C: AppColors) {
   return StyleSheet.create({
     overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
     sheet: {
-      backgroundColor: C.bg,
-      borderTopLeftRadius: 20,
-      borderTopRightRadius: 20,
+      backgroundColor: C.pageBg,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
       paddingTop: 8,
-      maxHeight: '65%',
+      maxHeight: '70%',
     },
     handle: {
-      width: 40, height: 4, borderRadius: 2,
+      width: 36, height: 4, borderRadius: 2,
       backgroundColor: C.border,
-      alignSelf: 'center', marginBottom: 12,
+      alignSelf: 'center', marginBottom: 4,
     },
-    quickRow: {
-      flexDirection: 'row',
-      paddingHorizontal: 16,
-      paddingBottom: 12,
-      borderBottomWidth: 1,
+
+    // Category tab bar
+    tabBarWrapper: {
+      borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: C.border,
-      justifyContent: 'space-around',
     },
-    quickBtn: {
-      width: 42, height: 42, borderRadius: 10,
-      alignItems: 'center', justifyContent: 'center',
-      backgroundColor: C.inputBg,
-    },
-    categoryLabel: {
-      fontSize: 11, fontWeight: '700', color: C.textFaint,
-      paddingHorizontal: 16, paddingTop: 14, paddingBottom: 6,
-      textTransform: 'uppercase', letterSpacing: 0.8,
-    },
-    emojiGrid: {
-      flexDirection: 'row', flexWrap: 'wrap',
+    tabBarInner: {
+      flexDirection: 'row',
       paddingHorizontal: 8,
-      paddingBottom: 8,
+    },
+    tab: {
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      alignItems: 'center',
+      borderBottomWidth: 2,
+      borderBottomColor: 'transparent',
+    },
+    tabActive: {
+      borderBottomColor: C.teal,
+    },
+    tabIcon: { fontSize: 20 },
+
+    // Emoji grid
+    emojiGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      paddingHorizontal: 8,
+      paddingTop: 8,
+      paddingBottom: 32,
     },
     emojiBtn: {
-      width: '12.5%', // 8 per row
-      paddingVertical: 6,
-      alignItems: 'center', justifyContent: 'center',
+      width: '12.5%',
+      paddingVertical: 7,
+      alignItems: 'center',
     },
-    emojiTxt: { fontSize: 24 },
+    emojiTxt: { fontSize: 26 },
   });
 }
 
 export const EmojiPicker: React.FC<EmojiPickerProps> = ({ visible, onClose, onEmojiSelect }) => {
   const { colors } = useTheme();
   const s = React.useMemo(() => makeStyles(colors), [colors]);
+  const [activeIdx, setActiveIdx] = useState(0);
 
   const handleEmoji = useCallback(
     (emoji: string) => {
@@ -117,6 +130,8 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({ visible, onClose, onEm
     },
     [onEmojiSelect, onClose],
   );
+
+  const activeEmojis = EMOJI_CATEGORIES[activeIdx]?.emojis ?? [];
 
   return (
     <Modal
@@ -132,29 +147,34 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({ visible, onClose, onEm
             <View style={s.sheet}>
               <View style={s.handle} />
 
-              {/* Quick reactions row */}
-              <View style={s.quickRow}>
-                {QUICK_EMOJIS.map((e) => (
-                  <TouchableOpacity key={e} style={s.quickBtn} onPress={() => handleEmoji(e)}>
-                    <Text style={s.emojiTxt}>{e}</Text>
-                  </TouchableOpacity>
-                ))}
+              {/* Category tab bar */}
+              <View style={s.tabBarWrapper}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={s.tabBarInner}
+                >
+                  {EMOJI_CATEGORIES.map((cat, i) => (
+                    <TouchableOpacity
+                      key={cat.label}
+                      style={[s.tab, i === activeIdx && s.tabActive]}
+                      onPress={() => setActiveIdx(i)}
+                    >
+                      <Text style={s.tabIcon}>{cat.icon}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
               </View>
 
-              {/* Categorised grid */}
+              {/* Emoji grid for active category */}
               <ScrollView showsVerticalScrollIndicator={false}>
-                {EMOJI_CATEGORIES.map((cat) => (
-                  <View key={cat.label}>
-                    <Text style={s.categoryLabel}>{cat.label}</Text>
-                    <View style={s.emojiGrid}>
-                      {cat.emojis.map((e) => (
-                        <TouchableOpacity key={e} style={s.emojiBtn} onPress={() => handleEmoji(e)}>
-                          <Text style={s.emojiTxt}>{e}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </View>
-                ))}
+                <View style={s.emojiGrid}>
+                  {activeEmojis.map((e) => (
+                    <TouchableOpacity key={e} style={s.emojiBtn} onPress={() => handleEmoji(e)}>
+                      <Text style={s.emojiTxt}>{e}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </ScrollView>
             </View>
           </TouchableWithoutFeedback>
