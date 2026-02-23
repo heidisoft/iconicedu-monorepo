@@ -21,7 +21,7 @@ import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
 
 export interface MessageBaseProps {
   message: MessageVM;
-  onOpenThread: (thread: ThreadVM, parentMessage: MessageVM) => void;
+  onOpenThread: (thread: ThreadVM, parentMessage: MessageVM) => void | Promise<void>;
   isThreadReply?: boolean;
   children?: ReactNode;
   className?: string;

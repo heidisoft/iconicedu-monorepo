@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity, Pressable, Linking } from 'react-native';
+import React, { useMemo, useState, useCallback } from 'react';
+import { View, Text, Image, StyleSheet, TouchableOpacity, Pressable, Linking, ActivityIndicator } from 'react-native';
 import type {
   MessageVM,
   ThreadVM,
@@ -9,11 +9,15 @@ import type {
   ProgressUpdateMessageVM,
   EventReminderMessageVM,
   HomeworkSubmissionMessageVM,
+  FeedbackRequestMessageVM,
+  SessionBookingMessageVM,
+  PaymentReminderMessageVM,
   FileMessageVM,
   AudioRecordingMessageVM,
   ReactionVM,
 } from '@iconicedu/shared-types';
 import type { AppColors } from '@/lib/theme';
+import { fetchThreadMessages } from '@/lib/api/queries';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -103,12 +107,12 @@ type SocialBarProps = {
   messageId: string;
   colors: AppColors;
   onReactionToggle?: (messageId: string, emoji: string) => void;
-  onThreadOpen?: (message: MessageVM) => void;
-  message: MessageVM;
+  onThreadPress?: () => void;
+  threadExpanded?: boolean;
 };
 
-function SocialBar({ reactions, thread, messageId, colors, onReactionToggle, onThreadOpen, message }: SocialBarProps) {
-  const hasThread = !!thread && thread.stats.messageCount > 0 && !!onThreadOpen;
+function SocialBar({ reactions, thread, messageId, colors, onReactionToggle, onThreadPress, threadExpanded }: SocialBarProps) {
+  const hasThread = !!thread && thread.stats.messageCount > 0;
   if (!reactions.length && !hasThread) return null;
 
   return (
@@ -136,7 +140,7 @@ function SocialBar({ reactions, thread, messageId, colors, onReactionToggle, onT
 
       {/* Thread pill */}
       {hasThread && (
-        <ThreadPill thread={thread!} colors={colors} onPress={() => onThreadOpen!(message)} />
+        <ThreadPill thread={thread!} colors={colors} onPress={onThreadPress ?? (() => {})} expanded={threadExpanded} />
       )}
     </View>
   );
@@ -144,7 +148,7 @@ function SocialBar({ reactions, thread, messageId, colors, onReactionToggle, onT
 
 // ─── Thread pill ──────────────────────────────────────────────────────────────
 
-function ThreadPill({ thread, colors, onPress }: { thread: ThreadVM; colors: AppColors; onPress: () => void }) {
+function ThreadPill({ thread, colors, onPress, expanded }: { thread: ThreadVM; colors: AppColors; onPress: () => void; expanded?: boolean }) {
   const count = thread.stats.messageCount;
   const participants = thread.participants.slice(0, 3);
 
@@ -154,16 +158,16 @@ function ThreadPill({ thread, colors, onPress }: { thread: ThreadVM; colors: App
       activeOpacity={0.75}
       style={{
         flexDirection: 'row', alignItems: 'center', gap: 5,
-        backgroundColor: colors.pageBg,
-        borderWidth: 1, borderColor: colors.border,
+        backgroundColor: expanded ? colors.tealBg : colors.pageBg,
+        borderWidth: 1, borderColor: expanded ? colors.teal : colors.border,
         borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5,
       }}
     >
       {/* Chat bubble icon */}
-      <Text style={{ fontSize: 13, color: colors.textMuted }}>💬</Text>
+      <Text style={{ fontSize: 13, color: expanded ? colors.teal : colors.textMuted }}>💬</Text>
 
       {/* Reply count */}
-      <Text style={{ fontSize: 12, color: colors.textMuted, fontWeight: '600' }}>
+      <Text style={{ fontSize: 12, color: expanded ? colors.teal : colors.textMuted, fontWeight: '600' }}>
         {count} {count === 1 ? 'reply' : 'replies'}
       </Text>
 
@@ -209,6 +213,34 @@ function ThreadPill({ thread, colors, onPress }: { thread: ThreadVM; colors: App
         </View>
       )}
     </TouchableOpacity>
+  );
+}
+
+// ─── Inline thread reply (compact) ────────────────────────────────────────────
+
+function InlineReply({ message, colors }: { message: MessageVM; colors: AppColors }) {
+  const senderName = message.core.sender.profile.displayName;
+  const time = formatTime(message.core.createdAt);
+  const { url: src, seed } = getAvatarInfo(message);
+  const text = (message as { content?: { text?: string } }).content?.text ?? '';
+
+  return (
+    <View style={{ flexDirection: 'row', gap: 8, paddingVertical: 4 }}>
+      {src ? (
+        <Image source={{ uri: src }} style={{ width: 28, height: 28, borderRadius: 14 }} accessibilityLabel={senderName} />
+      ) : (
+        <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: avatarBgColor(seed), alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>{getInitials(senderName)}</Text>
+        </View>
+      )}
+      <View style={{ flex: 1 }}>
+        <View style={{ flexDirection: 'row', gap: 6, alignItems: 'baseline', marginBottom: 2 }}>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: senderColor(senderName) }}>{senderName}</Text>
+          <Text style={{ fontSize: 11, color: colors.textFaint }}>{time}</Text>
+        </View>
+        <Text style={{ fontSize: 14, color: colors.text, lineHeight: 20 }}>{text}</Text>
+      </View>
+    </View>
   );
 }
 
@@ -359,6 +391,70 @@ function HomeworkCard({ message, colors, s }: { message: HomeworkSubmissionMessa
   );
 }
 
+function FeedbackRequestCard({ message, colors, s }: { message: FeedbackRequestMessageVM; colors: AppColors; s: S }) {
+  const prompt = message.feedback?.prompt ?? message.content?.text ?? '';
+  const rating = message.feedback?.rating;
+  const comment = message.feedback?.comment;
+  return (
+    <View style={[s.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
+      <CardHeader emoji="💬" label="Feedback Request" tag={message.feedback?.sessionTitle ?? undefined} colors={colors} s={s} />
+      {!!prompt && <Text style={[s.cardDesc, { color: colors.textMuted }]}>{prompt}</Text>}
+      {rating !== null && rating !== undefined && (
+        <Text style={[s.metaChip, { color: colors.textMuted, marginTop: 4 }]}>
+          {'★'.repeat(rating)}{'☆'.repeat(Math.max(0, 5 - rating))} {rating}/5
+        </Text>
+      )}
+      {!!comment && <Text style={[s.cardDesc, { color: colors.textMuted, marginTop: 4 }]}>{comment}</Text>}
+    </View>
+  );
+}
+
+function SessionBookingCard({ message, colors, s }: { message: SessionBookingMessageVM; colors: AppColors; s: S }) {
+  const { session } = message;
+  const statusColor = { scheduled: colors.textMuted, confirmed: '#22c55e', cancelled: '#ef4444', completed: colors.teal }[session.status] ?? colors.textMuted;
+  const statusLabel = { scheduled: '📅 Scheduled', confirmed: '✓ Confirmed', cancelled: '✗ Cancelled', completed: '✓ Completed' }[session.status];
+  return (
+    <View style={[s.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
+      <CardHeader emoji="🗓" label="Session Booked" tag={session.subject} colors={colors} s={s} />
+      <Text style={[s.cardTitle, { color: colors.text }]}>{session.title}</Text>
+      <Text style={[s.metaChip, { color: colors.textMuted }]}>
+        {formatDate(session.startAt)} · {formatTime(session.startAt)}
+        {session.durationMinutes ? ` · ${session.durationMinutes} min` : ''}
+      </Text>
+      <View style={[s.statusBadge, { backgroundColor: statusColor + '22' }]}>
+        <Text style={{ color: statusColor, fontWeight: '600', fontSize: 12 }}>{statusLabel}</Text>
+      </View>
+      {!!session.meetingLink && (
+        <TouchableOpacity
+          style={[s.joinBtn, { backgroundColor: colors.teal }]}
+          onPress={() => Linking.openURL(session.meetingLink!).catch(() => null)}
+        >
+          <Text style={{ color: colors.tealFg, fontWeight: '700', fontSize: 13 }}>Join Meeting</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+function PaymentReminderCard({ message, colors, s }: { message: PaymentReminderMessageVM; colors: AppColors; s: S }) {
+  const { payment } = message;
+  const statusColor = { pending: '#f59e0b', paid: '#22c55e', overdue: '#ef4444' }[payment.status] ?? colors.textMuted;
+  const statusLabel = { pending: '⏳ Pending', paid: '✓ Paid', overdue: '⚠ Overdue' }[payment.status];
+  return (
+    <View style={[s.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
+      <CardHeader emoji="💳" label="Payment Reminder" colors={colors} s={s} />
+      <Text style={[s.cardTitle, { color: colors.text }]}>
+        {payment.currency} {payment.amount.toLocaleString()}
+      </Text>
+      <View style={[s.statusBadge, { backgroundColor: statusColor + '22' }]}>
+        <Text style={{ color: statusColor, fontWeight: '600', fontSize: 12 }}>{statusLabel}</Text>
+      </View>
+      <Text style={[s.metaChip, { color: colors.textMuted, marginTop: 6 }]}>Due {formatDate(payment.dueAt)}</Text>
+      {!!payment.description && <Text style={[s.cardDesc, { color: colors.textMuted }]}>{payment.description}</Text>}
+    </View>
+  );
+}
+
 function SessionCompleteBar({ message, colors, s }: { message: SessionCompleteMessageVM; colors: AppColors; s: S }) {
   return (
     <View style={s.sessionCompleteRow}>
@@ -456,6 +552,11 @@ function makeStyles(colors: AppColors) {
     sessionCompleteCenter: { alignItems: 'center', gap: 4 },
     sessionCompleteIcon:   { width: 32, height: 32, borderRadius: 16, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
     sessionCompleteTitle:  { fontSize: 12, fontWeight: '600', textAlign: 'center', maxWidth: 160 },
+
+    // ── Inline thread expansion ────────────────────────────────────────────────
+    inlineThread:  { flexDirection: 'row', marginTop: 6 },
+    threadLine:    { width: 2, borderRadius: 1, alignSelf: 'stretch', marginLeft: 2, marginRight: 8 },
+    inlineReplies: { flex: 1 },
   });
 }
 
@@ -477,6 +578,8 @@ export type MessageItemProps = {
   onLongPress?: (message: MessageVM) => void;
   onReactionToggle?: (messageId: string, emoji: string) => void;
   onThreadOpen?: (message: MessageVM) => void;
+  currentProfileId?: string;
+  currentAccountId?: string;
 };
 
 export const MessageItem: React.FC<MessageItemProps> = ({
@@ -487,8 +590,13 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   onLongPress,
   onReactionToggle,
   onThreadOpen,
+  currentProfileId,
+  currentAccountId,
 }) => {
   const s = useMemo(() => makeStyles(colors), [colors]);
+  const [threadExpanded, setThreadExpanded] = useState(false);
+  const [threadReplies, setThreadReplies] = useState<MessageVM[]>([]);
+  const [threadLoading, setThreadLoading] = useState(false);
   const type = message.core.type;
   const senderDisplayName = message.core.sender.profile.displayName;
   const { url: avatarUrl, seed: avatarSeed } = getAvatarInfo(message);
@@ -496,6 +604,28 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   const reactions = message.social?.reactions ?? [];
   const thread = message.social?.thread ?? null;
   const isCard = CARD_TYPES.has(type);
+
+  const handleThreadPress = useCallback(async () => {
+    if (!thread) return;
+    const next = !threadExpanded;
+    setThreadExpanded(next);
+    if (next && threadReplies.length === 0) {
+      setThreadLoading(true);
+      try {
+        const replies = await fetchThreadMessages(
+          thread.ids.id,
+          message.ids.id,
+          currentProfileId ?? '',
+          currentAccountId ?? '',
+        );
+        setThreadReplies(replies);
+      } catch (err) {
+        console.warn('[MessageItem] fetchThreadMessages error:', err);
+      } finally {
+        setThreadLoading(false);
+      }
+    }
+  }, [thread, threadExpanded, threadReplies.length, message.ids.id, currentProfileId, currentAccountId]);
 
   // session-complete: full-width centred divider, no bubble
   if (type === 'session-complete') {
@@ -599,15 +729,32 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           {type === 'progress-update'     && <ProgressCard message={message as ProgressUpdateMessageVM} colors={colors} s={s} />}
           {type === 'event-reminder'      && <EventCard message={message as EventReminderMessageVM} colors={colors} s={s} />}
           {type === 'homework-submission' && <HomeworkCard message={message as HomeworkSubmissionMessageVM} colors={colors} s={s} />}
+          {type === 'feedback-request'    && <FeedbackRequestCard message={message as FeedbackRequestMessageVM} colors={colors} s={s} />}
+          {type === 'session-booking'     && <SessionBookingCard message={message as SessionBookingMessageVM} colors={colors} s={s} />}
+          {type === 'payment-reminder'    && <PaymentReminderCard message={message as PaymentReminderMessageVM} colors={colors} s={s} />}
           <SocialBar
             reactions={reactions}
             thread={thread}
             messageId={message.ids.id}
             colors={colors}
             onReactionToggle={onReactionToggle}
-            onThreadOpen={onThreadOpen}
-            message={message}
+            onThreadPress={handleThreadPress}
+            threadExpanded={threadExpanded}
           />
+          {threadExpanded && (
+            <View style={[s.inlineThread, isOwn && { alignSelf: 'stretch' }]}>
+              <View style={[s.threadLine, { backgroundColor: colors.border }]} />
+              <View style={s.inlineReplies}>
+                {threadLoading ? (
+                  <View style={{ paddingVertical: 8, alignItems: 'center' }}>
+                    <ActivityIndicator size="small" color={colors.teal} />
+                  </View>
+                ) : threadReplies.map((reply) => (
+                  <InlineReply key={reply.ids.id} message={reply} colors={colors} />
+                ))}
+              </View>
+            </View>
+          )}
         </View>
       </Pressable>
     );
@@ -651,9 +798,25 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           messageId={message.ids.id}
           colors={colors}
           onReactionToggle={onReactionToggle}
-          onThreadOpen={onThreadOpen}
-          message={message}
+          onThreadPress={handleThreadPress}
+          threadExpanded={threadExpanded}
         />
+
+        {/* Inline thread replies */}
+        {threadExpanded && (
+          <View style={[s.inlineThread, isOwn && { alignSelf: 'stretch' }]}>
+            <View style={[s.threadLine, { backgroundColor: colors.border }]} />
+            <View style={s.inlineReplies}>
+              {threadLoading ? (
+                <View style={{ paddingVertical: 8, alignItems: 'center' }}>
+                  <ActivityIndicator size="small" color={colors.teal} />
+                </View>
+              ) : threadReplies.map((reply) => (
+                <InlineReply key={reply.ids.id} message={reply} colors={colors} />
+              ))}
+            </View>
+          </View>
+        )}
       </View>
     </Pressable>
   );

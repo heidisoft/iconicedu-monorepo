@@ -136,6 +136,30 @@ export async function getMessagesByChannelIds(
     .returns<MessageRow[]>();
 }
 
+export async function getMessagesByThreadId(
+  supabase: SupabaseClient,
+  orgId: string,
+  threadId: string,
+  options: { parentMessageId?: string | null } = {},
+) {
+  let query = supabase
+    .from('messages')
+    .select(MESSAGE_SELECT)
+    .eq('org_id', orgId)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: true });
+
+  if (options.parentMessageId) {
+    query = query.or(
+      `thread_id.eq.${threadId},thread_parent_id.eq.${options.parentMessageId}`,
+    );
+  } else {
+    query = query.eq('thread_id', threadId);
+  }
+
+  return query.returns<MessageRow[]>();
+}
+
 export async function getThreadsByChannelId(
   supabase: SupabaseClient,
   orgId: string,

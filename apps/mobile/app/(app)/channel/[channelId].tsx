@@ -118,6 +118,7 @@ export default function ChannelConversationScreen() {
         <MessageList
           messages={messages ?? []}
           currentProfileId={profileId}
+          currentAccountId={accountId}
           onLoadMore={loadMore}
           loading={isLoading}
           refreshing={isRefetching}

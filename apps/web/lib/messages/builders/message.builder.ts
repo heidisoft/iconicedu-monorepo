@@ -12,6 +12,7 @@ import {
   getMessagesPageByChannelId,
   getMessageById,
   getMessageTextByMessageIds,
+  getMessagesByThreadId,
   getMessageImagesByMessageIds,
   getMessageFilesByMessageIds,
   getMessageDesignFileUpdatesByMessageIds,
@@ -126,6 +127,59 @@ export async function buildMessageById(
     payload: payloadsById.get(row.id) ?? null,
     reactions: reactionsByMessageId.get(row.id) ?? [],
     thread: thread ?? (row.thread_id ? options.threadsById?.get(row.thread_id) : undefined),
+  });
+}
+
+export async function buildMessagesByThreadId(
+  supabase: SupabaseClient,
+  orgId: string,
+  threadId: string,
+  options: { accountId?: string; parentMessageId?: string | null } = {},
+): Promise<MessageVM[]> {
+  const response = await getMessagesByThreadId(supabase, orgId, threadId, {
+    parentMessageId: options.parentMessageId,
+  });
+  const threadRows = response.data ?? [];
+
+  const parentRows = options.parentMessageId
+    ? [await getMessageById(supabase, orgId, options.parentMessageId)]
+    : [];
+  const parentRow = parentRows[0]?.data ?? null;
+
+  const rowsById = new Map<string, MessageRow>();
+  if (parentRow) {
+    rowsById.set(parentRow.id, parentRow);
+  }
+  threadRows.forEach((row) => rowsById.set(row.id, row));
+  const rows = Array.from(rowsById.values()).sort(
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+  );
+
+  if (!rows.length) return [];
+
+  const thread = await buildThreadById(supabase, orgId, threadId, {
+    accountId: options.accountId,
+  });
+  const threadsById = thread ? new Map([[threadId, thread]]) : undefined;
+
+  const mapped = await mapRowsToMessages(supabase, orgId, rows, threadsById);
+  if (!thread || !options.parentMessageId) {
+    return mapped;
+  }
+
+  const rowById = new Map(rows.map((row) => [row.id, row]));
+  return mapped.map((message) => {
+    const sourceRow = rowById.get(message.ids.id);
+    if (!sourceRow) return message;
+    if (message.social.thread) return message;
+    if (sourceRow.thread_parent_id !== options.parentMessageId) return message;
+    return {
+      ...message,
+      social: {
+        ...message.social,
+        thread,
+      },
+    };
   });
 }
 

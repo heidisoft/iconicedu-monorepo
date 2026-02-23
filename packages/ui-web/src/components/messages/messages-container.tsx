@@ -7,6 +7,7 @@ import { TypingIndicator } from '@iconicedu/ui-web/components/messages/typing-in
 import { useMessages } from '@iconicedu/ui-web/hooks/use-messages';
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
 import { useMessagesState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
+import { resolveThreadAfterReply } from '@iconicedu/ui-web/components/messages/thread-reply.utils';
 import type {
   ChannelVM,
   EducatorProfileVM,
@@ -232,32 +233,61 @@ export function MessagesContainer({
   );
 
   const handleOpenThread = useCallback(
-    (thread: ThreadVM, parentMessage: MessageVM) => {
-      const threadMessages = messages
+    async (thread: ThreadVM, parentMessage: MessageVM) => {
+      const localThreadMessages = messages
         .filter((message) => message.social.thread?.ids.id === thread.ids.id)
         .sort(
           (a, b) =>
             new Date(a.core.createdAt).getTime() - new Date(b.core.createdAt).getTime(),
         );
-      const resolvedThreadMessages = threadMessages.length
-        ? threadMessages
-        : [parentMessage];
-      const replyItems = resolvedThreadMessages.filter(
+      const localReplyItems = localThreadMessages.filter(
         (message) => message.ids.id !== parentMessage.ids.id,
       );
+      const expectedReplies = Math.max(0, (thread.stats?.messageCount ?? 1) - 1);
+      const needsFetch = expectedReplies > localReplyItems.length;
+
+      let resolvedReplies = localReplyItems;
+      if (needsFetch) {
+        try {
+          const params = new URLSearchParams({
+            threadId: thread.ids.id,
+            parentMessageId: parentMessage.ids.id,
+          });
+          const response = await window.fetch(`/api/messages/thread?${params.toString()}`);
+          if (response.ok) {
+            const payload = (await response.json()) as {
+              success?: boolean;
+              messages?: MessageVM[];
+            };
+            const fetchedMessages = payload.success ? (payload.messages ?? []) : [];
+            fetchedMessages.forEach((message) => addMessage(message));
+            resolvedReplies = fetchedMessages.filter(
+              (message) => message.ids.id !== parentMessage.ids.id,
+            );
+          }
+        } catch {
+          // Best effort thread hydration for inline view.
+        }
+      }
+
       setThreadData(thread, {
         replies: {
-          items: replyItems,
+          items: resolvedReplies,
           total:
             typeof thread.stats?.messageCount === 'number'
               ? Math.max(0, thread.stats.messageCount - 1)
-              : undefined,
+              : resolvedReplies.length,
         },
         parentMessage,
       });
-      toggle({ key: 'thread', threadId: thread.ids.id });
+      updateMessage(parentMessage.ids.id, {
+        social: {
+          ...(parentMessage.social ?? { reactions: [] }),
+          thread,
+        } as MessageVM['social'],
+      });
     },
-    [messages, setThreadData, toggle],
+    [addMessage, messages, setThreadData, updateMessage],
   );
 
   const syncParentThreadFromReply = useCallback(
@@ -327,6 +357,80 @@ export function MessagesContainer({
       messageWriteClient,
       currentUserId,
       readOnly,
+    ],
+  );
+
+  const handleSendThreadReply = useCallback(
+    async (parentMessage: MessageVM, thread: ThreadVM, content: string) => {
+      if (readOnly || !senderProfile) return;
+      const trimmed = content.trim();
+      if (!trimmed) return;
+
+      const createdMessage = messageWriteClient && currentUserId
+        ? await messageWriteClient.sendTextMessage({
+            orgId: channel.ids.orgId,
+            channelId: channel.ids.id,
+            senderProfileId: currentUserId,
+            content: trimmed,
+            threadId: thread.ids.id,
+            threadParentId: thread.parent.messageId ?? parentMessage.ids.id,
+          })
+        : ({
+            ids: { id: `reply-${Date.now()}`, orgId: channel.ids.orgId },
+            core: {
+              type: 'text',
+              sender: senderProfile,
+              createdAt: new Date().toISOString(),
+              visibility: { type: 'all' },
+            },
+            social: {
+              reactions: [],
+            },
+            state: {
+              isSaved: false,
+            },
+            content: { text: trimmed },
+          } as TextMessageVM);
+
+      const exists = messagesRef.current.some(
+        (message) => message.ids.id === createdMessage.ids.id,
+      );
+      if (!exists) {
+        addMessage(createdMessage);
+      }
+
+      const now = new Date().toISOString();
+      const existingReplyCount = messagesRef.current.filter((message) => {
+        const messageThread = message.social.thread;
+        if (!messageThread) return false;
+        if (messageThread.ids.id !== thread.ids.id) return false;
+        return message.ids.id !== parentMessage.ids.id;
+      }).length;
+      const { thread: updatedThread, message: messageWithThread } =
+        resolveThreadAfterReply({
+          currentThread: thread,
+          sentMessage: createdMessage,
+          replyCount: existingReplyCount + 1,
+          now,
+        });
+
+      updateMessage(createdMessage.ids.id, messageWithThread);
+      updateMessage(parentMessage.ids.id, {
+        social: {
+          ...(parentMessage.social ?? { reactions: [] }),
+          thread: updatedThread,
+        } as MessageVM['social'],
+      });
+    },
+    [
+      readOnly,
+      senderProfile,
+      messageWriteClient,
+      currentUserId,
+      channel.ids.orgId,
+      channel.ids.id,
+      addMessage,
+      updateMessage,
     ],
   );
 
@@ -801,6 +905,7 @@ export function MessagesContainer({
   const messageListProps = useMemo(
     () => ({
       messages: filteredMessages,
+      threadMessagesSource: messages,
       onOpenThread: handleOpenThread,
       onProfileClick: handleProfileClick,
       onToggleReaction: handleToggleReaction,
@@ -808,6 +913,8 @@ export function MessagesContainer({
       onToggleHidden: handleToggleHidden,
       onDelete: handleDeleteMessage,
       currentUserId,
+      isReadOnly: readOnly,
+      onSendThreadReply: handleSendThreadReply,
       lastReadMessageId,
       lastReadAt,
       hasMore: hasMoreOlderMessages,
@@ -818,6 +925,7 @@ export function MessagesContainer({
     }),
     [
       filteredMessages,
+      messages,
       handleOpenThread,
       handleProfileClick,
       handleToggleReaction,
@@ -825,6 +933,8 @@ export function MessagesContainer({
       handleToggleHidden,
       handleDeleteMessage,
       currentUserId,
+      readOnly,
+      handleSendThreadReply,
       lastReadMessageId,
       lastReadAt,
       hasMoreOlderMessages,

@@ -77,6 +77,7 @@ const sepStyles = StyleSheet.create({
 type MessageListProps = {
   messages: MessageVM[];
   currentProfileId: string;
+  currentAccountId?: string;
   onLoadMore?: () => void;
   loading?: boolean;
   refreshing?: boolean;
@@ -91,6 +92,7 @@ type MessageListProps = {
 export const MessageList: React.FC<MessageListProps> = ({
   messages,
   currentProfileId,
+  currentAccountId,
   onLoadMore,
   loading = false,
   refreshing = false,
@@ -154,10 +156,12 @@ export const MessageList: React.FC<MessageListProps> = ({
           onLongPress={onMessageLongPress}
           onReactionToggle={onReactionToggle}
           onThreadOpen={onThreadOpen}
+          currentProfileId={currentProfileId}
+          currentAccountId={currentAccountId}
         />
       );
     },
-    [currentProfileId, listData, colors, onMessageLongPress, onReactionToggle, onThreadOpen],
+    [currentProfileId, currentAccountId, listData, colors, onMessageLongPress, onReactionToggle, onThreadOpen],
   );
 
   const keyExtractor = useCallback((item: MessageListItem) => {

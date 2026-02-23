@@ -14,7 +14,6 @@ import { MessagesRightSidebarRegion } from '@iconicedu/ui-web/components/message
 import { ChannelInfoPanel } from '@iconicedu/ui-web/components/messages/panels/channel-info-panel';
 import { ProfilePanel } from '@iconicedu/ui-web/components/messages/panels/profile-panel';
 import { SavedPanel } from '@iconicedu/ui-web/components/messages/panels/saved-panel';
-import { ThreadPanel } from '@iconicedu/ui-web/components/messages/panels/thread-panel';
 import type {
   MessagesRightPanelRegistry,
   MessagesRightPanelIntent,
@@ -42,7 +41,7 @@ export const MessagesShell = memo(function MessagesShell(props: MessagesShellPro
       channel_info: ChannelInfoPanel,
       saved: SavedPanel,
       profile: ProfilePanel,
-      thread: ThreadPanel,
+      thread: () => null,
     };
     return { ...defaultRegistry, ...(props.panelRegistry ?? {}) };
   }, [props.panelRegistry]);

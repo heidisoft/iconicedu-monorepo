@@ -40,7 +40,7 @@ import type { MessageVM, ThreadVM } from '@iconicedu/shared-types';
 
 interface MessageActionsProps {
   message: MessageVM;
-  onOpenThread: (thread: ThreadVM, parentMessage: MessageVM) => void;
+  onOpenThread: (thread: ThreadVM, parentMessage: MessageVM) => void | Promise<void>;
   onAddReaction?: (emoji: string) => void;
   onToggleSaved?: () => void;
   onToggleHidden?: () => void;

@@ -11,22 +11,34 @@ import { MessageItem } from '@iconicedu/ui-web/components/messages/message-item'
 import { EmptyMessagesState } from '@iconicedu/ui-web/components/messages/empty-state';
 import type { ISODateTime, MessageVM, ThreadVM, UUID } from '@iconicedu/shared-types';
 import { ScrollArea } from '@iconicedu/ui-web/ui/scroll-area';
-import { formatDateHeader } from '@iconicedu/ui-web/lib/message-utils';
+import { formatDateHeader, formatTime } from '@iconicedu/ui-web/lib/message-utils';
 import { findUnreadAnchorMessageId } from '@iconicedu/ui-web/components/messages/unread-indicator.utils';
 import { findLatestIncomingMessageId } from '@iconicedu/ui-web/components/messages/read-state.utils';
 import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
-import { formatTime } from '@iconicedu/ui-web/lib/message-utils';
+import { Button } from '@iconicedu/ui-web/ui/button';
+import { Input } from '@iconicedu/ui-web/ui/input';
+import {
+  buildThreadRepliesByParent,
+  getInlineReplyPreview,
+} from '@iconicedu/ui-web/components/messages/message-list.inline-thread.utils';
 
 interface MessageListProps {
   messages: MessageVM[];
-  onOpenThread: (thread: ThreadVM, parentMessage: MessageVM) => void;
+  threadMessagesSource?: MessageVM[];
+  onOpenThread: (thread: ThreadVM, parentMessage: MessageVM) => void | Promise<void>;
+  onSendThreadReply?: (
+    parentMessage: MessageVM,
+    thread: ThreadVM,
+    content: string,
+  ) => Promise<void> | void;
   onProfileClick: (userId: string) => void;
   onToggleReaction?: (messageId: string, emoji: string) => void;
   onToggleSaved?: (messageId: string) => void;
   onToggleHidden?: (messageId: string) => void;
   onDelete?: (messageId: string) => void;
   currentUserId?: string;
+  isReadOnly?: boolean;
   lastReadMessageId?: UUID;
   lastReadAt?: ISODateTime;
   initialScrollToBottom?: boolean;
@@ -44,13 +56,16 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
   (
     {
       messages,
+      threadMessagesSource,
       onOpenThread,
+      onSendThreadReply,
       onProfileClick,
       onToggleReaction,
       onToggleSaved,
       onToggleHidden,
       onDelete,
       currentUserId,
+      isReadOnly = false,
       lastReadMessageId,
       lastReadAt,
       initialScrollToBottom = false,
@@ -70,6 +85,13 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
     const isNearBottomRef = useRef(false);
     const lastNotifiedReadIdRef = useRef<UUID | null>(null);
     const [expandedThreadsByParent, setExpandedThreadsByParent] = useState<
+      Record<UUID, boolean>
+    >({});
+    const [openedThreadByParent, setOpenedThreadByParent] = useState<
+      Record<UUID, ThreadVM>
+    >({});
+    const [draftByParent, setDraftByParent] = useState<Record<UUID, string>>({});
+    const [loadingThreadsByParent, setLoadingThreadsByParent] = useState<
       Record<UUID, boolean>
     >({});
 
@@ -114,6 +136,15 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
             new Date(a.core.createdAt).getTime() - new Date(b.core.createdAt).getTime(),
         ),
       [messages],
+    );
+
+    const sortedThreadSourceMessages = useMemo(
+      () =>
+        [...(threadMessagesSource ?? messages)].sort(
+          (a, b) =>
+            new Date(a.core.createdAt).getTime() - new Date(b.core.createdAt).getTime(),
+        ),
+      [messages, threadMessagesSource],
     );
 
     const unreadAnchorMessageId = useMemo(
@@ -256,43 +287,49 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
       return groups;
     }, [sortedMessages]);
 
-    const threadRepliesByParent = useMemo(() => {
-      const replies = new Map<UUID, MessageVM[]>();
-      sortedMessages.forEach((candidate) => {
-        const thread = candidate.social.thread;
-        if (!thread) return;
-        const parentId = thread.parent.messageId;
-        if (!parentId || candidate.ids.id === parentId) return;
-        const existing = replies.get(parentId) ?? [];
-        existing.push(candidate);
-        replies.set(parentId, existing);
-      });
-      return replies;
-    }, [sortedMessages]);
-
-    const getInlineReplyPreview = useCallback((message: MessageVM) => {
-      if ('content' in message && message.content && 'text' in message.content) {
-        const value = message.content.text;
-        if (typeof value === 'string' && value.trim().length > 0) {
-          return value;
-        }
-      }
-      return 'Shared an update';
-    }, []);
+    const threadRepliesByParent = useMemo(
+      () => buildThreadRepliesByParent(sortedThreadSourceMessages),
+      [sortedThreadSourceMessages],
+    );
 
     const handleThreadIndicatorClick = useCallback(
-      (thread: ThreadVM, parentMessage: MessageVM) => {
+      async (thread: ThreadVM, parentMessage: MessageVM) => {
         const parentId = thread.parent.messageId ?? parentMessage.ids.id;
-        if ((threadRepliesByParent.get(parentId)?.length ?? 0) === 0) {
-          onOpenThread(thread, parentMessage);
+        if (expandedThreadsByParent[parentId]) {
+          setExpandedThreadsByParent((prev) => ({
+            ...prev,
+            [parentId]: false,
+          }));
           return;
         }
+        setOpenedThreadByParent((prev) => ({ ...prev, [parentId]: thread }));
         setExpandedThreadsByParent((prev) => ({
           ...prev,
-          [parentId]: !prev[parentId],
+          [parentId]: true,
         }));
+        setLoadingThreadsByParent((prev) => ({ ...prev, [parentId]: true }));
+        try {
+          await onOpenThread(thread, parentMessage);
+        } finally {
+          setLoadingThreadsByParent((prev) => ({ ...prev, [parentId]: false }));
+        }
       },
-      [onOpenThread, threadRepliesByParent],
+      [expandedThreadsByParent, onOpenThread],
+    );
+
+    const handleThreadDraftChange = useCallback((parentId: UUID, value: string) => {
+      setDraftByParent((prev) => ({ ...prev, [parentId]: value }));
+    }, []);
+
+    const handleSendInlineReply = useCallback(
+      async (parentMessage: MessageVM, thread: ThreadVM) => {
+        const parentId = parentMessage.ids.id;
+        const content = (draftByParent[parentId] ?? '').trim();
+        if (!content) return;
+        await onSendThreadReply?.(parentMessage, thread, content);
+        setDraftByParent((prev) => ({ ...prev, [parentId]: '' }));
+      },
+      [draftByParent, onSendThreadReply],
     );
 
     return (
@@ -324,6 +361,10 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
             {group.messages.map((message) => {
               const showUnreadDivider =
                 unreadAnchorMessageId !== null && message.ids.id === unreadAnchorMessageId;
+              const inlineThread =
+                openedThreadByParent[message.ids.id] ?? message.social.thread;
+              const isInlineThreadExpanded =
+                Boolean(inlineThread) && Boolean(expandedThreadsByParent[message.ids.id]);
               return (
                 <div
                   key={message.ids.id}
@@ -356,11 +397,15 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                     onDelete={onDelete}
                     currentUserId={currentUserId}
                   />
-                  {message.social.thread &&
-                    expandedThreadsByParent[message.ids.id] &&
-                    (threadRepliesByParent.get(message.ids.id)?.length ?? 0) > 0 && (
+                  {isInlineThreadExpanded && (
                       <div className="pl-10 pr-2 pb-2">
-                        <div className="ml-4 border-l-2 border-border/70 pl-5 space-y-3">
+                        <div className="ml-4 border-l-2 border-border/60 pl-5 space-y-4">
+                          {loadingThreadsByParent[message.ids.id] && (
+                            <div className="inline-flex items-center gap-2 rounded-full bg-muted/50 px-3 py-1 text-xs text-muted-foreground">
+                              <span className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground/70" />
+                              Loading replies...
+                            </div>
+                          )}
                           {(threadRepliesByParent.get(message.ids.id) ?? []).map((reply) => {
                             const senderName = getProfileDisplayName(reply.core.sender.profile);
                             return (
@@ -371,25 +416,65 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                   themeKey={reply.core.sender.ui?.themeKey}
                                   showStatus={false}
                                   sizeClassName="h-8 w-8"
-                                  fallbackClassName="text-sm"
+                                  fallbackClassName="text-xs"
                                   initialsLength={1}
                                 />
                                 <div className="min-w-0">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-sm font-semibold text-foreground">
+                                  <div className="flex items-center gap-3">
+                                    <span className="text-sm font-semibold leading-none text-foreground">
                                       {senderName}
                                     </span>
-                                    <span className="text-sm text-muted-foreground">
+                                    <span className="text-xs leading-none text-muted-foreground">
                                       {formatTime(reply.core.createdAt)}
                                     </span>
                                   </div>
-                                  <p className="mt-1 text-base leading-snug text-foreground/90 break-words">
+                                  <p className="mt-1 text-sm leading-relaxed text-foreground/85 break-words">
                                     {getInlineReplyPreview(reply)}
                                   </p>
                                 </div>
                               </div>
                             );
                           })}
+                          {!loadingThreadsByParent[message.ids.id] &&
+                            (threadRepliesByParent.get(message.ids.id)?.length ?? 0) === 0 && (
+                              <p className="text-sm text-muted-foreground">
+                                No replies yet.
+                              </p>
+                            )}
+                          {!isReadOnly && (
+                            <form
+                              className="pt-1"
+                              onSubmit={(event) => {
+                                event.preventDefault();
+                                if (!inlineThread) return;
+                                void handleSendInlineReply(message, inlineThread);
+                              }}
+                            >
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  value={draftByParent[message.ids.id] ?? ''}
+                                  onChange={(event) =>
+                                    handleThreadDraftChange(
+                                      message.ids.id,
+                                      event.target.value,
+                                    )
+                                  }
+                                  placeholder="Reply in thread..."
+                                  className="h-9 rounded-full"
+                                />
+                                <Button
+                                  type="submit"
+                                  size="sm"
+                                  className="rounded-full"
+                                  disabled={
+                                    !(draftByParent[message.ids.id] ?? '').trim().length
+                                  }
+                                >
+                                  Send
+                                </Button>
+                              </div>
+                            </form>
+                          )}
                         </div>
                       </div>
                     )}

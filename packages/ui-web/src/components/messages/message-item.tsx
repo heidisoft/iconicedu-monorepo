@@ -40,7 +40,7 @@ import {
 
 interface MessageItemProps {
   message: MessageVM;
-  onOpenThread: (thread: ThreadVM, parentMessage: MessageVM) => void;
+  onOpenThread: (thread: ThreadVM, parentMessage: MessageVM) => void | Promise<void>;
   isThreadReply?: boolean;
   currentUserId?: UUID;
   onProfileClick: (userId: UUID) => void;
