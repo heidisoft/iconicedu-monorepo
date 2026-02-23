@@ -1,389 +1,192 @@
-# 📘 ICONIC EDU — Monorepo
+# IconicEdu — Monorepo
 
-A communication-first education platform connecting **guardians, educators, children, advisors, and staff** through:
-
-* Modern chat & channels
-* Scheduling & classes
-* Progress tracking
-* Homework workflows
-* Parent Advisor support
-* Multi-role dashboards
-* Web, Mobile, and API apps
-
-This monorepo powers the entire ecosystem.
+A communication-first education platform connecting **guardians, educators, children, advisors, and staff** through modern chat, scheduling, progress tracking, and homework workflows.
 
 ---
 
-# 🏗️ Tech Stack
+## Tech Stack
 
-### **Frontend**
-
-* **Next.js 14** (App Router) — Web app
-* **Expo / React Native** — Mobile app
-* **Tailwind CSS** — Web styling
-* **NativeWind** — Mobile styling
-* **Turborepo** — Monorepo orchestration
-* **Shared UI libraries** (Web + Native)
-
-### **Backend**
-
-* **NestJS 10** — API service
-* **Prisma** — ORM
-* **Supabase Postgres** — Database
-* **Supabase Auth** — Authentication
-* **Supabase Storage** — Files / homework uploads
-* **RLS** — Row-level security
-
-### **Package Management**
-
-* **pnpm 9**
-* **TypeScript everywhere**
-* Local packages:
-
-  * `@iconicedu/ui-web`
-  * `@iconicedu/ui-native`
-  * `@iconicedu/shared-types`
-  * `@iconicedu/utils`
+| Layer | Technology |
+|---|---|
+| Web | Next.js 15 (App Router) |
+| Mobile | Expo 54 + React Native 0.81 |
+| API | NestJS 11 |
+| ORM | Prisma 7 |
+| Database | Supabase PostgreSQL + RLS |
+| Auth | Supabase Auth |
+| Storage | Supabase Storage |
+| Styling | Tailwind CSS (web) · NativeWind v4 (mobile) |
+| Monorepo | Turborepo 2 |
+| Package manager | pnpm 9.12.0 |
 
 ---
 
-# 📁 Monorepo Structure
+## Monorepo Structure
 
 ```
 iconicedu-monorepo/
-├─ apps/
-│  ├─ web/        # Next.js web app
-│  ├─ mobile/     # Expo mobile app
-│  └─ api/        # NestJS backend
+├── apps/
+│   ├── web/          # Next.js 15 web app
+│   ├── mobile/       # Expo 54 mobile app
+│   └── api/          # NestJS 11 backend
 │
-├─ packages/
-│  ├─ ui-web/       # Web UI kit (Tailwind + React)
-│  ├─ ui-native/    # Native UI kit (React Native + NativeWind)
-│  ├─ shared-types/ # Shared DTOs, domain models
-│  ├─ utils/        # Shared utilities
-│  ├─ config-eslint/
-│  └─ config-tsconfig/
+├── packages/
+│   ├── ui-web/       # Web UI kit (shadcn/Radix + Tailwind)
+│   ├── ui-native/    # Native UI kit (NativeWind)
+│   ├── shared-types/ # VMs, rows, payloads, shared enums
+│   ├── utils/        # Shared utilities
+│   ├── config-eslint/
+│   └── config-tsconfig/
 │
-├─ supabase/
-│  ├─ schema.sql    # Tables + RLS
-│  └─ migrations/   # Optional
+├── supabase/
+│   └── migrations/   # All database migrations (source of truth)
 │
-├─ turbo.json
-├─ pnpm-workspace.yaml
-├─ package.json
-├─ .nvmrc
-├─ .tool-versions
-└─ README.md
+├── docs/             # Detailed documentation
+├── turbo.json
+├── pnpm-workspace.yaml
+└── package.json
 ```
 
 ---
 
-# ⚙️ Requirements
+## Quick Start
 
-To avoid Node / pnpm / Expo issues, all devs MUST use:
+> Full setup guide with Supabase, environment variables, and troubleshooting: [docs/setup.md](docs/setup.md)
 
-* **Node 20.18.1**
-* **pnpm 9.12.0**
-* macOS, Linux, or Windows via **WSL2**
+### 1. Prerequisites
 
-## Recommended OS for development
-
-| Platform             | Supported | Notes                                   |
-| -------------------- | --------- | --------------------------------------- |
-| **macOS**            | ✅ Best    | Required for iOS simulator              |
-| **Linux (Ubuntu)**   | ✅         | Fastest builds                          |
-| **Windows (native)** | ❌ NO      | Not supported due to Expo/Prisma issues |
-| **Windows (WSL2)**   | ✅         | Required for Windows devs               |
-
----
-
-# 🪟 Windows Setup (WSL2 Required)
-
-### 1. Enable WSL2
-
-```powershell
-wsl --install
-```
-
-### 2. Install build tools inside Ubuntu
+- **Node 20.19.0** — use `.nvmrc` or `.tool-versions`
+- **pnpm 9.12.0**
+- macOS or Linux (Windows requires WSL2)
 
 ```bash
-sudo apt update
-sudo apt install -y build-essential curl git openssl
-```
-
-### 3. Install ASDF (recommended)
-
-```bash
-git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch v0.14.0
-echo '. "$HOME/.asdf/asdf.sh"' >> ~/.bashrc
-source ~/.bashrc
-```
-
-Add tool plugins:
-
-```bash
-asdf plugin-add nodejs
-asdf plugin-add pnpm
-asdf plugin-add yarn
-asdf install
-```
-
----
-
-# 🐧 Linux Setup (Ubuntu / Debian)
-
-### Install dependencies
-
-```bash
-sudo apt update
-sudo apt install -y build-essential curl git libssl-dev libudev-dev pkg-config
-```
-
-Then install ASDF or NVM.
-
----
-
-# 🍎 macOS Setup
-
-### Install Homebrew
-
-```bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-```
-
-### Install Node version manager (choose one)
-
-#### Option A — NVM
-
-```bash
-brew install nvm
-mkdir ~/.nvm
-```
-
-Add to `~/.zshrc`:
-
-```bash
-export NVM_DIR="$HOME/.nvm"
-source $(brew --prefix nvm)/nvm.sh
-```
-
-Install Node:
-
-```bash
-nvm install 20.18.1
-nvm use 20.18.1
-```
-
-#### Option B — ASDF
-
-```bash
-brew install asdf
-asdf plugin-add nodejs
-asdf plugin-add pnpm
-asdf plugin-add yarn
-asdf install
-```
-
----
-
-# 🧩 Node & pnpm Versions (Important)
-
-The repo includes:
-
-### `.nvmrc`
-
-```
-20.18.1
-```
-
-### `.tool-versions`
-
-```
-nodejs 20.18.1
-pnpm 9.12.0
-yarn 1.22.22
-```
-
-To ensure your environment matches, run:
-
-```bash
+# Using nvm
 nvm use
-# or
+
+# Using asdf
 asdf install
 ```
 
----
-
-# 📦 Install Dependencies
-
-From the project root:
+### 2. Install dependencies
 
 ```bash
 pnpm install
 ```
 
-pnpm automatically links all workspace packages.
-
----
-
-# 🔐 Environment Variables
-
-Create `.env` files:
-
-```
-apps/web/.env.local
-apps/api/.env
-apps/mobile/.env
-```
-
-Typical variables include:
-
-```
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
-DATABASE_URL=
-```
-
----
-
-# ▶️ Running the Apps
-
-## Web App (Next.js)
+### 3. Set up environment variables
 
 ```bash
-pnpm dev:web
+cp apps/web/.env.local.example apps/web/.env.local
+cp apps/mobile/.env.example apps/mobile/.env
+cp apps/api/.env.example apps/api/.env
 ```
 
-Runs at: [http://localhost:3000](http://localhost:3000)
+Fill in your Supabase credentials — see [docs/setup.md#environment-variables](docs/setup.md#environment-variables).
 
----
-
-## Mobile App (Expo)
+### 4. Set up Supabase and apply migrations
 
 ```bash
-pnpm dev:mobile
-```
-
-Opens Expo Dev Tools:
-
-* Press **i** — iOS Simulator (macOS only)
-* Press **a** — Android Emulator
-* Scan QR — physical device
-
----
-
-## API Server (NestJS)
-
-```bash
-pnpm dev:api
-```
-
-Backend runs at:
-`http://localhost:3001`
-
-Swagger docs:
-`http://localhost:3001/docs`
-
----
-
-# 🗄️ Database Setup (Supabase)
-
-### 1. Install Supabase CLI
-
-```bash
-brew install supabase/tap/supabase
-```
-
-### 2. Link to your project
-
-```bash
-supabase login
-supabase link --project-ref <PROJECT_ID>
-```
-
-### 3. Apply the schema
-
-```bash
+# Apply all migrations to your Supabase project
+supabase link --project-ref <your-project-ref>
 supabase db push
 ```
 
-or:
+See [docs/setup.md#supabase-setup](docs/setup.md#supabase-setup) for local development with the Supabase CLI.
+
+### 5. Build shared packages
 
 ```bash
-psql $DATABASE_URL -f supabase/schema.sql
+pnpm build:packages
+```
+
+### 6. Run the apps
+
+```bash
+pnpm dev:web       # Next.js  → http://localhost:3000
+pnpm dev:api       # NestJS   → http://localhost:3001
+pnpm dev:mobile    # Expo     → scan QR or press i/a
 ```
 
 ---
 
-# 🧰 Useful Commands
-
-Build everything:
+## Common Commands
 
 ```bash
-pnpm build
+pnpm dev                 # All apps in parallel
+pnpm build               # Build everything
+pnpm lint                # Lint all packages
+pnpm typecheck           # Type-check all packages
+pnpm test                # Run all tests
+pnpm ci                  # Full pipeline (lint + typecheck + test + build)
+pnpm clean               # Clear build caches
+pnpm clean:all           # Clear build caches + node_modules
 ```
 
-Lint everything:
+### Scoped commands
 
 ```bash
-pnpm lint
+pnpm dev:web             # Web only
+pnpm dev:mobile          # Mobile + ui-native only
+pnpm dev:api             # API only
+pnpm test:web            # Web + ui-web tests
+pnpm test:mobile         # Mobile + ui-native tests
 ```
 
-Run tests:
+### Mobile native builds (EAS)
 
 ```bash
-pnpm test
+pnpm mobile:ios          # Run on iOS Simulator
+pnpm mobile:android      # Run on Android Emulator
+pnpm mobile:eas:build:dev     # EAS development build
+pnpm mobile:eas:build:preview # EAS preview build
 ```
 
-Update all shared packages:
+### Database (Prisma — API only)
 
 ```bash
-pnpm -w build
+pnpm --filter api db:generate  # Regenerate Prisma client
+pnpm --filter api db:migrate   # Create and apply new migration
+pnpm --filter api db:studio    # Open Prisma Studio
 ```
 
 ---
 
-# 🧨 Troubleshooting
+## Documentation
 
-### ❗ `ERR_PNPM_FETCH_404`
+| Document | Description |
+|---|---|
+| [docs/setup.md](docs/setup.md) | Full local environment setup, Supabase, env vars |
+| [docs/contributing.md](docs/contributing.md) | Branch naming, commits, PR process |
+| [docs/best-practices.md](docs/best-practices.md) | Code conventions, patterns, adding packages |
+| [docs/AGENTS.md](docs/AGENTS.md) | Architecture deep-dive, type system, data flow |
 
-You forgot to use `"workspace:*"` in dependencies.
+---
 
-### ❗ Corepack signature error
+## Supported Platforms
 
-Use Node 20:
+| Platform | Status | Notes |
+|---|---|---|
+| macOS | Best | Required for iOS Simulator |
+| Linux (Ubuntu/Debian) | Supported | Fastest CI builds |
+| Windows (native) | Not supported | Expo/Metro issues |
+| Windows (WSL2) | Supported | Works well for API/web |
 
+---
+
+## Troubleshooting
+
+**`ERR_PNPM_FETCH_404`** — You forgot to use `workspace:*` in a local dependency.
+
+**Corepack signature error** — Use Node 20 and re-activate corepack:
 ```bash
 nvm use 20
 corepack prepare pnpm@9.12.0 --activate
 ```
 
-### ❗ Expo throws Metro symlink errors
+**Metro symlink errors on Expo** — Don't run on Windows native Node; use WSL2 or macOS.
 
-Do NOT run on Windows native Node — use WSL2.
+**SWC errors on Next.js** — Node version mismatch. Run `nvm use`.
 
-### ❗ SWC errors on Next.js
+**`prisma generate` fails** — Ensure `DATABASE_URL` is set in `apps/api/.env` before running.
 
-Means your Node version mismatched.
-Fix with:
-
-```bash
-nvm use
-```
-
----
-
-# 🤝 Contributing
-
-1. Use Node 20
-2. Use pnpm
-3. Ensure all shared packages build:
-
-```bash
-pnpm -w build
-```
-
-4. Open PR with clear scope
-5. All changes must pass lint + typecheck
+For more, see [docs/setup.md#troubleshooting](docs/setup.md#troubleshooting).
