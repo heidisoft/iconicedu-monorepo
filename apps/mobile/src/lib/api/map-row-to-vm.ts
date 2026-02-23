@@ -24,12 +24,6 @@ export type RawMessageRow = {
 
 export type RawSenderProfile = RawMessageRow['sender'];
 
-export type ThreadStats = {
-  messageCount: number;
-  lastReplyAt: string;
-  participants: RawSenderProfile[];
-};
-
 export function buildSenderProfile(
   sender: RawSenderProfile,
   orgId: string,
@@ -56,31 +50,17 @@ export function buildSenderProfile(
  * Map a raw messages row + its payload (from the type-specific table) + reactions
  * into a MessageVM. Callers are responsible for fetching and passing the payload
  * and reactions separately (multi-step query pattern mirrors apps/web/lib/messages/).
- * Pass threadStats for top-level messages to populate social.thread.
+ * Pass thread for top-level messages to populate social.thread.
  */
 export function mapRowToMessageVM(
   row: RawMessageRow,
   payload: Record<string, unknown> | null,
   reactions: ReactionVM[],
-  threadStats?: ThreadStats,
+  thread?: ThreadVM,
 ): MessageVM {
   const c = payload ?? {};
   const sender = buildSenderProfile(row.sender, row.org_id);
   const previewText = String(c.text ?? '');
-
-  const thread: ThreadVM | undefined = threadStats
-    ? {
-        ids: { id: row.id, orgId: row.org_id },
-        parent: { messageId: row.id },
-        stats: {
-          messageCount: threadStats.messageCount,
-          lastReplyAt: threadStats.lastReplyAt,
-        },
-        participants: threadStats.participants.map((p) =>
-          buildSenderProfile(p, row.org_id),
-        ),
-      }
-    : undefined;
 
   const base = {
     ids: { id: row.id, orgId: row.org_id },
@@ -91,7 +71,6 @@ export function mapRowToMessageVM(
       visibility: { type: 'all' as const },
     },
     social: { reactions, ...(thread ? { thread } : {}) },
-    ...(row.thread_parent_id ? { threadParentId: row.thread_parent_id } : {}),
   };
 
   // The payload object IS the full type-specific payload (from message_text.payload etc.)

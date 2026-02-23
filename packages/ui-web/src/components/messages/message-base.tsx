@@ -241,15 +241,37 @@ export const MessageBase = memo(function MessageBase({
             )}
           </div>
 
-          <div
-            className={cn(
-              'inline-block w-fit max-w-full rounded-[12px] px-3 py-2',
-              isOwnMessage
-                ? 'bg-primary/22 text-foreground'
-                : 'bg-muted/45 text-foreground',
+          <div className="relative inline-block max-w-full">
+            <div
+              className={cn(
+                'inline-block w-fit max-w-full rounded-[12px] px-3 py-2',
+                isOwnMessage
+                  ? 'bg-primary/22 text-foreground'
+                  : 'bg-muted/45 text-foreground',
+              )}
+            >
+              {children}
+            </div>
+
+            {(isHovered || isDropdownOpen) && (
+              <MessageActions
+                message={message}
+                onOpenThread={onOpenThread}
+                onAddReaction={handleToggleReaction}
+                onToggleSaved={onToggleSaved}
+                onToggleHidden={onToggleHidden}
+                onDelete={onDelete}
+                isThreadReply={isThreadReply}
+                onDropdownOpenChange={setIsDropdownOpen}
+                currentUserId={currentUserId}
+                className={cn(
+                  'top-0 z-20 -translate-y-1/2',
+                  isOwnMessage
+                    ? 'left-0 right-auto -translate-x-1/2'
+                    : 'right-0 left-auto translate-x-1/2',
+                )}
+              />
             )}
-          >
-            {children}
           </div>
 
           <div
@@ -273,20 +295,6 @@ export const MessageBase = memo(function MessageBase({
           </div>
         </div>
       </div>
-
-      {(isHovered || isDropdownOpen) && (
-        <MessageActions
-          message={message}
-          onOpenThread={onOpenThread}
-          onAddReaction={handleToggleReaction}
-          onToggleSaved={onToggleSaved}
-          onToggleHidden={onToggleHidden}
-          onDelete={onDelete}
-          isThreadReply={isThreadReply}
-          onDropdownOpenChange={setIsDropdownOpen}
-          currentUserId={currentUserId}
-        />
-      )}
     </div>
   );
 });

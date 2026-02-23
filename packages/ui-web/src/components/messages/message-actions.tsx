@@ -31,7 +31,6 @@ import {
   Copy,
   Trash2,
   EyeOff,
-  Pin,
   SmilePlus,
 } from 'lucide-react';
 import { EmojiPicker } from '@iconicedu/ui-web/components/messages/emoji-picker';
@@ -49,6 +48,7 @@ interface MessageActionsProps {
   isThreadReply?: boolean;
   onDropdownOpenChange?: (open: boolean) => void;
   currentUserId?: string;
+  className?: string;
 }
 
 export const MessageActions = memo(function MessageActions({
@@ -61,6 +61,7 @@ export const MessageActions = memo(function MessageActions({
   isThreadReply,
   onDropdownOpenChange,
   currentUserId,
+  className,
 }: MessageActionsProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -128,7 +129,7 @@ export const MessageActions = memo(function MessageActions({
   const isOwnMessage = currentUserId === message.core.sender.ids.id;
 
   return (
-    <div className="absolute right-2 top-0 z-10 flex items-center gap-1 rounded-xl border bg-card px-1 py-1 shadow-md">
+    <div className={cn("absolute right-2 top-0 z-10 flex items-center gap-1 rounded-xl border bg-card px-1 py-1 shadow-md", className)}>
       {!isThreadReply && (
         <TooltipProvider>
           <Tooltip>

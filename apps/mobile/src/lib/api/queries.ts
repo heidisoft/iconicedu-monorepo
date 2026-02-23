@@ -5,8 +5,9 @@ import type {
   LearningSpaceVM,
   MessageVM,
   ReactionVM,
+  ThreadVM,
 } from '@iconicedu/shared-types';
-import { mapRowToMessageVM, type RawMessageRow, type ThreadStats, type RawSenderProfile } from './map-row-to-vm';
+import { mapRowToMessageVM, buildSenderProfile, type RawMessageRow, type RawSenderProfile } from './map-row-to-vm';
 
 export const queryKeys = {
   profile: (profileId: string) => ['profile', profileId] as const,
@@ -314,41 +315,86 @@ async function loadReactions(
   return result;
 }
 
-/** Fetch thread reply stats (count, last reply time, unique participants) for a set of parent message IDs. */
-async function loadThreadStats(
+// Matches ThreadRow from @iconicedu/shared-types/rows/message
+type RawThreadRow = {
+  id: string;
+  org_id: string;
+  parent_message_id: string;
+  snippet: string | null;
+  author_id: string | null;
+  author_name: string | null;
+  message_count: number | null;
+  last_reply_at: string | null;
+  created_at: string;
+};
+
+type RawThreadParticipantRow = {
+  thread_id: string;
+  profile: RawSenderProfile | null;
+};
+
+/**
+ * Fetch threads from the canonical `threads` table (mirrors web's buildThreadsByChannelId).
+ * Returns a map of parent_message_id → ThreadVM.
+ */
+async function loadThreads(
   parentMessageIds: string[],
-): Promise<Map<string, ThreadStats>> {
+): Promise<Map<string, ThreadVM>> {
   if (!parentMessageIds.length) return new Map();
 
-  const { data: replyRows } = await supabase
-    .from('messages')
-    .select(
-      'thread_parent_id, created_at, sender:profiles!sender_profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed)',
-    )
-    .in('thread_parent_id', parentMessageIds)
+  const { data: threadRows, error: threadError } = await supabase
+    .from('threads')
+    .select('id, org_id, parent_message_id, snippet, author_id, author_name, message_count, last_reply_at, created_at')
+    .in('parent_message_id', parentMessageIds);
+
+  if (threadError) {
+    console.warn('[loadThreads] threads query failed:', threadError.message);
+    return new Map();
+  }
+  if (!threadRows || threadRows.length === 0) return new Map();
+
+  const typedThreadRows = threadRows as RawThreadRow[];
+  const threadIds = typedThreadRows.map((t) => t.id);
+
+  const { data: participantRows, error: participantError } = await supabase
+    .from('thread_participants')
+    .select('thread_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed)')
+    .in('thread_id', threadIds)
     .is('deleted_at', null);
 
-  const result = new Map<string, ThreadStats>();
+  if (participantError) {
+    console.warn('[loadThreads] participants query failed:', participantError.message);
+  }
 
-  for (const reply of (replyRows ?? []) as Array<{
-    thread_parent_id: string;
-    created_at: string;
-    sender: RawSenderProfile | null;
-  }>) {
-    if (!reply.sender) continue;
-    const entry = result.get(reply.thread_parent_id) ?? {
-      messageCount: 0,
-      lastReplyAt: '',
-      participants: [] as RawSenderProfile[],
-    };
-    entry.messageCount++;
-    if (!entry.lastReplyAt || reply.created_at > entry.lastReplyAt) {
-      entry.lastReplyAt = reply.created_at;
-    }
-    if (!entry.participants.find((p) => p.id === reply.sender!.id)) {
-      entry.participants.push(reply.sender);
-    }
-    result.set(reply.thread_parent_id, entry);
+  // Build thread_id → participants map
+  const participantsByThread = new Map<string, RawSenderProfile[]>();
+  for (const p of (participantRows ?? []) as RawThreadParticipantRow[]) {
+    if (!p.profile) continue;
+    const list = participantsByThread.get(p.thread_id) ?? [];
+    list.push(p.profile);
+    participantsByThread.set(p.thread_id, list);
+  }
+
+  const result = new Map<string, ThreadVM>();
+  for (const t of typedThreadRows) {
+    const participants = (participantsByThread.get(t.id) ?? []).map((p) =>
+      buildSenderProfile(p, t.org_id),
+    );
+    // Map exactly as web's mapThreadRowToVM does
+    result.set(t.parent_message_id, {
+      ids: { id: t.id, orgId: t.org_id },
+      parent: {
+        messageId: t.parent_message_id,
+        snippet: t.snippet ?? undefined,
+        authorId: t.author_id ?? undefined,
+        authorName: t.author_name ?? undefined,
+      },
+      stats: {
+        messageCount: t.message_count ?? 0,
+        lastReplyAt: t.last_reply_at ?? t.created_at,  // fallback = thread created_at
+      },
+      participants,
+    });
   }
 
   return result;
@@ -381,10 +427,10 @@ export async function fetchChannelMessages(
   const typedRows = rows as RawMessageRow[];
   const messageIds = typedRows.map((r) => r.id);
 
-  const [payloadMap, reactionMap, threadStatsMap] = await Promise.all([
+  const [payloadMap, reactionMap, threadsMap] = await Promise.all([
     loadPayloads(typedRows),
     loadReactions(messageIds, currentAccountId),
-    loadThreadStats(messageIds),
+    loadThreads(messageIds),
   ]);
 
   // Reverse a copy (oldest→newest) without mutating the typed rows array.
@@ -393,22 +439,42 @@ export async function fetchChannelMessages(
       row,
       payloadMap.get(row.id) ?? null,
       reactionMap.get(row.id) ?? [],
-      threadStatsMap.get(row.id),
+      threadsMap.get(row.id),
     ),
   );
 }
 
+/**
+ * Fetch reply messages for a thread.
+ * Mirrors web's approach: queries by thread_id (FK to threads table) which is
+ * set on every reply message. Falls back to thread_parent_id for mobile-only replies.
+ *
+ * @param threadId   - The threads.id (from ThreadVM.ids.id) — preferred
+ * @param parentMessageId - The parent message's id — fallback if threadId unknown
+ */
 export async function fetchThreadMessages(
-  threadParentId: string,
+  threadId: string,
+  parentMessageId: string,
   currentProfileId = '',
   currentAccountId = '',
 ): Promise<MessageVM[]> {
-  const { data: rows, error } = await supabase
+  // Try thread_id first (web-aligned — replies have thread_id → threads.id)
+  let { data: rows, error } = await supabase
     .from('messages')
     .select(BASE_MESSAGE_SELECT)
-    .eq('thread_parent_id', threadParentId)
+    .eq('thread_id', threadId)
     .is('deleted_at', null)
     .order('created_at', { ascending: true });
+
+  // If no results, fall back to thread_parent_id (used by mobile sendTextMessage)
+  if (!error && (!rows || rows.length === 0)) {
+    ({ data: rows, error } = await supabase
+      .from('messages')
+      .select(BASE_MESSAGE_SELECT)
+      .eq('thread_parent_id', parentMessageId)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: true }));
+  }
 
   if (error) throw error;
   if (!rows || rows.length === 0) return [];
@@ -910,6 +976,7 @@ export async function sendTextMessage(
   orgId: string,
   text: string,
   threadParentId?: string,
+  threadId?: string,  // threads.id — set when replying so messages.thread_id is populated
 ) {
   // Insert the messages row first (no content column — schema uses type-specific tables)
   const { data: msg, error: msgError } = await supabase
@@ -920,6 +987,7 @@ export async function sendTextMessage(
       org_id: orgId,
       type: 'text',
       thread_parent_id: threadParentId ?? null,
+      ...(threadId ? { thread_id: threadId } : {}),
     })
     .select('id')
     .single();

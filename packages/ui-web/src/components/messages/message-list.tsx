@@ -5,6 +5,7 @@ import {
   forwardRef,
   useMemo,
   useCallback,
+  useState,
 } from 'react';
 import { MessageItem } from '@iconicedu/ui-web/components/messages/message-item';
 import { EmptyMessagesState } from '@iconicedu/ui-web/components/messages/empty-state';
@@ -13,6 +14,9 @@ import { ScrollArea } from '@iconicedu/ui-web/ui/scroll-area';
 import { formatDateHeader } from '@iconicedu/ui-web/lib/message-utils';
 import { findUnreadAnchorMessageId } from '@iconicedu/ui-web/components/messages/unread-indicator.utils';
 import { findLatestIncomingMessageId } from '@iconicedu/ui-web/components/messages/read-state.utils';
+import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
+import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
+import { formatTime } from '@iconicedu/ui-web/lib/message-utils';
 
 interface MessageListProps {
   messages: MessageVM[];
@@ -65,6 +69,9 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
     const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
     const isNearBottomRef = useRef(false);
     const lastNotifiedReadIdRef = useRef<UUID | null>(null);
+    const [expandedThreadsByParent, setExpandedThreadsByParent] = useState<
+      Record<UUID, boolean>
+    >({});
 
     useImperativeHandle(ref, () => ({
       scrollToMessage: (messageId: string) => {
@@ -72,7 +79,6 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
         if (messageElement) {
           messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
           messageElement.classList.add('ring-2', 'ring-primary', 'ring-offset-2');
-          // eslint-disable-next-line no-undef
           setTimeout(() => {
             messageElement.classList.remove('ring-2', 'ring-primary', 'ring-offset-2');
           }, 2000);
@@ -250,6 +256,45 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
       return groups;
     }, [sortedMessages]);
 
+    const threadRepliesByParent = useMemo(() => {
+      const replies = new Map<UUID, MessageVM[]>();
+      sortedMessages.forEach((candidate) => {
+        const thread = candidate.social.thread;
+        if (!thread) return;
+        const parentId = thread.parent.messageId;
+        if (!parentId || candidate.ids.id === parentId) return;
+        const existing = replies.get(parentId) ?? [];
+        existing.push(candidate);
+        replies.set(parentId, existing);
+      });
+      return replies;
+    }, [sortedMessages]);
+
+    const getInlineReplyPreview = useCallback((message: MessageVM) => {
+      if ('content' in message && message.content && 'text' in message.content) {
+        const value = message.content.text;
+        if (typeof value === 'string' && value.trim().length > 0) {
+          return value;
+        }
+      }
+      return 'Shared an update';
+    }, []);
+
+    const handleThreadIndicatorClick = useCallback(
+      (thread: ThreadVM, parentMessage: MessageVM) => {
+        const parentId = thread.parent.messageId ?? parentMessage.ids.id;
+        if ((threadRepliesByParent.get(parentId)?.length ?? 0) === 0) {
+          onOpenThread(thread, parentMessage);
+          return;
+        }
+        setExpandedThreadsByParent((prev) => ({
+          ...prev,
+          [parentId]: !prev[parentId],
+        }));
+      },
+      [onOpenThread, threadRepliesByParent],
+    );
+
     return (
       <ScrollArea ref={scrollAreaRootRef} className="flex-1 min-h-0">
         {isLoadingMore ? (
@@ -299,7 +344,11 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                   )}
                   <MessageItem
                     message={message}
-                    onOpenThread={onOpenThread}
+                    onOpenThread={handleThreadIndicatorClick}
+                    isThreadReply={
+                      Boolean(message.social.thread) &&
+                      message.social.thread?.parent.messageId !== message.ids.id
+                    }
                     onProfileClick={onProfileClick}
                     onToggleReaction={onToggleReaction}
                     onToggleSaved={onToggleSaved}
@@ -307,6 +356,43 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                     onDelete={onDelete}
                     currentUserId={currentUserId}
                   />
+                  {message.social.thread &&
+                    expandedThreadsByParent[message.ids.id] &&
+                    (threadRepliesByParent.get(message.ids.id)?.length ?? 0) > 0 && (
+                      <div className="pl-10 pr-2 pb-2">
+                        <div className="ml-4 border-l-2 border-border/70 pl-5 space-y-3">
+                          {(threadRepliesByParent.get(message.ids.id) ?? []).map((reply) => {
+                            const senderName = getProfileDisplayName(reply.core.sender.profile);
+                            return (
+                              <div key={reply.ids.id} className="flex items-start gap-3">
+                                <AvatarWithStatus
+                                  name={senderName}
+                                  avatar={reply.core.sender.profile.avatar}
+                                  themeKey={reply.core.sender.ui?.themeKey}
+                                  showStatus={false}
+                                  sizeClassName="h-8 w-8"
+                                  fallbackClassName="text-sm"
+                                  initialsLength={1}
+                                />
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-semibold text-foreground">
+                                      {senderName}
+                                    </span>
+                                    <span className="text-sm text-muted-foreground">
+                                      {formatTime(reply.core.createdAt)}
+                                    </span>
+                                  </div>
+                                  <p className="mt-1 text-base leading-snug text-foreground/90 break-words">
+                                    {getInlineReplyPreview(reply)}
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                 </div>
               );
             })}

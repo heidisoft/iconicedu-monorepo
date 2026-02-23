@@ -76,9 +76,9 @@ export default function ChannelConversationScreen() {
 
   // ── Send message ──
   const handleSend = useCallback(
-    async (text: string, threadParentId?: string) => {
+    async (text: string, threadParentId?: string, threadId?: string) => {
       if (!channelId || !profileId || !orgId) return;
-      await sendTextMessage(channelId, profileId, orgId, text, threadParentId);
+      await sendTextMessage(channelId, profileId, orgId, text, threadParentId, threadId);
     },
     [channelId, profileId, orgId],
   );

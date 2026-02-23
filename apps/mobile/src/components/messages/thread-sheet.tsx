@@ -24,7 +24,11 @@ type ThreadSheetProps = {
   currentProfileId: string;
   currentAccountId: string;
   onClose: () => void;
-  onSend: (text: string, threadParentId: string) => Promise<void>;
+  /**
+   * threadParentId = the parent message's ids.id
+   * threadId = the threads table row id (ThreadVM.ids.id) — set when the thread exists
+   */
+  onSend: (text: string, threadParentId: string, threadId?: string) => Promise<void>;
 };
 
 function makeStyles(C: AppColors) {
@@ -81,18 +85,27 @@ export const ThreadSheet: React.FC<ThreadSheetProps> = ({
   const [replies, setReplies] = useState<MessageVM[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // threads.id from the loaded ThreadVM — used as the preferred fetch key
+  const threadId = parentMessage?.social?.thread?.ids.id;
+
   const loadReplies = useCallback(async () => {
     if (!parentMessage) return;
     setLoading(true);
     try {
-      const data = await fetchThreadMessages(parentMessage.ids.id, currentProfileId, currentAccountId);
+      // Pass both threadId (preferred, threads table FK) and parentMessageId (fallback)
+      const data = await fetchThreadMessages(
+        threadId ?? parentMessage.ids.id,  // threadId when available
+        parentMessage.ids.id,              // always the parent message id
+        currentProfileId,
+        currentAccountId,
+      );
       setReplies(data);
-    } catch {
-      // silently fail — show empty state
+    } catch (err) {
+      console.warn('[ThreadSheet] loadReplies error:', err);
     } finally {
       setLoading(false);
     }
-  }, [parentMessage, currentProfileId]);
+  }, [parentMessage, threadId, currentProfileId, currentAccountId]);
 
   useEffect(() => {
     if (visible && parentMessage) {
@@ -105,11 +118,11 @@ export const ThreadSheet: React.FC<ThreadSheetProps> = ({
   const handleSend = useCallback(
     async (text: string) => {
       if (!parentMessage) return;
-      await onSend(text, parentMessage.ids.id);
-      // Refresh replies after sending
+      // Pass threadId so sendTextMessage can set messages.thread_id correctly
+      await onSend(text, parentMessage.ids.id, threadId);
       loadReplies();
     },
-    [parentMessage, onSend, loadReplies],
+    [parentMessage, threadId, onSend, loadReplies],
   );
 
   if (!parentMessage) return null;

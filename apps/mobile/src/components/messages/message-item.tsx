@@ -95,19 +95,25 @@ function senderColor(name: string): string {
 
 type S = ReturnType<typeof makeStyles>;
 
-// ─── Reaction pills ───────────────────────────────────────────────────────────
+// ─── Social bar: reactions + thread pill in one row ──────────────────────────
 
-type ReactionRowProps = {
+type SocialBarProps = {
   reactions: ReactionVM[];
-  colors: AppColors;
+  thread: ThreadVM | null;
   messageId: string;
+  colors: AppColors;
   onReactionToggle?: (messageId: string, emoji: string) => void;
+  onThreadOpen?: (message: MessageVM) => void;
+  message: MessageVM;
 };
 
-function ReactionRow({ reactions, colors, messageId, onReactionToggle }: ReactionRowProps) {
-  if (!reactions.length) return null;
+function SocialBar({ reactions, thread, messageId, colors, onReactionToggle, onThreadOpen, message }: SocialBarProps) {
+  const hasThread = !!thread && thread.stats.messageCount > 0 && !!onThreadOpen;
+  if (!reactions.length && !hasThread) return null;
+
   return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 2 }}>
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4, alignItems: 'center' }}>
+      {/* Reaction pills */}
       {reactions.map((r) => (
         <TouchableOpacity
           key={r.emoji}
@@ -115,25 +121,30 @@ function ReactionRow({ reactions, colors, messageId, onReactionToggle }: Reactio
           activeOpacity={0.75}
           style={{
             flexDirection: 'row', alignItems: 'center', gap: 4,
-            backgroundColor: r.reactedByMe ? colors.tealBg : colors.inputBg,
+            backgroundColor: r.reactedByMe ? colors.tealBg : colors.pageBg,
             borderWidth: 1,
             borderColor: r.reactedByMe ? colors.teal : colors.border,
-            borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3,
+            borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5,
           }}
         >
-          <Text style={{ fontSize: 13 }}>{r.emoji}</Text>
-          <Text style={{ fontSize: 12, color: r.reactedByMe ? colors.teal : colors.textMuted, fontWeight: '600' }}>
+          <Text style={{ fontSize: 14 }}>{r.emoji}</Text>
+          <Text style={{ fontSize: 12, color: r.reactedByMe ? colors.teal : colors.text, fontWeight: '600' }}>
             {r.count}
           </Text>
         </TouchableOpacity>
       ))}
+
+      {/* Thread pill */}
+      {hasThread && (
+        <ThreadPill thread={thread!} colors={colors} onPress={() => onThreadOpen!(message)} />
+      )}
     </View>
   );
 }
 
-// ─── Thread reply pill ────────────────────────────────────────────────────────
+// ─── Thread pill ──────────────────────────────────────────────────────────────
 
-function ThreadReplyPill({ thread, colors, onPress }: { thread: ThreadVM; colors: AppColors; onPress: () => void }) {
+function ThreadPill({ thread, colors, onPress }: { thread: ThreadVM; colors: AppColors; onPress: () => void }) {
   const count = thread.stats.messageCount;
   const participants = thread.participants.slice(0, 3);
 
@@ -142,23 +153,23 @@ function ThreadReplyPill({ thread, colors, onPress }: { thread: ThreadVM; colors
       onPress={onPress}
       activeOpacity={0.75}
       style={{
-        flexDirection: 'row', alignItems: 'center', gap: 6,
-        backgroundColor: colors.card,
+        flexDirection: 'row', alignItems: 'center', gap: 5,
+        backgroundColor: colors.pageBg,
         borderWidth: 1, borderColor: colors.border,
-        borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6,
+        borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5,
       }}
     >
-      {/* Speech bubble icon */}
-      <Text style={{ fontSize: 14, color: colors.teal }}>💬</Text>
+      {/* Chat bubble icon */}
+      <Text style={{ fontSize: 13, color: colors.textMuted }}>💬</Text>
 
       {/* Reply count */}
-      <Text style={{ fontSize: 13, color: colors.teal, fontWeight: '600' }}>
+      <Text style={{ fontSize: 12, color: colors.textMuted, fontWeight: '600' }}>
         {count} {count === 1 ? 'reply' : 'replies'}
       </Text>
 
-      {/* Overlapping participant avatars */}
+      {/* Overlapping participant initials/avatars */}
       {participants.length > 0 && (
-        <View style={{ flexDirection: 'row' }}>
+        <View style={{ flexDirection: 'row', marginLeft: 2 }}>
           {participants.map((p, i) => {
             const name = p.profile.displayName;
             const avatarProfile = p.profile as { avatar?: { source?: string; url?: string | null; seed?: string | null } };
@@ -171,9 +182,9 @@ function ThreadReplyPill({ thread, colors, onPress }: { thread: ThreadVM; colors
                 key={p.ids.id}
                 source={{ uri: src }}
                 style={{
-                  width: 22, height: 22, borderRadius: 11,
-                  borderWidth: 2, borderColor: colors.inputBg,
-                  marginLeft: i > 0 ? -8 : 0,
+                  width: 20, height: 20, borderRadius: 10,
+                  borderWidth: 1.5, borderColor: colors.pageBg,
+                  marginLeft: i > 0 ? -6 : 0,
                   zIndex: participants.length - i,
                 }}
               />
@@ -181,15 +192,15 @@ function ThreadReplyPill({ thread, colors, onPress }: { thread: ThreadVM; colors
               <View
                 key={p.ids.id}
                 style={{
-                  width: 22, height: 22, borderRadius: 11,
+                  width: 20, height: 20, borderRadius: 10,
                   backgroundColor: avatarBgColor(seed),
                   alignItems: 'center', justifyContent: 'center',
-                  borderWidth: 2, borderColor: colors.inputBg,
-                  marginLeft: i > 0 ? -8 : 0,
+                  borderWidth: 1.5, borderColor: colors.pageBg,
+                  marginLeft: i > 0 ? -6 : 0,
                   zIndex: participants.length - i,
                 }}
               >
-                <Text style={{ color: '#fff', fontSize: 8, fontWeight: '700', letterSpacing: 0 }}>
+                <Text style={{ color: '#fff', fontSize: 8, fontWeight: '700' }}>
                   {getInitials(name)[0]}
                 </Text>
               </View>
@@ -197,7 +208,6 @@ function ThreadReplyPill({ thread, colors, onPress }: { thread: ThreadVM; colors
           })}
         </View>
       )}
-
     </TouchableOpacity>
   );
 }
@@ -484,8 +494,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   const { url: avatarUrl, seed: avatarSeed } = getAvatarInfo(message);
   const time = formatTime(message.core.createdAt);
   const reactions = message.social?.reactions ?? [];
-  const threadParentId = (message as { threadParentId?: string }).threadParentId;
-  const thread = !threadParentId ? (message.social?.thread ?? null) : null;
+  const thread = message.social?.thread ?? null;
   const isCard = CARD_TYPES.has(type);
 
   // session-complete: full-width centred divider, no bubble
@@ -590,17 +599,15 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           {type === 'progress-update'     && <ProgressCard message={message as ProgressUpdateMessageVM} colors={colors} s={s} />}
           {type === 'event-reminder'      && <EventCard message={message as EventReminderMessageVM} colors={colors} s={s} />}
           {type === 'homework-submission' && <HomeworkCard message={message as HomeworkSubmissionMessageVM} colors={colors} s={s} />}
-          {reactions.length > 0 && (
-            <ReactionRow
-              reactions={reactions}
-              colors={colors}
-              messageId={message.ids.id}
-              onReactionToggle={onReactionToggle}
-            />
-          )}
-          {thread && onThreadOpen && (
-            <ThreadReplyPill thread={thread} colors={colors} onPress={() => onThreadOpen(message)} />
-          )}
+          <SocialBar
+            reactions={reactions}
+            thread={thread}
+            messageId={message.ids.id}
+            colors={colors}
+            onReactionToggle={onReactionToggle}
+            onThreadOpen={onThreadOpen}
+            message={message}
+          />
         </View>
       </Pressable>
     );
@@ -637,20 +644,16 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           {renderBubbleContent()}
         </View>
 
-        {/* Reactions below bubble */}
-        {reactions.length > 0 && (
-          <ReactionRow
-            reactions={reactions}
-            colors={colors}
-            messageId={message.ids.id}
-            onReactionToggle={onReactionToggle}
-          />
-        )}
-
-        {/* Thread reply pill */}
-        {thread && onThreadOpen && (
-          <ThreadReplyPill thread={thread} colors={colors} onPress={() => onThreadOpen(message)} />
-        )}
+        {/* Reactions + thread pill in one row */}
+        <SocialBar
+          reactions={reactions}
+          thread={thread}
+          messageId={message.ids.id}
+          colors={colors}
+          onReactionToggle={onReactionToggle}
+          onThreadOpen={onThreadOpen}
+          message={message}
+        />
       </View>
     </Pressable>
   );
