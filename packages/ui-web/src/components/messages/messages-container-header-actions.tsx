@@ -2,11 +2,18 @@
 
 import { memo } from 'react';
 import type { CSSProperties } from 'react';
-import { Bookmark, Info, LifeBuoy } from 'lucide-react';
+import { Bookmark, Flag, Info, LifeBuoy, LogOut, MoreHorizontal, Video } from 'lucide-react';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import { useMessagesState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
-import type { ChannelHeaderActionVM } from '@iconicedu/shared-types';
+import type { ChannelHeaderActionVM, ChannelQuickActionVM } from '@iconicedu/shared-types';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@iconicedu/ui-web/ui/dropdown-menu';
 
 const ActionButton = memo(function ActionButton({
   icon: Icon,
@@ -60,6 +67,38 @@ const ActionButton = memo(function ActionButton({
   );
 });
 
+export function getVisibleHeaderActions(
+  actions?: ChannelHeaderActionVM[] | null,
+): ChannelHeaderActionVM[] {
+  return actions?.filter((action) => !action.hidden && action.key !== 'info') ?? [];
+}
+
+export function getHeaderJoinQuickAction(
+  quickActions?: ChannelQuickActionVM[] | null,
+): ChannelQuickActionVM | null {
+  return (
+    quickActions?.find((action) => action.key === 'join' && !action.hidden) ?? null
+  );
+}
+
+export function resolveHeaderJoinQuickAction(
+  quickActions: ChannelQuickActionVM[] | null | undefined,
+  showFallback: boolean,
+): ChannelQuickActionVM | null {
+  const existingJoinAction = getHeaderJoinQuickAction(quickActions);
+  if (existingJoinAction) {
+    return existingJoinAction;
+  }
+  if (!showFallback) {
+    return null;
+  }
+  return {
+    key: 'join',
+    label: 'Join',
+    isPrimary: true,
+  };
+}
+
 export const MessagesContainerHeaderActions = memo(
   function MessagesContainerHeaderActions() {
     const { toggle, isActive, channel, currentUserId } = useMessagesState();
@@ -69,10 +108,11 @@ export const MessagesContainerHeaderActions = memo(
             (participant) => participant.ids.id !== currentUserId,
           )
         : null;
-    const actions: ChannelHeaderActionVM[] =
-      channel.ui?.headerActions?.filter((action) => !action.hidden) ?? [
-        { key: 'info', label: 'Info' },
-      ];
+    const actions = getVisibleHeaderActions(channel.ui?.headerActions);
+    const joinQuickAction = resolveHeaderJoinQuickAction(
+      channel.ui?.quickActions,
+      channel.basics.kind !== 'dm',
+    );
 
     const iconMap: Record<string, typeof Info> = {
       info: Info,
@@ -127,6 +167,41 @@ export const MessagesContainerHeaderActions = memo(
             />
           );
         })}
+        {joinQuickAction ? (
+          joinQuickAction.url ? (
+            <Button size="sm" asChild>
+              <a href={joinQuickAction.url} target="_blank" rel="noreferrer">
+                <Video className="h-4 w-4" />
+                {joinQuickAction.label}
+              </a>
+            </Button>
+          ) : (
+            <Button size="sm" disabled>
+              <Video className="h-4 w-4" />
+              {joinQuickAction.label}
+            </Button>
+          )
+        ) : null}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" aria-label="More actions">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                <MoreHorizontal className="h-4 w-4" />
+              </span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem>
+              <LogOut className="h-4 w-4 text-muted-foreground" />
+              <span>Leave</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem>
+              <Flag className="h-4 w-4 text-muted-foreground" />
+              <span>Report</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     );
   },

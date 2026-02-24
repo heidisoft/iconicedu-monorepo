@@ -8,10 +8,22 @@ import { useMessages } from '@iconicedu/ui-web/hooks/use-messages';
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
 import { useMessagesState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
 import { resolveThreadAfterReply } from '@iconicedu/ui-web/components/messages/thread-reply.utils';
+import { MessagesScheduleTab } from '@iconicedu/ui-web/components/messages/tabs/messages-schedule-tab';
+import { MessagesMembersTab } from '@iconicedu/ui-web/components/messages/tabs/messages-members-tab';
+import {
+  getMessagesContainerTabs,
+  type MessagesContainerTabKey,
+} from '@iconicedu/ui-web/components/messages/tabs/messages-container-tabs';
+import {
+  getMessagesContainerTabStorageKey,
+  persistMessagesContainerTab,
+  readMessagesContainerPersistedTab,
+} from '@iconicedu/ui-web/components/messages/tabs/messages-container-tab-persistence';
 import { Tabs, TabsList, TabsTrigger } from '../../ui/tabs';
 import { ScrollArea } from '../../ui/scroll-area';
 import type {
   ChannelFileItemVM,
+  ClassScheduleVM,
   ChannelVM,
   EducatorProfileVM,
   GuardianProfileVM,
@@ -24,8 +36,7 @@ import type {
   UUID,
   UserProfileVM,
 } from '@iconicedu/shared-types';
-import type { LucideIcon } from 'lucide-react';
-import { FileText, Loader2, MessageCircle } from 'lucide-react';
+import { FileText, Loader2 } from 'lucide-react';
 
 function getMessageInputPlaceholder(
   channel: ChannelVM,
@@ -70,16 +81,6 @@ const isEducatorProfile = (profile: UserProfileVM): profile is EducatorProfileVM
 const MESSAGES_PAGE_SIZE = 40;
 const READ_STATE_PERSIST_DEBOUNCE_MS = 220;
 const TYPING_REMOTE_TIMEOUT_MS = 4000;
-type ContainerTab = 'messages' | 'files';
-type ContainerTabDefinition = {
-  key: ContainerTab;
-  label: string;
-  icon: LucideIcon;
-};
-const CONTAINER_TABS: ContainerTabDefinition[] = [
-  { key: 'messages', label: 'Messages', icon: MessageCircle },
-  { key: 'files', label: 'Files', icon: FileText },
-];
 
 function formatFileSize(size?: number | null): string {
   if (!size || size <= 0) return 'Unknown size';
@@ -140,10 +141,13 @@ export function MessagesContainer({
   const [hasMoreOlderMessages, setHasMoreOlderMessages] = useState(
     channelMessages.length >= MESSAGES_PAGE_SIZE,
   );
-  const [activeTab, setActiveTab] = useState<ContainerTab>('messages');
+  const [activeTab, setActiveTab] = useState<MessagesContainerTabKey>('messages');
   const [loadedFiles, setLoadedFiles] = useState<ChannelFileItemVM[] | null>(null);
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
   const [filesLoadError, setFilesLoadError] = useState<string | null>(null);
+  const [loadedSchedules, setLoadedSchedules] = useState<ClassScheduleVM[] | null>(null);
+  const [isLoadingSchedules, setIsLoadingSchedules] = useState(false);
+  const [schedulesLoadError, setSchedulesLoadError] = useState<string | null>(null);
   const [oldestCursor, setOldestCursor] = useState<string | null>(
     channelMessages[0]?.core.createdAt ?? null,
   );
@@ -155,6 +159,20 @@ export function MessagesContainer({
   );
   const isNetworkBusy = networkRequestCount > 0;
   const filesForDisplay = loadedFiles ?? [];
+  const hasScheduleCapability = useMemo(
+    () => channel.context?.capabilities?.includes('has_schedule') ?? false,
+    [channel.context?.capabilities],
+  );
+  const enableScheduleTab =
+    hasScheduleCapability || (loadedSchedules?.length ?? 0) > 0;
+  const containerTabs = useMemo(
+    () => getMessagesContainerTabs(enableScheduleTab),
+    [enableScheduleTab],
+  );
+  const tabStorageKey = useMemo(
+    () => getMessagesContainerTabStorageKey(channel.ids.orgId, channel.ids.id),
+    [channel.ids.orgId, channel.ids.id],
+  );
 
   const runWithNetworkActivity = useCallback(async <T,>(operation: () => Promise<T>) => {
     setNetworkRequestCount((count) => count + 1);
@@ -729,11 +747,36 @@ export function MessagesContainer({
   }, [channel.ids.id, channelMessages]);
 
   useEffect(() => {
-    setActiveTab('messages');
+    const persistedTab = readMessagesContainerPersistedTab(tabStorageKey);
+    if (persistedTab) {
+      setActiveTab(persistedTab);
+    } else {
+      setActiveTab('messages');
+    }
     setLoadedFiles(null);
     setFilesLoadError(null);
     setIsLoadingFiles(false);
-  }, [channel.ids.id]);
+    setLoadedSchedules(null);
+    setSchedulesLoadError(null);
+    setIsLoadingSchedules(false);
+  }, [tabStorageKey]);
+
+  useEffect(() => {
+    if (containerTabs.some((tab) => tab.key === activeTab)) {
+      return;
+    }
+    setActiveTab('messages');
+  }, [containerTabs, activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== 'schedule') return;
+    if (enableScheduleTab) return;
+    setActiveTab('messages');
+  }, [activeTab, enableScheduleTab]);
+
+  useEffect(() => {
+    persistMessagesContainerTab(tabStorageKey, activeTab);
+  }, [tabStorageKey, activeTab]);
 
   useEffect(() => {
     setLastReadMessageId(channel.collections.readState?.lastReadMessageId);
@@ -1035,6 +1078,48 @@ export function MessagesContainer({
     };
   }, [activeTab, channel.ids.id, loadedFiles, runWithNetworkActivity]);
 
+  useEffect(() => {
+    if (activeTab !== 'schedule' || loadedSchedules) {
+      return;
+    }
+    let isCancelled = false;
+    const loadSchedules = async () => {
+      setIsLoadingSchedules(true);
+      setSchedulesLoadError(null);
+      try {
+        const params = new URLSearchParams({ channelId: channel.ids.id });
+        const response = await runWithNetworkActivity(() =>
+          window.fetch(`/api/messages/channel-schedules?${params.toString()}`),
+        );
+        if (!response.ok) {
+          throw new Error('Failed to load schedules');
+        }
+        const payload = (await response.json()) as {
+          success?: boolean;
+          schedules?: ClassScheduleVM[];
+        };
+        if (!payload.success) {
+          throw new Error('Failed to load schedules');
+        }
+        if (!isCancelled) {
+          setLoadedSchedules(payload.schedules ?? []);
+        }
+      } catch {
+        if (!isCancelled) {
+          setSchedulesLoadError('Unable to load schedule right now.');
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoadingSchedules(false);
+        }
+      }
+    };
+    void loadSchedules();
+    return () => {
+      isCancelled = true;
+    };
+  }, [activeTab, channel.ids.id, loadedSchedules, runWithNetworkActivity]);
+
   const messageListProps = useMemo(
     () => ({
       messages: filteredMessages,
@@ -1085,18 +1170,18 @@ export function MessagesContainer({
           Syncing...
         </div>
       ) : null}
-      <div className="border-b border-border px-4">
+      <div className="border-b border-border bg-muted/40 px-4">
         <Tabs
           value={activeTab}
           onValueChange={(value) => {
-            if (CONTAINER_TABS.some((tab) => tab.key === value)) {
-              setActiveTab(value as ContainerTab);
+            if (containerTabs.some((tab) => tab.key === value)) {
+              setActiveTab(value as MessagesContainerTabKey);
             }
           }}
           className="gap-0"
         >
           <TabsList variant="line" className="h-12 p-0">
-            {CONTAINER_TABS.map((tab) => {
+            {containerTabs.map((tab) => {
               const Icon = tab.icon;
               return (
                 <TabsTrigger
@@ -1104,7 +1189,7 @@ export function MessagesContainer({
                   value={tab.key}
                   className="w-auto flex-none px-1.5"
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className="h-4 w-4 text-muted-foreground/70" />
                   {tab.label}
                 </TabsTrigger>
               );
@@ -1135,7 +1220,7 @@ export function MessagesContainer({
             />
           )}
         </>
-      ) : (
+      ) : activeTab === 'files' ? (
         <ScrollArea className="min-h-0 flex-1">
           <div className="space-y-2 p-4">
             {isLoadingFiles ? (
@@ -1179,6 +1264,14 @@ export function MessagesContainer({
               : null}
           </div>
         </ScrollArea>
+      ) : activeTab === 'schedule' ? (
+        <MessagesScheduleTab
+          schedules={loadedSchedules ?? []}
+          isLoading={isLoadingSchedules}
+          error={schedulesLoadError}
+        />
+      ) : (
+        <MessagesMembersTab participants={participants} currentUserId={currentUserId} />
       )}
     </div>
   );
