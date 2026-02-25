@@ -14,6 +14,27 @@ export interface MonthScheduleGroup {
   schedules: ClassScheduleVM[];
 }
 
+export interface ClassSession {
+  id: string;
+  label: string;
+  time: string;
+  dayName: string;
+  dayNum: string;
+  isToday: boolean;
+  isPast: boolean;
+  status: ClassScheduleVM['status'];
+  meetingLink?: string | null;
+}
+
+export interface MonthGroup {
+  monthKey: string;
+  month: string;
+  year: string;
+  totalCount: number;
+  completedCount: number;
+  sessions: ClassSession[];
+}
+
 const weekdayFormatter = new Intl.DateTimeFormat('en-US', { weekday: 'long' });
 const shortWeekdayFormatter = new Intl.DateTimeFormat('en-US', { weekday: 'short' });
 const timeFormatter = new Intl.DateTimeFormat('en-US', {
@@ -213,6 +234,45 @@ export function takeMonthGroups(
 ): MonthScheduleGroup[] {
   if (monthLimit <= 0) return [];
   return groups.slice(0, monthLimit);
+}
+
+export function toMonthGroups(
+  groups: MonthScheduleGroup[],
+  now = new Date(),
+): MonthGroup[] {
+  const nowDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  return groups.map((group) => {
+    const [year, month] = group.monthKey.split('-');
+    const monthDate = new Date(Number(year), Number(month) - 1, 1);
+    const sessions: ClassSession[] = group.schedules.map((schedule) => {
+      const start = new Date(schedule.startAt);
+      const startDay = new Date(
+        start.getFullYear(),
+        start.getMonth(),
+        start.getDate(),
+      ).getTime();
+      return {
+        id: schedule.ids.id,
+        label: formatScheduleWeekTitle(schedule),
+        time: formatScheduleTimeBadge(schedule),
+        dayName: shortWeekdayFormatter.format(start),
+        dayNum: String(start.getDate()),
+        isToday: startDay === nowDay,
+        isPast: start.getTime() < now.getTime(),
+        status: schedule.status,
+        meetingLink: schedule.meetingLink ?? null,
+      };
+    });
+
+    return {
+      monthKey: group.monthKey,
+      month: monthDate.toLocaleDateString('en-US', { month: 'long' }),
+      year,
+      totalCount: sessions.length,
+      completedCount: sessions.filter((session) => session.status === 'completed').length,
+      sessions,
+    };
+  });
 }
 
 export function calculateScheduleCompletionPercent(

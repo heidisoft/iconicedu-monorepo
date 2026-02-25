@@ -12,6 +12,7 @@ import {
   formatScheduleWeekTitle,
   splitSchedulesByTimeline,
   takeMonthGroups,
+  toMonthGroups,
 } from './messages-schedule-tab.utils';
 
 function buildSchedule(id: string, startAt: string): ClassScheduleVM {
@@ -175,5 +176,25 @@ describe('messages-schedule-tab.utils', () => {
       '2026-03',
       '2026-04',
     ]);
+  });
+
+  it('maps month groups to month sections with session cards', () => {
+    const groups = groupSchedulesByMonth([
+      buildSchedule('1', '2026-03-03T16:00:00.000Z'),
+      { ...buildSchedule('2', '2026-03-10T16:00:00.000Z'), status: 'completed' as const },
+    ]);
+    const mapped = toMonthGroups(groups, new Date('2026-03-03T18:00:00.000Z'));
+    expect(mapped[0]?.month).toBe('March');
+    expect(mapped[0]?.year).toBe('2026');
+    expect(mapped[0]?.totalCount).toBe(2);
+    expect(mapped[0]?.completedCount).toBe(1);
+    expect(mapped[0]?.sessions[0]).toEqual(
+      expect.objectContaining({
+        id: '1',
+        dayName: 'Tue',
+        dayNum: '3',
+        isToday: true,
+      }),
+    );
   });
 });
