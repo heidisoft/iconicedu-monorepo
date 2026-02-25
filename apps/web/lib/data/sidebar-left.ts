@@ -19,7 +19,7 @@ export const SIDEBAR_LEFT_DATA: SidebarLeftDataVM = {
         icon: 'home',
       },
       {
-        title: 'Class schedule',
+        title: 'Calendar',
         url: '/iconic-academy/class-schedule',
         icon: 'class-schedule',
       },

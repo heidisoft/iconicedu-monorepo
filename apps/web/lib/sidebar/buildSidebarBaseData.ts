@@ -38,7 +38,7 @@ export async function buildSidebarBaseData(
           icon: 'home',
         },
         {
-          title: 'Class schedule',
+          title: 'Calendar',
           url: `${dashboardBasePath}/class-schedule`,
           icon: 'class-schedule',
         },
