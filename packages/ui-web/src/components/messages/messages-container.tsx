@@ -10,15 +10,15 @@ import { useMessagesState } from '@iconicedu/ui-web/components/messages/context/
 import { resolveThreadAfterReply } from '@iconicedu/ui-web/components/messages/thread-reply.utils';
 import { MessagesScheduleTab } from '@iconicedu/ui-web/components/messages/tabs/messages-schedule-tab';
 import { MessagesMembersTab } from '@iconicedu/ui-web/components/messages/tabs/messages-members-tab';
+import { MessagesSavedTab } from '@iconicedu/ui-web/components/messages/tabs/messages-saved-tab';
 import {
   getMessagesContainerTabs,
   type MessagesContainerTabKey,
 } from '@iconicedu/ui-web/components/messages/tabs/messages-container-tabs';
 import {
-  getMessagesContainerTabStorageKey,
-  persistMessagesContainerTab,
-  readMessagesContainerPersistedTab,
-} from '@iconicedu/ui-web/components/messages/tabs/messages-container-tab-persistence';
+  hashToTabKey,
+  tabKeyToHash,
+} from '@iconicedu/ui-web/components/messages/tabs/messages-container-tab-hash';
 import { Tabs, TabsList, TabsTrigger } from '../../ui/tabs';
 import { ScrollArea } from '../../ui/scroll-area';
 import type {
@@ -148,6 +148,7 @@ export function MessagesContainer({
   const [loadedSchedules, setLoadedSchedules] = useState<ClassScheduleVM[] | null>(null);
   const [isLoadingSchedules, setIsLoadingSchedules] = useState(false);
   const [schedulesLoadError, setSchedulesLoadError] = useState<string | null>(null);
+  const pendingSavedNavigationMessageIdRef = useRef<string | null>(null);
   const [oldestCursor, setOldestCursor] = useState<string | null>(
     channelMessages[0]?.core.createdAt ?? null,
   );
@@ -168,10 +169,6 @@ export function MessagesContainer({
   const containerTabs = useMemo(
     () => getMessagesContainerTabs(enableScheduleTab),
     [enableScheduleTab],
-  );
-  const tabStorageKey = useMemo(
-    () => getMessagesContainerTabStorageKey(channel.ids.orgId, channel.ids.id),
-    [channel.ids.orgId, channel.ids.id],
   );
 
   const runWithNetworkActivity = useCallback(async <T,>(operation: () => Promise<T>) => {
@@ -747,9 +744,9 @@ export function MessagesContainer({
   }, [channel.ids.id, channelMessages]);
 
   useEffect(() => {
-    const persistedTab = readMessagesContainerPersistedTab(tabStorageKey);
-    if (persistedTab) {
-      setActiveTab(persistedTab);
+    const hashTab = hashToTabKey(window.location.hash);
+    if (hashTab) {
+      setActiveTab(hashTab);
     } else {
       setActiveTab('messages');
     }
@@ -759,7 +756,7 @@ export function MessagesContainer({
     setLoadedSchedules(null);
     setSchedulesLoadError(null);
     setIsLoadingSchedules(false);
-  }, [tabStorageKey]);
+  }, [channel.ids.id]);
 
   useEffect(() => {
     if (containerTabs.some((tab) => tab.key === activeTab)) {
@@ -775,8 +772,35 @@ export function MessagesContainer({
   }, [activeTab, enableScheduleTab]);
 
   useEffect(() => {
-    persistMessagesContainerTab(tabStorageKey, activeTab);
-  }, [tabStorageKey, activeTab]);
+    const nextHash = `#${tabKeyToHash(activeTab)}`;
+    if (window.location.hash === nextHash) return;
+    window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.search}${nextHash}`);
+  }, [activeTab]);
+
+  useEffect(() => {
+    const onHashChange = () => {
+      const hashTab = hashToTabKey(window.location.hash);
+      if (!hashTab) return;
+      setActiveTab(hashTab);
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'messages') return;
+    const messageId = pendingSavedNavigationMessageIdRef.current;
+    if (!messageId) return;
+    pendingSavedNavigationMessageIdRef.current = null;
+    window.requestAnimationFrame(() => {
+      messageListRef.current?.scrollToMessage(messageId);
+    });
+  }, [activeTab]);
+
+  const handleSavedMessageClick = useCallback((messageId: string) => {
+    pendingSavedNavigationMessageIdRef.current = messageId;
+    setActiveTab('messages');
+  }, []);
 
   useEffect(() => {
     setLastReadMessageId(channel.collections.readState?.lastReadMessageId);
@@ -1203,7 +1227,7 @@ export function MessagesContainer({
             ref={messageListRef}
             {...messageListProps}
           />
-          {typingParticipants.length ? (
+          {activeTab === 'messages' && typingParticipants.length ? (
             <TypingIndicator profiles={typingParticipants} className="border-t border-border" />
           ) : null}
           {readOnly ? (
@@ -1220,6 +1244,11 @@ export function MessagesContainer({
             />
           )}
         </>
+      ) : activeTab === 'saved' ? (
+        <MessagesSavedTab
+          messages={visibleMessages}
+          onMessageClick={handleSavedMessageClick}
+        />
       ) : activeTab === 'files' ? (
         <ScrollArea className="min-h-0 flex-1">
           <div className="space-y-2 p-4">

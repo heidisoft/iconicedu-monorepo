@@ -1,7 +1,12 @@
 import type { LucideIcon } from 'lucide-react';
-import { CalendarDays, FileText, MessageCircle, Users } from 'lucide-react';
+import { Bookmark, CalendarDays, FileText, MessageCircle, Users } from 'lucide-react';
 
-export type MessagesContainerTabKey = 'messages' | 'files' | 'schedule' | 'members';
+export type MessagesContainerTabKey =
+  | 'messages'
+  | 'files'
+  | 'schedule'
+  | 'saved'
+  | 'members';
 
 export interface MessagesContainerTabDefinition {
   key: MessagesContainerTabKey;
@@ -13,6 +18,12 @@ const BASE_TABS: MessagesContainerTabDefinition[] = [
   { key: 'messages', label: 'Messages', icon: MessageCircle },
   { key: 'files', label: 'Files', icon: FileText },
 ];
+
+const SAVED_TAB: MessagesContainerTabDefinition = {
+  key: 'saved',
+  label: 'Saved',
+  icon: Bookmark,
+};
 
 const SCHEDULE_TAB: MessagesContainerTabDefinition = {
   key: 'schedule',
@@ -29,6 +40,6 @@ const MEMBERS_TAB: MessagesContainerTabDefinition = {
 export function getMessagesContainerTabs(
   enableScheduleTab: boolean,
 ): MessagesContainerTabDefinition[] {
-  if (!enableScheduleTab) return [...BASE_TABS, MEMBERS_TAB];
-  return [...BASE_TABS, SCHEDULE_TAB, MEMBERS_TAB];
+  if (!enableScheduleTab) return [...BASE_TABS, SAVED_TAB, MEMBERS_TAB];
+  return [...BASE_TABS, SCHEDULE_TAB, SAVED_TAB, MEMBERS_TAB];
 }
