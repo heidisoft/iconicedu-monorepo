@@ -11,6 +11,7 @@ import { MessageCircle } from 'lucide-react';
 interface MessagesMembersTabProps {
   participants: UserProfileVM[];
   currentUserId?: string | null;
+  onProfileClick?: (userId: string) => void;
 }
 
 export function getMemberRowActionKind(
@@ -22,11 +23,19 @@ export function getMemberRowActionKind(
   return 'message';
 }
 
+export function canOpenMemberProfile(
+  onProfileClick?: ((userId: string) => void) | undefined,
+): boolean {
+  return typeof onProfileClick === 'function';
+}
+
 export function MessagesMembersTab({
   participants,
   currentUserId,
+  onProfileClick,
 }: MessagesMembersTabProps) {
   const dashboardBasePath = resolveDashboardBasePathFromWindow();
+  const profileActionEnabled = canOpenMemberProfile(onProfileClick);
 
   return (
     <ScrollArea className="min-h-0 flex-1">
@@ -53,7 +62,17 @@ export function MessagesMembersTab({
                 initialsLength={1}
               />
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium text-foreground">{memberName}</div>
+                {profileActionEnabled ? (
+                  <button
+                    type="button"
+                    className="truncate text-left text-sm font-medium text-foreground hover:underline"
+                    onClick={() => onProfileClick?.(member.ids.id)}
+                  >
+                    {memberName}
+                  </button>
+                ) : (
+                  <div className="truncate text-sm font-medium text-foreground">{memberName}</div>
+                )}
                 {(member.presence?.state?.emoji || member.presence?.state?.text) && (
                   <div className="truncate text-xs text-muted-foreground">
                     <span className="inline-flex items-center gap-1.5">

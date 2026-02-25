@@ -74,11 +74,7 @@ const ROLE_ORDER: UserProfileVM['kind'][] = [
 ];
 
 function getInitials(name: string) {
-  return name
-    .split(' ')
-    .map((part) => part[0])
-    .join('')
-    .toUpperCase();
+  return name.trim().charAt(0).toUpperCase();
 }
 
 function getDisplayName(user: UserProfileVM) {

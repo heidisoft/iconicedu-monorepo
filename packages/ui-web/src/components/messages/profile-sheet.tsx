@@ -7,19 +7,23 @@ import {
   Users,
   FileText,
   Megaphone,
+  Mail,
+  MapPin,
+  Globe,
+  School,
+  Heart,
+  Sparkles,
+  type LucideIcon,
 } from 'lucide-react';
 import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
 import { Separator } from '@iconicedu/ui-web/ui/separator';
-import { ProfileActions } from '@iconicedu/ui-web/components/messages/profile-actions';
 import type {
-  ChannelFileItemVM,
-  ChannelMediaItemVM,
+  ChildProfileVM,
   GradeLevel,
   UserProfileVM,
 } from '@iconicedu/shared-types';
-import { MediaFilesPanel } from '@iconicedu/ui-web/components/messages/shared/media-files-panel';
 import { gradeLabel, normalizeCountryCode } from '@iconicedu/shared-types';
 
 export type ProfileDetailsUser = UserProfileVM & {
@@ -42,8 +46,6 @@ export type ProfileDetailsUser = UserProfileVM & {
 
 interface ProfileSheetProps {
   user: ProfileDetailsUser;
-  media?: ChannelMediaItemVM[];
-  files?: ChannelFileItemVM[];
   onCallClick?: () => void;
   onDmClick?: () => void;
   onScheduleClick?: () => void;
@@ -51,10 +53,161 @@ interface ProfileSheetProps {
   onReportClick?: () => void;
 }
 
+interface AboutField {
+  key: string;
+  label: string;
+  value: string;
+  icon: LucideIcon;
+}
+
+function roleLabelFromKind(kind: UserProfileVM['kind']): string {
+  switch (kind) {
+    case 'educator':
+      return 'Teacher';
+    case 'guardian':
+      return 'Parent';
+    case 'child':
+      return 'Student';
+    case 'staff':
+      return 'Staff';
+    case 'system':
+      return 'System';
+    default:
+      return 'Member';
+  }
+}
+
+function getJoinedDate(user: ProfileDetailsUser): string | null {
+  if (user.joinedDate) return user.joinedDate;
+  if (user.kind === 'educator' || user.kind === 'guardian') return user.joinedDate;
+  return null;
+}
+
+function getChildrenNames(user: ProfileDetailsUser): string[] {
+  if (user.childrenNames?.length) return user.childrenNames;
+  if (user.kind === 'guardian' && user.children?.items?.length) {
+    return user.children.items
+      .map((child: ChildProfileVM) => child.profile.displayName)
+      .filter(Boolean);
+  }
+  return [];
+}
+
+function buildLocationLabel(user: ProfileDetailsUser): string | null {
+  const parts = [user.location?.city, user.location?.region, user.location?.countryName]
+    .filter((part): part is string => Boolean(part?.trim()))
+    .map((part) => part.trim());
+
+  if (!parts.length) {
+    return null;
+  }
+
+  return parts.join(', ');
+}
+
+export function buildAboutFields(user: ProfileDetailsUser): AboutField[] {
+  const countryCode = normalizeCountryCode(user.location?.countryCode);
+  const aboutFields: AboutField[] = [];
+  const roleLabel = user.role ?? roleLabelFromKind(user.kind);
+  const joinedDate = getJoinedDate(user);
+  const childrenNames = getChildrenNames(user);
+
+  const pushField = (
+    key: string,
+    label: string,
+    value: string | null | undefined,
+    icon: LucideIcon,
+  ) => {
+    if (!value?.trim()) return;
+    aboutFields.push({ key, label, value: value.trim(), icon });
+  };
+
+  pushField('role', 'Role', roleLabel, Users);
+  pushField('bio', 'Bio', user.profile.bio, FileText);
+  pushField('email', 'Email', user.profile.email ?? user.accountEmail ?? null, Mail);
+  pushField('location', 'Location', buildLocationLabel(user), MapPin);
+  pushField('timezone', 'Timezone', user.prefs.timezone, Globe);
+  pushField('languagesSpoken', 'Languages', user.prefs.languagesSpoken?.join(', '), Globe);
+
+  if (user.kind === 'educator') {
+    pushField('headline', 'Headline', user.headline, Megaphone);
+    pushField('subjects', 'Subjects', user.subjects?.join(', '), BookOpen);
+    pushField(
+      'gradesSupported',
+      'Grades supported',
+      user.gradesSupported
+        ?.map((grade) => (grade ? gradeLabel(grade, countryCode) : null))
+        .filter(Boolean)
+        .join(', '),
+      GraduationCap,
+    );
+    pushField(
+      'experienceYears',
+      'Experience',
+      typeof user.experienceYears === 'number' ? `${user.experienceYears} years` : null,
+      Clock,
+    );
+    pushField('education', 'Education', user.education, School);
+    pushField(
+      'certifications',
+      'Certifications',
+      user.certifications
+        ?.map((cert) => {
+          if (cert.issuer && cert.year) {
+            return `${cert.name} (${cert.issuer}, ${cert.year})`;
+          }
+          if (cert.issuer) return `${cert.name} (${cert.issuer})`;
+          if (cert.year) return `${cert.name} (${cert.year})`;
+          return cert.name;
+        })
+        .join(', '),
+      Award,
+    );
+    pushField('curriculumTags', 'Curriculum', user.curriculumTags?.join(', '), BookOpen);
+    pushField('badges', 'Badges', user.badges?.join(', '), Award);
+  }
+
+  if (user.kind === 'child') {
+    pushField(
+      'gradeLevel',
+      'Grade',
+      user.gradeLevel ? gradeLabel(user.gradeLevel, countryCode) : null,
+      GraduationCap,
+    );
+    pushField('schoolName', 'School', user.schoolName, School);
+    pushField('schoolYear', 'School year', user.schoolYear, Calendar);
+    pushField('guardianNames', 'Parents', user.guardianNames?.join(', '), Users);
+    pushField('interests', 'Interests', user.interests?.join(', '), Heart);
+    pushField('strengths', 'Strengths', user.strengths?.join(', '), Sparkles);
+    pushField(
+      'learningPreferences',
+      'Learning style',
+      user.learningPreferences?.join(', '),
+      BookOpen,
+    );
+  }
+
+  if (user.kind === 'guardian') {
+    pushField('childrenNames', 'Children', childrenNames.join(', '), Users);
+  }
+
+  pushField(
+    'joinedDate',
+    'Member since',
+    joinedDate
+      ? new Date(joinedDate).toLocaleDateString('en-US', {
+          month: 'long',
+          year: 'numeric',
+        })
+      : null,
+    Calendar,
+  );
+
+  return aboutFields;
+}
+
 export function ProfileContent({
   user,
-  media = [],
-  files = [],
   onCallClick,
   onDmClick,
   onScheduleClick,
@@ -62,16 +215,15 @@ export function ProfileContent({
   onReportClick,
 }: {
   user: ProfileDetailsUser;
-  media?: ChannelMediaItemVM[];
-  files?: ChannelFileItemVM[];
   onCallClick?: () => void;
   onDmClick?: () => void;
   onScheduleClick?: () => void;
   onShareClick?: () => void;
   onReportClick?: () => void;
 }) {
-  const countryCode = normalizeCountryCode(user.location?.countryCode);
   const profileDisplayName = getProfileDisplayName(user.profile);
+  const roleLabel = user.role ?? roleLabelFromKind(user.kind);
+  const aboutFields = buildAboutFields(user);
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="flex flex-col items-center gap-3 p-6 min-w-0">
@@ -103,132 +255,25 @@ export function ProfileContent({
             </Badge>
           )}
         </div>
-        {user.role && (
-          <Badge variant="secondary" className="text-xs">
-            {user.role}
-          </Badge>
-        )}
+        <Badge variant="secondary" className="text-xs">
+          {roleLabel}
+        </Badge>
       </div>
 
       <Separator />
-
-      <div className="space-y-4 p-4 min-w-0">
-        <h3 className="text-sm font-semibold text-foreground">Quick actions</h3>
-        <ProfileActions
-          onCallClick={onCallClick}
-          onDmClick={onDmClick}
-          onScheduleClick={onScheduleClick}
-          onShareClick={onShareClick}
-          onReportClick={onReportClick}
-        />
-      </div>
-
-      <Separator />
-
-      <div className="space-y-4 p-4 min-w-0">
-        <MediaFilesPanel media={media} files={files} filterUserId={user.ids.id} />
-      </div>
 
       <div className="space-y-4 p-4 min-w-0">
         <h3 className="text-sm font-semibold text-foreground">About</h3>
         <div className="space-y-3 min-w-0">
-          {user.headline && (
-            <div className="flex items-start gap-3">
-              <Megaphone className="mt-0.5 h-4 w-4 text-muted-foreground" />
+          {aboutFields.map((field) => (
+            <div key={field.key} className="flex items-start gap-3">
+              <field.icon className="mt-0.5 h-4 w-4 text-muted-foreground" />
               <div className="flex-1 min-w-0">
-                <p className="text-xs text-muted-foreground">Headline</p>
-                <p className="text-sm text-foreground break-words">{user.headline}</p>
+                <p className="text-xs text-muted-foreground">{field.label}</p>
+                <p className="text-sm text-foreground break-words">{field.value}</p>
               </div>
             </div>
-          )}
-          {user.profile.bio && (
-            <div className="flex items-start gap-3">
-              <FileText className="mt-0.5 h-4 w-4 text-muted-foreground" />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-muted-foreground">Bio</p>
-                <p className="text-sm text-foreground break-words">{user.profile.bio}</p>
-              </div>
-            </div>
-          )}
-          {user.subjects?.length ? (
-            <div className="flex items-start gap-3">
-              <BookOpen className="mt-0.5 h-4 w-4 text-muted-foreground" />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-muted-foreground">Subjects</p>
-                <p className="text-sm text-foreground break-words">
-                  {user.subjects.join(', ')}
-                </p>
-              </div>
-            </div>
-          ) : null}
-          {user.gradesSupported?.length ? (
-            <div className="flex items-start gap-3">
-              <GraduationCap className="mt-0.5 h-4 w-4 text-muted-foreground" />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-muted-foreground">Grades supported</p>
-                <p className="text-sm text-foreground break-words">
-                  {user.gradesSupported
-                    .map((grade) => (grade ? gradeLabel(grade, countryCode) : null))
-                    .filter(Boolean)
-                    .join(', ')}
-                </p>
-              </div>
-            </div>
-          ) : null}
-          {typeof user.experienceYears === 'number' ? (
-            <div className="flex items-start gap-3">
-              <Clock className="mt-0.5 h-4 w-4 text-muted-foreground" />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-muted-foreground">Experience</p>
-                <p className="text-sm text-foreground">{user.experienceYears} years</p>
-              </div>
-            </div>
-          ) : null}
-          {user.certifications?.length ? (
-            <div className="flex items-start gap-3">
-              <Award className="mt-0.5 h-4 w-4 text-muted-foreground" />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-muted-foreground">Certifications</p>
-                <p className="text-sm text-foreground break-words">
-                  {user.certifications
-                    .map((cert) => {
-                      if (cert.issuer && cert.year) {
-                        return `${cert.name} (${cert.issuer}, ${cert.year})`;
-                      }
-                      if (cert.issuer) return `${cert.name} (${cert.issuer})`;
-                      if (cert.year) return `${cert.name} (${cert.year})`;
-                      return cert.name;
-                    })
-                    .join(', ')}
-                </p>
-              </div>
-            </div>
-          ) : null}
-          {user.childrenNames?.length ? (
-            <div className="flex items-start gap-3">
-              <Users className="mt-0.5 h-4 w-4 text-muted-foreground" />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-muted-foreground">Children</p>
-                <p className="text-sm text-foreground break-words">
-                  {user.childrenNames.join(', ')}
-                </p>
-              </div>
-            </div>
-          ) : null}
-          {user.joinedDate && (
-            <div className="flex items-start gap-3">
-              <Calendar className="mt-0.5 h-4 w-4 text-muted-foreground" />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-muted-foreground">Member since</p>
-                <p className="text-sm text-foreground">
-                  {new Date(user.joinedDate).toLocaleDateString('en-US', {
-                    month: 'long',
-                    year: 'numeric',
-                  })}
-                </p>
-              </div>
-            </div>
-          )}
+          ))}
         </div>
       </div>
     </div>
@@ -237,8 +282,6 @@ export function ProfileContent({
 
 export function ProfileSheet({
   user,
-  media,
-  files,
   onCallClick,
   onDmClick,
   onScheduleClick,
@@ -248,8 +291,6 @@ export function ProfileSheet({
   return (
     <ProfileContent
       user={user}
-      media={media}
-      files={files}
       onCallClick={onCallClick}
       onDmClick={onDmClick}
       onScheduleClick={onScheduleClick}

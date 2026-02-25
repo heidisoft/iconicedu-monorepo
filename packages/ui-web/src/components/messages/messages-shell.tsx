@@ -131,12 +131,12 @@ const MessagesShellLayout = memo(function MessagesShellLayout({
           </ResizablePanel>
           {state.isOpen ? (
             <>
-              <ResizableHandle withHandle />
+              <ResizableHandle withHandle className="animate-in fade-in-0 duration-200" />
               <ResizablePanel
                 defaultSize={40}
                 minSize={30}
                 maxSize={45}
-                className="min-w-0 min-h-0 flex flex-col"
+                className="min-w-0 min-h-0 flex flex-col animate-in slide-in-from-right-2 fade-in-0 duration-200"
               >
                 {rightPanel}
               </ResizablePanel>

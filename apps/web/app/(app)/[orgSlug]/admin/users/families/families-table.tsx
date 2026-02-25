@@ -73,7 +73,7 @@ export function FamiliesTable({ rows }: FamiliesTableProps) {
                               themeKey={resolveThemeKey(guardian.themeKey)}
                               showStatus={false}
                               sizeClassName="size-7"
-                              initialsLength={2}
+                              initialsLength={1}
                             />
                             <span className="truncate">{guardian.name ?? guardian.label}</span>
                           </div>
@@ -104,7 +104,7 @@ export function FamiliesTable({ rows }: FamiliesTableProps) {
                             themeKey={resolveThemeKey(child.themeKey)}
                             showStatus={false}
                             sizeClassName="size-7"
-                            initialsLength={2}
+                            initialsLength={1}
                           />
                           <span>{child.label}</span>
                         </div>

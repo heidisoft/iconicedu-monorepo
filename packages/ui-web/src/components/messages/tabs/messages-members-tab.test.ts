@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getMemberRowActionKind } from './messages-members-tab';
+import { canOpenMemberProfile, getMemberRowActionKind } from './messages-members-tab';
 
 describe('messages-members-tab', () => {
   it('returns self when row member matches current user', () => {
@@ -12,5 +12,10 @@ describe('messages-members-tab', () => {
 
   it('returns none when current user is missing', () => {
     expect(getMemberRowActionKind('user-2', null)).toBe('none');
+  });
+
+  it('enables member profile action only when callback is provided', () => {
+    expect(canOpenMemberProfile(undefined)).toBe(false);
+    expect(canOpenMemberProfile(() => void 0)).toBe(true);
   });
 });

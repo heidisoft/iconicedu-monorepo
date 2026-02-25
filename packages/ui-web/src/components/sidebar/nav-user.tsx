@@ -306,7 +306,7 @@ export function NavUser({
                 themeKey={profile.ui?.themeKey}
                 sizeClassName="h-8 w-8 rounded-full"
                 fallbackClassName="rounded-full"
-                initialsLength={2}
+                initialsLength={1}
               />
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">
@@ -334,7 +334,7 @@ export function NavUser({
                   themeKey={profile.ui?.themeKey}
                   sizeClassName="h-8 w-8 rounded-full"
                   fallbackClassName="rounded-full"
-                  initialsLength={2}
+                  initialsLength={1}
                 />
                 <div className="grid flex-1 text-left text-sm leading-tight">
                     <span className="truncate font-medium">

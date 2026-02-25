@@ -489,7 +489,7 @@ export function UsersTable({ rows }: UsersTableProps) {
                         themeKey={resolveThemeKey(row.themeKey)}
                         showStatus={false}
                         sizeClassName="size-8"
-                        initialsLength={2}
+                        initialsLength={1}
                       />
                       <div className="min-w-0">
                         <p className="text-sm font-semibold capitalize">{displayName}</p>

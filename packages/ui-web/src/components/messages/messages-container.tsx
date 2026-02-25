@@ -1186,48 +1186,15 @@ export function MessagesContainer({
     ],
   );
 
-  return (
-    <div className="relative flex h-full min-h-0 flex-1 min-w-0 flex-col">
-      {isNetworkBusy ? (
-        <div className="pointer-events-none absolute right-4 top-3 z-30 inline-flex items-center gap-2 rounded-full border border-border/80 bg-background/90 px-3 py-1 text-xs text-muted-foreground shadow-sm backdrop-blur">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          Syncing...
-        </div>
-      ) : null}
-      <div className="border-b border-border bg-muted/40 px-4">
-        <Tabs
-          value={activeTab}
-          onValueChange={(value) => {
-            if (containerTabs.some((tab) => tab.key === value)) {
-              setActiveTab(value as MessagesContainerTabKey);
-            }
-          }}
-          className="gap-0"
-        >
-          <TabsList variant="line" className="h-12 p-0">
-            {containerTabs.map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <TabsTrigger
-                  key={tab.key}
-                  value={tab.key}
-                  className="w-auto flex-none px-1.5"
-                >
-                  <Icon className="h-4 w-4 text-muted-foreground/70" />
-                  {tab.label}
-                </TabsTrigger>
-              );
-            })}
-          </TabsList>
-        </Tabs>
-      </div>
-      {activeTab === 'messages' ? (
+  const renderActiveTabContent = () => {
+    if (activeTab === 'messages') {
+      return (
         <>
           <MessageList
             ref={messageListRef}
             {...messageListProps}
           />
-          {activeTab === 'messages' && typingParticipants.length ? (
+          {typingParticipants.length ? (
             <TypingIndicator profiles={typingParticipants} className="border-t border-border" />
           ) : null}
           {readOnly ? (
@@ -1244,12 +1211,20 @@ export function MessagesContainer({
             />
           )}
         </>
-      ) : activeTab === 'saved' ? (
+      );
+    }
+
+    if (activeTab === 'saved') {
+      return (
         <MessagesSavedTab
           messages={visibleMessages}
           onMessageClick={handleSavedMessageClick}
         />
-      ) : activeTab === 'files' ? (
+      );
+    }
+
+    if (activeTab === 'files') {
+      return (
         <ScrollArea className="min-h-0 flex-1">
           <div className="space-y-2 p-4">
             {isLoadingFiles ? (
@@ -1293,15 +1268,70 @@ export function MessagesContainer({
               : null}
           </div>
         </ScrollArea>
-      ) : activeTab === 'schedule' ? (
+      );
+    }
+
+    if (activeTab === 'schedule') {
+      return (
         <MessagesScheduleTab
           schedules={loadedSchedules ?? []}
           isLoading={isLoadingSchedules}
           error={schedulesLoadError}
         />
-      ) : (
-        <MessagesMembersTab participants={participants} currentUserId={currentUserId} />
-      )}
+      );
+    }
+
+    return (
+      <MessagesMembersTab
+        participants={participants}
+        currentUserId={currentUserId}
+        onProfileClick={handleProfileClick}
+      />
+    );
+  };
+
+  return (
+    <div className="relative flex h-full min-h-0 flex-1 min-w-0 flex-col">
+      {isNetworkBusy ? (
+        <div className="pointer-events-none absolute right-4 top-3 z-30 inline-flex items-center gap-2 rounded-full border border-border/80 bg-background/90 px-3 py-1 text-xs text-muted-foreground shadow-sm backdrop-blur">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          Syncing...
+        </div>
+      ) : null}
+      <div className="border-b border-border bg-muted/40 px-4">
+        <Tabs
+          value={activeTab}
+          onValueChange={(value) => {
+            if (containerTabs.some((tab) => tab.key === value)) {
+              setActiveTab(value as MessagesContainerTabKey);
+            }
+          }}
+          className="gap-0"
+        >
+          <TabsList variant="line" className="h-12 p-0">
+            {containerTabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <TabsTrigger
+                  key={tab.key}
+                  value={tab.key}
+                  className="w-auto flex-none px-1.5"
+                >
+                  <Icon className="h-4 w-4 text-muted-foreground/70" />
+                  {tab.label}
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+        </Tabs>
+      </div>
+      <div
+        key={activeTab}
+        data-testid="messages-tab-content"
+        className="min-h-0 flex-1 flex flex-col motion-reduce:animate-none animate-in fade-in-0 slide-in-from-right-1 duration-200"
+      >
+        {renderActiveTabContent()}
+      </div>
     </div>
   );
 }

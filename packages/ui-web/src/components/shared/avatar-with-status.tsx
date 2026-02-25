@@ -43,7 +43,7 @@ interface AvatarWithStatusProps {
   fallbackClassName?: string;
 }
 
-const getInitials = (name?: string | null, maxLength = 2) =>
+const getInitials = (name?: string | null, maxLength = 1) =>
   (name ?? '')
     .split(' ')
     .map((part) => part[0])

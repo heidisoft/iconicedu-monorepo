@@ -200,7 +200,7 @@ export function LearningSpacesTable({ rows, onEdit }: LearningSpacesTableProps) 
                               themeKey={(participant.themeKey as ThemeKey | null) ?? null}
                               showStatus={false}
                               sizeClassName="size-8"
-                              initialsLength={2}
+                              initialsLength={1}
                             />
                           </span>
                         </TooltipTrigger>

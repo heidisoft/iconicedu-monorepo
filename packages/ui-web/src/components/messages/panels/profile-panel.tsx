@@ -31,8 +31,6 @@ export function ProfilePanel({ intent }: ProfilePanelProps) {
     return (
       <ProfileSheet
         user={user}
-        media={channel.collections.media.items}
-        files={channel.collections.files.items}
         onDmClick={handleDmClick}
       />
     );
@@ -40,8 +38,6 @@ export function ProfilePanel({ intent }: ProfilePanelProps) {
   return (
     <ProfileContent
       user={user}
-      media={channel.collections.media.items}
-      files={channel.collections.files.items}
       onDmClick={handleDmClick}
     />
   );

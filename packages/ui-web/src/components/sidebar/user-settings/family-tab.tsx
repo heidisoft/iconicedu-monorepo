@@ -980,7 +980,7 @@ export function FamilyTab({
                 .split(' ')
                 .map((part) => part[0])
                 .join('')
-                .slice(0, 2)
+                .slice(0, 1)
                 .toUpperCase();
               const isSelf = !member.canRemove;
               const editable = editableChildData[member.id];

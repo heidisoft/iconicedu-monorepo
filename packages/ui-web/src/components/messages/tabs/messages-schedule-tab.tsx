@@ -86,7 +86,7 @@ export function MessagesScheduleTab({
         onValueChange={(v) => setActiveTab(v as ScheduleSubTabKey)}
         className="min-h-0 flex-1"
       >
-        <TabsList className="bg-secondary">
+        <TabsList className="bg-secondary transition-colors duration-200">
           <TabsTrigger value="upcoming" className="gap-1.5">
             Upcoming
           </TabsTrigger>
@@ -95,7 +95,10 @@ export function MessagesScheduleTab({
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="upcoming" className="mt-4 min-h-0 flex-1 space-y-2">
+        <TabsContent
+          value="upcoming"
+          className="mt-4 min-h-0 flex-1 space-y-2 motion-reduce:animate-none animate-in fade-in-0 slide-in-from-right-1 duration-200"
+        >
           <ScrollArea className="min-h-0 flex-1 pr-1">
             <div className="space-y-2">
               {upcomingGroups.length === 0 ? (
@@ -132,7 +135,10 @@ export function MessagesScheduleTab({
           </ScrollArea>
         </TabsContent>
 
-        <TabsContent value="past" className="mt-4 min-h-0 flex-1 space-y-2">
+        <TabsContent
+          value="past"
+          className="mt-4 min-h-0 flex-1 space-y-2 motion-reduce:animate-none animate-in fade-in-0 slide-in-from-right-1 duration-200"
+        >
           <ScrollArea className="min-h-0 flex-1 pr-1">
             <div className="space-y-2">
               {pastGroups.length === 0 ? (

@@ -15,7 +15,7 @@ const getInitials = (name: string) =>
   name
     .split(' ')
     .filter(Boolean)
-    .slice(0, 2)
+    .slice(0, 1)
     .map((part) => part[0])
     .join('')
     .toUpperCase();
@@ -39,7 +39,7 @@ export function ActivityBadge({ activity, className }: ActivityBadgeProps) {
             showStatus={false}
             sizeClassName="size-6 border-2 border-background"
             fallbackClassName="text-[10px]"
-            initialsLength={2}
+            initialsLength={1}
           />
         ))}
         {overflowCount > 0 && (
@@ -65,7 +65,7 @@ export function ActivityBadge({ activity, className }: ActivityBadgeProps) {
       sizeClassName={cn('size-6 shrink-0', className)}
       fallbackClassName="text-[10px]"
       fallbackText={initials}
-      initialsLength={2}
+      initialsLength={1}
     />
   );
 }

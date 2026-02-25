@@ -5,7 +5,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function getInitials(text: string, letters = 2) {
+export function getInitials(text: string, letters = 1) {
   const trimmed = text.trim();
   if (!trimmed) {
     return '';
