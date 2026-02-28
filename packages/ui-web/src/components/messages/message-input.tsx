@@ -59,6 +59,8 @@ import {
   type ComposerAttachmentKind,
   type ComposerRecordingStatus,
 } from './message-input.attachments';
+import { extractComposerLinkPreviewUrl } from './message-input-link-preview.utils';
+import { LinkPreviewCard } from './link-preview-card';
 
 const TYPING_STOP_DELAY_MS = 3000;
 const TYPING_KEEPALIVE_THROTTLE_MS = 1200;
@@ -93,6 +95,15 @@ type RecordingSession = {
   status: ComposerRecordingStatus;
   startedAt: number;
   accumulatedMs: number;
+};
+
+type ComposerLinkPreview = {
+  url: string;
+  title: string;
+  description?: string;
+  imageUrl?: string;
+  siteName?: string;
+  favicon?: string;
 };
 
 function FormatButton({
@@ -143,6 +154,8 @@ export function MessageInput({
   const [pendingAttachments, setPendingAttachments] = React.useState<PendingAttachment[]>([]);
   const [attachmentError, setAttachmentError] = React.useState<string | null>(null);
   const [isDragOver, setIsDragOver] = React.useState(false);
+  const [linkPreview, setLinkPreview] = React.useState<ComposerLinkPreview | null>(null);
+  const [isLoadingLinkPreview, setIsLoadingLinkPreview] = React.useState(false);
   const [recordingSession, setRecordingSession] = React.useState<RecordingSession | null>(null);
   const [recordingElapsedMs, setRecordingElapsedMs] = React.useState(0);
   const [mentionState, setMentionState] = React.useState<MentionState | null>(null);
@@ -182,6 +195,13 @@ export function MessageInput({
   const pendingAttachmentPreviewGroups = React.useMemo(
     () => splitComposerAttachmentsByKind(pendingAttachments),
     [pendingAttachments],
+  );
+  const composerPreviewUrl = React.useMemo(
+    () =>
+      pendingAttachments.length === 0 && !hasActiveRecording
+        ? extractComposerLinkPreviewUrl(content)
+        : null,
+    [content, hasActiveRecording, pendingAttachments.length],
   );
 
   const stopRecordingStream = React.useCallback(() => {
@@ -575,6 +595,50 @@ export function MessageInput({
       textarea?.removeEventListener('scroll', handleViewportChange);
     };
   }, [isMentionListOpen, mentionState?.end, updateMentionPopupPosition]);
+
+  React.useEffect(() => {
+    if (!composerPreviewUrl) {
+      setLinkPreview(null);
+      setIsLoadingLinkPreview(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    setIsLoadingLinkPreview(true);
+
+    const loadPreview = async () => {
+      try {
+        const response = await fetch(
+          `/api/messages/link-preview?url=${encodeURIComponent(composerPreviewUrl)}`,
+          { signal: controller.signal },
+        );
+        if (!response.ok) {
+          throw new Error('Unable to load link preview');
+        }
+        const payload = (await response.json()) as {
+          success: boolean;
+          data?: ComposerLinkPreview;
+        };
+        if (!controller.signal.aborted) {
+          setLinkPreview(payload.data ?? null);
+        }
+      } catch {
+        if (!controller.signal.aborted) {
+          setLinkPreview(null);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsLoadingLinkPreview(false);
+        }
+      }
+    };
+
+    void loadPreview();
+
+    return () => {
+      controller.abort();
+    };
+  }, [composerPreviewUrl]);
 
   const formatButtons = [
     { icon: Bold, label: 'Bold', onClick: () => applyFormatAtSelection('**') },
@@ -1027,6 +1091,25 @@ export function MessageInput({
                   </div>
                 ))}
               </div>
+            </div>
+          ) : null}
+          {!pendingAttachments.length && (isLoadingLinkPreview || linkPreview) ? (
+            <div className="border-b border-border px-3 py-3">
+              {isLoadingLinkPreview ? (
+                <div className="flex items-center gap-2 rounded-xl border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading link preview...
+                </div>
+              ) : linkPreview ? (
+                <LinkPreviewCard
+                  url={linkPreview.url}
+                  title={linkPreview.title}
+                  description={linkPreview.description}
+                  imageUrl={linkPreview.imageUrl}
+                  siteName={linkPreview.siteName}
+                  favicon={linkPreview.favicon}
+                />
+              ) : null}
             </div>
           ) : null}
           {attachmentError ? (

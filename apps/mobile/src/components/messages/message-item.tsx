@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import { View, Text, Image, StyleSheet, StyleProp, TextStyle, TouchableOpacity, Pressable, Linking, ActivityIndicator } from 'react-native';
+import { View, Text, Image, StyleSheet, StyleProp, TextStyle, TouchableOpacity, Pressable, Linking, ActivityIndicator, Modal, StatusBar, SafeAreaView } from 'react-native';
 import type {
   MessageVM,
   ThreadVM,
@@ -22,7 +22,7 @@ import type {
 import type { AppColors } from '@/lib/theme';
 import { fetchThreadMessages } from '@/lib/api/queries';
 import { EmojiPicker } from './emoji-picker';
-import { SmilePlus, CornerUpLeft, MessageCircle, Download, FileText, ExternalLink, Play } from 'lucide-react-native';
+import { SmilePlus, CornerUpLeft, MessageCircle, Download, FileText, ExternalLink, Play, Pause, X } from 'lucide-react-native';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -656,22 +656,32 @@ function makeStyles(colors: AppColors) {
     textContent:    { fontSize: 15, lineHeight: 22, color: colors.text },
     textContentOwn: { color: '#fff' },
 
-    // ── File attachment (inside bubble for others, inverted for own) ──────────
-    fileWrap: { gap: 8 },
-    fileRow:  { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    fileIcon: { width: 36, height: 36, borderRadius: 8, backgroundColor: colors.tealBg, alignItems: 'center', justifyContent: 'center' },
+    // ── File attachment ────────────────────────────────────────────────────────
+    // fileBubble uses width:'85%' (not maxWidth) so flex:1 inside rows resolves correctly
+    fileBubble:    { width: '85%' as const, borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 },
+    fileIcon:      { width: 40, height: 40, borderRadius: 8, backgroundColor: colors.tealBg, alignItems: 'center', justifyContent: 'center' },
+    fileListWrap:  { borderWidth: 1, borderRadius: 12, overflow: 'hidden' },
+    fileRowPadded: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 },
 
-    // ── Audio player ──────────────────────────────────────────────────────────
-    audioRow:  { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    playBtn:   { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+    // ── Audio player — inner card matches web: rounded-2xl border bg-card px-3 py-3 ──
+    audioCard:    { borderWidth: 1, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 12 },
+    audioRow:     { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    playBtn:      { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+    // Waveform container: h-6 (24pt) with inner padding to match web rounded-xl border bg-muted/70 px-2
+    waveformRow:  { flexDirection: 'row' as const, alignItems: 'flex-end' as const, gap: 2, height: 24, borderRadius: 10, borderWidth: 1, borderColor: 'transparent', paddingHorizontal: 4 },
 
     // ── Image message (rendered outside bubble) ───────────────────────────────
-    imageWrapper:     { maxWidth: '85%', borderRadius: 18, overflow: 'hidden', borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
-    imageCaption:     { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6 },
-    imagePreview:     { width: '100%' },
+    imageWrapper:        { maxWidth: '85%', borderRadius: 18, overflow: 'hidden', borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+    imageGalleryWrapper: { maxWidth: '90%', borderRadius: 18, overflow: 'hidden', borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+    imageCaption:        { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6 },
+    imagePreview:        { width: '100%' },
+    galleryItem:         { width: '50%', height: 192, position: 'relative' as const },
+    galleryItemImg:      { width: '100%', height: '100%' },
+    imageDownloadBtn:    { position: 'absolute' as const, top: 8, right: 8, width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center' as const, justifyContent: 'center' as const },
 
     // ── Link preview card ──────────────────────────────────────────────────────
-    linkCard:         { borderWidth: 1, borderRadius: 12, overflow: 'hidden', marginTop: 4, maxWidth: 280 },
+    // width:'100%' fills fileBubble content area so flex:1 inside resolves (matches web max-w-md block)
+    linkCard:         { width: '100%' as const, borderWidth: 1, borderRadius: 12, overflow: 'hidden' },
     linkCardImg:      { width: '100%', aspectRatio: 16 / 9 },
     linkCardBody:     { padding: 10, gap: 4 },
     linkCardTitle:    { fontSize: 13, fontWeight: '700' },
@@ -754,6 +764,10 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   const [threadExpanded, setThreadExpanded] = useState(false);
   const [threadReplies, setThreadReplies] = useState<MessageVM[]>([]);
   const [threadLoading, setThreadLoading] = useState(false);
+  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
+  // Full-screen image viewer state
+  const [viewerImages, setViewerImages] = useState<string[]>([]);
+  const [viewerIndex, setViewerIndex] = useState(0);
   const type = message.core.type;
   const senderDisplayName = message.core.sender.profile.displayName;
   const { url: avatarUrl, seed: avatarSeed } = getAvatarInfo(message);
@@ -797,19 +811,21 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 
   // ── Image message (rendered edge-to-edge, no bubble padding) ─────────────
 
+  const openImageViewer = (urls: string[], index: number) => {
+    setViewerImages(urls);
+    setViewerIndex(index);
+  };
+
   const renderImageContent = () => {
     const im = message as ImageMessageVM;
-    const aspectRatio =
-      im.attachment.width && im.attachment.height
-        ? im.attachment.width / im.attachment.height
-        : 4 / 3;
+    const attachments = im.attachments?.length ? im.attachments : [im.attachment];
+    const isGallery = attachments.length > 1;
+    const first = attachments[0]!;
+    const singleAspect = first.width && first.height ? first.width / first.height : 4 / 3;
+    const urls = attachments.map((a) => a.url);
+
     return (
-      <TouchableOpacity
-        activeOpacity={0.9}
-        style={[s.imageWrapper, { backgroundColor: colors.card }]}
-        onPress={() => Linking.openURL(im.attachment.url).catch(() => null)}
-        accessibilityLabel={im.attachment.name ?? 'Image message'}
-      >
+      <View style={[isGallery ? s.imageGalleryWrapper : s.imageWrapper, { backgroundColor: colors.card }]}>
         {!!im.content?.text && (
           <View style={s.imageCaption}>
             <FormattedText
@@ -819,148 +835,275 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             />
           </View>
         )}
-        <Image
-          source={{ uri: im.attachment.url }}
-          style={[s.imagePreview, { aspectRatio }]}
-          resizeMode="cover"
-        />
-      </TouchableOpacity>
+        {isGallery ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+            {attachments.map((att, i) => (
+              <View key={`${att.url}-${i}`} style={s.galleryItem}>
+                <TouchableOpacity
+                  activeOpacity={0.9}
+                  style={{ flex: 1 }}
+                  onPress={() => openImageViewer(urls, i)}
+                >
+                  <Image source={{ uri: att.url }} style={s.galleryItemImg} resizeMode="cover" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={s.imageDownloadBtn}
+                  onPress={() => Linking.openURL(att.url).catch(() => null)}
+                  activeOpacity={0.8}
+                >
+                  <Download size={12} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <View style={{ position: 'relative' }}>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => openImageViewer(urls, 0)}
+            >
+              <Image
+                source={{ uri: first.url }}
+                style={[s.imagePreview, { aspectRatio: singleAspect }]}
+                resizeMode="cover"
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={s.imageDownloadBtn}
+              onPress={() => Linking.openURL(first.url).catch(() => null)}
+              activeOpacity={0.8}
+            >
+              <Download size={14} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  // ── File message (rendered outside bubble for proper flex layout) ──────────
+
+  const renderFileContent = () => {
+    const fm = message as FileMessageVM;
+    const attachments = fm.attachments?.length ? fm.attachments : [fm.attachment];
+    const listBorderColor = isOwn ? 'rgba(255,255,255,0.3)' : colors.border;
+    const listBg = isOwn ? 'rgba(255,255,255,0.1)' : colors.inputBg;
+    const rowDividerColor = isOwn ? 'rgba(255,255,255,0.15)' : colors.border;
+    const iconColor = isOwn ? '#fff' : colors.teal;
+    const nameColor = isOwn ? '#fff' : colors.text;
+    const sizeColor = isOwn ? 'rgba(255,255,255,0.6)' : colors.textFaint;
+    const downloadColor = isOwn ? 'rgba(255,255,255,0.7)' : colors.textMuted;
+    return (
+      // width: '85%' gives a definite pixel width from contentCol (flex:1),
+      // so flex:1 inside the file rows resolves correctly (unlike maxWidth which shrinks to content)
+      <View style={[s.fileBubble, isOwn ? s.bubbleOwn : s.bubbleOther]}>
+        {!!fm.content?.text && (
+          <FormattedText
+            text={fm.content.text}
+            style={[s.textContent, isOwn && s.textContentOwn, { marginBottom: 8 }]}
+            isOwn={isOwn}
+          />
+        )}
+        <View style={[s.fileListWrap, { borderColor: listBorderColor, backgroundColor: listBg }]}>
+          {attachments.map((att, i) => (
+            <TouchableOpacity
+              key={`${att.url}-${i}`}
+              style={[
+                s.fileRowPadded,
+                i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: rowDividerColor },
+              ]}
+              onPress={() => Linking.openURL(att.url).catch(() => null)}
+              accessibilityLabel={`Download ${att.name}`}
+            >
+              <View style={[s.fileIcon, isOwn && { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                <FileText size={18} color={iconColor} />
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: nameColor }} numberOfLines={1}>
+                  {att.name}
+                </Text>
+                {!!att.size && (
+                  <Text style={{ fontSize: 11, marginTop: 2, color: sizeColor }}>
+                    {formatFileSize(att.size)}
+                  </Text>
+                )}
+              </View>
+              <Download size={16} color={downloadColor} />
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+    );
+  };
+
+  // ── Audio message (rendered outside bubble, same pattern as file) ──────────
+
+  const renderAudioContent = () => {
+    const am = message as AudioRecordingMessageVM;
+    const totalSecs = am.audio.durationSeconds ?? 0;
+    const durationFmt = `${Math.floor(totalSecs / 60)}:${String(totalSecs % 60).padStart(2, '0')}`;
+    const barCount = 28;
+    const waveform =
+      am.audio.waveform?.slice(0, barCount) ??
+      Array.from({ length: barCount }, (_, i) => {
+        const curve = Math.sin(((i + 2) / barCount) * Math.PI * 1.3);
+        return Math.max(0.28, Math.min(0.92, 0.55 + curve * 0.28));
+      });
+
+    // Colors mirror web: play btn bg-primary/12 → tealBg; active → bg-primary; playing → solid fill
+    const playBtnBg = isOwn
+      ? (isAudioPlaying ? '#fff' : 'rgba(255,255,255,0.15)')
+      : (isAudioPlaying ? colors.teal : colors.tealBg);
+    const playBtnBorder = isOwn ? 'rgba(255,255,255,0.3)' : colors.teal + '33';
+    const playBtnColor = isOwn
+      ? (isAudioPlaying ? colors.teal : '#fff')
+      : (isAudioPlaying ? '#fff' : colors.teal);
+    // Bars: inactive = bg-foreground/20 equivalent (no seek tracking without expo-av)
+    const barInactive = isOwn ? 'rgba(255,255,255,0.22)' : colors.border;
+    const timeColor = isOwn ? 'rgba(255,255,255,0.7)' : colors.textFaint;
+    const cardBorder = isOwn ? 'rgba(255,255,255,0.2)' : colors.border;
+    const cardBg = isOwn ? 'rgba(255,255,255,0.06)' : colors.card;
+
+    return (
+      // width: '85%' (via fileBubble) ensures flex:1 waveform section resolves properly
+      <View style={[s.fileBubble, isOwn ? s.bubbleOwn : s.bubbleOther]}>
+        {!!am.content?.text && (
+          <FormattedText
+            text={am.content.text}
+            style={[s.textContent, isOwn && s.textContentOwn, { marginBottom: 8 }]}
+            isOwn={isOwn}
+          />
+        )}
+        {/* Inner card matches web: rounded-2xl border border-border bg-card px-3 py-3 */}
+        <View style={[s.audioCard, { borderColor: cardBorder, backgroundColor: cardBg }]}>
+          <View style={s.audioRow}>
+            <TouchableOpacity
+              style={[s.playBtn, { backgroundColor: playBtnBg, borderWidth: 1, borderColor: playBtnBorder }]}
+              onPress={() => {
+                const next = !isAudioPlaying;
+                setIsAudioPlaying(next);
+                if (next) Linking.openURL(am.audio.url).catch(() => null);
+              }}
+              accessibilityLabel={isAudioPlaying ? 'Pause audio' : 'Play audio'}
+            >
+              {isAudioPlaying ? (
+                <Pause size={15} color={playBtnColor} fill={playBtnColor} />
+              ) : (
+                <Play size={15} color={playBtnColor} fill={playBtnColor} style={{ marginLeft: 2 }} />
+              )}
+            </TouchableOpacity>
+            <View style={{ flex: 1, gap: 4 }}>
+              {/* Time row: currentTime left / duration right */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 11, color: timeColor }}>0:00</Text>
+                <Text style={{ fontSize: 11, color: timeColor }}>{durationFmt}</Text>
+              </View>
+              {/* Waveform: bar height matches web Math.max(8, round(v * 16))px */}
+              <View style={s.waveformRow}>
+                {waveform.map((v, i) => (
+                  <View
+                    key={i}
+                    style={{
+                      flex: 1,
+                      height: Math.max(8, Math.round(v * 16)),
+                      backgroundColor: barInactive,
+                      borderRadius: 99,
+                    }}
+                  />
+                ))}
+              </View>
+            </View>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
+  // ── Link preview (rendered outside bubble — same flex:1 fix as file/audio) ──
+
+  const renderLinkContent = () => {
+    const lp = message as LinkPreviewMessageVM;
+
+    // Fallback for legacy messages where link object wasn't populated
+    if (!lp.link) {
+      const fallback = lp.content?.text ?? '';
+      if (!fallback) return null;
+      return (
+        <View style={[s.bubble, isOwn ? s.bubbleOwn : s.bubbleOther]}>
+          <FormattedText
+            text={fallback}
+            mentions={lp.content?.mentions}
+            style={[s.textContent, isOwn && s.textContentOwn]}
+            isOwn={isOwn}
+          />
+        </View>
+      );
+    }
+
+    return (
+      // fileBubble (width: '85%') gives a definite width so flex:1 inside the card resolves
+      <View style={[s.fileBubble, isOwn ? s.bubbleOwn : s.bubbleOther]}>
+        {!!lp.content?.text && (
+          <FormattedText
+            text={lp.content.text}
+            mentions={lp.content.mentions}
+            style={[s.textContent, isOwn && s.textContentOwn, { marginBottom: 6 }]}
+            isOwn={isOwn}
+          />
+        )}
+        {/* Card: width:'100%' fills fileBubble content area — matches web max-w-md block */}
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={[s.linkCard, { borderColor: colors.border, backgroundColor: colors.card }]}
+          onPress={() => Linking.openURL(lp.link.url).catch(() => null)}
+          accessibilityLabel={`Open link: ${lp.link.title}`}
+        >
+          {!!lp.link.imageUrl && (
+            <Image
+              source={{ uri: lp.link.imageUrl }}
+              style={s.linkCardImg}
+              resizeMode="cover"
+              accessibilityLabel={lp.link.title}
+            />
+          )}
+          <View style={[s.linkCardBody, { backgroundColor: colors.card }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6 }}>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={[s.linkCardTitle, { color: colors.text }]} numberOfLines={2}>
+                  {lp.link.title}
+                </Text>
+                {!!lp.link.description && (
+                  <Text style={[s.linkCardDesc, { color: colors.textMuted, marginTop: 2 }]} numberOfLines={2}>
+                    {lp.link.description}
+                  </Text>
+                )}
+                {(!!lp.link.favicon || !!lp.link.siteName) && (
+                  <View style={s.linkCardMeta}>
+                    {!!lp.link.favicon && (
+                      <Image source={{ uri: lp.link.favicon }} style={s.linkCardFavicon} />
+                    )}
+                    {!!lp.link.siteName && (
+                      <Text style={[s.linkCardSite, { color: colors.textFaint }]} numberOfLines={1}>
+                        {lp.link.siteName}
+                      </Text>
+                    )}
+                  </View>
+                )}
+              </View>
+              <ExternalLink size={14} color={colors.textMuted} style={{ marginTop: 1 }} />
+            </View>
+          </View>
+        </TouchableOpacity>
+      </View>
     );
   };
 
   // ── Content inside bubble (or card) ──────────────────────────────────────
 
   const renderBubbleContent = () => {
-    if (type === 'file') {
-      const fm = message as FileMessageVM;
-      return (
-        <View style={s.fileWrap}>
-          {!!fm.content?.text && (
-            <FormattedText
-              text={fm.content.text}
-              style={[s.textContent, isOwn && s.textContentOwn, { marginBottom: 6 }]}
-              isOwn={isOwn}
-            />
-          )}
-          <TouchableOpacity
-            style={s.fileRow}
-            onPress={() => Linking.openURL(fm.attachment.url).catch(() => null)}
-            accessibilityLabel={`Download ${fm.attachment.name}`}
-          >
-            <View style={[s.fileIcon, isOwn && { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-              <FileText size={18} color={isOwn ? '#fff' : colors.teal} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 13, fontWeight: '600', color: isOwn ? '#fff' : colors.text }} numberOfLines={1}>
-                {fm.attachment.name}
-              </Text>
-              {!!fm.attachment.size && (
-                <Text style={{ fontSize: 11, marginTop: 2, color: isOwn ? 'rgba(255,255,255,0.6)' : colors.textFaint }}>
-                  {formatFileSize(fm.attachment.size)}
-                </Text>
-              )}
-            </View>
-            <Download size={16} color={isOwn ? 'rgba(255,255,255,0.7)' : colors.textMuted} />
-          </TouchableOpacity>
-        </View>
-      );
-    }
-
-    if (type === 'audio-recording') {
-      const am = message as AudioRecordingMessageVM;
-      const mins = Math.floor(am.audio.durationSeconds / 60);
-      const secs = am.audio.durationSeconds % 60;
-      const duration = `${mins}:${String(secs).padStart(2, '0')}`;
-      const barCount = 28;
-      const waveform =
-        am.audio.waveform?.slice(0, barCount) ??
-        Array.from({ length: barCount }, (_, i) => {
-          const curve = Math.sin(((i + 2) / barCount) * Math.PI * 1.3);
-          return Math.max(0.28, Math.min(0.92, 0.55 + curve * 0.28));
-        });
-      const playBtnBg = isOwn ? 'rgba(255,255,255,0.2)' : colors.tealBg;
-      const playBtnColor = isOwn ? '#fff' : colors.teal;
-      const barColor = isOwn ? 'rgba(255,255,255,0.7)' : colors.teal;
-      return (
-        <TouchableOpacity
-          style={s.audioRow}
-          onPress={() => Linking.openURL(am.audio.url).catch(() => null)}
-          accessibilityLabel="Play audio message"
-        >
-          <View style={[s.playBtn, { backgroundColor: playBtnBg, borderWidth: 1, borderColor: isOwn ? 'rgba(255,255,255,0.3)' : colors.border }]}>
-            <Play size={14} color={playBtnColor} fill={playBtnColor} />
-          </View>
-          <View style={{ flex: 1, gap: 6 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 2, height: 28 }}>
-              {waveform.map((v, i) => (
-                <View
-                  key={i}
-                  style={{ flex: 1, height: Math.max(4, Math.round(v * 24)), backgroundColor: barColor, borderRadius: 2 }}
-                />
-              ))}
-            </View>
-            <Text style={{ fontSize: 11, color: isOwn ? 'rgba(255,255,255,0.6)' : colors.textFaint }}>{duration}</Text>
-          </View>
-        </TouchableOpacity>
-      );
-    }
-
-    if (type === 'link-preview') {
-      const lp = message as LinkPreviewMessageVM;
-      return (
-        <View style={s.fileWrap}>
-          {!!lp.content?.text && (
-            <FormattedText
-              text={lp.content.text}
-              mentions={lp.content.mentions}
-              style={[s.textContent, isOwn && s.textContentOwn, { marginBottom: 6 }]}
-              isOwn={isOwn}
-            />
-          )}
-          <TouchableOpacity
-            activeOpacity={0.85}
-            style={[s.linkCard, { borderColor: colors.border, backgroundColor: colors.card }]}
-            onPress={() => Linking.openURL(lp.link.url).catch(() => null)}
-            accessibilityLabel={`Open link: ${lp.link.title}`}
-          >
-            {!!lp.link.imageUrl && (
-              <Image
-                source={{ uri: lp.link.imageUrl }}
-                style={s.linkCardImg}
-                resizeMode="cover"
-                accessibilityLabel={lp.link.title}
-              />
-            )}
-            <View style={[s.linkCardBody, { backgroundColor: colors.card }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[s.linkCardTitle, { color: colors.text }]} numberOfLines={2}>
-                    {lp.link.title}
-                  </Text>
-                  {!!lp.link.description && (
-                    <Text style={[s.linkCardDesc, { color: colors.textMuted, marginTop: 2 }]} numberOfLines={2}>
-                      {lp.link.description}
-                    </Text>
-                  )}
-                  {(!!lp.link.favicon || !!lp.link.siteName) && (
-                    <View style={s.linkCardMeta}>
-                      {!!lp.link.favicon && (
-                        <Image source={{ uri: lp.link.favicon }} style={s.linkCardFavicon} />
-                      )}
-                      {!!lp.link.siteName && (
-                        <Text style={[s.linkCardSite, { color: colors.textFaint }]} numberOfLines={1}>
-                          {lp.link.siteName}
-                        </Text>
-                      )}
-                    </View>
-                  )}
-                </View>
-                <ExternalLink size={14} color={colors.textMuted} />
-              </View>
-            </View>
-          </TouchableOpacity>
-        </View>
-      );
+    if (type === 'file' || type === 'audio-recording' || type === 'link-preview') {
+      // handled by dedicated render functions — should not reach here
+      return null;
     }
 
     // Default: formatted text (bold / italic / mentions)
@@ -1040,6 +1183,80 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   // ── Bubble messages (text, file, audio, image) ────────────────────────────
 
   return (
+    <>
+    {/* Full-screen image viewer */}
+    <Modal
+      visible={viewerImages.length > 0}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      onRequestClose={() => setViewerImages([])}
+    >
+      <StatusBar backgroundColor="#000" barStyle="light-content" />
+      <View style={{ flex: 1, backgroundColor: '#000' }}>
+        {/* Close + counter */}
+        <SafeAreaView style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 12 }}>
+            {viewerImages.length > 1 ? (
+              <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600', opacity: 0.85 }}>
+                {viewerIndex + 1} / {viewerImages.length}
+              </Text>
+            ) : <View />}
+            <TouchableOpacity
+              onPress={() => setViewerImages([])}
+              style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' }}
+              accessibilityLabel="Close image viewer"
+            >
+              <X size={18} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+
+        {/* Image */}
+        <Pressable style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }} onPress={() => setViewerImages([])}>
+          {viewerImages[viewerIndex] ? (
+            <Image
+              source={{ uri: viewerImages[viewerIndex] }}
+              style={{ width: '100%', height: '80%' }}
+              resizeMode="contain"
+            />
+          ) : null}
+        </Pressable>
+
+        {/* Gallery prev/next navigation */}
+        {viewerImages.length > 1 && (
+          <SafeAreaView style={{ position: 'absolute', bottom: 0, left: 0, right: 0 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 32, paddingBottom: 24 }}>
+              <TouchableOpacity
+                onPress={() => setViewerIndex((i) => Math.max(0, i - 1))}
+                style={{ opacity: viewerIndex === 0 ? 0.3 : 1, paddingHorizontal: 24, paddingVertical: 10, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.15)' }}
+                disabled={viewerIndex === 0}
+              >
+                <Text style={{ color: '#fff', fontWeight: '600' }}>← Prev</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setViewerIndex((i) => Math.min(viewerImages.length - 1, i + 1))}
+                style={{ opacity: viewerIndex === viewerImages.length - 1 ? 0.3 : 1, paddingHorizontal: 24, paddingVertical: 10, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.15)' }}
+                disabled={viewerIndex === viewerImages.length - 1}
+              >
+                <Text style={{ color: '#fff', fontWeight: '600' }}>Next →</Text>
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
+        )}
+
+        {/* Download current image */}
+        <SafeAreaView style={{ position: 'absolute', bottom: 0, right: 0 }}>
+          <TouchableOpacity
+            onPress={() => Linking.openURL(viewerImages[viewerIndex] ?? '').catch(() => null)}
+            style={{ margin: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' }}
+            accessibilityLabel="Download image"
+          >
+            <Download size={18} color="#fff" />
+          </TouchableOpacity>
+        </SafeAreaView>
+      </View>
+    </Modal>
     <Pressable
       onLongPress={() => onLongPress?.(message)}
       delayLongPress={350}
@@ -1063,8 +1280,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             <Text style={s.msgTime}>{time}</Text>
           </View>
         )}
-        {/* Bubble or edge-to-edge image */}
-        {type === 'image' ? renderImageContent() : (
+        {/* Dedicated layouts for rich message types; text/cards use bubble */}
+        {type === 'image' ? renderImageContent() :
+          type === 'file' ? renderFileContent() :
+          type === 'audio-recording' ? renderAudioContent() :
+          type === 'link-preview' ? renderLinkContent() : (
           <View style={[s.bubble, isOwn ? s.bubbleOwn : s.bubbleOther]}>
             {renderBubbleContent()}
           </View>
@@ -1099,5 +1319,6 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         )}
       </View>
     </Pressable>
+    </>
   );
 };
