@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity, Pressable, Linking, ActivityIndicator } from 'react-native';
+import { View, Text, Image, StyleSheet, StyleProp, TextStyle, TouchableOpacity, Pressable, Linking, ActivityIndicator } from 'react-native';
 import type {
   MessageVM,
   ThreadVM,
@@ -14,12 +14,15 @@ import type {
   PaymentReminderMessageVM,
   FileMessageVM,
   AudioRecordingMessageVM,
+  ImageMessageVM,
+  LinkPreviewMessageVM,
+  MessageMentionVM,
   ReactionVM,
 } from '@iconicedu/shared-types';
 import type { AppColors } from '@/lib/theme';
 import { fetchThreadMessages } from '@/lib/api/queries';
 import { EmojiPicker } from './emoji-picker';
-import { SmilePlus, CornerUpLeft, MessageCircle } from 'lucide-react-native';
+import { SmilePlus, CornerUpLeft, MessageCircle, Download, FileText, ExternalLink, Play } from 'lucide-react-native';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -109,6 +112,84 @@ const EMOJI_ONLY_RE =
 function isEmojiOnlyText(text: string): boolean {
   const trimmed = text.trim();
   return trimmed.length > 0 && trimmed.replace(EMOJI_ONLY_RE, '').replace(/\s+/g, '').length === 0;
+}
+
+// ─── Inline text formatting (bold / italic / mentions) ───────────────────────
+
+type FmtSegment =
+  | { kind: 'text'; value: string }
+  | { kind: 'bold'; value: string }
+  | { kind: 'italic'; value: string }
+  | { kind: 'mention'; value: string };
+
+function buildFmtSegments(text: string, mentions?: MessageMentionVM[]): FmtSegment[] {
+  const rawParts: Array<{ isText: boolean; value: string }> = [];
+
+  if (mentions && mentions.length > 0) {
+    const sorted = [...mentions].sort((a, b) => a.start - b.start);
+    let cur = 0;
+    for (const m of sorted) {
+      if (m.start > cur) rawParts.push({ isText: true, value: text.slice(cur, m.start) });
+      rawParts.push({ isText: false, value: `@${m.displayName}` });
+      cur = m.end;
+    }
+    if (cur < text.length) rawParts.push({ isText: true, value: text.slice(cur) });
+  } else {
+    rawParts.push({ isText: true, value: text });
+  }
+
+  const segs: FmtSegment[] = [];
+  const RE = /(\*\*([^*]+)\*\*|\*([^*]+)\*)/g;
+  for (const part of rawParts) {
+    if (!part.isText) {
+      segs.push({ kind: 'mention', value: part.value });
+      continue;
+    }
+    RE.lastIndex = 0;
+    let cur = 0;
+    let m: RegExpExecArray | null;
+    while ((m = RE.exec(part.value)) !== null) {
+      if (m.index > cur) segs.push({ kind: 'text', value: part.value.slice(cur, m.index) });
+      if (typeof m[2] === 'string') segs.push({ kind: 'bold', value: m[2] });
+      else if (typeof m[3] === 'string') segs.push({ kind: 'italic', value: m[3] });
+      cur = m.index + m[0].length;
+    }
+    if (cur < part.value.length) segs.push({ kind: 'text', value: part.value.slice(cur) });
+  }
+  return segs;
+}
+
+function FormattedText({
+  text,
+  mentions,
+  style,
+  isOwn,
+}: {
+  text: string;
+  mentions?: MessageMentionVM[];
+  style?: StyleProp<TextStyle>;
+  isOwn?: boolean;
+}) {
+  const segs = buildFmtSegments(text, mentions);
+  const mentionBg = isOwn ? 'rgba(255,255,255,0.25)' : '#e0f2fe';
+  const mentionColor = isOwn ? '#fff' : '#0369a1';
+  return (
+    <Text style={style}>
+      {segs.map((seg, i) => {
+        if (seg.kind === 'bold')
+          return <Text key={i} style={{ fontWeight: '700' }}>{seg.value}</Text>;
+        if (seg.kind === 'italic')
+          return <Text key={i} style={{ fontStyle: 'italic' }}>{seg.value}</Text>;
+        if (seg.kind === 'mention')
+          return (
+            <Text key={i} style={{ backgroundColor: mentionBg, color: mentionColor, fontWeight: '600' }}>
+              {` ${seg.value} `}
+            </Text>
+          );
+        return <Text key={i}>{seg.value}</Text>;
+      })}
+    </Text>
+  );
 }
 
 // ─── Social bar: reactions + thread pill in one row ──────────────────────────
@@ -283,6 +364,7 @@ function InlineReply({ message, colors }: { message: MessageVM; colors: AppColor
   const time = formatTime(message.core.createdAt);
   const { url: src, seed } = getAvatarInfo(message);
   const text = (message as { content?: { text?: string } }).content?.text ?? '';
+  const mentions = (message as { content?: { mentions?: MessageMentionVM[] } }).content?.mentions;
 
   return (
     <View style={{ flexDirection: 'row', gap: 8, paddingVertical: 4 }}>
@@ -298,7 +380,7 @@ function InlineReply({ message, colors }: { message: MessageVM; colors: AppColor
           <Text style={{ fontSize: 13, fontWeight: '700', color: senderColor(senderName) }}>{senderName}</Text>
           <Text style={{ fontSize: 11, color: colors.textFaint }}>{time}</Text>
         </View>
-        <Text style={{ fontSize: 14, color: colors.text, lineHeight: 20 }}>{text}</Text>
+        <FormattedText text={text} mentions={mentions} style={{ fontSize: 14, color: colors.text, lineHeight: 20 }} />
       </View>
     </View>
   );
@@ -583,8 +665,20 @@ function makeStyles(colors: AppColors) {
     audioRow:  { flexDirection: 'row', alignItems: 'center', gap: 10 },
     playBtn:   { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
 
-    // ── Image placeholder ─────────────────────────────────────────────────────
-    imagePlaceholder: { width: 200, height: 150, borderRadius: 10, backgroundColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+    // ── Image message (rendered outside bubble) ───────────────────────────────
+    imageWrapper:     { maxWidth: '85%', borderRadius: 18, overflow: 'hidden', borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+    imageCaption:     { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6 },
+    imagePreview:     { width: '100%' },
+
+    // ── Link preview card ──────────────────────────────────────────────────────
+    linkCard:         { borderWidth: 1, borderRadius: 12, overflow: 'hidden', marginTop: 4, maxWidth: 280 },
+    linkCardImg:      { width: '100%', aspectRatio: 16 / 9 },
+    linkCardBody:     { padding: 10, gap: 4 },
+    linkCardTitle:    { fontSize: 13, fontWeight: '700' },
+    linkCardDesc:     { fontSize: 12, lineHeight: 17 },
+    linkCardMeta:     { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 5, marginTop: 4 },
+    linkCardFavicon:  { width: 12, height: 12 },
+    linkCardSite:     { fontSize: 11, flex: 1 },
 
     // ── Structured cards (self-contained, no outer bubble) ────────────────────
     card:            { borderWidth: 1, borderRadius: 16, padding: 14, gap: 4 },
@@ -701,6 +795,39 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     return <SessionCompleteBar message={message as SessionCompleteMessageVM} colors={colors} s={s} />;
   }
 
+  // ── Image message (rendered edge-to-edge, no bubble padding) ─────────────
+
+  const renderImageContent = () => {
+    const im = message as ImageMessageVM;
+    const aspectRatio =
+      im.attachment.width && im.attachment.height
+        ? im.attachment.width / im.attachment.height
+        : 4 / 3;
+    return (
+      <TouchableOpacity
+        activeOpacity={0.9}
+        style={[s.imageWrapper, { backgroundColor: colors.card }]}
+        onPress={() => Linking.openURL(im.attachment.url).catch(() => null)}
+        accessibilityLabel={im.attachment.name ?? 'Image message'}
+      >
+        {!!im.content?.text && (
+          <View style={s.imageCaption}>
+            <FormattedText
+              text={im.content.text}
+              style={[s.textContent, isOwn && s.textContentOwn]}
+              isOwn={isOwn}
+            />
+          </View>
+        )}
+        <Image
+          source={{ uri: im.attachment.url }}
+          style={[s.imagePreview, { aspectRatio }]}
+          resizeMode="cover"
+        />
+      </TouchableOpacity>
+    );
+  };
+
   // ── Content inside bubble (or card) ──────────────────────────────────────
 
   const renderBubbleContent = () => {
@@ -709,23 +836,31 @@ export const MessageItem: React.FC<MessageItemProps> = ({
       return (
         <View style={s.fileWrap}>
           {!!fm.content?.text && (
-            <Text style={[s.textContent, isOwn && s.textContentOwn, { marginBottom: 6 }]}>
-              {fm.content.text}
-            </Text>
+            <FormattedText
+              text={fm.content.text}
+              style={[s.textContent, isOwn && s.textContentOwn, { marginBottom: 6 }]}
+              isOwn={isOwn}
+            />
           )}
           <TouchableOpacity
             style={s.fileRow}
             onPress={() => Linking.openURL(fm.attachment.url).catch(() => null)}
+            accessibilityLabel={`Download ${fm.attachment.name}`}
           >
-            <View style={s.fileIcon}><Text style={{ fontSize: 18 }}>📎</Text></View>
+            <View style={[s.fileIcon, isOwn && { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+              <FileText size={18} color={isOwn ? '#fff' : colors.teal} />
+            </View>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 13, fontWeight: '600', color: isOwn ? '#fff' : colors.text }} numberOfLines={1}>
                 {fm.attachment.name}
               </Text>
-              <Text style={{ fontSize: 11, marginTop: 2, color: isOwn ? 'rgba(255,255,255,0.6)' : colors.textFaint }}>
-                {formatFileSize(fm.attachment.size)}
-              </Text>
+              {!!fm.attachment.size && (
+                <Text style={{ fontSize: 11, marginTop: 2, color: isOwn ? 'rgba(255,255,255,0.6)' : colors.textFaint }}>
+                  {formatFileSize(fm.attachment.size)}
+                </Text>
+              )}
             </View>
+            <Download size={16} color={isOwn ? 'rgba(255,255,255,0.7)' : colors.textMuted} />
           </TouchableOpacity>
         </View>
       );
@@ -736,37 +871,109 @@ export const MessageItem: React.FC<MessageItemProps> = ({
       const mins = Math.floor(am.audio.durationSeconds / 60);
       const secs = am.audio.durationSeconds % 60;
       const duration = `${mins}:${String(secs).padStart(2, '0')}`;
-      const waveform = am.audio.waveform ?? [0.3, 0.5, 0.4, 0.7, 0.6, 0.5, 0.4, 0.8, 0.5, 0.3];
-      const waveColor = isOwn ? 'rgba(255,255,255,0.8)' : colors.teal;
+      const barCount = 28;
+      const waveform =
+        am.audio.waveform?.slice(0, barCount) ??
+        Array.from({ length: barCount }, (_, i) => {
+          const curve = Math.sin(((i + 2) / barCount) * Math.PI * 1.3);
+          return Math.max(0.28, Math.min(0.92, 0.55 + curve * 0.28));
+        });
+      const playBtnBg = isOwn ? 'rgba(255,255,255,0.2)' : colors.tealBg;
+      const playBtnColor = isOwn ? '#fff' : colors.teal;
+      const barColor = isOwn ? 'rgba(255,255,255,0.7)' : colors.teal;
       return (
-        <View style={s.audioRow}>
-          <View style={[s.playBtn, { backgroundColor: isOwn ? 'rgba(255,255,255,0.25)' : colors.teal }]}>
-            <Text style={{ color: isOwn ? '#fff' : colors.tealFg, fontSize: 12, fontWeight: '700' }}>▶</Text>
+        <TouchableOpacity
+          style={s.audioRow}
+          onPress={() => Linking.openURL(am.audio.url).catch(() => null)}
+          accessibilityLabel="Play audio message"
+        >
+          <View style={[s.playBtn, { backgroundColor: playBtnBg, borderWidth: 1, borderColor: isOwn ? 'rgba(255,255,255,0.3)' : colors.border }]}>
+            <Play size={14} color={playBtnColor} fill={playBtnColor} />
           </View>
-          <View style={{ flex: 1, gap: 4 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, height: 24 }}>
+          <View style={{ flex: 1, gap: 6 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 2, height: 28 }}>
               {waveform.map((v, i) => (
-                <View key={i} style={{ width: 3, height: Math.max(4, v * 24), backgroundColor: waveColor, borderRadius: 2 }} />
+                <View
+                  key={i}
+                  style={{ flex: 1, height: Math.max(4, Math.round(v * 24)), backgroundColor: barColor, borderRadius: 2 }}
+                />
               ))}
             </View>
-            <Text style={{ color: isOwn ? 'rgba(255,255,255,0.6)' : colors.textFaint, fontSize: 11 }}>{duration}</Text>
+            <Text style={{ fontSize: 11, color: isOwn ? 'rgba(255,255,255,0.6)' : colors.textFaint }}>{duration}</Text>
           </View>
-        </View>
+        </TouchableOpacity>
       );
     }
 
-    if (type === 'image') {
+    if (type === 'link-preview') {
+      const lp = message as LinkPreviewMessageVM;
       return (
-        <View style={s.imagePlaceholder}>
-          <Text style={{ fontSize: 32 }}>🖼</Text>
-          <Text style={{ fontSize: 11, color: colors.textFaint, marginTop: 4 }}>Image</Text>
+        <View style={s.fileWrap}>
+          {!!lp.content?.text && (
+            <FormattedText
+              text={lp.content.text}
+              mentions={lp.content.mentions}
+              style={[s.textContent, isOwn && s.textContentOwn, { marginBottom: 6 }]}
+              isOwn={isOwn}
+            />
+          )}
+          <TouchableOpacity
+            activeOpacity={0.85}
+            style={[s.linkCard, { borderColor: colors.border, backgroundColor: colors.card }]}
+            onPress={() => Linking.openURL(lp.link.url).catch(() => null)}
+            accessibilityLabel={`Open link: ${lp.link.title}`}
+          >
+            {!!lp.link.imageUrl && (
+              <Image
+                source={{ uri: lp.link.imageUrl }}
+                style={s.linkCardImg}
+                resizeMode="cover"
+                accessibilityLabel={lp.link.title}
+              />
+            )}
+            <View style={[s.linkCardBody, { backgroundColor: colors.card }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.linkCardTitle, { color: colors.text }]} numberOfLines={2}>
+                    {lp.link.title}
+                  </Text>
+                  {!!lp.link.description && (
+                    <Text style={[s.linkCardDesc, { color: colors.textMuted, marginTop: 2 }]} numberOfLines={2}>
+                      {lp.link.description}
+                    </Text>
+                  )}
+                  {(!!lp.link.favicon || !!lp.link.siteName) && (
+                    <View style={s.linkCardMeta}>
+                      {!!lp.link.favicon && (
+                        <Image source={{ uri: lp.link.favicon }} style={s.linkCardFavicon} />
+                      )}
+                      {!!lp.link.siteName && (
+                        <Text style={[s.linkCardSite, { color: colors.textFaint }]} numberOfLines={1}>
+                          {lp.link.siteName}
+                        </Text>
+                      )}
+                    </View>
+                  )}
+                </View>
+                <ExternalLink size={14} color={colors.textMuted} />
+              </View>
+            </View>
+          </TouchableOpacity>
         </View>
       );
     }
 
-    // Default: plain text
+    // Default: formatted text (bold / italic / mentions)
     const text = (message as { content?: { text?: string } }).content?.text ?? '';
-    return <Text style={[s.textContent, isOwn && s.textContentOwn]}>{text}</Text>;
+    const mentions = (message as { content?: { mentions?: MessageMentionVM[] } }).content?.mentions;
+    return (
+      <FormattedText
+        text={text}
+        mentions={mentions}
+        style={[s.textContent, isOwn && s.textContentOwn]}
+        isOwn={isOwn}
+      />
+    );
   };
 
   // ── Card messages (lesson-assignment, session-summary, etc.) ──────────────
@@ -856,10 +1063,12 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             <Text style={s.msgTime}>{time}</Text>
           </View>
         )}
-        {/* Bubble */}
-        <View style={[s.bubble, isOwn ? s.bubbleOwn : s.bubbleOther]}>
-          {renderBubbleContent()}
-        </View>
+        {/* Bubble or edge-to-edge image */}
+        {type === 'image' ? renderImageContent() : (
+          <View style={[s.bubble, isOwn ? s.bubbleOwn : s.bubbleOther]}>
+            {renderBubbleContent()}
+          </View>
+        )}
 
         {/* Reactions + thread pill in one row */}
         <SocialBar

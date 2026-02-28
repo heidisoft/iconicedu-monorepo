@@ -80,3 +80,49 @@ export function createChannelFileItem(
     createdAt: message.core.createdAt,
   };
 }
+
+export function createChannelFileItems(
+  channelId: string,
+  message: FileMessageVM | ImageMessageVM | AudioRecordingMessageVM,
+): ChannelFileItemVM[] {
+  if (isImageMessage(message)) {
+    const attachments = message.attachments?.length ? message.attachments : [message.attachment];
+    return attachments.map((attachment, index) => ({
+      ids: {
+        id: `file-${message.ids.id}-${index}`,
+        orgId: message.ids.orgId,
+        channelId,
+      },
+      messageId: message.ids.id,
+      senderId: message.core.sender.ids.id,
+      kind: 'file',
+      url: attachment.url,
+      storagePath: attachment.storagePath,
+      name: attachment.name,
+      mimeType: 'image/*',
+      createdAt: message.core.createdAt,
+    }));
+  }
+
+  if (isAudioRecordingMessage(message)) {
+    return [createChannelFileItem(channelId, message)];
+  }
+
+  const attachments = message.attachments?.length ? message.attachments : [message.attachment];
+  return attachments.map((attachment, index) => ({
+    ids: {
+      id: `file-${message.ids.id}-${index}`,
+      orgId: message.ids.orgId,
+      channelId,
+    },
+    messageId: message.ids.id,
+    senderId: message.core.sender.ids.id,
+    kind: 'file',
+    url: attachment.url,
+    storagePath: attachment.storagePath,
+    name: attachment.name,
+    mimeType: attachment.mimeType,
+    size: attachment.size,
+    createdAt: message.core.createdAt,
+  }));
+}

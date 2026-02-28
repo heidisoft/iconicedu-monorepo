@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getImageDownloadHref } from './image-message';
+import { getImageAttachments, getImageDownloadHref } from './image-message';
 
 describe('getImageDownloadHref', () => {
   it('uses the re-signing endpoint when image storagePath exists', () => {
@@ -22,5 +22,17 @@ describe('getImageDownloadHref', () => {
         },
       } as never),
     ).toBe('/api/messages/file-download?path=org-1%2Fchannel-1%2Fprofile-1%2Fimage.png');
+  });
+
+  it('returns grouped image attachments when present', () => {
+    expect(
+      getImageAttachments({
+        attachment: { type: 'image', name: 'cover.png', url: 'https://example.com/cover.png' },
+        attachments: [
+          { type: 'image', name: 'cover.png', url: 'https://example.com/cover.png' },
+          { type: 'image', name: 'detail.png', url: 'https://example.com/detail.png' },
+        ],
+      } as never).map((attachment) => attachment.name),
+    ).toEqual(['cover.png', 'detail.png']);
   });
 });

@@ -16,9 +16,8 @@ export function ThreadSheet({
 }: ThreadPanelPropsVM & {
   isReadOnly?: boolean;
   onAttachReplyFile?: (
-    file: File,
+    attachments: Array<{ file: File; durationSeconds?: number }>,
     content?: string,
-    options?: { durationSeconds?: number },
   ) => Promise<void> | void;
 }) {
   const { channel } = useMessagesState();
@@ -65,7 +64,7 @@ export function ThreadSheet({
         ) : (
           <MessageInput
             onSend={onSendReply}
-            onAttachFile={onAttachReplyFile}
+            onAttachFiles={onAttachReplyFile}
             placeholder="Reply..."
             sticky={false}
             participants={channel.collections.participants}

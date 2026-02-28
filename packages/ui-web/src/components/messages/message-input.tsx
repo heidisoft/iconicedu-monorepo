@@ -47,7 +47,7 @@ import {
   buildRecordedAudioFileName,
   formatRecordingDuration,
   formatComposerAttachmentSize,
-  getDroppedAttachmentFile,
+  getDroppedAttachmentFiles,
   getRecordingElapsedMs,
   getComposerAttachmentKind,
   getSupportedAudioRecordingMimeType,
@@ -64,10 +64,9 @@ const TYPING_KEEPALIVE_THROTTLE_MS = 1200;
 
 interface MessageInputProps {
   onSend: (content: string, mentions?: MessageMentionVM[]) => void;
-  onAttachFile?: (
-    file: File,
+  onAttachFiles?: (
+    attachments: Array<{ file: File; durationSeconds?: number }>,
     content?: string,
-    options?: { durationSeconds?: number },
   ) => Promise<void> | void;
   placeholder?: string;
   sticky?: boolean;
@@ -82,6 +81,7 @@ interface MessageInputProps {
 }
 
 type PendingAttachment = {
+  id: string;
   file: File;
   kind: ComposerAttachmentKind;
   previewUrl?: string;
@@ -125,7 +125,7 @@ function FormatButton({
 
 export function MessageInput({
   onSend,
-  onAttachFile,
+  onAttachFiles,
   placeholder = 'Write a message...',
   sticky = true,
   readOnly = false,
@@ -139,7 +139,7 @@ export function MessageInput({
 }: MessageInputProps) {
   const [content, setContent] = React.useState('');
   const [isAttachingFile, setIsAttachingFile] = React.useState(false);
-  const [pendingAttachment, setPendingAttachment] = React.useState<PendingAttachment | null>(null);
+  const [pendingAttachments, setPendingAttachments] = React.useState<PendingAttachment[]>([]);
   const [attachmentError, setAttachmentError] = React.useState<string | null>(null);
   const [isDragOver, setIsDragOver] = React.useState(false);
   const [recordingSession, setRecordingSession] = React.useState<RecordingSession | null>(null);
@@ -216,13 +216,26 @@ export function MessageInput({
     }, 250);
   }, [clearRecordingInterval]);
 
-  const clearPendingAttachment = React.useCallback(() => {
-    setPendingAttachment((current) => {
-      if (current?.previewUrl) {
-        URL.revokeObjectURL(current.previewUrl);
-      }
-      return null;
+  const clearPendingAttachments = React.useCallback(() => {
+    setPendingAttachments((current) => {
+      current.forEach((attachment) => {
+        if (attachment.previewUrl) {
+          URL.revokeObjectURL(attachment.previewUrl);
+        }
+      });
+      return [];
     });
+  }, []);
+
+  const removePendingAttachment = React.useCallback((attachmentId: string) => {
+    setPendingAttachments((current) =>
+      current.filter((attachment) => {
+        if (attachment.id === attachmentId && attachment.previewUrl) {
+          URL.revokeObjectURL(attachment.previewUrl);
+        }
+        return attachment.id !== attachmentId;
+      }),
+    );
   }, []);
 
   const resetRecordingState = React.useCallback(() => {
@@ -233,15 +246,29 @@ export function MessageInput({
   }, [clearRecordingInterval, clearRecordingTimeout, syncRecordingSession]);
 
   const setPendingComposerAttachment = React.useCallback(
-    (file: File, durationSeconds?: number) => {
-      clearPendingAttachment();
-      const kind = getComposerAttachmentKind(file);
-      const previewUrl =
-        kind === 'image' || kind === 'audio' ? URL.createObjectURL(file) : undefined;
-      setPendingAttachment({ file, kind, previewUrl, durationSeconds });
+    (files: File[], durationSeconds?: number) => {
+      if (!files.length) {
+        return;
+      }
+      const timestamp = Date.now();
+      setPendingAttachments((current) => [
+        ...current,
+        ...files.map((file, index) => {
+          const kind = getComposerAttachmentKind(file);
+          const previewUrl =
+            kind === 'image' || kind === 'audio' ? URL.createObjectURL(file) : undefined;
+          return {
+            id: `${timestamp}-${index}-${file.name}-${file.size}`,
+            file,
+            kind,
+            previewUrl,
+            durationSeconds,
+          };
+        }),
+      ]);
       setAttachmentError(null);
     },
-    [clearPendingAttachment],
+    [],
   );
 
   const updateMentionPopupPosition = React.useCallback(
@@ -378,7 +405,7 @@ export function MessageInput({
 
   const resetComposer = React.useCallback(() => {
     setContent('');
-    clearPendingAttachment();
+    clearPendingAttachments();
     setAttachmentError(null);
     setMentionState(null);
     setMentionPopupPosition(null);
@@ -386,31 +413,36 @@ export function MessageInput({
     clearTypingTimeout();
     notifyTypingStop();
     textareaRef.current?.focus();
-  }, [clearPendingAttachment, clearTypingTimeout, notifyTypingStop]);
+  }, [clearPendingAttachments, clearTypingTimeout, notifyTypingStop]);
 
   const handleSend = React.useCallback(() => {
     if (readOnly || isBusy || hasActiveRecording) {
       return;
     }
     const trimmedContent = content.trim();
-    if (!trimmedContent && !pendingAttachment) {
+    if (!trimmedContent && pendingAttachments.length === 0) {
       return;
     }
 
-    if (pendingAttachment && onAttachFile) {
+    if (pendingAttachments.length > 0 && onAttachFiles) {
       const sendAttachment = async () => {
         try {
           setIsAttachingFile(true);
-          const durationSeconds =
-            pendingAttachment.kind === 'audio'
-              ? await resolveAudioDurationSeconds(
-                  pendingAttachment.file,
-                  pendingAttachment.durationSeconds,
-                )
-              : undefined;
-          await onAttachFile(pendingAttachment.file, trimmedContent || undefined, {
-            durationSeconds,
-          });
+          await onAttachFiles(
+            await Promise.all(
+              pendingAttachments.map(async (pendingAttachment) => ({
+                file: pendingAttachment.file,
+                durationSeconds:
+                  pendingAttachment.kind === 'audio'
+                    ? await resolveAudioDurationSeconds(
+                        pendingAttachment.file,
+                        pendingAttachment.durationSeconds,
+                      )
+                    : undefined,
+              })),
+            ),
+            trimmedContent || undefined,
+          );
           resetComposer();
         } finally {
           setIsAttachingFile(false);
@@ -434,9 +466,9 @@ export function MessageInput({
     currentUserId,
     hasActiveRecording,
     isBusy,
-    onAttachFile,
+    onAttachFiles,
     onSend,
-    pendingAttachment,
+    pendingAttachments,
     participants,
     readOnly,
     resetComposer,
@@ -545,43 +577,43 @@ export function MessageInput({
   ];
 
   const handleAttachButtonClick = React.useCallback(() => {
-    if (readOnly || isBusy || hasActiveRecording || !onAttachFile) {
+    if (readOnly || isBusy || hasActiveRecording || !onAttachFiles) {
       return;
     }
     fileInputRef.current?.click();
-  }, [hasActiveRecording, isBusy, onAttachFile, readOnly]);
+  }, [hasActiveRecording, isBusy, onAttachFiles, readOnly]);
 
   const handleAttachImageClick = React.useCallback(() => {
-    if (readOnly || isBusy || hasActiveRecording || !onAttachFile) {
+    if (readOnly || isBusy || hasActiveRecording || !onAttachFiles) {
       return;
     }
     imageInputRef.current?.click();
-  }, [hasActiveRecording, isBusy, onAttachFile, readOnly]);
+  }, [hasActiveRecording, isBusy, onAttachFiles, readOnly]);
 
   const handleFileInputChange = React.useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
-      const selectedFile = event.target.files?.[0];
+      const selectedFiles = Array.from(event.target.files ?? []);
       event.target.value = '';
-      if (!selectedFile || readOnly || isBusy || hasActiveRecording || !onAttachFile) {
+      if (!selectedFiles.length || readOnly || isBusy || hasActiveRecording || !onAttachFiles) {
         return;
       }
-      setPendingComposerAttachment(selectedFile);
+      setPendingComposerAttachment(selectedFiles);
     },
-    [hasActiveRecording, isBusy, onAttachFile, readOnly, setPendingComposerAttachment],
+    [hasActiveRecording, isBusy, onAttachFiles, readOnly, setPendingComposerAttachment],
   );
 
   const handleDropAttachment = React.useCallback(
-    (file: File | null) => {
-      if (!file || readOnly || isBusy || hasActiveRecording || !onAttachFile) {
+    (files: File[]) => {
+      if (!files.length || readOnly || isBusy || hasActiveRecording || !onAttachFiles) {
         return;
       }
-      setPendingComposerAttachment(file);
+      setPendingComposerAttachment(files);
     },
-    [hasActiveRecording, isBusy, onAttachFile, readOnly, setPendingComposerAttachment],
+    [hasActiveRecording, isBusy, onAttachFiles, readOnly, setPendingComposerAttachment],
   );
 
   const handleStartAudioRecording = React.useCallback(async () => {
-    if (readOnly || isBusy || hasActiveRecording || !onAttachFile) {
+    if (readOnly || isBusy || hasActiveRecording || !onAttachFiles) {
       return;
     }
 
@@ -595,7 +627,7 @@ export function MessageInput({
     }
 
     try {
-      clearPendingAttachment();
+      clearPendingAttachments();
       setAttachmentError(null);
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaStreamRef.current = stream;
@@ -646,7 +678,7 @@ export function MessageInput({
           buildRecordedAudioFileName(Date.now(), blob.type),
           { type: blob.type || 'audio/webm' },
         );
-        setPendingComposerAttachment(file, durationSeconds);
+        setPendingComposerAttachment([file], durationSeconds);
       };
       recorder.onerror = () => {
         resetRecordingState();
@@ -664,10 +696,10 @@ export function MessageInput({
       setAttachmentError('Microphone permission was denied.');
     }
   }, [
-    clearPendingAttachment,
+    clearPendingAttachments,
     hasActiveRecording,
     isBusy,
-    onAttachFile,
+    onAttachFiles,
     readOnly,
     resetRecordingState,
     setPendingComposerAttachment,
@@ -755,10 +787,10 @@ export function MessageInput({
             isDragOver && 'border-primary bg-primary/5 ring-1 ring-primary/30',
           )}
           onDragEnter={(event) => {
-            if (readOnly || isBusy || hasActiveRecording || !onAttachFile) {
+            if (readOnly || isBusy || hasActiveRecording || !onAttachFiles) {
               return;
             }
-            if (!getDroppedAttachmentFile(event.dataTransfer)) {
+            if (getDroppedAttachmentFiles(event.dataTransfer).length === 0) {
               return;
             }
             dragDepthRef.current += 1;
@@ -766,10 +798,10 @@ export function MessageInput({
             setIsDragOver(true);
           }}
           onDragOver={(event) => {
-            if (readOnly || isBusy || hasActiveRecording || !onAttachFile) {
+            if (readOnly || isBusy || hasActiveRecording || !onAttachFiles) {
               return;
             }
-            if (!getDroppedAttachmentFile(event.dataTransfer)) {
+            if (getDroppedAttachmentFiles(event.dataTransfer).length === 0) {
               return;
             }
             event.preventDefault();
@@ -787,17 +819,18 @@ export function MessageInput({
           onDrop={(event) => {
             dragDepthRef.current = 0;
             setIsDragOver(false);
-            const droppedFile = getDroppedAttachmentFile(event.dataTransfer);
-            if (!droppedFile) {
+            const droppedFiles = getDroppedAttachmentFiles(event.dataTransfer);
+            if (droppedFiles.length === 0) {
               return;
             }
             event.preventDefault();
-            handleDropAttachment(droppedFile);
+            handleDropAttachment(droppedFiles);
           }}
         >
           <input
             ref={fileInputRef}
             type="file"
+            multiple
             accept={MESSAGE_INPUT_FILE_ACCEPT}
             className="sr-only"
             tabIndex={-1}
@@ -807,6 +840,7 @@ export function MessageInput({
           <input
             ref={imageInputRef}
             type="file"
+            multiple
             accept={MESSAGE_INPUT_IMAGE_ACCEPT}
             className="sr-only"
             tabIndex={-1}
@@ -875,54 +909,66 @@ export function MessageInput({
               </div>
             </div>
           ) : null}
-          {pendingAttachment ? (
+          {pendingAttachments.length > 0 ? (
             <div className="border-b border-border px-3 py-3">
-              <div className="flex items-start gap-3 rounded-xl border border-border bg-muted/30 p-3">
-                {pendingAttachment.kind === 'image' && pendingAttachment.previewUrl ? (
-                  <img
-                    src={pendingAttachment.previewUrl}
-                    alt={pendingAttachment.file.name}
-                    className="h-16 w-16 rounded-lg object-cover"
-                  />
-                ) : pendingAttachment.kind === 'audio' && pendingAttachment.previewUrl ? (
-                  <audio
-                    src={pendingAttachment.previewUrl}
-                    className="h-16 w-24 rounded-lg"
-                    controls
-                    preload="metadata"
-                  />
-                ) : (
-                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <FileText className="h-5 w-5" />
+              <div className="mb-2 text-xs font-medium text-muted-foreground">
+                {pendingAttachments.length} attachment{pendingAttachments.length === 1 ? '' : 's'} ready to send
+              </div>
+              <div className="space-y-2">
+                {pendingAttachments.map((pendingAttachment) => (
+                  <div
+                    key={pendingAttachment.id}
+                    className="flex items-start gap-3 rounded-xl border border-border bg-muted/30 p-3"
+                  >
+                    {pendingAttachment.kind === 'image' && pendingAttachment.previewUrl ? (
+                      <img
+                        src={pendingAttachment.previewUrl}
+                        alt={pendingAttachment.file.name}
+                        className="h-16 w-16 rounded-lg object-cover"
+                      />
+                    ) : pendingAttachment.kind === 'audio' && pendingAttachment.previewUrl ? (
+                      <audio
+                        src={pendingAttachment.previewUrl}
+                        className="h-16 w-24 rounded-lg"
+                        controls
+                        preload="metadata"
+                      />
+                    ) : (
+                      <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <FileText className="h-5 w-5" />
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium text-foreground">
+                        {pendingAttachment.file.name}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {pendingAttachment.kind === 'image'
+                          ? 'Image ready to send'
+                          : pendingAttachment.kind === 'audio'
+                            ? 'Voice message ready to send'
+                            : 'File ready to send'}
+                        {pendingAttachment.durationSeconds
+                          ? ` • ${Math.floor(pendingAttachment.durationSeconds / 60)}:${String(
+                              pendingAttachment.durationSeconds % 60,
+                            ).padStart(2, '0')}`
+                          : ''}
+                        {pendingAttachment.file.size
+                          ? ` • ${formatComposerAttachmentSize(pendingAttachment.file.size)}`
+                          : ''}
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-xs"
+                      aria-label={`Remove ${pendingAttachment.file.name}`}
+                      onClick={() => removePendingAttachment(pendingAttachment.id)}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium text-foreground">
-                    {pendingAttachment.file.name}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {pendingAttachment.kind === 'image'
-                      ? 'Image ready to send'
-                      : pendingAttachment.kind === 'audio'
-                        ? 'Voice message ready to send'
-                        : 'File ready to send'}
-                    {pendingAttachment.durationSeconds
-                      ? ` • ${Math.floor(pendingAttachment.durationSeconds / 60)}:${String(
-                          pendingAttachment.durationSeconds % 60,
-                        ).padStart(2, '0')}`
-                      : ''}
-                    {pendingAttachment.file.size ? ` • ${formatComposerAttachmentSize(pendingAttachment.file.size)}` : ''}
-                  </div>
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-xs"
-                  aria-label="Remove attachment"
-                  onClick={clearPendingAttachment}
-                >
-                  <X className="h-3.5 w-3.5" />
-                </Button>
+                ))}
               </div>
             </div>
           ) : null}
@@ -1088,7 +1134,7 @@ export function MessageInput({
               type="button"
               size="sm"
               onClick={handleSend}
-              disabled={readOnly || isBusy || hasActiveRecording || (!content.trim() && !pendingAttachment)}
+              disabled={readOnly || isBusy || hasActiveRecording || (!content.trim() && pendingAttachments.length === 0)}
               className="h-8 gap-1.5"
             >
               {isBusy ? (

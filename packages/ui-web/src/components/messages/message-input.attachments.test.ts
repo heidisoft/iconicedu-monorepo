@@ -4,7 +4,7 @@ import {
   buildRecordedAudioFileName,
   formatComposerAttachmentSize,
   formatRecordingDuration,
-  getDroppedAttachmentFile,
+  getDroppedAttachmentFiles,
   getRecordingElapsedMs,
   getComposerAttachmentKind,
   getSupportedAudioRecordingMimeType,
@@ -28,17 +28,20 @@ describe('message-input attachment helpers', () => {
     ).toBe('file');
   });
 
-  it('returns the first dropped file for supported drag-and-drop attachments', () => {
+  it('returns dropped files for supported drag-and-drop attachments', () => {
     const imageFile = new File(['image'], 'photo.png', { type: 'image/png' });
-    const file = getDroppedAttachmentFile({ files: [imageFile] } as unknown as DataTransfer);
+    const docFile = new File(['doc'], 'brief.pdf', { type: 'application/pdf' });
+    const files = getDroppedAttachmentFiles({
+      files: [imageFile, docFile],
+    } as unknown as DataTransfer);
 
-    expect(file).toBe(imageFile);
+    expect(files).toEqual([imageFile, docFile]);
     expect(
-      getDroppedAttachmentFile({
+      getDroppedAttachmentFiles({
         files: [new File(['audio'], 'voice.webm', { type: 'audio/webm' })],
       } as unknown as DataTransfer),
-    ).toBeNull();
-    expect(getDroppedAttachmentFile(null)).toBeNull();
+    ).toEqual([]);
+    expect(getDroppedAttachmentFiles(null)).toEqual([]);
   });
 
   it('formats attachment sizes into readable units', () => {

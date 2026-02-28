@@ -4,6 +4,7 @@ import type {
   ChannelVM,
   LearningSpaceVM,
   MessageSendFileInput,
+  MessageSendFilesInput,
   MessageSendTextInput,
   MessageVM,
   UserProfileVM,
@@ -19,6 +20,7 @@ export function LearningSpaceShell({
   readOnly = false,
   sendTextMessage,
   sendFileMessage,
+  sendFilesMessage,
   toggleReaction,
   deleteMessage,
   toggleHiddenMessage,
@@ -30,6 +32,7 @@ export function LearningSpaceShell({
   readOnly?: boolean;
   sendTextMessage: (input: MessageSendTextInput) => Promise<MessageVM>;
   sendFileMessage: (input: MessageSendFileInput) => Promise<MessageVM>;
+  sendFilesMessage: (input: MessageSendFilesInput) => Promise<MessageVM>;
   toggleReaction: (input: { orgId: string; messageId: string; emoji: string }) => Promise<void>;
   deleteMessage: (input: { orgId: string; messageId: string }) => Promise<void>;
   toggleHiddenMessage: (input: { orgId: string; messageId: string; isHidden: boolean }) => Promise<void>;
@@ -47,6 +50,7 @@ export function LearningSpaceShell({
       }}
       sendTextMessage={sendTextMessage}
       sendFileMessage={sendFileMessage}
+      sendFilesMessage={sendFilesMessage}
       toggleReaction={toggleReaction}
       deleteMessage={deleteMessage}
       toggleHiddenMessage={toggleHiddenMessage}

@@ -18,22 +18,15 @@ export function getComposerAttachmentKind(file: File): ComposerAttachmentKind {
   return 'file';
 }
 
-export function getDroppedAttachmentFile(dataTransfer: DataTransfer | null | undefined) {
+export function getDroppedAttachmentFiles(dataTransfer: DataTransfer | null | undefined) {
   if (!dataTransfer?.files?.length) {
-    return null;
+    return [];
   }
 
-  const [firstFile] = Array.from(dataTransfer.files);
-  if (!firstFile) {
-    return null;
-  }
-
-  const kind = getComposerAttachmentKind(firstFile);
-  if (kind === 'image' || kind === 'file') {
-    return firstFile;
-  }
-
-  return null;
+  return Array.from(dataTransfer.files).filter((file) => {
+    const kind = getComposerAttachmentKind(file);
+    return kind === 'image' || kind === 'file';
+  });
 }
 
 export function formatComposerAttachmentSize(bytes?: number): string {

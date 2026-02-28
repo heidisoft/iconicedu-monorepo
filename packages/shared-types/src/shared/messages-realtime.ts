@@ -61,6 +61,21 @@ export type MessageSendFileInput = {
   threadId?: string | null;
 };
 
+export type MessageSendFilesInput = {
+  orgId: string;
+  channelId: string;
+  senderProfileId: string;
+  assets: Array<{
+    name: string;
+    storagePath: string;
+    size?: number;
+    mimeType?: string;
+  }>;
+  content?: string;
+  threadParentId?: string | null;
+  threadId?: string | null;
+};
+
 export type MessageToggleReactionInput = {
   orgId: string;
   messageId: string;

@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { render } from '@testing-library/react';
+import { render, waitFor } from '@testing-library/react';
 
 import Page from '@iconicedu/web/app/(app)/[orgSlug]/c/[channelId]/page';
 
@@ -17,6 +17,7 @@ vi.mock('@iconicedu/web/app/(app)/[orgSlug]/messages/messages-shell-client', () 
 
 vi.mock('@iconicedu/web/app/actions/messages', () => ({
   sendFileMessageAction: vi.fn(),
+  sendFilesMessageAction: vi.fn(),
   sendTextMessageAction: vi.fn(),
   toggleMessageReactionAction: vi.fn(),
   deleteMessageAction: vi.fn(),
@@ -52,13 +53,15 @@ describe('d/c/[channelId] page', () => {
     });
     const element = await Page({ params: Promise.resolve({ orgSlug: 'iconic-academy', channelId: 'channel-1' }) });
     render(element as React.ReactElement);
-    expect(messagesShellMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        currentUserId: 'profile-1',
-        currentUserProfile: { ids: { id: 'profile-1', orgId: 'org-1' } },
-        readOnly: false,
-      }),
-    );
+    await waitFor(() => {
+      expect(messagesShellMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          currentUserId: 'profile-1',
+          currentUserProfile: { ids: { id: 'profile-1', orgId: 'org-1' } },
+          readOnly: false,
+        }),
+      );
+    });
   });
 
   it('enables read-only mode for staff who are not channel participants', async () => {
@@ -78,10 +81,12 @@ describe('d/c/[channelId] page', () => {
 
     const element = await Page({ params: Promise.resolve({ orgSlug: 'iconic-academy', channelId: 'channel-1' }) });
     render(element as React.ReactElement);
-    expect(messagesShellMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        readOnly: true,
-      }),
-    );
+    await waitFor(() => {
+      expect(messagesShellMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          readOnly: true,
+        }),
+      );
+    });
   });
 });

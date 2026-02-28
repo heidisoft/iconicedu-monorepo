@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react'
 import type {
   ChannelVM,
   MessageSendFileInput,
+  MessageSendFilesInput,
   MessageSendTextInput,
   MessageVM,
   MessagesRightPanelIntent,
@@ -66,6 +67,7 @@ type MessagesShellClientProps = {
   >;
   sendTextMessage: (input: MessageSendTextInput) => Promise<MessageVM>;
   sendFileMessage: (input: MessageSendFileInput) => Promise<MessageVM>;
+  sendFilesMessage: (input: MessageSendFilesInput) => Promise<MessageVM>;
   toggleReaction: (input: { orgId: string; messageId: string; emoji: string }) => Promise<void>;
   deleteMessage: (input: { orgId: string; messageId: string }) => Promise<void>;
   toggleHiddenMessage: (input: { orgId: string; messageId: string; isHidden: boolean }) => Promise<void>;
@@ -79,6 +81,7 @@ export function MessagesShellClient({
   panelRegistry,
   sendTextMessage,
   sendFileMessage,
+  sendFilesMessage,
   toggleReaction,
   deleteMessage,
   toggleHiddenMessage,
@@ -99,9 +102,8 @@ export function MessagesShellClient({
   const uploadFileMessage = useMemo(
     () =>
       async (input: {
-        file: File;
+        attachments: Array<{ file: File; durationSeconds?: number }>;
         content?: string;
-        durationSeconds?: number;
         threadId?: string | null;
         threadParentId?: string | null;
       }) => {
@@ -109,39 +111,141 @@ export function MessagesShellClient({
           throw new Error('Current user is required');
         }
 
-        const storagePath = buildMessageFileStoragePath({
-          orgId: channelState.ids.orgId,
-          channelId: channelState.ids.id,
-          profileId: currentUserId,
-          file: input.file,
-        });
+        const uploads = await Promise.all(
+          input.attachments.map(async (attachment) => {
+            const storagePath = buildMessageFileStoragePath({
+              orgId: channelState.ids.orgId,
+              channelId: channelState.ids.id,
+              profileId: currentUserId,
+              file: attachment.file,
+            });
 
-        const uploadResponse = await presenceClient.storage
-          .from(getChannelFilesBucket())
-          .upload(storagePath, input.file, {
-            upsert: false,
-            contentType: input.file.type || 'application/octet-stream',
-          });
+            const uploadResponse = await presenceClient.storage
+              .from(getChannelFilesBucket())
+              .upload(storagePath, attachment.file, {
+                upsert: false,
+                contentType: attachment.file.type || 'application/octet-stream',
+              });
 
-        if (uploadResponse.error) {
-          throw new Error(uploadResponse.error.message);
+            if (uploadResponse.error) {
+              throw new Error(uploadResponse.error.message);
+            }
+
+            return {
+              file: attachment.file,
+              durationSeconds: attachment.durationSeconds,
+              storagePath,
+            };
+          }),
+        );
+
+        const nonAudioUploads = uploads.filter(
+          (upload) => !(upload.file.type || '').startsWith('audio/'),
+        );
+        const audioUploads = uploads.filter((upload) =>
+          (upload.file.type || '').startsWith('audio/'),
+        );
+        const imageUploads = nonAudioUploads.filter((upload) =>
+          (upload.file.type || '').startsWith('image/'),
+        );
+        const fileUploads = nonAudioUploads.filter(
+          (upload) => !(upload.file.type || '').startsWith('image/'),
+        );
+
+        const createdMessages: MessageVM[] = [];
+
+        if (imageUploads.length === 1 && audioUploads.length === 0 && fileUploads.length === 0) {
+          createdMessages.push(
+            await sendFileMessage({
+              orgId: channelState.ids.orgId,
+              channelId: channelState.ids.id,
+              senderProfileId: currentUserId,
+              name: imageUploads[0].file.name,
+              storagePath: imageUploads[0].storagePath,
+              size: imageUploads[0].file.size,
+              mimeType: imageUploads[0].file.type || undefined,
+              content: input.content,
+              threadId: input.threadId,
+              threadParentId: input.threadParentId,
+            }),
+          );
+        } else if (imageUploads.length > 1) {
+          createdMessages.push(
+            await sendFilesMessage({
+              orgId: channelState.ids.orgId,
+              channelId: channelState.ids.id,
+              senderProfileId: currentUserId,
+              assets: imageUploads.map((upload) => ({
+                name: upload.file.name,
+                storagePath: upload.storagePath,
+                size: upload.file.size,
+                mimeType: upload.file.type || undefined,
+              })),
+              content: input.content,
+              threadId: input.threadId,
+              threadParentId: input.threadParentId,
+            }),
+          );
         }
 
-        return sendFileMessage({
-          orgId: channelState.ids.orgId,
-          channelId: channelState.ids.id,
-          senderProfileId: currentUserId,
-          name: input.file.name,
-          storagePath,
-          size: input.file.size,
-          mimeType: input.file.type || undefined,
-          durationSeconds: input.durationSeconds,
-          content: input.content,
-          threadId: input.threadId,
-          threadParentId: input.threadParentId,
-        });
+        if (fileUploads.length === 1) {
+          createdMessages.push(
+            await sendFileMessage({
+              orgId: channelState.ids.orgId,
+              channelId: channelState.ids.id,
+              senderProfileId: currentUserId,
+              name: fileUploads[0].file.name,
+              storagePath: fileUploads[0].storagePath,
+              size: fileUploads[0].file.size,
+              mimeType: fileUploads[0].file.type || undefined,
+              content: imageUploads.length ? undefined : input.content,
+              threadId: input.threadId,
+              threadParentId: input.threadParentId,
+            }),
+          );
+        } else if (fileUploads.length > 1) {
+          createdMessages.push(
+            await sendFilesMessage({
+              orgId: channelState.ids.orgId,
+              channelId: channelState.ids.id,
+              senderProfileId: currentUserId,
+              assets: fileUploads.map((upload) => ({
+                name: upload.file.name,
+                storagePath: upload.storagePath,
+                size: upload.file.size,
+                mimeType: upload.file.type || undefined,
+              })),
+              content: imageUploads.length ? undefined : input.content,
+              threadId: input.threadId,
+              threadParentId: input.threadParentId,
+            }),
+          );
+        }
+
+        for (const audioUpload of audioUploads) {
+          createdMessages.push(
+            await sendFileMessage({
+              orgId: channelState.ids.orgId,
+              channelId: channelState.ids.id,
+              senderProfileId: currentUserId,
+              name: audioUpload.file.name,
+              storagePath: audioUpload.storagePath,
+              size: audioUpload.file.size,
+              mimeType: audioUpload.file.type || undefined,
+              durationSeconds: audioUpload.durationSeconds,
+              content:
+                imageUploads.length || fileUploads.length || createdMessages.length > 0
+                  ? undefined
+                  : input.content,
+              threadId: input.threadId,
+              threadParentId: input.threadParentId,
+            }),
+          );
+        }
+
+        return createdMessages;
       },
-    [channelState.ids.id, channelState.ids.orgId, currentUserId, presenceClient, sendFileMessage],
+    [channelState.ids.id, channelState.ids.orgId, currentUserId, presenceClient, sendFileMessage, sendFilesMessage],
   );
 
   useEffect(() => {

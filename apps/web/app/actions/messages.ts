@@ -3,6 +3,7 @@
 import type {
   MessageMentionVM,
   MessageSendFileInput,
+  MessageSendFilesInput,
   MessageSendTextInput,
   MessageToggleReactionInput,
   MessageVM,
@@ -686,6 +687,216 @@ export async function sendFileMessageAction(
     payload: {
       ...payload,
       url: signedUrl,
+    },
+    reactions: [],
+    thread: thread ?? undefined,
+  });
+}
+
+export async function sendFilesMessageAction(
+  input: MessageSendFilesInput,
+): Promise<MessageVM> {
+  const supabase = await createSupabaseServerClient();
+  const authUser = await requireAuthedUser(supabase);
+  const accountResponse = await getAccountByAuthUserId(supabase, authUser.id);
+
+  if (!accountResponse.data) {
+    throw new Error('Account not found');
+  }
+
+  const profileResponse = await getProfileByAccountId(supabase, accountResponse.data.id);
+  if (!profileResponse.data) {
+    throw new Error('Profile not found');
+  }
+
+  if (input.orgId !== accountResponse.data.org_id) {
+    throw new Error('Invalid org');
+  }
+  if (input.senderProfileId !== profileResponse.data.id) {
+    throw new Error('Invalid sender');
+  }
+  if (!input.assets.length) {
+    throw new Error('At least one file is required');
+  }
+
+  const currentProfileId = profileResponse.data.id;
+  for (const asset of input.assets) {
+    if (!asset.name?.trim()) {
+      throw new Error('File name is required');
+    }
+    if (!asset.storagePath?.trim()) {
+      throw new Error('File storage path is required');
+    }
+    if (
+      !isValidMessageAssetPath({
+        storagePath: asset.storagePath,
+        orgId: input.orgId,
+        channelId: input.channelId,
+        profileId: currentProfileId,
+      })
+    ) {
+      throw new Error('Invalid file storage path');
+    }
+  }
+
+  const allImages = input.assets.every((asset) => asset.mimeType?.startsWith('image/'));
+  const anyImages = input.assets.some((asset) => asset.mimeType?.startsWith('image/'));
+  const anyAudio = input.assets.some((asset) => asset.mimeType?.startsWith('audio/'));
+
+  if (anyAudio) {
+    throw new Error('Audio recordings must be sent individually');
+  }
+  if (anyImages && !allImages) {
+    throw new Error('Mixed file and image uploads must be sent separately');
+  }
+
+  const now = new Date().toISOString();
+  const serviceSupabase = createSupabaseServiceClient();
+  const { threadId, threadCreated } = await resolveThreadContext({
+    supabase,
+    orgId: accountResponse.data.org_id,
+    channelId: input.channelId,
+    currentProfileId,
+    requestedThreadId: input.threadId,
+    threadParentId: input.threadParentId,
+    now,
+  });
+
+  const messageType = allImages ? 'image' : 'file';
+  const messageInsert = await supabase
+    .from('messages')
+    .insert({
+      org_id: input.orgId,
+      channel_id: input.channelId,
+      sender_profile_id: currentProfileId,
+      type: messageType,
+      visibility_type: 'all',
+      thread_id: threadId,
+      thread_parent_id: input.threadParentId ?? null,
+      created_at: now,
+      created_by: currentProfileId,
+      updated_at: now,
+      updated_by: currentProfileId,
+    })
+    .select('*')
+    .single();
+
+  if (messageInsert.error || !messageInsert.data) {
+    throw new Error(messageInsert.error?.message ?? 'Unable to create message.');
+  }
+
+  const signedAssets = await Promise.all(
+    input.assets.map(async (asset) => ({
+      ...asset,
+      url: await createSignedChannelFileUrl(supabase, asset.storagePath),
+    })),
+  );
+
+  const attachmentsPayload = input.assets.map((asset) => ({
+    url: asset.storagePath,
+    storagePath: asset.storagePath,
+    name: asset.name,
+    size: asset.size,
+    mimeType: asset.mimeType,
+  }));
+
+  const payloadInsert = await supabase
+    .from(allImages ? 'message_image' : 'message_file')
+    .insert({
+      message_id: messageInsert.data.id,
+      org_id: input.orgId,
+      payload: {
+        ...attachmentsPayload[0],
+        attachments: attachmentsPayload,
+        ...(input.content?.trim() ? { text: input.content.trim() } : {}),
+      },
+      created_at: now,
+      created_by: currentProfileId,
+      updated_at: now,
+      updated_by: currentProfileId,
+    });
+
+  if (payloadInsert.error) {
+    await serviceSupabase.storage.from(CHANNEL_FILE_BUCKET).remove(input.assets.map((asset) => asset.storagePath));
+    await supabase.from('messages').delete().eq('id', messageInsert.data.id);
+    throw new Error(payloadInsert.error.message);
+  }
+
+  const channelAssetInsert = allImages
+    ? await supabase.from('channel_media').insert(
+        input.assets.map((asset) => ({
+          org_id: input.orgId,
+          channel_id: input.channelId,
+          message_id: messageInsert.data.id,
+          sender_profile_id: currentProfileId,
+          type: 'image',
+          url: asset.storagePath,
+          name: asset.name,
+          width: null,
+          height: null,
+          created_at: now,
+          created_by: currentProfileId,
+          updated_at: now,
+          updated_by: currentProfileId,
+        })),
+      )
+    : await supabase.from('channel_files').insert(
+        input.assets.map((asset) => ({
+          org_id: input.orgId,
+          channel_id: input.channelId,
+          message_id: messageInsert.data.id,
+          sender_profile_id: currentProfileId,
+          kind: 'file',
+          url: asset.storagePath,
+          name: asset.name,
+          mime_type: asset.mimeType ?? null,
+          size: asset.size ?? null,
+          created_at: now,
+          created_by: currentProfileId,
+          updated_at: now,
+          updated_by: currentProfileId,
+        })),
+      );
+
+  if (channelAssetInsert.error) {
+    await serviceSupabase.storage.from(CHANNEL_FILE_BUCKET).remove(input.assets.map((asset) => asset.storagePath));
+    await supabase
+      .from(allImages ? 'message_image' : 'message_file')
+      .delete()
+      .eq('message_id', messageInsert.data.id);
+    await supabase.from('messages').delete().eq('id', messageInsert.data.id);
+    throw new Error(channelAssetInsert.error.message);
+  }
+
+  await bumpThreadReplyCount({
+    supabase,
+    threadId,
+    threadCreated,
+    now,
+    currentProfileId,
+  });
+
+  const sender = await buildUserProfileById(supabase, currentProfileId);
+  if (!sender) {
+    throw new Error('Sender not found');
+  }
+
+  const thread = threadId
+    ? await buildThreadById(supabase, accountResponse.data.org_id, threadId)
+    : null;
+
+  return mapMessageRowToVM(messageInsert.data, {
+    sender,
+    payload: {
+      ...attachmentsPayload[0],
+      attachments: signedAssets.map((asset) => ({
+        url: asset.url,
+        storagePath: asset.storagePath,
+        name: asset.name,
+        size: asset.size,
+        mimeType: asset.mimeType,
+      })),
+      ...(input.content?.trim() ? { text: input.content.trim() } : {}),
     },
     reactions: [],
     thread: thread ?? undefined,

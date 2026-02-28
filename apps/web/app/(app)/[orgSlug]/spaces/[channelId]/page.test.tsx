@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { render } from '@testing-library/react';
+import { render, waitFor } from '@testing-library/react';
 
 import Page from '@iconicedu/web/app/(app)/[orgSlug]/spaces/[channelId]/page';
 
@@ -17,6 +17,7 @@ vi.mock('@iconicedu/web/app/(app)/[orgSlug]/spaces/[channelId]/learning-space-sh
 
 vi.mock('@iconicedu/web/app/actions/messages', () => ({
   sendFileMessageAction: vi.fn(),
+  sendFilesMessageAction: vi.fn(),
   sendTextMessageAction: vi.fn(),
   toggleMessageReactionAction: vi.fn(),
   deleteMessageAction: vi.fn(),
@@ -54,13 +55,15 @@ describe('d/spaces/[channelId] page', () => {
     });
     const element = await Page({ params: Promise.resolve({ orgSlug: 'iconic-academy', channelId: 'channel-1' }) });
     render(element as React.ReactElement);
-    expect(learningSpaceShellMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        currentUserId: 'profile-1',
-        currentUserProfile: { ids: { id: 'profile-1', orgId: 'org-1' } },
-        readOnly: false,
-      }),
-    );
+    await waitFor(() => {
+      expect(learningSpaceShellMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          currentUserId: 'profile-1',
+          currentUserProfile: { ids: { id: 'profile-1', orgId: 'org-1' } },
+          readOnly: false,
+        }),
+      );
+    });
   });
 
   it('enables read-only mode for staff who are not learning space channel participants', async () => {
@@ -78,10 +81,12 @@ describe('d/spaces/[channelId] page', () => {
 
     const element = await Page({ params: Promise.resolve({ orgSlug: 'iconic-academy', channelId: 'channel-1' }) });
     render(element as React.ReactElement);
-    expect(learningSpaceShellMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        readOnly: true,
-      }),
-    );
+    await waitFor(() => {
+      expect(learningSpaceShellMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          readOnly: true,
+        }),
+      );
+    });
   });
 });

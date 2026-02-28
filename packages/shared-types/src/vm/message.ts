@@ -174,12 +174,14 @@ export interface ImageMessageVM extends BaseMessageVM {
   core: MessageCoreVM & { type: 'image' };
   content?: { text?: string };
   attachment: ImageAttachmentVM;
+  attachments?: ImageAttachmentVM[];
 }
 
 export interface FileMessageVM extends BaseMessageVM {
   core: MessageCoreVM & { type: 'file' };
   content?: { text?: string };
   attachment: FileAttachmentVM;
+  attachments?: FileAttachmentVM[];
 }
 
 export interface DesignFileUpdateMessageVM extends BaseMessageVM {

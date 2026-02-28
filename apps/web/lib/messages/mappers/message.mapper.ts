@@ -100,6 +100,20 @@ function mapAttachment(payload: Record<string, unknown> | null, type: MessageTyp
   } satisfies DesignFileAttachmentVM;
 }
 
+function mapFileAttachments(
+  payload: Record<string, unknown> | null,
+  type: 'image' | 'file',
+) {
+  const attachments = payload?.attachments;
+  if (!Array.isArray(attachments) || attachments.length === 0) {
+    return [mapAttachment(payload, type)];
+  }
+
+  return attachments.map((attachment) =>
+    mapAttachment(attachment as Record<string, unknown>, type),
+  );
+}
+
 function mapAttachments(
   payload: Record<string, unknown> | null,
 ): AttachmentVM[] | undefined {
@@ -148,19 +162,27 @@ export function mapMessageRowToVM(
         },
       };
     case 'image':
+      {
+        const attachments = mapFileAttachments(payload, type) as ImageAttachmentVM[];
       return {
         ...base,
         core: { ...core, type: 'image' },
         content: payload?.text ? { text: String(payload.text) } : undefined,
-        attachment: mapAttachment(payload, type) as ImageAttachmentVM,
+        attachment: attachments[0],
+        attachments,
       };
+      }
     case 'file':
+      {
+        const attachments = mapFileAttachments(payload, type) as FileAttachmentVM[];
       return {
         ...base,
         core: { ...core, type: 'file' },
         content: payload?.text ? { text: String(payload.text) } : undefined,
-        attachment: mapAttachment(payload, type) as FileAttachmentVM,
+        attachment: attachments[0],
+        attachments,
       };
+      }
     case 'design-file-update':
       return {
         ...base,

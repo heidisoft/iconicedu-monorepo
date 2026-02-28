@@ -22,7 +22,7 @@ import {
 } from '@iconicedu/ui-web/components/messages/tabs/messages-container-tab-hash';
 import { Tabs, TabsList, TabsTrigger } from '../../ui/tabs';
 import { ScrollArea } from '../../ui/scroll-area';
-import { createChannelFileItem } from './messages-container-files.utils';
+import { createChannelFileItems } from './messages-container-files.utils';
 import type {
   AudioRecordingMessageVM,
   ChannelFileItemVM,
@@ -77,12 +77,11 @@ export interface MessagesContainerProps {
   realtimeClient?: MessagesRealtimeClient | null;
   messageWriteClient?: MessageWriteClient | null;
   uploadFileMessage?: (input: {
-    file: File;
+    attachments: Array<{ file: File; durationSeconds?: number }>;
     content?: string;
-    durationSeconds?: number;
     threadId?: string | null;
     threadParentId?: string | null;
-  }) => Promise<MessageVM>;
+  }) => Promise<MessageVM[]>;
 }
 
 const isGuardianProfile = (profile: UserProfileVM): profile is GuardianProfileVM =>
@@ -1060,14 +1059,16 @@ export function MessagesContainer({
     if (!senderProfile) return;
     setSendFileMessage(async (input) => {
       if (uploadFileMessage) {
-        const created = await uploadFileMessage(input);
-        const exists = messagesRef.current.some(
-          (message) => message.ids.id === created.ids.id,
-        );
-        if (!exists) {
-          addMessage(created);
-        }
-        return created;
+        const createdMessages = await uploadFileMessage(input);
+        createdMessages.forEach((created) => {
+          const exists = messagesRef.current.some(
+            (message) => message.ids.id === created.ids.id,
+          );
+          if (!exists) {
+            addMessage(created);
+          }
+        });
+        return createdMessages[0] ?? null;
       }
       return {
         ids: { id: `file-${Date.now()}`, orgId: channel.ids.orgId },
@@ -1087,10 +1088,19 @@ export function MessagesContainer({
         attachment: {
           type: 'file',
           url: '',
-          name: input.file.name,
-          size: input.file.size,
-          mimeType: input.file.type || undefined,
+          name: input.attachments[0]?.file.name ?? 'Attachment',
+          size: input.attachments[0]?.file.size,
+          mimeType: input.attachments[0]?.file.type || undefined,
         },
+        attachments: input.attachments.slice(1).length
+          ? input.attachments.map((attachment) => ({
+              type: 'file' as const,
+              url: '',
+              name: attachment.file.name,
+              size: attachment.file.size,
+              mimeType: attachment.file.type || undefined,
+            }))
+          : undefined,
       } satisfies FileMessageVM;
     });
   }, [
@@ -1277,41 +1287,43 @@ export function MessagesContainer({
           ) : (
             <MessageInput
               onSend={handleSendMessage}
-              onAttachFile={(file, content, options) => {
+              onAttachFiles={(attachments, content) => {
                 if (readOnly || !uploadFileMessage) {
                   return;
                 }
                 const sendFile = async () => {
-                  const created = await runWithNetworkActivity(() =>
+                  const createdMessages = await runWithNetworkActivity(() =>
                     uploadFileMessage({
-                      file,
+                      attachments,
                       content,
-                      durationSeconds: options?.durationSeconds,
                     }),
                   );
-                  if (
-                    created.core.type === 'file' ||
-                    created.core.type === 'image' ||
-                    created.core.type === 'audio-recording'
-                  ) {
-                    const nextFile = createChannelFileItem(
-                      channel.ids.id,
-                      created as FileMessageVM | ImageMessageVM | AudioRecordingMessageVM,
-                    );
-                    setLoadedFiles((prev) => {
-                      if (!prev) {
-                        return prev;
-                      }
-                      const nextItems = prev ?? [];
-                      if (nextItems.some((item) => item.messageId === created.ids.id)) {
-                        return nextItems;
-                      }
-                      return [nextFile, ...nextItems].sort(
-                        (a, b) =>
-                          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+                  createdMessages.forEach((created) => {
+                    if (
+                      created.core.type === 'file' ||
+                      created.core.type === 'image' ||
+                      created.core.type === 'audio-recording'
+                    ) {
+                      const nextFiles = createChannelFileItems(
+                        channel.ids.id,
+                        created as FileMessageVM | ImageMessageVM | AudioRecordingMessageVM,
                       );
-                    });
-                  }
+                      setLoadedFiles((prev) => {
+                        if (!prev) {
+                          return prev;
+                        }
+                        const existingKeys = new Set(prev.map((item) => `${item.messageId}:${item.name}:${item.storagePath}`));
+                        const merged = [
+                          ...nextFiles.filter((item) => !existingKeys.has(`${item.messageId}:${item.name}:${item.storagePath}`)),
+                          ...prev,
+                        ];
+                        return merged.sort(
+                          (a, b) =>
+                            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+                        );
+                      });
+                    }
+                  });
                 };
                 return sendFile();
               }}

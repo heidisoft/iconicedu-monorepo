@@ -20,10 +20,9 @@ interface ThreadPanelProps {
 
 type ThreadPanelContentProps = ThreadPanelPropsVM & {
   isReadOnly?: boolean;
-  onAttachReplyFile?: (
-    file: File,
+  onAttachReplyFiles?: (
+    attachments: Array<{ file: File; durationSeconds?: number }>,
     content?: string,
-    options?: { durationSeconds?: number },
   ) => Promise<void> | void;
 };
 
@@ -34,7 +33,7 @@ const ThreadPanelContent = memo(function ThreadPanelContent({
   currentUserId,
   readState,
   isReadOnly,
-  onAttachReplyFile,
+  onAttachReplyFiles,
 }: ThreadPanelContentProps) {
   const { channel } = useMessagesState();
   const {
@@ -81,7 +80,7 @@ const ThreadPanelContent = memo(function ThreadPanelContent({
       ) : (
         <MessageInput
           onSend={onSendReply}
-          onAttachFile={onAttachReplyFile}
+          onAttachFiles={onAttachReplyFiles}
           placeholder="Reply..."
           participants={channel.collections.participants}
           currentUserId={currentUserId}
@@ -184,15 +183,13 @@ export function ThreadPanel({ intent }: ThreadPanelProps) {
     }
 
   };
-  const onAttachReplyFile = async (
-    file: File,
+  const onAttachReplyFiles = async (
+    attachments: Array<{ file: File; durationSeconds?: number }>,
     content?: string,
-    options?: { durationSeconds?: number },
   ) => {
     const message = await sendFileMessage({
-      file,
+      attachments,
       content,
-      durationSeconds: options?.durationSeconds,
       threadId: threadData.thread.ids.id,
       threadParentId: threadData.thread.parent.messageId ?? parentMessage?.ids.id,
     });
@@ -247,12 +244,12 @@ export function ThreadPanel({ intent }: ThreadPanelProps) {
         currentUserId={currentUserId}
         readState={threadData.thread.readState}
         isReadOnly={isReadOnly}
-        onAttachReplyFile={onAttachReplyFile}
+        onAttachReplyFile={onAttachReplyFiles}
       />
     );
   }
   return (
-    <ThreadPanelContent
+        <ThreadPanelContent
       thread={threadData.thread}
       replies={replies}
       parentMessage={parentMessage}
@@ -267,7 +264,7 @@ export function ThreadPanel({ intent }: ThreadPanelProps) {
       currentUserId={currentUserId}
       readState={threadData.thread.readState}
       isReadOnly={isReadOnly}
-      onAttachReplyFile={onAttachReplyFile}
+          onAttachReplyFiles={onAttachReplyFiles}
     />
   );
 }

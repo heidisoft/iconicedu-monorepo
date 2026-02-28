@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { createChannelFileItem } from './messages-container-files.utils';
+import { createChannelFileItem, createChannelFileItems } from './messages-container-files.utils';
 
 describe('createChannelFileItem', () => {
   it('maps an image message into a files-tab item', () => {
@@ -58,5 +58,41 @@ describe('createChannelFileItem', () => {
         size: 55,
       }),
     );
+  });
+
+  it('expands grouped file attachments into separate files-tab items', () => {
+    const items = createChannelFileItems('channel-1', {
+      ids: { id: 'message-3', orgId: 'org-1' },
+      core: {
+        type: 'file',
+        createdAt: '2026-02-24T10:00:00.000Z',
+        visibility: { type: 'all' },
+        sender: { ids: { id: 'profile-3' } },
+      },
+      social: { reactions: [] },
+      attachment: {
+        type: 'file',
+        url: 'https://example.com/brief.pdf',
+        storagePath: 'org-1/channel-1/files/profile-3/brief.pdf',
+        name: 'brief.pdf',
+      },
+      attachments: [
+        {
+          type: 'file',
+          url: 'https://example.com/brief.pdf',
+          storagePath: 'org-1/channel-1/files/profile-3/brief.pdf',
+          name: 'brief.pdf',
+        },
+        {
+          type: 'file',
+          url: 'https://example.com/notes.pdf',
+          storagePath: 'org-1/channel-1/files/profile-3/notes.pdf',
+          name: 'notes.pdf',
+        },
+      ],
+    } as never);
+
+    expect(items).toHaveLength(2);
+    expect(items.map((item) => item.name)).toEqual(['brief.pdf', 'notes.pdf']);
   });
 });

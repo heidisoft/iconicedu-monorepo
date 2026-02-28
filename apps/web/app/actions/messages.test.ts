@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { deleteMessageAction, sendFileMessageAction, sendTextMessageAction, toggleHiddenMessageAction } from '@iconicedu/web/app/actions/messages';
+import {
+  deleteMessageAction,
+  sendFileMessageAction,
+  sendFilesMessageAction,
+  sendTextMessageAction,
+  toggleHiddenMessageAction,
+} from '@iconicedu/web/app/actions/messages';
 
 const mapMessageRowToVM = vi.fn();
 const buildUserProfileById = vi.fn();
@@ -487,6 +493,200 @@ describe('sendTextMessageAction', () => {
       }),
     );
     expect(result).toEqual({ ids: { id: 'audio-message-1', orgId: 'org-1' } });
+  });
+
+  it('stores grouped file uploads as one file message with multiple attachments', async () => {
+    const supabase = {
+      from: vi.fn(),
+      storage: {
+        from: vi.fn(() => ({
+          createSignedUrl: vi.fn(async (path: string) => ({
+            data: { signedUrl: `https://signed.example.com/${path}` },
+            error: null,
+          })),
+        })),
+      },
+    };
+    const { createSupabaseServerClient } = await import('@iconicedu/web/lib/supabase/server');
+    const { createSupabaseServiceClient } = await import('@iconicedu/web/lib/supabase/service');
+    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
+      supabase,
+    );
+    (createSupabaseServiceClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue({
+      from: vi.fn(),
+      storage: { from: vi.fn(() => ({ remove: vi.fn(async () => ({ error: null })) })) },
+    });
+
+    const insertMessage = vi.fn().mockReturnValue({
+      select: () => ({
+        single: async () => ({
+          data: {
+            id: 'file-message-group-1',
+            org_id: 'org-1',
+            channel_id: 'channel-1',
+            sender_profile_id: 'profile-1',
+            type: 'file',
+            created_at: new Date().toISOString(),
+          },
+          error: null,
+        }),
+      }),
+    });
+    const insertMessageFile = vi.fn(async () => ({ error: null }));
+    const insertChannelFiles = vi.fn(async () => ({ error: null }));
+
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'messages') return { insert: insertMessage };
+      if (table === 'message_file') return { insert: insertMessageFile };
+      if (table === 'channel_files') return { insert: insertChannelFiles };
+      return {};
+    });
+
+    buildUserProfileById.mockResolvedValueOnce({ ids: { id: 'profile-1', orgId: 'org-1' } });
+    mapMessageRowToVM.mockReturnValueOnce({ ids: { id: 'file-message-group-1', orgId: 'org-1' } });
+
+    const result = await sendFilesMessageAction({
+      orgId: 'org-1',
+      channelId: 'channel-1',
+      senderProfileId: 'profile-1',
+      content: 'Three docs',
+      assets: [
+        {
+          name: 'brief.pdf',
+          storagePath: 'org-1/channel-1/files/profile-1/brief.pdf',
+          size: 11,
+          mimeType: 'application/pdf',
+        },
+        {
+          name: 'notes.docx',
+          storagePath: 'org-1/channel-1/files/profile-1/notes.docx',
+          size: 12,
+          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        },
+        {
+          name: 'table.csv',
+          storagePath: 'org-1/channel-1/files/profile-1/table.csv',
+          size: 13,
+          mimeType: 'text/csv',
+        },
+      ],
+    });
+
+    expect(insertMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'file' }));
+    expect(insertMessageFile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message_id: 'file-message-group-1',
+        payload: expect.objectContaining({
+          name: 'brief.pdf',
+          text: 'Three docs',
+          attachments: expect.arrayContaining([
+            expect.objectContaining({ name: 'brief.pdf' }),
+            expect.objectContaining({ name: 'notes.docx' }),
+            expect.objectContaining({ name: 'table.csv' }),
+          ]),
+        }),
+      }),
+    );
+    expect(insertChannelFiles).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ message_id: 'file-message-group-1', name: 'brief.pdf' }),
+        expect.objectContaining({ message_id: 'file-message-group-1', name: 'notes.docx' }),
+        expect.objectContaining({ message_id: 'file-message-group-1', name: 'table.csv' }),
+      ]),
+    );
+    expect(result).toEqual({ ids: { id: 'file-message-group-1', orgId: 'org-1' } });
+  });
+
+  it('stores grouped image uploads as one image message with multiple attachments', async () => {
+    const supabase = {
+      from: vi.fn(),
+      storage: {
+        from: vi.fn(() => ({
+          createSignedUrl: vi.fn(async (path: string) => ({
+            data: { signedUrl: `https://signed.example.com/${path}` },
+            error: null,
+          })),
+        })),
+      },
+    };
+    const { createSupabaseServerClient } = await import('@iconicedu/web/lib/supabase/server');
+    const { createSupabaseServiceClient } = await import('@iconicedu/web/lib/supabase/service');
+    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
+      supabase,
+    );
+    (createSupabaseServiceClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue({
+      from: vi.fn(),
+      storage: { from: vi.fn(() => ({ remove: vi.fn(async () => ({ error: null })) })) },
+    });
+
+    const insertMessage = vi.fn().mockReturnValue({
+      select: () => ({
+        single: async () => ({
+          data: {
+            id: 'image-message-group-1',
+            org_id: 'org-1',
+            channel_id: 'channel-1',
+            sender_profile_id: 'profile-1',
+            type: 'image',
+            created_at: new Date().toISOString(),
+          },
+          error: null,
+        }),
+      }),
+    });
+    const insertMessageImage = vi.fn(async () => ({ error: null }));
+    const insertChannelMedia = vi.fn(async () => ({ error: null }));
+
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'messages') return { insert: insertMessage };
+      if (table === 'message_image') return { insert: insertMessageImage };
+      if (table === 'channel_media') return { insert: insertChannelMedia };
+      return {};
+    });
+
+    buildUserProfileById.mockResolvedValueOnce({ ids: { id: 'profile-1', orgId: 'org-1' } });
+    mapMessageRowToVM.mockReturnValueOnce({ ids: { id: 'image-message-group-1', orgId: 'org-1' } });
+
+    const result = await sendFilesMessageAction({
+      orgId: 'org-1',
+      channelId: 'channel-1',
+      senderProfileId: 'profile-1',
+      assets: [
+        {
+          name: 'photo-1.png',
+          storagePath: 'org-1/channel-1/images/profile-1/photo-1.png',
+          size: 21,
+          mimeType: 'image/png',
+        },
+        {
+          name: 'photo-2.png',
+          storagePath: 'org-1/channel-1/images/profile-1/photo-2.png',
+          size: 22,
+          mimeType: 'image/png',
+        },
+      ],
+    });
+
+    expect(insertMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'image' }));
+    expect(insertMessageImage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message_id: 'image-message-group-1',
+        payload: expect.objectContaining({
+          name: 'photo-1.png',
+          attachments: expect.arrayContaining([
+            expect.objectContaining({ name: 'photo-1.png' }),
+            expect.objectContaining({ name: 'photo-2.png' }),
+          ]),
+        }),
+      }),
+    );
+    expect(insertChannelMedia).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ message_id: 'image-message-group-1', name: 'photo-1.png' }),
+        expect.objectContaining({ message_id: 'image-message-group-1', name: 'photo-2.png' }),
+      ]),
+    );
+    expect(result).toEqual({ ids: { id: 'image-message-group-1', orgId: 'org-1' } });
   });
 
   it('stores mentions in payload and creates mention notifications for opted-in recipients', async () => {

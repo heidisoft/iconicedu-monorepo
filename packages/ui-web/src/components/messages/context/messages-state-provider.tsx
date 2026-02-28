@@ -80,9 +80,8 @@ export type SendTextMessageHandler = (input: {
 }) => Promise<MessageVM | null>;
 
 export type SendFileMessageHandler = (input: {
-  file: File;
+  attachments: Array<{ file: File; durationSeconds?: number }>;
   content?: string;
-  durationSeconds?: number;
   threadId?: string | null;
   threadParentId?: string | null;
 }) => Promise<MessageVM | null>;

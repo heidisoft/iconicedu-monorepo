@@ -26,6 +26,7 @@ describe('MessagesShellClient', () => {
   it('passes realtime and write clients to MessagesShell', async () => {
     const sendTextMessage = vi.fn();
     const sendFileMessage = vi.fn();
+    const sendFilesMessage = vi.fn();
     const toggleReaction = vi.fn();
     const deleteMessage = vi.fn();
     const toggleHiddenMessage = vi.fn();
@@ -40,6 +41,7 @@ describe('MessagesShellClient', () => {
         readOnly
         sendTextMessage={sendTextMessage}
         sendFileMessage={sendFileMessage}
+        sendFilesMessage={sendFilesMessage}
         toggleReaction={toggleReaction}
         deleteMessage={deleteMessage}
         toggleHiddenMessage={toggleHiddenMessage}
