@@ -8,7 +8,9 @@ import {
 } from '@iconicedu/ui-web/components/messages/message-list.utils';
 
 export function useMessages(initialMessages: MessageVM[]) {
-  const [messages, setMessages] = useState<MessageVM[]>(initialMessages);
+  const [messages, setMessages] = useState<MessageVM[]>(() =>
+    prependUniqueMessages([], initialMessages),
+  );
 
   const addMessage = useCallback((message: MessageVM) => {
     setMessages((prev) => upsertMessage(prev, message));

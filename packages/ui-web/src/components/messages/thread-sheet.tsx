@@ -3,6 +3,7 @@ import { MessageInput } from '@iconicedu/ui-web/components/messages/message-inpu
 import type { ThreadPanelPropsVM } from '@iconicedu/shared-types';
 import { ScrollArea } from '@iconicedu/ui-web/ui/scroll-area';
 import { ThreadMessageList } from '@iconicedu/ui-web/components/messages/shared/thread-message-list';
+import { useMessagesState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
 
 export function ThreadSheet({
   replies,
@@ -12,6 +13,7 @@ export function ThreadSheet({
   readState,
   isReadOnly = false,
 }: ThreadPanelPropsVM & { isReadOnly?: boolean }) {
+  const { channel } = useMessagesState();
   const {
     onSendReply,
     onProfileClick,
@@ -53,7 +55,13 @@ export function ThreadSheet({
             Read-only supervised conversation
           </div>
         ) : (
-          <MessageInput onSend={onSendReply} placeholder="Reply..." sticky={false} />
+          <MessageInput
+            onSend={onSendReply}
+            placeholder="Reply..."
+            sticky={false}
+            participants={channel.collections.participants}
+            currentUserId={currentUserId}
+          />
         )}
       </div>
     </div>

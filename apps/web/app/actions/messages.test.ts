@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { deleteMessageAction, sendTextMessageAction, toggleHiddenMessageAction } from '@iconicedu/web/app/actions/messages';
 
@@ -37,6 +37,17 @@ vi.mock('@iconicedu/web/lib/messages/builders/thread.builder', () => ({
 }));
 
 describe('sendTextMessageAction', () => {
+  beforeEach(async () => {
+    mapMessageRowToVM.mockReset();
+    buildUserProfileById.mockReset();
+    const { createSupabaseServiceClient } = await import(
+      '@iconicedu/web/lib/supabase/service'
+    );
+    (createSupabaseServiceClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue({
+      from: vi.fn(),
+    });
+  });
+
   it('creates a text message and returns the mapped VM', async () => {
     const supabase = {
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
@@ -101,6 +112,119 @@ describe('sendTextMessageAction', () => {
       }),
     );
     expect(result).toEqual({ ids: { id: 'message-1', orgId: 'org-1' } });
+  });
+
+  it('stores mentions in payload and creates mention notifications for opted-in recipients', async () => {
+    const supabase = {
+      from: vi.fn(),
+    };
+    const serviceSupabase = {
+      from: vi.fn(),
+    };
+    const { createSupabaseServerClient } = await import('@iconicedu/web/lib/supabase/server');
+    const { createSupabaseServiceClient } = await import('@iconicedu/web/lib/supabase/service');
+    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
+      supabase,
+    );
+    (createSupabaseServiceClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
+      serviceSupabase,
+    );
+
+    const insertMessage = vi.fn().mockReturnValue({
+      select: () => ({
+        single: async () => ({
+          data: {
+            id: 'message-mention-1',
+            org_id: 'org-1',
+            channel_id: 'channel-1',
+            sender_profile_id: 'profile-1',
+            type: 'text',
+            created_at: new Date().toISOString(),
+          },
+          error: null,
+        }),
+      }),
+    });
+    const insertMessageText = vi.fn().mockResolvedValue({ error: null });
+    const channelMembersSelectChain: any = {};
+    channelMembersSelectChain.eq = vi.fn(() => channelMembersSelectChain);
+    channelMembersSelectChain.is = vi.fn(() => channelMembersSelectChain);
+    channelMembersSelectChain.returns = vi.fn(async () => ({
+      data: [{ profile_id: 'profile-2' }, { profile_id: 'profile-3' }],
+      error: null,
+    }));
+
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'channel_members') {
+        return { select: () => channelMembersSelectChain };
+      }
+      if (table === 'messages') {
+        return { insert: insertMessage };
+      }
+      if (table === 'message_text') {
+        return { insert: insertMessageText };
+      }
+      return {};
+    });
+
+    const notificationPreferencesChain: any = {};
+    notificationPreferencesChain.select = vi.fn(() => notificationPreferencesChain);
+    notificationPreferencesChain.eq = vi.fn(() => notificationPreferencesChain);
+    notificationPreferencesChain.in = vi.fn(() => notificationPreferencesChain);
+    notificationPreferencesChain.is = vi.fn(() => notificationPreferencesChain);
+    notificationPreferencesChain.returns = vi.fn(async () => ({
+      data: [{ profile_id: 'profile-2', channels: ['push'], muted: false }],
+      error: null,
+    }));
+    const insertActivityItems = vi.fn().mockResolvedValue({ error: null });
+
+    serviceSupabase.from.mockImplementation((table: string) => {
+      if (table === 'notification_preferences') {
+        return notificationPreferencesChain;
+      }
+      if (table === 'activity_feed_items') {
+        return { insert: insertActivityItems };
+      }
+      return {};
+    });
+
+    buildUserProfileById.mockResolvedValueOnce({
+      ids: { id: 'profile-1', orgId: 'org-1' },
+      profile: { displayName: 'Sender Name' },
+    });
+    mapMessageRowToVM.mockReturnValueOnce({ ids: { id: 'message-mention-1', orgId: 'org-1' } });
+
+    await sendTextMessageAction({
+      orgId: 'org-1',
+      channelId: 'channel-1',
+      senderProfileId: 'profile-1',
+      content: 'Hello @Taylor Reed',
+      mentions: [
+        { profileId: 'profile-2', displayName: 'Taylor Reed', start: 6, end: 18 },
+        { profileId: 'profile-1', displayName: 'Sender Name', start: 0, end: 12 },
+      ],
+    });
+
+    expect(insertMessageText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: {
+          text: 'Hello @Taylor Reed',
+          mentions: [
+            { profileId: 'profile-2', displayName: 'Taylor Reed', start: 6, end: 18 },
+          ],
+        },
+      }),
+    );
+    expect(insertActivityItems).toHaveBeenCalledWith([
+      expect.objectContaining({
+        actor_profile_id: 'profile-1',
+        summary: 'Sender Name mentioned you',
+        metadata: expect.objectContaining({
+          notificationKey: 'messages.mentions',
+          mentionedProfileId: 'profile-2',
+        }),
+      }),
+    ]);
   });
 
   it('creates a thread for a reply when needed', async () => {

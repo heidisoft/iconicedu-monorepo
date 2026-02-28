@@ -1,4 +1,5 @@
 import type { MessageVM } from '../vm/message';
+import type { MessageMentionVM } from '../vm/message';
 
 export type MessageRealtimeEvent =
   | { type: 'message-added'; message: MessageVM }
@@ -42,6 +43,7 @@ export type MessageSendTextInput = {
   channelId: string;
   senderProfileId: string;
   content: string;
+  mentions?: MessageMentionVM[];
   threadParentId?: string | null;
   threadId?: string | null;
 };

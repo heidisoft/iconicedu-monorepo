@@ -29,6 +29,7 @@ import type {
   GuardianProfileVM,
   ISODateTime,
   MessageVM,
+  MessageMentionVM,
   MessagesRealtimeClient,
   MessageWriteClient,
   TextMessageVM,
@@ -373,7 +374,7 @@ export function MessagesContainer({
   );
 
   const handleSendMessage = useCallback(
-    (content: string) => {
+    (content: string, mentions?: MessageMentionVM[]) => {
       if (readOnly) return;
       if (!senderProfile) return;
       if (messageFilter) {
@@ -387,6 +388,7 @@ export function MessagesContainer({
               channelId: channel.ids.id,
               senderProfileId: currentUserId,
               content,
+              mentions,
             }),
           );
           const exists = messagesRef.current.some(
@@ -411,7 +413,7 @@ export function MessagesContainer({
           state: {
             isSaved: false,
           },
-          content: { text: content },
+          content: { text: content, mentions },
         };
       addMessage(newMessage);
       };
@@ -432,7 +434,12 @@ export function MessagesContainer({
   );
 
   const handleSendThreadReply = useCallback(
-    async (parentMessage: MessageVM, thread: ThreadVM, content: string) => {
+    async (
+      parentMessage: MessageVM,
+      thread: ThreadVM,
+      content: string,
+      mentions?: MessageMentionVM[],
+    ) => {
       if (readOnly || !senderProfile) return;
       const trimmed = content.trim();
       if (!trimmed) return;
@@ -444,6 +451,7 @@ export function MessagesContainer({
               channelId: channel.ids.id,
               senderProfileId: currentUserId,
               content: trimmed,
+              mentions,
               threadId: thread.ids.id,
               threadParentId: thread.parent.messageId ?? parentMessage.ids.id,
             }),
@@ -462,7 +470,7 @@ export function MessagesContainer({
             state: {
               isSaved: false,
             },
-            content: { text: trimmed },
+            content: { text: trimmed, mentions },
           } as TextMessageVM);
 
       const exists = messagesRef.current.some(
@@ -958,7 +966,7 @@ export function MessagesContainer({
     }
     if (!senderProfile) return;
     setCreateTextMessage(
-      (content: string): TextMessageVM => ({
+      (content: string, mentions?: MessageMentionVM[]): TextMessageVM => ({
         ids: { id: `reply-${Date.now()}`, orgId: channel.ids.orgId },
         core: {
           type: 'text',
@@ -972,7 +980,7 @@ export function MessagesContainer({
         state: {
           isSaved: false,
         },
-        content: { text: content },
+        content: { text: content, mentions },
       }),
     );
   }, [senderProfile, setCreateTextMessage, channel.ids.orgId, readOnly]);
@@ -983,13 +991,14 @@ export function MessagesContainer({
       return;
     }
     if (!senderProfile) return;
-    setSendTextMessage(async ({ content, threadId, threadParentId }) => {
+    setSendTextMessage(async ({ content, mentions, threadId, threadParentId }) => {
       if (messageWriteClient && currentUserId) {
         const created = await messageWriteClient.sendTextMessage({
           orgId: channel.ids.orgId,
           channelId: channel.ids.id,
           senderProfileId: currentUserId,
           content,
+          mentions,
           threadId,
           threadParentId,
         });
@@ -1015,7 +1024,7 @@ export function MessagesContainer({
         state: {
           isSaved: false,
         },
-        content: { text: content },
+        content: { text: content, mentions },
       };
     });
   }, [
@@ -1205,6 +1214,8 @@ export function MessagesContainer({
             <MessageInput
               onSend={handleSendMessage}
               placeholder={getMessageInputPlaceholder(channel, resolvedCurrentUserId)}
+              participants={participants}
+              currentUserId={resolvedCurrentUserId}
               onTypingStart={handleTypingStart}
               onTypingStop={handleTypingStop}
               isLoading={isNetworkBusy}

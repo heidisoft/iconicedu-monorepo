@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, memo } from 'react';
 import type {
+  MessageMentionVM,
   MessagesRightPanelIntent,
   ThreadPanelPropsVM,
 } from '@iconicedu/shared-types';
@@ -29,6 +30,7 @@ const ThreadPanelContent = memo(function ThreadPanelContent({
   readState,
   isReadOnly,
 }: ThreadPanelContentProps) {
+  const { channel } = useMessagesState();
   const {
     onSendReply,
     onProfileClick,
@@ -71,7 +73,12 @@ const ThreadPanelContent = memo(function ThreadPanelContent({
           Read-only supervised conversation
         </div>
       ) : (
-        <MessageInput onSend={onSendReply} placeholder="Reply..." />
+        <MessageInput
+          onSend={onSendReply}
+          placeholder="Reply..."
+          participants={channel.collections.participants}
+          currentUserId={currentUserId}
+        />
       )}
     </>
   );
@@ -127,13 +134,14 @@ export function ThreadPanel({ intent }: ThreadPanelProps) {
     };
   }, [parentMessage?.ids.id, sortedThreadMessages]);
 
-  const onSendReply = async (content: string) => {
+  const onSendReply = async (content: string, mentions?: MessageMentionVM[]) => {
     const message =
       (await sendTextMessage({
         content,
+        mentions,
         threadId: threadData.thread.ids.id,
         threadParentId: threadData.thread.parent.messageId ?? parentMessage?.ids.id,
-      })) ?? createTextMessage?.(content);
+      })) ?? createTextMessage?.(content, mentions);
     if (!message) return;
     const now = new Date().toISOString();
     const { thread: updatedThread, message: messageWithThread, wasRekeyed } =

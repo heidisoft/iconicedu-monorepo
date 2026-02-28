@@ -1,6 +1,7 @@
 'use server';
 
 import type {
+  MessageMentionVM,
   MessageSendTextInput,
   MessageToggleReactionInput,
   MessageVM,
@@ -14,6 +15,141 @@ import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profil
 import { buildUserProfileById } from '@iconicedu/web/lib/profile/builders/user-profile.builder';
 import { mapMessageRowToVM } from '@iconicedu/web/lib/messages/mappers/message.mapper';
 import { buildThreadById } from '@iconicedu/web/lib/messages/builders/thread.builder';
+
+function sanitizeMentions(
+  content: string,
+  mentions: MessageMentionVM[] | undefined,
+  allowedProfileIds: Set<string>,
+  currentProfileId: string,
+): MessageMentionVM[] {
+  if (!mentions?.length) {
+    return [];
+  }
+
+  const seen = new Set<string>();
+
+  return mentions.filter((mention) => {
+    if (!mention?.profileId || mention.profileId === currentProfileId) {
+      return false;
+    }
+    if (!allowedProfileIds.has(mention.profileId)) {
+      return false;
+    }
+    if (
+      typeof mention.displayName !== 'string' ||
+      typeof mention.start !== 'number' ||
+      typeof mention.end !== 'number'
+    ) {
+      return false;
+    }
+    if (mention.start < 0 || mention.end <= mention.start || mention.end > content.length) {
+      return false;
+    }
+    if (content.slice(mention.start, mention.end) !== `@${mention.displayName}`) {
+      return false;
+    }
+
+    const key = `${mention.profileId}:${mention.start}:${mention.end}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
+async function createMentionNotifications(input: {
+  serviceSupabase: ReturnType<typeof createSupabaseServiceClient>;
+  orgId: string;
+  channelId: string;
+  senderProfileId: string;
+  senderName: string;
+  messageId: string;
+  content: string;
+  mentions: MessageMentionVM[];
+  now: string;
+}) {
+  const recipientIds = Array.from(new Set(input.mentions.map((mention) => mention.profileId)));
+  if (!recipientIds.length) {
+    return;
+  }
+
+  const preferencesResponse = await input.serviceSupabase
+    .from('notification_preferences')
+    .select('profile_id, channels, muted')
+    .eq('org_id', input.orgId)
+    .eq('pref_key', 'messages.mentions')
+    .in('profile_id', recipientIds)
+    .is('deleted_at', null)
+    .returns<Array<{ profile_id: string; channels: string[] | null; muted?: boolean | null }>>();
+
+  if (preferencesResponse.error) {
+    throw new Error(preferencesResponse.error.message);
+  }
+
+  const preferencesByProfileId = new Map(
+    (preferencesResponse.data ?? []).map((row) => [row.profile_id, row]),
+  );
+
+  const items = recipientIds.flatMap((recipientId) => {
+    const preference = preferencesByProfileId.get(recipientId);
+    if (!preference || preference.muted || !preference.channels?.length) {
+      return [];
+    }
+
+    return [
+      {
+        org_id: input.orgId,
+        kind: 'leaf',
+        occurred_at: input.now,
+        tab_key: 'all',
+        audience: {
+          scope: { kind: 'user', userId: recipientId },
+          visibility: 'direct',
+          audience: [{ kind: 'users_only', userIds: [recipientId] }],
+        },
+        verb: 'message.posted',
+        actor_profile_id: input.senderProfileId,
+        refs: {
+          object: { kind: 'message', id: input.messageId },
+        },
+        content: {
+          headline: {
+            primary: `${input.senderName} mentioned you`,
+          },
+          summary: input.content,
+          preview: { text: input.content.slice(0, 160) },
+        },
+        summary: `${input.senderName} mentioned you`,
+        importance: 'normal',
+        is_read: false,
+        metadata: {
+          notificationKey: 'messages.mentions',
+          notificationChannels: preference.channels,
+          channelId: input.channelId,
+          messageId: input.messageId,
+          mentionedProfileId: recipientId,
+        },
+        created_at: input.now,
+        created_by: input.senderProfileId,
+        updated_at: input.now,
+        updated_by: input.senderProfileId,
+      },
+    ];
+  });
+
+  if (!items.length) {
+    return;
+  }
+
+  const insertResponse = await input.serviceSupabase
+    .from('activity_feed_items')
+    .insert(items);
+
+  if (insertResponse.error) {
+    throw new Error(insertResponse.error.message);
+  }
+}
 
 export async function sendTextMessageAction(
   input: MessageSendTextInput,
@@ -32,12 +168,35 @@ export async function sendTextMessageAction(
   }
   const accountOrgId = accountResponse.data.org_id;
   const currentProfileId = profileResponse.data.id;
+  const serviceSupabase = createSupabaseServiceClient();
 
   if (input.orgId !== accountResponse.data.org_id) {
     throw new Error('Invalid org');
   }
   if (input.senderProfileId !== profileResponse.data.id) {
     throw new Error('Invalid sender');
+  }
+
+  let sanitizedMentions: MessageMentionVM[] = [];
+  if (input.mentions?.length) {
+    const channelMembersResponse = await supabase
+      .from('channel_members')
+      .select('profile_id')
+      .eq('org_id', accountResponse.data.org_id)
+      .eq('channel_id', input.channelId)
+      .is('deleted_at', null)
+      .returns<Array<{ profile_id: string }>>();
+
+    if (channelMembersResponse.error) {
+      throw new Error(channelMembersResponse.error.message);
+    }
+
+    sanitizedMentions = sanitizeMentions(
+      input.content,
+      input.mentions,
+      new Set((channelMembersResponse.data ?? []).map((member) => member.profile_id)),
+      currentProfileId,
+    );
   }
 
   const now = new Date().toISOString();
@@ -211,7 +370,10 @@ export async function sendTextMessageAction(
   const payloadInsert = await supabase.from('message_text').insert({
     message_id: messageInsert.data.id,
     org_id: accountResponse.data.org_id,
-    payload: { text: input.content },
+    payload: {
+      text: input.content,
+      ...(sanitizedMentions.length ? { mentions: sanitizedMentions } : {}),
+    },
     created_at: now,
     created_by: profileResponse.data.id,
     updated_at: now,
@@ -251,13 +413,30 @@ export async function sendTextMessageAction(
     throw new Error('Sender not found');
   }
 
+  if (sanitizedMentions.length) {
+    await createMentionNotifications({
+      serviceSupabase,
+      orgId: accountResponse.data.org_id,
+      channelId: input.channelId,
+      senderProfileId: currentProfileId,
+      senderName: sender.profile.displayName ?? 'Someone',
+      messageId: messageInsert.data.id,
+      content: input.content,
+      mentions: sanitizedMentions,
+      now,
+    });
+  }
+
   const thread = threadId
     ? await buildThreadById(supabase, accountResponse.data.org_id, threadId)
     : null;
 
   return mapMessageRowToVM(messageInsert.data, {
     sender,
-    payload: { text: input.content },
+    payload: {
+      text: input.content,
+      ...(sanitizedMentions.length ? { mentions: sanitizedMentions } : {}),
+    },
     reactions: [],
     thread: thread ?? undefined,
   });

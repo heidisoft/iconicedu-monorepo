@@ -438,8 +438,8 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                     >
                       <div
                         className={cn(
-                          'ml-4 border-l-2 border-border/60 pl-5 space-y-1',
-                          isParentRightAligned ? 'md:ml-[50%] md:max-w-[50%]' : '',
+                          'ml-4 max-w-[680px] border-l-2 border-border/60 pl-5 space-y-1',
+                          isParentRightAligned ? 'md:ml-auto' : '',
                         )}
                       >
                         {loadingThreadsByParent[message.ids.id] && (

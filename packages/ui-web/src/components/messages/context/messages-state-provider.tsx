@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useMemo, useState } from 'react
 import type {
   ChannelVM,
   ConnectionVM,
+  MessageMentionVM,
   MessagesRightPanelIntent,
   MessagesRightPanelIntentKey,
   MessagesRightSidebarState,
@@ -28,7 +29,7 @@ interface MessagesStateContextValue {
   sessionSummaryCount: number;
   messages: MessageVM[];
   messageFilter: MessageFilterKey | null;
-  createTextMessage: (content: string) => TextMessageVM | null;
+  createTextMessage: (content: string, mentions?: MessageMentionVM[]) => TextMessageVM | null;
   sendTextMessage: SendTextMessageHandler;
   threadHandlers: ThreadActionHandlers;
   state: MessagesRightSidebarState;
@@ -44,7 +45,9 @@ interface MessagesStateContextValue {
   setHomeworkCount: (count: number) => void;
   setSessionSummaryCount: (count: number) => void;
   setMessages: (messages: MessageVM[]) => void;
-  setCreateTextMessage: (factory: (content: string) => TextMessageVM | null) => void;
+  setCreateTextMessage: (
+    factory: (content: string, mentions?: MessageMentionVM[]) => TextMessageVM | null,
+  ) => void;
   setSendTextMessage: (handler: SendTextMessageHandler) => void;
   setThreadHandlers: (handlers: ThreadActionHandlers) => void;
   toggleMessageFilter: (key: MessageFilterKey) => void;
@@ -69,6 +72,7 @@ type ThreadActionHandlers = {
 
 export type SendTextMessageHandler = (input: {
   content: string;
+  mentions?: MessageMentionVM[];
   threadId?: string | null;
   threadParentId?: string | null;
 }) => Promise<MessageVM | null>;
@@ -112,7 +116,7 @@ export function MessagesStateProvider({
   const [messages, setMessages] = useState<MessageVM[]>([]);
   const [messageFilter, setMessageFilter] = useState<MessageFilterKey | null>(null);
   const [createTextMessage, setCreateTextMessage] = useState<
-    (content: string) => TextMessageVM | null
+    (content: string, mentions?: MessageMentionVM[]) => TextMessageVM | null
   >(() => () => null);
   const [sendTextMessage, setSendTextMessage] = useState<SendTextMessageHandler>(
     async () => null,
@@ -196,7 +200,9 @@ export function MessagesStateProvider({
   );
 
   const setCreateTextMessageFactory = useCallback(
-    (factory: (content: string) => TextMessageVM | null) => {
+    (
+      factory: (content: string, mentions?: MessageMentionVM[]) => TextMessageVM | null,
+    ) => {
       setCreateTextMessage(() => factory);
     },
     [],

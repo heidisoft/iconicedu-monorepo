@@ -88,6 +88,27 @@ describe('message-list utils', () => {
     expect(result[0].social.thread?.ids.id).toBe('thread-1');
   });
 
+  it('hydrates a parent thread from a loaded reply when the parent is missing thread metadata', () => {
+    const parent = createMessage('parent-1', '2026-01-01T10:00:00.000Z');
+    const reply = createMessage('reply-1', '2026-01-01T10:05:00.000Z', {
+      social: {
+        reactions: [],
+        thread: {
+          ids: { id: 'thread-1', orgId: 'org-1' },
+          parent: { messageId: 'parent-1' },
+          stats: { messageCount: 2, lastReplyAt: '2026-01-01T10:05:00.000Z' },
+          participants: [],
+        },
+      },
+    });
+
+    const result = prependUniqueMessages([parent], [reply]);
+
+    expect(result.find((message) => message.ids.id === 'parent-1')?.social.thread?.ids.id).toBe(
+      'thread-1',
+    );
+  });
+
   it('removes a message by id', () => {
     const first = createMessage('a', '2026-01-01T10:00:00.000Z');
     const second = createMessage('b', '2026-01-01T11:00:00.000Z');

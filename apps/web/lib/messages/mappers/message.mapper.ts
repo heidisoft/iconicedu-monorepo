@@ -12,6 +12,7 @@ import type {
   ImageAttachmentVM,
   LessonAssignmentMessageVM,
   MessageCoreVM,
+  MessageMentionVM,
   MessageRow,
   MessageSocialVM,
   MessageStateVM,
@@ -137,7 +138,12 @@ export function mapMessageRowToVM(
       return {
         ...base,
         core: { ...core, type: 'text' },
-        content: { text: String(payload?.text ?? '') },
+        content: {
+          text: String(payload?.text ?? ''),
+          mentions: Array.isArray(payload?.mentions)
+            ? (payload.mentions as MessageMentionVM[])
+            : undefined,
+        },
       };
     case 'image':
       return {

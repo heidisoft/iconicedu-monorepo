@@ -35,15 +35,62 @@ function mergeMessage(current: MessageVM, updates: Partial<MessageVM>): MessageV
   } as MessageVM;
 }
 
+function hydrateParentThreads(messages: MessageVM[]): MessageVM[] {
+  if (!messages.length) {
+    return messages;
+  }
+
+  const parentThreadByMessageId = new Map<string, NonNullable<MessageVM['social']['thread']>>();
+
+  messages.forEach((message) => {
+    const thread = message.social.thread;
+    const parentId = thread?.parent?.messageId;
+    if (!thread || !parentId || parentId === message.ids.id) {
+      return;
+    }
+
+    if (!parentThreadByMessageId.has(parentId)) {
+      parentThreadByMessageId.set(parentId, thread);
+    }
+  });
+
+  if (!parentThreadByMessageId.size) {
+    return messages;
+  }
+
+  let changed = false;
+  const hydrated = messages.map((message) => {
+    if (message.social.thread) {
+      return message;
+    }
+
+    const inferredThread = parentThreadByMessageId.get(message.ids.id);
+    if (!inferredThread) {
+      return message;
+    }
+
+    changed = true;
+    return {
+      ...message,
+      social: {
+        ...message.social,
+        thread: inferredThread,
+      },
+    };
+  });
+
+  return changed ? hydrated : messages;
+}
+
 export function upsertMessage(messages: MessageVM[], incoming: MessageVM): MessageVM[] {
   const existingIndex = messages.findIndex((message) => message.ids.id === incoming.ids.id);
   if (existingIndex < 0) {
-    return [...messages, incoming].sort(compareMessagesByCreatedAt);
+    return hydrateParentThreads([...messages, incoming].sort(compareMessagesByCreatedAt));
   }
 
   const next = [...messages];
   next[existingIndex] = mergeMessage(next[existingIndex], incoming);
-  return next.sort(compareMessagesByCreatedAt);
+  return hydrateParentThreads(next.sort(compareMessagesByCreatedAt));
 }
 
 export function prependUniqueMessages(
@@ -60,7 +107,7 @@ export function prependUniqueMessages(
     }
     merged.push(message);
   });
-  return merged.sort(compareMessagesByCreatedAt);
+  return hydrateParentThreads(merged.sort(compareMessagesByCreatedAt));
 }
 
 export function updateMessageById(
@@ -74,7 +121,7 @@ export function updateMessageById(
   }
   const next = [...messages];
   next[existingIndex] = mergeMessage(next[existingIndex], updates);
-  return next;
+  return hydrateParentThreads(next);
 }
 
 export function removeMessageById(messages: MessageVM[], id: string): MessageVM[] {

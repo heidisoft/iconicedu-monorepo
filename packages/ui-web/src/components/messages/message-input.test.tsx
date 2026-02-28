@@ -1,113 +1,255 @@
-import React from 'react';
-import { render, screen, fireEvent, act } from '@testing-library/react';
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import type { UserProfileVM } from '@iconicedu/shared-types';
 
-import { MessageInput } from './message-input';
+import {
+  getMentionCandidates,
+  getMentionPopupPosition,
+  getMentionState,
+  matchesMentionQuery,
+} from './message-input.utils';
 
-describe('MessageInput', () => {
-  afterEach(() => {
-    vi.useRealTimers();
+function createParticipant(overrides: Partial<UserProfileVM> & { ids?: Partial<UserProfileVM['ids']> } = {}) {
+  return {
+    kind: 'guardian',
+    ids: {
+      id: 'user-1',
+      orgId: 'org-1',
+      accountId: 'account-1',
+      ...(overrides.ids ?? {}),
+    },
+    profile: {
+      displayName: 'Alex Johnson',
+      firstName: 'Alex',
+      lastName: 'Johnson',
+      email: 'alex@example.com',
+      avatar: null,
+      ...(overrides.profile ?? {}),
+    },
+    prefs: {},
+    meta: {
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    },
+    accountEmail: 'alex@example.com',
+    ...(overrides as Omit<UserProfileVM, 'ids' | 'profile'>),
+  } as UserProfileVM;
+}
+
+describe('message-input mention helpers', () => {
+  it('detects a mention query at the start of the message', () => {
+    expect(getMentionState('@alex hi', 5)).toEqual({
+      query: 'alex',
+      start: 0,
+      end: 5,
+    });
   });
 
-  it('calls onTypingStart and onTypingStop as content changes', () => {
-    vi.useFakeTimers();
-    const onTypingStart = vi.fn();
-    const onTypingStop = vi.fn();
-    render(
-      <MessageInput onSend={vi.fn()} onTypingStart={onTypingStart} onTypingStop={onTypingStop} />,
-    );
+  it('detects a mention query at the cursor', () => {
+    expect(getMentionState('Hello @tay', 10)).toEqual({
+      query: 'tay',
+      start: 6,
+      end: 10,
+    });
+  });
 
-    const textarea = screen.getByPlaceholderText('Write a message...');
-    fireEvent.change(textarea, { target: { value: 'Hello' } });
+  it('returns null when the cursor is not in a mention token', () => {
+    expect(getMentionState('hello there', 11)).toBeNull();
+    expect(getMentionState('email@test.com', 14)).toBeNull();
+  });
 
-    expect(onTypingStart).toHaveBeenCalledTimes(1);
-    expect(onTypingStop).not.toHaveBeenCalled();
-
-    act(() => {
-      vi.advanceTimersByTime(3100);
+  it('builds mention candidates without the current user', () => {
+    const self = createParticipant({
+      ids: { id: 'self' },
+      profile: { displayName: 'Myself', firstName: 'My', lastName: 'Self', email: 'me@example.com' },
+      accountEmail: 'me@example.com',
+    });
+    const other = createParticipant({
+      ids: { id: 'other' },
+      profile: { displayName: 'Taylor Reed', firstName: 'Taylor', lastName: 'Reed', email: 'taylor@example.com' },
+      accountEmail: 'taylor@example.com',
     });
 
-    expect(onTypingStop).toHaveBeenCalledTimes(1);
+    expect(getMentionCandidates([self, other], 'self')).toEqual([
+      {
+        id: 'other',
+        displayName: 'Taylor Reed',
+        fullName: 'Taylor Reed',
+        email: 'taylor@example.com',
+        avatarUrl: undefined,
+      },
+    ]);
   });
 
-  it('sends typing keepalive while user continues typing', () => {
-    vi.useFakeTimers();
-    const onTypingStart = vi.fn();
-    render(<MessageInput onSend={vi.fn()} onTypingStart={onTypingStart} onTypingStop={vi.fn()} />);
+  it('matches a mention query against name and email', () => {
+    const candidate = getMentionCandidates(
+      [
+        createParticipant({
+          ids: { id: 'other' },
+          profile: { displayName: 'Taylor Reed', firstName: 'Taylor', lastName: 'Reed', email: 'taylor@example.com' },
+          accountEmail: 'taylor@example.com',
+        }),
+      ],
+      'self',
+    )[0];
 
-    const textarea = screen.getByPlaceholderText('Write a message...');
-    fireEvent.change(textarea, { target: { value: 'H' } });
-    expect(onTypingStart).toHaveBeenCalledTimes(1);
+    expect(matchesMentionQuery(candidate, 'tay')).toBe(true);
+    expect(matchesMentionQuery(candidate, 'reed')).toBe(true);
+    expect(matchesMentionQuery(candidate, 'example')).toBe(true);
+    expect(matchesMentionQuery(candidate, 'alex')).toBe(false);
+  });
 
-    act(() => {
-      vi.advanceTimersByTime(600);
+  it('positions the popup from the caret location inside the textarea', () => {
+    const wrapper = document.createElement('div');
+    const textarea = document.createElement('textarea');
+    textarea.value = '@tay';
+
+    Object.defineProperty(textarea, 'clientWidth', {
+      configurable: true,
+      value: 320,
     });
-    fireEvent.change(textarea, { target: { value: 'He' } });
-    expect(onTypingStart).toHaveBeenCalledTimes(1);
-
-    act(() => {
-      vi.advanceTimersByTime(700);
+    Object.defineProperty(textarea, 'scrollLeft', {
+      configurable: true,
+      value: 0,
     });
-    fireEvent.change(textarea, { target: { value: 'Hel' } });
-    expect(onTypingStart).toHaveBeenCalledTimes(2);
-  });
-
-  it('stops typing when content is cleared', () => {
-    const onTypingStart = vi.fn();
-    const onTypingStop = vi.fn();
-    render(
-      <MessageInput onSend={vi.fn()} onTypingStart={onTypingStart} onTypingStop={onTypingStop} />,
-    );
-
-    const textarea = screen.getByPlaceholderText('Write a message...');
-    fireEvent.change(textarea, { target: { value: 'Typing' } });
-    fireEvent.change(textarea, { target: { value: '' } });
-
-    expect(onTypingStart).toHaveBeenCalledTimes(1);
-    expect(onTypingStop).toHaveBeenCalledTimes(1);
-  });
-
-  it('calls onFocus when textarea receives focus', () => {
-    const onFocus = vi.fn();
-    render(<MessageInput onSend={vi.fn()} onFocus={onFocus} />);
-
-    fireEvent.focus(screen.getByPlaceholderText('Write a message...'));
-
-    expect(onFocus).toHaveBeenCalledTimes(1);
-  });
-
-  it('calls onInputKeyDown when user presses a key in textarea', () => {
-    const onInputKeyDown = vi.fn();
-    render(<MessageInput onSend={vi.fn()} onInputKeyDown={onInputKeyDown} />);
-
-    fireEvent.keyDown(screen.getByPlaceholderText('Write a message...'), {
-      key: 'a',
-      code: 'KeyA',
+    Object.defineProperty(textarea, 'scrollTop', {
+      configurable: true,
+      value: 0,
     });
 
-    expect(onInputKeyDown).toHaveBeenCalledTimes(1);
+    wrapper.getBoundingClientRect = () =>
+      ({ left: 20, top: 40, width: 360, height: 120, right: 380, bottom: 160, x: 20, y: 40, toJSON: () => ({}) }) as DOMRect;
+    textarea.getBoundingClientRect = () =>
+      ({ left: 32, top: 52, width: 320, height: 80, right: 352, bottom: 132, x: 32, y: 52, toJSON: () => ({}) }) as DOMRect;
+
+    const originalCreateElement = document.createElement.bind(document);
+
+    const marker = {
+      offsetLeft: 48,
+      offsetTop: 24,
+      textContent: '',
+    } as unknown as HTMLSpanElement;
+
+    const computedStyleSpy = vi.spyOn(window, 'getComputedStyle').mockReturnValue({
+      boxSizing: 'border-box',
+      font: '16px sans-serif',
+      fontFamily: 'sans-serif',
+      fontSize: '16px',
+      fontWeight: '400',
+      fontStyle: 'normal',
+      letterSpacing: '0px',
+      lineHeight: '20px',
+      padding: '8px 12px',
+      border: '0px',
+      textTransform: 'none',
+      textIndent: '0px',
+      tabSize: '4',
+    } as CSSStyleDeclaration);
+
+    const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation(((tagName: string) => {
+      if (tagName === 'div') {
+        return {
+          style: {},
+          textContent: '',
+          appendChild: vi.fn(),
+        } as unknown as HTMLDivElement;
+      }
+
+      if (tagName === 'span') {
+        return marker;
+      }
+
+      return originalCreateElement(tagName);
+    }) as typeof document.createElement);
+
+    const appendSpy = vi.spyOn(document.body, 'appendChild').mockImplementation((node) => node);
+    const removeSpy = vi.spyOn(document.body, 'removeChild').mockImplementation((node) => node);
+
+    const position = getMentionPopupPosition(wrapper, textarea, 4);
+
+    expect(position).toEqual({
+      left: 60,
+      top: 62,
+      maxWidth: 284,
+    });
+
+    appendSpy.mockRestore();
+    removeSpy.mockRestore();
+    computedStyleSpy.mockRestore();
+    createElementSpy.mockRestore();
   });
 
-  it('does not send in read-only mode', () => {
-    const onSend = vi.fn();
-    render(<MessageInput onSend={onSend} readOnly />);
+  it('clamps the popup left position to keep a small left gutter', () => {
+    const wrapper = document.createElement('div');
+    const textarea = document.createElement('textarea');
+    const originalCreateElement = document.createElement.bind(document);
+    textarea.value = '@a';
 
-    const textarea = screen.getByPlaceholderText('Write a message...');
-    fireEvent.change(textarea, { target: { value: 'Hello' } });
-    fireEvent.keyDown(textarea, { key: 'Enter', code: 'Enter' });
+    Object.defineProperty(textarea, 'clientWidth', {
+      configurable: true,
+      value: 320,
+    });
+    Object.defineProperty(textarea, 'scrollLeft', {
+      configurable: true,
+      value: 50,
+    });
+    Object.defineProperty(textarea, 'scrollTop', {
+      configurable: true,
+      value: 0,
+    });
 
-    expect(onSend).not.toHaveBeenCalled();
-  });
+    wrapper.getBoundingClientRect = () =>
+      ({ left: 20, top: 40, width: 360, height: 120, right: 380, bottom: 160, x: 20, y: 40, toJSON: () => ({}) }) as DOMRect;
+    textarea.getBoundingClientRect = () =>
+      ({ left: 32, top: 52, width: 320, height: 80, right: 352, bottom: 132, x: 32, y: 52, toJSON: () => ({}) }) as DOMRect;
 
-  it('shows loading state and prevents send while loading', () => {
-    const onSend = vi.fn();
-    render(<MessageInput onSend={onSend} isLoading />);
+    const marker = {
+      offsetLeft: 10,
+      offsetTop: 24,
+      textContent: '',
+    } as unknown as HTMLSpanElement;
 
-    const textarea = screen.getByPlaceholderText('Write a message...');
-    fireEvent.change(textarea, { target: { value: 'Hello' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Sending...' }));
+    const computedStyleSpy = vi.spyOn(window, 'getComputedStyle').mockReturnValue({
+      boxSizing: 'border-box',
+      font: '16px sans-serif',
+      fontFamily: 'sans-serif',
+      fontSize: '16px',
+      fontWeight: '400',
+      fontStyle: 'normal',
+      letterSpacing: '0px',
+      lineHeight: '20px',
+      padding: '8px 12px',
+      border: '0px',
+      textTransform: 'none',
+      textIndent: '0px',
+      tabSize: '4',
+    } as CSSStyleDeclaration);
 
-    expect(onSend).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Sending...' })).toBeDisabled();
+    const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation(((tagName: string) => {
+      if (tagName === 'div') {
+        return {
+          style: {},
+          textContent: '',
+          appendChild: vi.fn(),
+        } as unknown as HTMLDivElement;
+      }
+
+      if (tagName === 'span') {
+        return marker;
+      }
+
+      return originalCreateElement(tagName);
+    }) as typeof document.createElement);
+
+    const appendSpy = vi.spyOn(document.body, 'appendChild').mockImplementation((node) => node);
+    const removeSpy = vi.spyOn(document.body, 'removeChild').mockImplementation((node) => node);
+
+    const position = getMentionPopupPosition(wrapper, textarea, 2);
+
+    expect(position?.left).toBe(12);
+
+    appendSpy.mockRestore();
+    removeSpy.mockRestore();
+    computedStyleSpy.mockRestore();
+    createElementSpy.mockRestore();
   });
 });

@@ -57,35 +57,32 @@ function makeStyles(C: AppColors, bottomInset: number) {
     pill: {
       flex: 1,
       flexDirection: 'row',
-      alignItems: 'flex-end',
+      alignItems: 'center',
       backgroundColor: C.inputBg,
-      borderRadius: 22,
+      borderRadius: 20,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: C.border,
-      paddingLeft: 16,
+      paddingLeft: 14,
       paddingRight: 6,
-      paddingVertical: 8,
-      minHeight: 40,
+      paddingVertical: 6,
     },
     input: {
       flex: 1,
       fontSize: 15,
       color: C.text,
       lineHeight: 20,
-      maxHeight: 120,
       paddingVertical: 0,
     },
 
     // Smiley inside pill — right side
     emojiBtn: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
+      width: 28,
+      height: 28,
+      borderRadius: 14,
       alignItems: 'center',
       justifyContent: 'center',
-      marginLeft: 4,
     },
-    emojiTxt: { fontSize: 20 },
+    emojiTxt: { fontSize: 18 },
 
     // Send button — right of pill (only shown when text present)
     sendBtn: {
@@ -113,6 +110,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 }) => {
   const [text, setText] = useState('');
   const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
+  const [inputHeight, setInputHeight] = useState(20);
+  const MAX_INPUT_HEIGHT = 120;
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
@@ -122,6 +121,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     const trimmed = text.trim();
     if (!trimmed) return;
     setText('');
+    setInputHeight(20);
     await onSend(trimmed);
   }, [text, onSend]);
 
@@ -131,6 +131,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       if (t.length > 0) onTypingChange?.();
     },
     [onTypingChange],
+  );
+
+  const handleContentSizeChange = useCallback(
+    (e: { nativeEvent: { contentSize: { height: number } } }) => {
+      setInputHeight(e.nativeEvent.contentSize.height);
+    },
+    [],
   );
 
   const handleEmojiSelect = useCallback((emoji: string) => {
@@ -157,12 +164,17 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         <View style={s.pill}>
           <TextInput
             ref={inputRef}
-            style={s.input}
+            style={[
+              s.input,
+              inputHeight > MAX_INPUT_HEIGHT ? { height: MAX_INPUT_HEIGHT } : undefined,
+            ]}
             value={text}
             onChangeText={handleChangeText}
+            onContentSizeChange={handleContentSizeChange}
             placeholder={placeholder ?? 'Type your message'}
             placeholderTextColor={colors.textFaint}
             multiline
+            scrollEnabled={inputHeight > MAX_INPUT_HEIGHT}
             editable={!disabled}
             accessibilityLabel="Message input"
           />

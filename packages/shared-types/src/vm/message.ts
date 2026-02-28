@@ -95,7 +95,7 @@ export interface ThreadPanelPropsVM {
   parentMessage?: MessageVM;
 
   actions: {
-    onSendReply: (content: string) => void;
+    onSendReply: (content: string, mentions?: MessageMentionVM[]) => void;
     onProfileClick: (userId: UUID) => void;
     onToggleReaction?: (messageId: UUID, emoji: string) => void;
     onToggleSaved?: (messageId: UUID) => void;
@@ -144,6 +144,13 @@ export interface MessageStateVM {
   isHidden?: boolean;
 }
 
+export interface MessageMentionVM {
+  profileId: UUID;
+  displayName: string;
+  start: number;
+  end: number;
+}
+
 export interface MessageSocialVM {
   reactions: ReactionVM[];
   thread?: ThreadVM;
@@ -158,7 +165,7 @@ interface BaseMessageVM {
 
 export interface TextMessageVM extends BaseMessageVM {
   core: MessageCoreVM & { type: 'text' };
-  content: { text: string };
+  content: { text: string; mentions?: MessageMentionVM[] };
 }
 
 export interface ImageMessageVM extends BaseMessageVM {

@@ -40,5 +40,24 @@ describe('mapMessageRowToVM', () => {
 
     expect(message.social.thread?.ids.id).toBe('thread-1');
   });
-});
 
+  it('maps structured mentions from text payload', () => {
+    const message = mapMessageRowToVM(row as never, {
+      sender: sender as never,
+      payload: {
+        text: 'Hello @Taylor Reed',
+        mentions: [
+          { profileId: 'profile-2', displayName: 'Taylor Reed', start: 6, end: 18 },
+        ],
+      },
+    });
+
+    expect(message.core.type).toBe('text');
+    if (message.core.type !== 'text') {
+      throw new Error('Expected text message');
+    }
+    expect(message.content.mentions).toEqual([
+      { profileId: 'profile-2', displayName: 'Taylor Reed', start: 6, end: 18 },
+    ]);
+  });
+});
