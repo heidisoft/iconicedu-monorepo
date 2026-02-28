@@ -233,10 +233,41 @@ async function loadPayloadsByMessageIds(
         } catch {
           signedUrl = '';
         }
+        const signedAttachments = Array.isArray(payload.attachments)
+          ? await Promise.all(
+              payload.attachments.map(async (attachment) => {
+                if (
+                  !attachment ||
+                  typeof attachment !== 'object' ||
+                  typeof attachment.url !== 'string'
+                ) {
+                  return attachment;
+                }
+                let signedAttachmentUrl = '';
+                try {
+                  signedAttachmentUrl = await createSignedChannelFileUrl(
+                    supabase,
+                    attachment.url,
+                  );
+                } catch {
+                  signedAttachmentUrl = '';
+                }
+                return {
+                  ...attachment,
+                  storagePath:
+                    typeof attachment.storagePath === 'string'
+                      ? attachment.storagePath
+                      : attachment.url,
+                  url: signedAttachmentUrl,
+                };
+              }),
+            )
+          : undefined;
         payloadMap.set(row.id, {
           ...payload,
           storagePath: typeof payload.storagePath === 'string' ? payload.storagePath : payload.url,
           url: signedUrl,
+          ...(signedAttachments ? { attachments: signedAttachments } : {}),
         });
       }),
   );

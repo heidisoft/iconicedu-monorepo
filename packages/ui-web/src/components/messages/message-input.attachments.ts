@@ -29,6 +29,15 @@ export function getDroppedAttachmentFiles(dataTransfer: DataTransfer | null | un
   });
 }
 
+export function splitComposerAttachmentsByKind<
+  T extends { kind: ComposerAttachmentKind }
+>(attachments: T[]) {
+  return {
+    images: attachments.filter((attachment) => attachment.kind === 'image'),
+    others: attachments.filter((attachment) => attachment.kind !== 'image'),
+  };
+}
+
 export function formatComposerAttachmentSize(bytes?: number): string {
   if (!bytes) return '';
   const units = ['B', 'KB', 'MB', 'GB'];

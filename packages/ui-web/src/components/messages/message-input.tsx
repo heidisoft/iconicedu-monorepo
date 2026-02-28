@@ -50,6 +50,7 @@ import {
   getDroppedAttachmentFiles,
   getRecordingElapsedMs,
   getComposerAttachmentKind,
+  splitComposerAttachmentsByKind,
   getSupportedAudioRecordingMimeType,
   MESSAGE_INPUT_FILE_ACCEPT,
   MESSAGE_INPUT_IMAGE_ACCEPT,
@@ -178,6 +179,10 @@ export function MessageInput({
   const isRecordingAudio = recordingSession?.status === 'recording';
   const isRecordingPaused = recordingSession?.status === 'paused';
   const hasActiveRecording = recordingSession !== null;
+  const pendingAttachmentPreviewGroups = React.useMemo(
+    () => splitComposerAttachmentsByKind(pendingAttachments),
+    [pendingAttachments],
+  );
 
   const stopRecordingStream = React.useCallback(() => {
     mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -914,8 +919,62 @@ export function MessageInput({
               <div className="mb-2 text-xs font-medium text-muted-foreground">
                 {pendingAttachments.length} attachment{pendingAttachments.length === 1 ? '' : 's'} ready to send
               </div>
-              <div className="space-y-2">
-                {pendingAttachments.map((pendingAttachment) => (
+              <div className="space-y-3">
+                {pendingAttachmentPreviewGroups.images.length > 0 ? (
+                  <div
+                    className={cn(
+                      'grid gap-2',
+                      pendingAttachmentPreviewGroups.images.length === 1
+                        ? 'grid-cols-1 max-w-[220px]'
+                        : 'grid-cols-2',
+                    )}
+                  >
+                    {pendingAttachmentPreviewGroups.images.map((pendingAttachment) => (
+                      <div
+                        key={pendingAttachment.id}
+                        className="group relative overflow-hidden rounded-xl border border-border bg-muted/30"
+                      >
+                        {pendingAttachment.previewUrl ? (
+                          <img
+                            src={pendingAttachment.previewUrl}
+                            alt={pendingAttachment.file.name}
+                            className={cn(
+                              'w-full object-cover',
+                              pendingAttachmentPreviewGroups.images.length === 1
+                                ? 'max-h-[220px]'
+                                : 'h-32',
+                            )}
+                          />
+                        ) : (
+                          <div className="flex h-32 items-center justify-center bg-primary/5 text-primary">
+                            <ImageIcon className="h-5 w-5" />
+                          </div>
+                        )}
+                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-background/90 via-background/55 to-transparent px-3 pb-2 pt-6">
+                          <div className="truncate text-sm font-medium text-foreground">
+                            {pendingAttachment.file.name}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {pendingAttachment.file.size
+                              ? formatComposerAttachmentSize(pendingAttachment.file.size)
+                              : 'Image ready to send'}
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="icon-xs"
+                          className="absolute right-2 top-2"
+                          aria-label={`Remove ${pendingAttachment.file.name}`}
+                          onClick={() => removePendingAttachment(pendingAttachment.id)}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                {pendingAttachmentPreviewGroups.others.map((pendingAttachment) => (
                   <div
                     key={pendingAttachment.id}
                     className="flex items-start gap-3 rounded-xl border border-border bg-muted/30 p-3"
@@ -943,9 +1002,7 @@ export function MessageInput({
                         {pendingAttachment.file.name}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {pendingAttachment.kind === 'image'
-                          ? 'Image ready to send'
-                          : pendingAttachment.kind === 'audio'
+                        {pendingAttachment.kind === 'audio'
                             ? 'Voice message ready to send'
                             : 'File ready to send'}
                         {pendingAttachment.durationSeconds

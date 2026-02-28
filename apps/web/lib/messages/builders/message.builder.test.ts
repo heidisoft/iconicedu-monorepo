@@ -173,4 +173,60 @@ describe('buildMessageById', () => {
       }),
     );
   });
+
+  it('signs grouped image attachment urls before mapping', async () => {
+    const row = {
+      id: 'message-gallery',
+      org_id: 'org-1',
+      sender_profile_id: 'profile-1',
+      type: 'image',
+      created_at: new Date().toISOString(),
+    };
+    getMessageById.mockResolvedValueOnce({ data: row });
+    getMessageImagesByMessageIds.mockResolvedValueOnce({
+      data: [
+        {
+          message_id: 'message-gallery',
+          payload: {
+            url: 'org-1/channel-1/profile-1/image-1.png',
+            name: 'image-1.png',
+            attachments: [
+              {
+                url: 'org-1/channel-1/profile-1/image-1.png',
+                storagePath: 'org-1/channel-1/profile-1/image-1.png',
+                name: 'image-1.png',
+              },
+              {
+                url: 'org-1/channel-1/profile-1/image-2.png',
+                storagePath: 'org-1/channel-1/profile-1/image-2.png',
+                name: 'image-2.png',
+              },
+            ],
+          },
+        },
+      ],
+    });
+    buildUserProfileById.mockResolvedValueOnce({ ids: { id: 'profile-1', orgId: 'org-1' } });
+    mapMessageRowToVM.mockReturnValueOnce({ ids: { id: 'message-gallery', orgId: 'org-1' } });
+
+    await buildMessageById({} as any, 'org-1', 'message-gallery');
+
+    expect(mapMessageRowToVM).toHaveBeenCalledWith(
+      row,
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          attachments: [
+            expect.objectContaining({
+              url: 'signed:org-1/channel-1/profile-1/image-1.png',
+              storagePath: 'org-1/channel-1/profile-1/image-1.png',
+            }),
+            expect.objectContaining({
+              url: 'signed:org-1/channel-1/profile-1/image-2.png',
+              storagePath: 'org-1/channel-1/profile-1/image-2.png',
+            }),
+          ],
+        }),
+      }),
+    );
+  });
 });

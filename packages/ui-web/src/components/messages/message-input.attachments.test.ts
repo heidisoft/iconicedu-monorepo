@@ -11,6 +11,7 @@ import {
   MESSAGE_INPUT_FILE_ACCEPT,
   MESSAGE_INPUT_IMAGE_ACCEPT,
   resolveAudioDurationSeconds,
+  splitComposerAttachmentsByKind,
 } from './message-input.attachments';
 
 describe('message-input attachment helpers', () => {
@@ -42,6 +43,26 @@ describe('message-input attachment helpers', () => {
       } as unknown as DataTransfer),
     ).toEqual([]);
     expect(getDroppedAttachmentFiles(null)).toEqual([]);
+  });
+
+  it('splits image previews from other pending attachments', () => {
+    expect(
+      splitComposerAttachmentsByKind([
+        { kind: 'image', id: 'image-1' },
+        { kind: 'file', id: 'file-1' },
+        { kind: 'audio', id: 'audio-1' },
+        { kind: 'image', id: 'image-2' },
+      ]),
+    ).toEqual({
+      images: [
+        { kind: 'image', id: 'image-1' },
+        { kind: 'image', id: 'image-2' },
+      ],
+      others: [
+        { kind: 'file', id: 'file-1' },
+        { kind: 'audio', id: 'audio-1' },
+      ],
+    });
   });
 
   it('formats attachment sizes into readable units', () => {
