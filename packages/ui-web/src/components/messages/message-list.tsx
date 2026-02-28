@@ -43,6 +43,7 @@ import {
   buildThreadRepliesByParent,
   getInlineReplyPreview,
 } from '@iconicedu/ui-web/components/messages/message-list.inline-thread.utils';
+import { shouldHideMessageQuickActions } from '@iconicedu/ui-web/components/messages/message-action-visibility.utils';
 
 interface MessageListProps {
   messages: MessageVM[];
@@ -454,6 +455,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                               reply.core.sender.profile,
                             );
                             const isOwnReply = currentUserId === reply.core.sender.ids.id;
+                            const shouldHideQuickActions = shouldHideMessageQuickActions(reply);
                             return (
                               <div
                                 key={reply.ids.id}
@@ -569,32 +571,34 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                         }
                                       />
                                     </div>
-                                    {isReadOnly ? (
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        disabled
-                                        className="h-7 w-7 rounded-full border border-border bg-background/60 text-muted-foreground"
-                                        aria-label="Add emoji"
-                                      >
-                                        <SmilePlus className="h-4 w-4" />
-                                      </Button>
-                                    ) : (
-                                      <EmojiPicker
-                                        onEmojiSelect={(emoji) =>
-                                          onToggleReaction?.(reply.ids.id, emoji)
-                                        }
-                                      >
+                                    {!shouldHideQuickActions ? (
+                                      isReadOnly ? (
                                         <Button
                                           variant="ghost"
                                           size="icon"
-                                          className="h-7 w-7 rounded-full border border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                          disabled
+                                          className="h-7 w-7 rounded-full border border-border bg-background/60 text-muted-foreground"
                                           aria-label="Add emoji"
                                         >
                                           <SmilePlus className="h-4 w-4" />
                                         </Button>
-                                      </EmojiPicker>
-                                    )}
+                                      ) : (
+                                        <EmojiPicker
+                                          onEmojiSelect={(emoji) =>
+                                            onToggleReaction?.(reply.ids.id, emoji)
+                                          }
+                                        >
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-7 w-7 rounded-full border border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                            aria-label="Add emoji"
+                                          >
+                                            <SmilePlus className="h-4 w-4" />
+                                          </Button>
+                                        </EmojiPicker>
+                                      )
+                                    ) : null}
                                   </div>
                                 </div>
                               </div>

@@ -27,6 +27,7 @@ describe('ThreadIndicator', () => {
 
     expect(screen.getByText('New')).toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument();
+    expect(screen.getByRole('button')).toHaveClass('h-7', 'self-center', 'px-2');
   });
 
   it('does not show NEW indicator when there are no unread replies', () => {

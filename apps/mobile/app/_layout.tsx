@@ -22,7 +22,7 @@ const styles = StyleSheet.create({
 
 // StatusBar must be inside AppProviders to access ThemeContext.
 function RootContent() {
-  const { isDark } = useTheme();
+  const { isDark, colors } = useTheme();
   const { loading } = useAuth();
 
   // Block only while auth reads the session from SecureStore (local, <100 ms).
@@ -33,7 +33,7 @@ function RootContent() {
 
   return (
     <>
-      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <StatusBar style={isDark ? 'light' : 'dark'} backgroundColor={colors.bg} />
       <Slot />
     </>
   );

@@ -23,10 +23,10 @@ export const ThreadIndicator = memo(function ThreadIndicator({
       variant="ghost"
       size="sm"
       onClick={onClick}
-      className="mt-1 h-7 w-fit gap-2 rounded-full border border-border bg-background/60 px-3 text-primary hover:bg-muted hover:text-primary"
+      className="h-7 min-h-7 w-fit self-center gap-1.5 rounded-full border border-border bg-background/60 px-2 text-primary hover:bg-muted hover:text-primary"
     >
       <MessageCircleMore className="h-4 w-4" />
-      <span className="text-[13px] font-semibold tracking-tight leading-none">
+      <span className="text-[12px] font-semibold tracking-tight leading-none">
         {thread.stats.messageCount}{' '}
       </span>
       <span className="text-[12px] font-semibold leading-none">
@@ -52,7 +52,7 @@ export const ThreadIndicator = memo(function ThreadIndicator({
               avatar={participant.profile.avatar}
               themeKey={participant.ui?.themeKey}
               showStatus={false}
-              sizeClassName="h-6 w-6 border-2 border-background"
+              sizeClassName="h-5 w-5 border-2 border-background"
               fallbackClassName="text-[11px]"
               initialsLength={1}
             />

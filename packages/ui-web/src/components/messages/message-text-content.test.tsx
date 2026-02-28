@@ -19,6 +19,8 @@ describe('MessageTextContent', () => {
     const mention = screen.getByText('@Taylor Reed');
     expect(mention.tagName).toBe('SPAN');
     expect(mention.className).toContain('bg-sky-100');
+    expect(mention.className).toContain('dark:bg-sky-500/20');
+    expect(mention.className).toContain('dark:text-sky-100');
     expect(container.textContent).toBe('Hello @Taylor Reed there');
   });
 });

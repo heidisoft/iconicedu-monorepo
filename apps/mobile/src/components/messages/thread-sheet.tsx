@@ -29,6 +29,7 @@ type ThreadSheetProps = {
    * threadId = the threads table row id (ThreadVM.ids.id) — set when the thread exists
    */
   onSend: (text: string, threadParentId: string, threadId?: string) => Promise<void>;
+  onReactionToggle?: (messageId: string, emoji: string) => void;
 };
 
 function makeStyles(C: AppColors) {
@@ -79,6 +80,7 @@ export const ThreadSheet: React.FC<ThreadSheetProps> = ({
   currentAccountId,
   onClose,
   onSend,
+  onReactionToggle,
 }) => {
   const { colors } = useTheme();
   const s = React.useMemo(() => makeStyles(colors), [colors]);
@@ -151,13 +153,16 @@ export const ThreadSheet: React.FC<ThreadSheetProps> = ({
               </TouchableOpacity>
             </View>
 
-            {/* Parent message (non-interactive preview) */}
+            {/* Parent message */}
             <View style={s.parentSection}>
               <MessageItem
                 message={parentMessage}
                 isOwn={parentMessage.core.sender.ids.id === currentProfileId}
                 isGroupStart
                 colors={colors}
+                onReactionToggle={onReactionToggle}
+                currentProfileId={currentProfileId}
+                currentAccountId={currentAccountId}
               />
             </View>
 
@@ -187,6 +192,9 @@ export const ThreadSheet: React.FC<ThreadSheetProps> = ({
                     isOwn={item.core.sender.ids.id === currentProfileId}
                     isGroupStart
                     colors={colors}
+                    onReactionToggle={onReactionToggle}
+                    currentProfileId={currentProfileId}
+                    currentAccountId={currentAccountId}
                   />
                 )}
                 contentContainerStyle={{ paddingVertical: 8 }}

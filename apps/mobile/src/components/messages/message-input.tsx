@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,17 +9,76 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
+import type { MessageVM } from '@iconicedu/shared-types';
 import { EmojiPicker } from './emoji-picker';
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function getMessagePreviewText(message: MessageVM): string {
+  const text = (message as { content?: { text?: string } }).content?.text;
+  if (text) return text;
+  const type = message.core?.type;
+  if (type === 'image') return '🖼 Image';
+  if (type === 'audio-recording') return '🎵 Voice message';
+  if (type === 'file') return '📎 File';
+  return 'Message';
+}
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type MessageInputProps = {
   onSend: (text: string) => void | Promise<void>;
   placeholder?: string;
   disabled?: boolean;
   onTypingChange?: () => void;
+  /** Called when typing stops (input cleared or message sent). */
+  onTypingStop?: () => void;
+  /** When set, shows a reply-in-thread preview banner above the input bar. */
+  replyTo?: MessageVM | null;
+  /** Called when the user dismisses the reply preview with ✕. */
+  onCancelReply?: () => void;
 };
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
 function makeStyles(C: AppColors, bottomInset: number) {
   return StyleSheet.create({
+    // Reply-in-thread preview banner (sits above the bar)
+    replyPreview: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      backgroundColor: C.bg,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: C.border,
+      gap: 10,
+    },
+    replyAccent: {
+      width: 3,
+      borderRadius: 2,
+      alignSelf: 'stretch',
+      minHeight: 28,
+      backgroundColor: C.teal,
+    },
+    replyInfo: { flex: 1 },
+    replySender: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: C.teal,
+      marginBottom: 1,
+    },
+    replyText: {
+      fontSize: 12,
+      color: C.textMuted,
+    },
+    replyClose: {
+      fontSize: 16,
+      color: C.textMuted,
+      paddingHorizontal: 4,
+    },
+
+    // Main input bar
     bar: {
       flexDirection: 'row',
       alignItems: 'flex-end',
@@ -102,11 +161,16 @@ function makeStyles(C: AppColors, bottomInset: number) {
   });
 }
 
+// ─── Component ────────────────────────────────────────────────────────────────
+
 export const MessageInput: React.FC<MessageInputProps> = ({
   onSend,
   placeholder,
   disabled = false,
   onTypingChange,
+  onTypingStop,
+  replyTo,
+  onCancelReply,
 }) => {
   const [text, setText] = useState('');
   const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
@@ -117,20 +181,32 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const inputRef = useRef<TextInput>(null);
   const s = React.useMemo(() => makeStyles(colors, insets.bottom), [colors, insets.bottom]);
 
+  // Auto-focus the input whenever a reply target is set
+  useEffect(() => {
+    if (replyTo) {
+      inputRef.current?.focus();
+    }
+  }, [replyTo]);
+
   const handleSend = useCallback(async () => {
     const trimmed = text.trim();
     if (!trimmed) return;
     setText('');
     setInputHeight(20);
+    onTypingStop?.();
     await onSend(trimmed);
-  }, [text, onSend]);
+  }, [text, onSend, onTypingStop]);
 
   const handleChangeText = useCallback(
     (t: string) => {
       setText(t);
-      if (t.length > 0) onTypingChange?.();
+      if (t.length > 0) {
+        onTypingChange?.();
+      } else {
+        onTypingStop?.();
+      }
     },
-    [onTypingChange],
+    [onTypingChange, onTypingStop],
   );
 
   const handleContentSizeChange = useCallback(
@@ -149,6 +225,28 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
   return (
     <>
+      {/* Reply-in-thread preview banner */}
+      {replyTo && (
+        <View style={s.replyPreview}>
+          <View style={s.replyAccent} />
+          <View style={s.replyInfo}>
+            <Text style={s.replySender} numberOfLines={1}>
+              {replyTo.core.sender.profile.displayName}
+            </Text>
+            <Text style={s.replyText} numberOfLines={1}>
+              {getMessagePreviewText(replyTo)}
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={onCancelReply}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityLabel="Cancel reply"
+          >
+            <Text style={s.replyClose}>✕</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <View style={s.bar}>
         {/* + Attachment button */}
         <TouchableOpacity

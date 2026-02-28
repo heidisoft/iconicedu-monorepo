@@ -11,6 +11,12 @@ interface EmojiPickerProps {
   children: React.ReactNode;
 }
 
+export const EMOJI_PICKER_POPOVER_PROPS = {
+  align: 'center' as const,
+  side: 'bottom' as const,
+  sideOffset: 10,
+};
+
 const emojiCategories = {
   smileys: {
     label: '😊',
@@ -170,10 +176,9 @@ export const EmojiPicker = memo(function EmojiPicker({
       <PopoverTrigger asChild>{children}</PopoverTrigger>
       <PopoverContent
         className="w-[320px] p-0"
-        align="end"
-        alignOffset={-65}
-        side="bottom"
-        sideOffset={10}
+        align={EMOJI_PICKER_POPOVER_PROPS.align}
+        side={EMOJI_PICKER_POPOVER_PROPS.side}
+        sideOffset={EMOJI_PICKER_POPOVER_PROPS.sideOffset}
         style={{ zIndex: 9999 }}
       >
         <Tabs

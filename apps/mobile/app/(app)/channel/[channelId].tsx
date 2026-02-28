@@ -5,7 +5,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { MessageVM } from '@iconicedu/shared-types';
 import { useAccount } from '@/hooks/use-account';
 import { useMessages } from '@/hooks/use-messages';
-import { useTyping } from '@/hooks/use-typing';
 import { sendTextMessage, deleteMessage } from '@/lib/api/queries';
 import { useTheme } from '@/providers/theme-provider';
 import { MessageList } from '@/components/messages/message-list';
@@ -13,7 +12,6 @@ import { MessageInput } from '@/components/messages/message-input';
 import { TypingIndicator } from '@/components/messages/typing-indicator';
 import { ConversationHeader } from '@/components/messages/conversation-header';
 import { MessageActionsSheet } from '@/components/messages/message-actions-sheet';
-import { ThreadSheet } from '@/components/messages/thread-sheet';
 import { ChannelInfoSheet } from '@/components/messages/channel-info-sheet';
 
 export default function ChannelConversationScreen() {
@@ -45,13 +43,10 @@ export default function ChannelConversationScreen() {
     refetch,
     loadMore,
     toggleReaction,
-  } = useMessages(channelId ?? '', profileId, accountId);
-
-  const { typingUsers, broadcastTyping } = useTyping(
-    channelId ?? '',
-    senderName,
-    profileId,
-  );
+    typingUsers,
+    broadcastTyping,
+    broadcastTypingStop,
+  } = useMessages(channelId ?? '', profileId, accountId, senderName, orgId);
 
   // ── Info sheet state ──
   const [infoVisible, setInfoVisible] = useState(false);
@@ -65,22 +60,36 @@ export default function ChannelConversationScreen() {
     setActionsVisible(true);
   }, []);
 
-  // ── Thread sheet state ──
-  const [threadMessage, setThreadMessage] = useState<MessageVM | null>(null);
-  const [threadVisible, setThreadVisible] = useState(false);
+  // ── Thread reply target — drives the reply preview above the input ──
+  const [threadReplyTarget, setThreadReplyTarget] = useState<MessageVM | null>(null);
 
   const handleThreadOpen = useCallback((msg: MessageVM) => {
-    setThreadMessage(msg);
-    setThreadVisible(true);
+    setThreadReplyTarget(msg);
   }, []);
 
   // ── Send message ──
+  // When a thread reply target is active, route the message into that thread.
   const handleSend = useCallback(
-    async (text: string, threadParentId?: string, threadId?: string) => {
+    async (text: string) => {
       if (!channelId || !profileId || !orgId) return;
-      await sendTextMessage(channelId, profileId, orgId, text, threadParentId, threadId);
+      if (threadReplyTarget) {
+        const threadId = threadReplyTarget.social?.thread?.ids.id;
+        await sendTextMessage(
+          channelId,
+          profileId,
+          orgId,
+          text,
+          threadReplyTarget.ids.id,
+          threadId,
+        );
+        setThreadReplyTarget(null);
+        // Refresh so the parent message's thread stats (reply count) update
+        void refetch();
+      } else {
+        await sendTextMessage(channelId, profileId, orgId, text);
+      }
     },
-    [channelId, profileId, orgId],
+    [channelId, profileId, orgId, threadReplyTarget, refetch],
   );
 
   // ── Delete message ──
@@ -132,6 +141,9 @@ export default function ChannelConversationScreen() {
           onSend={handleSend}
           placeholder={`Message #${topic ?? ''}…`}
           onTypingChange={broadcastTyping}
+          onTypingStop={broadcastTypingStop}
+          replyTo={threadReplyTarget}
+          onCancelReply={() => setThreadReplyTarget(null)}
         />
       </KeyboardAvoidingView>
 
@@ -154,16 +166,6 @@ export default function ChannelConversationScreen() {
         onReact={handleReactionToggle}
         onThread={handleThreadOpen}
         onDelete={handleDelete}
-      />
-
-      {/* Thread sheet */}
-      <ThreadSheet
-        visible={threadVisible}
-        parentMessage={threadMessage}
-        currentProfileId={profileId}
-        currentAccountId={accountId}
-        onClose={() => setThreadVisible(false)}
-        onSend={handleSend}
       />
     </SafeAreaView>
   );

@@ -5,7 +5,7 @@ import React, {
   useEffect,
   useMemo,
 } from 'react';
-import { useColorScheme } from 'react-native';
+import { useColorScheme, Appearance } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { lightColors, darkColors, type AppColors, type ThemeMode } from '@/lib/theme';
 
@@ -28,7 +28,12 @@ const ThemeContext = createContext<ThemeContextType>({
 });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const systemScheme = useColorScheme() ?? 'light';
+  // useColorScheme() returns null on Android before the first render on some
+  // OS versions — fall back to Appearance.getColorScheme() which reads the
+  // Android UiMode directly and is always non-null.
+  const rnScheme = useColorScheme();
+  const systemScheme: 'light' | 'dark' =
+    (rnScheme ?? Appearance.getColorScheme() ?? 'light') as 'light' | 'dark';
   const [mode, setModeState] = useState<ThemeMode>('system');
   const [loaded, setLoaded] = useState(false);
 

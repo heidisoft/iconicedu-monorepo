@@ -138,7 +138,7 @@ export function mapChannelRowToVM(
             parsedUiDefaults?.themeKey ??
             null,
           defaultRightPanelOpen:
-            parsedUiDefaults?.defaultRightPanelOpen ?? (isLearningSpace ? true : undefined),
+            parsedUiDefaults?.defaultRightPanelOpen,
           defaultRightPanelKey:
             parsedUiDefaults?.defaultRightPanelKey ?? (isLearningSpace ? 'channel_info' : undefined),
         }

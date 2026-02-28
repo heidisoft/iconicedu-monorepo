@@ -16,6 +16,7 @@ import { ReactionBar } from '@iconicedu/ui-web/components/messages/shared/reacti
 import { ThreadIndicator } from '@iconicedu/ui-web/components/messages/shared/thread-indicator';
 import { VisibilityBadge } from '@iconicedu/ui-web/components/messages/shared/visibility-badge';
 import { HiddenMessagePlaceholder } from '@iconicedu/ui-web/components/messages/shared/hidden-message-placeholder';
+import { shouldHideMessageQuickActions } from '@iconicedu/ui-web/components/messages/message-action-visibility.utils';
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { EmojiPicker } from '@iconicedu/ui-web/components/messages/emoji-picker';
@@ -82,6 +83,7 @@ export const MessageBase = memo(function MessageBase({
   const isOwnMessage = currentUserId === message.core.sender.ids.id;
   const senderLabel = isOwnMessage ? 'You' : senderName;
   const isInteractionDisabled = Boolean(isReadOnly);
+  const shouldHideQuickActions = shouldHideMessageQuickActions(message);
 
   const handleProfileClick = useCallback(() => {
     onProfileClick(message.core.sender.ids.id);
@@ -394,48 +396,52 @@ export const MessageBase = memo(function MessageBase({
               />
             </div>
 
-            {isInteractionDisabled ? (
-              <Button
-                variant="ghost"
-                size="icon"
-                disabled
-                className="h-7 w-7 rounded-full border border-border bg-background/60 text-muted-foreground"
-                aria-label="Add emoji"
-              >
-                <SmilePlus className="h-4 w-4" />
-              </Button>
-            ) : (
-              <EmojiPicker onEmojiSelect={handleToggleReaction}>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 rounded-full border border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground"
-                  aria-label="Add emoji"
-                >
-                  <SmilePlus className="h-4 w-4" />
-                </Button>
-              </EmojiPicker>
-            )}
+            {!shouldHideQuickActions ? (
+              <>
+                {isInteractionDisabled ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    disabled
+                    className="h-7 w-7 rounded-full border border-border bg-background/60 text-muted-foreground"
+                    aria-label="Add emoji"
+                  >
+                    <SmilePlus className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <EmojiPicker onEmojiSelect={handleToggleReaction}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 rounded-full border border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                      aria-label="Add emoji"
+                    >
+                      <SmilePlus className="h-4 w-4" />
+                    </Button>
+                  </EmojiPicker>
+                )}
 
-            {!isThreadReply ? (
-              message.social.thread ? (
-                <ThreadIndicator
-                  thread={message.social.thread}
-                  onClick={handleThreadClick}
-                  unreadCount={message.social.thread.readState?.unreadCount}
-                />
-              ) : (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleThreadClick}
-                  disabled={isInteractionDisabled}
-                  className="h-7 w-7 rounded-full border border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground"
-                  aria-label="Reply"
-                >
-                  <MessageCircleReply className="h-4 w-4" />
-                </Button>
-              )
+                {!isThreadReply ? (
+                  message.social.thread ? (
+                    <ThreadIndicator
+                      thread={message.social.thread}
+                      onClick={handleThreadClick}
+                      unreadCount={message.social.thread.readState?.unreadCount}
+                    />
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleThreadClick}
+                      disabled={isInteractionDisabled}
+                      className="h-7 w-7 rounded-full border border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                      aria-label="Reply"
+                    >
+                      <MessageCircleReply className="h-4 w-4" />
+                    </Button>
+                  )
+                ) : null}
+              </>
             ) : null}
           </div>
         </div>

@@ -365,126 +365,128 @@ export function MessageInput({
           : 'w-full border-t border-border bg-card/95 backdrop-blur p-4'
       }
     >
-      <div
-        ref={wrapperRef}
-        className="relative rounded-xl border border-input bg-background focus-within:ring-1 focus-within:ring-ring"
-      >
-        <Textarea
-          ref={textareaRef}
-          rows={1}
-          value={content}
-          readOnly={readOnly}
-          onChange={(e) => {
-            const nextValue = e.target.value;
-            setContent(nextValue);
-            handleTyping(nextValue);
-            syncMentionState(nextValue, e.target.selectionStart);
-          }}
-          onClick={(e) => syncMentionState(e.currentTarget.value, e.currentTarget.selectionStart)}
-          onKeyUp={(e) => syncMentionState(e.currentTarget.value, e.currentTarget.selectionStart)}
-          onSelect={(e) => syncMentionState(e.currentTarget.value, e.currentTarget.selectionStart)}
-          onKeyDown={handleKeyDown}
-          onFocus={onFocus}
-          placeholder={placeholder}
-          className="min-h-[80px] max-h-[120px] resize-none border-0 bg-transparent px-3 py-2 text-base sm:text-sm focus-visible:ring-0 focus-visible:ring-offset-0 overflow-x-hidden placeholder:whitespace-nowrap placeholder:text-ellipsis"
-        />
-        {isMentionListOpen ? (
-          <div
-            role="listbox"
-            aria-label="Mention suggestions"
-            className="absolute z-20 max-h-56 w-max min-w-56 overflow-y-auto rounded-2xl border border-border bg-popover p-1 shadow-xl"
-            style={{
-              left: mentionPopupPosition?.left ?? 28,
-              top: mentionPopupPosition?.top ?? 12,
-              maxWidth: mentionPopupPosition?.maxWidth ?? undefined,
+      <div className="mx-auto w-full max-w-[960px]">
+        <div
+          ref={wrapperRef}
+          className="relative rounded-xl border border-input bg-background focus-within:ring-1 focus-within:ring-ring"
+        >
+          <Textarea
+            ref={textareaRef}
+            rows={1}
+            value={content}
+            readOnly={readOnly}
+            onChange={(e) => {
+              const nextValue = e.target.value;
+              setContent(nextValue);
+              handleTyping(nextValue);
+              syncMentionState(nextValue, e.target.selectionStart);
             }}
-          >
-            {filteredMentionCandidates.map((candidate, index) => {
-              const isActive = index === activeMentionIndex;
-              return (
-                <button
-                  key={candidate.id}
-                  type="button"
-                  role="option"
-                  aria-selected={isActive}
-                  className={cn(
-                    'flex min-w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition-colors',
-                    isActive ? 'bg-muted text-foreground' : 'text-foreground hover:bg-muted',
-                  )}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    handleMentionSelect(candidate);
-                  }}
-                  onMouseEnter={() => setActiveMentionIndex(index)}
-                >
-                  <Avatar size="sm">
-                    <AvatarImage src={candidate.avatarUrl} alt={candidate.displayName} />
-                    <AvatarFallback>
-                      {candidate.displayName.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate font-medium">{candidate.displayName}</div>
-                    {candidate.email ? (
-                      <div className="truncate text-xs text-muted-foreground">
-                        {candidate.email}
-                      </div>
-                    ) : null}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        ) : null}
-        <div className="flex items-center justify-between border-t border-border px-2 py-1.5">
-          <TooltipProvider>
-            <div className="flex items-center gap-0.5">
-              {formatButtons.map((btn) => (
-                <FormatButton key={btn.label} icon={btn.icon} label={btn.label} />
-              ))}
-              <div className="mx-1 h-4 w-px bg-border" />
-              <FormatButton
-                icon={AtSign}
-                label="Mention someone"
-                onClick={() => {
-                  if (readOnly || isLoading) return;
-                  insertAtCursor('@');
-                }}
-              />
-              <EmojiPicker onEmojiSelect={handleEmojiSelect}>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                >
-                  <Smile className="h-4 w-4" />
-                </Button>
-              </EmojiPicker>
-              <FormatButton icon={ImageIcon} label="Attach image" />
-              <FormatButton icon={Paperclip} label="Attach file" />
-              <FormatButton icon={Mic} label="Record audio" />
+            onClick={(e) => syncMentionState(e.currentTarget.value, e.currentTarget.selectionStart)}
+            onKeyUp={(e) => syncMentionState(e.currentTarget.value, e.currentTarget.selectionStart)}
+            onSelect={(e) => syncMentionState(e.currentTarget.value, e.currentTarget.selectionStart)}
+            onKeyDown={handleKeyDown}
+            onFocus={onFocus}
+            placeholder={placeholder}
+            className="min-h-[80px] max-h-[120px] resize-none border-0 bg-transparent px-3 py-2 text-base sm:text-sm focus-visible:ring-0 focus-visible:ring-offset-0 overflow-x-hidden placeholder:whitespace-nowrap placeholder:text-ellipsis"
+          />
+          {isMentionListOpen ? (
+            <div
+              role="listbox"
+              aria-label="Mention suggestions"
+              className="absolute z-20 max-h-56 w-max min-w-56 overflow-y-auto rounded-2xl border border-border bg-popover p-1 shadow-xl"
+              style={{
+                left: mentionPopupPosition?.left ?? 28,
+                top: mentionPopupPosition?.top ?? 12,
+                maxWidth: mentionPopupPosition?.maxWidth ?? undefined,
+              }}
+            >
+              {filteredMentionCandidates.map((candidate, index) => {
+                const isActive = index === activeMentionIndex;
+                return (
+                  <button
+                    key={candidate.id}
+                    type="button"
+                    role="option"
+                    aria-selected={isActive}
+                    className={cn(
+                      'flex min-w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition-colors',
+                      isActive ? 'bg-muted text-foreground' : 'text-foreground hover:bg-muted',
+                    )}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      handleMentionSelect(candidate);
+                    }}
+                    onMouseEnter={() => setActiveMentionIndex(index)}
+                  >
+                    <Avatar size="sm">
+                      <AvatarImage src={candidate.avatarUrl} alt={candidate.displayName} />
+                      <AvatarFallback>
+                        {candidate.displayName.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-medium">{candidate.displayName}</div>
+                      {candidate.email ? (
+                        <div className="truncate text-xs text-muted-foreground">
+                          {candidate.email}
+                        </div>
+                      ) : null}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
-          </TooltipProvider>
-          <Button
-            type="button"
-            size="sm"
-            onClick={handleSend}
-            disabled={readOnly || isLoading || !content.trim()}
-            className="h-8 gap-1.5"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Sending...
-              </>
-            ) : (
-              <>
-                <Send className="h-3.5 w-3.5" />
-                Send
-              </>
-            )}
-          </Button>
+          ) : null}
+          <div className="flex items-center justify-between border-t border-border px-2 py-1.5">
+            <TooltipProvider>
+              <div className="flex items-center gap-0.5">
+                {formatButtons.map((btn) => (
+                  <FormatButton key={btn.label} icon={btn.icon} label={btn.label} />
+                ))}
+                <div className="mx-1 h-4 w-px bg-border" />
+                <FormatButton
+                  icon={AtSign}
+                  label="Mention someone"
+                  onClick={() => {
+                    if (readOnly || isLoading) return;
+                    insertAtCursor('@');
+                  }}
+                />
+                <EmojiPicker onEmojiSelect={handleEmojiSelect}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                  >
+                    <Smile className="h-4 w-4" />
+                  </Button>
+                </EmojiPicker>
+                <FormatButton icon={ImageIcon} label="Attach image" />
+                <FormatButton icon={Paperclip} label="Attach file" />
+                <FormatButton icon={Mic} label="Record audio" />
+              </div>
+            </TooltipProvider>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleSend}
+              disabled={readOnly || isLoading || !content.trim()}
+              className="h-8 gap-1.5"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Send className="h-3.5 w-3.5" />
+                  Send
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

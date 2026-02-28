@@ -284,12 +284,6 @@ describe('sendTextMessageAction', () => {
     });
 
     const participantUpsert = vi.fn().mockResolvedValue({ error: null });
-    const channelMembersSelectChain: any = {};
-    channelMembersSelectChain.eq = vi.fn(() => channelMembersSelectChain);
-    channelMembersSelectChain.is = vi.fn(async () => ({
-      data: [{ profile_id: 'profile-parent' }, { profile_id: 'profile-2' }],
-      error: null,
-    }));
 
     supabase.from.mockImplementation((table: string) => {
       if (table === 'messages') {
@@ -310,9 +304,6 @@ describe('sendTextMessageAction', () => {
       }
       if (table === 'thread_participants') {
         return { upsert: participantUpsert };
-      }
-      if (table === 'channel_members') {
-        return { select: () => channelMembersSelectChain };
       }
       return {};
     });
@@ -336,9 +327,12 @@ describe('sendTextMessageAction', () => {
       expect.arrayContaining([
         expect.objectContaining({ profile_id: 'profile-parent' }),
         expect.objectContaining({ profile_id: 'profile-1' }),
-        expect.objectContaining({ profile_id: 'profile-2' }),
       ]),
       { onConflict: 'org_id,thread_id,profile_id' },
+    );
+    const createdThreadParticipants = participantUpsert.mock.calls[0]?.[0] ?? [];
+    expect(createdThreadParticipants).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ profile_id: 'profile-2' })]),
     );
     expect(result).toEqual({ ids: { id: 'message-2', orgId: 'org-1' } });
   });
@@ -402,12 +396,6 @@ describe('sendTextMessageAction', () => {
       }),
     });
     const participantUpsert = vi.fn().mockResolvedValue({ error: null });
-    const channelMembersSelectChain: any = {};
-    channelMembersSelectChain.eq = vi.fn(() => channelMembersSelectChain);
-    channelMembersSelectChain.is = vi.fn(async () => ({
-      data: [{ profile_id: 'profile-parent' }, { profile_id: 'profile-3' }],
-      error: null,
-    }));
 
     supabase.from.mockImplementation((table: string) => {
       if (table === 'messages') {
@@ -428,9 +416,6 @@ describe('sendTextMessageAction', () => {
       }
       if (table === 'thread_participants') {
         return { upsert: participantUpsert };
-      }
-      if (table === 'channel_members') {
-        return { select: () => channelMembersSelectChain };
       }
       return {};
     });
@@ -455,9 +440,12 @@ describe('sendTextMessageAction', () => {
       expect.arrayContaining([
         expect.objectContaining({ profile_id: 'profile-parent' }),
         expect.objectContaining({ profile_id: 'profile-1' }),
-        expect.objectContaining({ profile_id: 'profile-3' }),
       ]),
       { onConflict: 'org_id,thread_id,profile_id' },
+    );
+    const placeholderThreadParticipants = participantUpsert.mock.calls[0]?.[0] ?? [];
+    expect(placeholderThreadParticipants).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ profile_id: 'profile-3' })]),
     );
     expect(messageInsert).toHaveBeenCalledWith(
       expect.objectContaining({ thread_id: 'thread-2', thread_parent_id: 'parent-2' }),

@@ -27,7 +27,7 @@ export const MessageTextContent = memo(function MessageTextContent({
         return (
           <span
             key={`mention-${segment.mention.profileId}-${segment.mention.start}`}
-            className="mx-[1px] inline-flex items-center rounded-md bg-sky-100 px-1.5 py-0.5 font-medium text-sky-800 ring-1 ring-sky-200/80"
+            className="mx-[1px] inline-flex items-center rounded-md bg-sky-100 px-1.5 py-0.5 font-medium text-sky-900 ring-1 ring-sky-300/80 dark:bg-sky-500/20 dark:text-sky-100 dark:ring-sky-400/30"
           >
             @{segment.mention.displayName}
           </span>

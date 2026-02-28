@@ -34,6 +34,7 @@ import {
   SmilePlus,
 } from 'lucide-react';
 import { EmojiPicker } from '@iconicedu/ui-web/components/messages/emoji-picker';
+import { shouldHideMessageQuickActions } from '@iconicedu/ui-web/components/messages/message-action-visibility.utils';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
 import type { MessageVM, ThreadVM } from '@iconicedu/shared-types';
@@ -127,49 +128,54 @@ export const MessageActions = memo(function MessageActions({
   }, []);
 
   const isOwnMessage = currentUserId === message.core.sender.ids.id;
+  const shouldHideQuickActions = shouldHideMessageQuickActions(message);
 
   return (
     <div className={cn("absolute right-2 top-0 z-10 flex items-center gap-1 rounded-xl border bg-card px-1 py-1 shadow-md", className)}>
-      {!isThreadReply && (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                onClick={handleThreadClick}
-                aria-label={message.social.thread ? 'Reply in thread' : 'Start a thread'}
-              >
-                <MessageCircle className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>{message.social.thread ? 'Reply in thread' : 'Start a thread'}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      )}
+      {!shouldHideQuickActions ? (
+        <>
+          {!isThreadReply && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={handleThreadClick}
+                    aria-label={message.social.thread ? 'Reply in thread' : 'Start a thread'}
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{message.social.thread ? 'Reply in thread' : 'Start a thread'}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
 
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <EmojiPicker onEmojiSelect={handleEmojiSelect}>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                aria-label="Add reaction"
-              >
-                <SmilePlus className="h-4 w-4" />
-              </Button>
-            </EmojiPicker>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Add reaction</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <EmojiPicker onEmojiSelect={handleEmojiSelect}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    aria-label="Add reaction"
+                  >
+                    <SmilePlus className="h-4 w-4" />
+                  </Button>
+                </EmojiPicker>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Add reaction</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </>
+      ) : null}
 
       <TooltipProvider>
         <Tooltip>

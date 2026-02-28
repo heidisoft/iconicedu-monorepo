@@ -18,6 +18,7 @@ import type {
 } from '@iconicedu/shared-types';
 import type { AppColors } from '@/lib/theme';
 import { fetchThreadMessages } from '@/lib/api/queries';
+import { EmojiPicker } from './emoji-picker';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -99,6 +100,16 @@ function senderColor(name: string): string {
 
 type S = ReturnType<typeof makeStyles>;
 
+// ─── Emoji-only detection (mirrors web shouldHideMessageQuickActions) ─────────
+
+const EMOJI_ONLY_RE =
+  /(?:\p{Regional_Indicator}{2}|[#*0-9]\uFE0F?\u20E3|(?:\p{Extended_Pictographic}|\p{Emoji_Presentation})(?:\uFE0F|\uFE0E)?(?:\p{Emoji_Modifier})?(?:\u200D(?:\p{Extended_Pictographic}|\p{Emoji_Presentation})(?:\uFE0F|\uFE0E)?(?:\p{Emoji_Modifier})?)*)/gu;
+
+function isEmojiOnlyText(text: string): boolean {
+  const trimmed = text.trim();
+  return trimmed.length > 0 && trimmed.replace(EMOJI_ONLY_RE, '').replace(/\s+/g, '').length === 0;
+}
+
 // ─── Social bar: reactions + thread pill in one row ──────────────────────────
 
 type SocialBarProps = {
@@ -109,40 +120,98 @@ type SocialBarProps = {
   onReactionToggle?: (messageId: string, emoji: string) => void;
   onThreadPress?: () => void;
   threadExpanded?: boolean;
+  hideActions?: boolean;
 };
 
-function SocialBar({ reactions, thread, messageId, colors, onReactionToggle, onThreadPress, threadExpanded }: SocialBarProps) {
+function SocialBar({ reactions, thread, messageId, colors, onReactionToggle, onThreadPress, threadExpanded, hideActions }: SocialBarProps) {
+  const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
   const hasThread = !!thread && thread.stats.messageCount > 0;
-  if (!reactions.length && !hasThread) return null;
+
+  const actionBtnStyle = {
+    width: 30, height: 30, borderRadius: 15,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  };
 
   return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4, alignItems: 'center' }}>
-      {/* Reaction pills */}
-      {reactions.map((r) => (
-        <TouchableOpacity
-          key={r.emoji}
-          onPress={() => onReactionToggle?.(messageId, r.emoji)}
-          activeOpacity={0.75}
-          style={{
-            flexDirection: 'row', alignItems: 'center', gap: 4,
-            backgroundColor: r.reactedByMe ? colors.tealBg : colors.pageBg,
-            borderWidth: 1,
-            borderColor: r.reactedByMe ? colors.teal : colors.border,
-            borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5,
-          }}
-        >
-          <Text style={{ fontSize: 14 }}>{r.emoji}</Text>
-          <Text style={{ fontSize: 12, color: r.reactedByMe ? colors.teal : colors.text, fontWeight: '600' }}>
-            {r.count}
-          </Text>
-        </TouchableOpacity>
-      ))}
+    <>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4, alignItems: 'center' }}>
+        {/* Existing reaction pills */}
+        {reactions.map((r) => (
+          <TouchableOpacity
+            key={r.emoji}
+            onPress={() => onReactionToggle?.(messageId, r.emoji)}
+            activeOpacity={0.75}
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 4,
+              backgroundColor: r.reactedByMe ? colors.tealBg : colors.pageBg,
+              borderWidth: 1,
+              borderColor: r.reactedByMe ? colors.teal : colors.border,
+              borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5,
+            }}
+          >
+            <Text style={{ fontSize: 14 }}>{r.emoji}</Text>
+            <Text style={{ fontSize: 12, color: r.reactedByMe ? colors.teal : colors.text, fontWeight: '600' }}>
+              {r.count}
+            </Text>
+          </TouchableOpacity>
+        ))}
 
-      {/* Thread pill */}
-      {hasThread && (
-        <ThreadPill thread={thread!} colors={colors} onPress={onThreadPress ?? (() => {})} expanded={threadExpanded} />
-      )}
-    </View>
+        {!hideActions && (
+          <>
+            {/* Emoji reaction add button */}
+            <TouchableOpacity
+              onPress={() => setEmojiPickerVisible(true)}
+              activeOpacity={0.7}
+              style={actionBtnStyle}
+              accessibilityLabel="Add emoji reaction"
+            >
+              <View>
+                <Text style={{ fontSize: 14, lineHeight: 18, includeFontPadding: false }}>🙂</Text>
+                <View style={{
+                  position: 'absolute', top: -4, right: -5,
+                  width: 11, height: 11, borderRadius: 6,
+                  backgroundColor: colors.teal,
+                  alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Text style={{ color: colors.tealFg, fontSize: 8, fontWeight: '900', lineHeight: 11, includeFontPadding: false }}>+</Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+
+            {/* Thread pill if exists, reply button if not */}
+            {hasThread ? (
+              <ThreadPill thread={thread!} colors={colors} onPress={onThreadPress ?? (() => {})} expanded={threadExpanded} />
+            ) : (
+              <TouchableOpacity
+                onPress={onThreadPress}
+                activeOpacity={0.7}
+                style={actionBtnStyle}
+                accessibilityLabel="Reply in thread"
+              >
+                <Text style={{ fontSize: 15, color: colors.textMuted, lineHeight: 18, includeFontPadding: false }}>↩</Text>
+              </TouchableOpacity>
+            )}
+          </>
+        )}
+
+        {/* Thread pill always visible when thread exists (even on emoji-only) */}
+        {hideActions && hasThread && (
+          <ThreadPill thread={thread!} colors={colors} onPress={onThreadPress ?? (() => {})} expanded={threadExpanded} />
+        )}
+      </View>
+
+      <EmojiPicker
+        visible={emojiPickerVisible}
+        onClose={() => setEmojiPickerVisible(false)}
+        onEmojiSelect={(emoji) => {
+          onReactionToggle?.(messageId, emoji);
+        }}
+      />
+    </>
   );
 }
 
@@ -607,12 +676,18 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   const reactions = message.social?.reactions ?? [];
   const thread = message.social?.thread ?? null;
   const isCard = CARD_TYPES.has(type);
+  const msgText = (message as { content?: { text?: string } }).content?.text ?? null;
+  const hideActions = msgText !== null && isEmojiOnlyText(msgText);
 
   const handleThreadPress = useCallback(async () => {
-    if (!thread) return;
+    if (!thread) {
+      onThreadOpen?.(message);
+      return;
+    }
     const next = !threadExpanded;
     setThreadExpanded(next);
-    if (next && threadReplies.length === 0) {
+    if (next) {
+      // Always re-fetch on expand so new replies appear immediately
       setThreadLoading(true);
       try {
         const replies = await fetchThreadMessages(
@@ -628,7 +703,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         setThreadLoading(false);
       }
     }
-  }, [thread, threadExpanded, threadReplies.length, message.ids.id, currentProfileId, currentAccountId]);
+  }, [thread, threadExpanded, message, onThreadOpen, currentProfileId, currentAccountId]);
 
   // session-complete: full-width centred divider, no bubble
   if (type === 'session-complete') {
@@ -743,6 +818,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             onReactionToggle={onReactionToggle}
             onThreadPress={handleThreadPress}
             threadExpanded={threadExpanded}
+            hideActions={hideActions}
           />
           {threadExpanded && (
             <View style={[s.inlineThread, isOwn && s.inlineThreadOwn]}>
@@ -803,6 +879,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           onReactionToggle={onReactionToggle}
           onThreadPress={handleThreadPress}
           threadExpanded={threadExpanded}
+          hideActions={hideActions}
         />
 
         {/* Inline thread replies */}
