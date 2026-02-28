@@ -22,7 +22,13 @@ import {
 } from '@iconicedu/ui-web/components/messages/tabs/messages-container-tab-hash';
 import { Tabs, TabsList, TabsTrigger } from '../../ui/tabs';
 import { ScrollArea } from '../../ui/scroll-area';
-import { createChannelFileItems } from './messages-container-files.utils';
+import { Button } from '../../ui/button';
+import {
+  createChannelFileItems,
+  formatChannelFileUploadedDate,
+  getChannelFileVisualKind,
+  getChannelFileVisualTone,
+} from './messages-container-files.utils';
 import type {
   AudioRecordingMessageVM,
   ChannelFileItemVM,
@@ -42,7 +48,17 @@ import type {
   UUID,
   UserProfileVM,
 } from '@iconicedu/shared-types';
-import { FileText, Loader2 } from 'lucide-react';
+import {
+  Download,
+  FileArchive,
+  FileAudio,
+  FileImage,
+  FileSpreadsheet,
+  FileText,
+  FileType2,
+  Loader2,
+  Presentation,
+} from 'lucide-react';
 
 function getMessageInputPlaceholder(
   channel: ChannelVM,
@@ -100,6 +116,30 @@ function formatFileSize(size?: number | null): string {
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
   if (size < 1024 * 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
   return `${(size / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
+function getFilesTabIcon(item: ChannelFileItemVM) {
+  const kind = getChannelFileVisualKind(item);
+
+  switch (kind) {
+    case 'image':
+      return FileImage;
+    case 'audio':
+      return FileAudio;
+    case 'pdf':
+    case 'text':
+      return FileText;
+    case 'document':
+      return FileType2;
+    case 'spreadsheet':
+      return FileSpreadsheet;
+    case 'presentation':
+      return Presentation;
+    case 'archive':
+      return FileArchive;
+    default:
+      return FileText;
+  }
 }
 
 export function MessagesContainer({
@@ -1366,32 +1406,57 @@ export function MessagesContainer({
             ) : null}
             {!isLoadingFiles && !filesLoadError
               ? filesForDisplay.map((item) => (
-                  <a
-                    key={item.ids.id}
-                    href={buildFileDownloadHref({
+                  (() => {
+                    const href = buildFileDownloadHref({
                       url: item.url,
                       storagePath: item.storagePath,
-                    })}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-muted/40"
-                  >
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                      <FileText className="h-4 w-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-foreground">
-                        {item.name}
-                      </p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {item.kind === 'design-file'
-                          ? item.tool ?? 'Design file'
-                          : item.mimeType ?? 'File'}
-                        {' • '}
-                        {formatFileSize(item.size)}
-                      </p>
-                    </div>
-                  </a>
+                    });
+                    const visualKind = getChannelFileVisualKind(item);
+                    const FileIcon = getFilesTabIcon(item);
+                    const iconTone = getChannelFileVisualTone(visualKind);
+
+                    return (
+                      <div
+                        key={item.ids.id}
+                        className="flex items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-muted/40"
+                      >
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex min-w-0 flex-1 items-center gap-3"
+                        >
+                          <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${iconTone}`}>
+                            <FileIcon className="h-4 w-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-foreground">
+                              {item.name}
+                            </p>
+                            <p className="truncate text-xs text-muted-foreground">
+                              {item.kind === 'design-file'
+                                ? item.tool ?? 'Design file'
+                                : item.mimeType ?? 'File'}
+                              {' • '}
+                              {formatFileSize(item.size)}
+                              {' • '}
+                              Uploaded {formatChannelFileUploadedDate(item.createdAt)}
+                            </p>
+                          </div>
+                        </a>
+                        <Button asChild variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
+                          <a
+                            href={href}
+                            target="_blank"
+                            rel="noreferrer"
+                            aria-label={`Download ${item.name}`}
+                          >
+                            <Download className="h-4 w-4" />
+                          </a>
+                        </Button>
+                      </div>
+                    );
+                  })()
                 ))
               : null}
           </div>

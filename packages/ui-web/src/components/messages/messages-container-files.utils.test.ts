@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { createChannelFileItem, createChannelFileItems } from './messages-container-files.utils';
+import {
+  createChannelFileItem,
+  createChannelFileItems,
+  formatChannelFileUploadedDate,
+  getChannelFileVisualKind,
+  getChannelFileVisualTone,
+} from './messages-container-files.utils';
 
 describe('createChannelFileItem', () => {
   it('maps an image message into a files-tab item', () => {
@@ -94,5 +100,37 @@ describe('createChannelFileItem', () => {
 
     expect(items).toHaveLength(2);
     expect(items.map((item) => item.name)).toEqual(['brief.pdf', 'notes.pdf']);
+  });
+
+  it('derives a visual kind from mime type and file extension', () => {
+    expect(getChannelFileVisualKind({ name: 'brief.pdf', mimeType: 'application/pdf' })).toBe(
+      'pdf',
+    );
+    expect(
+      getChannelFileVisualKind({
+        name: 'worksheet.xlsx',
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      }),
+    ).toBe('spreadsheet');
+    expect(getChannelFileVisualKind({ name: 'voice.webm', mimeType: 'audio/webm' })).toBe(
+      'audio',
+    );
+    expect(getChannelFileVisualKind({ name: 'archive.zip', mimeType: 'application/zip' })).toBe(
+      'archive',
+    );
+    expect(getChannelFileVisualKind({ name: 'unknown.bin', mimeType: 'application/octet-stream' })).toBe(
+      'generic',
+    );
+  });
+
+  it('returns a stable visual tone for file kinds', () => {
+    expect(getChannelFileVisualTone('pdf')).toContain('rose');
+    expect(getChannelFileVisualTone('spreadsheet')).toContain('lime');
+    expect(getChannelFileVisualTone('audio')).toContain('orange');
+    expect(getChannelFileVisualTone('generic')).toContain('text-muted-foreground');
+  });
+
+  it('formats the uploaded date for files-tab metadata', () => {
+    expect(formatChannelFileUploadedDate('2026-02-24T10:00:00.000Z')).toBe('Feb 24, 2026');
   });
 });
