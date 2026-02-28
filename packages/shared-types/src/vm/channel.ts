@@ -99,6 +99,7 @@ export interface ChannelFileItemVM {
   kind: ChannelFileKind;
 
   url: string;
+  storagePath?: string;
   name: string;
 
   mimeType?: string | null;

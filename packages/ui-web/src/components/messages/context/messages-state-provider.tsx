@@ -31,6 +31,7 @@ interface MessagesStateContextValue {
   messageFilter: MessageFilterKey | null;
   createTextMessage: (content: string, mentions?: MessageMentionVM[]) => TextMessageVM | null;
   sendTextMessage: SendTextMessageHandler;
+  sendFileMessage: SendFileMessageHandler;
   threadHandlers: ThreadActionHandlers;
   state: MessagesRightSidebarState;
   open: (intent: MessagesRightPanelIntent) => void;
@@ -49,6 +50,7 @@ interface MessagesStateContextValue {
     factory: (content: string, mentions?: MessageMentionVM[]) => TextMessageVM | null,
   ) => void;
   setSendTextMessage: (handler: SendTextMessageHandler) => void;
+  setSendFileMessage: (handler: SendFileMessageHandler) => void;
   setThreadHandlers: (handlers: ThreadActionHandlers) => void;
   toggleMessageFilter: (key: MessageFilterKey) => void;
   appendThreadMessage: (threadId: UUID, message: MessageVM) => void;
@@ -73,6 +75,14 @@ type ThreadActionHandlers = {
 export type SendTextMessageHandler = (input: {
   content: string;
   mentions?: MessageMentionVM[];
+  threadId?: string | null;
+  threadParentId?: string | null;
+}) => Promise<MessageVM | null>;
+
+export type SendFileMessageHandler = (input: {
+  file: File;
+  content?: string;
+  durationSeconds?: number;
   threadId?: string | null;
   threadParentId?: string | null;
 }) => Promise<MessageVM | null>;
@@ -119,6 +129,9 @@ export function MessagesStateProvider({
     (content: string, mentions?: MessageMentionVM[]) => TextMessageVM | null
   >(() => () => null);
   const [sendTextMessage, setSendTextMessage] = useState<SendTextMessageHandler>(
+    async () => null,
+  );
+  const [sendFileMessage, setSendFileMessage] = useState<SendFileMessageHandler>(
     async () => null,
   );
   const [threadHandlers, setThreadHandlers] = useState<ThreadActionHandlers>({});
@@ -212,6 +225,10 @@ export function MessagesStateProvider({
     setSendTextMessage(() => handler);
   }, []);
 
+  const setSendFileMessageFactory = useCallback((handler: SendFileMessageHandler) => {
+    setSendFileMessage(() => handler);
+  }, []);
+
   const setThreadHandlersFactory = useCallback((handlers: ThreadActionHandlers) => {
     setThreadHandlers(handlers);
   }, []);
@@ -228,6 +245,7 @@ export function MessagesStateProvider({
       messageFilter,
       createTextMessage,
       sendTextMessage,
+      sendFileMessage,
       threadHandlers,
       state,
       open,
@@ -241,6 +259,7 @@ export function MessagesStateProvider({
       setMessages,
       setCreateTextMessage: setCreateTextMessageFactory,
       setSendTextMessage: setSendTextMessageFactory,
+      setSendFileMessage: setSendFileMessageFactory,
       setThreadHandlers: setThreadHandlersFactory,
       toggleMessageFilter,
       appendThreadMessage,
@@ -260,6 +279,7 @@ export function MessagesStateProvider({
       messageFilter,
       createTextMessage,
       sendTextMessage,
+      sendFileMessage,
       threadHandlers,
       state,
       open,
@@ -273,6 +293,7 @@ export function MessagesStateProvider({
       setMessages,
       setCreateTextMessageFactory,
       setSendTextMessageFactory,
+      setSendFileMessageFactory,
       setThreadHandlersFactory,
       toggleMessageFilter,
       appendThreadMessage,

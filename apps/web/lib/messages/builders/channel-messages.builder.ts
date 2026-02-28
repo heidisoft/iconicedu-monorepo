@@ -15,6 +15,7 @@ import {
   mapChannelMediaRow,
 } from '@iconicedu/web/lib/messages/mappers/message.mapper';
 import { buildMessagesByChannelId } from '@iconicedu/web/lib/messages/builders/message.builder';
+import { createSignedChannelFileUrl } from '@iconicedu/web/lib/messages/queries/file-url.query';
 
 export async function buildChannelMessages(
   supabase: SupabaseClient,
@@ -42,6 +43,51 @@ export async function buildChannelFiles(
   orgId: string,
   channelId: string,
 ): Promise<ChannelFileItemVM[]> {
-  const response = await getChannelFilesByChannelIds(supabase, orgId, [channelId]);
-  return (response.data ?? []).map(mapChannelFileRow);
+  const [fileResponse, mediaResponse] = await Promise.all([
+    getChannelFilesByChannelIds(supabase, orgId, [channelId]),
+    getChannelMediaByChannelIds(supabase, orgId, [channelId]),
+  ]);
+
+  const files = await Promise.all(
+    (fileResponse.data ?? []).map(async (row) => {
+      let signedUrl = '';
+      try {
+        signedUrl = await createSignedChannelFileUrl(supabase, row.url);
+      } catch {
+        signedUrl = '';
+      }
+      return mapChannelFileRow(
+        {
+          ...row,
+        },
+        { resolvedUrl: signedUrl },
+      );
+    }),
+  );
+
+  const mediaFiles = await Promise.all(
+    (mediaResponse.data ?? []).map(async (row) => {
+      let signedUrl = '';
+      try {
+        signedUrl = await createSignedChannelFileUrl(supabase, row.url);
+      } catch {
+        signedUrl = '';
+      }
+      return {
+        ids: { id: row.id, orgId: row.org_id, channelId: row.channel_id },
+        messageId: row.message_id ?? undefined,
+        senderId: row.sender_profile_id ?? undefined,
+        kind: 'file' as const,
+        url: signedUrl,
+        storagePath: row.url,
+        name: row.name ?? 'Image',
+        mimeType: 'image/*',
+        createdAt: row.created_at,
+      };
+    }),
+  );
+
+  return [...files, ...mediaFiles].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
 }

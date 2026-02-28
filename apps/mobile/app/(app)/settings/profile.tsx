@@ -7,38 +7,13 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Path, Circle } from 'react-native-svg';
+import { ChevronLeft, User, CreditCard } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { SettingsRow } from '@iconicedu/ui-native';
 import { useAuth } from '@/providers/auth-provider';
 import { useProfile } from '@/hooks/use-profile';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
-
-function ChevronLeftIcon({ color }: { color: string }) {
-  return (
-    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-      <Path d="M15 18L9 12L15 6" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
-}
-function UserIcon({ color }: { color: string }) {
-  return (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-      <Circle cx={12} cy={8} r={4} stroke={color} strokeWidth={1.8} />
-      <Path d="M4 20C4 17.79 7.58 16 12 16C16.42 16 20 17.79 20 20" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
-    </Svg>
-  );
-}
-function IdCardIcon({ color }: { color: string }) {
-  return (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-      <Path d="M20 4H4C2.89543 4 2 4.89543 2 6V18C2 19.1046 2.89543 20 4 20H20C21.1046 20 22 19.1046 22 18V6C22 4.89543 21.1046 4 20 4Z" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-      <Circle cx={9} cy={11} r={3} stroke={color} strokeWidth={1.8} />
-      <Path d="M14 10H18M14 14H16" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
-    </Svg>
-  );
-}
 
 const ROLE_LABELS: Record<string, string> = {
   educator: 'Educator',
@@ -94,7 +69,7 @@ export default function ProfileSettingsScreen() {
     <SafeAreaView style={s.safe}>
       <View style={s.nav}>
         <TouchableOpacity style={s.navBack} onPress={() => router.back()} hitSlop={8}>
-          <ChevronLeftIcon color={colors.text} />
+          <ChevronLeft size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={s.navTitle}>Profile</Text>
       </View>
@@ -115,7 +90,7 @@ export default function ProfileSettingsScreen() {
         <Text style={s.sectionLabel}>Identity</Text>
         <View style={s.card}>
           <SettingsRow
-            icon={<UserIcon color={colors.textMuted} />}
+            icon={<User size={20} color={colors.textMuted} />}
             label="Display Name"
             labelColor={colors.text}
             hideChevron
@@ -123,7 +98,7 @@ export default function ProfileSettingsScreen() {
           />
           <View style={s.divider} />
           <SettingsRow
-            icon={<UserIcon color={colors.textMuted} />}
+            icon={<User size={20} color={colors.textMuted} />}
             label="First Name"
             labelColor={colors.text}
             hideChevron
@@ -131,7 +106,7 @@ export default function ProfileSettingsScreen() {
           />
           <View style={s.divider} />
           <SettingsRow
-            icon={<UserIcon color={colors.textMuted} />}
+            icon={<User size={20} color={colors.textMuted} />}
             label="Last Name"
             labelColor={colors.text}
             hideChevron
@@ -139,7 +114,7 @@ export default function ProfileSettingsScreen() {
           />
           <View style={s.divider} />
           <SettingsRow
-            icon={<IdCardIcon color={colors.textMuted} />}
+            icon={<CreditCard size={20} color={colors.textMuted} />}
             label="Role"
             labelColor={colors.text}
             hideChevron
@@ -153,7 +128,7 @@ export default function ProfileSettingsScreen() {
             <Text style={s.sectionLabel}>About</Text>
             <View style={s.card}>
               <SettingsRow
-                icon={<IdCardIcon color={colors.textMuted} />}
+                icon={<CreditCard size={20} color={colors.textMuted} />}
                 label="Bio"
                 labelColor={colors.text}
                 hideChevron

@@ -1,14 +1,15 @@
 import { memo } from 'react';
 import { FileText, Download } from 'lucide-react';
-import { Button } from '@iconicedu/ui-web/ui/button';
+import { Button } from '../../../ui/button';
 import type { FileMessageVM as FileMessageType } from '@iconicedu/shared-types';
-import { MessageBase, type MessageBaseProps } from '@iconicedu/ui-web/components/messages/message-base';
+import { MessageBase, type MessageBaseProps } from '../message-base';
+import { buildFileDownloadHref } from '../file-download.utils';
 
 interface FileMessageProps extends Omit<MessageBaseProps, 'message' | 'children'> {
   message: FileMessageType;
 }
 
-function formatFileSize(bytes?: number): string {
+export function formatFileSize(bytes?: number): string {
   if (!bytes) return '';
   const units = ['B', 'KB', 'MB', 'GB'];
   let size = bytes;
@@ -49,6 +50,16 @@ export const FileMessage = memo(function FileMessage(props: FileMessageProps) {
           size="icon"
           className="flex-shrink-0"
           aria-label="Download file"
+          onClick={() => {
+            window.open(
+              buildFileDownloadHref({
+                url: message.attachment.url,
+                storagePath: message.attachment.storagePath,
+              }),
+              '_blank',
+              'noopener,noreferrer',
+            );
+          }}
         >
           <Download className="h-4 w-4" />
         </Button>

@@ -8,6 +8,7 @@ import { useMessages } from '@iconicedu/ui-web/hooks/use-messages';
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
 import { useMessagesState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
 import { resolveThreadAfterReply } from '@iconicedu/ui-web/components/messages/thread-reply.utils';
+import { buildFileDownloadHref } from '@iconicedu/ui-web/components/messages/file-download.utils';
 import { MessagesScheduleTab } from '@iconicedu/ui-web/components/messages/tabs/messages-schedule-tab';
 import { MessagesMembersTab } from '@iconicedu/ui-web/components/messages/tabs/messages-members-tab';
 import { MessagesSavedTab } from '@iconicedu/ui-web/components/messages/tabs/messages-saved-tab';
@@ -21,12 +22,16 @@ import {
 } from '@iconicedu/ui-web/components/messages/tabs/messages-container-tab-hash';
 import { Tabs, TabsList, TabsTrigger } from '../../ui/tabs';
 import { ScrollArea } from '../../ui/scroll-area';
+import { createChannelFileItem } from './messages-container-files.utils';
 import type {
+  AudioRecordingMessageVM,
   ChannelFileItemVM,
   ClassScheduleVM,
   ChannelVM,
   EducatorProfileVM,
+  FileMessageVM,
   GuardianProfileVM,
+  ImageMessageVM,
   ISODateTime,
   MessageVM,
   MessageMentionVM,
@@ -71,6 +76,13 @@ export interface MessagesContainerProps {
   readOnly?: boolean;
   realtimeClient?: MessagesRealtimeClient | null;
   messageWriteClient?: MessageWriteClient | null;
+  uploadFileMessage?: (input: {
+    file: File;
+    content?: string;
+    durationSeconds?: number;
+    threadId?: string | null;
+    threadParentId?: string | null;
+  }) => Promise<MessageVM>;
 }
 
 const isGuardianProfile = (profile: UserProfileVM): profile is GuardianProfileVM =>
@@ -98,6 +110,7 @@ export function MessagesContainer({
   readOnly = false,
   realtimeClient,
   messageWriteClient,
+  uploadFileMessage,
 }: MessagesContainerProps) {
   const messageListRef = useRef<MessageListRef>(null);
   const messagesRef = useRef<MessageVM[]>([]);
@@ -118,6 +131,7 @@ export function MessagesContainer({
     setMessages,
     setCreateTextMessage,
     setSendTextMessage,
+    setSendFileMessage,
     setThreadHandlers,
     setScrollToMessage,
     messageFilter,
@@ -1039,6 +1053,56 @@ export function MessagesContainer({
   ]);
 
   useEffect(() => {
+    if (readOnly) {
+      setSendFileMessage(async () => null);
+      return;
+    }
+    if (!senderProfile) return;
+    setSendFileMessage(async (input) => {
+      if (uploadFileMessage) {
+        const created = await uploadFileMessage(input);
+        const exists = messagesRef.current.some(
+          (message) => message.ids.id === created.ids.id,
+        );
+        if (!exists) {
+          addMessage(created);
+        }
+        return created;
+      }
+      return {
+        ids: { id: `file-${Date.now()}`, orgId: channel.ids.orgId },
+        core: {
+          type: 'file',
+          sender: senderProfile,
+          createdAt: new Date().toISOString(),
+          visibility: { type: 'all' },
+        },
+        social: {
+          reactions: [],
+        },
+        state: {
+          isSaved: false,
+        },
+        content: input.content ? { text: input.content } : undefined,
+        attachment: {
+          type: 'file',
+          url: '',
+          name: input.file.name,
+          size: input.file.size,
+          mimeType: input.file.type || undefined,
+        },
+      } satisfies FileMessageVM;
+    });
+  }, [
+    addMessage,
+    channel.ids.orgId,
+    readOnly,
+    senderProfile,
+    setSendFileMessage,
+    uploadFileMessage,
+  ]);
+
+  useEffect(() => {
     setThreadHandlers({
       onAddMessage: addMessage,
       onUpdateMessage: updateMessage,
@@ -1213,6 +1277,44 @@ export function MessagesContainer({
           ) : (
             <MessageInput
               onSend={handleSendMessage}
+              onAttachFile={(file, content, options) => {
+                if (readOnly || !uploadFileMessage) {
+                  return;
+                }
+                const sendFile = async () => {
+                  const created = await runWithNetworkActivity(() =>
+                    uploadFileMessage({
+                      file,
+                      content,
+                      durationSeconds: options?.durationSeconds,
+                    }),
+                  );
+                  if (
+                    created.core.type === 'file' ||
+                    created.core.type === 'image' ||
+                    created.core.type === 'audio-recording'
+                  ) {
+                    const nextFile = createChannelFileItem(
+                      channel.ids.id,
+                      created as FileMessageVM | ImageMessageVM | AudioRecordingMessageVM,
+                    );
+                    setLoadedFiles((prev) => {
+                      if (!prev) {
+                        return prev;
+                      }
+                      const nextItems = prev ?? [];
+                      if (nextItems.some((item) => item.messageId === created.ids.id)) {
+                        return nextItems;
+                      }
+                      return [nextFile, ...nextItems].sort(
+                        (a, b) =>
+                          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+                      );
+                    });
+                  }
+                };
+                return sendFile();
+              }}
               placeholder={getMessageInputPlaceholder(channel, resolvedCurrentUserId)}
               participants={participants}
               currentUserId={resolvedCurrentUserId}
@@ -1254,7 +1356,10 @@ export function MessagesContainer({
               ? filesForDisplay.map((item) => (
                   <a
                     key={item.ids.id}
-                    href={item.url}
+                    href={buildFileDownloadHref({
+                      url: item.url,
+                      storagePath: item.storagePath,
+                    })}
                     target="_blank"
                     rel="noreferrer"
                     className="flex items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-muted/40"

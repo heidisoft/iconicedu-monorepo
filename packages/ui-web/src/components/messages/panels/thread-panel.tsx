@@ -20,6 +20,11 @@ interface ThreadPanelProps {
 
 type ThreadPanelContentProps = ThreadPanelPropsVM & {
   isReadOnly?: boolean;
+  onAttachReplyFile?: (
+    file: File,
+    content?: string,
+    options?: { durationSeconds?: number },
+  ) => Promise<void> | void;
 };
 
 const ThreadPanelContent = memo(function ThreadPanelContent({
@@ -29,6 +34,7 @@ const ThreadPanelContent = memo(function ThreadPanelContent({
   currentUserId,
   readState,
   isReadOnly,
+  onAttachReplyFile,
 }: ThreadPanelContentProps) {
   const { channel } = useMessagesState();
   const {
@@ -75,6 +81,7 @@ const ThreadPanelContent = memo(function ThreadPanelContent({
       ) : (
         <MessageInput
           onSend={onSendReply}
+          onAttachFile={onAttachReplyFile}
           placeholder="Reply..."
           participants={channel.collections.participants}
           currentUserId={currentUserId}
@@ -87,11 +94,13 @@ const ThreadPanelContent = memo(function ThreadPanelContent({
 export function ThreadPanel({ intent }: ThreadPanelProps) {
   const isMobile = useIsMobile();
   const {
+    channel,
     getThreadData,
     setThreadData,
     open,
     createTextMessage,
     sendTextMessage,
+    sendFileMessage,
     toggle,
     currentUserId,
     threadHandlers,
@@ -175,6 +184,50 @@ export function ThreadPanel({ intent }: ThreadPanelProps) {
     }
 
   };
+  const onAttachReplyFile = async (
+    file: File,
+    content?: string,
+    options?: { durationSeconds?: number },
+  ) => {
+    const message = await sendFileMessage({
+      file,
+      content,
+      durationSeconds: options?.durationSeconds,
+      threadId: threadData.thread.ids.id,
+      threadParentId: threadData.thread.parent.messageId ?? parentMessage?.ids.id,
+    });
+    if (!message) return;
+    const now = new Date().toISOString();
+    const { thread: updatedThread, message: messageWithThread, wasRekeyed } =
+      resolveThreadAfterReply({
+        currentThread: threadData.thread,
+        sentMessage: message,
+        replyCount: replies.items.length + 1,
+        now,
+      });
+
+    threadHandlers.onAddMessage?.(messageWithThread);
+    threadHandlers.onUpdateMessage?.(threadData.thread.parent.messageId, {
+      social: {
+        ...(parentMessage?.social ?? { reactions: [] }),
+        thread: updatedThread,
+      },
+    });
+
+    const replyExists = replies.items.some((reply) => reply.ids.id === messageWithThread.ids.id);
+    setThreadData(updatedThread, {
+      parentMessage,
+      replies: {
+        ...replies,
+        items: replyExists ? replies.items : [...replies.items, messageWithThread],
+        total: replies.total + (replyExists ? 0 : 1),
+      },
+    });
+
+    if (wasRekeyed) {
+      open({ key: 'thread', threadId: updatedThread.ids.id });
+    }
+  };
   const onProfileClick = (userId: string) => toggle({ key: 'profile', userId });
 
   if (isMobile) {
@@ -194,6 +247,7 @@ export function ThreadPanel({ intent }: ThreadPanelProps) {
         currentUserId={currentUserId}
         readState={threadData.thread.readState}
         isReadOnly={isReadOnly}
+        onAttachReplyFile={onAttachReplyFile}
       />
     );
   }
@@ -213,6 +267,7 @@ export function ThreadPanel({ intent }: ThreadPanelProps) {
       currentUserId={currentUserId}
       readState={threadData.thread.readState}
       isReadOnly={isReadOnly}
+      onAttachReplyFile={onAttachReplyFile}
     />
   );
 }

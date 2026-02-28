@@ -23,4 +23,15 @@ describe('MessageTextContent', () => {
     expect(mention.className).toContain('dark:text-sky-100');
     expect(container.textContent).toBe('Hello @Taylor Reed there');
   });
+
+  it('renders bold and italic text markers as formatted content', async () => {
+    render(
+      <MessageTextContent text="This is **bold** and *italic* text" />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('bold').tagName).toBe('STRONG');
+      expect(screen.getByText('italic').tagName).toBe('EM');
+    });
+  });
 });

@@ -35,9 +35,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const systemScheme: 'light' | 'dark' =
     (rnScheme ?? Appearance.getColorScheme() ?? 'light') as 'light' | 'dark';
   const [mode, setModeState] = useState<ThemeMode>('system');
-  const [loaded, setLoaded] = useState(false);
 
-  // Load persisted preference on mount
+  // Load persisted preference on mount. We render immediately with 'system'
+  // mode (the default) so the native window background is never exposed as a
+  // blank/white frame while SecureStore reads asynchronously.
   useEffect(() => {
     SecureStore.getItemAsync(STORAGE_KEY)
       .then((saved) => {
@@ -45,7 +46,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
           setModeState(saved);
         }
       })
-      .finally(() => setLoaded(true));
+      .catch(() => {});
   }, []);
 
   const colorScheme: 'light' | 'dark' =
@@ -63,9 +64,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [mode, colorScheme, isDark],
   );
-
-  // Don't render children until the saved preference is loaded to avoid flash
-  if (!loaded) return null;
 
   return (
     <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>

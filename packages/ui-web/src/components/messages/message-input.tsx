@@ -25,25 +25,50 @@ import {
   type MentionState,
 } from './message-input.utils';
 import { extractMentionsFromMessageText } from './message-mentions.utils';
+import { applyInlineFormat } from './message-input-formatting.utils';
 import {
   Bold,
   Italic,
-  Link2,
   AtSign,
   Smile,
   Paperclip,
   Send,
   Loader2,
-  Mic,
   ImageIcon,
+  Mic,
+  Pause,
+  Play,
+  Check,
+  X,
+  FileText,
   type LucideIcon,
 } from 'lucide-react';
+import {
+  buildRecordedAudioFileName,
+  formatRecordingDuration,
+  formatComposerAttachmentSize,
+  getDroppedAttachmentFile,
+  getRecordingElapsedMs,
+  getComposerAttachmentKind,
+  getSupportedAudioRecordingMimeType,
+  MESSAGE_INPUT_FILE_ACCEPT,
+  MESSAGE_INPUT_IMAGE_ACCEPT,
+  resolveAudioDurationSeconds,
+  SHORT_AUDIO_RECORDING_MAX_MS,
+  type ComposerAttachmentKind,
+  type ComposerRecordingStatus,
+} from './message-input.attachments';
 
 const TYPING_STOP_DELAY_MS = 3000;
 const TYPING_KEEPALIVE_THROTTLE_MS = 1200;
 
 interface MessageInputProps {
   onSend: (content: string, mentions?: MessageMentionVM[]) => void;
+  onAttachFile?: (
+    file: File,
+    content?: string,
+    options?: { durationSeconds?: number },
+  ) => Promise<void> | void;
   placeholder?: string;
   sticky?: boolean;
   readOnly?: boolean;
@@ -55,6 +80,19 @@ interface MessageInputProps {
   onInputKeyDown?: () => void;
   isLoading?: boolean;
 }
+
+type PendingAttachment = {
+  file: File;
+  kind: ComposerAttachmentKind;
+  previewUrl?: string;
+  durationSeconds?: number;
+};
+
+type RecordingSession = {
+  status: ComposerRecordingStatus;
+  startedAt: number;
+  accumulatedMs: number;
+};
 
 function FormatButton({
   icon: Icon,
@@ -87,6 +125,7 @@ function FormatButton({
 
 export function MessageInput({
   onSend,
+  onAttachFile,
   placeholder = 'Write a message...',
   sticky = true,
   readOnly = false,
@@ -99,15 +138,31 @@ export function MessageInput({
   isLoading = false,
 }: MessageInputProps) {
   const [content, setContent] = React.useState('');
+  const [isAttachingFile, setIsAttachingFile] = React.useState(false);
+  const [pendingAttachment, setPendingAttachment] = React.useState<PendingAttachment | null>(null);
+  const [attachmentError, setAttachmentError] = React.useState<string | null>(null);
+  const [isDragOver, setIsDragOver] = React.useState(false);
+  const [recordingSession, setRecordingSession] = React.useState<RecordingSession | null>(null);
+  const [recordingElapsedMs, setRecordingElapsedMs] = React.useState(0);
   const [mentionState, setMentionState] = React.useState<MentionState | null>(null);
   const [mentionPopupPosition, setMentionPopupPosition] =
     React.useState<MentionPopupPosition | null>(null);
   const [activeMentionIndex, setActiveMentionIndex] = React.useState(0);
   const wrapperRef = React.useRef<HTMLDivElement>(null);
+  const dragDepthRef = React.useRef(0);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const imageInputRef = React.useRef<HTMLInputElement>(null);
   const typingTimeoutRef = React.useRef<number | null>(null);
+  const recordingTimeoutRef = React.useRef<number | null>(null);
+  const recordingIntervalRef = React.useRef<number | null>(null);
   const isTypingRef = React.useRef(false);
   const lastTypingSignalAtRef = React.useRef<number>(0);
+  const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = React.useRef<MediaStream | null>(null);
+  const recordingChunksRef = React.useRef<Blob[]>([]);
+  const recordingSessionRef = React.useRef<RecordingSession | null>(null);
+  const recordingStopModeRef = React.useRef<'complete' | 'cancel'>('complete');
   const mentionCandidates = React.useMemo(
     () => getMentionCandidates(participants, currentUserId),
     [participants, currentUserId],
@@ -119,6 +174,75 @@ export function MessageInput({
     );
   }, [mentionCandidates, mentionState]);
   const isMentionListOpen = mentionState !== null && filteredMentionCandidates.length > 0;
+  const isBusy = isLoading || isAttachingFile;
+  const isRecordingAudio = recordingSession?.status === 'recording';
+  const isRecordingPaused = recordingSession?.status === 'paused';
+  const hasActiveRecording = recordingSession !== null;
+
+  const stopRecordingStream = React.useCallback(() => {
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    mediaStreamRef.current = null;
+  }, []);
+
+  const clearRecordingTimeout = React.useCallback(() => {
+    if (recordingTimeoutRef.current) {
+      window.clearTimeout(recordingTimeoutRef.current);
+      recordingTimeoutRef.current = null;
+    }
+  }, []);
+
+  const clearRecordingInterval = React.useCallback(() => {
+    if (recordingIntervalRef.current) {
+      window.clearInterval(recordingIntervalRef.current);
+      recordingIntervalRef.current = null;
+    }
+  }, []);
+
+  const syncRecordingSession = React.useCallback((nextSession: RecordingSession | null) => {
+    recordingSessionRef.current = nextSession;
+    setRecordingSession(nextSession);
+    setRecordingElapsedMs(nextSession ? getRecordingElapsedMs(nextSession) : 0);
+  }, []);
+
+  const startRecordingInterval = React.useCallback(() => {
+    clearRecordingInterval();
+    recordingIntervalRef.current = window.setInterval(() => {
+      const currentSession = recordingSessionRef.current;
+      if (!currentSession) {
+        setRecordingElapsedMs(0);
+        return;
+      }
+      setRecordingElapsedMs(getRecordingElapsedMs(currentSession));
+    }, 250);
+  }, [clearRecordingInterval]);
+
+  const clearPendingAttachment = React.useCallback(() => {
+    setPendingAttachment((current) => {
+      if (current?.previewUrl) {
+        URL.revokeObjectURL(current.previewUrl);
+      }
+      return null;
+    });
+  }, []);
+
+  const resetRecordingState = React.useCallback(() => {
+    clearRecordingTimeout();
+    clearRecordingInterval();
+    mediaRecorderRef.current = null;
+    syncRecordingSession(null);
+  }, [clearRecordingInterval, clearRecordingTimeout, syncRecordingSession]);
+
+  const setPendingComposerAttachment = React.useCallback(
+    (file: File, durationSeconds?: number) => {
+      clearPendingAttachment();
+      const kind = getComposerAttachmentKind(file);
+      const previewUrl =
+        kind === 'image' || kind === 'audio' ? URL.createObjectURL(file) : undefined;
+      setPendingAttachment({ file, kind, previewUrl, durationSeconds });
+      setAttachmentError(null);
+    },
+    [clearPendingAttachment],
+  );
 
   const updateMentionPopupPosition = React.useCallback(
     (caretPosition: number | null) => {
@@ -200,6 +324,32 @@ export function MessageInput({
     [content, handleTyping, syncMentionState, updateMentionPopupPosition],
   );
 
+  const applyFormatAtSelection = React.useCallback(
+    (wrapper: string) => {
+      const textarea = textareaRef.current;
+      if (!textarea || readOnly || isBusy || hasActiveRecording) {
+        return;
+      }
+
+      const result = applyInlineFormat(
+        content,
+        textarea.selectionStart,
+        textarea.selectionEnd,
+        wrapper,
+      );
+
+      setContent(result.nextValue);
+      handleTyping(result.nextValue);
+
+      window.setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(result.selectionStart, result.selectionEnd);
+        syncMentionState(result.nextValue, result.selectionEnd);
+      }, 0);
+    },
+    [content, handleTyping, hasActiveRecording, isBusy, readOnly, syncMentionState],
+  );
+
   const handleMentionSelect = React.useCallback(
     (candidate: MentionCandidate) => {
       const textarea = textareaRef.current;
@@ -226,40 +376,75 @@ export function MessageInput({
     [content, handleTyping, mentionState, updateMentionPopupPosition],
   );
 
+  const resetComposer = React.useCallback(() => {
+    setContent('');
+    clearPendingAttachment();
+    setAttachmentError(null);
+    setMentionState(null);
+    setMentionPopupPosition(null);
+    setActiveMentionIndex(0);
+    clearTypingTimeout();
+    notifyTypingStop();
+    textareaRef.current?.focus();
+  }, [clearPendingAttachment, clearTypingTimeout, notifyTypingStop]);
+
   const handleSend = React.useCallback(() => {
-    if (readOnly || isLoading) {
+    if (readOnly || isBusy || hasActiveRecording) {
       return;
     }
-    if (content.trim()) {
-      const trimmedContent = content.trim();
+    const trimmedContent = content.trim();
+    if (!trimmedContent && !pendingAttachment) {
+      return;
+    }
+
+    if (pendingAttachment && onAttachFile) {
+      const sendAttachment = async () => {
+        try {
+          setIsAttachingFile(true);
+          const durationSeconds =
+            pendingAttachment.kind === 'audio'
+              ? await resolveAudioDurationSeconds(
+                  pendingAttachment.file,
+                  pendingAttachment.durationSeconds,
+                )
+              : undefined;
+          await onAttachFile(pendingAttachment.file, trimmedContent || undefined, {
+            durationSeconds,
+          });
+          resetComposer();
+        } finally {
+          setIsAttachingFile(false);
+        }
+      };
+      void sendAttachment();
+      return;
+    }
+
+    if (trimmedContent) {
       const mentions = extractMentionsFromMessageText(
         trimmedContent,
         participants,
         currentUserId,
       );
-      onSend(trimmedContent, mentions);
-      setContent('');
-      setMentionState(null);
-      setMentionPopupPosition(null);
-      setActiveMentionIndex(0);
-      clearTypingTimeout();
-      notifyTypingStop();
-      textareaRef.current?.focus();
+    onSend(trimmedContent, mentions);
+      resetComposer();
     }
   }, [
-    clearTypingTimeout,
     content,
     currentUserId,
-    isLoading,
-    notifyTypingStop,
+    hasActiveRecording,
+    isBusy,
+    onAttachFile,
     onSend,
+    pendingAttachment,
     participants,
     readOnly,
+    resetComposer,
   ]);
 
   const handleKeyDown = React.useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (readOnly || isLoading) {
+      if (readOnly || isBusy) {
         return;
       }
       onInputKeyDown?.();
@@ -308,7 +493,7 @@ export function MessageInput({
       filteredMentionCandidates,
       handleMentionSelect,
       handleSend,
-      isLoading,
+      isBusy,
       isMentionListOpen,
       onInputKeyDown,
       readOnly,
@@ -325,9 +510,12 @@ export function MessageInput({
   React.useEffect(() => {
     return () => {
       clearTypingTimeout();
+      clearRecordingTimeout();
+      clearRecordingInterval();
+      stopRecordingStream();
       notifyTypingStop();
     };
-  }, [clearTypingTimeout, notifyTypingStop]);
+  }, [clearRecordingInterval, clearRecordingTimeout, clearTypingTimeout, notifyTypingStop, stopRecordingStream]);
 
   React.useEffect(() => {
     if (!isMentionListOpen) {
@@ -352,10 +540,204 @@ export function MessageInput({
   }, [isMentionListOpen, mentionState?.end, updateMentionPopupPosition]);
 
   const formatButtons = [
-    { icon: Bold, label: 'Bold' },
-    { icon: Italic, label: 'Italic' },
-    { icon: Link2, label: 'Link' },
+    { icon: Bold, label: 'Bold', onClick: () => applyFormatAtSelection('**') },
+    { icon: Italic, label: 'Italic', onClick: () => applyFormatAtSelection('*') },
   ];
+
+  const handleAttachButtonClick = React.useCallback(() => {
+    if (readOnly || isBusy || hasActiveRecording || !onAttachFile) {
+      return;
+    }
+    fileInputRef.current?.click();
+  }, [hasActiveRecording, isBusy, onAttachFile, readOnly]);
+
+  const handleAttachImageClick = React.useCallback(() => {
+    if (readOnly || isBusy || hasActiveRecording || !onAttachFile) {
+      return;
+    }
+    imageInputRef.current?.click();
+  }, [hasActiveRecording, isBusy, onAttachFile, readOnly]);
+
+  const handleFileInputChange = React.useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const selectedFile = event.target.files?.[0];
+      event.target.value = '';
+      if (!selectedFile || readOnly || isBusy || hasActiveRecording || !onAttachFile) {
+        return;
+      }
+      setPendingComposerAttachment(selectedFile);
+    },
+    [hasActiveRecording, isBusy, onAttachFile, readOnly, setPendingComposerAttachment],
+  );
+
+  const handleDropAttachment = React.useCallback(
+    (file: File | null) => {
+      if (!file || readOnly || isBusy || hasActiveRecording || !onAttachFile) {
+        return;
+      }
+      setPendingComposerAttachment(file);
+    },
+    [hasActiveRecording, isBusy, onAttachFile, readOnly, setPendingComposerAttachment],
+  );
+
+  const handleStartAudioRecording = React.useCallback(async () => {
+    if (readOnly || isBusy || hasActiveRecording || !onAttachFile) {
+      return;
+    }
+
+    if (
+      typeof navigator === 'undefined' ||
+      !navigator.mediaDevices?.getUserMedia ||
+      typeof MediaRecorder === 'undefined'
+    ) {
+      setAttachmentError('Audio recording is not supported in this browser.');
+      return;
+    }
+
+    try {
+      clearPendingAttachment();
+      setAttachmentError(null);
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+      recordingChunksRef.current = [];
+      const mimeType = getSupportedAudioRecordingMimeType();
+      const recorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      const initialSession: RecordingSession = {
+        status: 'recording',
+        startedAt: Date.now(),
+        accumulatedMs: 0,
+      };
+      recordingStopModeRef.current = 'complete';
+      syncRecordingSession(initialSession);
+      startRecordingInterval();
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          recordingChunksRef.current.push(event.data);
+        }
+      };
+      recorder.onstop = () => {
+        const recordedChunks = [...recordingChunksRef.current];
+        const finalSession = recordingSessionRef.current;
+        const finalElapsedMs = finalSession ? getRecordingElapsedMs(finalSession) : 0;
+        const stopMode = recordingStopModeRef.current;
+        resetRecordingState();
+        stopRecordingStream();
+        recordingChunksRef.current = [];
+
+        if (stopMode === 'cancel') {
+          return;
+        }
+
+        const blob = new Blob(recordedChunks, {
+          type: recorder.mimeType || 'audio/webm',
+        });
+        if (!blob.size) {
+          setAttachmentError('Unable to record audio.');
+          return;
+        }
+
+        const durationSeconds = Math.max(1, Math.round(finalElapsedMs / 1000));
+        const file = new File(
+          [blob],
+          buildRecordedAudioFileName(Date.now(), blob.type),
+          { type: blob.type || 'audio/webm' },
+        );
+        setPendingComposerAttachment(file, durationSeconds);
+      };
+      recorder.onerror = () => {
+        resetRecordingState();
+        stopRecordingStream();
+        setAttachmentError('Unable to record audio.');
+      };
+      recorder.start();
+      recordingTimeoutRef.current = window.setTimeout(() => {
+        recordingStopModeRef.current = 'complete';
+        recorder.stop();
+      }, SHORT_AUDIO_RECORDING_MAX_MS);
+    } catch {
+      resetRecordingState();
+      stopRecordingStream();
+      setAttachmentError('Microphone permission was denied.');
+    }
+  }, [
+    clearPendingAttachment,
+    hasActiveRecording,
+    isBusy,
+    onAttachFile,
+    readOnly,
+    resetRecordingState,
+    setPendingComposerAttachment,
+    startRecordingInterval,
+    stopRecordingStream,
+    syncRecordingSession,
+  ]);
+
+  const handlePauseAudioRecording = React.useCallback(() => {
+    const recorder = mediaRecorderRef.current;
+    const currentSession = recordingSessionRef.current;
+    if (!recorder || !currentSession || currentSession.status !== 'recording') {
+      return;
+    }
+
+    const nextSession: RecordingSession = {
+      status: 'paused',
+      startedAt: currentSession.startedAt,
+      accumulatedMs: getRecordingElapsedMs(currentSession),
+    };
+    clearRecordingTimeout();
+    clearRecordingInterval();
+    syncRecordingSession(nextSession);
+    recorder.pause();
+  }, [clearRecordingInterval, clearRecordingTimeout, syncRecordingSession]);
+
+  const handleResumeAudioRecording = React.useCallback(() => {
+    const recorder = mediaRecorderRef.current;
+    const currentSession = recordingSessionRef.current;
+    if (!recorder || !currentSession || currentSession.status !== 'paused') {
+      return;
+    }
+
+    const nextSession: RecordingSession = {
+      status: 'recording',
+      startedAt: Date.now(),
+      accumulatedMs: currentSession.accumulatedMs,
+    };
+    syncRecordingSession(nextSession);
+    startRecordingInterval();
+    recorder.resume();
+    const remainingMs = Math.max(
+      0,
+      SHORT_AUDIO_RECORDING_MAX_MS - nextSession.accumulatedMs,
+    );
+    recordingTimeoutRef.current = window.setTimeout(() => {
+      recordingStopModeRef.current = 'complete';
+      recorder.stop();
+    }, remainingMs);
+  }, [startRecordingInterval, syncRecordingSession]);
+
+  const handleCompleteAudioRecording = React.useCallback(() => {
+    const recorder = mediaRecorderRef.current;
+    if (!recorder) {
+      return;
+    }
+    recordingStopModeRef.current = 'complete';
+    recorder.stop();
+  }, []);
+
+  const handleCancelAudioRecording = React.useCallback(() => {
+    const recorder = mediaRecorderRef.current;
+    if (!recorder) {
+      resetRecordingState();
+      stopRecordingStream();
+      return;
+    }
+    recordingStopModeRef.current = 'cancel';
+    recorder.stop();
+  }, [resetRecordingState, stopRecordingStream]);
 
   return (
     <div
@@ -368,13 +750,197 @@ export function MessageInput({
       <div className="mx-auto w-full max-w-[960px]">
         <div
           ref={wrapperRef}
-          className="relative rounded-xl border border-input bg-background focus-within:ring-1 focus-within:ring-ring"
+          className={cn(
+            'relative rounded-xl border border-input bg-background focus-within:ring-1 focus-within:ring-ring',
+            isDragOver && 'border-primary bg-primary/5 ring-1 ring-primary/30',
+          )}
+          onDragEnter={(event) => {
+            if (readOnly || isBusy || hasActiveRecording || !onAttachFile) {
+              return;
+            }
+            if (!getDroppedAttachmentFile(event.dataTransfer)) {
+              return;
+            }
+            dragDepthRef.current += 1;
+            event.preventDefault();
+            setIsDragOver(true);
+          }}
+          onDragOver={(event) => {
+            if (readOnly || isBusy || hasActiveRecording || !onAttachFile) {
+              return;
+            }
+            if (!getDroppedAttachmentFile(event.dataTransfer)) {
+              return;
+            }
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'copy';
+            setIsDragOver(true);
+          }}
+          onDragLeave={() => {
+            if (dragDepthRef.current > 0) {
+              dragDepthRef.current -= 1;
+            }
+            if (dragDepthRef.current === 0) {
+              setIsDragOver(false);
+            }
+          }}
+          onDrop={(event) => {
+            dragDepthRef.current = 0;
+            setIsDragOver(false);
+            const droppedFile = getDroppedAttachmentFile(event.dataTransfer);
+            if (!droppedFile) {
+              return;
+            }
+            event.preventDefault();
+            handleDropAttachment(droppedFile);
+          }}
         >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={MESSAGE_INPUT_FILE_ACCEPT}
+            className="sr-only"
+            tabIndex={-1}
+            aria-hidden="true"
+            onChange={handleFileInputChange}
+          />
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept={MESSAGE_INPUT_IMAGE_ACCEPT}
+            className="sr-only"
+            tabIndex={-1}
+            aria-hidden="true"
+            onChange={handleFileInputChange}
+          />
+          {recordingSession ? (
+            <div className="border-b border-border px-3 py-3">
+              <div className="flex items-start gap-3 rounded-xl border border-destructive/20 bg-destructive/5 p-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+                  <Mic className={cn('h-5 w-5', isRecordingAudio ? 'animate-pulse' : '')} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                    <span
+                      className={cn(
+                        'inline-block h-2.5 w-2.5 rounded-full',
+                        isRecordingAudio ? 'bg-destructive animate-pulse' : 'bg-amber-500',
+                      )}
+                    />
+                    {isRecordingAudio ? 'Recording voice message' : 'Recording paused'}
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {formatRecordingDuration(recordingElapsedMs / 1000)} elapsed
+                  </div>
+                  <div className="mt-3 flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1.5"
+                      onClick={isRecordingAudio ? handlePauseAudioRecording : handleResumeAudioRecording}
+                    >
+                      {isRecordingAudio ? (
+                        <>
+                          <Pause className="h-3.5 w-3.5" />
+                          Pause
+                        </>
+                      ) : (
+                        <>
+                          <Play className="h-3.5 w-3.5" />
+                          Resume
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="h-8 gap-1.5"
+                      onClick={handleCompleteAudioRecording}
+                    >
+                      <Check className="h-3.5 w-3.5" />
+                      Complete
+                    </Button>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label="Discard recording"
+                  onClick={handleCancelAudioRecording}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+          ) : null}
+          {pendingAttachment ? (
+            <div className="border-b border-border px-3 py-3">
+              <div className="flex items-start gap-3 rounded-xl border border-border bg-muted/30 p-3">
+                {pendingAttachment.kind === 'image' && pendingAttachment.previewUrl ? (
+                  <img
+                    src={pendingAttachment.previewUrl}
+                    alt={pendingAttachment.file.name}
+                    className="h-16 w-16 rounded-lg object-cover"
+                  />
+                ) : pendingAttachment.kind === 'audio' && pendingAttachment.previewUrl ? (
+                  <audio
+                    src={pendingAttachment.previewUrl}
+                    className="h-16 w-24 rounded-lg"
+                    controls
+                    preload="metadata"
+                  />
+                ) : (
+                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <FileText className="h-5 w-5" />
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium text-foreground">
+                    {pendingAttachment.file.name}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {pendingAttachment.kind === 'image'
+                      ? 'Image ready to send'
+                      : pendingAttachment.kind === 'audio'
+                        ? 'Voice message ready to send'
+                        : 'File ready to send'}
+                    {pendingAttachment.durationSeconds
+                      ? ` • ${Math.floor(pendingAttachment.durationSeconds / 60)}:${String(
+                          pendingAttachment.durationSeconds % 60,
+                        ).padStart(2, '0')}`
+                      : ''}
+                    {pendingAttachment.file.size ? ` • ${formatComposerAttachmentSize(pendingAttachment.file.size)}` : ''}
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label="Remove attachment"
+                  onClick={clearPendingAttachment}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+          ) : null}
+          {attachmentError ? (
+            <div className="border-b border-border px-3 py-2 text-xs text-destructive">
+              {attachmentError}
+            </div>
+          ) : null}
+          {isDragOver ? (
+            <div className="border-b border-border px-3 py-2 text-xs font-medium text-primary">
+              Drop file or image to attach
+            </div>
+          ) : null}
           <Textarea
             ref={textareaRef}
             rows={1}
             value={content}
-            readOnly={readOnly}
+            readOnly={readOnly || hasActiveRecording}
             onChange={(e) => {
               const nextValue = e.target.value;
               setContent(nextValue);
@@ -441,14 +1007,14 @@ export function MessageInput({
             <TooltipProvider>
               <div className="flex items-center gap-0.5">
                 {formatButtons.map((btn) => (
-                  <FormatButton key={btn.label} icon={btn.icon} label={btn.label} />
+                  <FormatButton key={btn.label} icon={btn.icon} label={btn.label} onClick={btn.onClick} />
                 ))}
                 <div className="mx-1 h-4 w-px bg-border" />
                 <FormatButton
                   icon={AtSign}
                   label="Mention someone"
                   onClick={() => {
-                    if (readOnly || isLoading) return;
+                    if (readOnly || isBusy || hasActiveRecording) return;
                     insertAtCursor('@');
                   }}
                 />
@@ -462,22 +1028,73 @@ export function MessageInput({
                     <Smile className="h-4 w-4" />
                   </Button>
                 </EmojiPicker>
-                <FormatButton icon={ImageIcon} label="Attach image" />
-                <FormatButton icon={Paperclip} label="Attach file" />
-                <FormatButton icon={Mic} label="Record audio" />
+                <FormatButton
+                  icon={ImageIcon}
+                  label="Attach image"
+                  onClick={handleAttachImageClick}
+                />
+                <FormatButton
+                  icon={Paperclip}
+                  label="Attach file"
+                  onClick={handleAttachButtonClick}
+                />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className={cn(
+                        'h-7 w-7',
+                        recordingSession
+                          ? 'bg-destructive/10 text-destructive hover:bg-destructive/15 hover:text-destructive'
+                          : 'text-muted-foreground hover:text-foreground',
+                      )}
+                      aria-label={
+                        recordingSession
+                          ? isRecordingAudio
+                            ? 'Recording in progress'
+                            : 'Recording paused'
+                          : 'Record voice message'
+                      }
+                      title={
+                        recordingSession
+                          ? isRecordingAudio
+                            ? 'Recording in progress'
+                            : 'Recording paused'
+                          : 'Record voice message'
+                      }
+                      onClick={() => {
+                        if (!recordingSession) {
+                          void handleStartAudioRecording();
+                        }
+                      }}
+                      disabled={Boolean(recordingSession)}
+                    >
+                      <Mic className={cn('h-4 w-4', isRecordingAudio ? 'animate-pulse' : '')} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {recordingSession
+                      ? isRecordingAudio
+                        ? 'Recording in progress'
+                        : 'Recording paused'
+                      : 'Record voice message'}
+                  </TooltipContent>
+                </Tooltip>
               </div>
             </TooltipProvider>
             <Button
               type="button"
               size="sm"
               onClick={handleSend}
-              disabled={readOnly || isLoading || !content.trim()}
+              disabled={readOnly || isBusy || hasActiveRecording || (!content.trim() && !pendingAttachment)}
               className="h-8 gap-1.5"
             >
-              {isLoading ? (
+              {isBusy ? (
                 <>
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Sending...
+                  {isAttachingFile ? 'Uploading...' : 'Sending...'}
                 </>
               ) : (
                 <>

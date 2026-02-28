@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { deleteMessageAction, sendTextMessageAction, toggleHiddenMessageAction } from '@iconicedu/web/app/actions/messages';
+import { deleteMessageAction, sendFileMessageAction, sendTextMessageAction, toggleHiddenMessageAction } from '@iconicedu/web/app/actions/messages';
 
 const mapMessageRowToVM = vi.fn();
 const buildUserProfileById = vi.fn();
@@ -34,6 +34,17 @@ vi.mock('@iconicedu/web/lib/messages/mappers/message.mapper', () => ({
 
 vi.mock('@iconicedu/web/lib/messages/builders/thread.builder', () => ({
   buildThreadById: vi.fn(async () => ({ ids: { id: 'thread-1', orgId: 'org-1' } })),
+}));
+vi.mock('@iconicedu/web/lib/messages/link-preview', () => ({
+  extractFirstUrl: vi.fn((content: string) => content.match(/https?:\/\/\S+/)?.[0] ?? null),
+  fetchLinkPreviewMetadata: vi.fn(async (url: string) => ({
+    url,
+    title: 'Preview title',
+    description: 'Preview description',
+    imageUrl: 'https://example.com/cover.png',
+    siteName: 'Example',
+    favicon: 'https://example.com/favicon.ico',
+  })),
 }));
 
 describe('sendTextMessageAction', () => {
@@ -112,6 +123,370 @@ describe('sendTextMessageAction', () => {
       }),
     );
     expect(result).toEqual({ ids: { id: 'message-1', orgId: 'org-1' } });
+  });
+
+  it('stores pasted links as link-preview messages', async () => {
+    const supabase = {
+      auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
+      from: vi.fn(),
+    };
+    const { createSupabaseServerClient } = await import(
+      '@iconicedu/web/lib/supabase/server'
+    );
+    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
+      supabase,
+    );
+    const insertMessage = vi.fn().mockReturnValue({
+      select: () => ({
+        single: async () => ({
+          data: {
+            id: 'message-link-1',
+            org_id: 'org-1',
+            channel_id: 'channel-1',
+            sender_profile_id: 'profile-1',
+            type: 'link-preview',
+            created_at: new Date().toISOString(),
+          },
+          error: null,
+        }),
+      }),
+    });
+    const insertLinkPreview = vi.fn().mockResolvedValue({ error: null });
+
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'messages') {
+        return { insert: insertMessage };
+      }
+      if (table === 'message_link_preview') {
+        return { insert: insertLinkPreview };
+      }
+      return { insert: vi.fn() };
+    });
+
+    buildUserProfileById.mockResolvedValueOnce({ ids: { id: 'profile-1', orgId: 'org-1' } });
+    mapMessageRowToVM.mockReturnValueOnce({ ids: { id: 'message-link-1', orgId: 'org-1' } });
+
+    const result = await sendTextMessageAction({
+      orgId: 'org-1',
+      channelId: 'channel-1',
+      senderProfileId: 'profile-1',
+      content: 'Check this out https://example.com/post',
+    });
+
+    expect(insertMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'link-preview' }));
+    expect(insertLinkPreview).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message_id: 'message-link-1',
+        payload: expect.objectContaining({
+          text: 'Check this out https://example.com/post',
+          url: 'https://example.com/post',
+          title: 'Preview title',
+        }),
+      }),
+    );
+    expect(result).toEqual({ ids: { id: 'message-link-1', orgId: 'org-1' } });
+  });
+
+  it('uploads a file, creates a file message, and records it in channel files', async () => {
+    const supabase = {
+      from: vi.fn(),
+      storage: {
+        from: vi.fn(() => ({
+          createSignedUrl: vi.fn(async () => ({
+            data: { signedUrl: 'https://signed.example.com/channel-files/brief.pdf' },
+            error: null,
+          })),
+        })),
+      },
+    };
+    const { createSupabaseServerClient } = await import(
+      '@iconicedu/web/lib/supabase/server'
+    );
+    const { createSupabaseServiceClient } = await import(
+      '@iconicedu/web/lib/supabase/service'
+    );
+    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
+      supabase,
+    );
+    (createSupabaseServiceClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue({
+      from: vi.fn(),
+    });
+
+    const insertMessage = vi.fn().mockReturnValue({
+      select: () => ({
+        single: async () => ({
+          data: {
+            id: 'file-message-1',
+            org_id: 'org-1',
+            channel_id: 'channel-1',
+            sender_profile_id: 'profile-1',
+            type: 'file',
+            created_at: new Date().toISOString(),
+          },
+          error: null,
+        }),
+      }),
+    });
+    const insertMessageFile = vi.fn(async () => ({ error: null }));
+    const insertChannelFile = vi.fn(async () => ({ error: null }));
+
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'messages') {
+        return { insert: insertMessage };
+      }
+      if (table === 'message_file') {
+        return { insert: insertMessageFile };
+      }
+      if (table === 'channel_files') {
+        return { insert: insertChannelFile };
+      }
+      return {};
+    });
+
+    buildUserProfileById.mockResolvedValueOnce({ ids: { id: 'profile-1', orgId: 'org-1' } });
+    mapMessageRowToVM.mockReturnValueOnce({ ids: { id: 'file-message-1', orgId: 'org-1' } });
+
+    const result = await sendFileMessageAction({
+      orgId: 'org-1',
+      channelId: 'channel-1',
+      senderProfileId: 'profile-1',
+      name: 'brief.pdf',
+      storagePath: 'org-1/channel-1/files/profile-1/brief.pdf',
+      size: 11,
+      mimeType: 'application/pdf',
+      content: 'See attached',
+    });
+
+    expect(supabase.storage.from).toHaveBeenCalledWith('channel-files');
+    expect(insertMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        org_id: 'org-1',
+        channel_id: 'channel-1',
+        sender_profile_id: 'profile-1',
+        type: 'file',
+      }),
+    );
+    expect(insertMessageFile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message_id: 'file-message-1',
+        payload: expect.objectContaining({
+          url: 'org-1/channel-1/files/profile-1/brief.pdf',
+          storagePath: 'org-1/channel-1/files/profile-1/brief.pdf',
+          name: 'brief.pdf',
+          mimeType: 'application/pdf',
+          text: 'See attached',
+        }),
+      }),
+    );
+    expect(insertChannelFile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message_id: 'file-message-1',
+        kind: 'file',
+        url: 'org-1/channel-1/files/profile-1/brief.pdf',
+        name: 'brief.pdf',
+      }),
+    );
+    expect(result).toEqual({ ids: { id: 'file-message-1', orgId: 'org-1' } });
+  });
+
+  it('stores image uploads as image messages and records them in channel media', async () => {
+    const supabase = {
+      from: vi.fn(),
+      storage: {
+        from: vi.fn(() => ({
+          createSignedUrl: vi.fn(async () => ({
+            data: { signedUrl: 'https://signed.example.com/channel-files/photo.png' },
+            error: null,
+          })),
+        })),
+      },
+    };
+    const { createSupabaseServerClient } = await import(
+      '@iconicedu/web/lib/supabase/server'
+    );
+    const { createSupabaseServiceClient } = await import(
+      '@iconicedu/web/lib/supabase/service'
+    );
+    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
+      supabase,
+    );
+    (createSupabaseServiceClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue({
+      from: vi.fn(),
+    });
+
+    const insertMessage = vi.fn().mockReturnValue({
+      select: () => ({
+        single: async () => ({
+          data: {
+            id: 'image-message-1',
+            org_id: 'org-1',
+            channel_id: 'channel-1',
+            sender_profile_id: 'profile-1',
+            type: 'image',
+            created_at: new Date().toISOString(),
+          },
+          error: null,
+        }),
+      }),
+    });
+    const insertMessageImage = vi.fn(async () => ({ error: null }));
+    const insertChannelMedia = vi.fn(async () => ({ error: null }));
+
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'messages') {
+        return { insert: insertMessage };
+      }
+      if (table === 'message_image') {
+        return { insert: insertMessageImage };
+      }
+      if (table === 'channel_media') {
+        return { insert: insertChannelMedia };
+      }
+      return {};
+    });
+
+    buildUserProfileById.mockResolvedValueOnce({ ids: { id: 'profile-1', orgId: 'org-1' } });
+    mapMessageRowToVM.mockReturnValueOnce({ ids: { id: 'image-message-1', orgId: 'org-1' } });
+
+    const result = await sendFileMessageAction({
+      orgId: 'org-1',
+      channelId: 'channel-1',
+      senderProfileId: 'profile-1',
+      name: 'photo.png',
+      storagePath: 'org-1/channel-1/images/profile-1/photo.png',
+      size: 99,
+      mimeType: 'image/png',
+      content: 'Look at this',
+    });
+
+    expect(insertMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'image',
+      }),
+    );
+    expect(insertMessageImage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message_id: 'image-message-1',
+        payload: expect.objectContaining({
+          url: 'org-1/channel-1/images/profile-1/photo.png',
+          storagePath: 'org-1/channel-1/images/profile-1/photo.png',
+          name: 'photo.png',
+          mimeType: 'image/png',
+          text: 'Look at this',
+        }),
+      }),
+    );
+    expect(insertChannelMedia).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message_id: 'image-message-1',
+        type: 'image',
+        url: 'org-1/channel-1/images/profile-1/photo.png',
+        name: 'photo.png',
+      }),
+    );
+    expect(result).toEqual({ ids: { id: 'image-message-1', orgId: 'org-1' } });
+  });
+
+  it('stores audio uploads as audio-recording messages', async () => {
+    const supabase = {
+      from: vi.fn(),
+      storage: {
+        from: vi.fn(() => ({
+          createSignedUrl: vi.fn(async () => ({
+            data: { signedUrl: 'https://signed.example.com/channel-files/voice.webm' },
+            error: null,
+          })),
+        })),
+      },
+    };
+    const { createSupabaseServerClient } = await import(
+      '@iconicedu/web/lib/supabase/server'
+    );
+    const { createSupabaseServiceClient } = await import(
+      '@iconicedu/web/lib/supabase/service'
+    );
+    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
+      supabase,
+    );
+    (createSupabaseServiceClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue({
+      from: vi.fn(),
+    });
+
+    const insertMessage = vi.fn().mockReturnValue({
+      select: () => ({
+        single: async () => ({
+          data: {
+            id: 'audio-message-1',
+            org_id: 'org-1',
+            channel_id: 'channel-1',
+            sender_profile_id: 'profile-1',
+            type: 'audio-recording',
+            created_at: new Date().toISOString(),
+          },
+          error: null,
+        }),
+      }),
+    });
+    const insertAudioRecording = vi.fn(async () => ({ error: null }));
+    const insertChannelFile = vi.fn(async () => ({ error: null }));
+
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'messages') {
+        return { insert: insertMessage };
+      }
+      if (table === 'message_audio_recording') {
+        return { insert: insertAudioRecording };
+      }
+      if (table === 'channel_files') {
+        return { insert: insertChannelFile };
+      }
+      return {};
+    });
+
+    buildUserProfileById.mockResolvedValueOnce({ ids: { id: 'profile-1', orgId: 'org-1' } });
+    mapMessageRowToVM.mockReturnValueOnce({ ids: { id: 'audio-message-1', orgId: 'org-1' } });
+
+    const result = await sendFileMessageAction({
+      orgId: 'org-1',
+      channelId: 'channel-1',
+      senderProfileId: 'profile-1',
+      name: 'voice-message.webm',
+      storagePath: 'org-1/channel-1/audio/profile-1/voice-message.webm',
+      size: 55,
+      mimeType: 'audio/webm',
+      durationSeconds: 9,
+      content: 'Voice note',
+    });
+
+    expect(insertMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'audio-recording',
+      }),
+    );
+    expect(insertAudioRecording).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message_id: 'audio-message-1',
+        payload: expect.objectContaining({
+          url: 'org-1/channel-1/audio/profile-1/voice-message.webm',
+          storagePath: 'org-1/channel-1/audio/profile-1/voice-message.webm',
+          durationSeconds: 9,
+          fileSize: 55,
+          mimeType: 'audio/webm',
+          text: 'Voice note',
+        }),
+      }),
+    );
+    expect(insertChannelFile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message_id: 'audio-message-1',
+        kind: 'file',
+        url: 'org-1/channel-1/audio/profile-1/voice-message.webm',
+        name: 'voice-message.webm',
+        mime_type: 'audio/webm',
+        size: 55,
+      }),
+    );
+    expect(result).toEqual({ ids: { id: 'audio-message-1', orgId: 'org-1' } });
   });
 
   it('stores mentions in payload and creates mention notifications for opted-in recipients', async () => {
@@ -451,6 +826,105 @@ describe('sendTextMessageAction', () => {
       expect.objectContaining({ thread_id: 'thread-2', thread_parent_id: 'parent-2' }),
     );
     expect(result).toEqual({ ids: { id: 'message-3', orgId: 'org-1' } });
+  });
+
+  it('upserts the parent author and current replier when replying to an existing thread', async () => {
+    const supabase = {
+      auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
+      from: vi.fn(),
+    };
+    const { createSupabaseServerClient } = await import(
+      '@iconicedu/web/lib/supabase/server'
+    );
+    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
+      supabase,
+    );
+
+    const parentSelectChain: any = {};
+    parentSelectChain.eq = vi.fn(() => parentSelectChain);
+    parentSelectChain.maybeSingle = vi.fn(async () => ({
+      data: {
+        id: 'parent-3',
+        org_id: 'org-1',
+        channel_id: 'channel-1',
+        sender_profile_id: 'profile-parent',
+        thread_id: 'thread-existing',
+        type: 'text',
+      },
+    }));
+
+    const messageInsert = vi.fn().mockReturnValue({
+      select: () => ({
+        single: async () => ({
+          data: {
+            id: 'message-4',
+            org_id: 'org-1',
+            channel_id: 'channel-1',
+            sender_profile_id: 'profile-2',
+            type: 'text',
+            created_at: new Date().toISOString(),
+          },
+          error: null,
+        }),
+      }),
+    });
+    const messageTextInsert = vi.fn().mockResolvedValue({ error: null });
+    const threadSelectChain: any = {};
+    threadSelectChain.eq = vi.fn(() => threadSelectChain);
+    threadSelectChain.maybeSingle = vi.fn(async () => ({
+      data: { id: 'thread-existing', message_count: 2 },
+    }));
+    const updateThread = vi.fn().mockResolvedValue({ error: null });
+    const participantUpsert = vi.fn().mockResolvedValue({ error: null });
+
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'messages') {
+        return {
+          select: () => parentSelectChain,
+          insert: messageInsert,
+        };
+      }
+      if (table === 'message_text') {
+        return {
+          insert: messageTextInsert,
+        };
+      }
+      if (table === 'thread_participants') {
+        return { upsert: participantUpsert };
+      }
+      if (table === 'threads') {
+        return {
+          select: () => threadSelectChain,
+          update: () => ({ eq: updateThread }),
+        };
+      }
+      return {};
+    });
+
+    buildUserProfileById.mockResolvedValueOnce({
+      ids: { id: 'profile-2', orgId: 'org-1' },
+      profile: { displayName: 'Replier' },
+    });
+    mapMessageRowToVM.mockReturnValueOnce({ ids: { id: 'message-4', orgId: 'org-1' } });
+
+    const result = await sendTextMessageAction({
+      orgId: 'org-1',
+      channelId: 'channel-1',
+      senderProfileId: 'profile-1',
+      content: 'Another reply',
+      threadParentId: 'parent-3',
+      threadId: 'thread-existing',
+    });
+
+    expect(participantUpsert).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ profile_id: 'profile-parent' }),
+        expect.objectContaining({ profile_id: 'profile-1' }),
+      ]),
+      { onConflict: 'org_id,thread_id,profile_id' },
+    );
+    expect(updateThread).toHaveBeenCalled();
+    expect(result).toEqual({ ids: { id: 'message-4', orgId: 'org-1' } });
   });
 });
 

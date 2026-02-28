@@ -8,6 +8,7 @@ import type { ChannelVM, UserProfileVM } from '@iconicedu/shared-types';
 const setCurrentUserId = vi.fn();
 const setCreateTextMessage = vi.fn();
 const setSendTextMessage = vi.fn();
+const setSendFileMessage = vi.fn();
 const addMessage = vi.fn();
 const updateMessage = vi.fn();
 const deleteMessage = vi.fn();
@@ -40,6 +41,7 @@ vi.mock('./context/messages-state-provider', () => ({
     setMessages: vi.fn(),
     setCreateTextMessage,
     setSendTextMessage,
+    setSendFileMessage,
     setThreadHandlers: vi.fn(),
     setScrollToMessage: vi.fn(),
     messageFilter: null,

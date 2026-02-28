@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import { ChevronRight } from 'lucide-react-native';
 
 export type SettingsRowProps = {
   icon: React.ReactNode;
@@ -37,15 +37,7 @@ export const SettingsRow: React.FC<SettingsRowProps> = ({
     <View style={styles.trailing}>
       {trailing}
       {!hideChevron && !trailing && (
-        <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-          <Path
-            d="M9 18L15 12L9 6"
-            stroke={chevronColor}
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </Svg>
+        <ChevronRight size={16} color={chevronColor} />
       )}
     </View>
   </TouchableOpacity>

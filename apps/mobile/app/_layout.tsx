@@ -2,7 +2,7 @@ import '../global.css';
 import React from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { Slot } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
+import { SystemBars } from 'react-native-edge-to-edge';
 import { AppProviders } from '@/providers/app-providers';
 import { useTheme } from '@/providers/theme-provider';
 import { useAuth } from '@/providers/auth-provider';
@@ -20,20 +20,26 @@ const styles = StyleSheet.create({
   screen: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 });
 
-// StatusBar must be inside AppProviders to access ThemeContext.
+// StatusBar and navigation bar appearance must be inside AppProviders to access ThemeContext.
 function RootContent() {
-  const { isDark, colors } = useTheme();
+  const { isDark } = useTheme();
   const { loading } = useAuth();
 
-  // Block only while auth reads the session from SecureStore (local, <100 ms).
-  // All routing logic lives in the group layouts — no onboarding checks here.
   if (loading) {
     return <SpinnerScreen />;
   }
 
   return (
     <>
-      <StatusBar style={isDark ? 'light' : 'dark'} backgroundColor={colors.bg} />
+      {/*
+        SystemBars (expo-edge-to-edge) manages BOTH the status bar AND the
+        Android gesture navigation bar appearance in one place.
+          style="light" → light icons/handles  (use on dark backgrounds)
+          style="dark"  → dark icons/handles   (use on light backgrounds)
+        The navigation bar background color comes from the React Native content
+        rendered behind it (the tab bar's tabBarBackground), not from this component.
+      */}
+      <SystemBars style={isDark ? 'light' : 'dark'} />
       <Slot />
     </>
   );

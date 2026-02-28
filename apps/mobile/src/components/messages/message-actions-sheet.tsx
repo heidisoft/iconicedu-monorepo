@@ -14,6 +14,7 @@ import type { MessageVM } from '@iconicedu/shared-types';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 import { EmojiPicker } from './emoji-picker';
+import { MessageCircle, Bookmark, Copy, Forward, EyeOff, Trash2, SmilePlus } from 'lucide-react-native';
 
 // Facebook Messenger-style quick reactions
 const QUICK_REACTIONS = ['❤️', '😂', '😮', '😢', '😡', '👍'];
@@ -253,19 +254,19 @@ export const MessageActionsSheet: React.FC<MessageActionsSheetProps> = ({
                   <ReactionBubble key={e} emoji={e} onPress={handleReact} colors={colors} />
                 ))}
                 <TouchableOpacity style={s.moreEmojiBtn} onPress={() => setEmojiPickerVisible(true)}>
-                  <Text style={s.moreTxt}>＋</Text>
+                  <SmilePlus size={22} color={colors.textMuted} />
                 </TouchableOpacity>
               </View>
 
               {/* Reply in thread */}
               <TouchableOpacity style={s.actionItem} onPress={handleThread}>
-                <Text style={s.actionIcon}>💬</Text>
+                <MessageCircle size={20} color={colors.text} />
                 <Text style={s.actionLabel}>Reply in thread</Text>
               </TouchableOpacity>
 
               {/* Save / Unsave */}
               <TouchableOpacity style={s.actionItem} onPress={handleSave}>
-                <Text style={s.actionIcon}>🔖</Text>
+                <Bookmark size={20} color={saved ? colors.teal : colors.text} />
                 <Text style={saved ? s.savedLabel : s.actionLabel}>
                   {saved ? 'Saved' : 'Save message'}
                 </Text>
@@ -276,11 +277,11 @@ export const MessageActionsSheet: React.FC<MessageActionsSheetProps> = ({
                 <>
                   <View style={s.divider} />
                   <TouchableOpacity style={s.actionItem} onPress={handleCopyText}>
-                    <Text style={s.actionIcon}>📋</Text>
+                    <Copy size={20} color={colors.text} />
                     <Text style={s.actionLabel}>Copy text</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={s.actionItem} onPress={handleForward}>
-                    <Text style={s.actionIcon}>↪️</Text>
+                    <Forward size={20} color={colors.text} />
                     <Text style={s.actionLabel}>Forward</Text>
                   </TouchableOpacity>
                 </>
@@ -292,12 +293,12 @@ export const MessageActionsSheet: React.FC<MessageActionsSheetProps> = ({
                   <View style={s.divider} />
                   {!!onHide && (
                     <TouchableOpacity style={s.actionItem} onPress={handleHide}>
-                      <Text style={s.actionIcon}>🙈</Text>
+                      <EyeOff size={20} color={colors.text} />
                       <Text style={s.actionLabel}>Hide message</Text>
                     </TouchableOpacity>
                   )}
                   <TouchableOpacity style={s.actionItem} onPress={handleDelete}>
-                    <Text style={[s.actionIcon, s.destructive]}>🗑</Text>
+                    <Trash2 size={20} color="#ef4444" />
                     <Text style={[s.actionLabel, s.destructive]}>Delete message</Text>
                   </TouchableOpacity>
                 </>

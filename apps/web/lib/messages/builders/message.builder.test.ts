@@ -6,13 +6,17 @@ const getMessageById = vi.fn();
 const buildUserProfileById = vi.fn();
 const mapMessageRowToVM = vi.fn();
 const buildThreadById = vi.fn();
+const getMessageFilesByMessageIds = vi.fn(async () => ({ data: [] }));
+const getMessageImagesByMessageIds = vi.fn(async () => ({ data: [] }));
+const getMessageAudioRecordingsByMessageIds = vi.fn(async () => ({ data: [] }));
+const createSignedChannelFileUrl = vi.fn(async (_supabase: unknown, path: string) => `signed:${path}`);
 
 vi.mock('@iconicedu/web/lib/messages/queries/messages.query', () => ({
   getMessageById: (...args: unknown[]) => getMessageById(...args),
   getMessagesByChannelId: vi.fn(async () => ({ data: [] })),
   getMessageTextByMessageIds: vi.fn(async () => ({ data: [] })),
-  getMessageImagesByMessageIds: vi.fn(async () => ({ data: [] })),
-  getMessageFilesByMessageIds: vi.fn(async () => ({ data: [] })),
+  getMessageImagesByMessageIds: (...args: unknown[]) => getMessageImagesByMessageIds(...args),
+  getMessageFilesByMessageIds: (...args: unknown[]) => getMessageFilesByMessageIds(...args),
   getMessageDesignFileUpdatesByMessageIds: vi.fn(async () => ({ data: [] })),
   getMessagePaymentRemindersByMessageIds: vi.fn(async () => ({ data: [] })),
   getMessageEventRemindersByMessageIds: vi.fn(async () => ({ data: [] })),
@@ -24,8 +28,13 @@ vi.mock('@iconicedu/web/lib/messages/queries/messages.query', () => ({
   getMessageSessionSummariesByMessageIds: vi.fn(async () => ({ data: [] })),
   getMessageHomeworkSubmissionsByMessageIds: vi.fn(async () => ({ data: [] })),
   getMessageLinkPreviewsByMessageIds: vi.fn(async () => ({ data: [] })),
-  getMessageAudioRecordingsByMessageIds: vi.fn(async () => ({ data: [] })),
+  getMessageAudioRecordingsByMessageIds: (...args: unknown[]) =>
+    getMessageAudioRecordingsByMessageIds(...args),
   getMessageReactionCountsByMessageIds: vi.fn(async () => ({ data: [] })),
+}));
+
+vi.mock('@iconicedu/web/lib/messages/queries/file-url.query', () => ({
+  createSignedChannelFileUrl: (...args: unknown[]) => createSignedChannelFileUrl(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/profile/builders/user-profile.builder', () => ({
@@ -41,6 +50,13 @@ vi.mock('@iconicedu/web/lib/messages/builders/thread.builder', () => ({
 }));
 
 describe('buildMessageById', () => {
+  beforeEach(() => {
+    getMessageFilesByMessageIds.mockResolvedValue({ data: [] });
+    getMessageImagesByMessageIds.mockResolvedValue({ data: [] });
+    getMessageAudioRecordingsByMessageIds.mockResolvedValue({ data: [] });
+    createSignedChannelFileUrl.mockClear();
+  });
+
   it('returns null when message does not exist', async () => {
     getMessageById.mockResolvedValueOnce({ data: null });
 
@@ -92,5 +108,69 @@ describe('buildMessageById', () => {
     expect(buildThreadById).toHaveBeenCalledWith({} as any, 'org-1', 'thread-1', {
       accountId: 'account-1',
     });
+  });
+
+  it('signs private image and audio payload urls before mapping', async () => {
+    const imageRow = {
+      id: 'message-image',
+      org_id: 'org-1',
+      sender_profile_id: 'profile-1',
+      type: 'image',
+      created_at: new Date().toISOString(),
+    };
+    getMessageById.mockResolvedValueOnce({ data: imageRow });
+    getMessageImagesByMessageIds.mockResolvedValueOnce({
+      data: [
+        {
+          message_id: 'message-image',
+          payload: { url: 'org-1/channel-1/profile-1/image.png', name: 'image.png' },
+        },
+      ],
+    });
+    buildUserProfileById.mockResolvedValueOnce({ ids: { id: 'profile-1', orgId: 'org-1' } });
+    mapMessageRowToVM.mockReturnValueOnce({ ids: { id: 'message-image', orgId: 'org-1' } });
+
+    await buildMessageById({} as any, 'org-1', 'message-image');
+
+    expect(mapMessageRowToVM).toHaveBeenCalledWith(
+      imageRow,
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          url: 'signed:org-1/channel-1/profile-1/image.png',
+          storagePath: 'org-1/channel-1/profile-1/image.png',
+        }),
+      }),
+    );
+
+    const audioRow = {
+      id: 'message-audio',
+      org_id: 'org-1',
+      sender_profile_id: 'profile-1',
+      type: 'audio-recording',
+      created_at: new Date().toISOString(),
+    };
+    getMessageById.mockResolvedValueOnce({ data: audioRow });
+    getMessageAudioRecordingsByMessageIds.mockResolvedValueOnce({
+      data: [
+        {
+          message_id: 'message-audio',
+          payload: { url: 'org-1/channel-1/profile-1/audio.m4a', durationSeconds: 10 },
+        },
+      ],
+    });
+    buildUserProfileById.mockResolvedValueOnce({ ids: { id: 'profile-1', orgId: 'org-1' } });
+    mapMessageRowToVM.mockReturnValueOnce({ ids: { id: 'message-audio', orgId: 'org-1' } });
+
+    await buildMessageById({} as any, 'org-1', 'message-audio');
+
+    expect(mapMessageRowToVM).toHaveBeenCalledWith(
+      audioRow,
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          url: 'signed:org-1/channel-1/profile-1/audio.m4a',
+          storagePath: 'org-1/channel-1/profile-1/audio.m4a',
+        }),
+      }),
+    );
   });
 });

@@ -1,3 +1,14 @@
+import { Platform } from 'react-native';
+
+// ─── Platform-canonical dark surfaces ─────────────────────────────────────────
+// One primary dark color per platform, applied uniformly so the nav bar,
+// tab bar, and page background all share the same base tone.
+//   iOS    → #1C1C1E  (UIColor.systemBackground in Dark Mode)
+//   Android → #121212  (Material Design 3 dark surface)
+const DARK_BASE = Platform.select({ ios: '#1C1C1E', default: '#121212' }) as string;
+// Slightly elevated surface for inputs / modals (adds depth without a second "page" color)
+const DARK_SURFACE = Platform.select({ ios: '#2C2C2E', default: '#1E1E1E' }) as string;
+
 export const lightColors = {
   pageBg:     '#f8fafc',
   bg:         '#ffffff',
@@ -20,22 +31,22 @@ export const lightColors = {
 };
 
 export const darkColors: typeof lightColors = {
-  pageBg:     '#000000',  // iOS systemGroupedBackground
-  bg:         '#1C1C1E',  // iOS systemBackground
-  card:       '#1C1C1E',  // iOS secondarySystemBackground
-  text:       '#FFFFFF',  // iOS label
-  textMuted:  '#8E8E93',  // iOS secondaryLabel
-  textFaint:  '#48484A',  // iOS tertiaryLabel
-  border:     '#38383A',  // iOS separator
-  inputBg:    '#2C2C2E',  // iOS tertiarySystemBackground (elevated input)
+  pageBg:     DARK_BASE,
+  bg:         DARK_BASE,
+  card:       DARK_BASE,
+  text:       '#FFFFFF',
+  textMuted:  '#8E8E93',
+  textFaint:  '#48484A',
+  border:     '#38383A',
+  inputBg:    DARK_SURFACE,
   teal:       '#2dd4a8',
   tealFg:     '#042f2e',
   tealBg:     '#0d2b22',
   red:        '#f87171',
-  tabBg:      '#1C1C1E',
+  tabBg:      DARK_BASE,
   tabBorder:  '#38383A',
   tabActive:  '#2dd4a8',
-  tabInactive:'#636366',  // iOS quaternaryLabel
+  tabInactive:'#636366',
   switchTrackOff: '#39393D',
   modalOverlay:   'rgba(0,0,0,0.6)',
 };

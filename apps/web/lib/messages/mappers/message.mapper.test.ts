@@ -60,4 +60,50 @@ describe('mapMessageRowToVM', () => {
       { profileId: 'profile-2', displayName: 'Taylor Reed', start: 6, end: 18 },
     ]);
   });
+
+  it('preserves storage paths for image and audio payloads', () => {
+    const imageMessage = mapMessageRowToVM(
+      {
+        ...row,
+        id: 'message-image',
+        type: 'image',
+      } as never,
+      {
+        sender: sender as never,
+        payload: {
+          url: 'https://signed.example.com/image.png',
+          storagePath: 'org-1/channel-1/profile-1/image.png',
+          name: 'image.png',
+        },
+      },
+    );
+
+    const audioMessage = mapMessageRowToVM(
+      {
+        ...row,
+        id: 'message-audio',
+        type: 'audio-recording',
+      } as never,
+      {
+        sender: sender as never,
+        payload: {
+          url: 'https://signed.example.com/audio.m4a',
+          storagePath: 'org-1/channel-1/profile-1/audio.m4a',
+          durationSeconds: 12,
+        },
+      },
+    );
+
+    expect(imageMessage.core.type).toBe('image');
+    if (imageMessage.core.type !== 'image') {
+      throw new Error('Expected image message');
+    }
+    expect(imageMessage.attachment.storagePath).toBe('org-1/channel-1/profile-1/image.png');
+
+    expect(audioMessage.core.type).toBe('audio-recording');
+    if (audioMessage.core.type !== 'audio-recording') {
+      throw new Error('Expected audio message');
+    }
+    expect(audioMessage.audio.storagePath).toBe('org-1/channel-1/profile-1/audio.m4a');
+  });
 });

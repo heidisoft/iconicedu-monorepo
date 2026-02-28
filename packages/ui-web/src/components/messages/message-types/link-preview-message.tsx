@@ -4,6 +4,7 @@ import { memo } from 'react';
 import { ExternalLink } from 'lucide-react';
 import type { LinkPreviewMessageVM as LinkPreviewMessageType } from '@iconicedu/shared-types';
 import { MessageBase, type MessageBaseProps } from '@iconicedu/ui-web/components/messages/message-base';
+import { MessageTextContent } from '@iconicedu/ui-web/components/messages/message-text-content';
 
 interface LinkPreviewMessageProps extends Omit<MessageBaseProps, 'message' | 'children'> {
   message: LinkPreviewMessageType;
@@ -17,9 +18,11 @@ export const LinkPreviewMessage = memo(function LinkPreviewMessage(
   return (
     <MessageBase message={message} {...baseProps}>
       {message.content?.text && (
-        <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap break-words mb-2">
-          {message.content.text}
-        </p>
+        <MessageTextContent
+          text={message.content.text}
+          mentions={message.content.mentions}
+          className="mb-2"
+        />
       )}
       <a
         href={message.link.url}

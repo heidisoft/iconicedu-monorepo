@@ -19,6 +19,7 @@ import type {
 import type { AppColors } from '@/lib/theme';
 import { fetchThreadMessages } from '@/lib/api/queries';
 import { EmojiPicker } from './emoji-picker';
+import { SmilePlus, CornerUpLeft, MessageCircle } from 'lucide-react-native';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -169,17 +170,7 @@ function SocialBar({ reactions, thread, messageId, colors, onReactionToggle, onT
               style={actionBtnStyle}
               accessibilityLabel="Add emoji reaction"
             >
-              <View>
-                <Text style={{ fontSize: 14, lineHeight: 18, includeFontPadding: false }}>🙂</Text>
-                <View style={{
-                  position: 'absolute', top: -4, right: -5,
-                  width: 11, height: 11, borderRadius: 6,
-                  backgroundColor: colors.teal,
-                  alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <Text style={{ color: colors.tealFg, fontSize: 8, fontWeight: '900', lineHeight: 11, includeFontPadding: false }}>+</Text>
-                </View>
-              </View>
+              <SmilePlus size={16} color={colors.textMuted} />
             </TouchableOpacity>
 
             {/* Thread pill if exists, reply button if not */}
@@ -192,7 +183,7 @@ function SocialBar({ reactions, thread, messageId, colors, onReactionToggle, onT
                 style={actionBtnStyle}
                 accessibilityLabel="Reply in thread"
               >
-                <Text style={{ fontSize: 15, color: colors.textMuted, lineHeight: 18, includeFontPadding: false }}>↩</Text>
+                <CornerUpLeft size={15} color={colors.textMuted} />
               </TouchableOpacity>
             )}
           </>
@@ -233,7 +224,7 @@ function ThreadPill({ thread, colors, onPress, expanded }: { thread: ThreadVM; c
       }}
     >
       {/* Chat bubble icon */}
-      <Text style={{ fontSize: 13, color: expanded ? colors.teal : colors.textMuted }}>💬</Text>
+      <MessageCircle size={13} color={expanded ? colors.teal : colors.textMuted} />
 
       {/* Reply count */}
       <Text style={{ fontSize: 12, color: expanded ? colors.teal : colors.textMuted, fontWeight: '600' }}>

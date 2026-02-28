@@ -1,4 +1,5 @@
 import type { ThemeKey } from '@iconicedu/shared-types';
+import { getAvatarBucket } from '@iconicedu/web/lib/storage/storage-paths';
 
 export const THEME_KEYS: ThemeKey[] = [
   'slate',
@@ -27,7 +28,7 @@ export const THEME_KEYS: ThemeKey[] = [
 
 export const THEME_KEY_SET = new Set(THEME_KEYS);
 
-export const AVATAR_BUCKET = 'public-avatars';
+export const AVATAR_BUCKET = getAvatarBucket();
 export const AVATAR_SIGNED_URL_TTL = 60 * 60;
 
 export const pickRandomThemeKey = () =>

@@ -9,58 +9,12 @@ import {
   Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Path, Circle } from 'react-native-svg';
+import { ChevronLeft, Check, Sun, Clock, Globe, Languages } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { SettingsRow } from '@iconicedu/ui-native';
 import { useProfile } from '@/hooks/use-profile';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors, ThemeMode } from '@/lib/theme';
-
-function ChevronLeftIcon({ color }: { color: string }) {
-  return (
-    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-      <Path d="M15 18L9 12L15 6" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
-}
-function CheckIcon({ color }: { color: string }) {
-  return (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-      <Path d="M20 6L9 17L4 12" stroke={color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
-}
-function AppearanceIcon({ color }: { color: string }) {
-  return (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-      <Path d="M12 3V4M12 20V21M4.22 4.22L5.64 5.64M18.36 18.36L19.78 19.78M3 12H4M20 12H21M4.22 19.78L5.64 18.36M18.36 5.64L19.78 4.22" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
-      <Circle cx={12} cy={12} r={4} stroke={color} strokeWidth={1.8} />
-    </Svg>
-  );
-}
-function ClockIcon({ color }: { color: string }) {
-  return (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-      <Circle cx={12} cy={12} r={10} stroke={color} strokeWidth={1.8} />
-      <Path d="M12 6V12L16 14" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
-}
-function GlobeIcon({ color }: { color: string }) {
-  return (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-      <Circle cx={12} cy={12} r={10} stroke={color} strokeWidth={1.8} />
-      <Path d="M2 12H22M12 2C12 2 8 6 8 12C8 18 12 22 12 22C12 22 16 18 16 12C16 6 12 2 12 2Z" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
-}
-function LanguageIcon({ color }: { color: string }) {
-  return (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-      <Path d="M5 8L10 13M4 14L9 9L11 6M2 6H12M7 2V4M22 22L17 12L12 22M13.5 19H20.5" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
-}
 
 const MODE_OPTIONS: { value: ThemeMode; label: string; sub: string }[] = [
   { value: 'system', label: 'System', sub: 'Follow device setting' },
@@ -106,7 +60,7 @@ export default function PreferencesScreen() {
     <SafeAreaView style={s.safe}>
       <View style={s.nav}>
         <TouchableOpacity style={s.navBack} onPress={() => router.back()} hitSlop={8}>
-          <ChevronLeftIcon color={colors.text} />
+          <ChevronLeft size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={s.navTitle}>Preferences</Text>
       </View>
@@ -116,7 +70,7 @@ export default function PreferencesScreen() {
         <Text style={s.sectionLabel}>Appearance</Text>
         <View style={s.card}>
           <SettingsRow
-            icon={<AppearanceIcon color={colors.textMuted} />}
+            icon={<Sun size={20} color={colors.textMuted} />}
             label="Theme"
             labelColor={colors.text}
             chevronColor={colors.textFaint}
@@ -129,7 +83,7 @@ export default function PreferencesScreen() {
         <Text style={s.sectionLabel}>Regional</Text>
         <View style={s.card}>
           <SettingsRow
-            icon={<ClockIcon color={colors.textMuted} />}
+            icon={<Clock size={20} color={colors.textMuted} />}
             label="Timezone"
             labelColor={colors.text}
             hideChevron
@@ -141,7 +95,7 @@ export default function PreferencesScreen() {
           />
           <View style={s.divider} />
           <SettingsRow
-            icon={<GlobeIcon color={colors.textMuted} />}
+            icon={<Globe size={20} color={colors.textMuted} />}
             label="Locale"
             labelColor={colors.text}
             hideChevron
@@ -153,7 +107,7 @@ export default function PreferencesScreen() {
           />
           <View style={s.divider} />
           <SettingsRow
-            icon={<LanguageIcon color={colors.textMuted} />}
+            icon={<Languages size={20} color={colors.textMuted} />}
             label="Languages"
             labelColor={colors.text}
             hideChevron
@@ -192,7 +146,7 @@ export default function PreferencesScreen() {
                       <Text style={s.modeLabel}>{opt.label}</Text>
                       <Text style={s.modeSub}>{opt.sub}</Text>
                     </View>
-                    {mode === opt.value && <CheckIcon color={colors.teal} />}
+                    {mode === opt.value && <Check size={20} color={colors.teal} />}
                   </TouchableOpacity>
                 </React.Fragment>
               ))}

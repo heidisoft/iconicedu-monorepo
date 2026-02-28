@@ -24,8 +24,9 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png"
       },
-      "package": "com.iconicedu.mobile"
+      "package": "com.iconicedu.mobile",
+      "userInterfaceStyle": "automatic"
     },
-    "plugins": ["expo-router", "expo-secure-store", "expo-splash-screen"]
+    "plugins": ["react-native-edge-to-edge", "expo-router", "expo-secure-store", "expo-splash-screen"]
   }
 }

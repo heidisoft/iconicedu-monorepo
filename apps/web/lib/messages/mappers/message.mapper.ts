@@ -73,6 +73,7 @@ function mapAttachment(payload: Record<string, unknown> | null, type: MessageTyp
     return {
       type: 'image',
       url: String(data.url ?? ''),
+      storagePath: typeof data.storagePath === 'string' ? data.storagePath : undefined,
       name: String(data.name ?? 'image'),
       width: typeof data.width === 'number' ? data.width : undefined,
       height: typeof data.height === 'number' ? data.height : undefined,
@@ -82,6 +83,7 @@ function mapAttachment(payload: Record<string, unknown> | null, type: MessageTyp
     return {
       type: 'file',
       url: String(data.url ?? ''),
+      storagePath: typeof data.storagePath === 'string' ? data.storagePath : undefined,
       name: String(data.name ?? 'file'),
       size: typeof data.size === 'number' ? data.size : undefined,
       mimeType: typeof data.mimeType === 'string' ? data.mimeType : undefined,
@@ -316,7 +318,14 @@ export function mapMessageRowToVM(
       return {
         ...base,
         core: { ...core, type: 'link-preview' },
-        content: payload?.text ? { text: String(payload.text) } : undefined,
+        content: payload?.text
+          ? {
+              text: String(payload.text),
+              mentions: Array.isArray(payload?.mentions)
+                ? (payload.mentions as MessageMentionVM[])
+                : undefined,
+            }
+          : undefined,
         link: {
           url: String(payload?.url ?? ''),
           title: String(payload?.title ?? ''),
@@ -333,6 +342,7 @@ export function mapMessageRowToVM(
         content: payload?.text ? { text: String(payload.text) } : undefined,
         audio: {
           url: String(payload?.url ?? ''),
+          storagePath: typeof payload?.storagePath === 'string' ? payload.storagePath : undefined,
           durationSeconds: Number(payload?.durationSeconds ?? 0),
           waveform: Array.isArray(payload?.waveform)
             ? (payload.waveform as number[])
@@ -350,13 +360,17 @@ export function mapMessageRowToVM(
   }
 }
 
-export function mapChannelFileRow(row: ChannelFileRow): ChannelFileItemVM {
+export function mapChannelFileRow(
+  row: ChannelFileRow,
+  options: { resolvedUrl?: string } = {},
+): ChannelFileItemVM {
   return {
     ids: { id: row.id, orgId: row.org_id, channelId: row.channel_id },
     messageId: row.message_id ?? undefined,
     senderId: row.sender_profile_id ?? undefined,
     kind: (row.kind ?? 'file') as ChannelFileKind,
-    url: row.url,
+    url: options.resolvedUrl ?? row.url,
+    storagePath: row.url,
     name: row.name,
     mimeType: row.mime_type ?? undefined,
     size: row.size ?? undefined,

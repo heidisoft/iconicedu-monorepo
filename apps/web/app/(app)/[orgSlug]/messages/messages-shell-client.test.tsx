@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { render } from '@testing-library/react';
+import { render, waitFor } from '@testing-library/react';
 
 import { MessagesShellClient } from '@iconicedu/web/app/(app)/[orgSlug]/messages/messages-shell-client';
 
@@ -16,12 +16,16 @@ vi.mock('@iconicedu/web/lib/messages/realtime/supabase-messages-realtime-client'
 }));
 
 vi.mock('@iconicedu/web/lib/supabase/client', () => ({
-  createSupabaseBrowserClient: () => ({ channel: vi.fn(() => ({ on: vi.fn().mockReturnThis(), subscribe: vi.fn(), unsubscribe: vi.fn() })) }),
+  createSupabaseBrowserClient: () => ({
+    channel: vi.fn(() => ({ on: vi.fn().mockReturnThis(), subscribe: vi.fn(), unsubscribe: vi.fn() })),
+    storage: { from: vi.fn(() => ({ upload: vi.fn(async () => ({ error: null })) })) },
+  }),
 }));
 
 describe('MessagesShellClient', () => {
-  it('passes realtime and write clients to MessagesShell', () => {
+  it('passes realtime and write clients to MessagesShell', async () => {
     const sendTextMessage = vi.fn();
+    const sendFileMessage = vi.fn();
     const toggleReaction = vi.fn();
     const deleteMessage = vi.fn();
     const toggleHiddenMessage = vi.fn();
@@ -35,19 +39,28 @@ describe('MessagesShellClient', () => {
         currentUserId="profile-1"
         readOnly
         sendTextMessage={sendTextMessage}
+        sendFileMessage={sendFileMessage}
         toggleReaction={toggleReaction}
         deleteMessage={deleteMessage}
         toggleHiddenMessage={toggleHiddenMessage}
       />,
     );
 
-    expect(messagesShellMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        realtimeClient,
-        messageWriteClient: { sendTextMessage, toggleReaction, deleteMessage, toggleHiddenMessage },
-        currentUserId: 'profile-1',
-        readOnly: true,
-      }),
-    );
+    await waitFor(() => {
+      expect(messagesShellMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          realtimeClient,
+          messageWriteClient: {
+            sendTextMessage,
+            toggleReaction,
+            deleteMessage,
+            toggleHiddenMessage,
+          },
+          uploadFileMessage: expect.any(Function),
+          currentUserId: 'profile-1',
+          readOnly: true,
+        }),
+      );
+    });
   });
 });

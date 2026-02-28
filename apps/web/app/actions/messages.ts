@@ -2,6 +2,7 @@
 
 import type {
   MessageMentionVM,
+  MessageSendFileInput,
   MessageSendTextInput,
   MessageToggleReactionInput,
   MessageVM,
@@ -15,6 +16,20 @@ import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profil
 import { buildUserProfileById } from '@iconicedu/web/lib/profile/builders/user-profile.builder';
 import { mapMessageRowToVM } from '@iconicedu/web/lib/messages/mappers/message.mapper';
 import { buildThreadById } from '@iconicedu/web/lib/messages/builders/thread.builder';
+import { CHANNEL_FILE_BUCKET, createSignedChannelFileUrl } from '@iconicedu/web/lib/messages/queries/file-url.query';
+import { isValidMessageAssetPath } from '@iconicedu/web/lib/storage/storage-paths';
+import { extractFirstUrl, fetchLinkPreviewMetadata } from '@iconicedu/web/lib/messages/link-preview';
+
+type SupabaseServerClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
+type SupabaseServiceClient = ReturnType<typeof createSupabaseServiceClient>;
+type ParentMessageRow = {
+  id: string;
+  org_id: string;
+  channel_id: string;
+  sender_profile_id: string;
+  thread_id?: string | null;
+  type: string;
+};
 
 function sanitizeMentions(
   content: string,
@@ -59,7 +74,7 @@ function sanitizeMentions(
 }
 
 async function createMentionNotifications(input: {
-  serviceSupabase: ReturnType<typeof createSupabaseServiceClient>;
+  serviceSupabase: SupabaseServiceClient;
   orgId: string;
   channelId: string;
   senderProfileId: string;
@@ -151,6 +166,182 @@ async function createMentionNotifications(input: {
   }
 }
 
+async function resolveThreadContext(input: {
+  supabase: SupabaseServerClient;
+  orgId: string;
+  channelId: string;
+  currentProfileId: string;
+  requestedThreadId?: string | null;
+  threadParentId?: string | null;
+  now: string;
+}): Promise<{
+  threadId: string | null;
+  threadCreated: boolean;
+  parentMessage: ParentMessageRow | null;
+}> {
+  let threadId = input.requestedThreadId ?? null;
+  let parentMessage: ParentMessageRow | null = null;
+  let threadCreated = false;
+
+  if (!input.threadParentId) {
+    return { threadId, threadCreated, parentMessage };
+  }
+
+  const parentResponse = await input.supabase
+    .from('messages')
+    .select('id, org_id, channel_id, sender_profile_id, thread_id, type')
+    .eq('id', input.threadParentId)
+    .maybeSingle<ParentMessageRow>();
+
+  parentMessage = parentResponse.data ?? null;
+
+  if (
+    !parentMessage ||
+    parentMessage.org_id !== input.orgId ||
+    parentMessage.channel_id !== input.channelId
+  ) {
+    throw new Error('Parent message not found');
+  }
+
+  if (parentMessage.thread_id) {
+    threadId = parentMessage.thread_id;
+  } else if (threadId) {
+    const threadLookup = await input.supabase
+      .from('threads')
+      .select('id, parent_message_id, channel_id, org_id')
+      .eq('id', threadId)
+      .maybeSingle<{
+        id: string;
+        parent_message_id: string | null;
+        channel_id: string;
+        org_id: string;
+      }>();
+    if (
+      !threadLookup.data ||
+      threadLookup.data.parent_message_id !== parentMessage.id ||
+      threadLookup.data.channel_id !== input.channelId ||
+      threadLookup.data.org_id !== input.orgId
+    ) {
+      threadId = null;
+    }
+  }
+
+  if (!threadId) {
+    const parentPayloadResponse = await input.supabase
+      .from('message_text')
+      .select('payload')
+      .eq('message_id', parentMessage.id)
+      .maybeSingle<{ payload: Record<string, unknown> | null }>();
+    const snippet =
+      typeof parentPayloadResponse.data?.payload?.text === 'string'
+        ? parentPayloadResponse.data.payload.text
+        : parentMessage.type;
+
+    const parentSender = await buildUserProfileById(
+      input.supabase,
+      parentMessage.sender_profile_id,
+    );
+
+    const threadInsert = await input.supabase
+      .from('threads')
+      .insert({
+        org_id: input.orgId,
+        channel_id: input.channelId,
+        parent_message_id: parentMessage.id,
+        snippet: snippet?.slice(0, 140) ?? null,
+        author_id: parentMessage.sender_profile_id,
+        author_name: parentSender?.profile.displayName ?? null,
+        message_count: 1,
+        last_reply_at: input.now,
+        created_at: input.now,
+        created_by: input.currentProfileId,
+        updated_at: input.now,
+        updated_by: input.currentProfileId,
+      })
+      .select('id')
+      .single();
+
+    if (threadInsert.error || !threadInsert.data) {
+      throw new Error(threadInsert.error?.message ?? 'Unable to create thread.');
+    }
+
+    threadId = threadInsert.data.id;
+    threadCreated = true;
+
+    const updateParent = await input.supabase
+      .from('messages')
+      .update({
+        thread_id: threadId,
+        updated_at: input.now,
+        updated_by: input.currentProfileId,
+      })
+      .eq('id', parentMessage.id);
+
+    if (updateParent.error) {
+      throw new Error(updateParent.error.message);
+    }
+  }
+
+  if (threadId) {
+    const participantRows = Array.from(
+      new Set([parentMessage.sender_profile_id, input.currentProfileId]),
+    ).map((participantProfileId) => ({
+      org_id: input.orgId,
+      thread_id: threadId as string,
+      profile_id: participantProfileId,
+      created_at: input.now,
+      created_by: input.currentProfileId,
+      updated_at: input.now,
+      updated_by: input.currentProfileId,
+    }));
+
+    const participantInsert = await input.supabase
+      .from('thread_participants')
+      .upsert(participantRows, { onConflict: 'org_id,thread_id,profile_id' });
+
+    if (participantInsert.error) {
+      throw new Error(participantInsert.error.message);
+    }
+  }
+
+  return { threadId, threadCreated, parentMessage };
+}
+
+async function bumpThreadReplyCount(input: {
+  supabase: SupabaseServerClient;
+  threadId: string | null;
+  threadCreated: boolean;
+  now: string;
+  currentProfileId: string;
+}) {
+  if (!input.threadId || input.threadCreated) {
+    return;
+  }
+
+  const threadRow = await input.supabase
+    .from('threads')
+    .select('id, message_count')
+    .eq('id', input.threadId)
+    .maybeSingle<{ id: string; message_count: number | null }>();
+
+  if (!threadRow.data) {
+    return;
+  }
+
+  const updateThread = await input.supabase
+    .from('threads')
+    .update({
+      message_count: (threadRow.data.message_count ?? 0) + 1,
+      last_reply_at: input.now,
+      updated_at: input.now,
+      updated_by: input.currentProfileId,
+    })
+    .eq('id', input.threadId);
+  if (updateThread.error) {
+    throw new Error(updateThread.error.message);
+  }
+}
+
 export async function sendTextMessageAction(
   input: MessageSendTextInput,
 ): Promise<MessageVM> {
@@ -200,138 +391,17 @@ export async function sendTextMessageAction(
   }
 
   const now = new Date().toISOString();
-  let threadId = input.threadId ?? null;
-  type ParentMessage = {
-    id: string;
-    org_id: string;
-    channel_id: string;
-    sender_profile_id: string;
-    thread_id?: string | null;
-    type: string;
-  };
-  let parentMessage: ParentMessage | null = null;
-  let threadCreated = false;
-
-  if (input.threadParentId) {
-    const parentResponse = await supabase
-      .from('messages')
-      .select('id, org_id, channel_id, sender_profile_id, thread_id, type')
-      .eq('id', input.threadParentId)
-      .maybeSingle<ParentMessage>();
-
-    parentMessage = parentResponse.data ?? null;
-
-    if (
-      !parentMessage ||
-      parentMessage.org_id !== accountResponse.data.org_id ||
-      parentMessage.channel_id !== input.channelId
-    ) {
-      throw new Error('Parent message not found');
-    }
-
-    if (parentMessage.thread_id) {
-      threadId = parentMessage.thread_id;
-    } else if (threadId) {
-      const threadLookup = await supabase
-        .from('threads')
-        .select('id, parent_message_id, channel_id, org_id')
-        .eq('id', threadId)
-        .maybeSingle<{
-          id: string;
-          parent_message_id: string | null;
-          channel_id: string;
-          org_id: string;
-        }>();
-      if (
-        !threadLookup.data ||
-        threadLookup.data.parent_message_id !== parentMessage.id ||
-        threadLookup.data.channel_id !== input.channelId ||
-        threadLookup.data.org_id !== accountResponse.data.org_id
-      ) {
-        threadId = null;
-      }
-    }
-
-    if (!threadId) {
-      const parentPayloadResponse = await supabase
-        .from('message_text')
-        .select('payload')
-        .eq('message_id', parentMessage.id)
-        .maybeSingle<{ payload: Record<string, unknown> | null }>();
-      const snippet =
-        typeof parentPayloadResponse.data?.payload?.text === 'string'
-          ? parentPayloadResponse.data.payload.text
-          : parentMessage.type;
-
-      const parentSender = await buildUserProfileById(
-        supabase,
-        parentMessage.sender_profile_id,
-      );
-
-      const threadInsert = await supabase
-        .from('threads')
-        .insert({
-          org_id: accountResponse.data.org_id,
-          channel_id: input.channelId,
-          parent_message_id: parentMessage.id,
-          snippet: snippet?.slice(0, 140) ?? null,
-          author_id: parentMessage.sender_profile_id,
-          author_name: parentSender?.profile.displayName ?? null,
-          message_count: 1,
-          last_reply_at: now,
-          created_at: now,
-          created_by: profileResponse.data.id,
-          updated_at: now,
-          updated_by: profileResponse.data.id,
-        })
-        .select('id')
-        .single();
-
-      if (threadInsert.error || !threadInsert.data) {
-        throw new Error(threadInsert.error?.message ?? 'Unable to create thread.');
-      }
-
-      threadId = threadInsert.data.id;
-      threadCreated = true;
-
-      const updateParent = await supabase
-        .from('messages')
-        .update({
-          thread_id: threadId,
-          updated_at: now,
-          updated_by: profileResponse.data.id,
-        })
-        .eq('id', parentMessage.id);
-
-      if (updateParent.error) {
-        throw new Error(updateParent.error.message);
-      }
-    }
-
-    if (threadId) {
-      const participants = [
-        parentMessage.sender_profile_id,
-        currentProfileId,
-      ].filter(Boolean);
-      const participantRows = Array.from(new Set(participants)).map((participantProfileId) => ({
-        org_id: accountOrgId,
-        thread_id: threadId as string,
-        profile_id: participantProfileId,
-        created_at: now,
-        created_by: currentProfileId,
-        updated_at: now,
-        updated_by: currentProfileId,
-      }));
-
-      const participantInsert = await supabase
-        .from('thread_participants')
-        .upsert(participantRows, { onConflict: 'org_id,thread_id,profile_id' });
-
-      if (participantInsert.error) {
-        throw new Error(participantInsert.error.message);
-      }
-    }
-  }
+  const firstUrl = extractFirstUrl(input.content);
+  const previewMetadata = firstUrl ? await fetchLinkPreviewMetadata(firstUrl) : null;
+  const { threadId, threadCreated } = await resolveThreadContext({
+    supabase,
+    orgId: accountOrgId,
+    channelId: input.channelId,
+    currentProfileId,
+    requestedThreadId: input.threadId,
+    threadParentId: input.threadParentId,
+    now,
+  });
 
   const messageInsert = await supabase
     .from('messages')
@@ -339,7 +409,7 @@ export async function sendTextMessageAction(
       org_id: accountResponse.data.org_id,
       channel_id: input.channelId,
       sender_profile_id: profileResponse.data.id,
-      type: 'text',
+      type: previewMetadata ? 'link-preview' : 'text',
       visibility_type: 'all',
       thread_id: threadId,
       thread_parent_id: input.threadParentId ?? null,
@@ -355,46 +425,44 @@ export async function sendTextMessageAction(
     throw new Error(messageInsert.error?.message ?? 'Unable to create message.');
   }
 
-  const payloadInsert = await supabase.from('message_text').insert({
-    message_id: messageInsert.data.id,
-    org_id: accountResponse.data.org_id,
-    payload: {
-      text: input.content,
-      ...(sanitizedMentions.length ? { mentions: sanitizedMentions } : {}),
-    },
-    created_at: now,
-    created_by: profileResponse.data.id,
-    updated_at: now,
-    updated_by: profileResponse.data.id,
-  });
+  const payloadInsert = await supabase
+    .from(previewMetadata ? 'message_link_preview' : 'message_text')
+    .insert({
+      message_id: messageInsert.data.id,
+      org_id: accountResponse.data.org_id,
+      payload: previewMetadata
+        ? {
+            ...(input.content.trim() ? { text: input.content } : {}),
+            ...(sanitizedMentions.length ? { mentions: sanitizedMentions } : {}),
+            url: previewMetadata.url,
+            title: previewMetadata.title,
+            description: previewMetadata.description,
+            imageUrl: previewMetadata.imageUrl,
+            siteName: previewMetadata.siteName,
+            favicon: previewMetadata.favicon,
+          }
+        : {
+            text: input.content,
+            ...(sanitizedMentions.length ? { mentions: sanitizedMentions } : {}),
+          },
+      created_at: now,
+      created_by: profileResponse.data.id,
+      updated_at: now,
+      updated_by: profileResponse.data.id,
+    });
 
   if (payloadInsert.error) {
     await supabase.from('messages').delete().eq('id', messageInsert.data.id);
     throw new Error(payloadInsert.error.message);
   }
 
-  if (threadId && !threadCreated) {
-    const threadRow = await supabase
-      .from('threads')
-      .select('id, message_count')
-      .eq('id', threadId)
-      .maybeSingle<{ id: string; message_count: number | null }>();
-
-    if (threadRow.data) {
-      const updateThread = await supabase
-        .from('threads')
-        .update({
-          message_count: (threadRow.data.message_count ?? 0) + 1,
-          last_reply_at: now,
-          updated_at: now,
-          updated_by: profileResponse.data.id,
-        })
-        .eq('id', threadId);
-      if (updateThread.error) {
-        throw new Error(updateThread.error.message);
-      }
-    }
-  }
+  await bumpThreadReplyCount({
+    supabase,
+    threadId,
+    threadCreated,
+    now,
+    currentProfileId,
+  });
 
   const sender = await buildUserProfileById(supabase, profileResponse.data.id);
   if (!sender) {
@@ -421,9 +489,203 @@ export async function sendTextMessageAction(
 
   return mapMessageRowToVM(messageInsert.data, {
     sender,
+    payload: previewMetadata
+      ? {
+          ...(input.content.trim() ? { text: input.content } : {}),
+          ...(sanitizedMentions.length ? { mentions: sanitizedMentions } : {}),
+          url: previewMetadata.url,
+          title: previewMetadata.title,
+          description: previewMetadata.description,
+          imageUrl: previewMetadata.imageUrl,
+          siteName: previewMetadata.siteName,
+          favicon: previewMetadata.favicon,
+        }
+      : {
+          text: input.content,
+          ...(sanitizedMentions.length ? { mentions: sanitizedMentions } : {}),
+        },
+    reactions: [],
+    thread: thread ?? undefined,
+  });
+}
+
+export async function sendFileMessageAction(
+  input: MessageSendFileInput,
+): Promise<MessageVM> {
+  const supabase = await createSupabaseServerClient();
+  const authUser = await requireAuthedUser(supabase);
+  const accountResponse = await getAccountByAuthUserId(supabase, authUser.id);
+
+  if (!accountResponse.data) {
+    throw new Error('Account not found');
+  }
+
+  const profileResponse = await getProfileByAccountId(supabase, accountResponse.data.id);
+  if (!profileResponse.data) {
+    throw new Error('Profile not found');
+  }
+
+  if (input.orgId !== accountResponse.data.org_id) {
+    throw new Error('Invalid org');
+  }
+  if (input.senderProfileId !== profileResponse.data.id) {
+    throw new Error('Invalid sender');
+  }
+  if (!input.name?.trim()) {
+    throw new Error('File name is required');
+  }
+  if (!input.storagePath?.trim()) {
+    throw new Error('File storage path is required');
+  }
+  if (
+    !isValidMessageAssetPath({
+      storagePath: input.storagePath,
+      orgId: input.orgId,
+      channelId: input.channelId,
+      profileId: profileResponse.data.id,
+    })
+  ) {
+    throw new Error('Invalid file storage path');
+  }
+
+  const now = new Date().toISOString();
+  const currentProfileId = profileResponse.data.id;
+  const serviceSupabase = createSupabaseServiceClient();
+  const { threadId, threadCreated } = await resolveThreadContext({
+    supabase,
+    orgId: accountResponse.data.org_id,
+    channelId: input.channelId,
+    currentProfileId,
+    requestedThreadId: input.threadId,
+    threadParentId: input.threadParentId,
+    now,
+  });
+  const signedUrl = await createSignedChannelFileUrl(supabase, input.storagePath);
+  const isImageUpload = input.mimeType?.startsWith('image/') ?? false;
+  const isAudioUpload = input.mimeType?.startsWith('audio/') ?? false;
+  const messageType = isImageUpload ? 'image' : isAudioUpload ? 'audio-recording' : 'file';
+
+  const messageInsert = await supabase
+    .from('messages')
+    .insert({
+      org_id: input.orgId,
+      channel_id: input.channelId,
+      sender_profile_id: currentProfileId,
+      type: messageType,
+      visibility_type: 'all',
+      thread_id: threadId,
+      thread_parent_id: input.threadParentId ?? null,
+      created_at: now,
+      created_by: currentProfileId,
+      updated_at: now,
+      updated_by: currentProfileId,
+    })
+    .select('*')
+    .single();
+
+  if (messageInsert.error || !messageInsert.data) {
+    throw new Error(messageInsert.error?.message ?? 'Unable to create message.');
+  }
+
+  const payload = {
+    url: input.storagePath,
+    storagePath: input.storagePath,
+    ...(isAudioUpload
+      ? {
+          durationSeconds: input.durationSeconds ?? 0,
+          fileSize: input.size,
+          mimeType: input.mimeType,
+        }
+      : {
+          name: input.name,
+          size: input.size,
+          mimeType: input.mimeType,
+        }),
+    ...(input.content?.trim() ? { text: input.content.trim() } : {}),
+  };
+
+  const payloadInsert = await supabase
+    .from(isImageUpload ? 'message_image' : isAudioUpload ? 'message_audio_recording' : 'message_file')
+    .insert({
+    message_id: messageInsert.data.id,
+    org_id: input.orgId,
+    payload,
+    created_at: now,
+    created_by: currentProfileId,
+    updated_at: now,
+    updated_by: currentProfileId,
+  });
+
+  if (payloadInsert.error) {
+    await serviceSupabase.storage.from(CHANNEL_FILE_BUCKET).remove([input.storagePath]);
+    await supabase.from('messages').delete().eq('id', messageInsert.data.id);
+    throw new Error(payloadInsert.error.message);
+  }
+
+  const channelAssetInsert = isImageUpload
+    ? await supabase.from('channel_media').insert({
+        org_id: input.orgId,
+        channel_id: input.channelId,
+        message_id: messageInsert.data.id,
+        sender_profile_id: currentProfileId,
+        type: 'image',
+        url: input.storagePath,
+        name: input.name,
+        width: null,
+        height: null,
+        created_at: now,
+        created_by: currentProfileId,
+        updated_at: now,
+        updated_by: currentProfileId,
+      })
+    : await supabase.from('channel_files').insert({
+        org_id: input.orgId,
+        channel_id: input.channelId,
+        message_id: messageInsert.data.id,
+        sender_profile_id: currentProfileId,
+        kind: 'file',
+        url: input.storagePath,
+        name: input.name,
+        mime_type: input.mimeType ?? null,
+        size: input.size ?? null,
+        created_at: now,
+        created_by: currentProfileId,
+        updated_at: now,
+        updated_by: currentProfileId,
+      });
+
+  if (channelAssetInsert.error) {
+    await serviceSupabase.storage.from(CHANNEL_FILE_BUCKET).remove([input.storagePath]);
+    await supabase
+      .from(isImageUpload ? 'message_image' : isAudioUpload ? 'message_audio_recording' : 'message_file')
+      .delete()
+      .eq('message_id', messageInsert.data.id);
+    await supabase.from('messages').delete().eq('id', messageInsert.data.id);
+    throw new Error(channelAssetInsert.error.message);
+  }
+
+  await bumpThreadReplyCount({
+    supabase,
+    threadId,
+    threadCreated,
+    now,
+    currentProfileId,
+  });
+
+  const sender = await buildUserProfileById(supabase, currentProfileId);
+  if (!sender) {
+    throw new Error('Sender not found');
+  }
+
+  const thread = threadId
+    ? await buildThreadById(supabase, accountResponse.data.org_id, threadId)
+    : null;
+
+  return mapMessageRowToVM(messageInsert.data, {
+    sender,
     payload: {
-      text: input.content,
-      ...(sanitizedMentions.length ? { mentions: sanitizedMentions } : {}),
+      ...payload,
+      url: signedUrl,
     },
     reactions: [],
     thread: thread ?? undefined,

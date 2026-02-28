@@ -55,8 +55,9 @@ import {
   type PresenceConnectionStatus,
 } from '@iconicedu/web/lib/presence/status';
 import { shouldPublishPresence } from '@iconicedu/web/lib/presence/publish-policy';
+import { buildAvatarStoragePath } from '@iconicedu/web/lib/profile/avatar-storage-path';
+import { getAvatarBucket } from '@iconicedu/web/lib/storage/storage-paths';
 
-const AVATAR_BUCKET = 'public-avatars';
 const AVATAR_SIGNED_URL_TTL = 60 * 60;
 const PRESENCE_HEARTBEAT_MS = 90 * 1000;
 const PRESENCE_STATUS_EVALUATION_MS = 30 * 1000;
@@ -1841,17 +1842,14 @@ export function SidebarShell({
           throw new Error('Image must be 5MB or less.');
         }
 
-        const rawExt = file.name.split('.').pop()?.toLowerCase();
-        const extension = rawExt && rawExt !== file.name ? rawExt : 'jpg';
-        const baseName = file.name
-          .replace(/\.[^/.]+$/, '')
-          .replace(/[^a-z0-9-_]/gi, '-')
-          .toLowerCase();
-        const fileName = `${baseName || 'avatar'}-${Date.now()}.${extension}`;
-        const path = `${orgId}/${profileId}/${fileName}`;
+        const path = buildAvatarStoragePath({
+          orgId,
+          profileId,
+          file,
+        });
 
         const { error: uploadError } = await supabase.storage
-          .from(AVATAR_BUCKET)
+          .from(getAvatarBucket())
           .upload(path, file, {
             upsert: true,
             contentType: file.type,
@@ -1862,12 +1860,12 @@ export function SidebarShell({
         }
 
         const { data: signedData, error: signedError } = await supabase.storage
-          .from(AVATAR_BUCKET)
+          .from(getAvatarBucket())
           .createSignedUrl(path, AVATAR_SIGNED_URL_TTL);
 
         const signedOrPublicUrl = signedData?.signedUrl
           ? signedData.signedUrl
-          : supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path).data.publicUrl;
+          : supabase.storage.from(getAvatarBucket()).getPublicUrl(path).data.publicUrl;
         if ((signedError && !signedOrPublicUrl) || !signedOrPublicUrl) {
           throw new Error('Unable to create a profile photo URL.');
         }

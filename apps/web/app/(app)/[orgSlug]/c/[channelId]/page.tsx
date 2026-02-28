@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { DashboardHeader } from '@iconicedu/ui-web';
-import { sendTextMessageAction, toggleMessageReactionAction, deleteMessageAction, toggleHiddenMessageAction } from '@iconicedu/web/app/actions/messages';
+import { sendFileMessageAction, sendTextMessageAction, toggleMessageReactionAction, deleteMessageAction, toggleHiddenMessageAction } from '@iconicedu/web/app/actions/messages';
 import { MessagesShellClient } from '@iconicedu/web/app/(app)/[orgSlug]/messages/messages-shell-client';
 import { buildChannelById } from '@iconicedu/web/lib/channels/builders/channel.builder';
 import { isStaffObserverReadOnlyChannel } from '@iconicedu/web/lib/channels/read-only';
@@ -41,6 +41,7 @@ export default async function Page({
         currentUserProfile={currentUserProfile}
         readOnly={isStaffReadOnly}
         sendTextMessage={sendTextMessageAction}
+        sendFileMessage={sendFileMessageAction}
         toggleReaction={toggleMessageReactionAction}
         deleteMessage={deleteMessageAction}
         toggleHiddenMessage={toggleHiddenMessageAction}

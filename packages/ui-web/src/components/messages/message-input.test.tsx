@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { UserProfileVM } from '@iconicedu/shared-types';
 
+import { MESSAGE_INPUT_FILE_ACCEPT } from './message-input.attachments';
 import {
   getMentionCandidates,
   getMentionPopupPosition,
@@ -251,5 +252,13 @@ describe('message-input mention helpers', () => {
     removeSpy.mockRestore();
     computedStyleSpy.mockRestore();
     createElementSpy.mockRestore();
+  });
+
+  it('accepts common document and archive file types for attachments', () => {
+    expect(MESSAGE_INPUT_FILE_ACCEPT).toContain('.pdf');
+    expect(MESSAGE_INPUT_FILE_ACCEPT).toContain('.docx');
+    expect(MESSAGE_INPUT_FILE_ACCEPT).toContain('.xlsx');
+    expect(MESSAGE_INPUT_FILE_ACCEPT).toContain('.pptx');
+    expect(MESSAGE_INPUT_FILE_ACCEPT).toContain('.zip');
   });
 });

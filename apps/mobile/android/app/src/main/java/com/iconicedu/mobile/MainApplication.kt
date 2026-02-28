@@ -3,6 +3,7 @@ package com.iconicedu.mobile
 import android.app.Application
 import android.content.res.Configuration
 
+import androidx.appcompat.app.AppCompatDelegate
 import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
 import com.facebook.react.ReactNativeApplicationEntryPoint.loadReactNative
@@ -40,6 +41,10 @@ class MainApplication : Application(), ReactApplication {
 
   override fun onCreate() {
     super.onCreate()
+    // Allow the app UI to follow the system dark/light mode.
+    // Without this call Android defaults to light mode regardless of system setting,
+    // which makes useColorScheme() always return 'light' on Android.
+    AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
     DefaultNewArchitectureEntryPoint.releaseLevel = try {
       ReleaseLevel.valueOf(BuildConfig.REACT_NATIVE_RELEASE_LEVEL.uppercase())
     } catch (e: IllegalArgumentException) {

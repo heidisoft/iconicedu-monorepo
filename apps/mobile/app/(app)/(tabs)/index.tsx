@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import Svg, { Path } from 'react-native-svg';
+import { Bell, ClipboardCheck, ArrowUpRight, MessageCircle, BookOpen, User } from 'lucide-react-native';
 import { SectionCard } from '@iconicedu/ui-native';
 import { useAuth } from '@/providers/auth-provider';
 import { useTheme } from '@/providers/theme-provider';
@@ -16,10 +16,10 @@ function getGreeting() {
 }
 
 const quickNav = [
-  { label: 'Messages', icon: '💬', route: '/(app)/(tabs)/messages', desc: 'Your conversations' },
-  { label: 'Inbox',    icon: '🔔', route: '/(app)/(tabs)/inbox',    desc: 'Activity & alerts' },
-  { label: 'Spaces',   icon: '📚', route: '/(app)/spaces',           desc: 'Learning spaces' },
-  { label: 'Account',  icon: '👤', route: '/(app)/(tabs)/account',  desc: 'Profile & settings' },
+  { label: 'Messages', Icon: MessageCircle, route: '/(app)/(tabs)/messages', desc: 'Your conversations' },
+  { label: 'Inbox',    Icon: Bell,          route: '/(app)/(tabs)/inbox',    desc: 'Activity & alerts' },
+  { label: 'Spaces',   Icon: BookOpen,      route: '/(app)/spaces',           desc: 'Learning spaces' },
+  { label: 'Account',  Icon: User,          route: '/(app)/(tabs)/account',  desc: 'Profile & settings' },
 ] as const;
 
 function makeStyles(C: AppColors) {
@@ -39,7 +39,6 @@ function makeStyles(C: AppColors) {
     sectionLabel: { fontSize: 12, fontWeight: '700', color: C.textFaint, textTransform: 'uppercase', letterSpacing: 0.8 },
     grid:         { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
     gridItem:     { width: '47%', backgroundColor: C.card, borderRadius: 14, borderWidth: 1, borderColor: C.border, padding: 16, gap: 6 },
-    gridIcon:     { fontSize: 24 },
     gridLabel:    { fontSize: 14, fontWeight: '700', color: C.text },
     gridDesc:     { fontSize: 12, color: C.textMuted, lineHeight: 17 },
     featureTitle: { fontSize: 16, fontWeight: '700', color: C.text },
@@ -77,12 +76,7 @@ export default function HomeScreen() {
             <Text style={s.avatarTxt}>{initial}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.bellBtn} onPress={() => router.push('/(app)/(tabs)/inbox')} activeOpacity={0.8} accessibilityLabel="Open inbox">
-            <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-              <Path d="M18 8C18 6.4 17.37 4.87 16.24 3.76C15.13 2.63 13.6 2 12 2C10.4 2 8.87 2.63 7.76 3.76C6.63 4.87 6 6.4 6 8C6 15 3 17 3 17H21C21 17 18 15 18 8Z"
-                stroke={colors.text} strokeWidth={1.8} strokeLinejoin="round" strokeLinecap="round" />
-              <Path d="M13.73 21C13.55 21.3 13.3 21.55 13 21.72C12.7 21.89 12.35 21.97 12 21.97C11.65 21.97 11.3 21.89 11 21.72C10.7 21.55 10.45 21.3 10.27 21"
-                stroke={colors.text} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-            </Svg>
+            <Bell size={20} color={colors.text} />
           </TouchableOpacity>
         </View>
 
@@ -96,16 +90,11 @@ export default function HomeScreen() {
         <View style={s.taskCard}>
           <View style={s.taskInner}>
             <View style={s.taskLeft}>
-              <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-                <Path d="M9 11L12 14L22 4" stroke={colors.text} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                <Path d="M21 12V19C21 19.53 20.79 20.04 20.41 20.41C20.04 20.79 19.53 21 19 21H5C4.47 21 3.96 20.79 3.59 20.41C3.21 20.04 3 19.53 3 19V5C3 4.47 3.21 3.96 3.59 3.59C3.96 3.21 4.47 3 5 3H16" stroke={colors.text} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-              </Svg>
+              <ClipboardCheck size={20} color={colors.text} />
               <Text style={s.taskText}>View your messages & channels</Text>
             </View>
             <TouchableOpacity style={s.arrowBtn} onPress={() => router.push('/(app)/(tabs)/messages')} activeOpacity={0.8}>
-              <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-                <Path d="M7 17L17 7M17 7H7M17 7V17" stroke={colors.tealFg} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-              </Svg>
+              <ArrowUpRight size={16} color={colors.tealFg} />
             </TouchableOpacity>
           </View>
         </View>
@@ -122,7 +111,7 @@ export default function HomeScreen() {
                 activeOpacity={0.75}
                 accessibilityLabel={item.label}
               >
-                <Text style={s.gridIcon}>{item.icon}</Text>
+                <item.Icon size={24} color={colors.text} />
                 <Text style={s.gridLabel}>{item.label}</Text>
                 <Text style={s.gridDesc}>{item.desc}</Text>
               </TouchableOpacity>

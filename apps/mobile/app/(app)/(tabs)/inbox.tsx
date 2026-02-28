@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
+import { Bell, CheckCircle, ClipboardCheck, CreditCard, FileText, GraduationCap, MessageSquare, Paperclip, Sparkles, Video } from 'lucide-react-native';
 import {
   View,
   Text,
@@ -24,17 +25,17 @@ import { DEMO_ACTIVITY_FEED } from '@/lib/dummy-activity-feed';
 // Helpers
 // ---------------------------------------------------------------------------
 
-const ICON_EMOJI: Record<InboxIconKeyVM, string> = {
-  Bell:           '🔔',
-  CheckCircle2:   '✅',
-  ClipboardCheck: '📋',
-  CreditCard:     '💳',
-  FileText:       '📄',
-  GraduationCap:  '🎓',
-  MessageSquare:  '💬',
-  Paperclip:      '📎',
-  Sparkles:       '✨',
-  Video:          '🎥',
+const ICON_MAP: Record<InboxIconKeyVM, React.ComponentType<{ size: number; color: string }>> = {
+  Bell:           Bell,
+  CheckCircle2:   CheckCircle,
+  ClipboardCheck: ClipboardCheck,
+  CreditCard:     CreditCard,
+  FileText:       FileText,
+  GraduationCap:  GraduationCap,
+  MessageSquare:  MessageSquare,
+  Paperclip:      Paperclip,
+  Sparkles:       Sparkles,
+  Video:          Video,
 };
 
 const TAB_LABELS: Record<string, string> = {
@@ -125,7 +126,7 @@ function ActivityItem({
   const iconKey = getIconKey(item);
   const tone = item.content.leading?.kind === 'icon' ? item.content.leading.tone : undefined;
   const { bg: iconBg, fg: iconFg } = isDark ? toneColorsDark(tone) : toneColors(tone);
-  const emoji = ICON_EMOJI[iconKey];
+  const IconComponent = ICON_MAP[iconKey];
   const time = relativeTime(item.timestamps.occurredAt);
   const isRead = item.state?.isRead ?? false;
   const isExpanded = expandedIds.has(item.ids.id);
@@ -170,7 +171,7 @@ function ActivityItem({
         {/* Avatar */}
         <View style={s.avatarWrap}>
           <View style={[s.avatar, { backgroundColor: iconBg }]}>
-            <Text style={s.avatarEmoji}>{emoji}</Text>
+            <IconComponent size={22} color={iconFg} />
           </View>
         </View>
 
@@ -184,7 +185,7 @@ function ActivityItem({
             </Text>
             {!!emphasis && (
               <View style={[s.badge, { backgroundColor: iconBg }]}>
-                <Text style={s.badgeEmoji}>{emoji}</Text>
+                <IconComponent size={14} color={iconFg} />
                 <Text style={[s.badgeText, { color: iconFg }]}>{emphasis}</Text>
               </View>
             )}
@@ -490,7 +491,7 @@ export default function InboxScreen() {
       {filteredSections.length === 0 ? (
         <View style={s.emptyWrap}>
           <View style={[s.emptyIcon, { backgroundColor: colors.inputBg }]}>
-            <Text style={{ fontSize: 32 }}>🔔</Text>
+            <Bell size={32} color={colors.teal} />
           </View>
           <Text style={[s.emptyTitle, { color: colors.text }]}>All caught up</Text>
           <Text style={[s.emptyDesc, { color: colors.textMuted }]}>

@@ -16,26 +16,22 @@ vi.mock('@iconicedu/web/app/(app)/[orgSlug]/spaces/[channelId]/learning-space-sh
 }));
 
 vi.mock('@iconicedu/web/app/actions/messages', () => ({
+  sendFileMessageAction: vi.fn(),
   sendTextMessageAction: vi.fn(),
   toggleMessageReactionAction: vi.fn(),
   deleteMessageAction: vi.fn(),
   toggleHiddenMessageAction: vi.fn(),
 }));
 
-vi.mock('@iconicedu/web/lib/supabase/server', () => ({
-  createSupabaseServerClient: vi.fn(() => ({})),
-}));
-
-vi.mock('@iconicedu/web/lib/auth/requireAuthedUser', () => ({
-  requireAuthedUser: vi.fn(async () => ({ id: 'auth-user', email: 'test@example.com' })),
-}));
-
-vi.mock('@iconicedu/web/lib/accounts/getOrCreateAccount', () => ({
-  getOrCreateAccount: vi.fn(async () => ({ account: { id: 'account-1', org_id: 'org-1' } })),
-}));
-
-vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
-  getProfileByAccountId: vi.fn(async () => ({ data: { id: 'profile-1' } })),
+vi.mock('@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth', () => ({
+  getDashboardAccountContext: vi.fn(async () => ({
+    supabase: {},
+    account: { id: 'account-1', org_id: 'org-1' },
+  })),
+  getDashboardProfileContext: vi.fn(async () => ({
+    profileResponse: { data: { id: 'profile-1' } },
+    currentUserProfile: { ids: { id: 'profile-1', orgId: 'org-1' } },
+  })),
 }));
 
 vi.mock('@iconicedu/web/lib/profile/builders/user-profile.builder', () => ({

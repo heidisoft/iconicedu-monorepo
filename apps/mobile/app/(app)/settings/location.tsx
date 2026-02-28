@@ -7,28 +7,12 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Path, Circle } from 'react-native-svg';
+import { ChevronLeft, MapPin } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { SettingsRow } from '@iconicedu/ui-native';
 import { useProfile } from '@/hooks/use-profile';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
-
-function ChevronLeftIcon({ color }: { color: string }) {
-  return (
-    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-      <Path d="M15 18L9 12L15 6" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
-}
-function MapPinIcon({ color }: { color: string }) {
-  return (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-      <Path d="M21 10C21 17 12 23 12 23C12 23 3 17 3 10C3 7.61305 3.94821 5.32387 5.63604 3.63604C7.32387 1.94821 9.61305 1 12 1C14.3869 1 16.6761 1.94821 18.364 3.63604C20.0518 5.32387 21 7.61305 21 10Z" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-      <Circle cx={12} cy={10} r={3} stroke={color} strokeWidth={1.8} />
-    </Svg>
-  );
-}
 
 function makeStyles(C: AppColors) {
   return StyleSheet.create({
@@ -68,7 +52,7 @@ export default function LocationScreen() {
     <SafeAreaView style={s.safe}>
       <View style={s.nav}>
         <TouchableOpacity style={s.navBack} onPress={() => router.back()} hitSlop={8}>
-          <ChevronLeftIcon color={colors.text} />
+          <ChevronLeft size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={s.navTitle}>Location</Text>
       </View>
@@ -85,7 +69,7 @@ export default function LocationScreen() {
         ) : (
           <View style={s.card}>
             <SettingsRow
-              icon={<MapPinIcon color={colors.textMuted} />}
+              icon={<MapPin size={20} color={colors.textMuted} />}
               label="Country"
               labelColor={colors.text}
               hideChevron
@@ -95,7 +79,7 @@ export default function LocationScreen() {
             />
             <View style={s.divider} />
             <SettingsRow
-              icon={<MapPinIcon color={colors.textMuted} />}
+              icon={<MapPin size={20} color={colors.textMuted} />}
               label="Region / State"
               labelColor={colors.text}
               hideChevron
@@ -103,7 +87,7 @@ export default function LocationScreen() {
             />
             <View style={s.divider} />
             <SettingsRow
-              icon={<MapPinIcon color={colors.textMuted} />}
+              icon={<MapPin size={20} color={colors.textMuted} />}
               label="City"
               labelColor={colors.text}
               hideChevron
@@ -111,7 +95,7 @@ export default function LocationScreen() {
             />
             <View style={s.divider} />
             <SettingsRow
-              icon={<MapPinIcon color={colors.textMuted} />}
+              icon={<MapPin size={20} color={colors.textMuted} />}
               label="Postal Code"
               labelColor={colors.text}
               hideChevron

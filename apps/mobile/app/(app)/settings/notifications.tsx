@@ -9,35 +9,12 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Path } from 'react-native-svg';
+import { ChevronLeft, Bell, BellOff } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { SettingsRow } from '@iconicedu/ui-native';
 import { useNotificationPrefs } from '@/hooks/use-notification-prefs';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
-
-function ChevronLeftIcon({ color }: { color: string }) {
-  return (
-    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-      <Path d="M15 18L9 12L15 6" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
-}
-function BellIcon({ color }: { color: string }) {
-  return (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-      <Path d="M18 8C18 6.4 17.37 4.87 16.24 3.76C15.13 2.63 13.6 2 12 2C10.4 2 8.87 2.63 7.76 3.76C6.63 4.87 6 6.4 6 8C6 15 3 17 3 17H21C21 17 18 15 18 8Z" stroke={color} strokeWidth={1.8} strokeLinejoin="round" strokeLinecap="round" />
-      <Path d="M13.73 21C13.55 21.3 13.3 21.55 13 21.72C12.7 21.89 12.35 21.97 12 21.97C11.65 21.97 11.3 21.89 11 21.72C10.7 21.55 10.45 21.3 10.27 21" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
-}
-function BellOffIcon({ color }: { color: string }) {
-  return (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-      <Path d="M13.73 21C13.55 21.3 13.3 21.55 13 21.72C12.7 21.89 12.35 21.97 12 21.97C11.65 21.97 11.3 21.89 11 21.72C10.7 21.55 10.45 21.3 10.27 21M18 8C18 6.4 17.37 4.87 16.24 3.76M6 8C6 5.3 7.93 3.1 10.5 2.5M3 3L21 21M6 6L3 17H21L18 11" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
-}
 
 const NOTIF_LABELS: Record<string, string> = {
   'message.posted':    'New Messages',
@@ -101,7 +78,7 @@ export default function NotificationsScreen() {
       <SafeAreaView style={s.safe}>
         <View style={s.nav}>
           <TouchableOpacity style={s.navBack} onPress={() => router.back()} hitSlop={8}>
-            <ChevronLeftIcon color={colors.text} />
+            <ChevronLeft size={24} color={colors.text} />
           </TouchableOpacity>
           <Text style={s.navTitle}>Notifications</Text>
         </View>
@@ -116,7 +93,7 @@ export default function NotificationsScreen() {
     <SafeAreaView style={s.safe}>
       <View style={s.nav}>
         <TouchableOpacity style={s.navBack} onPress={() => router.back()} hitSlop={8}>
-          <ChevronLeftIcon color={colors.text} />
+          <ChevronLeft size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={s.navTitle}>Notifications</Text>
       </View>
@@ -126,7 +103,7 @@ export default function NotificationsScreen() {
         <Text style={s.sectionLabel}>Push Notifications</Text>
         <View style={s.card}>
           <SettingsRow
-            icon={<BellIcon color={colors.textMuted} />}
+            icon={<Bell size={20} color={colors.textMuted} />}
             label="Allow push notifications"
             labelColor={colors.text}
             hideChevron
@@ -162,8 +139,8 @@ export default function NotificationsScreen() {
                 const label = NOTIF_LABELS[key] ?? key;
                 const isMuted = mutedMap[key] ?? (pref.muted as boolean) ?? false;
                 const icon = isMuted
-                  ? <BellOffIcon color={colors.textFaint} />
-                  : <BellIcon color={colors.textMuted} />;
+                  ? <BellOff size={20} color={colors.textFaint} />
+                  : <Bell size={20} color={colors.textMuted} />;
                 return (
                   <React.Fragment key={key}>
                     {i > 0 && <View style={s.divider} />}

@@ -33,12 +33,14 @@ export interface BaseAttachmentVM {
 
 export interface ImageAttachmentVM extends BaseAttachmentVM {
   type: 'image';
+  storagePath?: string;
   width?: number;
   height?: number;
 }
 
 export interface FileAttachmentVM extends BaseAttachmentVM {
   type: 'file';
+  storagePath?: string;
   size?: number;
   mimeType?: string;
 }
@@ -314,7 +316,7 @@ export interface HomeworkSubmissionMessageVM extends BaseMessageVM {
 
 export interface LinkPreviewMessageVM extends BaseMessageVM {
   core: MessageCoreVM & { type: 'link-preview' };
-  content?: { text?: string };
+  content?: { text?: string; mentions?: MessageMentionVM[] };
   link: {
     url: string;
     title: string;
@@ -330,6 +332,7 @@ export interface AudioRecordingMessageVM extends BaseMessageVM {
   content?: { text?: string };
   audio: {
     url: string;
+    storagePath?: string;
     durationSeconds: number;
     waveform?: number[];
     fileSize?: number;

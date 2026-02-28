@@ -12,7 +12,15 @@ export function ThreadSheet({
   currentUserId,
   readState,
   isReadOnly = false,
-}: ThreadPanelPropsVM & { isReadOnly?: boolean }) {
+  onAttachReplyFile,
+}: ThreadPanelPropsVM & {
+  isReadOnly?: boolean;
+  onAttachReplyFile?: (
+    file: File,
+    content?: string,
+    options?: { durationSeconds?: number },
+  ) => Promise<void> | void;
+}) {
   const { channel } = useMessagesState();
   const {
     onSendReply,
@@ -57,6 +65,7 @@ export function ThreadSheet({
         ) : (
           <MessageInput
             onSend={onSendReply}
+            onAttachFile={onAttachReplyFile}
             placeholder="Reply..."
             sticky={false}
             participants={channel.collections.participants}

@@ -11,6 +11,7 @@ import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 import type { MessageVM } from '@iconicedu/shared-types';
 import { EmojiPicker } from './emoji-picker';
+import { Smile, Plus, ArrowUp, X } from 'lucide-react-native';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -242,7 +243,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             accessibilityLabel="Cancel reply"
           >
-            <Text style={s.replyClose}>✕</Text>
+            <X size={18} color={colors.textMuted} />
           </TouchableOpacity>
         </View>
       )}
@@ -255,7 +256,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           activeOpacity={0.7}
           accessibilityLabel="Add attachment"
         >
-          <Text style={s.addTxt}>+</Text>
+          <Plus size={22} color={colors.textMuted} />
         </TouchableOpacity>
 
         {/* Pill: text input + smiley */}
@@ -283,7 +284,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             onPress={() => setEmojiPickerVisible(true)}
             accessibilityLabel="Open emoji picker"
           >
-            <Text style={s.emojiTxt}>😊</Text>
+            <Smile size={20} color={colors.textMuted} />
           </TouchableOpacity>
         </View>
 
@@ -295,7 +296,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             activeOpacity={0.8}
             accessibilityLabel="Send message"
           >
-            <Text style={s.sendTxt}>↑</Text>
+            <ArrowUp size={20} color={colors.tealFg} />
           </TouchableOpacity>
         )}
       </View>
