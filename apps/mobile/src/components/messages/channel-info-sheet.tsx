@@ -20,6 +20,8 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { supabase } from '@/lib/supabase/client';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -36,7 +38,6 @@ import type {
   MessageVM,
   ImageMessageVM,
   FileMessageVM,
-  AudioRecordingMessageVM,
   TextMessageVM,
   UserProfileVM,
 } from '@iconicedu/shared-types';
@@ -227,15 +228,36 @@ function FileItemRow({ item, colors, s }: { item: FileItem; colors: AppColors; s
     if (opening) return;
     setOpening(true);
     try {
-      await WebBrowser.openBrowserAsync(item.url, {
-        presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
-      });
+      let openUrl = item.url;
+      if (item.storagePath) {
+        const { data, error } = await supabase.storage
+          .from(CHANNEL_FILES_BUCKET)
+          .createSignedUrl(item.storagePath, 300);
+        if (!error && data?.signedUrl) openUrl = data.signedUrl;
+      }
+
+      if (item.kind === 'image') {
+        // Images render fine in the in-app browser
+        await WebBrowser.openBrowserAsync(openUrl, {
+          presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
+        });
+      } else {
+        // Binary files (PDF, DOCX, etc.) must be downloaded then opened
+        // with the native file viewer via expo-sharing
+        const safeName = item.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const localPath = `${FileSystem.cacheDirectory}iconicedu_${Date.now()}_${safeName}`;
+        const { uri } = await FileSystem.downloadAsync(openUrl, localPath);
+        await Sharing.shareAsync(uri, {
+          mimeType: item.mimeType ?? 'application/octet-stream',
+          dialogTitle: item.name,
+        });
+      }
     } catch {
       await Linking.openURL(item.url).catch(() => null);
     } finally {
       setOpening(false);
     }
-  }, [item.url, opening]);
+  }, [item, opening]);
 
   const iconBg = isImage ? colors.tealBg : colors.card;
   const iconColor = isImage ? colors.teal : colors.text;
@@ -259,97 +281,6 @@ function FileItemRow({ item, colors, s }: { item: FileItem; colors: AppColors; s
         : <Download size={16} color={colors.textMuted} />
       }
     </TouchableOpacity>
-  );
-}
-
-// ─── Audio item row (voice messages) ───────────────────────────────────────────
-
-function AudioItemRow({ item, colors, s }: { item: FileItem; colors: AppColors; s: ReturnType<typeof makeStyles> }) {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [positionMs, setPositionMs] = useState(0);
-  const [durationMs, setDurationMs] = useState(0);
-  const soundRef = useRef<Audio.Sound | null>(null);
-
-  useEffect(() => {
-    return () => {
-      soundRef.current?.unloadAsync().catch(() => null);
-    };
-  }, []);
-
-  const handlePlay = useCallback(async () => {
-    if (soundRef.current) {
-      if (isPlaying) {
-        await soundRef.current.pauseAsync();
-      } else {
-        await soundRef.current.playAsync();
-      }
-      return;
-    }
-    setIsLoading(true);
-    try {
-      await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: item.url },
-        { shouldPlay: true },
-        (status) => {
-          if (!status.isLoaded) return;
-          setIsPlaying(status.isPlaying ?? false);
-          setPositionMs(status.positionMillis ?? 0);
-          if (status.durationMillis) setDurationMs(status.durationMillis);
-          if (status.didJustFinish) {
-            soundRef.current?.setPositionAsync(0).catch(() => null);
-            setPositionMs(0);
-          }
-        },
-      );
-      soundRef.current = sound;
-      setIsPlaying(true);
-    } catch {
-      Alert.alert('Playback error', 'Could not play this voice message.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [item.url, isPlaying]);
-
-  const formatTime = (ms: number) => {
-    const totalSecs = Math.floor(ms / 1000);
-    return `${Math.floor(totalSecs / 60)}:${String(totalSecs % 60).padStart(2, '0')}`;
-  };
-
-  const totalMs = durationMs > 0 ? durationMs : (item.durationSeconds ?? 0) * 1000;
-  const progress = totalMs > 0 ? Math.min(1, positionMs / totalMs) : 0;
-
-  return (
-    <View style={s.fileItem}>
-      <TouchableOpacity
-        style={[s.audioPlayBtn, { backgroundColor: isPlaying ? colors.teal : colors.tealBg }]}
-        onPress={handlePlay}
-        disabled={isLoading}
-        activeOpacity={0.7}
-      >
-        {isLoading
-          ? <ActivityIndicator size="small" color={colors.teal} />
-          : isPlaying
-            ? <Pause size={15} color="#fff" />
-            : <Play size={15} color={colors.teal} />
-        }
-      </TouchableOpacity>
-
-      <View style={s.fileInfo}>
-        <View style={s.audioProgressTrack}>
-          <View style={[s.audioProgressFill, { width: `${Math.round(progress * 100)}%` }]} />
-        </View>
-        <View style={s.audioTimesRow}>
-          <Text style={s.fileMeta}>{formatTime(positionMs)}</Text>
-          <Text style={s.fileMeta}>{formatTime(totalMs)}</Text>
-        </View>
-      </View>
-
-      <View style={[s.fileIconBox, { backgroundColor: '#F0E8FF' }]}>
-        <Mic size={16} color="#9333ea" />
-      </View>
-    </View>
   );
 }
 
@@ -388,11 +319,9 @@ function TabContent({
     }
     return (
       <ScrollView showsVerticalScrollIndicator={false} scrollEnabled={isFullScreen}>
-        {fileItems.map((item) =>
-          item.kind === 'audio'
-            ? <AudioItemRow key={item.id} item={item} colors={colors} s={s} />
-            : <FileItemRow key={item.id} item={item} colors={colors} s={s} />
-        )}
+        {fileItems.map((item) => (
+          <FileItemRow key={item.id} item={item} colors={colors} s={s} />
+        ))}
       </ScrollView>
     );
   }
@@ -696,32 +625,6 @@ function makeStyles(C: AppColors) {
       justifyContent: 'center',
     },
 
-    // ── Audio player ──────────────────────────────────────────────────────────
-    audioPlayBtn: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
-      alignItems: 'center',
-      justifyContent: 'center',
-      flexShrink: 0,
-    },
-    audioProgressTrack: {
-      height: 4,
-      borderRadius: 2,
-      backgroundColor: C.inputBg,
-      overflow: 'hidden',
-      marginBottom: 4,
-    },
-    audioProgressFill: {
-      height: 4,
-      borderRadius: 2,
-      backgroundColor: C.teal,
-    },
-    audioTimesRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-    },
-
     // ── Saved tab ─────────────────────────────────────────────────────────────
     savedItem: {
       flexDirection: 'row',
@@ -899,6 +802,50 @@ export function ChannelInfoSheet({
     }).start();
   }, [sheetTranslateY]);
 
+  // ── Stable refs for partial overlay pan responder ──────────────────────────
+  const expandToFullRef = useRef<() => void>(() => {});
+  const handleCloseRef = useRef<() => void>(() => {});
+  useEffect(() => { expandToFullRef.current = expandToFull; }, [expandToFull]);
+  useEffect(() => { handleCloseRef.current = handleClose; }, [handleClose]);
+
+  // ── Partial overlay PanResponder — swipe down closes, tap/swipe-up expands ─
+  const partialOverlayPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      // Only steal the gesture once there's clear vertical movement
+      onMoveShouldSetPanResponder: (_, { dy, dx }) => Math.abs(dy) > 6 && Math.abs(dy) > Math.abs(dx),
+      onPanResponderGrant: () => {
+        sheetTranslateY.stopAnimation((val) => { panRef.current = val; });
+      },
+      onPanResponderMove: (_, { dy }) => {
+        // Only allow dragging downward from partial mode
+        if (dy > 0) {
+          sheetTranslateY.setValue(Math.min(SCREEN_HEIGHT, panRef.current + dy));
+        }
+      },
+      onPanResponderRelease: (_, { dy, vy }) => {
+        if (Math.abs(dy) < 8) {
+          // Tap — expand to full
+          expandToFullRef.current();
+        } else if (dy > 60 || vy > 0.5) {
+          // Swipe down — close the sheet
+          handleCloseRef.current();
+        } else if (dy < -30 || vy < -0.5) {
+          // Swipe up — expand to full
+          expandToFullRef.current();
+        } else {
+          // Small movement — snap back to partial
+          Animated.spring(sheetTranslateY, {
+            toValue: SCREEN_HEIGHT - PARTIAL_HEIGHT,
+            useNativeDriver: true,
+            tension: 80,
+            friction: 12,
+          }).start();
+        }
+      },
+    }),
+  ).current;
+
   // ── PanResponder (drag handle) ──────────────────────────────────────────────
   const panResponder = useRef(
     PanResponder.create({
@@ -1030,9 +977,9 @@ export function ChannelInfoSheet({
               )}
             </View>
 
-            {/* Expand overlay in partial mode */}
+            {/* Partial overlay — swipe down closes, tap expands */}
             {!isFullScreen && (
-              <Pressable style={StyleSheet.absoluteFill} onPress={expandToFull} />
+              <View style={StyleSheet.absoluteFill} {...partialOverlayPanResponder.panHandlers} />
             )}
           </ScrollView>
         ) : (
@@ -1082,9 +1029,9 @@ export function ChannelInfoSheet({
               />
             </View>
 
-            {/* Expand overlay in partial mode — tapping content area expands sheet */}
+            {/* Partial overlay — swipe down closes, tap expands */}
             {!isFullScreen && (
-              <Pressable style={StyleSheet.absoluteFill} onPress={expandToFull} />
+              <View style={StyleSheet.absoluteFill} {...partialOverlayPanResponder.panHandlers} />
             )}
           </>
         )}
