@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
-import { View, Text, Image, StyleSheet, StyleProp, TextStyle, TouchableOpacity, Pressable, Linking, ActivityIndicator, Modal, StatusBar, SafeAreaView } from 'react-native';
+import { View, Text, Image, StyleSheet, StyleProp, TextStyle, TouchableOpacity, Pressable, Linking, ActivityIndicator } from 'react-native';
 import type {
   MessageVM,
   ThreadVM,
@@ -15,6 +15,7 @@ import type {
   FileMessageVM,
   AudioRecordingMessageVM,
   ImageMessageVM,
+  ImageAttachmentVM,
   LinkPreviewMessageVM,
   MessageMentionVM,
   ReactionVM,
@@ -22,7 +23,7 @@ import type {
 import type { AppColors } from '@/lib/theme';
 import { fetchThreadMessages } from '@/lib/api/queries';
 import { EmojiPicker } from './emoji-picker';
-import { SmilePlus, CornerUpLeft, MessageCircle, Download, FileText, Play, Pause, X } from 'lucide-react-native';
+import { SmilePlus, CornerUpLeft, MessageCircle, Download, FileText, Play, Pause } from 'lucide-react-native';
 import { Audio } from 'expo-av';
 import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '@/lib/supabase/client';
@@ -777,6 +778,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   const [audioDurationMs, setAudioDurationMs] = useState(0);
   const soundRef = useRef<Audio.Sound | null>(null);
   const [openingFile, setOpeningFile] = useState<string | null>(null);
+  const [imageSignedUrls, setImageSignedUrls] = useState<Record<string, string>>({});
 
   // Unload sound when the message item unmounts
   useEffect(() => {
@@ -785,9 +787,31 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     };
   }, []);
 
-  // Full-screen image viewer state
-  const [viewerImages, setViewerImages] = useState<string[]>([]);
-  const [viewerIndex, setViewerIndex] = useState(0);
+  // Pre-generate signed URLs for image attachments so <Image> can render them
+  useEffect(() => {
+    if (type !== 'image') return;
+    const im = message as ImageMessageVM;
+    const attachments: ImageAttachmentVM[] = im.attachments?.length ? im.attachments : (im.attachment ? [im.attachment] : []);
+    const withPaths = attachments.filter((a) => a.storagePath);
+    if (!withPaths.length) return;
+
+    let cancelled = false;
+    (async () => {
+      const entries = await Promise.all(
+        withPaths.map(async (att) => {
+          const { data, error } = await supabase.storage
+            .from(CHANNEL_FILES_BUCKET)
+            .createSignedUrl(att.storagePath!, 3600);
+          if (!error && data?.signedUrl) return [att.storagePath!, data.signedUrl] as [string, string];
+          return null;
+        }),
+      );
+      if (cancelled) return;
+      setImageSignedUrls(Object.fromEntries(entries.filter((e): e is [string, string] => !!e)));
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [type, message.ids.id]);
   const type = message.core.type;
   const senderDisplayName = message.core.sender.profile.displayName;
   const { url: avatarUrl, seed: avatarSeed } = getAvatarInfo(message);
@@ -893,18 +917,16 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 
   // ── Image message (rendered edge-to-edge, no bubble padding) ─────────────
 
-  const openImageViewer = (urls: string[], index: number) => {
-    setViewerImages(urls);
-    setViewerIndex(index);
-  };
-
   const renderImageContent = () => {
     const im = message as ImageMessageVM;
     const attachments = im.attachments?.length ? im.attachments : [im.attachment];
     const isGallery = attachments.length > 1;
     const first = attachments[0]!;
     const singleAspect = first.width && first.height ? first.width / first.height : 4 / 3;
-    const urls = attachments.map((a) => a.url);
+
+    // Use pre-generated signed URL for display; fall back to raw url if not yet ready
+    const displayUrl = (att: ImageAttachmentVM) =>
+      (att.storagePath ? imageSignedUrls[att.storagePath] : undefined) ?? att.url;
 
     return (
       <View style={[isGallery ? s.imageGalleryWrapper : s.imageWrapper, { backgroundColor: colors.card }]}>
@@ -919,45 +941,44 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         )}
         {isGallery ? (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-            {attachments.map((att, i) => (
-              <View key={`${att.url}-${i}`} style={s.galleryItem}>
+            {attachments.map((att, i) => {
+              const fileKey = att.storagePath ?? att.url;
+              const isOpening = openingFile === fileKey;
+              return (
                 <TouchableOpacity
+                  key={`${att.url}-${i}`}
+                  style={s.galleryItem}
                   activeOpacity={0.9}
-                  style={{ flex: 1 }}
-                  onPress={() => openImageViewer(urls, i)}
+                  onPress={() => handleFileOpen(att.url, att.storagePath)}
+                  disabled={isOpening}
                 >
-                  <Image source={{ uri: att.url }} style={s.galleryItemImg} resizeMode="cover" />
+                  <Image source={{ uri: displayUrl(att) }} style={s.galleryItemImg} resizeMode="cover" />
+                  {isOpening && (
+                    <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.35)' }]}>
+                      <ActivityIndicator color="#fff" />
+                    </View>
+                  )}
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={s.imageDownloadBtn}
-                  onPress={() => Linking.openURL(att.url).catch(() => null)}
-                  activeOpacity={0.8}
-                >
-                  <Download size={12} color="#fff" />
-                </TouchableOpacity>
-              </View>
-            ))}
+              );
+            })}
           </View>
         ) : (
-          <View style={{ position: 'relative' }}>
-            <TouchableOpacity
-              activeOpacity={0.9}
-              onPress={() => openImageViewer(urls, 0)}
-            >
-              <Image
-                source={{ uri: first.url }}
-                style={[s.imagePreview, { aspectRatio: singleAspect }]}
-                resizeMode="cover"
-              />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={s.imageDownloadBtn}
-              onPress={() => Linking.openURL(first.url).catch(() => null)}
-              activeOpacity={0.8}
-            >
-              <Download size={14} color="#fff" />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => handleFileOpen(first.url, first.storagePath)}
+            disabled={openingFile === (first.storagePath ?? first.url)}
+          >
+            <Image
+              source={{ uri: displayUrl(first) }}
+              style={[s.imagePreview, { aspectRatio: singleAspect }]}
+              resizeMode="cover"
+            />
+            {openingFile === (first.storagePath ?? first.url) && (
+              <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.35)' }]}>
+                <ActivityIndicator color="#fff" />
+              </View>
+            )}
+          </TouchableOpacity>
         )}
       </View>
     );
@@ -1284,80 +1305,6 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   // ── Bubble messages (text, file, audio, image) ────────────────────────────
 
   return (
-    <>
-    {/* Full-screen image viewer */}
-    <Modal
-      visible={viewerImages.length > 0}
-      transparent
-      animationType="fade"
-      statusBarTranslucent
-      onRequestClose={() => setViewerImages([])}
-    >
-      <StatusBar backgroundColor="#000" barStyle="light-content" />
-      <View style={{ flex: 1, backgroundColor: '#000' }}>
-        {/* Close + counter */}
-        <SafeAreaView style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 12 }}>
-            {viewerImages.length > 1 ? (
-              <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600', opacity: 0.85 }}>
-                {viewerIndex + 1} / {viewerImages.length}
-              </Text>
-            ) : <View />}
-            <TouchableOpacity
-              onPress={() => setViewerImages([])}
-              style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' }}
-              accessibilityLabel="Close image viewer"
-            >
-              <X size={18} color="#fff" />
-            </TouchableOpacity>
-          </View>
-        </SafeAreaView>
-
-        {/* Image */}
-        <Pressable style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }} onPress={() => setViewerImages([])}>
-          {viewerImages[viewerIndex] ? (
-            <Image
-              source={{ uri: viewerImages[viewerIndex] }}
-              style={{ width: '100%', height: '80%' }}
-              resizeMode="contain"
-            />
-          ) : null}
-        </Pressable>
-
-        {/* Gallery prev/next navigation */}
-        {viewerImages.length > 1 && (
-          <SafeAreaView style={{ position: 'absolute', bottom: 0, left: 0, right: 0 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 32, paddingBottom: 24 }}>
-              <TouchableOpacity
-                onPress={() => setViewerIndex((i) => Math.max(0, i - 1))}
-                style={{ opacity: viewerIndex === 0 ? 0.3 : 1, paddingHorizontal: 24, paddingVertical: 10, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.15)' }}
-                disabled={viewerIndex === 0}
-              >
-                <Text style={{ color: '#fff', fontWeight: '600' }}>← Prev</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setViewerIndex((i) => Math.min(viewerImages.length - 1, i + 1))}
-                style={{ opacity: viewerIndex === viewerImages.length - 1 ? 0.3 : 1, paddingHorizontal: 24, paddingVertical: 10, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.15)' }}
-                disabled={viewerIndex === viewerImages.length - 1}
-              >
-                <Text style={{ color: '#fff', fontWeight: '600' }}>Next →</Text>
-              </TouchableOpacity>
-            </View>
-          </SafeAreaView>
-        )}
-
-        {/* Download current image */}
-        <SafeAreaView style={{ position: 'absolute', bottom: 0, right: 0 }}>
-          <TouchableOpacity
-            onPress={() => Linking.openURL(viewerImages[viewerIndex] ?? '').catch(() => null)}
-            style={{ margin: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' }}
-            accessibilityLabel="Download image"
-          >
-            <Download size={18} color="#fff" />
-          </TouchableOpacity>
-        </SafeAreaView>
-      </View>
-    </Modal>
     <Pressable
       onLongPress={() => onLongPress?.(message)}
       delayLongPress={350}
@@ -1420,6 +1367,5 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         )}
       </View>
     </Pressable>
-    </>
   );
 };

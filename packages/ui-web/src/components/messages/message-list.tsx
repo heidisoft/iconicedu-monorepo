@@ -625,8 +625,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                 }
                                 placeholder="Reply in thread..."
                                 className={cn(
-                                  'h-9 rounded-full w-full',
-                                  !isParentRightAligned && 'md:w-1/2',
+                                  'h-9 w-full rounded-full',
                                 )}
                                 disabled={sendingReplyByParent[message.ids.id]}
                               />
