@@ -22,7 +22,7 @@ import type {
 import type { AppColors } from '@/lib/theme';
 import { fetchThreadMessages } from '@/lib/api/queries';
 import { EmojiPicker } from './emoji-picker';
-import { SmilePlus, CornerUpLeft, MessageCircle, Download, FileText, ExternalLink, Play, Pause, X } from 'lucide-react-native';
+import { SmilePlus, CornerUpLeft, MessageCircle, Download, FileText, Play, Pause, X } from 'lucide-react-native';
 import { Audio } from 'expo-av';
 import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '@/lib/supabase/client';
@@ -836,43 +836,29 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     }
   }, [isAudioPlaying]);
 
-  const handleFileDownload = useCallback(async (
-    url: string,
-    name: string,
-    storagePath?: string,
-  ) => {
+  const handleFileOpen = useCallback(async (url: string, storagePath?: string) => {
     const key = storagePath ?? url;
-    if (downloadingUrls.has(key)) return;
-    setDownloadingUrls(prev => new Set(prev).add(key));
+    if (openingFile === key) return;
+    setOpeningFile(key);
     try {
-      // If we have a storagePath, generate a fresh signed URL (same as web's
-      // /api/messages/file-download route which calls createSignedUrl).
-      // Otherwise fall back to the stored URL (public assets, external URLs).
-      let downloadUrl = url;
+      let openUrl = url;
       if (storagePath) {
         const { data, error } = await supabase.storage
           .from(CHANNEL_FILES_BUCKET)
-          .createSignedUrl(storagePath, 300); // 5-minute window
-        if (error || !data?.signedUrl) throw new Error(error?.message ?? 'Could not sign URL');
-        downloadUrl = data.signedUrl;
+          .createSignedUrl(storagePath, 300);
+        if (error || !data?.signedUrl) throw new Error();
+        openUrl = data.signedUrl;
       }
-
-      const safeFilename = `${Date.now()}_${name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-      const docDir = FileSystem.documentDirectory ?? FileSystem.cacheDirectory;
-      if (!docDir) throw new Error('No writable directory');
-      const dest = `${docDir}${safeFilename}`;
-      await FileSystem.downloadAsync(downloadUrl, dest);
-      Alert.alert('Saved', `"${name}" has been saved to your device.`);
-    } catch {
-      Alert.alert('Download failed', 'Could not save the file. Please try again.');
-    } finally {
-      setDownloadingUrls(prev => {
-        const next = new Set(prev);
-        next.delete(key);
-        return next;
+      await WebBrowser.openBrowserAsync(openUrl, {
+        presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
       });
+    } catch {
+      // open falls back to system browser
+      await Linking.openURL(url).catch(() => null);
+    } finally {
+      setOpeningFile(null);
     }
-  }, [downloadingUrls]);
+  }, [openingFile]);
 
   const handleThreadPress = useCallback(async () => {
     if (!thread) {
@@ -1000,8 +986,8 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         )}
         <View style={[s.fileListWrap, { borderColor: colors.border, backgroundColor: colors.card }]}>
           {attachments.map((att, i) => {
-            const dlKey = att.storagePath ?? att.url;
-            const isDownloading = downloadingUrls.has(dlKey);
+            const fileKey = att.storagePath ?? att.url;
+            const isOpening = openingFile === fileKey;
             return (
               <TouchableOpacity
                 key={`${att.url}-${i}`}
@@ -1009,15 +995,13 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                   s.fileRowPadded,
                   i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
                 ]}
-                onPress={() => handleFileDownload(att.url, att.name, att.storagePath)}
-                disabled={isDownloading}
-                accessibilityLabel={`Download ${att.name}`}
+                onPress={() => handleFileOpen(att.url, att.storagePath)}
+                disabled={isOpening}
+                accessibilityLabel={`Open ${att.name}`}
               >
-                {/* Icon: matches web "h-10 w-10 bg-primary/10 rounded-md" + FileText h-5 w-5 text-primary */}
                 <View style={s.fileIcon}>
                   <FileText size={20} color={colors.teal} />
                 </View>
-                {/* Name + size: matches web "flex-1 min-w-0" */}
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={{ fontSize: 13, fontWeight: '500', color: colors.text }} numberOfLines={1}>
                     {att.name}
@@ -1028,8 +1012,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                     </Text>
                   )}
                 </View>
-                {/* Download icon / spinner */}
-                {isDownloading
+                {isOpening
                   ? <ActivityIndicator size="small" color={colors.textMuted} />
                   : <Download size={16} color={colors.textMuted} />
                 }
