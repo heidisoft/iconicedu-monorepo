@@ -6,6 +6,7 @@ import { SystemBars } from 'react-native-edge-to-edge';
 import { AppProviders } from '@/providers/app-providers';
 import { useTheme } from '@/providers/theme-provider';
 import { useAuth } from '@/providers/auth-provider';
+import { PostHogScreenTracker } from '@/providers/posthog-screen-tracker';
 
 function SpinnerScreen() {
   const { colors } = useTheme();
@@ -40,6 +41,7 @@ function RootContent() {
         rendered behind it (the tab bar's tabBarBackground), not from this component.
       */}
       <SystemBars style={isDark ? 'light' : 'dark'} />
+      <PostHogScreenTracker />
       <Slot />
     </>
   );

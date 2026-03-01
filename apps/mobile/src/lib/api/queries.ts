@@ -7,6 +7,16 @@ import type {
   MessageVM,
   ReactionVM,
   ThreadVM,
+  ClassScheduleVM,
+  EventSourceVM,
+  RecurrenceVM,
+  ClassScheduleParticipantVM,
+  RecurrenceFrequencyVM,
+  ParticipantRoleVM,
+  ParticipationStatusVM,
+  EventStatusVM,
+  ClassScheduleVisibilityVM,
+  ClassSchedulePatchVM,
 } from '@iconicedu/shared-types';
 import { mapRowToMessageVM, buildSenderProfile, type RawMessageRow, type RawSenderProfile } from './map-row-to-vm';
 
@@ -1433,4 +1443,142 @@ export async function sendFilesMessage(
 
   if (payloadError) throw payloadError;
   return msg;
+}
+
+// ─── Class Schedule Mapper ─────────────────────────────────────────────────────
+
+function mapClassScheduleRow(row: Record<string, unknown>): ClassScheduleVM {
+  const orgId = row.org_id as string;
+
+  // Map recurrence
+  const recurrenceRows = row.recurrence as Record<string, unknown>[] | null;
+  const recurrenceRow = recurrenceRows?.[0];
+  const recurrence: RecurrenceVM | undefined = recurrenceRow
+    ? {
+        ids: { id: recurrenceRow.id as string, orgId },
+        rule: {
+          frequency: recurrenceRow.frequency as RecurrenceFrequencyVM,
+          interval: (recurrenceRow.interval as number | null) ?? undefined,
+          byWeekday: (recurrenceRow.byday as string[] | null) as RecurrenceVM['rule']['byWeekday'] ?? undefined,
+          count: (recurrenceRow.count as number | null) ?? undefined,
+          until: (recurrenceRow.until as string | null) ?? undefined,
+          timezone: (recurrenceRow.timezone as string | null) ?? undefined,
+        },
+        exceptions: ((recurrenceRow.exceptions as Record<string, unknown>[]) ?? []).map((e) => ({
+          occurrenceKey: e.occurrence_key as string,
+          reason: (e.reason as string | null) ?? undefined,
+        })),
+        overrides: ((recurrenceRow.overrides as Record<string, unknown>[]) ?? []).map((o) => ({
+          occurrenceKey: o.occurrence_key as string,
+          patch: o.patch as ClassSchedulePatchVM,
+        })),
+      }
+    : undefined;
+
+  // Map source
+  const sourceKind = row.source_kind as string;
+  let source: EventSourceVM;
+  if (sourceKind === 'class_session') {
+    source = {
+      kind: 'class_session',
+      learningSpaceId: row.source_learning_space_id as string,
+      channelId: (row.source_channel_id as string | null) ?? undefined,
+      sessionId: (row.source_session_id as string | null) ?? undefined,
+    };
+  } else if (sourceKind === 'availability_block') {
+    source = { kind: 'availability_block', ownerUserId: row.source_owner_user_id as string };
+  } else {
+    source = {
+      kind: 'manual',
+      createdByUserId: row.source_created_by_user_id as string,
+      relatedTo: row.source_related_learning_space_id
+        ? { kind: 'learning_space', id: row.source_related_learning_space_id as string }
+        : undefined,
+    };
+  }
+
+  // Map participants
+  const participants: ClassScheduleParticipantVM[] = (
+    (row.participants as Record<string, unknown>[]) ?? []
+  ).map((p) => ({
+    ids: { id: p.id as string, orgId },
+    role: p.role as ParticipantRoleVM,
+    status: (p.status as ParticipationStatusVM | null) ?? undefined,
+    displayName: (p.display_name as string | null) ?? undefined,
+    avatarUrl: (p.avatar_url as string | null) ?? undefined,
+    themeKey: (p.theme_key as string | null) ?? undefined,
+  }));
+
+  return {
+    ids: { id: row.id as string, orgId },
+    title: row.title as string,
+    description: (row.description as string | null) ?? undefined,
+    location: (row.location as string | null) ?? undefined,
+    meetingLink: (row.meeting_link as string | null) ?? undefined,
+    startAt: row.start_at as string,
+    endAt: row.end_at as string,
+    timezone: (row.timezone as string | null) ?? undefined,
+    status: row.status as EventStatusVM,
+    visibility: row.visibility as ClassScheduleVisibilityVM,
+    themeKey: (row.theme_key as string | null) ?? undefined,
+    participants,
+    source,
+    recurrence,
+    audit: {
+      createdAt: row.created_at as string,
+      createdBy: row.created_by as string,
+      updatedAt: (row.updated_at as string | null) ?? undefined,
+      updatedBy: (row.updated_by as string | null) ?? undefined,
+    },
+  };
+}
+
+// ─── Space Sessions ────────────────────────────────────────────────────────────
+
+/**
+ * Fetches class schedules for the learning space that owns the given channel.
+ * Sessions are a learning-space concern — decoupled from channel messaging logic.
+ */
+export async function fetchSpaceSchedulesByChannelId(
+  channelId: string,
+  orgId: string,
+): Promise<ClassScheduleVM[]> {
+  // Step 1: Resolve channel → learning space
+  const { data: spaceLink, error: linkError } = await supabase
+    .from('learning_space_channels')
+    .select('learning_space_id')
+    .eq('org_id', orgId)
+    .eq('channel_id', channelId)
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  if (linkError) throw linkError;
+  if (!spaceLink) return [];
+
+  // Step 2: Fetch schedules for the learning space (not the channel)
+  const { data, error } = await supabase
+    .from('class_schedules')
+    .select(`
+      id, org_id, title, description, location, meeting_link,
+      start_at, end_at, timezone, status, visibility, theme_key,
+      source_kind, source_learning_space_id, source_channel_id,
+      source_session_id, source_owner_user_id, source_created_by_user_id,
+      source_related_learning_space_id,
+      created_at, created_by, updated_at, updated_by,
+      participants:class_schedule_participants(
+        id, org_id, role, status, display_name, avatar_url, theme_key
+      ),
+      recurrence:class_schedule_recurrence(
+        id, org_id, frequency, interval, count, until, timezone, byday,
+        exceptions:class_schedule_recurrence_exceptions(id, occurrence_key, reason),
+        overrides:class_schedule_recurrence_overrides(id, occurrence_key, patch)
+      )
+    `)
+    .eq('org_id', orgId)
+    .eq('source_learning_space_id', spaceLink.learning_space_id)
+    .is('deleted_at', null)
+    .order('start_at', { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []).map((row) => mapClassScheduleRow(row as Record<string, unknown>));
 }

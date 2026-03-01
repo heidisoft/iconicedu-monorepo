@@ -123,57 +123,6 @@ function getRecurringDisplayRange(schedules: ClassScheduleVM[], now: Date) {
   };
 }
 
-function buildExceptionDisplaySchedules(
-  schedules: ClassScheduleVM[],
-  rangeStart: Date,
-  rangeEnd: Date,
-): DisplaySchedule[] {
-  const rangeStartMs = rangeStart.getTime();
-  const rangeEndMs = rangeEnd.getTime();
-
-  return schedules.flatMap((schedule) => {
-    if (!schedule.recurrence?.exceptions?.length) return [];
-
-    const durationMs = new Date(schedule.endAt).getTime() - new Date(schedule.startAt).getTime();
-    const overriddenKeys = new Set(
-      schedule.recurrence.overrides?.map((override) => override.occurrenceKey) ?? [],
-    );
-
-    return schedule.recurrence.exceptions.flatMap((exception) => {
-      if (overriddenKeys.has(exception.occurrenceKey)) return [];
-
-      const originalStart = new Date(exception.occurrenceKey);
-      const startMs = originalStart.getTime();
-      if (startMs < rangeStartMs || startMs > rangeEndMs) return [];
-
-      const originalEnd = new Date(startMs + durationMs);
-
-      return [
-        {
-          ...schedule,
-          ids: {
-            ...schedule.ids,
-            id: `${schedule.ids.id}__${exception.occurrenceKey}__exception`,
-          },
-          startAt: originalStart.toISOString(),
-          endAt: originalEnd.toISOString(),
-          status: 'cancelled',
-          meetingLink: null,
-          recurrence: undefined,
-          description: exception.reason ?? null,
-          uiState: {
-            kind: 'exception',
-            disabled: true,
-            reason: exception.reason ?? null,
-            originalStartAt: originalStart.toISOString(),
-            originalEndAt: originalEnd.toISOString(),
-          },
-        },
-      ];
-    });
-  });
-}
-
 export function expandSchedulesForDisplay(
   schedules: ClassScheduleVM[],
   now = new Date(),
@@ -191,9 +140,19 @@ export function expandSchedulesForDisplay(
 
   const { rangeStart, rangeEnd } = getRecurringDisplayRange(schedules, now);
   const expandedRecurring = expandRecurringEvents(recurring, rangeStart, rangeEnd);
-  const exceptionSchedules = buildExceptionDisplaySchedules(recurring, rangeStart, rangeEnd);
   const recurringById = new Map(recurring.map((item) => [item.ids.id, item]));
   const normalizedRecurring: DisplaySchedule[] = expandedRecurring.map((schedule) => {
+    if (schedule.uiState?.kind) {
+      return {
+        ...schedule,
+        description:
+          schedule.uiState.kind === 'exception'
+            ? schedule.uiState.reason ?? schedule.description ?? null
+            : null,
+        uiState: schedule.uiState,
+      };
+    }
+
     const compositeId = schedule.ids.id;
     const separatorIndex = compositeId.indexOf('__');
     if (separatorIndex === -1) {
@@ -233,7 +192,6 @@ export function expandSchedulesForDisplay(
   return dedupeDisplaySchedules([
     ...normalizedNonRecurring,
     ...normalizedRecurring,
-    ...exceptionSchedules,
   ]);
 }
 
