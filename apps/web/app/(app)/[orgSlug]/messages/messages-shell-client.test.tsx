@@ -28,6 +28,7 @@ describe('MessagesShellClient', () => {
     const sendFileMessage = vi.fn();
     const sendFilesMessage = vi.fn();
     const toggleReaction = vi.fn();
+    const toggleSavedMessage = vi.fn();
     const deleteMessage = vi.fn();
     const toggleHiddenMessage = vi.fn();
 
@@ -43,6 +44,7 @@ describe('MessagesShellClient', () => {
         sendFileMessage={sendFileMessage}
         sendFilesMessage={sendFilesMessage}
         toggleReaction={toggleReaction}
+        toggleSavedMessage={toggleSavedMessage}
         deleteMessage={deleteMessage}
         toggleHiddenMessage={toggleHiddenMessage}
       />,
@@ -55,6 +57,7 @@ describe('MessagesShellClient', () => {
           messageWriteClient: {
             sendTextMessage,
             toggleReaction,
+            toggleSavedMessage,
             deleteMessage,
             toggleHiddenMessage,
           },

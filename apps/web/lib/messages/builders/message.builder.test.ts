@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { buildMessageById } from '@iconicedu/web/lib/messages/builders/message.builder';
 
@@ -9,6 +9,7 @@ const buildThreadById = vi.fn();
 const getMessageFilesByMessageIds = vi.fn(async () => ({ data: [] }));
 const getMessageImagesByMessageIds = vi.fn(async () => ({ data: [] }));
 const getMessageAudioRecordingsByMessageIds = vi.fn(async () => ({ data: [] }));
+const getMessageSavesByMessageIds = vi.fn(async () => ({ data: [] }));
 const createSignedChannelFileUrl = vi.fn(async (_supabase: unknown, path: string) => `signed:${path}`);
 
 vi.mock('@iconicedu/web/lib/messages/queries/messages.query', () => ({
@@ -31,6 +32,7 @@ vi.mock('@iconicedu/web/lib/messages/queries/messages.query', () => ({
   getMessageAudioRecordingsByMessageIds: (...args: unknown[]) =>
     getMessageAudioRecordingsByMessageIds(...args),
   getMessageReactionCountsByMessageIds: vi.fn(async () => ({ data: [] })),
+  getMessageSavesByMessageIds: (...args: unknown[]) => getMessageSavesByMessageIds(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/messages/queries/file-url.query', () => ({
@@ -51,9 +53,14 @@ vi.mock('@iconicedu/web/lib/messages/builders/thread.builder', () => ({
 
 describe('buildMessageById', () => {
   beforeEach(() => {
+    getMessageById.mockReset();
+    buildUserProfileById.mockReset();
+    mapMessageRowToVM.mockReset();
+    buildThreadById.mockReset();
     getMessageFilesByMessageIds.mockResolvedValue({ data: [] });
     getMessageImagesByMessageIds.mockResolvedValue({ data: [] });
     getMessageAudioRecordingsByMessageIds.mockResolvedValue({ data: [] });
+    getMessageSavesByMessageIds.mockResolvedValue({ data: [] });
     createSignedChannelFileUrl.mockClear();
   });
 
@@ -80,13 +87,42 @@ describe('buildMessageById', () => {
     const result = await buildMessageById({} as any, 'org-1', 'message-1');
 
     expect(mapMessageRowToVM).toHaveBeenCalledWith(
-      row,
+      expect.objectContaining({
+        id: 'message-1',
+        is_saved: false,
+      }),
       expect.objectContaining({
         payload: null,
         reactions: [],
       }),
     );
     expect(result).toEqual({ ids: { id: 'message-1', orgId: 'org-1' } });
+  });
+
+  it('maps saved state from per-profile message saves', async () => {
+    const row = {
+      id: 'message-saved',
+      org_id: 'org-1',
+      sender_profile_id: 'profile-1',
+      type: 'text',
+      created_at: new Date().toISOString(),
+    };
+    getMessageById.mockResolvedValueOnce({ data: row });
+    getMessageSavesByMessageIds.mockResolvedValueOnce({
+      data: [{ message_id: 'message-saved' }],
+    });
+    buildUserProfileById.mockResolvedValueOnce({ ids: { id: 'profile-1', orgId: 'org-1' } });
+    mapMessageRowToVM.mockReturnValueOnce({ ids: { id: 'message-saved', orgId: 'org-1' } });
+
+    await buildMessageById({} as any, 'org-1', 'message-saved', { profileId: 'profile-1' });
+
+    expect(mapMessageRowToVM).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'message-saved',
+        is_saved: true,
+      }),
+      expect.anything(),
+    );
   });
 
   it('loads thread read state with account context when thread exists', async () => {
@@ -133,7 +169,10 @@ describe('buildMessageById', () => {
     await buildMessageById({} as any, 'org-1', 'message-image');
 
     expect(mapMessageRowToVM).toHaveBeenCalledWith(
-      imageRow,
+      expect.objectContaining({
+        id: 'message-image',
+        is_saved: false,
+      }),
       expect.objectContaining({
         payload: expect.objectContaining({
           url: 'signed:org-1/channel-1/profile-1/image.png',
@@ -164,7 +203,10 @@ describe('buildMessageById', () => {
     await buildMessageById({} as any, 'org-1', 'message-audio');
 
     expect(mapMessageRowToVM).toHaveBeenCalledWith(
-      audioRow,
+      expect.objectContaining({
+        id: 'message-audio',
+        is_saved: false,
+      }),
       expect.objectContaining({
         payload: expect.objectContaining({
           url: 'signed:org-1/channel-1/profile-1/audio.m4a',
@@ -212,7 +254,10 @@ describe('buildMessageById', () => {
     await buildMessageById({} as any, 'org-1', 'message-gallery');
 
     expect(mapMessageRowToVM).toHaveBeenCalledWith(
-      row,
+      expect.objectContaining({
+        id: 'message-gallery',
+        is_saved: false,
+      }),
       expect.objectContaining({
         payload: expect.objectContaining({
           attachments: [

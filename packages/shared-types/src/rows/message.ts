@@ -23,6 +23,20 @@ export interface MessageRow {
   deleted_by?: UUID | null;
 }
 
+export interface MessageSaveRow {
+  id: UUID;
+  org_id: UUID;
+  message_id: UUID;
+  channel_id: UUID;
+  profile_id: UUID;
+  created_at: ISODateTime;
+  created_by?: UUID | null;
+  updated_at: ISODateTime;
+  updated_by?: UUID | null;
+  deleted_at?: ISODateTime | null;
+  deleted_by?: UUID | null;
+}
+
 export interface ThreadRow {
   id: UUID;
   org_id: UUID;

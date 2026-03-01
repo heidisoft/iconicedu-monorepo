@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, Image, StyleSheet, StyleProp, TextStyle, TouchableOpacity, Pressable, Linking, ActivityIndicator, Modal, StatusBar, SafeAreaView } from 'react-native';
 import type {
   MessageVM,
@@ -23,6 +23,11 @@ import type { AppColors } from '@/lib/theme';
 import { fetchThreadMessages } from '@/lib/api/queries';
 import { EmojiPicker } from './emoji-picker';
 import { SmilePlus, CornerUpLeft, MessageCircle, Download, FileText, ExternalLink, Play, Pause, X } from 'lucide-react-native';
+import { Audio } from 'expo-av';
+import * as WebBrowser from 'expo-web-browser';
+import { supabase } from '@/lib/supabase/client';
+
+const CHANNEL_FILES_BUCKET = 'channel-files';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -657,11 +662,13 @@ function makeStyles(colors: AppColors) {
     textContentOwn: { color: '#fff' },
 
     // ── File attachment ────────────────────────────────────────────────────────
-    // fileBubble uses width:'85%' (not maxWidth) so flex:1 inside rows resolves correctly
+    // width:'85%' (not maxWidth) gives a definite pixel width → flex:1 inside rows resolves
     fileBubble:    { width: '85%' as const, borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 },
+    // File list: standalone card matching web "max-w-sm rounded-xl border border-border bg-muted/30"
+    fileListWrap:  { width: '85%' as const, borderWidth: 1, borderRadius: 12, overflow: 'hidden' },
+    fileRowPadded: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 },
+    // Icon: matches web "h-10 w-10 bg-primary/10 rounded-md"
     fileIcon:      { width: 40, height: 40, borderRadius: 8, backgroundColor: colors.tealBg, alignItems: 'center', justifyContent: 'center' },
-    fileListWrap:  { borderWidth: 1, borderRadius: 12, overflow: 'hidden' },
-    fileRowPadded: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 },
 
     // ── Audio player — inner card matches web: rounded-2xl border bg-card px-3 py-3 ──
     audioCard:    { borderWidth: 1, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 12 },
@@ -680,8 +687,8 @@ function makeStyles(colors: AppColors) {
     imageDownloadBtn:    { position: 'absolute' as const, top: 8, right: 8, width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center' as const, justifyContent: 'center' as const },
 
     // ── Link preview card ──────────────────────────────────────────────────────
-    // width:'100%' fills fileBubble content area so flex:1 inside resolves (matches web max-w-md block)
-    linkCard:         { width: '100%' as const, borderWidth: 1, borderRadius: 12, overflow: 'hidden' },
+    // width set inline as '85%' so the card is a direct child of contentCol — flex:1 inside resolves
+    linkCard:         { borderWidth: 1, borderRadius: 12, overflow: 'hidden' },
     linkCardImg:      { width: '100%', aspectRatio: 16 / 9 },
     linkCardBody:     { padding: 10, gap: 4 },
     linkCardTitle:    { fontSize: 13, fontWeight: '700' },
@@ -765,6 +772,19 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   const [threadReplies, setThreadReplies] = useState<MessageVM[]>([]);
   const [threadLoading, setThreadLoading] = useState(false);
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
+  const [audioLoading, setAudioLoading] = useState(false);
+  const [audioPositionMs, setAudioPositionMs] = useState(0);
+  const [audioDurationMs, setAudioDurationMs] = useState(0);
+  const soundRef = useRef<Audio.Sound | null>(null);
+  const [openingFile, setOpeningFile] = useState<string | null>(null);
+
+  // Unload sound when the message item unmounts
+  useEffect(() => {
+    return () => {
+      soundRef.current?.unloadAsync().catch(() => null);
+    };
+  }, []);
+
   // Full-screen image viewer state
   const [viewerImages, setViewerImages] = useState<string[]>([]);
   const [viewerIndex, setViewerIndex] = useState(0);
@@ -777,6 +797,82 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   const isCard = CARD_TYPES.has(type);
   const msgText = (message as { content?: { text?: string } }).content?.text ?? null;
   const hideActions = msgText !== null && isEmojiOnlyText(msgText);
+
+  const handleAudioPress = useCallback(async (url: string) => {
+    if (soundRef.current) {
+      // Sound already loaded — toggle play/pause
+      if (isAudioPlaying) {
+        await soundRef.current.pauseAsync();
+      } else {
+        await soundRef.current.playAsync();
+      }
+    } else {
+      // First press — load and play
+      setAudioLoading(true);
+      try {
+        await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: url },
+          { shouldPlay: true },
+          (status) => {
+            if (!status.isLoaded) return;
+            setIsAudioPlaying(status.isPlaying ?? false);
+            setAudioPositionMs(status.positionMillis ?? 0);
+            if (status.durationMillis) setAudioDurationMs(status.durationMillis);
+            if (status.didJustFinish) {
+              // Reset to start after finishing
+              soundRef.current?.setPositionAsync(0).catch(() => null);
+              setAudioPositionMs(0);
+            }
+          },
+        );
+        soundRef.current = sound;
+        setIsAudioPlaying(true);
+      } catch (err) {
+        console.warn('[Audio] playback error:', err);
+      } finally {
+        setAudioLoading(false);
+      }
+    }
+  }, [isAudioPlaying]);
+
+  const handleFileDownload = useCallback(async (
+    url: string,
+    name: string,
+    storagePath?: string,
+  ) => {
+    const key = storagePath ?? url;
+    if (downloadingUrls.has(key)) return;
+    setDownloadingUrls(prev => new Set(prev).add(key));
+    try {
+      // If we have a storagePath, generate a fresh signed URL (same as web's
+      // /api/messages/file-download route which calls createSignedUrl).
+      // Otherwise fall back to the stored URL (public assets, external URLs).
+      let downloadUrl = url;
+      if (storagePath) {
+        const { data, error } = await supabase.storage
+          .from(CHANNEL_FILES_BUCKET)
+          .createSignedUrl(storagePath, 300); // 5-minute window
+        if (error || !data?.signedUrl) throw new Error(error?.message ?? 'Could not sign URL');
+        downloadUrl = data.signedUrl;
+      }
+
+      const safeFilename = `${Date.now()}_${name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const docDir = FileSystem.documentDirectory ?? FileSystem.cacheDirectory;
+      if (!docDir) throw new Error('No writable directory');
+      const dest = `${docDir}${safeFilename}`;
+      await FileSystem.downloadAsync(downloadUrl, dest);
+      Alert.alert('Saved', `"${name}" has been saved to your device.`);
+    } catch {
+      Alert.alert('Download failed', 'Could not save the file. Please try again.');
+    } finally {
+      setDownloadingUrls(prev => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
+  }, [downloadingUrls]);
 
   const handleThreadPress = useCallback(async () => {
     if (!thread) {
@@ -885,54 +981,63 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 
   const renderFileContent = () => {
     const fm = message as FileMessageVM;
+    // attachments is now correctly populated by the mapper (mirrors web mapFileAttachments)
     const attachments = fm.attachments?.length ? fm.attachments : [fm.attachment];
-    const listBorderColor = isOwn ? 'rgba(255,255,255,0.3)' : colors.border;
-    const listBg = isOwn ? 'rgba(255,255,255,0.1)' : colors.inputBg;
-    const rowDividerColor = isOwn ? 'rgba(255,255,255,0.15)' : colors.border;
-    const iconColor = isOwn ? '#fff' : colors.teal;
-    const nameColor = isOwn ? '#fff' : colors.text;
-    const sizeColor = isOwn ? 'rgba(255,255,255,0.6)' : colors.textFaint;
-    const downloadColor = isOwn ? 'rgba(255,255,255,0.7)' : colors.textMuted;
+
+    // File list visual: standalone card matching web "border border-border bg-muted/30 rounded-xl"
+    // Rendered directly in contentCol (width:'85%' on fileListWrap gives definite px → flex:1 resolves).
+    // Text (if any) goes in its own bubble above — same pattern as link preview.
     return (
-      // width: '85%' gives a definite pixel width from contentCol (flex:1),
-      // so flex:1 inside the file rows resolves correctly (unlike maxWidth which shrinks to content)
-      <View style={[s.fileBubble, isOwn ? s.bubbleOwn : s.bubbleOther]}>
+      <>
         {!!fm.content?.text && (
-          <FormattedText
-            text={fm.content.text}
-            style={[s.textContent, isOwn && s.textContentOwn, { marginBottom: 8 }]}
-            isOwn={isOwn}
-          />
+          <View style={[s.bubble, isOwn ? s.bubbleOwn : s.bubbleOther]}>
+            <FormattedText
+              text={fm.content.text}
+              style={[s.textContent, isOwn && s.textContentOwn]}
+              isOwn={isOwn}
+            />
+          </View>
         )}
-        <View style={[s.fileListWrap, { borderColor: listBorderColor, backgroundColor: listBg }]}>
-          {attachments.map((att, i) => (
-            <TouchableOpacity
-              key={`${att.url}-${i}`}
-              style={[
-                s.fileRowPadded,
-                i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: rowDividerColor },
-              ]}
-              onPress={() => Linking.openURL(att.url).catch(() => null)}
-              accessibilityLabel={`Download ${att.name}`}
-            >
-              <View style={[s.fileIcon, isOwn && { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-                <FileText size={18} color={iconColor} />
-              </View>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={{ fontSize: 13, fontWeight: '600', color: nameColor }} numberOfLines={1}>
-                  {att.name}
-                </Text>
-                {!!att.size && (
-                  <Text style={{ fontSize: 11, marginTop: 2, color: sizeColor }}>
-                    {formatFileSize(att.size)}
+        <View style={[s.fileListWrap, { borderColor: colors.border, backgroundColor: colors.card }]}>
+          {attachments.map((att, i) => {
+            const dlKey = att.storagePath ?? att.url;
+            const isDownloading = downloadingUrls.has(dlKey);
+            return (
+              <TouchableOpacity
+                key={`${att.url}-${i}`}
+                style={[
+                  s.fileRowPadded,
+                  i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+                ]}
+                onPress={() => handleFileDownload(att.url, att.name, att.storagePath)}
+                disabled={isDownloading}
+                accessibilityLabel={`Download ${att.name}`}
+              >
+                {/* Icon: matches web "h-10 w-10 bg-primary/10 rounded-md" + FileText h-5 w-5 text-primary */}
+                <View style={s.fileIcon}>
+                  <FileText size={20} color={colors.teal} />
+                </View>
+                {/* Name + size: matches web "flex-1 min-w-0" */}
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '500', color: colors.text }} numberOfLines={1}>
+                    {att.name}
                   </Text>
-                )}
-              </View>
-              <Download size={16} color={downloadColor} />
-            </TouchableOpacity>
-          ))}
+                  {!!att.size && (
+                    <Text style={{ fontSize: 11, marginTop: 1, color: colors.textMuted }}>
+                      {formatFileSize(att.size)}
+                    </Text>
+                  )}
+                </View>
+                {/* Download icon / spinner */}
+                {isDownloading
+                  ? <ActivityIndicator size="small" color={colors.textMuted} />
+                  : <Download size={16} color={colors.textMuted} />
+                }
+              </TouchableOpacity>
+            );
+          })}
         </View>
-      </View>
+      </>
     );
   };
 
@@ -940,8 +1045,6 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 
   const renderAudioContent = () => {
     const am = message as AudioRecordingMessageVM;
-    const totalSecs = am.audio.durationSeconds ?? 0;
-    const durationFmt = `${Math.floor(totalSecs / 60)}:${String(totalSecs % 60).padStart(2, '0')}`;
     const barCount = 28;
     const waveform =
       am.audio.waveform?.slice(0, barCount) ??
@@ -949,6 +1052,14 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         const curve = Math.sin(((i + 2) / barCount) * Math.PI * 1.3);
         return Math.max(0.28, Math.min(0.92, 0.55 + curve * 0.28));
       });
+
+    // Use real duration from expo-av once loaded, fall back to message metadata
+    const totalMs = audioDurationMs > 0 ? audioDurationMs : (am.audio.durationSeconds ?? 0) * 1000;
+    const fmtMs = (ms: number) => {
+      const s = Math.floor(ms / 1000);
+      return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    };
+    const progress = totalMs > 0 ? audioPositionMs / totalMs : 0;
 
     // Colors mirror web: play btn bg-primary/12 → tealBg; active → bg-primary; playing → solid fill
     const playBtnBg = isOwn
@@ -958,11 +1069,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     const playBtnColor = isOwn
       ? (isAudioPlaying ? colors.teal : '#fff')
       : (isAudioPlaying ? '#fff' : colors.teal);
-    // Bars: inactive = bg-foreground/20 equivalent (no seek tracking without expo-av)
+    const barActive   = isOwn ? '#fff' : colors.teal;
     const barInactive = isOwn ? 'rgba(255,255,255,0.22)' : colors.border;
-    const timeColor = isOwn ? 'rgba(255,255,255,0.7)' : colors.textFaint;
-    const cardBorder = isOwn ? 'rgba(255,255,255,0.2)' : colors.border;
-    const cardBg = isOwn ? 'rgba(255,255,255,0.06)' : colors.card;
+    const timeColor   = isOwn ? 'rgba(255,255,255,0.7)' : colors.textFaint;
+    const cardBorder  = isOwn ? 'rgba(255,255,255,0.2)' : colors.border;
+    const cardBg      = isOwn ? 'rgba(255,255,255,0.06)' : colors.card;
 
     return (
       // width: '85%' (via fileBubble) ensures flex:1 waveform section resolves properly
@@ -979,14 +1090,13 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           <View style={s.audioRow}>
             <TouchableOpacity
               style={[s.playBtn, { backgroundColor: playBtnBg, borderWidth: 1, borderColor: playBtnBorder }]}
-              onPress={() => {
-                const next = !isAudioPlaying;
-                setIsAudioPlaying(next);
-                if (next) Linking.openURL(am.audio.url).catch(() => null);
-              }}
+              onPress={() => handleAudioPress(am.audio.url)}
+              disabled={audioLoading}
               accessibilityLabel={isAudioPlaying ? 'Pause audio' : 'Play audio'}
             >
-              {isAudioPlaying ? (
+              {audioLoading ? (
+                <ActivityIndicator size="small" color={playBtnColor} />
+              ) : isAudioPlaying ? (
                 <Pause size={15} color={playBtnColor} fill={playBtnColor} />
               ) : (
                 <Play size={15} color={playBtnColor} fill={playBtnColor} style={{ marginLeft: 2 }} />
@@ -995,22 +1105,25 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             <View style={{ flex: 1, gap: 4 }}>
               {/* Time row: currentTime left / duration right */}
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={{ fontSize: 11, color: timeColor }}>0:00</Text>
-                <Text style={{ fontSize: 11, color: timeColor }}>{durationFmt}</Text>
+                <Text style={{ fontSize: 11, color: timeColor }}>{fmtMs(audioPositionMs)}</Text>
+                <Text style={{ fontSize: 11, color: timeColor }}>{fmtMs(totalMs)}</Text>
               </View>
-              {/* Waveform: bar height matches web Math.max(8, round(v * 16))px */}
+              {/* Waveform: bars before progress point are highlighted, rest are inactive */}
               <View style={s.waveformRow}>
-                {waveform.map((v, i) => (
-                  <View
-                    key={i}
-                    style={{
-                      flex: 1,
-                      height: Math.max(8, Math.round(v * 16)),
-                      backgroundColor: barInactive,
-                      borderRadius: 99,
-                    }}
-                  />
-                ))}
+                {waveform.map((v, i) => {
+                  const played = i / barCount <= progress;
+                  return (
+                    <View
+                      key={i}
+                      style={{
+                        flex: 1,
+                        height: Math.max(8, Math.round(v * 16)),
+                        backgroundColor: played ? barActive : barInactive,
+                        borderRadius: 99,
+                      }}
+                    />
+                  );
+                })}
               </View>
             </View>
           </View>
@@ -1040,21 +1153,26 @@ export const MessageItem: React.FC<MessageItemProps> = ({
       );
     }
 
+    // Text (if any) renders in its own regular bubble above the card.
+    // The card is a direct child of contentCol with width:'85%' — no outer fileBubble wrapper —
+    // so there's no color collision between outer and inner, matching the web layout where the
+    // link card is a standalone bordered element (bg-card, border-border, rounded-xl).
     return (
-      // fileBubble (width: '85%') gives a definite width so flex:1 inside the card resolves
-      <View style={[s.fileBubble, isOwn ? s.bubbleOwn : s.bubbleOther]}>
+      <>
         {!!lp.content?.text && (
-          <FormattedText
-            text={lp.content.text}
-            mentions={lp.content.mentions}
-            style={[s.textContent, isOwn && s.textContentOwn, { marginBottom: 6 }]}
-            isOwn={isOwn}
-          />
+          <View style={[s.bubble, isOwn ? s.bubbleOwn : s.bubbleOther]}>
+            <FormattedText
+              text={lp.content.text}
+              mentions={lp.content.mentions}
+              style={[s.textContent, isOwn && s.textContentOwn]}
+              isOwn={isOwn}
+            />
+          </View>
         )}
-        {/* Card: width:'100%' fills fileBubble content area — matches web max-w-md block */}
+        {/* Card width:'85%' on the card itself gives contentCol a definite px value → flex:1 inside resolves */}
         <TouchableOpacity
           activeOpacity={0.85}
-          style={[s.linkCard, { borderColor: colors.border, backgroundColor: colors.card }]}
+          style={[s.linkCard, { borderColor: colors.border, backgroundColor: colors.card, width: '85%' as const }]}
           onPress={() => Linking.openURL(lp.link.url).catch(() => null)}
           accessibilityLabel={`Open link: ${lp.link.title}`}
         >
@@ -1066,7 +1184,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
               accessibilityLabel={lp.link.title}
             />
           )}
-          <View style={[s.linkCardBody, { backgroundColor: colors.card }]}>
+          <View style={s.linkCardBody}>
             <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6 }}>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={[s.linkCardTitle, { color: colors.text }]} numberOfLines={2}>
@@ -1094,7 +1212,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             </View>
           </View>
         </TouchableOpacity>
-      </View>
+      </>
     );
   };
 

@@ -5,6 +5,7 @@ import type {
   MessageSendFileInput,
   MessageSendFilesInput,
   MessageSendTextInput,
+  MessageToggleSavedInput,
   MessageToggleReactionInput,
   MessageVM,
 } from '@iconicedu/shared-types';
@@ -1125,5 +1126,94 @@ export async function toggleHiddenMessageAction(input: {
 
   if (updateResult.error) {
     throw new Error(updateResult.error.message);
+  }
+}
+
+export async function toggleSavedMessageAction(
+  input: MessageToggleSavedInput,
+): Promise<void> {
+  const supabase = await createSupabaseServerClient();
+  const authUser = await requireAuthedUser(supabase);
+  const accountResponse = await getAccountByAuthUserId(supabase, authUser.id);
+
+  if (!accountResponse.data) {
+    throw new Error('Account not found');
+  }
+
+  if (input.orgId !== accountResponse.data.org_id) {
+    throw new Error('Invalid org');
+  }
+
+  const profileResponse = await getProfileByAccountId(supabase, accountResponse.data.id);
+  if (!profileResponse.data) {
+    throw new Error('Profile not found');
+  }
+
+  const messageResponse = await supabase
+    .from('messages')
+    .select('id, org_id, channel_id')
+    .eq('id', input.messageId)
+    .is('deleted_at', null)
+    .maybeSingle<{ id: string; org_id: string; channel_id: string }>();
+
+  if (!messageResponse.data || messageResponse.data.org_id !== input.orgId) {
+    throw new Error('Message not found');
+  }
+
+  const membershipResponse = await supabase
+    .from('channel_members')
+    .select('id')
+    .eq('org_id', input.orgId)
+    .eq('channel_id', messageResponse.data.channel_id)
+    .eq('profile_id', profileResponse.data.id)
+    .is('deleted_at', null)
+    .maybeSingle<{ id: string }>();
+
+  if (!membershipResponse.data) {
+    throw new Error('Unauthorized');
+  }
+
+  const now = new Date().toISOString();
+
+  if (input.isSaved) {
+    const upsertResponse = await supabase
+      .from('message_saves')
+      .upsert({
+        org_id: input.orgId,
+        message_id: input.messageId,
+        channel_id: messageResponse.data.channel_id,
+        profile_id: profileResponse.data.id,
+        created_at: now,
+        created_by: profileResponse.data.id,
+        updated_at: now,
+        updated_by: profileResponse.data.id,
+        deleted_at: null,
+        deleted_by: null,
+      }, {
+        onConflict: 'org_id,message_id,profile_id',
+      });
+
+    if (upsertResponse.error) {
+      throw new Error(upsertResponse.error.message);
+    }
+
+    return;
+  }
+
+  const unsaveResponse = await supabase
+    .from('message_saves')
+    .update({
+      deleted_at: now,
+      deleted_by: profileResponse.data.id,
+      updated_at: now,
+      updated_by: profileResponse.data.id,
+    })
+    .eq('org_id', input.orgId)
+    .eq('message_id', input.messageId)
+    .eq('profile_id', profileResponse.data.id)
+    .is('deleted_at', null);
+
+  if (unsaveResponse.error) {
+    throw new Error(unsaveResponse.error.message);
   }
 }

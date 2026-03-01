@@ -20,6 +20,7 @@ vi.mock('@iconicedu/web/app/actions/messages', () => ({
   sendFilesMessageAction: vi.fn(),
   sendTextMessageAction: vi.fn(),
   toggleMessageReactionAction: vi.fn(),
+  toggleSavedMessageAction: vi.fn(),
   deleteMessageAction: vi.fn(),
   toggleHiddenMessageAction: vi.fn(),
 }));

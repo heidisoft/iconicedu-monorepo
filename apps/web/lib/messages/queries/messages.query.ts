@@ -4,6 +4,7 @@ import type {
   ThreadRow,
   MessageReactionRow,
   MessageReactionCountRow,
+  MessageSaveRow,
   ChannelFileRow,
   ChannelMediaRow,
   ThreadParticipantRow,
@@ -32,6 +33,7 @@ import {
   THREAD_READ_STATE_SELECT,
   MESSAGE_REACTION_SELECT,
   MESSAGE_REACTION_COUNT_SELECT,
+  MESSAGE_SAVE_SELECT,
   MESSAGE_TEXT_SELECT,
   MESSAGE_IMAGE_SELECT,
   MESSAGE_FILE_SELECT,
@@ -254,6 +256,26 @@ export async function getMessageReactionCountsByMessageIds(
     .in('message_id', messageIds)
     .is('deleted_at', null)
     .returns<MessageReactionCountRow[]>();
+}
+
+export async function getMessageSavesByMessageIds(
+  supabase: SupabaseClient,
+  orgId: string,
+  profileId: string,
+  messageIds: string[],
+) {
+  if (!messageIds.length) {
+    return { data: [] as MessageSaveRow[] };
+  }
+
+  return supabase
+    .from('message_saves')
+    .select(MESSAGE_SAVE_SELECT)
+    .eq('org_id', orgId)
+    .eq('profile_id', profileId)
+    .in('message_id', messageIds)
+    .is('deleted_at', null)
+    .returns<MessageSaveRow[]>();
 }
 
 export async function getMessageTextByMessageIds(

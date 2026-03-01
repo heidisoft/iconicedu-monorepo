@@ -18,7 +18,9 @@ describe('LearningSpaceShell', () => {
   it('forwards currentUserId and message actions to MessagesShell', async () => {
     const sendTextMessage = vi.fn();
     const sendFileMessage = vi.fn();
+    const sendFilesMessage = vi.fn();
     const toggleReaction = vi.fn();
+    const toggleSavedMessage = vi.fn();
     const deleteMessage = vi.fn();
     const toggleHiddenMessage = vi.fn();
 
@@ -30,7 +32,9 @@ describe('LearningSpaceShell', () => {
         currentUserProfile={{ ids: { id: 'profile-1', orgId: 'org-1', accountId: 'account-1' } } as any}
         sendTextMessage={sendTextMessage}
         sendFileMessage={sendFileMessage}
+        sendFilesMessage={sendFilesMessage}
         toggleReaction={toggleReaction}
+        toggleSavedMessage={toggleSavedMessage}
         deleteMessage={deleteMessage}
         toggleHiddenMessage={toggleHiddenMessage}
       />,
@@ -44,7 +48,9 @@ describe('LearningSpaceShell', () => {
           readOnly: false,
           sendTextMessage,
           sendFileMessage,
+          sendFilesMessage,
           toggleReaction,
+          toggleSavedMessage,
           deleteMessage,
           toggleHiddenMessage,
         }),
@@ -61,7 +67,9 @@ describe('LearningSpaceShell', () => {
         readOnly
         sendTextMessage={vi.fn()}
         sendFileMessage={vi.fn()}
+        sendFilesMessage={vi.fn()}
         toggleReaction={vi.fn()}
+        toggleSavedMessage={vi.fn()}
         deleteMessage={vi.fn()}
         toggleHiddenMessage={vi.fn()}
       />,

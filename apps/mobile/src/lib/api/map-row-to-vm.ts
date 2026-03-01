@@ -141,19 +141,32 @@ export function mapRowToMessageVM(
         feedback: c,
       } as MessageVM;
 
-    case 'image':
+    case 'image': {
+      // Mirror web's mapFileAttachments: if payload has an `attachments` array use it,
+      // otherwise wrap the top-level payload as a single-element array.
+      const imgAtts = (Array.isArray(c.attachments) && (c.attachments as unknown[]).length > 0)
+        ? c.attachments as Record<string, unknown>[]
+        : [c];
       return {
         ...base,
-        content: { text: previewText },
-        attachment: c,
+        content: previewText ? { text: previewText } : undefined,
+        attachment: imgAtts[0],
+        attachments: imgAtts,
       } as MessageVM;
+    }
 
-    case 'file':
+    case 'file': {
+      // Mirror web's mapFileAttachments: extract the `attachments` array so all files render.
+      const fileAtts = (Array.isArray(c.attachments) && (c.attachments as unknown[]).length > 0)
+        ? c.attachments as Record<string, unknown>[]
+        : [c];
       return {
         ...base,
-        content: { text: previewText },
-        attachment: c,
+        content: previewText ? { text: previewText } : undefined,
+        attachment: fileAtts[0],
+        attachments: fileAtts,
       } as MessageVM;
+    }
 
     case 'audio-recording':
       return { ...base, audio: c } as MessageVM;

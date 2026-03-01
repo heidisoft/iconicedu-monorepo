@@ -27,6 +27,7 @@ import { getProfilesByIds } from '@iconicedu/web/lib/profile/queries/profiles.qu
 
 type BuildChannelOptions = {
   accountId?: string | null;
+  profileId?: string | null;
   messagesLimit?: number;
 };
 
@@ -168,6 +169,7 @@ async function buildChannelsFromRows(
       const messages = await buildChannelMessages(supabase, orgId, row.id, {
         threadsById,
         limit: options.messagesLimit,
+        profileId: options.profileId ?? undefined,
       });
       const [media, files] = await Promise.all([
         buildChannelMedia(supabase, orgId, row.id),
@@ -219,6 +221,7 @@ async function buildChannelFromRow(
   const messages = await buildChannelMessages(supabase, orgId, row.id, {
     threadsById,
     limit: options.messagesLimit,
+    profileId: options.profileId ?? undefined,
   });
   const [media, files] = await Promise.all([
     buildChannelMedia(supabase, orgId, row.id),

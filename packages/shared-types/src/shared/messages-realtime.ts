@@ -93,9 +93,16 @@ export type MessageToggleHiddenInput = {
   isHidden: boolean;
 };
 
+export type MessageToggleSavedInput = {
+  orgId: string;
+  messageId: string;
+  isSaved: boolean;
+};
+
 export interface MessageWriteClient {
   sendTextMessage: (input: MessageSendTextInput) => Promise<MessageVM>;
   toggleReaction: (input: MessageToggleReactionInput) => Promise<void>;
+  toggleSavedMessage: (input: MessageToggleSavedInput) => Promise<void>;
   deleteMessage: (input: MessageDeleteInput) => Promise<void>;
   toggleHiddenMessage: (input: MessageToggleHiddenInput) => Promise<void>;
 }

@@ -5,6 +5,7 @@ import {
   sendFilesMessageAction,
   sendTextMessageAction,
   toggleMessageReactionAction,
+  toggleSavedMessageAction,
   deleteMessageAction,
   toggleHiddenMessageAction,
 } from '@iconicedu/web/app/actions/messages';
@@ -41,10 +42,12 @@ export default async function Page({
   const channel =
     (await buildChannelById(supabase, account.org_id, channelId, {
       accountId: account.id,
+      profileId: profileResponse.data?.id ?? null,
       messagesLimit: INITIAL_MESSAGES_PAGE_SIZE,
     })) ??
     (await buildChannelByDmKey(supabase, account.org_id, channelId, {
       accountId: account.id,
+      profileId: profileResponse.data?.id ?? null,
       messagesLimit: INITIAL_MESSAGES_PAGE_SIZE,
     }));
 
@@ -97,6 +100,7 @@ export default async function Page({
         sendFileMessage={sendFileMessageAction}
         sendFilesMessage={sendFilesMessageAction}
         toggleReaction={toggleMessageReactionAction}
+        toggleSavedMessage={toggleSavedMessageAction}
         deleteMessage={deleteMessageAction}
         toggleHiddenMessage={toggleHiddenMessageAction}
       />

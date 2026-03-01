@@ -6,6 +6,7 @@ import {
   sendFilesMessageAction,
   sendTextMessageAction,
   toggleHiddenMessageAction,
+  toggleSavedMessageAction,
 } from '@iconicedu/web/app/actions/messages';
 
 const mapMessageRowToVM = vi.fn();
@@ -1377,5 +1378,126 @@ describe('toggleHiddenMessageAction', () => {
     await expect(
       toggleHiddenMessageAction({ orgId: 'org-1', messageId: 'message-1', isHidden: true }),
     ).rejects.toThrow('Unauthorized: You can only hide your own messages');
+  });
+});
+
+describe('toggleSavedMessageAction', () => {
+  it('upserts a per-profile saved message row', async () => {
+    const supabase = {
+      auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
+      from: vi.fn(),
+    };
+    const { createSupabaseServerClient } = await import(
+      '@iconicedu/web/lib/supabase/server'
+    );
+    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
+      supabase,
+    );
+
+    const messageSelectChain: any = {};
+    messageSelectChain.eq = vi.fn(() => messageSelectChain);
+    messageSelectChain.is = vi.fn(() => messageSelectChain);
+    messageSelectChain.maybeSingle = vi.fn(async () => ({
+      data: { id: 'message-1', org_id: 'org-1', channel_id: 'channel-1' },
+    }));
+
+    const memberSelectChain: any = {};
+    memberSelectChain.eq = vi.fn(() => memberSelectChain);
+    memberSelectChain.is = vi.fn(() => memberSelectChain);
+    memberSelectChain.maybeSingle = vi.fn(async () => ({ data: { id: 'member-1' } }));
+
+    const upsertSave = vi.fn(async () => ({ error: null }));
+
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'messages') {
+        return { select: () => messageSelectChain };
+      }
+      if (table === 'channel_members') {
+        return { select: () => memberSelectChain };
+      }
+      if (table === 'message_saves') {
+        return { upsert: upsertSave };
+      }
+      return {};
+    });
+
+    await toggleSavedMessageAction({
+      orgId: 'org-1',
+      messageId: 'message-1',
+      isSaved: true,
+    });
+
+    expect(upsertSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        org_id: 'org-1',
+        message_id: 'message-1',
+        channel_id: 'channel-1',
+        profile_id: 'profile-1',
+        deleted_at: null,
+      }),
+      expect.objectContaining({
+        onConflict: 'org_id,message_id,profile_id',
+      }),
+    );
+  });
+
+  it('soft deletes the saved message row when unsaving', async () => {
+    const supabase = {
+      auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
+      from: vi.fn(),
+    };
+    const { createSupabaseServerClient } = await import(
+      '@iconicedu/web/lib/supabase/server'
+    );
+    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
+      supabase,
+    );
+
+    const messageSelectChain: any = {};
+    messageSelectChain.eq = vi.fn(() => messageSelectChain);
+    messageSelectChain.is = vi.fn(() => messageSelectChain);
+    messageSelectChain.maybeSingle = vi.fn(async () => ({
+      data: { id: 'message-1', org_id: 'org-1', channel_id: 'channel-1' },
+    }));
+
+    const memberSelectChain: any = {};
+    memberSelectChain.eq = vi.fn(() => memberSelectChain);
+    memberSelectChain.is = vi.fn(() => memberSelectChain);
+    memberSelectChain.maybeSingle = vi.fn(async () => ({ data: { id: 'member-1' } }));
+
+    const unsaveChain: any = {};
+    unsaveChain.eq = vi.fn(() => unsaveChain);
+    unsaveChain.is = vi.fn(async () => ({ error: null }));
+    const updateSave = vi.fn(() => unsaveChain);
+
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'messages') {
+        return { select: () => messageSelectChain };
+      }
+      if (table === 'channel_members') {
+        return { select: () => memberSelectChain };
+      }
+      if (table === 'message_saves') {
+        return { update: updateSave };
+      }
+      return {};
+    });
+
+    await toggleSavedMessageAction({
+      orgId: 'org-1',
+      messageId: 'message-1',
+      isSaved: false,
+    });
+
+    expect(updateSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        deleted_at: expect.any(String),
+        deleted_by: 'profile-1',
+      }),
+    );
+    expect(unsaveChain.eq).toHaveBeenCalledWith('org_id', 'org-1');
+    expect(unsaveChain.eq).toHaveBeenCalledWith('message_id', 'message-1');
+    expect(unsaveChain.eq).toHaveBeenCalledWith('profile_id', 'profile-1');
+    expect(unsaveChain.is).toHaveBeenCalledWith('deleted_at', null);
   });
 });

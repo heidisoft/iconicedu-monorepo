@@ -59,7 +59,10 @@ import {
   type ComposerAttachmentKind,
   type ComposerRecordingStatus,
 } from './message-input.attachments';
-import { extractComposerLinkPreviewUrl } from './message-input-link-preview.utils';
+import {
+  extractComposerLinkPreviewUrl,
+  shouldShowComposerLinkPreview,
+} from './message-input-link-preview.utils';
 import { LinkPreviewCard } from './link-preview-card';
 
 const TYPING_STOP_DELAY_MS = 3000;
@@ -156,6 +159,7 @@ export function MessageInput({
   const [isDragOver, setIsDragOver] = React.useState(false);
   const [linkPreview, setLinkPreview] = React.useState<ComposerLinkPreview | null>(null);
   const [isLoadingLinkPreview, setIsLoadingLinkPreview] = React.useState(false);
+  const [dismissedLinkPreviewUrl, setDismissedLinkPreviewUrl] = React.useState<string | null>(null);
   const [recordingSession, setRecordingSession] = React.useState<RecordingSession | null>(null);
   const [recordingElapsedMs, setRecordingElapsedMs] = React.useState(0);
   const [mentionState, setMentionState] = React.useState<MentionState | null>(null);
@@ -202,6 +206,13 @@ export function MessageInput({
         ? extractComposerLinkPreviewUrl(content)
         : null,
     [content, hasActiveRecording, pendingAttachments.length],
+  );
+  const visibleComposerPreviewUrl = React.useMemo(
+    () =>
+      shouldShowComposerLinkPreview(composerPreviewUrl, dismissedLinkPreviewUrl)
+        ? composerPreviewUrl
+        : null,
+    [composerPreviewUrl, dismissedLinkPreviewUrl],
   );
 
   const stopRecordingStream = React.useCallback(() => {
@@ -598,6 +609,17 @@ export function MessageInput({
 
   React.useEffect(() => {
     if (!composerPreviewUrl) {
+      setDismissedLinkPreviewUrl(null);
+    } else if (
+      dismissedLinkPreviewUrl &&
+      dismissedLinkPreviewUrl !== composerPreviewUrl
+    ) {
+      setDismissedLinkPreviewUrl(null);
+    }
+  }, [composerPreviewUrl, dismissedLinkPreviewUrl]);
+
+  React.useEffect(() => {
+    if (!visibleComposerPreviewUrl) {
       setLinkPreview(null);
       setIsLoadingLinkPreview(false);
       return;
@@ -608,10 +630,10 @@ export function MessageInput({
 
     const loadPreview = async () => {
       try {
-        const response = await fetch(
-          `/api/messages/link-preview?url=${encodeURIComponent(composerPreviewUrl)}`,
-          { signal: controller.signal },
-        );
+      const response = await fetch(
+        `/api/messages/link-preview?url=${encodeURIComponent(visibleComposerPreviewUrl)}`,
+        { signal: controller.signal },
+      );
         if (!response.ok) {
           throw new Error('Unable to load link preview');
         }
@@ -635,10 +657,10 @@ export function MessageInput({
 
     void loadPreview();
 
-    return () => {
+  return () => {
       controller.abort();
     };
-  }, [composerPreviewUrl]);
+  }, [visibleComposerPreviewUrl]);
 
   const formatButtons = [
     { icon: Bold, label: 'Bold', onClick: () => applyFormatAtSelection('**') },
@@ -1096,19 +1118,46 @@ export function MessageInput({
           {!pendingAttachments.length && (isLoadingLinkPreview || linkPreview) ? (
             <div className="border-b border-border px-3 py-3">
               {isLoadingLinkPreview ? (
-                <div className="flex items-center gap-2 rounded-xl border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Loading link preview...
+                <div className="relative max-w-md">
+                  <div className="flex items-center gap-2 rounded-xl border border-border bg-muted/30 p-3 pr-10 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading link preview...
+                  </div>
+                  {visibleComposerPreviewUrl ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-xs"
+                      className="absolute right-2 top-2"
+                      aria-label="Dismiss link preview"
+                      onClick={() => setDismissedLinkPreviewUrl(visibleComposerPreviewUrl)}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  ) : null}
                 </div>
               ) : linkPreview ? (
-                <LinkPreviewCard
-                  url={linkPreview.url}
-                  title={linkPreview.title}
-                  description={linkPreview.description}
-                  imageUrl={linkPreview.imageUrl}
-                  siteName={linkPreview.siteName}
-                  favicon={linkPreview.favicon}
-                />
+                <div className="relative max-w-md">
+                  <LinkPreviewCard
+                    url={linkPreview.url}
+                    title={linkPreview.title}
+                    description={linkPreview.description}
+                    imageUrl={linkPreview.imageUrl}
+                    siteName={linkPreview.siteName}
+                    favicon={linkPreview.favicon}
+                    className="max-w-none overflow-hidden rounded-xl border border-border bg-card transition-colors"
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="icon-xs"
+                    className="absolute right-2 top-2"
+                    aria-label="Dismiss link preview"
+                    onClick={() => setDismissedLinkPreviewUrl(linkPreview.url)}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               ) : null}
             </div>
           ) : null}

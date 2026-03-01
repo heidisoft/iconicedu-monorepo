@@ -639,9 +639,28 @@ export function MessagesContainer({
   const handleToggleSaved = useCallback(
     (messageId: string) => {
       if (readOnly) return;
+      const message = messages.find((m) => m.ids.id === messageId);
+      if (!message) return;
+      const newSavedState = !message.state?.isSaved;
       toggleSaved(messageId);
+      if (messageWriteClient) {
+        const persistSavedState = async () => {
+          try {
+            await runWithNetworkActivity(() =>
+              messageWriteClient.toggleSavedMessage({
+                orgId: channel.ids.orgId,
+                messageId,
+                isSaved: newSavedState,
+              }),
+            );
+          } catch {
+            toggleSaved(messageId);
+          }
+        };
+        void persistSavedState();
+      }
     },
-    [toggleSaved, readOnly],
+    [channel.ids.orgId, messageWriteClient, messages, readOnly, runWithNetworkActivity, toggleSaved],
   );
 
   const handleToggleHidden = useCallback(

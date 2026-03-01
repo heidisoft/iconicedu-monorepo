@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { extractComposerLinkPreviewUrl } from './message-input-link-preview.utils';
+import {
+  extractComposerLinkPreviewUrl,
+  shouldShowComposerLinkPreview,
+} from './message-input-link-preview.utils';
 
 describe('extractComposerLinkPreviewUrl', () => {
   it('returns the first url in composer text', () => {
@@ -11,5 +14,18 @@ describe('extractComposerLinkPreviewUrl', () => {
 
   it('returns null when no url exists', () => {
     expect(extractComposerLinkPreviewUrl('No links here')).toBeNull();
+  });
+
+  it('hides the preview when the same url was dismissed', () => {
+    expect(
+      shouldShowComposerLinkPreview('https://example.com/post', 'https://example.com/post'),
+    ).toBe(false);
+  });
+
+  it('shows the preview when there is no dismissal or the url changed', () => {
+    expect(shouldShowComposerLinkPreview('https://example.com/post', null)).toBe(true);
+    expect(
+      shouldShowComposerLinkPreview('https://example.com/next', 'https://example.com/post'),
+    ).toBe(true);
   });
 });

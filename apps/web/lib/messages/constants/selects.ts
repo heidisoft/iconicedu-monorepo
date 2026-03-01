@@ -97,6 +97,20 @@ export const MESSAGE_REACTION_COUNT_SELECT = [
   'deleted_by',
 ].join(',');
 
+export const MESSAGE_SAVE_SELECT = [
+  'id',
+  'org_id',
+  'message_id',
+  'channel_id',
+  'profile_id',
+  'created_at',
+  'created_by',
+  'updated_at',
+  'updated_by',
+  'deleted_at',
+  'deleted_by',
+].join(',');
+
 const MESSAGE_PAYLOAD_BASE_SELECT = [
   'message_id',
   'org_id',

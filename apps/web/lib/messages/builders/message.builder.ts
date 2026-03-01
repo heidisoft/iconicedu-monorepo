@@ -28,6 +28,7 @@ import {
   getMessageLinkPreviewsByMessageIds,
   getMessageAudioRecordingsByMessageIds,
   getMessageReactionCountsByMessageIds,
+  getMessageSavesByMessageIds,
 } from '@iconicedu/web/lib/messages/queries/messages.query';
 import { createSignedChannelFileUrl } from '@iconicedu/web/lib/messages/queries/file-url.query';
 import { buildUserProfileById } from '@iconicedu/web/lib/profile/builders/user-profile.builder';
@@ -39,6 +40,7 @@ type MessageBuildOptions = {
   limit?: number;
   beforeCreatedAt?: string | null;
   accountId?: string;
+  profileId?: string;
 };
 
 export async function buildMessagesByChannelId(
@@ -59,7 +61,7 @@ export async function buildMessagesByChannelId(
   if (!rows.length) {
     return [];
   }
-  return mapRowsToMessages(supabase, orgId, rows, options.threadsById);
+  return mapRowsToMessages(supabase, orgId, rows, options);
 }
 
 export async function buildMessagesPageByChannelId(
@@ -90,7 +92,7 @@ export async function buildMessagesPageByChannelId(
   }
 
   return {
-    messages: await mapRowsToMessages(supabase, orgId, rows, options.threadsById),
+    messages: await mapRowsToMessages(supabase, orgId, rows, options),
     hasMore: response.hasMore,
     nextCursor: response.nextCursor,
   };
@@ -108,7 +110,7 @@ export async function buildMessageById(
     return null;
   }
 
-  const [payloadsById, reactionsByMessageId, sender, thread] = await Promise.all([
+  const [payloadsById, reactionsByMessageId, sender, thread, savedMessageIds] = await Promise.all([
     loadPayloadsByMessageIds(supabase, orgId, [row]),
     loadReactionsByMessageIds(supabase, orgId, [row.id]),
     buildUserProfileById(supabase, row.sender_profile_id),
@@ -117,18 +119,25 @@ export async function buildMessageById(
           accountId: options.accountId,
         })
       : Promise.resolve(null),
+    loadSavedMessageIds(supabase, orgId, options.profileId, [row.id]),
   ]);
 
   if (!sender) {
     return null;
   }
 
-  return mapMessageRowToVM(row, {
+  return mapMessageRowToVM(
+    {
+      ...row,
+      is_saved: savedMessageIds.has(row.id),
+    },
+    {
     sender,
     payload: payloadsById.get(row.id) ?? null,
     reactions: reactionsByMessageId.get(row.id) ?? [],
     thread: thread ?? (row.thread_id ? options.threadsById?.get(row.thread_id) : undefined),
-  });
+    },
+  );
 }
 
 export async function buildMessagesByThreadId(
@@ -163,7 +172,11 @@ export async function buildMessagesByThreadId(
   });
   const threadsById = thread ? new Map([[threadId, thread]]) : undefined;
 
-  const mapped = await mapRowsToMessages(supabase, orgId, rows, threadsById);
+  const mapped = await mapRowsToMessages(supabase, orgId, rows, {
+    threadsById,
+    accountId: options.accountId,
+    profileId: options.profileId,
+  });
   if (!thread || !options.parentMessageId) {
     return mapped;
   }
@@ -334,15 +347,18 @@ async function mapRowsToMessages(
   supabase: SupabaseClient,
   orgId: string,
   rows: MessageRow[],
-  threadsById?: Map<string, ThreadVM>,
+  options: Pick<MessageBuildOptions, 'threadsById' | 'profileId'> = {},
 ) {
   const messageIds = rows.map((row) => row.id);
-  const payloadsById = await loadPayloadsByMessageIds(supabase, orgId, rows);
-  const reactionsByMessageId = await loadReactionsByMessageIds(supabase, orgId, messageIds);
-  const profilesById = await resolveProfilesById(
-    supabase,
-    Array.from(new Set(rows.map((row) => row.sender_profile_id))),
-  );
+  const [payloadsById, reactionsByMessageId, profilesById, savedMessageIds] = await Promise.all([
+    loadPayloadsByMessageIds(supabase, orgId, rows),
+    loadReactionsByMessageIds(supabase, orgId, messageIds),
+    resolveProfilesById(
+      supabase,
+      Array.from(new Set(rows.map((row) => row.sender_profile_id))),
+    ),
+    loadSavedMessageIds(supabase, orgId, options.profileId, messageIds),
+  ]);
 
   return rows
     .map((row) => {
@@ -350,14 +366,34 @@ async function mapRowsToMessages(
       if (!sender) {
         return null;
       }
-      return mapMessageRowToVM(row, {
+      return mapMessageRowToVM(
+        {
+          ...row,
+          is_saved: savedMessageIds.has(row.id),
+        },
+        {
         sender,
         payload: payloadsById.get(row.id) ?? null,
         reactions: reactionsByMessageId.get(row.id) ?? [],
-        thread: row.thread_id ? threadsById?.get(row.thread_id) : undefined,
-      });
+        thread: row.thread_id ? options.threadsById?.get(row.thread_id) : undefined,
+        },
+      );
     })
     .filter((message): message is MessageVM => Boolean(message));
+}
+
+async function loadSavedMessageIds(
+  supabase: SupabaseClient,
+  orgId: string,
+  profileId: string | undefined,
+  messageIds: string[],
+): Promise<Set<string>> {
+  if (!profileId || !messageIds.length) {
+    return new Set();
+  }
+
+  const response = await getMessageSavesByMessageIds(supabase, orgId, profileId, messageIds);
+  return new Set((response.data ?? []).map((row) => row.message_id));
 }
 
 function groupBy<T, K extends string>(

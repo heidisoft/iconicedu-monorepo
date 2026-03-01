@@ -69,6 +69,7 @@ type MessagesShellClientProps = {
   sendFileMessage: (input: MessageSendFileInput) => Promise<MessageVM>;
   sendFilesMessage: (input: MessageSendFilesInput) => Promise<MessageVM>;
   toggleReaction: (input: { orgId: string; messageId: string; emoji: string }) => Promise<void>;
+  toggleSavedMessage: (input: { orgId: string; messageId: string; isSaved: boolean }) => Promise<void>;
   deleteMessage: (input: { orgId: string; messageId: string }) => Promise<void>;
   toggleHiddenMessage: (input: { orgId: string; messageId: string; isHidden: boolean }) => Promise<void>;
 };
@@ -83,6 +84,7 @@ export function MessagesShellClient({
   sendFileMessage,
   sendFilesMessage,
   toggleReaction,
+  toggleSavedMessage,
   deleteMessage,
   toggleHiddenMessage,
 }: MessagesShellClientProps) {
@@ -94,10 +96,11 @@ export function MessagesShellClient({
     () => ({
       sendTextMessage,
       toggleReaction,
+      toggleSavedMessage,
       deleteMessage,
       toggleHiddenMessage,
     }),
-    [sendTextMessage, toggleReaction, deleteMessage, toggleHiddenMessage],
+    [sendTextMessage, toggleReaction, toggleSavedMessage, deleteMessage, toggleHiddenMessage],
   );
   const uploadFileMessage = useMemo(
     () =>
