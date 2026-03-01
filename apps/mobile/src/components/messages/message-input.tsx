@@ -11,6 +11,7 @@ import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 import type { MessageVM } from '@iconicedu/shared-types';
 import { EmojiPicker } from './emoji-picker';
+import { AttachmentSheet, type AttachmentPayload } from './attachment-sheet';
 import { Smile, Plus, ArrowUp, X } from 'lucide-react-native';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -29,6 +30,8 @@ function getMessagePreviewText(message: MessageVM): string {
 
 type MessageInputProps = {
   onSend: (text: string) => void | Promise<void>;
+  /** Called with the picked/recorded attachment — caller handles upload + send. */
+  onSendAttachment?: (attachment: AttachmentPayload) => Promise<void>;
   placeholder?: string;
   disabled?: boolean;
   onTypingChange?: () => void;
@@ -166,6 +169,7 @@ function makeStyles(C: AppColors, bottomInset: number) {
 
 export const MessageInput: React.FC<MessageInputProps> = ({
   onSend,
+  onSendAttachment,
   placeholder,
   disabled = false,
   onTypingChange,
@@ -175,6 +179,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 }) => {
   const [text, setText] = useState('');
   const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
+  const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
   const [inputHeight, setInputHeight] = useState(20);
   const MAX_INPUT_HEIGHT = 120;
   const { colors } = useTheme();
@@ -254,6 +259,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           style={s.addBtn}
           disabled={disabled}
           activeOpacity={0.7}
+          onPress={() => setAttachmentSheetVisible(true)}
           accessibilityLabel="Add attachment"
         >
           <Plus size={22} color={colors.textMuted} />
@@ -305,6 +311,16 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         visible={emojiPickerVisible}
         onClose={() => setEmojiPickerVisible(false)}
         onEmojiSelect={handleEmojiSelect}
+      />
+
+      <AttachmentSheet
+        visible={attachmentSheetVisible}
+        onClose={() => setAttachmentSheetVisible(false)}
+        onAttach={async (attachment) => {
+          setAttachmentSheetVisible(false);
+          await onSendAttachment?.(attachment);
+        }}
+        disabled={disabled}
       />
     </>
   );

@@ -1226,3 +1226,109 @@ export async function sendTextMessage(
   if (textError) throw textError;
   return msg;
 }
+
+// ─── File / Image / Audio upload + message creation ───────────────────────────
+// Mirrors the web's uploadFileMessage flow in messages-shell-client.tsx and
+// sendFileMessageAction in apps/web/app/actions/messages.ts.
+
+const CHANNEL_FILES_BUCKET = 'channel-files';
+
+/** Build a Supabase storage path identical to the web's buildMessageAssetPath helper. */
+export function buildMessageStoragePath(
+  orgId: string,
+  channelId: string,
+  profileId: string,
+  mimeType: string,
+  fileName: string,
+): string {
+  const kind = mimeType.startsWith('image/')
+    ? 'images'
+    : mimeType.startsWith('audio/')
+      ? 'audio'
+      : 'files';
+  // Sanitise filename: replace spaces with underscores
+  const safe = fileName.replace(/\s+/g, '_');
+  return `org/${orgId}/channel/${channelId}/messages/${kind}/${profileId}/${Date.now()}_${safe}`;
+}
+
+/**
+ * Upload a local file URI to the channel-files Supabase bucket.
+ * Returns the storagePath on success.
+ */
+export async function uploadChannelFile(
+  localUri: string,
+  storagePath: string,
+  mimeType: string,
+): Promise<void> {
+  const response = await fetch(localUri);
+  const blob = await response.blob();
+  const { error } = await supabase.storage
+    .from(CHANNEL_FILES_BUCKET)
+    .upload(storagePath, blob, { contentType: mimeType, upsert: false });
+  if (error) throw error;
+}
+
+export type FileAttachmentInput = {
+  storagePath: string;
+  name: string;
+  mimeType: string;
+  size?: number;
+  durationSeconds?: number; // audio only
+};
+
+/**
+ * Insert a file / image / audio-recording message row + its type-specific payload.
+ * Mirrors web's sendFileMessageAction — same tables, same payload shape.
+ */
+export async function sendFileMessage(
+  channelId: string,
+  senderProfileId: string,
+  orgId: string,
+  file: FileAttachmentInput,
+  content?: string,
+  threadParentId?: string,
+  threadId?: string,
+) {
+  const isImage = file.mimeType.startsWith('image/');
+  const isAudio = file.mimeType.startsWith('audio/');
+  const type = isImage ? 'image' : isAudio ? 'audio-recording' : 'file';
+
+  const { data: msg, error: msgError } = await supabase
+    .from('messages')
+    .insert({
+      channel_id: channelId,
+      sender_profile_id: senderProfileId,
+      org_id: orgId,
+      type,
+      thread_parent_id: threadParentId ?? null,
+      ...(threadId ? { thread_id: threadId } : {}),
+    })
+    .select('id')
+    .single();
+
+  if (msgError) throw msgError;
+
+  // Build payload — identical shape to web's sendFileMessageAction
+  const payload: Record<string, unknown> = {
+    url: file.storagePath,
+    storagePath: file.storagePath,
+    name: file.name,
+    ...(file.size !== undefined ? { size: file.size } : {}),
+    mimeType: file.mimeType,
+    ...(isAudio ? { durationSeconds: file.durationSeconds ?? 0 } : {}),
+    ...(content?.trim() ? { text: content.trim() } : {}),
+  };
+
+  const table = isImage
+    ? 'message_image'
+    : isAudio
+      ? 'message_audio_recording'
+      : 'message_file';
+
+  const { error: payloadError } = await supabase
+    .from(table)
+    .insert({ message_id: msg.id, org_id: orgId, payload });
+
+  if (payloadError) throw payloadError;
+  return msg;
+}
