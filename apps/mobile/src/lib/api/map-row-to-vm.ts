@@ -168,6 +168,20 @@ export function mapRowToMessageVM(
       } as MessageVM;
     }
 
+    case 'link-preview':
+      return {
+        ...base,
+        content: c.text ? { text: String(c.text) } : undefined,
+        link: {
+          url: String(c.url ?? ''),
+          title: String(c.title ?? ''),
+          description: typeof c.description === 'string' ? c.description : undefined,
+          imageUrl: typeof c.imageUrl === 'string' ? c.imageUrl : undefined,
+          siteName: typeof c.siteName === 'string' ? c.siteName : undefined,
+          favicon: typeof c.favicon === 'string' ? c.favicon : undefined,
+        },
+      } as MessageVM;
+
     case 'audio-recording':
       return { ...base, audio: c } as MessageVM;
 
@@ -195,6 +209,7 @@ export function getMessagePreview(msg: {
     image:                 '🖼 Image',
     file:                  '📎 File',
     'audio-recording':     '🎙 Voice message',
+    'link-preview':        '🔗 Link',
   };
   return labels[msg.type] ?? 'Message';
 }

@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
-import { View, Text, Image, StyleSheet, StyleProp, TextStyle, TouchableOpacity, Pressable, Linking, ActivityIndicator } from 'react-native';
+import { View, Text, Image, StyleSheet, StyleProp, TextStyle, TouchableOpacity, Pressable, Linking, ActivityIndicator, Platform, Alert } from 'react-native';
 import type {
   MessageVM,
   ThreadVM,
@@ -690,13 +690,14 @@ function makeStyles(colors: AppColors) {
     // ── Link preview card ──────────────────────────────────────────────────────
     // width set inline as '85%' so the card is a direct child of contentCol — flex:1 inside resolves
     linkCard:         { borderWidth: 1, borderRadius: 12, overflow: 'hidden' },
-    linkCardImg:      { width: '100%', aspectRatio: 16 / 9 },
-    linkCardBody:     { padding: 10, gap: 4 },
-    linkCardTitle:    { fontSize: 13, fontWeight: '700' },
+    linkCardImgWrapper: { width: '100%', aspectRatio: 16 / 9, backgroundColor: colors.card, overflow: 'hidden' },
+    linkCardImg:      { width: '100%', height: '100%' },
+    linkCardBody:     { padding: 12 },
+    linkCardTitle:    { fontSize: 14, fontWeight: '600', marginBottom: 4 },
     linkCardDesc:     { fontSize: 12, lineHeight: 17 },
-    linkCardMeta:     { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 5, marginTop: 4 },
+    linkCardMeta:     { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 6, marginTop: 8 },
     linkCardFavicon:  { width: 12, height: 12 },
-    linkCardSite:     { fontSize: 11, flex: 1 },
+    linkCardSite:     { fontSize: 12, flex: 1 },
 
     // ── Structured cards (self-contained, no outer bubble) ────────────────────
     card:            { borderWidth: 1, borderRadius: 16, padding: 14, gap: 4 },
@@ -877,6 +878,19 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         setIsAudioPlaying(true);
       } catch (err) {
         console.warn('[Audio] playback error:', err);
+        // WebM/Opus (recorded by Chrome on web) is not supported by iOS AVFoundation.
+        // Show a targeted message so the user understands why it failed.
+        if (Platform.OS === 'ios') {
+          const mimeType = (message as AudioRecordingMessageVM).audio?.mimeType ?? '';
+          if (mimeType.includes('webm') || mimeType.includes('ogg')) {
+            Alert.alert(
+              'Format not supported',
+              'This voice message was recorded in WebM format, which iPhone cannot play. Ask the sender to record on Safari, or listen on the web app.',
+            );
+          } else {
+            Alert.alert('Playback error', 'Could not play this audio message.');
+          }
+        }
       } finally {
         setAudioLoading(false);
       }
@@ -1112,6 +1126,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     const cardBorder  = isOwn ? 'rgba(255,255,255,0.2)' : colors.border;
     const cardBg      = isOwn ? 'rgba(255,255,255,0.06)' : colors.card;
 
+    // WebM/Opus (recorded by Chrome) cannot be decoded by iOS AVFoundation
+    const isUnsupportedOnIOS =
+      Platform.OS === 'ios' &&
+      (am.audio.mimeType?.includes('webm') || am.audio.mimeType?.includes('ogg'));
+
     return (
       // width: '85%' (via fileBubble) ensures flex:1 waveform section resolves properly
       <View style={[s.fileBubble, isOwn ? s.bubbleOwn : s.bubbleOther]}>
@@ -1124,6 +1143,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         )}
         {/* Inner card matches web: rounded-2xl border border-border bg-card px-3 py-3 */}
         <View style={[s.audioCard, { borderColor: cardBorder, backgroundColor: cardBg }]}>
+          {isUnsupportedOnIOS && (
+            <Text style={{ fontSize: 11, color: '#f59e0b', marginBottom: 6 }}>
+              ⚠ This audio format is not supported on iPhone
+            </Text>
+          )}
           <View style={s.audioRow}>
             <TouchableOpacity
               style={[s.playBtn, { backgroundColor: playBtnBg, borderWidth: 1, borderColor: playBtnBorder }]}
@@ -1194,13 +1218,17 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     // The card is a direct child of contentCol with width:'85%' — no outer fileBubble wrapper —
     // so there's no color collision between outer and inner, matching the web layout where the
     // link card is a standalone bordered element (bg-card, border-border, rounded-xl).
+    // Strip the URL itself from the caption — if the user sent only a URL there's nothing
+    // left to show above the card (the card already displays the link).
+    const caption = (lp.content?.text ?? '').replace(lp.link.url, '').trim();
+
     return (
       <>
-        {!!lp.content?.text && (
+        {!!caption && (
           <View style={[s.bubble, isOwn ? s.bubbleOwn : s.bubbleOther]}>
             <FormattedText
-              text={lp.content.text}
-              mentions={lp.content.mentions}
+              text={caption}
+              mentions={lp.content?.mentions}
               style={[s.textContent, isOwn && s.textContentOwn]}
               isOwn={isOwn}
             />
@@ -1214,38 +1242,36 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           accessibilityLabel={`Open link: ${lp.link.title}`}
         >
           {!!lp.link.imageUrl && (
-            <Image
-              source={{ uri: lp.link.imageUrl }}
-              style={s.linkCardImg}
-              resizeMode="cover"
-              accessibilityLabel={lp.link.title}
-            />
+            <View style={s.linkCardImgWrapper}>
+              <Image
+                source={{ uri: lp.link.imageUrl }}
+                style={s.linkCardImg}
+                resizeMode="cover"
+                accessibilityLabel={lp.link.title}
+              />
+            </View>
           )}
           <View style={s.linkCardBody}>
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={[s.linkCardTitle, { color: colors.text }]} numberOfLines={2}>
+                <Text style={[s.linkCardTitle, { color: colors.text }]} numberOfLines={1}>
                   {lp.link.title}
                 </Text>
                 {!!lp.link.description && (
-                  <Text style={[s.linkCardDesc, { color: colors.textMuted, marginTop: 2 }]} numberOfLines={2}>
+                  <Text style={[s.linkCardDesc, { color: colors.textMuted }]} numberOfLines={2}>
                     {lp.link.description}
                   </Text>
                 )}
-                {(!!lp.link.favicon || !!lp.link.siteName) && (
-                  <View style={s.linkCardMeta}>
-                    {!!lp.link.favicon && (
-                      <Image source={{ uri: lp.link.favicon }} style={s.linkCardFavicon} />
-                    )}
-                    {!!lp.link.siteName && (
-                      <Text style={[s.linkCardSite, { color: colors.textFaint }]} numberOfLines={1}>
-                        {lp.link.siteName}
-                      </Text>
-                    )}
-                  </View>
-                )}
+                <View style={s.linkCardMeta}>
+                  {!!lp.link.favicon && (
+                    <Image source={{ uri: lp.link.favicon }} style={s.linkCardFavicon} />
+                  )}
+                  <Text style={[s.linkCardSite, { color: colors.textFaint }]} numberOfLines={1}>
+                    {lp.link.siteName || lp.link.url}
+                  </Text>
+                </View>
               </View>
-              <ExternalLink size={14} color={colors.textMuted} style={{ marginTop: 1 }} />
+              <ExternalLink size={16} color={colors.textMuted} style={{ marginTop: 2, flexShrink: 0 }} />
             </View>
           </View>
         </TouchableOpacity>

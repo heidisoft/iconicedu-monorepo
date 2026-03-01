@@ -331,6 +331,7 @@ const TYPE_TABLE: Record<string, string> = {
   'image':                'message_image',
   'file':                 'message_file',
   'audio-recording':      'message_audio_recording',
+  'link-preview':         'message_link_preview',
   'lesson-assignment':    'message_lesson_assignment',
   'homework-submission':  'message_homework_submission',
   'progress-update':      'message_progress_update',
