@@ -1,10 +1,11 @@
-import React, { useState, useCallback } from 'react';
-import { View, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useState, useCallback, useMemo } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { MessageVM } from '@iconicedu/shared-types';
 import { useAccount } from '@/hooks/use-account';
 import { useMessages } from '@/hooks/use-messages';
+import { useSpaceSessions } from '@/hooks/use-space-sessions';
 import { sendTextMessage, sendFileMessage, sendFilesMessage, uploadChannelFile, buildMessageStoragePath, deleteMessage } from '@/lib/api/queries';
 import type { AttachmentPayload } from '@/components/messages/attachment-sheet';
 import type { PendingUpload } from '@/components/messages/pending-message-row';
@@ -15,6 +16,9 @@ import { TypingIndicator } from '@/components/messages/typing-indicator';
 import { ConversationHeader } from '@/components/messages/conversation-header';
 import { MessageActionsSheet } from '@/components/messages/message-actions-sheet';
 import { ChannelInfoSheet } from '@/components/messages/channel-info-sheet';
+import { SpaceSessionsTab } from '@/components/messages/space-sessions-tab';
+
+type ChannelTab = 'messages' | 'sessions';
 
 export default function ChannelConversationScreen() {
   const { channelId, topic, iconEmoji, subtitle } = useLocalSearchParams<{
@@ -49,6 +53,15 @@ export default function ChannelConversationScreen() {
     broadcastTyping,
     broadcastTypingStop,
   } = useMessages(channelId ?? '', profileId, accountId, senderName, orgId);
+
+  const { schedules, isLoading: isLoadingSessions, error: sessionsError } = useSpaceSessions(
+    channelId ?? '',
+    orgId,
+  );
+
+  // ── Tab state ──
+  const [activeTab, setActiveTab] = useState<ChannelTab>('messages');
+  const s = useMemo(() => makeStyles(colors), [colors]);
 
   // ── Info sheet state ──
   const [infoVisible, setInfoVisible] = useState(false);
@@ -202,57 +215,95 @@ export default function ChannelConversationScreen() {
   if (!channelId) return null;
 
   const isOwnMessage = (msg: MessageVM) => msg.core.sender.ids.id === profileId;
+  // Show the Sessions tab only for learning space channels (identified by having an iconEmoji)
+  const isSpaceChannel = Boolean(iconEmoji);
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: colors.pageBg }]} edges={['top']}>
+    <SafeAreaView style={[s.safe, { backgroundColor: colors.pageBg }]} edges={['top']}>
       <ConversationHeader
         title={topic ?? 'Channel'}
         subtitle={subtitle}
-        kind="channel"
+        kind={isSpaceChannel ? 'space' : 'channel'}
         iconEmoji={iconEmoji}
         onBack={() => router.back()}
         onMore={() => setInfoVisible(true)}
       />
-      <KeyboardAvoidingView
-        style={[styles.flex, { backgroundColor: colors.pageBg }]}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={0}
-      >
-        <MessageList
-          messages={messages ?? []}
-          currentProfileId={profileId}
-          currentAccountId={accountId}
-          onLoadMore={loadMore}
-          loading={isLoading}
-          refreshing={isRefetching}
-          onRefresh={refetch}
-          onMessageLongPress={handleLongPress}
-          onReactionToggle={handleReactionToggle}
-          onThreadOpen={handleThreadOpen}
-          pendingUploads={pendingUploads}
-          onRetryUpload={handleRetryUpload}
-        />
-        <TypingIndicator typingUsers={typingUsers} />
-        <MessageInput
-          onSend={handleSend}
-          onSendAttachment={handleSendAttachment}
-          placeholder={`Message #${topic ?? ''}…`}
-          onTypingChange={broadcastTyping}
-          onTypingStop={broadcastTypingStop}
-          replyTo={threadReplyTarget}
-          onCancelReply={() => setThreadReplyTarget(null)}
-          uploading={pendingUploads.some((p) => !p.failed)}
-        />
-      </KeyboardAvoidingView>
+
+      {/* Tab bar: Messages | Sessions — only shown for learning space channels */}
+      {isSpaceChannel && (
+        <View style={[s.tabBar, { borderBottomColor: colors.border }]}>
+          {(['messages', 'sessions'] as ChannelTab[]).map((tab) => {
+            const isActive = activeTab === tab;
+            return (
+              <TouchableOpacity
+                key={tab}
+                style={[s.tabItem, isActive && { borderBottomColor: colors.teal }]}
+                onPress={() => setActiveTab(tab)}
+                activeOpacity={0.7}
+              >
+                <Text style={[s.tabLabel, { color: isActive ? colors.teal : colors.textMuted }]}>
+                  {tab === 'messages' ? 'Messages' : 'Sessions'}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+
+      {/* Sessions tab */}
+      {activeTab === 'sessions' ? (
+        <View style={[s.flex, { backgroundColor: colors.pageBg }]}>
+          <SpaceSessionsTab
+            schedules={schedules}
+            isLoading={isLoadingSessions}
+            error={sessionsError}
+          />
+        </View>
+      ) : (
+        <KeyboardAvoidingView
+          style={[s.flex, { backgroundColor: colors.pageBg }]}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={0}
+        >
+          <MessageList
+            messages={messages ?? []}
+            currentProfileId={profileId}
+            currentAccountId={accountId}
+            onLoadMore={loadMore}
+            loading={isLoading}
+            refreshing={isRefetching}
+            onRefresh={refetch}
+            onMessageLongPress={handleLongPress}
+            onReactionToggle={handleReactionToggle}
+            onThreadOpen={handleThreadOpen}
+            pendingUploads={pendingUploads}
+            onRetryUpload={handleRetryUpload}
+          />
+          <TypingIndicator typingUsers={typingUsers} />
+          <MessageInput
+            onSend={handleSend}
+            onSendAttachment={handleSendAttachment}
+            placeholder={`Message ${isSpaceChannel ? (topic ?? 'Space') : `#${topic ?? ''}`}…`}
+            onTypingChange={broadcastTyping}
+            onTypingStop={broadcastTypingStop}
+            replyTo={threadReplyTarget}
+            onCancelReply={() => setThreadReplyTarget(null)}
+            uploading={pendingUploads.some((p) => !p.failed)}
+          />
+        </KeyboardAvoidingView>
+      )}
 
       {/* Info sheet */}
       <ChannelInfoSheet
         visible={infoVisible}
         title={topic ?? 'Channel'}
         subtitle={subtitle}
-        kind="channel"
+        kind={isSpaceChannel ? 'space' : 'channel'}
         iconEmoji={iconEmoji}
         messages={messages ?? []}
+        schedules={schedules}
+        isLoadingSessions={isLoadingSessions}
+        sessionsError={sessionsError}
         onClose={() => setInfoVisible(false)}
       />
 
@@ -270,7 +321,24 @@ export default function ChannelConversationScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1 },
-  flex: { flex: 1 },
-});
+function makeStyles(colors: { border: string; teal: string; textMuted: string; pageBg: string }) {
+  return StyleSheet.create({
+    safe: { flex: 1 },
+    flex: { flex: 1 },
+    tabBar: {
+      flexDirection: 'row',
+      borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    tabItem: {
+      flex: 1,
+      alignItems: 'center',
+      paddingVertical: 11,
+      borderBottomWidth: 2,
+      borderBottomColor: 'transparent',
+    },
+    tabLabel: {
+      fontSize: 14,
+      fontWeight: '600',
+    },
+  });
+}

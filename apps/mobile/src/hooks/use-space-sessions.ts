@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { fetchSpaceSchedulesByChannelId } from '@/lib/api/queries';
+import { fetchSpaceSchedulesByChannelId, queryKeys } from '@/lib/api/queries';
 import type { ClassScheduleVM } from '@iconicedu/shared-types';
 
 /**
@@ -15,7 +15,7 @@ export function useSpaceSessions(
   error: string | null;
 } {
   const { data, isLoading, error } = useQuery({
-    queryKey: ['space-sessions', channelId, orgId],
+    queryKey: queryKeys.spaceSchedules(channelId, orgId),
     queryFn: () => fetchSpaceSchedulesByChannelId(channelId, orgId),
     enabled: Boolean(channelId && orgId),
     staleTime: 5 * 60 * 1000, // 5 minutes
