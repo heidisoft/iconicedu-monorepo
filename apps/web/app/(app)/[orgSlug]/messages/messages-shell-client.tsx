@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
+import { useRouter } from 'next/navigation';
 import type {
   ChannelVM,
   MessageSendFileInput,
@@ -158,6 +159,7 @@ export function MessagesShellClient({
   deleteMessage,
   toggleHiddenMessage,
 }: MessagesShellClientProps) {
+  const router = useRouter();
   const [channelState, setChannelState] = useState(channel);
   const onlineProfileIdsRef = useRef(new Set<string>());
   const presenceClient = useMemo(() => createSupabaseBrowserClient(), []);
@@ -359,42 +361,27 @@ export function MessagesShellClient({
       return;
     }
 
-    const joinWindow = window.open('', '_blank', 'noopener,noreferrer');
-
-    try {
-      const response = await window.fetch(
-        `/api/channels/${channelState.ids.id}/live-sessions/join`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ orgSlug }),
+    const response = await window.fetch(
+      `/api/channels/${channelState.ids.id}/live-sessions/join`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-      );
+        body: JSON.stringify({ orgSlug }),
+      },
+    );
 
-      const payload = (await response.json().catch(() => null)) as
-        | { success?: boolean; joinPath?: string; error?: string }
-        | null;
+    const payload = (await response.json().catch(() => null)) as
+      | { success?: boolean; joinPath?: string; error?: string }
+      | null;
 
-      if (!response.ok || !payload?.success || !payload.joinPath) {
-        throw new Error(payload?.error ?? 'Failed to join live session');
-      }
-
-      const resolvedJoinUrl = new URL(payload.joinPath, window.location.origin).toString();
-
-      if (joinWindow) {
-        joinWindow.location.href = resolvedJoinUrl;
-      } else {
-        window.open(resolvedJoinUrl, '_blank', 'noopener,noreferrer');
-      }
-    } catch (error) {
-      if (joinWindow && !joinWindow.closed) {
-        joinWindow.close();
-      }
-      throw error;
+    if (!response.ok || !payload?.success || !payload.joinPath) {
+      throw new Error(payload?.error ?? 'Failed to join live session');
     }
-  }, [channelState.ids.id, orgSlug]);
+
+    router.push(payload.joinPath);
+  }, [channelState.ids.id, orgSlug, router]);
 
   useEffect(() => {
     setChannelState(channel);

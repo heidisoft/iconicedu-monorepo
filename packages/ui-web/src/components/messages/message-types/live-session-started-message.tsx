@@ -32,7 +32,7 @@ export const LiveSessionStartedMessage = memo(function LiveSessionStartedMessage
           ) : null}
         </div>
         <Button size="sm" asChild className="w-fit">
-          <a href={message.liveSession.joinUrl} target="_blank" rel="noreferrer">
+          <a href={message.liveSession.joinUrl}>
             <Video className="h-4 w-4" />
             Join
           </a>
