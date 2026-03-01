@@ -26,3 +26,7 @@ export function resolvePostHogBrowserConfig(env: PostHogEnv = process.env): Post
     defaults: '2026-01-30',
   };
 }
+
+export function isPostHogBrowserConfigured(env: PostHogEnv = process.env): boolean {
+  return Boolean(resolvePostHogBrowserConfig(env));
+}

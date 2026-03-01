@@ -1538,13 +1538,17 @@ function mapClassScheduleRow(row: Record<string, unknown>): ClassScheduleVM {
 /**
  * Fetches class schedules for the learning space that owns the given channel.
  * Sessions are a learning-space concern — decoupled from channel messaging logic.
+ *
+ * Strategy: prefer the learning-space link (source_learning_space_id) which is the
+ * authoritative relationship. If no learning_space_channels row exists yet, fall back
+ * to matching source_channel_id directly — same as the web approach.
  */
 export async function fetchSpaceSchedulesByChannelId(
   channelId: string,
   orgId: string,
 ): Promise<ClassScheduleVM[]> {
-  // Step 1: Resolve channel → learning space
-  const { data: spaceLink, error: linkError } = await supabase
+  // Step 1: Resolve channel → learning space (optional — used when available)
+  const { data: spaceLink } = await supabase
     .from('learning_space_channels')
     .select('learning_space_id')
     .eq('org_id', orgId)
@@ -1552,33 +1556,39 @@ export async function fetchSpaceSchedulesByChannelId(
     .is('deleted_at', null)
     .maybeSingle();
 
-  if (linkError) throw linkError;
-  if (!spaceLink) return [];
+  const selectFragment = `
+    id, org_id, title, description, location, meeting_link,
+    start_at, end_at, timezone, status, visibility, theme_key,
+    source_kind, source_learning_space_id, source_channel_id,
+    source_session_id, source_owner_user_id, source_created_by_user_id,
+    source_related_learning_space_id,
+    created_at, created_by, updated_at, updated_by,
+    participants:class_schedule_participants(
+      id, org_id, role, status, display_name, avatar_url, theme_key
+    ),
+    recurrence:class_schedule_recurrence(
+      id, org_id, frequency, interval, count, until, timezone, byday,
+      exceptions:class_schedule_recurrence_exceptions(id, occurrence_key, reason),
+      overrides:class_schedule_recurrence_overrides(id, occurrence_key, patch)
+    )
+  `;
 
-  // Step 2: Fetch schedules for the learning space (not the channel)
-  const { data, error } = await supabase
+  // Step 2: Fetch schedules — use learning_space_id when available, channel_id otherwise
+  let query = supabase
     .from('class_schedules')
-    .select(`
-      id, org_id, title, description, location, meeting_link,
-      start_at, end_at, timezone, status, visibility, theme_key,
-      source_kind, source_learning_space_id, source_channel_id,
-      source_session_id, source_owner_user_id, source_created_by_user_id,
-      source_related_learning_space_id,
-      created_at, created_by, updated_at, updated_by,
-      participants:class_schedule_participants(
-        id, org_id, role, status, display_name, avatar_url, theme_key
-      ),
-      recurrence:class_schedule_recurrence(
-        id, org_id, frequency, interval, count, until, timezone, byday,
-        exceptions:class_schedule_recurrence_exceptions(id, occurrence_key, reason),
-        overrides:class_schedule_recurrence_overrides(id, occurrence_key, patch)
-      )
-    `)
+    .select(selectFragment)
     .eq('org_id', orgId)
-    .eq('source_learning_space_id', spaceLink.learning_space_id)
     .is('deleted_at', null)
     .order('start_at', { ascending: true });
 
+  if (spaceLink?.learning_space_id) {
+    query = query.eq('source_learning_space_id', spaceLink.learning_space_id);
+  } else {
+    // Fallback: match by source_channel_id directly (mirrors web filter)
+    query = query.eq('source_channel_id', channelId);
+  }
+
+  const { data, error } = await query;
   if (error) throw error;
   return (data ?? []).map((row) => mapClassScheduleRow(row as Record<string, unknown>));
 }

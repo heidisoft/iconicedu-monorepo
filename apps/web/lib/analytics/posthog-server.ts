@@ -27,7 +27,7 @@ export function getPostHogServerClient() {
   return posthogServerClient;
 }
 
-export function capturePostHogServerEvent(input: {
+export async function capturePostHogServerEvent(input: {
   distinctId?: string;
   event: string;
   properties?: Record<string | number, unknown>;
@@ -38,15 +38,15 @@ export function capturePostHogServerEvent(input: {
     return;
   }
 
-  client.capture({
-    distinctId: input.distinctId,
+  await client.captureImmediate({
+    distinctId: input.distinctId ?? 'anonymous',
     event: input.event,
     properties: input.properties,
     groups: input.groups,
   });
 }
 
-export function capturePostHogServerException(
+export async function capturePostHogServerException(
   error: unknown,
   input?: {
     distinctId?: string;
@@ -58,7 +58,7 @@ export function capturePostHogServerException(
     return;
   }
 
-  client.captureException(error, input?.distinctId, input?.properties);
+  await client.captureExceptionImmediate(error, input?.distinctId, input?.properties);
 }
 
 export async function getPostHogServerFeatureFlag(

@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **Agent guidelines**: See [AGENTS.md](./AGENTS.md) for architecture details, domain model, TypeScript patterns, vendor-agnostic coding rules, and the unit-test requirement (every touched file must have a test).
+
 ## Commands
 
 ### Development

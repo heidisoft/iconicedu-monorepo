@@ -49,8 +49,10 @@ import type {
 } from '@iconicedu/shared-types';
 
 // ─── Screen dimensions ─────────────────────────────────────────────────────────
+// Use 'screen' (not 'window') so the full display height is captured on Android,
+// including the system navigation bar area when navigationBarTranslucent is set.
 
-const SCREEN_HEIGHT = Dimensions.get('window').height;
+const SCREEN_HEIGHT = Dimensions.get('screen').height;
 const PARTIAL_HEIGHT = SCREEN_HEIGHT * 0.58;
 
 // ─── Avatar helpers ────────────────────────────────────────────────────────────
@@ -1750,6 +1752,7 @@ export function ChannelInfoSheet({
       animationType="none"
       onRequestClose={handleClose}
       statusBarTranslucent
+      navigationBarTranslucent
     >
       {/* Backdrop — tapping closes sheet when in partial mode */}
       <Pressable
@@ -1762,7 +1765,7 @@ export function ChannelInfoSheet({
         style={[
           s.sheet,
           { transform: [{ translateY: sheetTranslateY }] },
-          isFullScreen && { paddingTop: insets.top },
+          isFullScreen && { paddingTop: insets.top, paddingBottom: insets.bottom },
         ]}
       >
         {/* Drag handle — always visible, handles gesture for expand/collapse/close */}
@@ -1819,8 +1822,8 @@ export function ChannelInfoSheet({
         ) : (
           /* ── Channel / Space: compact hero + fixed tabs + scrollable content ── */
           <>
-            {/* Compact hero */}
-            <View style={s.heroCompact}>
+            {/* Compact hero — also handles swipe-down when fully open */}
+            <View style={s.heroCompact} {...(isFullScreen ? panResponder.panHandlers : {})}>
               <View style={[s.iconBoxCompact, { backgroundColor: colors.tealBg }]}>
                 <Text style={s.iconEmojiTxtCompact}>{iconEmoji ?? '📚'}</Text>
               </View>

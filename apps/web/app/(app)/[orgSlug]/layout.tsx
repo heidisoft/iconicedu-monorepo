@@ -5,6 +5,7 @@ import { SidebarProvider } from '@iconicedu/ui-web';
 import { cookies } from 'next/headers';
 
 import { SidebarShell } from '@iconicedu/web/app/(app)/[orgSlug]/sidebar-shell';
+import { PostHogIdentify } from '@iconicedu/web/components/posthog-identify';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { buildAdminMenuSections } from '@iconicedu/web/lib/data/admin-menu-sections';
 import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
@@ -84,6 +85,13 @@ export default async function Layout({
 
   return (
     <SidebarProvider>
+      <PostHogIdentify
+        distinctId={authUser.id}
+        email={authUser.email ?? null}
+        accountId={account.id}
+        orgId={account.org_id}
+        orgSlug={orgSlug}
+      />
       <SidebarShell
         data={sidebarData}
         initialOnboardingStatus={onboardingStatus}

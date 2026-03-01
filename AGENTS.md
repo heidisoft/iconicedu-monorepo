@@ -1134,6 +1134,15 @@ TextMessageVM | ImageMessageVM | ... (narrowed type)
    - Avoid abrupt jumps when content appears/disappears.
    - Respect reduced-motion preferences when platform support is available.
 
+### Vendor-Agnostic Code
+
+**Write code that is not tightly coupled to a single vendor or SDK.**
+
+- Isolate third-party integrations (Supabase, AI providers, analytics, storage) behind a thin wrapper in `lib/`, `queries/`, or a dedicated adapter file. Feature code must not import vendor SDKs directly.
+- When two equivalent approaches exist, prefer the one that relies on standard web/Node/React APIs over a proprietary vendor extension.
+- Use standard TypeScript interfaces for data contracts between layers — never leak vendor-specific types (e.g. `SupabaseClient`, SDK response shapes) beyond the integration boundary.
+- AI/LLM integrations: abstract the provider behind a service interface so the underlying model or SDK can be swapped without touching calling code.
+
 ### Testing Requirements
 
 **CRITICAL: Every time a file is modified, unit tests MUST be updated or created.**
@@ -1494,4 +1503,4 @@ pnpm --filter mobile exec jest src/__tests__/message-list.test.tsx
 
 **End of AGENTS.md**
 
-*This document should be updated as the architecture evolves. Last updated: 2026-02-22*
+*This document should be updated as the architecture evolves. Last updated: 2026-03-01*

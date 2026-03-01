@@ -21,7 +21,7 @@ export async function onRequestError(
     revalidateReason: 'on-demand' | 'stale' | undefined;
   }>,
 ) {
-  capturePostHogServerException(error, {
+  await capturePostHogServerException(error, {
     properties: {
       routePath: context.routePath,
       routeType: context.routeType,

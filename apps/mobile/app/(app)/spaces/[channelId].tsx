@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from 'react';
-import { View, StyleSheet } from 'react-native';
+import React, { useState, useCallback, useMemo } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAccount } from '@/hooks/use-account';
@@ -13,6 +13,9 @@ import { MessageInput } from '@/components/messages/message-input';
 import { TypingIndicator } from '@/components/messages/typing-indicator';
 import { ConversationHeader } from '@/components/messages/conversation-header';
 import { ChannelInfoSheet } from '@/components/messages/channel-info-sheet';
+import { SpaceSessionsTab } from '@/components/messages/space-sessions-tab';
+
+type SpaceTab = 'messages' | 'sessions';
 
 export default function SpaceDetailScreen() {
   const { channelId, topic, iconEmoji, subtitle } = useLocalSearchParams<{
@@ -37,6 +40,9 @@ export default function SpaceDetailScreen() {
     orgId,
   );
 
+  // ── Tab state ──
+  const [activeTab, setActiveTab] = useState<SpaceTab>('messages');
+
   // ── Info sheet state ──
   const [infoVisible, setInfoVisible] = useState(false);
 
@@ -48,27 +54,60 @@ export default function SpaceDetailScreen() {
     [channelId, profileId, orgId],
   );
 
+  const s = useMemo(() => makeStyles(colors), [colors]);
+
   if (!channelId) return null;
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: colors.pageBg }]} edges={['top']}>
+    <SafeAreaView style={[s.safe, { backgroundColor: colors.pageBg }]} edges={['top']}>
       <ConversationHeader
         title={topic ?? 'Learning Space'}
         kind="space"
         onBack={() => router.back()}
         onMore={() => setInfoVisible(true)}
       />
-      <View style={[styles.flex, { backgroundColor: colors.pageBg }]}>
-        <MessageList
-          messages={messages ?? []}
-          currentProfileId={profileId}
-          currentAccountId={accountId}
-          onLoadMore={loadMore}
-          loading={isLoading}
-        />
-        <TypingIndicator typingUsers={[]} />
-        <MessageInput onSend={handleSend} placeholder={`Message ${topic ?? 'Learning Space'}…`} />
+
+      {/* Tab bar: Messages | Sessions */}
+      <View style={[s.tabBar, { borderBottomColor: colors.border }]}>
+        {(['messages', 'sessions'] as SpaceTab[]).map((tab) => {
+          const isActive = activeTab === tab;
+          return (
+            <TouchableOpacity
+              key={tab}
+              style={[s.tabItem, isActive && { borderBottomColor: colors.teal }]}
+              onPress={() => setActiveTab(tab)}
+              activeOpacity={0.7}
+            >
+              <Text style={[s.tabLabel, { color: isActive ? colors.teal : colors.textMuted }]}>
+                {tab === 'messages' ? 'Messages' : 'Sessions'}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
+
+      {/* Content */}
+      {activeTab === 'messages' ? (
+        <View style={[s.flex, { backgroundColor: colors.pageBg }]}>
+          <MessageList
+            messages={messages ?? []}
+            currentProfileId={profileId}
+            currentAccountId={accountId}
+            onLoadMore={loadMore}
+            loading={isLoading}
+          />
+          <TypingIndicator typingUsers={[]} />
+          <MessageInput onSend={handleSend} placeholder={`Message ${topic ?? 'Learning Space'}…`} />
+        </View>
+      ) : (
+        <View style={[s.flex, { backgroundColor: colors.pageBg }]}>
+          <SpaceSessionsTab
+            schedules={schedules ?? []}
+            isLoading={isLoadingSessions}
+            error={sessionsError}
+          />
+        </View>
+      )}
 
       {/* Info sheet */}
       <ChannelInfoSheet
@@ -86,7 +125,23 @@ export default function SpaceDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1 },
-  flex: { flex: 1 },
-});
+const makeStyles = (colors: { border: string; teal: string; textMuted: string }) =>
+  StyleSheet.create({
+    safe: { flex: 1 },
+    flex: { flex: 1 },
+    tabBar: {
+      flexDirection: 'row',
+      borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    tabItem: {
+      flex: 1,
+      alignItems: 'center',
+      paddingVertical: 11,
+      borderBottomWidth: 2,
+      borderBottomColor: 'transparent',
+    },
+    tabLabel: {
+      fontSize: 14,
+      fontWeight: '600',
+    },
+  });

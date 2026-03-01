@@ -8,6 +8,9 @@ if (config && typeof window !== 'undefined') {
   posthog.init(config.apiKey, {
     api_host: config.apiHost,
     defaults: config.defaults,
-    capture_pageview: 'history_change',
+    autocapture: true,
+    capture_pageview: false,
+    capture_pageleave: true,
+    persistence: 'localStorage+cookie',
   });
 }

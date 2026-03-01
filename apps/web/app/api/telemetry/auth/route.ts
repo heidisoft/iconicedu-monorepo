@@ -2,7 +2,9 @@ import { NextResponse } from 'next/server';
 
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
+import { capturePostHogServerEvent } from '@iconicedu/web/lib/analytics/posthog-server';
 import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
+import { POSTHOG_EVENT_KEYS } from '@iconicedu/web/lib/analytics/posthog-events';
 import { getDefaultOrg, getOrgBySlug } from '@iconicedu/web/lib/org/queries/org.query';
 
 const ALLOWED_EVENTS = new Set([
@@ -83,6 +85,22 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
+
+  await capturePostHogServerEvent({
+    distinctId: user?.id ?? accountId ?? `org:${orgId}`,
+    event: POSTHOG_EVENT_KEYS.authTelemetry,
+    properties: {
+      authEvent: event,
+      orgId,
+      accountId,
+      authUserId: user?.id ?? null,
+      ...((payload ?? {}) as Record<string, unknown>),
+    },
+    groups: {
+      organization: orgId,
+      ...(accountId ? { account: accountId } : {}),
+    },
+  });
 
   return NextResponse.json({ success: true });
 }
