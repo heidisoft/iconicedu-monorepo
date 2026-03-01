@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import { toStoredLiveSessionConfig } from '@iconicedu/web/lib/admin/live-session-config';
 import type {
   ChannelUiDefaultsVM,
   LearningSpaceCreatePayload,
@@ -91,6 +92,7 @@ export async function createLearningSpaceFromPayload(
     iconKey: payload.basics.iconKey ?? null,
     uiThemeKey: payload.settings?.themeKey ?? null,
     uiDefaults: payload.settings?.uiDefaults ?? null,
+    liveSession: payload.liveSession ?? null,
     primaryEntityId: learningSpaceId,
     createdByProfileId: actorProfileId,
     createdAt: now,
@@ -196,6 +198,7 @@ type ChannelInsertPayload = {
   description: string | null;
   uiThemeKey: string | null;
   uiDefaults: ChannelUiDefaultsVM | null | undefined;
+  liveSession: LearningSpaceCreatePayload['liveSession'];
   primaryEntityId: string;
   createdByProfileId: string;
   createdAt: string;
@@ -217,6 +220,7 @@ async function insertChannel(supabase: SupabaseClient, payload: ChannelInsertPay
     allow_reactions: true,
     ui_theme_key: payload.uiThemeKey,
     ui_defaults: payload.uiDefaults ?? null,
+    live_session_config: toStoredLiveSessionConfig(payload.liveSession),
     primary_entity_kind: 'learning_space',
     primary_entity_id: payload.primaryEntityId,
     created_by_profile_id: payload.createdByProfileId,

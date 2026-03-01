@@ -27,6 +27,7 @@ import {
   getMessageHomeworkSubmissionsByMessageIds,
   getMessageLinkPreviewsByMessageIds,
   getMessageAudioRecordingsByMessageIds,
+  getMessageLiveSessionStartedByMessageIds,
   getMessageReactionCountsByMessageIds,
   getMessageSavesByMessageIds,
 } from '@iconicedu/web/lib/messages/queries/messages.query';
@@ -226,6 +227,7 @@ async function loadPayloadsByMessageIds(
     loadPayloads(getMessageHomeworkSubmissionsByMessageIds, 'homework-submission'),
     loadPayloads(getMessageLinkPreviewsByMessageIds, 'link-preview'),
     loadPayloads(getMessageAudioRecordingsByMessageIds, 'audio-recording'),
+    loadPayloads(getMessageLiveSessionStartedByMessageIds, 'live-session-started'),
   ];
 
   await Promise.all(loaders);

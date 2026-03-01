@@ -7,6 +7,7 @@ import { ScrollArea } from '@iconicedu/ui-web/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@iconicedu/ui-web/ui/tabs';
 import { CalendarDays, Loader2 } from 'lucide-react';
 import {
+  getJoinableSessionId,
   groupSchedulesByMonth,
   splitSchedulesByTimeline,
   takeMonthGroups,
@@ -46,6 +47,7 @@ export function MessagesScheduleTab({
     () => toMonthGroups(takeMonthGroups(upcomingMonthGroups, upcomingMonthLimit), now),
     [upcomingMonthGroups, upcomingMonthLimit, now],
   );
+  const joinableSessionId = useMemo(() => getJoinableSessionId(upcoming), [upcoming]);
 
   const pastGroups = useMemo(
     () => toMonthGroups(takeMonthGroups(pastMonthGroups, pastMonthLimit), now),
@@ -115,6 +117,7 @@ export function MessagesScheduleTab({
                     group={group}
                     isCurrentMonth={group.monthKey === currentMonthKey}
                     defaultOpen={index === 0}
+                    joinableSessionId={joinableSessionId}
                   />
                 ))
               )}

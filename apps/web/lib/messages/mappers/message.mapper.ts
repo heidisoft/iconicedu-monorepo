@@ -23,6 +23,7 @@ import type {
   ReactionVM,
   SessionBookingMessageVM,
   SessionSummaryMessageVM,
+  LiveSessionStartedMessageVM,
   ThreadVM,
   UserProfileVM,
 } from '@iconicedu/shared-types';
@@ -372,6 +373,29 @@ export function mapMessageRowToVM(
             : undefined,
           fileSize: typeof payload?.fileSize === 'number' ? payload.fileSize : undefined,
           mimeType: typeof payload?.mimeType === 'string' ? payload.mimeType : undefined,
+        },
+      } as MessageVM;
+    case 'live-session-started':
+      return {
+        ...base,
+        core: { ...core, type: 'live-session-started' },
+        content: payload?.text ? { text: String(payload.text) } : undefined,
+        liveSession: {
+          sessionId: String(payload?.sessionId ?? ''),
+          provider: (payload?.provider as LiveSessionStartedMessageVM['liveSession']['provider']) ?? 'daily',
+          title: String(payload?.title ?? ''),
+          joinUrl: String(payload?.joinUrl ?? ''),
+          startedByProfileId: String(payload?.startedByProfileId ?? input.sender.ids.id),
+          startedByDisplayName: String(
+            payload?.startedByDisplayName ?? input.sender.profile.displayName,
+          ),
+          startedAt: String(payload?.startedAt ?? row.created_at),
+          occurrenceKey:
+            typeof payload?.occurrenceKey === 'string' ? payload.occurrenceKey : null,
+          occurrenceLabel:
+            typeof payload?.occurrenceLabel === 'string' ? payload.occurrenceLabel : null,
+          status:
+            (payload?.status as LiveSessionStartedMessageVM['liveSession']['status']) ?? 'live',
         },
       } as MessageVM;
     default:

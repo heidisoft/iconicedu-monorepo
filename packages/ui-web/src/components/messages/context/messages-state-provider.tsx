@@ -40,6 +40,7 @@ interface MessagesStateContextValue {
   createTextMessage: (content: string, mentions?: MessageMentionVM[]) => TextMessageVM | null;
   sendTextMessage: SendTextMessageHandler;
   sendFileMessage: SendFileMessageHandler;
+  joinLiveSession?: JoinLiveSessionHandler;
   threadHandlers: ThreadActionHandlers;
   state: MessagesRightSidebarState;
   open: (intent: MessagesRightPanelIntent) => void;
@@ -59,6 +60,7 @@ interface MessagesStateContextValue {
   ) => void;
   setSendTextMessage: (handler: SendTextMessageHandler) => void;
   setSendFileMessage: (handler: SendFileMessageHandler) => void;
+  setJoinLiveSession: (handler: JoinLiveSessionHandler | undefined) => void;
   setThreadHandlers: (handlers: ThreadActionHandlers) => void;
   toggleMessageFilter: (key: MessageFilterKey) => void;
   appendThreadMessage: (threadId: UUID, message: MessageVM) => void;
@@ -97,6 +99,8 @@ export type SendFileMessageHandler = (input: {
   threadId?: string | null;
   threadParentId?: string | null;
 }) => Promise<MessageVM | null>;
+
+export type JoinLiveSessionHandler = () => Promise<void>;
 
 export type MessageFilterKey = 'homework' | 'session-summary';
 
@@ -144,6 +148,9 @@ export function MessagesStateProvider({
   );
   const [sendFileMessage, setSendFileMessage] = useState<SendFileMessageHandler>(
     async () => null,
+  );
+  const [joinLiveSession, setJoinLiveSession] = useState<JoinLiveSessionHandler | undefined>(
+    undefined,
   );
   const [threadHandlers, setThreadHandlers] = useState<ThreadActionHandlers>({});
   const [threadData, setThreadDataState] = useState<Record<UUID, ThreadData>>({});
@@ -243,6 +250,13 @@ export function MessagesStateProvider({
     setSendFileMessage(() => handler);
   }, []);
 
+  const setJoinLiveSessionFactory = useCallback(
+    (handler: JoinLiveSessionHandler | undefined) => {
+      setJoinLiveSession(() => handler);
+    },
+    [],
+  );
+
   const setThreadHandlersFactory = useCallback((handlers: ThreadActionHandlers) => {
     setThreadHandlers(handlers);
   }, []);
@@ -267,6 +281,7 @@ export function MessagesStateProvider({
       createTextMessage,
       sendTextMessage,
       sendFileMessage,
+      joinLiveSession,
       threadHandlers,
       state,
       open,
@@ -281,6 +296,7 @@ export function MessagesStateProvider({
       setCreateTextMessage: setCreateTextMessageFactory,
       setSendTextMessage: setSendTextMessageFactory,
       setSendFileMessage: setSendFileMessageFactory,
+      setJoinLiveSession: setJoinLiveSessionFactory,
       setThreadHandlers: setThreadHandlersFactory,
       toggleMessageFilter,
       appendThreadMessage,
@@ -303,6 +319,7 @@ export function MessagesStateProvider({
       createTextMessage,
       sendTextMessage,
       sendFileMessage,
+      joinLiveSession,
       threadHandlers,
       state,
       open,
@@ -317,6 +334,7 @@ export function MessagesStateProvider({
       setCreateTextMessageFactory,
       setSendTextMessageFactory,
       setSendFileMessageFactory,
+      setJoinLiveSessionFactory,
       setThreadHandlersFactory,
       toggleMessageFilter,
       appendThreadMessage,

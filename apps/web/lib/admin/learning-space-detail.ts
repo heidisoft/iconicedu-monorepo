@@ -1,4 +1,5 @@
 import type {
+  ChannelLiveSessionConfigVM,
   ChannelUiDefaultsVM,
   ClassScheduleRecurrenceExceptionRow,
   ClassScheduleRecurrenceOverrideRow,
@@ -17,6 +18,7 @@ import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { buildUserProfileById } from '@iconicedu/web/lib/profile/builders/user-profile.builder';
 import { mapLearningSpaceLinkRow } from '@iconicedu/web/lib/spaces/mappers/learning-space.mapper';
+import { getAdminLiveSessionConfig } from '@iconicedu/web/lib/admin/live-session-config';
 
 export type LearningSpaceDetail = {
   ids: { id: string; orgId: string };
@@ -31,6 +33,7 @@ export type LearningSpaceDetail = {
     themeKey: ThemeKey | null;
     uiDefaults?: ChannelUiDefaultsVM | null;
   };
+  liveSession: ChannelLiveSessionConfigVM;
   participants: UserProfileVM[];
   resources: LearningSpaceLinkVM[];
   schedules: RecurrenceFormData[];
@@ -117,14 +120,19 @@ export async function getLearningSpaceDetail(learningSpaceId: string) {
   const primaryChannelId = channelLinksResponse.data?.channel_id ?? null;
   let channelThemeKey: ThemeKey | null = null;
   let channelUiDefaults: ChannelUiDefaultsVM | null = null;
+  let channelLiveSessionConfig: unknown = null;
   if (primaryChannelId) {
     const { data: channel, error: channelError } = await supabase
       .from('channels')
-      .select('ui_theme_key, ui_defaults')
+      .select('ui_theme_key, ui_defaults, live_session_config')
       .eq('org_id', orgId)
       .eq('id', primaryChannelId)
       .is('deleted_at', null)
-      .maybeSingle<{ ui_theme_key?: string | null; ui_defaults?: unknown }>();
+      .maybeSingle<{
+        ui_theme_key?: string | null;
+        ui_defaults?: unknown;
+        live_session_config?: unknown;
+      }>();
 
     if (channelError) {
       throw new Error(channelError.message);
@@ -134,6 +142,7 @@ export async function getLearningSpaceDetail(learningSpaceId: string) {
       channel?.ui_defaults && typeof channel.ui_defaults === 'object'
         ? (channel.ui_defaults as ChannelUiDefaultsVM)
         : null;
+    channelLiveSessionConfig = channel?.live_session_config ?? null;
   }
 
   const participantProfiles = await Promise.all(
@@ -158,6 +167,7 @@ export async function getLearningSpaceDetail(learningSpaceId: string) {
       themeKey: channelThemeKey,
       uiDefaults: channelUiDefaults,
     },
+    liveSession: getAdminLiveSessionConfig(channelLiveSessionConfig),
     participants,
     resources: (linksResponse.data ?? []).map(mapLearningSpaceLinkRow),
     schedules,

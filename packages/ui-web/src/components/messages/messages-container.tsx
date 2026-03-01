@@ -100,6 +100,7 @@ export interface MessagesContainerProps {
     threadId?: string | null;
     threadParentId?: string | null;
   }) => Promise<MessageVM[]>;
+  joinLiveSession?: () => Promise<void>;
 }
 
 const isGuardianProfile = (profile: UserProfileVM): profile is GuardianProfileVM =>
@@ -152,6 +153,7 @@ export function MessagesContainer({
   realtimeClient,
   messageWriteClient,
   uploadFileMessage,
+  joinLiveSession,
 }: MessagesContainerProps) {
   const messageListRef = useRef<MessageListRef>(null);
   const messagesRef = useRef<MessageVM[]>([]);
@@ -173,6 +175,7 @@ export function MessagesContainer({
     setCreateTextMessage,
     setSendTextMessage,
     setSendFileMessage,
+    setJoinLiveSession,
     setThreadHandlers,
     setGetMessageActionState,
     setScrollToMessage,
@@ -1089,6 +1092,15 @@ export function MessagesContainer({
     upsertTypingProfile,
     clearTypingTimeout,
   ]);
+
+  useEffect(() => {
+    if (readOnly || !joinLiveSession) {
+      setJoinLiveSession(undefined);
+      return;
+    }
+
+    setJoinLiveSession(joinLiveSession);
+  }, [joinLiveSession, readOnly, setJoinLiveSession]);
 
   useEffect(() => {
     if (readOnly) {

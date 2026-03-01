@@ -19,6 +19,7 @@ const MESSAGE_PAYLOAD_TABLES = [
   'message_homework_submission',
   'message_link_preview',
   'message_audio_recording',
+  'message_live_session_started',
   'message_reactions',
   'message_reaction_counts',
 ] as const;

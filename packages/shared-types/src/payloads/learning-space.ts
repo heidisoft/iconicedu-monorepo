@@ -1,6 +1,6 @@
 import type { IANATimezone, ISODateTime, ThemeKey } from '@iconicedu/shared-types/shared/shared';
 import type { RecurrenceFrequencyVM, WeekdayVM } from '@iconicedu/shared-types/vm/class-schedule';
-import type { ChannelUiDefaultsVM } from '@iconicedu/shared-types/vm/channel';
+import type { ChannelLiveSessionConfigVM, ChannelUiDefaultsVM } from '@iconicedu/shared-types/vm/channel';
 
 export type LearningSpaceScheduleWeekdayTimePayload = {
   day: WeekdayVM;
@@ -65,6 +65,7 @@ export type LearningSpaceCreatePayload = {
     themeKey?: ThemeKey | null;
     uiDefaults?: ChannelUiDefaultsVM | null;
   } | null;
+  liveSession?: ChannelLiveSessionConfigVM | null;
   participants: LearningSpaceParticipantPayload[];
   resources?: LearningSpaceResourcePayload[] | null;
   schedules?: LearningSpaceSchedulePayload[] | null;

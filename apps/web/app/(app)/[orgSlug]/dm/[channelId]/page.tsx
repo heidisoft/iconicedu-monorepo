@@ -92,6 +92,7 @@ export default async function Page({
     <div className="flex h-[calc(100vh-1.0rem)] flex-col">
       <DashboardHeader />
       <MessagesShellClient
+        orgSlug={orgSlug}
         channel={channel}
         currentUserId={profileResponse.data?.id ?? ''}
         currentUserProfile={currentUserProfile}

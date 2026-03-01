@@ -56,6 +56,15 @@ export type ChannelQuickActionKey =
   | 'more'
   | 'custom';
 
+export type LiveSessionProviderVM = 'daily' | 'zoom' | 'jitsi' | 'custom';
+export type LiveSessionModeVM = 'video' | 'audio';
+
+export interface ChannelLiveSessionConfigVM {
+  enabled: boolean;
+  provider: LiveSessionProviderVM;
+  mode?: LiveSessionModeVM | null;
+}
+
 export interface ChannelQuickActionVM {
   key: ChannelQuickActionKey;
   label: string;
@@ -125,6 +134,7 @@ export interface ChannelCapabilityRecordVM {
 export interface ChannelContextVM {
   primaryEntity?: EntityRefVM | null;
   capabilities?: ChannelCapabilityVM[] | null;
+  liveSession?: ChannelLiveSessionConfigVM | null;
 }
 
 export interface ChannelBasicsVM {

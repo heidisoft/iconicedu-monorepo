@@ -1,6 +1,7 @@
 import type {
   ChannelUiDefaultsVM,
   ChannelCapabilityVM,
+  ChannelLiveSessionConfigVM,
   ChannelPostingPolicyVM,
   ThemeKey,
   UserProfileVM,
@@ -14,6 +15,7 @@ import {
   getChannelCapabilitiesByChannelIds,
   getChannelParticipantsByChannelIds,
 } from '@iconicedu/web/lib/channels/queries/channels.query';
+import { getAdminLiveSessionConfig } from '@iconicedu/web/lib/admin/live-session-config';
 
 export type ChannelDetail = {
   ids: { id: string; orgId: string };
@@ -29,6 +31,7 @@ export type ChannelDetail = {
     themeKey: ThemeKey | null;
   };
   postingPolicy: ChannelPostingPolicyVM;
+  liveSession: ChannelLiveSessionConfigVM;
   lifecycle: {
     status: 'active' | 'archived';
   };
@@ -110,6 +113,7 @@ export async function getChannelDetail(channelId: string): Promise<ChannelDetail
       allowThreads: channelResponse.data.allow_threads ?? true,
       allowReactions: channelResponse.data.allow_reactions ?? true,
     },
+    liveSession: getAdminLiveSessionConfig(channelResponse.data.live_session_config),
     lifecycle: {
       status: channelResponse.data.status === 'archived' ? 'archived' : 'active',
     },

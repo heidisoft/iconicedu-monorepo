@@ -1,8 +1,8 @@
 'use client';
 
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { Bookmark, Flag, Info, LifeBuoy, LogOut, MoreHorizontal, Video } from 'lucide-react';
+import { Bookmark, Flag, Info, LifeBuoy, Loader2, LogOut, MoreHorizontal, Video } from 'lucide-react';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import { useMessagesState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
@@ -101,7 +101,8 @@ export function resolveHeaderJoinQuickAction(
 
 export const MessagesContainerHeaderActions = memo(
   function MessagesContainerHeaderActions() {
-    const { toggle, isActive, channel, currentUserId } = useMessagesState();
+    const { toggle, isActive, channel, currentUserId, joinLiveSession } = useMessagesState();
+    const [isJoinPending, setIsJoinPending] = useState(false);
     const otherParticipant =
       channel.basics.kind === 'dm'
         ? channel.collections.participants.find(
@@ -111,8 +112,20 @@ export const MessagesContainerHeaderActions = memo(
     const actions = getVisibleHeaderActions(channel.ui?.headerActions);
     const joinQuickAction = resolveHeaderJoinQuickAction(
       channel.ui?.quickActions,
-      channel.basics.kind !== 'dm',
+      channel.context?.liveSession?.enabled === true,
     );
+
+    const handleJoin = async () => {
+      if (!joinLiveSession || isJoinPending) {
+        return;
+      }
+      setIsJoinPending(true);
+      try {
+        await joinLiveSession();
+      } finally {
+        setIsJoinPending(false);
+      }
+    };
 
     const iconMap: Record<string, typeof Info> = {
       info: Info,
@@ -168,19 +181,18 @@ export const MessagesContainerHeaderActions = memo(
           );
         })}
         {joinQuickAction ? (
-          joinQuickAction.url ? (
-            <Button size="sm" asChild>
-              <a href={joinQuickAction.url} target="_blank" rel="noreferrer">
-                <Video className="h-4 w-4" />
-                {joinQuickAction.label}
-              </a>
-            </Button>
-          ) : (
-            <Button size="sm" disabled>
+          <Button
+            size="sm"
+            disabled={!joinLiveSession || isJoinPending}
+            onClick={() => void handleJoin()}
+          >
+            {isJoinPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
               <Video className="h-4 w-4" />
-              {joinQuickAction.label}
-            </Button>
-          )
+            )}
+            {joinQuickAction.label}
+          </Button>
         ) : null}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

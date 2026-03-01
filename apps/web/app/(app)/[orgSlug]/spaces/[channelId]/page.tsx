@@ -52,6 +52,7 @@ export default async function Page({
     <div className="flex h-[calc(100vh-1.0rem)] flex-col">
       <DashboardHeader title={LEARNING_SPACE_MESSAGES_SECTION_TITLE} />
       <LearningSpaceShell
+        orgSlug={orgSlug}
         channel={channel}
         learningSpace={learningSpace}
         currentUserId={profileResponse.data?.id ?? ''}

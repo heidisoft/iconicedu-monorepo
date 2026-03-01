@@ -13,6 +13,7 @@ import { LearningSpaceInfoPanel } from '@iconicedu/ui-web';
 import { MessagesShellClient } from '@iconicedu/web/app/(app)/[orgSlug]/messages/messages-shell-client';
 
 export function LearningSpaceShell({
+  orgSlug,
   channel,
   learningSpace,
   currentUserId,
@@ -26,6 +27,7 @@ export function LearningSpaceShell({
   deleteMessage,
   toggleHiddenMessage,
 }: {
+  orgSlug: string;
   channel: ChannelVM;
   learningSpace: LearningSpaceVM | null;
   currentUserId?: string;
@@ -41,6 +43,7 @@ export function LearningSpaceShell({
 }) {
   return (
     <MessagesShellClient
+      orgSlug={orgSlug}
       channel={channel}
       currentUserId={currentUserId}
       currentUserProfile={currentUserProfile}

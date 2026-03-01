@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { ClassSession } from './messages-schedule-tab.utils';
-import { getSessionCardState } from './messages-session-card';
+import {
+  getSessionCardState,
+  isSessionJoinButtonDisabled,
+} from './messages-session-card';
 
 const baseSession: ClassSession = {
   id: 'session-1',
@@ -36,5 +39,61 @@ describe('messages-session-card', () => {
       isPast: false,
       isDisabled: true,
     });
+  });
+
+  it('disables join only for unavailable states or when join handler is missing', () => {
+    expect(
+      isSessionJoinButtonDisabled({
+        session: baseSession,
+        hasJoinLiveSession: true,
+        isJoinPending: false,
+        canJoin: true,
+      }),
+    ).toBe(false);
+
+    expect(
+      isSessionJoinButtonDisabled({
+        session: baseSession,
+        hasJoinLiveSession: false,
+        isJoinPending: false,
+        canJoin: true,
+      }),
+    ).toBe(true);
+
+    expect(
+      isSessionJoinButtonDisabled({
+        session: baseSession,
+        hasJoinLiveSession: true,
+        isJoinPending: false,
+        canJoin: false,
+      }),
+    ).toBe(true);
+
+    expect(
+      isSessionJoinButtonDisabled({
+        session: { ...baseSession, isPast: true },
+        hasJoinLiveSession: true,
+        isJoinPending: false,
+        canJoin: true,
+      }),
+    ).toBe(true);
+
+    expect(
+      isSessionJoinButtonDisabled({
+        session: { ...baseSession, disabled: true },
+        hasJoinLiveSession: true,
+        isJoinPending: false,
+        canJoin: true,
+      }),
+    ).toBe(true);
+
+    expect(
+      isSessionJoinButtonDisabled({
+        session: baseSession,
+        hasJoinLiveSession: true,
+        isJoinPending: true,
+        canJoin: true,
+      }),
+    ).toBe(true);
   });
 });

@@ -1,5 +1,6 @@
 import type { ConnectionVM, IdsBaseVM, ISODateTime, UUID } from '@iconicedu/shared-types/shared/shared';
 import type { UserProfileVM } from '@iconicedu/shared-types/vm/profile';
+import type { LiveSessionProviderVM } from '@iconicedu/shared-types/vm/channel';
 
 export interface ReactionVM {
   emoji: string;
@@ -131,7 +132,8 @@ export type MessageTypeVM =
   | 'session-summary'
   | 'homework-submission'
   | 'link-preview'
-  | 'audio-recording';
+  | 'audio-recording'
+  | 'live-session-started';
 
 export interface MessageCoreVM {
   type: MessageTypeVM;
@@ -343,6 +345,23 @@ export interface AudioRecordingMessageVM extends BaseMessageVM {
   };
 }
 
+export interface LiveSessionStartedMessageVM extends BaseMessageVM {
+  core: MessageCoreVM & { type: 'live-session-started' };
+  content?: { text?: string };
+  liveSession: {
+    sessionId: UUID;
+    provider: LiveSessionProviderVM;
+    title: string;
+    joinUrl: string;
+    startedByProfileId: UUID;
+    startedByDisplayName: string;
+    startedAt: ISODateTime;
+    occurrenceKey?: ISODateTime | null;
+    occurrenceLabel?: string | null;
+    status: 'live' | 'ended';
+  };
+}
+
 export type MessageVM =
   | TextMessageVM
   | ImageMessageVM
@@ -358,4 +377,5 @@ export type MessageVM =
   | SessionSummaryMessageVM
   | HomeworkSubmissionMessageVM
   | LinkPreviewMessageVM
-  | AudioRecordingMessageVM;
+  | AudioRecordingMessageVM
+  | LiveSessionStartedMessageVM;

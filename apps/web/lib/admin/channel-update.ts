@@ -5,6 +5,7 @@ import type { ChannelCreatePayload, ChannelCapabilityVM } from '@iconicedu/share
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import { toStoredLiveSessionConfig } from '@iconicedu/web/lib/admin/live-session-config';
 
 export async function updateChannelFromPayload(
   channelId: string,
@@ -43,6 +44,7 @@ export async function updateChannelFromPayload(
     kind: payload.basics.kind,
     themeKey: payload.ui?.themeKey ?? 'teal',
     uiDefaults: payload.ui ?? null,
+    liveSessionConfig: payload.liveSession ?? null,
     status: payload.lifecycle?.status ?? 'active',
     postingPolicyKind: payload.postingPolicy.kind,
     allowThreads: payload.postingPolicy.allowThreads ?? true,
@@ -79,6 +81,7 @@ type UpdateChannelPayload = {
   kind: string;
   themeKey: string;
   uiDefaults: ChannelCreatePayload['ui'];
+  liveSessionConfig: ChannelCreatePayload['liveSession'];
   status: string;
   postingPolicyKind: string;
   allowThreads: boolean;
@@ -99,6 +102,7 @@ async function updateChannel(supabase: SupabaseClient, payload: UpdateChannelPay
       kind: payload.kind,
       ui_theme_key: payload.themeKey,
       ui_defaults: payload.uiDefaults,
+      live_session_config: toStoredLiveSessionConfig(payload.liveSessionConfig),
       status: payload.status,
       posting_policy_kind: payload.postingPolicyKind,
       allow_threads: payload.allowThreads,

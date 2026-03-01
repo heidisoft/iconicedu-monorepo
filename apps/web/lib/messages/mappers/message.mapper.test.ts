@@ -106,4 +106,47 @@ describe('mapMessageRowToVM', () => {
     }
     expect(audioMessage.audio.storagePath).toBe('org-1/channel-1/profile-1/audio.m4a');
   });
+
+  it('maps live-session-started payloads', () => {
+    const message = mapMessageRowToVM(
+      {
+        ...row,
+        id: 'message-live-session',
+        type: 'live-session-started',
+      } as never,
+      {
+        sender: sender as never,
+        payload: {
+          sessionId: 'session-1',
+          provider: 'daily',
+          title: 'Class started',
+          joinUrl: '/iconic-academy/live-sessions/session-1',
+          startedByProfileId: 'profile-1',
+          startedByDisplayName: 'Taylor Reed',
+          startedAt: '2026-01-01T10:00:00.000Z',
+          occurrenceKey: '2026-01-01T10:00:00.000Z',
+          occurrenceLabel: 'Jan 1, 10:00 AM',
+          status: 'live',
+        },
+      },
+    );
+
+    expect(message.core.type).toBe('live-session-started');
+    if (message.core.type !== 'live-session-started') {
+      throw new Error('Expected live-session-started message');
+    }
+
+    expect(message.liveSession).toEqual({
+      sessionId: 'session-1',
+      provider: 'daily',
+      title: 'Class started',
+      joinUrl: '/iconic-academy/live-sessions/session-1',
+      startedByProfileId: 'profile-1',
+      startedByDisplayName: 'Taylor Reed',
+      startedAt: '2026-01-01T10:00:00.000Z',
+      occurrenceKey: '2026-01-01T10:00:00.000Z',
+      occurrenceLabel: 'Jan 1, 10:00 AM',
+      status: 'live',
+    });
+  });
 });

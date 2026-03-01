@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
 import type {
   ChannelVM,
   MessageSendFileInput,
@@ -126,6 +126,7 @@ async function createImageThumbnailFile(file: File): Promise<File | null> {
 }
 
 type MessagesShellClientProps = {
+  orgSlug: string;
   channel: ChannelVM;
   currentUserId?: string;
   currentUserProfile?: UserProfileVM | null;
@@ -143,6 +144,7 @@ type MessagesShellClientProps = {
 };
 
 export function MessagesShellClient({
+  orgSlug,
   channel,
   currentUserId,
   currentUserProfile,
@@ -352,6 +354,48 @@ export function MessagesShellClient({
     [channelState.ids.id, channelState.ids.orgId, currentUserId, presenceClient, sendFileMessage, sendFilesMessage],
   );
 
+  const joinLiveSession = useCallback(async () => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const joinWindow = window.open('', '_blank', 'noopener,noreferrer');
+
+    try {
+      const response = await window.fetch(
+        `/api/channels/${channelState.ids.id}/live-sessions/join`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ orgSlug }),
+        },
+      );
+
+      const payload = (await response.json().catch(() => null)) as
+        | { success?: boolean; joinPath?: string; error?: string }
+        | null;
+
+      if (!response.ok || !payload?.success || !payload.joinPath) {
+        throw new Error(payload?.error ?? 'Failed to join live session');
+      }
+
+      const resolvedJoinUrl = new URL(payload.joinPath, window.location.origin).toString();
+
+      if (joinWindow) {
+        joinWindow.location.href = resolvedJoinUrl;
+      } else {
+        window.open(resolvedJoinUrl, '_blank', 'noopener,noreferrer');
+      }
+    } catch (error) {
+      if (joinWindow && !joinWindow.closed) {
+        joinWindow.close();
+      }
+      throw error;
+    }
+  }, [channelState.ids.id, orgSlug]);
+
   useEffect(() => {
     setChannelState(channel);
   }, [channel]);
@@ -440,6 +484,7 @@ export function MessagesShellClient({
       realtimeClient={realtimeClient}
       messageWriteClient={messageWriteClient}
       uploadFileMessage={uploadFileMessage}
+      joinLiveSession={joinLiveSession}
     />
   );
 }

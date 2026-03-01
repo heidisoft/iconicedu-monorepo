@@ -10,6 +10,7 @@ interface MonthSectionProps {
   group: MonthGroup;
   isCurrentMonth: boolean;
   defaultOpen?: boolean;
+  joinableSessionId?: string | null;
 }
 
 export function shouldMonthSectionStartOpen(
@@ -33,6 +34,7 @@ export function MonthSection({
   group,
   isCurrentMonth,
   defaultOpen = false,
+  joinableSessionId = null,
 }: MonthSectionProps) {
   const [isOpen, setIsOpen] = useState(
     shouldMonthSectionStartOpen(defaultOpen, isCurrentMonth),
@@ -92,7 +94,12 @@ export function MonthSection({
       {isOpen ? (
         <div className="space-y-2 px-1 pt-2">
           {group.sessions.map((session, index) => (
-            <SessionCard key={session.id} session={session} index={index} />
+            <SessionCard
+              key={session.id}
+              session={session}
+              index={index}
+              canJoin={session.id === joinableSessionId}
+            />
           ))}
         </div>
       ) : null}

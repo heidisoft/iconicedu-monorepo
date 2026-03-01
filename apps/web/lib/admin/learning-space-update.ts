@@ -6,6 +6,7 @@ import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service
 import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
 import { insertClassSchedules } from '@iconicedu/web/lib/admin/learning-space-create';
+import { toStoredLiveSessionConfig } from '@iconicedu/web/lib/admin/live-session-config';
 import type {
   ChannelUiDefaultsVM,
   LearningSpaceCreatePayload,
@@ -94,6 +95,7 @@ export async function updateLearningSpaceFromPayload(
     iconKey: payload.basics.iconKey ?? null,
     uiThemeKey: payload.settings?.themeKey ?? null,
     uiDefaults: payload.settings?.uiDefaults ?? null,
+    liveSession: payload.liveSession ?? null,
     updatedBy: actorProfileId,
     updatedAt: now,
   });
@@ -180,6 +182,7 @@ type UpdateChannelPayload = {
   iconKey: string | null;
   uiThemeKey: string | null;
   uiDefaults: ChannelUiDefaultsVM | null | undefined;
+  liveSession: LearningSpaceCreatePayload['liveSession'];
   updatedBy: string;
   updatedAt: string;
 };
@@ -193,6 +196,7 @@ async function updateChannel(supabase: SupabaseClient, payload: UpdateChannelPay
       icon_key: payload.iconKey,
       ui_theme_key: payload.uiThemeKey,
       ui_defaults: payload.uiDefaults ?? null,
+      live_session_config: toStoredLiveSessionConfig(payload.liveSession),
       updated_at: payload.updatedAt,
       updated_by: payload.updatedBy,
     })

@@ -361,6 +361,13 @@ export function toMonthGroups(
   });
 }
 
+export function getJoinableSessionId(schedules: DisplaySchedule[]): string | null {
+  const nextJoinable = schedules.find(
+    (schedule) => !(schedule.uiState?.disabled ?? false),
+  );
+  return nextJoinable?.ids.id ?? null;
+}
+
 export function calculateScheduleCompletionPercent(
   scheduledCount: number,
   completedCount: number,

@@ -6,6 +6,7 @@ import {
   formatScheduleDateBadge,
   formatScheduleDateTime,
   formatScheduleDayTimeMeta,
+  getJoinableSessionId,
   getScheduleMonthKey,
   groupSchedulesByMonth,
   formatScheduleStatus,
@@ -261,5 +262,18 @@ describe('messages-schedule-tab.utils', () => {
         variant: 'default',
       }),
     );
+  });
+
+  it('selects only the first upcoming non-disabled session as joinable', () => {
+    const schedules = [
+      {
+        ...buildSchedule('1', '2026-03-03T16:00:00.000Z'),
+        uiState: { kind: 'exception' as const, disabled: true },
+      },
+      buildSchedule('2', '2026-03-04T16:00:00.000Z'),
+      buildSchedule('3', '2026-03-05T16:00:00.000Z'),
+    ];
+
+    expect(getJoinableSessionId(schedules)).toBe('2');
   });
 });

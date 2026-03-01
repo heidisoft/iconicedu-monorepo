@@ -18,6 +18,7 @@ import {
   isHomeworkSubmissionMessage,
   isLinkPreviewMessage,
   isAudioRecordingMessage,
+  isLiveSessionStartedMessage,
   isMessageVisibleToUser,
 } from '@iconicedu/ui-web/lib/message-guards';
 import {
@@ -36,6 +37,7 @@ import {
   HomeworkSubmissionMessage,
   AudioMessage,
   LinkPreviewMessage,
+  LiveSessionStartedMessage,
 } from '@iconicedu/ui-web/components/messages/message-types';
 import type { MessageActionState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
 
@@ -164,6 +166,10 @@ export const MessageItem = memo(function MessageItem({
 
   if (isLinkPreviewMessage(message)) {
     return <LinkPreviewMessage message={message} {...commonProps} />;
+  }
+
+  if (isLiveSessionStartedMessage(message)) {
+    return <LiveSessionStartedMessage message={message} {...commonProps} />;
   }
 
   return null;

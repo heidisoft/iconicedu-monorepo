@@ -39,18 +39,24 @@ import type { AdminChannelRow } from '@iconicedu/web/lib/admin/channels';
 import type {
   ChannelCapabilityVM,
   ChannelKind,
+  ChannelLiveSessionConfigVM,
   ChannelPurpose,
   ChannelStatus,
   ChannelVisibility,
   ChannelCreatePayload,
+  LiveSessionModeVM,
+  LiveSessionProviderVM,
   ChannelPostingPolicyVM,
   ChannelUiDefaultsVM,
   UserProfileVM,
 } from '@iconicedu/shared-types';
 import { ChannelsTable } from '@iconicedu/web/app/(app)/[orgSlug]/admin/channels/channels-table';
 import type { ChannelDetail } from '@iconicedu/web/lib/admin/channel-detail';
+import { DEFAULT_ADMIN_LIVE_SESSION_CONFIG } from '@iconicedu/web/lib/admin/live-session-config';
 
 const PAGE_SIZES = [10, 25, 50];
+const LIVE_SESSION_PROVIDER_OPTIONS: LiveSessionProviderVM[] = ['daily', 'zoom', 'jitsi', 'custom'];
+const LIVE_SESSION_MODE_OPTIONS: LiveSessionModeVM[] = ['video', 'audio'];
 
 type ChannelsDashboardProps = {
   rows: AdminChannelRow[];
@@ -64,6 +70,7 @@ type CreateChannelFormState = {
   visibility: string;
   uiDefaults: ChannelUiDefaultsVM;
   status: ChannelStatus;
+  liveSession: ChannelLiveSessionConfigVM;
   postingPolicyKind: ChannelPostingPolicyVM['kind'];
   allowThreads: boolean;
   allowReactions: boolean;
@@ -109,6 +116,7 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
     visibility: 'private',
     uiDefaults: createDefaultChannelUiDefaults(),
     status: 'active',
+    liveSession: { ...DEFAULT_ADMIN_LIVE_SESSION_CONFIG },
     postingPolicyKind: 'members-only',
     allowThreads: true,
     allowReactions: true,
@@ -191,6 +199,7 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
       visibility: 'private',
       uiDefaults: createDefaultChannelUiDefaults(),
       status: 'active',
+      liveSession: { ...DEFAULT_ADMIN_LIVE_SESSION_CONFIG },
       postingPolicyKind: 'members-only',
       allowThreads: true,
       allowReactions: true,
@@ -215,6 +224,7 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
         themeKey: detail.ui?.themeKey ?? 'teal',
       },
       status: detail.lifecycle.status,
+      liveSession: detail.liveSession ?? { ...DEFAULT_ADMIN_LIVE_SESSION_CONFIG },
       postingPolicyKind: detail.postingPolicy.kind,
       allowThreads: detail.postingPolicy.allowThreads ?? true,
       allowReactions: detail.postingPolicy.allowReactions ?? true,
@@ -270,6 +280,7 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
           ...formState.uiDefaults,
           themeKey: formState.uiDefaults.themeKey ?? null,
         },
+        liveSession: formState.liveSession.enabled ? formState.liveSession : null,
         postingPolicy: {
           kind: formState.postingPolicyKind,
           allowThreads: formState.allowThreads,
@@ -481,6 +492,85 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
                       Allow reactions
                     </Label>
                   </div>
+                </FieldGroup>
+              </FieldSet>
+              <FieldSeparator />
+              <FieldSet>
+                <FieldLegend>Live sessions</FieldLegend>
+                <FieldDescription>
+                  Configure how members can start and join live sessions from the channel header.
+                </FieldDescription>
+                <FieldGroup>
+                  <div className="flex flex-wrap gap-4 pt-2">
+                    <Label className="flex items-center gap-2 text-sm">
+                      <Checkbox
+                        checked={formState.liveSession.enabled}
+                        onCheckedChange={(checked) =>
+                          updateFormState({
+                            liveSession: {
+                              ...formState.liveSession,
+                              enabled: checked === true,
+                            },
+                          })
+                        }
+                      />
+                      Enable live sessions
+                    </Label>
+                  </div>
+                  <FieldGroup className="grid gap-3 md:grid-cols-2">
+                    <Field>
+                      <FieldLabel htmlFor="channel-live-session-provider">Provider</FieldLabel>
+                      <Select
+                        value={formState.liveSession.provider}
+                        onValueChange={(value) =>
+                          updateFormState({
+                            liveSession: {
+                              ...formState.liveSession,
+                              provider: value as LiveSessionProviderVM,
+                            },
+                          })
+                        }
+                        disabled={!formState.liveSession.enabled}
+                      >
+                        <SelectTrigger id="channel-live-session-provider">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {LIVE_SESSION_PROVIDER_OPTIONS.map((provider) => (
+                            <SelectItem key={provider} value={provider}>
+                              {provider}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="channel-live-session-mode">Mode</FieldLabel>
+                      <Select
+                        value={formState.liveSession.mode ?? 'video'}
+                        onValueChange={(value) =>
+                          updateFormState({
+                            liveSession: {
+                              ...formState.liveSession,
+                              mode: value as LiveSessionModeVM,
+                            },
+                          })
+                        }
+                        disabled={!formState.liveSession.enabled}
+                      >
+                        <SelectTrigger id="channel-live-session-mode">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {LIVE_SESSION_MODE_OPTIONS.map((mode) => (
+                            <SelectItem key={mode} value={mode}>
+                              {mode}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                  </FieldGroup>
                 </FieldGroup>
               </FieldSet>
               <FieldSeparator />

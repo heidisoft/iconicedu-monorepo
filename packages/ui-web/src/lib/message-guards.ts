@@ -15,6 +15,7 @@ import type {
   HomeworkSubmissionMessageVM,
   LinkPreviewMessageVM,
   AudioRecordingMessageVM,
+  LiveSessionStartedMessageVM,
   UUID,
 } from '@iconicedu/shared-types';
 
@@ -100,6 +101,12 @@ export function isAudioRecordingMessage(
   message: MessageVM,
 ): message is AudioRecordingMessageVM {
   return message.core.type === 'audio-recording';
+}
+
+export function isLiveSessionStartedMessage(
+  message: MessageVM,
+): message is LiveSessionStartedMessageVM {
+  return message.core.type === 'live-session-started';
 }
 
 export function isMessageVisibleToUser(message: MessageVM, userId: UUID): boolean {

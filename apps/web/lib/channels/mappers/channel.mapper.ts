@@ -12,6 +12,7 @@ import type {
   ChannelMiniVM,
   ChannelReadStateVM,
   ChannelCapabilityVM,
+  ChannelLiveSessionConfigVM,
   UserProfileVM,
   EntityRefVM,
   ChannelUiDefaultsVM,
@@ -75,6 +76,40 @@ function parseUiDefaults(
   return parsed;
 }
 
+function parseLiveSessionConfig(value: unknown): ChannelLiveSessionConfigVM | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  if (typeof value.enabled !== 'boolean' || typeof value.provider !== 'string') {
+    return null;
+  }
+
+  if (
+    value.provider !== 'daily' &&
+    value.provider !== 'zoom' &&
+    value.provider !== 'jitsi' &&
+    value.provider !== 'custom'
+  ) {
+    return null;
+  }
+
+  if (
+    value.mode !== undefined &&
+    value.mode !== null &&
+    value.mode !== 'video' &&
+    value.mode !== 'audio'
+  ) {
+    return null;
+  }
+
+  return {
+    enabled: value.enabled,
+    provider: value.provider,
+    mode: value.mode === 'video' || value.mode === 'audio' ? value.mode : null,
+  };
+}
+
 export function mapChannelRowToMiniVM(
   row: ChannelRow,
   input?: {
@@ -122,10 +157,16 @@ export function mapChannelRowToVM(
             id: row.primary_entity_id,
           },
           capabilities: input.capabilities?.length ? input.capabilities : undefined,
+          liveSession: parseLiveSessionConfig(row.live_session_config),
         }
       : input.capabilities?.length
-        ? { capabilities: input.capabilities }
-        : null;
+        ? {
+            capabilities: input.capabilities,
+            liveSession: parseLiveSessionConfig(row.live_session_config),
+          }
+        : parseLiveSessionConfig(row.live_session_config)
+          ? { liveSession: parseLiveSessionConfig(row.live_session_config) }
+          : null;
 
   const dm: ChannelDmVM | undefined = row.dm_key ? { dmKey: row.dm_key } : undefined;
   const parsedUiDefaults = parseUiDefaults(row.ui_defaults);

@@ -34,6 +34,7 @@ describe('MessagesShellClient', () => {
 
     render(
       <MessagesShellClient
+        orgSlug="iconic-academy"
         channel={{
           ids: { id: 'channel-1', orgId: 'org-1' },
           collections: { participants: [] },

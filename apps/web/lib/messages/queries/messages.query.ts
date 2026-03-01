@@ -24,6 +24,7 @@ import type {
   MessageHomeworkSubmissionRow,
   MessageLinkPreviewRow,
   MessageAudioRecordingRow,
+  MessageLiveSessionStartedRow,
 } from '@iconicedu/shared-types';
 
 import {
@@ -49,6 +50,7 @@ import {
   MESSAGE_HOMEWORK_SUBMISSION_SELECT,
   MESSAGE_LINK_PREVIEW_SELECT,
   MESSAGE_AUDIO_RECORDING_SELECT,
+  MESSAGE_LIVE_SESSION_STARTED_SELECT,
   CHANNEL_FILE_SELECT,
   CHANNEL_MEDIA_SELECT,
 } from '@iconicedu/web/lib/messages/constants/selects';
@@ -546,6 +548,24 @@ export async function getMessageAudioRecordingsByMessageIds(
     .in('message_id', messageIds)
     .is('deleted_at', null)
     .returns<MessageAudioRecordingRow[]>();
+}
+
+export async function getMessageLiveSessionStartedByMessageIds(
+  supabase: SupabaseClient,
+  orgId: string,
+  messageIds: string[],
+) {
+  if (!messageIds.length) {
+    return { data: [] as MessageLiveSessionStartedRow[] };
+  }
+
+  return supabase
+    .from('message_live_session_started')
+    .select(MESSAGE_LIVE_SESSION_STARTED_SELECT)
+    .eq('org_id', orgId)
+    .in('message_id', messageIds)
+    .is('deleted_at', null)
+    .returns<MessageLiveSessionStartedRow[]>();
 }
 
 export async function getChannelFilesByChannelIds(

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 
 import {
   Button,
+  Checkbox,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -20,6 +21,7 @@ import {
   FieldSet,
   FieldSeparator,
   Input,
+  Label,
   ScrollArea,
   ScrollBar,
   Plus,
@@ -45,9 +47,12 @@ import {
 } from '@iconicedu/ui-web/lib/icons';
 import type { RecurrenceFormData } from '@iconicedu/ui-web/lib/recurrence-types';
 import type {
+  ChannelLiveSessionConfigVM,
   ChannelUiDefaultsVM,
   LearningSpaceCreatePayload,
   LearningSpaceLinkVM,
+  LiveSessionModeVM,
+  LiveSessionProviderVM,
   ThemeKey,
   UserProfileVM,
 } from '@iconicedu/shared-types';
@@ -55,6 +60,7 @@ import {
   mapSchedulesToPayload,
   normalizeSchedules,
 } from '@iconicedu/web/app/(app)/[orgSlug]/admin/spaces/learning-space-form-dialog.utils';
+import { DEFAULT_ADMIN_LIVE_SESSION_CONFIG } from '@iconicedu/web/lib/admin/live-session-config';
 
 const KIND_OPTIONS = [
   { value: 'one_on_one', label: 'One on one' },
@@ -63,6 +69,8 @@ const KIND_OPTIONS = [
 ];
 
 const SUBJECT_OPTIONS = ['MATH', 'SCIENCE', 'ELA', 'CHESS'];
+const LIVE_SESSION_PROVIDER_OPTIONS: LiveSessionProviderVM[] = ['daily', 'zoom', 'jitsi', 'custom'];
+const LIVE_SESSION_MODE_OPTIONS: LiveSessionModeVM[] = ['video', 'audio'];
 
 const mapLinksToPayload = (links: LearningSpaceLinkVM[]) =>
   links.map((resource) => ({
@@ -103,6 +111,7 @@ type LearningSpaceFormDialogProps = {
     participants: UserProfileVM[];
     resources: LearningSpaceLinkVM[];
     schedules: RecurrenceFormData[];
+    liveSession?: ChannelLiveSessionConfigVM | null;
   } | null;
   onSuccess?: () => void;
 };
@@ -117,6 +126,7 @@ type LearningSpaceFormState = {
   participants: UserProfileVM[];
   resources: LearningSpaceLinkVM[];
   schedules: RecurrenceFormData[];
+  liveSession: ChannelLiveSessionConfigVM;
 };
 
 function createDefaultChannelUiDefaults(): ChannelUiDefaultsVM {
@@ -168,6 +178,7 @@ export function LearningSpaceFormDialog({
       participants: [],
       resources: [],
       schedules: [],
+      liveSession: { ...DEFAULT_ADMIN_LIVE_SESSION_CONFIG },
     }),
     [],
   );
@@ -201,6 +212,7 @@ export function LearningSpaceFormDialog({
         participants: initialData.participants ?? [],
         resources: initialData.resources ?? [],
         schedules: normalizeSchedules(initialData.schedules ?? []),
+        liveSession: initialData.liveSession ?? { ...DEFAULT_ADMIN_LIVE_SESSION_CONFIG },
       });
       setIsSubmitted(false);
       return;
@@ -248,6 +260,7 @@ export function LearningSpaceFormDialog({
         uiDefaults: formState.uiDefaults,
       },
       participants: mapParticipantsToPayload(formState.participants),
+      liveSession: formState.liveSession.enabled ? formState.liveSession : null,
       resources: mapLinksToPayload(formState.resources),
       schedules: mapSchedulesToPayload(formState.schedules),
     };
@@ -454,6 +467,89 @@ export function LearningSpaceFormDialog({
                     links={formState.resources}
                     onLinksChange={(nextLinks) => updateFormState({ resources: nextLinks })}
                   />
+                </FieldSet>
+                <FieldSeparator />
+                <FieldSet>
+                  <FieldLegend>Live sessions</FieldLegend>
+                  <FieldDescription>
+                    Configure the primary channel’s live session provider and mode for this learning space.
+                  </FieldDescription>
+                  <FieldGroup>
+                    <div className="flex flex-wrap gap-4 pt-2">
+                      <Label className="flex items-center gap-2 text-sm">
+                        <Checkbox
+                          checked={formState.liveSession.enabled}
+                          onCheckedChange={(checked) =>
+                            updateFormState({
+                              liveSession: {
+                                ...formState.liveSession,
+                                enabled: checked === true,
+                              },
+                            })
+                          }
+                        />
+                        Enable live sessions
+                      </Label>
+                    </div>
+                    <FieldGroup className="grid gap-3 md:grid-cols-2">
+                      <Field>
+                        <FieldLabel htmlFor="ls-live-session-provider">Provider</FieldLabel>
+                        <Select
+                          value={formState.liveSession.provider}
+                          onValueChange={(value) =>
+                            updateFormState({
+                              liveSession: {
+                                ...formState.liveSession,
+                                provider: value as LiveSessionProviderVM,
+                              },
+                            })
+                          }
+                          disabled={!formState.liveSession.enabled}
+                        >
+                          <SelectTrigger id="ls-live-session-provider">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              {LIVE_SESSION_PROVIDER_OPTIONS.map((provider) => (
+                                <SelectItem key={provider} value={provider}>
+                                  {provider}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                      <Field>
+                        <FieldLabel htmlFor="ls-live-session-mode">Mode</FieldLabel>
+                        <Select
+                          value={formState.liveSession.mode ?? 'video'}
+                          onValueChange={(value) =>
+                            updateFormState({
+                              liveSession: {
+                                ...formState.liveSession,
+                                mode: value as LiveSessionModeVM,
+                              },
+                            })
+                          }
+                          disabled={!formState.liveSession.enabled}
+                        >
+                          <SelectTrigger id="ls-live-session-mode">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              {LIVE_SESSION_MODE_OPTIONS.map((mode) => (
+                                <SelectItem key={mode} value={mode}>
+                                  {mode}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                    </FieldGroup>
+                  </FieldGroup>
                 </FieldSet>
                 <FieldSeparator />
                 <FieldSet data-invalid={participantsInvalid}>

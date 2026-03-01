@@ -1,14 +1,17 @@
 'use client';
 
-import { CalendarPlus, ChevronRight, Clock3, Video } from 'lucide-react';
+import { useState } from 'react';
+import { CalendarPlus, ChevronRight, Clock3, Loader2, Video } from 'lucide-react';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
+import { useMessagesState } from '../context/messages-state-provider';
 import type { ClassSession } from './messages-schedule-tab.utils';
 
 interface SessionCardProps {
   session: ClassSession;
   index: number;
+  canJoin?: boolean;
 }
 
 export function getSessionCardState(session: ClassSession): {
@@ -24,8 +27,41 @@ export function getSessionCardState(session: ClassSession): {
   };
 }
 
-export function SessionCard({ session }: SessionCardProps) {
+export function isSessionJoinButtonDisabled(input: {
+  session: ClassSession;
+  hasJoinLiveSession: boolean;
+  isJoinPending: boolean;
+  canJoin: boolean;
+}): boolean {
+  const { isPast, isDisabled } = getSessionCardState(input.session);
+  if (isPast || isDisabled) {
+    return true;
+  }
+  return !input.canJoin || !input.hasJoinLiveSession || input.isJoinPending;
+}
+
+export function SessionCard({ session, canJoin = false }: SessionCardProps) {
   const { isLive, isPast, isDisabled } = getSessionCardState(session);
+  const { joinLiveSession } = useMessagesState();
+  const [isJoinPending, setIsJoinPending] = useState(false);
+  const isJoinButtonDisabled = isSessionJoinButtonDisabled({
+    session,
+    hasJoinLiveSession: Boolean(joinLiveSession),
+    isJoinPending,
+    canJoin,
+  });
+
+  const handleJoin = async () => {
+    if (!joinLiveSession || isJoinPending) {
+      return;
+    }
+    setIsJoinPending(true);
+    try {
+      await joinLiveSession();
+    } finally {
+      setIsJoinPending(false);
+    }
+  };
 
   return (
     <div
@@ -123,25 +159,17 @@ export function SessionCard({ session }: SessionCardProps) {
                 : 'bg-primary/10 text-primary hover:bg-primary/20',
             )}
             variant="default"
-            asChild={Boolean(session.meetingLink)}
-            disabled={!session.meetingLink}
+            disabled={isJoinButtonDisabled}
+            onClick={() => void handleJoin()}
           >
-            {session.meetingLink ? (
-              <a
-                href={session.meetingLink}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5"
-              >
+            <span className="inline-flex items-center gap-1.5">
+              {isJoinPending ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
                 <Video className="size-3.5" />
-                {isLive ? 'Join Now' : 'Join'}
-              </a>
-            ) : (
-              <span className="inline-flex items-center gap-1.5">
-                <Video className="size-3.5" />
-                Join
-              </span>
-            )}
+              )}
+              {isLive ? 'Join Now' : 'Join'}
+            </span>
           </Button>
         ) : isDisabled ? (
           <Button

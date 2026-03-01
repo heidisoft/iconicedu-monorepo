@@ -5,6 +5,7 @@ import type { ChannelCreatePayload, ChannelCapabilityVM } from '@iconicedu/share
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import { toStoredLiveSessionConfig } from '@iconicedu/web/lib/admin/live-session-config';
 
 const DEFAULT_CAPABILITIES: ChannelCapabilityVM[] = [];
 
@@ -43,6 +44,7 @@ export async function createAdminChannel(payload: ChannelCreatePayload) {
     purpose: payload.basics.purpose,
     ui_theme_key: payload.ui?.themeKey ?? 'teal',
     ui_defaults: payload.ui ?? null,
+    live_session_config: toStoredLiveSessionConfig(payload.liveSession),
     status,
     posting_policy_kind: payload.postingPolicy.kind,
     allow_threads: payload.postingPolicy.allowThreads ?? true,

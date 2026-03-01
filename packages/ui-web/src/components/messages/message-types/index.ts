@@ -3,6 +3,7 @@ export { ImageMessage } from '@iconicedu/ui-web/components/messages/message-type
 export { FileMessage } from '@iconicedu/ui-web/components/messages/message-types/file-message';
 export { AudioMessage } from '@iconicedu/ui-web/components/messages/message-types/audio-message';
 export { LinkPreviewMessage } from '@iconicedu/ui-web/components/messages/message-types/link-preview-message';
+export { LiveSessionStartedMessage } from '@iconicedu/ui-web/components/messages/message-types/live-session-started-message';
 export { DesignFileMessage } from '@iconicedu/ui-web/components/messages/message-types/design-file-message';
 export { PaymentReminderMessage } from '@iconicedu/ui-web/components/messages/message-types/payment-reminder-message';
 export { EventReminderMessage } from '@iconicedu/ui-web/components/messages/message-types/event-reminder-message';

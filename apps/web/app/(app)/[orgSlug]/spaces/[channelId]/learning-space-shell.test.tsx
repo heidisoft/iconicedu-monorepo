@@ -26,6 +26,7 @@ describe('LearningSpaceShell', () => {
 
     render(
       <LearningSpaceShell
+        orgSlug="iconic-academy"
         channel={{ ids: { id: 'channel-1', orgId: 'org-1' } } as any}
         learningSpace={null}
         currentUserId="profile-1"
@@ -61,6 +62,7 @@ describe('LearningSpaceShell', () => {
   it('forwards readOnly to MessagesShell', async () => {
     render(
       <LearningSpaceShell
+        orgSlug="iconic-academy"
         channel={{ ids: { id: 'channel-1', orgId: 'org-1' } } as any}
         learningSpace={null}
         currentUserId="profile-1"
