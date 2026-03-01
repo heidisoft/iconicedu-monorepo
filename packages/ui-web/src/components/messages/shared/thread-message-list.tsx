@@ -3,15 +3,17 @@
 import { memo } from 'react';
 import type { MessageVM } from '@iconicedu/shared-types';
 import { MessageItem } from '@iconicedu/ui-web/components/messages/message-item';
+import type { MessageActionState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
 
 interface ThreadMessageListProps {
   messages: MessageVM[];
   onProfileClick: (userId: string) => void;
   isReadOnly?: boolean;
-  onToggleReaction?: (messageId: string, emoji: string) => void;
+  onToggleReaction?: (messageId: string, emoji: string, source?: 'bar' | 'picker') => void;
   onToggleSaved?: (messageId: string) => void;
   onToggleHidden?: (messageId: string) => void;
   onDelete?: (messageId: string) => void;
+  getMessageActionState?: (messageId: string) => MessageActionState | undefined;
   currentUserId?: string;
   lastReadMessageId?: string;
   unreadCount?: number;
@@ -49,6 +51,7 @@ export const ThreadMessageList = memo(function ThreadMessageList({
   onToggleSaved,
   onToggleHidden,
   onDelete,
+  getMessageActionState,
   currentUserId,
   lastReadMessageId,
   unreadCount,
@@ -89,6 +92,7 @@ export const ThreadMessageList = memo(function ThreadMessageList({
               onToggleSaved={onToggleSaved}
               onToggleHidden={onToggleHidden}
               onDelete={onDelete}
+              actionState={getMessageActionState?.(message.ids.id)}
               currentUserId={currentUserId}
             />
             {index === 0 && messages.length > 1 && (

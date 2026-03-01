@@ -252,6 +252,7 @@ export default function ChannelConversationScreen() {
         subtitle={subtitle}
         kind="channel"
         iconEmoji={iconEmoji}
+        messages={messages ?? []}
         onClose={() => setInfoVisible(false)}
       />
 

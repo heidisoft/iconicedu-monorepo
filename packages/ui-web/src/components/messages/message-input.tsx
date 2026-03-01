@@ -64,6 +64,7 @@ import {
   shouldShowComposerLinkPreview,
 } from './message-input-link-preview.utils';
 import { LinkPreviewCard } from './link-preview-card';
+import { getComposerSubmitLabel } from './message-loading-state.utils';
 
 const TYPING_STOP_DELAY_MS = 3000;
 const TYPING_KEEPALIVE_THROTTLE_MS = 1200;
@@ -83,7 +84,6 @@ interface MessageInputProps {
   onTypingStop?: () => void;
   onFocus?: () => void;
   onInputKeyDown?: () => void;
-  isLoading?: boolean;
 }
 
 type PendingAttachment = {
@@ -150,9 +150,9 @@ export function MessageInput({
   onTypingStop,
   onFocus,
   onInputKeyDown,
-  isLoading = false,
 }: MessageInputProps) {
   const [content, setContent] = React.useState('');
+  const [isSendingText, setIsSendingText] = React.useState(false);
   const [isAttachingFile, setIsAttachingFile] = React.useState(false);
   const [pendingAttachments, setPendingAttachments] = React.useState<PendingAttachment[]>([]);
   const [attachmentError, setAttachmentError] = React.useState<string | null>(null);
@@ -192,7 +192,7 @@ export function MessageInput({
     );
   }, [mentionCandidates, mentionState]);
   const isMentionListOpen = mentionState !== null && filteredMentionCandidates.length > 0;
-  const isBusy = isLoading || isAttachingFile;
+  const isBusy = isSendingText || isAttachingFile;
   const isRecordingAudio = recordingSession?.status === 'recording';
   const isRecordingPaused = recordingSession?.status === 'paused';
   const hasActiveRecording = recordingSession !== null;
@@ -494,8 +494,16 @@ export function MessageInput({
         participants,
         currentUserId,
       );
-    onSend(trimmedContent, mentions);
-      resetComposer();
+      const sendText = async () => {
+        try {
+          setIsSendingText(true);
+          await Promise.resolve(onSend(trimmedContent, mentions));
+          resetComposer();
+        } finally {
+          setIsSendingText(false);
+        }
+      };
+      void sendText();
     }
   }, [
     content,
@@ -1329,7 +1337,7 @@ export function MessageInput({
               {isBusy ? (
                 <>
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  {isAttachingFile ? 'Uploading...' : 'Sending...'}
+                  {getComposerSubmitLabel({ isSendingText, isAttachingFile })}
                 </>
               ) : (
                 <>

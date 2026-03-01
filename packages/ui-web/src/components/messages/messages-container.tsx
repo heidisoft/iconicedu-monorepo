@@ -7,6 +7,7 @@ import { TypingIndicator } from '@iconicedu/ui-web/components/messages/typing-in
 import { useMessages } from '@iconicedu/ui-web/hooks/use-messages';
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
 import { useMessagesState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
+import type { MessageActionState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
 import { resolveThreadAfterReply } from '@iconicedu/ui-web/components/messages/thread-reply.utils';
 import { buildFileDownloadHref } from '@iconicedu/ui-web/components/messages/file-download.utils';
 import { MessagesScheduleTab } from '@iconicedu/ui-web/components/messages/tabs/messages-schedule-tab';
@@ -29,6 +30,7 @@ import {
   getChannelFileVisualKind,
   getChannelFileVisualTone,
 } from './messages-container-files.utils';
+import { buildMessageActionState } from './message-loading-state.utils';
 import type {
   AudioRecordingMessageVM,
   ChannelFileItemVM,
@@ -172,6 +174,7 @@ export function MessagesContainer({
     setSendTextMessage,
     setSendFileMessage,
     setThreadHandlers,
+    setGetMessageActionState,
     setScrollToMessage,
     messageFilter,
     toggleMessageFilter,
@@ -191,7 +194,11 @@ export function MessagesContainer({
     toggleHidden,
   } = useMessages(channelMessages);
   const [isLoadingOlder, setIsLoadingOlder] = useState(false);
-  const [networkRequestCount, setNetworkRequestCount] = useState(0);
+  const [savingMessageIds, setSavingMessageIds] = useState<Record<string, true>>({});
+  const [hidingMessageIds, setHidingMessageIds] = useState<Record<string, true>>({});
+  const [deletingMessageIds, setDeletingMessageIds] = useState<Record<string, true>>({});
+  const [reactionPickerMessageIds, setReactionPickerMessageIds] = useState<Record<string, true>>({});
+  const [reactionEmojiKeys, setReactionEmojiKeys] = useState<Record<string, true>>({});
   const [hasMoreOlderMessages, setHasMoreOlderMessages] = useState(
     channelMessages.length >= MESSAGES_PAGE_SIZE,
   );
@@ -212,7 +219,6 @@ export function MessagesContainer({
   const [lastReadAt, setLastReadAt] = useState<ISODateTime | undefined>(
     channel.collections.readState?.lastReadAt,
   );
-  const isNetworkBusy = networkRequestCount > 0;
   const filesForDisplay = loadedFiles ?? [];
   const hasScheduleCapability = useMemo(
     () => channel.context?.capabilities?.includes('has_schedule') ?? false,
@@ -226,13 +232,42 @@ export function MessagesContainer({
   );
 
   const runWithNetworkActivity = useCallback(async <T,>(operation: () => Promise<T>) => {
-    setNetworkRequestCount((count) => count + 1);
-    try {
-      return await operation();
-    } finally {
-      setNetworkRequestCount((count) => Math.max(0, count - 1));
-    }
+    return await operation();
   }, []);
+
+  const setPendingMessageAction = useCallback(
+    (
+      setter: React.Dispatch<React.SetStateAction<Record<string, true>>>,
+      key: string,
+      pending: boolean,
+    ) => {
+      setter((current) => {
+        if (pending) {
+          return { ...current, [key]: true };
+        }
+        if (!current[key]) {
+          return current;
+        }
+        const next = { ...current };
+        delete next[key];
+        return next;
+      });
+    },
+    [],
+  );
+
+  const getMessageActionState = useCallback(
+    (messageId: string): MessageActionState | undefined => {
+      return buildMessageActionState(messageId, {
+        savingMessageIds,
+        hidingMessageIds,
+        deletingMessageIds,
+        reactionPickerMessageIds,
+        reactionEmojiKeys,
+      });
+    },
+    [deletingMessageIds, hidingMessageIds, reactionEmojiKeys, reactionPickerMessageIds, savingMessageIds],
+  );
 
   const participants = useMemo(
     () => channel.collections.participants ?? [],
@@ -605,12 +640,18 @@ export function MessagesContainer({
   }, [realtimeClient, currentUserId, channel.ids.orgId, channel.ids.id, readOnly]);
 
   const handleToggleReaction = useCallback(
-    (messageId: string, emoji: string) => {
+    (messageId: string, emoji: string, source: 'bar' | 'picker' = 'bar') => {
       if (readOnly) return;
       if (!currentUserId) return;
+      const reactionKey = `${messageId}:${emoji}`;
       toggleReaction(messageId, emoji, currentUserId);
       if (messageWriteClient) {
         const persistReaction = async () => {
+          if (source === 'picker') {
+            setPendingMessageAction(setReactionPickerMessageIds, messageId, true);
+          } else {
+            setPendingMessageAction(setReactionEmojiKeys, reactionKey, true);
+          }
           try {
             await runWithNetworkActivity(() =>
               messageWriteClient.toggleReaction({
@@ -621,6 +662,12 @@ export function MessagesContainer({
             );
           } catch {
             toggleReaction(messageId, emoji, currentUserId);
+          } finally {
+            if (source === 'picker') {
+              setPendingMessageAction(setReactionPickerMessageIds, messageId, false);
+            } else {
+              setPendingMessageAction(setReactionEmojiKeys, reactionKey, false);
+            }
           }
         };
         void persistReaction();
@@ -633,6 +680,7 @@ export function MessagesContainer({
       channel.ids.orgId,
       readOnly,
       runWithNetworkActivity,
+      setPendingMessageAction,
     ],
   );
 
@@ -645,6 +693,7 @@ export function MessagesContainer({
       toggleSaved(messageId);
       if (messageWriteClient) {
         const persistSavedState = async () => {
+          setPendingMessageAction(setSavingMessageIds, messageId, true);
           try {
             await runWithNetworkActivity(() =>
               messageWriteClient.toggleSavedMessage({
@@ -655,12 +704,14 @@ export function MessagesContainer({
             );
           } catch {
             toggleSaved(messageId);
+          } finally {
+            setPendingMessageAction(setSavingMessageIds, messageId, false);
           }
         };
         void persistSavedState();
       }
     },
-    [channel.ids.orgId, messageWriteClient, messages, readOnly, runWithNetworkActivity, toggleSaved],
+    [channel.ids.orgId, messageWriteClient, messages, readOnly, runWithNetworkActivity, toggleSaved, setPendingMessageAction],
   );
 
   const handleToggleHidden = useCallback(
@@ -672,6 +723,7 @@ export function MessagesContainer({
       const newHiddenState = !message.state?.isHidden;
 
       if (messageWriteClient) {
+        setPendingMessageAction(setHidingMessageIds, messageId, true);
         try {
           await runWithNetworkActivity(() =>
             messageWriteClient.toggleHiddenMessage({
@@ -694,6 +746,8 @@ export function MessagesContainer({
         } catch (error) {
           console.error('Failed to toggle hidden message:', error);
           return;
+        } finally {
+          setPendingMessageAction(setHidingMessageIds, messageId, false);
         }
       }
     },
@@ -706,6 +760,7 @@ export function MessagesContainer({
       toggleHidden,
       readOnly,
       runWithNetworkActivity,
+      setPendingMessageAction,
     ],
   );
 
@@ -713,6 +768,7 @@ export function MessagesContainer({
     async (messageId: string) => {
       if (readOnly) return;
       if (messageWriteClient) {
+        setPendingMessageAction(setDeletingMessageIds, messageId, true);
         try {
           await runWithNetworkActivity(() =>
             messageWriteClient.deleteMessage({
@@ -734,6 +790,8 @@ export function MessagesContainer({
         } catch (error) {
           console.error('Failed to delete message:', error);
           return;
+        } finally {
+          setPendingMessageAction(setDeletingMessageIds, messageId, false);
         }
       }
     },
@@ -745,6 +803,7 @@ export function MessagesContainer({
       deleteMessage,
       readOnly,
       runWithNetworkActivity,
+      setPendingMessageAction,
     ],
   );
 
@@ -1198,6 +1257,10 @@ export function MessagesContainer({
   }, [setScrollToMessage]);
 
   useEffect(() => {
+    setGetMessageActionState(getMessageActionState);
+  }, [getMessageActionState, setGetMessageActionState]);
+
+  useEffect(() => {
     if (activeTab !== 'files' || loadedFiles) {
       return;
     }
@@ -1296,6 +1359,7 @@ export function MessagesContainer({
       onToggleSaved: handleToggleSaved,
       onToggleHidden: handleToggleHidden,
       onDelete: handleDeleteMessage,
+      getMessageActionState,
       currentUserId,
       isReadOnly: readOnly,
       onSendThreadReply: handleSendThreadReply,
@@ -1316,6 +1380,7 @@ export function MessagesContainer({
       handleToggleSaved,
       handleToggleHidden,
       handleDeleteMessage,
+      getMessageActionState,
       currentUserId,
       readOnly,
       handleSendThreadReply,
@@ -1391,7 +1456,6 @@ export function MessagesContainer({
               currentUserId={resolvedCurrentUserId}
               onTypingStart={handleTypingStart}
               onTypingStop={handleTypingStop}
-              isLoading={isNetworkBusy}
             />
           )}
         </>
@@ -1504,12 +1568,6 @@ export function MessagesContainer({
 
   return (
     <div className="relative flex h-full min-h-0 flex-1 min-w-0 flex-col">
-      {isNetworkBusy ? (
-        <div className="pointer-events-none absolute right-4 top-3 z-30 inline-flex items-center gap-2 rounded-full border border-border/80 bg-background/90 px-3 py-1 text-xs text-muted-foreground shadow-sm backdrop-blur">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          Syncing...
-        </div>
-      ) : null}
       <div className="border-b border-border bg-muted/40 px-4">
         <Tabs
           value={activeTab}

@@ -13,6 +13,7 @@ import { MessageInput } from '@iconicedu/ui-web/components/messages/message-inpu
 import { ScrollArea } from '@iconicedu/ui-web/ui/scroll-area';
 import { ThreadMessageList } from '@iconicedu/ui-web/components/messages/shared/thread-message-list';
 import { resolveThreadAfterReply } from '@iconicedu/ui-web/components/messages/thread-reply.utils';
+import type { MessageActionState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
 
 interface ThreadPanelProps {
   intent: MessagesRightPanelIntent;
@@ -24,6 +25,7 @@ type ThreadPanelContentProps = ThreadPanelPropsVM & {
     attachments: Array<{ file: File; durationSeconds?: number }>,
     content?: string,
   ) => Promise<void> | void;
+  getMessageActionState?: (messageId: string) => MessageActionState | undefined;
 };
 
 const ThreadPanelContent = memo(function ThreadPanelContent({
@@ -34,6 +36,7 @@ const ThreadPanelContent = memo(function ThreadPanelContent({
   readState,
   isReadOnly,
   onAttachReplyFiles,
+  getMessageActionState,
 }: ThreadPanelContentProps) {
   const { channel } = useMessagesState();
   const {
@@ -66,6 +69,7 @@ const ThreadPanelContent = memo(function ThreadPanelContent({
           onToggleSaved={onToggleSaved}
           onToggleHidden={onToggleHidden}
           onDelete={onDelete}
+          getMessageActionState={getMessageActionState}
           currentUserId={currentUserId}
           lastReadMessageId={readState?.lastReadMessageId}
           unreadCount={readState?.unreadCount}
@@ -103,6 +107,7 @@ export function ThreadPanel({ intent }: ThreadPanelProps) {
     toggle,
     currentUserId,
     threadHandlers,
+    getMessageActionState,
     messages,
     isReadOnly,
   } = useMessagesState();
@@ -245,6 +250,7 @@ export function ThreadPanel({ intent }: ThreadPanelProps) {
         readState={threadData.thread.readState}
         isReadOnly={isReadOnly}
         onAttachReplyFile={onAttachReplyFiles}
+        getMessageActionState={getMessageActionState}
       />
     );
   }
@@ -264,7 +270,8 @@ export function ThreadPanel({ intent }: ThreadPanelProps) {
       currentUserId={currentUserId}
       readState={threadData.thread.readState}
       isReadOnly={isReadOnly}
-          onAttachReplyFiles={onAttachReplyFiles}
+      onAttachReplyFiles={onAttachReplyFiles}
+      getMessageActionState={getMessageActionState}
     />
   );
 }

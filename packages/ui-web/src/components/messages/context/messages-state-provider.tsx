@@ -20,6 +20,14 @@ type ThreadData = {
   parentMessage?: MessageVM;
 };
 
+export type MessageActionState = {
+  isSaving?: boolean;
+  isHiding?: boolean;
+  isDeleting?: boolean;
+  isAddingReaction?: boolean;
+  pendingReactionEmojis?: string[];
+};
+
 interface MessagesStateContextValue {
   channel: ChannelVM;
   isReadOnly: boolean;
@@ -59,6 +67,10 @@ interface MessagesStateContextValue {
     data: { replies: ConnectionVM<MessageVM>; parentMessage?: MessageVM },
   ) => void;
   getThreadData: (threadId: UUID) => ThreadData | undefined;
+  getMessageActionState: (messageId: UUID) => MessageActionState | undefined;
+  setGetMessageActionState: (
+    handler: (messageId: UUID) => MessageActionState | undefined,
+  ) => void;
   setScrollToMessage: (handler: (messageId: string) => void) => void;
   scrollToMessage?: (messageId: string) => void;
 }
@@ -67,7 +79,7 @@ type ThreadActionHandlers = {
   onAddMessage?: (message: MessageVM) => void;
   onUpdateMessage?: (messageId: string, updates: Partial<MessageVM>) => void;
   onDeleteMessage?: (messageId: string) => void;
-  onToggleReaction?: (messageId: string, emoji: string) => void;
+  onToggleReaction?: (messageId: string, emoji: string, source?: 'bar' | 'picker') => void;
   onToggleSaved?: (messageId: string) => void;
   onToggleHidden?: (messageId: string) => void;
 };
@@ -135,6 +147,9 @@ export function MessagesStateProvider({
   );
   const [threadHandlers, setThreadHandlers] = useState<ThreadActionHandlers>({});
   const [threadData, setThreadDataState] = useState<Record<UUID, ThreadData>>({});
+  const [getMessageActionState, setGetMessageActionState] = useState<
+    (messageId: UUID) => MessageActionState | undefined
+  >(() => () => undefined);
   const [scrollToMessage, setScrollToMessage] = useState<
     ((messageId: string) => void) | undefined
   >(undefined);
@@ -232,6 +247,13 @@ export function MessagesStateProvider({
     setThreadHandlers(handlers);
   }, []);
 
+  const setGetMessageActionStateFactory = useCallback(
+    (handler: (messageId: UUID) => MessageActionState | undefined) => {
+      setGetMessageActionState(() => handler);
+    },
+    [],
+  );
+
   const value = useMemo(
     () => ({
       channel,
@@ -264,6 +286,8 @@ export function MessagesStateProvider({
       appendThreadMessage,
       setThreadData,
       getThreadData,
+      getMessageActionState,
+      setGetMessageActionState: setGetMessageActionStateFactory,
       setScrollToMessage,
       scrollToMessage,
     }),
@@ -298,6 +322,8 @@ export function MessagesStateProvider({
       appendThreadMessage,
       setThreadData,
       getThreadData,
+      getMessageActionState,
+      setGetMessageActionStateFactory,
       setScrollToMessage,
       scrollToMessage,
     ],

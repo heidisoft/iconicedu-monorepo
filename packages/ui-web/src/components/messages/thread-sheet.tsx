@@ -4,6 +4,7 @@ import type { ThreadPanelPropsVM } from '@iconicedu/shared-types';
 import { ScrollArea } from '@iconicedu/ui-web/ui/scroll-area';
 import { ThreadMessageList } from '@iconicedu/ui-web/components/messages/shared/thread-message-list';
 import { useMessagesState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
+import type { MessageActionState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
 
 export function ThreadSheet({
   replies,
@@ -13,12 +14,14 @@ export function ThreadSheet({
   readState,
   isReadOnly = false,
   onAttachReplyFile,
+  getMessageActionState,
 }: ThreadPanelPropsVM & {
   isReadOnly?: boolean;
   onAttachReplyFile?: (
     attachments: Array<{ file: File; durationSeconds?: number }>,
     content?: string,
   ) => Promise<void> | void;
+  getMessageActionState?: (messageId: string) => MessageActionState | undefined;
 }) {
   const { channel } = useMessagesState();
   const {
@@ -49,6 +52,7 @@ export function ThreadSheet({
           onToggleReaction={onToggleReaction}
           onToggleSaved={onToggleSaved}
           onToggleHidden={onToggleHidden}
+          getMessageActionState={getMessageActionState}
           currentUserId={currentUserId}
           lastReadMessageId={readState?.lastReadMessageId}
           unreadCount={readState?.unreadCount}

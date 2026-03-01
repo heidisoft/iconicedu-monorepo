@@ -42,11 +42,13 @@ import {
   Copy,
   EyeOff,
   Forward,
+  Loader2,
   MessageCircleReply,
   MoreHorizontal,
   SmilePlus,
   Trash2,
 } from 'lucide-react';
+import type { MessageActionState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
 
 export interface MessageBaseProps {
   message: MessageVM;
@@ -56,11 +58,12 @@ export interface MessageBaseProps {
   children?: ReactNode;
   className?: string;
   onProfileClick: (userId: UUID) => void;
-  onToggleReaction?: (emoji: string) => void;
+  onToggleReaction?: (emoji: string, source?: 'bar' | 'picker') => void;
   onToggleSaved?: () => void;
   onToggleHidden?: () => void;
   onDelete?: () => void;
   currentUserId?: UUID;
+  actionState?: MessageActionState;
 }
 
 export const MessageBase = memo(function MessageBase({
@@ -76,52 +79,68 @@ export const MessageBase = memo(function MessageBase({
   onToggleHidden,
   onDelete,
   currentUserId,
+  actionState,
 }: MessageBaseProps) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isThreadActionPending, setIsThreadActionPending] = useState(false);
 
   const senderName = getProfileDisplayName(message.core.sender.profile);
   const isOwnMessage = currentUserId === message.core.sender.ids.id;
   const senderLabel = isOwnMessage ? 'You' : senderName;
   const isInteractionDisabled = Boolean(isReadOnly);
   const shouldHideQuickActions = shouldHideMessageQuickActions(message);
+  const pendingReactionEmojis = actionState?.pendingReactionEmojis ?? [];
+  const isSaving = Boolean(actionState?.isSaving);
+  const isHiding = Boolean(actionState?.isHiding);
+  const isDeleting = Boolean(actionState?.isDeleting);
+  const isAddingReaction = Boolean(actionState?.isAddingReaction);
 
   const handleProfileClick = useCallback(() => {
     onProfileClick(message.core.sender.ids.id);
   }, [onProfileClick, message.core.sender.ids.id]);
 
   const handleToggleReaction = useCallback(
-    (emoji: string) => {
+    (emoji: string, source: 'bar' | 'picker' = 'bar') => {
       if (isInteractionDisabled) return;
-      onToggleReaction?.(emoji);
+      onToggleReaction?.(emoji, source);
     },
     [isInteractionDisabled, onToggleReaction],
   );
 
   const handleThreadClick = useCallback(() => {
-    if (message.social.thread) {
-      onOpenThread(message.social.thread, message);
-      return;
-    }
-    if (isInteractionDisabled) return;
+    const openThread = async () => {
+      setIsThreadActionPending(true);
+      try {
+        if (message.social.thread) {
+          await Promise.resolve(onOpenThread(message.social.thread, message));
+          return;
+        }
+        if (isInteractionDisabled) return;
 
-    const snippet =
-      'content' in message && message.content?.text ? message.content.text : null;
-    const newThread: ThreadVM = {
-      ids: { id: message.ids.id, orgId: message.ids.orgId },
-      parent: {
-        messageId: message.ids.id,
-        snippet,
-        authorId: message.core.sender.ids.id,
-        authorName: senderName,
-      },
-      stats: {
-        messageCount: 1,
-        lastReplyAt: new Date().toISOString(),
-      },
-      participants: [message.core.sender],
+        const snippet =
+          'content' in message && message.content?.text ? message.content.text : null;
+        const newThread: ThreadVM = {
+          ids: { id: message.ids.id, orgId: message.ids.orgId },
+          parent: {
+            messageId: message.ids.id,
+            snippet,
+            authorId: message.core.sender.ids.id,
+            authorName: senderName,
+          },
+          stats: {
+            messageCount: 1,
+            lastReplyAt: new Date().toISOString(),
+          },
+          participants: [message.core.sender],
+        };
+
+        await Promise.resolve(onOpenThread(newThread, message));
+      } finally {
+        setIsThreadActionPending(false);
+      }
     };
 
-    onOpenThread(newThread, message);
+    void openThread();
   }, [isInteractionDisabled, message, onOpenThread, senderName]);
 
   const handleDeleteClick = useCallback(() => {
@@ -156,15 +175,24 @@ export const MessageBase = memo(function MessageBase({
         {isOwnMessage ? (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onToggleHidden} className="py-2">
-              <EyeOff className="mr-2 h-4 w-4" />
+            <DropdownMenuItem onClick={onToggleHidden} disabled={isHiding} className="py-2">
+              {isHiding ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <EyeOff className="mr-2 h-4 w-4" />
+              )}
               <span>Hide message</span>
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={handleDeleteClick}
+              disabled={isDeleting}
               className="py-2 text-destructive focus:text-destructive"
             >
-              <Trash2 className="mr-2 h-4 w-4" />
+              {isDeleting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="mr-2 h-4 w-4" />
+              )}
               <span>Delete</span>
             </DropdownMenuItem>
           </>
@@ -296,15 +324,19 @@ export const MessageBase = memo(function MessageBase({
                   size="icon"
                   className="h-7 w-7"
                   onClick={onToggleSaved}
-                  disabled={isInteractionDisabled}
+                  disabled={isInteractionDisabled || isSaving}
                   aria-label={message.state?.isSaved ? 'Unsave message' : 'Save message'}
                 >
-                  <Bookmark
-                    className={cn(
-                      'h-4 w-4',
-                      message.state?.isSaved && 'fill-primary text-primary',
-                    )}
-                  />
+                  {isSaving ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Bookmark
+                      className={cn(
+                        'h-4 w-4',
+                        message.state?.isSaved && 'fill-primary text-primary',
+                      )}
+                    />
+                  )}
                 </Button>
                 {actionsMenu}
                 <TooltipProvider>
@@ -351,15 +383,19 @@ export const MessageBase = memo(function MessageBase({
                   size="icon"
                   className="h-7 w-7"
                   onClick={onToggleSaved}
-                  disabled={isInteractionDisabled}
+                  disabled={isInteractionDisabled || isSaving}
                   aria-label={message.state?.isSaved ? 'Unsave message' : 'Save message'}
                 >
-                  <Bookmark
-                    className={cn(
-                      'h-4 w-4',
-                      message.state?.isSaved && 'fill-primary text-primary',
-                    )}
-                  />
+                  {isSaving ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Bookmark
+                      className={cn(
+                        'h-4 w-4',
+                        message.state?.isSaved && 'fill-primary text-primary',
+                      )}
+                    />
+                  )}
                 </Button>
                 {actionsMenu}
               </>
@@ -393,6 +429,7 @@ export const MessageBase = memo(function MessageBase({
               <ReactionBar
                 reactions={message.social.reactions}
                 onToggleReaction={isInteractionDisabled ? undefined : handleToggleReaction}
+                pendingEmojis={pendingReactionEmojis}
               />
             </div>
 
@@ -409,14 +446,19 @@ export const MessageBase = memo(function MessageBase({
                     <SmilePlus className="h-4 w-4" />
                   </Button>
                 ) : (
-                  <EmojiPicker onEmojiSelect={handleToggleReaction}>
+                  <EmojiPicker onEmojiSelect={(emoji) => handleToggleReaction(emoji, 'picker')}>
                     <Button
                       variant="ghost"
                       size="icon"
+                      disabled={isAddingReaction}
                       className="h-7 w-7 rounded-full border border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground"
                       aria-label="Add emoji"
                     >
-                      <SmilePlus className="h-4 w-4" />
+                      {isAddingReaction ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <SmilePlus className="h-4 w-4" />
+                      )}
                     </Button>
                   </EmojiPicker>
                 )}
@@ -433,11 +475,15 @@ export const MessageBase = memo(function MessageBase({
                       variant="ghost"
                       size="icon"
                       onClick={handleThreadClick}
-                      disabled={isInteractionDisabled}
+                      disabled={isInteractionDisabled || isThreadActionPending}
                       className="h-7 w-7 rounded-full border border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground"
                       aria-label="Reply"
                     >
-                      <MessageCircleReply className="h-4 w-4" />
+                      {isThreadActionPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <MessageCircleReply className="h-4 w-4" />
+                      )}
                     </Button>
                   )
                 ) : null}

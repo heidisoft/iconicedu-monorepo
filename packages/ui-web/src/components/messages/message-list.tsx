@@ -44,6 +44,7 @@ import {
   getInlineReplyPreview,
 } from '@iconicedu/ui-web/components/messages/message-list.inline-thread.utils';
 import { shouldHideMessageQuickActions } from '@iconicedu/ui-web/components/messages/message-action-visibility.utils';
+import type { MessageActionState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
 
 interface MessageListProps {
   messages: MessageVM[];
@@ -55,10 +56,11 @@ interface MessageListProps {
     content: string,
   ) => Promise<void> | void;
   onProfileClick: (userId: string) => void;
-  onToggleReaction?: (messageId: string, emoji: string) => void;
+  onToggleReaction?: (messageId: string, emoji: string, source?: 'bar' | 'picker') => void;
   onToggleSaved?: (messageId: string) => void;
   onToggleHidden?: (messageId: string) => void;
   onDelete?: (messageId: string) => void;
+  getMessageActionState?: (messageId: string) => MessageActionState | undefined;
   currentUserId?: string;
   isReadOnly?: boolean;
   lastReadMessageId?: UUID;
@@ -86,6 +88,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
       onToggleSaved,
       onToggleHidden,
       onDelete,
+      getMessageActionState,
       currentUserId,
       isReadOnly = false,
       lastReadMessageId,
@@ -429,6 +432,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                     onToggleSaved={onToggleSaved}
                     onToggleHidden={onToggleHidden}
                     onDelete={onDelete}
+                    actionState={getMessageActionState?.(message.ids.id)}
                     currentUserId={currentUserId}
                   />
                   {isInlineThreadExpanded && (
@@ -456,6 +460,13 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                             );
                             const isOwnReply = currentUserId === reply.core.sender.ids.id;
                             const shouldHideQuickActions = shouldHideMessageQuickActions(reply);
+                            const replyActionState = getMessageActionState?.(reply.ids.id);
+                            const isSavingReply = Boolean(replyActionState?.isSaving);
+                            const isHidingReply = Boolean(replyActionState?.isHiding);
+                            const isDeletingReply = Boolean(replyActionState?.isDeleting);
+                            const isAddingReactionReply = Boolean(replyActionState?.isAddingReaction);
+                            const pendingReplyReactionEmojis =
+                              replyActionState?.pendingReactionEmojis ?? [];
                             return (
                               <div
                                 key={reply.ids.id}
@@ -482,7 +493,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                       variant="ghost"
                                       size="icon"
                                       className="h-6 w-6"
-                                      disabled={isReadOnly}
+                                      disabled={isReadOnly || isSavingReply}
                                       onClick={() => onToggleSaved?.(reply.ids.id)}
                                       aria-label={
                                         reply.state?.isSaved
@@ -490,13 +501,17 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                           : 'Save message'
                                       }
                                     >
-                                      <Bookmark
-                                        className={cn(
-                                          'h-3.5 w-3.5',
-                                          reply.state?.isSaved &&
-                                            'fill-primary text-primary',
-                                        )}
-                                      />
+                                      {isSavingReply ? (
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                      ) : (
+                                        <Bookmark
+                                          className={cn(
+                                            'h-3.5 w-3.5',
+                                            reply.state?.isSaved &&
+                                              'fill-primary text-primary',
+                                          )}
+                                        />
+                                      )}
                                     </Button>
                                     <DropdownMenu>
                                       <DropdownMenuTrigger asChild>
@@ -535,16 +550,26 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                               onClick={() =>
                                                 onToggleHidden?.(reply.ids.id)
                                               }
+                                              disabled={isHidingReply}
                                               className="py-2"
                                             >
-                                              <EyeOff className="mr-2 h-4 w-4" />
+                                              {isHidingReply ? (
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                              ) : (
+                                                <EyeOff className="mr-2 h-4 w-4" />
+                                              )}
                                               <span>Hide message</span>
                                             </DropdownMenuItem>
                                             <DropdownMenuItem
                                               onClick={() => onDelete?.(reply.ids.id)}
+                                              disabled={isDeletingReply}
                                               className="py-2 text-destructive focus:text-destructive"
                                             >
-                                              <Trash2 className="mr-2 h-4 w-4" />
+                                              {isDeletingReply ? (
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                              ) : (
+                                                <Trash2 className="mr-2 h-4 w-4" />
+                                              )}
                                               <span>Delete</span>
                                             </DropdownMenuItem>
                                           </>
@@ -563,11 +588,12 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                     >
                                       <ReactionBar
                                         reactions={reply.social.reactions}
+                                        pendingEmojis={pendingReplyReactionEmojis}
                                         onToggleReaction={
                                           isReadOnly
                                             ? undefined
                                             : (emoji) =>
-                                                onToggleReaction?.(reply.ids.id, emoji)
+                                                onToggleReaction?.(reply.ids.id, emoji, 'bar')
                                         }
                                       />
                                     </div>
@@ -585,16 +611,21 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                       ) : (
                                         <EmojiPicker
                                           onEmojiSelect={(emoji) =>
-                                            onToggleReaction?.(reply.ids.id, emoji)
+                                            onToggleReaction?.(reply.ids.id, emoji, 'picker')
                                           }
                                         >
                                           <Button
                                             variant="ghost"
                                             size="icon"
+                                            disabled={isAddingReactionReply}
                                             className="h-7 w-7 rounded-full border border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground"
                                             aria-label="Add emoji"
                                           >
-                                            <SmilePlus className="h-4 w-4" />
+                                            {isAddingReactionReply ? (
+                                              <Loader2 className="h-4 w-4 animate-spin" />
+                                            ) : (
+                                              <SmilePlus className="h-4 w-4" />
+                                            )}
                                           </Button>
                                         </EmojiPicker>
                                       )

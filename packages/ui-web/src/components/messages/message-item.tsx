@@ -37,6 +37,7 @@ import {
   AudioMessage,
   LinkPreviewMessage,
 } from '@iconicedu/ui-web/components/messages/message-types';
+import type { MessageActionState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
 
 interface MessageItemProps {
   message: MessageVM;
@@ -45,11 +46,12 @@ interface MessageItemProps {
   isReadOnly?: boolean;
   currentUserId?: UUID;
   onProfileClick: (userId: UUID) => void;
-  onToggleReaction?: (messageId: string, emoji: string) => void;
+  onToggleReaction?: (messageId: string, emoji: string, source?: 'bar' | 'picker') => void;
   onToggleSaved?: (messageId: string) => void;
   onToggleHidden?: (messageId: string) => void;
   onToggleImportant?: (messageId: string) => void;
   onDelete?: (messageId: string) => void;
+  actionState?: MessageActionState;
 }
 
 export const MessageItem = memo(function MessageItem({
@@ -64,13 +66,14 @@ export const MessageItem = memo(function MessageItem({
   onToggleHidden,
   onToggleImportant,
   onDelete,
+  actionState,
 }: MessageItemProps) {
   if (!isMessageVisibleToUser(message, currentUserId)) {
     return null;
   }
 
-  const handleToggleReaction = (emoji: string) => {
-    onToggleReaction?.(message.ids.id, emoji);
+  const handleToggleReaction = (emoji: string, source?: 'bar' | 'picker') => {
+    onToggleReaction?.(message.ids.id, emoji, source);
   };
 
   const handleToggleSaved = () => {
@@ -100,6 +103,7 @@ export const MessageItem = memo(function MessageItem({
     onToggleImportant: handleToggleImportant,
     onDelete: handleDelete,
     currentUserId,
+    actionState,
   };
 
   if (isTextMessage(message)) {
