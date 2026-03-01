@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ClassScheduleVM } from '@iconicedu/shared-types';
 
-import { expandRecurringEvents } from './class-schedule-utils';
+import { expandRecurringEvents, getDisplayEventState } from './class-schedule-utils';
 
 function buildRecurringSchedule(): ClassScheduleVM {
   return {
@@ -47,5 +47,114 @@ describe('class-schedule-utils', () => {
     );
 
     expect(expanded.map((item) => item.startAt)).toContain('2026-03-03T17:00:00.000Z');
+  });
+
+  it('keeps exceptions visible as disabled entries with the provided reason', () => {
+    const schedule: ClassScheduleVM = {
+      ...buildRecurringSchedule(),
+      recurrence: {
+        ...buildRecurringSchedule().recurrence!,
+        overrides: [],
+        exceptions: [
+          {
+            occurrenceKey: '2026-03-02T15:00:00.000Z',
+            reason: 'Spring holiday',
+          },
+        ],
+      },
+    };
+
+    const expanded = expandRecurringEvents(
+      [schedule],
+      new Date('2026-03-01T00:00:00.000Z'),
+      new Date('2026-03-03T00:00:00.000Z'),
+    );
+
+    const exception = expanded.find((item) => item.uiState?.kind === 'exception');
+    expect(exception?.status).toBe('cancelled');
+    expect(getDisplayEventState(exception!).disabled).toBe(true);
+    expect(getDisplayEventState(exception!).reason).toBe('Spring holiday');
+  });
+
+  it('marks override occurrences as changed and preserves original timing metadata', () => {
+    const expanded = expandRecurringEvents(
+      [buildRecurringSchedule()],
+      new Date('2026-03-01T00:00:00.000Z'),
+      new Date('2026-03-04T00:00:00.000Z'),
+    );
+
+    const override = expanded.find((item) => item.uiState?.kind === 'override');
+    const displayState = getDisplayEventState(override!);
+
+    expect(override?.status).toBe('rescheduled');
+    expect(displayState.originalStartAt).toBe('2026-03-02T15:00:00.000Z');
+    expect(displayState.originalEndAt).toBe('2026-03-02T16:00:00.000Z');
+  });
+
+  it('dedupes day collisions so an override replaces the default occurrence on that day', () => {
+    const schedule: ClassScheduleVM = {
+      ...buildRecurringSchedule(),
+      recurrence: {
+        ...buildRecurringSchedule().recurrence!,
+        rule: {
+          frequency: 'daily',
+          interval: 1,
+          count: 3,
+        },
+        overrides: [
+          {
+            occurrenceKey: '2026-03-01T15:00:00.000Z',
+            patch: {
+              startAt: '2026-03-02T17:00:00.000Z',
+              endAt: '2026-03-02T18:00:00.000Z',
+            },
+          },
+        ],
+      },
+    };
+
+    const expanded = expandRecurringEvents(
+      [schedule],
+      new Date('2026-03-01T00:00:00.000Z'),
+      new Date('2026-03-03T23:59:59.000Z'),
+    );
+
+    expect(expanded.map((item) => item.startAt)).toEqual([
+      '2026-03-02T17:00:00.000Z',
+      '2026-03-03T15:00:00.000Z',
+    ]);
+  });
+
+  it('includes an override when the moved occurrence date is in range but the original date is not', () => {
+    const schedule: ClassScheduleVM = {
+      ...buildRecurringSchedule(),
+      recurrence: {
+        ...buildRecurringSchedule().recurrence!,
+        rule: {
+          frequency: 'daily',
+          interval: 1,
+          count: 3,
+        },
+        overrides: [
+          {
+            occurrenceKey: '2026-03-01T15:00:00.000Z',
+            patch: {
+              startAt: '2026-03-05T17:00:00.000Z',
+              endAt: '2026-03-05T18:00:00.000Z',
+            },
+          },
+        ],
+      },
+    };
+
+    const expanded = expandRecurringEvents(
+      [schedule],
+      new Date('2026-03-05T00:00:00.000Z'),
+      new Date('2026-03-05T23:59:59.000Z'),
+    );
+
+    expect(expanded).toHaveLength(1);
+    expect(expanded[0]?.startAt).toBe('2026-03-05T17:00:00.000Z');
+    expect(expanded[0]?.uiState?.kind).toBe('override');
   });
 });

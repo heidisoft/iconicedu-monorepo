@@ -4,6 +4,16 @@ import type {
   WeekdayVM,
 } from '@iconicedu/shared-types';
 
+export interface DisplayClassScheduleVM extends ClassScheduleVM {
+  uiState?: {
+    kind?: 'default' | 'exception' | 'override';
+    disabled?: boolean;
+    reason?: string | null;
+    originalStartAt?: string;
+    originalEndAt?: string;
+  };
+}
+
 export function getWeekDays(date: Date): Date[] {
   const startOfWeek = new Date(date);
   const day = startOfWeek.getDay();
@@ -42,6 +52,17 @@ export function formatEventTime(isoTime: string): string {
     hour: 'numeric',
     minute: '2-digit',
   });
+}
+
+export function getDisplayEventState(event: ClassScheduleVM | DisplayClassScheduleVM) {
+  const uiState = (event as DisplayClassScheduleVM).uiState;
+  return {
+    kind: uiState?.kind ?? 'default',
+    disabled: uiState?.disabled ?? false,
+    reason: uiState?.reason ?? null,
+    originalStartAt: uiState?.originalStartAt ?? null,
+    originalEndAt: uiState?.originalEndAt ?? null,
+  };
 }
 
 export function getEventDate(event: ClassScheduleVM): Date {
@@ -176,10 +197,42 @@ const weekdayTokens: WeekdayVM[] = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
 
 const getOccurrenceDayKey = (isoDateTime: string) => isoDateTime.slice(0, 10);
 
+const getDisplaySchedulePriority = (schedule: DisplayClassScheduleVM) => {
+  if (schedule.uiState?.kind === 'exception') return 3;
+  if (schedule.uiState?.kind === 'override') return 2;
+  return 1;
+};
+
+const getDisplayScheduleBaseId = (schedule: DisplayClassScheduleVM) => {
+  const separatorIndex = schedule.ids.id.indexOf('__');
+  return separatorIndex === -1 ? schedule.ids.id : schedule.ids.id.slice(0, separatorIndex);
+};
+
+const dedupeExpandedEvents = (schedules: DisplayClassScheduleVM[]) => {
+  const deduped = new Map<string, DisplayClassScheduleVM>();
+
+  schedules.forEach((schedule) => {
+    const key = `${getDisplayScheduleBaseId(schedule)}|${schedule.startAt.slice(0, 10)}`;
+    const existing = deduped.get(key);
+
+    if (!existing || getDisplaySchedulePriority(schedule) > getDisplaySchedulePriority(existing)) {
+      deduped.set(key, schedule);
+    }
+  });
+
+  return Array.from(deduped.values());
+};
+
 const isWithinRange = (date: Date, rangeStart: Date, rangeEnd: Date) => {
   const day = startOfDay(date).getTime();
   return day >= rangeStart.getTime() && day <= rangeEnd.getTime();
 };
+
+const getMinDate = (dates: Date[]) =>
+  dates.reduce((min, current) => (current < min ? current : min), dates[0]!);
+
+const getMaxDate = (dates: Date[]) =>
+  dates.reduce((max, current) => (current > max ? current : max), dates[0]!);
 
 const getWeekStart = (date: Date) => {
   const start = new Date(date);
@@ -200,7 +253,7 @@ export const expandRecurringEvents = (
   rangeStart: Date,
   rangeEnd: Date,
 ) => {
-  const expanded: ClassScheduleVM[] = [];
+  const expanded: DisplayClassScheduleVM[] = [];
   const rangeStartDay = startOfDay(rangeStart);
   const rangeEndDay = startOfDay(rangeEnd);
 
@@ -208,7 +261,10 @@ export const expandRecurringEvents = (
     if (!event.recurrence) {
       const eventDate = startOfDay(new Date(event.startAt));
       if (isWithinRange(eventDate, rangeStartDay, rangeEndDay)) {
-        expanded.push(event);
+        expanded.push({
+          ...event,
+          uiState: { kind: 'default' },
+        });
       }
       return;
     }
@@ -239,13 +295,66 @@ export const expandRecurringEvents = (
     const byWeekday = rule.byWeekday?.length
       ? rule.byWeekday
       : [weekdayTokens[baseDate.getDay()]];
+    const overrideOriginalDates = recurrence.overrides?.map((override) =>
+      startOfDay(new Date(override.occurrenceKey)),
+    ) ?? [];
+    const overridePatchedDates = recurrence.overrides
+      ?.map((override) =>
+        override.patch.startAt ? startOfDay(new Date(override.patch.startAt)) : null,
+      )
+      .filter((date): date is Date => Boolean(date)) ?? [];
+    const exceptionDates = recurrence.exceptions?.map((exception) =>
+      startOfDay(new Date(exception.occurrenceKey)),
+    ) ?? [];
+    const iterationStart = getMinDate([
+      baseDate,
+      rangeStartDay,
+      ...overrideOriginalDates,
+      ...exceptionDates,
+    ]);
+    const iterationEnd = getMaxDate([
+      rangeEndDay,
+      ...overrideOriginalDates,
+      ...overridePatchedDates,
+      ...exceptionDates,
+    ]);
+
+    recurrence.exceptions?.forEach((exception) => {
+      const originalStart = new Date(exception.occurrenceKey);
+
+      const occurrenceDayKey = getOccurrenceDayKey(exception.occurrenceKey);
+      if (overrides.has(exception.occurrenceKey) || overridesByDay.has(occurrenceDayKey)) return;
+
+      const originalEnd = new Date(originalStart.getTime() + durationMs);
+
+      expanded.push({
+        ...event,
+        ids: {
+          ...event.ids,
+          id: `${event.ids.id}__${exception.occurrenceKey}__exception`,
+        },
+        startAt: originalStart.toISOString(),
+        endAt: originalEnd.toISOString(),
+        status: 'cancelled',
+        meetingLink: null,
+        recurrence: undefined,
+        description: exception.reason ?? event.description ?? null,
+        uiState: {
+          kind: 'exception',
+          disabled: true,
+          reason: exception.reason ?? null,
+          originalStartAt: originalStart.toISOString(),
+          originalEndAt: originalEnd.toISOString(),
+        },
+      });
+    });
 
     let occurrenceCount = 0;
     const until = rule.until ? startOfDay(new Date(rule.until)) : null;
 
     for (
-      let current = rangeStartDay;
-      current <= rangeEndDay;
+      let current = iterationStart;
+      current <= iterationEnd;
       current = addDays(current, 1)
     ) {
       if (current < baseDate) continue;
@@ -283,7 +392,7 @@ export const expandRecurringEvents = (
       if (rule.count && occurrenceCount >= rule.count) break;
 
       const occurrenceEnd = new Date(occurrenceStart.getTime() + durationMs);
-      const occurrence: ClassScheduleVM = {
+      const occurrence: DisplayClassScheduleVM = {
         ...event,
         ...override,
         ids: {
@@ -292,7 +401,21 @@ export const expandRecurringEvents = (
         },
         startAt: override?.startAt ?? occurrenceStart.toISOString(),
         endAt: override?.endAt ?? occurrenceEnd.toISOString(),
+        status: override?.status ?? (hasOverride ? 'rescheduled' : event.status),
         recurrence: undefined,
+        uiState: hasOverride
+          ? {
+              kind: 'override',
+              reason:
+                typeof override?.description === 'string'
+                  ? override.description
+                  : typeof (override as { reason?: unknown } | undefined)?.reason === 'string'
+                    ? ((override as { reason?: string }).reason ?? null)
+                    : null,
+              originalStartAt: occurrenceStart.toISOString(),
+              originalEndAt: occurrenceEnd.toISOString(),
+            }
+          : { kind: 'default' },
       };
 
       expanded.push(occurrence);
@@ -300,7 +423,9 @@ export const expandRecurringEvents = (
     }
   });
 
-  return expanded;
+  return dedupeExpandedEvents(expanded).filter((schedule) =>
+    isWithinRange(new Date(schedule.startAt), rangeStartDay, rangeEndDay),
+  );
 };
 
 export const getClassScheduleEventsForView = (

@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { ChevronLeft, Phone, Video, MoreVertical } from 'lucide-react-native';
+import { ChevronLeft, Video, MoreVertical } from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 
@@ -139,11 +139,8 @@ export function ConversationHeader({
         {!!subtitle && <Text style={s.subtitle} numberOfLines={1}>{subtitle}</Text>}
       </View>
 
-      {/* Action buttons — always rendered */}
+      {/* Action buttons — Phone removed, keep Video and MoreVertical */}
       <View style={s.actions}>
-        <TouchableOpacity style={s.actionBtn} onPress={onCall} hitSlop={8}>
-          <Phone size={20} color="rgba(255,255,255,0.9)" />
-        </TouchableOpacity>
         <TouchableOpacity style={s.actionBtn} onPress={onVideo} hitSlop={8}>
           <Video size={20} color="rgba(255,255,255,0.9)" />
         </TouchableOpacity>

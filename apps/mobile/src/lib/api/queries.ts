@@ -611,26 +611,35 @@ export async function toggleReaction(
   messageId: string,
   accountId: string,
   emoji: string,
+  orgId: string,
 ): Promise<void> {
-  const { data: existing } = await supabase
+  // org_id is required (NOT NULL) — omitting it causes a silent constraint violation
+  const { data: existing, error: selectError } = await supabase
     .from('message_reactions')
     .select('id')
+    .eq('org_id', orgId)
     .eq('message_id', messageId)
     .eq('account_id', accountId)
     .eq('emoji', emoji)
+    .is('deleted_at', null)
     .maybeSingle();
 
+  if (selectError) throw selectError;
+
   if (existing) {
-    await supabase
+    const { error } = await supabase
       .from('message_reactions')
       .delete()
+      .eq('org_id', orgId)
       .eq('message_id', messageId)
       .eq('account_id', accountId)
       .eq('emoji', emoji);
+    if (error) throw error;
   } else {
-    await supabase
+    const { error } = await supabase
       .from('message_reactions')
-      .insert({ message_id: messageId, account_id: accountId, emoji });
+      .insert({ org_id: orgId, message_id: messageId, account_id: accountId, emoji });
+    if (error) throw error;
   }
 }
 

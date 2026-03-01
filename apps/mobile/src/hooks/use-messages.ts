@@ -281,15 +281,15 @@ export function useMessages(
       });
 
       try {
-        // message_reactions uses account_id
-        await apiToggleReaction(messageId, currentAccountId, emoji);
+        // org_id is required (NOT NULL constraint) — must be passed alongside account_id
+        await apiToggleReaction(messageId, currentAccountId, emoji, orgId);
       } catch {
         // Roll back on error
         queryClient.setQueryData(key, previous);
         queryClient.invalidateQueries({ queryKey: key });
       }
     },
-    [channelId, currentAccountId, queryClient],
+    [channelId, currentAccountId, orgId, queryClient],
   );
 
   return {

@@ -3,7 +3,7 @@ import { CalendarDays } from 'lucide-react';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import { AvatarGroup, AvatarGroupCount } from '@iconicedu/ui-web/ui/avatar';
 import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
-import { formatEventTime } from '@iconicedu/ui-web/lib/class-schedule-utils';
+import { formatEventTime, getDisplayEventState } from '@iconicedu/ui-web/lib/class-schedule-utils';
 import { ThemedIconBadge } from '@iconicedu/ui-web/components/shared/themed-icon';
 
 interface EventDetailsHeaderProps {
@@ -11,6 +11,7 @@ interface EventDetailsHeaderProps {
 }
 
 export function EventDetailsHeader({ event }: EventDetailsHeaderProps) {
+  const displayState = getDisplayEventState(event);
   const maxVisibleGuests = 2;
   const visibleGuests = event.participants.slice(0, maxVisibleGuests);
   const remainingGuests = Math.max(0, event.participants.length - visibleGuests.length);
@@ -36,6 +37,24 @@ export function EventDetailsHeader({ event }: EventDetailsHeaderProps) {
       </div>
 
       <h2 className="font-semibold">{event.title}</h2>
+
+      {(displayState.kind === 'exception' || displayState.kind === 'override') && (
+        <div className="flex items-center gap-2">
+          <span
+            className={cn(
+              'rounded-full px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide',
+              displayState.kind === 'exception'
+                ? 'bg-muted text-muted-foreground'
+                : 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
+            )}
+          >
+            {displayState.kind === 'exception' ? 'Skipped' : 'Changed'}
+          </span>
+          {displayState.reason && (
+            <span className="text-xs text-muted-foreground">{displayState.reason}</span>
+          )}
+        </div>
+      )}
 
       <p className="text-sm text-muted-foreground">{event.location}</p>
 
