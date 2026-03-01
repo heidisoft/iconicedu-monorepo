@@ -252,8 +252,8 @@ export function useMessages(
           const existing = reactions.find((r) => r.emoji === emoji);
 
           let nextReactions: ReactionVM[];
-          if (existing) {
-            // Toggle off
+          if (existing?.reactedByMe) {
+            // Remove my reaction
             nextReactions = existing.count <= 1
               ? reactions.filter((r) => r.emoji !== emoji)
               : reactions.map((r) =>
@@ -261,8 +261,15 @@ export function useMessages(
                     ? { ...r, count: r.count - 1, reactedByMe: false }
                     : r,
                 );
+          } else if (existing) {
+            // Add my reaction to an existing emoji group (others reacted, I haven't yet)
+            nextReactions = reactions.map((r) =>
+              r.emoji === emoji
+                ? { ...r, count: r.count + 1, reactedByMe: true }
+                : r,
+            );
           } else {
-            // Toggle on
+            // New emoji — toggle on
             nextReactions = [
               ...reactions,
               { emoji, count: 1, reactedByMe: true, sampleUserIds: [currentAccountId] },

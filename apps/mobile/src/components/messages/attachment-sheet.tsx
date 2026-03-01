@@ -12,7 +12,13 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { Audio } from 'expo-av';
-import { Image, Paperclip, Mic, Square, X } from 'lucide-react-native';
+import {
+  ImageIcon,
+  Paperclip,
+  Mic,
+  Square,
+  X,
+} from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 
@@ -24,16 +30,32 @@ export type AttachmentPayload = {
   mimeType: string;
   size?: number;
   durationSeconds?: number;
+  /** Pre-read base64 string (images from photo library) — skips FileSystem read on upload. */
+  base64?: string;
 };
 
 type AttachmentSheetProps = {
   visible: boolean;
   onClose: () => void;
-  onAttach: (attachment: AttachmentPayload) => void;
+  /** Called immediately after picking/recording — caller shows preview above the input bar. */
+  onAttach: (attachments: AttachmentPayload[]) => void;
   disabled?: boolean;
 };
 
 type SheetMode = 'menu' | 'recording';
+
+const ALLOWED_DOC_TYPES = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain',
+  'text/csv',
+  'application/rtf',
+];
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
@@ -59,6 +81,8 @@ function makeStyles(C: AppColors) {
       marginTop: 10,
       marginBottom: 20,
     },
+
+    // ── Menu ──
     menuItem: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -90,7 +114,7 @@ function makeStyles(C: AppColors) {
       marginHorizontal: 20,
     },
 
-    // Recording UI
+    // ── Recording ──
     recordingArea: {
       alignItems: 'center',
       paddingHorizontal: 24,
@@ -147,12 +171,14 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
   const s = React.useMemo(() => makeStyles(colors), [colors]);
 
   const [mode, setMode] = useState<SheetMode>('menu');
+
+  // Recording state
   const [recordingMs, setRecordingMs] = useState(0);
   const [isStopping, setIsStopping] = useState(false);
   const recordingRef = useRef<Audio.Recording | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Reset to menu when sheet closes
+  // Reset when sheet closes
   useEffect(() => {
     if (!visible) {
       setMode('menu');
@@ -179,17 +205,19 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      allowsMultipleSelection: false,
+      allowsMultipleSelection: true,
       quality: 0.85,
+      base64: true,
     });
-    if (result.canceled || !result.assets[0]) return;
-    const asset = result.assets[0];
-    const uri = asset.uri;
-    const mimeType = asset.mimeType ?? 'image/jpeg';
-    const ext = mimeType.split('/')[1] ?? 'jpg';
-    const name = asset.fileName ?? `photo_${Date.now()}.${ext}`;
+    if (result.canceled || !result.assets.length) return;
+    const payloads: AttachmentPayload[] = result.assets.map((asset, i) => {
+      const mimeType = asset.mimeType ?? 'image/jpeg';
+      const ext = mimeType.split('/')[1] ?? 'jpg';
+      const name = asset.fileName ?? `photo_${Date.now()}_${i}.${ext}`;
+      return { uri: asset.uri, name, mimeType, size: asset.fileSize, base64: asset.base64 ?? undefined };
+    });
     onClose();
-    onAttach({ uri, name, mimeType, size: asset.fileSize });
+    onAttach(payloads);
   }, [onClose, onAttach]);
 
   // ── Document picker ───────────────────────────────────────────────────────
@@ -197,17 +225,18 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
   const handlePickFile = useCallback(async () => {
     const result = await DocumentPicker.getDocumentAsync({
       copyToCacheDirectory: true,
-      multiple: false,
+      multiple: true,
+      type: ALLOWED_DOC_TYPES,
     });
-    if (result.canceled || !result.assets[0]) return;
-    const asset = result.assets[0];
-    onClose();
-    onAttach({
+    if (result.canceled || !result.assets.length) return;
+    const payloads: AttachmentPayload[] = result.assets.map((asset) => ({
       uri: asset.uri,
       name: asset.name,
       mimeType: asset.mimeType ?? 'application/octet-stream',
       size: asset.size,
-    });
+    }));
+    onClose();
+    onAttach(payloads);
   }, [onClose, onAttach]);
 
   // ── Audio recording ───────────────────────────────────────────────────────
@@ -220,7 +249,6 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
     }
     try {
       await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-      // HIGH_QUALITY preset records as M4A/AAC on iOS — universally compatible
       const { recording } = await Audio.Recording.createAsync(
         Audio.RecordingOptionsPresets.HIGH_QUALITY,
       );
@@ -229,7 +257,6 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
       setRecordingMs(0);
       timerRef.current = setInterval(() => setRecordingMs((ms) => ms + 100), 100);
 
-      // Auto-stop at 60 s (matches web SHORT_AUDIO_RECORDING_MAX_MS)
       setTimeout(() => {
         if (recordingRef.current) handleStopRecording();
       }, 60_000);
@@ -252,18 +279,20 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
       await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
       if (uri) {
         onClose();
-        onAttach({
+        onAttach([{
           uri,
           name: `voice_${Date.now()}.m4a`,
           mimeType: 'audio/mp4',
           durationSeconds: Math.max(1, durationSeconds),
-        });
+        }]);
+      } else {
+        setMode('menu');
       }
     } catch (err) {
       console.warn('[AttachmentSheet] recording stop error:', err);
+      setMode('menu');
     } finally {
       setIsStopping(false);
-      setMode('menu');
       setRecordingMs(0);
     }
   }, [isStopping, recordingMs, onClose, onAttach]);
@@ -287,12 +316,10 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
     return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
   };
 
-  // Animated waveform bars (simple pulse using recordingMs)
   const barCount = 20;
   const waveformBars = Array.from({ length: barCount }, (_, i) => {
     const phase = (recordingMs / 120 + i * 18) % 360;
-    const h = 8 + Math.abs(Math.sin((phase * Math.PI) / 180)) * 28;
-    return h;
+    return 8 + Math.abs(Math.sin((phase * Math.PI) / 180)) * 28;
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -305,14 +332,17 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
       onRequestClose={mode === 'recording' ? handleCancelRecording : onClose}
       statusBarTranslucent
     >
-      <Pressable style={s.overlay} onPress={mode === 'recording' ? undefined : onClose}>
+      <Pressable
+        style={s.overlay}
+        onPress={mode === 'recording' ? undefined : onClose}
+      >
         <Pressable>
           <View style={s.sheet}>
             <View style={s.handle} />
 
-            {mode === 'menu' ? (
+            {/* ── Menu ── */}
+            {mode === 'menu' && (
               <>
-                {/* Photos */}
                 <TouchableOpacity
                   style={s.menuItem}
                   onPress={handlePickImage}
@@ -320,17 +350,16 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
                   activeOpacity={0.7}
                 >
                   <View style={s.menuIconWrap}>
-                    <Image size={22} color={colors.teal} />
+                    <ImageIcon size={22} color={colors.teal} />
                   </View>
                   <View>
                     <Text style={s.menuLabel}>Photo Library</Text>
-                    <Text style={s.menuSub}>Share a photo or image</Text>
+                    <Text style={s.menuSub}>Select one or more photos</Text>
                   </View>
                 </TouchableOpacity>
 
                 <View style={s.divider} />
 
-                {/* Files */}
                 <TouchableOpacity
                   style={s.menuItem}
                   onPress={handlePickFile}
@@ -342,13 +371,12 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
                   </View>
                   <View>
                     <Text style={s.menuLabel}>Files</Text>
-                    <Text style={s.menuSub}>Share a document or file</Text>
+                    <Text style={s.menuSub}>PDF, Word, Excel, PowerPoint…</Text>
                   </View>
                 </TouchableOpacity>
 
                 <View style={s.divider} />
 
-                {/* Voice */}
                 <TouchableOpacity
                   style={s.menuItem}
                   onPress={handleStartRecording}
@@ -364,13 +392,14 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
                   </View>
                 </TouchableOpacity>
               </>
-            ) : (
-              /* Recording UI */
+            )}
+
+            {/* ── Recording ── */}
+            {mode === 'recording' && (
               <View style={s.recordingArea}>
                 <Text style={s.recordingTimer}>{fmtTimer(recordingMs)}</Text>
                 <Text style={s.recordingHint}>Recording… tap stop when done</Text>
 
-                {/* Simple animated waveform */}
                 <View style={s.waveformRow}>
                   {waveformBars.map((h, i) => (
                     <View
@@ -386,7 +415,6 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
                   ))}
                 </View>
 
-                {/* Stop button */}
                 <TouchableOpacity
                   style={s.stopBtn}
                   onPress={handleStopRecording}
@@ -394,11 +422,10 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
                   activeOpacity={0.8}
                   accessibilityLabel="Stop recording"
                 >
-                  {isStopping ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <Square size={24} color="#fff" fill="#fff" />
-                  )}
+                  {isStopping
+                    ? <ActivityIndicator color="#fff" />
+                    : <Square size={24} color="#fff" fill="#fff" />
+                  }
                 </TouchableOpacity>
 
                 <TouchableOpacity

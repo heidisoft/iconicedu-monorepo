@@ -5,14 +5,18 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
+  ActivityIndicator,
+  Image as RNImage,
+  ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Audio } from 'expo-av';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 import type { MessageVM } from '@iconicedu/shared-types';
 import { EmojiPicker } from './emoji-picker';
 import { AttachmentSheet, type AttachmentPayload } from './attachment-sheet';
-import { Smile, Plus, ArrowUp, X } from 'lucide-react-native';
+import { Smile, Plus, ArrowUp, X, FileText, Play, Pause } from 'lucide-react-native';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -26,14 +30,22 @@ function getMessagePreviewText(message: MessageVM): string {
   return 'Message';
 }
 
+function fmtDuration(s: number): string {
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type MessageInputProps = {
   onSend: (text: string) => void | Promise<void>;
-  /** Called with the picked/recorded attachment — caller handles upload + send. */
-  onSendAttachment?: (attachment: AttachmentPayload) => Promise<void>;
+  /** Called with picked/recorded attachments and optional caption — caller handles upload + send. */
+  onSendAttachment?: (attachments: AttachmentPayload[], caption?: string) => Promise<void>;
   placeholder?: string;
   disabled?: boolean;
+  /** When true, an upload is in flight — shows spinner on the + button and blocks new uploads. */
+  uploading?: boolean;
   onTypingChange?: () => void;
   /** Called when typing stops (input cleared or message sent). */
   onTypingStop?: () => void;
@@ -76,10 +88,98 @@ function makeStyles(C: AppColors, bottomInset: number) {
       fontSize: 12,
       color: C.textMuted,
     },
-    replyClose: {
-      fontSize: 16,
+
+    // Attachment preview strip (sits above the bar, same pattern as reply preview)
+    attachPreview: {
+      backgroundColor: C.bg,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: C.border,
+      paddingVertical: 10,
+    },
+    attachPreviewContent: {
+      paddingHorizontal: 12,
+      gap: 8,
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+    },
+    // Image thumbnail
+    attachThumbWrap: {
+      width: 64,
+      height: 64,
+      borderRadius: 10,
+      overflow: 'hidden',
+    },
+    attachThumb: {
+      width: 64,
+      height: 64,
+    },
+    attachRemoveBtn: {
+      position: 'absolute',
+      top: 4,
+      right: 4,
+      width: 18,
+      height: 18,
+      borderRadius: 9,
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    attachThumbLoading: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: C.card,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 10,
+    },
+    // File item
+    attachFileItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      height: 64,
+      maxWidth: 180,
+      borderRadius: 10,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: C.border,
+      backgroundColor: C.card,
+    },
+    attachFileName: {
+      flex: 1,
+      fontSize: 12,
+      color: C.text,
+    },
+    // Audio item
+    attachAudioItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      height: 64,
+      width: 160,
+      borderRadius: 10,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: C.border,
+      backgroundColor: C.card,
+    },
+    attachAudioPlayBtn: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      backgroundColor: C.teal,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    attachAudioLabel: {
+      fontSize: 12,
+      fontWeight: '500',
+      color: C.text,
+    },
+    attachAudioMeta: {
+      fontSize: 11,
       color: C.textMuted,
-      paddingHorizontal: 4,
     },
 
     // Main input bar
@@ -107,13 +207,6 @@ function makeStyles(C: AppColors, bottomInset: number) {
       alignItems: 'center',
       justifyContent: 'center',
       marginBottom: 0,
-    },
-    addTxt: {
-      fontSize: 24,
-      lineHeight: 28,
-      color: C.textMuted,
-      fontWeight: '300',
-      includeFontPadding: false,
     },
 
     // Pill input row
@@ -145,9 +238,8 @@ function makeStyles(C: AppColors, bottomInset: number) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    emojiTxt: { fontSize: 18 },
 
-    // Send button — right of pill (only shown when text present)
+    // Send button — right of pill
     sendBtn: {
       width: 40,
       height: 40,
@@ -155,12 +247,6 @@ function makeStyles(C: AppColors, bottomInset: number) {
       backgroundColor: C.teal,
       alignItems: 'center',
       justifyContent: 'center',
-    },
-    sendTxt: {
-      color: C.tealFg,
-      fontSize: 20,
-      fontWeight: '700',
-      includeFontPadding: false,
     },
   });
 }
@@ -172,6 +258,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   onSendAttachment,
   placeholder,
   disabled = false,
+  uploading = false,
   onTypingChange,
   onTypingStop,
   replyTo,
@@ -181,6 +268,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
   const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
   const [inputHeight, setInputHeight] = useState(20);
+  const [pendingAttachments, setPendingAttachments] = useState<AttachmentPayload[]>([]);
+  const [loadedImageUris, setLoadedImageUris] = useState<Set<string>>(new Set());
+  const [audioPlaying, setAudioPlaying] = useState(false);
+  const audioSoundRef = useRef<Audio.Sound | null>(null);
   const MAX_INPUT_HEIGHT = 120;
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -194,14 +285,76 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     }
   }, [replyTo]);
 
+  // Reset image loading state whenever the pending set changes
+  useEffect(() => {
+    setLoadedImageUris(new Set());
+  }, [pendingAttachments]);
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      audioSoundRef.current?.stopAsync().catch(() => null);
+      audioSoundRef.current?.unloadAsync().catch(() => null);
+    };
+  }, []);
+
+  const clearPendingAudio = useCallback(async () => {
+    if (audioSoundRef.current) {
+      await audioSoundRef.current.stopAsync().catch(() => null);
+      await audioSoundRef.current.unloadAsync().catch(() => null);
+      audioSoundRef.current = null;
+    }
+    setAudioPlaying(false);
+  }, []);
+
+  const handleToggleAudio = useCallback(async (uri: string) => {
+    if (!audioSoundRef.current) {
+      const { sound } = await Audio.Sound.createAsync({ uri }, { shouldPlay: true });
+      audioSoundRef.current = sound;
+      setAudioPlaying(true);
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded) {
+          setAudioPlaying(status.isPlaying);
+          if (status.didJustFinish) {
+            sound.setPositionAsync(0).catch(() => null);
+            setAudioPlaying(false);
+          }
+        }
+      });
+    } else if (audioPlaying) {
+      await audioSoundRef.current.pauseAsync().catch(() => null);
+    } else {
+      await audioSoundRef.current.playAsync().catch(() => null);
+    }
+  }, [audioPlaying]);
+
+  const handleRemovePending = useCallback(async (index: number) => {
+    const removing = pendingAttachments[index];
+    if (removing?.mimeType.startsWith('audio/')) {
+      await clearPendingAudio();
+    }
+    setPendingAttachments((prev) => prev.filter((_, i) => i !== index));
+  }, [pendingAttachments, clearPendingAudio]);
+
   const handleSend = useCallback(async () => {
+    if (pendingAttachments.length > 0) {
+      const attachments = pendingAttachments;
+      const caption = text.trim() || undefined;
+      setPendingAttachments([]);
+      setText('');
+      setInputHeight(20);
+      onTypingStop?.();
+      await clearPendingAudio();
+      await onSendAttachment?.(attachments, caption);
+      return;
+    }
     const trimmed = text.trim();
     if (!trimmed) return;
     setText('');
     setInputHeight(20);
     onTypingStop?.();
     await onSend(trimmed);
-  }, [text, onSend, onTypingStop]);
+  }, [text, pendingAttachments, onSend, onSendAttachment, onTypingStop, clearPendingAudio]);
 
   const handleChangeText = useCallback(
     (t: string) => {
@@ -227,7 +380,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     inputRef.current?.focus();
   }, []);
 
-  const canSend = text.trim().length > 0 && !disabled;
+  const canSend = (text.trim().length > 0 || pendingAttachments.length > 0) && !disabled;
 
   return (
     <>
@@ -253,16 +406,103 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         </View>
       )}
 
+      {/* Attachment preview strip — shown when the user has picked files/images/audio */}
+      {pendingAttachments.length > 0 && (
+        <View style={s.attachPreview}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={s.attachPreviewContent}
+          >
+            {pendingAttachments.map((a, i) => {
+              if (a.mimeType.startsWith('image/')) {
+                const loaded = loadedImageUris.has(a.uri);
+                return (
+                  <View key={i} style={s.attachThumbWrap}>
+                    <RNImage
+                      source={{ uri: a.uri }}
+                      style={s.attachThumb}
+                      resizeMode="cover"
+                      onLoad={() =>
+                        setLoadedImageUris((prev) => new Set([...prev, a.uri]))
+                      }
+                    />
+                    {!loaded && (
+                      <View style={s.attachThumbLoading}>
+                        <ActivityIndicator size="small" color={colors.teal} />
+                      </View>
+                    )}
+                    <TouchableOpacity
+                      style={s.attachRemoveBtn}
+                      onPress={() => handleRemovePending(i)}
+                      hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                    >
+                      <X size={10} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                );
+              }
+
+              if (a.mimeType.startsWith('audio/')) {
+                return (
+                  <View key={i} style={s.attachAudioItem}>
+                    <TouchableOpacity
+                      style={s.attachAudioPlayBtn}
+                      onPress={() => handleToggleAudio(a.uri)}
+                      activeOpacity={0.8}
+                    >
+                      {audioPlaying
+                        ? <Pause size={14} color={colors.tealFg} />
+                        : <Play size={14} color={colors.tealFg} />
+                      }
+                    </TouchableOpacity>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.attachAudioLabel}>Voice</Text>
+                      <Text style={s.attachAudioMeta}>
+                        {a.durationSeconds ? fmtDuration(a.durationSeconds) : '—'}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => handleRemovePending(i)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <X size={14} color={colors.textMuted} />
+                    </TouchableOpacity>
+                  </View>
+                );
+              }
+
+              // File
+              return (
+                <View key={i} style={s.attachFileItem}>
+                  <FileText size={16} color={colors.teal} />
+                  <Text style={s.attachFileName} numberOfLines={2}>{a.name}</Text>
+                  <TouchableOpacity
+                    onPress={() => handleRemovePending(i)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <X size={14} color={colors.textMuted} />
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+
       <View style={s.bar}>
-        {/* + Attachment button */}
+        {/* + Attachment button — shows spinner while an upload is in flight */}
         <TouchableOpacity
           style={s.addBtn}
-          disabled={disabled}
+          disabled={disabled || uploading}
           activeOpacity={0.7}
           onPress={() => setAttachmentSheetVisible(true)}
           accessibilityLabel="Add attachment"
         >
-          <Plus size={22} color={colors.textMuted} />
+          {uploading
+            ? <ActivityIndicator size="small" color={colors.teal} />
+            : <Plus size={22} color={colors.textMuted} />
+          }
         </TouchableOpacity>
 
         {/* Pill: text input + smiley */}
@@ -294,7 +534,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           </TouchableOpacity>
         </View>
 
-        {/* Send button — appears when text is present */}
+        {/* Send button — appears when text is present or attachments are pending */}
         {canSend && (
           <TouchableOpacity
             style={s.sendBtn}
@@ -316,9 +556,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       <AttachmentSheet
         visible={attachmentSheetVisible}
         onClose={() => setAttachmentSheetVisible(false)}
-        onAttach={async (attachment) => {
-          setAttachmentSheetVisible(false);
-          await onSendAttachment?.(attachment);
+        onAttach={(attachments) => {
+          setPendingAttachments(attachments);
         }}
         disabled={disabled}
       />

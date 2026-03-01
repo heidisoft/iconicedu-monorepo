@@ -967,13 +967,15 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 
     return (
       <>
-        {/* Caption text sits above the image card, matching web layout */}
+        {/* Caption text sits above the image card in its own sender-styled bubble */}
         {!!im.content?.text && (
-          <FormattedText
-            text={im.content.text}
-            style={[s.textContent, isOwn && s.textContentOwn, s.imageCaption]}
-            isOwn={isOwn}
-          />
+          <View style={[s.bubble, isOwn ? s.bubbleOwn : s.bubbleOther, s.imageCaption]}>
+            <FormattedText
+              text={im.content.text}
+              style={[s.textContent, isOwn && s.textContentOwn]}
+              isOwn={isOwn}
+            />
+          </View>
         )}
 
         {isGallery ? (
@@ -1112,19 +1114,15 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     };
     const progress = totalMs > 0 ? audioPositionMs / totalMs : 0;
 
-    // Colors mirror web: play btn bg-primary/12 → tealBg; active → bg-primary; playing → solid fill
-    const playBtnBg = isOwn
-      ? (isAudioPlaying ? '#fff' : 'rgba(255,255,255,0.15)')
-      : (isAudioPlaying ? colors.teal : colors.tealBg);
-    const playBtnBorder = isOwn ? 'rgba(255,255,255,0.3)' : colors.teal + '33';
-    const playBtnColor = isOwn
-      ? (isAudioPlaying ? colors.teal : '#fff')
-      : (isAudioPlaying ? '#fff' : colors.teal);
-    const barActive   = isOwn ? '#fff' : colors.teal;
-    const barInactive = isOwn ? 'rgba(255,255,255,0.22)' : colors.border;
-    const timeColor   = isOwn ? 'rgba(255,255,255,0.7)' : colors.textFaint;
-    const cardBorder  = isOwn ? 'rgba(255,255,255,0.2)' : colors.border;
-    const cardBg      = isOwn ? 'rgba(255,255,255,0.06)' : colors.card;
+    // Colors: audio player always uses neutral styling regardless of sender
+    const playBtnBg = isAudioPlaying ? colors.teal : colors.tealBg;
+    const playBtnBorder = colors.teal + '33';
+    const playBtnColor = isAudioPlaying ? '#fff' : colors.teal;
+    const barActive   = colors.teal;
+    const barInactive = colors.border;
+    const timeColor   = colors.textFaint;
+    const cardBorder  = colors.border;
+    const cardBg      = colors.card;
 
     // WebM/Opus (recorded by Chrome) cannot be decoded by iOS AVFoundation
     const isUnsupportedOnIOS =
@@ -1133,14 +1131,8 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 
     return (
       // width: '85%' (via fileBubble) ensures flex:1 waveform section resolves properly
-      <View style={[s.fileBubble, isOwn ? s.bubbleOwn : s.bubbleOther]}>
-        {!!am.content?.text && (
-          <FormattedText
-            text={am.content.text}
-            style={[s.textContent, isOwn && s.textContentOwn, { marginBottom: 8 }]}
-            isOwn={isOwn}
-          />
-        )}
+      // Caption is rendered separately in renderAudioSection so it can use sender-bubble styling
+      <View style={s.fileBubble}>
         {/* Inner card matches web: rounded-2xl border border-border bg-card px-3 py-3 */}
         <View style={[s.audioCard, { borderColor: cardBorder, backgroundColor: cardBg }]}>
           {isUnsupportedOnIOS && (
@@ -1190,6 +1182,28 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           </View>
         </View>
       </View>
+    );
+  };
+
+  // ── Audio section: caption bubble (own-styled) + audio player (always neutral) ──
+  // Keeps text styling consistent with other sender messages while audio card stays green-free.
+
+  const renderAudioSection = () => {
+    const am = message as AudioRecordingMessageVM;
+    const captionText = am.content?.text;
+    return (
+      <>
+        {!!captionText && (
+          <View style={[s.bubble, isOwn ? s.bubbleOwn : s.bubbleOther]}>
+            <FormattedText
+              text={captionText}
+              style={[s.textContent, isOwn && s.textContentOwn]}
+              isOwn={isOwn}
+            />
+          </View>
+        )}
+        {renderAudioContent()}
+      </>
     );
   };
 
@@ -1390,7 +1404,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         {/* Dedicated layouts for rich message types; text/cards use bubble */}
         {type === 'image' ? renderImageContent() :
           type === 'file' ? renderFileContent() :
-          type === 'audio-recording' ? renderAudioContent() :
+          type === 'audio-recording' ? renderAudioSection() :
           type === 'link-preview' ? renderLinkContent() : (
           <View style={[s.bubble, isOwn ? s.bubbleOwn : s.bubbleOther]}>
             {renderBubbleContent()}

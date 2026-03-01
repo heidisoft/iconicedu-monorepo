@@ -365,11 +365,14 @@ type ReplaceSchedulesPayload = {
   schedules: LearningSpaceCreatePayload['schedules'];
 };
 
-async function replaceLearningSpaceSchedules(
+export async function replaceLearningSpaceSchedules(
   supabase: SupabaseClient,
   payload: ReplaceSchedulesPayload,
 ) {
-  const { data: schedules, error } = await supabase
+  const serviceClient = createSupabaseServiceClient();
+  void supabase;
+
+  const { data: schedules, error } = await serviceClient
     .from('class_schedules')
     .select('id')
     .eq('org_id', payload.orgId)
@@ -381,13 +384,13 @@ async function replaceLearningSpaceSchedules(
   }
 
   const scheduleIds = (schedules ?? []).map((row) => row.id).filter(Boolean);
-  await deleteSchedules(supabase, payload.orgId, scheduleIds);
+  await deleteSchedules(serviceClient, payload.orgId, scheduleIds);
 
   if (!payload.schedules?.length) {
     return;
   }
 
-  await insertClassSchedules(supabase, {
+  await insertClassSchedules(serviceClient, {
     orgId: payload.orgId,
     learningSpaceId: payload.learningSpaceId,
     channelId: payload.channelId,

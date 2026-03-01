@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase/client';
+import { File as ExpoFile } from 'expo-file-system';
 import type {
   UserProfileBlockVM,
   ChannelVM,
@@ -1228,12 +1229,32 @@ export async function sendTextMessage(
 }
 
 // ─── File / Image / Audio upload + message creation ───────────────────────────
-// Mirrors the web's uploadFileMessage flow in messages-shell-client.tsx and
-// sendFileMessageAction in apps/web/app/actions/messages.ts.
+// Mirrors the web's uploadFileMessage flow (messages-shell-client.tsx) and
+// sendFileMessageAction / sendFilesMessageAction (apps/web/app/actions/messages.ts).
 
 const CHANNEL_FILES_BUCKET = 'channel-files';
 
-/** Build a Supabase storage path identical to the web's buildMessageAssetPath helper. */
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+function sanitizeStorageFileName(name: string, fallback = 'file') {
+  const trimmed = name.trim() || fallback;
+  return trimmed.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/-+/g, '-');
+}
+
+function buildStorageFileKey(name: string, fallbackExt?: string): string {
+  const hasExt = /\.[^./]+$/.test(name);
+  const rawExt = hasExt ? name.split('.').pop()?.toLowerCase() : null;
+  const ext = rawExt ?? fallbackExt ?? null;
+  const timestamp = Date.now();
+  const randomSuffix = Math.random().toString(36).slice(2, 10);
+  const baseName = sanitizeStorageFileName(name.replace(/\.[^/.]+$/, '')).replace(/\.+$/g, '');
+  return ext ? `${timestamp}-${randomSuffix}-${baseName}.${ext}` : `${timestamp}-${randomSuffix}-${baseName}`;
+}
+
+/**
+ * Build a storage path identical to the web's buildMessageAssetPath helper.
+ * Format: {orgId}/{channelId}/{assetKind}/{profileId}/{timestamp}-{random}-{name}.{ext}
+ */
 export function buildMessageStoragePath(
   orgId: string,
   channelId: string,
@@ -1246,25 +1267,46 @@ export function buildMessageStoragePath(
     : mimeType.startsWith('audio/')
       ? 'audio'
       : 'files';
-  // Sanitise filename: replace spaces with underscores
-  const safe = fileName.replace(/\s+/g, '_');
-  return `org/${orgId}/channel/${channelId}/messages/${kind}/${profileId}/${Date.now()}_${safe}`;
+  const fileKey = buildStorageFileKey(fileName);
+  return `${orgId}/${channelId}/${kind}/${profileId}/${fileKey}`;
+}
+
+/**
+ * Decode a pre-read base64 string (from expo-image-picker) into a Uint8Array.
+ */
+function base64ToUint8Array(base64: string): Uint8Array {
+  const binaryStr = atob(base64);
+  const bytes = new Uint8Array(binaryStr.length);
+  for (let i = 0; i < binaryStr.length; i++) {
+    bytes[i] = binaryStr.charCodeAt(i);
+  }
+  return bytes;
 }
 
 /**
  * Upload a local file URI to the channel-files Supabase bucket.
- * Returns the storagePath on success.
+ *
+ * Mirrors the web's supabase.storage.from(bucket).upload(path, blob, opts) call.
+ *
+ * - Images: carry pre-read base64 from expo-image-picker (base64: true option).
+ *   Decoded directly to Uint8Array — no filesystem read needed.
+ * - Docs / audio: file:// URI (DocumentPicker copyToCacheDirectory: true, or expo-av).
+ *   Read synchronously via the new expo-file-system File.bytes() API (SDK 54+).
  */
 export async function uploadChannelFile(
   localUri: string,
   storagePath: string,
   mimeType: string,
+  prereadBase64?: string,
 ): Promise<void> {
-  const response = await fetch(localUri);
-  const blob = await response.blob();
+  const data: Uint8Array = prereadBase64
+    ? base64ToUint8Array(prereadBase64)
+    : new ExpoFile(localUri).bytes();
+
   const { error } = await supabase.storage
     .from(CHANNEL_FILES_BUCKET)
-    .upload(storagePath, blob, { contentType: mimeType, upsert: false });
+    .upload(storagePath, data, { contentType: mimeType, upsert: false });
+
   if (error) throw error;
 }
 
@@ -1277,7 +1319,7 @@ export type FileAttachmentInput = {
 };
 
 /**
- * Insert a file / image / audio-recording message row + its type-specific payload.
+ * Insert a single file / image / audio-recording message.
  * Mirrors web's sendFileMessageAction — same tables, same payload shape.
  */
 export async function sendFileMessage(
@@ -1308,7 +1350,6 @@ export async function sendFileMessage(
 
   if (msgError) throw msgError;
 
-  // Build payload — identical shape to web's sendFileMessageAction
   const payload: Record<string, unknown> = {
     url: file.storagePath,
     storagePath: file.storagePath,
@@ -1319,12 +1360,64 @@ export async function sendFileMessage(
     ...(content?.trim() ? { text: content.trim() } : {}),
   };
 
-  const table = isImage
-    ? 'message_image'
-    : isAudio
-      ? 'message_audio_recording'
-      : 'message_file';
+  const table = isImage ? 'message_image' : isAudio ? 'message_audio_recording' : 'message_file';
+  const { error: payloadError } = await supabase
+    .from(table)
+    .insert({ message_id: msg.id, org_id: orgId, payload });
 
+  if (payloadError) throw payloadError;
+  return msg;
+}
+
+/**
+ * Insert multiple images or files as a single message with an attachments array.
+ * Mirrors web's sendFilesMessageAction — same payload shape with attachments[].
+ * Audio must be sent individually via sendFileMessage.
+ */
+export async function sendFilesMessage(
+  channelId: string,
+  senderProfileId: string,
+  orgId: string,
+  files: FileAttachmentInput[],
+  content?: string,
+  threadParentId?: string,
+  threadId?: string,
+) {
+  if (!files.length) throw new Error('No files provided');
+  const allImages = files.every((f) => f.mimeType.startsWith('image/'));
+  const type = allImages ? 'image' : 'file';
+
+  const { data: msg, error: msgError } = await supabase
+    .from('messages')
+    .insert({
+      channel_id: channelId,
+      sender_profile_id: senderProfileId,
+      org_id: orgId,
+      type,
+      thread_parent_id: threadParentId ?? null,
+      ...(threadId ? { thread_id: threadId } : {}),
+    })
+    .select('id')
+    .single();
+
+  if (msgError) throw msgError;
+
+  // Build attachments array — identical to web's sendFilesMessageAction payload shape
+  const attachmentsPayload = files.map((f) => ({
+    url: f.storagePath,
+    storagePath: f.storagePath,
+    name: f.name,
+    ...(f.size !== undefined ? { size: f.size } : {}),
+    mimeType: f.mimeType,
+  }));
+
+  const payload: Record<string, unknown> = {
+    ...attachmentsPayload[0],
+    attachments: attachmentsPayload,
+    ...(content?.trim() ? { text: content.trim() } : {}),
+  };
+
+  const table = allImages ? 'message_image' : 'message_file';
   const { error: payloadError } = await supabase
     .from(table)
     .insert({ message_id: msg.id, org_id: orgId, payload });

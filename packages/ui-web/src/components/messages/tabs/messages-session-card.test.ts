@@ -19,14 +19,22 @@ describe('messages-session-card', () => {
     expect(getSessionCardState({ ...baseSession, isToday: false, isPast: false })).toEqual({
       isLive: false,
       isPast: false,
+      isDisabled: false,
     });
     expect(getSessionCardState({ ...baseSession, isToday: true, isPast: false })).toEqual({
       isLive: true,
       isPast: false,
+      isDisabled: false,
     });
     expect(getSessionCardState({ ...baseSession, isToday: true, isPast: true })).toEqual({
       isLive: false,
       isPast: true,
+      isDisabled: false,
+    });
+    expect(getSessionCardState({ ...baseSession, disabled: true })).toEqual({
+      isLive: false,
+      isPast: false,
+      isDisabled: true,
     });
   });
 });

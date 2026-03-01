@@ -51,6 +51,10 @@ import type {
   ThemeKey,
   UserProfileVM,
 } from '@iconicedu/shared-types';
+import {
+  mapSchedulesToPayload,
+  normalizeSchedules,
+} from '@iconicedu/web/app/(app)/[orgSlug]/admin/spaces/learning-space-form-dialog.utils';
 
 const KIND_OPTIONS = [
   { value: 'one_on_one', label: 'One on one' },
@@ -76,33 +80,6 @@ const mapParticipantsToPayload = (selected: UserProfileVM[]) =>
     displayName: participant.profile.displayName,
     avatarUrl: participant.profile.avatar.url ?? null,
     themeKey: participant.ui?.themeKey ?? null,
-  }));
-
-const mapSchedulesToPayload = (items: RecurrenceFormData[]) =>
-  items
-    .filter((schedule) => schedule.startDate)
-    .map((schedule) => ({
-      startDate:
-        schedule.startDate instanceof Date
-          ? schedule.startDate.toISOString()
-          : schedule.startDate
-            ? new Date(schedule.startDate as unknown as string).toISOString()
-            : '',
-      timezone: schedule.timezone,
-      rule: schedule.rule,
-      exceptions: schedule.exceptions,
-      overrides: schedule.overrides,
-    }));
-
-const normalizeSchedules = (items: RecurrenceFormData[]) =>
-  items.map((schedule) => ({
-    ...schedule,
-    startDate:
-      schedule.startDate instanceof Date
-        ? schedule.startDate
-        : schedule.startDate
-          ? new Date(schedule.startDate as unknown as string)
-          : undefined,
   }));
 
 type LearningSpaceFormDialogProps = {

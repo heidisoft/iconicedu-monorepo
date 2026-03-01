@@ -4,14 +4,50 @@ import { expandRecurringEvents } from '@iconicedu/ui-web/lib/class-schedule-util
 export type ScheduleSubTabKey = 'upcoming' | 'past';
 
 export interface ScheduleBuckets {
-  upcoming: ClassScheduleVM[];
-  past: ClassScheduleVM[];
+  upcoming: DisplaySchedule[];
+  past: DisplaySchedule[];
 }
 
 export interface MonthScheduleGroup {
   monthKey: string;
   monthTitle: string;
-  schedules: ClassScheduleVM[];
+  schedules: DisplaySchedule[];
+}
+
+export interface DisplaySchedule extends ClassScheduleVM {
+  uiState?: {
+    kind?: 'default' | 'exception' | 'override';
+    disabled?: boolean;
+    reason?: string | null;
+    originalStartAt?: string;
+    originalEndAt?: string;
+  };
+}
+
+function getDisplaySchedulePriority(schedule: DisplaySchedule) {
+  if (schedule.uiState?.kind === 'exception') return 3;
+  if (schedule.uiState?.kind === 'override') return 2;
+  return 1;
+}
+
+function getDisplayScheduleBaseId(schedule: DisplaySchedule) {
+  const separatorIndex = schedule.ids.id.indexOf('__');
+  return separatorIndex === -1 ? schedule.ids.id : schedule.ids.id.slice(0, separatorIndex);
+}
+
+function dedupeDisplaySchedules(schedules: DisplaySchedule[]) {
+  const deduped = new Map<string, DisplaySchedule>();
+
+  schedules.forEach((schedule) => {
+    const key = `${getDisplayScheduleBaseId(schedule)}|${schedule.startAt.slice(0, 10)}`;
+    const existing = deduped.get(key);
+
+    if (!existing || getDisplaySchedulePriority(schedule) > getDisplaySchedulePriority(existing)) {
+      deduped.set(key, schedule);
+    }
+  });
+
+  return Array.from(deduped.values());
 }
 
 export interface ClassSession {
@@ -24,6 +60,11 @@ export interface ClassSession {
   isPast: boolean;
   status: ClassScheduleVM['status'];
   meetingLink?: string | null;
+  variant?: 'default' | 'exception' | 'override';
+  disabled?: boolean;
+  reason?: string | null;
+  originalTime?: string | null;
+  originalDate?: string | null;
 }
 
 export interface MonthGroup {
@@ -51,6 +92,7 @@ const monthDayFormatter = new Intl.DateTimeFormat('en-US', {
   month: 'short',
   day: 'numeric',
 });
+const getOccurrenceDayKey = (isoDateTime: string) => isoDateTime.slice(0, 10);
 
 function getRecurringDisplayRange(schedules: ClassScheduleVM[], now: Date) {
   const recurringSchedules = schedules.filter((schedule) => Boolean(schedule.recurrence));
@@ -81,15 +123,67 @@ function getRecurringDisplayRange(schedules: ClassScheduleVM[], now: Date) {
   };
 }
 
+function buildExceptionDisplaySchedules(
+  schedules: ClassScheduleVM[],
+  rangeStart: Date,
+  rangeEnd: Date,
+): DisplaySchedule[] {
+  const rangeStartMs = rangeStart.getTime();
+  const rangeEndMs = rangeEnd.getTime();
+
+  return schedules.flatMap((schedule) => {
+    if (!schedule.recurrence?.exceptions?.length) return [];
+
+    const durationMs = new Date(schedule.endAt).getTime() - new Date(schedule.startAt).getTime();
+    const overriddenKeys = new Set(
+      schedule.recurrence.overrides?.map((override) => override.occurrenceKey) ?? [],
+    );
+
+    return schedule.recurrence.exceptions.flatMap((exception) => {
+      if (overriddenKeys.has(exception.occurrenceKey)) return [];
+
+      const originalStart = new Date(exception.occurrenceKey);
+      const startMs = originalStart.getTime();
+      if (startMs < rangeStartMs || startMs > rangeEndMs) return [];
+
+      const originalEnd = new Date(startMs + durationMs);
+
+      return [
+        {
+          ...schedule,
+          ids: {
+            ...schedule.ids,
+            id: `${schedule.ids.id}__${exception.occurrenceKey}__exception`,
+          },
+          startAt: originalStart.toISOString(),
+          endAt: originalEnd.toISOString(),
+          status: 'cancelled',
+          meetingLink: null,
+          recurrence: undefined,
+          description: exception.reason ?? null,
+          uiState: {
+            kind: 'exception',
+            disabled: true,
+            reason: exception.reason ?? null,
+            originalStartAt: originalStart.toISOString(),
+            originalEndAt: originalEnd.toISOString(),
+          },
+        },
+      ];
+    });
+  });
+}
+
 export function expandSchedulesForDisplay(
   schedules: ClassScheduleVM[],
   now = new Date(),
-): ClassScheduleVM[] {
+): DisplaySchedule[] {
   const recurring = schedules.filter((schedule) => schedule.recurrence);
   const nonRecurring = schedules.filter((schedule) => !schedule.recurrence);
-  const normalizedNonRecurring = nonRecurring.map((schedule) => ({
+  const normalizedNonRecurring: DisplaySchedule[] = nonRecurring.map((schedule) => ({
     ...schedule,
     description: null,
+    uiState: { kind: 'default' },
   }));
   if (!recurring.length) {
     return normalizedNonRecurring;
@@ -97,32 +191,50 @@ export function expandSchedulesForDisplay(
 
   const { rangeStart, rangeEnd } = getRecurringDisplayRange(schedules, now);
   const expandedRecurring = expandRecurringEvents(recurring, rangeStart, rangeEnd);
+  const exceptionSchedules = buildExceptionDisplaySchedules(recurring, rangeStart, rangeEnd);
   const recurringById = new Map(recurring.map((item) => [item.ids.id, item]));
-  const normalizedRecurring = expandedRecurring.map((schedule) => {
+  const normalizedRecurring: DisplaySchedule[] = expandedRecurring.map((schedule) => {
     const compositeId = schedule.ids.id;
     const separatorIndex = compositeId.indexOf('__');
     if (separatorIndex === -1) {
-      return { ...schedule, description: null };
+      return { ...schedule, description: null, uiState: { kind: 'default' } };
     }
 
     const baseId = compositeId.slice(0, separatorIndex);
     const occurrenceKey = compositeId.slice(separatorIndex + 2);
     const baseSchedule = recurringById.get(baseId);
-    const reason =
-      baseSchedule?.recurrence?.exceptions?.find(
-        (exception) => exception.occurrenceKey === occurrenceKey,
-      )?.reason ??
-      baseSchedule?.recurrence?.exceptions?.find((exception) => Boolean(exception.reason))
-        ?.reason ??
-      null;
+    const override = baseSchedule?.recurrence?.overrides?.find(
+      (item) =>
+        item.occurrenceKey === occurrenceKey ||
+        getOccurrenceDayKey(item.occurrenceKey) === getOccurrenceDayKey(occurrenceKey),
+    );
+    const originalStartAt = occurrenceKey;
+    const durationMs =
+      baseSchedule
+        ? new Date(baseSchedule.endAt).getTime() - new Date(baseSchedule.startAt).getTime()
+        : 0;
+    const originalEndAt = durationMs
+      ? new Date(new Date(originalStartAt).getTime() + durationMs).toISOString()
+      : undefined;
 
     return {
       ...schedule,
-      description: reason,
+      description: null,
+      uiState: override
+        ? {
+            kind: 'override',
+            originalStartAt,
+            originalEndAt,
+          }
+        : { kind: 'default' },
     };
   });
 
-  return [...normalizedNonRecurring, ...normalizedRecurring];
+  return dedupeDisplaySchedules([
+    ...normalizedNonRecurring,
+    ...normalizedRecurring,
+    ...exceptionSchedules,
+  ]);
 }
 
 export function splitSchedulesByTimeline(
@@ -131,8 +243,8 @@ export function splitSchedulesByTimeline(
 ): ScheduleBuckets {
   const expandedSchedules = expandSchedulesForDisplay(schedules, now);
   const nowMs = now.getTime();
-  const upcoming: ClassScheduleVM[] = [];
-  const past: ClassScheduleVM[] = [];
+  const upcoming: DisplaySchedule[] = [];
+  const past: DisplaySchedule[] = [];
 
   expandedSchedules.forEach((schedule) => {
     const startMs = new Date(schedule.startAt).getTime();
@@ -210,9 +322,9 @@ export function formatScheduleMonthTitleFromKey(monthKey: string): string {
 }
 
 export function groupSchedulesByMonth(
-  schedules: ClassScheduleVM[],
+  schedules: DisplaySchedule[],
 ): MonthScheduleGroup[] {
-  const map = new Map<string, ClassScheduleVM[]>();
+  const map = new Map<string, DisplaySchedule[]>();
 
   schedules.forEach((schedule) => {
     const monthKey = getScheduleMonthKey(schedule);
@@ -261,6 +373,22 @@ export function toMonthGroups(
         isPast: start.getTime() < now.getTime(),
         status: schedule.status,
         meetingLink: schedule.meetingLink ?? null,
+        variant: schedule.uiState?.kind ?? 'default',
+        disabled: schedule.uiState?.disabled ?? false,
+        reason: schedule.uiState?.reason ?? null,
+        originalTime: schedule.uiState?.originalStartAt
+          ? formatScheduleDateTime({
+              ...schedule,
+              startAt: schedule.uiState.originalStartAt,
+              endAt: schedule.uiState.originalEndAt ?? schedule.uiState.originalStartAt,
+            })
+          : null,
+        originalDate: schedule.uiState?.originalStartAt
+          ? formatScheduleDateBadge({
+              ...schedule,
+              startAt: schedule.uiState.originalStartAt,
+            })
+          : null,
       };
     });
 

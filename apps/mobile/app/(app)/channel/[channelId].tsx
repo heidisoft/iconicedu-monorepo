@@ -5,7 +5,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { MessageVM } from '@iconicedu/shared-types';
 import { useAccount } from '@/hooks/use-account';
 import { useMessages } from '@/hooks/use-messages';
-import { sendTextMessage, deleteMessage } from '@/lib/api/queries';
+import { sendTextMessage, sendFileMessage, sendFilesMessage, uploadChannelFile, buildMessageStoragePath, deleteMessage } from '@/lib/api/queries';
+import type { AttachmentPayload } from '@/components/messages/attachment-sheet';
+import type { PendingUpload } from '@/components/messages/pending-message-row';
 import { useTheme } from '@/providers/theme-provider';
 import { MessageList } from '@/components/messages/message-list';
 import { MessageInput } from '@/components/messages/message-input';
@@ -67,8 +69,13 @@ export default function ChannelConversationScreen() {
     setThreadReplyTarget(msg);
   }, []);
 
+  // ── Pending uploads (WhatsApp-style optimistic UI) ──
+  // Each pending item is shown in the message list immediately while the upload runs.
+  // The realtime subscription invalidates the query once the DB row is created, replacing
+  // the pending item with the real message — no manual refetch needed.
+  const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
+
   // ── Send message ──
-  // When a thread reply target is active, route the message into that thread.
   const handleSend = useCallback(
     async (text: string) => {
       if (!channelId || !profileId || !orgId) return;
@@ -83,19 +90,106 @@ export default function ChannelConversationScreen() {
           threadId,
         );
         setThreadReplyTarget(null);
-        // Refresh so the parent message's thread stats (reply count) update
+        // Thread reply count lives in the threads table — refetch to update the pill.
         void refetch();
       } else {
         await sendTextMessage(channelId, profileId, orgId, text);
+        // Realtime subscription handles cache invalidation for non-thread messages.
       }
     },
     [channelId, profileId, orgId, threadReplyTarget, refetch],
+  );
+
+  // ── Send attachment (WhatsApp-style: show locally first, upload in background) ──
+  const handleSendAttachment = useCallback(
+    async (attachments: AttachmentPayload[], caption?: string) => {
+      if (!channelId || !profileId || !orgId || !attachments.length) return;
+
+      const type: PendingUpload['type'] =
+        attachments[0].mimeType === 'audio/mp4' ? 'audio'
+        : attachments[0].mimeType.startsWith('image/') ? 'image'
+        : 'file';
+
+      const pendingId = `pending-${Date.now()}`;
+
+      // 1. Add local preview immediately — user sees it right away (like WhatsApp)
+      setPendingUploads((prev) => [
+        ...prev,
+        { id: pendingId, type, attachments, senderName, createdAt: new Date().toISOString(), caption },
+      ]);
+
+      try {
+        if (type === 'audio') {
+          const a = attachments[0];
+          const storagePath = buildMessageStoragePath(orgId, channelId, profileId, a.mimeType, a.name);
+          await uploadChannelFile(a.uri, storagePath, a.mimeType, a.base64);
+          await sendFileMessage(channelId, profileId, orgId, { ...a, storagePath }, caption);
+        } else {
+          const uploaded = await Promise.all(
+            attachments.map(async (a) => {
+              const storagePath = buildMessageStoragePath(orgId, channelId, profileId, a.mimeType, a.name);
+              await uploadChannelFile(a.uri, storagePath, a.mimeType, a.base64);
+              return { ...a, storagePath };
+            }),
+          );
+          if (uploaded.length === 1) {
+            await sendFileMessage(channelId, profileId, orgId, uploaded[0], caption);
+          } else {
+            await sendFilesMessage(channelId, profileId, orgId, uploaded, caption);
+          }
+        }
+
+        // 2. Remove pending entry — the realtime subscription will add the real message
+        setPendingUploads((prev) => prev.filter((p) => p.id !== pendingId));
+      } catch {
+        // 3. Mark as failed — user sees a red error state on the pending item
+        setPendingUploads((prev) =>
+          prev.map((p) => (p.id === pendingId ? { ...p, failed: true } : p)),
+        );
+      }
+    },
+    [channelId, profileId, orgId, senderName],
   );
 
   // ── Delete message ──
   const handleDelete = useCallback(async (messageId: string) => {
     await deleteMessage(messageId);
   }, []);
+
+  // ── Retry a failed upload ──
+  const handleRetryUpload = useCallback(async (pendingId: string) => {
+    const pending = pendingUploads.find((p) => p.id === pendingId);
+    if (!pending?.failed) return;
+
+    // Reset to uploading state so the spinner shows again
+    setPendingUploads((prev) => prev.map((p) => (p.id === pendingId ? { ...p, failed: false } : p)));
+
+    try {
+      const { caption } = pending;
+      if (pending.type === 'audio') {
+        const a = pending.attachments[0];
+        const storagePath = buildMessageStoragePath(orgId, channelId!, profileId, a.mimeType, a.name);
+        await uploadChannelFile(a.uri, storagePath, a.mimeType, a.base64);
+        await sendFileMessage(channelId!, profileId, orgId, { ...a, storagePath }, caption);
+      } else {
+        const uploaded = await Promise.all(
+          pending.attachments.map(async (a) => {
+            const storagePath = buildMessageStoragePath(orgId, channelId!, profileId, a.mimeType, a.name);
+            await uploadChannelFile(a.uri, storagePath, a.mimeType, a.base64);
+            return { ...a, storagePath };
+          }),
+        );
+        if (uploaded.length === 1) {
+          await sendFileMessage(channelId!, profileId, orgId, uploaded[0], caption);
+        } else {
+          await sendFilesMessage(channelId!, profileId, orgId, uploaded, caption);
+        }
+      }
+      setPendingUploads((prev) => prev.filter((p) => p.id !== pendingId));
+    } catch {
+      setPendingUploads((prev) => prev.map((p) => (p.id === pendingId ? { ...p, failed: true } : p)));
+    }
+  }, [pendingUploads, channelId, profileId, orgId]);
 
   // ── Reaction toggle ──
   const handleReactionToggle = useCallback(
@@ -135,15 +229,19 @@ export default function ChannelConversationScreen() {
           onMessageLongPress={handleLongPress}
           onReactionToggle={handleReactionToggle}
           onThreadOpen={handleThreadOpen}
+          pendingUploads={pendingUploads}
+          onRetryUpload={handleRetryUpload}
         />
         <TypingIndicator typingUsers={typingUsers} />
         <MessageInput
           onSend={handleSend}
+          onSendAttachment={handleSendAttachment}
           placeholder={`Message #${topic ?? ''}…`}
           onTypingChange={broadcastTyping}
           onTypingStop={broadcastTypingStop}
           replyTo={threadReplyTarget}
           onCancelReply={() => setThreadReplyTarget(null)}
+          uploading={pendingUploads.some((p) => !p.failed)}
         />
       </KeyboardAvoidingView>
 

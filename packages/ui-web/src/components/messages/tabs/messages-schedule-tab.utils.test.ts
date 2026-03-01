@@ -92,11 +92,75 @@ describe('messages-schedule-tab.utils', () => {
       },
     };
     const { upcoming } = splitSchedulesByTimeline([schedule], new Date('2026-03-01T09:00:00.000Z'));
-    expect(upcoming).toHaveLength(3);
-    expect(upcoming.some((item) => item.description === 'Holiday break')).toBe(true);
-    expect(upcoming.some((item) => item.description === 'Original description')).toBe(
-      false,
-    );
+    expect(upcoming).toHaveLength(4);
+    expect(
+      upcoming.find((item) => item.uiState?.kind === 'exception')?.uiState?.reason,
+    ).toBe('Holiday break');
+    expect(upcoming.some((item) => item.uiState?.kind === 'exception')).toBe(true);
+    expect(upcoming.some((item) => item.uiState?.kind === 'default')).toBe(true);
+  });
+
+  it('marks override occurrences as changed and preserves original timing metadata', () => {
+    const schedule = {
+      ...buildSchedule('rec-override', '2026-03-01T10:00:00.000Z'),
+      recurrence: {
+        ids: { id: 'recur-override', orgId: 'org-1' },
+        rule: {
+          frequency: 'daily' as const,
+          interval: 1,
+          count: 2,
+        },
+        overrides: [
+          {
+            occurrenceKey: '2026-03-02T10:00:00.000Z',
+            patch: {
+              startAt: '2026-03-03T12:00:00.000Z',
+              endAt: '2026-03-03T13:00:00.000Z',
+            },
+          },
+        ],
+      },
+    };
+
+    const { upcoming } = splitSchedulesByTimeline([schedule], new Date('2026-03-01T09:00:00.000Z'));
+    const changed = upcoming.find((item) => item.uiState?.kind === 'override');
+
+    expect(changed?.startAt).toBe('2026-03-03T12:00:00.000Z');
+    expect(changed?.uiState?.originalStartAt).toBe('2026-03-02T10:00:00.000Z');
+    const mapped = toMonthGroups(groupSchedulesByMonth(upcoming), new Date('2026-03-01T09:00:00.000Z'));
+    const changedSession = mapped[0]?.sessions.find((item) => item.variant === 'override');
+    expect(changedSession?.originalDate).toBe('Mar 2');
+  });
+
+  it('suppresses duplicate day entries when an override lands on an existing recurrence day', () => {
+    const schedule = {
+      ...buildSchedule('rec-dedupe', '2026-03-01T10:00:00.000Z'),
+      recurrence: {
+        ids: { id: 'recur-dedupe', orgId: 'org-1' },
+        rule: {
+          frequency: 'daily' as const,
+          interval: 1,
+          count: 3,
+        },
+        overrides: [
+          {
+            occurrenceKey: '2026-03-01T10:00:00.000Z',
+            patch: {
+              startAt: '2026-03-02T12:00:00.000Z',
+              endAt: '2026-03-02T13:00:00.000Z',
+            },
+          },
+        ],
+      },
+    };
+
+    const { upcoming } = splitSchedulesByTimeline([schedule], new Date('2026-03-01T00:00:00.000Z'));
+
+    expect(upcoming.map((item) => item.startAt)).toEqual([
+      '2026-03-02T12:00:00.000Z',
+      '2026-03-03T10:00:00.000Z',
+    ]);
+    expect(upcoming[0]?.uiState?.kind).toBe('override');
   });
 
   it('builds a google calendar url', () => {
@@ -194,6 +258,7 @@ describe('messages-schedule-tab.utils', () => {
         dayName: 'Tue',
         dayNum: '3',
         isToday: true,
+        variant: 'default',
       }),
     );
   });

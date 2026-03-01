@@ -14,36 +14,42 @@ interface SessionCardProps {
 export function getSessionCardState(session: ClassSession): {
   isLive: boolean;
   isPast: boolean;
+  isDisabled: boolean;
 } {
   const isPast = session.isPast;
   return {
     isPast,
+    isDisabled: Boolean(session.disabled),
     isLive: session.isToday && !isPast,
   };
 }
 
 export function SessionCard({ session }: SessionCardProps) {
-  const { isLive, isPast } = getSessionCardState(session);
+  const { isLive, isPast, isDisabled } = getSessionCardState(session);
 
   return (
     <div
       className={cn(
         'group relative flex items-center gap-4 rounded-xl border px-4 py-3 transition-all',
-        isLive
-          ? 'border-primary/30 bg-primary/5 shadow-sm shadow-primary/10'
-          : isPast
-            ? 'border-border/50 bg-muted/40'
-            : 'border-border bg-card hover:border-primary/20 hover:shadow-sm',
+        isDisabled
+          ? 'border-border/50 bg-muted/25 opacity-75'
+          : isLive
+            ? 'border-primary/30 bg-primary/5 shadow-sm shadow-primary/10'
+            : isPast
+              ? 'border-border/50 bg-muted/40'
+              : 'border-border bg-card hover:border-primary/20 hover:shadow-sm',
       )}
     >
       <div
         className={cn(
           'flex min-w-[4.5rem] flex-col items-center rounded-lg px-3 py-2',
-          isLive
-            ? 'bg-primary text-primary-foreground'
-            : isPast
-              ? 'bg-muted text-muted-foreground'
-              : 'bg-secondary text-secondary-foreground',
+          isDisabled
+            ? 'bg-muted/70 text-muted-foreground'
+            : isLive
+              ? 'bg-primary text-primary-foreground'
+              : isPast
+                ? 'bg-muted text-muted-foreground'
+                : 'bg-secondary text-secondary-foreground',
         )}
       >
         {isLive ? (
@@ -60,7 +66,7 @@ export function SessionCard({ session }: SessionCardProps) {
           <h3
             className={cn(
               'text-sm font-semibold',
-              isPast ? 'text-muted-foreground' : 'text-card-foreground',
+              isDisabled || isPast ? 'text-muted-foreground' : 'text-card-foreground',
             )}
           >
             {session.label}
@@ -70,7 +76,17 @@ export function SessionCard({ session }: SessionCardProps) {
               LIVE
             </Badge>
           ) : null}
-          {isPast ? (
+          {session.variant === 'exception' ? (
+            <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
+              Skipped
+            </Badge>
+          ) : null}
+          {session.variant === 'override' ? (
+            <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
+              Changed
+            </Badge>
+          ) : null}
+          {isPast && session.variant !== 'exception' ? (
             <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
               Completed
             </Badge>
@@ -80,10 +96,24 @@ export function SessionCard({ session }: SessionCardProps) {
           <Clock3 className="size-3" />
           <span>{session.time}</span>
         </div>
+        {session.variant === 'override' && session.originalTime ? (
+          <>
+            <p className="text-xs text-muted-foreground">
+              Was{' '}
+              <span className="line-through">
+                {session.originalDate ? `${session.originalDate} ` : ''}
+                {session.originalTime}
+              </span>
+            </p>
+          </>
+        ) : null}
+        {session.variant === 'exception' && session.reason ? (
+          <p className="text-xs text-muted-foreground">{session.reason}</p>
+        ) : null}
       </div>
 
       <div className="flex items-center gap-2">
-        {!isPast ? (
+        {!isPast && !isDisabled ? (
           <Button
             size="sm"
             className={cn(
@@ -113,8 +143,22 @@ export function SessionCard({ session }: SessionCardProps) {
               </span>
             )}
           </Button>
+        ) : isDisabled ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="gap-1.5 text-xs text-muted-foreground"
+            disabled
+          >
+            <Video className="size-3.5" />
+            Unavailable
+          </Button>
         ) : (
-          <Button size="sm" variant="ghost" className="gap-1.5 text-xs text-muted-foreground">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="gap-1.5 text-xs text-muted-foreground"
+          >
             <Video className="size-3.5" />
             Recording
           </Button>

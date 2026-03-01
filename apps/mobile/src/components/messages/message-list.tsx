@@ -4,6 +4,7 @@ import type { MessageVM } from '@iconicedu/shared-types';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 import { MessageItem } from './message-item';
+import { PendingMessageRow, type PendingUpload } from './pending-message-row';
 
 // ─── Date grouping helpers ────────────────────────────────────────────────────
 
@@ -85,6 +86,10 @@ type MessageListProps = {
   onMessageLongPress?: (message: MessageVM) => void;
   onReactionToggle?: (messageId: string, emoji: string) => void;
   onThreadOpen?: (message: MessageVM) => void;
+  /** Optimistic pending uploads — appear at the bottom while upload is in flight. */
+  pendingUploads?: PendingUpload[];
+  /** Called when the user taps "retry" on a failed upload row. */
+  onRetryUpload?: (pendingId: string) => void;
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -100,6 +105,8 @@ export const MessageList: React.FC<MessageListProps> = ({
   onMessageLongPress,
   onReactionToggle,
   onThreadOpen,
+  pendingUploads,
+  onRetryUpload,
 }) => {
   const flatListRef = useRef<FlatList>(null);
   const { colors } = useTheme();
@@ -181,6 +188,17 @@ export const MessageList: React.FC<MessageListProps> = ({
       refreshing={refreshing}
       onEndReached={onLoadMore}
       onEndReachedThreshold={0.3}
+      // In an inverted FlatList, ListHeaderComponent renders at the VISUAL BOTTOM —
+      // perfect for pending uploads that appear just above the input bar.
+      ListHeaderComponent={
+        pendingUploads && pendingUploads.length > 0 ? (
+          <View>
+            {pendingUploads.map((p) => (
+              <PendingMessageRow key={p.id} pending={p} colors={colors} onRetry={() => onRetryUpload?.(p.id)} />
+            ))}
+          </View>
+        ) : null
+      }
       ListFooterComponent={
         loading ? (
           <View style={{ alignItems: 'center', paddingVertical: 16 }}>

@@ -174,6 +174,8 @@ const addDays = (date: Date, days: number) => {
 
 const weekdayTokens: WeekdayVM[] = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
 
+const getOccurrenceDayKey = (isoDateTime: string) => isoDateTime.slice(0, 10);
+
 const isWithinRange = (date: Date, rangeStart: Date, rangeEnd: Date) => {
   const day = startOfDay(date).getTime();
   return day >= rangeStart.getTime() && day <= rangeEnd.getTime();
@@ -220,9 +222,19 @@ export const expandRecurringEvents = (
     const exceptions = new Set(
       recurrence.exceptions?.map((exception) => exception.occurrenceKey) ?? [],
     );
+    const exceptionsByDay = new Set(
+      recurrence.exceptions?.map((exception) => getOccurrenceDayKey(exception.occurrenceKey)) ??
+        [],
+    );
     const overrides = new Map(
       recurrence.overrides?.map((override) => [override.occurrenceKey, override.patch]) ??
         [],
+    );
+    const overridesByDay = new Map(
+      recurrence.overrides?.map((override) => [
+        getOccurrenceDayKey(override.occurrenceKey),
+        override.patch,
+      ]) ?? [],
     );
     const byWeekday = rule.byWeekday?.length
       ? rule.byWeekday
@@ -260,11 +272,13 @@ export const expandRecurringEvents = (
         baseStart.getMilliseconds(),
       );
       const occurrenceKey = occurrenceStart.toISOString();
-      const override = overrides.get(occurrenceKey);
+      const occurrenceDayKey = getOccurrenceDayKey(occurrenceKey);
+      const override = overrides.get(occurrenceKey) ?? overridesByDay.get(occurrenceDayKey);
       const hasOverride = Boolean(override);
 
       if (!matches && !hasOverride) continue;
-      if (exceptions.has(occurrenceKey) && !hasOverride) continue;
+      if ((exceptions.has(occurrenceKey) || exceptionsByDay.has(occurrenceDayKey)) && !hasOverride)
+        continue;
 
       if (rule.count && occurrenceCount >= rule.count) break;
 
