@@ -16,6 +16,7 @@ export interface ChannelRow {
   allow_reactions?: boolean | null;
   primary_entity_kind?: string | null;
   primary_entity_id?: UUID | null;
+  call_config?: Record<string, unknown> | null;
   ui_theme_key?: string | null;
   ui_defaults?: Record<string, unknown> | null;
   created_by_profile_id?: UUID | null;

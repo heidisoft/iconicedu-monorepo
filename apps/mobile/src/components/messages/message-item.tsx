@@ -23,7 +23,7 @@ import type {
 import type { AppColors } from '@/lib/theme';
 import { fetchThreadMessages } from '@/lib/api/queries';
 import { EmojiPicker } from './emoji-picker';
-import { SmilePlus, CornerUpLeft, MessageCircle, Download, FileText, Play, Pause } from 'lucide-react-native';
+import { SmilePlus, CornerUpLeft, MessageCircle, Download, FileText, ExternalLink, Play, Pause } from 'lucide-react-native';
 import { Audio } from 'expo-av';
 import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '@/lib/supabase/client';
@@ -678,14 +678,14 @@ function makeStyles(colors: AppColors) {
     // Waveform container: h-6 (24pt) with inner padding to match web rounded-xl border bg-muted/70 px-2
     waveformRow:  { flexDirection: 'row' as const, alignItems: 'flex-end' as const, gap: 2, height: 24, borderRadius: 10, borderWidth: 1, borderColor: 'transparent', paddingHorizontal: 4 },
 
-    // ── Image message (rendered outside bubble) ───────────────────────────────
-    imageWrapper:        { maxWidth: '85%', borderRadius: 18, overflow: 'hidden', borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
-    imageGalleryWrapper: { maxWidth: '90%', borderRadius: 18, overflow: 'hidden', borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
-    imageCaption:        { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6 },
+    // ── Image message (matches web: rounded-xl, border, download btn overlay) ──
+    imageWrapper:        { maxWidth: 320, borderRadius: 12, overflow: 'hidden', borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+    imageGalleryWrapper: { maxWidth: '90%', flexDirection: 'row' as const, flexWrap: 'wrap' as const, gap: 8 },
+    imageCaption:        { marginBottom: 6 },
     imagePreview:        { width: '100%' },
-    galleryItem:         { width: '50%', height: 192, position: 'relative' as const },
+    galleryItem:         { width: '48%', height: 192, borderRadius: 12, overflow: 'hidden', borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.card },
     galleryItemImg:      { width: '100%', height: '100%' },
-    imageDownloadBtn:    { position: 'absolute' as const, top: 8, right: 8, width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center' as const, justifyContent: 'center' as const },
+    imageDownloadBtn:    { position: 'absolute' as const, top: 12, right: 12, width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center' as const, justifyContent: 'center' as const },
 
     // ── Link preview card ──────────────────────────────────────────────────────
     // width set inline as '85%' so the card is a direct child of contentCol — flex:1 inside resolves
@@ -779,6 +779,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   const soundRef = useRef<Audio.Sound | null>(null);
   const [openingFile, setOpeningFile] = useState<string | null>(null);
   const [imageSignedUrls, setImageSignedUrls] = useState<Record<string, string>>({});
+  const [audioSignedUrl, setAudioSignedUrl] = useState<string | null>(null);
 
   // Unload sound when the message item unmounts
   useEffect(() => {
@@ -786,6 +787,8 @@ export const MessageItem: React.FC<MessageItemProps> = ({
       soundRef.current?.unloadAsync().catch(() => null);
     };
   }, []);
+
+  const type = message.core.type;
 
   // Pre-generate signed URLs for image attachments so <Image> can render them
   useEffect(() => {
@@ -812,7 +815,27 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [type, message.ids.id]);
-  const type = message.core.type;
+
+  // Pre-generate signed URL for audio so playback works from the private bucket
+  useEffect(() => {
+    if (type !== 'audio-recording') return;
+    const am = message as AudioRecordingMessageVM;
+    const storagePath = am.audio.storagePath;
+    if (!storagePath) return;
+
+    let cancelled = false;
+    supabase.storage
+      .from(CHANNEL_FILES_BUCKET)
+      .createSignedUrl(storagePath, 3600)
+      .then(({ data, error }) => {
+        if (!cancelled && !error && data?.signedUrl) {
+          setAudioSignedUrl(data.signedUrl);
+        }
+      });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [type, message.ids.id]);
+
   const senderDisplayName = message.core.sender.profile.displayName;
   const { url: avatarUrl, seed: avatarSeed } = getAvatarInfo(message);
   const time = formatTime(message.core.createdAt);
@@ -929,18 +952,19 @@ export const MessageItem: React.FC<MessageItemProps> = ({
       (att.storagePath ? imageSignedUrls[att.storagePath] : undefined) ?? att.url;
 
     return (
-      <View style={[isGallery ? s.imageGalleryWrapper : s.imageWrapper, { backgroundColor: colors.card }]}>
+      <>
+        {/* Caption text sits above the image card, matching web layout */}
         {!!im.content?.text && (
-          <View style={s.imageCaption}>
-            <FormattedText
-              text={im.content.text}
-              style={[s.textContent, isOwn && s.textContentOwn]}
-              isOwn={isOwn}
-            />
-          </View>
+          <FormattedText
+            text={im.content.text}
+            style={[s.textContent, isOwn && s.textContentOwn, s.imageCaption]}
+            isOwn={isOwn}
+          />
         )}
+
         {isGallery ? (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+          /* Gallery: 2-column grid with gap, each item gets its own border+radius */
+          <View style={s.imageGalleryWrapper}>
             {attachments.map((att, i) => {
               const fileKey = att.storagePath ?? att.url;
               const isOpening = openingFile === fileKey;
@@ -953,6 +977,9 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                   disabled={isOpening}
                 >
                   <Image source={{ uri: displayUrl(att) }} style={s.galleryItemImg} resizeMode="cover" />
+                  <View style={s.imageDownloadBtn} pointerEvents="none">
+                    <Download size={14} color="#fff" />
+                  </View>
                   {isOpening && (
                     <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.35)' }]}>
                       <ActivityIndicator color="#fff" />
@@ -963,24 +990,30 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             })}
           </View>
         ) : (
-          <TouchableOpacity
-            activeOpacity={0.9}
-            onPress={() => handleFileOpen(first.url, first.storagePath)}
-            disabled={openingFile === (first.storagePath ?? first.url)}
-          >
-            <Image
-              source={{ uri: displayUrl(first) }}
-              style={[s.imagePreview, { aspectRatio: singleAspect }]}
-              resizeMode="cover"
-            />
-            {openingFile === (first.storagePath ?? first.url) && (
-              <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.35)' }]}>
-                <ActivityIndicator color="#fff" />
+          /* Single image: rounded card with border, download btn overlay */
+          <View style={[s.imageWrapper, { backgroundColor: colors.card }]}>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => handleFileOpen(first.url, first.storagePath)}
+              disabled={openingFile === (first.storagePath ?? first.url)}
+            >
+              <Image
+                source={{ uri: displayUrl(first) }}
+                style={[s.imagePreview, { aspectRatio: singleAspect }]}
+                resizeMode="cover"
+              />
+              <View style={s.imageDownloadBtn} pointerEvents="none">
+                <Download size={14} color="#fff" />
               </View>
-            )}
-          </TouchableOpacity>
+              {openingFile === (first.storagePath ?? first.url) && (
+                <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.35)' }]}>
+                  <ActivityIndicator color="#fff" />
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
         )}
-      </View>
+      </>
     );
   };
 
@@ -1094,7 +1127,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           <View style={s.audioRow}>
             <TouchableOpacity
               style={[s.playBtn, { backgroundColor: playBtnBg, borderWidth: 1, borderColor: playBtnBorder }]}
-              onPress={() => handleAudioPress(am.audio.url)}
+              onPress={() => handleAudioPress(audioSignedUrl ?? am.audio.url)}
               disabled={audioLoading}
               accessibilityLabel={isAudioPlaying ? 'Pause audio' : 'Play audio'}
             >
