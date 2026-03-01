@@ -118,10 +118,12 @@ export default function SpaceDetailScreen() {
       {/* Info sheet */}
       <ChannelInfoSheet
         visible={infoVisible}
+        channelId={channelId ?? ''}
         title={topic ?? 'Learning Space'}
         subtitle={subtitle}
         kind="space"
         iconEmoji={iconEmoji}
+        messages={messages ?? []}
         onClose={() => setInfoVisible(false)}
       />
     </SafeAreaView>

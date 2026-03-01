@@ -302,6 +302,7 @@ export default function ChannelConversationScreen() {
       {/* Info sheet */}
       <ChannelInfoSheet
         visible={infoVisible}
+        channelId={channelId ?? ''}
         title={topic ?? 'Channel'}
         subtitle={subtitle}
         kind={isSpaceChannel ? 'space' : 'channel'}

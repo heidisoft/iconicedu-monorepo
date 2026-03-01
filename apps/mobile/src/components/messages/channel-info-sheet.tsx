@@ -20,8 +20,6 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
 import { supabase } from '@/lib/supabase/client';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -36,8 +34,6 @@ import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 import type {
   MessageVM,
-  ImageMessageVM,
-  FileMessageVM,
   TextMessageVM,
   UserProfileVM,
 } from '@iconicedu/shared-types';
@@ -86,41 +82,6 @@ type FileItem = {
   kind: 'image' | 'file';
 };
 
-function extractFiles(messages: MessageVM[]): FileItem[] {
-  const items: FileItem[] = [];
-  for (const msg of messages) {
-    if (msg.core.type === 'image') {
-      const m = msg as ImageMessageVM;
-      const allAttachments = m.attachments ?? [m.attachment];
-      for (const att of allAttachments) {
-        items.push({
-          id: `${msg.ids.id}-${att.name}`,
-          name: att.name,
-          url: att.url,
-          storagePath: att.storagePath,
-          kind: 'image',
-          createdAt: msg.core.createdAt,
-        });
-      }
-    } else if (msg.core.type === 'file') {
-      const m = msg as FileMessageVM;
-      const allAttachments = m.attachments ?? [m.attachment];
-      for (const att of allAttachments) {
-        items.push({
-          id: `${msg.ids.id}-${att.name}`,
-          name: att.name,
-          url: att.url,
-          storagePath: att.storagePath,
-          mimeType: att.mimeType,
-          size: att.size,
-          kind: 'file',
-          createdAt: msg.core.createdAt,
-        });
-      }
-    }
-  }
-  return items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-}
 
 function formatFileSize(bytes?: number): string {
   if (!bytes) return '';
@@ -143,7 +104,7 @@ function getMessagePreview(msg: MessageVM): string {
   switch (msg.core.type) {
     case 'text': return (msg as TextMessageVM).content.text.slice(0, 120);
     case 'image': return '📷 Photo';
-    case 'file': return `📎 ${(msg as FileMessageVM).attachment.name}`;
+    case 'file': return `📎 ${(msg as unknown as { attachment: { name: string } }).attachment.name}`;
     case 'audio-recording': return '🎤 Voice message';
     default: return 'Message';
   }
@@ -189,6 +150,7 @@ type ChannelTab = 'files' | 'saved' | 'members';
 
 export type ChannelInfoSheetProps = {
   visible: boolean;
+  channelId?: string;
   title: string;
   subtitle?: string | null;
   kind: 'dm' | 'channel' | 'space';
@@ -236,22 +198,9 @@ function FileItemRow({ item, colors, s }: { item: FileItem; colors: AppColors; s
         if (!error && data?.signedUrl) openUrl = data.signedUrl;
       }
 
-      if (item.kind === 'image') {
-        // Images render fine in the in-app browser
-        await WebBrowser.openBrowserAsync(openUrl, {
-          presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
-        });
-      } else {
-        // Binary files (PDF, DOCX, etc.) must be downloaded then opened
-        // with the native file viewer via expo-sharing
-        const safeName = item.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-        const localPath = `${FileSystem.cacheDirectory}iconicedu_${Date.now()}_${safeName}`;
-        const { uri } = await FileSystem.downloadAsync(openUrl, localPath);
-        await Sharing.shareAsync(uri, {
-          mimeType: item.mimeType ?? 'application/octet-stream',
-          dialogTitle: item.name,
-        });
-      }
+      await WebBrowser.openBrowserAsync(openUrl, {
+        presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
+      });
     } catch {
       await Linking.openURL(item.url).catch(() => null);
     } finally {
@@ -289,6 +238,7 @@ function FileItemRow({ item, colors, s }: { item: FileItem; colors: AppColors; s
 type TabContentProps = {
   activeTab: ChannelTab;
   fileItems: FileItem[];
+  filesLoading: boolean;
   savedItems: Array<{ id: string; senderName: string; preview: string; createdAt: string }>;
   memberItems: Array<{ id: string; name: string; seed: string }>;
   colors: AppColors;
@@ -300,6 +250,7 @@ type TabContentProps = {
 function TabContent({
   activeTab,
   fileItems,
+  filesLoading,
   savedItems,
   memberItems,
   colors,
@@ -308,12 +259,19 @@ function TabContent({
   isFullScreen,
 }: TabContentProps) {
   if (activeTab === 'files') {
+    if (filesLoading) {
+      return (
+        <View style={s.emptyState}>
+          <ActivityIndicator size="large" color={colors.teal} />
+        </View>
+      );
+    }
     if (fileItems.length === 0) {
       return (
         <View style={s.emptyState}>
           <FileText size={44} color={colors.textMuted} style={{ opacity: 0.4 }} />
           <Text style={s.emptyTitle}>No files yet</Text>
-          <Text style={s.emptySubtitle}>Shared photos, files, and voice messages will appear here</Text>
+          <Text style={s.emptySubtitle}>Shared photos and files will appear here</Text>
         </View>
       );
     }
@@ -716,6 +674,7 @@ function makeStyles(C: AppColors) {
 
 export function ChannelInfoSheet({
   visible,
+  channelId,
   title,
   subtitle,
   kind,
@@ -744,8 +703,74 @@ export function ChannelInfoSheet({
   const seed = avatarSeed ?? title;
   const typeLabel = isDm ? 'Direct Message' : kind === 'space' ? 'Learning Space' : 'Channel';
 
-  // Derived data for tabs
-  const fileItems = useMemo(() => extractFiles(messages), [messages]);
+  // ── Files: fetch directly from channel_files + channel_media tables ─────────
+  // Messages are paginated (last ~40), so we can't extract files from them reliably.
+  // The url column in these tables stores the storage path, not a public URL.
+  const [fileItems, setFileItems] = useState<FileItem[]>([]);
+  const [filesLoading, setFilesLoading] = useState(false);
+
+  useEffect(() => {
+    if (!visible || !channelId) return;
+    setFileItems([]);
+    setFilesLoading(true);
+
+    (async () => {
+      try {
+        const [filesResult, mediaResult] = await Promise.all([
+          supabase
+            .from('channel_files')
+            .select('id, url, name, mime_type, size, created_at')
+            .eq('channel_id', channelId)
+            .is('deleted_at', null)
+            .not('mime_type', 'like', 'audio/%')
+            .order('created_at', { ascending: false })
+            .limit(100),
+          supabase
+            .from('channel_media')
+            .select('id, url, name, created_at')
+            .eq('channel_id', channelId)
+            .is('deleted_at', null)
+            .order('created_at', { ascending: false })
+            .limit(100),
+        ]);
+
+        const items: FileItem[] = [];
+
+        for (const f of (filesResult.data ?? [])) {
+          items.push({
+            id: String(f.id),
+            name: String(f.name ?? 'file'),
+            url: String(f.url),
+            storagePath: String(f.url), // url IS the storage path in this table
+            mimeType: f.mime_type ? String(f.mime_type) : undefined,
+            size: f.size ? Number(f.size) : undefined,
+            createdAt: String(f.created_at),
+            kind: 'file',
+          });
+        }
+
+        for (const m of (mediaResult.data ?? [])) {
+          items.push({
+            id: String(m.id),
+            name: String(m.name ?? 'image'),
+            url: String(m.url),
+            storagePath: String(m.url), // url IS the storage path in this table
+            createdAt: String(m.created_at),
+            kind: 'image',
+          });
+        }
+
+        items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        setFileItems(items);
+      } catch {
+        // silently fail — empty files tab
+      } finally {
+        setFilesLoading(false);
+      }
+    })();
+  }, [visible, channelId]);
+
+  // Derived data for saved/members tabs (from messages prop)
   const savedItems = useMemo(() => extractSaved(messages), [messages]);
   const memberItems = useMemo(() => extractMembers(messages, members), [messages, members]);
 
@@ -1020,6 +1045,7 @@ export function ChannelInfoSheet({
               <TabContent
                 activeTab={activeTab}
                 fileItems={fileItems}
+                filesLoading={filesLoading}
                 savedItems={savedItems}
                 memberItems={memberItems}
                 colors={colors}
