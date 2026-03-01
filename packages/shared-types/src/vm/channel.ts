@@ -78,6 +78,7 @@ export interface ChannelMediaItemVM {
   type: ChannelMediaType;
 
   url: string;
+  storagePath?: string;
   name?: string | null;
 
   width?: number | null;

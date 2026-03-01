@@ -35,6 +35,7 @@ import {
   markDirectMessageChannelRead,
   touchDirectMessageChannelOrder,
 } from '@iconicedu/web/lib/sidebar/direct-message-unread';
+import { shouldAttemptDirectMessageSync } from '@iconicedu/web/lib/sidebar/direct-message-sync';
 import {
   applyIncomingLearningSpaceUnread,
   markLearningSpaceChannelRead,
@@ -145,6 +146,7 @@ export function SidebarShell({
   const directMessageIdsRef = React.useRef(
     new Set(data.collections.directMessages.map((dm) => dm.ids.id)),
   );
+  const excludedDirectMessageSyncIdsRef = React.useRef<Set<string>>(new Set());
   const [onboardingStatus, setOnboardingStatus] = React.useState<UserOnboardingStatusVM | null>(
     initialOnboardingStatus ?? null,
   );
@@ -158,6 +160,17 @@ export function SidebarShell({
       sidebarData.collections.directMessages.map((dm) => dm.ids.id),
     );
   }, [sidebarData.collections.directMessages]);
+
+  React.useEffect(() => {
+    const excludedChannelIds = new Set<string>();
+    sidebarData.collections.learningSpaces.forEach((space) => {
+      excludedChannelIds.add(space.channels.primaryChannel.ids.id);
+      (space.channels.relatedChannels ?? []).forEach((channel) => {
+        excludedChannelIds.add(channel.ids.id);
+      });
+    });
+    excludedDirectMessageSyncIdsRef.current = excludedChannelIds;
+  }, [sidebarData.collections.learningSpaces]);
 
   React.useEffect(() => {
     setOnboardingStatus(initialOnboardingStatus ?? null);
@@ -459,6 +472,15 @@ export function SidebarShell({
       senderProfileId?: string | null,
       attempt = 0,
     ) => {
+      if (
+        !shouldAttemptDirectMessageSync(
+          channelId,
+          directMessageIdsRef.current,
+          excludedDirectMessageSyncIdsRef.current,
+        )
+      ) {
+        return;
+      }
       if (pendingChannelFetches.has(channelId)) {
         return;
       }
@@ -475,6 +497,7 @@ export function SidebarShell({
         }
 
         if (nextChannel.basics.kind !== 'dm' && nextChannel.basics.kind !== 'group_dm') {
+          excludedDirectMessageSyncIdsRef.current.add(channelId);
           return;
         }
 
@@ -531,15 +554,18 @@ export function SidebarShell({
 
       await Promise.all(
         candidateChannelIds
-          .filter((channelId) => !directMessageIdsRef.current.has(channelId))
+          .filter((channelId) =>
+            shouldAttemptDirectMessageSync(
+              channelId,
+              directMessageIdsRef.current,
+              excludedDirectMessageSyncIdsRef.current,
+            ),
+          )
           .map((channelId) => addOrRefreshDmChannel(channelId, null)),
       );
     };
 
     void syncDirectMessageMemberships();
-    const membershipSyncInterval = window.setInterval(() => {
-      void syncDirectMessageMemberships();
-    }, 4000);
 
     channel.on(
       'postgres_changes',
@@ -612,7 +638,6 @@ export function SidebarShell({
     channel.subscribe();
 
     return () => {
-      window.clearInterval(membershipSyncInterval);
       retryTimers.forEach((timer) => {
         window.clearTimeout(timer);
       });

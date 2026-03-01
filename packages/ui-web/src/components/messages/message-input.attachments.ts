@@ -7,6 +7,8 @@ export const MESSAGE_INPUT_FILE_ACCEPT =
 export const MESSAGE_INPUT_IMAGE_ACCEPT = 'image/*';
 
 export const SHORT_AUDIO_RECORDING_MAX_MS = 60_000;
+const IMAGE_THUMBNAIL_MAX_DIMENSION = 480;
+const IMAGE_THUMBNAIL_QUALITY = 0.72;
 
 export function getComposerAttachmentKind(file: File): ComposerAttachmentKind {
   if (file.type.startsWith('image/')) {
@@ -138,4 +140,67 @@ export async function resolveAudioDurationSeconds(
   } finally {
     URL.revokeObjectURL(objectUrl);
   }
+}
+
+export async function createImageThumbnailFile(file: File): Promise<File | null> {
+  if (
+    typeof window === 'undefined' ||
+    typeof document === 'undefined' ||
+    typeof URL === 'undefined' ||
+    !file.type.startsWith('image/')
+  ) {
+    return null;
+  }
+
+  return new Promise<File | null>((resolve) => {
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    image.onload = () => {
+      const maxSide = Math.max(image.width, image.height);
+      const scale =
+        maxSide > IMAGE_THUMBNAIL_MAX_DIMENSION
+          ? IMAGE_THUMBNAIL_MAX_DIMENSION / maxSide
+          : 1;
+      const width = Math.max(1, Math.round(image.width * scale));
+      const height = Math.max(1, Math.round(image.height * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext('2d');
+
+      if (!context) {
+        URL.revokeObjectURL(objectUrl);
+        resolve(null);
+        return;
+      }
+
+      context.drawImage(image, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => {
+          URL.revokeObjectURL(objectUrl);
+          if (!blob) {
+            resolve(null);
+            return;
+          }
+
+          const fallbackBaseName = file.name.replace(/\.[^/.]+$/, '') || 'thumbnail';
+          resolve(
+            new File([blob], `${fallbackBaseName}.jpg`, {
+              type: 'image/jpeg',
+            }),
+          );
+        },
+        'image/jpeg',
+        IMAGE_THUMBNAIL_QUALITY,
+      );
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(null);
+    };
+
+    image.src = objectUrl;
+  });
 }

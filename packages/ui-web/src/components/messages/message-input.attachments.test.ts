@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   buildRecordedAudioFileName,
+  createImageThumbnailFile,
   formatComposerAttachmentSize,
   formatRecordingDuration,
   getDroppedAttachmentFiles,
@@ -154,5 +155,11 @@ describe('message-input attachment helpers', () => {
     globalThis.Audio = originalAudio;
     URL.createObjectURL = originalCreateObjectUrl;
     URL.revokeObjectURL = originalRevokeObjectUrl;
+  });
+
+  it('returns null when image thumbnail generation is unavailable', async () => {
+    await expect(
+      createImageThumbnailFile(new File(['doc'], 'brief.pdf', { type: 'application/pdf' })),
+    ).resolves.toBeNull();
   });
 });

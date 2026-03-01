@@ -54,9 +54,11 @@ export type MessageSendFileInput = {
   senderProfileId: string;
   name: string;
   storagePath: string;
+  thumbnailUrl?: string;
   size?: number;
   mimeType?: string;
   content?: string;
+  durationSeconds?: number;
   threadParentId?: string | null;
   threadId?: string | null;
 };
@@ -68,6 +70,7 @@ export type MessageSendFilesInput = {
   assets: Array<{
     name: string;
     storagePath: string;
+    thumbnailUrl?: string;
     size?: number;
     mimeType?: string;
   }>;

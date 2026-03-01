@@ -30,7 +30,6 @@ import {
   getMessageReactionCountsByMessageIds,
   getMessageSavesByMessageIds,
 } from '@iconicedu/web/lib/messages/queries/messages.query';
-import { createSignedChannelFileUrl } from '@iconicedu/web/lib/messages/queries/file-url.query';
 import { buildUserProfileById } from '@iconicedu/web/lib/profile/builders/user-profile.builder';
 import { mapMessageRowToVM } from '@iconicedu/web/lib/messages/mappers/message.mapper';
 import { buildThreadById } from '@iconicedu/web/lib/messages/builders/thread.builder';
@@ -230,60 +229,40 @@ async function loadPayloadsByMessageIds(
   ];
 
   await Promise.all(loaders);
-  await Promise.all(
-    rows
-      .filter((row) =>
-        row.type === 'file' || row.type === 'image' || row.type === 'audio-recording',
-      )
-      .map(async (row) => {
-        const payload = payloadMap.get(row.id);
-        if (!payload || typeof payload.url !== 'string') {
-          return;
-        }
-        let signedUrl = '';
-        try {
-          signedUrl = await createSignedChannelFileUrl(supabase, payload.url);
-        } catch {
-          signedUrl = '';
-        }
-        const signedAttachments = Array.isArray(payload.attachments)
-          ? await Promise.all(
-              payload.attachments.map(async (attachment) => {
-                if (
-                  !attachment ||
-                  typeof attachment !== 'object' ||
-                  typeof attachment.url !== 'string'
-                ) {
-                  return attachment;
-                }
-                let signedAttachmentUrl = '';
-                try {
-                  signedAttachmentUrl = await createSignedChannelFileUrl(
-                    supabase,
-                    attachment.url,
-                  );
-                } catch {
-                  signedAttachmentUrl = '';
-                }
-                return {
-                  ...attachment,
-                  storagePath:
-                    typeof attachment.storagePath === 'string'
-                      ? attachment.storagePath
-                      : attachment.url,
-                  url: signedAttachmentUrl,
-                };
-              }),
-            )
-          : undefined;
-        payloadMap.set(row.id, {
-          ...payload,
-          storagePath: typeof payload.storagePath === 'string' ? payload.storagePath : payload.url,
-          url: signedUrl,
-          ...(signedAttachments ? { attachments: signedAttachments } : {}),
-        });
-      }),
-  );
+  rows
+    .filter((row) => row.type === 'file' || row.type === 'image' || row.type === 'audio-recording')
+    .forEach((row) => {
+      const payload = payloadMap.get(row.id);
+      if (!payload || typeof payload.url !== 'string') {
+        return;
+      }
+
+      const normalizedAttachments = Array.isArray(payload.attachments)
+        ? payload.attachments.map((attachment) => {
+            if (
+              !attachment ||
+              typeof attachment !== 'object' ||
+              typeof attachment.url !== 'string'
+            ) {
+              return attachment;
+            }
+
+            return {
+              ...attachment,
+              storagePath:
+                typeof attachment.storagePath === 'string'
+                  ? attachment.storagePath
+                  : attachment.url,
+            };
+          })
+        : undefined;
+
+      payloadMap.set(row.id, {
+        ...payload,
+        storagePath: typeof payload.storagePath === 'string' ? payload.storagePath : payload.url,
+        ...(normalizedAttachments ? { attachments: normalizedAttachments } : {}),
+      });
+    });
 
   return payloadMap;
 

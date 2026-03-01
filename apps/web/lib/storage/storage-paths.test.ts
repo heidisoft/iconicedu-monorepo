@@ -3,10 +3,12 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   buildAvatarPath,
   buildMessageAssetPath,
+  buildMessageThumbnailPath,
   buildOrgScopedStoragePath,
   buildStorageFileKey,
   getAvatarBucket,
   getChannelFilesBucket,
+  getMessageThumbnailsBucket,
   isValidMessageAssetPath,
   sanitizeStorageFileName,
   STORAGE_BUCKETS,
@@ -72,14 +74,26 @@ describe('storage-paths', () => {
         fileName: '1700000000000-abcd1234-avatar.jpg',
       }),
     ).toBe('org-1/avatars/profile-1/1700000000000-abcd1234-avatar.jpg');
+
+    expect(
+      buildMessageThumbnailPath({
+        orgId: 'org-1',
+        channelId: 'channel-1',
+        profileId: 'profile-1',
+        fileName: '1700000000000-abcd1234-thumb.jpg',
+      }),
+    ).toBe('org-1/channel-1/thumbnails/profile-1/1700000000000-abcd1234-thumb.jpg');
   });
 
   it('exports canonical storage bucket names and path segments', () => {
     expect(STORAGE_BUCKETS.channelFiles).toBe('channel-files');
+    expect(STORAGE_BUCKETS.publicMessageThumbnails).toBe('public-message-thumbnails');
     expect(STORAGE_BUCKETS.publicAvatars).toBe('public-avatars');
     expect(getChannelFilesBucket()).toBe('channel-files');
+    expect(getMessageThumbnailsBucket()).toBe('public-message-thumbnails');
     expect(getAvatarBucket()).toBe('public-avatars');
     expect(STORAGE_PATH_SEGMENTS.images).toBe('images');
+    expect(STORAGE_PATH_SEGMENTS.thumbnails).toBe('thumbnails');
     expect(STORAGE_PATH_SEGMENTS.audio).toBe('audio');
     expect(STORAGE_PATH_SEGMENTS.avatars).toBe('avatars');
   });

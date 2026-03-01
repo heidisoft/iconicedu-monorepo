@@ -361,6 +361,7 @@ describe('sendTextMessageAction', () => {
       senderProfileId: 'profile-1',
       name: 'photo.png',
       storagePath: 'org-1/channel-1/images/profile-1/photo.png',
+      thumbnailUrl: 'https://public.example.com/thumbs/photo.jpg',
       size: 99,
       mimeType: 'image/png',
       content: 'Look at this',
@@ -377,6 +378,7 @@ describe('sendTextMessageAction', () => {
         payload: expect.objectContaining({
           url: 'org-1/channel-1/images/profile-1/photo.png',
           storagePath: 'org-1/channel-1/images/profile-1/photo.png',
+          thumbnailUrl: 'https://public.example.com/thumbs/photo.jpg',
           name: 'photo.png',
           mimeType: 'image/png',
           text: 'Look at this',
@@ -656,12 +658,14 @@ describe('sendTextMessageAction', () => {
         {
           name: 'photo-1.png',
           storagePath: 'org-1/channel-1/images/profile-1/photo-1.png',
+          thumbnailUrl: 'https://public.example.com/thumbs/photo-1.jpg',
           size: 21,
           mimeType: 'image/png',
         },
         {
           name: 'photo-2.png',
           storagePath: 'org-1/channel-1/images/profile-1/photo-2.png',
+          thumbnailUrl: 'https://public.example.com/thumbs/photo-2.jpg',
           size: 22,
           mimeType: 'image/png',
         },
@@ -675,8 +679,14 @@ describe('sendTextMessageAction', () => {
         payload: expect.objectContaining({
           name: 'photo-1.png',
           attachments: expect.arrayContaining([
-            expect.objectContaining({ name: 'photo-1.png' }),
-            expect.objectContaining({ name: 'photo-2.png' }),
+            expect.objectContaining({
+              name: 'photo-1.png',
+              thumbnailUrl: 'https://public.example.com/thumbs/photo-1.jpg',
+            }),
+            expect.objectContaining({
+              name: 'photo-2.png',
+              thumbnailUrl: 'https://public.example.com/thumbs/photo-2.jpg',
+            }),
           ]),
         }),
       }),

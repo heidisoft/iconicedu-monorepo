@@ -5,7 +5,7 @@ import { Download } from 'lucide-react';
 import type { ImageMessageVM as ImageMessageType } from '@iconicedu/shared-types';
 import { Button } from '../../../ui/button';
 import { MessageBase, type MessageBaseProps } from '../message-base';
-import { buildFileDownloadHref } from '../file-download.utils';
+import { buildFileDownloadHref, buildImageRenderHref } from '../file-download.utils';
 
 interface ImageMessageProps extends Omit<MessageBaseProps, 'message' | 'children'> {
   message: ImageMessageType;
@@ -19,6 +19,15 @@ export function getImageDownloadHref(message: Pick<ImageMessageType, 'attachment
   return buildFileDownloadHref({
     url: message.attachment.url,
     storagePath: message.attachment.storagePath,
+  });
+}
+
+export function getImageRenderSrc(message: Pick<ImageMessageType, 'attachment'>) {
+  return buildImageRenderHref({
+    url: message.attachment.url,
+    storagePath: message.attachment.storagePath,
+    thumbnailUrl:
+      'thumbnailUrl' in message.attachment ? message.attachment.thumbnailUrl : undefined,
   });
 }
 
@@ -51,7 +60,13 @@ export const ImageMessage = memo(function ImageMessage(props: ImageMessageProps)
             }
           >
             <img
-              src={attachment.url || '/placeholder.svg'}
+              src={
+                buildImageRenderHref({
+                  url: attachment.url,
+                  storagePath: attachment.storagePath,
+                  thumbnailUrl: 'thumbnailUrl' in attachment ? attachment.thumbnailUrl : undefined,
+                }) || '/placeholder.svg'
+              }
               alt={attachment.name}
               className={isGallery ? 'h-48 w-full object-cover' : 'h-auto w-full'}
             />

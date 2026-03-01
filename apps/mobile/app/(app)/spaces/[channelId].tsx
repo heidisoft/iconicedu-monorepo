@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { MessageCircle, CalendarDays } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAccount } from '@/hooks/use-account';
@@ -71,6 +72,7 @@ export default function SpaceDetailScreen() {
       <View style={[s.tabBar, { borderBottomColor: colors.border }]}>
         {(['messages', 'sessions'] as SpaceTab[]).map((tab) => {
           const isActive = activeTab === tab;
+          const color = isActive ? colors.teal : colors.textMuted;
           return (
             <TouchableOpacity
               key={tab}
@@ -78,7 +80,11 @@ export default function SpaceDetailScreen() {
               onPress={() => setActiveTab(tab)}
               activeOpacity={0.7}
             >
-              <Text style={[s.tabLabel, { color: isActive ? colors.teal : colors.textMuted }]}>
+              {tab === 'messages'
+                ? <MessageCircle size={16} color={color} />
+                : <CalendarDays size={16} color={color} />
+              }
+              <Text style={[s.tabLabel, { color }]}>
                 {tab === 'messages' ? 'Messages' : 'Sessions'}
               </Text>
             </TouchableOpacity>
@@ -116,9 +122,6 @@ export default function SpaceDetailScreen() {
         subtitle={subtitle}
         kind="space"
         iconEmoji={iconEmoji}
-        schedules={schedules}
-        isLoadingSessions={isLoadingSessions}
-        sessionsError={sessionsError}
         onClose={() => setInfoVisible(false)}
       />
     </SafeAreaView>
@@ -136,12 +139,15 @@ const makeStyles = (colors: { border: string; teal: string; textMuted: string })
     tabItem: {
       flex: 1,
       alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'row',
+      gap: 6,
       paddingVertical: 11,
       borderBottomWidth: 2,
       borderBottomColor: 'transparent',
     },
     tabLabel: {
-      fontSize: 14,
+      fontSize: 13,
       fontWeight: '600',
     },
   });

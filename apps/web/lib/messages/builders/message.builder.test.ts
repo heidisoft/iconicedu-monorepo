@@ -10,7 +10,6 @@ const getMessageFilesByMessageIds = vi.fn(async () => ({ data: [] }));
 const getMessageImagesByMessageIds = vi.fn(async () => ({ data: [] }));
 const getMessageAudioRecordingsByMessageIds = vi.fn(async () => ({ data: [] }));
 const getMessageSavesByMessageIds = vi.fn(async () => ({ data: [] }));
-const createSignedChannelFileUrl = vi.fn(async (_supabase: unknown, path: string) => `signed:${path}`);
 
 vi.mock('@iconicedu/web/lib/messages/queries/messages.query', () => ({
   getMessageById: (...args: unknown[]) => getMessageById(...args),
@@ -35,10 +34,6 @@ vi.mock('@iconicedu/web/lib/messages/queries/messages.query', () => ({
   getMessageSavesByMessageIds: (...args: unknown[]) => getMessageSavesByMessageIds(...args),
 }));
 
-vi.mock('@iconicedu/web/lib/messages/queries/file-url.query', () => ({
-  createSignedChannelFileUrl: (...args: unknown[]) => createSignedChannelFileUrl(...args),
-}));
-
 vi.mock('@iconicedu/web/lib/profile/builders/user-profile.builder', () => ({
   buildUserProfileById: (...args: unknown[]) => buildUserProfileById(...args),
 }));
@@ -61,7 +56,6 @@ describe('buildMessageById', () => {
     getMessageImagesByMessageIds.mockResolvedValue({ data: [] });
     getMessageAudioRecordingsByMessageIds.mockResolvedValue({ data: [] });
     getMessageSavesByMessageIds.mockResolvedValue({ data: [] });
-    createSignedChannelFileUrl.mockClear();
   });
 
   it('returns null when message does not exist', async () => {
@@ -146,7 +140,7 @@ describe('buildMessageById', () => {
     });
   });
 
-  it('signs private image and audio payload urls before mapping', async () => {
+  it('keeps private image and audio payload urls stable while adding storage paths', async () => {
     const imageRow = {
       id: 'message-image',
       org_id: 'org-1',
@@ -175,7 +169,7 @@ describe('buildMessageById', () => {
       }),
       expect.objectContaining({
         payload: expect.objectContaining({
-          url: 'signed:org-1/channel-1/profile-1/image.png',
+          url: 'org-1/channel-1/profile-1/image.png',
           storagePath: 'org-1/channel-1/profile-1/image.png',
         }),
       }),
@@ -209,14 +203,14 @@ describe('buildMessageById', () => {
       }),
       expect.objectContaining({
         payload: expect.objectContaining({
-          url: 'signed:org-1/channel-1/profile-1/audio.m4a',
+          url: 'org-1/channel-1/profile-1/audio.m4a',
           storagePath: 'org-1/channel-1/profile-1/audio.m4a',
         }),
       }),
     );
   });
 
-  it('signs grouped image attachment urls before mapping', async () => {
+  it('normalizes grouped image attachment storage paths before mapping', async () => {
     const row = {
       id: 'message-gallery',
       org_id: 'org-1',
@@ -262,11 +256,11 @@ describe('buildMessageById', () => {
         payload: expect.objectContaining({
           attachments: [
             expect.objectContaining({
-              url: 'signed:org-1/channel-1/profile-1/image-1.png',
+              url: 'org-1/channel-1/profile-1/image-1.png',
               storagePath: 'org-1/channel-1/profile-1/image-1.png',
             }),
             expect.objectContaining({
-              url: 'signed:org-1/channel-1/profile-1/image-2.png',
+              url: 'org-1/channel-1/profile-1/image-2.png',
               storagePath: 'org-1/channel-1/profile-1/image-2.png',
             }),
           ],

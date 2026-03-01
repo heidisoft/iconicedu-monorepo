@@ -1,11 +1,13 @@
 export const STORAGE_BUCKETS = {
   channelFiles: 'channel-files',
+  publicMessageThumbnails: 'public-message-thumbnails',
   publicAvatars: 'public-avatars',
 } as const;
 
 export const STORAGE_PATH_SEGMENTS = {
   files: 'files',
   images: 'images',
+  thumbnails: 'thumbnails',
   audio: 'audio',
   avatars: 'avatars',
 } as const;
@@ -15,6 +17,10 @@ export type StorageAssetKind =
 
 export function getChannelFilesBucket() {
   return STORAGE_BUCKETS.channelFiles;
+}
+
+export function getMessageThumbnailsBucket() {
+  return STORAGE_BUCKETS.publicMessageThumbnails;
 }
 
 export function getAvatarBucket() {
@@ -82,6 +88,19 @@ export function buildAvatarPath(input: {
   return buildOrgScopedStoragePath({
     orgId: input.orgId,
     segments: [STORAGE_PATH_SEGMENTS.avatars, input.profileId],
+    fileName: input.fileName,
+  });
+}
+
+export function buildMessageThumbnailPath(input: {
+  orgId: string;
+  channelId: string;
+  profileId: string;
+  fileName: string;
+}) {
+  return buildOrgScopedStoragePath({
+    orgId: input.orgId,
+    segments: [input.channelId, STORAGE_PATH_SEGMENTS.thumbnails, input.profileId],
     fileName: input.fileName,
   });
 }

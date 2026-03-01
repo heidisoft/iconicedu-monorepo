@@ -19,22 +19,16 @@ import {
   Pressable,
   ActivityIndicator,
 } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+import { supabase } from '@/lib/supabase/client';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   FileText,
-  CalendarDays,
   Bookmark,
   Users,
-  ChevronRight,
   Image as ImageIcon,
-  Mic,
   Download,
   File,
-  ChevronDown,
-  Video,
-  Clock3,
-  CalendarPlus,
-  CheckCircle2,
 } from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
@@ -45,8 +39,9 @@ import type {
   AudioRecordingMessageVM,
   TextMessageVM,
   UserProfileVM,
-  ClassScheduleVM,
 } from '@iconicedu/shared-types';
+
+const CHANNEL_FILES_BUCKET = 'channel-files';
 
 // ─── Screen dimensions ─────────────────────────────────────────────────────────
 // Use 'screen' (not 'window') so the full display height is captured on Android,
@@ -83,11 +78,11 @@ type FileItem = {
   id: string;
   name: string;
   url: string;
+  storagePath?: string;
   mimeType?: string;
   size?: number;
-  durationSeconds?: number;
   createdAt: string;
-  kind: 'image' | 'file' | 'audio';
+  kind: 'image' | 'file';
 };
 
 function extractFiles(messages: MessageVM[]): FileItem[] {
@@ -101,6 +96,7 @@ function extractFiles(messages: MessageVM[]): FileItem[] {
           id: `${msg.ids.id}-${att.name}`,
           name: att.name,
           url: att.url,
+          storagePath: att.storagePath,
           kind: 'image',
           createdAt: msg.core.createdAt,
         });
@@ -113,24 +109,13 @@ function extractFiles(messages: MessageVM[]): FileItem[] {
           id: `${msg.ids.id}-${att.name}`,
           name: att.name,
           url: att.url,
+          storagePath: att.storagePath,
           mimeType: att.mimeType,
           size: att.size,
           kind: 'file',
           createdAt: msg.core.createdAt,
         });
       }
-    } else if (msg.core.type === 'audio-recording') {
-      const m = msg as AudioRecordingMessageVM;
-      items.push({
-        id: msg.ids.id,
-        name: 'Voice message',
-        url: m.audio.url,
-        mimeType: m.audio.mimeType,
-        size: m.audio.fileSize,
-        durationSeconds: m.audio.durationSeconds,
-        kind: 'audio',
-        createdAt: msg.core.createdAt,
-      });
     }
   }
   return items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -197,344 +182,9 @@ function extractMembers(
   return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
-// ─── Sessions helpers ──────────────────────────────────────────────────────────
-
-type SessionSubTab = 'upcoming' | 'past';
-
-// ── Types matching web ─────────────────────────────────────────────────────────
-
-type ClassSession = {
-  id: string;
-  label: string;
-  time: string;
-  dayName: string;
-  dayNum: string;
-  isToday: boolean;
-  isPast: boolean;
-  status: ClassScheduleVM['status'];
-  meetingLink?: string | null;
-  variant: 'default' | 'exception' | 'override';
-  disabled: boolean;
-  reason?: string | null;
-  originalTime?: string | null;
-  originalDate?: string | null;
-  startAt: string;
-  endAt: string;
-};
-
-type MonthGroup = {
-  monthKey: string;
-  month: string;
-  year: string;
-  totalCount: number;
-  completedCount: number;
-  isCurrentMonth: boolean;
-  sessions: ClassSession[];
-};
-
-// ── Internal display type with uiState ────────────────────────────────────────
-
-type DisplaySchedule = ClassScheduleVM & {
-  uiState?: {
-    kind: 'default' | 'exception' | 'override';
-    disabled?: boolean;
-    reason?: string | null;
-    originalStartAt?: string;
-    originalEndAt?: string;
-  };
-};
-
-// ── Recurring expansion helpers ────────────────────────────────────────────────
-
-const weekdayTokens: Record<number, string> = {
-  0: 'SU', 1: 'MO', 2: 'TU', 3: 'WE', 4: 'TH', 5: 'FR', 6: 'SA',
-};
-
-function startOfDay2(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-}
-
-function addDays2(date: Date, days: number): Date {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
-}
-
-function occurrenceDayKey(iso: string): string {
-  return iso.slice(0, 10);
-}
-
-function expandRecurringSchedules(
-  schedules: ClassScheduleVM[],
-  rangeStart: Date,
-  rangeEnd: Date,
-): DisplaySchedule[] {
-  const expanded: DisplaySchedule[] = [];
-  const rangeStartDay = startOfDay2(rangeStart);
-  const rangeEndDay = startOfDay2(rangeEnd);
-
-  for (const event of schedules) {
-    if (!event.recurrence) {
-      const eventDay = startOfDay2(new Date(event.startAt));
-      if (eventDay >= rangeStartDay && eventDay <= rangeEndDay) {
-        expanded.push({ ...event, uiState: { kind: 'default' } });
-      }
-      continue;
-    }
-
-    const recurrence = event.recurrence;
-    const rule = recurrence.rule;
-    const interval = rule.interval ?? 1;
-    const baseStart = new Date(event.startAt);
-    const baseDate = startOfDay2(baseStart);
-    const durationMs = new Date(event.endAt).getTime() - baseStart.getTime();
-
-    const exceptions = new Set(
-      recurrence.exceptions?.map((e) => e.occurrenceKey) ?? [],
-    );
-    const exceptionsByDay = new Set(
-      recurrence.exceptions?.map((e) => occurrenceDayKey(e.occurrenceKey)) ?? [],
-    );
-    const overrides = new Map(
-      recurrence.overrides?.map((o) => [o.occurrenceKey, o.patch]) ?? [],
-    );
-    const overridesByDay = new Map(
-      recurrence.overrides?.map((o) => [occurrenceDayKey(o.occurrenceKey), o.patch]) ?? [],
-    );
-
-    const byWeekday = rule.byWeekday?.length
-      ? rule.byWeekday
-      : [weekdayTokens[baseDate.getDay()]!];
-
-    // Add exception (skipped) occurrences
-    for (const exc of recurrence.exceptions ?? []) {
-      const excDayKey = occurrenceDayKey(exc.occurrenceKey);
-      if (overrides.has(exc.occurrenceKey) || overridesByDay.has(excDayKey)) continue;
-      const originalStart = new Date(exc.occurrenceKey);
-      const originalEnd = new Date(originalStart.getTime() + durationMs);
-      expanded.push({
-        ...event,
-        ids: { ...event.ids, id: `${event.ids.id}__${exc.occurrenceKey}__exception` },
-        startAt: originalStart.toISOString(),
-        endAt: originalEnd.toISOString(),
-        status: 'cancelled',
-        meetingLink: null,
-        recurrence: undefined,
-        uiState: {
-          kind: 'exception',
-          disabled: true,
-          reason: exc.reason ?? null,
-          originalStartAt: originalStart.toISOString(),
-          originalEndAt: originalEnd.toISOString(),
-        },
-      });
-    }
-
-    // Iterate over date range to generate occurrences
-    const until = rule.until ? startOfDay2(new Date(rule.until)) : null;
-    let occurrenceCount = 0;
-
-    for (
-      let current = new Date(baseDate);
-      current <= rangeEndDay;
-      current = addDays2(current, 1)
-    ) {
-      if (current < rangeStartDay) continue;
-      if (until && current > until) break;
-
-      const diffDays = (current.getTime() - baseDate.getTime()) / 86400000;
-      let matches = false;
-      if (rule.frequency === 'daily') {
-        matches = diffDays % interval === 0;
-      } else if (rule.frequency === 'weekly') {
-        const weeksDiff = Math.floor(diffDays / 7);
-        matches =
-          weeksDiff % interval === 0 &&
-          byWeekday.includes(weekdayTokens[current.getDay()]!);
-      }
-
-      const occurrenceStart = new Date(current);
-      occurrenceStart.setHours(
-        baseStart.getHours(),
-        baseStart.getMinutes(),
-        baseStart.getSeconds(),
-        baseStart.getMilliseconds(),
-      );
-      const occurrenceKey = occurrenceStart.toISOString();
-      const occDayKey = occurrenceDayKey(occurrenceKey);
-      const override = overrides.get(occurrenceKey) ?? overridesByDay.get(occDayKey);
-      const hasOverride = Boolean(override);
-
-      if (!matches && !hasOverride) continue;
-      if ((exceptions.has(occurrenceKey) || exceptionsByDay.has(occDayKey)) && !hasOverride) continue;
-      if (rule.count && occurrenceCount >= rule.count) break;
-
-      const occurrenceEnd = new Date(occurrenceStart.getTime() + durationMs);
-      const effectiveStart = override?.startAt ? new Date(override.startAt) : occurrenceStart;
-      const effectiveEnd = override?.endAt ? new Date(override.endAt) : occurrenceEnd;
-
-      expanded.push({
-        ...event,
-        ...override,
-        ids: { ...event.ids, id: `${event.ids.id}__${occurrenceKey}` },
-        startAt: effectiveStart.toISOString(),
-        endAt: effectiveEnd.toISOString(),
-        status: override?.status ?? event.status,
-        recurrence: undefined,
-        uiState: override
-          ? {
-              kind: 'override',
-              originalStartAt: occurrenceKey,
-              originalEndAt: occurrenceEnd.toISOString(),
-            }
-          : { kind: 'default' },
-      });
-
-      occurrenceCount++;
-    }
-  }
-
-  // Deduplicate: higher priority wins per base-id + day
-  const deduped = new Map<string, DisplaySchedule>();
-  for (const s of expanded) {
-    const baseId = s.ids.id.includes('__')
-      ? s.ids.id.slice(0, s.ids.id.indexOf('__'))
-      : s.ids.id;
-    const key = `${baseId}|${s.startAt.slice(0, 10)}`;
-    const existing = deduped.get(key);
-    const priority = (ds: DisplaySchedule) =>
-      ds.uiState?.kind === 'exception' ? 3 : ds.uiState?.kind === 'override' ? 2 : 1;
-    if (!existing || priority(s) > priority(existing)) {
-      deduped.set(key, s);
-    }
-  }
-
-  return Array.from(deduped.values());
-}
-
-// ── Format helpers (matching web) ─────────────────────────────────────────────
-
-function formatScheduleWeekTitle(startAt: string): string {
-  const start = new Date(startAt);
-  const weekNumber = Math.min(5, Math.floor((start.getDate() - 1) / 7) + 1);
-  const month = start.toLocaleDateString('en-US', { month: 'short' });
-  return `${month} · Week ${weekNumber}`;
-}
-
-function formatScheduleTimeBadge(startAt: string): string {
-  return new Date(startAt).toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
-}
-
-function formatOriginalTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
-}
-
-function formatOriginalDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
-function createGoogleCalendarUrl(session: ClassSession): string {
-  const fmt = (iso: string) =>
-    new Date(iso).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
-  const params = new URLSearchParams({
-    action: 'TEMPLATE',
-    text: session.label,
-    dates: `${fmt(session.startAt)}/${fmt(session.endAt)}`,
-  });
-  return `https://calendar.google.com/calendar/render?${params.toString()}`;
-}
-
-// ── splitAndGroupSessions ─────────────────────────────────────────────────────
-
-function splitAndGroupSessions(schedules: ClassScheduleVM[]): {
-  upcoming: MonthGroup[];
-  past: MonthGroup[];
-} {
-  const now = new Date();
-  const nowMs = now.getTime();
-  const nowDay = startOfDay2(now).getTime();
-  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-
-  const rangeStart = new Date(now.getFullYear() - 1, now.getMonth(), 1);
-  const rangeEnd = new Date(now.getFullYear() + 2, now.getMonth(), 0);
-
-  const expanded = expandRecurringSchedules(schedules, rangeStart, rangeEnd);
-
-  const upcoming: DisplaySchedule[] = [];
-  const past: DisplaySchedule[] = [];
-
-  for (const s of expanded) {
-    if (new Date(s.startAt).getTime() >= nowMs) upcoming.push(s);
-    else past.push(s);
-  }
-
-  upcoming.sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
-  past.sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime());
-
-  function groupByMonth(displaySchedules: DisplaySchedule[]): MonthGroup[] {
-    const map = new Map<string, DisplaySchedule[]>();
-    for (const s of displaySchedules) {
-      const d = new Date(s.startAt);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(s);
-    }
-    return [...map.entries()].map(([key, list]) => {
-      const [y, m] = key.split('-').map(Number);
-      const monthDate = new Date(y!, m! - 1, 1);
-      const sessions: ClassSession[] = list.map((s) => {
-        const start = new Date(s.startAt);
-        const startDay = startOfDay2(start).getTime();
-        const isPast = start.getTime() < nowMs;
-        return {
-          id: s.ids.id,
-          label: formatScheduleWeekTitle(s.startAt),
-          time: formatScheduleTimeBadge(s.startAt),
-          dayName: start.toLocaleDateString('en-US', { weekday: 'short' }),
-          dayNum: String(start.getDate()),
-          isToday: startDay === nowDay,
-          isPast,
-          status: s.status,
-          meetingLink: s.meetingLink ?? null,
-          variant: s.uiState?.kind ?? 'default',
-          disabled: s.uiState?.disabled ?? false,
-          reason: s.uiState?.reason ?? null,
-          originalTime: s.uiState?.originalStartAt
-            ? formatOriginalTime(s.uiState.originalStartAt)
-            : null,
-          originalDate: s.uiState?.originalStartAt
-            ? formatOriginalDate(s.uiState.originalStartAt)
-            : null,
-          startAt: s.startAt,
-          endAt: s.endAt,
-        };
-      });
-      return {
-        monthKey: key,
-        month: monthDate.toLocaleDateString('en-US', { month: 'long' }),
-        year: String(y),
-        totalCount: sessions.length,
-        completedCount: sessions.filter((s) => s.status === 'completed').length,
-        isCurrentMonth: key === currentMonthKey,
-        sessions,
-      };
-    });
-  }
-
-  return { upcoming: groupByMonth(upcoming), past: groupByMonth(past) };
-}
-
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
-type ChannelTab = 'files' | 'sessions' | 'saved' | 'members';
+type ChannelTab = 'files' | 'saved' | 'members';
 
 export type ChannelInfoSheetProps = {
   visible: boolean;
@@ -547,338 +197,158 @@ export type ChannelInfoSheetProps = {
   description?: string | null;
   members?: Array<{ id: string; name: string; avatarSeed?: string | null }> | null;
   messages?: MessageVM[];
-  schedules?: ClassScheduleVM[];
-  isLoadingSessions?: boolean;
-  sessionsError?: string | null;
   onClose: () => void;
 };
 
 // ─── Tab definitions ───────────────────────────────────────────────────────────
 
 const TABS: Array<{ key: ChannelTab; label: string }> = [
-  { key: 'files',    label: 'Files' },
-  { key: 'sessions', label: 'Sessions' },
-  { key: 'saved',    label: 'Saved' },
-  { key: 'members',  label: 'Members' },
+  { key: 'files',   label: 'Files' },
+  { key: 'saved',   label: 'Saved' },
+  { key: 'members', label: 'Members' },
 ];
 
 // ─── Tab icon renderer ─────────────────────────────────────────────────────────
 
 function TabIcon({ tabKey, color }: { tabKey: ChannelTab; color: string }) {
   const size = 16;
-  if (tabKey === 'files')    return <FileText    size={size} color={color} />;
-  if (tabKey === 'sessions') return <CalendarDays size={size} color={color} />;
-  if (tabKey === 'saved')    return <Bookmark    size={size} color={color} />;
+  if (tabKey === 'files') return <FileText size={size} color={color} />;
+  if (tabKey === 'saved') return <Bookmark size={size} color={color} />;
   return <Users size={size} color={color} />;
 }
 
-// ─── File item row ─────────────────────────────────────────────────────────────
+// ─── File item row (images + documents) ────────────────────────────────────────
 
 function FileItemRow({ item, colors, s }: { item: FileItem; colors: AppColors; s: ReturnType<typeof makeStyles> }) {
+  const [opening, setOpening] = useState(false);
   const isImage = item.kind === 'image';
-  const isAudio = item.kind === 'audio';
 
-  const iconBg = isImage ? colors.tealBg : isAudio ? '#F0E8FF' : colors.card;
-  const iconColor = isImage ? colors.teal : isAudio ? '#9333ea' : colors.text;
+  const handleOpen = useCallback(async () => {
+    if (opening) return;
+    setOpening(true);
+    try {
+      await WebBrowser.openBrowserAsync(item.url, {
+        presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
+      });
+    } catch {
+      await Linking.openURL(item.url).catch(() => null);
+    } finally {
+      setOpening(false);
+    }
+  }, [item.url, opening]);
+
+  const iconBg = isImage ? colors.tealBg : colors.card;
+  const iconColor = isImage ? colors.teal : colors.text;
 
   const meta: string[] = [];
   if (item.mimeType) meta.push(item.mimeType.split('/').pop() ?? item.mimeType);
   if (item.size) meta.push(formatFileSize(item.size));
-  if (item.durationSeconds) meta.push(`${item.durationSeconds}s`);
   meta.push(formatRelativeDate(item.createdAt));
 
   return (
-    <View style={s.fileItem}>
+    <TouchableOpacity style={s.fileItem} onPress={handleOpen} activeOpacity={0.7}>
       <View style={[s.fileIconBox, { backgroundColor: iconBg }]}>
-        {isImage ? (
-          <ImageIcon size={20} color={iconColor} />
-        ) : isAudio ? (
-          <Mic size={20} color={iconColor} />
-        ) : (
-          <File size={20} color={iconColor} />
-        )}
+        {isImage ? <ImageIcon size={20} color={iconColor} /> : <File size={20} color={iconColor} />}
       </View>
       <View style={s.fileInfo}>
         <Text style={s.fileName} numberOfLines={1}>{item.name}</Text>
         <Text style={s.fileMeta} numberOfLines={1}>{meta.filter(Boolean).join(' • ')}</Text>
       </View>
-      <TouchableOpacity
-        style={s.fileDownloadBtn}
-        onPress={() => void Linking.openURL(item.url)}
-        hitSlop={8}
-        activeOpacity={0.7}
-      >
-        <Download size={16} color={colors.textMuted} />
-      </TouchableOpacity>
-    </View>
+      {opening
+        ? <ActivityIndicator size="small" color={colors.textMuted} />
+        : <Download size={16} color={colors.textMuted} />
+      }
+    </TouchableOpacity>
   );
 }
 
-// ─── Session card ──────────────────────────────────────────────────────────────
+// ─── Audio item row (voice messages) ───────────────────────────────────────────
 
-function SessionCard({
-  session,
-  colors,
-  s,
-}: {
-  session: ClassSession;
-  colors: AppColors;
-  s: ReturnType<typeof makeStyles>;
-}) {
-  const isLive = session.isToday && !session.isPast;
-  const { isPast } = session;
-  const isDisabled = session.disabled;
+function AudioItemRow({ item, colors, s }: { item: FileItem; colors: AppColors; s: ReturnType<typeof makeStyles> }) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [positionMs, setPositionMs] = useState(0);
+  const [durationMs, setDurationMs] = useState(0);
+  const soundRef = useRef<Audio.Sound | null>(null);
 
-  const badgeBg = isDisabled
-    ? colors.inputBg
-    : isLive
-      ? colors.teal
-      : isPast
-        ? colors.inputBg
-        : colors.card;
-  const badgeTxt = isLive ? '#fff' : isPast || isDisabled ? colors.textMuted : colors.text;
+  useEffect(() => {
+    return () => {
+      soundRef.current?.unloadAsync().catch(() => null);
+    };
+  }, []);
 
-  const cardExtra = isLive ? s.sessionCardLive : isPast ? s.sessionCardPast : null;
+  const handlePlay = useCallback(async () => {
+    if (soundRef.current) {
+      if (isPlaying) {
+        await soundRef.current.pauseAsync();
+      } else {
+        await soundRef.current.playAsync();
+      }
+      return;
+    }
+    setIsLoading(true);
+    try {
+      await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: item.url },
+        { shouldPlay: true },
+        (status) => {
+          if (!status.isLoaded) return;
+          setIsPlaying(status.isPlaying ?? false);
+          setPositionMs(status.positionMillis ?? 0);
+          if (status.durationMillis) setDurationMs(status.durationMillis);
+          if (status.didJustFinish) {
+            soundRef.current?.setPositionAsync(0).catch(() => null);
+            setPositionMs(0);
+          }
+        },
+      );
+      soundRef.current = sound;
+      setIsPlaying(true);
+    } catch {
+      Alert.alert('Playback error', 'Could not play this voice message.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [item.url, isPlaying]);
 
-  return (
-    <View style={[s.sessionCard, cardExtra]}>
-      {/* Day badge */}
-      <View style={[s.sessionDayBadge, { backgroundColor: badgeBg }]}>
-        {isLive && <Text style={[s.sessionDayExtra, { color: '#fff' }]}>Today</Text>}
-        <Text style={[s.sessionDayName, { color: badgeTxt }]}>{session.dayName}</Text>
-        <Text style={[s.sessionDayNum, { color: badgeTxt }]}>{session.dayNum}</Text>
-      </View>
-
-      {/* Info */}
-      <View style={s.sessionInfo}>
-        <View style={s.sessionTitleRow}>
-          <Text
-            style={[s.sessionLabel, (isDisabled || isPast) && { color: colors.textMuted }]}
-            numberOfLines={1}
-          >
-            {session.label}
-          </Text>
-          {isLive && (
-            <View style={s.liveBadge}>
-              <Text style={s.liveBadgeText}>LIVE</Text>
-            </View>
-          )}
-          {session.variant === 'exception' && (
-            <View style={s.variantBadge}>
-              <Text style={s.variantBadgeText}>Skipped</Text>
-            </View>
-          )}
-          {session.variant === 'override' && (
-            <View style={[s.variantBadge, s.variantBadgeOutline]}>
-              <Text style={s.variantBadgeText}>Changed</Text>
-            </View>
-          )}
-          {isPast && session.variant !== 'exception' && (
-            <View style={s.variantBadge}>
-              <Text style={s.variantBadgeText}>Completed</Text>
-            </View>
-          )}
-        </View>
-
-        <View style={s.sessionTimeRow}>
-          <Clock3 size={11} color={colors.textMuted} />
-          <Text style={s.sessionTimeTxt}>{session.time}</Text>
-        </View>
-
-        {session.variant === 'override' && session.originalTime && (
-          <Text style={s.sessionOriginalTimeTxt}>
-            Was{' '}
-            {session.originalDate ? `${session.originalDate} ` : ''}
-            <Text style={s.sessionOriginalTimeStrike}>{session.originalTime}</Text>
-          </Text>
-        )}
-
-        {session.variant === 'exception' && session.reason && (
-          <Text style={s.sessionReasonTxt}>{session.reason}</Text>
-        )}
-      </View>
-
-      {/* Action buttons — row, matching web */}
-      <View style={s.sessionActions}>
-        {!isPast && !isDisabled ? (
-          <TouchableOpacity
-            style={[s.joinBtn, isLive ? s.joinBtnLive : s.joinBtnUpcoming]}
-            onPress={session.meetingLink ? () => void Linking.openURL(session.meetingLink!) : undefined}
-            disabled={!session.meetingLink}
-            activeOpacity={0.7}
-          >
-            <Video size={11} color={isLive ? '#fff' : colors.teal} />
-            <Text style={[s.joinBtnTxt, { color: isLive ? '#fff' : colors.teal }]}>
-              {isLive ? 'Join Now' : 'Join'}
-            </Text>
-          </TouchableOpacity>
-        ) : isDisabled ? (
-          <View style={[s.joinBtn, s.joinBtnDisabled]}>
-            <Video size={11} color={colors.textMuted} />
-            <Text style={[s.joinBtnTxt, { color: colors.textMuted }]}>Unavailable</Text>
-          </View>
-        ) : (
-          <TouchableOpacity style={[s.joinBtn, s.joinBtnRecording]} activeOpacity={0.7}>
-            <Video size={11} color={colors.textMuted} />
-            <Text style={[s.joinBtnTxt, { color: colors.textMuted }]}>Recording</Text>
-          </TouchableOpacity>
-        )}
-        <TouchableOpacity
-          style={s.calBtn}
-          hitSlop={6}
-          activeOpacity={0.7}
-          onPress={() => void Linking.openURL(createGoogleCalendarUrl(session))}
-        >
-          <CalendarPlus size={14} color={colors.textMuted} />
-        </TouchableOpacity>
-        <ChevronRight size={15} color={colors.textFaint} />
-      </View>
-    </View>
-  );
-}
-
-// ─── Sessions tab content ──────────────────────────────────────────────────────
-
-function SessionsTabContent({
-  schedules,
-  isLoading,
-  error,
-  colors,
-  s,
-  scrollEnabled,
-}: {
-  schedules: ClassScheduleVM[];
-  isLoading?: boolean;
-  error?: string | null;
-  colors: AppColors;
-  s: ReturnType<typeof makeStyles>;
-  scrollEnabled: boolean;
-}) {
-  const [activeSubTab, setActiveSubTab] = useState<SessionSubTab>('upcoming');
-  const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
-
-  const { upcoming, past } = useMemo(() => splitAndGroupSessions(schedules), [schedules]);
-
-  const toggleMonth = (key: string) => {
-    setExpandedMonths((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+  const formatTime = (ms: number) => {
+    const totalSecs = Math.floor(ms / 1000);
+    return `${Math.floor(totalSecs / 60)}:${String(totalSecs % 60).padStart(2, '0')}`;
   };
 
-  // Auto-open current month (or first month) when sub-tab changes
-  useEffect(() => {
-    const groups = activeSubTab === 'upcoming' ? upcoming : past;
-    const target = groups.find((g) => g.isCurrentMonth) ?? groups[0];
-    setExpandedMonths(target ? new Set([target.monthKey]) : new Set());
-  }, [activeSubTab, upcoming, past]);
-
-  if (isLoading) {
-    return (
-      <View style={s.emptyState}>
-        <ActivityIndicator size="large" color={colors.teal} />
-        <Text style={s.emptySubtitle}>Loading sessions…</Text>
-      </View>
-    );
-  }
-
-  if (error) {
-    return (
-      <View style={s.emptyState}>
-        <Text style={s.emptySubtitle}>{error}</Text>
-      </View>
-    );
-  }
-
-  const groups = activeSubTab === 'upcoming' ? upcoming : past;
+  const totalMs = durationMs > 0 ? durationMs : (item.durationSeconds ?? 0) * 1000;
+  const progress = totalMs > 0 ? Math.min(1, positionMs / totalMs) : 0;
 
   return (
-    <View style={{ flex: 1 }}>
-      {/* Sub-tabs: Upcoming | Past */}
-      <View style={s.subTabBar}>
-        {(['upcoming', 'past'] as SessionSubTab[]).map((key) => (
-          <TouchableOpacity
-            key={key}
-            style={[s.subTabBtn, activeSubTab === key && s.subTabBtnActive]}
-            onPress={() => setActiveSubTab(key)}
-            activeOpacity={0.7}
-          >
-            <Text style={[s.subTabLabel, activeSubTab === key && s.subTabLabelActive]}>
-              {key === 'upcoming' ? 'Upcoming' : 'Past'}
-            </Text>
-          </TouchableOpacity>
-        ))}
+    <View style={s.fileItem}>
+      <TouchableOpacity
+        style={[s.audioPlayBtn, { backgroundColor: isPlaying ? colors.teal : colors.tealBg }]}
+        onPress={handlePlay}
+        disabled={isLoading}
+        activeOpacity={0.7}
+      >
+        {isLoading
+          ? <ActivityIndicator size="small" color={colors.teal} />
+          : isPlaying
+            ? <Pause size={15} color="#fff" />
+            : <Play size={15} color={colors.teal} />
+        }
+      </TouchableOpacity>
+
+      <View style={s.fileInfo}>
+        <View style={s.audioProgressTrack}>
+          <View style={[s.audioProgressFill, { width: `${Math.round(progress * 100)}%` }]} />
+        </View>
+        <View style={s.audioTimesRow}>
+          <Text style={s.fileMeta}>{formatTime(positionMs)}</Text>
+          <Text style={s.fileMeta}>{formatTime(totalMs)}</Text>
+        </View>
       </View>
 
-      {groups.length === 0 ? (
-        <View style={s.emptyState}>
-          <CalendarDays size={40} color={colors.textMuted} style={{ opacity: 0.4 }} />
-          <Text style={s.emptyTitle}>
-            {activeSubTab === 'upcoming' ? 'No upcoming sessions' : 'No past sessions yet'}
-          </Text>
-        </View>
-      ) : (
-        <ScrollView showsVerticalScrollIndicator={false} scrollEnabled={scrollEnabled}>
-          {groups.map((group) => {
-            const isOpen = expandedMonths.has(group.monthKey);
-            const progressPercent = group.totalCount > 0
-              ? Math.round((group.completedCount / group.totalCount) * 100)
-              : 0;
-            const allComplete = group.completedCount === group.totalCount && group.totalCount > 0;
-            return (
-              <View key={group.monthKey} style={[s.monthSection, group.isCurrentMonth && s.monthSectionCurrent]}>
-                {/* Month header - collapsible */}
-                <TouchableOpacity
-                  style={[s.monthHeader, group.isCurrentMonth && s.monthHeaderCurrent]}
-                  onPress={() => toggleMonth(group.monthKey)}
-                  activeOpacity={0.7}
-                >
-                  <View style={{ flex: 1 }}>
-                    <View style={s.monthTitleRow}>
-                      <Text style={s.monthTitle}>{group.month} {group.year}</Text>
-                      {group.isCurrentMonth && (
-                        <View style={s.currentMonthBadge}>
-                          <Text style={s.currentMonthBadgeTxt}>Current</Text>
-                        </View>
-                      )}
-                      {allComplete && (
-                        <CheckCircle2 size={14} color={colors.teal} />
-                      )}
-                    </View>
-                    <Text style={s.monthMeta}>
-                      {group.totalCount}{' '}
-                      {group.totalCount === 1 ? 'session' : 'sessions'}
-                      {group.completedCount > 0 ? ` · ${group.completedCount} completed` : ''}
-                    </Text>
-                  </View>
-
-                  {/* Progress bar */}
-                  <View style={s.progressBarWrap}>
-                    <View style={s.progressBarTrack}>
-                      <View style={[s.progressBarFill, { width: `${Math.max(0, Math.min(100, progressPercent))}%` }]} />
-                    </View>
-                    <Text style={s.progressPct}>{progressPercent}%</Text>
-                  </View>
-
-                  <ChevronDown
-                    size={18}
-                    color={colors.textMuted}
-                    style={{ transform: [{ rotate: isOpen ? '180deg' : '0deg' }] }}
-                  />
-                </TouchableOpacity>
-
-                {/* Session cards */}
-                {isOpen &&
-                  group.sessions.map((session) => (
-                    <SessionCard key={session.id} session={session} colors={colors} s={s} />
-                  ))}
-              </View>
-            );
-          })}
-        </ScrollView>
-      )}
+      <View style={[s.fileIconBox, { backgroundColor: '#F0E8FF' }]}>
+        <Mic size={16} color="#9333ea" />
+      </View>
     </View>
   );
 }
@@ -893,9 +363,6 @@ type TabContentProps = {
   colors: AppColors;
   s: ReturnType<typeof makeStyles>;
   memberCount?: number | null;
-  schedules: ClassScheduleVM[];
-  isLoadingSessions?: boolean;
-  sessionsError?: string | null;
   isFullScreen: boolean;
 };
 
@@ -907,9 +374,6 @@ function TabContent({
   colors,
   s,
   memberCount,
-  schedules,
-  isLoadingSessions,
-  sessionsError,
   isFullScreen,
 }: TabContentProps) {
   if (activeTab === 'files') {
@@ -924,23 +388,12 @@ function TabContent({
     }
     return (
       <ScrollView showsVerticalScrollIndicator={false} scrollEnabled={isFullScreen}>
-        {fileItems.map((item) => (
-          <FileItemRow key={item.id} item={item} colors={colors} s={s} />
-        ))}
+        {fileItems.map((item) =>
+          item.kind === 'audio'
+            ? <AudioItemRow key={item.id} item={item} colors={colors} s={s} />
+            : <FileItemRow key={item.id} item={item} colors={colors} s={s} />
+        )}
       </ScrollView>
-    );
-  }
-
-  if (activeTab === 'sessions') {
-    return (
-      <SessionsTabContent
-        schedules={schedules}
-        isLoading={isLoadingSessions}
-        error={sessionsError}
-        colors={colors}
-        s={s}
-        scrollEnabled={isFullScreen}
-      />
     );
   }
 
@@ -1243,6 +696,32 @@ function makeStyles(C: AppColors) {
       justifyContent: 'center',
     },
 
+    // ── Audio player ──────────────────────────────────────────────────────────
+    audioPlayBtn: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+    },
+    audioProgressTrack: {
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: C.inputBg,
+      overflow: 'hidden',
+      marginBottom: 4,
+    },
+    audioProgressFill: {
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: C.teal,
+    },
+    audioTimesRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+
     // ── Saved tab ─────────────────────────────────────────────────────────────
     savedItem: {
       flexDirection: 'row',
@@ -1327,266 +806,6 @@ function makeStyles(C: AppColors) {
       flex: 1,
     },
 
-    // ── Sessions tab ──────────────────────────────────────────────────────────
-    subTabBar: {
-      flexDirection: 'row',
-      gap: 8,
-      paddingHorizontal: 16,
-      paddingVertical: 10,
-      borderBottomWidth: hairline,
-      borderBottomColor: C.border,
-    },
-    subTabBtn: {
-      paddingHorizontal: 14,
-      paddingVertical: 6,
-      borderRadius: 20,
-      backgroundColor: C.inputBg,
-    },
-    subTabBtnActive: {
-      backgroundColor: C.teal,
-    },
-    subTabLabel: {
-      fontSize: 13,
-      fontWeight: '600',
-      color: C.textMuted,
-    },
-    subTabLabelActive: {
-      color: '#fff',
-    },
-
-    // Month section
-    monthSection: {
-      borderBottomWidth: hairline,
-      borderBottomColor: C.border,
-    },
-    monthSectionCurrent: {
-      backgroundColor: C.tealBg + '30',
-    },
-    monthHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      gap: 8,
-    },
-    monthHeaderCurrent: {
-      backgroundColor: C.tealBg + '40',
-    },
-    monthTitleRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-    },
-    monthTitle: {
-      fontSize: 14,
-      fontWeight: '700',
-      color: C.text,
-    },
-    monthMeta: {
-      fontSize: 12,
-      color: C.textMuted,
-      marginTop: 1,
-    },
-    currentMonthBadge: {
-      backgroundColor: C.tealBg,
-      paddingHorizontal: 6,
-      paddingVertical: 2,
-      borderRadius: 99,
-    },
-    currentMonthBadgeTxt: {
-      fontSize: 9,
-      fontWeight: '700',
-      color: C.teal,
-    },
-
-    // Progress bar
-    progressBarWrap: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-    },
-    progressBarTrack: {
-      width: 72,
-      height: 5,
-      backgroundColor: C.inputBg,
-      borderRadius: 2.5,
-      overflow: 'hidden',
-    },
-    progressBarFill: {
-      height: 5,
-      backgroundColor: C.teal,
-      borderRadius: 2.5,
-    },
-    progressPct: {
-      fontSize: 9,
-      color: C.textMuted,
-      fontWeight: '500',
-      minWidth: 24,
-    },
-
-    // Session card
-    sessionCard: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-      paddingHorizontal: 14,
-      paddingVertical: 10,
-      marginHorizontal: 12,
-      marginBottom: 6,
-      borderRadius: 12,
-      backgroundColor: C.card,
-      borderWidth: hairline,
-      borderColor: C.border,
-    },
-    sessionCardLive: {
-      borderColor: C.teal,
-      borderWidth: 1.5,
-      backgroundColor: C.tealBg,
-    },
-    sessionCardPast: {
-      backgroundColor: C.inputBg,
-      opacity: 0.85,
-    },
-
-    // Day badge
-    sessionDayBadge: {
-      minWidth: 44,
-      paddingHorizontal: 6,
-      paddingVertical: 6,
-      borderRadius: 10,
-      backgroundColor: C.inputBg,
-      alignItems: 'center',
-      justifyContent: 'center',
-      flexShrink: 0,
-    },
-    sessionDayExtra: {
-      fontSize: 8,
-      fontWeight: '700',
-      letterSpacing: 0.5,
-      textTransform: 'uppercase',
-    },
-    sessionDayName: {
-      fontSize: 10,
-      fontWeight: '600',
-      color: C.textMuted,
-    },
-    sessionDayNum: {
-      fontSize: 16,
-      fontWeight: '700',
-      color: C.text,
-      lineHeight: 20,
-    },
-
-    // Session info column
-    sessionInfo: {
-      flex: 1,
-      gap: 3,
-    },
-    sessionTitleRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      flexWrap: 'wrap',
-    },
-    sessionLabel: {
-      fontSize: 13,
-      fontWeight: '600',
-      color: C.text,
-    },
-    sessionTimeRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 3,
-    },
-    sessionTimeTxt: {
-      fontSize: 11,
-      color: C.textMuted,
-    },
-    sessionOriginalTimeTxt: {
-      fontSize: 11,
-      color: C.textMuted,
-    },
-    sessionOriginalTimeStrike: {
-      textDecorationLine: 'line-through',
-    },
-    sessionReasonTxt: {
-      fontSize: 11,
-      color: C.textMuted,
-      fontStyle: 'italic',
-    },
-
-    // LIVE badge
-    liveBadge: {
-      backgroundColor: C.teal,
-      paddingHorizontal: 5,
-      paddingVertical: 1,
-      borderRadius: 4,
-    },
-    liveBadgeText: {
-      color: '#fff',
-      fontSize: 9,
-      fontWeight: '700',
-      letterSpacing: 0.5,
-    },
-
-    // Variant badges (Skipped, Changed, Completed)
-    variantBadge: {
-      backgroundColor: C.inputBg,
-      paddingHorizontal: 5,
-      paddingVertical: 1,
-      borderRadius: 4,
-    },
-    variantBadgeOutline: {
-      backgroundColor: 'transparent',
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: C.border,
-    },
-    variantBadgeText: {
-      fontSize: 9,
-      color: C.textMuted,
-      fontWeight: '500',
-    },
-
-    // Action buttons column
-    sessionActions: {
-      flexDirection: 'column',
-      alignItems: 'flex-end',
-      gap: 4,
-      flexShrink: 0,
-    },
-    joinBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 3,
-      paddingHorizontal: 8,
-      paddingVertical: 5,
-      borderRadius: 20,
-    },
-    joinBtnLive: {
-      backgroundColor: C.teal,
-    },
-    joinBtnUpcoming: {
-      backgroundColor: C.tealBg,
-    },
-    joinBtnDisabled: {
-      backgroundColor: C.inputBg,
-      opacity: 0.5,
-    },
-    joinBtnRecording: {
-      backgroundColor: C.inputBg,
-    },
-    joinBtnTxt: {
-      fontSize: 11,
-      fontWeight: '600',
-    },
-    calBtn: {
-      width: 26,
-      height: 26,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: 13,
-      backgroundColor: C.inputBg,
-    },
   });
 }
 
@@ -1603,9 +822,6 @@ export function ChannelInfoSheet({
   description,
   members,
   messages = [],
-  schedules = [],
-  isLoadingSessions,
-  sessionsError,
   onClose,
 }: ChannelInfoSheetProps) {
   const { colors } = useTheme();
@@ -1862,9 +1078,6 @@ export function ChannelInfoSheet({
                 colors={colors}
                 s={s}
                 memberCount={memberCount}
-                schedules={schedules}
-                isLoadingSessions={isLoadingSessions}
-                sessionsError={sessionsError}
                 isFullScreen={isFullScreen}
               />
             </View>

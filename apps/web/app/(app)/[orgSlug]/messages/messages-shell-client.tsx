@@ -18,9 +18,11 @@ import { createSupabaseMessagesRealtimeClient } from '@iconicedu/web/lib/message
 import { createSupabaseBrowserClient } from '@iconicedu/web/lib/supabase/client';
 import {
   buildMessageAssetPath,
+  buildMessageThumbnailPath,
   buildStorageFileKey,
   STORAGE_PATH_SEGMENTS,
   getChannelFilesBucket,
+  getMessageThumbnailsBucket,
 } from '@iconicedu/web/lib/storage/storage-paths';
 import { mapProfilePresenceRowToVM } from '@iconicedu/web/lib/profile/mappers/presence.mapper';
 import {
@@ -54,6 +56,72 @@ export function buildMessageFileStoragePath(input: {
       name: input.file.name,
       fallbackBaseName: 'file',
     }),
+  });
+}
+
+const IMAGE_THUMBNAIL_MAX_DIMENSION = 480;
+const IMAGE_THUMBNAIL_QUALITY = 0.72;
+
+async function createImageThumbnailFile(file: File): Promise<File | null> {
+  if (
+    typeof window === 'undefined' ||
+    typeof document === 'undefined' ||
+    typeof URL === 'undefined' ||
+    !file.type.startsWith('image/')
+  ) {
+    return null;
+  }
+
+  return new Promise<File | null>((resolve) => {
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    image.onload = () => {
+      const maxSide = Math.max(image.width, image.height);
+      const scale =
+        maxSide > IMAGE_THUMBNAIL_MAX_DIMENSION
+          ? IMAGE_THUMBNAIL_MAX_DIMENSION / maxSide
+          : 1;
+      const width = Math.max(1, Math.round(image.width * scale));
+      const height = Math.max(1, Math.round(image.height * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext('2d');
+
+      if (!context) {
+        URL.revokeObjectURL(objectUrl);
+        resolve(null);
+        return;
+      }
+
+      context.drawImage(image, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => {
+          URL.revokeObjectURL(objectUrl);
+          if (!blob) {
+            resolve(null);
+            return;
+          }
+
+          const fallbackBaseName = file.name.replace(/\.[^/.]+$/, '') || 'thumbnail';
+          resolve(
+            new File([blob], `${fallbackBaseName}.jpg`, {
+              type: 'image/jpeg',
+            }),
+          );
+        },
+        'image/jpeg',
+        IMAGE_THUMBNAIL_QUALITY,
+      );
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(null);
+    };
+
+    image.src = objectUrl;
   });
 }
 
@@ -134,10 +202,41 @@ export function MessagesShellClient({
               throw new Error(uploadResponse.error.message);
             }
 
+            let thumbnailUrl: string | undefined;
+            if ((attachment.file.type || '').startsWith('image/')) {
+              const thumbnailFile = await createImageThumbnailFile(attachment.file);
+              if (thumbnailFile) {
+                const thumbnailPath = buildMessageThumbnailPath({
+                  orgId: channelState.ids.orgId,
+                  channelId: channelState.ids.id,
+                  profileId: currentUserId,
+                  fileName: buildStorageFileKey({
+                    name: thumbnailFile.name,
+                    fallbackBaseName: 'thumbnail',
+                    fallbackExtension: 'jpg',
+                  }),
+                });
+
+                const thumbnailUploadResponse = await presenceClient.storage
+                  .from(getMessageThumbnailsBucket())
+                  .upload(thumbnailPath, thumbnailFile, {
+                    upsert: false,
+                    contentType: thumbnailFile.type || 'image/jpeg',
+                  });
+
+                if (!thumbnailUploadResponse.error) {
+                  thumbnailUrl = presenceClient.storage
+                    .from(getMessageThumbnailsBucket())
+                    .getPublicUrl(thumbnailPath).data.publicUrl;
+                }
+              }
+            }
+
             return {
               file: attachment.file,
               durationSeconds: attachment.durationSeconds,
               storagePath,
+              thumbnailUrl,
             };
           }),
         );
@@ -165,6 +264,7 @@ export function MessagesShellClient({
               senderProfileId: currentUserId,
               name: imageUploads[0].file.name,
               storagePath: imageUploads[0].storagePath,
+              thumbnailUrl: imageUploads[0].thumbnailUrl,
               size: imageUploads[0].file.size,
               mimeType: imageUploads[0].file.type || undefined,
               content: input.content,
@@ -181,6 +281,7 @@ export function MessagesShellClient({
               assets: imageUploads.map((upload) => ({
                 name: upload.file.name,
                 storagePath: upload.storagePath,
+                thumbnailUrl: upload.thumbnailUrl,
                 size: upload.file.size,
                 mimeType: upload.file.type || undefined,
               })),

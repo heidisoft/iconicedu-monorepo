@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { MessageCircle, CalendarDays } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { MessageVM } from '@iconicedu/shared-types';
@@ -234,6 +235,7 @@ export default function ChannelConversationScreen() {
         <View style={[s.tabBar, { borderBottomColor: colors.border }]}>
           {(['messages', 'sessions'] as ChannelTab[]).map((tab) => {
             const isActive = activeTab === tab;
+            const color = isActive ? colors.teal : colors.textMuted;
             return (
               <TouchableOpacity
                 key={tab}
@@ -241,7 +243,11 @@ export default function ChannelConversationScreen() {
                 onPress={() => setActiveTab(tab)}
                 activeOpacity={0.7}
               >
-                <Text style={[s.tabLabel, { color: isActive ? colors.teal : colors.textMuted }]}>
+                {tab === 'messages'
+                  ? <MessageCircle size={16} color={color} />
+                  : <CalendarDays size={16} color={color} />
+                }
+                <Text style={[s.tabLabel, { color }]}>
                   {tab === 'messages' ? 'Messages' : 'Sessions'}
                 </Text>
               </TouchableOpacity>
@@ -301,9 +307,6 @@ export default function ChannelConversationScreen() {
         kind={isSpaceChannel ? 'space' : 'channel'}
         iconEmoji={iconEmoji}
         messages={messages ?? []}
-        schedules={schedules}
-        isLoadingSessions={isLoadingSessions}
-        sessionsError={sessionsError}
         onClose={() => setInfoVisible(false)}
       />
 
@@ -332,12 +335,15 @@ function makeStyles(colors: { border: string; teal: string; textMuted: string; p
     tabItem: {
       flex: 1,
       alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'row',
+      gap: 6,
       paddingVertical: 11,
       borderBottomWidth: 2,
       borderBottomColor: 'transparent',
     },
     tabLabel: {
-      fontSize: 14,
+      fontSize: 13,
       fontWeight: '600',
     },
   });

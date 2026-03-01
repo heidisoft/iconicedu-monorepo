@@ -6,6 +6,7 @@ import type { AudioRecordingMessageVM } from '@iconicedu/shared-types';
 import { Button } from '../../../ui/button';
 import { MessageBase, type MessageBaseProps } from '../message-base';
 import { cn } from '../../../lib/utils';
+import { buildFileAccessHref } from '../file-download.utils';
 
 interface AudioMessageProps extends Omit<MessageBaseProps, 'message' | 'children'> {
   message: AudioRecordingMessageVM;
@@ -53,11 +54,21 @@ export const AudioMessage = memo(function AudioMessage(props: AudioMessageProps)
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(message.audio.durationSeconds ?? 0);
   const [canPlay, setCanPlay] = useState(false);
+  const [audioSrc, setAudioSrc] = useState<string | null>(null);
+  const [pendingPlay, setPendingPlay] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const waveformBars = useMemo(
     () => buildAudioWaveformBars(message.audio.waveform),
     [message.audio.waveform],
   );
+
+  useEffect(() => {
+    setAudioSrc(null);
+    setPendingPlay(false);
+    setCanPlay(false);
+    setIsPlaying(false);
+    setCurrentTime(0);
+  }, [message.ids.id]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -93,11 +104,47 @@ export const AudioMessage = memo(function AudioMessage(props: AudioMessageProps)
     };
   }, [message.audio.durationSeconds]);
 
+  useEffect(() => {
+    if (!pendingPlay || !audioSrc || !audioRef.current) {
+      return;
+    }
+
+    const playResult = audioRef.current.play();
+    if (playResult && typeof playResult.then === 'function') {
+      void playResult
+        .then(() => {
+          setCanPlay(true);
+          setIsPlaying(true);
+          setPendingPlay(false);
+        })
+        .catch(() => {
+          setIsPlaying(false);
+          setPendingPlay(false);
+        });
+      return;
+    }
+
+    setCanPlay(true);
+    setIsPlaying(true);
+    setPendingPlay(false);
+  }, [audioSrc, pendingPlay]);
+
   const togglePlayPause = useCallback(() => {
     if (!audioRef.current) return;
     if (isPlaying) {
       audioRef.current.pause();
       setIsPlaying(false);
+      return;
+    }
+
+    if (!audioSrc) {
+      setAudioSrc(
+        buildFileAccessHref({
+          url: message.audio.url,
+          storagePath: message.audio.storagePath,
+        }),
+      );
+      setPendingPlay(true);
       return;
     }
 
@@ -116,7 +163,7 @@ export const AudioMessage = memo(function AudioMessage(props: AudioMessageProps)
 
     setCanPlay(true);
     setIsPlaying(true);
-  }, [isPlaying]);
+  }, [audioSrc, isPlaying, message.audio.storagePath, message.audio.url]);
 
   const seekToRatio = useCallback((ratio: number) => {
     const audio = audioRef.current;
@@ -170,8 +217,8 @@ export const AudioMessage = memo(function AudioMessage(props: AudioMessageProps)
       <div className="max-w-md rounded-2xl border border-border bg-card px-3 py-3 shadow-sm">
         <audio
           ref={audioRef}
-          src={message.audio.url}
-          preload="metadata"
+          src={audioSrc ?? undefined}
+          preload="none"
           aria-label="Audio message"
         />
         <div className="flex items-center gap-3">

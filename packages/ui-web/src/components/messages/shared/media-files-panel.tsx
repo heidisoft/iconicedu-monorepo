@@ -4,6 +4,7 @@ import { memo, useMemo } from 'react';
 import { FileText } from 'lucide-react';
 import type { ChannelFileItemVM, ChannelMediaItemVM } from '@iconicedu/shared-types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@iconicedu/ui-web/ui/tabs';
+import { buildFileAccessHref } from '@iconicedu/ui-web/components/messages/file-download.utils';
 
 type MediaFilesPanelProps = {
   media: ChannelMediaItemVM[];
@@ -52,9 +53,13 @@ export const MediaFilesPanel = memo(function MediaFilesPanel({
                   className="aspect-square overflow-hidden rounded-xl bg-muted"
                 >
                   <img
-                    src={item.url}
+                    src={buildFileAccessHref({
+                      url: item.url,
+                      storagePath: 'storagePath' in item ? item.storagePath : undefined,
+                    })}
                     alt={item.name ?? 'Media'}
                     className="h-full w-full object-cover"
+                    loading="lazy"
                   />
                 </div>
               ))}

@@ -535,7 +535,7 @@ export function SpaceSessionsTab({
     );
   }
 
-  const groups = activeSubTab === 'upcoming' ? upcoming : past;
+  const groups = activeSubTab === 'upcoming' ? upcoming.slice(0, 4) : past;
 
   return (
     <View style={s.container}>
@@ -894,11 +894,11 @@ function makeStyles(C: AppColors) {
       fontWeight: '500',
     },
 
-    // Action buttons column
+    // Action buttons row
     sessionActions: {
-      flexDirection: 'column',
-      alignItems: 'flex-end',
-      gap: 4,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
       flexShrink: 0,
     },
     joinBtn: {

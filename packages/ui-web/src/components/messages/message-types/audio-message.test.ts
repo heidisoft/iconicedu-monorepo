@@ -37,4 +37,8 @@ describe('audio-message helpers', () => {
     expect(resolveAudioDuration(8, 14)).toBe(14);
     expect(resolveAudioDuration(undefined, undefined)).toBe(0);
   });
+
+  it('does not require message audio src to compute helper output', () => {
+    expect(formatAudioTime(125)).toBe('2:05');
+  });
 });

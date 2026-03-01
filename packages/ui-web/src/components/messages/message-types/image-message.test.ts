@@ -1,8 +1,22 @@
 import { describe, expect, it } from 'vitest';
 
-import { getImageAttachments, getImageDownloadHref } from './image-message';
+import { getImageAttachments, getImageDownloadHref, getImageRenderSrc } from './image-message';
 
 describe('getImageDownloadHref', () => {
+  it('uses the stable re-signing endpoint for rendering when image storagePath exists', () => {
+    expect(
+      getImageRenderSrc({
+        attachment: {
+          type: 'image',
+          url: 'https://signed.example.com/image.png',
+          storagePath: 'org-1/channel-1/profile-1/image.png',
+          thumbnailUrl: 'https://public.example.com/thumb.jpg',
+          name: 'image.png',
+        },
+      } as never),
+    ).toBe('https://public.example.com/thumb.jpg');
+  });
+
   it('uses the re-signing endpoint when image storagePath exists', () => {
     expect(
       getImageDownloadHref({

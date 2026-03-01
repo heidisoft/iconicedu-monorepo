@@ -15,7 +15,6 @@ import {
   mapChannelMediaRow,
 } from '@iconicedu/web/lib/messages/mappers/message.mapper';
 import { buildMessagesByChannelId } from '@iconicedu/web/lib/messages/builders/message.builder';
-import { createSignedChannelFileUrl } from '@iconicedu/web/lib/messages/queries/file-url.query';
 
 export async function buildChannelMessages(
   supabase: SupabaseClient,

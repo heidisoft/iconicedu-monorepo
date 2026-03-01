@@ -602,6 +602,7 @@ export async function sendFileMessageAction(
           name: input.name,
           size: input.size,
           mimeType: input.mimeType,
+          ...(isImageUpload && input.thumbnailUrl ? { thumbnailUrl: input.thumbnailUrl } : {}),
         }),
     ...(input.content?.trim() ? { text: input.content.trim() } : {}),
   };
@@ -799,6 +800,7 @@ export async function sendFilesMessageAction(
     name: asset.name,
     size: asset.size,
     mimeType: asset.mimeType,
+    ...(allImages && asset.thumbnailUrl ? { thumbnailUrl: asset.thumbnailUrl } : {}),
   }));
 
   const payloadInsert = await supabase
@@ -896,6 +898,7 @@ export async function sendFilesMessageAction(
         name: asset.name,
         size: asset.size,
         mimeType: asset.mimeType,
+        ...(allImages && asset.thumbnailUrl ? { thumbnailUrl: asset.thumbnailUrl } : {}),
       })),
       ...(input.content?.trim() ? { text: input.content.trim() } : {}),
     },

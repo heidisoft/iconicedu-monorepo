@@ -34,6 +34,7 @@ export interface BaseAttachmentVM {
 export interface ImageAttachmentVM extends BaseAttachmentVM {
   type: 'image';
   storagePath?: string;
+  thumbnailUrl?: string;
   width?: number;
   height?: number;
 }
