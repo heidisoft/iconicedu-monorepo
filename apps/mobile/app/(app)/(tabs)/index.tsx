@@ -199,7 +199,7 @@ function ActivityItem({
       >
         <View style={s.itemRow}>
           <View style={s.avatarWrap}>
-            <View style={[s.avatar, { backgroundColor: iconBg }]}>
+            <View style={[s.itemAvatar, { backgroundColor: iconBg }]}>
               <IconComponent size={22} color={iconFg} />
             </View>
           </View>
@@ -335,7 +335,7 @@ function makeStyles(C: AppColors) {
     itemWrap:     { borderRadius: 14, backgroundColor: C.card, borderWidth: StyleSheet.hairlineWidth, borderColor: C.border, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 14, overflow: 'hidden', minHeight: 80 },
     itemRow:      { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
     avatarWrap:   { width: 52, height: 52, flexShrink: 0 },
-    avatar:       { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
+    itemAvatar:   { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
     unreadDot:    { width: 9, height: 9, borderRadius: 5, flexShrink: 0, marginTop: 8 },
     content:      { flex: 1, paddingTop: 2 },
     headlineRow:  { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 5, marginBottom: 5 },

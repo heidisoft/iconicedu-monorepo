@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Linking } from 'react-native';
 import { ChevronLeft, Video, MoreVertical } from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
@@ -35,6 +35,12 @@ export type ConversationHeaderProps = {
   onCall?: () => void;
   onVideo?: () => void;
   onMore?: () => void;
+  /**
+   * When provided, replaces the Video icon button with a "Join" pill button
+   * that opens this URL — mirrors web MessagesContainerHeaderActions join button
+   * (shown when channel.context?.liveSession?.enabled === true).
+   */
+  liveJoinUrl?: string | null;
 };
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
@@ -90,6 +96,15 @@ function makeStyles(C: AppColors) {
     },
     actionIcon: { fontSize: 19, color: 'rgba(255,255,255,0.9)' },
     moreIcon:   { fontSize: 24, color: 'rgba(255,255,255,0.9)' },
+
+    // ── Live session join pill — mirrors web MessagesContainerHeaderActions Join button ──
+    joinPill: {
+      flexDirection: 'row', alignItems: 'center', gap: 5,
+      paddingHorizontal: 12, paddingVertical: 7,
+      borderRadius: 20,
+      backgroundColor: '#fff',
+    },
+    joinPillTxt: { fontSize: 13, fontWeight: '700', color: C.teal },
   });
 }
 
@@ -105,6 +120,7 @@ export function ConversationHeader({
   onCall,
   onVideo,
   onMore,
+  liveJoinUrl,
 }: ConversationHeaderProps) {
   const { colors } = useTheme();
   const s = useMemo(() => makeStyles(colors), [colors]);
@@ -139,11 +155,24 @@ export function ConversationHeader({
         {!!subtitle && <Text style={s.subtitle} numberOfLines={1}>{subtitle}</Text>}
       </View>
 
-      {/* Action buttons — Phone removed, keep Video and MoreVertical */}
+      {/* Action buttons */}
       <View style={s.actions}>
-        <TouchableOpacity style={s.actionBtn} onPress={onVideo} hitSlop={8}>
-          <Video size={20} color="rgba(255,255,255,0.9)" />
-        </TouchableOpacity>
+        {/* Join pill when live session active — mirrors web header Join button */}
+        {liveJoinUrl ? (
+          <TouchableOpacity
+            style={s.joinPill}
+            onPress={() => Linking.openURL(liveJoinUrl).catch(() => null)}
+            activeOpacity={0.85}
+            accessibilityLabel="Join live session"
+          >
+            <Video size={14} color={colors.teal} />
+            <Text style={s.joinPillTxt}>Join</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={s.actionBtn} onPress={onVideo} hitSlop={8}>
+            <Video size={20} color="rgba(255,255,255,0.9)" />
+          </TouchableOpacity>
+        )}
         <TouchableOpacity style={s.actionBtn} onPress={onMore} hitSlop={8}>
           <MoreVertical size={22} color="rgba(255,255,255,0.9)" />
         </TouchableOpacity>

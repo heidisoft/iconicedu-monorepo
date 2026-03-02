@@ -502,7 +502,7 @@ export default function InboxScreen() {
         <SectionList<ActivityFeedItemVM, FeedSection>
           sections={filteredSections}
           keyExtractor={item => item.ids.id}
-          stickySectionHeaders={false}
+          stickySectionHeadersEnabled={false}
           contentContainerStyle={{ paddingTop: 8, paddingBottom: 40 }}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.teal} />

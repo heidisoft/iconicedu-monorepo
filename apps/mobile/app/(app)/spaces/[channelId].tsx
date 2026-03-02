@@ -41,6 +41,17 @@ export default function SpaceDetailScreen() {
     orgId,
   );
 
+  // ── Live session detection — mirrors web channel.context?.liveSession?.enabled check ──
+  const liveSession = useMemo(() => {
+    if (!schedules?.length) return null;
+    const now = Date.now();
+    return schedules.find((s) => {
+      const start = Date.parse(s.startAt);
+      const end = Date.parse(s.endAt);
+      return start <= now && end >= now && !!s.meetingLink;
+    }) ?? null;
+  }, [schedules]);
+
   // ── Tab state ──
   const [activeTab, setActiveTab] = useState<SpaceTab>('messages');
 
@@ -66,6 +77,7 @@ export default function SpaceDetailScreen() {
         kind="space"
         onBack={() => router.back()}
         onMore={() => setInfoVisible(true)}
+        liveJoinUrl={liveSession?.meetingLink ?? null}
       />
 
       {/* Tab bar: Messages | Sessions */}

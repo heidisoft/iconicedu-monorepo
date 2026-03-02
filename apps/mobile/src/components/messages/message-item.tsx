@@ -641,76 +641,74 @@ function isLiveSessionEnded(msg: LiveSessionStartedMessageVM): boolean {
 }
 
 function LiveSessionStartedCard({ message, colors, s }: { message: LiveSessionStartedMessageVM; colors: AppColors; s: S }) {
-  const liveSession = message.liveSession;
-
-  if (!liveSession) {
-    return (
-      <View style={[s.card, { borderColor: colors.border, backgroundColor: colors.inputBg }]}>
-        <View style={s.cardHeader}>
-          <Video size={16} color={colors.textMuted} />
-          <Text style={[s.cardHeaderLabel, { color: colors.textMuted }]}>Live session</Text>
-        </View>
-      </View>
-    );
-  }
+  // Business logic mirrors packages/ui-web/.../live-session-started-message.utils.ts
+  const liveSession = message.liveSession as {
+    status?: string;
+    title?: string;
+    startedByDisplayName?: string;
+    provider?: string;
+    joinUrl?: string;
+    occurrenceLabel?: string;
+    endsAt?: string;
+    startedAt?: string;
+  } | undefined;
 
   const ended = isLiveSessionEnded(message);
+  const title = ended ? 'Class ended' : (liveSession?.title ?? 'Live session');
+  const buttonLabel = ended ? 'Class ended' : 'Join';
 
   return (
     <View style={[
       s.card,
-      { borderColor: ended ? colors.border : colors.teal, backgroundColor: ended ? colors.inputBg : colors.card },
+      { borderColor: colors.border, backgroundColor: ended ? colors.inputBg : colors.card, gap: 12 },
     ]}>
-      {/* Header: icon + label */}
-      <View style={s.cardHeader}>
-        <View style={{
-          width: 28, height: 28, borderRadius: 14,
-          backgroundColor: ended ? colors.border : colors.teal,
-          alignItems: 'center', justifyContent: 'center',
-        }}>
-          <Video size={14} color={ended ? colors.textMuted : colors.tealFg} />
-        </View>
-        <Text style={[s.cardHeaderLabel, { color: ended ? colors.textMuted : colors.teal }]}>
-          {ended ? 'Class ended' : 'Class started'}
+      {/* Title + description + occurrence — mirrors web space-y-1 block */}
+      <View style={{ gap: 4 }}>
+        <Text style={{ fontSize: 14, fontWeight: '600', color: ended ? colors.textMuted : colors.text }}>
+          {title}
         </Text>
+        {!!liveSession && (
+          <>
+            <Text style={{ fontSize: 14, color: colors.textMuted }}>
+              {liveSession.startedByDisplayName}{' '}
+              {ended
+                ? `ended this ${liveSession.provider ?? ''} live session.`
+                : `started this ${liveSession.provider ?? ''} live session.`}
+            </Text>
+            {!!liveSession.occurrenceLabel && (
+              <Text style={{ fontSize: 12, color: colors.textMuted }}>
+                For {liveSession.occurrenceLabel}
+              </Text>
+            )}
+          </>
+        )}
       </View>
 
-      {/* Title */}
-      <Text style={[s.cardTitle, { color: ended ? colors.textMuted : colors.text }]}>
-        {ended ? 'Class ended' : liveSession.title}
-      </Text>
-
-      {/* Description */}
-      <Text style={[s.cardDesc, { color: colors.textMuted }]}>
-        {liveSession.startedByDisplayName}{' '}
-        {ended
-          ? `ended this ${liveSession.provider} live session.`
-          : `started this ${liveSession.provider} live session.`}
-      </Text>
-
-      {/* Occurrence label */}
-      {!!liveSession.occurrenceLabel && (
-        <Text style={[s.cardDesc, { color: colors.textFaint, fontSize: 12, marginTop: 2 }]}>
-          For {liveSession.occurrenceLabel}
-        </Text>
-      )}
-
-      {/* Join / Ended button */}
+      {/* Join / Ended button — mirrors web <Button size="sm" variant={ended ? 'outline' : 'default'}> */}
       <TouchableOpacity
-        style={[
-          s.joinBtn,
-          { backgroundColor: ended ? colors.inputBg : colors.teal, borderWidth: ended ? 1 : 0, borderColor: colors.border },
-        ]}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+          alignSelf: 'flex-start',
+          borderRadius: 8,
+          paddingVertical: 7,
+          paddingHorizontal: 14,
+          backgroundColor: ended ? colors.inputBg : colors.teal,
+          borderWidth: ended ? 1 : 0,
+          borderColor: colors.border,
+        }}
         disabled={ended}
         activeOpacity={0.8}
         onPress={() => {
-          if (!ended && liveSession.joinUrl) {
+          if (!ended && liveSession?.joinUrl) {
             Linking.openURL(liveSession.joinUrl).catch(() => null);
           }
         }}
       >
-        <Text style={{ fontSize: 14, fontWeight: '700', color: ended ? colors.textMuted : colors.tealFg }}>
-          {ended ? 'Class ended' : 'Join'}
+        <Video size={16} color={ended ? colors.textMuted : colors.tealFg} />
+        <Text style={{ fontSize: 13, fontWeight: '600', color: ended ? colors.textMuted : colors.tealFg }}>
+          {buttonLabel}
         </Text>
       </TouchableOpacity>
     </View>

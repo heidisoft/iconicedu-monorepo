@@ -32,6 +32,8 @@ type ClassSession = {
   dayName: string;
   dayNum: string;
   isToday: boolean;
+  /** True while startAt <= now <= endAt — mirrors web isEventLive() */
+  isLive: boolean;
   isPast: boolean;
   status: ClassScheduleVM['status'];
   meetingLink?: string | null;
@@ -291,7 +293,8 @@ function splitAndGroupSessions(schedules: ClassScheduleVM[]): {
   const past: DisplaySchedule[] = [];
 
   for (const s of expanded) {
-    if (new Date(s.startAt).getTime() >= nowMs) upcoming.push(s);
+    // A session is "upcoming" (not past) if it hasn't ended yet — mirrors web isEventLive
+    if (new Date(s.endAt).getTime() >= nowMs) upcoming.push(s);
     else past.push(s);
   }
 
@@ -311,8 +314,13 @@ function splitAndGroupSessions(schedules: ClassScheduleVM[]): {
       const monthDate = new Date(y!, m! - 1, 1);
       const sessions: ClassSession[] = list.map((s) => {
         const start = new Date(s.startAt);
+        const end = new Date(s.endAt);
+        const startMs = start.getTime();
+        const endMs = end.getTime();
         const startDay = startOfDay(start).getTime();
-        const isPast = start.getTime() < nowMs;
+        // Mirrors web isEventLive: now >= startAt && now <= endAt
+        const isLive = startMs <= nowMs && endMs >= nowMs;
+        const isPast = endMs < nowMs;
         return {
           id: s.ids.id,
           label: formatWeekTitle(s.startAt),
@@ -320,6 +328,7 @@ function splitAndGroupSessions(schedules: ClassScheduleVM[]): {
           dayName: start.toLocaleDateString('en-US', { weekday: 'short' }),
           dayNum: String(start.getDate()),
           isToday: startDay === nowDay,
+          isLive,
           isPast,
           status: s.status,
           meetingLink: s.meetingLink ?? null,
@@ -362,8 +371,8 @@ function SessionCard({
   colors: AppColors;
   s: ReturnType<typeof makeStyles>;
 }) {
-  const isLive = session.isToday && !session.isPast;
-  const { isPast } = session;
+  // Mirrors web isEventLive — true while startAt <= now <= endAt
+  const { isLive, isPast } = session;
   const isDisabled = session.disabled;
 
   const badgeBg = isDisabled
