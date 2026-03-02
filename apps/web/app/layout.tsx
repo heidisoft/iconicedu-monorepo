@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
+import { Suspense } from 'react';
 import '@iconicedu/ui-web/styles.css';
 import { ThemeProvider, Toaster } from '@iconicedu/ui-web';
 import { SpeedInsights } from '@vercel/speed-insights/next';
@@ -26,7 +27,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           {children}
           <Toaster />
-          <PostHogAnalytics />
+          <Suspense fallback={null}>
+            <PostHogAnalytics />
+          </Suspense>
           <SpeedInsights />
         </ThemeProvider>
       </body>
