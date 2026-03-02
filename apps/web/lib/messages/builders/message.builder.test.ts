@@ -9,6 +9,7 @@ const buildThreadById = vi.fn();
 const getMessageFilesByMessageIds = vi.fn(async () => ({ data: [] }));
 const getMessageImagesByMessageIds = vi.fn(async () => ({ data: [] }));
 const getMessageAudioRecordingsByMessageIds = vi.fn(async () => ({ data: [] }));
+const getMessageLiveSessionStartedByMessageIds = vi.fn(async () => ({ data: [] }));
 const getMessageSavesByMessageIds = vi.fn(async () => ({ data: [] }));
 
 vi.mock('@iconicedu/web/lib/messages/queries/messages.query', () => ({
@@ -30,6 +31,8 @@ vi.mock('@iconicedu/web/lib/messages/queries/messages.query', () => ({
   getMessageLinkPreviewsByMessageIds: vi.fn(async () => ({ data: [] })),
   getMessageAudioRecordingsByMessageIds: (...args: unknown[]) =>
     getMessageAudioRecordingsByMessageIds(...args),
+  getMessageLiveSessionStartedByMessageIds: (...args: unknown[]) =>
+    getMessageLiveSessionStartedByMessageIds(...args),
   getMessageReactionCountsByMessageIds: vi.fn(async () => ({ data: [] })),
   getMessageSavesByMessageIds: (...args: unknown[]) => getMessageSavesByMessageIds(...args),
 }));
@@ -55,6 +58,7 @@ describe('buildMessageById', () => {
     getMessageFilesByMessageIds.mockResolvedValue({ data: [] });
     getMessageImagesByMessageIds.mockResolvedValue({ data: [] });
     getMessageAudioRecordingsByMessageIds.mockResolvedValue({ data: [] });
+    getMessageLiveSessionStartedByMessageIds.mockResolvedValue({ data: [] });
     getMessageSavesByMessageIds.mockResolvedValue({ data: [] });
   });
 

@@ -328,7 +328,7 @@ async function mapRowsToMessages(
   supabase: SupabaseClient,
   orgId: string,
   rows: MessageRow[],
-  options: Pick<MessageBuildOptions, 'threadsById' | 'profileId'> = {},
+  options: Pick<MessageBuildOptions, 'threadsById' | 'profileId' | 'accountId'> = {},
 ) {
   const messageIds = rows.map((row) => row.id);
   const [payloadsById, reactionsByMessageId, profilesById, savedMessageIds] = await Promise.all([
