@@ -13,6 +13,7 @@ type ChannelLiveSessionConfigRecord = {
   enabled: boolean;
   provider: LiveSessionProviderVM;
   mode?: LiveSessionModeVM | null;
+  joinUrl?: string | null;
 };
 
 type ChannelLiveSessionRowRecord = {
@@ -93,6 +94,12 @@ function parseChannelLiveSessionConfig(value: unknown): ChannelLiveSessionConfig
     enabled: true,
     provider: candidate.provider,
     mode: candidate.mode === 'audio' || candidate.mode === 'video' ? candidate.mode : null,
+    joinUrl:
+      candidate.provider === 'custom' &&
+      typeof candidate.joinUrl === 'string' &&
+      candidate.joinUrl.trim().length > 0
+        ? candidate.joinUrl.trim()
+        : null,
   };
 }
 
@@ -456,6 +463,20 @@ export async function createOrJoinLiveSession(input: {
   );
   if (!liveSessionConfig) {
     throw new Error('Live sessions are not enabled for this channel');
+  }
+
+  if (liveSessionConfig.provider === 'custom') {
+    if (!liveSessionConfig.joinUrl) {
+      throw new Error('Custom live session join URL is missing');
+    }
+
+    return {
+      sessionId: `external:${channelResponse.data.id}`,
+      joinPath: liveSessionConfig.joinUrl,
+      status: 'live',
+      created: false,
+      provider: liveSessionConfig.provider,
+    };
   }
 
   const scope = await resolveChannelLiveSessionScope({

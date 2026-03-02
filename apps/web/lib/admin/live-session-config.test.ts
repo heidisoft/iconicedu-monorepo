@@ -19,6 +19,23 @@ describe('live-session-config', () => {
       enabled: true,
       provider: 'daily',
       mode: 'video',
+      joinUrl: null,
+    });
+  });
+
+  it('parses a custom provider join URL', () => {
+    expect(
+      parseAdminLiveSessionConfig({
+        enabled: true,
+        provider: 'custom',
+        mode: 'video',
+        joinUrl: ' https://meet.example.com/custom-room ',
+      }),
+    ).toEqual({
+      enabled: true,
+      provider: 'custom',
+      mode: 'video',
+      joinUrl: 'https://meet.example.com/custom-room',
     });
   });
 
@@ -49,6 +66,23 @@ describe('live-session-config', () => {
       enabled: true,
       provider: 'jitsi',
       mode: 'video',
+      joinUrl: null,
+    });
+  });
+
+  it('stores a custom join URL when the custom provider is enabled', () => {
+    expect(
+      toStoredLiveSessionConfig({
+        enabled: true,
+        provider: 'custom',
+        mode: 'audio',
+        joinUrl: ' https://meet.example.com/direct ',
+      }),
+    ).toEqual({
+      enabled: true,
+      provider: 'custom',
+      mode: 'audio',
+      joinUrl: 'https://meet.example.com/direct',
     });
   });
 });

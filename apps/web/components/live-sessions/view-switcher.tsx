@@ -48,7 +48,7 @@ export function ViewSwitcher({ currentView, onViewChange }: ViewSwitcherProps) {
       <DropdownMenuTrigger asChild>
         <Button
           variant="outline"
-          className="gap-2 border-white/10 bg-white/5 text-white hover:bg-white/10"
+          className="gap-2"
         >
           <CurrentIcon className="h-4 w-4" />
           <span className="hidden sm:inline">{currentViewOption.label}</span>
@@ -69,7 +69,9 @@ export function ViewSwitcher({ currentView, onViewChange }: ViewSwitcherProps) {
                 <span className="font-medium">{option.label}</span>
                 <span className="text-xs text-muted-foreground">{option.description}</span>
               </div>
-              {currentView === option.id ? <span className="ml-auto">✓</span> : null}
+              {currentView === option.id ? (
+                <span className="ml-auto text-primary">✓</span>
+              ) : null}
             </DropdownMenuItem>
           );
         })}

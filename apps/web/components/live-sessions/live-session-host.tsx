@@ -11,10 +11,7 @@ import {
   getEmbeddedLiveSessionFrameAllow,
   getEmbeddedLiveSessionTitle,
 } from '@iconicedu/web/lib/live-sessions/embed';
-import {
-  getLiveSessionHostHeading,
-  getLiveSessionHostSubheading,
-} from '@iconicedu/web/components/live-sessions/live-session-host.utils';
+import { getLiveSessionHostHeading } from '@iconicedu/web/components/live-sessions/live-session-host.utils';
 
 const DailyLiveSessionEmbed = dynamic(
   () =>
@@ -24,7 +21,7 @@ const DailyLiveSessionEmbed = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex min-h-[70vh] items-center justify-center rounded-2xl border border-border bg-black">
+      <div className="flex min-h-[70vh] items-center justify-center rounded-2xl border border-border bg-card">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
           Loading live session...
@@ -57,17 +54,10 @@ export function LiveSessionHost({
 }) {
   const [isLoaded, setIsLoaded] = useState(false);
   const heading = getLiveSessionHostHeading({ provider, channelTopic });
-  const subheading = getLiveSessionHostSubheading({ purpose: channelPurpose });
 
   if (provider === 'daily' && joinUrl) {
     return (
       <div className="flex flex-1 flex-col gap-4 px-4 py-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-semibold">{heading}</h1>
-            <p className="text-sm text-muted-foreground">{subheading}</p>
-          </div>
-        </div>
         <DailyLiveSessionEmbed
           joinUrl={joinUrl}
           token={token ?? null}
@@ -75,6 +65,7 @@ export function LiveSessionHost({
           channelKind={channelKind ?? null}
           mode={mode ?? null}
           returnPath={returnPath}
+          meetingName={heading}
         />
       </div>
     );
@@ -96,7 +87,7 @@ export function LiveSessionHost({
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">{heading}</h1>
-          <p className="text-sm text-muted-foreground">{subheading}</p>
+          <p className="text-sm text-muted-foreground">{channelPurpose ?? 'Live session'}</p>
         </div>
         <Button asChild variant="outline" size="sm">
           <a href={(externalJoinUrl ?? joinUrl) ?? undefined} target="_blank" rel="noreferrer">
@@ -106,7 +97,7 @@ export function LiveSessionHost({
         </Button>
       </div>
 
-      <div className="relative min-h-0 flex-1 overflow-hidden rounded-2xl border border-border bg-black">
+      <div className="relative min-h-0 flex-1 overflow-hidden rounded-2xl border border-border bg-card">
         {!isLoaded ? (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/80">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">

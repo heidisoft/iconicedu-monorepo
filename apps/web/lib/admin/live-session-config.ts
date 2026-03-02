@@ -8,6 +8,7 @@ export const DEFAULT_ADMIN_LIVE_SESSION_CONFIG: ChannelLiveSessionConfigVM = {
   enabled: false,
   provider: 'daily',
   mode: 'video',
+  joinUrl: null,
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -27,10 +28,16 @@ export function parseAdminLiveSessionConfig(value: unknown): ChannelLiveSessionC
     return null;
   }
 
+  const joinUrl =
+    value.provider === 'custom' && typeof value.joinUrl === 'string' && value.joinUrl.trim().length > 0
+      ? value.joinUrl.trim()
+      : null;
+
   return {
     enabled: value.enabled,
     provider: value.provider,
     mode: isMode(value.mode) ? value.mode : null,
+    joinUrl,
   };
 }
 
@@ -51,5 +58,9 @@ export function toStoredLiveSessionConfig(
     enabled: true,
     provider: value.provider,
     mode: value.mode ?? 'video',
+    joinUrl:
+      value.provider === 'custom' && typeof value.joinUrl === 'string' && value.joinUrl.trim().length > 0
+        ? value.joinUrl.trim()
+        : null,
   };
 }

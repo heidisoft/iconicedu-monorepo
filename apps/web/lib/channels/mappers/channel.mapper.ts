@@ -107,6 +107,10 @@ function parseLiveSessionConfig(value: unknown): ChannelLiveSessionConfigVM | nu
     enabled: value.enabled,
     provider: value.provider,
     mode: value.mode === 'video' || value.mode === 'audio' ? value.mode : null,
+    joinUrl:
+      value.provider === 'custom' && typeof value.joinUrl === 'string' && value.joinUrl.trim().length > 0
+        ? value.joinUrl.trim()
+        : null,
   };
 }
 

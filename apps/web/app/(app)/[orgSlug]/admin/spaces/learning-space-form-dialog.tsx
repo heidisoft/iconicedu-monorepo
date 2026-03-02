@@ -501,6 +501,8 @@ export function LearningSpaceFormDialog({
                               liveSession: {
                                 ...formState.liveSession,
                                 provider: value as LiveSessionProviderVM,
+                                joinUrl:
+                                  value === 'custom' ? formState.liveSession.joinUrl ?? '' : null,
                               },
                             })
                           }
@@ -549,6 +551,29 @@ export function LearningSpaceFormDialog({
                         </Select>
                       </Field>
                     </FieldGroup>
+                    {formState.liveSession.enabled &&
+                      formState.liveSession.provider === 'custom' && (
+                        <Field>
+                          <FieldLabel htmlFor="ls-live-session-join-url">Join URL</FieldLabel>
+                          <Input
+                            id="ls-live-session-join-url"
+                            type="url"
+                            placeholder="https://meet.example.com/room"
+                            value={formState.liveSession.joinUrl ?? ''}
+                            onChange={(event) =>
+                              updateFormState({
+                                liveSession: {
+                                  ...formState.liveSession,
+                                  joinUrl: event.target.value,
+                                },
+                              })
+                            }
+                          />
+                          <FieldDescription>
+                            Used when the custom provider is selected. Channel join actions will open this URL directly.
+                          </FieldDescription>
+                        </Field>
+                      )}
                   </FieldGroup>
                 </FieldSet>
                 <FieldSeparator />

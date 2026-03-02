@@ -63,6 +63,7 @@ export interface ChannelLiveSessionConfigVM {
   enabled: boolean;
   provider: LiveSessionProviderVM;
   mode?: LiveSessionModeVM | null;
+  joinUrl?: string | null;
 }
 
 export interface ChannelQuickActionVM {

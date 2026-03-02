@@ -380,6 +380,11 @@ export function MessagesShellClient({
       throw new Error(payload?.error ?? 'Failed to join live session');
     }
 
+    if (/^https?:\/\//i.test(payload.joinPath)) {
+      window.location.assign(payload.joinPath);
+      return;
+    }
+
     router.push(payload.joinPath);
   }, [channelState.ids.id, orgSlug, router]);
 
