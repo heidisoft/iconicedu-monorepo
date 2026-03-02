@@ -356,6 +356,7 @@ export interface LiveSessionStartedMessageVM extends BaseMessageVM {
     startedByProfileId: UUID;
     startedByDisplayName: string;
     startedAt: ISODateTime;
+    endsAt?: ISODateTime | null;
     occurrenceKey?: ISODateTime | null;
     occurrenceLabel?: string | null;
     status: 'live' | 'ended';

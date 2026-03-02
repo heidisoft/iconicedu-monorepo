@@ -126,6 +126,31 @@ function mapAttachments(
   return attachments as AttachmentVM[];
 }
 
+const DEFAULT_LIVE_SESSION_DURATION_MS = 30 * 60 * 1000;
+
+function resolveLiveSessionStartedStatus(
+  payload: Record<string, unknown> | null | undefined,
+): LiveSessionStartedMessageVM['liveSession']['status'] {
+  if (payload?.status === 'ended') {
+    return 'ended';
+  }
+
+  const startedAt =
+    typeof payload?.startedAt === 'string' ? Date.parse(payload.startedAt) : Number.NaN;
+  const endsAt = typeof payload?.endsAt === 'string' ? Date.parse(payload.endsAt) : Number.NaN;
+  const effectiveEndsAt = Number.isFinite(endsAt)
+    ? endsAt
+    : Number.isFinite(startedAt)
+      ? startedAt + DEFAULT_LIVE_SESSION_DURATION_MS
+      : Number.NaN;
+
+  if (Number.isFinite(effectiveEndsAt) && effectiveEndsAt <= Date.now()) {
+    return 'ended';
+  }
+
+  return 'live';
+}
+
 export function mapMessageRowToVM(
   row: MessageRow,
   input: MessageMapperInput,
@@ -390,12 +415,12 @@ export function mapMessageRowToVM(
             payload?.startedByDisplayName ?? input.sender.profile.displayName,
           ),
           startedAt: String(payload?.startedAt ?? row.created_at),
+          endsAt: typeof payload?.endsAt === 'string' ? payload.endsAt : null,
           occurrenceKey:
             typeof payload?.occurrenceKey === 'string' ? payload.occurrenceKey : null,
           occurrenceLabel:
             typeof payload?.occurrenceLabel === 'string' ? payload.occurrenceLabel : null,
-          status:
-            (payload?.status as LiveSessionStartedMessageVM['liveSession']['status']) ?? 'live',
+          status: resolveLiveSessionStartedStatus(payload),
         },
       } as MessageVM;
     default:

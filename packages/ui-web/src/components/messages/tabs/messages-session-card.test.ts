@@ -13,6 +13,7 @@ const baseSession: ClassSession = {
   dayNum: '3',
   isToday: false,
   isPast: false,
+  endAt: '2026-03-03T17:00:00.000Z',
   status: 'scheduled',
   meetingLink: null,
 };

@@ -58,6 +58,7 @@ export interface ClassSession {
   dayNum: string;
   isToday: boolean;
   isPast: boolean;
+  endAt: string;
   status: ClassScheduleVM['status'];
   meetingLink?: string | null;
   variant?: 'default' | 'exception' | 'override';
@@ -205,8 +206,8 @@ export function splitSchedulesByTimeline(
   const past: DisplaySchedule[] = [];
 
   expandedSchedules.forEach((schedule) => {
-    const startMs = new Date(schedule.startAt).getTime();
-    if (startMs >= nowMs) {
+    const endMs = new Date(schedule.endAt).getTime();
+    if (endMs >= nowMs) {
       upcoming.push(schedule);
       return;
     }
@@ -328,7 +329,8 @@ export function toMonthGroups(
         dayName: shortWeekdayFormatter.format(start),
         dayNum: String(start.getDate()),
         isToday: startDay === nowDay,
-        isPast: start.getTime() < now.getTime(),
+        isPast: new Date(schedule.endAt).getTime() < now.getTime(),
+        endAt: schedule.endAt,
         status: schedule.status,
         meetingLink: schedule.meetingLink ?? null,
         variant: schedule.uiState?.kind ?? 'default',

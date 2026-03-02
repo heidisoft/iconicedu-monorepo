@@ -12,6 +12,7 @@ import type {
   FeedbackRequestMessageVM,
   SessionBookingMessageVM,
   PaymentReminderMessageVM,
+  LiveSessionStartedMessageVM,
   FileMessageVM,
   AudioRecordingMessageVM,
   ImageMessageVM,
@@ -23,7 +24,7 @@ import type {
 import type { AppColors } from '@/lib/theme';
 import { fetchThreadMessages } from '@/lib/api/queries';
 import { EmojiPicker } from './emoji-picker';
-import { SmilePlus, CornerUpLeft, MessageCircle, Download, FileText, ExternalLink, Play, Pause } from 'lucide-react-native';
+import { SmilePlus, CornerUpLeft, MessageCircle, Download, FileText, ExternalLink, Play, Pause, Video } from 'lucide-react-native';
 import { Audio } from 'expo-av';
 import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '@/lib/supabase/client';
@@ -623,6 +624,99 @@ function SessionCompleteBar({ message, colors, s }: { message: SessionCompleteMe
   );
 }
 
+// ─── LiveSessionStartedCard ───────────────────────────────────────────────────
+
+const DEFAULT_LIVE_SESSION_DURATION_MS = 30 * 60 * 1000;
+
+function isLiveSessionEnded(msg: LiveSessionStartedMessageVM): boolean {
+  const ls = msg.liveSession;
+  if (!ls) return true;
+  if (ls.status === 'ended') return true;
+  const startedAt = Date.parse(ls.startedAt);
+  const endsAt = ls.endsAt ? Date.parse(ls.endsAt) : NaN;
+  const effectiveEndsAt = Number.isFinite(endsAt)
+    ? endsAt
+    : Number.isFinite(startedAt) ? startedAt + DEFAULT_LIVE_SESSION_DURATION_MS : NaN;
+  return Number.isFinite(effectiveEndsAt) && effectiveEndsAt <= Date.now();
+}
+
+function LiveSessionStartedCard({ message, colors, s }: { message: LiveSessionStartedMessageVM; colors: AppColors; s: S }) {
+  const liveSession = message.liveSession;
+
+  if (!liveSession) {
+    return (
+      <View style={[s.card, { borderColor: colors.border, backgroundColor: colors.inputBg }]}>
+        <View style={s.cardHeader}>
+          <Video size={16} color={colors.textMuted} />
+          <Text style={[s.cardHeaderLabel, { color: colors.textMuted }]}>Live session</Text>
+        </View>
+      </View>
+    );
+  }
+
+  const ended = isLiveSessionEnded(message);
+
+  return (
+    <View style={[
+      s.card,
+      { borderColor: ended ? colors.border : colors.teal, backgroundColor: ended ? colors.inputBg : colors.card },
+    ]}>
+      {/* Header: icon + label */}
+      <View style={s.cardHeader}>
+        <View style={{
+          width: 28, height: 28, borderRadius: 14,
+          backgroundColor: ended ? colors.border : colors.teal,
+          alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Video size={14} color={ended ? colors.textMuted : colors.tealFg} />
+        </View>
+        <Text style={[s.cardHeaderLabel, { color: ended ? colors.textMuted : colors.teal }]}>
+          {ended ? 'Class ended' : 'Class started'}
+        </Text>
+      </View>
+
+      {/* Title */}
+      <Text style={[s.cardTitle, { color: ended ? colors.textMuted : colors.text }]}>
+        {ended ? 'Class ended' : liveSession.title}
+      </Text>
+
+      {/* Description */}
+      <Text style={[s.cardDesc, { color: colors.textMuted }]}>
+        {liveSession.startedByDisplayName}{' '}
+        {ended
+          ? `ended this ${liveSession.provider} live session.`
+          : `started this ${liveSession.provider} live session.`}
+      </Text>
+
+      {/* Occurrence label */}
+      {!!liveSession.occurrenceLabel && (
+        <Text style={[s.cardDesc, { color: colors.textFaint, fontSize: 12, marginTop: 2 }]}>
+          For {liveSession.occurrenceLabel}
+        </Text>
+      )}
+
+      {/* Join / Ended button */}
+      <TouchableOpacity
+        style={[
+          s.joinBtn,
+          { backgroundColor: ended ? colors.inputBg : colors.teal, borderWidth: ended ? 1 : 0, borderColor: colors.border },
+        ]}
+        disabled={ended}
+        activeOpacity={0.8}
+        onPress={() => {
+          if (!ended && liveSession.joinUrl) {
+            Linking.openURL(liveSession.joinUrl).catch(() => null);
+          }
+        }}
+      >
+        <Text style={{ fontSize: 14, fontWeight: '700', color: ended ? colors.textMuted : colors.tealFg }}>
+          {ended ? 'Class ended' : 'Join'}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 // ─── Styles factory ───────────────────────────────────────────────────────────
 
 function makeStyles(colors: AppColors) {
@@ -741,7 +835,7 @@ function makeStyles(colors: AppColors) {
 const CARD_TYPES = new Set([
   'lesson-assignment', 'session-summary', 'progress-update',
   'event-reminder', 'homework-submission', 'feedback-request',
-  'session-booking', 'payment-reminder',
+  'session-booking', 'payment-reminder', 'live-session-started',
 ]);
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -1338,14 +1432,15 @@ export const MessageItem: React.FC<MessageItemProps> = ({
               <Text style={s.msgTime}>{time}</Text>
             </View>
           )}
-          {type === 'lesson-assignment'   && <AssignmentCard message={message as LessonAssignmentMessageVM} colors={colors} s={s} />}
-          {type === 'session-summary'     && <SessionSummaryCard message={message as SessionSummaryMessageVM} colors={colors} s={s} />}
-          {type === 'progress-update'     && <ProgressCard message={message as ProgressUpdateMessageVM} colors={colors} s={s} />}
-          {type === 'event-reminder'      && <EventCard message={message as EventReminderMessageVM} colors={colors} s={s} />}
-          {type === 'homework-submission' && <HomeworkCard message={message as HomeworkSubmissionMessageVM} colors={colors} s={s} />}
-          {type === 'feedback-request'    && <FeedbackRequestCard message={message as FeedbackRequestMessageVM} colors={colors} s={s} />}
-          {type === 'session-booking'     && <SessionBookingCard message={message as SessionBookingMessageVM} colors={colors} s={s} />}
-          {type === 'payment-reminder'    && <PaymentReminderCard message={message as PaymentReminderMessageVM} colors={colors} s={s} />}
+          {type === 'lesson-assignment'    && <AssignmentCard message={message as LessonAssignmentMessageVM} colors={colors} s={s} />}
+          {type === 'session-summary'      && <SessionSummaryCard message={message as SessionSummaryMessageVM} colors={colors} s={s} />}
+          {type === 'progress-update'      && <ProgressCard message={message as ProgressUpdateMessageVM} colors={colors} s={s} />}
+          {type === 'event-reminder'       && <EventCard message={message as EventReminderMessageVM} colors={colors} s={s} />}
+          {type === 'homework-submission'  && <HomeworkCard message={message as HomeworkSubmissionMessageVM} colors={colors} s={s} />}
+          {type === 'feedback-request'     && <FeedbackRequestCard message={message as FeedbackRequestMessageVM} colors={colors} s={s} />}
+          {type === 'session-booking'      && <SessionBookingCard message={message as SessionBookingMessageVM} colors={colors} s={s} />}
+          {type === 'payment-reminder'     && <PaymentReminderCard message={message as PaymentReminderMessageVM} colors={colors} s={s} />}
+          {type === 'live-session-started' && <LiveSessionStartedCard message={message as LiveSessionStartedMessageVM} colors={colors} s={s} />}
           <SocialBar
             reactions={reactions}
             thread={thread}

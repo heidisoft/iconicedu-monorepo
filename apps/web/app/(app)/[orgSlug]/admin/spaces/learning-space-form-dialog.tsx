@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 
 import {
   Button,
-  Checkbox,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -21,10 +20,6 @@ import {
   FieldSet,
   FieldSeparator,
   Input,
-  Label,
-  ScrollArea,
-  ScrollBar,
-  Plus,
   Select,
   SelectContent,
   SelectGroup,
@@ -32,6 +27,9 @@ import {
   SelectLabel,
   SelectTrigger,
   SelectValue,
+  ScrollArea,
+  ScrollBar,
+  Plus,
   ChannelUiDefaultsSettingsSection,
   toast,
   ResourceLinksEditor,
@@ -51,8 +49,6 @@ import type {
   ChannelUiDefaultsVM,
   LearningSpaceCreatePayload,
   LearningSpaceLinkVM,
-  LiveSessionModeVM,
-  LiveSessionProviderVM,
   ThemeKey,
   UserProfileVM,
 } from '@iconicedu/shared-types';
@@ -60,6 +56,7 @@ import {
   mapSchedulesToPayload,
   normalizeSchedules,
 } from '@iconicedu/web/app/(app)/[orgSlug]/admin/spaces/learning-space-form-dialog.utils';
+import { LiveSessionSettingsSection } from '@iconicedu/web/components/admin/live-session-settings-section';
 import { DEFAULT_ADMIN_LIVE_SESSION_CONFIG } from '@iconicedu/web/lib/admin/live-session-config';
 
 const KIND_OPTIONS = [
@@ -69,9 +66,6 @@ const KIND_OPTIONS = [
 ];
 
 const SUBJECT_OPTIONS = ['MATH', 'SCIENCE', 'ELA', 'CHESS'];
-const LIVE_SESSION_PROVIDER_OPTIONS: LiveSessionProviderVM[] = ['daily', 'zoom', 'jitsi', 'custom'];
-const LIVE_SESSION_MODE_OPTIONS: LiveSessionModeVM[] = ['video', 'audio'];
-
 const mapLinksToPayload = (links: LearningSpaceLinkVM[]) =>
   links.map((resource) => ({
     label: resource.label,
@@ -469,113 +463,18 @@ export function LearningSpaceFormDialog({
                   />
                 </FieldSet>
                 <FieldSeparator />
-                <FieldSet>
-                  <FieldLegend>Live sessions</FieldLegend>
-                  <FieldDescription>
-                    Configure the primary channel’s live session provider and mode for this learning space.
-                  </FieldDescription>
-                  <FieldGroup>
-                    <div className="flex flex-wrap gap-4 pt-2">
-                      <Label className="flex items-center gap-2 text-sm">
-                        <Checkbox
-                          checked={formState.liveSession.enabled}
-                          onCheckedChange={(checked) =>
-                            updateFormState({
-                              liveSession: {
-                                ...formState.liveSession,
-                                enabled: checked === true,
-                              },
-                            })
-                          }
-                        />
-                        Enable live sessions
-                      </Label>
-                    </div>
-                    <FieldGroup className="grid gap-3 md:grid-cols-2">
-                      <Field>
-                        <FieldLabel htmlFor="ls-live-session-provider">Provider</FieldLabel>
-                        <Select
-                          value={formState.liveSession.provider}
-                          onValueChange={(value) =>
-                            updateFormState({
-                              liveSession: {
-                                ...formState.liveSession,
-                                provider: value as LiveSessionProviderVM,
-                                joinUrl:
-                                  value === 'custom' ? formState.liveSession.joinUrl ?? '' : null,
-                              },
-                            })
-                          }
-                          disabled={!formState.liveSession.enabled}
-                        >
-                          <SelectTrigger id="ls-live-session-provider">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectGroup>
-                              {LIVE_SESSION_PROVIDER_OPTIONS.map((provider) => (
-                                <SelectItem key={provider} value={provider}>
-                                  {provider}
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          </SelectContent>
-                        </Select>
-                      </Field>
-                      <Field>
-                        <FieldLabel htmlFor="ls-live-session-mode">Mode</FieldLabel>
-                        <Select
-                          value={formState.liveSession.mode ?? 'video'}
-                          onValueChange={(value) =>
-                            updateFormState({
-                              liveSession: {
-                                ...formState.liveSession,
-                                mode: value as LiveSessionModeVM,
-                              },
-                            })
-                          }
-                          disabled={!formState.liveSession.enabled}
-                        >
-                          <SelectTrigger id="ls-live-session-mode">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectGroup>
-                              {LIVE_SESSION_MODE_OPTIONS.map((mode) => (
-                                <SelectItem key={mode} value={mode}>
-                                  {mode}
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          </SelectContent>
-                        </Select>
-                      </Field>
-                    </FieldGroup>
-                    {formState.liveSession.enabled &&
-                      formState.liveSession.provider === 'custom' && (
-                        <Field>
-                          <FieldLabel htmlFor="ls-live-session-join-url">Join URL</FieldLabel>
-                          <Input
-                            id="ls-live-session-join-url"
-                            type="url"
-                            placeholder="https://meet.example.com/room"
-                            value={formState.liveSession.joinUrl ?? ''}
-                            onChange={(event) =>
-                              updateFormState({
-                                liveSession: {
-                                  ...formState.liveSession,
-                                  joinUrl: event.target.value,
-                                },
-                              })
-                            }
-                          />
-                          <FieldDescription>
-                            Used when the custom provider is selected. Channel join actions will open this URL directly.
-                          </FieldDescription>
-                        </Field>
-                      )}
-                  </FieldGroup>
-                </FieldSet>
+                <LiveSessionSettingsSection
+                  description="Configure the primary channel’s live session provider and mode for this learning space."
+                  providerSelectId="ls-live-session-provider"
+                  modeSelectId="ls-live-session-mode"
+                  joinUrlInputId="ls-live-session-join-url"
+                  value={formState.liveSession}
+                  onChange={(nextLiveSession) =>
+                    updateFormState({
+                      liveSession: nextLiveSession,
+                    })
+                  }
+                />
                 <FieldSeparator />
                 <FieldSet data-invalid={participantsInvalid}>
                   <FieldLegend>

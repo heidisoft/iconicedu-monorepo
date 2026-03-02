@@ -45,8 +45,20 @@ describe('messages-schedule-tab.utils', () => {
     ];
 
     const { upcoming, past } = splitSchedulesByTimeline(schedules, now);
-    expect(upcoming.map((item) => item.ids.id)).toEqual(['1', '3']);
-    expect(past.map((item) => item.ids.id)).toEqual(['2', '4']);
+    expect(upcoming.map((item) => item.ids.id)).toEqual(['2', '1', '3']);
+    expect(past.map((item) => item.ids.id)).toEqual(['4']);
+  });
+
+  it('keeps a session upcoming until its end time passes', () => {
+    const schedule = buildSchedule('active-1', '2026-03-01T09:30:00.000Z');
+
+    const { upcoming, past } = splitSchedulesByTimeline(
+      [schedule],
+      new Date('2026-03-01T10:00:00.000Z'),
+    );
+
+    expect(upcoming.map((item) => item.ids.id)).toEqual(['active-1']);
+    expect(past).toHaveLength(0);
   });
 
   it('formats status labels', () => {
@@ -258,6 +270,7 @@ describe('messages-schedule-tab.utils', () => {
         id: '1',
         dayName: 'Tue',
         dayNum: '3',
+        endAt: '2026-03-03T17:00:00.000Z',
         isToday: true,
         variant: 'default',
       }),

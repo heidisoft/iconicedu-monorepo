@@ -54,6 +54,7 @@ export interface LiveSessionProviderAdapter {
 export type ResolvedLiveSessionScope = {
   scopeKey: string;
   occurrenceKey?: string | null;
+  occurrenceEndAt?: string | null;
   occurrenceLabel?: string | null;
   schedule?: ClassScheduleVM | null;
 };

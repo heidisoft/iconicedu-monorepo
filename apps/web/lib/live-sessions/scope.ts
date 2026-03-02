@@ -64,6 +64,7 @@ export async function resolveChannelLiveSessionScope(input: {
     return {
       scopeKey: `occurrence:${relevantOccurrence.startAt}`,
       occurrenceKey: relevantOccurrence.startAt,
+      occurrenceEndAt: relevantOccurrence.endAt,
       occurrenceLabel: buildOccurrenceLabel(schedule, relevantOccurrence.startAt),
       schedule,
     };
@@ -72,6 +73,7 @@ export async function resolveChannelLiveSessionScope(input: {
   return {
     scopeKey: `channel:${input.channelId}`,
     occurrenceKey: null,
+    occurrenceEndAt: null,
     occurrenceLabel: null,
     schedule: null,
   };

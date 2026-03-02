@@ -17,6 +17,7 @@ export * from './vm/learning-space';
 export * from './vm/org';
 export * from './vm/onboarding';
 export * from './vm/availability';
+export * from './vm/live-session';
 export * from './rows';
 export * from './shared/grades';
 export * from './payloads/learning-space';

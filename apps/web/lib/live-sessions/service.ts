@@ -366,6 +366,7 @@ async function insertLiveSessionStartedMessage(input: {
   provider: LiveSessionProviderVM;
   sessionId: string;
   occurrenceKey?: string | null;
+  occurrenceEndAt?: string | null;
   occurrenceLabel?: string | null;
 }) {
   const now = new Date().toISOString();
@@ -402,6 +403,7 @@ async function insertLiveSessionStartedMessage(input: {
         startedByProfileId: input.actorProfileId,
         startedByDisplayName: input.actorDisplayName,
         startedAt: now,
+        endsAt: input.occurrenceEndAt ?? null,
         occurrenceKey: input.occurrenceKey ?? null,
         occurrenceLabel: input.occurrenceLabel ?? null,
         status: 'live',
@@ -465,20 +467,6 @@ export async function createOrJoinLiveSession(input: {
     throw new Error('Live sessions are not enabled for this channel');
   }
 
-  if (liveSessionConfig.provider === 'custom') {
-    if (!liveSessionConfig.joinUrl) {
-      throw new Error('Custom live session join URL is missing');
-    }
-
-    return {
-      sessionId: `external:${channelResponse.data.id}`,
-      joinPath: liveSessionConfig.joinUrl,
-      status: 'live',
-      created: false,
-      provider: liveSessionConfig.provider,
-    };
-  }
-
   const scope = await resolveChannelLiveSessionScope({
     supabase: input.serviceSupabase,
     orgId: channelResponse.data.org_id,
@@ -524,7 +512,14 @@ export async function createOrJoinLiveSession(input: {
   }
 
   const now = new Date().toISOString();
-  const joinPath = `/${input.orgSlug}/live-sessions/temp`;
+  const joinPath =
+    liveSessionConfig.provider === 'custom'
+      ? liveSessionConfig.joinUrl ?? ''
+      : `/${input.orgSlug}/live-sessions/temp`;
+
+  if (liveSessionConfig.provider === 'custom' && !joinPath) {
+    throw new Error('Custom live session join URL is missing');
+  }
   const insertResponse = await input.serviceSupabase
     .from('channel_live_sessions')
     .insert({
@@ -582,9 +577,105 @@ export async function createOrJoinLiveSession(input: {
   }
 
   const session = insertResponse.data;
-  const provider = getLiveSessionProvider(liveSessionConfig.provider);
 
   try {
+    if (liveSessionConfig.provider === 'custom') {
+      const updateResponse = await input.serviceSupabase
+        .from('channel_live_sessions')
+        .update({
+          provider_metadata: {},
+          join_path: joinPath,
+          status: 'live',
+          updated_at: new Date().toISOString(),
+          updated_by: profileResponse.data.id,
+        })
+        .eq('id', session.id)
+        .eq('org_id', session.org_id)
+        .select('*')
+        .single<ChannelLiveSessionRowRecord>();
+
+      if (updateResponse.error) {
+        throw new Error(updateResponse.error.message);
+      }
+
+      const messageSenderProfileId =
+        (await findSystemProfileId(input.serviceSupabase, session.org_id)) ?? profileResponse.data.id;
+      const title =
+        channelResponse.data.purpose === 'learning-space'
+          ? 'Class started'
+          : 'Live session started';
+      const startedMessageId = await insertLiveSessionStartedMessage({
+        supabase: input.serviceSupabase,
+        orgId: session.org_id,
+        channelId: session.channel_id,
+        senderProfileId: messageSenderProfileId,
+        actorProfileId: profileResponse.data.id,
+        actorDisplayName:
+          profileResponse.data.display_name ??
+          ([profileResponse.data.first_name, profileResponse.data.last_name]
+            .filter(Boolean)
+            .join(' ') || 'User'),
+        title,
+        joinUrl: joinPath,
+        provider: liveSessionConfig.provider,
+        sessionId: session.id,
+        occurrenceKey: scope.occurrenceKey ?? null,
+        occurrenceEndAt: scope.occurrenceEndAt ?? null,
+        occurrenceLabel: scope.occurrenceLabel ?? null,
+      });
+
+      await input.serviceSupabase
+        .from('channel_live_sessions')
+        .update({
+          started_message_id: startedMessageId,
+          updated_at: new Date().toISOString(),
+          updated_by: profileResponse.data.id,
+        })
+        .eq('id', session.id)
+        .eq('org_id', session.org_id);
+
+      await upsertJoinRequestedParticipant({
+        supabase: input.serviceSupabase,
+        session: updateResponse.data,
+        profileId: profileResponse.data.id,
+      });
+      await insertParticipantEvent({
+        supabase: input.serviceSupabase,
+        orgId: session.org_id,
+        channelId: session.channel_id,
+        liveSessionId: session.id,
+        provider: liveSessionConfig.provider,
+        eventType: 'session_started',
+        profileId: profileResponse.data.id,
+        payload: {
+          startedMessageId,
+          external: true,
+        },
+      });
+      await insertParticipantEvent({
+        supabase: input.serviceSupabase,
+        orgId: session.org_id,
+        channelId: session.channel_id,
+        liveSessionId: session.id,
+        provider: liveSessionConfig.provider,
+        eventType: 'join_requested',
+        profileId: profileResponse.data.id,
+        payload: {
+          created: true,
+          external: true,
+        },
+      });
+
+      return {
+        sessionId: session.id,
+        joinPath,
+        status: 'live',
+        created: true,
+        provider: liveSessionConfig.provider,
+      };
+    }
+
+    const provider = getLiveSessionProvider(liveSessionConfig.provider);
     const providerSession = await provider.createSession({
       sessionId: session.id,
       orgId: session.org_id,
@@ -635,6 +726,7 @@ export async function createOrJoinLiveSession(input: {
       provider: liveSessionConfig.provider,
       sessionId: session.id,
       occurrenceKey: scope.occurrenceKey ?? null,
+      occurrenceEndAt: scope.occurrenceEndAt ?? null,
       occurrenceLabel: scope.occurrenceLabel ?? null,
     });
 

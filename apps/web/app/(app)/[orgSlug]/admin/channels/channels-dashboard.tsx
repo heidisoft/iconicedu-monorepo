@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 
 import {
   Button,
-  Checkbox,
   Loader2,
   Dialog,
   DialogContent,
@@ -23,7 +22,6 @@ import {
   FieldSeparator,
   Input,
   Textarea,
-  Label,
   Plus,
   ParticipantSelector,
   RotateCw,
@@ -44,19 +42,16 @@ import type {
   ChannelStatus,
   ChannelVisibility,
   ChannelCreatePayload,
-  LiveSessionModeVM,
-  LiveSessionProviderVM,
   ChannelPostingPolicyVM,
   ChannelUiDefaultsVM,
   UserProfileVM,
 } from '@iconicedu/shared-types';
 import { ChannelsTable } from '@iconicedu/web/app/(app)/[orgSlug]/admin/channels/channels-table';
+import { LiveSessionSettingsSection } from '@iconicedu/web/components/admin/live-session-settings-section';
 import type { ChannelDetail } from '@iconicedu/web/lib/admin/channel-detail';
 import { DEFAULT_ADMIN_LIVE_SESSION_CONFIG } from '@iconicedu/web/lib/admin/live-session-config';
 
 const PAGE_SIZES = [10, 25, 50];
-const LIVE_SESSION_PROVIDER_OPTIONS: LiveSessionProviderVM[] = ['daily', 'zoom', 'jitsi', 'custom'];
-const LIVE_SESSION_MODE_OPTIONS: LiveSessionModeVM[] = ['video', 'audio'];
 
 type ChannelsDashboardProps = {
   rows: AdminChannelRow[];
@@ -495,109 +490,18 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
                 </FieldGroup>
               </FieldSet>
               <FieldSeparator />
-              <FieldSet>
-                <FieldLegend>Live sessions</FieldLegend>
-                <FieldDescription>
-                  Configure how members can start and join live sessions from the channel header.
-                </FieldDescription>
-                <FieldGroup>
-                  <div className="flex flex-wrap gap-4 pt-2">
-                    <Label className="flex items-center gap-2 text-sm">
-                      <Checkbox
-                        checked={formState.liveSession.enabled}
-                        onCheckedChange={(checked) =>
-                          updateFormState({
-                            liveSession: {
-                              ...formState.liveSession,
-                              enabled: checked === true,
-                            },
-                          })
-                        }
-                      />
-                      Enable live sessions
-                    </Label>
-                  </div>
-                  <FieldGroup className="grid gap-3 md:grid-cols-2">
-                    <Field>
-                      <FieldLabel htmlFor="channel-live-session-provider">Provider</FieldLabel>
-                      <Select
-                        value={formState.liveSession.provider}
-                        onValueChange={(value) =>
-                          updateFormState({
-                            liveSession: {
-                              ...formState.liveSession,
-                              provider: value as LiveSessionProviderVM,
-                              joinUrl:
-                                value === 'custom' ? formState.liveSession.joinUrl ?? '' : null,
-                            },
-                          })
-                        }
-                        disabled={!formState.liveSession.enabled}
-                      >
-                        <SelectTrigger id="channel-live-session-provider">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {LIVE_SESSION_PROVIDER_OPTIONS.map((provider) => (
-                            <SelectItem key={provider} value={provider}>
-                              {provider}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </Field>
-                    <Field>
-                      <FieldLabel htmlFor="channel-live-session-mode">Mode</FieldLabel>
-                      <Select
-                        value={formState.liveSession.mode ?? 'video'}
-                        onValueChange={(value) =>
-                          updateFormState({
-                            liveSession: {
-                              ...formState.liveSession,
-                              mode: value as LiveSessionModeVM,
-                            },
-                          })
-                        }
-                        disabled={!formState.liveSession.enabled}
-                      >
-                        <SelectTrigger id="channel-live-session-mode">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {LIVE_SESSION_MODE_OPTIONS.map((mode) => (
-                            <SelectItem key={mode} value={mode}>
-                              {mode}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                        </Select>
-                      </Field>
-                    </FieldGroup>
-                    {formState.liveSession.enabled &&
-                      formState.liveSession.provider === 'custom' && (
-                        <Field>
-                          <FieldLabel htmlFor="channel-live-session-join-url">Join URL</FieldLabel>
-                          <Input
-                            id="channel-live-session-join-url"
-                            type="url"
-                            placeholder="https://meet.example.com/room"
-                            value={formState.liveSession.joinUrl ?? ''}
-                            onChange={(event) =>
-                              updateFormState({
-                                liveSession: {
-                                  ...formState.liveSession,
-                                  joinUrl: event.target.value,
-                                },
-                              })
-                            }
-                          />
-                          <FieldDescription>
-                            Used when the custom provider is selected. Channel join actions will open this URL directly.
-                          </FieldDescription>
-                        </Field>
-                      )}
-                </FieldGroup>
-              </FieldSet>
+              <LiveSessionSettingsSection
+                description="Configure how members can start and join live sessions from the channel header."
+                providerSelectId="channel-live-session-provider"
+                modeSelectId="channel-live-session-mode"
+                joinUrlInputId="channel-live-session-join-url"
+                value={formState.liveSession}
+                onChange={(nextLiveSession) =>
+                  updateFormState({
+                    liveSession: nextLiveSession,
+                  })
+                }
+              />
               <FieldSeparator />
               <FieldSet>
                 <FieldLegend>Participants</FieldLegend>
