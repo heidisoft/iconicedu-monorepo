@@ -144,7 +144,7 @@ export async function buildMessagesByThreadId(
   supabase: SupabaseClient,
   orgId: string,
   threadId: string,
-  options: { accountId?: string; parentMessageId?: string | null } = {},
+  options: { accountId?: string; profileId?: string; parentMessageId?: string | null } = {},
 ): Promise<MessageVM[]> {
   const response = await getMessagesByThreadId(supabase, orgId, threadId, {
     parentMessageId: options.parentMessageId,
