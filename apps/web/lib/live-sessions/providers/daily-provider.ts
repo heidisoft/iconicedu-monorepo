@@ -63,6 +63,7 @@ async function createDailyRoom(input: LiveSessionProviderCreateInput): Promise<D
         start_video_off: input.mode === 'audio',
         start_audio_off: false,
         enable_screenshare: input.mode === 'video',
+        enable_recording: 'cloud',
       },
     }),
   });
@@ -81,6 +82,7 @@ async function createDailyMeetingToken(input: {
   roomName: string;
   profileId: string;
   displayName: string;
+  mode: 'video' | 'audio';
 }): Promise<DailyMeetingTokenResponse> {
   const config = getDailyConfig();
   if (!config.apiKey) {
@@ -98,6 +100,7 @@ async function createDailyMeetingToken(input: {
         room_name: input.roomName,
         user_id: input.profileId,
         user_name: input.displayName,
+        start_cloud_recording: true,
       },
     }),
   });
@@ -208,6 +211,7 @@ export const dailyLiveSessionProvider: LiveSessionProviderAdapter = {
         roomId: room.id ?? null,
         roomName: room.name ?? null,
         roomUrl: room.url ?? null,
+        mode: input.mode,
       },
     };
   },
@@ -229,6 +233,10 @@ export const dailyLiveSessionProvider: LiveSessionProviderAdapter = {
       roomName,
       profileId: input.profileId,
       displayName: input.displayName,
+      mode:
+        input.providerMetadata?.mode === 'audio' || input.providerMetadata?.mode === 'video'
+          ? input.providerMetadata.mode
+          : 'video',
     });
 
     if (!tokenResponse.token) {
@@ -236,11 +244,12 @@ export const dailyLiveSessionProvider: LiveSessionProviderAdapter = {
     }
 
     return {
-      joinUrl: `${roomUrl}?t=${encodeURIComponent(tokenResponse.token)}`,
+      joinUrl: roomUrl,
       token: tokenResponse.token,
       metadata: {
         roomName,
         roomUrl,
+        externalJoinUrl: `${roomUrl}?t=${encodeURIComponent(tokenResponse.token)}`,
       },
     };
   },

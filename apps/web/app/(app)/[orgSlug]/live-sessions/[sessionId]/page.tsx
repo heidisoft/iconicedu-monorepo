@@ -1,8 +1,20 @@
 import { DashboardHeader } from '@iconicedu/ui-web';
 import { getDashboardAccountContext, getDashboardProfileContext } from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
 import { LiveSessionHost } from '@iconicedu/web/components/live-sessions/live-session-host';
+import { getLiveSessionReturnPath } from '@iconicedu/web/components/live-sessions/live-session-host.utils';
 import { resolveLiveSessionJoinAccess } from '@iconicedu/web/lib/live-sessions/service';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
+
+function parseLiveSessionMode(value: unknown): 'video' | 'audio' | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  return candidate.mode === 'audio' || candidate.mode === 'video'
+    ? candidate.mode
+    : null;
+}
 
 export default async function Page({
   params,
@@ -26,11 +38,22 @@ export default async function Page({
     });
     const channelResponse = await serviceSupabase
       .from('channels')
-      .select('topic, purpose')
+      .select('topic, purpose, kind, live_session_config')
       .eq('id', session.channel_id)
       .eq('org_id', session.org_id)
       .is('deleted_at', null)
-      .maybeSingle<{ topic: string; purpose: string }>();
+      .maybeSingle<{
+        topic: string;
+        purpose: string;
+        kind: string;
+        live_session_config?: Record<string, unknown> | null;
+      }>();
+    const returnPath = getLiveSessionReturnPath({
+      orgSlug,
+      channelId: session.channel_id,
+      channelKind: channelResponse.data?.kind ?? null,
+      channelPurpose: channelResponse.data?.purpose ?? null,
+    });
 
     return (
       <div className="flex h-[calc(100vh-1rem)] flex-col">
@@ -38,8 +61,17 @@ export default async function Page({
         <LiveSessionHost
           provider={session.provider as 'daily' | 'zoom' | 'jitsi' | 'custom'}
           joinUrl={joinAccess.joinUrl ?? null}
+          token={joinAccess.token ?? null}
+          externalJoinUrl={
+            typeof joinAccess.metadata?.externalJoinUrl === 'string'
+              ? joinAccess.metadata.externalJoinUrl
+              : null
+          }
+          channelKind={channelResponse.data?.kind ?? null}
+          mode={parseLiveSessionMode(channelResponse.data?.live_session_config)}
           channelTopic={channelResponse.data?.topic ?? null}
           channelPurpose={channelResponse.data?.purpose ?? null}
+          returnPath={returnPath}
         />
       </div>
     );

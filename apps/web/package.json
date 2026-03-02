@@ -18,6 +18,8 @@
     "clean": "rm -rf .next"
   },
   "dependencies": {
+    "@daily-co/daily-js": "^0.87.0",
+    "@daily-co/daily-react": "^0.24.0",
     "@flags-sdk/vercel": "^1.0.1",
     "@iconicedu/shared-types": "workspace:*",
     "@iconicedu/ui-web": "workspace:*",
@@ -28,6 +30,7 @@
     "@vercel/flags-core": "^1.0.1",
     "@vercel/speed-insights": "^1.0.12",
     "flags": "^4.0.3",
+    "jotai": "^2.18.0",
     "next": "^15.2.0",
     "posthog-js": "^1.356.1",
     "posthog-node": "^5.26.0",
