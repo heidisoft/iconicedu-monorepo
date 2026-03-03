@@ -15,6 +15,8 @@ import {
 import {
   formatAttendanceDateTime,
   formatAttendanceDuration,
+  formatAttendancePercent,
+  getParticipantAttendanceTone,
 } from '@iconicedu/web/app/(app)/[orgSlug]/admin/attendance/sessions/live-session-attendance.utils';
 
 type LiveSessionAttendanceDetailProps = {
@@ -34,6 +36,12 @@ export function LiveSessionAttendanceDetail({ detail }: LiveSessionAttendanceDet
           <div>Started: {formatAttendanceDateTime(detail.session.startedAt)}</div>
           <div>Ended: {formatAttendanceDateTime(detail.session.endedAt)}</div>
           <div>Duration: {formatAttendanceDuration(detail.session.metrics.durationSeconds)}</div>
+          <div>Expected: {detail.session.metrics.expectedParticipantCount}</div>
+          <div>Attendees: {detail.session.metrics.attendeeCount}</div>
+          <div>Full attendance: {detail.session.metrics.fullAttendanceCount}</div>
+          <div>Partial attendance: {detail.session.metrics.partialAttendanceCount}</div>
+          <div>No-show: {detail.session.metrics.noShowCount}</div>
+          <div>Full threshold: {detail.policy.fullAttendanceThresholdPercent}%</div>
           <div>Starter: {detail.session.startedBy?.profile.displayName ?? 'System'}</div>
           <div>
             Status:{' '}
@@ -51,10 +59,12 @@ export function LiveSessionAttendanceDetail({ detail }: LiveSessionAttendanceDet
             <TableRow>
               <TableHead>Participant</TableHead>
               <TableHead>Type</TableHead>
-              <TableHead>Attended</TableHead>
+              <TableHead>Expected</TableHead>
               <TableHead>First joined</TableHead>
               <TableHead>Last left</TableHead>
               <TableHead>Duration</TableHead>
+              <TableHead>Required</TableHead>
+              <TableHead>Attendance</TableHead>
               <TableHead>Joins</TableHead>
               <TableHead>Status</TableHead>
             </TableRow>
@@ -64,17 +74,49 @@ export function LiveSessionAttendanceDetail({ detail }: LiveSessionAttendanceDet
               <TableRow key={row.ids.id}>
                 <TableCell>{row.participant?.profile.displayName ?? 'Unknown user'}</TableCell>
                 <TableCell className="capitalize">{row.participant?.kind ?? 'unknown'}</TableCell>
-                <TableCell>{row.attended ? 'Yes' : 'No'}</TableCell>
+                <TableCell>{row.expectedToAttend ? 'Yes' : 'No'}</TableCell>
                 <TableCell>{formatAttendanceDateTime(row.firstJoinedAt)}</TableCell>
                 <TableCell>{formatAttendanceDateTime(row.lastLeftAt)}</TableCell>
-                <TableCell>{formatAttendanceDuration(row.totalSeconds)}</TableCell>
+                <TableCell>{formatAttendanceDuration(row.creditedSeconds ?? row.totalSeconds)}</TableCell>
+                <TableCell>{formatAttendanceDuration(row.requiredSeconds)}</TableCell>
+                <TableCell>{formatAttendancePercent(row.attendanceRatio)}</TableCell>
                 <TableCell>{row.joinCount}</TableCell>
-                <TableCell className="capitalize">{row.lastKnownStatus}</TableCell>
+                <TableCell>
+                  <Badge variant={getParticipantAttendanceTone(row.attendanceStatus)} className="capitalize">
+                    {row.attendanceStatus.replace('_', ' ')}
+                  </Badge>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </div>
+
+      {detail.timeline?.length ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Timeline</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {detail.timeline.map((event) => (
+              <div key={event.id} className="flex items-center justify-between gap-4 text-sm">
+                <div className="flex flex-col gap-1">
+                  <span className="font-medium capitalize text-foreground">
+                    {event.eventType.replace(/_/g, ' ')}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {event.participantDisplayName ?? event.providerParticipantId ?? 'System'}
+                  </span>
+                </div>
+                <div className="text-right text-muted-foreground">
+                  <div>{formatAttendanceDateTime(event.occurredAt)}</div>
+                  <div className="capitalize">{event.source.replace('_', ' ')}</div>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }

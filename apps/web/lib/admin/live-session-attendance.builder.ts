@@ -1,4 +1,5 @@
 import type {
+  ChannelLiveSessionParticipantEventRow,
   ChannelLiveSessionParticipantRow,
   ChannelLiveSessionRow,
   ChannelRow,
@@ -7,6 +8,8 @@ import type {
   LiveSessionAttendanceDetailVM,
   LiveSessionAttendanceListItemVM,
   LiveSessionAttendanceParticipantVM,
+  LiveSessionAttendancePolicyVM,
+  LiveSessionParticipantTimelineVM,
   ProfileRow,
 } from '@iconicedu/shared-types';
 
@@ -78,24 +81,91 @@ function buildMetrics(
   participants: ChannelLiveSessionParticipantRow[],
 ) {
   const participantCount = participants.length;
+  const expectedParticipantCount =
+    session.expected_participant_count ??
+    participants.filter((row) => row.expected_to_attend === true).length;
   const attendeeRows = participants.filter((row) => Boolean(row.first_joined_at));
-  const attendeeCount = attendeeRows.length;
-  const noShowCount = participants.filter(
-    (row) => Boolean(row.join_requested_at) && !row.first_joined_at,
-  ).length;
+  const attendeeCount = session.attendee_count ?? attendeeRows.length;
+  const fullAttendanceCount =
+    session.full_attendance_count ??
+    participants.filter((row) => row.attendance_status === 'full').length;
+  const partialAttendanceCount =
+    session.partial_attendance_count ??
+    participants.filter((row) => row.attendance_status === 'partial').length;
+  const noShowCount =
+    session.no_show_count ??
+    participants.filter((row) => row.attendance_status === 'no_show').length;
   const durations = attendeeRows
-    .map((row) => row.total_seconds ?? null)
+    .map((row) => row.credited_seconds ?? row.total_seconds ?? null)
     .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+  const denominator = expectedParticipantCount || participantCount || 0;
 
   return {
     participantCount,
+    expectedParticipantCount,
     attendeeCount,
+    fullAttendanceCount,
+    partialAttendanceCount,
     noShowCount,
+    attendanceRate: denominator ? attendeeCount / denominator : null,
+    fullAttendanceRate: denominator ? fullAttendanceCount / denominator : null,
     averageAttendanceSeconds: durations.length
       ? Math.round(durations.reduce((sum, value) => sum + value, 0) / durations.length)
       : null,
-    durationSeconds: resolveDurationSeconds(session),
+    durationSeconds: session.session_duration_seconds ?? resolveDurationSeconds(session),
   };
+}
+
+function resolveAttendancePolicy(
+  session: ChannelLiveSessionRow,
+): LiveSessionAttendancePolicyVM {
+  const value = session.attendance_policy;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {
+      fullAttendanceThresholdPercent: 90,
+      graceSeconds: 0,
+      countLateJoinAsAttended: true,
+      countRejoins: true,
+      source: 'hybrid',
+    };
+  }
+
+  return {
+    fullAttendanceThresholdPercent:
+      typeof value.fullAttendanceThresholdPercent === 'number'
+        ? value.fullAttendanceThresholdPercent
+        : 90,
+    graceSeconds: typeof value.graceSeconds === 'number' ? value.graceSeconds : 0,
+    countLateJoinAsAttended:
+      typeof value.countLateJoinAsAttended === 'boolean'
+        ? value.countLateJoinAsAttended
+        : true,
+    countRejoins:
+      typeof value.countRejoins === 'boolean' ? value.countRejoins : true,
+    source: 'hybrid',
+  };
+}
+
+function buildTimeline(
+  events: ChannelLiveSessionParticipantEventRow[],
+  profiles: ProfileRow[],
+): LiveSessionParticipantTimelineVM[] {
+  const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
+  return events.map((event) => ({
+    id: event.id,
+    liveSessionId: event.live_session_id,
+    profileId: event.profile_id ?? null,
+    participantDisplayName: event.profile_id
+      ? (profileById.get(event.profile_id)?.display_name ?? null)
+      : null,
+    providerParticipantId: event.provider_participant_id ?? null,
+    provider: event.provider as LiveSessionParticipantTimelineVM['provider'],
+    eventType: event.event_type as LiveSessionParticipantTimelineVM['eventType'],
+    occurredAt: event.occurred_at,
+    source: event.source as LiveSessionParticipantTimelineVM['source'],
+    correlationKey: event.correlation_key ?? null,
+    payload: event.payload ?? null,
+  }));
 }
 
 export function buildLiveSessionAttendanceListItemVM(input: {
@@ -125,6 +195,7 @@ export function buildLiveSessionAttendanceListItemVM(input: {
     failedAt: input.session.failed_at ?? null,
     failureReason: input.session.failure_reason ?? null,
     joinPath: input.session.join_path,
+    reportGeneratedAt: input.session.report_generated_at ?? null,
     startedBy: toProfileSummary(input.starterProfile),
     metrics: buildMetrics(input.session, input.participants),
   };
@@ -151,7 +222,17 @@ export function buildLiveSessionAttendanceParticipantVM(input: {
     totalSeconds: input.participantRow.total_seconds ?? null,
     lastKnownStatus: (input.participantRow.last_known_status ?? 'requested') as LiveSessionAttendanceParticipantVM['lastKnownStatus'],
     attended: Boolean(input.participantRow.first_joined_at),
-    noShow: Boolean(input.participantRow.join_requested_at) && !input.participantRow.first_joined_at,
+    noShow: input.participantRow.attendance_status === 'no_show',
+    expectedToAttend: input.participantRow.expected_to_attend === true,
+    attendanceStatus:
+      (input.participantRow.attendance_status as LiveSessionAttendanceParticipantVM['attendanceStatus']) ??
+      (input.participantRow.first_joined_at ? 'partial' : 'expected'),
+    attendanceRatio: input.participantRow.attendance_ratio ?? null,
+    qualifiedFullAttendance: input.participantRow.qualified_full_attendance === true,
+    requiredSeconds: input.participantRow.required_seconds ?? null,
+    creditedSeconds:
+      input.participantRow.credited_seconds ?? input.participantRow.total_seconds ?? null,
+    evaluationReason: input.participantRow.evaluation_reason ?? null,
   };
 }
 
@@ -161,6 +242,7 @@ export function buildLiveSessionAttendanceDetailVM(input: {
   learningSpaceLink: LearningSpaceChannelRow | null;
   learningSpace: LearningSpaceRow | null;
   participants: ChannelLiveSessionParticipantRow[];
+  events: ChannelLiveSessionParticipantEventRow[];
   profiles: ProfileRow[];
   starterProfile: ProfileRow | null;
 }): LiveSessionAttendanceDetailVM {
@@ -175,11 +257,14 @@ export function buildLiveSessionAttendanceDetailVM(input: {
       participants: input.participants,
       starterProfile: input.starterProfile,
     }),
+    policy: resolveAttendancePolicy(input.session),
+    reportGeneratedAt: input.session.report_generated_at ?? null,
     participants: input.participants.map((participantRow) =>
       buildLiveSessionAttendanceParticipantVM({
         participantRow,
         profile: profileById.get(participantRow.profile_id) ?? null,
       }),
     ),
+    timeline: buildTimeline(input.events, input.profiles),
   };
 }

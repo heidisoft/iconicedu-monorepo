@@ -1,4 +1,5 @@
 export * from './account';
+export * from './activity-event';
 export * from './activity-feed';
 export * from './channel';
 export * from './class-schedule';

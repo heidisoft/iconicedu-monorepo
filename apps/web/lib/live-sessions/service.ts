@@ -3,9 +3,15 @@ import type { LiveSessionModeVM, LiveSessionProviderVM, ProfileRow } from '@icon
 import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
 import { getLiveSessionProvider } from '@iconicedu/web/lib/live-sessions/providers';
+import { snapshotExpectedParticipantsForLiveSession } from '@iconicedu/web/lib/live-sessions/expected-participants';
+import {
+  evaluateLiveSessionAttendance,
+  regenerateLiveSessionAttendanceReport,
+} from '@iconicedu/web/lib/live-sessions/attendance-evaluator';
 import { resolveChannelLiveSessionScope } from '@iconicedu/web/lib/live-sessions/scope';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import type { SupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
+import { publishActivityEvent } from '@iconicedu/web/lib/activity-feed/publisher/activity-publisher';
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
 
@@ -32,6 +38,15 @@ type ChannelLiveSessionRowRecord = {
   ended_at?: string | null;
   failed_at?: string | null;
   failure_reason?: string | null;
+  expected_participant_count?: number | null;
+  attendee_count?: number | null;
+  full_attendance_count?: number | null;
+  partial_attendance_count?: number | null;
+  no_show_count?: number | null;
+  session_duration_seconds?: number | null;
+  report_generated_at?: string | null;
+  attendance_policy?: Record<string, unknown> | null;
+  report_status?: 'pending' | 'generated' | 'stale' | 'failed' | null;
   provider_metadata?: Record<string, unknown> | null;
   app_metadata?: Record<string, unknown> | null;
 };
@@ -42,6 +57,7 @@ type ChannelSummaryRow = {
   kind: string;
   topic: string;
   purpose: string;
+  primary_entity_id?: string | null;
   live_session_config?: Record<string, unknown> | null;
 };
 
@@ -65,6 +81,15 @@ type ChannelLiveSessionParticipantRowRecord = {
   last_left_at?: string | null;
   join_count: number;
   total_seconds?: number | null;
+  expected_to_attend?: boolean | null;
+  attendance_status?: 'expected' | 'attended' | 'partial' | 'full' | 'no_show' | 'excused' | null;
+  attendance_ratio?: number | null;
+  qualified_full_attendance?: boolean | null;
+  required_seconds?: number | null;
+  credited_seconds?: number | null;
+  evaluation_reason?: string | null;
+  evaluated_at?: string | null;
+  evaluation_version?: string | null;
   last_known_status: 'requested' | 'joined' | 'left';
   provider_participant_id?: string | null;
   provider_metadata?: Record<string, unknown> | null;
@@ -110,7 +135,7 @@ async function getChannelSummary(
 ) {
   return supabase
     .from('channels')
-    .select('id, org_id, kind, topic, purpose, live_session_config')
+    .select('id, org_id, kind, topic, purpose, primary_entity_id, live_session_config')
     .eq('org_id', orgId)
     .eq('id', channelId)
     .is('deleted_at', null)
@@ -208,6 +233,9 @@ async function insertParticipantEvent(input: {
     | 'participant_left';
   profileId: string | null;
   payload: Record<string, unknown>;
+  normalizedEventVersion?: string | null;
+  rawProviderPayload?: Record<string, unknown>;
+  correlationKey?: string | null;
   providerParticipantId?: string | null;
   providerEventId?: string | null;
   occurredAt?: string;
@@ -224,6 +252,9 @@ async function insertParticipantEvent(input: {
     occurred_at: input.occurredAt ?? new Date().toISOString(),
     source: input.source ?? 'app',
     provider_event_id: input.providerEventId ?? null,
+    normalized_event_version: input.normalizedEventVersion ?? null,
+    raw_provider_payload: input.rawProviderPayload ?? {},
+    correlation_key: input.correlationKey ?? null,
     payload: input.payload,
   });
 
@@ -231,6 +262,25 @@ async function insertParticipantEvent(input: {
     if (input.providerEventId && response.error.code === '23505') {
       return;
     }
+    throw new Error(response.error.message);
+  }
+}
+
+async function markLiveSessionReportStatus(
+  supabase: SupabaseServiceClient,
+  session: ChannelLiveSessionRowRecord,
+  reportStatus: 'pending' | 'generated' | 'stale' | 'failed',
+) {
+  const response = await supabase
+    .from('channel_live_sessions')
+    .update({
+      report_status: reportStatus,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', session.id)
+    .eq('org_id', session.org_id);
+
+  if (response.error) {
     throw new Error(response.error.message);
   }
 }
@@ -484,6 +534,12 @@ export async function createOrJoinLiveSession(input: {
 
   const existingSession = activeSessionResponse.data ?? null;
   if (existingSession) {
+    await snapshotExpectedParticipantsForLiveSession({
+      supabase: input.serviceSupabase,
+      session: existingSession,
+      scope,
+      createdBy: profileResponse.data.id,
+    });
     await upsertJoinRequestedParticipant({
       supabase: input.serviceSupabase,
       session: existingSession,
@@ -531,6 +587,14 @@ export async function createOrJoinLiveSession(input: {
       status: 'starting',
       started_by_profile_id: profileResponse.data.id,
       join_path: joinPath,
+      attendance_policy: null,
+      report_status: 'pending',
+      app_metadata: {
+        occurrenceEndAt: scope.occurrenceEndAt ?? null,
+        occurrenceLabel: scope.occurrenceLabel ?? null,
+        scheduleId: scope.schedule?.ids.id ?? null,
+        scheduleTitle: scope.schedule?.title ?? null,
+      },
       started_at: now,
       created_at: now,
       updated_at: now,
@@ -547,6 +611,12 @@ export async function createOrJoinLiveSession(input: {
       scope.scopeKey,
     );
     if (fallbackSessionResponse.data) {
+      await snapshotExpectedParticipantsForLiveSession({
+        supabase: input.serviceSupabase,
+        session: fallbackSessionResponse.data,
+        scope,
+        createdBy: profileResponse.data.id,
+      });
       await upsertJoinRequestedParticipant({
         supabase: input.serviceSupabase,
         session: fallbackSessionResponse.data,
@@ -579,6 +649,13 @@ export async function createOrJoinLiveSession(input: {
   const session = insertResponse.data;
 
   try {
+    await snapshotExpectedParticipantsForLiveSession({
+      supabase: input.serviceSupabase,
+      session,
+      scope,
+      createdBy: profileResponse.data.id,
+    });
+
     if (liveSessionConfig.provider === 'custom') {
       const updateResponse = await input.serviceSupabase
         .from('channel_live_sessions')
@@ -651,6 +728,33 @@ export async function createOrJoinLiveSession(input: {
           startedMessageId,
           external: true,
         },
+        normalizedEventVersion: 'v1',
+      });
+      await publishActivityEvent({
+        supabase: input.serviceSupabase,
+        orgId: session.org_id,
+        eventType: 'session.started',
+        occurredAt: now,
+        sourceKind: 'profile',
+        actorProfileId: profileResponse.data.id,
+        scope:
+          channelResponse.data.primary_entity_id
+            ? { kind: 'learning_space', learningSpaceId: channelResponse.data.primary_entity_id }
+            : { kind: 'channel', channelId: session.channel_id },
+        objectRef: { kind: 'session', id: session.id },
+        targetRef: channelResponse.data.primary_entity_id
+          ? { kind: 'learning_space', id: channelResponse.data.primary_entity_id }
+          : undefined,
+        payload: {
+          liveSessionId: session.id,
+          channelId: session.channel_id,
+          learningSpaceId: channelResponse.data.primary_entity_id ?? null,
+          title,
+          joinPath,
+          startedAt: now,
+        },
+        dedupeKey: `session.started:${session.id}`,
+        createdBy: profileResponse.data.id,
       });
       await insertParticipantEvent({
         supabase: input.serviceSupabase,
@@ -664,6 +768,7 @@ export async function createOrJoinLiveSession(input: {
           created: true,
           external: true,
         },
+        normalizedEventVersion: 'v1',
       });
 
       return {
@@ -753,9 +858,36 @@ export async function createOrJoinLiveSession(input: {
       provider: liveSessionConfig.provider,
       eventType: 'session_started',
       profileId: profileResponse.data.id,
+        payload: {
+          startedMessageId,
+        },
+        normalizedEventVersion: 'v1',
+      });
+    await publishActivityEvent({
+      supabase: input.serviceSupabase,
+      orgId: session.org_id,
+      eventType: 'session.started',
+      occurredAt: now,
+      sourceKind: 'profile',
+      actorProfileId: profileResponse.data.id,
+      scope:
+        channelResponse.data.primary_entity_id
+          ? { kind: 'learning_space', learningSpaceId: channelResponse.data.primary_entity_id }
+          : { kind: 'channel', channelId: session.channel_id },
+      objectRef: { kind: 'session', id: session.id },
+      targetRef: channelResponse.data.primary_entity_id
+        ? { kind: 'learning_space', id: channelResponse.data.primary_entity_id }
+        : undefined,
       payload: {
-        startedMessageId,
+        liveSessionId: session.id,
+        channelId: session.channel_id,
+        learningSpaceId: channelResponse.data.primary_entity_id ?? null,
+        title,
+        joinPath: resolvedJoinPath,
+        startedAt: now,
       },
+      dedupeKey: `session.started:${session.id}`,
+      createdBy: profileResponse.data.id,
     });
     await insertParticipantEvent({
       supabase: input.serviceSupabase,
@@ -765,10 +897,11 @@ export async function createOrJoinLiveSession(input: {
       provider: liveSessionConfig.provider,
       eventType: 'join_requested',
       profileId: profileResponse.data.id,
-      payload: {
-        created: true,
-      },
-    });
+        payload: {
+          created: true,
+        },
+        normalizedEventVersion: 'v1',
+      });
 
     return {
       sessionId: session.id,
@@ -887,6 +1020,9 @@ export async function processLiveSessionProviderWebhook(input: {
       occurredAt: event.occurredAt,
       source: 'provider_webhook',
       payload: event.payload,
+      normalizedEventVersion: 'v1',
+      rawProviderPayload: event.raw ?? event.payload,
+      correlationKey: event.correlationKey ?? null,
     });
 
     if (
@@ -910,6 +1046,7 @@ export async function processLiveSessionProviderWebhook(input: {
         .update({
           status: 'live',
           started_at: session.started_at ?? event.occurredAt,
+          report_status: session.report_status === 'generated' ? 'stale' : session.report_status ?? 'pending',
           updated_at: new Date().toISOString(),
         })
         .eq('id', session.id)
@@ -917,6 +1054,12 @@ export async function processLiveSessionProviderWebhook(input: {
 
       if (updateResponse.error) {
         throw new Error(updateResponse.error.message);
+      }
+    }
+
+    if (event.eventType === 'participant_joined' || event.eventType === 'participant_left') {
+      if (session.report_status === 'generated') {
+        await markLiveSessionReportStatus(input.supabase, session, 'stale');
       }
     }
 
@@ -959,8 +1102,52 @@ export async function processLiveSessionProviderWebhook(input: {
           eventType: 'participant_left',
         });
       }
+
+      await evaluateLiveSessionAttendance({
+        supabase: input.supabase,
+        sessionId: session.id,
+        orgId: session.org_id,
+      });
+
+      await publishActivityEvent({
+        supabase: input.supabase,
+        orgId: session.org_id,
+        eventType: 'session.ended',
+        occurredAt: event.occurredAt,
+        sourceKind: 'provider_webhook',
+        actorProfileId: null,
+        scope:
+          typeof session.app_metadata?.scheduleId === 'string'
+            ? { kind: 'channel', channelId: session.channel_id }
+            : { kind: 'channel', channelId: session.channel_id },
+        objectRef: { kind: 'session', id: session.id },
+        payload: {
+          liveSessionId: session.id,
+          channelId: session.channel_id,
+          title:
+            typeof session.app_metadata?.scheduleTitle === 'string'
+              ? session.app_metadata.scheduleTitle
+              : 'Live session',
+          endedAt: event.occurredAt,
+        },
+        dedupeKey: `session.ended:${session.id}`,
+      });
     }
   }
 
   return { processed: events.length };
 }
+
+export async function regenerateLiveSessionAttendanceReportById(input: {
+  supabase: SupabaseServiceClient;
+  sessionId: string;
+  orgId?: string | null;
+}) {
+  return regenerateLiveSessionAttendanceReport(input);
+}
+
+export {
+  snapshotExpectedParticipantsForLiveSession,
+  evaluateLiveSessionAttendance,
+  regenerateLiveSessionAttendanceReport,
+};

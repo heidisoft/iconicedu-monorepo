@@ -16,7 +16,10 @@ import type {
   InboxTabKeyVM,
 } from '@iconicedu/shared-types';
 
-export function InboxContainer({ feed }: { feed: ActivityFeedVM }) {
+export function InboxContainer({ feed, markReadEndpoint = '/api/activity-feed/read' }: {
+  feed: ActivityFeedVM;
+  markReadEndpoint?: string;
+}) {
   const [sections, setSections] = useState(feed.sections);
   const [activeTab, setActiveTab] = useState<InboxTabKeyVM>(feed.activeTab);
 
@@ -50,6 +53,11 @@ export function InboxContainer({ feed }: { feed: ActivityFeedVM }) {
 
   const markAsRead = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    void fetch(markReadEndpoint, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ids: [id] }),
+    });
     setSections((prev) =>
       prev.map((section) => ({
         ...section,

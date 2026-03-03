@@ -39,3 +39,26 @@ export function getAttendanceStatusTone(status: LiveSessionAttendanceListItemVM[
       return 'secondary';
   }
 }
+
+export function formatAttendancePercent(value: number | null | undefined) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return '—';
+  }
+
+  return `${Math.round(value * 100)}%`;
+}
+
+export function getParticipantAttendanceTone(
+  status: 'expected' | 'attended' | 'partial' | 'full' | 'no_show' | 'excused',
+) {
+  switch (status) {
+    case 'full':
+      return 'default';
+    case 'no_show':
+      return 'destructive';
+    case 'partial':
+      return 'secondary';
+    default:
+      return 'outline';
+  }
+}

@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
+import { publishActivityEvent } from '@iconicedu/web/lib/activity-feed/publisher/activity-publisher';
 import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
 import { toStoredLiveSessionConfig } from '@iconicedu/web/lib/admin/live-session-config';
@@ -150,6 +151,74 @@ export async function createLearningSpaceFromPayload(
     participants: payload.participants,
     schedules: payload.schedules ?? [],
   });
+
+  const serviceClient = createSupabaseServiceClient();
+  await publishActivityEvent({
+    supabase: serviceClient,
+    orgId,
+    eventType: 'class.created',
+    occurredAt: now,
+    sourceKind: 'profile',
+    actorProfileId,
+    scope: { kind: 'learning_space', learningSpaceId },
+    targetRef: { kind: 'learning_space', id: learningSpaceId },
+    payload: {
+      learningSpaceId,
+      channelId,
+      title: payload.basics.title,
+      kind: payload.basics.kind,
+      subject: payload.basics.subject ?? null,
+      status: 'active',
+    },
+    dedupeKey: `class.created:${learningSpaceId}`,
+    createdBy: actorProfileId,
+  });
+
+  for (const participant of payload.participants) {
+    await publishActivityEvent({
+      supabase: serviceClient,
+      orgId,
+      eventType: 'member.invited',
+      occurredAt: now,
+      sourceKind: 'profile',
+      actorProfileId,
+      scope: { kind: 'learning_space', learningSpaceId },
+      targetRef: { kind: 'learning_space', id: learningSpaceId },
+      payload: {
+        learningSpaceId,
+        channelId,
+        memberProfileId: participant.profileId,
+        memberDisplayName: participant.displayName ?? null,
+        role: participant.kind,
+      },
+      dedupeKey: `member.invited:${learningSpaceId}:${participant.profileId}`,
+      createdBy: actorProfileId,
+    });
+  }
+
+  for (const [index, schedule] of (payload.schedules ?? []).entries()) {
+    const expanded = buildScheduleStart(schedule);
+    await publishActivityEvent({
+      supabase: serviceClient,
+      orgId,
+      eventType: 'session.scheduled',
+      occurredAt: now,
+      sourceKind: 'profile',
+      actorProfileId,
+      scope: { kind: 'learning_space', learningSpaceId },
+      targetRef: { kind: 'learning_space', id: learningSpaceId },
+      payload: {
+        learningSpaceId,
+        channelId,
+        scheduleId: scheduleIds[index],
+        title: payload.basics.title,
+        startAt: expanded.startAt,
+        endAt: expanded.endAt,
+      },
+      dedupeKey: `session.scheduled:${scheduleIds[index]}`,
+      createdBy: actorProfileId,
+    });
+  }
 
   return { learningSpaceId, channelId, scheduleIds };
 }

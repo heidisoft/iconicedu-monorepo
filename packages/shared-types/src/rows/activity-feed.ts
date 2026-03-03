@@ -3,6 +3,8 @@ import type { ISODateTime, UUID } from '../shared/shared';
 export interface ActivityFeedItemRow {
   id: UUID;
   org_id: UUID;
+  recipient_profile_id: UUID;
+  source_event_id?: UUID | null;
   kind: string;
   occurred_at: ISODateTime;
   created_at: ISODateTime;
@@ -22,6 +24,8 @@ export interface ActivityFeedItemRow {
   expanded_content?: string | null;
   importance?: string | null;
   is_read?: boolean | null;
+  read_at?: ISODateTime | null;
+  dedupe_key?: string | null;
   metadata?: Record<string, unknown> | null;
   created_by?: UUID | null;
   updated_at: ISODateTime;

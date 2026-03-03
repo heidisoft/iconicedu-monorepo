@@ -23,9 +23,12 @@ export type ActivityGroupKeyVM =
 export type ActivityVerbVM =
   | 'class.created'
   | 'class.updated'
+  | 'class.archived'
   | 'session.scheduled'
   | 'session.rescheduled'
   | 'session.canceled'
+  | 'session.started'
+  | 'session.ended'
   | 'session.completed'
   | 'message.posted'
   | 'message.edited'
@@ -42,7 +45,17 @@ export type ActivityVerbVM =
   | 'member.invited'
   | 'member.joined'
   | 'member.removed'
-  | 'role.changed';
+  | 'role.changed'
+  | 'payment.reminder'
+  | 'payment.received'
+  | 'payment.failed'
+  | 'system.notice';
+
+export type ActivitySourceKindVM =
+  | 'profile'
+  | 'system'
+  | 'integration'
+  | 'provider_webhook';
 
 export type ActivityVisibilityVM = 'public' | 'scope_only' | 'direct';
 export type ActivityImportanceVM = 'normal' | 'important' | 'urgent';

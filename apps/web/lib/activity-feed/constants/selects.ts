@@ -1,6 +1,8 @@
 export const ACTIVITY_FEED_ITEM_SELECT = [
   'id',
   'org_id',
+  'recipient_profile_id',
+  'source_event_id',
   'kind',
   'occurred_at',
   'created_at',
@@ -20,6 +22,8 @@ export const ACTIVITY_FEED_ITEM_SELECT = [
   'expanded_content',
   'importance',
   'is_read',
+  'read_at',
+  'dedupe_key',
   'metadata',
   'created_by',
   'updated_at',

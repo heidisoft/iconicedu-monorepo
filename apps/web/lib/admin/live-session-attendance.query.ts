@@ -1,4 +1,5 @@
 import type {
+  ChannelLiveSessionParticipantEventRow,
   ChannelLiveSessionParticipantRow,
   ChannelLiveSessionRow,
   ChannelRow,
@@ -33,6 +34,7 @@ export type LiveSessionAttendanceDetailRows = {
   learningSpaceLink: LearningSpaceChannelRow | null;
   learningSpace: LearningSpaceRow | null;
   participants: ChannelLiveSessionParticipantRow[];
+  events: ChannelLiveSessionParticipantEventRow[];
   profiles: ProfileRow[];
   starterProfile: ProfileRow | null;
 };
@@ -244,12 +246,13 @@ export async function getLiveSessionAttendanceDetailRows(
       learningSpaceLink: null,
       learningSpace: null,
       participants: [],
+      events: [],
       profiles: [],
       starterProfile: null,
     };
   }
 
-  const [channelResponse, linkResponse, participantsResponse] = await Promise.all([
+  const [channelResponse, linkResponse, participantsResponse, eventsResponse] = await Promise.all([
     supabase
       .from('channels')
       .select('*')
@@ -271,6 +274,14 @@ export async function getLiveSessionAttendanceDetailRows(
       .eq('live_session_id', liveSessionId)
       .is('deleted_at', null)
       .returns<ChannelLiveSessionParticipantRow[]>(),
+    supabase
+      .from('channel_live_session_participant_events')
+      .select('*')
+      .eq('org_id', orgId)
+      .eq('live_session_id', liveSessionId)
+      .is('deleted_at', null)
+      .order('occurred_at', { ascending: true })
+      .returns<ChannelLiveSessionParticipantEventRow[]>(),
   ]);
 
   if (channelResponse.error) {
@@ -282,9 +293,13 @@ export async function getLiveSessionAttendanceDetailRows(
   if (participantsResponse.error) {
     throw new Error(participantsResponse.error.message);
   }
+  if (eventsResponse.error) {
+    throw new Error(eventsResponse.error.message);
+  }
 
   const learningSpaceLink = linkResponse.data ?? null;
   const participants = participantsResponse.data ?? [];
+  const events = eventsResponse.data ?? [];
   const [learningSpaceResponse, profilesResponse] = await Promise.all([
     learningSpaceLink
       ? supabase
@@ -302,6 +317,9 @@ export async function getLiveSessionAttendanceDetailRows(
         new Set([
           session.started_by_profile_id,
           ...participants.map((row) => row.profile_id),
+          ...events
+            .map((row) => row.profile_id)
+            .filter((profileId): profileId is string => Boolean(profileId)),
         ]),
       ),
     ),
@@ -322,7 +340,49 @@ export async function getLiveSessionAttendanceDetailRows(
     learningSpaceLink,
     learningSpace: learningSpaceResponse.data ?? null,
     participants,
+    events,
     profiles,
     starterProfile: profiles.find((profile) => profile.id === session.started_by_profile_id) ?? null,
   };
+}
+
+export async function listLiveSessionAttendanceParticipantsWithOutcomes(
+  supabase: SupabaseClient,
+  orgId: string,
+  liveSessionId: string,
+) {
+  const response = await supabase
+    .from('channel_live_session_participants')
+    .select('*')
+    .eq('org_id', orgId)
+    .eq('live_session_id', liveSessionId)
+    .is('deleted_at', null)
+    .returns<ChannelLiveSessionParticipantRow[]>();
+
+  if (response.error) {
+    throw new Error(response.error.message);
+  }
+
+  return response.data ?? [];
+}
+
+export async function getLiveSessionAttendanceTimeline(
+  supabase: SupabaseClient,
+  orgId: string,
+  liveSessionId: string,
+) {
+  const response = await supabase
+    .from('channel_live_session_participant_events')
+    .select('*')
+    .eq('org_id', orgId)
+    .eq('live_session_id', liveSessionId)
+    .is('deleted_at', null)
+    .order('occurred_at', { ascending: true })
+    .returns<ChannelLiveSessionParticipantEventRow[]>();
+
+  if (response.error) {
+    throw new Error(response.error.message);
+  }
+
+  return response.data ?? [];
 }

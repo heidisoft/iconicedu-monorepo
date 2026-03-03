@@ -53,4 +53,37 @@ describe('daily live session provider', () => {
       'https://example.daily.co/room-name?t=meeting-token',
     );
   });
+
+  it('normalizes participant identity metadata from Daily webhook payloads', async () => {
+    const events = await dailyLiveSessionProvider.normalizeWebhook({
+      headers: new Headers(),
+      body: JSON.stringify({
+        event: 'participant.joined',
+        id: 'evt-1',
+        payload: {
+          ts: Date.parse('2026-03-02T10:00:00.000Z'),
+          room: { name: 'room-name' },
+          participant: {
+            id: 'provider-participant-1',
+            user_id: 'profile-1',
+            user_name: 'Taylor Reed',
+            user_email: 'taylor@example.com',
+            session_id: 'session-correlation-1',
+          },
+        },
+      }),
+    });
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        provider: 'daily',
+        providerSessionId: 'room-name',
+        providerParticipantId: 'provider-participant-1',
+        profileId: 'profile-1',
+        participantDisplayName: 'Taylor Reed',
+        participantEmail: 'taylor@example.com',
+        correlationKey: 'session-correlation-1',
+      }),
+    ]);
+  });
 });

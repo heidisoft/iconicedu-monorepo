@@ -1,6 +1,7 @@
 'use server';
 
 import type {
+  AudienceRuleVM,
   MessageMentionVM,
   MessageSendFileInput,
   MessageSendFilesInput,
@@ -21,6 +22,7 @@ import { buildThreadById } from '@iconicedu/web/lib/messages/builders/thread.bui
 import { CHANNEL_FILE_BUCKET, createSignedChannelFileUrl } from '@iconicedu/web/lib/messages/queries/file-url.query';
 import { isValidMessageAssetPath } from '@iconicedu/web/lib/storage/storage-paths';
 import { extractFirstUrl, fetchLinkPreviewMetadata } from '@iconicedu/web/lib/messages/link-preview';
+import { publishActivityEvent } from '@iconicedu/web/lib/activity-feed/publisher/activity-publisher';
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
 type SupabaseServiceClient = ReturnType<typeof createSupabaseServiceClient>;
@@ -159,13 +161,94 @@ async function createMentionNotifications(input: {
     return;
   }
 
-  const insertResponse = await input.serviceSupabase
-    .from('activity_feed_items')
-    .insert(items);
-
-  if (insertResponse.error) {
-    throw new Error(insertResponse.error.message);
+  for (const item of items) {
+    await publishActivityEvent({
+      supabase: input.serviceSupabase,
+      orgId: input.orgId,
+      eventType: 'message.posted',
+      occurredAt: input.now,
+      sourceKind: 'profile',
+      actorProfileId: input.senderProfileId,
+      scope: (item.audience as { scope: { kind: 'user'; userId: string } }).scope,
+      objectRef: { kind: 'message', id: input.messageId },
+      audienceRules: (item.audience as { audience?: AudienceRuleVM[] }).audience,
+      payload: {
+        channelId: input.channelId,
+        messageId: input.messageId,
+        mentionedProfileId: (item.metadata as { mentionedProfileId: string }).mentionedProfileId,
+        senderName: input.senderName,
+        content: input.content,
+      },
+      dedupeKey: `message.mention:${input.messageId}:${(item.metadata as { mentionedProfileId: string }).mentionedProfileId}`,
+      createdBy: input.senderProfileId,
+    });
   }
+}
+
+async function createChannelMessageActivity(input: {
+  serviceSupabase: SupabaseServiceClient;
+  orgId: string;
+  channelId: string;
+  senderProfileId: string;
+  senderName: string;
+  messageId: string;
+  content: string;
+  now: string;
+}) {
+  await publishActivityEvent({
+    supabase: input.serviceSupabase,
+    orgId: input.orgId,
+    eventType: 'message.posted',
+    occurredAt: input.now,
+    sourceKind: 'profile',
+    actorProfileId: input.senderProfileId,
+    scope: { kind: 'channel', channelId: input.channelId },
+    objectRef: { kind: 'message', id: input.messageId },
+    payload: {
+      channelId: input.channelId,
+      messageId: input.messageId,
+      senderName: input.senderName,
+      content: input.content,
+    },
+    dedupeKey: `message.posted:${input.messageId}`,
+    createdBy: input.senderProfileId,
+  });
+}
+
+async function createFileUploadActivity(input: {
+  serviceSupabase: SupabaseServiceClient;
+  orgId: string;
+  channelId: string;
+  senderProfileId: string;
+  messageId: string;
+  name: string;
+  content?: string | null;
+  mimeType?: string | null;
+  storagePath?: string | null;
+  fileCount?: number;
+  now: string;
+}) {
+  await publishActivityEvent({
+    supabase: input.serviceSupabase,
+    orgId: input.orgId,
+    eventType: 'file.uploaded',
+    occurredAt: input.now,
+    sourceKind: 'profile',
+    actorProfileId: input.senderProfileId,
+    scope: { kind: 'channel', channelId: input.channelId },
+    objectRef: { kind: 'message', id: input.messageId },
+    payload: {
+      channelId: input.channelId,
+      messageId: input.messageId,
+      name: input.name,
+      content: input.content ?? null,
+      mimeType: input.mimeType ?? null,
+      storagePath: input.storagePath ?? null,
+      fileCount: input.fileCount ?? 1,
+    },
+    dedupeKey: `file.uploaded:${input.messageId}`,
+    createdBy: input.senderProfileId,
+  });
 }
 
 async function resolveThreadContext(input: {
@@ -485,6 +568,24 @@ export async function sendTextMessageAction(
     });
   }
 
+  await createChannelMessageActivity({
+    serviceSupabase,
+    orgId: accountResponse.data.org_id,
+    channelId: input.channelId,
+    senderProfileId: currentProfileId,
+    senderName:
+      ('profile' in sender &&
+      sender.profile &&
+      typeof sender.profile === 'object' &&
+      'displayName' in sender.profile &&
+      typeof sender.profile.displayName === 'string'
+        ? sender.profile.displayName
+        : undefined) ?? 'Someone',
+    messageId: messageInsert.data.id,
+    content: input.content,
+    now,
+  });
+
   const thread = threadId
     ? await buildThreadById(supabase, accountResponse.data.org_id, threadId)
     : null;
@@ -683,6 +784,19 @@ export async function sendFileMessageAction(
   const thread = threadId
     ? await buildThreadById(supabase, accountResponse.data.org_id, threadId)
     : null;
+
+  await createFileUploadActivity({
+    serviceSupabase,
+    orgId: input.orgId,
+    channelId: input.channelId,
+    senderProfileId: currentProfileId,
+    messageId: messageInsert.data.id,
+    name: input.name,
+    content: input.content?.trim() ?? null,
+    mimeType: input.mimeType ?? null,
+    storagePath: input.storagePath,
+    now,
+  });
 
   return mapMessageRowToVM(messageInsert.data, {
     sender,
@@ -887,6 +1001,23 @@ export async function sendFilesMessageAction(
   const thread = threadId
     ? await buildThreadById(supabase, accountResponse.data.org_id, threadId)
     : null;
+
+  await createFileUploadActivity({
+    serviceSupabase,
+    orgId: input.orgId,
+    channelId: input.channelId,
+    senderProfileId: currentProfileId,
+    messageId: messageInsert.data.id,
+    name:
+      input.assets.length > 1
+        ? `${input.assets[0]?.name ?? 'File'} +${input.assets.length - 1} more`
+        : input.assets[0]?.name ?? 'File',
+    content: input.content?.trim() ?? null,
+    mimeType: allImages ? 'image/*' : input.assets[0]?.mimeType ?? null,
+    storagePath: input.assets[0]?.storagePath ?? null,
+    fileCount: input.assets.length,
+    now,
+  });
 
   return mapMessageRowToVM(messageInsert.data, {
     sender,

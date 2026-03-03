@@ -39,6 +39,12 @@ function createQuerySupabaseStub() {
               join_path: '/iconic-academy/live-sessions/session-1',
               started_at: '2026-03-02T10:00:00.000Z',
               ended_at: '2026-03-02T11:00:00.000Z',
+              expected_participant_count: 1,
+              attendee_count: 1,
+              full_attendance_count: 1,
+              partial_attendance_count: 0,
+              no_show_count: 0,
+              session_duration_seconds: 3600,
               created_at: '2026-03-02T10:00:00.000Z',
               updated_at: '2026-03-02T11:00:00.000Z',
             }],
@@ -56,6 +62,12 @@ function createQuerySupabaseStub() {
               join_path: '/iconic-academy/live-sessions/session-1',
               started_at: '2026-03-02T10:00:00.000Z',
               ended_at: '2026-03-02T11:00:00.000Z',
+              expected_participant_count: 1,
+              attendee_count: 1,
+              full_attendance_count: 1,
+              partial_attendance_count: 0,
+              no_show_count: 0,
+              session_duration_seconds: 3600,
               created_at: '2026-03-02T10:00:00.000Z',
               updated_at: '2026-03-02T11:00:00.000Z',
             },
@@ -182,10 +194,41 @@ function createQuerySupabaseStub() {
               profile_id: 'profile-1',
               join_requested_at: '2026-03-02T09:59:00.000Z',
               first_joined_at: '2026-03-02T10:00:10.000Z',
+              expected_to_attend: true,
+              attendance_status: 'full',
+              attendance_ratio: 0.98,
+              qualified_full_attendance: true,
+              required_seconds: 3600,
+              credited_seconds: 3530,
               join_count: 1,
               last_known_status: 'joined',
               created_at: '2026-03-02T10:00:00.000Z',
               updated_at: '2026-03-02T10:10:00.000Z',
+            }],
+            error: null,
+          }),
+        };
+      }
+
+      if (table === 'channel_live_session_participant_events') {
+        return {
+          select() { return this; },
+          eq() { return this; },
+          is() { return this; },
+          order() { return this; },
+          returns: async () => ({
+            data: [{
+              id: 'event-1',
+              org_id: 'org-1',
+              live_session_id: 'session-1',
+              channel_id: 'channel-1',
+              profile_id: 'profile-1',
+              provider: 'daily',
+              event_type: 'participant_joined',
+              occurred_at: '2026-03-02T10:00:10.000Z',
+              source: 'provider_webhook',
+              created_at: '2026-03-02T10:00:10.000Z',
+              updated_at: '2026-03-02T10:00:10.000Z',
             }],
             error: null,
           }),
@@ -262,5 +305,6 @@ describe('live-session-attendance.query', () => {
     expect(result.channel?.topic).toBe('Algebra 1');
     expect(result.learningSpace?.title).toBe('Algebra tutoring');
     expect(result.starterProfile?.id).toBe('profile-1');
+    expect(result.events).toHaveLength(1);
   });
 });

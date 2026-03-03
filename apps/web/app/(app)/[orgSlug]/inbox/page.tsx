@@ -1,7 +1,10 @@
 import { DashboardHeader, InboxContainer } from '@iconicedu/ui-web';
 
-import { buildActivityFeedByOrg } from '@iconicedu/web/lib/activity-feed/builders/activity-feed.builder';
-import { getDashboardAccountContext } from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
+import { buildActivityFeedForProfile } from '@iconicedu/web/lib/activity-feed/builders/activity-feed.builder';
+import {
+  getDashboardAccountContext,
+  getDashboardProfileContext,
+} from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
 
 export default async function Page({
   params,
@@ -10,7 +13,12 @@ export default async function Page({
 }) {
   const { orgSlug } = await params;
   const { supabase, account } = await getDashboardAccountContext(orgSlug);
-  const feed = await buildActivityFeedByOrg(supabase, account.org_id);
+  const { profileResponse } = await getDashboardProfileContext(supabase, account.id);
+  const feed = await buildActivityFeedForProfile(
+    supabase,
+    account.org_id,
+    profileResponse.data?.id ?? '',
+  );
 
   return (
     <div className="flex min-h-0 h-screen flex-1 flex-col">

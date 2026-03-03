@@ -37,7 +37,10 @@ export function LiveSessionAttendanceTable({
             <TableHead>Ended</TableHead>
             <TableHead>Duration</TableHead>
             <TableHead>Provider</TableHead>
+            <TableHead>Expected</TableHead>
             <TableHead>Attendees</TableHead>
+            <TableHead>Full</TableHead>
+            <TableHead>No-show</TableHead>
             <TableHead>Status</TableHead>
             <TableHead className="text-right">View</TableHead>
           </TableRow>
@@ -59,9 +62,12 @@ export function LiveSessionAttendanceTable({
               <TableCell>{formatAttendanceDateTime(row.endedAt)}</TableCell>
               <TableCell>{formatAttendanceDuration(row.metrics.durationSeconds)}</TableCell>
               <TableCell className="capitalize">{row.provider}</TableCell>
+              <TableCell>{row.metrics.expectedParticipantCount}</TableCell>
               <TableCell>
-                {row.metrics.attendeeCount}/{row.metrics.participantCount}
+                {row.metrics.attendeeCount}/{row.metrics.expectedParticipantCount || row.metrics.participantCount}
               </TableCell>
+              <TableCell>{row.metrics.fullAttendanceCount}</TableCell>
+              <TableCell>{row.metrics.noShowCount}</TableCell>
               <TableCell>
                 <Badge variant={getAttendanceStatusTone(row.status)} className="capitalize">
                   {row.status}

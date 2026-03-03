@@ -21,6 +21,7 @@ function createServiceSupabaseStub() {
   let liveSessionRow: Record<string, unknown> | null = null;
   let startedMessageId: string | null = null;
   let participantUpserted = false;
+  let expectedParticipantsInserted = 0;
   const participantEvents: Array<Record<string, unknown>> = [];
 
   return {
@@ -33,6 +34,9 @@ function createServiceSupabaseStub() {
       },
       get participantUpserted() {
         return participantUpserted;
+      },
+      get expectedParticipantsInserted() {
+        return expectedParticipantsInserted;
       },
       get participantEvents() {
         return participantEvents;
@@ -77,6 +81,10 @@ function createServiceSupabaseStub() {
           eq() {
             return this;
           },
+          returns: async () => ({
+            data: [{ profile_id: 'profile-1' }],
+            error: null,
+          }),
           is() {
             return this;
           },
@@ -201,6 +209,35 @@ function createServiceSupabaseStub() {
               maybeSingle: async () => ({ data: { id: 'participant-1' }, error: null }),
             };
           },
+          select() {
+            return this;
+          },
+          eq() {
+            return this;
+          },
+          is() {
+            return this;
+          },
+          returns: async () => ({ data: [], error: null }),
+        };
+      }
+
+      if (table === 'channel_live_session_expected_participants') {
+        return {
+          select() {
+            return this;
+          },
+          eq() {
+            return this;
+          },
+          is() {
+            return this;
+          },
+          returns: async () => ({ data: [], error: null }),
+          insert: async (payload: Array<Record<string, unknown>>) => {
+            expectedParticipantsInserted = payload.length;
+            return { error: null };
+          },
         };
       }
 
@@ -274,6 +311,7 @@ describe('createOrJoinLiveSession', () => {
     });
     expect(serviceSupabase.state.startedMessageId).toBe('message-1');
     expect(serviceSupabase.state.participantUpserted).toBe(true);
+    expect(serviceSupabase.state.expectedParticipantsInserted).toBe(1);
     expect(serviceSupabase.state.participantEvents).toHaveLength(2);
     expect(serviceSupabase.state.participantEvents.map((event) => event.event_type)).toEqual([
       'session_started',

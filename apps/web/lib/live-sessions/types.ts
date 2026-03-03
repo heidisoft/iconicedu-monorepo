@@ -36,9 +36,13 @@ export type NormalizedLiveSessionParticipantEvent = {
   providerEventId?: string | null;
   providerParticipantId?: string | null;
   profileId?: string | null;
+  participantDisplayName?: string | null;
+  participantEmail?: string | null;
+  correlationKey?: string | null;
   eventType: 'session_started' | 'session_ended' | 'participant_joined' | 'participant_left';
   occurredAt: string;
   payload: Record<string, unknown>;
+  raw?: Record<string, unknown>;
 };
 
 export interface LiveSessionProviderAdapter {

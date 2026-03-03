@@ -14,25 +14,33 @@ import {
 export async function getActivityFeedItemsByOrg(
   supabase: SupabaseClient,
   orgId: string,
+  recipientProfileId?: string,
 ) {
-  return supabase
+  const query = supabase
     .from('activity_feed_items')
     .select(ACTIVITY_FEED_ITEM_SELECT)
     .eq('org_id', orgId)
     .is('deleted_at', null)
-    .order('occurred_at', { ascending: false })
-    .returns<ActivityFeedItemRow[]>();
+    .order('occurred_at', { ascending: false });
+
+  if (recipientProfileId) {
+    query.eq('recipient_profile_id', recipientProfileId);
+  }
+
+  return query.returns<ActivityFeedItemRow[]>();
 }
 
-export async function getActivityFeedItemsByOrgAndTab(
+export async function getActivityFeedItemsByProfileAndTab(
   supabase: SupabaseClient,
   orgId: string,
+  recipientProfileId: string,
   tabKey: string,
 ) {
   return supabase
     .from('activity_feed_items')
     .select(ACTIVITY_FEED_ITEM_SELECT)
     .eq('org_id', orgId)
+    .eq('recipient_profile_id', recipientProfileId)
     .eq('tab_key', tabKey)
     .is('deleted_at', null)
     .order('occurred_at', { ascending: false })

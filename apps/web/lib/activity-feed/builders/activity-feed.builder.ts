@@ -26,13 +26,14 @@ type BuildActivityFeedOptions = {
   activeTab?: InboxTabKeyVM;
 };
 
-export async function buildActivityFeedByOrg(
+export async function buildActivityFeedForProfile(
   supabase: SupabaseClient,
   orgId: string,
+  profileId: string,
   options: BuildActivityFeedOptions = {},
 ): Promise<ActivityFeedVM> {
   const { activeTab = 'all' } = options;
-  const itemsResponse = await getActivityFeedItemsByOrg(supabase, orgId);
+  const itemsResponse = await getActivityFeedItemsByOrg(supabase, orgId, profileId);
   const itemRows = itemsResponse.data ?? [];
 
   const actorProfiles = await loadActivityFeedActors(supabase, orgId, itemRows);
@@ -64,6 +65,14 @@ export async function buildActivityFeedByOrg(
     nextCursor: null,
     unreadCount,
   };
+}
+
+export async function buildActivityFeedByOrg(
+  supabase: SupabaseClient,
+  orgId: string,
+  options: BuildActivityFeedOptions = {},
+) {
+  return buildActivityFeedForProfile(supabase, orgId, '', options);
 }
 
 async function loadActivityFeedActors(

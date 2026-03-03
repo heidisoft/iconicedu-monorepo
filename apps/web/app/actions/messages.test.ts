@@ -11,6 +11,7 @@ import {
 
 const mapMessageRowToVM = vi.fn();
 const buildUserProfileById = vi.fn();
+const publishActivityEvent = vi.fn();
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
@@ -38,6 +39,9 @@ vi.mock('@iconicedu/web/lib/profile/builders/user-profile.builder', () => ({
 vi.mock('@iconicedu/web/lib/messages/mappers/message.mapper', () => ({
   mapMessageRowToVM: (...args: unknown[]) => mapMessageRowToVM(...args),
 }));
+vi.mock('@iconicedu/web/lib/activity-feed/publisher/activity-publisher', () => ({
+  publishActivityEvent: (...args: unknown[]) => publishActivityEvent(...args),
+}));
 
 vi.mock('@iconicedu/web/lib/messages/builders/thread.builder', () => ({
   buildThreadById: vi.fn(async () => ({ ids: { id: 'thread-1', orgId: 'org-1' } })),
@@ -58,6 +62,7 @@ describe('sendTextMessageAction', () => {
   beforeEach(async () => {
     mapMessageRowToVM.mockReset();
     buildUserProfileById.mockReset();
+    publishActivityEvent.mockReset();
     const { createSupabaseServiceClient } = await import(
       '@iconicedu/web/lib/supabase/service'
     );
@@ -127,6 +132,17 @@ describe('sendTextMessageAction', () => {
         message_id: 'message-1',
         org_id: 'org-1',
         payload: { text: 'Hello world' },
+      }),
+    );
+    expect(publishActivityEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'message.posted',
+        scope: { kind: 'channel', channelId: 'channel-1' },
+        dedupeKey: 'message.posted:message-1',
+        payload: expect.objectContaining({
+          messageId: 'message-1',
+          content: 'Hello world',
+        }),
       }),
     );
     expect(result).toEqual({ ids: { id: 'message-1', orgId: 'org-1' } });
@@ -293,6 +309,17 @@ describe('sendTextMessageAction', () => {
         name: 'brief.pdf',
       }),
     );
+    expect(publishActivityEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'file.uploaded',
+        dedupeKey: 'file.uploaded:file-message-1',
+        payload: expect.objectContaining({
+          messageId: 'file-message-1',
+          name: 'brief.pdf',
+          storagePath: 'org-1/channel-1/files/profile-1/brief.pdf',
+        }),
+      }),
+    );
     expect(result).toEqual({ ids: { id: 'file-message-1', orgId: 'org-1' } });
   });
 
@@ -391,6 +418,17 @@ describe('sendTextMessageAction', () => {
         type: 'image',
         url: 'org-1/channel-1/images/profile-1/photo.png',
         name: 'photo.png',
+      }),
+    );
+    expect(publishActivityEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'file.uploaded',
+        dedupeKey: 'file.uploaded:image-message-1',
+        payload: expect.objectContaining({
+          messageId: 'image-message-1',
+          name: 'photo.png',
+          mimeType: 'image/png',
+        }),
       }),
     );
     expect(result).toEqual({ ids: { id: 'image-message-1', orgId: 'org-1' } });
@@ -495,6 +533,17 @@ describe('sendTextMessageAction', () => {
         size: 55,
       }),
     );
+    expect(publishActivityEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'file.uploaded',
+        dedupeKey: 'file.uploaded:audio-message-1',
+        payload: expect.objectContaining({
+          messageId: 'audio-message-1',
+          name: 'voice-message.webm',
+          mimeType: 'audio/webm',
+        }),
+      }),
+    );
     expect(result).toEqual({ ids: { id: 'audio-message-1', orgId: 'org-1' } });
   });
 
@@ -597,6 +646,16 @@ describe('sendTextMessageAction', () => {
         expect.objectContaining({ message_id: 'file-message-group-1', name: 'table.csv' }),
       ]),
     );
+    expect(publishActivityEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'file.uploaded',
+        dedupeKey: 'file.uploaded:file-message-group-1',
+        payload: expect.objectContaining({
+          messageId: 'file-message-group-1',
+          fileCount: 3,
+        }),
+      }),
+    );
     expect(result).toEqual({ ids: { id: 'file-message-group-1', orgId: 'org-1' } });
   });
 
@@ -697,6 +756,17 @@ describe('sendTextMessageAction', () => {
         expect.objectContaining({ message_id: 'image-message-group-1', name: 'photo-2.png' }),
       ]),
     );
+    expect(publishActivityEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'file.uploaded',
+        dedupeKey: 'file.uploaded:image-message-group-1',
+        payload: expect.objectContaining({
+          messageId: 'image-message-group-1',
+          fileCount: 2,
+          mimeType: 'image/*',
+        }),
+      }),
+    );
     expect(result).toEqual({ ids: { id: 'image-message-group-1', orgId: 'org-1' } });
   });
 
@@ -762,17 +832,14 @@ describe('sendTextMessageAction', () => {
       data: [{ profile_id: 'profile-2', channels: ['push'], muted: false }],
       error: null,
     }));
-    const insertActivityItems = vi.fn().mockResolvedValue({ error: null });
-
     serviceSupabase.from.mockImplementation((table: string) => {
       if (table === 'notification_preferences') {
         return notificationPreferencesChain;
       }
-      if (table === 'activity_feed_items') {
-        return { insert: insertActivityItems };
-      }
       return {};
     });
+
+    publishActivityEvent.mockResolvedValue({});
 
     buildUserProfileById.mockResolvedValueOnce({
       ids: { id: 'profile-1', orgId: 'org-1' },
@@ -801,16 +868,25 @@ describe('sendTextMessageAction', () => {
         },
       }),
     );
-    expect(insertActivityItems).toHaveBeenCalledWith([
+    expect(publishActivityEvent).toHaveBeenCalledWith(
       expect.objectContaining({
-        actor_profile_id: 'profile-1',
-        summary: 'Sender Name mentioned you',
-        metadata: expect.objectContaining({
-          notificationKey: 'messages.mentions',
+        orgId: 'org-1',
+        eventType: 'message.posted',
+        actorProfileId: 'profile-1',
+        dedupeKey: 'message.mention:message-mention-1:profile-2',
+        payload: expect.objectContaining({
           mentionedProfileId: 'profile-2',
+          senderName: 'Sender Name',
         }),
       }),
-    ]);
+    );
+    expect(publishActivityEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'message.posted',
+        dedupeKey: 'message.posted:message-mention-1',
+        scope: { kind: 'channel', channelId: 'channel-1' },
+      }),
+    );
   });
 
   it('creates a thread for a reply when needed', async () => {

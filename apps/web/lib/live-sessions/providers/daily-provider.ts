@@ -173,6 +173,24 @@ function normalizeDailyEvent(body: Record<string, unknown>): NormalizedLiveSessi
       typeof participant.id === 'string' ? participant.id : null,
     profileId:
       typeof participant.user_id === 'string' ? participant.user_id : null,
+    participantDisplayName:
+      typeof participant.user_name === 'string'
+        ? participant.user_name
+        : typeof participant.username === 'string'
+          ? participant.username
+          : null,
+    participantEmail:
+      typeof participant.user_email === 'string'
+        ? participant.user_email
+        : typeof participant.email === 'string'
+          ? participant.email
+          : null,
+    correlationKey:
+      typeof participant.session_id === 'string'
+        ? participant.session_id
+        : typeof participant.id === 'string'
+          ? participant.id
+          : null,
     occurredAt:
       typeof payload.ts === 'number'
         ? new Date(payload.ts).toISOString()
@@ -180,6 +198,7 @@ function normalizeDailyEvent(body: Record<string, unknown>): NormalizedLiveSessi
           ? new Date(body.timestamp).toISOString()
           : new Date().toISOString(),
     payload,
+    raw: body,
   };
 
   switch (eventName) {

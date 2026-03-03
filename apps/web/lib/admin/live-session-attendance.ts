@@ -73,6 +73,7 @@ export async function getAdminLiveSessionAttendanceDetail(
     learningSpaceLink: rows.learningSpaceLink,
     learningSpace: rows.learningSpace,
     participants: rows.participants,
+    events: rows.events,
     profiles: rows.profiles,
     starterProfile: rows.starterProfile,
   });

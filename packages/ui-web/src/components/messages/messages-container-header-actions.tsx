@@ -99,6 +99,39 @@ export function resolveHeaderJoinQuickAction(
   };
 }
 
+export function resolveHeaderJoinHref(input: {
+  joinQuickAction?: ChannelQuickActionVM | null;
+  fallbackUrl?: string | null;
+}): string | null {
+  const joinQuickActionUrl =
+    typeof input.joinQuickAction?.url === 'string' && input.joinQuickAction.url.trim().length > 0
+      ? input.joinQuickAction.url.trim()
+      : null;
+
+  if (joinQuickActionUrl) {
+    return joinQuickActionUrl;
+  }
+
+  return typeof input.fallbackUrl === 'string' && input.fallbackUrl.trim().length > 0
+    ? input.fallbackUrl.trim()
+    : null;
+}
+
+export function shouldUseExternalHeaderJoin(input: {
+  provider?: string | null;
+  joinHref?: string | null;
+}): boolean {
+  if (!input.joinHref) {
+    return false;
+  }
+
+  return (
+    input.provider === 'custom' ||
+    input.provider === 'zoom' ||
+    input.provider === 'jitsi'
+  );
+}
+
 export const MessagesContainerHeaderActions = memo(
   function MessagesContainerHeaderActions() {
     const { toggle, isActive, channel, currentUserId, joinLiveSession } = useMessagesState();
@@ -114,16 +147,38 @@ export const MessagesContainerHeaderActions = memo(
       channel.ui?.quickActions,
       channel.context?.liveSession?.enabled === true,
     );
+    const joinHref = resolveHeaderJoinHref({
+      joinQuickAction,
+      fallbackUrl: channel.context?.liveSession?.joinUrl ?? null,
+    });
+    const useExternalJoin = shouldUseExternalHeaderJoin({
+      provider: channel.context?.liveSession?.provider ?? null,
+      joinHref,
+    });
+    const canJoin = useExternalJoin ? Boolean(joinHref) : Boolean(joinLiveSession || joinHref);
 
     const handleJoin = async () => {
-      if (!joinLiveSession || isJoinPending) {
+      if (isJoinPending) {
         return;
       }
-      setIsJoinPending(true);
-      try {
-        await joinLiveSession();
-      } finally {
-        setIsJoinPending(false);
+      if (useExternalJoin) {
+        if (joinHref && typeof window !== 'undefined') {
+          window.location.assign(joinHref);
+        }
+        return;
+      }
+      if (joinLiveSession) {
+        setIsJoinPending(true);
+        try {
+          await joinLiveSession();
+        } finally {
+          setIsJoinPending(false);
+        }
+        return;
+      }
+
+      if (joinHref && typeof window !== 'undefined') {
+        window.location.assign(joinHref);
       }
     };
 
@@ -183,7 +238,7 @@ export const MessagesContainerHeaderActions = memo(
         {joinQuickAction ? (
           <Button
             size="sm"
-            disabled={!joinLiveSession || isJoinPending}
+            disabled={!canJoin || isJoinPending}
             onClick={() => void handleJoin()}
           >
             {isJoinPending ? (

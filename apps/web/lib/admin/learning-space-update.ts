@@ -7,12 +7,36 @@ import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/acco
 import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
 import { insertClassSchedules } from '@iconicedu/web/lib/admin/learning-space-create';
 import { toStoredLiveSessionConfig } from '@iconicedu/web/lib/admin/live-session-config';
+import { publishActivityEvent } from '@iconicedu/web/lib/activity-feed/publisher/activity-publisher';
 import type {
   ChannelUiDefaultsVM,
   LearningSpaceCreatePayload,
   LearningSpaceParticipantPayload,
   LearningSpaceResourcePayload,
+  LearningSpaceSchedulePayload,
 } from '@iconicedu/shared-types';
+
+type ExpandedSchedule = {
+  startAt: string;
+  endAt: string;
+};
+
+function buildScheduleStartForActivity(
+  schedule: LearningSpaceSchedulePayload,
+): ExpandedSchedule {
+  const baseDate = new Date(schedule.startDate);
+  const weekdayTime = schedule.rule.weekdayTimes?.[0];
+  const time = weekdayTime?.time ?? '09:00';
+  const [hour, minute] = time
+    .split(':')
+    .map((value: string) => Number.parseInt(value, 10));
+  baseDate.setUTCHours(Number.isFinite(hour) ? hour : 9, Number.isFinite(minute) ? minute : 0, 0, 0);
+  const endDate = new Date(baseDate.getTime() + 60 * 60 * 1000);
+  return {
+    startAt: baseDate.toISOString(),
+    endAt: endDate.toISOString(),
+  };
+}
 
 export async function updateLearningSpaceFromPayload(
   learningSpaceId: string,
@@ -73,6 +97,31 @@ export async function updateLearningSpaceFromPayload(
   const channelId = channelRow?.channel_id;
   if (!channelId) {
     throw new Error('Primary channel not found');
+  }
+
+  const serviceClient = createSupabaseServiceClient();
+  const [existingParticipantsResponse, existingSchedulesResponse] = await Promise.all([
+    serviceClient
+      .from('learning_space_participants')
+      .select('profile_id')
+      .eq('org_id', orgId)
+      .eq('learning_space_id', learningSpaceId)
+      .is('deleted_at', null)
+      .returns<Array<{ profile_id: string }>>(),
+    serviceClient
+      .from('class_schedules')
+      .select('id, title, start_at, end_at')
+      .eq('org_id', orgId)
+      .eq('source_learning_space_id', learningSpaceId)
+      .is('deleted_at', null)
+      .returns<Array<{ id: string; title: string; start_at: string; end_at: string }>>(),
+  ]);
+
+  if (existingParticipantsResponse.error) {
+    throw new Error(existingParticipantsResponse.error.message);
+  }
+  if (existingSchedulesResponse.error) {
+    throw new Error(existingSchedulesResponse.error.message);
   }
 
   await updateLearningSpace(supabase, {
@@ -136,6 +185,154 @@ export async function updateLearningSpaceFromPayload(
     participants: payload.participants,
     schedules: payload.schedules ?? [],
   });
+
+  await publishActivityEvent({
+    supabase: serviceClient,
+    orgId,
+    eventType: 'class.updated',
+    occurredAt: now,
+    sourceKind: 'profile',
+    actorProfileId,
+    scope: { kind: 'learning_space', learningSpaceId },
+    targetRef: { kind: 'learning_space', id: learningSpaceId },
+    payload: {
+      learningSpaceId,
+      channelId,
+      title: payload.basics.title,
+      kind: payload.basics.kind,
+      subject: payload.basics.subject ?? null,
+      changeSummary: 'Class details updated',
+    },
+    dedupeKey: `class.updated:${learningSpaceId}:${now}`,
+    createdBy: actorProfileId,
+  });
+
+  const existingParticipantIds = new Set(
+    (existingParticipantsResponse.data ?? []).map((row) => row.profile_id),
+  );
+  const nextParticipants = payload.participants ?? [];
+  const nextParticipantIds = new Set(nextParticipants.map((participant) => participant.profileId));
+
+  for (const participant of nextParticipants) {
+    if (!existingParticipantIds.has(participant.profileId)) {
+      await publishActivityEvent({
+        supabase: serviceClient,
+        orgId,
+        eventType: 'member.joined',
+        occurredAt: now,
+        sourceKind: 'profile',
+        actorProfileId,
+        scope: { kind: 'learning_space', learningSpaceId },
+        targetRef: { kind: 'learning_space', id: learningSpaceId },
+        payload: {
+          learningSpaceId,
+          channelId,
+          memberProfileId: participant.profileId,
+          memberDisplayName: participant.displayName ?? null,
+          role: participant.kind,
+        },
+        dedupeKey: `member.joined:${learningSpaceId}:${participant.profileId}:${now}`,
+        createdBy: actorProfileId,
+      });
+    }
+  }
+
+  for (const removedProfileId of existingParticipantIds) {
+    if (nextParticipantIds.has(removedProfileId)) {
+      continue;
+    }
+    await publishActivityEvent({
+      supabase: serviceClient,
+      orgId,
+      eventType: 'member.removed',
+      occurredAt: now,
+      sourceKind: 'profile',
+      actorProfileId,
+      scope: { kind: 'learning_space', learningSpaceId },
+      targetRef: { kind: 'learning_space', id: learningSpaceId },
+      payload: {
+        learningSpaceId,
+        channelId,
+        memberProfileId: removedProfileId,
+      },
+      dedupeKey: `member.removed:${learningSpaceId}:${removedProfileId}:${now}`,
+      createdBy: actorProfileId,
+    });
+  }
+
+  const previousSchedules = existingSchedulesResponse.data ?? [];
+  if (!previousSchedules.length && payload.schedules?.length) {
+    for (const schedule of payload.schedules) {
+      const expanded = buildScheduleStartForActivity(schedule);
+      await publishActivityEvent({
+        supabase: serviceClient,
+        orgId,
+        eventType: 'session.scheduled',
+        occurredAt: now,
+        sourceKind: 'profile',
+        actorProfileId,
+        scope: { kind: 'learning_space', learningSpaceId },
+        targetRef: { kind: 'learning_space', id: learningSpaceId },
+        payload: {
+          learningSpaceId,
+          channelId,
+          scheduleId: 'pending',
+          title: payload.basics.title,
+          startAt: expanded.startAt,
+          endAt: expanded.endAt,
+        },
+        dedupeKey: `session.scheduled:${learningSpaceId}:${expanded.startAt}`,
+        createdBy: actorProfileId,
+      });
+    }
+  } else if (previousSchedules.length && !(payload.schedules?.length)) {
+    for (const schedule of previousSchedules) {
+      await publishActivityEvent({
+        supabase: serviceClient,
+        orgId,
+        eventType: 'session.canceled',
+        occurredAt: now,
+        sourceKind: 'profile',
+        actorProfileId,
+        scope: { kind: 'learning_space', learningSpaceId },
+        targetRef: { kind: 'learning_space', id: learningSpaceId },
+        payload: {
+          learningSpaceId,
+          channelId,
+          scheduleId: schedule.id,
+          title: schedule.title,
+          startAt: schedule.start_at,
+          endAt: schedule.end_at,
+        },
+        dedupeKey: `session.canceled:${schedule.id}:${now}`,
+        createdBy: actorProfileId,
+      });
+    }
+  } else if (previousSchedules.length && payload.schedules?.length) {
+    for (const schedule of payload.schedules) {
+      const expanded = buildScheduleStartForActivity(schedule);
+      await publishActivityEvent({
+        supabase: serviceClient,
+        orgId,
+        eventType: 'session.rescheduled',
+        occurredAt: now,
+        sourceKind: 'profile',
+        actorProfileId,
+        scope: { kind: 'learning_space', learningSpaceId },
+        targetRef: { kind: 'learning_space', id: learningSpaceId },
+        payload: {
+          learningSpaceId,
+          channelId,
+          scheduleId: previousSchedules[0]?.id ?? 'pending',
+          title: payload.basics.title,
+          startAt: expanded.startAt,
+          endAt: expanded.endAt,
+        },
+        dedupeKey: `session.rescheduled:${learningSpaceId}:${expanded.startAt}:${now}`,
+        createdBy: actorProfileId,
+      });
+    }
+  }
 }
 
 type UpdateLearningSpacePayload = {
