@@ -55,6 +55,80 @@ function asOptionalString(value: unknown) {
   return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
 
+function asOptionalRouteKind(value: unknown) {
+  return value === 'space' || value === 'dm' || value === 'channel' ? value : undefined;
+}
+
+function getScopeKind(event: ActivityEventRow) {
+  const scope = asRecord(event.scope);
+  return typeof scope.kind === 'string' ? scope.kind : undefined;
+}
+
+function getContextTitle(payload: Record<string, unknown>) {
+  return (
+    asOptionalString(payload.learningSpaceTitle) ??
+    asOptionalString(payload.channelTopic) ??
+    asOptionalString(payload.title)
+  );
+}
+
+function buildInboxSourceHref(
+  event: ActivityEventRow,
+  payload: Record<string, unknown>,
+) {
+  const explicitHref = asOptionalString(payload.href);
+  if (explicitHref) {
+    return explicitHref;
+  }
+
+  const channelId = asOptionalString(payload.channelId);
+  if (!channelId) {
+    return undefined;
+  }
+
+  const routeKind = asOptionalRouteKind(payload.channelRouteKind);
+  if (routeKind === 'space') {
+    return `../spaces/${channelId}`;
+  }
+  if (routeKind === 'dm') {
+    return `../dm/${channelId}`;
+  }
+  if (routeKind === 'channel') {
+    return `../c/${channelId}`;
+  }
+
+  const scopeKind = getScopeKind(event);
+  const isLearningSpace =
+    scopeKind === 'learning_space' || typeof payload.learningSpaceId === 'string';
+
+  return isLearningSpace ? `../spaces/${channelId}` : `../c/${channelId}`;
+}
+
+function sourceAction(
+  event: ActivityEventRow,
+  payload: Record<string, unknown>,
+  variant: InboxActionButtonVM['variant'] = 'outline',
+): InboxActionButtonVM | undefined {
+  const href = buildInboxSourceHref(event, payload);
+  if (!href) {
+    return undefined;
+  }
+
+  const routeKind = asOptionalRouteKind(payload.channelRouteKind);
+  const label =
+    routeKind === 'space' || href.includes('/spaces/')
+      ? 'Open class'
+      : routeKind === 'dm' || href.includes('/dm/')
+        ? 'Open conversation'
+        : 'Open channel';
+
+  return {
+    label,
+    variant,
+    href,
+  };
+}
+
 function paymentAction(payload: Record<string, unknown>): InboxActionButtonVM | undefined {
   const href = asOptionalString(payload.href);
   if (!href) return undefined;
@@ -86,17 +160,27 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     render: (event) => {
       const payload = asRecord(event.payload);
       const senderName = asString(payload.senderName, 'Someone');
-      const content = asString(payload.content);
+      const content = asString(payload.content).slice(0, 160);
       const mentionedProfileId = asOptionalString(payload.mentionedProfileId);
+      const isDirectMessage = asOptionalRouteKind(payload.channelRouteKind) === 'dm';
+      const isThreadReply = Boolean(payload.threadReply);
       const isMention = Boolean(mentionedProfileId);
       return {
         verb: 'message.posted',
         leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'info' },
         headline: {
-          primary: isMention ? `${senderName} mentioned you` : `${senderName} sent a message`,
+          primary: isMention
+            ? `${senderName} mentioned you`
+            : isDirectMessage
+              ? `${senderName} sent you a message`
+              : isThreadReply
+                ? `${senderName} replied in a thread`
+                : `${senderName} sent a message`,
+          secondary: getContextTitle(payload),
         },
         summary: content,
         preview: content ? { text: content.slice(0, 160) } : undefined,
+        actionButton: sourceAction(event, payload),
         metadata: {
           channelId: payload.channelId,
           messageId: payload.messageId,
@@ -110,12 +194,24 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     eventType: 'file.uploaded',
     tabKey: 'classes',
     importance: 'normal',
-    group: null,
+    group: {
+      groupType: 'notes',
+      collapseByDefault: true,
+      buildGroupKey: (event) => {
+        const payload = asRecord(event.payload);
+        const learningSpaceId = asOptionalString(payload.learningSpaceId);
+        if (!learningSpaceId) {
+          return null;
+        }
+        return `file.uploaded:${learningSpaceId}:${event.occurred_at.slice(0, 10)}`;
+      },
+    },
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => {
       const payload = asRecord(event.payload);
       const name = asString(payload.name, 'File');
       const content = asOptionalString(payload.content);
+      const contextTitle = getContextTitle(payload);
       const fileCount =
         typeof payload.fileCount === 'number' && Number.isFinite(payload.fileCount)
           ? payload.fileCount
@@ -124,11 +220,13 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
         verb: 'file.uploaded',
         leading: { kind: 'icon', iconKey: 'FileText', tone: 'info' },
         headline: {
-          primary: fileCount && fileCount > 1 ? `${fileCount} files uploaded` : 'File uploaded',
-          secondary: fileCount && fileCount > 1 ? undefined : name,
+          primary: fileCount && fileCount > 1 ? `${fileCount} new files uploaded` : 'New file uploaded',
+          secondary: contextTitle ?? (fileCount && fileCount > 1 ? undefined : name),
         },
-        summary: content ?? (fileCount && fileCount > 1 ? name : undefined),
+        summary:
+          fileCount && fileCount > 1 ? content ?? name : content ?? name,
         preview: content ? { text: content.slice(0, 160) } : undefined,
+        actionButton: sourceAction(event, payload),
         metadata: {
           channelId: payload.channelId,
           messageId: payload.messageId,
@@ -152,6 +250,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
         leading: { kind: 'icon', iconKey: 'GraduationCap', tone: 'info' },
         headline: { primary: 'Class created', secondary: className(payload) },
         summary: asOptionalString(payload.subject),
+        actionButton: sourceAction(event, payload),
       };
     },
   },
@@ -168,6 +267,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
         leading: { kind: 'icon', iconKey: 'GraduationCap', tone: 'neutral' },
         headline: { primary: 'Class updated', secondary: className(payload) },
         summary: asOptionalString(payload.changeSummary) ?? asOptionalString(payload.subject),
+        actionButton: sourceAction(event, payload),
       };
     },
   },
@@ -183,6 +283,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
         verb: 'class.archived',
         leading: { kind: 'icon', iconKey: 'GraduationCap', tone: 'warning' },
         headline: { primary: 'Class archived', secondary: className(payload) },
+        actionButton: sourceAction(event, payload),
       };
     },
   },
@@ -202,6 +303,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
           secondary: asString(payload.memberDisplayName, 'New member'),
         },
         summary: asOptionalString(payload.role),
+        actionButton: sourceAction(event, payload),
       };
     },
   },
@@ -221,6 +323,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
           secondary: asString(payload.memberDisplayName, 'New member'),
         },
         summary: asOptionalString(payload.role),
+        actionButton: sourceAction(event, payload),
       };
     },
   },
@@ -239,6 +342,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
           primary: 'Member removed',
           secondary: asString(payload.memberDisplayName, 'Member'),
         },
+        actionButton: sourceAction(event, payload),
       };
     },
   },
@@ -258,6 +362,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
           secondary: asString(payload.memberDisplayName, 'Member'),
         },
         summary: asOptionalString(payload.role),
+        actionButton: sourceAction(event, payload),
       };
     },
   },
@@ -274,6 +379,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
         leading: { kind: 'icon', iconKey: 'GraduationCap', tone: 'info' },
         headline: { primary: 'Session scheduled', secondary: sessionName(payload) },
         summary: asOptionalString(payload.startAt),
+        actionButton: sourceAction(event, payload),
       };
     },
   },
@@ -290,6 +396,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
         leading: { kind: 'icon', iconKey: 'GraduationCap', tone: 'warning' },
         headline: { primary: 'Session rescheduled', secondary: sessionName(payload) },
         summary: asOptionalString(payload.startAt),
+        actionButton: sourceAction(event, payload),
       };
     },
   },
@@ -305,6 +412,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
         verb: 'session.canceled',
         leading: { kind: 'icon', iconKey: 'GraduationCap', tone: 'danger' },
         headline: { primary: 'Session canceled', secondary: sessionName(payload) },
+        actionButton: sourceAction(event, payload),
       };
     },
   },
@@ -327,7 +435,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
               variant: 'default',
               href: joinPath,
             }
-          : undefined,
+          : sourceAction(event, payload),
       };
     },
   },
@@ -343,6 +451,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
         verb: 'session.ended',
         leading: { kind: 'icon', iconKey: 'Video', tone: 'neutral' },
         headline: { primary: 'Class ended', secondary: sessionName(payload) },
+        actionButton: sourceAction(event, payload),
       };
     },
   },
@@ -358,6 +467,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
         verb: 'session.completed',
         leading: { kind: 'icon', iconKey: 'CheckCircle2', tone: 'success' },
         headline: { primary: 'Session completed', secondary: sessionName(payload) },
+        actionButton: sourceAction(event, payload),
       };
     },
   },

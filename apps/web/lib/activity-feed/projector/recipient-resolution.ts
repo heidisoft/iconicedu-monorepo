@@ -15,6 +15,36 @@ function unique(values: string[]) {
   return Array.from(new Set(values.filter(Boolean)));
 }
 
+function applyRecipientExclusions(
+  recipients: string[],
+  event: ActivityEventRow,
+  audienceRules: Record<string, unknown>[],
+) {
+  const excludedIds = new Set<string>();
+
+  for (const rule of audienceRules) {
+    if (rule.kind !== 'exclude_users' || !Array.isArray(rule.userIds)) {
+      continue;
+    }
+
+    for (const userId of rule.userIds) {
+      if (typeof userId === 'string' && userId) {
+        excludedIds.add(userId);
+      }
+    }
+  }
+
+  if (event.actor_profile_id) {
+    excludedIds.add(event.actor_profile_id);
+  }
+
+  if (!excludedIds.size) {
+    return unique(recipients);
+  }
+
+  return unique(recipients.filter((recipientId) => !excludedIds.has(recipientId)));
+}
+
 async function loadGuardianProfileIdsForChildProfileIds(
   supabase: SupabaseServiceClient,
   orgId: string,
@@ -111,19 +141,28 @@ export async function resolveRecipientsForActivityEvent(
   event: ActivityEventRow,
 ) {
   const scope = asRecord(event.scope);
-  const audienceRules = Array.isArray(event.audience_rules) ? event.audience_rules : [];
+  const audienceRules = (Array.isArray(event.audience_rules) ? event.audience_rules : []).filter(
+    (rule): rule is Record<string, unknown> =>
+      Boolean(rule) && typeof rule === 'object' && !Array.isArray(rule),
+  );
   const scopeKind = typeof scope.kind === 'string' ? scope.kind : 'global';
 
   if (scopeKind === 'user' && typeof scope.userId === 'string') {
-    return [scope.userId];
+    return applyRecipientExclusions([scope.userId], event, audienceRules);
   }
 
   if (scopeKind === 'learning_space' && typeof scope.learningSpaceId === 'string') {
-    return resolveLearningSpaceRecipients(supabase, event.org_id, scope.learningSpaceId);
+    const recipients = await resolveLearningSpaceRecipients(
+      supabase,
+      event.org_id,
+      scope.learningSpaceId,
+    );
+    return applyRecipientExclusions(recipients, event, audienceRules);
   }
 
   if (scopeKind === 'channel' && typeof scope.channelId === 'string') {
-    return resolveChannelRecipients(supabase, event.org_id, scope.channelId);
+    const recipients = await resolveChannelRecipients(supabase, event.org_id, scope.channelId);
+    return applyRecipientExclusions(recipients, event, audienceRules);
   }
 
   const usersOnlyRule = audienceRules.find(
@@ -135,8 +174,12 @@ export async function resolveRecipientsForActivityEvent(
   ) as Record<string, unknown> | undefined;
 
   if (usersOnlyRule && Array.isArray(usersOnlyRule.userIds)) {
-    return unique(usersOnlyRule.userIds.filter((value): value is string => typeof value === 'string'));
+    return applyRecipientExclusions(
+      usersOnlyRule.userIds.filter((value): value is string => typeof value === 'string'),
+      event,
+      audienceRules,
+    );
   }
 
-  return [];
+  return applyRecipientExclusions([], event, audienceRules);
 }

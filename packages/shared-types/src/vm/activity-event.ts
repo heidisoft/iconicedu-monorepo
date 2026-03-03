@@ -85,4 +85,10 @@ export interface MessageActivityEventPayload {
   senderName: string;
   content: string;
   mentionedProfileId?: UUID | null;
+  learningSpaceId?: UUID | null;
+  learningSpaceTitle?: string | null;
+  channelTopic?: string | null;
+  channelRouteKind?: 'space' | 'dm' | 'channel' | null;
+  threadId?: UUID | null;
+  threadReply?: boolean | null;
 }

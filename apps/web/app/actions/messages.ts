@@ -35,6 +35,15 @@ type ParentMessageRow = {
   type: string;
 };
 
+type ActivityChannelContext = {
+  scope: { kind: 'learning_space'; learningSpaceId: string } | { kind: 'channel'; channelId: string };
+  targetRef?: { kind: 'learning_space'; id: string };
+  channelTopic?: string | null;
+  learningSpaceId?: string | null;
+  learningSpaceTitle?: string | null;
+  channelRouteKind: 'space' | 'dm' | 'channel';
+};
+
 function sanitizeMentions(
   content: string,
   mentions: MessageMentionVM[] | undefined,
@@ -178,6 +187,7 @@ async function createMentionNotifications(input: {
         mentionedProfileId: (item.metadata as { mentionedProfileId: string }).mentionedProfileId,
         senderName: input.senderName,
         content: input.content,
+        threadReply: false,
       },
       dedupeKey: `message.mention:${input.messageId}:${(item.metadata as { mentionedProfileId: string }).mentionedProfileId}`,
       createdBy: input.senderProfileId,
@@ -193,6 +203,9 @@ async function createChannelMessageActivity(input: {
   senderName: string;
   messageId: string;
   content: string;
+  threadId?: string | null;
+  threadReply?: boolean;
+  activityContext: ActivityChannelContext;
   now: string;
 }) {
   await publishActivityEvent({
@@ -202,17 +215,92 @@ async function createChannelMessageActivity(input: {
     occurredAt: input.now,
     sourceKind: 'profile',
     actorProfileId: input.senderProfileId,
-    scope: { kind: 'channel', channelId: input.channelId },
+    scope: input.activityContext.scope,
     objectRef: { kind: 'message', id: input.messageId },
+    targetRef: input.activityContext.targetRef,
     payload: {
       channelId: input.channelId,
       messageId: input.messageId,
       senderName: input.senderName,
       content: input.content,
+      threadId: input.threadId ?? null,
+      threadReply: input.threadReply ?? false,
+      learningSpaceId: input.activityContext.learningSpaceId ?? null,
+      learningSpaceTitle: input.activityContext.learningSpaceTitle ?? null,
+      channelTopic: input.activityContext.channelTopic ?? null,
+      channelRouteKind: input.activityContext.channelRouteKind,
     },
     dedupeKey: `message.posted:${input.messageId}`,
     createdBy: input.senderProfileId,
   });
+}
+
+async function createThreadReplyNotifications(input: {
+  supabase: SupabaseServerClient;
+  serviceSupabase: SupabaseServiceClient;
+  orgId: string;
+  threadId: string;
+  channelId: string;
+  senderProfileId: string;
+  senderName: string;
+  messageId: string;
+  content: string;
+  activityContext: ActivityChannelContext;
+  excludeProfileIds?: string[];
+  now: string;
+}) {
+  const participantsResponse = await input.supabase
+    .from('thread_participants')
+    .select('profile_id')
+    .eq('org_id', input.orgId)
+    .eq('thread_id', input.threadId)
+    .is('deleted_at', null)
+    .returns<Array<{ profile_id: string }>>();
+
+  if (participantsResponse.error) {
+    throw new Error(participantsResponse.error.message);
+  }
+
+  const exclude = new Set([
+    input.senderProfileId,
+    ...(input.excludeProfileIds ?? []),
+  ]);
+  const recipientIds = Array.from(
+    new Set(
+      (participantsResponse.data ?? [])
+        .map((row) => row.profile_id)
+        .filter((profileId) => profileId && !exclude.has(profileId)),
+    ),
+  );
+
+  for (const recipientId of recipientIds) {
+    await publishActivityEvent({
+      supabase: input.serviceSupabase,
+      orgId: input.orgId,
+      eventType: 'message.posted',
+      occurredAt: input.now,
+      sourceKind: 'profile',
+      actorProfileId: input.senderProfileId,
+      scope: { kind: 'user', userId: recipientId },
+      objectRef: { kind: 'message', id: input.messageId },
+      targetRef: input.activityContext.targetRef,
+      audienceRules: [{ kind: 'users_only', userIds: [recipientId] }],
+      payload: {
+        channelId: input.channelId,
+        messageId: input.messageId,
+        senderName: input.senderName,
+        content: input.content,
+        threadId: input.threadId,
+        threadReply: true,
+        learningSpaceId: input.activityContext.learningSpaceId ?? null,
+        learningSpaceTitle: input.activityContext.learningSpaceTitle ?? null,
+        channelTopic: input.activityContext.channelTopic ?? null,
+        channelRouteKind: input.activityContext.channelRouteKind,
+      },
+      dedupeKey: `message.thread-reply:${input.messageId}:${recipientId}`,
+      createdBy: input.senderProfileId,
+    });
+  }
 }
 
 async function createFileUploadActivity(input: {
@@ -226,6 +314,7 @@ async function createFileUploadActivity(input: {
   mimeType?: string | null;
   storagePath?: string | null;
   fileCount?: number;
+  activityContext: ActivityChannelContext;
   now: string;
 }) {
   await publishActivityEvent({
@@ -235,8 +324,9 @@ async function createFileUploadActivity(input: {
     occurredAt: input.now,
     sourceKind: 'profile',
     actorProfileId: input.senderProfileId,
-    scope: { kind: 'channel', channelId: input.channelId },
+    scope: input.activityContext.scope,
     objectRef: { kind: 'message', id: input.messageId },
+    targetRef: input.activityContext.targetRef,
     payload: {
       channelId: input.channelId,
       messageId: input.messageId,
@@ -245,10 +335,84 @@ async function createFileUploadActivity(input: {
       mimeType: input.mimeType ?? null,
       storagePath: input.storagePath ?? null,
       fileCount: input.fileCount ?? 1,
+      learningSpaceId: input.activityContext.learningSpaceId ?? null,
+      learningSpaceTitle: input.activityContext.learningSpaceTitle ?? null,
+      channelTopic: input.activityContext.channelTopic ?? null,
+      channelRouteKind: input.activityContext.channelRouteKind,
     },
     dedupeKey: `file.uploaded:${input.messageId}`,
     createdBy: input.senderProfileId,
   });
+}
+
+async function resolveActivityChannelContext(input: {
+  supabase: SupabaseServerClient;
+  orgId: string;
+  channelId: string;
+}): Promise<ActivityChannelContext> {
+  const defaultContext: ActivityChannelContext = {
+    scope: { kind: 'channel', channelId: input.channelId },
+    channelRouteKind: 'channel',
+  };
+
+  const channelsTable = input.supabase.from('channels') as unknown as {
+    select?: (query: string) => {
+      eq: (column: string, value: string) => {
+        eq: (column: string, value: string) => {
+          is: (column: string, value: null) => {
+            maybeSingle: () => Promise<{
+              data: {
+                id: string;
+                kind: string;
+                topic?: string | null;
+                primary_entity_kind?: string | null;
+                primary_entity_id?: string | null;
+              } | null;
+              error: { message: string } | null;
+            }>;
+          };
+        };
+      };
+    };
+  };
+
+  if (typeof channelsTable.select !== 'function') {
+    return defaultContext;
+  }
+
+  const channelResponse = await channelsTable
+    .select('id, kind, topic, primary_entity_kind, primary_entity_id')
+    .eq('org_id', input.orgId)
+    .eq('id', input.channelId)
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  if (channelResponse.error) {
+    throw new Error(channelResponse.error.message);
+  }
+
+  const channel = channelResponse.data;
+  if (!channel) {
+    return defaultContext;
+  }
+
+  if (channel.primary_entity_kind === 'learning_space' && channel.primary_entity_id) {
+    return {
+      scope: { kind: 'learning_space', learningSpaceId: channel.primary_entity_id },
+      targetRef: { kind: 'learning_space', id: channel.primary_entity_id },
+      channelTopic: channel.topic ?? null,
+      learningSpaceId: channel.primary_entity_id,
+      learningSpaceTitle: channel.topic ?? null,
+      channelRouteKind: 'space',
+    };
+  }
+
+  const routeKind = channel.kind === 'dm' || channel.kind === 'group_dm' ? 'dm' : 'channel';
+  return {
+    scope: { kind: 'channel', channelId: input.channelId },
+    channelTopic: channel.topic ?? null,
+    channelRouteKind: routeKind,
+  };
 }
 
 async function resolveThreadContext(input: {
@@ -478,6 +642,11 @@ export async function sendTextMessageAction(
   const now = new Date().toISOString();
   const firstUrl = extractFirstUrl(input.content);
   const previewMetadata = firstUrl ? await fetchLinkPreviewMetadata(firstUrl) : null;
+  const activityContext = await resolveActivityChannelContext({
+    supabase,
+    orgId: accountOrgId,
+    channelId: input.channelId,
+  });
   const { threadId, threadCreated } = await resolveThreadContext({
     supabase,
     orgId: accountOrgId,
@@ -568,23 +737,45 @@ export async function sendTextMessageAction(
     });
   }
 
-  await createChannelMessageActivity({
-    serviceSupabase,
-    orgId: accountResponse.data.org_id,
-    channelId: input.channelId,
-    senderProfileId: currentProfileId,
-    senderName:
-      ('profile' in sender &&
-      sender.profile &&
-      typeof sender.profile === 'object' &&
-      'displayName' in sender.profile &&
-      typeof sender.profile.displayName === 'string'
-        ? sender.profile.displayName
-        : undefined) ?? 'Someone',
-    messageId: messageInsert.data.id,
-    content: input.content,
-    now,
-  });
+  const senderDisplayName =
+    ('profile' in sender &&
+    sender.profile &&
+    typeof sender.profile === 'object' &&
+    'displayName' in sender.profile &&
+    typeof sender.profile.displayName === 'string'
+      ? sender.profile.displayName
+      : undefined) ?? 'Someone';
+
+  if (activityContext.channelRouteKind === 'dm') {
+    await createChannelMessageActivity({
+      serviceSupabase,
+      orgId: accountResponse.data.org_id,
+      channelId: input.channelId,
+      senderProfileId: currentProfileId,
+      senderName: senderDisplayName,
+      messageId: messageInsert.data.id,
+      content: input.content,
+      threadId,
+      threadReply: Boolean(threadId && input.threadParentId),
+      activityContext,
+      now,
+    });
+  } else if (threadId && input.threadParentId) {
+    await createThreadReplyNotifications({
+      supabase,
+      serviceSupabase,
+      orgId: accountResponse.data.org_id,
+      threadId,
+      channelId: input.channelId,
+      senderProfileId: currentProfileId,
+      senderName: senderDisplayName,
+      messageId: messageInsert.data.id,
+      content: input.content,
+      activityContext,
+      excludeProfileIds: sanitizedMentions.map((mention) => mention.profileId),
+      now,
+    });
+  }
 
   const thread = threadId
     ? await buildThreadById(supabase, accountResponse.data.org_id, threadId)
@@ -654,6 +845,11 @@ export async function sendFileMessageAction(
   const now = new Date().toISOString();
   const currentProfileId = profileResponse.data.id;
   const serviceSupabase = createSupabaseServiceClient();
+  const activityContext = await resolveActivityChannelContext({
+    supabase,
+    orgId: input.orgId,
+    channelId: input.channelId,
+  });
   const { threadId, threadCreated } = await resolveThreadContext({
     supabase,
     orgId: accountResponse.data.org_id,
@@ -785,18 +981,21 @@ export async function sendFileMessageAction(
     ? await buildThreadById(supabase, accountResponse.data.org_id, threadId)
     : null;
 
-  await createFileUploadActivity({
-    serviceSupabase,
-    orgId: input.orgId,
-    channelId: input.channelId,
-    senderProfileId: currentProfileId,
-    messageId: messageInsert.data.id,
-    name: input.name,
-    content: input.content?.trim() ?? null,
-    mimeType: input.mimeType ?? null,
-    storagePath: input.storagePath,
-    now,
-  });
+  if (!isAudioUpload) {
+    await createFileUploadActivity({
+      serviceSupabase,
+      orgId: input.orgId,
+      channelId: input.channelId,
+      senderProfileId: currentProfileId,
+      messageId: messageInsert.data.id,
+      name: input.name,
+      content: input.content?.trim() ?? null,
+      mimeType: input.mimeType ?? null,
+      storagePath: input.storagePath,
+      activityContext,
+      now,
+    });
+  }
 
   return mapMessageRowToVM(messageInsert.data, {
     sender,
@@ -868,6 +1067,11 @@ export async function sendFilesMessageAction(
 
   const now = new Date().toISOString();
   const serviceSupabase = createSupabaseServiceClient();
+  const activityContext = await resolveActivityChannelContext({
+    supabase,
+    orgId: input.orgId,
+    channelId: input.channelId,
+  });
   const { threadId, threadCreated } = await resolveThreadContext({
     supabase,
     orgId: accountResponse.data.org_id,
@@ -1016,6 +1220,7 @@ export async function sendFilesMessageAction(
     mimeType: allImages ? 'image/*' : input.assets[0]?.mimeType ?? null,
     storagePath: input.assets[0]?.storagePath ?? null,
     fileCount: input.assets.length,
+    activityContext,
     now,
   });
 

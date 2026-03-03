@@ -13,6 +13,20 @@ const mapMessageRowToVM = vi.fn();
 const buildUserProfileById = vi.fn();
 const publishActivityEvent = vi.fn();
 
+function createChannelLookupChain(data: {
+  id: string;
+  kind: string;
+  topic?: string | null;
+  primary_entity_kind?: string | null;
+  primary_entity_id?: string | null;
+} | null) {
+  const chain: any = {};
+  chain.eq = vi.fn(() => chain);
+  chain.is = vi.fn(() => chain);
+  chain.maybeSingle = vi.fn(async () => ({ data, error: null }));
+  return chain;
+}
+
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
 }));
@@ -71,7 +85,7 @@ describe('sendTextMessageAction', () => {
     });
   });
 
-  it('creates a text message and returns the mapped VM', async () => {
+  it('creates a text message and does not publish inbox activity for a normal channel post', async () => {
     const supabase = {
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
       from: vi.fn(),
@@ -134,18 +148,81 @@ describe('sendTextMessageAction', () => {
         payload: { text: 'Hello world' },
       }),
     );
+    expect(publishActivityEvent).not.toHaveBeenCalled();
+    expect(result).toEqual({ ids: { id: 'message-1', orgId: 'org-1' } });
+  });
+
+  it('publishes inbox activity for direct messages', async () => {
+    const supabase = {
+      auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
+      from: vi.fn(),
+    };
+    const { createSupabaseServerClient } = await import(
+      '@iconicedu/web/lib/supabase/server'
+    );
+    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
+      supabase,
+    );
+    const insertMessage = vi.fn().mockReturnValue({
+      select: () => ({
+        single: async () => ({
+          data: {
+            id: 'message-dm-1',
+            org_id: 'org-1',
+            channel_id: 'channel-dm-1',
+            sender_profile_id: 'profile-1',
+            type: 'text',
+            created_at: new Date().toISOString(),
+          },
+          error: null,
+        }),
+      }),
+    });
+    const insertMessageText = vi.fn().mockResolvedValue({ error: null });
+    const channelLookup = createChannelLookupChain({
+      id: 'channel-dm-1',
+      kind: 'dm',
+      topic: 'Priya + Riley',
+      primary_entity_kind: null,
+      primary_entity_id: null,
+    });
+
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'channels') {
+        return { select: () => channelLookup };
+      }
+      if (table === 'messages') {
+        return { insert: insertMessage };
+      }
+      if (table === 'message_text') {
+        return { insert: insertMessageText };
+      }
+      return { insert: vi.fn() };
+    });
+
+    buildUserProfileById.mockResolvedValueOnce({
+      ids: { id: 'profile-1', orgId: 'org-1' },
+      profile: { displayName: 'Priya' },
+    });
+    mapMessageRowToVM.mockReturnValueOnce({ ids: { id: 'message-dm-1', orgId: 'org-1' } });
+
+    await sendTextMessageAction({
+      orgId: 'org-1',
+      channelId: 'channel-dm-1',
+      senderProfileId: 'profile-1',
+      content: 'Hello in DM',
+    });
+
     expect(publishActivityEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         eventType: 'message.posted',
-        scope: { kind: 'channel', channelId: 'channel-1' },
-        dedupeKey: 'message.posted:message-1',
+        dedupeKey: 'message.posted:message-dm-1',
         payload: expect.objectContaining({
-          messageId: 'message-1',
-          content: 'Hello world',
+          channelRouteKind: 'dm',
+          channelTopic: 'Priya + Riley',
         }),
       }),
     );
-    expect(result).toEqual({ ids: { id: 'message-1', orgId: 'org-1' } });
   });
 
   it('stores pasted links as link-preview messages', async () => {
@@ -210,7 +287,7 @@ describe('sendTextMessageAction', () => {
     expect(result).toEqual({ ids: { id: 'message-link-1', orgId: 'org-1' } });
   });
 
-  it('uploads a file, creates a file message, and records it in channel files', async () => {
+  it('uploads a class file, creates a file message, and records it in channel files', async () => {
     const supabase = {
       from: vi.fn(),
       storage: {
@@ -252,8 +329,18 @@ describe('sendTextMessageAction', () => {
     });
     const insertMessageFile = vi.fn(async () => ({ error: null }));
     const insertChannelFile = vi.fn(async () => ({ error: null }));
+    const channelLookup = createChannelLookupChain({
+      id: 'channel-1',
+      kind: 'channel',
+      topic: 'Algebra I',
+      primary_entity_kind: 'learning_space',
+      primary_entity_id: 'space-1',
+    });
 
     supabase.from.mockImplementation((table: string) => {
+      if (table === 'channels') {
+        return { select: () => channelLookup };
+      }
       if (table === 'messages') {
         return { insert: insertMessage };
       }
@@ -317,6 +404,8 @@ describe('sendTextMessageAction', () => {
           messageId: 'file-message-1',
           name: 'brief.pdf',
           storagePath: 'org-1/channel-1/files/profile-1/brief.pdf',
+          channelRouteKind: 'space',
+          learningSpaceId: 'space-1',
         }),
       }),
     );
@@ -533,17 +622,7 @@ describe('sendTextMessageAction', () => {
         size: 55,
       }),
     );
-    expect(publishActivityEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        eventType: 'file.uploaded',
-        dedupeKey: 'file.uploaded:audio-message-1',
-        payload: expect.objectContaining({
-          messageId: 'audio-message-1',
-          name: 'voice-message.webm',
-          mimeType: 'audio/webm',
-        }),
-      }),
-    );
+    expect(publishActivityEvent).not.toHaveBeenCalled();
     expect(result).toEqual({ ids: { id: 'audio-message-1', orgId: 'org-1' } });
   });
 
@@ -880,13 +959,7 @@ describe('sendTextMessageAction', () => {
         }),
       }),
     );
-    expect(publishActivityEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        eventType: 'message.posted',
-        dedupeKey: 'message.posted:message-mention-1',
-        scope: { kind: 'channel', channelId: 'channel-1' },
-      }),
-    );
+    expect(publishActivityEvent).toHaveBeenCalledTimes(1);
   });
 
   it('creates a thread for a reply when needed', async () => {
@@ -946,8 +1019,25 @@ describe('sendTextMessageAction', () => {
     });
 
     const participantUpsert = vi.fn().mockResolvedValue({ error: null });
+    const participantSelectChain: any = {};
+    participantSelectChain.eq = vi.fn(() => participantSelectChain);
+    participantSelectChain.is = vi.fn(() => participantSelectChain);
+    participantSelectChain.returns = vi.fn(async () => ({
+      data: [{ profile_id: 'profile-parent' }, { profile_id: 'profile-1' }],
+      error: null,
+    }));
+    const channelLookup = createChannelLookupChain({
+      id: 'channel-1',
+      kind: 'channel',
+      topic: 'General',
+      primary_entity_kind: null,
+      primary_entity_id: null,
+    });
 
     supabase.from.mockImplementation((table: string) => {
+      if (table === 'channels') {
+        return { select: () => channelLookup };
+      }
       if (table === 'messages') {
         return {
           select: () => parentSelectChain,
@@ -965,7 +1055,7 @@ describe('sendTextMessageAction', () => {
         return { insert: threadInsert };
       }
       if (table === 'thread_participants') {
-        return { upsert: participantUpsert };
+        return { upsert: participantUpsert, select: () => participantSelectChain };
       }
       return {};
     });
@@ -995,6 +1085,13 @@ describe('sendTextMessageAction', () => {
     const createdThreadParticipants = participantUpsert.mock.calls[0]?.[0] ?? [];
     expect(createdThreadParticipants).not.toEqual(
       expect.arrayContaining([expect.objectContaining({ profile_id: 'profile-2' })]),
+    );
+    expect(publishActivityEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dedupeKey: 'message.thread-reply:message-2:profile-parent',
+        scope: { kind: 'user', userId: 'profile-parent' },
+        payload: expect.objectContaining({ threadReply: true }),
+      }),
     );
     expect(result).toEqual({ ids: { id: 'message-2', orgId: 'org-1' } });
   });
@@ -1058,8 +1155,25 @@ describe('sendTextMessageAction', () => {
       }),
     });
     const participantUpsert = vi.fn().mockResolvedValue({ error: null });
+    const participantSelectChain: any = {};
+    participantSelectChain.eq = vi.fn(() => participantSelectChain);
+    participantSelectChain.is = vi.fn(() => participantSelectChain);
+    participantSelectChain.returns = vi.fn(async () => ({
+      data: [{ profile_id: 'profile-parent' }, { profile_id: 'profile-1' }],
+      error: null,
+    }));
+    const channelLookup = createChannelLookupChain({
+      id: 'channel-1',
+      kind: 'channel',
+      topic: 'General',
+      primary_entity_kind: null,
+      primary_entity_id: null,
+    });
 
     supabase.from.mockImplementation((table: string) => {
+      if (table === 'channels') {
+        return { select: () => channelLookup };
+      }
       if (table === 'messages') {
         return {
           select: () => parentSelectChain,
@@ -1077,7 +1191,7 @@ describe('sendTextMessageAction', () => {
         return { select: () => threadSelectChain, insert: threadInsert };
       }
       if (table === 'thread_participants') {
-        return { upsert: participantUpsert };
+        return { upsert: participantUpsert, select: () => participantSelectChain };
       }
       return {};
     });
@@ -1111,6 +1225,12 @@ describe('sendTextMessageAction', () => {
     );
     expect(messageInsert).toHaveBeenCalledWith(
       expect.objectContaining({ thread_id: 'thread-2', thread_parent_id: 'parent-2' }),
+    );
+    expect(publishActivityEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dedupeKey: 'message.thread-reply:message-3:profile-parent',
+        scope: { kind: 'user', userId: 'profile-parent' },
+      }),
     );
     expect(result).toEqual({ ids: { id: 'message-3', orgId: 'org-1' } });
   });
@@ -1163,8 +1283,25 @@ describe('sendTextMessageAction', () => {
     }));
     const updateThread = vi.fn().mockResolvedValue({ error: null });
     const participantUpsert = vi.fn().mockResolvedValue({ error: null });
+    const participantSelectChain: any = {};
+    participantSelectChain.eq = vi.fn(() => participantSelectChain);
+    participantSelectChain.is = vi.fn(() => participantSelectChain);
+    participantSelectChain.returns = vi.fn(async () => ({
+      data: [{ profile_id: 'profile-parent' }, { profile_id: 'profile-1' }],
+      error: null,
+    }));
+    const channelLookup = createChannelLookupChain({
+      id: 'channel-1',
+      kind: 'channel',
+      topic: 'General',
+      primary_entity_kind: null,
+      primary_entity_id: null,
+    });
 
     supabase.from.mockImplementation((table: string) => {
+      if (table === 'channels') {
+        return { select: () => channelLookup };
+      }
       if (table === 'messages') {
         return {
           select: () => parentSelectChain,
@@ -1177,7 +1314,7 @@ describe('sendTextMessageAction', () => {
         };
       }
       if (table === 'thread_participants') {
-        return { upsert: participantUpsert };
+        return { upsert: participantUpsert, select: () => participantSelectChain };
       }
       if (table === 'threads') {
         return {
@@ -1211,6 +1348,12 @@ describe('sendTextMessageAction', () => {
       { onConflict: 'org_id,thread_id,profile_id' },
     );
     expect(updateThread).toHaveBeenCalled();
+    expect(publishActivityEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dedupeKey: 'message.thread-reply:message-4:profile-parent',
+        scope: { kind: 'user', userId: 'profile-parent' },
+      }),
+    );
     expect(result).toEqual({ ids: { id: 'message-4', orgId: 'org-1' } });
   });
 });

@@ -23,11 +23,16 @@ function createSupabaseMock() {
       event_type: 'class.created',
       occurred_at: '2026-03-03T12:00:00.000Z',
       source_kind: 'profile',
-      actor_profile_id: 'profile-educator',
+      actor_profile_id: 'educator-profile-1',
       scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
       object_ref: null,
       target_ref: { kind: 'learning_space', id: 'space-1' },
-      payload: { learningSpaceId: 'space-1', title: 'Algebra I', subject: 'Math' },
+      payload: {
+        learningSpaceId: 'space-1',
+        channelId: 'channel-1',
+        title: 'Algebra I',
+        subject: 'Math',
+      },
       audience_rules: [],
       dedupe_key: 'class.created:space-1',
       projection_status: 'pending',
@@ -145,10 +150,18 @@ describe('projectActivityEvents', () => {
 
     expect(result).toEqual({ processed: 1 });
     const itemUpserts = upserts.filter((entry) => entry.table === 'activity_feed_items');
-    expect(itemUpserts).toHaveLength(3);
+    expect(itemUpserts).toHaveLength(2);
     expect(itemUpserts.map((entry) => entry.payload.recipient_profile_id)).toEqual(
-      expect.arrayContaining(['child-profile-1', 'educator-profile-1', 'guardian-profile-1']),
+      expect.arrayContaining(['child-profile-1', 'guardian-profile-1']),
     );
+    expect(itemUpserts.map((entry) => entry.payload.recipient_profile_id)).not.toContain(
+      'educator-profile-1',
+    );
+    expect(itemUpserts[0]?.payload.action_button).toEqual({
+      label: 'Open class',
+      variant: 'outline',
+      href: '../spaces/channel-1',
+    });
     expect(updates).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
