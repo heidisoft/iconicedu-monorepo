@@ -147,11 +147,21 @@ export function ThreadPanel({ intent }: ThreadPanelProps) {
     };
   }, [parentMessage?.ids.id, sortedThreadMessages]);
 
-  const onSendReply = async (content: string, mentions?: MessageMentionVM[]) => {
+  const onSendReply = async (
+    content: string,
+    mentions?: MessageMentionVM[],
+    homework?: {
+      title: string;
+      description?: string;
+      dueAt: string;
+      subject?: string;
+    } | null,
+  ) => {
     const message =
       (await sendTextMessage({
         content,
         mentions,
+        homework,
         threadId: threadData.thread.ids.id,
         threadParentId: threadData.thread.parent.messageId ?? parentMessage?.ids.id,
       })) ?? createTextMessage?.(content, mentions);

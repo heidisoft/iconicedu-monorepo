@@ -225,6 +225,182 @@ describe('sendTextMessageAction', () => {
     );
   });
 
+  it('stores @homework messages as lesson assignments and emits homework activity for class channels', async () => {
+    const supabase = {
+      auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
+      from: vi.fn(),
+    };
+    const { createSupabaseServerClient } = await import(
+      '@iconicedu/web/lib/supabase/server'
+    );
+    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
+      supabase,
+    );
+    const insertMessage = vi.fn().mockReturnValue({
+      select: () => ({
+        single: async () => ({
+          data: {
+            id: 'message-homework-1',
+            org_id: 'org-1',
+            channel_id: 'channel-class-1',
+            sender_profile_id: 'profile-1',
+            type: 'lesson-assignment',
+            created_at: new Date().toISOString(),
+          },
+          error: null,
+        }),
+      }),
+    });
+    const insertLessonAssignment = vi.fn().mockResolvedValue({ error: null });
+    const channelLookup = createChannelLookupChain({
+      id: 'channel-class-1',
+      kind: 'channel',
+      topic: 'Math Foundations',
+      primary_entity_kind: 'learning_space',
+      primary_entity_id: 'space-1',
+    });
+
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'channels') {
+        return { select: () => channelLookup };
+      }
+      if (table === 'messages') {
+        return { insert: insertMessage };
+      }
+      if (table === 'message_lesson_assignment') {
+        return { insert: insertLessonAssignment };
+      }
+      return { insert: vi.fn() };
+    });
+
+    buildUserProfileById.mockResolvedValueOnce({
+      ids: { id: 'profile-1', orgId: 'org-1' },
+      profile: { displayName: 'Priya' },
+    });
+    mapMessageRowToVM.mockReturnValueOnce({ ids: { id: 'message-homework-1', orgId: 'org-1' } });
+
+    await sendTextMessageAction({
+      orgId: 'org-1',
+      channelId: 'channel-class-1',
+      senderProfileId: 'profile-1',
+      content: '@homework Fractions Practice Set\nFocus on equivalent fractions and number lines.',
+    });
+
+    expect(insertMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'lesson-assignment',
+      }),
+    );
+    expect(insertLessonAssignment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message_id: 'message-homework-1',
+        org_id: 'org-1',
+        payload: expect.objectContaining({
+          title: 'Fractions Practice Set',
+          description: 'Fractions Practice Set\nFocus on equivalent fractions and number lines.',
+          subject: 'Math Foundations',
+        }),
+      }),
+    );
+    expect(insertLessonAssignment.mock.calls[0]?.[0]?.payload).not.toHaveProperty('text');
+    expect(publishActivityEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'homework.assigned',
+        dedupeKey: 'homework.assigned:message-homework-1',
+        payload: expect.objectContaining({
+          messageId: 'message-homework-1',
+          title: 'Fractions Practice Set',
+          learningSpaceId: 'space-1',
+          channelRouteKind: 'space',
+        }),
+      }),
+    );
+  });
+
+  it('respects explicit homework metadata from the composer prompt', async () => {
+    const supabase = {
+      auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
+      from: vi.fn(),
+    };
+    const { createSupabaseServerClient } = await import(
+      '@iconicedu/web/lib/supabase/server'
+    );
+    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
+      supabase,
+    );
+    const insertMessage = vi.fn().mockReturnValue({
+      select: () => ({
+        single: async () => ({
+          data: {
+            id: 'message-homework-2',
+            org_id: 'org-1',
+            channel_id: 'channel-class-1',
+            sender_profile_id: 'profile-1',
+            type: 'lesson-assignment',
+            created_at: new Date().toISOString(),
+          },
+          error: null,
+        }),
+      }),
+    });
+    const insertLessonAssignment = vi.fn().mockResolvedValue({ error: null });
+    const channelLookup = createChannelLookupChain({
+      id: 'channel-class-1',
+      kind: 'channel',
+      topic: 'Math Foundations',
+      primary_entity_kind: 'learning_space',
+      primary_entity_id: 'space-1',
+    });
+
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'channels') {
+        return { select: () => channelLookup };
+      }
+      if (table === 'messages') {
+        return { insert: insertMessage };
+      }
+      if (table === 'message_lesson_assignment') {
+        return { insert: insertLessonAssignment };
+      }
+      return { insert: vi.fn() };
+    });
+
+    buildUserProfileById.mockResolvedValueOnce({
+      ids: { id: 'profile-1', orgId: 'org-1' },
+      profile: { displayName: 'Priya' },
+    });
+    mapMessageRowToVM.mockReturnValueOnce({ ids: { id: 'message-homework-2', orgId: 'org-1' } });
+
+    await sendTextMessageAction({
+      orgId: 'org-1',
+      channelId: 'channel-class-1',
+      senderProfileId: 'profile-1',
+      content: 'Please complete this before Friday.',
+      homework: {
+        title: 'Fractions Practice Set',
+        description: 'Focus on equivalent fractions and number lines.',
+        dueAt: '2026-03-11T12:00:00.000Z',
+        subject: 'Math',
+      },
+    });
+
+    expect(insertMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'lesson-assignment',
+      }),
+    );
+    expect(insertLessonAssignment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          title: 'Fractions Practice Set',
+          description: 'Focus on equivalent fractions and number lines.',
+          dueAt: '2026-03-11T12:00:00.000Z',
+          subject: 'Math',
+        }),
+      }),
+    );
+  });
+
   it('stores pasted links as link-preview messages', async () => {
     const supabase = {
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },

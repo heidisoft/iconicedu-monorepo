@@ -3,6 +3,9 @@
 import * as React from 'react';
 import type { MessageMentionVM, UserProfileVM } from '@iconicedu/shared-types';
 import { Button } from '../../ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../../ui/dialog';
+import { Input } from '../../ui/input';
+import { Label } from '../../ui/label';
 import { Textarea } from '../../ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '../../ui/avatar';
 import {
@@ -68,9 +71,19 @@ import { getComposerSubmitLabel } from './message-loading-state.utils';
 
 const TYPING_STOP_DELAY_MS = 3000;
 const TYPING_KEEPALIVE_THROTTLE_MS = 1200;
+const HOMEWORK_TRIGGER_PATTERN = /(^|\s)@(homework|homeowork)\b/i;
 
 interface MessageInputProps {
-  onSend: (content: string, mentions?: MessageMentionVM[]) => void;
+  onSend: (
+    content: string,
+    mentions?: MessageMentionVM[],
+    homework?: {
+      title: string;
+      description?: string;
+      dueAt: string;
+      subject?: string;
+    } | null,
+  ) => void;
   onAttachFiles?: (
     attachments: Array<{ file: File; durationSeconds?: number }>,
     content?: string,
@@ -108,6 +121,48 @@ type ComposerLinkPreview = {
   siteName?: string;
   favicon?: string;
 };
+
+type HomeworkComposerDraft = {
+  title: string;
+  description: string;
+  dueAt: string;
+  subject: string;
+};
+
+export function hasHomeworkTrigger(value: string) {
+  return HOMEWORK_TRIGGER_PATTERN.test(value);
+}
+
+export function stripHomeworkTrigger(value: string) {
+  return value
+    .replace(/(^|\s)@(homework|homeowork)\b/gi, '$1')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function getDefaultHomeworkDueDate() {
+  const nextWeek = new Date();
+  nextWeek.setDate(nextWeek.getDate() + 7);
+  return nextWeek.toISOString().slice(0, 10);
+}
+
+export function buildHomeworkDraftFromContent(value: string): HomeworkComposerDraft {
+  const description = stripHomeworkTrigger(value);
+  const firstMeaningfulLine =
+    description
+      .split('\n')
+      .map((line) => line.trim())
+      .find(Boolean)
+      ?.replace(/[.!?]+$/, '') ?? '';
+
+  return {
+    title: firstMeaningfulLine.slice(0, 72) || 'Homework assignment',
+    description,
+    dueAt: getDefaultHomeworkDueDate(),
+    subject: '',
+  };
+}
 
 function FormatButton({
   icon: Icon,
@@ -163,6 +218,10 @@ export function MessageInput({
   const [recordingSession, setRecordingSession] = React.useState<RecordingSession | null>(null);
   const [recordingElapsedMs, setRecordingElapsedMs] = React.useState(0);
   const [mentionState, setMentionState] = React.useState<MentionState | null>(null);
+  const [isHomeworkDialogOpen, setIsHomeworkDialogOpen] = React.useState(false);
+  const [homeworkDraft, setHomeworkDraft] = React.useState<HomeworkComposerDraft>(
+    buildHomeworkDraftFromContent(''),
+  );
   const [mentionPopupPosition, setMentionPopupPosition] =
     React.useState<MentionPopupPosition | null>(null);
   const [activeMentionIndex, setActiveMentionIndex] = React.useState(0);
@@ -214,6 +273,7 @@ export function MessageInput({
         : null,
     [composerPreviewUrl, dismissedLinkPreviewUrl],
   );
+  const hasHomeworkTag = React.useMemo(() => hasHomeworkTrigger(content), [content]);
 
   const stopRecordingStream = React.useCallback(() => {
     mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -489,6 +549,12 @@ export function MessageInput({
     }
 
     if (trimmedContent) {
+      if (hasHomeworkTrigger(trimmedContent) && !isHomeworkDialogOpen) {
+        setHomeworkDraft(buildHomeworkDraftFromContent(trimmedContent));
+        setIsHomeworkDialogOpen(true);
+        return;
+      }
+
       const mentions = extractMentionsFromMessageText(
         trimmedContent,
         participants,
@@ -497,7 +563,7 @@ export function MessageInput({
       const sendText = async () => {
         try {
           setIsSendingText(true);
-          await Promise.resolve(onSend(trimmedContent, mentions));
+          await Promise.resolve(onSend(trimmedContent, mentions, null));
           resetComposer();
         } finally {
           setIsSendingText(false);
@@ -516,7 +582,33 @@ export function MessageInput({
     participants,
     readOnly,
     resetComposer,
+    isHomeworkDialogOpen,
   ]);
+
+  const handleHomeworkSubmit = React.useCallback(() => {
+    const cleanedContent = stripHomeworkTrigger(content.trim());
+    const mentions = extractMentionsFromMessageText(cleanedContent, participants, currentUserId);
+
+    const sendHomework = async () => {
+      try {
+        setIsSendingText(true);
+        await Promise.resolve(
+          onSend(cleanedContent, mentions, {
+            title: homeworkDraft.title.trim() || 'Homework assignment',
+            description: homeworkDraft.description.trim() || cleanedContent || undefined,
+            dueAt: new Date(`${homeworkDraft.dueAt}T12:00:00`).toISOString(),
+            subject: homeworkDraft.subject.trim() || undefined,
+          }),
+        );
+        setIsHomeworkDialogOpen(false);
+        resetComposer();
+      } finally {
+        setIsSendingText(false);
+      }
+    };
+
+    void sendHomework();
+  }, [content, currentUserId, homeworkDraft, onSend, participants, resetComposer]);
 
   const handleKeyDown = React.useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -1179,6 +1271,11 @@ export function MessageInput({
               Drop file or image to attach
             </div>
           ) : null}
+          {hasHomeworkTag ? (
+            <div className="border-b border-border px-3 py-2 text-xs font-medium text-primary">
+              Homework tag detected. Send to confirm assignment details.
+            </div>
+          ) : null}
           <Textarea
             ref={textareaRef}
             rows={1}
@@ -1349,6 +1446,82 @@ export function MessageInput({
           </div>
         </div>
       </div>
+      <Dialog open={isHomeworkDialogOpen} onOpenChange={setIsHomeworkDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create homework assignment</DialogTitle>
+            <DialogDescription>
+              Finish the assignment details before sending this homework message.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="homework-title">Title</Label>
+              <Input
+                id="homework-title"
+                value={homeworkDraft.title}
+                onChange={(event) =>
+                  setHomeworkDraft((current) => ({ ...current, title: event.target.value }))
+                }
+                placeholder="Fractions Practice Set"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="homework-due-date">Due date</Label>
+              <Input
+                id="homework-due-date"
+                type="date"
+                value={homeworkDraft.dueAt}
+                onChange={(event) =>
+                  setHomeworkDraft((current) => ({ ...current, dueAt: event.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="homework-subject">Subject</Label>
+              <Input
+                id="homework-subject"
+                value={homeworkDraft.subject}
+                onChange={(event) =>
+                  setHomeworkDraft((current) => ({ ...current, subject: event.target.value }))
+                }
+                placeholder="Optional"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="homework-description">Description</Label>
+              <Textarea
+                id="homework-description"
+                rows={4}
+                value={homeworkDraft.description}
+                onChange={(event) =>
+                  setHomeworkDraft((current) => ({
+                    ...current,
+                    description: event.target.value,
+                  }))
+                }
+                placeholder="Add assignment instructions"
+              />
+            </div>
+            <div className="flex items-center justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsHomeworkDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleHomeworkSubmit}
+                disabled={!homeworkDraft.title.trim() || !homeworkDraft.dueAt}
+              >
+                Create homework
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -92,3 +92,16 @@ export interface MessageActivityEventPayload {
   threadId?: UUID | null;
   threadReply?: boolean | null;
 }
+
+export interface HomeworkActivityEventPayload {
+  channelId: UUID;
+  messageId: UUID;
+  learningSpaceId?: UUID | null;
+  learningSpaceTitle?: string | null;
+  channelTopic?: string | null;
+  channelRouteKind?: 'space' | 'dm' | 'channel' | null;
+  title: string;
+  description: string;
+  dueAt: ISODateTime;
+  subject?: string | null;
+}

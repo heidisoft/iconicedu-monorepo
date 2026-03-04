@@ -175,4 +175,129 @@ describe('projectActivityEvents', () => {
       ]),
     );
   });
+
+  it('creates grouped parent and subactivity rows for hourly class file updates', async () => {
+    const { supabase, upserts } = createSupabaseMock();
+    const fileEvent = {
+      id: 'event-2',
+      org_id: 'org-1',
+      event_type: 'file.uploaded',
+      occurred_at: '2026-03-03T12:30:00.000Z',
+      source_kind: 'profile',
+      actor_profile_id: 'educator-profile-1',
+      scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+      object_ref: { kind: 'message', id: 'message-2' },
+      target_ref: { kind: 'learning_space', id: 'space-1' },
+      payload: {
+        learningSpaceId: 'space-1',
+        learningSpaceTitle: 'Algebra I',
+        channelId: 'channel-1',
+        name: 'worksheet.pdf',
+      },
+      audience_rules: [],
+      dedupe_key: 'file.uploaded:message-2',
+      projection_status: 'pending',
+      projection_attempts: 0,
+      created_at: '2026-03-03T12:30:00.000Z',
+      updated_at: '2026-03-03T12:30:00.000Z',
+    };
+
+    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
+      if (table === 'activity_events') {
+        return {
+          select: vi.fn(() => ({
+            is: vi.fn(() => ({
+              lt: vi.fn(() => ({
+                order: vi.fn(() => ({
+                  limit: vi.fn(() => ({
+                    in: vi.fn(() => ({
+                      returns: vi.fn(async () => ({ data: [fileEvent], error: null })),
+                    })),
+                  })),
+                })),
+              })),
+            })),
+          })),
+          update: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              is: vi.fn(async () => ({ error: null })),
+            })),
+          })),
+        };
+      }
+
+      if (table === 'learning_space_participants') {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                is: vi.fn(() => ({
+                  returns: vi.fn(async () => ({
+                    data: [{ profile_id: 'child-profile-1' }, { profile_id: 'educator-profile-1' }],
+                    error: null,
+                  })),
+                })),
+              })),
+            })),
+          })),
+        };
+      }
+
+      if (table === 'activity_feed_items') {
+        return {
+          upsert: vi.fn((payload: Record<string, unknown>) => ({
+            select: vi.fn(() => ({
+              single: vi.fn(async () => {
+                upserts.push({ table, payload });
+                return {
+                  data: { id: payload.kind === 'group' ? 'group-1' : 'leaf-1' },
+                  error: null,
+                };
+              }),
+            })),
+          })),
+          update: vi.fn(() => ({
+            eq: vi.fn(async () => ({ error: null })),
+          })),
+        };
+      }
+
+      if (table === 'activity_feed_group_members') {
+        return {
+          upsert: vi.fn(async (payload: Record<string, unknown>) => {
+            upserts.push({ table, payload });
+            return { error: null };
+          }),
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              is: vi.fn(async () => ({ count: 1, error: null })),
+            })),
+          })),
+        };
+      }
+
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    await projectActivityEvents(supabase as never);
+
+    const feedItemUpserts = upserts.filter((entry) => entry.table === 'activity_feed_items');
+    expect(feedItemUpserts.some((entry) => entry.payload.kind === 'group')).toBe(true);
+    expect(feedItemUpserts.find((entry) => entry.payload.kind === 'group')?.payload).toMatchObject({
+      group_key: 'files:space-1:2026-03-03T12',
+      group_type: 'class',
+      content: expect.objectContaining({
+        headline: expect.objectContaining({
+          primary: 'New class files',
+          secondary: 'Algebra I',
+        }),
+      }),
+    });
+    expect(
+      upserts.find((entry) => entry.table === 'activity_feed_group_members')?.payload,
+    ).toMatchObject({
+      group_id: 'group-1',
+      item_id: 'leaf-1',
+    });
+  });
 });

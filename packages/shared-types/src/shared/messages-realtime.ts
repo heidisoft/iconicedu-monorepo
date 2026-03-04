@@ -44,6 +44,12 @@ export type MessageSendTextInput = {
   senderProfileId: string;
   content: string;
   mentions?: MessageMentionVM[];
+  homework?: {
+    title: string;
+    description?: string;
+    dueAt: string;
+    subject?: string;
+  } | null;
   threadParentId?: string | null;
   threadId?: string | null;
 };

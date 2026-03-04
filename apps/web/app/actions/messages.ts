@@ -44,6 +44,16 @@ type ActivityChannelContext = {
   channelRouteKind: 'space' | 'dm' | 'channel';
 };
 
+type HomeworkMessageIntent = {
+  cleanedContent: string;
+  description: string;
+  title: string;
+  dueAt: string;
+  subject: string;
+};
+
+const HOMEWORK_TRIGGER_PATTERN = /(^|\s)@(homework|homeowork)\b/gi;
+
 function sanitizeMentions(
   content: string,
   mentions: MessageMentionVM[] | undefined,
@@ -84,6 +94,76 @@ function sanitizeMentions(
     seen.add(key);
     return true;
   });
+}
+
+function deriveHomeworkMessageIntent(
+  content: string,
+  activityContext: ActivityChannelContext,
+  now: string,
+  explicitHomework?: {
+    title: string;
+    description?: string;
+    dueAt: string;
+    subject?: string;
+  } | null,
+): HomeworkMessageIntent | null {
+  if (explicitHomework) {
+    const cleanedContent = content.trim();
+    return {
+      cleanedContent,
+      description:
+        explicitHomework.description?.trim() ||
+        cleanedContent ||
+        'Open the class to review the new assignment.',
+      title: explicitHomework.title.trim() || 'Homework assignment',
+      dueAt: explicitHomework.dueAt,
+      subject:
+        explicitHomework.subject?.trim() ||
+        activityContext.learningSpaceTitle ||
+        activityContext.channelTopic ||
+        'Homework',
+    };
+  }
+
+  if (!HOMEWORK_TRIGGER_PATTERN.test(content)) {
+    return null;
+  }
+
+  HOMEWORK_TRIGGER_PATTERN.lastIndex = 0;
+
+  const cleanedContent = content
+    .replace(HOMEWORK_TRIGGER_PATTERN, '$1')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  const description = cleanedContent || 'Open the class to review the new assignment.';
+  const firstMeaningfulLine =
+    description
+      .split('\n')
+      .map((line) => line.trim())
+      .find(Boolean)
+      ?.replace(/[.!?]+$/, '') ?? '';
+
+  const title =
+    firstMeaningfulLine.slice(0, 72) ||
+    activityContext.learningSpaceTitle ||
+    activityContext.channelTopic ||
+    'Homework assignment';
+
+  const dueDate = new Date(now);
+  dueDate.setUTCDate(dueDate.getUTCDate() + 7);
+
+  return {
+    cleanedContent,
+    description,
+    title,
+    dueAt: dueDate.toISOString(),
+    subject:
+      activityContext.learningSpaceTitle ??
+      activityContext.channelTopic ??
+      'Homework',
+  };
 }
 
 async function createMentionNotifications(input: {
@@ -640,13 +720,19 @@ export async function sendTextMessageAction(
   }
 
   const now = new Date().toISOString();
-  const firstUrl = extractFirstUrl(input.content);
-  const previewMetadata = firstUrl ? await fetchLinkPreviewMetadata(firstUrl) : null;
   const activityContext = await resolveActivityChannelContext({
     supabase,
     orgId: accountOrgId,
     channelId: input.channelId,
   });
+  const homeworkIntent = deriveHomeworkMessageIntent(
+    input.content,
+    activityContext,
+    now,
+    input.homework ?? null,
+  );
+  const firstUrl = homeworkIntent ? null : extractFirstUrl(input.content);
+  const previewMetadata = firstUrl ? await fetchLinkPreviewMetadata(firstUrl) : null;
   const { threadId, threadCreated } = await resolveThreadContext({
     supabase,
     orgId: accountOrgId,
@@ -663,7 +749,7 @@ export async function sendTextMessageAction(
       org_id: accountResponse.data.org_id,
       channel_id: input.channelId,
       sender_profile_id: profileResponse.data.id,
-      type: previewMetadata ? 'link-preview' : 'text',
+      type: homeworkIntent ? 'lesson-assignment' : previewMetadata ? 'link-preview' : 'text',
       visibility_type: 'all',
       thread_id: threadId,
       thread_parent_id: input.threadParentId ?? null,
@@ -680,11 +766,24 @@ export async function sendTextMessageAction(
   }
 
   const payloadInsert = await supabase
-    .from(previewMetadata ? 'message_link_preview' : 'message_text')
+    .from(
+      homeworkIntent
+        ? 'message_lesson_assignment'
+        : previewMetadata
+          ? 'message_link_preview'
+          : 'message_text',
+    )
     .insert({
       message_id: messageInsert.data.id,
       org_id: accountResponse.data.org_id,
-      payload: previewMetadata
+      payload: homeworkIntent
+        ? {
+            title: homeworkIntent.title,
+            description: homeworkIntent.description,
+            dueAt: homeworkIntent.dueAt,
+            subject: homeworkIntent.subject,
+          }
+        : previewMetadata
         ? {
             ...(input.content.trim() ? { text: input.content } : {}),
             ...(sanitizedMentions.length ? { mentions: sanitizedMentions } : {}),
@@ -695,7 +794,7 @@ export async function sendTextMessageAction(
             siteName: previewMetadata.siteName,
             favicon: previewMetadata.favicon,
           }
-        : {
+      : {
             text: input.content,
             ...(sanitizedMentions.length ? { mentions: sanitizedMentions } : {}),
           },
@@ -746,7 +845,33 @@ export async function sendTextMessageAction(
       ? sender.profile.displayName
       : undefined) ?? 'Someone';
 
-  if (activityContext.channelRouteKind === 'dm') {
+  if (homeworkIntent && activityContext.scope.kind === 'learning_space') {
+    await publishActivityEvent({
+      supabase: serviceSupabase,
+      orgId: accountResponse.data.org_id,
+      eventType: 'homework.assigned',
+      occurredAt: now,
+      sourceKind: 'profile',
+      actorProfileId: currentProfileId,
+      scope: activityContext.scope,
+      objectRef: { kind: 'message', id: messageInsert.data.id },
+      targetRef: activityContext.targetRef,
+      payload: {
+        channelId: input.channelId,
+        messageId: messageInsert.data.id,
+        title: homeworkIntent.title,
+        description: homeworkIntent.description,
+        dueAt: homeworkIntent.dueAt,
+        subject: homeworkIntent.subject,
+        learningSpaceId: activityContext.learningSpaceId ?? null,
+        learningSpaceTitle: activityContext.learningSpaceTitle ?? null,
+        channelTopic: activityContext.channelTopic ?? null,
+        channelRouteKind: activityContext.channelRouteKind,
+      },
+      dedupeKey: `homework.assigned:${messageInsert.data.id}`,
+      createdBy: currentProfileId,
+    });
+  } else if (activityContext.channelRouteKind === 'dm') {
     await createChannelMessageActivity({
       serviceSupabase,
       orgId: accountResponse.data.org_id,

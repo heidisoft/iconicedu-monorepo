@@ -42,6 +42,7 @@ import {
 } from '@iconicedu/web/lib/sidebar/learning-space-unread';
 import { upsertDirectMessageChannel } from '@iconicedu/web/lib/sidebar/direct-message-realtime';
 import { persistDirectMessageUnreadCount } from '@iconicedu/web/lib/sidebar/direct-message-unread-persistence';
+import { applyInboxUnreadCount } from '@iconicedu/web/lib/sidebar/inbox-count';
 import { mapProfilePresenceRowToVM } from '@iconicedu/web/lib/profile/mappers/presence.mapper';
 import {
   applyPresenceToSidebarData,
@@ -274,6 +275,32 @@ export function SidebarShell({
   const sidebarAccountId =
     sidebarData.user.account?.ids?.id ?? sidebarProfile.ids?.accountId ?? null;
 
+  const refreshInboxUnreadCount = React.useCallback(async () => {
+    const orgId = sidebarProfile.ids?.orgId;
+    const profileId = sidebarProfile.ids?.id;
+    if (!orgId || !profileId) {
+      return;
+    }
+
+    const response = await supabase
+      .from('activity_feed_items')
+      .select('id', { count: 'exact', head: true })
+      .eq('org_id', orgId)
+      .eq('recipient_profile_id', profileId)
+      .eq('is_read', false)
+      .is('deleted_at', null);
+
+    if (response.error) {
+      return;
+    }
+
+    setSidebarData((prev) => applyInboxUnreadCount(prev, response.count ?? 0));
+  }, [sidebarProfile.ids?.id, sidebarProfile.ids?.orgId, supabase]);
+
+  React.useEffect(() => {
+    void refreshInboxUnreadCount();
+  }, [refreshInboxUnreadCount]);
+
   const computedOnboardingStep = React.useMemo(
     () => determineOnboardingStep(sidebarProfile, sidebarAccount),
     [sidebarProfile, sidebarAccount],
@@ -432,6 +459,58 @@ export function SidebarShell({
     sidebarProfile.ids?.orgId,
     sidebarProfile.ids?.id,
     persistUnread,
+  ]);
+
+  React.useEffect(() => {
+    const orgId = sidebarProfile.ids?.orgId;
+    const profileId = sidebarProfile.ids?.id;
+    if (!orgId || !profileId) {
+      return;
+    }
+
+    let refreshTimer: number | null = null;
+    const scheduleInboxRefresh = () => {
+      if (refreshTimer) {
+        window.clearTimeout(refreshTimer);
+      }
+
+      refreshTimer = window.setTimeout(() => {
+        void refreshInboxUnreadCount();
+        if (pathname?.startsWith(`${dashboardBasePath}/inbox`)) {
+          React.startTransition(() => {
+            router.refresh();
+          });
+        }
+      }, 120);
+    };
+
+    const channel = supabase.channel(`sidebar-inbox:${orgId}:${profileId}`);
+    channel.on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'activity_feed_items',
+        filter: `recipient_profile_id=eq.${profileId}`,
+      },
+      scheduleInboxRefresh,
+    );
+    channel.subscribe();
+
+    return () => {
+      if (refreshTimer) {
+        window.clearTimeout(refreshTimer);
+      }
+      void channel.unsubscribe();
+    };
+  }, [
+    dashboardBasePath,
+    pathname,
+    refreshInboxUnreadCount,
+    router,
+    sidebarProfile.ids?.id,
+    sidebarProfile.ids?.orgId,
+    supabase,
   ]);
 
   React.useEffect(() => {

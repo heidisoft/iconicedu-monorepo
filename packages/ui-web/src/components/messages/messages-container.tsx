@@ -1134,17 +1134,19 @@ export function MessagesContainer({
       return;
     }
     if (!senderProfile) return;
-    setSendTextMessage(async ({ content, mentions, threadId, threadParentId }) => {
+    setSendTextMessage(async ({ content, mentions, homework, threadId, threadParentId }) => {
       if (messageWriteClient && currentUserId) {
-        const created = await messageWriteClient.sendTextMessage({
+        const sendInput = {
           orgId: channel.ids.orgId,
           channelId: channel.ids.id,
           senderProfileId: currentUserId,
           content,
           mentions,
+          homework,
           threadId,
           threadParentId,
-        });
+        } as Parameters<MessageWriteClient['sendTextMessage']>[0];
+        const created = await messageWriteClient.sendTextMessage(sendInput);
         const exists = messagesRef.current.some(
           (message) => message.ids.id === created.ids.id,
         );

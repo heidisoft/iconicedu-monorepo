@@ -248,13 +248,16 @@ async function projectEvent(supabase: SupabaseServiceClient, event: ActivityEven
     if (definition.group) {
       const groupKey = definition.group.buildGroupKey(event);
       if (groupKey) {
+        const groupRendered = definition.group.renderGroup
+          ? definition.group.renderGroup(event)
+          : rendered;
         const groupId = await ensureGroupParent({
           supabase,
           event,
           recipientProfileId,
           groupKey,
           groupType: definition.group.groupType,
-          rendered,
+          rendered: groupRendered,
           tabKey: definition.tabKey,
           importance: definition.importance,
         });

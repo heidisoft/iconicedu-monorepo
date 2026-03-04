@@ -5,6 +5,7 @@ import type {
   ActivityItemContentVM,
   ActivityVerbVM,
   InboxActionButtonVM,
+  InboxIconKeyVM,
   InboxLeadingVM,
   InboxTabKeyVM,
 } from '@iconicedu/shared-types';
@@ -32,6 +33,7 @@ export type ActivityEventDefinition = {
     groupType: ActivityGroupKeyVM;
     collapseByDefault?: boolean;
     buildGroupKey: (event: ActivityEventRow) => string | null;
+    renderGroup?: (event: ActivityEventRow) => ActivityRenderResult;
   } | null;
   resolveRecipients: (
     supabase: SupabaseServiceClient,
@@ -57,6 +59,22 @@ function asOptionalString(value: unknown) {
 
 function asOptionalRouteKind(value: unknown) {
   return value === 'space' || value === 'dm' || value === 'channel' ? value : undefined;
+}
+
+function formatShortDate(value: unknown) {
+  if (typeof value !== 'string' || !value) {
+    return undefined;
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return undefined;
+  }
+
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+  });
 }
 
 function getScopeKind(event: ActivityEventRow) {
@@ -108,6 +126,7 @@ function sourceAction(
   event: ActivityEventRow,
   payload: Record<string, unknown>,
   variant: InboxActionButtonVM['variant'] = 'outline',
+  customLabel?: string,
 ): InboxActionButtonVM | undefined {
   const href = buildInboxSourceHref(event, payload);
   if (!href) {
@@ -115,7 +134,7 @@ function sourceAction(
   }
 
   const routeKind = asOptionalRouteKind(payload.channelRouteKind);
-  const label =
+  const resolvedLabel =
     routeKind === 'space' || href.includes('/spaces/')
       ? 'Open class'
       : routeKind === 'dm' || href.includes('/dm/')
@@ -123,7 +142,7 @@ function sourceAction(
         : 'Open channel';
 
   return {
-    label,
+    label: customLabel ?? resolvedLabel,
     variant,
     href,
   };
@@ -148,6 +167,64 @@ function className(payload: Record<string, unknown>) {
 
 function sessionName(payload: Record<string, unknown>) {
   return asString(payload.title, 'Session');
+}
+
+function buildHourlyLearningSpaceGroupKey(
+  prefix: string,
+  event: ActivityEventRow,
+  payload: Record<string, unknown>,
+) {
+  const learningSpaceId = asOptionalString(payload.learningSpaceId);
+  if (!learningSpaceId) {
+    return null;
+  }
+
+  const hourBucket = event.occurred_at.slice(0, 13);
+  return `${prefix}:${learningSpaceId}:${hourBucket}`;
+}
+
+function buildWeeklyLearningSpaceGroupKey(
+  prefix: string,
+  event: ActivityEventRow,
+  payload: Record<string, unknown>,
+) {
+  const learningSpaceId = asOptionalString(payload.learningSpaceId);
+  if (!learningSpaceId) {
+    return null;
+  }
+
+  const occurredAt = new Date(event.occurred_at);
+  if (Number.isNaN(occurredAt.getTime())) {
+    return null;
+  }
+
+  const day = occurredAt.getUTCDay();
+  const offset = day === 0 ? -6 : 1 - day;
+  occurredAt.setUTCDate(occurredAt.getUTCDate() + offset);
+  occurredAt.setUTCHours(0, 0, 0, 0);
+
+  return `${prefix}:${learningSpaceId}:${occurredAt.toISOString().slice(0, 10)}`;
+}
+
+function renderGroupedClassActivity(
+  event: ActivityEventRow,
+  input: {
+    iconKey: InboxIconKeyVM;
+    tone: 'neutral' | 'success' | 'warning' | 'danger' | 'info';
+    primary: string;
+  },
+) {
+  const payload = asRecord(event.payload);
+  return {
+    verb: event.event_type as ActivityVerbVM,
+    leading: { kind: 'icon', iconKey: input.iconKey, tone: input.tone },
+    headline: {
+      primary: input.primary,
+      secondary: getContextTitle(payload),
+    },
+    summary: 'Open to review the latest class activity.',
+    actionButton: sourceAction(event, payload),
+  } satisfies ActivityRenderResult;
 }
 
 export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition> = {
@@ -195,16 +272,18 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     tabKey: 'classes',
     importance: 'normal',
     group: {
-      groupType: 'notes',
+      groupType: 'class',
       collapseByDefault: true,
       buildGroupKey: (event) => {
         const payload = asRecord(event.payload);
-        const learningSpaceId = asOptionalString(payload.learningSpaceId);
-        if (!learningSpaceId) {
-          return null;
-        }
-        return `file.uploaded:${learningSpaceId}:${event.occurred_at.slice(0, 10)}`;
+        return buildHourlyLearningSpaceGroupKey('files', event, payload);
       },
+      renderGroup: (event) =>
+        renderGroupedClassActivity(event, {
+          iconKey: 'FileText',
+          tone: 'info',
+          primary: 'New class files',
+        }),
     },
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => {
@@ -237,6 +316,46 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       };
     },
   },
+  'homework.assigned': {
+    eventType: 'homework.assigned',
+    tabKey: 'classes',
+    importance: 'normal',
+    group: {
+      groupType: 'homework',
+      collapseByDefault: true,
+      buildGroupKey: (event) => {
+        const payload = asRecord(event.payload);
+        return buildWeeklyLearningSpaceGroupKey('homework', event, payload);
+      },
+      renderGroup: (event) =>
+        renderGroupedClassActivity(event, {
+          iconKey: 'ClipboardCheck',
+          tone: 'info',
+          primary: 'Homework updates',
+        }),
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => {
+      const payload = asRecord(event.payload);
+      const dueLabel = formatShortDate(payload.dueAt);
+      return {
+        verb: 'homework.assigned',
+        leading: { kind: 'icon', iconKey: 'ClipboardCheck', tone: 'info' },
+        headline: {
+          primary: 'New homework assigned',
+          secondary: asString(payload.title, 'Homework assignment'),
+        },
+        summary: dueLabel ? `Due ${dueLabel}` : getContextTitle(payload),
+        expandedContent: asOptionalString(payload.description),
+        actionButton: sourceAction(event, payload, 'default', 'View homework'),
+        metadata: {
+          channelId: payload.channelId,
+          messageId: payload.messageId,
+          learningSpaceId: payload.learningSpaceId,
+        },
+      };
+    },
+  },
   'class.created': {
     eventType: 'class.created',
     tabKey: 'classes',
@@ -258,7 +377,20 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     eventType: 'class.updated',
     tabKey: 'classes',
     importance: 'normal',
-    group: null,
+    group: {
+      groupType: 'class',
+      collapseByDefault: true,
+      buildGroupKey: (event) => {
+        const payload = asRecord(event.payload);
+        return buildHourlyLearningSpaceGroupKey('class', event, payload);
+      },
+      renderGroup: (event) =>
+        renderGroupedClassActivity(event, {
+          iconKey: 'GraduationCap',
+          tone: 'neutral',
+          primary: 'Class updates',
+        }),
+    },
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => {
       const payload = asRecord(event.payload);
@@ -370,7 +502,20 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     eventType: 'session.scheduled',
     tabKey: 'classes',
     importance: 'normal',
-    group: null,
+    group: {
+      groupType: 'class',
+      collapseByDefault: true,
+      buildGroupKey: (event) => {
+        const payload = asRecord(event.payload);
+        return buildHourlyLearningSpaceGroupKey('session', event, payload);
+      },
+      renderGroup: (event) =>
+        renderGroupedClassActivity(event, {
+          iconKey: 'GraduationCap',
+          tone: 'info',
+          primary: 'Lesson schedule updates',
+        }),
+    },
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => {
       const payload = asRecord(event.payload);
@@ -387,7 +532,20 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     eventType: 'session.rescheduled',
     tabKey: 'classes',
     importance: 'important',
-    group: null,
+    group: {
+      groupType: 'class',
+      collapseByDefault: true,
+      buildGroupKey: (event) => {
+        const payload = asRecord(event.payload);
+        return buildHourlyLearningSpaceGroupKey('session', event, payload);
+      },
+      renderGroup: (event) =>
+        renderGroupedClassActivity(event, {
+          iconKey: 'GraduationCap',
+          tone: 'warning',
+          primary: 'Lesson schedule updates',
+        }),
+    },
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => {
       const payload = asRecord(event.payload);
@@ -404,7 +562,20 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     eventType: 'session.canceled',
     tabKey: 'classes',
     importance: 'important',
-    group: null,
+    group: {
+      groupType: 'class',
+      collapseByDefault: true,
+      buildGroupKey: (event) => {
+        const payload = asRecord(event.payload);
+        return buildHourlyLearningSpaceGroupKey('session', event, payload);
+      },
+      renderGroup: (event) =>
+        renderGroupedClassActivity(event, {
+          iconKey: 'GraduationCap',
+          tone: 'warning',
+          primary: 'Lesson schedule updates',
+        }),
+    },
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => {
       const payload = asRecord(event.payload);

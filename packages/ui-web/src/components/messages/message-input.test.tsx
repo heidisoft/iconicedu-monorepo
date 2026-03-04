@@ -1,7 +1,12 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { UserProfileVM } from '@iconicedu/shared-types';
 
 import { MESSAGE_INPUT_FILE_ACCEPT } from './message-input.attachments';
+import {
+  buildHomeworkDraftFromContent,
+  hasHomeworkTrigger,
+  stripHomeworkTrigger,
+} from './message-input';
 import {
   getMentionCandidates,
   getMentionPopupPosition,
@@ -260,5 +265,20 @@ describe('message-input mention helpers', () => {
     expect(MESSAGE_INPUT_FILE_ACCEPT).toContain('.xlsx');
     expect(MESSAGE_INPUT_FILE_ACCEPT).toContain('.pptx');
     expect(MESSAGE_INPUT_FILE_ACCEPT).toContain('.zip');
+  });
+
+  it('detects the homework trigger and builds a structured draft from content', () => {
+    const content =
+      '@homework Fractions Practice Set\nFocus on equivalent fractions and number lines.';
+
+    expect(hasHomeworkTrigger(content)).toBe(true);
+    expect(stripHomeworkTrigger(content)).toBe(
+      'Fractions Practice Set\nFocus on equivalent fractions and number lines.',
+    );
+    expect(buildHomeworkDraftFromContent(content)).toMatchObject({
+      title: 'Fractions Practice Set',
+      description: 'Fractions Practice Set\nFocus on equivalent fractions and number lines.',
+      subject: '',
+    });
   });
 });
