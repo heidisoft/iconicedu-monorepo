@@ -41,5 +41,5 @@ export function getMessagesContainerTabs(
   enableScheduleTab: boolean,
 ): MessagesContainerTabDefinition[] {
   if (!enableScheduleTab) return [...BASE_TABS, SAVED_TAB, MEMBERS_TAB];
-  return [BASE_TABS[0], SCHEDULE_TAB, BASE_TABS[1], SAVED_TAB, MEMBERS_TAB];
+  return [SCHEDULE_TAB, BASE_TABS[0], BASE_TABS[1], SAVED_TAB, MEMBERS_TAB];
 }

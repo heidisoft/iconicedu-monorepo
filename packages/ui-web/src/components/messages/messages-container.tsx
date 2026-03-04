@@ -121,6 +121,21 @@ function formatFileSize(size?: number | null): string {
   return `${(size / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
+export function getDefaultMessagesTab(
+  channel: ChannelVM,
+  enableScheduleTab: boolean,
+): MessagesContainerTabKey {
+  if (!enableScheduleTab) {
+    return 'messages';
+  }
+
+  const isLearningSpaceChannel =
+    channel.basics.purpose === 'learning-space' ||
+    channel.context?.primaryEntity?.kind === 'learning_space';
+
+  return isLearningSpaceChannel ? 'schedule' : 'messages';
+}
+
 function getFilesTabIcon(item: ChannelFileItemVM) {
   const kind = getChannelFileVisualKind(item);
 
@@ -232,6 +247,10 @@ export function MessagesContainer({
   const containerTabs = useMemo(
     () => getMessagesContainerTabs(enableScheduleTab),
     [enableScheduleTab],
+  );
+  const defaultTab = useMemo(
+    () => getDefaultMessagesTab(channel, enableScheduleTab),
+    [channel, enableScheduleTab],
   );
 
   const runWithNetworkActivity = useCallback(async <T,>(operation: () => Promise<T>) => {
@@ -890,7 +909,7 @@ export function MessagesContainer({
     if (hashTab) {
       setActiveTab(hashTab);
     } else {
-      setActiveTab('messages');
+      setActiveTab(defaultTab);
     }
     setLoadedFiles(null);
     setFilesLoadError(null);
@@ -898,20 +917,20 @@ export function MessagesContainer({
     setLoadedSchedules(null);
     setSchedulesLoadError(null);
     setIsLoadingSchedules(false);
-  }, [channel.ids.id]);
+  }, [channel.ids.id, defaultTab]);
 
   useEffect(() => {
     if (containerTabs.some((tab) => tab.key === activeTab)) {
       return;
     }
-    setActiveTab('messages');
-  }, [containerTabs, activeTab]);
+    setActiveTab(defaultTab);
+  }, [containerTabs, activeTab, defaultTab]);
 
   useEffect(() => {
     if (activeTab !== 'schedule') return;
     if (enableScheduleTab) return;
-    setActiveTab('messages');
-  }, [activeTab, enableScheduleTab]);
+    setActiveTab(defaultTab);
+  }, [activeTab, enableScheduleTab, defaultTab]);
 
   useEffect(() => {
     const nextHash = `#${tabKeyToHash(activeTab)}`;

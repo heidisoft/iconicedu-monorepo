@@ -12,11 +12,11 @@ describe('messages-container-tabs', () => {
     ]);
   });
 
-  it('places sessions immediately after messages when schedule is enabled', () => {
+  it('places sessions first when schedule is enabled', () => {
     const tabs = getMessagesContainerTabs(true);
     expect(tabs.map((tab) => tab.key)).toEqual([
-      'messages',
       'schedule',
+      'messages',
       'files',
       'saved',
       'members',

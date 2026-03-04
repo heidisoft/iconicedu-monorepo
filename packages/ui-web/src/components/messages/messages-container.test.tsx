@@ -109,6 +109,7 @@ const channel: ChannelVM = {
   },
 };
 
+
 describe('MessagesContainer', () => {
   beforeEach(() => {
     vi.stubGlobal(
