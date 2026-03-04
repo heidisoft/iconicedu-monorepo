@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@iconicedu/ui-web/ui/t
 import { CalendarDays, Loader2 } from 'lucide-react';
 import {
   getJoinableSessionId,
+  getMonthProgressStatsByKey,
   groupSchedulesByMonth,
   splitSchedulesByTimeline,
   takeMonthGroups,
@@ -33,6 +34,10 @@ export function MessagesScheduleTab({
   const [upcomingMonthLimit, setUpcomingMonthLimit] = useState(MONTH_PAGE_SIZE);
   const [pastMonthLimit, setPastMonthLimit] = useState(MONTH_PAGE_SIZE);
   const { upcoming, past } = useMemo(() => splitSchedulesByTimeline(schedules), [schedules]);
+  const allDisplaySchedules = useMemo(
+    () => [...past, ...upcoming],
+    [past, upcoming],
+  );
 
   const now = useMemo(() => new Date(), []);
   const currentMonthKey = useMemo(
@@ -42,6 +47,10 @@ export function MessagesScheduleTab({
 
   const upcomingMonthGroups = useMemo(() => groupSchedulesByMonth(upcoming), [upcoming]);
   const pastMonthGroups = useMemo(() => groupSchedulesByMonth(past), [past]);
+  const monthProgressStatsByKey = useMemo(
+    () => getMonthProgressStatsByKey(allDisplaySchedules, now),
+    [allDisplaySchedules, now],
+  );
 
   const upcomingGroups = useMemo(
     () => toMonthGroups(takeMonthGroups(upcomingMonthGroups, upcomingMonthLimit), now),
@@ -118,6 +127,7 @@ export function MessagesScheduleTab({
                     isCurrentMonth={group.monthKey === currentMonthKey}
                     defaultOpen={index === 0}
                     joinableSessionId={joinableSessionId}
+                    progressStats={monthProgressStatsByKey.get(group.monthKey)}
                   />
                 ))
               )}
@@ -158,6 +168,7 @@ export function MessagesScheduleTab({
                     group={group}
                     isCurrentMonth={false}
                     defaultOpen={index === 0}
+                    progressStats={monthProgressStatsByKey.get(group.monthKey)}
                   />
                 ))
               )}

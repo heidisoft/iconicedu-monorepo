@@ -6,6 +6,7 @@ import {
   formatScheduleDateBadge,
   formatScheduleDateTime,
   formatScheduleDayTimeMeta,
+  getMonthProgressStatsByKey,
   getJoinableSessionId,
   getScheduleMonthKey,
   groupSchedulesByMonth,
@@ -275,6 +276,40 @@ describe('messages-schedule-tab.utils', () => {
         variant: 'default',
       }),
     );
+  });
+
+  it('builds month progress stats from all scheduled sessions in the month', () => {
+    const stats = getMonthProgressStatsByKey([
+      buildSchedule('1', '2026-03-03T16:00:00.000Z'),
+      { ...buildSchedule('2', '2026-03-10T16:00:00.000Z'), status: 'completed' as const },
+      { ...buildSchedule('3', '2026-03-12T16:00:00.000Z'), status: 'cancelled' as const },
+      buildSchedule('4', '2026-04-02T16:00:00.000Z'),
+    ], new Date('2026-03-09T00:00:00.000Z'));
+
+    expect(stats.get('2026-03')).toEqual({
+      scheduledCount: 2,
+      completedCount: 2,
+    });
+    expect(stats.get('2026-04')).toEqual({
+      scheduledCount: 1,
+      completedCount: 0,
+    });
+  });
+
+  it('counts past non-cancelled lessons as complete for month progress', () => {
+    const stats = getMonthProgressStatsByKey(
+      [
+        buildSchedule('past-scheduled', '2026-03-03T16:00:00.000Z'),
+        buildSchedule('future-scheduled', '2026-03-20T16:00:00.000Z'),
+        { ...buildSchedule('cancelled', '2026-03-05T16:00:00.000Z'), status: 'cancelled' as const },
+      ],
+      new Date('2026-03-10T00:00:00.000Z'),
+    );
+
+    expect(stats.get('2026-03')).toEqual({
+      scheduledCount: 2,
+      completedCount: 1,
+    });
   });
 
   it('selects only the first upcoming non-disabled session as joinable', () => {

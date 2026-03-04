@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { CheckCircle2, ChevronDown } from 'lucide-react';
 import { cn } from '@iconicedu/ui-web/lib/utils';
-import type { MonthGroup } from './messages-schedule-tab.utils';
+import type { MonthGroup, MonthProgressStats } from './messages-schedule-tab.utils';
 import { SessionCard } from './messages-session-card';
 
 interface MonthSectionProps {
@@ -11,6 +11,7 @@ interface MonthSectionProps {
   isCurrentMonth: boolean;
   defaultOpen?: boolean;
   joinableSessionId?: string | null;
+  progressStats?: MonthProgressStats;
 }
 
 export function shouldMonthSectionStartOpen(
@@ -20,14 +21,29 @@ export function shouldMonthSectionStartOpen(
   return Boolean(defaultOpen || isCurrentMonth);
 }
 
-export function getMonthSectionStats(group: MonthGroup): {
+export function getMonthSectionStats(
+  group: MonthGroup,
+  progressStats?: MonthProgressStats,
+): {
   progressPercent: number;
   allComplete: boolean;
+  scheduledCount: number;
+  completedCount: number;
 } {
+  const scheduledCount = progressStats?.scheduledCount ?? group.totalCount;
+  const completedCount = progressStats?.completedCount ?? group.completedCount;
   const progressPercent =
-    group.totalCount > 0 ? Math.round((group.completedCount / group.totalCount) * 100) : 0;
-  const allComplete = group.completedCount === group.totalCount && group.totalCount > 0;
-  return { progressPercent, allComplete };
+    scheduledCount > 0 ? Math.round((completedCount / scheduledCount) * 100) : 0;
+  const allComplete = completedCount === scheduledCount && scheduledCount > 0;
+  return { progressPercent, allComplete, scheduledCount, completedCount };
+}
+
+export function formatMonthSectionProgressLabel(
+  progressPercent: number,
+  completedCount: number,
+  scheduledCount: number,
+): string {
+  return `${progressPercent}% ${completedCount}/${scheduledCount}`;
 }
 
 export function MonthSection({
@@ -35,12 +51,15 @@ export function MonthSection({
   isCurrentMonth,
   defaultOpen = false,
   joinableSessionId = null,
+  progressStats,
 }: MonthSectionProps) {
   const [isOpen, setIsOpen] = useState(
     shouldMonthSectionStartOpen(defaultOpen, isCurrentMonth),
   );
-  const { progressPercent, allComplete } = getMonthSectionStats(group);
-
+  const { progressPercent, allComplete, scheduledCount, completedCount } = getMonthSectionStats(
+    group,
+    progressStats,
+  );
   return (
     <section className="space-y-0">
       <button
@@ -65,8 +84,8 @@ export function MonthSection({
               {allComplete ? <CheckCircle2 className="size-4 text-primary" /> : null}
             </div>
             <span className="text-xs text-muted-foreground">
-              {group.totalCount} {group.totalCount === 1 ? 'session' : 'sessions'}
-              {group.completedCount > 0 ? ` · ${group.completedCount} completed` : ''}
+              {scheduledCount} {scheduledCount === 1 ? 'session' : 'sessions'}
+              {completedCount > 0 ? ` · ${completedCount} completed` : ''}
             </span>
           </div>
         </div>
@@ -78,8 +97,12 @@ export function MonthSection({
               style={{ width: `${Math.max(0, Math.min(100, progressPercent))}%` }}
             />
           </div>
-          <span className="tabular-nums text-[10px] font-medium text-muted-foreground">
-            {progressPercent}%
+          <span className="text-[10px] font-medium text-muted-foreground">
+            <span className="tabular-nums">{progressPercent}%</span>
+            <span className="mx-1 text-muted-foreground/60">·</span>
+            <span className="tabular-nums">
+              {completedCount}/{scheduledCount}
+            </span>
           </span>
         </div>
 

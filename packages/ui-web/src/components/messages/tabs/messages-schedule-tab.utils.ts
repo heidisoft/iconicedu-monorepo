@@ -77,6 +77,23 @@ export interface MonthGroup {
   sessions: ClassSession[];
 }
 
+export interface MonthProgressStats {
+  scheduledCount: number;
+  completedCount: number;
+}
+
+function isScheduleCompletedForProgress(schedule: DisplaySchedule, now: Date): boolean {
+  if (schedule.status === 'completed') {
+    return true;
+  }
+
+  if (schedule.status === 'cancelled') {
+    return false;
+  }
+
+  return new Date(schedule.endAt).getTime() < now.getTime();
+}
+
 const weekdayFormatter = new Intl.DateTimeFormat('en-US', { weekday: 'long' });
 const shortWeekdayFormatter = new Intl.DateTimeFormat('en-US', { weekday: 'short' });
 const timeFormatter = new Intl.DateTimeFormat('en-US', {
@@ -368,6 +385,33 @@ export function getJoinableSessionId(schedules: DisplaySchedule[]): string | nul
     (schedule) => !(schedule.uiState?.disabled ?? false),
   );
   return nextJoinable?.ids.id ?? null;
+}
+
+export function getMonthProgressStatsByKey(
+  schedules: DisplaySchedule[],
+  now = new Date(),
+): Map<string, MonthProgressStats> {
+  const statsByMonthKey = new Map<string, MonthProgressStats>();
+
+  schedules.forEach((schedule) => {
+    const monthKey = getScheduleMonthKey(schedule);
+    const current = statsByMonthKey.get(monthKey) ?? {
+      scheduledCount: 0,
+      completedCount: 0,
+    };
+
+    if (schedule.status !== 'cancelled') {
+      current.scheduledCount += 1;
+    }
+
+    if (isScheduleCompletedForProgress(schedule, now)) {
+      current.completedCount += 1;
+    }
+
+    statsByMonthKey.set(monthKey, current);
+  });
+
+  return statsByMonthKey;
 }
 
 export function calculateScheduleCompletionPercent(
