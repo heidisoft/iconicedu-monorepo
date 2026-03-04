@@ -1,14 +1,10 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
+import { getServiceWebEnv } from '@iconicedu/web/lib/config/env';
 
 export const createSupabaseServiceClient = () => {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const { supabaseUrl, supabaseServiceRoleKey } = getServiceWebEnv();
 
-  if (!url || !key) {
-    throw new Error('Missing Supabase service configuration.');
-  }
-
-  return createClient(url, key, {
+  return createClient(supabaseUrl, supabaseServiceRoleKey, {
     auth: { persistSession: false },
   });
 };

@@ -9,7 +9,10 @@ import type {
 import type { AccountRow, ProfileRow } from '@iconicedu/shared-types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import { mapAccountRowToVM, mapUserRoles } from '@iconicedu/web/lib/accounts/mappers/account.mapper';
+import {
+  mapAccountRowToVM,
+  mapUserRoles,
+} from '@iconicedu/web/lib/accounts/mappers/account.mapper';
 import { resolveProfileAvatarUrl } from '@iconicedu/web/lib/profile/avatar-url';
 import { mapBaseProfile } from '@iconicedu/web/lib/profile/mappers/base-profile.mapper';
 import {
@@ -149,11 +152,7 @@ export async function buildSidebarUser(
   const [notificationDefaults, presence, avatarUrl] = await Promise.all([
     loadNotificationDefaults(supabase, profileRow.org_id, profileRow.id),
     loadPresence(supabase, profileRow.org_id, profileRow.id),
-    resolveAvatarUrl(
-      supabase,
-      profileRow.avatar_source,
-      profileRow.avatar_url ?? null,
-    ),
+    resolveAvatarUrl(supabase, profileRow.avatar_source, profileRow.avatar_url ?? null),
   ]);
 
   const baseProfile = mapBaseProfile(profileRow, {
@@ -223,10 +222,11 @@ async function loadNotificationDefaults(
 
   const defaults: NotificationDefaultsVM = {};
   data.forEach((item) => {
+    const notificationKey = item.pref_key as keyof NotificationDefaultsVM;
     const channels = Array.isArray(item.channels)
       ? (item.channels.filter(Boolean) as NotificationPreferenceVM['channels'])
       : [];
-    defaults[item.pref_key] = {
+    defaults[notificationKey] = {
       channels,
       muted: item.muted ?? null,
     };

@@ -1,18 +1,19 @@
-export const ROLE_SELECT = 'id, org_id, role_key, assigned_by, assigned_at';
-
-export const PROFILE_SELECT = [
-  'id',
-  'org_id',
-  'account_id',
-  'kind',
-  'display_name',
-  'first_name',
-  'last_name',
-  'bio',
+const PROFILE_IDENTITY_FIELDS = ['id', 'org_id', 'account_id', 'kind'] as const;
+const PROFILE_DISPLAY_FIELDS = ['display_name', 'first_name', 'last_name'] as const;
+const PROFILE_AVATAR_FIELDS = [
   'avatar_source',
   'avatar_url',
   'avatar_seed',
   'avatar_updated_at',
+] as const;
+
+export const ROLE_SELECT = 'id, org_id, role_key, assigned_by, assigned_at';
+
+export const PROFILE_SELECT = [
+  ...PROFILE_IDENTITY_FIELDS,
+  ...PROFILE_DISPLAY_FIELDS,
+  'bio',
+  ...PROFILE_AVATAR_FIELDS,
   'timezone',
   'locale',
   'languages_spoken',
@@ -22,25 +23,15 @@ export const PROFILE_SELECT = [
   'region',
   'city',
   'postal_code',
-  'notes_internal',
-  'lead_source',
   'ui_theme_key',
   'created_at',
   'updated_at',
 ].join(',');
 
 export const PROFILE_SUMMARY_SELECT = [
-  'id',
-  'org_id',
-  'account_id',
-  'kind',
-  'display_name',
-  'first_name',
-  'last_name',
-  'avatar_source',
-  'avatar_url',
-  'avatar_seed',
-  'avatar_updated_at',
+  ...PROFILE_IDENTITY_FIELDS,
+  ...PROFILE_DISPLAY_FIELDS,
+  ...PROFILE_AVATAR_FIELDS,
   'ui_theme_key',
 ].join(',');
 
@@ -73,21 +64,27 @@ export const EDUCATOR_SUBJECTS_SELECT = 'subject';
 export const EDUCATOR_GRADE_LEVELS_SELECT = 'grade_id, grade_label';
 export const EDUCATOR_CURRICULUM_TAGS_SELECT = 'tag';
 export const EDUCATOR_BADGES_SELECT = 'badge';
-export const EDUCATOR_AVAILABILITY_SELECT =
-  'profile_id, org_id, class_types, weekly_commitment, availability, created_at, created_by, updated_at, updated_by, deleted_at, deleted_by';
+export const EDUCATOR_AVAILABILITY_SELECT = [
+  'profile_id',
+  'org_id',
+  'class_types',
+  'weekly_commitment',
+  'availability',
+].join(',');
 
-export const CHILD_PROFILE_SELECT = [
+const CHILD_PROFILE_FIELDS = [
   'birth_year',
   'school_name',
   'school_year',
   'confidence_level',
-  'communication_style',
   'interests',
   'strengths',
   'learning_preferences',
   'motivation_styles',
   'communication_styles',
-].join(',');
+] as const;
+
+export const CHILD_PROFILE_SELECT = [...CHILD_PROFILE_FIELDS].join(',');
 export const CHILD_GRADE_LEVEL_SELECT = 'grade_id, grade_label';
 
 export const STAFF_PROFILE_SELECT =
@@ -98,18 +95,7 @@ export const GUARDIAN_PROFILE_SELECT = 'joined_date, session_notes_visibility';
 export const FAMILY_LINKS_SELECT = 'child_account_id';
 
 export const CHILD_PROFILES_SELECT = PROFILE_SELECT;
-export const CHILD_PROFILE_ROWS_SELECT = [
-  'profile_id',
-  'birth_year',
-  'school_name',
-  'school_year',
-  'confidence_level',
-  'communication_style',
-  'interests',
-  'strengths',
-  'learning_preferences',
-  'motivation_styles',
-  'communication_styles',
-].join(',');
-export const CHILD_GRADE_LEVEL_ROWS_SELECT =
-  'profile_id, grade_id, grade_label';
+export const CHILD_PROFILE_ROWS_SELECT = ['profile_id', ...CHILD_PROFILE_FIELDS].join(
+  ',',
+);
+export const CHILD_GRADE_LEVEL_ROWS_SELECT = 'profile_id, grade_id, grade_label';

@@ -1,0 +1,8 @@
+node_modules
+dist
+.next
+.expo
+android
+ios
+*.generated.ts
+pnpm-lock.yaml

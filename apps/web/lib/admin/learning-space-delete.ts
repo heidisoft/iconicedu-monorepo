@@ -1,24 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
-import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
+import { requireAdminAuthContext } from '@iconicedu/web/lib/admin/_auth-context';
 
 export async function deleteLearningSpaceCascade(learningSpaceId: string) {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    throw new Error('Unauthorized');
-  }
-
-  const accountResponse = await getAccountByAuthUserId(supabase, user.id);
-  if (!accountResponse.data) {
-    throw new Error('Account not found');
-  }
-
-  const orgId = accountResponse.data.org_id;
+  const { supabase, orgId } = await requireAdminAuthContext();
 
   const { data: learningSpace, error: learningSpaceError } = await supabase
     .from('learning_spaces')
@@ -47,9 +32,7 @@ export async function deleteLearningSpaceCascade(learningSpaceId: string) {
     throw new Error(channelError.message);
   }
 
-  const channelIds = (channelRows ?? [])
-    .map((row) => row.channel_id)
-    .filter(Boolean);
+  const channelIds = (channelRows ?? []).map((row) => row.channel_id).filter(Boolean);
 
   const { data: scheduleRows, error: scheduleError } = await supabase
     .from('class_schedules')
@@ -126,11 +109,7 @@ async function deleteSchedules(
   );
 
   await ensureDeleted(
-    supabase
-      .from('class_schedules')
-      .delete()
-      .eq('org_id', orgId)
-      .in('id', scheduleIds),
+    supabase.from('class_schedules').delete().eq('org_id', orgId).in('id', scheduleIds),
   );
 }
 

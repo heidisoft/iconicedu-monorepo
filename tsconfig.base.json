@@ -25,6 +25,7 @@
       "@iconicedu/ui-native/*": ["packages/ui-native/src/*"],
       "@iconicedu/shared-types/*": ["packages/shared-types/src/*"],
       "@iconicedu/shared-types": ["packages/shared-types/src"],
+      "@iconicedu/utils": ["packages/utils/src"],
       "@iconicedu/utils/*": ["packages/utils/src/*"]
     }
   }

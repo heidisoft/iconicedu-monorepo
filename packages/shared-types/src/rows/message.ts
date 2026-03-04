@@ -1,4 +1,5 @@
 import type { ISODateTime, UUID } from '../shared/shared';
+import type { AuditRow, MessagePayloadRow } from './base';
 
 export interface MessageRow {
   id: UUID;
@@ -23,21 +24,15 @@ export interface MessageRow {
   deleted_by?: UUID | null;
 }
 
-export interface MessageSaveRow {
+export interface MessageSaveRow extends AuditRow {
   id: UUID;
   org_id: UUID;
   message_id: UUID;
   channel_id: UUID;
   profile_id: UUID;
-  created_at: ISODateTime;
-  created_by?: UUID | null;
-  updated_at: ISODateTime;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
 }
 
-export interface ThreadRow {
+export interface ThreadRow extends AuditRow {
   id: UUID;
   org_id: UUID;
   channel_id: UUID;
@@ -47,28 +42,16 @@ export interface ThreadRow {
   author_name?: string | null;
   message_count?: number | null;
   last_reply_at?: ISODateTime | null;
-  created_at: ISODateTime;
-  created_by?: UUID | null;
-  updated_at: ISODateTime;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
 }
 
-export interface ThreadParticipantRow {
+export interface ThreadParticipantRow extends AuditRow {
   id: UUID;
   org_id: UUID;
   thread_id: UUID;
   profile_id: UUID;
-  created_at: ISODateTime;
-  created_by?: UUID | null;
-  updated_at: ISODateTime;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
 }
 
-export interface ThreadReadStateRow {
+export interface ThreadReadStateRow extends AuditRow {
   id: UUID;
   org_id: UUID;
   thread_id: UUID;
@@ -77,235 +60,42 @@ export interface ThreadReadStateRow {
   last_read_message_id?: UUID | null;
   last_read_at?: ISODateTime | null;
   unread_count?: number | null;
-  created_at: ISODateTime;
-  created_by?: UUID | null;
-  updated_at: ISODateTime;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
 }
 
-export interface MessageTextRow {
-  message_id: UUID;
-  org_id: UUID;
-  payload: Record<string, unknown>;
-  created_at: ISODateTime;
-  created_by?: UUID | null;
-  updated_at: ISODateTime;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
-}
+export type MessageTextRow = MessagePayloadRow;
+export type MessageImageRow = MessagePayloadRow;
+export type MessageFileRow = MessagePayloadRow;
+export type MessageDesignFileUpdateRow = MessagePayloadRow;
+export type MessagePaymentReminderRow = MessagePayloadRow;
+export type MessageEventReminderRow = MessagePayloadRow;
+export type MessageFeedbackRequestRow = MessagePayloadRow;
+export type MessageLessonAssignmentRow = MessagePayloadRow;
+export type MessageProgressUpdateRow = MessagePayloadRow;
+export type MessageSessionBookingRow = MessagePayloadRow;
+export type MessageSessionCompleteRow = MessagePayloadRow;
+export type MessageSessionSummaryRow = MessagePayloadRow;
+export type MessageHomeworkSubmissionRow = MessagePayloadRow;
+export type MessageLinkPreviewRow = MessagePayloadRow;
+export type MessageAudioRecordingRow = MessagePayloadRow;
+export type MessageLiveSessionStartedRow = MessagePayloadRow;
 
-export interface MessageImageRow {
-  message_id: UUID;
-  org_id: UUID;
-  payload: Record<string, unknown>;
-  created_at: ISODateTime;
-  created_by?: UUID | null;
-  updated_at: ISODateTime;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
-}
-
-export interface MessageFileRow {
-  message_id: UUID;
-  org_id: UUID;
-  payload: Record<string, unknown>;
-  created_at: ISODateTime;
-  created_by?: UUID | null;
-  updated_at: ISODateTime;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
-}
-
-export interface MessageDesignFileUpdateRow {
-  message_id: UUID;
-  org_id: UUID;
-  payload: Record<string, unknown>;
-  created_at: ISODateTime;
-  created_by?: UUID | null;
-  updated_at: ISODateTime;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
-}
-
-export interface MessagePaymentReminderRow {
-  message_id: UUID;
-  org_id: UUID;
-  payload: Record<string, unknown>;
-  created_at: ISODateTime;
-  created_by?: UUID | null;
-  updated_at: ISODateTime;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
-}
-
-export interface MessageEventReminderRow {
-  message_id: UUID;
-  org_id: UUID;
-  payload: Record<string, unknown>;
-  created_at: ISODateTime;
-  created_by?: UUID | null;
-  updated_at: ISODateTime;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
-}
-
-export interface MessageFeedbackRequestRow {
-  message_id: UUID;
-  org_id: UUID;
-  payload: Record<string, unknown>;
-  created_at: ISODateTime;
-  created_by?: UUID | null;
-  updated_at: ISODateTime;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
-}
-
-export interface MessageLessonAssignmentRow {
-  message_id: UUID;
-  org_id: UUID;
-  payload: Record<string, unknown>;
-  created_at: ISODateTime;
-  created_by?: UUID | null;
-  updated_at: ISODateTime;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
-}
-
-export interface MessageProgressUpdateRow {
-  message_id: UUID;
-  org_id: UUID;
-  payload: Record<string, unknown>;
-  created_at: ISODateTime;
-  created_by?: UUID | null;
-  updated_at: ISODateTime;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
-}
-
-export interface MessageSessionBookingRow {
-  message_id: UUID;
-  org_id: UUID;
-  payload: Record<string, unknown>;
-  created_at: ISODateTime;
-  created_by?: UUID | null;
-  updated_at: ISODateTime;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
-}
-
-export interface MessageSessionCompleteRow {
-  message_id: UUID;
-  org_id: UUID;
-  payload: Record<string, unknown>;
-  created_at: ISODateTime;
-  created_by?: UUID | null;
-  updated_at: ISODateTime;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
-}
-
-export interface MessageSessionSummaryRow {
-  message_id: UUID;
-  org_id: UUID;
-  payload: Record<string, unknown>;
-  created_at: ISODateTime;
-  created_by?: UUID | null;
-  updated_at: ISODateTime;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
-}
-
-export interface MessageHomeworkSubmissionRow {
-  message_id: UUID;
-  org_id: UUID;
-  payload: Record<string, unknown>;
-  created_at: ISODateTime;
-  created_by?: UUID | null;
-  updated_at: ISODateTime;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
-}
-
-export interface MessageLinkPreviewRow {
-  message_id: UUID;
-  org_id: UUID;
-  payload: Record<string, unknown>;
-  created_at: ISODateTime;
-  created_by?: UUID | null;
-  updated_at: ISODateTime;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
-}
-
-export interface MessageAudioRecordingRow {
-  message_id: UUID;
-  org_id: UUID;
-  payload: Record<string, unknown>;
-  created_at: ISODateTime;
-  created_by?: UUID | null;
-  updated_at: ISODateTime;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
-}
-
-export interface MessageLiveSessionStartedRow {
-  message_id: UUID;
-  org_id: UUID;
-  payload: Record<string, unknown>;
-  created_at: ISODateTime;
-  created_by?: UUID | null;
-  updated_at: ISODateTime;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
-}
-
-export interface MessageReactionRow {
+export interface MessageReactionRow extends AuditRow {
   id: UUID;
   org_id: UUID;
   message_id: UUID;
   emoji: string;
   account_id: UUID;
-  created_at: ISODateTime;
-  created_by?: UUID | null;
-  updated_at: ISODateTime;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
 }
 
-export interface MessageReactionCountRow {
+export interface MessageReactionCountRow extends AuditRow {
   id: UUID;
   org_id: UUID;
   message_id: UUID;
   emoji: string;
   count: number;
-  created_at: ISODateTime;
-  created_by?: UUID | null;
-  updated_at: ISODateTime;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
 }
 
-export interface ChannelFileRow {
+export interface ChannelFileRow extends AuditRow {
   id: UUID;
   org_id: UUID;
   channel_id: UUID;
@@ -317,15 +107,9 @@ export interface ChannelFileRow {
   mime_type?: string | null;
   size?: number | null;
   tool?: string | null;
-  created_at: ISODateTime;
-  created_by?: UUID | null;
-  updated_at: ISODateTime;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
 }
 
-export interface ChannelMediaRow {
+export interface ChannelMediaRow extends AuditRow {
   id: UUID;
   org_id: UUID;
   channel_id: UUID;
@@ -336,10 +120,4 @@ export interface ChannelMediaRow {
   name?: string | null;
   width?: number | null;
   height?: number | null;
-  created_at: ISODateTime;
-  created_by?: UUID | null;
-  updated_at: ISODateTime;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
 }

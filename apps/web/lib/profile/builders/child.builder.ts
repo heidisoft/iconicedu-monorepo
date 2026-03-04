@@ -2,7 +2,10 @@ import type { ChildProfileVM, GradeLevel, UserProfileVM } from '@iconicedu/share
 import type { ProfileRow } from '@iconicedu/shared-types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import { getChildGradeLevel, getChildProfile } from '@iconicedu/web/lib/profile/queries/child.query';
+import {
+  getChildGradeLevel,
+  getChildProfile,
+} from '@iconicedu/web/lib/profile/queries/child.query';
 import { parseGradeLevel } from '@iconicedu/shared-types';
 
 export async function buildChildProfile(
@@ -16,8 +19,8 @@ export async function buildChildProfile(
   ]);
 
   const gradeLevel: GradeLevel | null = grade.data
-    ? parseGradeLevel(grade.data.grade_id) ??
-      parseGradeLevel(grade.data.grade_label ?? grade.data.grade_id)
+    ? (parseGradeLevel(grade.data.grade_id) ??
+      parseGradeLevel(grade.data.grade_label ?? grade.data.grade_id))
     : null;
 
   return {
@@ -32,8 +35,6 @@ export async function buildChildProfile(
     learningPreferences: child.data?.learning_preferences ?? null,
     motivationStyles: child.data?.motivation_styles ?? null,
     confidenceLevel: child.data?.confidence_level ?? null,
-    communicationStyles:
-      child.data?.communication_styles ??
-      (child.data?.communication_style ? [child.data.communication_style] : null),
+    communicationStyles: child.data?.communication_styles ?? null,
   };
 }

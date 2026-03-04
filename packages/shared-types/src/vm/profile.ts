@@ -67,7 +67,50 @@ export interface NotificationPreferenceVM {
   muted?: boolean | null;
 }
 
-export type NotificationDefaultsVM = Record<string, NotificationPreferenceVM>;
+export type NotificationKey =
+  | 'defaults.message_updates'
+  | 'defaults.weekly_digest'
+  | 'defaults.sms_reminders'
+  | 'system.alerts'
+  | 'messages.direct_message'
+  | 'messages.teacher_message'
+  | 'messages.mentions'
+  | 'messages.replies'
+  | 'messages.mute_busy'
+  | 'schedule.upcoming_reminder'
+  | 'schedule.starting_soon'
+  | 'schedule.rescheduled'
+  | 'schedule.canceled'
+  | 'schedule.no_show'
+  | 'schedule.makeup'
+  | 'homework.assigned'
+  | 'homework.due_reminder'
+  | 'homework.feedback'
+  | 'homework.new'
+  | 'homework.new_resource'
+  | 'progress.weekly_report'
+  | 'progress.monthly_report'
+  | 'progress.attendance_summary'
+  | 'progress.milestones'
+  | 'announcements.important'
+  | 'announcements.class_posts'
+  | 'announcements.policy_updates'
+  | 'billing.receipt'
+  | 'billing.failed'
+  | 'billing.invoice_ready'
+  | 'billing.refund'
+  | 'billing.renewal'
+  | 'app.security_alerts'
+  | 'app.new_device'
+  | 'app.account_changes'
+  | 'digest.instant'
+  | 'digest.daily'
+  | 'digest.weekly'
+  | 'digest.urgent_only';
+
+export type NotificationDefaultsVM = Partial<
+  Record<NotificationKey, NotificationPreferenceVM>
+>;
 
 export interface UserLocationVM {
   countryCode?: string | null;

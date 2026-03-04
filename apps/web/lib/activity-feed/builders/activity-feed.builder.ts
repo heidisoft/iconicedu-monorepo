@@ -36,7 +36,13 @@ export async function buildActivityFeedForProfile(
   const itemsResponse = await getActivityFeedItemsByOrg(supabase, orgId, profileId);
   const itemRows = itemsResponse.data ?? [];
 
-  const actorProfiles = await loadActivityFeedActors(supabase, orgId, itemRows);
+  const groupIds = itemRows.filter((row) => row.kind === 'group').map((row) => row.id);
+  const [actorProfiles, groupMembersResponse] = await Promise.all([
+    loadActivityFeedActors(supabase, orgId, itemRows),
+    groupIds.length
+      ? getActivityFeedGroupMembersByGroupIds(supabase, orgId, groupIds)
+      : Promise.resolve({ data: [] }),
+  ]);
   const mappedItems = itemRows.map((row) =>
     mapActivityFeedItemRow(row, {
       actor: row.actor_profile_id ? actorProfiles.get(row.actor_profile_id) : null,
@@ -44,9 +50,8 @@ export async function buildActivityFeedForProfile(
   );
 
   const groupedItems = await attachGroupMembers(
-    supabase,
-    orgId,
     mappedItems,
+    groupMembersResponse.data ?? [],
   );
 
   const filteredItems =
@@ -90,35 +95,24 @@ async function loadActivityFeedActors(
 
   const profilesResponse = await getProfilesByIds(supabase, orgId, actorIds);
   const profileRows = profilesResponse.data ?? [];
-  const actorEntries: Array<[string, ActivityFeedItemVM['refs']['actor']]> = await Promise.all(
-    profileRows.map(async (row) => [
-      row.id,
-      await buildUserProfileFromRow(supabase, row),
-    ]),
-  );
+  const actorEntries: Array<[string, ActivityFeedItemVM['refs']['actor']]> =
+    await Promise.all(
+      profileRows.map(async (row) => [
+        row.id,
+        await buildUserProfileFromRow(supabase, row),
+      ]),
+    );
 
   return new Map(actorEntries);
 }
 
 async function attachGroupMembers(
-  supabase: SupabaseClient,
-  orgId: string,
   items: ActivityFeedItemVM[],
+  groupMembers: Array<{ group_id: string; item_id: string }>,
 ) {
-  const groupIds = items
-    .filter((item) => item.kind === 'group')
-    .map((item) => item.ids.id);
-
-  if (!groupIds.length) {
+  if (!groupMembers.length) {
     return items;
   }
-
-  const groupMembersResponse = await getActivityFeedGroupMembersByGroupIds(
-    supabase,
-    orgId,
-    groupIds,
-  );
-  const groupMembers = groupMembersResponse.data ?? [];
 
   const itemMap = new Map(items.map((item) => [item.ids.id, item]));
   const membersByGroup = new Map<string, string[]>();
@@ -163,8 +157,8 @@ function buildFeedTabs(items: ActivityFeedItemVM[]): ActivityFeedTabVM[] {
   items.forEach((item) => {
     const unreadItemCount =
       item.kind === 'group'
-        ? item.subActivities?.items.filter((subItem) => !subItem.state?.isRead).length ??
-          (!item.state?.isRead ? 1 : 0)
+        ? (item.subActivities?.items.filter((subItem) => !subItem.state?.isRead).length ??
+          (!item.state?.isRead ? 1 : 0))
         : !item.state?.isRead
           ? 1
           : 0;
@@ -182,7 +176,7 @@ function buildFeedTabs(items: ActivityFeedItemVM[]): ActivityFeedTabVM[] {
     badgeCount:
       tab.key === 'all'
         ? Array.from(counts.values()).reduce((total, count) => total + count, 0)
-        : counts.get(tab.key) ?? 0,
+        : (counts.get(tab.key) ?? 0),
   }));
 }
 

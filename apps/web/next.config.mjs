@@ -6,7 +6,7 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   // Transpile shared UI package from source instead of relying on a prebuilt bundle.
-  transpilePackages: ['@iconicedu/ui-web'],
+  transpilePackages: ['@iconicedu/ui-web', '@iconicedu/utils'],
 };
 
 export default nextConfig;

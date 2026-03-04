@@ -19,9 +19,15 @@ import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profil
 import { buildUserProfileById } from '@iconicedu/web/lib/profile/builders/user-profile.builder';
 import { mapMessageRowToVM } from '@iconicedu/web/lib/messages/mappers/message.mapper';
 import { buildThreadById } from '@iconicedu/web/lib/messages/builders/thread.builder';
-import { CHANNEL_FILE_BUCKET, createSignedChannelFileUrl } from '@iconicedu/web/lib/messages/queries/file-url.query';
+import {
+  CHANNEL_FILE_BUCKET,
+  createSignedChannelFileUrl,
+} from '@iconicedu/web/lib/messages/queries/file-url.query';
 import { isValidMessageAssetPath } from '@iconicedu/web/lib/storage/storage-paths';
-import { extractFirstUrl, fetchLinkPreviewMetadata } from '@iconicedu/web/lib/messages/link-preview';
+import {
+  extractFirstUrl,
+  fetchLinkPreviewMetadata,
+} from '@iconicedu/web/lib/messages/link-preview';
 import { publishActivityEvent } from '@iconicedu/web/lib/activity-feed/publisher/activity-publisher';
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
@@ -36,7 +42,9 @@ type ParentMessageRow = {
 };
 
 type ActivityChannelContext = {
-  scope: { kind: 'learning_space'; learningSpaceId: string } | { kind: 'channel'; channelId: string };
+  scope:
+    | { kind: 'learning_space'; learningSpaceId: string }
+    | { kind: 'channel'; channelId: string };
   targetRef?: { kind: 'learning_space'; id: string };
   channelTopic?: string | null;
   learningSpaceId?: string | null;
@@ -51,8 +59,6 @@ type HomeworkMessageIntent = {
   dueAt: string;
   subject: string;
 };
-
-const HOMEWORK_TRIGGER_PATTERN = /(^|\s)@(homework|homeowork)\b/gi;
 
 function sanitizeMentions(
   content: string,
@@ -80,7 +86,11 @@ function sanitizeMentions(
     ) {
       return false;
     }
-    if (mention.start < 0 || mention.end <= mention.start || mention.end > content.length) {
+    if (
+      mention.start < 0 ||
+      mention.end <= mention.start ||
+      mention.end > content.length
+    ) {
       return false;
     }
     if (content.slice(mention.start, mention.end) !== `@${mention.displayName}`) {
@@ -125,14 +135,14 @@ function deriveHomeworkMessageIntent(
     };
   }
 
-  if (!HOMEWORK_TRIGGER_PATTERN.test(content)) {
+  const homeworkTriggerPattern = /(^|\s)@(homework|homeowork)\b/gi;
+
+  if (!homeworkTriggerPattern.test(content)) {
     return null;
   }
 
-  HOMEWORK_TRIGGER_PATTERN.lastIndex = 0;
-
   const cleanedContent = content
-    .replace(HOMEWORK_TRIGGER_PATTERN, '$1')
+    .replace(homeworkTriggerPattern, '$1')
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
@@ -160,9 +170,7 @@ function deriveHomeworkMessageIntent(
     title,
     dueAt: dueDate.toISOString(),
     subject:
-      activityContext.learningSpaceTitle ??
-      activityContext.channelTopic ??
-      'Homework',
+      activityContext.learningSpaceTitle ?? activityContext.channelTopic ?? 'Homework',
   };
 }
 
@@ -177,7 +185,9 @@ async function createMentionNotifications(input: {
   mentions: MessageMentionVM[];
   now: string;
 }) {
-  const recipientIds = Array.from(new Set(input.mentions.map((mention) => mention.profileId)));
+  const recipientIds = Array.from(
+    new Set(input.mentions.map((mention) => mention.profileId)),
+  );
   if (!recipientIds.length) {
     return;
   }
@@ -189,7 +199,9 @@ async function createMentionNotifications(input: {
     .eq('pref_key', 'messages.mentions')
     .in('profile_id', recipientIds)
     .is('deleted_at', null)
-    .returns<Array<{ profile_id: string; channels: string[] | null; muted?: boolean | null }>>();
+    .returns<
+      Array<{ profile_id: string; channels: string[] | null; muted?: boolean | null }>
+    >();
 
   if (preferencesResponse.error) {
     throw new Error(preferencesResponse.error.message);
@@ -264,7 +276,8 @@ async function createMentionNotifications(input: {
       payload: {
         channelId: input.channelId,
         messageId: input.messageId,
-        mentionedProfileId: (item.metadata as { mentionedProfileId: string }).mentionedProfileId,
+        mentionedProfileId: (item.metadata as { mentionedProfileId: string })
+          .mentionedProfileId,
         senderName: input.senderName,
         content: input.content,
         threadReply: false,
@@ -341,10 +354,7 @@ async function createThreadReplyNotifications(input: {
     throw new Error(participantsResponse.error.message);
   }
 
-  const exclude = new Set([
-    input.senderProfileId,
-    ...(input.excludeProfileIds ?? []),
-  ]);
+  const exclude = new Set([input.senderProfileId, ...(input.excludeProfileIds ?? [])]);
   const recipientIds = Array.from(
     new Set(
       (participantsResponse.data ?? [])
@@ -437,9 +447,18 @@ async function resolveActivityChannelContext(input: {
 
   const channelsTable = input.supabase.from('channels') as unknown as {
     select?: (query: string) => {
-      eq: (column: string, value: string) => {
-        eq: (column: string, value: string) => {
-          is: (column: string, value: null) => {
+      eq: (
+        column: string,
+        value: string,
+      ) => {
+        eq: (
+          column: string,
+          value: string,
+        ) => {
+          is: (
+            column: string,
+            value: null,
+          ) => {
             maybeSingle: () => Promise<{
               data: {
                 id: string;
@@ -487,7 +506,8 @@ async function resolveActivityChannelContext(input: {
     };
   }
 
-  const routeKind = channel.kind === 'dm' || channel.kind === 'group_dm' ? 'dm' : 'channel';
+  const routeKind =
+    channel.kind === 'dm' || channel.kind === 'group_dm' ? 'dm' : 'channel';
   return {
     scope: { kind: 'channel', channelId: input.channelId },
     channelTopic: channel.topic ?? null,
@@ -749,7 +769,11 @@ export async function sendTextMessageAction(
       org_id: accountResponse.data.org_id,
       channel_id: input.channelId,
       sender_profile_id: profileResponse.data.id,
-      type: homeworkIntent ? 'lesson-assignment' : previewMetadata ? 'link-preview' : 'text',
+      type: homeworkIntent
+        ? 'lesson-assignment'
+        : previewMetadata
+          ? 'link-preview'
+          : 'text',
       visibility_type: 'all',
       thread_id: threadId,
       thread_parent_id: input.threadParentId ?? null,
@@ -784,20 +808,20 @@ export async function sendTextMessageAction(
             subject: homeworkIntent.subject,
           }
         : previewMetadata
-        ? {
-            ...(input.content.trim() ? { text: input.content } : {}),
-            ...(sanitizedMentions.length ? { mentions: sanitizedMentions } : {}),
-            url: previewMetadata.url,
-            title: previewMetadata.title,
-            description: previewMetadata.description,
-            imageUrl: previewMetadata.imageUrl,
-            siteName: previewMetadata.siteName,
-            favicon: previewMetadata.favicon,
-          }
-      : {
-            text: input.content,
-            ...(sanitizedMentions.length ? { mentions: sanitizedMentions } : {}),
-          },
+          ? {
+              ...(input.content.trim() ? { text: input.content } : {}),
+              ...(sanitizedMentions.length ? { mentions: sanitizedMentions } : {}),
+              url: previewMetadata.url,
+              title: previewMetadata.title,
+              description: previewMetadata.description,
+              imageUrl: previewMetadata.imageUrl,
+              siteName: previewMetadata.siteName,
+              favicon: previewMetadata.favicon,
+            }
+          : {
+              text: input.content,
+              ...(sanitizedMentions.length ? { mentions: sanitizedMentions } : {}),
+            },
       created_at: now,
       created_by: profileResponse.data.id,
       updated_at: now,
@@ -987,7 +1011,11 @@ export async function sendFileMessageAction(
   const signedUrl = await createSignedChannelFileUrl(supabase, input.storagePath);
   const isImageUpload = input.mimeType?.startsWith('image/') ?? false;
   const isAudioUpload = input.mimeType?.startsWith('audio/') ?? false;
-  const messageType = isImageUpload ? 'image' : isAudioUpload ? 'audio-recording' : 'file';
+  const messageType = isImageUpload
+    ? 'image'
+    : isAudioUpload
+      ? 'audio-recording'
+      : 'file';
 
   const messageInsert = await supabase
     .from('messages')
@@ -1024,22 +1052,30 @@ export async function sendFileMessageAction(
           name: input.name,
           size: input.size,
           mimeType: input.mimeType,
-          ...(isImageUpload && input.thumbnailUrl ? { thumbnailUrl: input.thumbnailUrl } : {}),
+          ...(isImageUpload && input.thumbnailUrl
+            ? { thumbnailUrl: input.thumbnailUrl }
+            : {}),
         }),
     ...(input.content?.trim() ? { text: input.content.trim() } : {}),
   };
 
   const payloadInsert = await supabase
-    .from(isImageUpload ? 'message_image' : isAudioUpload ? 'message_audio_recording' : 'message_file')
+    .from(
+      isImageUpload
+        ? 'message_image'
+        : isAudioUpload
+          ? 'message_audio_recording'
+          : 'message_file',
+    )
     .insert({
-    message_id: messageInsert.data.id,
-    org_id: input.orgId,
-    payload,
-    created_at: now,
-    created_by: currentProfileId,
-    updated_at: now,
-    updated_by: currentProfileId,
-  });
+      message_id: messageInsert.data.id,
+      org_id: input.orgId,
+      payload,
+      created_at: now,
+      created_by: currentProfileId,
+      updated_at: now,
+      updated_by: currentProfileId,
+    });
 
   if (payloadInsert.error) {
     await serviceSupabase.storage.from(CHANNEL_FILE_BUCKET).remove([input.storagePath]);
@@ -1082,7 +1118,13 @@ export async function sendFileMessageAction(
   if (channelAssetInsert.error) {
     await serviceSupabase.storage.from(CHANNEL_FILE_BUCKET).remove([input.storagePath]);
     await supabase
-      .from(isImageUpload ? 'message_image' : isAudioUpload ? 'message_audio_recording' : 'message_file')
+      .from(
+        isImageUpload
+          ? 'message_image'
+          : isAudioUpload
+            ? 'message_audio_recording'
+            : 'message_file',
+      )
       .delete()
       .eq('message_id', messageInsert.data.id);
     await supabase.from('messages').delete().eq('id', messageInsert.data.id);
@@ -1263,7 +1305,9 @@ export async function sendFilesMessageAction(
     });
 
   if (payloadInsert.error) {
-    await serviceSupabase.storage.from(CHANNEL_FILE_BUCKET).remove(input.assets.map((asset) => asset.storagePath));
+    await serviceSupabase.storage
+      .from(CHANNEL_FILE_BUCKET)
+      .remove(input.assets.map((asset) => asset.storagePath));
     await supabase.from('messages').delete().eq('id', messageInsert.data.id);
     throw new Error(payloadInsert.error.message);
   }
@@ -1305,7 +1349,9 @@ export async function sendFilesMessageAction(
       );
 
   if (channelAssetInsert.error) {
-    await serviceSupabase.storage.from(CHANNEL_FILE_BUCKET).remove(input.assets.map((asset) => asset.storagePath));
+    await serviceSupabase.storage
+      .from(CHANNEL_FILE_BUCKET)
+      .remove(input.assets.map((asset) => asset.storagePath));
     await supabase
       .from(allImages ? 'message_image' : 'message_file')
       .delete()
@@ -1340,9 +1386,9 @@ export async function sendFilesMessageAction(
     name:
       input.assets.length > 1
         ? `${input.assets[0]?.name ?? 'File'} +${input.assets.length - 1} more`
-        : input.assets[0]?.name ?? 'File',
+        : (input.assets[0]?.name ?? 'File'),
     content: input.content?.trim() ?? null,
-    mimeType: allImages ? 'image/*' : input.assets[0]?.mimeType ?? null,
+    mimeType: allImages ? 'image/*' : (input.assets[0]?.mimeType ?? null),
     storagePath: input.assets[0]?.storagePath ?? null,
     fileCount: input.assets.length,
     activityContext,
@@ -1640,9 +1686,8 @@ export async function toggleSavedMessageAction(
   const now = new Date().toISOString();
 
   if (input.isSaved) {
-    const upsertResponse = await supabase
-      .from('message_saves')
-      .upsert({
+    const upsertResponse = await supabase.from('message_saves').upsert(
+      {
         org_id: input.orgId,
         message_id: input.messageId,
         channel_id: messageResponse.data.channel_id,
@@ -1653,9 +1698,11 @@ export async function toggleSavedMessageAction(
         updated_by: profileResponse.data.id,
         deleted_at: null,
         deleted_by: null,
-      }, {
+      },
+      {
         onConflict: 'org_id,message_id,profile_id',
-      });
+      },
+    );
 
     if (upsertResponse.error) {
       throw new Error(upsertResponse.error.message);

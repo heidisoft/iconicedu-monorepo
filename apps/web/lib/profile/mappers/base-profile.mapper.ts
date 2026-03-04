@@ -75,10 +75,6 @@ export function mapBaseProfile(
       city: profileRow.city,
       postalCode: profileRow.postal_code,
     },
-    internal: {
-      notesInternal: profileRow.notes_internal,
-      leadSource: profileRow.lead_source,
-    },
     meta: {
       createdAt: profileRow.created_at,
       updatedAt: profileRow.updated_at,

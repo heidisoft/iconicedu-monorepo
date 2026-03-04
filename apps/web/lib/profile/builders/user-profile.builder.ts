@@ -16,15 +16,14 @@ import { mapProfilePresenceRowToVM } from '@iconicedu/web/lib/profile/mappers/pr
 import {
   getProfileByAccountId,
   getProfileById,
+  getProfilesByIds,
 } from '@iconicedu/web/lib/profile/queries/profiles.query';
 import { buildChildProfile } from '@iconicedu/web/lib/profile/builders/child.builder';
 import { buildEducatorProfile } from '@iconicedu/web/lib/profile/builders/educator.builder';
 import { buildGuardianProfile } from '@iconicedu/web/lib/profile/builders/guardian.builder';
 import { buildStaffProfile } from '@iconicedu/web/lib/profile/builders/staff.builder';
 import { getGuardianFamilyInvites } from '@iconicedu/web/lib/profile/queries/family-link-invites.query';
-import {
-  mapFamilyLinkInviteRowToVM,
-} from '@iconicedu/web/lib/family/queries/invite.query';
+import { mapFamilyLinkInviteRowToVM } from '@iconicedu/web/lib/family/queries/invite.query';
 
 type BuildUserProfileOptions = {
   accountEmail?: string | null;
@@ -42,6 +41,31 @@ export async function buildUserProfileById(
   }
 
   return buildUserProfileFromRow(supabase, profileResponse.data, options);
+}
+
+export async function buildUserProfilesByIds(
+  supabase: SupabaseClient,
+  orgId: string,
+  profileIds: string[],
+  options: BuildUserProfileOptions = {},
+): Promise<Map<string, UserProfileVM>> {
+  if (!profileIds.length) {
+    return new Map<string, UserProfileVM>();
+  }
+
+  const profileResponse = await getProfilesByIds(
+    supabase,
+    orgId,
+    Array.from(new Set(profileIds)),
+  );
+  const profileRows = profileResponse.data ?? [];
+  const profiles = await Promise.all(
+    profileRows.map((profileRow) =>
+      buildUserProfileFromRow(supabase, profileRow, options),
+    ),
+  );
+
+  return new Map(profiles.map((profile) => [profile.ids.id, profile]));
 }
 
 export async function buildUserProfileByAccountId(
@@ -129,10 +153,11 @@ async function loadNotificationDefaults(
 
   const defaults: NotificationDefaultsVM = {};
   data.forEach((item) => {
+    const notificationKey = item.pref_key as keyof NotificationDefaultsVM;
     const channels = Array.isArray(item.channels)
       ? (item.channels.filter(Boolean) as NotificationPreferenceVM['channels'])
       : [];
-    defaults[item.pref_key] = {
+    defaults[notificationKey] = {
       channels,
       muted: item.muted ?? null,
     };

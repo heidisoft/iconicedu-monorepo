@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { getPublicWebEnv } from '@iconicedu/web/lib/config/env';
 
 type CookieStore = Awaited<ReturnType<typeof cookies>>;
 
@@ -12,18 +13,11 @@ export const createSupabaseServerClient = async ({
   cookieStore,
   allowCookieModification = false,
 }: CreateSupabaseServerClientOptions = {}) => {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey =
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ??
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !anonKey) {
-    throw new Error('Missing Supabase environment variables.');
-  }
+  const { supabaseUrl, supabasePublishableKey } = getPublicWebEnv();
 
   const resolvedCookieStore = cookieStore ?? (await cookies());
 
-  return createServerClient(url, anonKey, {
+  return createServerClient(supabaseUrl, supabasePublishableKey, {
     cookies: {
       get(name) {
         return resolvedCookieStore.get(name)?.value;

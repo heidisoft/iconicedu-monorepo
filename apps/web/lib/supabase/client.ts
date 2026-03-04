@@ -1,14 +1,8 @@
 import { createBrowserClient } from '@supabase/ssr';
+import { getPublicWebEnv } from '@iconicedu/web/lib/config/env';
 
 export const createSupabaseBrowserClient = () => {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey =
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ??
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const { supabaseUrl, supabasePublishableKey } = getPublicWebEnv();
 
-  if (!url || !anonKey) {
-    throw new Error('Missing Supabase environment variables.');
-  }
-
-  return createBrowserClient(url, anonKey);
+  return createBrowserClient(supabaseUrl, supabasePublishableKey);
 };

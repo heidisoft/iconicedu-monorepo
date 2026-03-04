@@ -12,6 +12,7 @@ import type {
   FamilyLinkInviteRole,
   GradeLevel,
   NotificationChannelVM,
+  NotificationKey,
   SidebarLeftDataVM,
   StaffProfileSaveInput,
   ThemeKey,
@@ -98,9 +99,7 @@ const normalizeThemeKey = (value?: string | null): ThemeKey | null | undefined =
   return value as ThemeKey;
 };
 
-const normalizeNotificationChannels = (
-  channels: string[],
-): NotificationChannelVM[] => {
+const normalizeNotificationChannels = (channels: string[]): NotificationChannelVM[] => {
   const allowed: NotificationChannelVM[] = ['push', 'email', 'sms', 'whatsapp'];
   return channels.filter((channel): channel is NotificationChannelVM =>
     allowed.includes(channel as NotificationChannelVM),
@@ -148,9 +147,8 @@ export function SidebarShell({
     new Set(data.collections.directMessages.map((dm) => dm.ids.id)),
   );
   const excludedDirectMessageSyncIdsRef = React.useRef<Set<string>>(new Set());
-  const [onboardingStatus, setOnboardingStatus] = React.useState<UserOnboardingStatusVM | null>(
-    initialOnboardingStatus ?? null,
-  );
+  const [onboardingStatus, setOnboardingStatus] =
+    React.useState<UserOnboardingStatusVM | null>(initialOnboardingStatus ?? null);
 
   React.useEffect(() => {
     setSidebarData(data);
@@ -220,9 +218,9 @@ export function SidebarShell({
         }),
       });
       if (!response.ok) {
-        const payload = (await response.json().catch(() => null)) as
-          | { message?: string }
-          | null;
+        const payload = (await response.json().catch(() => null)) as {
+          message?: string;
+        } | null;
         throw new Error(payload?.message || 'Unable to update status');
       }
 
@@ -258,11 +256,7 @@ export function SidebarShell({
           presenceLoaded: true,
         } as const;
 
-        return applyPresenceToSidebarData(
-          prev,
-          prev.user.profile.ids.id,
-          nextPresence,
-        );
+        return applyPresenceToSidebarData(prev, prev.user.profile.ids.id, nextPresence);
       });
       showSuccessToast('Status updated');
     },
@@ -388,9 +382,10 @@ export function SidebarShell({
         filter: `org_id=eq.${orgId}`,
       },
       (payload) => {
-        const row = payload.new as
-          | { channel_id?: string; sender_profile_id?: string | null }
-          | null;
+        const row = payload.new as {
+          channel_id?: string;
+          sender_profile_id?: string | null;
+        } | null;
         if (!row?.channel_id) {
           return;
         }
@@ -454,12 +449,7 @@ export function SidebarShell({
     return () => {
       void channel.unsubscribe();
     };
-  }, [
-    supabase,
-    sidebarProfile.ids?.orgId,
-    sidebarProfile.ids?.id,
-    persistUnread,
-  ]);
+  }, [supabase, sidebarProfile.ids?.orgId, sidebarProfile.ids?.id, persistUnread]);
 
   React.useEffect(() => {
     const orgId = sidebarProfile.ids?.orgId;
@@ -1088,8 +1078,7 @@ export function SidebarShell({
   );
 
   const normalizeList = (values?: string[] | null) => {
-    const cleaned =
-      values?.map((value) => value.trim()).filter((value) => value) ?? [];
+    const cleaned = values?.map((value) => value.trim()).filter((value) => value) ?? [];
     return Array.from(new Set(cleaned));
   };
 
@@ -1099,18 +1088,16 @@ export function SidebarShell({
         const specialties = normalizeList(input.specialties);
         const normalizedAvailability = input.weeklyAvailability ?? null;
 
-        const { error } = await supabase
-          .from('staff_profiles')
-          .upsert(
-            {
-              profile_id: input.profileId,
-              org_id: input.orgId,
-              department: input.department ?? null,
-              job_title: input.jobTitle ?? null,
-              weekly_availability: normalizedAvailability,
-            },
-            { onConflict: 'profile_id' },
-          );
+        const { error } = await supabase.from('staff_profiles').upsert(
+          {
+            profile_id: input.profileId,
+            org_id: input.orgId,
+            department: input.department ?? null,
+            job_title: input.jobTitle ?? null,
+            weekly_availability: normalizedAvailability,
+          },
+          { onConflict: 'profile_id' },
+        );
         if (error) {
           throw error;
         }
@@ -1178,10 +1165,6 @@ export function SidebarShell({
           school_name: input.schoolName ?? null,
           school_year: input.schoolYear ?? null,
           confidence_level: input.confidenceLevel ?? null,
-          communication_style:
-            input.communicationStyles && input.communicationStyles.length
-              ? input.communicationStyles[0]
-              : null,
           interests: input.interests ?? [],
           strengths: input.strengths ?? [],
           learning_preferences: input.learningPreferences ?? [],
@@ -1228,7 +1211,7 @@ export function SidebarShell({
             user: {
               ...prev.user,
               profile: {
-              ...profile,
+                ...profile,
                 gradeLevel: input.gradeId ?? null,
                 gradeLabel: input.gradeLabel ?? gradeId,
                 birthYear: input.birthYear ?? null,
@@ -1245,14 +1228,14 @@ export function SidebarShell({
           };
         });
 
-      showSuccessToast('Student profile saved');
-    } catch (error) {
-      showErrorToast('Unable to save student profile', error);
-      throw error;
-    }
-  },
-  [supabase],
-);
+        showSuccessToast('Student profile saved');
+      } catch (error) {
+        showErrorToast('Unable to save student profile', error);
+        throw error;
+      }
+    },
+    [supabase],
+  );
 
   const handleEducatorProfileSave = React.useCallback(
     async (input: EducatorProfileSaveInput) => {
@@ -1275,8 +1258,7 @@ export function SidebarShell({
                 gradeLabel: grade.gradeLabel?.trim() ?? gradeId,
               };
             })
-            .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry)) ??
-          [];
+            .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry)) ?? [];
 
         const uniqueGradeMap = new Map(
           gradeEntries.map((grade) => [grade.gradeId, grade]),
@@ -1677,10 +1659,10 @@ export function SidebarShell({
             input.phoneE164 && input.whatsappE164
               ? 'Contact numbers updated'
               : input.phoneE164
-              ? 'Phone number saved'
-              : input.whatsappE164
-              ? 'WhatsApp number saved'
-              : 'Notification preferences saved';
+                ? 'Phone number saved'
+                : input.whatsappE164
+                  ? 'WhatsApp number saved'
+                  : 'Notification preferences saved';
           showSuccessToast(title);
         }
       } catch (error) {
@@ -1776,18 +1758,16 @@ export function SidebarShell({
     }) => {
       try {
         const channels = normalizeNotificationChannels(input.channels);
-        const { error } = await supabase
-          .from('notification_preferences')
-          .upsert(
-            {
-              org_id: input.orgId,
-              profile_id: input.profileId,
-              pref_key: input.prefKey,
-              channels,
-              muted: null,
-            },
-            { onConflict: 'org_id,profile_id,pref_key' },
-          );
+        const { error } = await supabase.from('notification_preferences').upsert(
+          {
+            org_id: input.orgId,
+            profile_id: input.profileId,
+            pref_key: input.prefKey,
+            channels,
+            muted: null,
+          },
+          { onConflict: 'org_id,profile_id,pref_key' },
+        );
 
         if (error) {
           throw error;
@@ -1795,7 +1775,8 @@ export function SidebarShell({
 
         setSidebarData((prev) => {
           const currentDefaults = prev.user.profile.prefs.notificationDefaults ?? {};
-          const existing = currentDefaults[input.prefKey];
+          const notificationKey = input.prefKey as NotificationKey;
+          const existing = currentDefaults[notificationKey];
           return {
             ...prev,
             user: {
@@ -1806,7 +1787,7 @@ export function SidebarShell({
                   ...prev.user.profile.prefs,
                   notificationDefaults: {
                     ...currentDefaults,
-                    [input.prefKey]: {
+                    [notificationKey]: {
                       channels,
                       muted: existing?.muted ?? null,
                     },
@@ -1874,9 +1855,9 @@ export function SidebarShell({
         showErrorToast('Unable to save location', error);
         throw error;
       }
-   },
-   [supabase],
- );
+    },
+    [supabase],
+  );
 
   const handleFamilyInviteCreate = React.useCallback(
     async (input: {
@@ -2080,15 +2061,15 @@ export function SidebarShell({
         onAvatarRemove={handleAvatarRemove}
         onNotificationPreferenceSave={handleNotificationPreferenceSave}
         onFamilyInviteCreate={handleFamilyInviteCreate}
-      onFamilyInviteRemove={handleFamilyInviteRemove}
-      onChildThemeSave={handleChildThemeSave}
-      onChildProfileCreate={handleChildProfileCreate}
-      onFamilyMemberRemove={handleFamilyMemberRemove}
-      onEducatorProfileSave={handleEducatorProfileSave}
-      onEducatorAvailabilitySave={handleEducatorAvailabilitySave}
-      onStaffProfileSave={handleStaffProfileSave}
-      onStatusOverrideSave={handleStatusOverrideSave}
-      adminSections={adminSections ?? undefined}
+        onFamilyInviteRemove={handleFamilyInviteRemove}
+        onChildThemeSave={handleChildThemeSave}
+        onChildProfileCreate={handleChildProfileCreate}
+        onFamilyMemberRemove={handleFamilyMemberRemove}
+        onEducatorProfileSave={handleEducatorProfileSave}
+        onEducatorAvailabilitySave={handleEducatorAvailabilitySave}
+        onStaffProfileSave={handleStaffProfileSave}
+        onStatusOverrideSave={handleStatusOverrideSave}
+        adminSections={adminSections ?? undefined}
       />
       <SidebarInset>{children}</SidebarInset>
     </>

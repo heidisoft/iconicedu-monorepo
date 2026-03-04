@@ -3,7 +3,6 @@ import {
   Bell,
   BookOpen,
   ChevronDown,
-  ChevronRight,
   Clock,
   FileText,
   Megaphone,
@@ -29,6 +28,15 @@ type NotificationSectionItem = {
   key: string;
   label: string;
 };
+
+type NotificationSection = {
+  key: string;
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
+  items: NotificationSectionItem[];
+};
+
+const defineNotificationItems = <T extends NotificationSectionItem[]>(items: T) => items;
 
 type NotificationsTabProps = {
   isGuardianOrAdmin: boolean;
@@ -60,45 +68,51 @@ export function NotificationsTab({
       key: 'defaults',
       title: 'Defaults',
       icon: Bell,
-      items: [
+      items: defineNotificationItems([
         {
           key: 'defaults.message_updates',
           label: 'Email updates about new messages and schedule changes',
         },
-        { key: 'defaults.weekly_digest', label: 'Weekly digest of learning space activity' },
+        {
+          key: 'defaults.weekly_digest',
+          label: 'Weekly digest of learning space activity',
+        },
         { key: 'defaults.sms_reminders', label: 'SMS reminders for upcoming sessions' },
-      ],
+      ]),
     },
     {
       key: 'messages',
       title: 'Messages',
       icon: MessageCircle,
-      items: [
+      items: defineNotificationItems([
         { key: 'messages.direct_message', label: 'Email me when I get a direct message' },
         { key: 'messages.teacher_message', label: 'Email me when a teacher messages me' },
         { key: 'messages.mentions', label: 'Notify me about @mentions' },
         { key: 'messages.replies', label: 'Notify me about replies to my messages' },
-        { key: 'messages.mute_busy', label: 'Mute busy channels (only @mentions and DMs)' },
-      ],
+        {
+          key: 'messages.mute_busy',
+          label: 'Mute busy channels (only @mentions and DMs)',
+        },
+      ]),
     },
     {
       key: 'schedule',
       title: 'Schedule & Sessions',
       icon: Clock,
-      items: [
+      items: defineNotificationItems([
         { key: 'schedule.upcoming_reminder', label: 'Upcoming session reminder' },
         { key: 'schedule.starting_soon', label: 'Session starting soon' },
         { key: 'schedule.rescheduled', label: 'Session rescheduled' },
         { key: 'schedule.canceled', label: 'Session canceled' },
         { key: 'schedule.no_show', label: 'Tutor running late / no-show alert' },
         { key: 'schedule.makeup', label: 'Make-up session scheduled' },
-      ],
+      ]),
     },
     {
       key: 'homework',
       title: 'Homework & Classwork',
       icon: BookOpen,
-      items: [
+      items: defineNotificationItems([
         { key: 'homework.assigned', label: 'New homework assigned' },
         { key: 'homework.due_reminder', label: 'Homework due reminder' },
         { key: 'homework.feedback', label: 'Homework feedback posted' },
@@ -106,31 +120,34 @@ export function NotificationsTab({
           key: 'homework.new_resource',
           label: 'New resource/material added (PDF, link, worksheet)',
         },
-      ],
+      ]),
     },
     {
       key: 'progress',
       title: 'Progress & Reports',
       icon: FileText,
-      items: [
+      items: defineNotificationItems([
         { key: 'progress.weekly_report', label: 'Weekly progress report' },
         { key: 'progress.monthly_report', label: 'Monthly progress report' },
         { key: 'progress.attendance_summary', label: 'Attendance summary' },
         { key: 'progress.milestones', label: 'Milestones/achievements (optional)' },
-      ],
+      ]),
     },
     {
       key: 'announcements',
       title: 'Announcements',
       icon: Megaphone,
-      items: [
+      items: defineNotificationItems([
         { key: 'announcements.important', label: 'Important announcements from ICONIC' },
-        { key: 'announcements.class_posts', label: 'Class announcements (teacher posts)' },
+        {
+          key: 'announcements.class_posts',
+          label: 'Class announcements (teacher posts)',
+        },
         {
           key: 'announcements.policy_updates',
           label: 'Policy or calendar updates (holidays, closures)',
         },
-      ],
+      ]),
     },
     ...(isGuardianOrAdmin
       ? [
@@ -138,13 +155,13 @@ export function NotificationsTab({
             key: 'billing',
             title: 'Billing & Payments',
             icon: Wallet,
-            items: [
+            items: defineNotificationItems([
               { key: 'billing.receipt', label: 'Payment receipt' },
               { key: 'billing.failed', label: 'Payment failed' },
               { key: 'billing.invoice_ready', label: 'Invoice ready' },
               { key: 'billing.refund', label: 'Refund processed' },
               { key: 'billing.renewal', label: 'Plan ending / renewal reminder' },
-            ],
+            ]),
           },
         ]
       : []),
@@ -152,20 +169,20 @@ export function NotificationsTab({
       key: 'app',
       title: 'App & Account',
       icon: ShieldCheck,
-      items: [
+      items: defineNotificationItems([
         {
           key: 'app.security_alerts',
           label: 'Security alerts (new login, password change) (recommended always on)',
         },
         { key: 'app.new_device', label: 'New device sign-in' },
         { key: 'app.account_changes', label: 'Account changes (role/invite accepted)' },
-      ],
+      ]),
     },
     {
       key: 'digest',
       title: 'Digest & Frequency',
       icon: SlidersHorizontal,
-      items: [
+      items: defineNotificationItems([
         { key: 'digest.instant', label: 'Instant notifications' },
         { key: 'digest.daily', label: 'Daily digest' },
         { key: 'digest.weekly', label: 'Weekly digest' },
@@ -173,13 +190,13 @@ export function NotificationsTab({
           key: 'digest.urgent_only',
           label: 'Only urgent (schedule changes + direct messages)',
         },
-      ],
+      ]),
     },
-  ];
+  ] satisfies NotificationSection[];
 
   const notificationKeys = React.useMemo(
     () =>
-      new Set(
+      new Set<string>(
         sections.flatMap((section) => section.items.map((item) => item.key)),
       ),
     [sections],
@@ -192,9 +209,7 @@ export function NotificationsTab({
     return Object.fromEntries(entries);
   }, [notificationChannels, notificationKeys]);
 
-  const [pendingPreferenceToasts, setPendingPreferenceToasts] = React.useState<
-    Record<string, boolean>
-  >({});
+  const [, setPendingPreferenceToasts] = React.useState<Record<string, boolean>>({});
   const pendingToastTimers = React.useRef<Record<string, number>>({});
 
   const toggleNotificationChannel = React.useCallback(
@@ -244,28 +259,25 @@ export function NotificationsTab({
     ],
   );
 
-  const handleMenuOpenChange = React.useCallback(
-    (itemKey: string, open: boolean) => {
-      if (open) {
-        return;
+  const handleMenuOpenChange = React.useCallback((itemKey: string, open: boolean) => {
+    if (open) {
+      return;
+    }
+    setPendingPreferenceToasts((prev) => {
+      if (!prev[itemKey]) {
+        return prev;
       }
-      setPendingPreferenceToasts((prev) => {
-        if (!prev[itemKey]) {
-          return prev;
-        }
-        const now = Date.now();
-        const lastToast = pendingToastTimers.current[itemKey] ?? 0;
-        if (now - lastToast > 2000) {
-          toast.success('Notification preferences saved');
-          pendingToastTimers.current[itemKey] = now;
-        }
-        const next = { ...prev };
-        delete next[itemKey];
-        return next;
-      });
-    },
-    [],
-  );
+      const now = Date.now();
+      const lastToast = pendingToastTimers.current[itemKey] ?? 0;
+      if (now - lastToast > 2000) {
+        toast.success('Notification preferences saved');
+        pendingToastTimers.current[itemKey] = now;
+      }
+      const next = { ...prev };
+      delete next[itemKey];
+      return next;
+    });
+  }, []);
 
   const formatNotificationChannels = (itemKey: string) => {
     const selected = scopedChannels[itemKey] ?? [];
@@ -309,9 +321,15 @@ export function NotificationsTab({
                       className="flex items-start justify-between gap-4 text-sm"
                     >
                       <span className="leading-5">{item.label}</span>
-                      <DropdownMenu onOpenChange={(open) => handleMenuOpenChange(item.key, open)}>
+                      <DropdownMenu
+                        onOpenChange={(open) => handleMenuOpenChange(item.key, open)}
+                      >
                         <DropdownMenuTrigger asChild>
-                          <Button variant="outline" size="sm" className="h-8 gap-1 px-2 text-xs">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 gap-1 px-2 text-xs"
+                          >
                             {formatNotificationChannels(item.key)}
                             <ChevronDown className="h-3 w-3" />
                           </Button>
@@ -330,7 +348,11 @@ export function NotificationsTab({
                                 <Switch
                                   checked={isChecked}
                                   onCheckedChange={(checked) =>
-                                    toggleNotificationChannel(item.key, option.key, checked)
+                                    toggleNotificationChannel(
+                                      item.key,
+                                      option.key,
+                                      checked,
+                                    )
                                   }
                                   aria-label={`${option.label} notifications for ${item.label}`}
                                 />

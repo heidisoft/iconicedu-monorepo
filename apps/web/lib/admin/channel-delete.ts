@@ -1,38 +1,17 @@
-import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
-import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
-import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import { requireAdminAuthContext } from '@iconicedu/web/lib/admin/_auth-context';
 
 export async function deleteChannel(channelId: string) {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    throw new Error('Unauthorized');
-  }
-
-  const accountResponse = await getAccountByAuthUserId(supabase, user.id);
-  if (!accountResponse.data) {
-    throw new Error('Account not found');
-  }
-
-  const profileResponse = await getProfileByAccountId(supabase, accountResponse.data.id);
-  if (!profileResponse.data) {
-    throw new Error('Profile not found');
-  }
-
-  const now = new Date().toISOString();
+  const { supabase, orgId, profileId, now } = await requireAdminAuthContext();
 
   const { error } = await supabase
     .from('channels')
     .update({
       deleted_at: now,
-      deleted_by: profileResponse.data.id,
+      deleted_by: profileId,
       updated_at: now,
-      updated_by: profileResponse.data.id,
+      updated_by: profileId,
     })
-    .eq('org_id', accountResponse.data.org_id)
+    .eq('org_id', orgId)
     .eq('id', channelId)
     .is('deleted_at', null);
 

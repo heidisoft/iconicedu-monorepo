@@ -8,6 +8,8 @@ export type LinkPreviewMetadata = {
 };
 
 const URL_PATTERN = /(https?:\/\/[^\s]+)/i;
+const PRIVATE_HOST_PATTERN =
+  /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.)/i;
 
 function decodeHtml(value: string) {
   return value
@@ -20,10 +22,22 @@ function decodeHtml(value: string) {
 
 function extractMetaContent(html: string, property: string) {
   const patterns = [
-    new RegExp(`<meta[^>]+property=["']${property}["'][^>]+content=["']([^"']+)["'][^>]*>`, 'i'),
-    new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+property=["']${property}["'][^>]*>`, 'i'),
-    new RegExp(`<meta[^>]+name=["']${property}["'][^>]+content=["']([^"']+)["'][^>]*>`, 'i'),
-    new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+name=["']${property}["'][^>]*>`, 'i'),
+    new RegExp(
+      `<meta[^>]+property=["']${property}["'][^>]+content=["']([^"']+)["'][^>]*>`,
+      'i',
+    ),
+    new RegExp(
+      `<meta[^>]+content=["']([^"']+)["'][^>]+property=["']${property}["'][^>]*>`,
+      'i',
+    ),
+    new RegExp(
+      `<meta[^>]+name=["']${property}["'][^>]+content=["']([^"']+)["'][^>]*>`,
+      'i',
+    ),
+    new RegExp(
+      `<meta[^>]+content=["']([^"']+)["'][^>]+name=["']${property}["'][^>]*>`,
+      'i',
+    ),
   ];
 
   for (const pattern of patterns) {
@@ -55,7 +69,24 @@ export function extractFirstUrl(text: string) {
   return text.match(URL_PATTERN)?.[1] ?? null;
 }
 
-export async function fetchLinkPreviewMetadata(url: string): Promise<LinkPreviewMetadata> {
+export function isSafeLinkPreviewUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return false;
+    }
+    return !PRIVATE_HOST_PATTERN.test(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
+export async function fetchLinkPreviewMetadata(
+  url: string,
+): Promise<LinkPreviewMetadata> {
+  if (!isSafeLinkPreviewUrl(url)) {
+    throw new Error('Unsafe URL for link preview');
+  }
   const normalizedUrl = new URL(url).toString();
   const fallbackHost = new URL(normalizedUrl).hostname.replace(/^www\./, '');
 
@@ -79,8 +110,9 @@ export async function fetchLinkPreviewMetadata(url: string): Promise<LinkPreview
     const metaDescription = extractMetaContent(html, 'description');
     const title = ogTitle ?? extractTitle(html) ?? fallbackHost;
     const faviconHref =
-      html.match(/<link[^>]+rel=["'][^"']*icon[^"']*["'][^>]+href=["']([^"']+)["'][^>]*>/i)?.[1] ??
-      '/favicon.ico';
+      html.match(
+        /<link[^>]+rel=["'][^"']*icon[^"']*["'][^>]+href=["']([^"']+)["'][^>]*>/i,
+      )?.[1] ?? '/favicon.ico';
 
     return {
       url: normalizedUrl,

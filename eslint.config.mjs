@@ -99,6 +99,17 @@ export default [
     path.join(__dirname, 'packages/shared-types/tsconfig.json')
   ),
   {
+    files: ['apps/web/tailwind.config.ts', 'packages/ui-web/tailwind.config.ts'],
+    languageOptions: {
+      parser: tsParser,
+      parserOptions: {
+        project: null,
+        ecmaVersion: 2020,
+        sourceType: 'module',
+      },
+    },
+  },
+  {
     files: [
       '**/*.test.{ts,tsx,js,jsx}',
       '**/*.spec.{ts,tsx,js,jsx}',

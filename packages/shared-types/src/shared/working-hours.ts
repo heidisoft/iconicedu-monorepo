@@ -1,5 +1,4 @@
-import type { DayAvailability, DayKey } from '@iconicedu/shared-types/shared/availability';
-import { EMPTY_DAY_AVAILABILITY } from '@iconicedu/shared-types/shared/availability';
+import type { DayKey } from '@iconicedu/shared-types/shared/availability';
 
 export type Weekday =
   | 'monday'
@@ -38,37 +37,3 @@ export const DAY_KEY_TO_WEEKDAY: Record<DayKey, Weekday> = {
   Sat: 'saturday',
   Sun: 'sunday',
 };
-
-const parseHour = (value?: string | null): number | null => {
-  if (!value) {
-    return null;
-  }
-  const [hourPart] = value.split(':');
-  const parsed = Number(hourPart);
-  return Number.isNaN(parsed) ? null : parsed;
-};
-
-export function workingHoursScheduleToDayAvailability(
-  schedule?: WorkingHoursSchedule | null,
-): DayAvailability {
-  const availability: DayAvailability = { ...EMPTY_DAY_AVAILABILITY };
-  schedule?.forEach((entry) => {
-    if (!entry.enabled) {
-      return;
-    }
-    const dayKey = WEEKDAY_TO_DAY_KEY[entry.day];
-    if (!dayKey) {
-      return;
-    }
-    const fromHour = parseHour(entry.from);
-    const toHour = parseHour(entry.to);
-    if (fromHour === null || toHour === null || toHour <= fromHour) {
-      return;
-    }
-    availability[dayKey] = Array.from(
-      { length: toHour - fromHour },
-      (_, index) => fromHour + index,
-    );
-  });
-  return availability;
-}

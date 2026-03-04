@@ -25,8 +25,6 @@ const baseProfileRow: ProfileRow = {
   region: null,
   city: null,
   postal_code: null,
-  notes_internal: null,
-  lead_source: null,
   ui_theme_key: null,
   created_at: '2026-01-01T00:00:00.000Z',
   created_by: null,

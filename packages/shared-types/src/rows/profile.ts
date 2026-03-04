@@ -1,11 +1,16 @@
-import type { AccountStatus, FamilyRelation, ISODateTime, UUID } from '@iconicedu/shared-types/shared/shared';
+import type {
+  AccountStatus,
+  FamilyRelation,
+  ISODateTime,
+  UUID,
+} from '@iconicedu/shared-types/shared/shared';
 import type { GradeLevel } from '@iconicedu/shared-types/shared/grades';
 import type { DayAvailability } from '@iconicedu/shared-types/shared/availability';
-import type { WorkingHoursSchedule } from '@iconicedu/shared-types/shared/working-hours';
+import type { AuditRow } from './base';
 
 export type ProfileKindRow = 'educator' | 'guardian' | 'child' | 'staff' | 'system';
 
-export interface ProfileRow {
+export interface ProfileRow extends AuditRow {
   id: UUID;
   org_id: UUID;
   account_id: UUID;
@@ -27,18 +32,10 @@ export interface ProfileRow {
   region?: string | null;
   city?: string | null;
   postal_code?: string | null;
-  notes_internal?: string | null;
-  lead_source?: string | null;
   ui_theme_key?: string | null;
-  created_at: ISODateTime;
-  created_by?: UUID | null;
-  updated_at: ISODateTime;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
 }
 
-export interface EducatorProfileRow {
+export interface EducatorProfileRow extends Partial<AuditRow> {
   profile_id: UUID;
   org_id: UUID;
   headline?: string | null;
@@ -51,147 +48,84 @@ export interface EducatorProfileRow {
   average_rating?: number | null;
   total_reviews?: number | null;
   featured_video_intro_url?: string | null;
-  created_at?: ISODateTime | null;
-  created_by?: UUID | null;
-  updated_at?: ISODateTime | null;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
 }
 
-export interface ChildProfileRow {
+export interface ChildProfileRow extends Partial<AuditRow> {
   profile_id: UUID;
   org_id: UUID;
   birth_year?: number | null;
   school_name?: string | null;
   school_year?: string | null;
   confidence_level?: string | null;
-  communication_style?: string | null;
   interests?: string[] | null;
   strengths?: string[] | null;
   learning_preferences?: string[] | null;
   motivation_styles?: string[] | null;
   communication_styles?: string[] | null;
-  created_at?: ISODateTime | null;
-  created_by?: UUID | null;
-  updated_at?: ISODateTime | null;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
 }
 
-export interface GuardianProfileRow {
+export interface GuardianProfileRow extends Partial<AuditRow> {
   profile_id: UUID;
   org_id: UUID;
   joined_date?: ISODateTime | null;
   session_notes_visibility?: string | null;
-  created_at?: ISODateTime | null;
-  created_by?: UUID | null;
-  updated_at?: ISODateTime | null;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
 }
 
-export interface StaffProfileRow {
+export interface StaffProfileRow extends Partial<AuditRow> {
   profile_id: UUID;
   org_id: UUID;
   department?: string | null;
   manager_staff_id?: UUID | null;
   job_title?: string | null;
   permissions_scope?: string | null;
-  working_hours_rules?: WorkingHoursSchedule | null;
-  working_hours_schedule?: WorkingHoursSchedule | null;
   weekly_availability?: DayAvailability | null;
-  created_at?: ISODateTime | null;
-  created_by?: UUID | null;
-  updated_at?: ISODateTime | null;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
 }
 
-export interface EducatorProfileSubjectRow {
+export interface EducatorProfileSubjectRow extends Partial<AuditRow> {
   id: UUID;
   org_id: UUID;
   profile_id: UUID;
   subject: string;
-  created_at?: ISODateTime | null;
-  created_by?: UUID | null;
-  updated_at?: ISODateTime | null;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
 }
 
-export interface EducatorProfileGradeLevelRow {
+export interface EducatorProfileGradeLevelRow extends Partial<AuditRow> {
   id: UUID;
   org_id: UUID;
   profile_id: UUID;
   grade_id: GradeLevel;
   grade_label?: string | null;
-  created_at?: ISODateTime | null;
-  created_by?: UUID | null;
-  updated_at?: ISODateTime | null;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
 }
 
-export interface ChildProfileGradeLevelRow {
+export interface ChildProfileGradeLevelRow extends Partial<AuditRow> {
   id: UUID;
   org_id: UUID;
   profile_id: UUID;
   grade_id: GradeLevel;
   grade_label?: string | null;
-  created_at?: ISODateTime | null;
-  created_by?: UUID | null;
-  updated_at?: ISODateTime | null;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
 }
 
-export interface EducatorProfileCurriculumTagRow {
+export interface EducatorProfileCurriculumTagRow extends Partial<AuditRow> {
   id: UUID;
   org_id: UUID;
   profile_id: UUID;
   tag: string;
-  created_at?: ISODateTime | null;
-  created_by?: UUID | null;
-  updated_at?: ISODateTime | null;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
 }
 
-export interface EducatorProfileBadgeRow {
+export interface EducatorProfileBadgeRow extends Partial<AuditRow> {
   id: UUID;
   org_id: UUID;
   profile_id: UUID;
   badge: string;
-  created_at?: ISODateTime | null;
-  created_by?: UUID | null;
-  updated_at?: ISODateTime | null;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
 }
 
-export interface StaffProfileSpecialtyRow {
+export interface StaffProfileSpecialtyRow extends Partial<AuditRow> {
   id: UUID;
   org_id: UUID;
   profile_id: UUID;
   specialty: string;
-  created_at?: ISODateTime | null;
-  created_by?: UUID | null;
-  updated_at?: ISODateTime | null;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
 }
 
-export interface ProfilePresenceRow {
+export interface ProfilePresenceRow extends Partial<AuditRow> {
   id: UUID;
   org_id: UUID;
   profile_id: UUID;
@@ -202,30 +136,18 @@ export interface ProfilePresenceRow {
   display_status?: string | null;
   last_seen_at?: ISODateTime | null;
   presence_loaded?: boolean | null;
-  created_at?: ISODateTime | null;
-  created_by?: UUID | null;
-  updated_at?: ISODateTime | null;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
 }
 
-export interface NotificationPreferenceRow {
+export interface NotificationPreferenceRow extends Partial<AuditRow> {
   id: UUID;
   org_id: UUID;
   profile_id: UUID;
   pref_key: string;
   channels: string[];
   muted?: boolean | null;
-  created_at?: ISODateTime | null;
-  created_by?: UUID | null;
-  updated_at?: ISODateTime | null;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
 }
 
-export interface FamilyLinkRow {
+export interface FamilyLinkRow extends Partial<AuditRow> {
   id: UUID;
   org_id: UUID;
   family_id: UUID;
@@ -233,10 +155,4 @@ export interface FamilyLinkRow {
   child_account_id: UUID;
   relation: FamilyRelation;
   permissions_scope?: string[] | null;
-  created_at?: ISODateTime | null;
-  created_by?: UUID | null;
-  updated_at?: ISODateTime | null;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
 }

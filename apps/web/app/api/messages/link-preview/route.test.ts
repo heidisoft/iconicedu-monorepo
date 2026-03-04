@@ -3,9 +3,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { GET } from '@iconicedu/web/app/api/messages/link-preview/route';
 
 const fetchLinkPreviewMetadata = vi.fn();
+const isSafeLinkPreviewUrl = vi.fn();
 
 vi.mock('@iconicedu/web/lib/messages/link-preview', () => ({
   fetchLinkPreviewMetadata: (...args: unknown[]) => fetchLinkPreviewMetadata(...args),
+  isSafeLinkPreviewUrl: (...args: unknown[]) => isSafeLinkPreviewUrl(...args),
 }));
 
 describe('GET /api/messages/link-preview', () => {
@@ -18,6 +20,7 @@ describe('GET /api/messages/link-preview', () => {
   });
 
   it('returns fetched metadata for a valid url', async () => {
+    isSafeLinkPreviewUrl.mockReturnValueOnce(true);
     fetchLinkPreviewMetadata.mockResolvedValueOnce({
       url: 'https://example.com/post',
       title: 'Example Post',
@@ -40,6 +43,22 @@ describe('GET /api/messages/link-preview', () => {
         description: 'Preview description',
         siteName: 'Example',
       },
+    });
+  });
+
+  it('returns 400 for blocked urls', async () => {
+    isSafeLinkPreviewUrl.mockReturnValueOnce(false);
+
+    const response = await GET(
+      new Request(
+        'https://app.iconicedu.test/api/messages/link-preview?url=http%3A%2F%2F127.0.0.1%2Fprivate',
+      ),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      success: false,
+      message: 'url is not allowed',
     });
   });
 });

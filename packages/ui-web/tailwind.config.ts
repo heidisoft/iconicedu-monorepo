@@ -1,8 +1,8 @@
 import type { Config } from 'tailwindcss';
 import colors from 'tailwindcss/colors';
 
-const config: Config = {
-  content: ['./src/**/*.{ts,tsx,js,jsx}', '../../apps/web/app/**/*.{ts,tsx}'],
+export const uiWebTailwindBaseConfig: Config = {
+  content: ['./src/**/*.{ts,tsx,js,jsx}'],
   theme: {
     extend: {
       colors: {
@@ -46,4 +46,4 @@ const config: Config = {
   plugins: [],
 };
 
-export default config;
+export default uiWebTailwindBaseConfig;

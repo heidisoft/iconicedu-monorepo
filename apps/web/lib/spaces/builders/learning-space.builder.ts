@@ -12,6 +12,7 @@ import type {
   LearningSpaceLinkRow,
   LearningSpaceParticipantRow,
 } from '@iconicedu/shared-types';
+import { groupBy } from '@iconicedu/utils';
 
 import {
   getLearningSpaceById,
@@ -23,9 +24,12 @@ import {
   getLearningSpaceLinksByLearningSpaceIds,
   getLearningSpaceParticipantsByLearningSpaceIds,
 } from '@iconicedu/web/lib/spaces/queries/learning-space-relations.query';
-import { mapLearningSpaceLinkRow, mapLearningSpaceRowToVM } from '@iconicedu/web/lib/spaces/mappers/learning-space.mapper';
+import {
+  mapLearningSpaceLinkRow,
+  mapLearningSpaceRowToVM,
+} from '@iconicedu/web/lib/spaces/mappers/learning-space.mapper';
 import { buildChannelById } from '@iconicedu/web/lib/channels/builders/channel.builder';
-import { buildUserProfileById } from '@iconicedu/web/lib/profile/builders/user-profile.builder';
+import { buildUserProfilesByIds } from '@iconicedu/web/lib/profile/builders/user-profile.builder';
 import { buildClassScheduleById } from '@iconicedu/web/lib/schedules/builders/class-schedule.builder';
 
 type LearningSpaceRelations = {
@@ -56,10 +60,7 @@ async function resolveChannels(
 
   const primaryRow = rows.find((row) => row.is_primary);
   const primaryChannel =
-    (primaryRow &&
-      (await buildChannelById(supabase, orgId, primaryRow.channel_id, {
-        accountId: options.accountId ?? undefined,
-      }))) ??
+    channels.find((channel) => channel.ids.id === primaryRow?.channel_id) ??
     channels[0] ??
     null;
 
@@ -72,12 +73,17 @@ async function resolveChannels(
 
 async function resolveParticipants(
   supabase: SupabaseClient,
+  orgId: string,
   rows: LearningSpaceParticipantRow[],
 ): Promise<UserProfileVM[]> {
-  const profiles = await Promise.all(
-    rows.map((row) => buildUserProfileById(supabase, row.profile_id)),
+  const profilesById = await buildUserProfilesByIds(
+    supabase,
+    orgId,
+    rows.map((row) => row.profile_id),
   );
-  return profiles.filter((profile): profile is UserProfileVM => Boolean(profile));
+  return rows
+    .map((row) => profilesById.get(row.profile_id))
+    .filter((profile): profile is UserProfileVM => Boolean(profile));
 }
 
 function resolveLinks(rows: LearningSpaceLinkRow[]): LearningSpaceLinkVM[] {
@@ -130,7 +136,7 @@ export async function buildLearningSpaceFromRow(
   }
 
   const [participants, links] = await Promise.all([
-    resolveParticipants(supabase, relations.participants),
+    resolveParticipants(supabase, row.org_id, relations.participants),
     Promise.resolve(resolveLinks(relations.links)),
   ]);
 
@@ -154,10 +160,7 @@ export async function buildLearningSpaceById(
   scheduleId?: string | null,
   options: BuildLearningSpaceOptions = {},
 ): Promise<LearningSpaceVM | null> {
-  const { data: learningSpace } = await getLearningSpaceById(
-    supabase,
-    learningSpaceId,
-  );
+  const { data: learningSpace } = await getLearningSpaceById(supabase, learningSpaceId);
 
   if (!learningSpace || learningSpace.org_id !== orgId) {
     return null;
@@ -256,18 +259,4 @@ export async function buildLearningSpaceByChannelId(
     scheduleId,
     options,
   );
-}
-
-function groupBy<T, K extends string>(
-  rows: T[],
-  getKey: (row: T) => K,
-): Map<K, T[]> {
-  const map = new Map<K, T[]>();
-  rows.forEach((row) => {
-    const key = getKey(row);
-    const bucket = map.get(key) ?? [];
-    bucket.push(row);
-    map.set(key, bucket);
-  });
-  return map;
 }

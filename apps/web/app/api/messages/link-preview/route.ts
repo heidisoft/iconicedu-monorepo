@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 
-import { fetchLinkPreviewMetadata } from '@iconicedu/web/lib/messages/link-preview';
+import {
+  fetchLinkPreviewMetadata,
+  isSafeLinkPreviewUrl,
+} from '@iconicedu/web/lib/messages/link-preview';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -9,6 +12,13 @@ export async function GET(request: Request) {
   if (!url) {
     return NextResponse.json(
       { success: false, message: 'url is required' },
+      { status: 400 },
+    );
+  }
+
+  if (!isSafeLinkPreviewUrl(url)) {
+    return NextResponse.json(
+      { success: false, message: 'url is not allowed' },
       { status: 400 },
     );
   }

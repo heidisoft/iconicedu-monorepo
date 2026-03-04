@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ThreadVM, UserProfileVM } from '@iconicedu/shared-types';
+import { groupBy } from '@iconicedu/utils';
 
 import {
   getThreadById,
@@ -7,7 +8,7 @@ import {
   getThreadParticipantsByThreadIds,
   getThreadReadStatesByAccountId,
 } from '@iconicedu/web/lib/messages/queries/messages.query';
-import { buildUserProfileById } from '@iconicedu/web/lib/profile/builders/user-profile.builder';
+import { buildUserProfilesByIds } from '@iconicedu/web/lib/profile/builders/user-profile.builder';
 import { mapThreadRowToVM } from '@iconicedu/web/lib/messages/mappers/thread.mapper';
 
 type ThreadBuildOptions = {
@@ -45,7 +46,7 @@ export async function buildThreadsByChannelId(
   const profileIds = new Set<string>();
   (participantsResponse.data ?? []).forEach((row) => profileIds.add(row.profile_id));
 
-  const profilesById = await resolveProfilesById(supabase, Array.from(profileIds));
+  const profilesById = await resolveProfilesById(supabase, orgId, Array.from(profileIds));
 
   return threadRows.map((row) => {
     const participants = (participantsByThread.get(row.id) ?? [])
@@ -80,7 +81,7 @@ export async function buildThreadById(
   const participants = (participantsResponse.data ?? [])
     .map((row) => row.profile_id)
     .filter(Boolean);
-  const profilesById = await resolveProfilesById(supabase, participants);
+  const profilesById = await resolveProfilesById(supabase, orgId, participants);
   const participantVMs = (participantsResponse.data ?? [])
     .map((row) => profilesById.get(row.profile_id))
     .filter((profile): profile is UserProfileVM => Boolean(profile));
@@ -96,30 +97,8 @@ export async function buildThreadById(
 
 async function resolveProfilesById(
   supabase: SupabaseClient,
+  orgId: string,
   profileIds: string[],
 ): Promise<Map<string, UserProfileVM>> {
-  const profiles = await Promise.all(
-    profileIds.map((profileId) => buildUserProfileById(supabase, profileId)),
-  );
-  const map = new Map<string, UserProfileVM>();
-  profiles.forEach((profile) => {
-    if (profile) {
-      map.set(profile.ids.id, profile);
-    }
-  });
-  return map;
-}
-
-function groupBy<T, K extends string>(
-  rows: T[],
-  getKey: (row: T) => K,
-): Map<K, T[]> {
-  const map = new Map<K, T[]>();
-  rows.forEach((row) => {
-    const key = getKey(row);
-    const bucket = map.get(key) ?? [];
-    bucket.push(row);
-    map.set(key, bucket);
-  });
-  return map;
+  return buildUserProfilesByIds(supabase, orgId, profileIds);
 }

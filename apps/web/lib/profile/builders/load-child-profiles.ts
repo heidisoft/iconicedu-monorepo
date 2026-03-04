@@ -1,5 +1,9 @@
 import type { ChildProfileVM, GradeLevel, UserProfileVM } from '@iconicedu/shared-types';
-import type { ChildProfileGradeLevelRow, ChildProfileRow, ProfileRow } from '@iconicedu/shared-types';
+import type {
+  ChildProfileGradeLevelRow,
+  ChildProfileRow,
+  ProfileRow,
+} from '@iconicedu/shared-types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { resolveProfileAvatarUrl } from '@iconicedu/web/lib/profile/avatar-url';
@@ -32,10 +36,7 @@ export async function loadChildProfiles(
   }
 
   const profileIds = profiles.data.map((row) => row.id);
-  const { childRows, gradeRows } = await getChildProfilesDetails(
-    supabase,
-    profileIds,
-  );
+  const { childRows, gradeRows } = await getChildProfilesDetails(supabase, profileIds);
   const accountIds = profiles.data.map((row) => row.account_id);
   const accountsResponse = await getAccountsByIds(supabase, orgId, accountIds);
   const accountById = new Map(
@@ -64,18 +65,16 @@ export async function loadChildProfiles(
   );
 
   return profilesWithAvatar.map(({ row, avatarUrl }) => {
-    const baseProfile: Omit<UserProfileVM, 'kind'> = mapBaseProfile(
-      row as ProfileRow,
-      {
-        notificationDefaults: null,
-        presence: null,
-        avatarUrlOverride: avatarUrl,
-      },
-    );
+    const baseProfile: Omit<UserProfileVM, 'kind'> = mapBaseProfile(row as ProfileRow, {
+      notificationDefaults: null,
+      presence: null,
+      avatarUrlOverride: avatarUrl,
+    });
     const child = childByProfileId.get(row.id);
     const grade = gradeByProfileId.get(row.id);
     const gradeLevel: GradeLevel | null = grade
-      ? parseGradeLevel(grade.grade_id) ?? parseGradeLevel(grade.grade_label ?? grade.grade_id)
+      ? (parseGradeLevel(grade.grade_id) ??
+        parseGradeLevel(grade.grade_label ?? grade.grade_id))
       : null;
 
     const account = accountById.get(row.account_id);
@@ -92,8 +91,7 @@ export async function loadChildProfiles(
       learningPreferences: child?.learning_preferences ?? null,
       motivationStyles: child?.motivation_styles ?? null,
       confidenceLevel: child?.confidence_level ?? null,
-      communicationStyles:
-        child?.communication_styles ?? (child?.communication_style ? [child.communication_style] : null),
+      communicationStyles: child?.communication_styles ?? null,
       accountEmail: account?.email ?? null,
     };
   });
