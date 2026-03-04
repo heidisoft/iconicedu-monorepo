@@ -16,20 +16,27 @@ type ActivityWithSubitemsProps = {
   isSubActivity?: boolean;
   parentExpanded?: boolean;
   onMarkRead: (id: string, event: React.MouseEvent) => void;
+  onAutoRead?: (id: string) => void;
   className?: string;
 };
+
+export function groupHasUnreadSubActivities(subActivities: ActivityFeedLeafItemVM[]) {
+  return subActivities.some((sub: ActivityFeedLeafItemVM) => !sub.state?.isRead);
+}
 
 export function ActivityWithSubitems({
   activity,
   isSubActivity = false,
   parentExpanded = false,
   onMarkRead,
+  onAutoRead,
   className,
 }: ActivityWithSubitemsProps) {
   const subActivities = activity.subActivities?.items ?? [];
   const subActivityCount =
     activity.subActivityCount ?? activity.subActivities?.total ?? subActivities.length;
   const hasSubActivities = subActivityCount > 0;
+  const hasUnreadSubActivities = groupHasUnreadSubActivities(subActivities);
   const [isCollapsed, setIsCollapsed] = useState(hasSubActivities);
 
   const handleToggle = (event: React.MouseEvent) => {
@@ -46,6 +53,7 @@ export function ActivityWithSubitems({
       <ActivityItemBase
         activity={activity}
         onMarkRead={onMarkRead}
+        onAutoRead={onAutoRead}
         onToggle={handleToggle}
         isSubActivity={isSubActivity}
         parentExpanded={parentExpanded}
@@ -53,6 +61,7 @@ export function ActivityWithSubitems({
         showSubActivityToggle={hasSubActivities}
         showActionButton={Boolean(activity.content.actionButton)}
         subActivityCount={subActivityCount}
+        hasUnreadSubActivities={hasUnreadSubActivities}
       />
 
       {hasSubActivities && !isCollapsed && (
@@ -63,6 +72,7 @@ export function ActivityWithSubitems({
                 <ActivityBasicWithExpandedContent
                   activity={sub}
                   onMarkRead={onMarkRead}
+                  onAutoRead={onAutoRead}
                   showActionButton={Boolean(sub.content.actionButton)}
                   isSubActivity
                   parentExpanded={!isCollapsed}
@@ -71,6 +81,7 @@ export function ActivityWithSubitems({
                 <ActivityBasicWithActionButton
                   activity={sub}
                   onMarkRead={onMarkRead}
+                  onAutoRead={onAutoRead}
                   isSubActivity
                   parentExpanded={!isCollapsed}
                 />
@@ -78,6 +89,7 @@ export function ActivityWithSubitems({
                 <ActivityItemBase
                   activity={sub}
                   onMarkRead={onMarkRead}
+                  onAutoRead={onAutoRead}
                   isSubActivity
                   parentExpanded={!isCollapsed}
                 />

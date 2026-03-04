@@ -1,6 +1,7 @@
 'use client';
 
 import type React from 'react';
+import { useEffect, useRef } from 'react';
 import {
   Bell,
   Check,
@@ -25,6 +26,7 @@ import type { ActivityFeedItemVM, InboxIconKeyVM } from '@iconicedu/shared-types
 type ActivityItemBaseProps = {
   activity: ActivityFeedItemVM;
   onMarkRead: (id: string, event: React.MouseEvent) => void;
+  onAutoRead?: (id: string) => void;
   onToggle?: (event: React.MouseEvent) => void;
   isSubActivity?: boolean;
   parentExpanded?: boolean;
@@ -32,6 +34,7 @@ type ActivityItemBaseProps = {
   showSubActivityToggle?: boolean;
   showActionButton?: boolean;
   subActivityCount?: number;
+  hasUnreadSubActivities?: boolean;
   footer?: React.ReactNode;
   className?: string;
 };
@@ -145,6 +148,7 @@ const formatRelativeTime = (occurredAt: string) => {
 export function ActivityItemBase({
   activity,
   onMarkRead,
+  onAutoRead,
   onToggle,
   isSubActivity = false,
   parentExpanded = false,
@@ -152,6 +156,7 @@ export function ActivityItemBase({
   showSubActivityToggle = false,
   showActionButton = false,
   subActivityCount,
+  hasUnreadSubActivities = false,
   footer,
   className,
 }: ActivityItemBaseProps) {
@@ -165,9 +170,66 @@ export function ActivityItemBase({
       : undefined;
   const Icon = INBOX_ICON_MAP[iconKey];
   const timestampLabel = formatRelativeTime(activity.timestamps.occurredAt);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const autoReadTriggeredRef = useRef(false);
+
+  useEffect(() => {
+    autoReadTriggeredRef.current = false;
+  }, [activity.ids.id]);
+
+  useEffect(() => {
+    if (!onAutoRead || activity.state?.isRead || autoReadTriggeredRef.current) {
+      return;
+    }
+    if (typeof IntersectionObserver === 'undefined') {
+      return;
+    }
+
+    const node = rootRef.current;
+    if (!node) {
+      return;
+    }
+
+    let readTimer: ReturnType<typeof setTimeout> | null = null;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (!entry) {
+          return;
+        }
+
+        if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
+          if (!readTimer) {
+            readTimer = setTimeout(() => {
+              autoReadTriggeredRef.current = true;
+              onAutoRead(activity.ids.id);
+            }, 900);
+          }
+          return;
+        }
+
+        if (readTimer) {
+          window.clearTimeout(readTimer);
+          readTimer = null;
+        }
+      },
+      { threshold: [0.6] },
+    );
+
+    observer.observe(node);
+
+    return () => {
+      if (readTimer) {
+        window.clearTimeout(readTimer);
+      }
+      observer.disconnect();
+    };
+  }, [activity.ids.id, activity.state?.isRead, onAutoRead]);
 
   return (
     <div
+      ref={rootRef}
+      data-activity-id={activity.ids.id}
       className={cn(
         'flex flex-col gap-2 py-2.5 md:flex-row md:items-start md:gap-3',
         className,
@@ -235,7 +297,16 @@ export function ActivityItemBase({
 
             {showSubActivityToggle && (
               <>
-                <Badge variant="secondary" className="shrink-0 text-[10px] h-4 px-1.5">
+                <Badge
+                  variant="secondary"
+                  className="shrink-0 text-[10px] h-4 px-1.5 gap-1"
+                >
+                  {hasUnreadSubActivities ? (
+                    <span
+                      className="size-1.5 rounded-full bg-rose-500"
+                      aria-label="Unread sub activities"
+                    />
+                  ) : null}
                   {subActivityCount ?? 0}
                 </Badge>
                 <ChevronDown

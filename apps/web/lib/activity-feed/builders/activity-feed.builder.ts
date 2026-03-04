@@ -161,13 +161,28 @@ async function attachGroupMembers(
 function buildFeedTabs(items: ActivityFeedItemVM[]): ActivityFeedTabVM[] {
   const counts = new Map<InboxTabKeyVM, number>();
   items.forEach((item) => {
-    counts.set(item.tabKey, (counts.get(item.tabKey) ?? 0) + 1);
+    const unreadItemCount =
+      item.kind === 'group'
+        ? item.subActivities?.items.filter((subItem) => !subItem.state?.isRead).length ??
+          (!item.state?.isRead ? 1 : 0)
+        : !item.state?.isRead
+          ? 1
+          : 0;
+
+    if (unreadItemCount === 0) {
+      return;
+    }
+
+    counts.set(item.tabKey, (counts.get(item.tabKey) ?? 0) + unreadItemCount);
   });
 
   return FEED_TABS.map((tab) => ({
     key: tab.key,
     label: tab.label,
-    badgeCount: tab.key === 'all' ? items.length : counts.get(tab.key) ?? 0,
+    badgeCount:
+      tab.key === 'all'
+        ? Array.from(counts.values()).reduce((total, count) => total + count, 0)
+        : counts.get(tab.key) ?? 0,
   }));
 }
 

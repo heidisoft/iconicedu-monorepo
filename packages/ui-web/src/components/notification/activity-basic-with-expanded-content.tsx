@@ -8,6 +8,7 @@ import type { ActivityFeedItemVM } from '@iconicedu/shared-types';
 type ActivityBasicWithExpandedContentProps = {
   activity: ActivityFeedItemVM;
   onMarkRead: (id: string, event: React.MouseEvent) => void;
+  onAutoRead?: (id: string) => void;
   showActionButton?: boolean;
   isSubActivity?: boolean;
   parentExpanded?: boolean;
@@ -17,6 +18,7 @@ type ActivityBasicWithExpandedContentProps = {
 export function ActivityBasicWithExpandedContent({
   activity,
   onMarkRead,
+  onAutoRead,
   showActionButton = false,
   isSubActivity,
   parentExpanded,
@@ -34,6 +36,7 @@ export function ActivityBasicWithExpandedContent({
     <ActivityItemBase
       activity={activity}
       onMarkRead={onMarkRead}
+      onAutoRead={onAutoRead}
       onToggle={handleToggle}
       isSubActivity={isSubActivity}
       parentExpanded={parentExpanded}
