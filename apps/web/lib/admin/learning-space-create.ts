@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { publishActivityEvent } from '@iconicedu/web/lib/activity-feed/publisher/activity-publisher';
+import { compileLearningSpaceReminderJobs } from '@iconicedu/web/lib/automation/reminder-jobs';
 import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
 import { toStoredLiveSessionConfig } from '@iconicedu/web/lib/admin/live-session-config';
@@ -153,6 +154,12 @@ export async function createLearningSpaceFromPayload(
   });
 
   const serviceClient = createSupabaseServiceClient();
+  await compileLearningSpaceReminderJobs({
+    supabase: serviceClient,
+    orgId,
+    learningSpaceId,
+  });
+
   await publishActivityEvent({
     supabase: serviceClient,
     orgId,
@@ -818,12 +825,11 @@ function buildRRuleFields(
   startDate: string,
 ): RRuleFields {
   const weekdayTimes = rule.weekdayTimes ?? [];
-  const byday =
-    rule.byWeekday?.length
-      ? rule.byWeekday
-      : weekdayTimes.length
-        ? weekdayTimes.map((entry) => entry.day)
-        : null;
+  const byday = rule.byWeekday?.length
+    ? rule.byWeekday
+    : weekdayTimes.length
+      ? weekdayTimes.map((entry) => entry.day)
+      : null;
 
   const times = weekdayTimes.length
     ? weekdayTimes.map((entry) => entry.time)
@@ -938,10 +944,7 @@ function applyTime(date: Date, time: string) {
   return withTime;
 }
 
-function buildExpandedSchedule(
-  startAtDate: Date,
-  time: string,
-): ExpandedSchedule {
+function buildExpandedSchedule(startAtDate: Date, time: string): ExpandedSchedule {
   const startAt = startAtDate.toISOString();
   return {
     startAt,

@@ -1,5 +1,4 @@
 import type {
-  ActivityFeedItemVM,
   ActivityGroupKeyVM,
   ActivityImportanceVM,
   ActivityItemContentVM,
@@ -90,10 +89,7 @@ function getContextTitle(payload: Record<string, unknown>) {
   );
 }
 
-function buildInboxSourceHref(
-  event: ActivityEventRow,
-  payload: Record<string, unknown>,
-) {
+function buildInboxSourceHref(event: ActivityEventRow, payload: Record<string, unknown>) {
   const explicitHref = asOptionalString(payload.href);
   if (explicitHref) {
     return explicitHref;
@@ -148,7 +144,9 @@ function sourceAction(
   };
 }
 
-function paymentAction(payload: Record<string, unknown>): InboxActionButtonVM | undefined {
+function paymentAction(
+  payload: Record<string, unknown>,
+): InboxActionButtonVM | undefined {
   const href = asOptionalString(payload.href);
   if (!href) return undefined;
   return {
@@ -158,8 +156,10 @@ function paymentAction(payload: Record<string, unknown>): InboxActionButtonVM | 
   };
 }
 
-const DEFAULT_RECIPIENTS: ActivityEventDefinition['resolveRecipients'] = async (supabase, event) =>
-  resolveRecipientsForActivityEvent(supabase, event);
+const DEFAULT_RECIPIENTS: ActivityEventDefinition['resolveRecipients'] = async (
+  supabase,
+  event,
+) => resolveRecipientsForActivityEvent(supabase, event);
 
 function className(payload: Record<string, unknown>) {
   return asString(payload.title, 'Class');
@@ -204,6 +204,18 @@ function buildWeeklyLearningSpaceGroupKey(
   occurredAt.setUTCHours(0, 0, 0, 0);
 
   return `${prefix}:${learningSpaceId}:${occurredAt.toISOString().slice(0, 10)}`;
+}
+
+function buildReminderHourlyGroupKey(
+  event: ActivityEventRow,
+  payload: Record<string, unknown>,
+) {
+  const learningSpaceId = asOptionalString(payload.learningSpaceId);
+  const occurrence = asOptionalString(payload.occurrenceStart) ?? event.occurred_at;
+  if (!learningSpaceId) {
+    return null;
+  }
+  return `reminder:${learningSpaceId}:${occurrence.slice(0, 13)}`;
 }
 
 function renderGroupedClassActivity(
@@ -299,11 +311,13 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
         verb: 'file.uploaded',
         leading: { kind: 'icon', iconKey: 'FileText', tone: 'info' },
         headline: {
-          primary: fileCount && fileCount > 1 ? `${fileCount} new files uploaded` : 'New file uploaded',
+          primary:
+            fileCount && fileCount > 1
+              ? `${fileCount} new files uploaded`
+              : 'New file uploaded',
           secondary: contextTitle ?? (fileCount && fileCount > 1 ? undefined : name),
         },
-        summary:
-          fileCount && fileCount > 1 ? content ?? name : content ?? name,
+        summary: fileCount && fileCount > 1 ? (content ?? name) : (content ?? name),
         preview: content ? { text: content.slice(0, 160) } : undefined,
         actionButton: sourceAction(event, payload),
         metadata: {
@@ -398,7 +412,8 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
         verb: 'class.updated',
         leading: { kind: 'icon', iconKey: 'GraduationCap', tone: 'neutral' },
         headline: { primary: 'Class updated', secondary: className(payload) },
-        summary: asOptionalString(payload.changeSummary) ?? asOptionalString(payload.subject),
+        summary:
+          asOptionalString(payload.changeSummary) ?? asOptionalString(payload.subject),
         actionButton: sourceAction(event, payload),
       };
     },
@@ -642,6 +657,81 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       };
     },
   },
+  'session.reminder.sent': {
+    eventType: 'session.reminder.sent',
+    tabKey: 'classes',
+    importance: 'normal',
+    group: {
+      groupType: 'class',
+      collapseByDefault: true,
+      buildGroupKey: (event) =>
+        buildReminderHourlyGroupKey(event, asRecord(event.payload)),
+      renderGroup: (event) => {
+        const payload = asRecord(event.payload);
+        return {
+          verb: 'session.reminder.sent',
+          leading: { kind: 'icon', iconKey: 'Bell', tone: 'info' },
+          headline: {
+            primary: 'Class reminders',
+            secondary: getContextTitle(payload),
+          },
+          actionButton: sourceAction(event, payload),
+        };
+      },
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => {
+      const payload = asRecord(event.payload);
+      return {
+        verb: 'session.reminder.sent',
+        leading: { kind: 'icon', iconKey: 'Bell', tone: 'info' },
+        headline: {
+          primary: 'Upcoming class reminder',
+          secondary: sessionName(payload),
+        },
+        summary:
+          asOptionalString(payload.summary) ?? asOptionalString(payload.occurrenceStart),
+        actionButton: sourceAction(event, payload),
+      };
+    },
+  },
+  'session.feedback_request.sent': {
+    eventType: 'session.feedback_request.sent',
+    tabKey: 'classes',
+    importance: 'normal',
+    group: {
+      groupType: 'class',
+      collapseByDefault: true,
+      buildGroupKey: (event) =>
+        buildReminderHourlyGroupKey(event, asRecord(event.payload)),
+      renderGroup: (event) => {
+        const payload = asRecord(event.payload);
+        return {
+          verb: 'session.feedback_request.sent',
+          leading: { kind: 'icon', iconKey: 'ClipboardCheck', tone: 'info' },
+          headline: {
+            primary: 'Feedback requests',
+            secondary: getContextTitle(payload),
+          },
+          actionButton: sourceAction(event, payload),
+        };
+      },
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => {
+      const payload = asRecord(event.payload);
+      return {
+        verb: 'session.feedback_request.sent',
+        leading: { kind: 'icon', iconKey: 'ClipboardCheck', tone: 'info' },
+        headline: {
+          primary: 'Session feedback requested',
+          secondary: sessionName(payload),
+        },
+        summary: asOptionalString(payload.summary),
+        actionButton: sourceAction(event, payload),
+      };
+    },
+  },
   'payment.reminder': {
     eventType: 'payment.reminder',
     tabKey: 'payment',
@@ -663,6 +753,33 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
         headline: { primary: 'Payment reminder' },
         summary: asOptionalString(payload.description),
         actionButton: paymentAction(payload),
+      };
+    },
+  },
+  'payment.reminder.sent': {
+    eventType: 'payment.reminder.sent',
+    tabKey: 'payment',
+    importance: 'important',
+    group: {
+      groupType: 'payment',
+      collapseByDefault: true,
+      buildGroupKey: (event) => {
+        const payload = asRecord(event.payload);
+        return asOptionalString(payload.invoiceId) ?? null;
+      },
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => {
+      const payload = asRecord(event.payload);
+      return {
+        verb: 'payment.reminder.sent',
+        leading: { kind: 'icon', iconKey: 'CreditCard', tone: 'warning' },
+        headline: {
+          primary: 'Payment reminder',
+          secondary: asOptionalString(payload.title),
+        },
+        summary: asOptionalString(payload.summary),
+        actionButton: paymentAction(payload) ?? sourceAction(event, payload),
       };
     },
   },

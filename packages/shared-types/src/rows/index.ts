@@ -11,5 +11,6 @@ export * from './learning-space';
 export * from './message';
 export * from './org';
 export * from './profile';
+export * from './reminder-job';
 export * from './roles';
 export * from './user-onboarding-status';

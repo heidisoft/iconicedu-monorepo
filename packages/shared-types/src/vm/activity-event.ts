@@ -4,16 +4,27 @@ import type {
   ActivitySourceKindVM,
   ActivityVerbVM,
 } from '@iconicedu/shared-types/vm/activity-feed';
-import type { EntityRefVM, ISODateTime, UUID } from '@iconicedu/shared-types/shared/shared';
+import type {
+  EntityRefVM,
+  ISODateTime,
+  UUID,
+} from '@iconicedu/shared-types/shared/shared';
 
-export type ActivityEventTypeVM = ActivityVerbVM | 'session.ended' | 'payment.received' | 'payment.failed' | 'system.notice';
+export type ActivityEventTypeVM =
+  | ActivityVerbVM
+  | 'session.ended'
+  | 'payment.received'
+  | 'payment.failed'
+  | 'system.notice';
 
 export interface ActivityEventIdsVM {
   id: UUID;
   orgId: UUID;
 }
 
-export interface ActivityEventBaseVM<TPayload extends Record<string, unknown> = Record<string, unknown>> {
+export interface ActivityEventBaseVM<
+  TPayload extends Record<string, unknown> = Record<string, unknown>,
+> {
   ids: ActivityEventIdsVM;
   eventType: ActivityEventTypeVM;
   occurredAt: ISODateTime;
@@ -70,6 +81,39 @@ export interface PaymentActivityEventPayload {
   currency?: string | null;
   description?: string | null;
   href?: string | null;
+}
+
+export interface SessionReminderSentActivityEventPayload {
+  channelId: UUID;
+  messageId: UUID;
+  learningSpaceId?: UUID | null;
+  scheduleId?: UUID | null;
+  occurrenceStart: ISODateTime;
+  title: string;
+  summary?: string | null;
+  channelRouteKind?: 'space' | 'dm' | 'channel' | null;
+}
+
+export interface SessionFeedbackRequestSentActivityEventPayload {
+  channelId: UUID;
+  messageId: UUID;
+  learningSpaceId?: UUID | null;
+  scheduleId?: UUID | null;
+  occurrenceStart: ISODateTime;
+  title: string;
+  summary?: string | null;
+  channelRouteKind?: 'space' | 'dm' | 'channel' | null;
+}
+
+export interface PaymentReminderSentActivityEventPayload {
+  channelId: UUID;
+  messageId: UUID;
+  learningSpaceId?: UUID | null;
+  invoiceId?: string | null;
+  dueAt?: ISODateTime | null;
+  title: string;
+  summary?: string | null;
+  channelRouteKind?: 'space' | 'dm' | 'channel' | null;
 }
 
 export interface SystemNoticeActivityEventPayload {

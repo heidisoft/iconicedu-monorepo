@@ -47,8 +47,11 @@ export type ActivityVerbVM =
   | 'member.removed'
   | 'role.changed'
   | 'payment.reminder'
+  | 'payment.reminder.sent'
   | 'payment.received'
   | 'payment.failed'
+  | 'session.reminder.sent'
+  | 'session.feedback_request.sent'
   | 'system.notice';
 
 export type ActivitySourceKindVM =

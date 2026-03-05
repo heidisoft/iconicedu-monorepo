@@ -210,4 +210,50 @@ describe('activity event definitions', () => {
       expandedContent: 'Focus on equivalent fractions and number lines.',
     });
   });
+
+  it('groups session reminder sent activities by class/hour', () => {
+    const definition = getActivityEventDefinition('session.reminder.sent');
+    if (!definition?.group) {
+      throw new Error('Missing session.reminder.sent group definition');
+    }
+
+    const event = {
+      id: 'event-6',
+      org_id: 'org-1',
+      event_type: 'session.reminder.sent',
+      occurred_at: '2026-03-03T12:34:00.000Z',
+      source_kind: 'system',
+      actor_profile_id: 'profile-system',
+      scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+      object_ref: { kind: 'message', id: 'message-6' },
+      target_ref: { kind: 'learning_space', id: 'space-1' },
+      payload: {
+        channelId: 'channel-1',
+        messageId: 'message-6',
+        learningSpaceId: 'space-1',
+        title: 'Algebra',
+        occurrenceStart: '2026-03-03T12:40:00.000Z',
+        summary: 'Class starts in 10 minutes',
+        channelRouteKind: 'space',
+      },
+      audience_rules: [],
+      dedupe_key: 'session.reminder:org-1:schedule-1:2026-03-03T12:40:00.000Z:activity',
+      projection_status: 'pending',
+      projection_attempts: 0,
+      created_at: '2026-03-03T12:34:00.000Z',
+      updated_at: '2026-03-03T12:34:00.000Z',
+    };
+
+    expect(definition.group.buildGroupKey(event)).toBe('reminder:space-1:2026-03-03T12');
+    expect(definition.render(event)).toMatchObject({
+      headline: {
+        primary: 'Upcoming class reminder',
+        secondary: 'Algebra',
+      },
+      actionButton: {
+        label: 'Open class',
+        href: '../spaces/channel-1',
+      },
+    });
+  });
 });

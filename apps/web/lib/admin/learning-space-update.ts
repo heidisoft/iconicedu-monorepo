@@ -8,6 +8,7 @@ import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profil
 import { insertClassSchedules } from '@iconicedu/web/lib/admin/learning-space-create';
 import { toStoredLiveSessionConfig } from '@iconicedu/web/lib/admin/live-session-config';
 import { publishActivityEvent } from '@iconicedu/web/lib/activity-feed/publisher/activity-publisher';
+import { compileLearningSpaceReminderJobs } from '@iconicedu/web/lib/automation/reminder-jobs';
 import type {
   ChannelUiDefaultsVM,
   LearningSpaceCreatePayload,
@@ -30,7 +31,12 @@ function buildScheduleStartForActivity(
   const [hour, minute] = time
     .split(':')
     .map((value: string) => Number.parseInt(value, 10));
-  baseDate.setUTCHours(Number.isFinite(hour) ? hour : 9, Number.isFinite(minute) ? minute : 0, 0, 0);
+  baseDate.setUTCHours(
+    Number.isFinite(hour) ? hour : 9,
+    Number.isFinite(minute) ? minute : 0,
+    0,
+    0,
+  );
   const endDate = new Date(baseDate.getTime() + 60 * 60 * 1000);
   return {
     startAt: baseDate.toISOString(),
@@ -186,6 +192,12 @@ export async function updateLearningSpaceFromPayload(
     schedules: payload.schedules ?? [],
   });
 
+  await compileLearningSpaceReminderJobs({
+    supabase: serviceClient,
+    orgId,
+    learningSpaceId,
+  });
+
   await publishActivityEvent({
     supabase: serviceClient,
     orgId,
@@ -211,7 +223,9 @@ export async function updateLearningSpaceFromPayload(
     (existingParticipantsResponse.data ?? []).map((row) => row.profile_id),
   );
   const nextParticipants = payload.participants ?? [];
-  const nextParticipantIds = new Set(nextParticipants.map((participant) => participant.profileId));
+  const nextParticipantIds = new Set(
+    nextParticipants.map((participant) => participant.profileId),
+  );
 
   for (const participant of nextParticipants) {
     if (!existingParticipantIds.has(participant.profileId)) {
@@ -285,7 +299,7 @@ export async function updateLearningSpaceFromPayload(
         createdBy: actorProfileId,
       });
     }
-  } else if (previousSchedules.length && !(payload.schedules?.length)) {
+  } else if (previousSchedules.length && !payload.schedules?.length) {
     for (const schedule of previousSchedules) {
       await publishActivityEvent({
         supabase: serviceClient,
@@ -662,11 +676,7 @@ async function deleteSchedules(
   );
 
   await ensureDeleted(
-    supabase
-      .from('class_schedules')
-      .delete()
-      .eq('org_id', orgId)
-      .in('id', scheduleIds),
+    supabase.from('class_schedules').delete().eq('org_id', orgId).in('id', scheduleIds),
   );
 }
 
