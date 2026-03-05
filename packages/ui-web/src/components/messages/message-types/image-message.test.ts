@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { getImageAttachments, getImageDownloadHref, getImageRenderSrc } from './image-message';
+import {
+  getFullImageRenderSrc,
+  getImageAttachments,
+  getImageDownloadHref,
+  getImageRenderSrc,
+} from './image-message';
 
 describe('getImageDownloadHref', () => {
   it('uses the stable re-signing endpoint for rendering when image storagePath exists', () => {
@@ -41,12 +46,30 @@ describe('getImageDownloadHref', () => {
   it('returns grouped image attachments when present', () => {
     expect(
       getImageAttachments({
-        attachment: { type: 'image', name: 'cover.png', url: 'https://example.com/cover.png' },
+        attachment: {
+          type: 'image',
+          name: 'cover.png',
+          url: 'https://example.com/cover.png',
+        },
         attachments: [
           { type: 'image', name: 'cover.png', url: 'https://example.com/cover.png' },
           { type: 'image', name: 'detail.png', url: 'https://example.com/detail.png' },
         ],
       } as never).map((attachment) => attachment.name),
     ).toEqual(['cover.png', 'detail.png']);
+  });
+
+  it('uses original file access href for full-size preview images', () => {
+    expect(
+      getFullImageRenderSrc({
+        attachment: {
+          type: 'image',
+          url: 'https://signed.example.com/image.png',
+          storagePath: 'org-1/channel-1/profile-1/image.png',
+          thumbnailUrl: 'https://public.example.com/thumb.jpg',
+          name: 'image.png',
+        },
+      } as never),
+    ).toBe('/api/messages/file-download?path=org-1%2Fchannel-1%2Fprofile-1%2Fimage.png');
   });
 });

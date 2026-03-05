@@ -116,6 +116,12 @@ export default [
       '**/__tests__/**/*.{ts,tsx,js,jsx}',
     ],
     languageOptions: {
+      parser: tsParser,
+      parserOptions: {
+        project: null,
+        ecmaVersion: 2020,
+        sourceType: 'module',
+      },
       globals: {
         describe: 'readonly',
         it: 'readonly',
