@@ -267,8 +267,8 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
                 : `${senderName} sent a message`,
           secondary: getContextTitle(payload),
         },
-        summary: content,
-        preview: content ? { text: content.slice(0, 160) } : undefined,
+        summary: undefined,
+        expandedContent: content || undefined,
         actionButton: sourceAction(event, payload),
         metadata: {
           channelId: payload.channelId,

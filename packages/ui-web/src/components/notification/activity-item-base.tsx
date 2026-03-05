@@ -40,19 +40,21 @@ type ActivityItemBaseProps = {
 };
 
 const READ_ICON_CLASS = 'bg-muted text-muted-foreground';
-const INBOX_ICON_MAP: Record<InboxIconKeyVM, React.ComponentType<{ className?: string }>> =
-  {
-    Bell,
-    CheckCircle2,
-    ClipboardCheck,
-    CreditCard,
-    FileText,
-    GraduationCap,
-    MessageSquare,
-    Paperclip,
-    Sparkles,
-    Video,
-  };
+const INBOX_ICON_MAP: Record<
+  InboxIconKeyVM,
+  React.ComponentType<{ className?: string }>
+> = {
+  Bell,
+  CheckCircle2,
+  ClipboardCheck,
+  CreditCard,
+  FileText,
+  GraduationCap,
+  MessageSquare,
+  Paperclip,
+  Sparkles,
+  Video,
+};
 
 const TONE_CLASSNAMES = {
   neutral: 'bg-muted text-muted-foreground',
@@ -170,6 +172,7 @@ export function ActivityItemBase({
       : undefined;
   const Icon = INBOX_ICON_MAP[iconKey];
   const timestampLabel = formatRelativeTime(activity.timestamps.occurredAt);
+  const secondaryHref = activity.content.actionButton?.href ?? undefined;
   const rootRef = useRef<HTMLDivElement>(null);
   const autoReadTriggeredRef = useRef(false);
 
@@ -271,11 +274,22 @@ export function ActivityItemBase({
               <span className="font-semibold text-foreground">
                 {activity.content.headline.primary}
               </span>{' '}
-              {activity.content.headline.secondary && (
-                <span className="text-muted-foreground">
-                  {activity.content.headline.secondary}
-                </span>
-              )}{' '}
+              {activity.content.headline.secondary &&
+                (secondaryHref ? (
+                  <a
+                    href={secondaryHref}
+                    className="text-muted-foreground underline-offset-2 hover:underline"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                    }}
+                  >
+                    {activity.content.headline.secondary}
+                  </a>
+                ) : (
+                  <span className="text-muted-foreground">
+                    {activity.content.headline.secondary}
+                  </span>
+                ))}{' '}
               {activity.content.headline.emphasis && (
                 <span className="font-medium text-foreground">
                   {activity.content.headline.emphasis}

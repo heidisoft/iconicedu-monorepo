@@ -17,6 +17,7 @@ type ActivityWithSubitemsProps = {
   parentExpanded?: boolean;
   onMarkRead: (id: string, event: React.MouseEvent) => void;
   onAutoRead?: (id: string) => void;
+  showActionButton?: boolean;
   className?: string;
 };
 
@@ -30,6 +31,7 @@ export function ActivityWithSubitems({
   parentExpanded = false,
   onMarkRead,
   onAutoRead,
+  showActionButton = true,
   className,
 }: ActivityWithSubitemsProps) {
   const subActivities = activity.subActivities?.items ?? [];
@@ -59,7 +61,7 @@ export function ActivityWithSubitems({
         parentExpanded={parentExpanded}
         isCollapsed={isCollapsed}
         showSubActivityToggle={hasSubActivities}
-        showActionButton={Boolean(activity.content.actionButton)}
+        showActionButton={showActionButton && Boolean(activity.content.actionButton)}
         subActivityCount={subActivityCount}
         hasUnreadSubActivities={hasUnreadSubActivities}
       />
@@ -73,11 +75,11 @@ export function ActivityWithSubitems({
                   activity={sub}
                   onMarkRead={onMarkRead}
                   onAutoRead={onAutoRead}
-                  showActionButton={Boolean(sub.content.actionButton)}
+                  showActionButton={showActionButton && Boolean(sub.content.actionButton)}
                   isSubActivity
                   parentExpanded={!isCollapsed}
                 />
-              ) : sub.content.actionButton ? (
+              ) : showActionButton && sub.content.actionButton ? (
                 <ActivityBasicWithActionButton
                   activity={sub}
                   onMarkRead={onMarkRead}

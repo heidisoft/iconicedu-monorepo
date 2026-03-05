@@ -6,7 +6,6 @@ import { Badge } from '@iconicedu/ui-web/ui/badge';
 import { ScrollArea } from '@iconicedu/ui-web/ui/scroll-area';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@iconicedu/ui-web/ui/tabs';
 import { ActivityBasic } from '@iconicedu/ui-web/components/notification/activity-basic';
-import { ActivityBasicWithActionButton } from '@iconicedu/ui-web/components/notification/activity-basic-with-action-button';
 import { ActivityBasicWithExpandedContent } from '@iconicedu/ui-web/components/notification/activity-basic-with-expanded-content';
 import { ActivityWithSubitems } from '@iconicedu/ui-web/components/notification/activity-with-subitems';
 import type {
@@ -63,8 +62,9 @@ export function applyReadStateToSections(
 function getUnreadCountForItem(item: ActivityFeedItemVM): number {
   if (item.kind === 'group') {
     return (
-      item.subActivities?.items.filter((sub: ActivityFeedLeafItemVM) => !sub.state?.isRead).length ??
-      (!item.state?.isRead ? 1 : 0)
+      item.subActivities?.items.filter(
+        (sub: ActivityFeedLeafItemVM) => !sub.state?.isRead,
+      ).length ?? (!item.state?.isRead ? 1 : 0)
     );
   }
 
@@ -100,7 +100,10 @@ export function buildUnreadTabCounts(
   return counts;
 }
 
-export function InboxContainer({ feed, markReadEndpoint = '/api/activity-feed/read' }: {
+export function InboxContainer({
+  feed,
+  markReadEndpoint = '/api/activity-feed/read',
+}: {
   feed: ActivityFeedVM;
   markReadEndpoint?: string;
 }) {
@@ -192,6 +195,7 @@ export function InboxContainer({ feed, markReadEndpoint = '/api/activity-feed/re
           activity={activity}
           onMarkRead={markAsRead}
           onAutoRead={autoMarkAsRead}
+          showActionButton={false}
         />
       );
     }
@@ -202,17 +206,7 @@ export function InboxContainer({ feed, markReadEndpoint = '/api/activity-feed/re
           activity={activity}
           onMarkRead={markAsRead}
           onAutoRead={autoMarkAsRead}
-          showActionButton={Boolean(activity.content.actionButton)}
-        />
-      );
-    }
-
-    if (activity.content.actionButton) {
-      return (
-        <ActivityBasicWithActionButton
-          activity={activity}
-          onMarkRead={markAsRead}
-          onAutoRead={autoMarkAsRead}
+          showActionButton={false}
         />
       );
     }
