@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import posthog from 'posthog-js';
 
-import { isPostHogBrowserConfigured } from '@iconicedu/web/lib/analytics/posthog-browser-config';
+import { isPostHogBrowserConfigured } from '@iconicedu/web/lib/analytics/posthog-config';
 import {
   POSTHOG_EVENT_KEYS,
   buildPostHogPageViewProperties,

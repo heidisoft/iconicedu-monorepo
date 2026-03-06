@@ -1,13 +1,12 @@
 import { PostHog } from 'posthog-node';
 
+const POSTHOG_DEFAULT_HOST = 'https://us.i.posthog.com';
+
 let posthogClient: PostHog | null | undefined;
 
 function resolvePostHogConfig() {
   const apiKey =
-    process.env.POSTHOG_API_KEY?.trim() ||
-    process.env.POSTHOG_KEY?.trim() ||
-    process.env.NEXT_PUBLIC_POSTHOG_KEY?.trim() ||
-    '';
+    process.env.POSTHOG_KEY?.trim() || process.env.NEXT_PUBLIC_POSTHOG_KEY?.trim() || '';
 
   if (!apiKey) {
     return null;
@@ -15,10 +14,7 @@ function resolvePostHogConfig() {
 
   return {
     apiKey,
-    apiHost:
-      process.env.POSTHOG_HOST?.trim() ||
-      process.env.NEXT_PUBLIC_POSTHOG_HOST?.trim() ||
-      'https://us.i.posthog.com',
+    apiHost: process.env.POSTHOG_HOST?.trim() || POSTHOG_DEFAULT_HOST,
   };
 }
 
@@ -46,11 +42,10 @@ export async function capturePostHogServerEvent(input: {
   distinctId?: string;
   event: string;
   properties?: Record<string, unknown>;
+  groups?: Record<string, string | number>;
 }) {
   const client = getPostHogClient();
-  if (!client) {
-    return;
-  }
+  if (!client) return;
 
   try {
     await Promise.race([
@@ -58,7 +53,9 @@ export async function capturePostHogServerEvent(input: {
         distinctId: input.distinctId ?? 'system',
         event: input.event,
         properties: input.properties,
+        groups: input.groups,
       }),
+      // Hard cap so telemetry never blocks the reminders dispatch pipeline.
       new Promise((resolve) => setTimeout(resolve, 400)),
     ]);
   } catch {

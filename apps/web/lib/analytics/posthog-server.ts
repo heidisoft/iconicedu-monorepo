@@ -2,7 +2,7 @@ import 'server-only';
 
 import { PostHog } from 'posthog-node';
 
-import { resolvePostHogServerConfig } from './posthog-server-config';
+import { resolvePostHogServerConfig } from './posthog-config';
 
 let posthogServerClient: PostHog | null | undefined;
 

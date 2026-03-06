@@ -1,6 +1,6 @@
 import posthog from 'posthog-js';
 
-import { resolvePostHogBrowserConfig } from './lib/analytics/posthog-browser-config';
+import { resolvePostHogBrowserConfig } from './lib/analytics/posthog-config';
 
 const config = resolvePostHogBrowserConfig();
 

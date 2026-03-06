@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import posthog from 'posthog-js';
 
-import { isPostHogBrowserConfigured } from '@iconicedu/web/lib/analytics/posthog-browser-config';
+import { isPostHogBrowserConfigured } from '@iconicedu/web/lib/analytics/posthog-config';
 import { buildPostHogIdentifyProperties } from '@iconicedu/web/lib/analytics/posthog-events';
 
 type PostHogIdentifyProps = {
