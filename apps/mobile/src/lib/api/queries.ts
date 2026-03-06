@@ -1,9 +1,6 @@
 import { supabase } from '@/lib/supabase/client';
 import { File as ExpoFile } from 'expo-file-system';
 import type {
-  UserProfileBlockVM,
-  ChannelVM,
-  LearningSpaceVM,
   MessageVM,
   ReactionVM,
   ThreadVM,
@@ -17,8 +14,14 @@ import type {
   EventStatusVM,
   ClassScheduleVisibilityVM,
   ClassSchedulePatchVM,
+  ThemeKey,
 } from '@iconicedu/shared-types';
-import { mapRowToMessageVM, buildSenderProfile, type RawMessageRow, type RawSenderProfile } from './map-row-to-vm';
+import {
+  mapRowToMessageVM,
+  buildSenderProfile,
+  type RawMessageRow,
+  type RawSenderProfile,
+} from './map-row-to-vm';
 
 export const queryKeys = {
   profile: (profileId: string) => ['profile', profileId] as const,
@@ -29,10 +32,8 @@ export const queryKeys = {
   messages: (channelId: string) => ['messages', channelId] as const,
   learningSpaces: (orgId: string) => ['learningSpaces', orgId] as const,
   learningSpace: (spaceId: string) => ['learningSpace', spaceId] as const,
-  inbox: (orgId: string, profileId: string) =>
-    ['inbox', orgId, profileId] as const,
-  sidebar: (orgId: string, profileId: string) =>
-    ['sidebar', orgId, profileId] as const,
+  inbox: (orgId: string, profileId: string) => ['inbox', orgId, profileId] as const,
+  sidebar: (orgId: string, profileId: string) => ['sidebar', orgId, profileId] as const,
   notificationPrefs: (orgId: string, profileId: string) =>
     ['notificationPrefs', orgId, profileId] as const,
   familyLinks: (orgId: string, accountId: string) =>
@@ -73,7 +74,9 @@ export async function fetchUserAccount() {
   // Include the linked profile so callers don't need a second round-trip.
   const { data: account, error } = await supabase
     .from('accounts')
-    .select('*, profile:profiles!account_id(id, display_name, first_name, last_name, avatar_seed)')
+    .select(
+      '*, profile:profiles!account_id(id, display_name, first_name, last_name, avatar_seed)',
+    )
     .eq('auth_user_id', user.id)
     .single();
 
@@ -170,14 +173,19 @@ export async function fetchDirectMessages(
   // Step 3: fetch all members for those channels to build name/avatar display
   const { data: memberRows } = await supabase
     .from('channel_members')
-    .select('channel_id, profile_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed)')
-    .in('channel_id', chRows.map((c) => c.id))
+    .select(
+      'channel_id, profile_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed)',
+    )
+    .in(
+      'channel_id',
+      chRows.map((c) => c.id),
+    )
     .is('deleted_at', null);
 
   // Build channelId → DmParticipant[] map, excluding self
   const participantMap = new Map<string, DmParticipant[]>();
   for (const member of memberRows ?? []) {
-    const profile = member.profile as DmParticipant | null;
+    const profile = member.profile as unknown as DmParticipant | null;
     if (!profile || profile.id === myProfileId) continue;
     const list = participantMap.get(member.channel_id) ?? [];
     list.push(profile);
@@ -209,25 +217,27 @@ export async function fetchDirectMessages(
 type LastMessageInfo = { text: string | null; at: string | null; sender: string | null };
 
 const PREVIEW_LABELS: Record<string, string> = {
-  'image':                '🖼 Image',
-  'file':                 '📎 File',
-  'audio-recording':      '🎙 Voice message',
-  'lesson-assignment':    '📚 Assignment',
-  'homework-submission':  '📝 Homework submitted',
-  'progress-update':      '📈 Progress update',
-  'event-reminder':       '📅 Event reminder',
-  'session-summary':      '📋 Session summary',
-  'session-complete':     '✓ Session complete',
-  'session-booking':      '🗓 Session booked',
-  'payment-reminder':     '💳 Payment reminder',
-  'feedback-request':     '💬 Feedback request',
+  image: '🖼 Image',
+  file: '📎 File',
+  'audio-recording': '🎙 Voice message',
+  'lesson-assignment': '📚 Assignment',
+  'homework-submission': '📝 Homework submitted',
+  'progress-update': '📈 Progress update',
+  'event-reminder': '📅 Event reminder',
+  'session-summary': '📋 Session summary',
+  'session-complete': '✓ Session complete',
+  'session-booking': '🗓 Session booked',
+  'payment-reminder': '💳 Payment reminder',
+  'feedback-request': '💬 Feedback request',
 };
 
 /**
  * Batch-fetch the most recent message preview for a list of channel IDs.
  * Two queries: one for the latest message row per channel, one for text payloads.
  */
-async function fetchLastMessages(channelIds: string[]): Promise<Map<string, LastMessageInfo>> {
+async function fetchLastMessages(
+  channelIds: string[],
+): Promise<Map<string, LastMessageInfo>> {
   if (!channelIds.length) return new Map();
 
   type MsgRow = {
@@ -235,14 +245,20 @@ async function fetchLastMessages(channelIds: string[]): Promise<Map<string, Last
     channel_id: string;
     type: string;
     created_at: string;
-    sender: { display_name: string | null; first_name: string | null; last_name: string | null } | null;
+    sender: {
+      display_name: string | null;
+      first_name: string | null;
+      last_name: string | null;
+    } | null;
   };
 
   // Fetch recent top-level messages (no thread replies), ordered newest-first.
   // Limit heuristic: 3 per channel gives enough headroom to find the latest per channel in JS.
   const { data: msgRows } = await supabase
     .from('messages')
-    .select('id, channel_id, type, created_at, sender:profiles!sender_profile_id(display_name, first_name, last_name)')
+    .select(
+      'id, channel_id, type, created_at, sender:profiles!sender_profile_id(display_name, first_name, last_name)',
+    )
     .in('channel_id', channelIds)
     .is('deleted_at', null)
     .is('thread_parent_id', null)
@@ -251,7 +267,7 @@ async function fetchLastMessages(channelIds: string[]): Promise<Map<string, Last
 
   if (!msgRows?.length) return new Map();
 
-  const rows = msgRows as MsgRow[];
+  const rows = msgRows as unknown as MsgRow[];
 
   // Pick the newest per channel (already DESC ordered)
   const latestByChannel = new Map<string, MsgRow>();
@@ -273,19 +289,24 @@ async function fetchLastMessages(channelIds: string[]): Promise<Map<string, Last
       .select('message_id, payload')
       .in('message_id', textMessageIds);
     for (const t of textRows ?? []) {
-      const text = ((t.payload as Record<string, unknown>)?.text as string | undefined)?.trim();
+      const text = (
+        (t.payload as Record<string, unknown>)?.text as string | undefined
+      )?.trim();
       if (text) textByMessageId.set(t.message_id, text);
     }
   }
 
   const result = new Map<string, LastMessageInfo>();
   for (const [channelId, row] of latestByChannel) {
-    const text = row.type === 'text'
-      ? (textByMessageId.get(row.id) ?? null)
-      : (PREVIEW_LABELS[row.type] ?? null);
+    const text =
+      row.type === 'text'
+        ? (textByMessageId.get(row.id) ?? null)
+        : (PREVIEW_LABELS[row.type] ?? null);
     const s = row.sender;
     const sender = s
-      ? (s.display_name?.trim() || [s.first_name, s.last_name].filter(Boolean).join(' ') || null)
+      ? s.display_name?.trim() ||
+        [s.first_name, s.last_name].filter(Boolean).join(' ') ||
+        null
       : null;
     result.set(channelId, { text, at: row.created_at, sender });
   }
@@ -314,7 +335,9 @@ export async function fetchChannels(orgId: string): Promise<ChannelListItem[]> {
   const lastMessages = await fetchLastMessages(data.map((ch) => ch.id));
 
   return data.map((ch) => {
-    const readState = (ch.channel_read_state as Array<{ unread_count: number | null }> | null)?.[0];
+    const readState = (
+      ch.channel_read_state as Array<{ unread_count: number | null }> | null
+    )?.[0];
     const last = lastMessages.get(ch.id);
     return {
       id: ch.id,
@@ -340,20 +363,20 @@ const BASE_MESSAGE_SELECT = `
 
 /** message type → payload table name */
 const TYPE_TABLE: Record<string, string> = {
-  'text':                 'message_text',
-  'image':                'message_image',
-  'file':                 'message_file',
-  'audio-recording':      'message_audio_recording',
-  'link-preview':         'message_link_preview',
-  'lesson-assignment':    'message_lesson_assignment',
-  'homework-submission':  'message_homework_submission',
-  'progress-update':      'message_progress_update',
-  'event-reminder':       'message_event_reminder',
-  'session-summary':      'message_session_summary',
-  'session-complete':     'message_session_complete',
-  'session-booking':      'message_session_booking',
-  'payment-reminder':     'message_payment_reminder',
-  'feedback-request':     'message_feedback_request',
+  text: 'message_text',
+  image: 'message_image',
+  file: 'message_file',
+  'audio-recording': 'message_audio_recording',
+  'link-preview': 'message_link_preview',
+  'lesson-assignment': 'message_lesson_assignment',
+  'homework-submission': 'message_homework_submission',
+  'progress-update': 'message_progress_update',
+  'event-reminder': 'message_event_reminder',
+  'session-summary': 'message_session_summary',
+  'session-complete': 'message_session_complete',
+  'session-booking': 'message_session_booking',
+  'payment-reminder': 'message_payment_reminder',
+  'feedback-request': 'message_feedback_request',
 };
 
 /** Batch-fetch payloads from type-specific tables, grouped by message_id. */
@@ -380,11 +403,17 @@ async function loadPayloads(
         .select('message_id, payload')
         .in('message_id', ids)
         .is('deleted_at', null)
-        .then(({ data }: { data: Array<{ message_id: string; payload: Record<string, unknown> }> | null }) => {
-          for (const row of data ?? []) {
-            payloadMap.set(row.message_id, row.payload);
-          }
-        }),
+        .then(
+          ({
+            data,
+          }: {
+            data: Array<{ message_id: string; payload: Record<string, unknown> }> | null;
+          }) => {
+            for (const row of data ?? []) {
+              payloadMap.set(row.message_id, row.payload);
+            }
+          },
+        ),
     );
   }
 
@@ -406,7 +435,11 @@ async function loadReactions(
     .is('deleted_at', null);
 
   const grouped = new Map<string, Array<{ emoji: string; account_id: string }>>();
-  for (const r of (reactionRows ?? []) as Array<{ message_id: string; emoji: string; account_id: string }>) {
+  for (const r of (reactionRows ?? []) as Array<{
+    message_id: string;
+    emoji: string;
+    account_id: string;
+  }>) {
     const bucket = grouped.get(r.message_id) ?? [];
     bucket.push({ emoji: r.emoji, account_id: r.account_id });
     grouped.set(r.message_id, bucket);
@@ -456,14 +489,14 @@ type RawThreadParticipantRow = {
  * Fetch threads from the canonical `threads` table (mirrors web's buildThreadsByChannelId).
  * Returns a map of parent_message_id → ThreadVM.
  */
-async function loadThreads(
-  parentMessageIds: string[],
-): Promise<Map<string, ThreadVM>> {
+async function loadThreads(parentMessageIds: string[]): Promise<Map<string, ThreadVM>> {
   if (!parentMessageIds.length) return new Map();
 
   const { data: threadRows, error: threadError } = await supabase
     .from('threads')
-    .select('id, org_id, channel_id, parent_message_id, snippet, author_id, author_name, message_count, last_reply_at, created_at')
+    .select(
+      'id, org_id, channel_id, parent_message_id, snippet, author_id, author_name, message_count, last_reply_at, created_at',
+    )
     .in('parent_message_id', parentMessageIds);
 
   if (threadError) {
@@ -477,7 +510,9 @@ async function loadThreads(
 
   const { data: participantRows, error: participantError } = await supabase
     .from('thread_participants')
-    .select('thread_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed)')
+    .select(
+      'thread_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed)',
+    )
     .in('thread_id', threadIds)
     .is('deleted_at', null);
 
@@ -487,7 +522,7 @@ async function loadThreads(
 
   // Build thread_id → participants map
   const participantsByThread = new Map<string, RawSenderProfile[]>();
-  for (const p of (participantRows ?? []) as RawThreadParticipantRow[]) {
+  for (const p of (participantRows ?? []) as unknown as RawThreadParticipantRow[]) {
     if (!p.profile) continue;
     const list = participantsByThread.get(p.thread_id) ?? [];
     list.push(p.profile);
@@ -510,7 +545,7 @@ async function loadThreads(
       },
       stats: {
         messageCount: t.message_count ?? 0,
-        lastReplyAt: t.last_reply_at ?? t.created_at,  // fallback = thread created_at
+        lastReplyAt: t.last_reply_at ?? t.created_at, // fallback = thread created_at
       },
       participants,
     });
@@ -521,7 +556,7 @@ async function loadThreads(
 
 export async function fetchChannelMessages(
   channelId: string,
-  currentProfileId = '',
+  _currentProfileId = '',
   currentAccountId = '',
   limit = 40,
   before?: string,
@@ -543,7 +578,7 @@ export async function fetchChannelMessages(
   if (error) throw error;
   if (!rows || rows.length === 0) return [];
 
-  const typedRows = rows as RawMessageRow[];
+  const typedRows = rows as unknown as RawMessageRow[];
   const messageIds = typedRows.map((r) => r.id);
 
   const [payloadMap, reactionMap, threadsMap] = await Promise.all([
@@ -553,14 +588,16 @@ export async function fetchChannelMessages(
   ]);
 
   // Reverse a copy (oldest→newest) without mutating the typed rows array.
-  return [...typedRows].reverse().map((row) =>
-    mapRowToMessageVM(
-      row,
-      payloadMap.get(row.id) ?? null,
-      reactionMap.get(row.id) ?? [],
-      threadsMap.get(row.id),
-    ),
-  );
+  return [...typedRows]
+    .reverse()
+    .map((row) =>
+      mapRowToMessageVM(
+        row,
+        payloadMap.get(row.id) ?? null,
+        reactionMap.get(row.id) ?? [],
+        threadsMap.get(row.id),
+      ),
+    );
 }
 
 /**
@@ -574,7 +611,7 @@ export async function fetchChannelMessages(
 export async function fetchThreadMessages(
   threadId: string,
   parentMessageId: string,
-  currentProfileId = '',
+  _currentProfileId = '',
   currentAccountId = '',
 ): Promise<MessageVM[]> {
   // Try thread_id first (web-aligned — replies have thread_id → threads.id).
@@ -602,7 +639,7 @@ export async function fetchThreadMessages(
   if (error) throw error;
   if (!rows || rows.length === 0) return [];
 
-  const typedRows = rows as RawMessageRow[];
+  const typedRows = rows as unknown as RawMessageRow[];
   const messageIds = typedRows.map((r) => r.id);
 
   const [payloadMap, reactionMap] = await Promise.all([
@@ -611,11 +648,7 @@ export async function fetchThreadMessages(
   ]);
 
   return typedRows.map((row) =>
-    mapRowToMessageVM(
-      row,
-      payloadMap.get(row.id) ?? null,
-      reactionMap.get(row.id) ?? [],
-    ),
+    mapRowToMessageVM(row, payloadMap.get(row.id) ?? null, reactionMap.get(row.id) ?? []),
   );
 }
 
@@ -684,15 +717,15 @@ export async function fetchLearningSpaces(orgId: string) {
 /** Emoji icon for each learning space icon_key (Lucide icon keys mapped to emoji equivalents). */
 const SPACE_ICON_EMOJI: Record<string, string> = {
   'square-pi': '📐',
-  'languages': '🌐',
+  languages: '🌐',
   'chef-hat': '👨‍🍳',
-  'earth': '🌍',
-  'sparkles': '✨',
+  earth: '🌍',
+  sparkles: '✨',
   'book-open': '📖',
   'flask-conical': '🧪',
-  'music': '🎵',
-  'palette': '🎨',
-  'dumbbell': '🏋️',
+  music: '🎵',
+  palette: '🎨',
+  dumbbell: '🏋️',
 };
 
 /**
@@ -738,14 +771,25 @@ export async function fetchLearningSpaceChannels(
   if (error) throw error;
 
   type Row = typeof data extends (infer R)[] | null ? R : never;
-  const toSpace = (r: Row) => r.space as { id: string; title: string; icon_key: string | null; subject: string | null; status: string; deleted_at: string | null } | null;
-  const toChannel = (r: Row) => r.channel as { id: string; org_id: string; updated_at: string } | null;
+  const toSpace = (r: Row) =>
+    r.space as unknown as {
+      id: string;
+      title: string;
+      icon_key: string | null;
+      subject: string | null;
+      status: string;
+      deleted_at: string | null;
+    } | null;
+  const toChannel = (r: Row) =>
+    r.channel as unknown as { id: string; org_id: string; updated_at: string } | null;
 
   const items = (data ?? [])
     .filter((row) => {
       const sp = toSpace(row);
       const ch = toChannel(row);
-      return sp && ch && !sp.deleted_at && (sp.status === 'active' || sp.status === 'paused');
+      return (
+        sp && ch && !sp.deleted_at && (sp.status === 'active' || sp.status === 'paused')
+      );
     })
     .map((row) => {
       const sp = toSpace(row)!;
@@ -813,7 +857,14 @@ export async function fetchProfilesByAccountIds(orgId: string, accountIds: strin
   return data ?? [];
 }
 
-const MOBILE_ALLOWED_ROLES = new Set(['educator', 'guardian', 'child', 'staff', 'admin', 'system']);
+const MOBILE_ALLOWED_ROLES = new Set([
+  'educator',
+  'guardian',
+  'child',
+  'staff',
+  'admin',
+  'system',
+]);
 
 export type DayAvailability = Record<string, Array<{ start: string; end: string }>>;
 
@@ -849,7 +900,12 @@ export type OnboardingStatus = {
 export function fetchOnboardingStatus(): Promise<OnboardingStatus> {
   const timeout = new Promise<never>((_, reject) =>
     setTimeout(
-      () => reject(new Error('Account lookup timed out. Please check your connection and try again.')),
+      () =>
+        reject(
+          new Error(
+            'Account lookup timed out. Please check your connection and try again.',
+          ),
+        ),
       12_000,
     ),
   );
@@ -859,7 +915,9 @@ export function fetchOnboardingStatus(): Promise<OnboardingStatus> {
 async function _doFetchOnboardingStatus(): Promise<OnboardingStatus> {
   // getSession() reads from SecureStore — no network request, no hang risk.
   // getUser() verifies with the auth server over the network and can hang indefinitely.
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
   const user = session?.user;
   if (!user) throw new Error('Not authenticated');
 
@@ -897,7 +955,8 @@ async function _doFetchOnboardingStatus(): Promise<OnboardingStatus> {
     }
   }
 
-  if (!account) throw new Error('No account found for this user. Please contact your administrator.');
+  if (!account)
+    throw new Error('No account found for this user. Please contact your administrator.');
 
   // Profiles are linked via account_id on the profiles table (not the other way around)
   let profileId: string | null = null;
@@ -912,32 +971,34 @@ async function _doFetchOnboardingStatus(): Promise<OnboardingStatus> {
 
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('id, kind, first_name, last_name, timezone, city, region, postal_code, country_code')
+    .select(
+      'id, kind, first_name, last_name, timezone, city, region, postal_code, country_code',
+    )
     .eq('account_id', account.id)
     .is('deleted_at', null)
     .maybeSingle();
 
   if (profileError) console.warn('[onboarding] profile fetch error:', profileError);
   if (profile) {
-    profileId   = profile.id;
+    profileId = profile.id;
     profileKind = profile.kind ?? null;
-    firstName   = profile.first_name ?? '';
-    lastName    = profile.last_name ?? '';
-    timezone    = profile.timezone ?? '';
-    city        = (profile as Record<string, unknown>).city as string ?? '';
-    region      = (profile as Record<string, unknown>).region as string ?? '';
-    postalCode  = (profile as Record<string, unknown>).postal_code as string ?? '';
-    countryCode = (profile as Record<string, unknown>).country_code as string ?? '';
+    firstName = profile.first_name ?? '';
+    lastName = profile.last_name ?? '';
+    timezone = profile.timezone ?? '';
+    city = ((profile as Record<string, unknown>).city as string) ?? '';
+    region = ((profile as Record<string, unknown>).region as string) ?? '';
+    postalCode = ((profile as Record<string, unknown>).postal_code as string) ?? '';
+    countryCode = ((profile as Record<string, unknown>).country_code as string) ?? '';
   }
 
   const kind = profileKind ?? account.primary_role ?? null;
 
   // Mirror web's determineOnboardingStep required-field checks:
-  const hasName     = !!firstName.trim() && !!lastName.trim();
+  const hasName = !!firstName.trim() && !!lastName.trim();
   const hasTimezone = !!timezone.trim() && timezone.trim() !== 'UTC';
   const hasLocation = !!city.trim() && !!region.trim();
   const requiresPhone = kind !== 'child';
-  const hasPhone    = !!(account.phone_e164?.trim());
+  const hasPhone = !!account.phone_e164?.trim();
 
   // Role-specific checks (child: grade set; educator: subjects + grade levels set)
   let hasRoleData = true;
@@ -950,8 +1011,16 @@ async function _doFetchOnboardingStatus(): Promise<OnboardingStatus> {
     hasRoleData = (gradeRows?.length ?? 0) > 0;
   } else if (kind === 'educator' && profileId) {
     const [{ data: subjectRows }, { data: gradeRows }] = await Promise.all([
-      supabase.from('educator_profile_subjects').select('subject').eq('profile_id', profileId).limit(1),
-      supabase.from('educator_profile_grade_levels').select('grade_id').eq('profile_id', profileId).limit(1),
+      supabase
+        .from('educator_profile_subjects')
+        .select('subject')
+        .eq('profile_id', profileId)
+        .limit(1),
+      supabase
+        .from('educator_profile_grade_levels')
+        .select('grade_id')
+        .eq('profile_id', profileId)
+        .limit(1),
     ]);
     hasRoleData = (subjectRows?.length ?? 0) > 0 && (gradeRows?.length ?? 0) > 0;
   }
@@ -986,7 +1055,15 @@ async function _doFetchOnboardingStatus(): Promise<OnboardingStatus> {
     orgId: account.org_id,
     primaryRole: account.primary_role ?? null,
     profileKind,
-    flags: { hasName, hasTimezone, hasLocation, hasPhone, requiresPhone, hasRoleData, hasAvailability },
+    flags: {
+      hasName,
+      hasTimezone,
+      hasLocation,
+      hasPhone,
+      requiresPhone,
+      hasRoleData,
+      hasAvailability,
+    },
     prefill: {
       firstName,
       lastName,
@@ -1002,11 +1079,19 @@ async function _doFetchOnboardingStatus(): Promise<OnboardingStatus> {
 
 // ─── Wizard step saves ─────────────────────────────────────────────────────────
 
-export async function saveNameStep(profileId: string, firstName: string, lastName: string) {
+export async function saveNameStep(
+  profileId: string,
+  firstName: string,
+  lastName: string,
+) {
   const displayName = `${firstName.trim()} ${lastName.trim()}`.trim();
   const { error } = await supabase
     .from('profiles')
-    .update({ first_name: firstName.trim(), last_name: lastName.trim(), display_name: displayName })
+    .update({
+      first_name: firstName.trim(),
+      last_name: lastName.trim(),
+      display_name: displayName,
+    })
     .eq('id', profileId);
   if (error) throw error;
 }
@@ -1035,7 +1120,10 @@ export async function saveStudentStep(
 ) {
   const { error: profileError } = await supabase
     .from('child_profiles')
-    .upsert({ profile_id: profileId, org_id: orgId, birth_year: birthYear }, { onConflict: 'profile_id' });
+    .upsert(
+      { profile_id: profileId, org_id: orgId, birth_year: birthYear },
+      { onConflict: 'profile_id' },
+    );
   if (profileError) throw profileError;
 
   if (gradeLevel) {
@@ -1075,16 +1163,31 @@ export async function saveEducatorProfileStep(
   // Save subjects
   await supabase.from('educator_profile_subjects').delete().eq('profile_id', profileId);
   if (subjects.length > 0) {
-    const subjectRows = subjects.map((subject) => ({ profile_id: profileId, org_id: orgId, subject }));
-    const { error } = await supabase.from('educator_profile_subjects').insert(subjectRows);
+    const subjectRows = subjects.map((subject) => ({
+      profile_id: profileId,
+      org_id: orgId,
+      subject,
+    }));
+    const { error } = await supabase
+      .from('educator_profile_subjects')
+      .insert(subjectRows);
     if (error) throw error;
   }
 
   // Save grade levels
-  await supabase.from('educator_profile_grade_levels').delete().eq('profile_id', profileId);
+  await supabase
+    .from('educator_profile_grade_levels')
+    .delete()
+    .eq('profile_id', profileId);
   if (gradeLevels.length > 0) {
-    const gradeRows = gradeLevels.map((grade_id) => ({ profile_id: profileId, org_id: orgId, grade_id }));
-    const { error } = await supabase.from('educator_profile_grade_levels').insert(gradeRows);
+    const gradeRows = gradeLevels.map((grade_id) => ({
+      profile_id: profileId,
+      org_id: orgId,
+      grade_id,
+    }));
+    const { error } = await supabase
+      .from('educator_profile_grade_levels')
+      .insert(gradeRows);
     if (error) throw error;
   }
 }
@@ -1099,7 +1202,13 @@ export async function saveEducatorAvailabilityStep(
   const { error } = await supabase
     .from('educator_availabilities')
     .upsert(
-      { profile_id: profileId, org_id: orgId, class_types: classTypes, weekly_commitment: weeklyCommitment, availability },
+      {
+        profile_id: profileId,
+        org_id: orgId,
+        class_types: classTypes,
+        weekly_commitment: weeklyCommitment,
+        availability,
+      },
       { onConflict: 'profile_id' },
     );
   if (error) throw error;
@@ -1120,7 +1229,7 @@ export async function sendTextMessage(
   orgId: string,
   text: string,
   threadParentId?: string,
-  threadId?: string,  // threads.id — set when replying to existing thread
+  threadId?: string, // threads.id — set when replying to existing thread
 ) {
   const now = new Date().toISOString();
   let resolvedThreadId = threadId;
@@ -1132,7 +1241,9 @@ export async function sendTextMessage(
       const [{ data: parentMsg }, { data: parentText }] = await Promise.all([
         supabase
           .from('messages')
-          .select('sender_profile_id, sender:profiles!sender_profile_id(display_name, first_name, last_name)')
+          .select(
+            'sender_profile_id, sender:profiles!sender_profile_id(display_name, first_name, last_name)',
+          )
           .eq('id', threadParentId)
           .maybeSingle(),
         supabase
@@ -1142,7 +1253,11 @@ export async function sendTextMessage(
           .maybeSingle(),
       ]);
 
-      type ParentSenderShape = { display_name: string | null; first_name: string | null; last_name: string | null };
+      type ParentSenderShape = {
+        display_name: string | null;
+        first_name: string | null;
+        last_name: string | null;
+      };
       const parentSenderProfileId =
         (parentMsg as { sender_profile_id?: string } | null)?.sender_profile_id ?? null;
       const parentSender =
@@ -1153,8 +1268,11 @@ export async function sendTextMessage(
         null;
       // Use parent message text as snippet (thread context); fall back to reply text
       const snippet =
-        ((parentText?.payload as Record<string, unknown> | null)?.text as string | undefined)
-          ?.slice(0, 100) ?? text.slice(0, 100);
+        (
+          (parentText?.payload as Record<string, unknown> | null)?.text as
+            | string
+            | undefined
+        )?.slice(0, 100) ?? text.slice(0, 100);
 
       // Create the threads row (mirrors web's sendTextMessageAction)
       const { data: newThread, error: threadError } = await supabase
@@ -1183,18 +1301,19 @@ export async function sendTextMessage(
 
       // Add participants: parent author + reply sender (deduped)
       const participantIds = Array.from(
-        new Set([senderProfileId, ...(parentSenderProfileId ? [parentSenderProfileId] : [])]),
+        new Set([
+          senderProfileId,
+          ...(parentSenderProfileId ? [parentSenderProfileId] : []),
+        ]),
       );
-      await supabase
-        .from('thread_participants')
-        .upsert(
-          participantIds.map((profileId) => ({
-            thread_id: resolvedThreadId!,
-            org_id: orgId,
-            profile_id: profileId,
-          })),
-          { ignoreDuplicates: true },
-        );
+      await supabase.from('thread_participants').upsert(
+        participantIds.map((profileId) => ({
+          thread_id: resolvedThreadId!,
+          org_id: orgId,
+          profile_id: profileId,
+        })),
+        { ignoreDuplicates: true },
+      );
     } else {
       // ─ Existing thread: increment message_count, update last_reply_at, upsert participant ─
       const { data: threadRow } = await supabase
@@ -1237,13 +1356,11 @@ export async function sendTextMessage(
   if (msgError) throw msgError;
 
   // ── Insert the text payload ──────────────────────────────────────────────
-  const { error: textError } = await supabase
-    .from('message_text')
-    .insert({
-      message_id: msg.id,
-      org_id: orgId,
-      payload: { text },
-    });
+  const { error: textError } = await supabase.from('message_text').insert({
+    message_id: msg.id,
+    org_id: orgId,
+    payload: { text },
+  });
 
   if (textError) throw textError;
   return msg;
@@ -1268,8 +1385,13 @@ function buildStorageFileKey(name: string, fallbackExt?: string): string {
   const ext = rawExt ?? fallbackExt ?? null;
   const timestamp = Date.now();
   const randomSuffix = Math.random().toString(36).slice(2, 10);
-  const baseName = sanitizeStorageFileName(name.replace(/\.[^/.]+$/, '')).replace(/\.+$/g, '');
-  return ext ? `${timestamp}-${randomSuffix}-${baseName}.${ext}` : `${timestamp}-${randomSuffix}-${baseName}`;
+  const baseName = sanitizeStorageFileName(name.replace(/\.[^/.]+$/, '')).replace(
+    /\.+$/g,
+    '',
+  );
+  return ext
+    ? `${timestamp}-${randomSuffix}-${baseName}.${ext}`
+    : `${timestamp}-${randomSuffix}-${baseName}`;
 }
 
 /**
@@ -1296,7 +1418,7 @@ export function buildMessageStoragePath(
  * Decode a pre-read base64 string (from expo-image-picker) into a Uint8Array.
  */
 function base64ToUint8Array(base64: string): Uint8Array {
-  const binaryStr = atob(base64);
+  const binaryStr = globalThis.atob(base64);
   const bytes = new Uint8Array(binaryStr.length);
   for (let i = 0; i < binaryStr.length; i++) {
     bytes[i] = binaryStr.charCodeAt(i);
@@ -1322,7 +1444,7 @@ export async function uploadChannelFile(
 ): Promise<void> {
   const data: Uint8Array = prereadBase64
     ? base64ToUint8Array(prereadBase64)
-    : new ExpoFile(localUri).bytes();
+    : await new ExpoFile(localUri).bytes();
 
   const { error } = await supabase.storage
     .from(CHANNEL_FILES_BUCKET)
@@ -1381,7 +1503,11 @@ export async function sendFileMessage(
     ...(content?.trim() ? { text: content.trim() } : {}),
   };
 
-  const table = isImage ? 'message_image' : isAudio ? 'message_audio_recording' : 'message_file';
+  const table = isImage
+    ? 'message_image'
+    : isAudio
+      ? 'message_audio_recording'
+      : 'message_file';
   const { error: payloadError } = await supabase
     .from(table)
     .insert({ message_id: msg.id, org_id: orgId, payload });
@@ -1461,19 +1587,26 @@ function mapClassScheduleRow(row: Record<string, unknown>): ClassScheduleVM {
         rule: {
           frequency: recurrenceRow.frequency as RecurrenceFrequencyVM,
           interval: (recurrenceRow.interval as number | null) ?? undefined,
-          byWeekday: (recurrenceRow.byday as string[] | null) as RecurrenceVM['rule']['byWeekday'] ?? undefined,
+          byWeekday:
+            (recurrenceRow.byday as
+              | string[]
+              | null as RecurrenceVM['rule']['byWeekday']) ?? undefined,
           count: (recurrenceRow.count as number | null) ?? undefined,
           until: (recurrenceRow.until as string | null) ?? undefined,
           timezone: (recurrenceRow.timezone as string | null) ?? undefined,
         },
-        exceptions: ((recurrenceRow.exceptions as Record<string, unknown>[]) ?? []).map((e) => ({
-          occurrenceKey: e.occurrence_key as string,
-          reason: (e.reason as string | null) ?? undefined,
-        })),
-        overrides: ((recurrenceRow.overrides as Record<string, unknown>[]) ?? []).map((o) => ({
-          occurrenceKey: o.occurrence_key as string,
-          patch: o.patch as ClassSchedulePatchVM,
-        })),
+        exceptions: ((recurrenceRow.exceptions as Record<string, unknown>[]) ?? []).map(
+          (e) => ({
+            occurrenceKey: e.occurrence_key as string,
+            reason: (e.reason as string | null) ?? undefined,
+          }),
+        ),
+        overrides: ((recurrenceRow.overrides as Record<string, unknown>[]) ?? []).map(
+          (o) => ({
+            occurrenceKey: o.occurrence_key as string,
+            patch: o.patch as ClassSchedulePatchVM,
+          }),
+        ),
       }
     : undefined;
 
@@ -1488,7 +1621,10 @@ function mapClassScheduleRow(row: Record<string, unknown>): ClassScheduleVM {
       sessionId: (row.source_session_id as string | null) ?? undefined,
     };
   } else if (sourceKind === 'availability_block') {
-    source = { kind: 'availability_block', ownerUserId: row.source_owner_user_id as string };
+    source = {
+      kind: 'availability_block',
+      ownerUserId: row.source_owner_user_id as string,
+    };
   } else {
     source = {
       kind: 'manual',
@@ -1508,7 +1644,7 @@ function mapClassScheduleRow(row: Record<string, unknown>): ClassScheduleVM {
     status: (p.status as ParticipationStatusVM | null) ?? undefined,
     displayName: (p.display_name as string | null) ?? undefined,
     avatarUrl: (p.avatar_url as string | null) ?? undefined,
-    themeKey: (p.theme_key as string | null) ?? undefined,
+    themeKey: (p.theme_key as ThemeKey | null) ?? undefined,
   }));
 
   return {
@@ -1522,7 +1658,7 @@ function mapClassScheduleRow(row: Record<string, unknown>): ClassScheduleVM {
     timezone: (row.timezone as string | null) ?? undefined,
     status: row.status as EventStatusVM,
     visibility: row.visibility as ClassScheduleVisibilityVM,
-    themeKey: (row.theme_key as string | null) ?? undefined,
+    themeKey: (row.theme_key as ThemeKey | null) ?? undefined,
     participants,
     source,
     recurrence,

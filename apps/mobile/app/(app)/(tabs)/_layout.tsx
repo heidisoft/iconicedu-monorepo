@@ -18,10 +18,10 @@ const SIDE_RAIL_WIDTH = 72;
 
 // Visible tabs in the order they appear in both the bottom bar and side rail.
 const VISIBLE_TABS = [
-  { name: 'index',    title: 'Home',     Icon: Home },
+  { name: 'index', title: 'Home', Icon: Home },
   { name: 'messages', title: 'Messages', Icon: MessageCircle },
-  { name: 'inbox',    title: 'Inbox',    Icon: Bell },
-  { name: 'account',  title: 'Account',  Icon: User },
+  { name: 'inbox', title: 'Inbox', Icon: Bell },
+  { name: 'account', title: 'Account', Icon: User },
 ] as const;
 
 type SideRailProps = {
@@ -51,7 +51,7 @@ function SideRail({ state, navigation }: SideRailProps) {
       }}
     >
       {VISIBLE_TABS.map(({ name, title, Icon }) => {
-        const routeIndex = state.routes.findIndex(r => r.name === name);
+        const routeIndex = state.routes.findIndex((r) => r.name === name);
         if (routeIndex === -1) return null;
         const isFocused = state.index === routeIndex;
         const color = isFocused ? colors.tabActive : colors.tabInactive;
@@ -95,7 +95,6 @@ export default function TabsLayout() {
 
   return (
     <Tabs
-      sceneContainerStyle={isTablet ? { paddingLeft: SIDE_RAIL_WIDTH } : undefined}
       tabBar={isTablet ? (props) => <SideRail {...props} /> : undefined}
       screenOptions={{
         headerShown: false,
@@ -157,10 +156,7 @@ export default function TabsLayout() {
           tabBarIcon: ({ color }) => <User size={22} color={color} />,
         }}
       />
-      <Tabs.Screen
-        name="schedule"
-        options={{ href: null }}
-      />
+      <Tabs.Screen name="schedule" options={{ href: null }} />
     </Tabs>
   );
 }

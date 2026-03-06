@@ -1,10 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react';
-import { Suspense } from 'react';
 import '@iconicedu/ui-web/styles.css';
 import { ThemeProvider, Toaster } from '@iconicedu/ui-web';
 import { SpeedInsights } from '@vercel/speed-insights/next';
-
-import { PostHogAnalytics } from '@iconicedu/web/components/posthog-analytics';
 
 export const metadata = {
   title: 'ICONIC EDU',
@@ -27,9 +24,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           {children}
           <Toaster />
-          <Suspense fallback={null}>
-            <PostHogAnalytics />
-          </Suspense>
           <SpeedInsights />
         </ThemeProvider>
       </body>

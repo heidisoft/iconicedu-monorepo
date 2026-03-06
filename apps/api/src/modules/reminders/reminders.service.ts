@@ -3,7 +3,6 @@ import type { FeedScopeVM, ReminderJobRow } from '@iconicedu/shared-types';
 import { projectActivityEvents } from '@iconicedu/web/lib/activity-feed/projector/project-activity-events';
 import { randomUUID } from 'crypto';
 
-import { capturePostHogServerEvent } from '@iconicedu/api/lib/analytics/posthog-server';
 import {
   createSupabaseServiceClient,
   type SupabaseServiceClient,
@@ -45,137 +44,84 @@ export class RemindersService {
     const runId = randomUUID();
     const startedAt = Date.now();
 
-    await capturePostHogServerEvent({
-      distinctId: 'system:reminders',
-      event: 'reminders_dispatch_started',
-      properties: {
-        run_id: runId,
-        lease_owner: input.leaseOwner,
-        limit: input.limit ?? DEFAULT_JOB_LIMIT,
-        lease_seconds: input.leaseSeconds ?? DEFAULT_LEASE_SECONDS,
-      },
+    const claimResponse = await this.supabase.rpc('claim_due_reminder_jobs', {
+      p_limit: input.limit ?? DEFAULT_JOB_LIMIT,
+      p_lease_owner: input.leaseOwner,
+      p_lease_seconds: input.leaseSeconds ?? DEFAULT_LEASE_SECONDS,
     });
 
-    try {
-      const claimResponse = await this.supabase.rpc('claim_due_reminder_jobs', {
-        p_limit: input.limit ?? DEFAULT_JOB_LIMIT,
-        p_lease_owner: input.leaseOwner,
-        p_lease_seconds: input.leaseSeconds ?? DEFAULT_LEASE_SECONDS,
-      });
+    if (claimResponse.error) {
+      throw new Error(claimResponse.error.message);
+    }
 
-      if (claimResponse.error) {
-        throw new Error(claimResponse.error.message);
-      }
+    const claimed = (claimResponse.data ?? []) as ReminderJobRow[];
+    let succeeded = 0;
+    let failed = 0;
+    let deadLettered = 0;
 
-      const claimed = (claimResponse.data ?? []) as ReminderJobRow[];
-      let succeeded = 0;
-      let failed = 0;
-      let deadLettered = 0;
+    for (const job of claimed) {
+      try {
+        await this.processReminderJob(job);
+        succeeded += 1;
+      } catch (error) {
+        const now = new Date();
+        const nextAttemptAt = new Date(
+          now.getTime() + this.resolveRetryDelayMs(job.attempt_count + 1),
+        ).toISOString();
+        const retryable =
+          this.isRetryableError(error) && job.attempt_count + 1 < job.max_attempts;
+        const nextStatus = retryable ? 'failed' : 'dead_letter';
+        const message = error instanceof Error ? error.message : String(error);
 
-      for (const job of claimed) {
-        try {
-          await this.processReminderJob(job);
-          succeeded += 1;
-        } catch (error) {
-          const now = new Date();
-          const nextAttemptAt = new Date(
-            now.getTime() + this.resolveRetryDelayMs(job.attempt_count + 1),
-          ).toISOString();
-          const retryable =
-            this.isRetryableError(error) && job.attempt_count + 1 < job.max_attempts;
-          const nextStatus = retryable ? 'failed' : 'dead_letter';
-          const message = error instanceof Error ? error.message : String(error);
+        const response = await this.supabase
+          .from('reminder_jobs')
+          .update({
+            status: nextStatus,
+            attempt_count: job.attempt_count + 1,
+            next_attempt_at: retryable ? nextAttemptAt : null,
+            last_error: message,
+            lease_owner: null,
+            lease_until: null,
+            updated_at: now.toISOString(),
+          })
+          .eq('id', job.id)
+          .eq('org_id', job.org_id);
 
-          const response = await this.supabase
-            .from('reminder_jobs')
-            .update({
-              status: nextStatus,
-              attempt_count: job.attempt_count + 1,
-              next_attempt_at: retryable ? nextAttemptAt : null,
-              last_error: message,
-              lease_owner: null,
-              lease_until: null,
-              updated_at: now.toISOString(),
-            })
-            .eq('id', job.id)
-            .eq('org_id', job.org_id);
+        if (response.error) {
+          throw new Error(response.error.message);
+        }
 
-          if (response.error) {
-            throw new Error(response.error.message);
-          }
+        await this.logDispatch({
+          supabase: this.supabase,
+          orgId: job.org_id,
+          jobId: job.id,
+          result: retryable ? 'retryable_failure' : 'fatal_failure',
+          details: {
+            error_class: error instanceof Error ? error.name : 'Error',
+            error: message,
+            attempt_count: job.attempt_count + 1,
+            next_status: nextStatus,
+          },
+        });
 
-          await this.logDispatch({
-            supabase: this.supabase,
-            orgId: job.org_id,
-            jobId: job.id,
-            result: retryable ? 'retryable_failure' : 'fatal_failure',
-            details: {
-              error_class: error instanceof Error ? error.name : 'Error',
-              error: message,
-              attempt_count: job.attempt_count + 1,
-              next_status: nextStatus,
-            },
-          });
-
-          await capturePostHogServerEvent({
-            distinctId: 'system:reminders',
-            event: 'reminder_job_failed',
-            properties: {
-              run_id: runId,
-              job_type: job.job_type,
-              attempt_count: job.attempt_count + 1,
-              error_class: error instanceof Error ? error.name : 'Error',
-              next_status: nextStatus,
-            },
-          });
-
-          failed += 1;
-          if (!retryable) {
-            deadLettered += 1;
-          }
+        failed += 1;
+        if (!retryable) {
+          deadLettered += 1;
         }
       }
-
-      const durationMs = Date.now() - startedAt;
-      await capturePostHogServerEvent({
-        distinctId: 'system:reminders',
-        event: 'reminders_dispatch_completed',
-        properties: {
-          run_id: runId,
-          lease_owner: input.leaseOwner,
-          claimed: claimed.length,
-          succeeded,
-          failed,
-          dead_lettered: deadLettered,
-          skipped: 0,
-          duration_ms: durationMs,
-        },
-      });
-
-      return {
-        runId,
-        claimed: claimed.length,
-        succeeded,
-        failed,
-        skipped: 0,
-        deadLettered,
-        durationMs,
-      };
-    } catch (error) {
-      const durationMs = Date.now() - startedAt;
-      await capturePostHogServerEvent({
-        distinctId: 'system:reminders',
-        event: 'reminders_dispatch_failed',
-        properties: {
-          run_id: runId,
-          lease_owner: input.leaseOwner,
-          duration_ms: durationMs,
-          error_class: error instanceof Error ? error.name : 'Error',
-          error_message: error instanceof Error ? error.message : String(error),
-        },
-      });
-      throw error;
     }
+
+    const durationMs = Date.now() - startedAt;
+
+    return {
+      runId,
+      claimed: claimed.length,
+      succeeded,
+      failed,
+      skipped: 0,
+      deadLettered,
+      durationMs,
+    };
   }
 
   private buildReminderText(payload: ReminderJobPayload) {
@@ -512,15 +458,6 @@ export class RemindersService {
       details: {
         event_type: eventType,
         payload_table: payloadTable,
-      },
-    });
-
-    await capturePostHogServerEvent({
-      distinctId: 'system:reminders',
-      event: 'reminder_job_processed',
-      properties: {
-        job_type: job.job_type,
-        attempt_count: job.attempt_count,
       },
     });
   }

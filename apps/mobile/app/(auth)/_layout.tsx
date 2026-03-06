@@ -14,7 +14,7 @@ export default function AuthLayout() {
     // segments: ['(auth)', 'login'] | ['(auth)', 'otp'] | ['(auth)', 'profile-setup']
     // profile-setup is valid for logged-in users with incomplete onboarding.
     // login and otp should redirect to the app if the user already has a session.
-    const screen = segments[1];
+    const screen = (segments as string[])[1];
     if (screen !== 'profile-setup') {
       router.replace('/(app)/(tabs)');
     }
