@@ -8,9 +8,24 @@ if (config && typeof window !== 'undefined') {
   posthog.init(config.apiKey, {
     api_host: config.apiHost,
     defaults: config.defaults,
+    // Person profiles for pre-auth and post-auth funnel tracking
+    person_profiles: 'always',
+    // Autocapture: clicks, inputs, form submits, rage clicks, dead clicks
     autocapture: true,
+    // Pageview handled manually in PostHogAnalytics (SPA-safe deduplication)
     capture_pageview: false,
     capture_pageleave: true,
+    // Native exception capture → $exception events (PostHog Errors dashboard)
+    capture_exceptions: true,
+    // Native web vitals → $web_vitals events (PostHog Performance dashboard)
+    capture_performance: true,
     persistence: 'localStorage+cookie',
+    // Record console logs alongside session replays for easier debugging
+    enable_recording_console_log: true,
+    session_recording: {
+      // Mask passwords; leave other inputs visible for support/debugging
+      maskAllInputs: false,
+      maskInputOptions: { password: true },
+    },
   });
 }

@@ -1,25 +1,29 @@
-# Reminders Cron Ops (Supabase Edge Function)
+# Reminders Cron Ops (Supabase Edge Function -> API)
 
 This sets up a Supabase scheduled Edge Function that calls:
 
-- `POST /api/internal/reminders/dispatch`
+- `POST /internal/reminders/dispatch` on the API service (Railway).
 
-The app endpoint performs lease-based due-job claiming and dispatching.
+The API endpoint performs lease-based due-job claiming and dispatching.
 
-## 1. Required app env (web)
+## 1. Required API env (`apps/api`)
 
-In your web deployment, set:
+In your API deployment, set:
 
-- `INTERNAL_REMINDERS_TOKEN=<long-random-secret>`
+- `INTERNAL_REMINDERS_TOKEN_API=<long-random-secret>`
+- `SUPABASE_URL=<https://<project-ref>.supabase.co>`
+- `SUPABASE_SERVICE_ROLE_KEY=<service-role-key>`
+- `POSTHOG_API_KEY=<optional-posthog-key>`
+- `POSTHOG_HOST=https://us.i.posthog.com`
 
-This must match the secret configured in Supabase function env below.
+`INTERNAL_REMINDERS_TOKEN_API` must match the secret configured in Supabase function env below.
 
 ## 2. Required function env (Supabase)
 
 Set these Supabase secrets for the `reminders-dispatch` function:
 
-- `REMINDERS_DISPATCH_URL=https://<your-web-domain>/api/internal/reminders/dispatch`
-- `INTERNAL_REMINDERS_TOKEN=<same-value-as-web>`
+- `REMINDERS_DISPATCH_URL=https://<your-railway-api-domain>/internal/reminders/dispatch`
+- `INTERNAL_REMINDERS_TOKEN=<same-value-as-INTERNAL_REMINDERS_TOKEN_API>`
 
 Optional:
 
@@ -35,6 +39,14 @@ supabase functions deploy reminders-dispatch
 
 If you deploy to a linked remote project, ensure `supabase link --project-ref <ref>` is already done.
 
+## API service health checks (Railway)
+
+`apps/api/railway.toml` configures Railway deployment health checks to hit:
+
+- `GET /healthz`
+
+Ensure your Railway service uses `apps/api` as the service root so this config is applied.
+
 ## 4. Configure schedule (every minute)
 
 In Supabase Dashboard:
@@ -48,7 +60,7 @@ In Supabase Dashboard:
 ## 5. Validate
 
 1. Invoke function manually once from dashboard.
-2. Verify web logs show requests to `/api/internal/reminders/dispatch`.
+2. Verify API logs show requests to `/internal/reminders/dispatch`.
 3. Verify response payload has counters like `claimed/succeeded/failed`.
 4. Verify DB updates:
    - `reminder_jobs.status` transitions
@@ -61,3 +73,8 @@ In Supabase Dashboard:
 - Keep `limit` conservative (`100` to start).
 - Use alerting if no successful invocation > 5 minutes.
 - Because jobs are lease-claimed and idempotent, overlapping ticks are safe.
+
+## 7. Transitional fallback
+
+The existing web endpoint (`/api/internal/reminders/dispatch`) can remain temporarily during rollout.
+If needed, point `REMINDERS_DISPATCH_URL` back to web while investigating API issues.

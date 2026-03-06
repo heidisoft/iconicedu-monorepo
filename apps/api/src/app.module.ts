@@ -5,6 +5,7 @@ import { AuthModule } from '@iconicedu/api/modules/auth/auth.module';
 import { UsersModule } from '@iconicedu/api/modules/users/users.module';
 import { ChannelsModule } from '@iconicedu/api/modules/channels/channels.module';
 import { ClassesModule } from '@iconicedu/api/modules/classes/classes.module';
+import { RemindersModule } from '@iconicedu/api/modules/reminders/reminders.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { ClassesModule } from '@iconicedu/api/modules/classes/classes.module';
     UsersModule,
     ChannelsModule,
     ClassesModule,
+    RemindersModule,
   ],
 })
 export class AppModule {}

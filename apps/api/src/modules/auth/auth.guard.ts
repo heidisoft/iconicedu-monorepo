@@ -5,6 +5,17 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { AuthService } from '@iconicedu/api/modules/auth/auth.service';
+import type { JwtPayload } from 'jsonwebtoken';
+
+type SupabaseJwtPayload = JwtPayload & {
+  user_metadata?: {
+    app_role?: string;
+  };
+};
+
+function isJwtPayload(value: string | JwtPayload | null): value is SupabaseJwtPayload {
+  return Boolean(value) && typeof value === 'object';
+}
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -18,7 +29,7 @@ export class AuthGuard implements CanActivate {
     }
     const token = authHeader.slice('Bearer '.length);
     const decoded = this.authService.decodeToken(token);
-    if (!decoded) {
+    if (!isJwtPayload(decoded) || typeof decoded.sub !== 'string') {
       throw new UnauthorizedException('Invalid token');
     }
 
