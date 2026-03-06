@@ -26,3 +26,4 @@ supabase/.temp
 playwright-report
 test-results
 apps/web/playwright/.auth
+local.properties

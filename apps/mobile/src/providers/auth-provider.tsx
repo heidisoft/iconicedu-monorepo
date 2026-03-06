@@ -10,6 +10,8 @@ import { type Session, type User } from '@supabase/supabase-js';
 import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '@/lib/supabase/client';
 import { activateAccount } from '@/lib/api/queries';
+import { useAnalytics } from '@/providers/analytics-provider';
+import { AnalyticsEvent } from '@iconicedu/utils';
 
 // Explicit path is required — bare `iconicedu://` does not match Supabase's `iconicedu://**` glob.
 // Ensure `iconicedu://auth-callback` (or `iconicedu://**`) is in
@@ -55,10 +57,14 @@ async function checkOrgAssignment(userId: string): Promise<string | null> {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const analytics = useAnalytics();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s);
+      if (s?.user) {
+        analytics.identify(s.user.id, { email: s.user.email });
+      }
       setLoading(false);
     });
 
@@ -66,10 +72,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
+      if (s?.user) {
+        analytics.identify(s.user.id, { email: s.user.email });
+      } else {
+        analytics.reset();
+      }
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [analytics]);
 
   /** Send a sign-in OTP. Only works for accounts that already exist. */
   const signInWithOtp = useCallback(async (email: string) => {
@@ -86,7 +97,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         error.status === 422 ||
         error.status === 400
       ) {
-        return { error: 'No account found with this email address. Visit www.iconicedu.lk to sign up before logging in to the app.' };
+        return {
+          error:
+            'No account found with this email address. Visit www.iconicedu.lk to sign up before logging in to the app.',
+        };
       }
       return { error: error.message };
     }
@@ -142,7 +156,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error: error?.message ?? 'Could not start Google sign-in.' };
     }
 
-    const browserResult = await WebBrowser.openAuthSessionAsync(data.url, GOOGLE_REDIRECT_URI);
+    const browserResult = await WebBrowser.openAuthSessionAsync(
+      data.url,
+      GOOGLE_REDIRECT_URI,
+    );
 
     if (browserResult.type !== 'success') {
       return { error: null };
@@ -150,7 +167,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Implicit flow: tokens arrive in the URL hash fragment
     const url = browserResult.url;
-    const fragment = url.includes('#') ? url.split('#')[1] : url.split('?')[1] ?? '';
+    const fragment = url.includes('#') ? url.split('#')[1] : (url.split('?')[1] ?? '');
     const params = new URLSearchParams(fragment);
     const accessToken = params.get('access_token');
     const refreshToken = params.get('refresh_token');
@@ -166,7 +183,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (sessionError) return { error: sessionError.message };
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (user) {
       const orgError = await checkOrgAssignment(user.id);
       if (orgError) return { error: orgError };
@@ -179,8 +198,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
+    analytics.capture(AnalyticsEvent.SIGNED_OUT);
+    analytics.reset();
     await supabase.auth.signOut();
-  }, []);
+  }, [analytics]);
 
   const value = useMemo<AuthState>(
     () => ({

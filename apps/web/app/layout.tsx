@@ -1,7 +1,9 @@
 import type { CSSProperties, ReactNode } from 'react';
+import { Suspense } from 'react';
 import '@iconicedu/ui-web/styles.css';
 import { ThemeProvider, Toaster } from '@iconicedu/ui-web';
 import { SpeedInsights } from '@vercel/speed-insights/next';
+import { PostHogPageView } from '@iconicedu/web/components/analytics-provider';
 
 export const metadata = {
   title: 'ICONIC EDU',
@@ -22,6 +24,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     >
       <body className="bg-background text-foreground">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <Suspense fallback={null}>
+            <PostHogPageView />
+          </Suspense>
           {children}
           <Toaster />
           <SpeedInsights />

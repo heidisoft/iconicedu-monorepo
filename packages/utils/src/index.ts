@@ -1,3 +1,19 @@
+export {
+  type AnalyticsClient,
+  type AnalyticsEventName,
+  type UserTraits,
+  type ScreenViewedProps,
+  type ButtonClickedProps,
+  type FormEventProps,
+  type SearchProps,
+  type MessageEventProps,
+  type ErrorEventProps,
+  type FunnelProps,
+  type NotificationEventProps,
+  AnalyticsEvent,
+  createNoopAnalytics,
+} from './analytics';
+
 export const formatDateTime = (iso: string) =>
   new Intl.DateTimeFormat('en-US', {
     dateStyle: 'medium',

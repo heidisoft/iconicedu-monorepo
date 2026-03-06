@@ -15,6 +15,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/providers/auth-provider';
 import { useTheme } from '@/providers/theme-provider';
+import { useAnalytics } from '@/providers/analytics-provider';
+import { AnalyticsEvent } from '@iconicedu/utils';
 import type { AppColors } from '@/lib/theme';
 import {
   fetchOnboardingStatus,
@@ -32,101 +34,108 @@ import {
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
 const TIMEZONES: Array<{ id: string; label: string }> = [
-  { id: 'Pacific/Auckland',    label: 'New Zealand (Auckland)' },
-  { id: 'Australia/Sydney',    label: 'Australia (Sydney)' },
+  { id: 'Pacific/Auckland', label: 'New Zealand (Auckland)' },
+  { id: 'Australia/Sydney', label: 'Australia (Sydney)' },
   { id: 'Australia/Melbourne', label: 'Australia (Melbourne)' },
-  { id: 'Australia/Perth',     label: 'Australia (Perth)' },
-  { id: 'Asia/Tokyo',          label: 'Japan (Tokyo)' },
-  { id: 'Asia/Singapore',      label: 'Singapore' },
-  { id: 'Asia/Colombo',        label: 'Sri Lanka (Colombo)' },
-  { id: 'Asia/Kolkata',        label: 'India (Kolkata)' },
-  { id: 'Asia/Dhaka',          label: 'Bangladesh (Dhaka)' },
-  { id: 'Asia/Karachi',        label: 'Pakistan (Karachi)' },
-  { id: 'Asia/Dubai',          label: 'UAE (Dubai)' },
-  { id: 'Asia/Riyadh',         label: 'Saudi Arabia (Riyadh)' },
-  { id: 'Europe/Istanbul',     label: 'Turkey (Istanbul)' },
-  { id: 'Europe/Moscow',       label: 'Russia (Moscow)' },
-  { id: 'Africa/Nairobi',      label: 'Kenya (Nairobi)' },
-  { id: 'Africa/Lagos',        label: 'Nigeria (Lagos)' },
-  { id: 'Europe/Paris',        label: 'France / Central Europe' },
-  { id: 'Europe/London',       label: 'UK (London)' },
-  { id: 'America/Sao_Paulo',   label: 'Brazil (São Paulo)' },
-  { id: 'America/New_York',    label: 'US Eastern (New York)' },
-  { id: 'America/Chicago',     label: 'US Central (Chicago)' },
-  { id: 'America/Denver',      label: 'US Mountain (Denver)' },
+  { id: 'Australia/Perth', label: 'Australia (Perth)' },
+  { id: 'Asia/Tokyo', label: 'Japan (Tokyo)' },
+  { id: 'Asia/Singapore', label: 'Singapore' },
+  { id: 'Asia/Colombo', label: 'Sri Lanka (Colombo)' },
+  { id: 'Asia/Kolkata', label: 'India (Kolkata)' },
+  { id: 'Asia/Dhaka', label: 'Bangladesh (Dhaka)' },
+  { id: 'Asia/Karachi', label: 'Pakistan (Karachi)' },
+  { id: 'Asia/Dubai', label: 'UAE (Dubai)' },
+  { id: 'Asia/Riyadh', label: 'Saudi Arabia (Riyadh)' },
+  { id: 'Europe/Istanbul', label: 'Turkey (Istanbul)' },
+  { id: 'Europe/Moscow', label: 'Russia (Moscow)' },
+  { id: 'Africa/Nairobi', label: 'Kenya (Nairobi)' },
+  { id: 'Africa/Lagos', label: 'Nigeria (Lagos)' },
+  { id: 'Europe/Paris', label: 'France / Central Europe' },
+  { id: 'Europe/London', label: 'UK (London)' },
+  { id: 'America/Sao_Paulo', label: 'Brazil (São Paulo)' },
+  { id: 'America/New_York', label: 'US Eastern (New York)' },
+  { id: 'America/Chicago', label: 'US Central (Chicago)' },
+  { id: 'America/Denver', label: 'US Mountain (Denver)' },
   { id: 'America/Los_Angeles', label: 'US Pacific (Los Angeles)' },
-  { id: 'America/Toronto',     label: 'Canada (Toronto)' },
-  { id: 'America/Vancouver',   label: 'Canada (Vancouver)' },
+  { id: 'America/Toronto', label: 'Canada (Toronto)' },
+  { id: 'America/Vancouver', label: 'Canada (Vancouver)' },
 ];
 
 const COUNTRIES: Array<{ code: string; label: string; flag: string }> = [
-  { code: 'LK', label: 'Sri Lanka',      flag: '🇱🇰' },
-  { code: 'IN', label: 'India',          flag: '🇮🇳' },
-  { code: 'AU', label: 'Australia',      flag: '🇦🇺' },
+  { code: 'LK', label: 'Sri Lanka', flag: '🇱🇰' },
+  { code: 'IN', label: 'India', flag: '🇮🇳' },
+  { code: 'AU', label: 'Australia', flag: '🇦🇺' },
   { code: 'GB', label: 'United Kingdom', flag: '🇬🇧' },
-  { code: 'US', label: 'United States',  flag: '🇺🇸' },
-  { code: 'CA', label: 'Canada',         flag: '🇨🇦' },
-  { code: 'NZ', label: 'New Zealand',    flag: '🇳🇿' },
-  { code: 'SG', label: 'Singapore',      flag: '🇸🇬' },
-  { code: 'AE', label: 'UAE',            flag: '🇦🇪' },
-  { code: 'SA', label: 'Saudi Arabia',   flag: '🇸🇦' },
-  { code: 'PK', label: 'Pakistan',       flag: '🇵🇰' },
-  { code: 'BD', label: 'Bangladesh',     flag: '🇧🇩' },
-  { code: 'MY', label: 'Malaysia',       flag: '🇲🇾' },
-  { code: 'KE', label: 'Kenya',          flag: '🇰🇪' },
-  { code: 'NG', label: 'Nigeria',        flag: '🇳🇬' },
-  { code: 'ZA', label: 'South Africa',   flag: '🇿🇦' },
-  { code: 'FR', label: 'France',         flag: '🇫🇷' },
-  { code: 'DE', label: 'Germany',        flag: '🇩🇪' },
-  { code: 'TR', label: 'Turkey',         flag: '🇹🇷' },
-  { code: 'BR', label: 'Brazil',         flag: '🇧🇷' },
-  { code: 'JP', label: 'Japan',          flag: '🇯🇵' },
-  { code: 'CN', label: 'China',          flag: '🇨🇳' },
-  { code: 'PH', label: 'Philippines',    flag: '🇵🇭' },
-  { code: 'OM', label: 'Oman',           flag: '🇴🇲' },
-  { code: 'QA', label: 'Qatar',          flag: '🇶🇦' },
+  { code: 'US', label: 'United States', flag: '🇺🇸' },
+  { code: 'CA', label: 'Canada', flag: '🇨🇦' },
+  { code: 'NZ', label: 'New Zealand', flag: '🇳🇿' },
+  { code: 'SG', label: 'Singapore', flag: '🇸🇬' },
+  { code: 'AE', label: 'UAE', flag: '🇦🇪' },
+  { code: 'SA', label: 'Saudi Arabia', flag: '🇸🇦' },
+  { code: 'PK', label: 'Pakistan', flag: '🇵🇰' },
+  { code: 'BD', label: 'Bangladesh', flag: '🇧🇩' },
+  { code: 'MY', label: 'Malaysia', flag: '🇲🇾' },
+  { code: 'KE', label: 'Kenya', flag: '🇰🇪' },
+  { code: 'NG', label: 'Nigeria', flag: '🇳🇬' },
+  { code: 'ZA', label: 'South Africa', flag: '🇿🇦' },
+  { code: 'FR', label: 'France', flag: '🇫🇷' },
+  { code: 'DE', label: 'Germany', flag: '🇩🇪' },
+  { code: 'TR', label: 'Turkey', flag: '🇹🇷' },
+  { code: 'BR', label: 'Brazil', flag: '🇧🇷' },
+  { code: 'JP', label: 'Japan', flag: '🇯🇵' },
+  { code: 'CN', label: 'China', flag: '🇨🇳' },
+  { code: 'PH', label: 'Philippines', flag: '🇵🇭' },
+  { code: 'OM', label: 'Oman', flag: '🇴🇲' },
+  { code: 'QA', label: 'Qatar', flag: '🇶🇦' },
 ];
 
 const GRADE_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: 'pre_k',         label: 'Pre-K' },
-  { value: 'kindergarten',  label: 'Kindergarten' },
-  { value: 'grade_1',       label: 'Grade 1' },
-  { value: 'grade_2',       label: 'Grade 2' },
-  { value: 'grade_3',       label: 'Grade 3' },
-  { value: 'grade_4',       label: 'Grade 4' },
-  { value: 'grade_5',       label: 'Grade 5' },
-  { value: 'grade_6',       label: 'Grade 6' },
-  { value: 'grade_7',       label: 'Grade 7' },
-  { value: 'grade_8',       label: 'Grade 8' },
-  { value: 'grade_9',       label: 'Grade 9' },
-  { value: 'grade_10',      label: 'Grade 10 (O/L Prep)' },
-  { value: 'grade_11',      label: 'Grade 11 (O/L Exam)' },
-  { value: 'grade_12',      label: 'Grade 12 (A/L Year 1)' },
-  { value: 'grade_13',      label: 'Grade 13 (A/L Year 2)' },
+  { value: 'pre_k', label: 'Pre-K' },
+  { value: 'kindergarten', label: 'Kindergarten' },
+  { value: 'grade_1', label: 'Grade 1' },
+  { value: 'grade_2', label: 'Grade 2' },
+  { value: 'grade_3', label: 'Grade 3' },
+  { value: 'grade_4', label: 'Grade 4' },
+  { value: 'grade_5', label: 'Grade 5' },
+  { value: 'grade_6', label: 'Grade 6' },
+  { value: 'grade_7', label: 'Grade 7' },
+  { value: 'grade_8', label: 'Grade 8' },
+  { value: 'grade_9', label: 'Grade 9' },
+  { value: 'grade_10', label: 'Grade 10 (O/L Prep)' },
+  { value: 'grade_11', label: 'Grade 11 (O/L Exam)' },
+  { value: 'grade_12', label: 'Grade 12 (A/L Year 1)' },
+  { value: 'grade_13', label: 'Grade 13 (A/L Year 2)' },
   { value: 'undergraduate', label: 'Undergraduate' },
-  { value: 'graduate',      label: 'Graduate' },
+  { value: 'graduate', label: 'Graduate' },
 ];
 
 const EDUCATOR_SUBJECTS = [
-  'Mathematics', 'Science', 'English Language Arts', 'Social Studies',
-  'STEM & Coding', 'Creative Arts', 'Music & Performance',
-  'Mindfulness & SEL', 'Language Studies', 'Career Readiness',
+  'Mathematics',
+  'Science',
+  'English Language Arts',
+  'Social Studies',
+  'STEM & Coding',
+  'Creative Arts',
+  'Music & Performance',
+  'Mindfulness & SEL',
+  'Language Studies',
+  'Career Readiness',
 ];
 
 const CLASS_TYPES = [
-  { id: 'online',     label: 'Online' },
-  { id: 'in_person',  label: 'In-Person' },
-  { id: 'hybrid',     label: 'Hybrid' },
+  { id: 'online', label: 'Online' },
+  { id: 'in_person', label: 'In-Person' },
+  { id: 'hybrid', label: 'Hybrid' },
 ];
 
 const DAYS_OF_WEEK = [
-  { id: 'monday',    short: 'Mon' },
-  { id: 'tuesday',   short: 'Tue' },
+  { id: 'monday', short: 'Mon' },
+  { id: 'tuesday', short: 'Tue' },
   { id: 'wednesday', short: 'Wed' },
-  { id: 'thursday',  short: 'Thu' },
-  { id: 'friday',    short: 'Fri' },
-  { id: 'saturday',  short: 'Sat' },
-  { id: 'sunday',    short: 'Sun' },
+  { id: 'thursday', short: 'Thu' },
+  { id: 'friday', short: 'Fri' },
+  { id: 'saturday', short: 'Sat' },
+  { id: 'sunday', short: 'Sun' },
 ];
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -143,7 +152,10 @@ type WizardStepId =
   | 'educator-profile'
   | 'educator-availability';
 
-function buildSteps(profileKind: string | null, primaryRole: string | null): WizardStepId[] {
+function buildSteps(
+  profileKind: string | null,
+  primaryRole: string | null,
+): WizardStepId[] {
   const steps: WizardStepId[] = ['name', 'phone', 'timezone', 'location'];
   const kind = profileKind ?? primaryRole;
   if (kind === 'child') steps.push('student-profile');
@@ -155,7 +167,10 @@ function buildSteps(profileKind: string | null, primaryRole: string | null): Wiz
   return steps;
 }
 
-const STEP_META: Record<WizardStepId, { title: string; subtitle: string; emoji: string }> = {
+const STEP_META: Record<
+  WizardStepId,
+  { title: string; subtitle: string; emoji: string }
+> = {
   name: {
     emoji: '👤',
     title: 'Your name',
@@ -164,7 +179,8 @@ const STEP_META: Record<WizardStepId, { title: string; subtitle: string; emoji: 
   phone: {
     emoji: '📱',
     title: 'Your phone number',
-    subtitle: 'For important updates and reminders. Include your country code (e.g. +94, +44, +1).',
+    subtitle:
+      'For important updates and reminders. Include your country code (e.g. +94, +44, +1).',
   },
   timezone: {
     emoji: '🌍',
@@ -174,7 +190,8 @@ const STEP_META: Record<WizardStepId, { title: string; subtitle: string; emoji: 
   location: {
     emoji: '📍',
     title: 'Your location',
-    subtitle: 'Used to personalise your experience and show relevant grade and curriculum options.',
+    subtitle:
+      'Used to personalise your experience and show relevant grade and curriculum options.',
   },
   'student-profile': {
     emoji: '🎓',
@@ -189,7 +206,7 @@ const STEP_META: Record<WizardStepId, { title: string; subtitle: string; emoji: 
   'educator-availability': {
     emoji: '🗓️',
     title: 'Your availability',
-    subtitle: 'Let students know when you\'re available and how you like to teach.',
+    subtitle: "Let students know when you're available and how you like to teach.",
   },
 };
 
@@ -199,115 +216,196 @@ function makeStyles(C: AppColors) {
   return {
     placeholderColor: C.textFaint,
     ...StyleSheet.create({
-      safe:   { flex: 1, backgroundColor: C.pageBg },
-      center: { flex: 1, alignItems: 'center' as const, justifyContent: 'center' as const },
+      safe: { flex: 1, backgroundColor: C.pageBg },
+      center: {
+        flex: 1,
+        alignItems: 'center' as const,
+        justifyContent: 'center' as const,
+      },
 
       header: {
-        paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4,
-        flexDirection: 'row' as const, alignItems: 'center' as const, gap: 10,
+        paddingHorizontal: 20,
+        paddingTop: 8,
+        paddingBottom: 4,
+        flexDirection: 'row' as const,
+        alignItems: 'center' as const,
+        gap: 10,
       },
       backBtn: {
-        width: 40, height: 40, alignItems: 'center' as const,
-        justifyContent: 'center' as const, borderRadius: 20, backgroundColor: C.inputBg,
+        width: 40,
+        height: 40,
+        alignItems: 'center' as const,
+        justifyContent: 'center' as const,
+        borderRadius: 20,
+        backgroundColor: C.inputBg,
       },
       backArrow: { fontSize: 20, color: C.teal },
       stepLabel: { fontSize: 13, color: C.textFaint, fontWeight: '500' as const },
 
       progressTrack: {
-        height: 4, borderRadius: 2, backgroundColor: C.border,
-        marginHorizontal: 20, marginBottom: 8, overflow: 'hidden' as const,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: C.border,
+        marginHorizontal: 20,
+        marginBottom: 8,
+        overflow: 'hidden' as const,
       },
       progressFill: { height: 4, borderRadius: 2, backgroundColor: C.teal },
 
       scrollContent: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 40 },
 
       badge: {
-        alignSelf: 'center' as const, width: 68, height: 68, borderRadius: 34,
-        backgroundColor: C.teal + '18', alignItems: 'center' as const,
-        justifyContent: 'center' as const, marginBottom: 20,
+        alignSelf: 'center' as const,
+        width: 68,
+        height: 68,
+        borderRadius: 34,
+        backgroundColor: C.teal + '18',
+        alignItems: 'center' as const,
+        justifyContent: 'center' as const,
+        marginBottom: 20,
       },
       badgeEmoji: { fontSize: 30 },
       heading: {
-        fontSize: 24, fontWeight: '700' as const, color: C.text,
-        textAlign: 'center' as const, marginBottom: 6,
+        fontSize: 24,
+        fontWeight: '700' as const,
+        color: C.text,
+        textAlign: 'center' as const,
+        marginBottom: 6,
       },
       sub: {
-        fontSize: 14, color: C.textMuted, textAlign: 'center' as const,
-        marginBottom: 28, lineHeight: 20,
+        fontSize: 14,
+        color: C.textMuted,
+        textAlign: 'center' as const,
+        marginBottom: 28,
+        lineHeight: 20,
       },
 
       label: {
-        fontSize: 12, fontWeight: '600' as const, color: C.textMuted,
-        letterSpacing: 0.5, marginBottom: 6, textTransform: 'uppercase' as const,
+        fontSize: 12,
+        fontWeight: '600' as const,
+        color: C.textMuted,
+        letterSpacing: 0.5,
+        marginBottom: 6,
+        textTransform: 'uppercase' as const,
       },
-      labelOptional: { fontWeight: '400' as const, textTransform: 'none' as const, fontSize: 11 },
+      labelOptional: {
+        fontWeight: '400' as const,
+        textTransform: 'none' as const,
+        fontSize: 11,
+      },
 
       inputWrap: {
-        flexDirection: 'row' as const, alignItems: 'center' as const,
-        backgroundColor: C.inputBg, borderRadius: 14,
-        borderWidth: 1, borderColor: C.border,
-        paddingHorizontal: 16, marginBottom: 16, minHeight: 52,
+        flexDirection: 'row' as const,
+        alignItems: 'center' as const,
+        backgroundColor: C.inputBg,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: C.border,
+        paddingHorizontal: 16,
+        marginBottom: 16,
+        minHeight: 52,
       },
       input: { flex: 1, fontSize: 16, color: C.text, paddingVertical: 14 },
-      inputHint: { fontSize: 12, color: C.textFaint, marginTop: -10, marginBottom: 16, marginLeft: 4 },
+      inputHint: {
+        fontSize: 12,
+        color: C.textFaint,
+        marginTop: -10,
+        marginBottom: 16,
+        marginLeft: 4,
+      },
 
       searchBox: {
-        flexDirection: 'row' as const, alignItems: 'center' as const,
-        backgroundColor: C.inputBg, borderRadius: 12,
-        borderWidth: 1, borderColor: C.border,
-        paddingHorizontal: 12, paddingVertical: 10, gap: 8, marginBottom: 12,
+        flexDirection: 'row' as const,
+        alignItems: 'center' as const,
+        backgroundColor: C.inputBg,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: C.border,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        gap: 8,
+        marginBottom: 12,
       },
       searchInput: { flex: 1, fontSize: 14, color: C.text },
 
       listItem: {
-        flexDirection: 'row' as const, alignItems: 'center' as const,
-        paddingHorizontal: 16, paddingVertical: 14,
-        borderRadius: 12, marginBottom: 6,
-        backgroundColor: C.inputBg, borderWidth: 1, borderColor: C.border,
+        flexDirection: 'row' as const,
+        alignItems: 'center' as const,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        borderRadius: 12,
+        marginBottom: 6,
+        backgroundColor: C.inputBg,
+        borderWidth: 1,
+        borderColor: C.border,
       },
-      listItemSelected:    { backgroundColor: C.tealBg, borderColor: C.teal },
-      listItemTxt:         { flex: 1, fontSize: 15, color: C.text },
+      listItemSelected: { backgroundColor: C.tealBg, borderColor: C.teal },
+      listItemTxt: { flex: 1, fontSize: 15, color: C.text },
       listItemSelectedTxt: { color: C.teal, fontWeight: '600' as const },
-      listCheck:           { fontSize: 15, color: C.teal },
-      listFlag:            { fontSize: 20, marginRight: 10 },
-      listChevron:         { fontSize: 18, color: C.textFaint },
+      listCheck: { fontSize: 15, color: C.teal },
+      listFlag: { fontSize: 20, marginRight: 10 },
+      listChevron: { fontSize: 18, color: C.textFaint },
 
-      tabRow:       { flexDirection: 'row' as const, gap: 8, marginBottom: 16 },
-      tabBtn:       {
-        flex: 1, paddingVertical: 10, alignItems: 'center' as const,
-        borderRadius: 12, backgroundColor: C.inputBg,
-        borderWidth: 1, borderColor: C.border,
+      tabRow: { flexDirection: 'row' as const, gap: 8, marginBottom: 16 },
+      tabBtn: {
+        flex: 1,
+        paddingVertical: 10,
+        alignItems: 'center' as const,
+        borderRadius: 12,
+        backgroundColor: C.inputBg,
+        borderWidth: 1,
+        borderColor: C.border,
       },
       tabBtnActive: { backgroundColor: C.tealBg, borderColor: C.teal },
-      tabTxt:       { fontSize: 14, fontWeight: '600' as const, color: C.textMuted },
+      tabTxt: { fontSize: 14, fontWeight: '600' as const, color: C.textMuted },
       tabTxtActive: { color: C.teal },
 
-      chipsRow: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, gap: 8, marginBottom: 16 },
+      chipsRow: {
+        flexDirection: 'row' as const,
+        flexWrap: 'wrap' as const,
+        gap: 8,
+        marginBottom: 16,
+      },
       chip: {
-        flexDirection: 'row' as const, alignItems: 'center' as const,
-        paddingHorizontal: 14, paddingVertical: 9,
-        borderRadius: 20, borderWidth: 1,
+        flexDirection: 'row' as const,
+        alignItems: 'center' as const,
+        paddingHorizontal: 14,
+        paddingVertical: 9,
+        borderRadius: 20,
+        borderWidth: 1,
       },
       chipTxt: { fontSize: 14, fontWeight: '500' as const },
 
       sectionLabel: {
-        fontSize: 13, fontWeight: '700' as const, color: C.text,
-        marginBottom: 10, marginTop: 4,
+        fontSize: 13,
+        fontWeight: '700' as const,
+        color: C.text,
+        marginBottom: 10,
+        marginTop: 4,
       },
       sectionHint: { fontSize: 12, color: C.textFaint, marginBottom: 12 },
 
       dayRow: {
-        flexDirection: 'row' as const, alignItems: 'center' as const,
-        paddingHorizontal: 14, paddingVertical: 12,
-        backgroundColor: C.inputBg, borderRadius: 12,
-        borderWidth: 1, borderColor: C.border, marginBottom: 8,
+        flexDirection: 'row' as const,
+        alignItems: 'center' as const,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        backgroundColor: C.inputBg,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: C.border,
+        marginBottom: 8,
         gap: 10,
       },
       dayRowActive: { backgroundColor: C.tealBg, borderColor: C.teal },
       dayToggle: {
-        width: 24, height: 24, borderRadius: 12,
-        borderWidth: 2, borderColor: C.border,
-        alignItems: 'center' as const, justifyContent: 'center' as const,
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        borderWidth: 2,
+        borderColor: C.border,
+        alignItems: 'center' as const,
+        justifyContent: 'center' as const,
       },
       dayToggleActive: { backgroundColor: C.teal, borderColor: C.teal },
       dayToggleTxt: { fontSize: 13, color: '#ffffff', fontWeight: '700' as const },
@@ -315,32 +413,55 @@ function makeStyles(C: AppColors) {
       dayLabelActive: { color: C.teal },
       timeRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 8 },
       timeInput: {
-        backgroundColor: C.pageBg, borderRadius: 8,
-        borderWidth: 1, borderColor: C.teal,
-        paddingHorizontal: 10, paddingVertical: 6,
-        fontSize: 13, color: C.text, width: 60, textAlign: 'center' as const,
+        backgroundColor: C.pageBg,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: C.teal,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        fontSize: 13,
+        color: C.text,
+        width: 60,
+        textAlign: 'center' as const,
       },
       timeSep: { fontSize: 13, color: C.textMuted },
 
       numberInputRow: {
-        flexDirection: 'row' as const, alignItems: 'center' as const,
-        backgroundColor: C.inputBg, borderRadius: 14,
-        borderWidth: 1, borderColor: C.border,
-        paddingHorizontal: 16, marginBottom: 8, minHeight: 52, gap: 10,
+        flexDirection: 'row' as const,
+        alignItems: 'center' as const,
+        backgroundColor: C.inputBg,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: C.border,
+        paddingHorizontal: 16,
+        marginBottom: 8,
+        minHeight: 52,
+        gap: 10,
       },
       numberInput: { flex: 1, fontSize: 16, color: C.text, paddingVertical: 14 },
       numberUnit: { fontSize: 14, color: C.textMuted },
 
-      errorTxt: { fontSize: 13, color: '#ef4444', textAlign: 'center' as const, marginBottom: 12 },
+      errorTxt: {
+        fontSize: 13,
+        color: '#ef4444',
+        textAlign: 'center' as const,
+        marginBottom: 12,
+      },
 
       footer: {
         paddingHorizontal: 20,
         paddingBottom: Platform.OS === 'ios' ? 32 : 20,
-        paddingTop: 12, gap: 8,
+        paddingTop: 12,
+        gap: 8,
       },
-      btn:     { backgroundColor: C.teal, borderRadius: 14, paddingVertical: 16, alignItems: 'center' as const },
-      btnDim:  { opacity: 0.4 },
-      btnTxt:  { color: C.tealFg, fontSize: 16, fontWeight: '700' as const },
+      btn: {
+        backgroundColor: C.teal,
+        borderRadius: 14,
+        paddingVertical: 16,
+        alignItems: 'center' as const,
+      },
+      btnDim: { opacity: 0.4 },
+      btnTxt: { color: C.tealFg, fontSize: 16, fontWeight: '700' as const },
       skipBtn: { alignItems: 'center' as const, paddingVertical: 6 },
       skipTxt: { fontSize: 14, color: C.textFaint },
     }),
@@ -351,45 +472,78 @@ type S = ReturnType<typeof makeStyles>;
 
 // ─── Step sub-components ───────────────────────────────────────────────────────
 
-function NameStep({ firstName, setFirstName, lastName, setLastName, s }: {
-  firstName: string; setFirstName: (v: string) => void;
-  lastName: string; setLastName: (v: string) => void;
-  s: S; colors: AppColors;
+function NameStep({
+  firstName,
+  setFirstName,
+  lastName,
+  setLastName,
+  s,
+}: {
+  firstName: string;
+  setFirstName: (v: string) => void;
+  lastName: string;
+  setLastName: (v: string) => void;
+  s: S;
+  colors: AppColors;
 }) {
   return (
     <>
       <Text style={s.label}>First Name</Text>
       <View style={s.inputWrap}>
         <TextInput
-          style={s.input} value={firstName} onChangeText={setFirstName}
-          placeholder="First name" placeholderTextColor={s.placeholderColor}
-          autoCapitalize="words" autoFocus returnKeyType="next"
+          style={s.input}
+          value={firstName}
+          onChangeText={setFirstName}
+          placeholder="First name"
+          placeholderTextColor={s.placeholderColor}
+          autoCapitalize="words"
+          autoFocus
+          returnKeyType="next"
         />
       </View>
       <Text style={s.label}>Last Name</Text>
       <View style={s.inputWrap}>
         <TextInput
-          style={s.input} value={lastName} onChangeText={setLastName}
-          placeholder="Last name" placeholderTextColor={s.placeholderColor}
-          autoCapitalize="words" returnKeyType="done"
+          style={s.input}
+          value={lastName}
+          onChangeText={setLastName}
+          placeholder="Last name"
+          placeholderTextColor={s.placeholderColor}
+          autoCapitalize="words"
+          returnKeyType="done"
         />
       </View>
     </>
   );
 }
 
-function PhoneStep({ phone, setPhone, s, isChild }: {
-  phone: string; setPhone: (v: string) => void;
-  s: S; colors: AppColors; isChild: boolean;
+function PhoneStep({
+  phone,
+  setPhone,
+  s,
+  isChild,
+}: {
+  phone: string;
+  setPhone: (v: string) => void;
+  s: S;
+  colors: AppColors;
+  isChild: boolean;
 }) {
   return (
     <>
-      <Text style={s.label}>Phone Number{isChild ? <Text style={s.labelOptional}> (optional)</Text> : null}</Text>
+      <Text style={s.label}>
+        Phone Number{isChild ? <Text style={s.labelOptional}> (optional)</Text> : null}
+      </Text>
       <View style={s.inputWrap}>
         <TextInput
-          style={s.input} value={phone} onChangeText={setPhone}
-          placeholder="+94 71 234 5678" placeholderTextColor={s.placeholderColor}
-          keyboardType="phone-pad" autoFocus returnKeyType="done"
+          style={s.input}
+          value={phone}
+          onChangeText={setPhone}
+          placeholder="+94 71 234 5678"
+          placeholderTextColor={s.placeholderColor}
+          keyboardType="phone-pad"
+          autoFocus
+          returnKeyType="done"
         />
       </View>
       <Text style={s.inputHint}>Include your country code, e.g. +94, +44, +1</Text>
@@ -397,8 +551,15 @@ function PhoneStep({ phone, setPhone, s, isChild }: {
   );
 }
 
-function TimezoneStep({ timezone, setTimezone, s }: {
-  timezone: string; setTimezone: (v: string) => void; s: S; colors: AppColors;
+function TimezoneStep({
+  timezone,
+  setTimezone,
+  s,
+}: {
+  timezone: string;
+  setTimezone: (v: string) => void;
+  s: S;
+  colors: AppColors;
 }) {
   const [search, setSearch] = useState('');
 
@@ -408,7 +569,9 @@ function TimezoneStep({ timezone, setTimezone, s }: {
       if (detected && !TIMEZONES.some((t) => t.id === detected)) {
         return [{ id: detected, label: `${detected} (your device)` }, ...TIMEZONES];
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     return TIMEZONES;
   }, []);
 
@@ -425,8 +588,11 @@ function TimezoneStep({ timezone, setTimezone, s }: {
       <View style={s.searchBox}>
         <Text>🔍</Text>
         <TextInput
-          style={s.searchInput} value={search} onChangeText={setSearch}
-          placeholder="Search time zones…" placeholderTextColor={s.placeholderColor}
+          style={s.searchInput}
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Search time zones…"
+          placeholderTextColor={s.placeholderColor}
           autoCapitalize="none"
         />
       </View>
@@ -438,7 +604,9 @@ function TimezoneStep({ timezone, setTimezone, s }: {
             style={[s.listItem, sel && s.listItemSelected]}
             onPress={() => setTimezone(item.id)}
           >
-            <Text style={[s.listItemTxt, sel && s.listItemSelectedTxt]}>{item.label}</Text>
+            <Text style={[s.listItemTxt, sel && s.listItemSelectedTxt]}>
+              {item.label}
+            </Text>
             {sel && <Text style={s.listCheck}>✓</Text>}
           </TouchableOpacity>
         );
@@ -448,13 +616,26 @@ function TimezoneStep({ timezone, setTimezone, s }: {
 }
 
 function LocationStep({
-  city, setCity, region, setRegion, postalCode, setPostalCode, countryCode, setCountryCode, s,
+  city,
+  setCity,
+  region,
+  setRegion,
+  postalCode,
+  setPostalCode,
+  countryCode,
+  setCountryCode,
+  s,
 }: {
-  city: string; setCity: (v: string) => void;
-  region: string; setRegion: (v: string) => void;
-  postalCode: string; setPostalCode: (v: string) => void;
-  countryCode: string; setCountryCode: (v: string) => void;
-  s: S; colors: AppColors;
+  city: string;
+  setCity: (v: string) => void;
+  region: string;
+  setRegion: (v: string) => void;
+  postalCode: string;
+  setPostalCode: (v: string) => void;
+  countryCode: string;
+  setCountryCode: (v: string) => void;
+  s: S;
+  colors: AppColors;
 }) {
   const [showPicker, setShowPicker] = useState(false);
   const [search, setSearch] = useState('');
@@ -472,7 +653,10 @@ function LocationStep({
       <>
         <TouchableOpacity
           style={[s.listItem, { marginBottom: 12 }]}
-          onPress={() => { setShowPicker(false); setSearch(''); }}
+          onPress={() => {
+            setShowPicker(false);
+            setSearch('');
+          }}
         >
           <Text style={s.listCheck}>‹</Text>
           <Text style={[s.listItemTxt, { marginLeft: 8 }]}>Back to location</Text>
@@ -480,9 +664,13 @@ function LocationStep({
         <View style={s.searchBox}>
           <Text>🔍</Text>
           <TextInput
-            style={s.searchInput} value={search} onChangeText={setSearch}
-            placeholder="Search countries…" placeholderTextColor={s.placeholderColor}
-            autoFocus autoCapitalize="none"
+            style={s.searchInput}
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search countries…"
+            placeholderTextColor={s.placeholderColor}
+            autoFocus
+            autoCapitalize="none"
           />
         </View>
         {filtered.map((c) => {
@@ -491,7 +679,11 @@ function LocationStep({
             <TouchableOpacity
               key={c.code}
               style={[s.listItem, sel && s.listItemSelected]}
-              onPress={() => { setCountryCode(c.code); setShowPicker(false); setSearch(''); }}
+              onPress={() => {
+                setCountryCode(c.code);
+                setShowPicker(false);
+                setSearch('');
+              }}
             >
               <Text style={s.listFlag}>{c.flag}</Text>
               <Text style={[s.listItemTxt, sel && s.listItemSelectedTxt]}>{c.label}</Text>
@@ -511,7 +703,15 @@ function LocationStep({
         onPress={() => setShowPicker(true)}
       >
         {selectedCountry && <Text style={s.listFlag}>{selectedCountry.flag}</Text>}
-        <Text style={[s.input, { paddingVertical: 0, color: selectedCountry ? undefined : s.placeholderColor }]}>
+        <Text
+          style={[
+            s.input,
+            {
+              paddingVertical: 0,
+              color: selectedCountry ? undefined : s.placeholderColor,
+            },
+          ]}
+        >
           {selectedCountry?.label ?? 'Select country…'}
         </Text>
         <Text style={s.listChevron}>›</Text>
@@ -520,18 +720,26 @@ function LocationStep({
       <Text style={s.label}>City</Text>
       <View style={s.inputWrap}>
         <TextInput
-          style={s.input} value={city} onChangeText={setCity}
-          placeholder="e.g. Colombo" placeholderTextColor={s.placeholderColor}
-          autoCapitalize="words" returnKeyType="next"
+          style={s.input}
+          value={city}
+          onChangeText={setCity}
+          placeholder="e.g. Colombo"
+          placeholderTextColor={s.placeholderColor}
+          autoCapitalize="words"
+          returnKeyType="next"
         />
       </View>
 
       <Text style={s.label}>State / Region / Province</Text>
       <View style={s.inputWrap}>
         <TextInput
-          style={s.input} value={region} onChangeText={setRegion}
-          placeholder="e.g. Western Province" placeholderTextColor={s.placeholderColor}
-          autoCapitalize="words" returnKeyType="next"
+          style={s.input}
+          value={region}
+          onChangeText={setRegion}
+          placeholder="e.g. Western Province"
+          placeholderTextColor={s.placeholderColor}
+          autoCapitalize="words"
+          returnKeyType="next"
         />
       </View>
 
@@ -541,8 +749,11 @@ function LocationStep({
       </Text>
       <View style={s.inputWrap}>
         <TextInput
-          style={s.input} value={postalCode} onChangeText={setPostalCode}
-          placeholder="e.g. 00100" placeholderTextColor={s.placeholderColor}
+          style={s.input}
+          value={postalCode}
+          onChangeText={setPostalCode}
+          placeholder="e.g. 00100"
+          placeholderTextColor={s.placeholderColor}
           returnKeyType="done"
         />
       </View>
@@ -550,19 +761,34 @@ function LocationStep({
   );
 }
 
-function StudentProfileStep({ birthYear, setBirthYear, grade, setGrade, s }: {
-  birthYear: string; setBirthYear: (v: string) => void;
-  grade: string | null; setGrade: (v: string) => void;
-  s: S; colors: AppColors;
+function StudentProfileStep({
+  birthYear,
+  setBirthYear,
+  grade,
+  setGrade,
+  s,
+}: {
+  birthYear: string;
+  setBirthYear: (v: string) => void;
+  grade: string | null;
+  setGrade: (v: string) => void;
+  s: S;
+  colors: AppColors;
 }) {
   const [tab, setTab] = useState<'grade' | 'year'>('grade');
   return (
     <>
       <View style={s.tabRow}>
-        <TouchableOpacity style={[s.tabBtn, tab === 'grade' && s.tabBtnActive]} onPress={() => setTab('grade')}>
+        <TouchableOpacity
+          style={[s.tabBtn, tab === 'grade' && s.tabBtnActive]}
+          onPress={() => setTab('grade')}
+        >
           <Text style={[s.tabTxt, tab === 'grade' && s.tabTxtActive]}>Grade Level</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[s.tabBtn, tab === 'year' && s.tabBtnActive]} onPress={() => setTab('year')}>
+        <TouchableOpacity
+          style={[s.tabBtn, tab === 'year' && s.tabBtnActive]}
+          onPress={() => setTab('year')}
+        >
           <Text style={[s.tabTxt, tab === 'year' && s.tabTxtActive]}>Birth Year</Text>
         </TouchableOpacity>
       </View>
@@ -576,7 +802,9 @@ function StudentProfileStep({ birthYear, setBirthYear, grade, setGrade, s }: {
               style={[s.listItem, sel && s.listItemSelected]}
               onPress={() => setGrade(item.value)}
             >
-              <Text style={[s.listItemTxt, sel && s.listItemSelectedTxt]}>{item.label}</Text>
+              <Text style={[s.listItemTxt, sel && s.listItemSelectedTxt]}>
+                {item.label}
+              </Text>
               {sel && <Text style={s.listCheck}>✓</Text>}
             </TouchableOpacity>
           );
@@ -586,10 +814,14 @@ function StudentProfileStep({ birthYear, setBirthYear, grade, setGrade, s }: {
           <Text style={s.label}>Year of Birth</Text>
           <View style={s.inputWrap}>
             <TextInput
-              style={s.input} value={birthYear}
+              style={s.input}
+              value={birthYear}
               onChangeText={(v) => setBirthYear(v.replace(/\D/g, '').slice(0, 4))}
-              placeholder={`e.g. ${BIRTH_YEARS[8]}`} placeholderTextColor={s.placeholderColor}
-              keyboardType="number-pad" maxLength={4} autoFocus
+              placeholder={`e.g. ${BIRTH_YEARS[8]}`}
+              placeholderTextColor={s.placeholderColor}
+              keyboardType="number-pad"
+              maxLength={4}
+              autoFocus
             />
           </View>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
@@ -599,14 +831,22 @@ function StudentProfileStep({ birthYear, setBirthYear, grade, setGrade, s }: {
                 onPress={() => setBirthYear(String(yr))}
                 style={[
                   s.listItem,
-                  { paddingHorizontal: 12, paddingVertical: 10, minWidth: 72, justifyContent: 'center' },
+                  {
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    minWidth: 72,
+                    justifyContent: 'center',
+                  },
                   birthYear === String(yr) && s.listItemSelected,
                 ]}
               >
-                <Text style={[
-                  s.listItemTxt, { textAlign: 'center' },
-                  birthYear === String(yr) && s.listItemSelectedTxt,
-                ]}>
+                <Text
+                  style={[
+                    s.listItemTxt,
+                    { textAlign: 'center' },
+                    birthYear === String(yr) && s.listItemSelectedTxt,
+                  ]}
+                >
                   {yr}
                 </Text>
               </TouchableOpacity>
@@ -619,28 +859,48 @@ function StudentProfileStep({ birthYear, setBirthYear, grade, setGrade, s }: {
 }
 
 function EducatorProfileStep({
-  subjects, setSubjects, gradeLevels, setGradeLevels, s, colors,
+  subjects,
+  setSubjects,
+  gradeLevels,
+  setGradeLevels,
+  s,
+  colors,
 }: {
-  subjects: string[]; setSubjects: (v: string[]) => void;
-  gradeLevels: string[]; setGradeLevels: (v: string[]) => void;
-  s: S; colors: AppColors;
+  subjects: string[];
+  setSubjects: (v: string[]) => void;
+  gradeLevels: string[];
+  setGradeLevels: (v: string[]) => void;
+  s: S;
+  colors: AppColors;
 }) {
-  const toggleSubject = useCallback((subject: string) => {
-    setSubjects(subjects.includes(subject)
-      ? subjects.filter((x) => x !== subject)
-      : [...subjects, subject]);
-  }, [subjects, setSubjects]);
+  const toggleSubject = useCallback(
+    (subject: string) => {
+      setSubjects(
+        subjects.includes(subject)
+          ? subjects.filter((x) => x !== subject)
+          : [...subjects, subject],
+      );
+    },
+    [subjects, setSubjects],
+  );
 
-  const toggleGrade = useCallback((grade: string) => {
-    setGradeLevels(gradeLevels.includes(grade)
-      ? gradeLevels.filter((x) => x !== grade)
-      : [...gradeLevels, grade]);
-  }, [gradeLevels, setGradeLevels]);
+  const toggleGrade = useCallback(
+    (grade: string) => {
+      setGradeLevels(
+        gradeLevels.includes(grade)
+          ? gradeLevels.filter((x) => x !== grade)
+          : [...gradeLevels, grade],
+      );
+    },
+    [gradeLevels, setGradeLevels],
+  );
 
   return (
     <>
       <Text style={s.sectionLabel}>Subjects you teach</Text>
-      <Text style={s.sectionHint}>Select all that apply. You can update these later.</Text>
+      <Text style={s.sectionHint}>
+        Select all that apply. You can update these later.
+      </Text>
       <View style={s.chipsRow}>
         {EDUCATOR_SUBJECTS.map((subject) => {
           const sel = subjects.includes(subject);
@@ -657,14 +917,18 @@ function EducatorProfileStep({
               onPress={() => toggleSubject(subject)}
             >
               {sel && <Text style={{ color: colors.teal, fontSize: 13 }}>✓ </Text>}
-              <Text style={[s.chipTxt, { color: sel ? colors.teal : colors.textMuted }]}>{subject}</Text>
+              <Text style={[s.chipTxt, { color: sel ? colors.teal : colors.textMuted }]}>
+                {subject}
+              </Text>
             </TouchableOpacity>
           );
         })}
       </View>
 
       <Text style={[s.sectionLabel, { marginTop: 8 }]}>Grade levels you teach</Text>
-      <Text style={s.sectionHint}>Select all grade levels you're comfortable teaching.</Text>
+      <Text style={s.sectionHint}>
+        {"Select all grade levels you're comfortable teaching."}
+      </Text>
       {GRADE_OPTIONS.map((item) => {
         const sel = gradeLevels.includes(item.value);
         return (
@@ -673,44 +937,69 @@ function EducatorProfileStep({
             style={[s.listItem, sel && s.listItemSelected]}
             onPress={() => toggleGrade(item.value)}
           >
-            <Text style={[s.listItemTxt, sel && s.listItemSelectedTxt]}>{item.label}</Text>
+            <Text style={[s.listItemTxt, sel && s.listItemSelectedTxt]}>
+              {item.label}
+            </Text>
             {sel && <Text style={s.listCheck}>✓</Text>}
           </TouchableOpacity>
         );
       })}
-      <Text style={s.inputHint}>At least one subject and one grade level are required.</Text>
+      <Text style={s.inputHint}>
+        At least one subject and one grade level are required.
+      </Text>
     </>
   );
 }
 
 function EducatorAvailabilityStep({
-  classTypes, setClassTypes, weeklyHours, setWeeklyHours, daySlots, setDaySlots, s, colors,
+  classTypes,
+  setClassTypes,
+  weeklyHours,
+  setWeeklyHours,
+  daySlots,
+  setDaySlots,
+  s,
+  colors,
 }: {
-  classTypes: string[]; setClassTypes: (v: string[]) => void;
-  weeklyHours: string; setWeeklyHours: (v: string) => void;
+  classTypes: string[];
+  setClassTypes: (v: string[]) => void;
+  weeklyHours: string;
+  setWeeklyHours: (v: string) => void;
   daySlots: Record<string, { start: string; end: string }>;
   setDaySlots: (v: Record<string, { start: string; end: string }>) => void;
-  s: S; colors: AppColors;
+  s: S;
+  colors: AppColors;
 }) {
-  const toggleClassType = useCallback((id: string) => {
-    setClassTypes(classTypes.includes(id)
-      ? classTypes.filter((x) => x !== id)
-      : [...classTypes, id]);
-  }, [classTypes, setClassTypes]);
+  const toggleClassType = useCallback(
+    (id: string) => {
+      setClassTypes(
+        classTypes.includes(id)
+          ? classTypes.filter((x) => x !== id)
+          : [...classTypes, id],
+      );
+    },
+    [classTypes, setClassTypes],
+  );
 
-  const toggleDay = useCallback((dayId: string) => {
-    if (daySlots[dayId]) {
-      const next = { ...daySlots };
-      delete next[dayId];
-      setDaySlots(next);
-    } else {
-      setDaySlots({ ...daySlots, [dayId]: { start: '09:00', end: '17:00' } });
-    }
-  }, [daySlots, setDaySlots]);
+  const toggleDay = useCallback(
+    (dayId: string) => {
+      if (daySlots[dayId]) {
+        const next = { ...daySlots };
+        delete next[dayId];
+        setDaySlots(next);
+      } else {
+        setDaySlots({ ...daySlots, [dayId]: { start: '09:00', end: '17:00' } });
+      }
+    },
+    [daySlots, setDaySlots],
+  );
 
-  const updateTime = useCallback((dayId: string, field: 'start' | 'end', value: string) => {
-    setDaySlots({ ...daySlots, [dayId]: { ...daySlots[dayId], [field]: value } });
-  }, [daySlots, setDaySlots]);
+  const updateTime = useCallback(
+    (dayId: string, field: 'start' | 'end', value: string) => {
+      setDaySlots({ ...daySlots, [dayId]: { ...daySlots[dayId], [field]: value } });
+    },
+    [daySlots, setDaySlots],
+  );
 
   return (
     <>
@@ -731,25 +1020,34 @@ function EducatorAvailabilityStep({
               onPress={() => toggleClassType(ct.id)}
             >
               {sel && <Text style={{ color: colors.teal, fontSize: 13 }}>✓ </Text>}
-              <Text style={[s.chipTxt, { color: sel ? colors.teal : colors.textMuted }]}>{ct.label}</Text>
+              <Text style={[s.chipTxt, { color: sel ? colors.teal : colors.textMuted }]}>
+                {ct.label}
+              </Text>
             </TouchableOpacity>
           );
         })}
       </View>
 
-      <Text style={s.sectionLabel}>Weekly commitment <Text style={s.sectionHint}>(optional)</Text></Text>
+      <Text style={s.sectionLabel}>
+        Weekly commitment <Text style={s.sectionHint}>(optional)</Text>
+      </Text>
       <View style={s.numberInputRow}>
         <TextInput
-          style={s.numberInput} value={weeklyHours}
+          style={s.numberInput}
+          value={weeklyHours}
           onChangeText={(v) => setWeeklyHours(v.replace(/\D/g, ''))}
-          placeholder="e.g. 10" placeholderTextColor={s.placeholderColor}
-          keyboardType="number-pad" maxLength={3}
+          placeholder="e.g. 10"
+          placeholderTextColor={s.placeholderColor}
+          keyboardType="number-pad"
+          maxLength={3}
         />
         <Text style={s.numberUnit}>hours / week</Text>
       </View>
 
       <Text style={[s.sectionLabel, { marginTop: 4 }]}>Available days & times</Text>
-      <Text style={s.sectionHint}>Toggle a day to set your available hours for that day.</Text>
+      <Text style={s.sectionHint}>
+        Toggle a day to set your available hours for that day.
+      </Text>
       {DAYS_OF_WEEK.map((day) => {
         const isOn = !!daySlots[day.id];
         return (
@@ -788,7 +1086,9 @@ function EducatorAvailabilityStep({
           </View>
         );
       })}
-      <Text style={[s.inputHint, { marginTop: 4 }]}>Select at least one teaching format and one available day.</Text>
+      <Text style={[s.inputHint, { marginTop: 4 }]}>
+        Select at least one teaching format and one available day.
+      </Text>
     </>
   );
 }
@@ -801,6 +1101,11 @@ export default function ProfileSetupScreen() {
   const s = useMemo(() => makeStyles(colors), [colors]);
   const queryClient = useQueryClient();
   const { session } = useAuth();
+  const analytics = useAnalytics();
+
+  useEffect(() => {
+    analytics.screen('Profile Setup', { screen_name: 'profile_setup' });
+  }, [analytics]);
 
   // Redirect to login if somehow reached without a session
   useEffect(() => {
@@ -808,38 +1113,44 @@ export default function ProfileSetupScreen() {
   }, [session, router]);
 
   // Form state — universal
-  const [firstName, setFirstName]     = useState('');
-  const [lastName, setLastName]       = useState('');
-  const [phone, setPhone]             = useState('');
-  const [timezone, setTimezone]       = useState(() => {
-    try { return Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC'; } catch { return 'UTC'; }
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [timezone, setTimezone] = useState(() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC';
+    } catch {
+      return 'UTC';
+    }
   });
-  const [city, setCity]               = useState('');
-  const [region, setRegion]           = useState('');
-  const [postalCode, setPostalCode]   = useState('');
+  const [city, setCity] = useState('');
+  const [region, setRegion] = useState('');
+  const [postalCode, setPostalCode] = useState('');
   const [countryCode, setCountryCode] = useState('LK');
 
   // Student-specific
-  const [birthYear, setBirthYear]     = useState('');
-  const [grade, setGrade]             = useState<string | null>(null);
+  const [birthYear, setBirthYear] = useState('');
+  const [grade, setGrade] = useState<string | null>(null);
 
   // Educator-specific
-  const [subjects, setSubjects]       = useState<string[]>([]);
+  const [subjects, setSubjects] = useState<string[]>([]);
   const [gradeLevels, setGradeLevels] = useState<string[]>([]);
-  const [classTypes, setClassTypes]   = useState<string[]>([]);
+  const [classTypes, setClassTypes] = useState<string[]>([]);
   const [weeklyHours, setWeeklyHours] = useState('');
-  const [daySlots, setDaySlots]       = useState<Record<string, { start: string; end: string }>>({});
+  const [daySlots, setDaySlots] = useState<
+    Record<string, { start: string; end: string }>
+  >({});
 
   const [stepIdx, setStepIdx] = useState(0);
-  const [error, setError]     = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Synchronously seed from the TanStack Query cache (populated by OTP screen).
   // If cache is cold this is null and statusLoading starts true.
-  const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(() =>
-    queryClient.getQueryData<OnboardingStatus>(['onboarding-status']) ?? null,
+  const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(
+    () => queryClient.getQueryData<OnboardingStatus>(['onboarding-status']) ?? null,
   );
-  const [statusLoading, setStatusLoading] = useState(() =>
-    !queryClient.getQueryData(['onboarding-status']),
+  const [statusLoading, setStatusLoading] = useState(
+    () => !queryClient.getQueryData(['onboarding-status']),
   );
 
   // Kick off a network fetch only when the cache is cold or stale.
@@ -857,7 +1168,7 @@ export default function ProfileSetupScreen() {
       .catch(() => {
         setStatusLoading(false);
       });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const kind = onboarding?.profileKind ?? onboarding?.primaryRole ?? null;
@@ -876,14 +1187,14 @@ export default function ProfileSetupScreen() {
     initializedRef.current = true;
 
     const p = onboarding.prefill;
-    if (p.firstName)                        setFirstName(p.firstName);
-    if (p.lastName)                         setLastName(p.lastName);
-    if (p.phone)                            setPhone(p.phone);
+    if (p.firstName) setFirstName(p.firstName);
+    if (p.lastName) setLastName(p.lastName);
+    if (p.phone) setPhone(p.phone);
     if (p.timezone && p.timezone !== 'UTC') setTimezone(p.timezone);
-    if (p.city)                             setCity(p.city);
-    if (p.region)                           setRegion(p.region);
-    if (p.postalCode)                       setPostalCode(p.postalCode);
-    if (p.countryCode)                      setCountryCode(p.countryCode);
+    if (p.city) setCity(p.city);
+    if (p.region) setRegion(p.region);
+    if (p.postalCode) setPostalCode(p.postalCode);
+    if (p.countryCode) setCountryCode(p.countryCode);
 
     // Jump directly to the first incomplete step
     const f = onboarding.flags;
@@ -899,7 +1210,9 @@ export default function ProfileSetupScreen() {
     } else if (!f.hasLocation) {
       targetIdx = steps.indexOf('location');
     } else if (!f.hasRoleData) {
-      const roleStep = steps.find((step) => step === 'student-profile' || step === 'educator-profile');
+      const roleStep = steps.find(
+        (step) => step === 'student-profile' || step === 'educator-profile',
+      );
       if (roleStep) targetIdx = steps.indexOf(roleStep);
     } else if (onboardingKind === 'educator' && !f.hasAvailability) {
       const availIdx = steps.indexOf('educator-availability');
@@ -922,15 +1235,26 @@ export default function ProfileSetupScreen() {
         } else if (currentStep === 'timezone') {
           await saveTimezoneStep(onboarding.profileId, timezone);
         } else if (currentStep === 'location') {
-          await saveLocationStep(onboarding.profileId, city, region, postalCode, countryCode);
+          await saveLocationStep(
+            onboarding.profileId,
+            city,
+            region,
+            postalCode,
+            countryCode,
+          );
         } else if (currentStep === 'student-profile') {
           await saveStudentStep(
-            onboarding.profileId, onboarding.orgId ?? '',
-            birthYear ? parseInt(birthYear, 10) : null, grade,
+            onboarding.profileId,
+            onboarding.orgId ?? '',
+            birthYear ? parseInt(birthYear, 10) : null,
+            grade,
           );
         } else if (currentStep === 'educator-profile') {
           await saveEducatorProfileStep(
-            onboarding.profileId, onboarding.orgId ?? '', subjects, gradeLevels,
+            onboarding.profileId,
+            onboarding.orgId ?? '',
+            subjects,
+            gradeLevels,
           );
         } else if (currentStep === 'educator-availability') {
           const availability: Record<string, Array<{ start: string; end: string }>> = {};
@@ -938,14 +1262,18 @@ export default function ProfileSetupScreen() {
             availability[day] = [slot];
           });
           await saveEducatorAvailabilityStep(
-            onboarding.profileId, onboarding.orgId ?? '',
+            onboarding.profileId,
+            onboarding.orgId ?? '',
             classTypes,
             weeklyHours ? parseInt(weeklyHours, 10) : null,
             availability,
           );
         }
       }
-      if (isLast) await completeOnboarding(onboarding.accountId);
+      if (isLast) {
+        await completeOnboarding(onboarding.accountId);
+        analytics.capture(AnalyticsEvent.ONBOARDING_COMPLETED, { role: kind });
+      }
     },
     onSuccess: (_, { isLast }) => {
       setError(null);
@@ -968,51 +1296,125 @@ export default function ProfileSetupScreen() {
   const canNext = useMemo(() => {
     if (saving) return false;
     switch (currentStep) {
-      case 'name':                  return !!firstName.trim() && !!lastName.trim();
-      case 'phone':                 return kind === 'child' || !!phone.trim();
-      case 'timezone':              return !!timezone && timezone !== 'UTC';
-      case 'location':              return !!city.trim() && !!region.trim() && !!countryCode;
-      case 'student-profile':       return !!grade;
-      case 'educator-profile':      return subjects.length > 0 && gradeLevels.length > 0;
-      case 'educator-availability': return classTypes.length > 0 && Object.keys(daySlots).length > 0;
-      default:                      return true;
+      case 'name':
+        return !!firstName.trim() && !!lastName.trim();
+      case 'phone':
+        return kind === 'child' || !!phone.trim();
+      case 'timezone':
+        return !!timezone && timezone !== 'UTC';
+      case 'location':
+        return !!city.trim() && !!region.trim() && !!countryCode;
+      case 'student-profile':
+        return !!grade;
+      case 'educator-profile':
+        return subjects.length > 0 && gradeLevels.length > 0;
+      case 'educator-availability':
+        return classTypes.length > 0 && Object.keys(daySlots).length > 0;
+      default:
+        return true;
     }
-  }, [saving, currentStep, firstName, lastName, phone, timezone, city, region, countryCode, grade, subjects, gradeLevels, classTypes, daySlots, kind]);
+  }, [
+    saving,
+    currentStep,
+    firstName,
+    lastName,
+    phone,
+    timezone,
+    city,
+    region,
+    countryCode,
+    grade,
+    subjects,
+    gradeLevels,
+    classTypes,
+    daySlots,
+    kind,
+  ]);
 
   const handleNext = useCallback(() => {
     setError(null);
     switch (currentStep) {
       case 'name':
-        if (!firstName.trim()) { setError('Please enter your first name.'); return; }
-        if (!lastName.trim())  { setError('Please enter your last name.'); return; }
+        if (!firstName.trim()) {
+          setError('Please enter your first name.');
+          return;
+        }
+        if (!lastName.trim()) {
+          setError('Please enter your last name.');
+          return;
+        }
         break;
       case 'phone':
-        if (kind !== 'child' && !phone.trim()) { setError('Please enter your phone number.'); return; }
+        if (kind !== 'child' && !phone.trim()) {
+          setError('Please enter your phone number.');
+          return;
+        }
         break;
       case 'timezone':
-        if (!timezone || timezone === 'UTC') { setError('Please select your time zone.'); return; }
+        if (!timezone || timezone === 'UTC') {
+          setError('Please select your time zone.');
+          return;
+        }
         break;
       case 'location':
-        if (!countryCode)     { setError('Please select your country.'); return; }
-        if (!city.trim())     { setError('Please enter your city.'); return; }
-        if (!region.trim())   { setError('Please enter your state or region.'); return; }
+        if (!countryCode) {
+          setError('Please select your country.');
+          return;
+        }
+        if (!city.trim()) {
+          setError('Please enter your city.');
+          return;
+        }
+        if (!region.trim()) {
+          setError('Please enter your state or region.');
+          return;
+        }
         break;
       case 'student-profile':
-        if (!grade) { setError('Please select your grade level to continue.'); return; }
+        if (!grade) {
+          setError('Please select your grade level to continue.');
+          return;
+        }
         break;
       case 'educator-profile':
-        if (subjects.length === 0)   { setError('Please select at least one subject.'); return; }
-        if (gradeLevels.length === 0) { setError('Please select at least one grade level.'); return; }
+        if (subjects.length === 0) {
+          setError('Please select at least one subject.');
+          return;
+        }
+        if (gradeLevels.length === 0) {
+          setError('Please select at least one grade level.');
+          return;
+        }
         break;
       case 'educator-availability':
-        if (classTypes.length === 0)         { setError('Please select at least one teaching format.'); return; }
-        if (Object.keys(daySlots).length === 0) { setError('Please select at least one available day.'); return; }
+        if (classTypes.length === 0) {
+          setError('Please select at least one teaching format.');
+          return;
+        }
+        if (Object.keys(daySlots).length === 0) {
+          setError('Please select at least one available day.');
+          return;
+        }
         break;
     }
     advance({ isSkip: false, isLast: isLastStep });
   }, [
-    currentStep, firstName, lastName, phone, timezone, city, region, countryCode,
-    grade, subjects, gradeLevels, classTypes, daySlots, kind, advance, isLastStep,
+    currentStep,
+    firstName,
+    lastName,
+    phone,
+    timezone,
+    city,
+    region,
+    countryCode,
+    grade,
+    subjects,
+    gradeLevels,
+    classTypes,
+    daySlots,
+    kind,
+    advance,
+    isLastStep,
   ]);
 
   const handleSkip = useCallback(() => {
@@ -1021,7 +1423,10 @@ export default function ProfileSetupScreen() {
   }, [advance, isLastStep]);
 
   const handleBack = useCallback(() => {
-    if (stepIdx > 0) { setStepIdx((i) => i - 1); setError(null); }
+    if (stepIdx > 0) {
+      setStepIdx((i) => i - 1);
+      setError(null);
+    }
   }, [stepIdx]);
 
   if (statusLoading) {
@@ -1046,12 +1451,19 @@ export default function ProfileSetupScreen() {
         ) : (
           <View style={{ width: 40 }} />
         )}
-        <Text style={s.stepLabel}>Step {stepIdx + 1} of {steps.length}</Text>
+        <Text style={s.stepLabel}>
+          Step {stepIdx + 1} of {steps.length}
+        </Text>
       </View>
 
       {/* Progress bar */}
       <View style={s.progressTrack}>
-        <View style={[s.progressFill, { width: `${Math.round(progress * 100)}%` as `${number}%` }]} />
+        <View
+          style={[
+            s.progressFill,
+            { width: `${Math.round(progress * 100)}%` as `${number}%` },
+          ]}
+        />
       </View>
 
       <KeyboardAvoidingView
@@ -1066,50 +1478,85 @@ export default function ProfileSetupScreen() {
         >
           {meta && (
             <>
-              <View style={s.badge}><Text style={s.badgeEmoji}>{meta.emoji}</Text></View>
+              <View style={s.badge}>
+                <Text style={s.badgeEmoji}>{meta.emoji}</Text>
+              </View>
               <Text style={s.heading}>{meta.title}</Text>
               <Text style={s.sub}>{meta.subtitle}</Text>
             </>
           )}
 
           {currentStep === 'name' && (
-            <NameStep firstName={firstName} setFirstName={setFirstName} lastName={lastName} setLastName={setLastName} s={s} colors={colors} />
+            <NameStep
+              firstName={firstName}
+              setFirstName={setFirstName}
+              lastName={lastName}
+              setLastName={setLastName}
+              s={s}
+              colors={colors}
+            />
           )}
           {currentStep === 'phone' && (
-            <PhoneStep phone={phone} setPhone={setPhone} s={s} colors={colors} isChild={kind === 'child'} />
+            <PhoneStep
+              phone={phone}
+              setPhone={setPhone}
+              s={s}
+              colors={colors}
+              isChild={kind === 'child'}
+            />
           )}
           {currentStep === 'timezone' && (
-            <TimezoneStep timezone={timezone} setTimezone={setTimezone} s={s} colors={colors} />
+            <TimezoneStep
+              timezone={timezone}
+              setTimezone={setTimezone}
+              s={s}
+              colors={colors}
+            />
           )}
           {currentStep === 'location' && (
             <LocationStep
-              city={city} setCity={setCity}
-              region={region} setRegion={setRegion}
-              postalCode={postalCode} setPostalCode={setPostalCode}
-              countryCode={countryCode} setCountryCode={setCountryCode}
-              s={s} colors={colors}
+              city={city}
+              setCity={setCity}
+              region={region}
+              setRegion={setRegion}
+              postalCode={postalCode}
+              setPostalCode={setPostalCode}
+              countryCode={countryCode}
+              setCountryCode={setCountryCode}
+              s={s}
+              colors={colors}
             />
           )}
           {currentStep === 'student-profile' && (
             <StudentProfileStep
-              birthYear={birthYear} setBirthYear={setBirthYear}
-              grade={grade} setGrade={setGrade}
-              s={s} colors={colors}
+              birthYear={birthYear}
+              setBirthYear={setBirthYear}
+              grade={grade}
+              setGrade={setGrade}
+              s={s}
+              colors={colors}
             />
           )}
           {currentStep === 'educator-profile' && (
             <EducatorProfileStep
-              subjects={subjects} setSubjects={setSubjects}
-              gradeLevels={gradeLevels} setGradeLevels={setGradeLevels}
-              s={s} colors={colors}
+              subjects={subjects}
+              setSubjects={setSubjects}
+              gradeLevels={gradeLevels}
+              setGradeLevels={setGradeLevels}
+              s={s}
+              colors={colors}
             />
           )}
           {currentStep === 'educator-availability' && (
             <EducatorAvailabilityStep
-              classTypes={classTypes} setClassTypes={setClassTypes}
-              weeklyHours={weeklyHours} setWeeklyHours={setWeeklyHours}
-              daySlots={daySlots} setDaySlots={setDaySlots}
-              s={s} colors={colors}
+              classTypes={classTypes}
+              setClassTypes={setClassTypes}
+              weeklyHours={weeklyHours}
+              setWeeklyHours={setWeeklyHours}
+              daySlots={daySlots}
+              setDaySlots={setDaySlots}
+              s={s}
+              colors={colors}
             />
           )}
 
@@ -1122,10 +1569,11 @@ export default function ProfileSetupScreen() {
             onPress={handleNext}
             disabled={!canNext || saving}
           >
-            {saving
-              ? <ActivityIndicator color={colors.tealFg} />
-              : <Text style={s.btnTxt}>{isLastStep ? 'Finish →' : 'Continue →'}</Text>
-            }
+            {saving ? (
+              <ActivityIndicator color={colors.tealFg} />
+            ) : (
+              <Text style={s.btnTxt}>{isLastStep ? 'Finish →' : 'Continue →'}</Text>
+            )}
           </TouchableOpacity>
           {canSkip && (
             <TouchableOpacity style={s.skipBtn} onPress={handleSkip} disabled={saving}>

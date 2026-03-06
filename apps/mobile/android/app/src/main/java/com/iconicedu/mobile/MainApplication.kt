@@ -17,6 +17,9 @@ import com.facebook.react.defaults.DefaultReactNativeHost
 import expo.modules.ApplicationLifecycleDispatcher
 import expo.modules.ReactNativeHostWrapper
 
+import com.posthog.android.PostHogAndroid
+import com.posthog.android.PostHogAndroidConfig
+
 class MainApplication : Application(), ReactApplication {
 
   override val reactNativeHost: ReactNativeHost = ReactNativeHostWrapper(
@@ -50,6 +53,16 @@ class MainApplication : Application(), ReactApplication {
     } catch (e: IllegalArgumentException) {
       ReleaseLevel.STABLE
     }
+    val postHogConfig = PostHogAndroidConfig(
+      apiKey = BuildConfig.POSTHOG_API_KEY,
+      host = BuildConfig.POSTHOG_HOST
+    ).apply {
+      captureApplicationLifecycleEvents = true
+      captureScreenViews = true
+      captureDeepLinks = true
+    }
+    PostHogAndroid.setup(this, postHogConfig)
+
     loadReactNative(this)
     ApplicationLifecycleDispatcher.onApplicationCreate(this)
   }
