@@ -3,7 +3,8 @@ import PostHog, { PostHogProvider as PHProvider } from 'posthog-react-native';
 import { useAuth } from '@/providers/auth-provider';
 
 const POSTHOG_KEY = process.env.EXPO_PUBLIC_POSTHOG_KEY?.trim() ?? '';
-const POSTHOG_HOST = process.env.EXPO_PUBLIC_POSTHOG_HOST?.trim() ?? 'https://us.i.posthog.com';
+const POSTHOG_HOST =
+  process.env.EXPO_PUBLIC_POSTHOG_HOST?.trim() ?? 'https://us.i.posthog.com';
 
 /**
  * Module-level singleton — created once if the key is available.
@@ -11,7 +12,22 @@ const POSTHOG_HOST = process.env.EXPO_PUBLIC_POSTHOG_HOST?.trim() ?? 'https://us
  * matches the PostHog React Native docs recommendation.
  */
 export const posthogClient: PostHog | null = POSTHOG_KEY
-  ? new PostHog(POSTHOG_KEY, { host: POSTHOG_HOST })
+  ? new PostHog(POSTHOG_KEY, {
+      host: POSTHOG_HOST,
+      // Session replay: wireframe/screenshot recording of screens
+      enableSessionReplay: true,
+      sessionReplayConfig: {
+        // Mask text inputs for privacy; show images for visual context
+        maskAllTextInputs: true,
+        maskAllImages: false,
+        // Include console logs in replays for debugging
+        captureLog: true,
+        // Capture iOS network telemetry (timings, status codes)
+        captureNetworkTelemetry: true,
+        // 1s throttle to minimise performance overhead
+        throttleDelayMs: 1000,
+      },
+    })
   : null;
 
 /**
@@ -43,5 +59,9 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
 
-  return <PHProvider client={posthogClient}>{children}</PHProvider>;
+  return (
+    <PHProvider client={posthogClient} autocapture>
+      {children}
+    </PHProvider>
+  );
 }

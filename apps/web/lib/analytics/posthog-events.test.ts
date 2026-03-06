@@ -3,18 +3,23 @@ import {
   buildPostHogCurrentUrl,
   buildPostHogIdentifyProperties,
   buildPostHogPageViewProperties,
-  buildPostHogWebVitalProperties,
 } from './posthog-events';
 
 describe('posthog-events helpers', () => {
   it('builds a current url with origin and search', () => {
-    expect(buildPostHogCurrentUrl('/iconic-academy/spaces', 'tab=sessions', 'https://app.example.com')).toBe(
-      'https://app.example.com/iconic-academy/spaces?tab=sessions',
-    );
+    expect(
+      buildPostHogCurrentUrl(
+        '/iconic-academy/spaces',
+        'tab=sessions',
+        'https://app.example.com',
+      ),
+    ).toBe('https://app.example.com/iconic-academy/spaces?tab=sessions');
   });
 
   it('returns path only when origin is missing', () => {
-    expect(buildPostHogCurrentUrl('/iconic-academy/spaces', '', null)).toBe('/iconic-academy/spaces');
+    expect(buildPostHogCurrentUrl('/iconic-academy/spaces', '', null)).toBe(
+      '/iconic-academy/spaces',
+    );
   });
 
   it('builds pageview properties', () => {
@@ -46,28 +51,8 @@ describe('posthog-events helpers', () => {
     });
   });
 
-  it('builds web vital properties', () => {
-    expect(
-      buildPostHogWebVitalProperties({
-        id: 'vital-1',
-        name: 'CLS',
-        value: 0.04,
-        delta: 0.01,
-        rating: 'good',
-        navigationType: 'navigate',
-      }),
-    ).toEqual({
-      metricId: 'vital-1',
-      metricName: 'CLS',
-      metricValue: 0.04,
-      metricDelta: 0.01,
-      rating: 'good',
-      navigationType: 'navigate',
-    });
-  });
-
   it('exports stable event keys', () => {
     expect(POSTHOG_EVENT_KEYS.appLoaded).toBe('app_loaded');
-    expect(POSTHOG_EVENT_KEYS.clientException).toBe('client_exception');
+    expect(POSTHOG_EVENT_KEYS.authTelemetry).toBe('auth_telemetry');
   });
 });

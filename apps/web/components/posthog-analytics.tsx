@@ -2,16 +2,16 @@
 
 import { useEffect, useMemo, useRef } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { useReportWebVitals } from 'next/web-vitals';
 import posthog from 'posthog-js';
 
 import { isPostHogBrowserConfigured } from '@iconicedu/web/lib/analytics/posthog-browser-config';
 import {
   POSTHOG_EVENT_KEYS,
   buildPostHogPageViewProperties,
-  buildPostHogWebVitalProperties,
 } from '@iconicedu/web/lib/analytics/posthog-events';
 
+// Error capture and web vitals are handled natively by PostHog via
+// capture_exceptions: true and capture_performance: true in instrumentation-client.ts.
 export function PostHogAnalytics() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -54,50 +54,6 @@ export function PostHogAnalytics() {
     posthog.capture('$pageview', pageViewProperties);
     lastPageViewRef.current = pageViewProperties.$current_url;
   }, [hasPostHog, pageViewProperties]);
-
-  useEffect(() => {
-    if (!hasPostHog) {
-      return;
-    }
-
-    function handleError(event: ErrorEvent) {
-      posthog.capture(POSTHOG_EVENT_KEYS.clientException, {
-        kind: 'error',
-        message: event.message,
-        filename: event.filename,
-        lineNumber: event.lineno,
-        columnNumber: event.colno,
-      });
-    }
-
-    function handleUnhandledRejection(event: PromiseRejectionEvent) {
-      posthog.capture(POSTHOG_EVENT_KEYS.clientException, {
-        kind: 'unhandledrejection',
-        reason:
-          typeof event.reason === 'string'
-            ? event.reason
-            : event.reason instanceof Error
-              ? event.reason.message
-              : 'unknown',
-      });
-    }
-
-    window.addEventListener('error', handleError);
-    window.addEventListener('unhandledrejection', handleUnhandledRejection);
-
-    return () => {
-      window.removeEventListener('error', handleError);
-      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
-    };
-  }, [hasPostHog]);
-
-  useReportWebVitals((metric) => {
-    if (!hasPostHog) {
-      return;
-    }
-
-    posthog.capture(POSTHOG_EVENT_KEYS.webVital, buildPostHogWebVitalProperties(metric));
-  });
 
   return null;
 }
