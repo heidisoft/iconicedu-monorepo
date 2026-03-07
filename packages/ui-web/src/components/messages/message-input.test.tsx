@@ -1,12 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { UserProfileVM } from '@iconicedu/shared-types';
 
 import { MESSAGE_INPUT_FILE_ACCEPT } from './message-input.attachments';
-import {
-  buildHomeworkDraftFromContent,
-  hasHomeworkTrigger,
-  stripHomeworkTrigger,
-} from './message-input';
+import { buildAssignmentDraftFromContent } from './message-input';
 import {
   getMentionCandidates,
   getMentionPopupPosition,
@@ -14,7 +10,9 @@ import {
   matchesMentionQuery,
 } from './message-input.utils';
 
-function createParticipant(overrides: Partial<UserProfileVM> & { ids?: Partial<UserProfileVM['ids']> } = {}) {
+function createParticipant(
+  overrides: Partial<UserProfileVM> & { ids?: Partial<UserProfileVM['ids']> } = {},
+) {
   return {
     kind: 'guardian',
     ids: {
@@ -66,12 +64,22 @@ describe('message-input mention helpers', () => {
   it('builds mention candidates without the current user', () => {
     const self = createParticipant({
       ids: { id: 'self' },
-      profile: { displayName: 'Myself', firstName: 'My', lastName: 'Self', email: 'me@example.com' },
+      profile: {
+        displayName: 'Myself',
+        firstName: 'My',
+        lastName: 'Self',
+        email: 'me@example.com',
+      },
       accountEmail: 'me@example.com',
     });
     const other = createParticipant({
       ids: { id: 'other' },
-      profile: { displayName: 'Taylor Reed', firstName: 'Taylor', lastName: 'Reed', email: 'taylor@example.com' },
+      profile: {
+        displayName: 'Taylor Reed',
+        firstName: 'Taylor',
+        lastName: 'Reed',
+        email: 'taylor@example.com',
+      },
       accountEmail: 'taylor@example.com',
     });
 
@@ -91,7 +99,12 @@ describe('message-input mention helpers', () => {
       [
         createParticipant({
           ids: { id: 'other' },
-          profile: { displayName: 'Taylor Reed', firstName: 'Taylor', lastName: 'Reed', email: 'taylor@example.com' },
+          profile: {
+            displayName: 'Taylor Reed',
+            firstName: 'Taylor',
+            lastName: 'Reed',
+            email: 'taylor@example.com',
+          },
           accountEmail: 'taylor@example.com',
         }),
       ],
@@ -123,9 +136,29 @@ describe('message-input mention helpers', () => {
     });
 
     wrapper.getBoundingClientRect = () =>
-      ({ left: 20, top: 40, width: 360, height: 120, right: 380, bottom: 160, x: 20, y: 40, toJSON: () => ({}) }) as DOMRect;
+      ({
+        left: 20,
+        top: 40,
+        width: 360,
+        height: 120,
+        right: 380,
+        bottom: 160,
+        x: 20,
+        y: 40,
+        toJSON: () => ({}),
+      }) as DOMRect;
     textarea.getBoundingClientRect = () =>
-      ({ left: 32, top: 52, width: 320, height: 80, right: 352, bottom: 132, x: 32, y: 52, toJSON: () => ({}) }) as DOMRect;
+      ({
+        left: 32,
+        top: 52,
+        width: 320,
+        height: 80,
+        right: 352,
+        bottom: 132,
+        x: 32,
+        y: 52,
+        toJSON: () => ({}),
+      }) as DOMRect;
 
     const originalCreateElement = document.createElement.bind(document);
 
@@ -151,7 +184,9 @@ describe('message-input mention helpers', () => {
       tabSize: '4',
     } as CSSStyleDeclaration);
 
-    const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation(((tagName: string) => {
+    const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation(((
+      tagName: string,
+    ) => {
       if (tagName === 'div') {
         return {
           style: {},
@@ -167,8 +202,12 @@ describe('message-input mention helpers', () => {
       return originalCreateElement(tagName);
     }) as typeof document.createElement);
 
-    const appendSpy = vi.spyOn(document.body, 'appendChild').mockImplementation((node) => node);
-    const removeSpy = vi.spyOn(document.body, 'removeChild').mockImplementation((node) => node);
+    const appendSpy = vi
+      .spyOn(document.body, 'appendChild')
+      .mockImplementation((node) => node);
+    const removeSpy = vi
+      .spyOn(document.body, 'removeChild')
+      .mockImplementation((node) => node);
 
     const position = getMentionPopupPosition(wrapper, textarea, 4);
 
@@ -204,9 +243,29 @@ describe('message-input mention helpers', () => {
     });
 
     wrapper.getBoundingClientRect = () =>
-      ({ left: 20, top: 40, width: 360, height: 120, right: 380, bottom: 160, x: 20, y: 40, toJSON: () => ({}) }) as DOMRect;
+      ({
+        left: 20,
+        top: 40,
+        width: 360,
+        height: 120,
+        right: 380,
+        bottom: 160,
+        x: 20,
+        y: 40,
+        toJSON: () => ({}),
+      }) as DOMRect;
     textarea.getBoundingClientRect = () =>
-      ({ left: 32, top: 52, width: 320, height: 80, right: 352, bottom: 132, x: 32, y: 52, toJSON: () => ({}) }) as DOMRect;
+      ({
+        left: 32,
+        top: 52,
+        width: 320,
+        height: 80,
+        right: 352,
+        bottom: 132,
+        x: 32,
+        y: 52,
+        toJSON: () => ({}),
+      }) as DOMRect;
 
     const marker = {
       offsetLeft: 10,
@@ -230,7 +289,9 @@ describe('message-input mention helpers', () => {
       tabSize: '4',
     } as CSSStyleDeclaration);
 
-    const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation(((tagName: string) => {
+    const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation(((
+      tagName: string,
+    ) => {
       if (tagName === 'div') {
         return {
           style: {},
@@ -246,8 +307,12 @@ describe('message-input mention helpers', () => {
       return originalCreateElement(tagName);
     }) as typeof document.createElement);
 
-    const appendSpy = vi.spyOn(document.body, 'appendChild').mockImplementation((node) => node);
-    const removeSpy = vi.spyOn(document.body, 'removeChild').mockImplementation((node) => node);
+    const appendSpy = vi
+      .spyOn(document.body, 'appendChild')
+      .mockImplementation((node) => node);
+    const removeSpy = vi
+      .spyOn(document.body, 'removeChild')
+      .mockImplementation((node) => node);
 
     const position = getMentionPopupPosition(wrapper, textarea, 2);
 
@@ -267,17 +332,24 @@ describe('message-input mention helpers', () => {
     expect(MESSAGE_INPUT_FILE_ACCEPT).toContain('.zip');
   });
 
-  it('detects the homework trigger and builds a structured draft from content', () => {
+  it('builds assignment drafts for homework and lesson composer flows', () => {
     const content =
-      '@homework Fractions Practice Set\nFocus on equivalent fractions and number lines.';
+      'Fractions Practice Set\nFocus on equivalent fractions and number lines.';
 
-    expect(hasHomeworkTrigger(content)).toBe(true);
-    expect(stripHomeworkTrigger(content)).toBe(
-      'Fractions Practice Set\nFocus on equivalent fractions and number lines.',
-    );
-    expect(buildHomeworkDraftFromContent(content)).toMatchObject({
+    expect(buildAssignmentDraftFromContent('homework', content)).toMatchObject({
+      kind: 'homework',
       title: 'Fractions Practice Set',
-      description: 'Fractions Practice Set\nFocus on equivalent fractions and number lines.',
+      description:
+        'Fractions Practice Set\nFocus on equivalent fractions and number lines.',
+      message: 'Fractions Practice Set\nFocus on equivalent fractions and number lines.',
+      subject: '',
+    });
+
+    expect(buildAssignmentDraftFromContent('lesson', '')).toMatchObject({
+      kind: 'lesson',
+      title: 'Lesson assignment',
+      description: '',
+      message: '',
       subject: '',
     });
   });

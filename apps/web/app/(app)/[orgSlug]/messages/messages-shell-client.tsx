@@ -1,6 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentType,
+} from 'react';
 import { useRouter } from 'next/navigation';
 import type {
   ChannelVM,
@@ -74,7 +81,7 @@ async function createImageThumbnailFile(file: File): Promise<File | null> {
   }
 
   return new Promise<File | null>((resolve) => {
-    const image = new Image();
+    const image = new globalThis.Image();
     const objectUrl = URL.createObjectURL(file);
 
     image.onload = () => {
@@ -132,16 +139,29 @@ type MessagesShellClientProps = {
   currentUserId?: string;
   currentUserProfile?: UserProfileVM | null;
   readOnly?: boolean;
+  showCreateMessageTypeButton?: boolean;
   panelRegistry?: Partial<
     MessagesRightPanelRegistry<ComponentType<{ intent: MessagesRightPanelIntent }>>
   >;
   sendTextMessage: (input: MessageSendTextInput) => Promise<MessageVM>;
   sendFileMessage: (input: MessageSendFileInput) => Promise<MessageVM>;
   sendFilesMessage: (input: MessageSendFilesInput) => Promise<MessageVM>;
-  toggleReaction: (input: { orgId: string; messageId: string; emoji: string }) => Promise<void>;
-  toggleSavedMessage: (input: { orgId: string; messageId: string; isSaved: boolean }) => Promise<void>;
+  toggleReaction: (input: {
+    orgId: string;
+    messageId: string;
+    emoji: string;
+  }) => Promise<void>;
+  toggleSavedMessage: (input: {
+    orgId: string;
+    messageId: string;
+    isSaved: boolean;
+  }) => Promise<void>;
   deleteMessage: (input: { orgId: string; messageId: string }) => Promise<void>;
-  toggleHiddenMessage: (input: { orgId: string; messageId: string; isHidden: boolean }) => Promise<void>;
+  toggleHiddenMessage: (input: {
+    orgId: string;
+    messageId: string;
+    isHidden: boolean;
+  }) => Promise<void>;
 };
 
 export function MessagesShellClient({
@@ -150,6 +170,7 @@ export function MessagesShellClient({
   currentUserId,
   currentUserProfile,
   readOnly = false,
+  showCreateMessageTypeButton = true,
   panelRegistry,
   sendTextMessage,
   sendFileMessage,
@@ -172,7 +193,13 @@ export function MessagesShellClient({
       deleteMessage,
       toggleHiddenMessage,
     }),
-    [sendTextMessage, toggleReaction, toggleSavedMessage, deleteMessage, toggleHiddenMessage],
+    [
+      sendTextMessage,
+      toggleReaction,
+      toggleSavedMessage,
+      deleteMessage,
+      toggleHiddenMessage,
+    ],
   );
   const uploadFileMessage = useMemo(
     () =>
@@ -260,7 +287,11 @@ export function MessagesShellClient({
 
         const createdMessages: MessageVM[] = [];
 
-        if (imageUploads.length === 1 && audioUploads.length === 0 && fileUploads.length === 0) {
+        if (
+          imageUploads.length === 1 &&
+          audioUploads.length === 0 &&
+          fileUploads.length === 0
+        ) {
           createdMessages.push(
             await sendFileMessage({
               orgId: channelState.ids.orgId,
@@ -353,7 +384,14 @@ export function MessagesShellClient({
 
         return createdMessages;
       },
-    [channelState.ids.id, channelState.ids.orgId, currentUserId, presenceClient, sendFileMessage, sendFilesMessage],
+    [
+      channelState.ids.id,
+      channelState.ids.orgId,
+      currentUserId,
+      presenceClient,
+      sendFileMessage,
+      sendFilesMessage,
+    ],
   );
 
   const joinLiveSession = useCallback(async () => {
@@ -372,9 +410,11 @@ export function MessagesShellClient({
       },
     );
 
-    const payload = (await response.json().catch(() => null)) as
-      | { success?: boolean; joinPath?: string; error?: string }
-      | null;
+    const payload = (await response.json().catch(() => null)) as {
+      success?: boolean;
+      joinPath?: string;
+      error?: string;
+    } | null;
 
     if (!response.ok || !payload?.success || !payload.joinPath) {
       throw new Error(payload?.error ?? 'Failed to join live session');
@@ -472,6 +512,7 @@ export function MessagesShellClient({
       currentUserId={currentUserId}
       currentUserProfile={currentUserProfile}
       readOnly={readOnly}
+      showCreateMessageTypeButton={showCreateMessageTypeButton}
       panelRegistry={panelRegistry}
       realtimeClient={realtimeClient}
       messageWriteClient={messageWriteClient}

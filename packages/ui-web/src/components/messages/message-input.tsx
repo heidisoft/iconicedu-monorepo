@@ -3,7 +3,22 @@
 import * as React from 'react';
 import type { MessageMentionVM, UserProfileVM } from '@iconicedu/shared-types';
 import { Button } from '../../ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../../ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../../ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../../ui/dropdown-menu';
 import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
 import { Textarea } from '../../ui/textarea';
@@ -15,9 +30,7 @@ import {
   TooltipTrigger,
 } from '../../ui/tooltip';
 import { EmojiPicker } from './emoji-picker';
-import {
-  cn,
-} from '../../lib/utils';
+import { cn } from '../../lib/utils';
 import {
   getMentionCandidates,
   getMentionPopupPosition,
@@ -44,6 +57,9 @@ import {
   Check,
   X,
   FileText,
+  Plus,
+  BookOpen,
+  ClipboardCheck,
   type LucideIcon,
 } from 'lucide-react';
 import {
@@ -71,13 +87,13 @@ import { getComposerSubmitLabel } from './message-loading-state.utils';
 
 const TYPING_STOP_DELAY_MS = 3000;
 const TYPING_KEEPALIVE_THROTTLE_MS = 1200;
-const HOMEWORK_TRIGGER_PATTERN = /(^|\s)@(homework|homeowork)\b/i;
 
 interface MessageInputProps {
   onSend: (
     content: string,
     mentions?: MessageMentionVM[],
     homework?: {
+      kind?: 'homework' | 'lesson';
       title: string;
       description?: string;
       dueAt: string;
@@ -97,6 +113,7 @@ interface MessageInputProps {
   onTypingStop?: () => void;
   onFocus?: () => void;
   onInputKeyDown?: () => void;
+  showCreateMessageTypeButton?: boolean;
 }
 
 type PendingAttachment = {
@@ -122,33 +139,37 @@ type ComposerLinkPreview = {
   favicon?: string;
 };
 
-type HomeworkComposerDraft = {
+type AssignmentComposerKind = 'homework' | 'lesson';
+
+type AssignmentComposerDraft = {
+  kind: AssignmentComposerKind;
   title: string;
   description: string;
   dueAt: string;
   subject: string;
+  message: string;
 };
 
-export function hasHomeworkTrigger(value: string) {
-  return HOMEWORK_TRIGGER_PATTERN.test(value);
+function getAssignmentKindLabel(kind: AssignmentComposerKind) {
+  return kind === 'homework' ? 'Homework' : 'Lesson';
 }
 
-export function stripHomeworkTrigger(value: string) {
-  return value
-    .replace(/(^|\s)@(homework|homeowork)\b/gi, '$1')
-    .replace(/[ \t]{2,}/g, ' ')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
+function getAssignmentDefaultTitle(kind: AssignmentComposerKind) {
+  return kind === 'homework' ? 'Homework assignment' : 'Lesson assignment';
 }
 
-function getDefaultHomeworkDueDate() {
+function getDefaultAssignmentDueDate() {
   const nextWeek = new Date();
   nextWeek.setDate(nextWeek.getDate() + 7);
   return nextWeek.toISOString().slice(0, 10);
 }
 
-export function buildHomeworkDraftFromContent(value: string): HomeworkComposerDraft {
-  const description = stripHomeworkTrigger(value);
+export function buildAssignmentDraftFromContent(
+  kind: AssignmentComposerKind,
+  value: string,
+): AssignmentComposerDraft {
+  const cleanedValue = value.trim();
+  const description = cleanedValue;
   const firstMeaningfulLine =
     description
       .split('\n')
@@ -157,10 +178,12 @@ export function buildHomeworkDraftFromContent(value: string): HomeworkComposerDr
       ?.replace(/[.!?]+$/, '') ?? '';
 
   return {
-    title: firstMeaningfulLine.slice(0, 72) || 'Homework assignment',
+    kind,
+    title: firstMeaningfulLine.slice(0, 72) || getAssignmentDefaultTitle(kind),
     description,
-    dueAt: getDefaultHomeworkDueDate(),
+    dueAt: getDefaultAssignmentDueDate(),
     subject: '',
+    message: cleanedValue,
   };
 }
 
@@ -205,22 +228,30 @@ export function MessageInput({
   onTypingStop,
   onFocus,
   onInputKeyDown,
+  showCreateMessageTypeButton = true,
 }: MessageInputProps) {
   const [content, setContent] = React.useState('');
   const [isSendingText, setIsSendingText] = React.useState(false);
   const [isAttachingFile, setIsAttachingFile] = React.useState(false);
-  const [pendingAttachments, setPendingAttachments] = React.useState<PendingAttachment[]>([]);
+  const [pendingAttachments, setPendingAttachments] = React.useState<PendingAttachment[]>(
+    [],
+  );
   const [attachmentError, setAttachmentError] = React.useState<string | null>(null);
   const [isDragOver, setIsDragOver] = React.useState(false);
   const [linkPreview, setLinkPreview] = React.useState<ComposerLinkPreview | null>(null);
   const [isLoadingLinkPreview, setIsLoadingLinkPreview] = React.useState(false);
-  const [dismissedLinkPreviewUrl, setDismissedLinkPreviewUrl] = React.useState<string | null>(null);
-  const [recordingSession, setRecordingSession] = React.useState<RecordingSession | null>(null);
+  const [dismissedLinkPreviewUrl, setDismissedLinkPreviewUrl] = React.useState<
+    string | null
+  >(null);
+  const [recordingSession, setRecordingSession] = React.useState<RecordingSession | null>(
+    null,
+  );
   const [recordingElapsedMs, setRecordingElapsedMs] = React.useState(0);
   const [mentionState, setMentionState] = React.useState<MentionState | null>(null);
-  const [isHomeworkDialogOpen, setIsHomeworkDialogOpen] = React.useState(false);
-  const [homeworkDraft, setHomeworkDraft] = React.useState<HomeworkComposerDraft>(
-    buildHomeworkDraftFromContent(''),
+  const [isCreateMenuOpen, setIsCreateMenuOpen] = React.useState(false);
+  const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = React.useState(false);
+  const [assignmentDraft, setAssignmentDraft] = React.useState<AssignmentComposerDraft>(
+    buildAssignmentDraftFromContent('homework', ''),
   );
   const [mentionPopupPosition, setMentionPopupPosition] =
     React.useState<MentionPopupPosition | null>(null);
@@ -253,7 +284,6 @@ export function MessageInput({
   const isMentionListOpen = mentionState !== null && filteredMentionCandidates.length > 0;
   const isBusy = isSendingText || isAttachingFile;
   const isRecordingAudio = recordingSession?.status === 'recording';
-  const isRecordingPaused = recordingSession?.status === 'paused';
   const hasActiveRecording = recordingSession !== null;
   const pendingAttachmentPreviewGroups = React.useMemo(
     () => splitComposerAttachmentsByKind(pendingAttachments),
@@ -273,7 +303,6 @@ export function MessageInput({
         : null,
     [composerPreviewUrl, dismissedLinkPreviewUrl],
   );
-  const hasHomeworkTag = React.useMemo(() => hasHomeworkTrigger(content), [content]);
 
   const stopRecordingStream = React.useCallback(() => {
     mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -294,11 +323,14 @@ export function MessageInput({
     }
   }, []);
 
-  const syncRecordingSession = React.useCallback((nextSession: RecordingSession | null) => {
-    recordingSessionRef.current = nextSession;
-    setRecordingSession(nextSession);
-    setRecordingElapsedMs(nextSession ? getRecordingElapsedMs(nextSession) : 0);
-  }, []);
+  const syncRecordingSession = React.useCallback(
+    (nextSession: RecordingSession | null) => {
+      recordingSessionRef.current = nextSession;
+      setRecordingSession(nextSession);
+      setRecordingElapsedMs(nextSession ? getRecordingElapsedMs(nextSession) : 0);
+    },
+    [],
+  );
 
   const startRecordingInterval = React.useCallback(() => {
     clearRecordingInterval();
@@ -367,14 +399,11 @@ export function MessageInput({
     [],
   );
 
-  const updateMentionPopupPosition = React.useCallback(
-    (caretPosition: number | null) => {
-      setMentionPopupPosition(
-        getMentionPopupPosition(wrapperRef.current, textareaRef.current, caretPosition),
-      );
-    },
-    [],
-  );
+  const updateMentionPopupPosition = React.useCallback((caretPosition: number | null) => {
+    setMentionPopupPosition(
+      getMentionPopupPosition(wrapperRef.current, textareaRef.current, caretPosition),
+    );
+  }, []);
 
   const clearTypingTimeout = React.useCallback(() => {
     if (typingTimeoutRef.current) {
@@ -416,14 +445,21 @@ export function MessageInput({
     [clearTypingTimeout, notifyTypingStop, onTypingStart, readOnly],
   );
 
-  const syncMentionState = React.useCallback((value: string, caretPosition: number | null) => {
-    const nextMentionState = getMentionState(value, caretPosition);
-    setMentionState(nextMentionState);
-    setActiveMentionIndex(0);
-    setMentionPopupPosition(
-      getMentionPopupPosition(wrapperRef.current, textareaRef.current, nextMentionState?.end ?? null),
-    );
-  }, []);
+  const syncMentionState = React.useCallback(
+    (value: string, caretPosition: number | null) => {
+      const nextMentionState = getMentionState(value, caretPosition);
+      setMentionState(nextMentionState);
+      setActiveMentionIndex(0);
+      setMentionPopupPosition(
+        getMentionPopupPosition(
+          wrapperRef.current,
+          textareaRef.current,
+          nextMentionState?.end ?? null,
+        ),
+      );
+    },
+    [],
+  );
 
   const insertAtCursor = React.useCallback(
     (text: string) => {
@@ -549,12 +585,6 @@ export function MessageInput({
     }
 
     if (trimmedContent) {
-      if (hasHomeworkTrigger(trimmedContent) && !isHomeworkDialogOpen) {
-        setHomeworkDraft(buildHomeworkDraftFromContent(trimmedContent));
-        setIsHomeworkDialogOpen(true);
-        return;
-      }
-
       const mentions = extractMentionsFromMessageText(
         trimmedContent,
         participants,
@@ -582,33 +612,51 @@ export function MessageInput({
     participants,
     readOnly,
     resetComposer,
-    isHomeworkDialogOpen,
   ]);
 
-  const handleHomeworkSubmit = React.useCallback(() => {
-    const cleanedContent = stripHomeworkTrigger(content.trim());
-    const mentions = extractMentionsFromMessageText(cleanedContent, participants, currentUserId);
+  const openAssignmentComposer = React.useCallback(
+    (kind: AssignmentComposerKind) => {
+      setAssignmentDraft(buildAssignmentDraftFromContent(kind, content));
+      setIsCreateMenuOpen(false);
+      setIsAssignmentDialogOpen(true);
+    },
+    [content],
+  );
 
-    const sendHomework = async () => {
+  const handleAssignmentSubmit = React.useCallback(() => {
+    const assignmentMessage = assignmentDraft.message.trim();
+    const mentions = extractMentionsFromMessageText(
+      assignmentMessage,
+      participants,
+      currentUserId,
+    );
+    const assignmentLabel = getAssignmentKindLabel(assignmentDraft.kind);
+    const fallbackText = `${assignmentLabel} assignment posted.`;
+
+    const sendAssignment = async () => {
       try {
         setIsSendingText(true);
         await Promise.resolve(
-          onSend(cleanedContent, mentions, {
-            title: homeworkDraft.title.trim() || 'Homework assignment',
-            description: homeworkDraft.description.trim() || cleanedContent || undefined,
-            dueAt: new Date(`${homeworkDraft.dueAt}T12:00:00`).toISOString(),
-            subject: homeworkDraft.subject.trim() || undefined,
+          onSend(assignmentMessage || fallbackText, mentions, {
+            kind: assignmentDraft.kind,
+            title:
+              assignmentDraft.title.trim() ||
+              getAssignmentDefaultTitle(assignmentDraft.kind),
+            description:
+              assignmentDraft.description.trim() || assignmentMessage || undefined,
+            dueAt: new Date(`${assignmentDraft.dueAt}T12:00:00`).toISOString(),
+            subject: assignmentDraft.subject.trim() || undefined,
           }),
         );
-        setIsHomeworkDialogOpen(false);
+        setIsAssignmentDialogOpen(false);
         resetComposer();
       } finally {
         setIsSendingText(false);
       }
     };
 
-    void sendHomework();
-  }, [content, currentUserId, homeworkDraft, onSend, participants, resetComposer]);
+    void sendAssignment();
+  }, [assignmentDraft, currentUserId, onSend, participants, resetComposer]);
 
   const handleKeyDown = React.useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -683,7 +731,13 @@ export function MessageInput({
       stopRecordingStream();
       notifyTypingStop();
     };
-  }, [clearRecordingInterval, clearRecordingTimeout, clearTypingTimeout, notifyTypingStop, stopRecordingStream]);
+  }, [
+    clearRecordingInterval,
+    clearRecordingTimeout,
+    clearTypingTimeout,
+    notifyTypingStop,
+    stopRecordingStream,
+  ]);
 
   React.useEffect(() => {
     if (!isMentionListOpen) {
@@ -691,10 +745,14 @@ export function MessageInput({
       return;
     }
 
-    updateMentionPopupPosition(mentionState?.end ?? textareaRef.current?.selectionStart ?? null);
+    updateMentionPopupPosition(
+      mentionState?.end ?? textareaRef.current?.selectionStart ?? null,
+    );
 
     const handleViewportChange = () => {
-      updateMentionPopupPosition(mentionState?.end ?? textareaRef.current?.selectionStart ?? null);
+      updateMentionPopupPosition(
+        mentionState?.end ?? textareaRef.current?.selectionStart ?? null,
+      );
     };
 
     window.addEventListener('resize', handleViewportChange);
@@ -730,10 +788,10 @@ export function MessageInput({
 
     const loadPreview = async () => {
       try {
-      const response = await fetch(
-        `/api/messages/link-preview?url=${encodeURIComponent(visibleComposerPreviewUrl)}`,
-        { signal: controller.signal },
-      );
+        const response = await fetch(
+          `/api/messages/link-preview?url=${encodeURIComponent(visibleComposerPreviewUrl)}`,
+          { signal: controller.signal },
+        );
         if (!response.ok) {
           throw new Error('Unable to load link preview');
         }
@@ -757,7 +815,7 @@ export function MessageInput({
 
     void loadPreview();
 
-  return () => {
+    return () => {
       controller.abort();
     };
   }, [visibleComposerPreviewUrl]);
@@ -785,7 +843,13 @@ export function MessageInput({
     (event: React.ChangeEvent<HTMLInputElement>) => {
       const selectedFiles = Array.from(event.target.files ?? []);
       event.target.value = '';
-      if (!selectedFiles.length || readOnly || isBusy || hasActiveRecording || !onAttachFiles) {
+      if (
+        !selectedFiles.length ||
+        readOnly ||
+        isBusy ||
+        hasActiveRecording ||
+        !onAttachFiles
+      ) {
         return;
       }
       setPendingComposerAttachment(selectedFiles);
@@ -864,11 +928,9 @@ export function MessageInput({
         }
 
         const durationSeconds = Math.max(1, Math.round(finalElapsedMs / 1000));
-        const file = new File(
-          [blob],
-          buildRecordedAudioFileName(Date.now(), blob.type),
-          { type: blob.type || 'audio/webm' },
-        );
+        const file = new File([blob], buildRecordedAudioFileName(Date.now(), blob.type), {
+          type: blob.type || 'audio/webm',
+        });
         setPendingComposerAttachment([file], durationSeconds);
       };
       recorder.onerror = () => {
@@ -1042,14 +1104,18 @@ export function MessageInput({
             <div className="border-b border-border px-3 py-3">
               <div className="flex items-start gap-3 rounded-xl border border-destructive/20 bg-destructive/5 p-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
-                  <Mic className={cn('h-5 w-5', isRecordingAudio ? 'animate-pulse' : '')} />
+                  <Mic
+                    className={cn('h-5 w-5', isRecordingAudio ? 'animate-pulse' : '')}
+                  />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                     <span
                       className={cn(
                         'inline-block h-2.5 w-2.5 rounded-full',
-                        isRecordingAudio ? 'bg-destructive animate-pulse' : 'bg-amber-500',
+                        isRecordingAudio
+                          ? 'bg-destructive animate-pulse'
+                          : 'bg-amber-500',
                       )}
                     />
                     {isRecordingAudio ? 'Recording voice message' : 'Recording paused'}
@@ -1063,7 +1129,11 @@ export function MessageInput({
                       variant="outline"
                       size="sm"
                       className="h-8 gap-1.5"
-                      onClick={isRecordingAudio ? handlePauseAudioRecording : handleResumeAudioRecording}
+                      onClick={
+                        isRecordingAudio
+                          ? handlePauseAudioRecording
+                          : handleResumeAudioRecording
+                      }
                     >
                       {isRecordingAudio ? (
                         <>
@@ -1103,7 +1173,8 @@ export function MessageInput({
           {pendingAttachments.length > 0 ? (
             <div className="border-b border-border px-3 py-3">
               <div className="mb-2 text-xs font-medium text-muted-foreground">
-                {pendingAttachments.length} attachment{pendingAttachments.length === 1 ? '' : 's'} ready to send
+                {pendingAttachments.length} attachment
+                {pendingAttachments.length === 1 ? '' : 's'} ready to send
               </div>
               <div className="space-y-3">
                 {pendingAttachmentPreviewGroups.images.length > 0 ? (
@@ -1165,13 +1236,15 @@ export function MessageInput({
                     key={pendingAttachment.id}
                     className="flex items-start gap-3 rounded-xl border border-border bg-muted/30 p-3"
                   >
-                    {pendingAttachment.kind === 'image' && pendingAttachment.previewUrl ? (
+                    {pendingAttachment.kind === 'image' &&
+                    pendingAttachment.previewUrl ? (
                       <img
                         src={pendingAttachment.previewUrl}
                         alt={pendingAttachment.file.name}
                         className="h-16 w-16 rounded-lg object-cover"
                       />
-                    ) : pendingAttachment.kind === 'audio' && pendingAttachment.previewUrl ? (
+                    ) : pendingAttachment.kind === 'audio' &&
+                      pendingAttachment.previewUrl ? (
                       <audio
                         src={pendingAttachment.previewUrl}
                         className="h-16 w-24 rounded-lg"
@@ -1189,8 +1262,8 @@ export function MessageInput({
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {pendingAttachment.kind === 'audio'
-                            ? 'Voice message ready to send'
-                            : 'File ready to send'}
+                          ? 'Voice message ready to send'
+                          : 'File ready to send'}
                         {pendingAttachment.durationSeconds
                           ? ` • ${Math.floor(pendingAttachment.durationSeconds / 60)}:${String(
                               pendingAttachment.durationSeconds % 60,
@@ -1230,7 +1303,9 @@ export function MessageInput({
                       size="icon-xs"
                       className="absolute right-2 top-2"
                       aria-label="Dismiss link preview"
-                      onClick={() => setDismissedLinkPreviewUrl(visibleComposerPreviewUrl)}
+                      onClick={() =>
+                        setDismissedLinkPreviewUrl(visibleComposerPreviewUrl)
+                      }
                     >
                       <X className="h-3.5 w-3.5" />
                     </Button>
@@ -1271,11 +1346,6 @@ export function MessageInput({
               Drop file or image to attach
             </div>
           ) : null}
-          {hasHomeworkTag ? (
-            <div className="border-b border-border px-3 py-2 text-xs font-medium text-primary">
-              Homework tag detected. Send to confirm assignment details.
-            </div>
-          ) : null}
           <Textarea
             ref={textareaRef}
             rows={1}
@@ -1287,9 +1357,15 @@ export function MessageInput({
               handleTyping(nextValue);
               syncMentionState(nextValue, e.target.selectionStart);
             }}
-            onClick={(e) => syncMentionState(e.currentTarget.value, e.currentTarget.selectionStart)}
-            onKeyUp={(e) => syncMentionState(e.currentTarget.value, e.currentTarget.selectionStart)}
-            onSelect={(e) => syncMentionState(e.currentTarget.value, e.currentTarget.selectionStart)}
+            onClick={(e) =>
+              syncMentionState(e.currentTarget.value, e.currentTarget.selectionStart)
+            }
+            onKeyUp={(e) =>
+              syncMentionState(e.currentTarget.value, e.currentTarget.selectionStart)
+            }
+            onSelect={(e) =>
+              syncMentionState(e.currentTarget.value, e.currentTarget.selectionStart)
+            }
             onKeyDown={handleKeyDown}
             onFocus={onFocus}
             placeholder={placeholder}
@@ -1316,7 +1392,9 @@ export function MessageInput({
                     aria-selected={isActive}
                     className={cn(
                       'flex min-w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition-colors',
-                      isActive ? 'bg-muted text-foreground' : 'text-foreground hover:bg-muted',
+                      isActive
+                        ? 'bg-muted text-foreground'
+                        : 'text-foreground hover:bg-muted',
                     )}
                     onMouseDown={(e) => {
                       e.preventDefault();
@@ -1325,7 +1403,10 @@ export function MessageInput({
                     onMouseEnter={() => setActiveMentionIndex(index)}
                   >
                     <Avatar size="sm">
-                      <AvatarImage src={candidate.avatarUrl} alt={candidate.displayName} />
+                      <AvatarImage
+                        src={candidate.avatarUrl}
+                        alt={candidate.displayName}
+                      />
                       <AvatarFallback>
                         {candidate.displayName.charAt(0).toUpperCase()}
                       </AvatarFallback>
@@ -1347,7 +1428,12 @@ export function MessageInput({
             <TooltipProvider>
               <div className="flex items-center gap-0.5">
                 {formatButtons.map((btn) => (
-                  <FormatButton key={btn.label} icon={btn.icon} label={btn.label} onClick={btn.onClick} />
+                  <FormatButton
+                    key={btn.label}
+                    icon={btn.icon}
+                    label={btn.label}
+                    onClick={btn.onClick}
+                  />
                 ))}
                 <div className="mx-1 h-4 w-px bg-border" />
                 <FormatButton
@@ -1411,7 +1497,9 @@ export function MessageInput({
                       }}
                       disabled={Boolean(recordingSession)}
                     >
-                      <Mic className={cn('h-4 w-4', isRecordingAudio ? 'animate-pulse' : '')} />
+                      <Mic
+                        className={cn('h-4 w-4', isRecordingAudio ? 'animate-pulse' : '')}
+                      />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -1422,13 +1510,71 @@ export function MessageInput({
                       : 'Record voice message'}
                   </TooltipContent>
                 </Tooltip>
+                {showCreateMessageTypeButton ? (
+                  <>
+                    <div className="mx-1 h-4 w-px bg-border" />
+                    <DropdownMenu
+                      open={isCreateMenuOpen}
+                      onOpenChange={setIsCreateMenuOpen}
+                    >
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                          aria-label="Create message type"
+                          title="Create message type"
+                          disabled={readOnly || isBusy || hasActiveRecording}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-64">
+                        <DropdownMenuLabel>Create message</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onSelect={() => openAssignmentComposer('homework')}
+                        >
+                          <ClipboardCheck className="h-4 w-4" />
+                          <div className="flex min-w-0 flex-col">
+                            <span className="truncate font-medium">
+                              Homework assignment
+                            </span>
+                            <span className="truncate text-xs text-muted-foreground">
+                              Add title, due date, and instructions.
+                            </span>
+                          </div>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onSelect={() => openAssignmentComposer('lesson')}
+                        >
+                          <BookOpen className="h-4 w-4" />
+                          <div className="flex min-w-0 flex-col">
+                            <span className="truncate font-medium">
+                              Lesson assignment
+                            </span>
+                            <span className="truncate text-xs text-muted-foreground">
+                              Share structured work for the current lesson.
+                            </span>
+                          </div>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </>
+                ) : null}
               </div>
             </TooltipProvider>
             <Button
               type="button"
               size="sm"
               onClick={handleSend}
-              disabled={readOnly || isBusy || hasActiveRecording || (!content.trim() && pendingAttachments.length === 0)}
+              disabled={
+                readOnly ||
+                isBusy ||
+                hasActiveRecording ||
+                (!content.trim() && pendingAttachments.length === 0)
+              }
               className="h-8 gap-1.5"
             >
               {isBusy ? (
@@ -1446,56 +1592,68 @@ export function MessageInput({
           </div>
         </div>
       </div>
-      <Dialog open={isHomeworkDialogOpen} onOpenChange={setIsHomeworkDialogOpen}>
+      <Dialog open={isAssignmentDialogOpen} onOpenChange={setIsAssignmentDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Create homework assignment</DialogTitle>
+            <DialogTitle>
+              Create {getAssignmentKindLabel(assignmentDraft.kind).toLowerCase()}{' '}
+              assignment
+            </DialogTitle>
             <DialogDescription>
-              Finish the assignment details before sending this homework message.
+              Fill in the assignment details and review the preview before sending.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="homework-title">Title</Label>
+              <Label htmlFor="assignment-title">Title</Label>
               <Input
-                id="homework-title"
-                value={homeworkDraft.title}
+                id="assignment-title"
+                value={assignmentDraft.title}
                 onChange={(event) =>
-                  setHomeworkDraft((current) => ({ ...current, title: event.target.value }))
+                  setAssignmentDraft((current) => ({
+                    ...current,
+                    title: event.target.value,
+                  }))
                 }
                 placeholder="Fractions Practice Set"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="homework-due-date">Due date</Label>
+              <Label htmlFor="assignment-due-date">Due date</Label>
               <Input
-                id="homework-due-date"
+                id="assignment-due-date"
                 type="date"
-                value={homeworkDraft.dueAt}
+                value={assignmentDraft.dueAt}
                 onChange={(event) =>
-                  setHomeworkDraft((current) => ({ ...current, dueAt: event.target.value }))
+                  setAssignmentDraft((current) => ({
+                    ...current,
+                    dueAt: event.target.value,
+                  }))
                 }
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="homework-subject">Subject</Label>
+              <Label htmlFor="assignment-subject">Subject</Label>
               <Input
-                id="homework-subject"
-                value={homeworkDraft.subject}
+                id="assignment-subject"
+                value={assignmentDraft.subject}
                 onChange={(event) =>
-                  setHomeworkDraft((current) => ({ ...current, subject: event.target.value }))
+                  setAssignmentDraft((current) => ({
+                    ...current,
+                    subject: event.target.value,
+                  }))
                 }
                 placeholder="Optional"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="homework-description">Description</Label>
+              <Label htmlFor="assignment-description">Description</Label>
               <Textarea
-                id="homework-description"
+                id="assignment-description"
                 rows={4}
-                value={homeworkDraft.description}
+                value={assignmentDraft.description}
                 onChange={(event) =>
-                  setHomeworkDraft((current) => ({
+                  setAssignmentDraft((current) => ({
                     ...current,
                     description: event.target.value,
                   }))
@@ -1503,22 +1661,64 @@ export function MessageInput({
                 placeholder="Add assignment instructions"
               />
             </div>
-            <div className="flex items-center justify-end gap-2">
+            <div className="space-y-2">
+              <Label htmlFor="assignment-message">Message note</Label>
+              <Textarea
+                id="assignment-message"
+                rows={3}
+                value={assignmentDraft.message}
+                onChange={(event) =>
+                  setAssignmentDraft((current) => ({
+                    ...current,
+                    message: event.target.value,
+                  }))
+                }
+                placeholder="Optional note to include above the assignment card"
+              />
+            </div>
+            <div className="rounded-xl border border-border bg-muted/25 p-3">
+              <div className="mb-2 text-xs font-medium text-muted-foreground">
+                Preview
+              </div>
+              <div className="space-y-1 text-sm">
+                <div className="font-medium text-foreground">
+                  {assignmentDraft.title.trim() ||
+                    getAssignmentDefaultTitle(assignmentDraft.kind)}
+                </div>
+                <div className="text-muted-foreground">
+                  Due {assignmentDraft.dueAt || 'No due date selected'}
+                  {assignmentDraft.subject.trim()
+                    ? ` • ${assignmentDraft.subject.trim()}`
+                    : ''}
+                </div>
+                {assignmentDraft.description.trim() ? (
+                  <div className="whitespace-pre-wrap text-muted-foreground">
+                    {assignmentDraft.description.trim()}
+                  </div>
+                ) : null}
+                {assignmentDraft.message.trim() ? (
+                  <div className="rounded-lg bg-background px-2 py-1 text-foreground">
+                    {assignmentDraft.message.trim()}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+            <DialogFooter>
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setIsHomeworkDialogOpen(false)}
+                onClick={() => setIsAssignmentDialogOpen(false)}
               >
                 Cancel
               </Button>
               <Button
                 type="button"
-                onClick={handleHomeworkSubmit}
-                disabled={!homeworkDraft.title.trim() || !homeworkDraft.dueAt}
+                onClick={handleAssignmentSubmit}
+                disabled={!assignmentDraft.title.trim() || !assignmentDraft.dueAt}
               >
-                Create homework
+                Send assignment
               </Button>
-            </div>
+            </DialogFooter>
           </div>
         </DialogContent>
       </Dialog>

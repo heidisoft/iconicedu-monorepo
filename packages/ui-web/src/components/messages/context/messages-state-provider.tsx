@@ -37,7 +37,11 @@ interface MessagesStateContextValue {
   sessionSummaryCount: number;
   messages: MessageVM[];
   messageFilter: MessageFilterKey | null;
-  createTextMessage: (content: string, mentions?: MessageMentionVM[]) => TextMessageVM | null;
+  showCreateMessageTypeButton: boolean;
+  createTextMessage: (
+    content: string,
+    mentions?: MessageMentionVM[],
+  ) => TextMessageVM | null;
   sendTextMessage: SendTextMessageHandler;
   sendFileMessage: SendFileMessageHandler;
   joinLiveSession?: JoinLiveSessionHandler;
@@ -81,7 +85,11 @@ type ThreadActionHandlers = {
   onAddMessage?: (message: MessageVM) => void;
   onUpdateMessage?: (messageId: string, updates: Partial<MessageVM>) => void;
   onDeleteMessage?: (messageId: string) => void;
-  onToggleReaction?: (messageId: string, emoji: string, source?: 'bar' | 'picker') => void;
+  onToggleReaction?: (
+    messageId: string,
+    emoji: string,
+    source?: 'bar' | 'picker',
+  ) => void;
   onToggleSaved?: (messageId: string) => void;
   onToggleHidden?: (messageId: string) => void;
 };
@@ -90,6 +98,7 @@ export type SendTextMessageHandler = (input: {
   content: string;
   mentions?: MessageMentionVM[];
   homework?: {
+    kind?: 'homework' | 'lesson';
     title: string;
     description?: string;
     dueAt: string;
@@ -130,10 +139,12 @@ const isSameIntent = (
 export function MessagesStateProvider({
   channel,
   isReadOnly = false,
+  showCreateMessageTypeButton = true,
   children,
 }: {
   channel: ChannelVM;
   isReadOnly?: boolean;
+  showCreateMessageTypeButton?: boolean;
   children: React.ReactNode;
 }) {
   const [state, setState] = useState<MessagesRightSidebarState>({
@@ -155,9 +166,9 @@ export function MessagesStateProvider({
   const [sendFileMessage, setSendFileMessage] = useState<SendFileMessageHandler>(
     async () => null,
   );
-  const [joinLiveSession, setJoinLiveSession] = useState<JoinLiveSessionHandler | undefined>(
-    undefined,
-  );
+  const [joinLiveSession, setJoinLiveSession] = useState<
+    JoinLiveSessionHandler | undefined
+  >(undefined);
   const [threadHandlers, setThreadHandlers] = useState<ThreadActionHandlers>({});
   const [threadData, setThreadDataState] = useState<Record<UUID, ThreadData>>({});
   const [getMessageActionState, setGetMessageActionState] = useState<
@@ -284,6 +295,7 @@ export function MessagesStateProvider({
       sessionSummaryCount,
       messages,
       messageFilter,
+      showCreateMessageTypeButton,
       createTextMessage,
       sendTextMessage,
       sendFileMessage,
@@ -322,6 +334,7 @@ export function MessagesStateProvider({
       sessionSummaryCount,
       messages,
       messageFilter,
+      showCreateMessageTypeButton,
       createTextMessage,
       sendTextMessage,
       sendFileMessage,

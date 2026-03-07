@@ -15,6 +15,20 @@ import type {
   ClassScheduleVisibilityVM,
   ClassSchedulePatchVM,
   ThemeKey,
+  ActivityFeedVM,
+  ActivityFeedItemVM,
+  ActivityFeedLeafItemVM,
+  ActivityFeedSectionVM,
+  ActivityFeedTabVM,
+  InboxTabKeyVM,
+  ActivityVerbVM,
+  ActivityItemContentVM,
+  ActivityItemAudienceVM,
+  ActivityItemRefsVM,
+  ActivityItemStateVM,
+  ActivityItemGroupingVM,
+  ActivityFeedItemRow,
+  ActivityFeedGroupMemberRow,
 } from '@iconicedu/shared-types';
 import {
   mapRowToMessageVM,
@@ -671,6 +685,17 @@ export async function toggleReaction(
 
   if (selectError) throw selectError;
 
+  const { data: countRow, error: countSelectError } = await supabase
+    .from('message_reaction_counts')
+    .select('id, count')
+    .eq('org_id', orgId)
+    .eq('message_id', messageId)
+    .eq('emoji', emoji)
+    .is('deleted_at', null)
+    .maybeSingle<{ id: string; count: number }>();
+
+  if (countSelectError) throw countSelectError;
+
   if (existing) {
     const { error } = await supabase
       .from('message_reactions')
@@ -680,11 +705,40 @@ export async function toggleReaction(
       .eq('account_id', accountId)
       .eq('emoji', emoji);
     if (error) throw error;
+
+    if (countRow) {
+      if (countRow.count <= 1) {
+        const { error: deleteCountError } = await supabase
+          .from('message_reaction_counts')
+          .delete()
+          .eq('id', countRow.id);
+        if (deleteCountError) throw deleteCountError;
+      } else {
+        const { error: updateCountError } = await supabase
+          .from('message_reaction_counts')
+          .update({ count: countRow.count - 1 })
+          .eq('id', countRow.id);
+        if (updateCountError) throw updateCountError;
+      }
+    }
   } else {
     const { error } = await supabase
       .from('message_reactions')
       .insert({ org_id: orgId, message_id: messageId, account_id: accountId, emoji });
     if (error) throw error;
+
+    if (countRow) {
+      const { error: updateCountError } = await supabase
+        .from('message_reaction_counts')
+        .update({ count: countRow.count + 1 })
+        .eq('id', countRow.id);
+      if (updateCountError) throw updateCountError;
+    } else {
+      const { error: insertCountError } = await supabase
+        .from('message_reaction_counts')
+        .insert({ org_id: orgId, message_id: messageId, emoji, count: 1 });
+      if (insertCountError) throw insertCountError;
+    }
   }
 }
 
@@ -1199,18 +1253,16 @@ export async function saveEducatorAvailabilityStep(
   weeklyCommitment: number | null,
   availability: DayAvailability,
 ) {
-  const { error } = await supabase
-    .from('educator_availabilities')
-    .upsert(
-      {
-        profile_id: profileId,
-        org_id: orgId,
-        class_types: classTypes,
-        weekly_commitment: weeklyCommitment,
-        availability,
-      },
-      { onConflict: 'profile_id' },
-    );
+  const { error } = await supabase.from('educator_availabilities').upsert(
+    {
+      profile_id: profileId,
+      org_id: orgId,
+      class_types: classTypes,
+      weekly_commitment: weeklyCommitment,
+      availability,
+    },
+    { onConflict: 'profile_id' },
+  );
   if (error) throw error;
 }
 
@@ -1710,4 +1762,249 @@ export async function fetchSpaceSchedulesByChannelId(
 
   if (error) throw error;
   return (data ?? []).map((row) => mapClassScheduleRow(row as Record<string, unknown>));
+}
+
+// ---------------------------------------------------------------------------
+// Activity feed
+// ---------------------------------------------------------------------------
+
+const ACTIVITY_FEED_ITEM_SELECT = [
+  'id',
+  'org_id',
+  'recipient_profile_id',
+  'source_event_id',
+  'kind',
+  'occurred_at',
+  'created_at',
+  'tab_key',
+  'audience',
+  'verb',
+  'actor_profile_id',
+  'refs',
+  'group_key',
+  'group_type',
+  'is_collapsed',
+  'sub_activity_count',
+  'content',
+  'summary',
+  'preview',
+  'action_button',
+  'expanded_content',
+  'importance',
+  'is_read',
+  'read_at',
+  'dedupe_key',
+  'metadata',
+  'updated_at',
+  'deleted_at',
+].join(',');
+
+const ACTIVITY_FEED_GROUP_MEMBER_SELECT =
+  'id,org_id,group_id,item_id,updated_at,deleted_at';
+
+const FEED_TABS: Array<{ key: InboxTabKeyVM; label: string }> = [
+  { key: 'all', label: 'All' },
+  { key: 'classes', label: 'Classes' },
+  { key: 'payment', label: 'Payment' },
+  { key: 'system', label: 'System' },
+];
+
+function mapFeedRow(row: ActivityFeedItemRow): ActivityFeedItemVM {
+  const contentBase = (row.content ?? {}) as Partial<ActivityItemContentVM>;
+  const content: ActivityItemContentVM = {
+    ...contentBase,
+    headline: contentBase.headline ?? { primary: row.summary ?? 'Activity update' },
+    summary: contentBase.summary ?? row.summary ?? undefined,
+    preview:
+      contentBase.preview ??
+      (row.preview as ActivityItemContentVM['preview']) ??
+      undefined,
+    actionButton:
+      contentBase.actionButton ??
+      (row.action_button as ActivityItemContentVM['actionButton']) ??
+      undefined,
+    expandedContent: contentBase.expandedContent ?? row.expanded_content ?? undefined,
+  };
+
+  const refsBase = (row.refs ?? {}) as Partial<ActivityItemRefsVM>;
+  const refs = { ...refsBase } as ActivityItemRefsVM;
+
+  const audienceBase = (row.audience ?? {}) as Partial<ActivityItemAudienceVM>;
+  const audience: ActivityItemAudienceVM = {
+    ...audienceBase,
+    scope: audienceBase.scope ?? { kind: 'global' },
+    visibility: audienceBase.visibility ?? 'public',
+  };
+
+  const grouping: ActivityItemGroupingVM | undefined =
+    row.group_key || row.group_type
+      ? {
+          groupKey: row.group_key ?? undefined,
+          groupType: row.group_type as ActivityItemGroupingVM['groupType'],
+        }
+      : undefined;
+
+  const state: ActivityItemStateVM = {
+    importance: row.importance as ActivityItemStateVM['importance'],
+    isRead: row.is_read ?? undefined,
+  };
+
+  return {
+    kind: (row.kind ?? 'leaf') as ActivityFeedItemVM['kind'],
+    ids: { id: row.id, orgId: row.org_id },
+    timestamps: {
+      occurredAt: row.occurred_at ?? row.created_at,
+      createdAt: row.created_at,
+    },
+    tabKey: row.tab_key as InboxTabKeyVM,
+    audience,
+    verb: row.verb as ActivityVerbVM,
+    refs,
+    content,
+    state,
+    grouping,
+    subActivityCount: row.sub_activity_count ?? undefined,
+    isCollapsed: row.is_collapsed ?? undefined,
+  } as ActivityFeedItemVM;
+}
+
+function attachFeedGroupMembers(
+  items: ActivityFeedItemVM[],
+  groupMembers: ActivityFeedGroupMemberRow[],
+): ActivityFeedItemVM[] {
+  if (!groupMembers.length) return items;
+
+  const itemMap = new Map(items.map((item) => [item.ids.id, item]));
+  const membersByGroup = new Map<string, string[]>();
+  groupMembers.forEach((member) => {
+    const list = membersByGroup.get(member.group_id) ?? [];
+    list.push(member.item_id);
+    membersByGroup.set(member.group_id, list);
+  });
+
+  const groupedMemberIds = new Set<string>();
+  const withGroups = items.map((item) => {
+    if (item.kind !== 'group') return item;
+
+    const memberIds = membersByGroup.get(item.ids.id) ?? [];
+    const members = memberIds
+      .map((id) => itemMap.get(id))
+      .filter((m): m is ActivityFeedLeafItemVM => m !== undefined && m.kind === 'leaf');
+
+    memberIds.forEach((id) => groupedMemberIds.add(id));
+
+    return {
+      ...item,
+      subActivities: { items: members },
+      subActivityCount: item.subActivityCount ?? members.length,
+    } as ActivityFeedItemVM;
+  });
+
+  return withGroups.filter(
+    (item) => item.kind === 'group' || !groupedMemberIds.has(item.ids.id),
+  );
+}
+
+function buildFeedSections(items: ActivityFeedItemVM[]): ActivityFeedSectionVM[] {
+  if (!items.length) return [];
+
+  const now = new Date();
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  const startOfWeek = new Date(startOfToday);
+  startOfWeek.setDate(startOfWeek.getDate() - 7);
+
+  const today: ActivityFeedItemVM[] = [];
+  const thisWeek: ActivityFeedItemVM[] = [];
+  const older: ActivityFeedItemVM[] = [];
+
+  items.forEach((item) => {
+    const occurredAt = new Date(item.timestamps.occurredAt);
+    if (occurredAt >= startOfToday) {
+      today.push(item);
+      return;
+    }
+    if (occurredAt >= startOfWeek) {
+      thisWeek.push(item);
+      return;
+    }
+    older.push(item);
+  });
+
+  const sections: ActivityFeedSectionVM[] = [];
+  if (today.length) sections.push({ label: 'Today', items: today });
+  if (thisWeek.length) sections.push({ label: 'This week', items: thisWeek });
+  if (older.length) sections.push({ label: 'Earlier', items: older });
+  return sections;
+}
+
+function buildFeedTabs(items: ActivityFeedItemVM[]): ActivityFeedTabVM[] {
+  const counts = new Map<InboxTabKeyVM, number>();
+  items.forEach((item) => {
+    const unread =
+      item.kind === 'group'
+        ? ((
+            item as { subActivities?: { items: ActivityFeedLeafItemVM[] } }
+          ).subActivities?.items.filter((sub) => !sub.state?.isRead).length ??
+          (!item.state?.isRead ? 1 : 0))
+        : !item.state?.isRead
+          ? 1
+          : 0;
+    if (!unread) return;
+    counts.set(item.tabKey, (counts.get(item.tabKey) ?? 0) + unread);
+  });
+
+  return FEED_TABS.map((tab) => ({
+    key: tab.key,
+    label: tab.label,
+    badgeCount:
+      tab.key === 'all'
+        ? Array.from(counts.values()).reduce((t, n) => t + n, 0)
+        : (counts.get(tab.key) ?? 0),
+  }));
+}
+
+export async function fetchActivityFeed(
+  orgId: string,
+  profileId: string,
+): Promise<ActivityFeedVM> {
+  const { data: itemRows, error: itemsError } = await supabase
+    .from('activity_feed_items')
+    .select(ACTIVITY_FEED_ITEM_SELECT)
+    .eq('org_id', orgId)
+    .eq('recipient_profile_id', profileId)
+    .is('deleted_at', null)
+    .order('occurred_at', { ascending: false })
+    .returns<ActivityFeedItemRow[]>();
+
+  if (itemsError) throw itemsError;
+  const rows = itemRows ?? [];
+
+  const groupIds = rows.filter((r) => r.kind === 'group').map((r) => r.id);
+  let groupMembers: ActivityFeedGroupMemberRow[] = [];
+  if (groupIds.length) {
+    const { data: members, error: membersError } = await supabase
+      .from('activity_feed_group_members')
+      .select(ACTIVITY_FEED_GROUP_MEMBER_SELECT)
+      .eq('org_id', orgId)
+      .in('group_id', groupIds)
+      .is('deleted_at', null)
+      .returns<ActivityFeedGroupMemberRow[]>();
+    if (membersError) throw membersError;
+    groupMembers = members ?? [];
+  }
+
+  const mappedItems = rows.map(mapFeedRow);
+  const groupedItems = attachFeedGroupMembers(mappedItems, groupMembers);
+  const sections = buildFeedSections(groupedItems);
+  const tabs = buildFeedTabs(mappedItems);
+  const unreadCount = mappedItems.filter((item) => !item.state?.isRead).length;
+
+  return {
+    activeTab: 'all',
+    tabs,
+    sections,
+    nextCursor: null,
+    unreadCount,
+  };
 }

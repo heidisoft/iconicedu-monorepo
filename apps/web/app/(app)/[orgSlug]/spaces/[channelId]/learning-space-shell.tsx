@@ -19,6 +19,7 @@ export function LearningSpaceShell({
   currentUserId,
   currentUserProfile,
   readOnly = false,
+  showCreateMessageTypeButton = true,
   sendTextMessage,
   sendFileMessage,
   sendFilesMessage,
@@ -33,13 +34,26 @@ export function LearningSpaceShell({
   currentUserId?: string;
   currentUserProfile?: UserProfileVM | null;
   readOnly?: boolean;
+  showCreateMessageTypeButton?: boolean;
   sendTextMessage: (input: MessageSendTextInput) => Promise<MessageVM>;
   sendFileMessage: (input: MessageSendFileInput) => Promise<MessageVM>;
   sendFilesMessage: (input: MessageSendFilesInput) => Promise<MessageVM>;
-  toggleReaction: (input: { orgId: string; messageId: string; emoji: string }) => Promise<void>;
-  toggleSavedMessage: (input: { orgId: string; messageId: string; isSaved: boolean }) => Promise<void>;
+  toggleReaction: (input: {
+    orgId: string;
+    messageId: string;
+    emoji: string;
+  }) => Promise<void>;
+  toggleSavedMessage: (input: {
+    orgId: string;
+    messageId: string;
+    isSaved: boolean;
+  }) => Promise<void>;
   deleteMessage: (input: { orgId: string; messageId: string }) => Promise<void>;
-  toggleHiddenMessage: (input: { orgId: string; messageId: string; isHidden: boolean }) => Promise<void>;
+  toggleHiddenMessage: (input: {
+    orgId: string;
+    messageId: string;
+    isHidden: boolean;
+  }) => Promise<void>;
 }) {
   return (
     <MessagesShellClient
@@ -48,6 +62,7 @@ export function LearningSpaceShell({
       currentUserId={currentUserId}
       currentUserProfile={currentUserProfile}
       readOnly={readOnly}
+      showCreateMessageTypeButton={showCreateMessageTypeButton}
       panelRegistry={{
         channel_info: (props) => (
           <LearningSpaceInfoPanel {...props} learningSpace={learningSpace} />

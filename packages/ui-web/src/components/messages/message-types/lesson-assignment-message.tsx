@@ -5,7 +5,10 @@ import { BookOpen, Calendar, Clock, FileText, Download } from 'lucide-react';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
 import type { LessonAssignmentMessageVM as LessonAssignmentMessageType } from '@iconicedu/shared-types';
-import { MessageBase, type MessageBaseProps } from '@iconicedu/ui-web/components/messages/message-base';
+import {
+  MessageBase,
+  type MessageBaseProps,
+} from '@iconicedu/ui-web/components/messages/message-base';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 
 interface LessonAssignmentMessageProps extends Omit<
@@ -30,11 +33,16 @@ const difficultyConfig = {
   },
 };
 
+export function getAssignmentTypeLabel(kind?: 'homework' | 'lesson') {
+  return kind === 'lesson' ? 'Lesson' : 'Homework';
+}
+
 export const LessonAssignmentMessage = memo(function LessonAssignmentMessage(
   props: LessonAssignmentMessageProps,
 ) {
   const { message, ...baseProps } = props;
   const { assignment } = message;
+  const assignmentTypeLabel = getAssignmentTypeLabel(assignment.kind);
   const difficulty = assignment.difficulty
     ? difficultyConfig[assignment.difficulty]
     : null;
@@ -71,7 +79,9 @@ export const LessonAssignmentMessage = memo(function LessonAssignmentMessage(
                 <BookOpen className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <p className="text-xs font-medium text-muted-foreground">Assignment</p>
+                <p className="text-xs font-medium text-muted-foreground">
+                  {assignmentTypeLabel}
+                </p>
                 <p className="text-sm font-semibold text-foreground">
                   {assignment.title}
                 </p>

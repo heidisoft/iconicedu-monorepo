@@ -27,10 +27,13 @@ describe('LearningSpaceShell', () => {
     render(
       <LearningSpaceShell
         orgSlug="iconic-academy"
-        channel={{ ids: { id: 'channel-1', orgId: 'org-1' } } as any}
+        channel={{ ids: { id: 'channel-1', orgId: 'org-1' } } as unknown}
         learningSpace={null}
         currentUserId="profile-1"
-        currentUserProfile={{ ids: { id: 'profile-1', orgId: 'org-1', accountId: 'account-1' } } as any}
+        currentUserProfile={
+          { ids: { id: 'profile-1', orgId: 'org-1', accountId: 'account-1' } } as unknown
+        }
+        showCreateMessageTypeButton={false}
         sendTextMessage={sendTextMessage}
         sendFileMessage={sendFileMessage}
         sendFilesMessage={sendFilesMessage}
@@ -45,8 +48,11 @@ describe('LearningSpaceShell', () => {
       expect(messagesShellMock).toHaveBeenCalledWith(
         expect.objectContaining({
           currentUserId: 'profile-1',
-          currentUserProfile: { ids: { id: 'profile-1', orgId: 'org-1', accountId: 'account-1' } },
+          currentUserProfile: {
+            ids: { id: 'profile-1', orgId: 'org-1', accountId: 'account-1' },
+          },
           readOnly: false,
+          showCreateMessageTypeButton: false,
           sendTextMessage,
           sendFileMessage,
           sendFilesMessage,
@@ -63,7 +69,7 @@ describe('LearningSpaceShell', () => {
     render(
       <LearningSpaceShell
         orgSlug="iconic-academy"
-        channel={{ ids: { id: 'channel-1', orgId: 'org-1' } } as any}
+        channel={{ ids: { id: 'channel-1', orgId: 'org-1' } } as unknown}
         learningSpace={null}
         currentUserId="profile-1"
         readOnly

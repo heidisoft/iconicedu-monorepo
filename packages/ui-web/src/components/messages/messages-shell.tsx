@@ -19,11 +19,7 @@ import type {
   MessagesRightPanelIntent,
 } from '@iconicedu/shared-types';
 import { useHasHydrated, useIsMobile } from '../../hooks/use-mobile';
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from '../../ui/resizable';
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '../../ui/resizable';
 
 interface MessagesRightPanelProps {
   intent: MessagesRightPanelIntent;
@@ -53,7 +49,11 @@ export const MessagesShell = memo(function MessagesShell(props: MessagesShellPro
   }, [props.panelRegistry]);
 
   return (
-    <MessagesStateProvider channel={channel} isReadOnly={props.readOnly}>
+    <MessagesStateProvider
+      channel={channel}
+      isReadOnly={props.readOnly}
+      showCreateMessageTypeButton={props.showCreateMessageTypeButton}
+    >
       <MessagesShellLayout {...props} registry={rightPanelRegistry} />
     </MessagesStateProvider>
   );

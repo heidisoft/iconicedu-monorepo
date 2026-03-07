@@ -6,6 +6,7 @@ import Page from '@iconicedu/web/app/(app)/[orgSlug]/c/[channelId]/page';
 
 const messagesShellMock = vi.fn(() => null);
 const buildChannelByIdMock = vi.fn();
+const enableMessageTypeComposerRunMock = vi.fn(async () => true);
 
 vi.mock('@iconicedu/ui-web', () => ({
   DashboardHeader: () => null,
@@ -36,12 +37,14 @@ vi.mock('@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth', () => ({
   })),
 }));
 
-vi.mock('@iconicedu/web/lib/profile/builders/user-profile.builder', () => ({
-  buildUserProfileById: vi.fn(async () => ({ ids: { id: 'profile-1', orgId: 'org-1' } })),
-}));
-
 vi.mock('@iconicedu/web/lib/channels/builders/channel.builder', () => ({
   buildChannelById: (...args: unknown[]) => buildChannelByIdMock(...args),
+}));
+
+vi.mock('@iconicedu/web/flags', () => ({
+  enableMessageTypeComposer: {
+    run: (...args: unknown[]) => enableMessageTypeComposerRunMock(...args),
+  },
 }));
 
 describe('d/c/[channelId] page', () => {
@@ -52,7 +55,9 @@ describe('d/c/[channelId] page', () => {
         participants: [{ ids: { accountId: 'account-1' } }],
       },
     });
-    const element = await Page({ params: Promise.resolve({ orgSlug: 'iconic-academy', channelId: 'channel-1' }) });
+    const element = await Page({
+      params: Promise.resolve({ orgSlug: 'iconic-academy', channelId: 'channel-1' }),
+    });
     render(element as React.ReactElement);
     await waitFor(() => {
       expect(messagesShellMock).toHaveBeenCalledWith(
@@ -60,19 +65,22 @@ describe('d/c/[channelId] page', () => {
           currentUserId: 'profile-1',
           currentUserProfile: { ids: { id: 'profile-1', orgId: 'org-1' } },
           readOnly: false,
+          showCreateMessageTypeButton: true,
         }),
       );
     });
   });
 
   it('enables read-only mode for staff who are not channel participants', async () => {
-    const { buildUserProfileById } = await import(
-      '@iconicedu/web/lib/profile/builders/user-profile.builder'
-    );
-    vi.mocked(buildUserProfileById).mockResolvedValueOnce({
-      kind: 'staff',
-      ids: { id: 'profile-1', orgId: 'org-1', accountId: 'account-1' },
-    } as any);
+    const { getDashboardProfileContext } =
+      await import('@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth');
+    vi.mocked(getDashboardProfileContext).mockResolvedValueOnce({
+      profileResponse: { data: { id: 'profile-1' } },
+      currentUserProfile: {
+        kind: 'staff',
+        ids: { id: 'profile-1', orgId: 'org-1', accountId: 'account-1' },
+      } as unknown,
+    });
     buildChannelByIdMock.mockResolvedValueOnce({
       ids: { id: 'channel-1', orgId: 'org-1' },
       collections: {
@@ -80,7 +88,9 @@ describe('d/c/[channelId] page', () => {
       },
     });
 
-    const element = await Page({ params: Promise.resolve({ orgSlug: 'iconic-academy', channelId: 'channel-1' }) });
+    const element = await Page({
+      params: Promise.resolve({ orgSlug: 'iconic-academy', channelId: 'channel-1' }),
+    });
     render(element as React.ReactElement);
     await waitFor(() => {
       expect(messagesShellMock).toHaveBeenCalledWith(

@@ -7,6 +7,9 @@ const monorepoRoot = path.resolve(projectRoot, '../..');
 
 const config = getDefaultConfig(projectRoot);
 
+// Exclude test files from the bundle
+config.resolver.blockList = /.*\.(test|spec)\.(ts|tsx|js|jsx)$/;
+
 // Watch all workspace packages
 config.watchFolders = [monorepoRoot];
 

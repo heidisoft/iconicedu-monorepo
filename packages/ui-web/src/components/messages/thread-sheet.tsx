@@ -1,10 +1,41 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useMemo } from 'react';
 import { MessageInput } from '@iconicedu/ui-web/components/messages/message-input';
-import type { ThreadPanelPropsVM } from '@iconicedu/shared-types';
+import type {
+  ConnectionVM,
+  MessageMentionVM,
+  MessageVM,
+  ThreadReadStateVM,
+  UUID,
+} from '@iconicedu/shared-types';
 import { ScrollArea } from '@iconicedu/ui-web/ui/scroll-area';
 import { ThreadMessageList } from '@iconicedu/ui-web/components/messages/shared/thread-message-list';
 import { useMessagesState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
 import type { MessageActionState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
+
+type ThreadSheetProps = {
+  replies: ConnectionVM<MessageVM>;
+  parentMessage?: MessageVM;
+  actions: {
+    onSendReply: (
+      content: string,
+      mentions?: MessageMentionVM[],
+      homework?: {
+        kind?: 'homework' | 'lesson';
+        title: string;
+        description?: string;
+        dueAt: string;
+        subject?: string;
+      } | null,
+    ) => void;
+    onProfileClick: (userId: UUID) => void;
+    onToggleReaction?: (messageId: UUID, emoji: string) => void;
+    onToggleSaved?: (messageId: UUID) => void;
+    onToggleHidden?: (messageId: UUID) => void;
+    onDelete?: (messageId: UUID) => void;
+  };
+  readState?: ThreadReadStateVM;
+  currentUserId?: UUID;
+};
 
 export function ThreadSheet({
   replies,
@@ -13,10 +44,12 @@ export function ThreadSheet({
   currentUserId,
   readState,
   isReadOnly = false,
+  showCreateMessageTypeButton = true,
   onAttachReplyFile,
   getMessageActionState,
-}: ThreadPanelPropsVM & {
+}: ThreadSheetProps & {
   isReadOnly?: boolean;
+  showCreateMessageTypeButton?: boolean;
   onAttachReplyFile?: (
     attachments: Array<{ file: File; durationSeconds?: number }>,
     content?: string,
@@ -24,14 +57,12 @@ export function ThreadSheet({
   getMessageActionState?: (messageId: string) => MessageActionState | undefined;
 }) {
   const { channel } = useMessagesState();
-  const {
-    onSendReply,
-    onProfileClick,
-    onToggleReaction,
-    onToggleSaved,
-    onToggleHidden,
-  } = actions;
-  const messages = parentMessage ? [parentMessage, ...replies.items] : replies.items;
+  const { onSendReply, onProfileClick, onToggleReaction, onToggleSaved, onToggleHidden } =
+    actions;
+  const messages = useMemo(
+    () => (parentMessage ? [parentMessage, ...replies.items] : replies.items),
+    [parentMessage, replies.items],
+  );
   const bottomRef = useRef<HTMLDivElement>(null);
   const messageCountRef = useRef(messages.length);
 
@@ -73,6 +104,7 @@ export function ThreadSheet({
             sticky={false}
             participants={channel.collections.participants}
             currentUserId={currentUserId}
+            showCreateMessageTypeButton={showCreateMessageTypeButton}
           />
         )}
       </div>

@@ -53,6 +53,7 @@ type ActivityChannelContext = {
 };
 
 type HomeworkMessageIntent = {
+  kind: 'homework' | 'lesson';
   cleanedContent: string;
   description: string;
   title: string;
@@ -109,68 +110,32 @@ function sanitizeMentions(
 function deriveHomeworkMessageIntent(
   content: string,
   activityContext: ActivityChannelContext,
-  now: string,
   explicitHomework?: {
+    kind?: 'homework' | 'lesson';
     title: string;
     description?: string;
     dueAt: string;
     subject?: string;
   } | null,
 ): HomeworkMessageIntent | null {
-  if (explicitHomework) {
-    const cleanedContent = content.trim();
-    return {
-      cleanedContent,
-      description:
-        explicitHomework.description?.trim() ||
-        cleanedContent ||
-        'Open the class to review the new assignment.',
-      title: explicitHomework.title.trim() || 'Homework assignment',
-      dueAt: explicitHomework.dueAt,
-      subject:
-        explicitHomework.subject?.trim() ||
-        activityContext.learningSpaceTitle ||
-        activityContext.channelTopic ||
-        'Homework',
-    };
-  }
-
-  const homeworkTriggerPattern = /(^|\s)@(homework|homeowork)\b/gi;
-
-  if (!homeworkTriggerPattern.test(content)) {
+  if (!explicitHomework) {
     return null;
   }
 
-  const cleanedContent = content
-    .replace(homeworkTriggerPattern, '$1')
-    .replace(/[ \t]{2,}/g, ' ')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-
-  const description = cleanedContent || 'Open the class to review the new assignment.';
-  const firstMeaningfulLine =
-    description
-      .split('\n')
-      .map((line) => line.trim())
-      .find(Boolean)
-      ?.replace(/[.!?]+$/, '') ?? '';
-
-  const title =
-    firstMeaningfulLine.slice(0, 72) ||
-    activityContext.learningSpaceTitle ||
-    activityContext.channelTopic ||
-    'Homework assignment';
-
-  const dueDate = new Date(now);
-  dueDate.setUTCDate(dueDate.getUTCDate() + 7);
-
   return {
-    cleanedContent,
-    description,
-    title,
-    dueAt: dueDate.toISOString(),
+    kind: explicitHomework.kind === 'lesson' ? 'lesson' : 'homework',
+    cleanedContent: content.trim(),
+    description:
+      explicitHomework.description?.trim() ||
+      content.trim() ||
+      'Open the class to review the new assignment.',
+    title: explicitHomework.title.trim() || 'Homework assignment',
+    dueAt: explicitHomework.dueAt,
     subject:
-      activityContext.learningSpaceTitle ?? activityContext.channelTopic ?? 'Homework',
+      explicitHomework.subject?.trim() ||
+      activityContext.learningSpaceTitle ||
+      activityContext.channelTopic ||
+      'Homework',
   };
 }
 
@@ -748,7 +713,6 @@ export async function sendTextMessageAction(
   const homeworkIntent = deriveHomeworkMessageIntent(
     input.content,
     activityContext,
-    now,
     input.homework ?? null,
   );
   const firstUrl = homeworkIntent ? null : extractFirstUrl(input.content);
@@ -802,6 +766,8 @@ export async function sendTextMessageAction(
       org_id: accountResponse.data.org_id,
       payload: homeworkIntent
         ? {
+            kind: homeworkIntent.kind,
+            text: homeworkIntent.cleanedContent,
             title: homeworkIntent.title,
             description: homeworkIntent.description,
             dueAt: homeworkIntent.dueAt,
@@ -854,7 +820,7 @@ export async function sendTextMessageAction(
       senderProfileId: currentProfileId,
       senderName: sender.profile.displayName ?? 'Someone',
       messageId: messageInsert.data.id,
-      content: input.content,
+      content: homeworkIntent?.cleanedContent ?? input.content,
       mentions: sanitizedMentions,
       now,
     });
@@ -903,7 +869,7 @@ export async function sendTextMessageAction(
       senderProfileId: currentProfileId,
       senderName: senderDisplayName,
       messageId: messageInsert.data.id,
-      content: input.content,
+      content: homeworkIntent?.cleanedContent ?? input.content,
       threadId,
       threadReply: Boolean(threadId && input.threadParentId),
       activityContext,
@@ -932,21 +898,30 @@ export async function sendTextMessageAction(
 
   return mapMessageRowToVM(messageInsert.data, {
     sender,
-    payload: previewMetadata
+    payload: homeworkIntent
       ? {
-          ...(input.content.trim() ? { text: input.content } : {}),
-          ...(sanitizedMentions.length ? { mentions: sanitizedMentions } : {}),
-          url: previewMetadata.url,
-          title: previewMetadata.title,
-          description: previewMetadata.description,
-          imageUrl: previewMetadata.imageUrl,
-          siteName: previewMetadata.siteName,
-          favicon: previewMetadata.favicon,
+          kind: homeworkIntent.kind,
+          text: homeworkIntent.cleanedContent,
+          title: homeworkIntent.title,
+          description: homeworkIntent.description,
+          dueAt: homeworkIntent.dueAt,
+          subject: homeworkIntent.subject,
         }
-      : {
-          text: input.content,
-          ...(sanitizedMentions.length ? { mentions: sanitizedMentions } : {}),
-        },
+      : previewMetadata
+        ? {
+            ...(input.content.trim() ? { text: input.content } : {}),
+            ...(sanitizedMentions.length ? { mentions: sanitizedMentions } : {}),
+            url: previewMetadata.url,
+            title: previewMetadata.title,
+            description: previewMetadata.description,
+            imageUrl: previewMetadata.imageUrl,
+            siteName: previewMetadata.siteName,
+            favicon: previewMetadata.favicon,
+          }
+        : {
+            text: input.content,
+            ...(sanitizedMentions.length ? { mentions: sanitizedMentions } : {}),
+          },
     reactions: [],
     thread: thread ?? undefined,
   });

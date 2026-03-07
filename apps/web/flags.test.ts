@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   enableChannelCommunications,
+  enableMessageTypeComposer,
   getFlagsProviderData,
   isVercelFlagsSdkConfigured,
   webFlags,
@@ -14,6 +15,12 @@ describe('web flags', () => {
     expect(webFlags.enableChannelCommunications).toBe(enableChannelCommunications);
   });
 
+  it('declares the message type composer flag with stable metadata', () => {
+    expect(enableMessageTypeComposer.key).toBe('enable-message-type-composer');
+    expect(enableMessageTypeComposer.defaultValue).toBe(false);
+    expect(webFlags.enableMessageTypeComposer).toBe(enableMessageTypeComposer);
+  });
+
   it('does not require FLAGS env to load the catalog', () => {
     expect(isVercelFlagsSdkConfigured()).toBe(false);
   });
@@ -23,5 +30,6 @@ describe('web flags', () => {
 
     expect(providerData).toBeTruthy();
     expect(JSON.stringify(providerData)).toContain('enable-channel-communications');
+    expect(JSON.stringify(providerData)).toContain('enable-message-type-composer');
   });
 });

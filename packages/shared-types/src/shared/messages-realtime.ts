@@ -45,6 +45,7 @@ export type MessageSendTextInput = {
   content: string;
   mentions?: MessageMentionVM[];
   homework?: {
+    kind?: 'homework' | 'lesson';
     title: string;
     description?: string;
     dueAt: string;

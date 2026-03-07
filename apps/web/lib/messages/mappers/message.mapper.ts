@@ -22,7 +22,6 @@ import type {
   PaymentReminderMessageVM,
   ReactionVM,
   SessionBookingMessageVM,
-  SessionSummaryMessageVM,
   LiveSessionStartedMessageVM,
   ThreadVM,
   UserProfileVM,
@@ -137,7 +136,8 @@ function resolveLiveSessionStartedStatus(
 
   const startedAt =
     typeof payload?.startedAt === 'string' ? Date.parse(payload.startedAt) : Number.NaN;
-  const endsAt = typeof payload?.endsAt === 'string' ? Date.parse(payload.endsAt) : Number.NaN;
+  const endsAt =
+    typeof payload?.endsAt === 'string' ? Date.parse(payload.endsAt) : Number.NaN;
   const effectiveEndsAt = Number.isFinite(endsAt)
     ? endsAt
     : Number.isFinite(startedAt)
@@ -151,10 +151,7 @@ function resolveLiveSessionStartedStatus(
   return 'live';
 }
 
-export function mapMessageRowToVM(
-  row: MessageRow,
-  input: MessageMapperInput,
-): MessageVM {
+export function mapMessageRowToVM(row: MessageRow, input: MessageMapperInput): MessageVM {
   const type = row.type as MessageTypeVM;
   const payload = input.payload ?? null;
   const core: MessageCoreVM = {
@@ -188,9 +185,8 @@ export function mapMessageRowToVM(
             : undefined,
         },
       };
-    case 'image':
-      {
-        const attachments = mapFileAttachments(payload, type) as ImageAttachmentVM[];
+    case 'image': {
+      const attachments = mapFileAttachments(payload, type) as ImageAttachmentVM[];
       return {
         ...base,
         core: { ...core, type: 'image' },
@@ -198,10 +194,9 @@ export function mapMessageRowToVM(
         attachment: attachments[0],
         attachments,
       };
-      }
-    case 'file':
-      {
-        const attachments = mapFileAttachments(payload, type) as FileAttachmentVM[];
+    }
+    case 'file': {
+      const attachments = mapFileAttachments(payload, type) as FileAttachmentVM[];
       return {
         ...base,
         core: { ...core, type: 'file' },
@@ -209,7 +204,7 @@ export function mapMessageRowToVM(
         attachment: attachments[0],
         attachments,
       };
-      }
+    }
     case 'design-file-update':
       return {
         ...base,
@@ -227,9 +222,13 @@ export function mapMessageRowToVM(
           amount: Number(payload?.amount ?? 0),
           currency: String(payload?.currency ?? 'USD'),
           dueAt: String(payload?.dueAt ?? row.created_at),
-          status: (payload?.status as PaymentReminderMessageVM['payment']['status']) ?? 'pending',
-          invoiceId: typeof payload?.invoiceId === 'string' ? payload.invoiceId : undefined,
-          description: typeof payload?.description === 'string' ? payload.description : undefined,
+          status:
+            (payload?.status as PaymentReminderMessageVM['payment']['status']) ??
+            'pending',
+          invoiceId:
+            typeof payload?.invoiceId === 'string' ? payload.invoiceId : undefined,
+          description:
+            typeof payload?.description === 'string' ? payload.description : undefined,
         },
       } as MessageVM;
     case 'event-reminder':
@@ -243,7 +242,8 @@ export function mapMessageRowToVM(
           startAt: String(payload?.startAt ?? row.created_at),
           endAt: payload?.endAt ? String(payload.endAt) : undefined,
           location: typeof payload?.location === 'string' ? payload.location : undefined,
-          meetingLink: typeof payload?.meetingLink === 'string' ? payload.meetingLink : undefined,
+          meetingLink:
+            typeof payload?.meetingLink === 'string' ? payload.meetingLink : undefined,
           attendees: payload?.attendees as UserProfileVM[] | undefined,
           isAllDay: typeof payload?.isAllDay === 'boolean' ? payload.isAllDay : undefined,
         },
@@ -267,6 +267,10 @@ export function mapMessageRowToVM(
         core: { ...core, type: 'lesson-assignment' },
         content: { text: String(payload?.text ?? '') },
         assignment: {
+          kind:
+            payload?.kind === 'lesson' || payload?.kind === 'homework'
+              ? payload.kind
+              : undefined,
           title: String(payload?.title ?? ''),
           description: String(payload?.description ?? ''),
           dueAt: String(payload?.dueAt ?? row.created_at),
@@ -276,7 +280,8 @@ export function mapMessageRowToVM(
             typeof payload?.estimatedDuration === 'number'
               ? payload.estimatedDuration
               : undefined,
-          difficulty: payload?.difficulty as LessonAssignmentMessageVM['assignment']['difficulty'],
+          difficulty:
+            payload?.difficulty as LessonAssignmentMessageVM['assignment']['difficulty'],
         },
       } as MessageVM;
     case 'progress-update':
@@ -306,12 +311,15 @@ export function mapMessageRowToVM(
           startAt: String(payload?.startAt ?? row.created_at),
           endAt: payload?.endAt ? String(payload.endAt) : undefined,
           durationMinutes: Number(payload?.durationMinutes ?? 0),
-          meetingLink: typeof payload?.meetingLink === 'string' ? payload.meetingLink : undefined,
+          meetingLink:
+            typeof payload?.meetingLink === 'string' ? payload.meetingLink : undefined,
           location: typeof payload?.location === 'string' ? payload.location : undefined,
           status:
             (payload?.status as SessionBookingMessageVM['session']['status']) ??
             'scheduled',
-          topics: Array.isArray(payload?.topics) ? (payload.topics as string[]) : undefined,
+          topics: Array.isArray(payload?.topics)
+            ? (payload.topics as string[])
+            : undefined,
         },
       } as MessageVM;
     case 'session-complete':
@@ -378,7 +386,8 @@ export function mapMessageRowToVM(
         link: {
           url: String(payload?.url ?? ''),
           title: String(payload?.title ?? ''),
-          description: typeof payload?.description === 'string' ? payload.description : undefined,
+          description:
+            typeof payload?.description === 'string' ? payload.description : undefined,
           imageUrl: typeof payload?.imageUrl === 'string' ? payload.imageUrl : undefined,
           siteName: typeof payload?.siteName === 'string' ? payload.siteName : undefined,
           favicon: typeof payload?.favicon === 'string' ? payload.favicon : undefined,
@@ -391,7 +400,8 @@ export function mapMessageRowToVM(
         content: payload?.text ? { text: String(payload.text) } : undefined,
         audio: {
           url: String(payload?.url ?? ''),
-          storagePath: typeof payload?.storagePath === 'string' ? payload.storagePath : undefined,
+          storagePath:
+            typeof payload?.storagePath === 'string' ? payload.storagePath : undefined,
           durationSeconds: Number(payload?.durationSeconds ?? 0),
           waveform: Array.isArray(payload?.waveform)
             ? (payload.waveform as number[])
@@ -407,7 +417,9 @@ export function mapMessageRowToVM(
         content: payload?.text ? { text: String(payload.text) } : undefined,
         liveSession: {
           sessionId: String(payload?.sessionId ?? ''),
-          provider: (payload?.provider as LiveSessionStartedMessageVM['liveSession']['provider']) ?? 'daily',
+          provider:
+            (payload?.provider as LiveSessionStartedMessageVM['liveSession']['provider']) ??
+            'daily',
           title: String(payload?.title ?? ''),
           joinUrl: String(payload?.joinUrl ?? ''),
           startedByProfileId: String(payload?.startedByProfileId ?? input.sender.ids.id),

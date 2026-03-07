@@ -11,9 +11,7 @@ import {
 } from '@iconicedu/web/app/actions/messages';
 import { MessagesShellClient } from '@iconicedu/web/app/(app)/[orgSlug]/messages/messages-shell-client';
 
-import {
-  getProfileById,
-} from '@iconicedu/web/lib/profile/queries/profiles.query';
+import { getProfileById } from '@iconicedu/web/lib/profile/queries/profiles.query';
 import { ensureDirectMessageChannel } from '@iconicedu/web/lib/channels/actions/ensure-direct-message-channel';
 import {
   buildChannelByDmKey,
@@ -24,6 +22,7 @@ import {
   getDashboardAccountContext,
   getDashboardProfileContext,
 } from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
+import { enableMessageTypeComposer } from '@iconicedu/web/flags';
 
 const INITIAL_MESSAGES_PAGE_SIZE = 40;
 
@@ -68,9 +67,14 @@ export default async function Page({
   if (!channel) {
     notFound();
   }
+  const showCreateMessageTypeButton = await enableMessageTypeComposer.run({
+    identify: { profileId: profileResponse.data?.id ?? null },
+  });
 
   const participantAccountIds = new Set(
-    (channel.collections.participants ?? []).map((participant) => participant.ids.accountId),
+    (channel.collections.participants ?? []).map(
+      (participant) => participant.ids.accountId,
+    ),
   );
   const guardianChildAccountIds = new Set(
     currentUserProfile?.kind === 'guardian'
@@ -86,7 +90,11 @@ export default async function Page({
     (channel.basics.kind === 'dm' || channel.basics.kind === 'group_dm') &&
     !hasGuardianInChannel &&
     hasChildInChannel;
-  const isStaffReadOnly = isStaffObserverReadOnlyChannel(channel, account.id, currentUserProfile);
+  const isStaffReadOnly = isStaffObserverReadOnlyChannel(
+    channel,
+    account.id,
+    currentUserProfile,
+  );
 
   return (
     <div className="flex h-[calc(100vh-1.0rem)] flex-col">
@@ -97,6 +105,7 @@ export default async function Page({
         currentUserId={profileResponse.data?.id ?? ''}
         currentUserProfile={currentUserProfile}
         readOnly={isSupervisedReadOnly || isStaffReadOnly}
+        showCreateMessageTypeButton={showCreateMessageTypeButton}
         sendTextMessage={sendTextMessageAction}
         sendFileMessage={sendFileMessageAction}
         sendFilesMessage={sendFilesMessageAction}

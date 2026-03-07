@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -13,13 +14,15 @@ const mapMessageRowToVM = vi.fn();
 const buildUserProfileById = vi.fn();
 const publishActivityEvent = vi.fn();
 
-function createChannelLookupChain(data: {
-  id: string;
-  kind: string;
-  topic?: string | null;
-  primary_entity_kind?: string | null;
-  primary_entity_id?: string | null;
-} | null) {
+function createChannelLookupChain(
+  data: {
+    id: string;
+    kind: string;
+    topic?: string | null;
+    primary_entity_kind?: string | null;
+    primary_entity_id?: string | null;
+  } | null,
+) {
   const chain: any = {};
   chain.eq = vi.fn(() => chain);
   chain.is = vi.fn(() => chain);
@@ -39,7 +42,9 @@ vi.mock('@iconicedu/web/lib/auth/requireAuthedUser', () => ({
 }));
 
 vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
-  getAccountByAuthUserId: vi.fn(async () => ({ data: { id: 'account-1', org_id: 'org-1' } })),
+  getAccountByAuthUserId: vi.fn(async () => ({
+    data: { id: 'account-1', org_id: 'org-1' },
+  })),
 }));
 
 vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
@@ -61,7 +66,9 @@ vi.mock('@iconicedu/web/lib/messages/builders/thread.builder', () => ({
   buildThreadById: vi.fn(async () => ({ ids: { id: 'thread-1', orgId: 'org-1' } })),
 }));
 vi.mock('@iconicedu/web/lib/messages/link-preview', () => ({
-  extractFirstUrl: vi.fn((content: string) => content.match(/https?:\/\/\S+/)?.[0] ?? null),
+  extractFirstUrl: vi.fn(
+    (content: string) => content.match(/https?:\/\/\S+/)?.[0] ?? null,
+  ),
   fetchLinkPreviewMetadata: vi.fn(async (url: string) => ({
     url,
     title: 'Preview title',
@@ -77,10 +84,11 @@ describe('sendTextMessageAction', () => {
     mapMessageRowToVM.mockReset();
     buildUserProfileById.mockReset();
     publishActivityEvent.mockReset();
-    const { createSupabaseServiceClient } = await import(
-      '@iconicedu/web/lib/supabase/service'
-    );
-    (createSupabaseServiceClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue({
+    const { createSupabaseServiceClient } =
+      await import('@iconicedu/web/lib/supabase/service');
+    (
+      createSupabaseServiceClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue({
       from: vi.fn(),
     });
   });
@@ -90,12 +98,11 @@ describe('sendTextMessageAction', () => {
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
       from: vi.fn(),
     };
-    const { createSupabaseServerClient } = await import(
-      '@iconicedu/web/lib/supabase/server'
-    );
-    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
-      supabase,
-    );
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
     const insertMessage = vi.fn();
     const insertMessageText = vi.fn();
     const messageRow = {
@@ -123,7 +130,9 @@ describe('sendTextMessageAction', () => {
       return { insert: vi.fn() };
     });
 
-    buildUserProfileById.mockResolvedValueOnce({ ids: { id: 'profile-1', orgId: 'org-1' } });
+    buildUserProfileById.mockResolvedValueOnce({
+      ids: { id: 'profile-1', orgId: 'org-1' },
+    });
     mapMessageRowToVM.mockReturnValueOnce({ ids: { id: 'message-1', orgId: 'org-1' } });
 
     const result = await sendTextMessageAction({
@@ -152,17 +161,79 @@ describe('sendTextMessageAction', () => {
     expect(result).toEqual({ ids: { id: 'message-1', orgId: 'org-1' } });
   });
 
+  it('treats @homework text as plain text when explicit assignment metadata is not provided', async () => {
+    const supabase = {
+      auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
+      from: vi.fn(),
+    };
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
+    const insertMessage = vi.fn().mockReturnValue({
+      select: () => ({
+        single: async () => ({
+          data: {
+            id: 'message-tag-1',
+            org_id: 'org-1',
+            channel_id: 'channel-1',
+            sender_profile_id: 'profile-1',
+            type: 'text',
+            created_at: new Date().toISOString(),
+          },
+          error: null,
+        }),
+      }),
+    });
+    const insertMessageText = vi.fn().mockResolvedValue({ error: null });
+
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'messages') {
+        return { insert: insertMessage };
+      }
+      if (table === 'message_text') {
+        return { insert: insertMessageText };
+      }
+      return { insert: vi.fn() };
+    });
+
+    buildUserProfileById.mockResolvedValueOnce({
+      ids: { id: 'profile-1', orgId: 'org-1' },
+    });
+    mapMessageRowToVM.mockReturnValueOnce({
+      ids: { id: 'message-tag-1', orgId: 'org-1' },
+    });
+
+    await sendTextMessageAction({
+      orgId: 'org-1',
+      channelId: 'channel-1',
+      senderProfileId: 'profile-1',
+      content: '@homework Please review chapter 4',
+    });
+
+    expect(insertMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'text' }));
+    expect(insertMessageText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message_id: 'message-tag-1',
+        payload: { text: '@homework Please review chapter 4' },
+      }),
+    );
+    expect(publishActivityEvent).not.toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: 'homework.assigned' }),
+    );
+  });
+
   it('publishes inbox activity for direct messages', async () => {
     const supabase = {
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
       from: vi.fn(),
     };
-    const { createSupabaseServerClient } = await import(
-      '@iconicedu/web/lib/supabase/server'
-    );
-    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
-      supabase,
-    );
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
     const insertMessage = vi.fn().mockReturnValue({
       select: () => ({
         single: async () => ({
@@ -204,7 +275,9 @@ describe('sendTextMessageAction', () => {
       ids: { id: 'profile-1', orgId: 'org-1' },
       profile: { displayName: 'Priya' },
     });
-    mapMessageRowToVM.mockReturnValueOnce({ ids: { id: 'message-dm-1', orgId: 'org-1' } });
+    mapMessageRowToVM.mockReturnValueOnce({
+      ids: { id: 'message-dm-1', orgId: 'org-1' },
+    });
 
     await sendTextMessageAction({
       orgId: 'org-1',
@@ -225,17 +298,16 @@ describe('sendTextMessageAction', () => {
     );
   });
 
-  it('stores @homework messages as lesson assignments and emits homework activity for class channels', async () => {
+  it('stores explicit assignment metadata as lesson assignments and emits homework activity for class channels', async () => {
     const supabase = {
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
       from: vi.fn(),
     };
-    const { createSupabaseServerClient } = await import(
-      '@iconicedu/web/lib/supabase/server'
-    );
-    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
-      supabase,
-    );
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
     const insertMessage = vi.fn().mockReturnValue({
       select: () => ({
         single: async () => ({
@@ -277,13 +349,21 @@ describe('sendTextMessageAction', () => {
       ids: { id: 'profile-1', orgId: 'org-1' },
       profile: { displayName: 'Priya' },
     });
-    mapMessageRowToVM.mockReturnValueOnce({ ids: { id: 'message-homework-1', orgId: 'org-1' } });
+    mapMessageRowToVM.mockReturnValueOnce({
+      ids: { id: 'message-homework-1', orgId: 'org-1' },
+    });
 
     await sendTextMessageAction({
       orgId: 'org-1',
       channelId: 'channel-class-1',
       senderProfileId: 'profile-1',
-      content: '@homework Fractions Practice Set\nFocus on equivalent fractions and number lines.',
+      content: 'Please complete before Thursday.',
+      homework: {
+        kind: 'homework',
+        title: 'Fractions Practice Set',
+        description: 'Focus on equivalent fractions and number lines.',
+        dueAt: '2026-03-13T12:00:00.000Z',
+      },
     });
 
     expect(insertMessage).toHaveBeenCalledWith(
@@ -297,12 +377,16 @@ describe('sendTextMessageAction', () => {
         org_id: 'org-1',
         payload: expect.objectContaining({
           title: 'Fractions Practice Set',
-          description: 'Fractions Practice Set\nFocus on equivalent fractions and number lines.',
+          description: 'Focus on equivalent fractions and number lines.',
+          dueAt: '2026-03-13T12:00:00.000Z',
+          kind: 'homework',
           subject: 'Math Foundations',
         }),
       }),
     );
-    expect(insertLessonAssignment.mock.calls[0]?.[0]?.payload).not.toHaveProperty('text');
+    expect(insertLessonAssignment.mock.calls[0]?.[0]?.payload).toMatchObject({
+      text: 'Please complete before Thursday.',
+    });
     expect(publishActivityEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         eventType: 'homework.assigned',
@@ -317,17 +401,16 @@ describe('sendTextMessageAction', () => {
     );
   });
 
-  it('respects explicit homework metadata from the composer prompt', async () => {
+  it('supports explicit lesson assignment metadata from the composer prompt', async () => {
     const supabase = {
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
       from: vi.fn(),
     };
-    const { createSupabaseServerClient } = await import(
-      '@iconicedu/web/lib/supabase/server'
-    );
-    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
-      supabase,
-    );
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
     const insertMessage = vi.fn().mockReturnValue({
       select: () => ({
         single: async () => ({
@@ -369,7 +452,9 @@ describe('sendTextMessageAction', () => {
       ids: { id: 'profile-1', orgId: 'org-1' },
       profile: { displayName: 'Priya' },
     });
-    mapMessageRowToVM.mockReturnValueOnce({ ids: { id: 'message-homework-2', orgId: 'org-1' } });
+    mapMessageRowToVM.mockReturnValueOnce({
+      ids: { id: 'message-homework-2', orgId: 'org-1' },
+    });
 
     await sendTextMessageAction({
       orgId: 'org-1',
@@ -377,6 +462,7 @@ describe('sendTextMessageAction', () => {
       senderProfileId: 'profile-1',
       content: 'Please complete this before Friday.',
       homework: {
+        kind: 'lesson',
         title: 'Fractions Practice Set',
         description: 'Focus on equivalent fractions and number lines.',
         dueAt: '2026-03-11T12:00:00.000Z',
@@ -392,6 +478,7 @@ describe('sendTextMessageAction', () => {
     expect(insertLessonAssignment).toHaveBeenCalledWith(
       expect.objectContaining({
         payload: expect.objectContaining({
+          kind: 'lesson',
           title: 'Fractions Practice Set',
           description: 'Focus on equivalent fractions and number lines.',
           dueAt: '2026-03-11T12:00:00.000Z',
@@ -406,12 +493,11 @@ describe('sendTextMessageAction', () => {
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
       from: vi.fn(),
     };
-    const { createSupabaseServerClient } = await import(
-      '@iconicedu/web/lib/supabase/server'
-    );
-    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
-      supabase,
-    );
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
     const insertMessage = vi.fn().mockReturnValue({
       select: () => ({
         single: async () => ({
@@ -439,8 +525,12 @@ describe('sendTextMessageAction', () => {
       return { insert: vi.fn() };
     });
 
-    buildUserProfileById.mockResolvedValueOnce({ ids: { id: 'profile-1', orgId: 'org-1' } });
-    mapMessageRowToVM.mockReturnValueOnce({ ids: { id: 'message-link-1', orgId: 'org-1' } });
+    buildUserProfileById.mockResolvedValueOnce({
+      ids: { id: 'profile-1', orgId: 'org-1' },
+    });
+    mapMessageRowToVM.mockReturnValueOnce({
+      ids: { id: 'message-link-1', orgId: 'org-1' },
+    });
 
     const result = await sendTextMessageAction({
       orgId: 'org-1',
@@ -449,7 +539,9 @@ describe('sendTextMessageAction', () => {
       content: 'Check this out https://example.com/post',
     });
 
-    expect(insertMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'link-preview' }));
+    expect(insertMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'link-preview' }),
+    );
     expect(insertLinkPreview).toHaveBeenCalledWith(
       expect.objectContaining({
         message_id: 'message-link-1',
@@ -475,16 +567,16 @@ describe('sendTextMessageAction', () => {
         })),
       },
     };
-    const { createSupabaseServerClient } = await import(
-      '@iconicedu/web/lib/supabase/server'
-    );
-    const { createSupabaseServiceClient } = await import(
-      '@iconicedu/web/lib/supabase/service'
-    );
-    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
-      supabase,
-    );
-    (createSupabaseServiceClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue({
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    const { createSupabaseServiceClient } =
+      await import('@iconicedu/web/lib/supabase/service');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
+    (
+      createSupabaseServiceClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue({
       from: vi.fn(),
     });
 
@@ -529,8 +621,12 @@ describe('sendTextMessageAction', () => {
       return {};
     });
 
-    buildUserProfileById.mockResolvedValueOnce({ ids: { id: 'profile-1', orgId: 'org-1' } });
-    mapMessageRowToVM.mockReturnValueOnce({ ids: { id: 'file-message-1', orgId: 'org-1' } });
+    buildUserProfileById.mockResolvedValueOnce({
+      ids: { id: 'profile-1', orgId: 'org-1' },
+    });
+    mapMessageRowToVM.mockReturnValueOnce({
+      ids: { id: 'file-message-1', orgId: 'org-1' },
+    });
 
     const result = await sendFileMessageAction({
       orgId: 'org-1',
@@ -600,16 +696,16 @@ describe('sendTextMessageAction', () => {
         })),
       },
     };
-    const { createSupabaseServerClient } = await import(
-      '@iconicedu/web/lib/supabase/server'
-    );
-    const { createSupabaseServiceClient } = await import(
-      '@iconicedu/web/lib/supabase/service'
-    );
-    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
-      supabase,
-    );
-    (createSupabaseServiceClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue({
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    const { createSupabaseServiceClient } =
+      await import('@iconicedu/web/lib/supabase/service');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
+    (
+      createSupabaseServiceClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue({
       from: vi.fn(),
     });
 
@@ -644,8 +740,12 @@ describe('sendTextMessageAction', () => {
       return {};
     });
 
-    buildUserProfileById.mockResolvedValueOnce({ ids: { id: 'profile-1', orgId: 'org-1' } });
-    mapMessageRowToVM.mockReturnValueOnce({ ids: { id: 'image-message-1', orgId: 'org-1' } });
+    buildUserProfileById.mockResolvedValueOnce({
+      ids: { id: 'profile-1', orgId: 'org-1' },
+    });
+    mapMessageRowToVM.mockReturnValueOnce({
+      ids: { id: 'image-message-1', orgId: 'org-1' },
+    });
 
     const result = await sendFileMessageAction({
       orgId: 'org-1',
@@ -711,16 +811,16 @@ describe('sendTextMessageAction', () => {
         })),
       },
     };
-    const { createSupabaseServerClient } = await import(
-      '@iconicedu/web/lib/supabase/server'
-    );
-    const { createSupabaseServiceClient } = await import(
-      '@iconicedu/web/lib/supabase/service'
-    );
-    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
-      supabase,
-    );
-    (createSupabaseServiceClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue({
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    const { createSupabaseServiceClient } =
+      await import('@iconicedu/web/lib/supabase/service');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
+    (
+      createSupabaseServiceClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue({
       from: vi.fn(),
     });
 
@@ -755,8 +855,12 @@ describe('sendTextMessageAction', () => {
       return {};
     });
 
-    buildUserProfileById.mockResolvedValueOnce({ ids: { id: 'profile-1', orgId: 'org-1' } });
-    mapMessageRowToVM.mockReturnValueOnce({ ids: { id: 'audio-message-1', orgId: 'org-1' } });
+    buildUserProfileById.mockResolvedValueOnce({
+      ids: { id: 'profile-1', orgId: 'org-1' },
+    });
+    mapMessageRowToVM.mockReturnValueOnce({
+      ids: { id: 'audio-message-1', orgId: 'org-1' },
+    });
 
     const result = await sendFileMessageAction({
       orgId: 'org-1',
@@ -814,12 +918,16 @@ describe('sendTextMessageAction', () => {
         })),
       },
     };
-    const { createSupabaseServerClient } = await import('@iconicedu/web/lib/supabase/server');
-    const { createSupabaseServiceClient } = await import('@iconicedu/web/lib/supabase/service');
-    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
-      supabase,
-    );
-    (createSupabaseServiceClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue({
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    const { createSupabaseServiceClient } =
+      await import('@iconicedu/web/lib/supabase/service');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
+    (
+      createSupabaseServiceClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue({
       from: vi.fn(),
       storage: { from: vi.fn(() => ({ remove: vi.fn(async () => ({ error: null })) })) },
     });
@@ -849,8 +957,12 @@ describe('sendTextMessageAction', () => {
       return {};
     });
 
-    buildUserProfileById.mockResolvedValueOnce({ ids: { id: 'profile-1', orgId: 'org-1' } });
-    mapMessageRowToVM.mockReturnValueOnce({ ids: { id: 'file-message-group-1', orgId: 'org-1' } });
+    buildUserProfileById.mockResolvedValueOnce({
+      ids: { id: 'profile-1', orgId: 'org-1' },
+    });
+    mapMessageRowToVM.mockReturnValueOnce({
+      ids: { id: 'file-message-group-1', orgId: 'org-1' },
+    });
 
     const result = await sendFilesMessageAction({
       orgId: 'org-1',
@@ -868,7 +980,8 @@ describe('sendTextMessageAction', () => {
           name: 'notes.docx',
           storagePath: 'org-1/channel-1/files/profile-1/notes.docx',
           size: 12,
-          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          mimeType:
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         },
         {
           name: 'table.csv',
@@ -896,9 +1009,18 @@ describe('sendTextMessageAction', () => {
     );
     expect(insertChannelFiles).toHaveBeenCalledWith(
       expect.arrayContaining([
-        expect.objectContaining({ message_id: 'file-message-group-1', name: 'brief.pdf' }),
-        expect.objectContaining({ message_id: 'file-message-group-1', name: 'notes.docx' }),
-        expect.objectContaining({ message_id: 'file-message-group-1', name: 'table.csv' }),
+        expect.objectContaining({
+          message_id: 'file-message-group-1',
+          name: 'brief.pdf',
+        }),
+        expect.objectContaining({
+          message_id: 'file-message-group-1',
+          name: 'notes.docx',
+        }),
+        expect.objectContaining({
+          message_id: 'file-message-group-1',
+          name: 'table.csv',
+        }),
       ]),
     );
     expect(publishActivityEvent).toHaveBeenCalledWith(
@@ -926,12 +1048,16 @@ describe('sendTextMessageAction', () => {
         })),
       },
     };
-    const { createSupabaseServerClient } = await import('@iconicedu/web/lib/supabase/server');
-    const { createSupabaseServiceClient } = await import('@iconicedu/web/lib/supabase/service');
-    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
-      supabase,
-    );
-    (createSupabaseServiceClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue({
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    const { createSupabaseServiceClient } =
+      await import('@iconicedu/web/lib/supabase/service');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
+    (
+      createSupabaseServiceClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue({
       from: vi.fn(),
       storage: { from: vi.fn(() => ({ remove: vi.fn(async () => ({ error: null })) })) },
     });
@@ -961,8 +1087,12 @@ describe('sendTextMessageAction', () => {
       return {};
     });
 
-    buildUserProfileById.mockResolvedValueOnce({ ids: { id: 'profile-1', orgId: 'org-1' } });
-    mapMessageRowToVM.mockReturnValueOnce({ ids: { id: 'image-message-group-1', orgId: 'org-1' } });
+    buildUserProfileById.mockResolvedValueOnce({
+      ids: { id: 'profile-1', orgId: 'org-1' },
+    });
+    mapMessageRowToVM.mockReturnValueOnce({
+      ids: { id: 'image-message-group-1', orgId: 'org-1' },
+    });
 
     const result = await sendFilesMessageAction({
       orgId: 'org-1',
@@ -986,7 +1116,9 @@ describe('sendTextMessageAction', () => {
       ],
     });
 
-    expect(insertMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'image' }));
+    expect(insertMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'image' }),
+    );
     expect(insertMessageImage).toHaveBeenCalledWith(
       expect.objectContaining({
         message_id: 'image-message-group-1',
@@ -1007,8 +1139,14 @@ describe('sendTextMessageAction', () => {
     );
     expect(insertChannelMedia).toHaveBeenCalledWith(
       expect.arrayContaining([
-        expect.objectContaining({ message_id: 'image-message-group-1', name: 'photo-1.png' }),
-        expect.objectContaining({ message_id: 'image-message-group-1', name: 'photo-2.png' }),
+        expect.objectContaining({
+          message_id: 'image-message-group-1',
+          name: 'photo-1.png',
+        }),
+        expect.objectContaining({
+          message_id: 'image-message-group-1',
+          name: 'photo-2.png',
+        }),
       ]),
     );
     expect(publishActivityEvent).toHaveBeenCalledWith(
@@ -1032,14 +1170,16 @@ describe('sendTextMessageAction', () => {
     const serviceSupabase = {
       from: vi.fn(),
     };
-    const { createSupabaseServerClient } = await import('@iconicedu/web/lib/supabase/server');
-    const { createSupabaseServiceClient } = await import('@iconicedu/web/lib/supabase/service');
-    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
-      supabase,
-    );
-    (createSupabaseServiceClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
-      serviceSupabase,
-    );
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    const { createSupabaseServiceClient } =
+      await import('@iconicedu/web/lib/supabase/service');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
+    (
+      createSupabaseServiceClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(serviceSupabase);
 
     const insertMessage = vi.fn().mockReturnValue({
       select: () => ({
@@ -1100,7 +1240,9 @@ describe('sendTextMessageAction', () => {
       ids: { id: 'profile-1', orgId: 'org-1' },
       profile: { displayName: 'Sender Name' },
     });
-    mapMessageRowToVM.mockReturnValueOnce({ ids: { id: 'message-mention-1', orgId: 'org-1' } });
+    mapMessageRowToVM.mockReturnValueOnce({
+      ids: { id: 'message-mention-1', orgId: 'org-1' },
+    });
 
     await sendTextMessageAction({
       orgId: 'org-1',
@@ -1143,12 +1285,11 @@ describe('sendTextMessageAction', () => {
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
       from: vi.fn(),
     };
-    const { createSupabaseServerClient } = await import(
-      '@iconicedu/web/lib/supabase/server'
-    );
-    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
-      supabase,
-    );
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
 
     const parentSelectChain: any = {};
     parentSelectChain.eq = vi.fn(() => parentSelectChain);
@@ -1237,8 +1378,14 @@ describe('sendTextMessageAction', () => {
     });
 
     buildUserProfileById
-      .mockResolvedValueOnce({ ids: { id: 'profile-parent', orgId: 'org-1' }, profile: { displayName: 'Parent' } })
-      .mockResolvedValueOnce({ ids: { id: 'profile-1', orgId: 'org-1' }, profile: { displayName: 'Sender' } });
+      .mockResolvedValueOnce({
+        ids: { id: 'profile-parent', orgId: 'org-1' },
+        profile: { displayName: 'Parent' },
+      })
+      .mockResolvedValueOnce({
+        ids: { id: 'profile-1', orgId: 'org-1' },
+        profile: { displayName: 'Sender' },
+      });
     mapMessageRowToVM.mockReturnValueOnce({ ids: { id: 'message-2', orgId: 'org-1' } });
 
     const result = await sendTextMessageAction({
@@ -1277,12 +1424,11 @@ describe('sendTextMessageAction', () => {
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
       from: vi.fn(),
     };
-    const { createSupabaseServerClient } = await import(
-      '@iconicedu/web/lib/supabase/server'
-    );
-    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
-      supabase,
-    );
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
 
     const parentSelectChain: any = {};
     parentSelectChain.eq = vi.fn(() => parentSelectChain);
@@ -1373,8 +1519,14 @@ describe('sendTextMessageAction', () => {
     });
 
     buildUserProfileById
-      .mockResolvedValueOnce({ ids: { id: 'profile-parent', orgId: 'org-1' }, profile: { displayName: 'Parent' } })
-      .mockResolvedValueOnce({ ids: { id: 'profile-1', orgId: 'org-1' }, profile: { displayName: 'Sender' } });
+      .mockResolvedValueOnce({
+        ids: { id: 'profile-parent', orgId: 'org-1' },
+        profile: { displayName: 'Parent' },
+      })
+      .mockResolvedValueOnce({
+        ids: { id: 'profile-1', orgId: 'org-1' },
+        profile: { displayName: 'Sender' },
+      });
     mapMessageRowToVM.mockReturnValueOnce({ ids: { id: 'message-3', orgId: 'org-1' } });
 
     const result = await sendTextMessageAction({
@@ -1416,12 +1568,11 @@ describe('sendTextMessageAction', () => {
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
       from: vi.fn(),
     };
-    const { createSupabaseServerClient } = await import(
-      '@iconicedu/web/lib/supabase/server'
-    );
-    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
-      supabase,
-    );
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
 
     const parentSelectChain: any = {};
     parentSelectChain.eq = vi.fn(() => parentSelectChain);
@@ -1540,12 +1691,11 @@ describe('toggleMessageReactionAction', () => {
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
       from: vi.fn(),
     };
-    const { createSupabaseServerClient } = await import(
-      '@iconicedu/web/lib/supabase/server'
-    );
-    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
-      supabase,
-    );
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
 
     const makeSelectChain = (response: { data: any }) => {
       const chain: any = {};
@@ -1555,9 +1705,9 @@ describe('toggleMessageReactionAction', () => {
       return chain;
     };
 
-    const selectMessage = vi.fn().mockReturnValue(
-      makeSelectChain({ data: { id: 'message-1', org_id: 'org-1' } }),
-    );
+    const selectMessage = vi
+      .fn()
+      .mockReturnValue(makeSelectChain({ data: { id: 'message-1', org_id: 'org-1' } }));
     const selectReaction = vi.fn().mockReturnValue(makeSelectChain({ data: null }));
     const selectCount = vi.fn().mockReturnValue(makeSelectChain({ data: null }));
     const insertReaction = vi.fn().mockResolvedValue({ error: null });
@@ -1576,7 +1726,8 @@ describe('toggleMessageReactionAction', () => {
       return {};
     });
 
-    const { toggleMessageReactionAction } = await import('@iconicedu/web/app/actions/messages');
+    const { toggleMessageReactionAction } =
+      await import('@iconicedu/web/app/actions/messages');
     await toggleMessageReactionAction({
       orgId: 'org-1',
       messageId: 'message-1',
@@ -1592,12 +1743,11 @@ describe('toggleMessageReactionAction', () => {
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
       from: vi.fn(),
     };
-    const { createSupabaseServerClient } = await import(
-      '@iconicedu/web/lib/supabase/server'
-    );
-    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
-      supabase,
-    );
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
 
     const makeSelectChain = (response: { data: any }) => {
       const chain: any = {};
@@ -1607,15 +1757,15 @@ describe('toggleMessageReactionAction', () => {
       return chain;
     };
 
-    const selectMessage = vi.fn().mockReturnValue(
-      makeSelectChain({ data: { id: 'message-1', org_id: 'org-1' } }),
-    );
-    const selectReaction = vi.fn().mockReturnValue(
-      makeSelectChain({ data: { id: 'reaction-1' } }),
-    );
-    const selectCount = vi.fn().mockReturnValue(
-      makeSelectChain({ data: { id: 'count-1', count: 1 } }),
-    );
+    const selectMessage = vi
+      .fn()
+      .mockReturnValue(makeSelectChain({ data: { id: 'message-1', org_id: 'org-1' } }));
+    const selectReaction = vi
+      .fn()
+      .mockReturnValue(makeSelectChain({ data: { id: 'reaction-1' } }));
+    const selectCount = vi
+      .fn()
+      .mockReturnValue(makeSelectChain({ data: { id: 'count-1', count: 1 } }));
     const deleteReaction = vi.fn().mockResolvedValue({ error: null });
     const deleteCount = vi.fn().mockResolvedValue({ error: null });
 
@@ -1632,7 +1782,8 @@ describe('toggleMessageReactionAction', () => {
       return {};
     });
 
-    const { toggleMessageReactionAction } = await import('@iconicedu/web/app/actions/messages');
+    const { toggleMessageReactionAction } =
+      await import('@iconicedu/web/app/actions/messages');
     await toggleMessageReactionAction({
       orgId: 'org-1',
       messageId: 'message-1',
@@ -1653,18 +1804,16 @@ describe('deleteMessageAction', () => {
     const serviceSupabase = {
       from: vi.fn(),
     };
-    const { createSupabaseServerClient } = await import(
-      '@iconicedu/web/lib/supabase/server'
-    );
-    const { createSupabaseServiceClient } = await import(
-      '@iconicedu/web/lib/supabase/service'
-    );
-    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
-      supabase,
-    );
-    (createSupabaseServiceClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
-      serviceSupabase,
-    );
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    const { createSupabaseServiceClient } =
+      await import('@iconicedu/web/lib/supabase/service');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
+    (
+      createSupabaseServiceClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(serviceSupabase);
 
     const selectChain: any = {};
     selectChain.eq = vi.fn(() => selectChain);
@@ -1711,12 +1860,11 @@ describe('toggleHiddenMessageAction', () => {
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
       from: vi.fn(),
     };
-    const { createSupabaseServerClient } = await import(
-      '@iconicedu/web/lib/supabase/server'
-    );
-    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
-      supabase,
-    );
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
 
     const selectChain: any = {};
     selectChain.eq = vi.fn(() => selectChain);
@@ -1736,7 +1884,11 @@ describe('toggleHiddenMessageAction', () => {
       return {};
     });
 
-    await toggleHiddenMessageAction({ orgId: 'org-1', messageId: 'message-1', isHidden: true });
+    await toggleHiddenMessageAction({
+      orgId: 'org-1',
+      messageId: 'message-1',
+      isHidden: true,
+    });
 
     expect(updateMessage).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1754,18 +1906,16 @@ describe('toggleHiddenMessageAction', () => {
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
       from: vi.fn(),
     };
-    const { createSupabaseServerClient } = await import(
-      '@iconicedu/web/lib/supabase/server'
-    );
-    const { getProfileByAccountId } = await import(
-      '@iconicedu/web/lib/profile/queries/profiles.query'
-    );
-    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
-      supabase,
-    );
-    (getProfileByAccountId as unknown as { mockResolvedValueOnce: (value: any) => void }).mockResolvedValueOnce(
-      { data: { id: 'profile-2' } },
-    );
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    const { getProfileByAccountId } =
+      await import('@iconicedu/web/lib/profile/queries/profiles.query');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
+    (
+      getProfileByAccountId as unknown as { mockResolvedValueOnce: (value: any) => void }
+    ).mockResolvedValueOnce({ data: { id: 'profile-2' } });
 
     const selectChain: any = {};
     selectChain.eq = vi.fn(() => selectChain);
@@ -1781,7 +1931,11 @@ describe('toggleHiddenMessageAction', () => {
     });
 
     await expect(
-      toggleHiddenMessageAction({ orgId: 'org-1', messageId: 'message-1', isHidden: true }),
+      toggleHiddenMessageAction({
+        orgId: 'org-1',
+        messageId: 'message-1',
+        isHidden: true,
+      }),
     ).rejects.toThrow('Unauthorized: You can only hide your own messages');
   });
 });
@@ -1792,12 +1946,11 @@ describe('toggleSavedMessageAction', () => {
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
       from: vi.fn(),
     };
-    const { createSupabaseServerClient } = await import(
-      '@iconicedu/web/lib/supabase/server'
-    );
-    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
-      supabase,
-    );
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
 
     const messageSelectChain: any = {};
     messageSelectChain.eq = vi.fn(() => messageSelectChain);
@@ -1851,12 +2004,11 @@ describe('toggleSavedMessageAction', () => {
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
       from: vi.fn(),
     };
-    const { createSupabaseServerClient } = await import(
-      '@iconicedu/web/lib/supabase/server'
-    );
-    (createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }).mockReturnValue(
-      supabase,
-    );
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
 
     const messageSelectChain: any = {};
     messageSelectChain.eq = vi.fn(() => messageSelectChain);

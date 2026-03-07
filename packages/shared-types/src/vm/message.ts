@@ -1,4 +1,4 @@
-import type { ConnectionVM, IdsBaseVM, ISODateTime, UUID } from '@iconicedu/shared-types/shared/shared';
+import type { IdsBaseVM, ISODateTime, UUID } from '@iconicedu/shared-types/shared/shared';
 import type { UserProfileVM } from '@iconicedu/shared-types/vm/profile';
 import type { LiveSessionProviderVM } from '@iconicedu/shared-types/vm/channel';
 
@@ -92,24 +92,6 @@ export interface MessagesRightSidebarState {
 }
 
 export type MessagesRightPanelRegistry<T> = Record<MessagesRightPanelIntentKey, T>;
-
-export interface ThreadPanelPropsVM {
-  thread: ThreadVM;
-  replies: ConnectionVM<MessageVM>;
-  parentMessage?: MessageVM;
-
-  actions: {
-    onSendReply: (content: string, mentions?: MessageMentionVM[]) => void;
-    onProfileClick: (userId: UUID) => void;
-    onToggleReaction?: (messageId: UUID, emoji: string) => void;
-    onToggleSaved?: (messageId: UUID) => void;
-    onToggleHidden?: (messageId: UUID) => void;
-    onDelete?: (messageId: UUID) => void;
-  };
-
-  readState?: ThreadReadStateVM;
-  currentUserId?: UUID;
-}
 
 export type MessageVisibilityVM =
   | { type: 'all' }
@@ -242,6 +224,7 @@ export interface LessonAssignmentMessageVM extends BaseMessageVM {
   core: MessageCoreVM & { type: 'lesson-assignment' };
   content: { text: string };
   assignment: {
+    kind?: 'homework' | 'lesson';
     title: string;
     description: string;
     dueAt: ISODateTime;

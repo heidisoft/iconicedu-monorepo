@@ -32,7 +32,7 @@ const baseChannel: ChannelVM = {
 };
 
 describe('getDefaultMessagesTab', () => {
-  it('defaults learning space channels with schedule capability to the sessions tab', () => {
+  it('defaults learning space channels with schedule capability to the messages tab', () => {
     const learningSpaceChannel: ChannelVM = {
       ...baseChannel,
       basics: {
@@ -45,7 +45,7 @@ describe('getDefaultMessagesTab', () => {
       },
     };
 
-    expect(getDefaultMessagesTab(learningSpaceChannel, true)).toBe('schedule');
+    expect(getDefaultMessagesTab(learningSpaceChannel, true)).toBe('messages');
   });
 
   it('defaults non-learning-space channels to the messages tab', () => {

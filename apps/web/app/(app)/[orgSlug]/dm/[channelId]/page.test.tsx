@@ -11,6 +11,7 @@ const ensureDmMock = vi.fn();
 const buildChannelByIdMock = vi.fn();
 const buildChannelByDmKeyMock = vi.fn();
 const resolveOrgDashboardPathMock = vi.fn(async () => '/iconic-academy');
+const enableMessageTypeComposerRunMock = vi.fn(async () => true);
 
 vi.mock('next/navigation', () => ({
   notFound: () => {
@@ -57,10 +58,6 @@ vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
   getProfileById: vi.fn(async () => ({ data: { id: 'profile-2', org_id: 'org-1' } })),
 }));
 
-vi.mock('@iconicedu/web/lib/profile/builders/user-profile.builder', () => ({
-  buildUserProfileById: vi.fn(async () => ({ ids: { id: 'profile-1', orgId: 'org-1' } })),
-}));
-
 vi.mock('@iconicedu/web/lib/channels/builders/channel.builder', () => ({
   buildChannelById: (...args: unknown[]) => buildChannelByIdMock(...args),
   buildChannelByDmKey: (...args: unknown[]) => buildChannelByDmKeyMock(...args),
@@ -72,6 +69,12 @@ vi.mock('@iconicedu/web/lib/channels/actions/ensure-direct-message-channel', () 
 
 vi.mock('@iconicedu/web/lib/org/resolve-dashboard-path', () => ({
   resolveOrgDashboardPath: (...args: unknown[]) => resolveOrgDashboardPathMock(...args),
+}));
+
+vi.mock('@iconicedu/web/flags', () => ({
+  enableMessageTypeComposer: {
+    run: (...args: unknown[]) => enableMessageTypeComposerRunMock(...args),
+  },
 }));
 
 describe('d/dm/[channelId] page', () => {
@@ -87,7 +90,9 @@ describe('d/dm/[channelId] page', () => {
       collections: { participants: [] },
     });
     buildChannelByDmKeyMock.mockResolvedValueOnce(null);
-    const element = await Page({ params: Promise.resolve({ orgSlug: 'iconic-academy', channelId: 'channel-1' }) });
+    const element = await Page({
+      params: Promise.resolve({ orgSlug: 'iconic-academy', channelId: 'channel-1' }),
+    });
     render(element as React.ReactElement);
     await waitFor(() => {
       expect(messagesShellMock).toHaveBeenCalledWith(
@@ -95,6 +100,7 @@ describe('d/dm/[channelId] page', () => {
           currentUserId: 'profile-1',
           currentUserProfile: { ids: { id: 'profile-1', orgId: 'org-1' } },
           readOnly: false,
+          showCreateMessageTypeButton: true,
         }),
       );
     });
@@ -106,7 +112,9 @@ describe('d/dm/[channelId] page', () => {
     ensureDmMock.mockResolvedValueOnce({ channelId: 'channel-new' });
 
     await expect(
-      Page({ params: Promise.resolve({ orgSlug: 'iconic-academy', channelId: 'profile-2' }) }),
+      Page({
+        params: Promise.resolve({ orgSlug: 'iconic-academy', channelId: 'profile-2' }),
+      }),
     ).rejects.toThrow('NEXT_REDIRECT');
 
     expect(ensureDmMock).toHaveBeenCalled();
@@ -125,18 +133,24 @@ describe('d/dm/[channelId] page', () => {
       },
     });
     buildChannelByDmKeyMock.mockResolvedValueOnce(null);
-    const { buildUserProfileById } = await import(
-      '@iconicedu/web/lib/profile/builders/user-profile.builder'
-    );
-    vi.mocked(buildUserProfileById).mockResolvedValueOnce({
-      kind: 'guardian',
-      ids: { id: 'profile-1', orgId: 'org-1', accountId: 'account-1' },
-      children: {
-        items: [{ ids: { id: 'profile-child', orgId: 'org-1', accountId: 'account-child' } }],
-      },
-    } as any);
+    const { getDashboardProfileContext } =
+      await import('@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth');
+    vi.mocked(getDashboardProfileContext).mockResolvedValueOnce({
+      profileResponse: { data: { id: 'profile-1' } },
+      currentUserProfile: {
+        kind: 'guardian',
+        ids: { id: 'profile-1', orgId: 'org-1', accountId: 'account-1' },
+        children: {
+          items: [
+            { ids: { id: 'profile-child', orgId: 'org-1', accountId: 'account-child' } },
+          ],
+        },
+      } as unknown,
+    });
 
-    const element = await Page({ params: Promise.resolve({ orgSlug: 'iconic-academy', channelId: 'channel-1' }) });
+    const element = await Page({
+      params: Promise.resolve({ orgSlug: 'iconic-academy', channelId: 'channel-1' }),
+    });
     render(element as React.ReactElement);
 
     await waitFor(() => {
@@ -160,15 +174,19 @@ describe('d/dm/[channelId] page', () => {
       },
     });
     buildChannelByDmKeyMock.mockResolvedValueOnce(null);
-    const { buildUserProfileById } = await import(
-      '@iconicedu/web/lib/profile/builders/user-profile.builder'
-    );
-    vi.mocked(buildUserProfileById).mockResolvedValueOnce({
-      kind: 'staff',
-      ids: { id: 'profile-1', orgId: 'org-1', accountId: 'account-1' },
-    } as any);
+    const { getDashboardProfileContext } =
+      await import('@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth');
+    vi.mocked(getDashboardProfileContext).mockResolvedValueOnce({
+      profileResponse: { data: { id: 'profile-1' } },
+      currentUserProfile: {
+        kind: 'staff',
+        ids: { id: 'profile-1', orgId: 'org-1', accountId: 'account-1' },
+      } as unknown,
+    });
 
-    const element = await Page({ params: Promise.resolve({ orgSlug: 'iconic-academy', channelId: 'channel-1' }) });
+    const element = await Page({
+      params: Promise.resolve({ orgSlug: 'iconic-academy', channelId: 'channel-1' }),
+    });
     render(element as React.ReactElement);
 
     await waitFor(() => {

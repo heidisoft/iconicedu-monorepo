@@ -1,4 +1,9 @@
-import { fetchSpaceSchedulesByChannelId, queryKeys } from './queries';
+import {
+  fetchSpaceSchedulesByChannelId,
+  fetchActivityFeed,
+  toggleReaction,
+  queryKeys,
+} from './queries';
 
 // ─── Supabase mock ──────────────────────────────────────────────────────────────
 
@@ -150,7 +155,9 @@ describe('fetchSpaceSchedulesByChannelId', () => {
     expect(result[0]!.recurrence!.rule.byWeekday).toEqual(['MO', 'WE']);
     expect(result[0]!.recurrence!.rule.until).toBe('2026-06-01');
     expect(result[0]!.recurrence!.exceptions).toHaveLength(1);
-    expect(result[0]!.recurrence!.exceptions![0]!.occurrenceKey).toBe('2026-03-09T10:00:00Z');
+    expect(result[0]!.recurrence!.exceptions![0]!.occurrenceKey).toBe(
+      '2026-03-09T10:00:00Z',
+    );
     expect(result[0]!.recurrence!.exceptions![0]!.reason).toBe('Holiday');
     expect(result[0]!.recurrence!.overrides).toHaveLength(0);
   });
@@ -159,8 +166,24 @@ describe('fetchSpaceSchedulesByChannelId', () => {
     const rowWithParticipants = {
       ...minimalRow,
       participants: [
-        { id: 'p-1', org_id: ORG_ID, role: 'teacher', status: 'accepted', display_name: 'Ms Smith', avatar_url: null, theme_key: null },
-        { id: 'p-2', org_id: ORG_ID, role: 'student', status: 'pending', display_name: 'Jane', avatar_url: 'https://img/a.png', theme_key: 'teal' },
+        {
+          id: 'p-1',
+          org_id: ORG_ID,
+          role: 'teacher',
+          status: 'accepted',
+          display_name: 'Ms Smith',
+          avatar_url: null,
+          theme_key: null,
+        },
+        {
+          id: 'p-2',
+          org_id: ORG_ID,
+          role: 'student',
+          status: 'pending',
+          display_name: 'Jane',
+          avatar_url: 'https://img/a.png',
+          theme_key: 'teal',
+        },
       ],
     };
     const chain = createQueryChain({ data: [rowWithParticipants], error: null });
@@ -169,8 +192,17 @@ describe('fetchSpaceSchedulesByChannelId', () => {
     const result = await fetchSpaceSchedulesByChannelId(CHANNEL_ID, ORG_ID);
 
     expect(result[0]!.participants).toHaveLength(2);
-    expect(result[0]!.participants[0]).toMatchObject({ ids: { id: 'p-1' }, role: 'teacher', displayName: 'Ms Smith' });
-    expect(result[0]!.participants[1]).toMatchObject({ ids: { id: 'p-2' }, role: 'student', avatarUrl: 'https://img/a.png', themeKey: 'teal' });
+    expect(result[0]!.participants[0]).toMatchObject({
+      ids: { id: 'p-1' },
+      role: 'teacher',
+      displayName: 'Ms Smith',
+    });
+    expect(result[0]!.participants[1]).toMatchObject({
+      ids: { id: 'p-2' },
+      role: 'student',
+      avatarUrl: 'https://img/a.png',
+      themeKey: 'teal',
+    });
   });
 
   it('handles null data gracefully', async () => {
@@ -187,9 +219,334 @@ describe('fetchSpaceSchedulesByChannelId', () => {
     const chain = createQueryChain({ data: null, error: dbError });
     mockFrom.mockReturnValue(chain);
 
-    await expect(
-      fetchSpaceSchedulesByChannelId(CHANNEL_ID, ORG_ID),
-    ).rejects.toThrow('Connection refused');
+    await expect(fetchSpaceSchedulesByChannelId(CHANNEL_ID, ORG_ID)).rejects.toThrow(
+      'Connection refused',
+    );
+  });
+});
+
+// ─── fetchActivityFeed ─────────────────────────────────────────────────────────
+
+// Chain mock that resolves at .returns() (used by fetchActivityFeed)
+function createReturnsChain(resolvedValue: { data: unknown; error: unknown }) {
+  const chain: Record<string, jest.Mock> = {};
+  const returnChain = () => chain;
+  chain.select = jest.fn(returnChain);
+  chain.eq = jest.fn(returnChain);
+  chain.is = jest.fn(returnChain);
+  chain.order = jest.fn(returnChain);
+  chain.in = jest.fn(returnChain);
+  chain.returns = jest.fn().mockResolvedValue(resolvedValue);
+  return chain;
+}
+
+const ORG_ID_FEED = 'org-feed-1';
+const PROFILE_ID = 'profile-1';
+
+const leafRow = {
+  id: 'item-1',
+  org_id: ORG_ID_FEED,
+  recipient_profile_id: PROFILE_ID,
+  source_event_id: null,
+  kind: 'leaf',
+  occurred_at: new Date().toISOString(),
+  created_at: new Date().toISOString(),
+  tab_key: 'classes',
+  audience: { scope: { kind: 'global' }, visibility: 'public' },
+  verb: 'summary.posted',
+  actor_profile_id: null,
+  refs: {},
+  group_key: null,
+  group_type: null,
+  is_collapsed: null,
+  sub_activity_count: null,
+  content: { headline: { primary: 'Priya posted a session summary' } },
+  summary: null,
+  preview: null,
+  action_button: null,
+  expanded_content: null,
+  importance: null,
+  is_read: false,
+  read_at: null,
+  dedupe_key: null,
+  metadata: null,
+  updated_at: new Date().toISOString(),
+  deleted_at: null,
+};
+
+const groupRow = {
+  ...leafRow,
+  id: 'item-2',
+  kind: 'group',
+  tab_key: 'classes',
+  verb: 'session.scheduled',
+  group_key: 'sessions-week',
+  group_type: 'class',
+  sub_activity_count: 2,
+  is_collapsed: true,
+  content: { headline: { primary: '2 Scheduled Sessions' } },
+};
+
+const memberRow1 = {
+  id: 'mem-1',
+  org_id: ORG_ID_FEED,
+  group_id: 'item-2',
+  item_id: 'item-1',
+  updated_at: new Date().toISOString(),
+  deleted_at: null,
+};
+
+describe('fetchActivityFeed', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('queries activity_feed_items with org and profile filters', async () => {
+    const itemsChain = createReturnsChain({ data: [], error: null });
+    mockFrom.mockReturnValue(itemsChain);
+
+    await fetchActivityFeed(ORG_ID_FEED, PROFILE_ID);
+
+    expect(mockFrom).toHaveBeenCalledWith('activity_feed_items');
+    expect(itemsChain.eq).toHaveBeenCalledWith('org_id', ORG_ID_FEED);
+    expect(itemsChain.eq).toHaveBeenCalledWith('recipient_profile_id', PROFILE_ID);
+    expect(itemsChain.is).toHaveBeenCalledWith('deleted_at', null);
+    expect(itemsChain.order).toHaveBeenCalledWith('occurred_at', { ascending: false });
+  });
+
+  it('returns empty sections and zero unreadCount when there are no items', async () => {
+    const chain = createReturnsChain({ data: [], error: null });
+    mockFrom.mockReturnValue(chain);
+
+    const result = await fetchActivityFeed(ORG_ID_FEED, PROFILE_ID);
+
+    expect(result.sections).toEqual([]);
+    expect(result.unreadCount).toBe(0);
+    expect(result.activeTab).toBe('all');
+    expect(result.tabs).toHaveLength(4);
+  });
+
+  it('maps a leaf item into the correct section', async () => {
+    const chain = createReturnsChain({ data: [leafRow], error: null });
+    mockFrom.mockReturnValue(chain);
+
+    const result = await fetchActivityFeed(ORG_ID_FEED, PROFILE_ID);
+
+    expect(result.sections).toHaveLength(1);
+    expect(result.sections[0]!.label).toBe('Today');
+    expect(result.sections[0]!.items).toHaveLength(1);
+    expect(result.sections[0]!.items[0]).toMatchObject({
+      kind: 'leaf',
+      ids: { id: 'item-1', orgId: ORG_ID_FEED },
+      tabKey: 'classes',
+      verb: 'summary.posted',
+      content: { headline: { primary: 'Priya posted a session summary' } },
+      state: { isRead: false },
+    });
+  });
+
+  it('counts unread items correctly', async () => {
+    const chain = createReturnsChain({ data: [leafRow], error: null });
+    mockFrom.mockReturnValue(chain);
+
+    const result = await fetchActivityFeed(ORG_ID_FEED, PROFILE_ID);
+
+    expect(result.unreadCount).toBe(1);
+    const classesTab = result.tabs.find((t) => t.key === 'classes');
+    expect(classesTab?.badgeCount).toBe(1);
+    const allTab = result.tabs.find((t) => t.key === 'all');
+    expect(allTab?.badgeCount).toBe(1);
+  });
+
+  it('does not query group_members when there are no group items', async () => {
+    const chain = createReturnsChain({ data: [leafRow], error: null });
+    mockFrom.mockReturnValue(chain);
+
+    await fetchActivityFeed(ORG_ID_FEED, PROFILE_ID);
+
+    const queriedTables = mockFrom.mock.calls.map(([t]: [string]) => t);
+    expect(queriedTables).not.toContain('activity_feed_group_members');
+  });
+
+  it('attaches sub-activities to group items and removes them from top level', async () => {
+    const itemsChain = createReturnsChain({ data: [leafRow, groupRow], error: null });
+    const membersChain = createReturnsChain({ data: [memberRow1], error: null });
+    mockFrom
+      .mockReturnValueOnce(itemsChain) // activity_feed_items
+      .mockReturnValueOnce(membersChain); // activity_feed_group_members
+
+    const result = await fetchActivityFeed(ORG_ID_FEED, PROFILE_ID);
+
+    const topLevelItems = result.sections.flatMap((s) => s.items);
+    // leaf (item-1) is a member of group (item-2), so only the group appears at top level
+    expect(topLevelItems).toHaveLength(1);
+    expect(topLevelItems[0]!.kind).toBe('group');
+    expect(topLevelItems[0]!.ids.id).toBe('item-2');
+
+    const groupItem = topLevelItems[0] as { subActivities?: { items: unknown[] } };
+    expect(groupItem.subActivities?.items).toHaveLength(1);
+  });
+
+  it('throws when activity_feed_items query returns an error', async () => {
+    const dbError = new Error('DB error');
+    const chain = createReturnsChain({ data: null, error: dbError });
+    mockFrom.mockReturnValue(chain);
+
+    await expect(fetchActivityFeed(ORG_ID_FEED, PROFILE_ID)).rejects.toThrow('DB error');
+  });
+});
+
+// ─── toggleReaction ────────────────────────────────────────────────────────────
+
+function createMaybeSingleChain(resolvedValue: { data: unknown; error: unknown }) {
+  const chain: Record<string, jest.Mock> = {};
+  const returnChain = () => chain;
+  chain.select = jest.fn(returnChain);
+  chain.eq = jest.fn(returnChain);
+  chain.is = jest.fn(returnChain);
+  chain.maybeSingle = jest.fn().mockResolvedValue(resolvedValue);
+  return chain;
+}
+
+// Thenable chain: all builder methods return self; awaiting the chain resolves
+// with resolvedValue. Handles DML operations (insert/update/delete) with any
+// number of chained .eq() calls.
+function createThenableChain(resolvedValue: { error: unknown } = { error: null }) {
+  type ThenableChain = {
+    delete: jest.Mock<ThenableChain, []>;
+    insert: jest.Mock<ThenableChain, []>;
+    update: jest.Mock<ThenableChain, []>;
+    eq: jest.Mock<ThenableChain, []>;
+    is: jest.Mock<ThenableChain, []>;
+    then: PromiseLike<{ error: unknown }>['then'];
+  };
+  const chain = {} as ThenableChain;
+  const returnChain = () => chain;
+  chain.delete = jest.fn(returnChain);
+  chain.insert = jest.fn(returnChain);
+  chain.update = jest.fn(returnChain);
+  chain.eq = jest.fn(returnChain);
+  chain.is = jest.fn(returnChain);
+  chain.then = (
+    resolve: (value: unknown) => unknown,
+    reject?: (reason: unknown) => unknown,
+  ) => Promise.resolve(resolvedValue).then(resolve, reject);
+  return chain;
+}
+
+const MSG_ID = 'msg-1';
+const ACCOUNT_ID = 'acct-1';
+const EMOJI = '👍';
+const ORG = 'org-1';
+
+describe('toggleReaction', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('adds a reaction and inserts a new count row when no count row exists', async () => {
+    const noExistingReaction = createMaybeSingleChain({ data: null, error: null });
+    const noExistingCount = createMaybeSingleChain({ data: null, error: null });
+
+    const insertReactionChain = createThenableChain();
+    const insertCountChain = createThenableChain();
+
+    mockFrom
+      .mockReturnValueOnce(noExistingReaction) // message_reactions select
+      .mockReturnValueOnce(noExistingCount) // message_reaction_counts select
+      .mockReturnValueOnce(insertReactionChain) // message_reactions insert
+      .mockReturnValueOnce(insertCountChain); // message_reaction_counts insert
+
+    await toggleReaction(MSG_ID, ACCOUNT_ID, EMOJI, ORG);
+
+    expect(insertReactionChain.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message_id: MSG_ID,
+        account_id: ACCOUNT_ID,
+        emoji: EMOJI,
+        org_id: ORG,
+      }),
+    );
+    expect(insertCountChain.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message_id: MSG_ID,
+        emoji: EMOJI,
+        org_id: ORG,
+        count: 1,
+      }),
+    );
+  });
+
+  it('adds a reaction and increments an existing count row', async () => {
+    const noExistingReaction = createMaybeSingleChain({ data: null, error: null });
+    const existingCount = createMaybeSingleChain({
+      data: { id: 'cnt-1', count: 3 },
+      error: null,
+    });
+
+    const insertReactionChain = createThenableChain();
+    const updateCountChain = createThenableChain();
+
+    mockFrom
+      .mockReturnValueOnce(noExistingReaction)
+      .mockReturnValueOnce(existingCount)
+      .mockReturnValueOnce(insertReactionChain)
+      .mockReturnValueOnce(updateCountChain);
+
+    await toggleReaction(MSG_ID, ACCOUNT_ID, EMOJI, ORG);
+
+    expect(insertReactionChain.insert).toHaveBeenCalled();
+    expect(updateCountChain.update).toHaveBeenCalledWith({ count: 4 });
+  });
+
+  it('removes a reaction and decrements the count row', async () => {
+    const existingReaction = createMaybeSingleChain({
+      data: { id: 'rxn-1' },
+      error: null,
+    });
+    const existingCount = createMaybeSingleChain({
+      data: { id: 'cnt-1', count: 3 },
+      error: null,
+    });
+
+    const deleteReactionChain = createThenableChain();
+    const updateCountChain = createThenableChain();
+
+    mockFrom
+      .mockReturnValueOnce(existingReaction)
+      .mockReturnValueOnce(existingCount)
+      .mockReturnValueOnce(deleteReactionChain)
+      .mockReturnValueOnce(updateCountChain);
+
+    await toggleReaction(MSG_ID, ACCOUNT_ID, EMOJI, ORG);
+
+    expect(deleteReactionChain.delete).toHaveBeenCalled();
+    expect(updateCountChain.update).toHaveBeenCalledWith({ count: 2 });
+  });
+
+  it('removes a reaction and deletes the count row when count is 1', async () => {
+    const existingReaction = createMaybeSingleChain({
+      data: { id: 'rxn-1' },
+      error: null,
+    });
+    const existingCount = createMaybeSingleChain({
+      data: { id: 'cnt-1', count: 1 },
+      error: null,
+    });
+
+    const deleteReactionChain = createThenableChain();
+    const deleteCountChain = createThenableChain();
+
+    mockFrom
+      .mockReturnValueOnce(existingReaction)
+      .mockReturnValueOnce(existingCount)
+      .mockReturnValueOnce(deleteReactionChain)
+      .mockReturnValueOnce(deleteCountChain);
+
+    await toggleReaction(MSG_ID, ACCOUNT_ID, EMOJI, ORG);
+
+    expect(deleteReactionChain.delete).toHaveBeenCalled();
+    expect(deleteCountChain.delete).toHaveBeenCalled();
   });
 });
 

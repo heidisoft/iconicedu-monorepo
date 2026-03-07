@@ -1,7 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { MessageList, type MessageListRef } from '@iconicedu/ui-web/components/messages/message-list';
+import {
+  MessageList,
+  type MessageListRef,
+} from '@iconicedu/ui-web/components/messages/message-list';
 import { MessageInput } from '@iconicedu/ui-web/components/messages/message-input';
 import { TypingIndicator } from '@iconicedu/ui-web/components/messages/typing-indicator';
 import { useMessages } from '@iconicedu/ui-web/hooks/use-messages';
@@ -45,6 +48,7 @@ import type {
   MessageMentionVM,
   MessagesRealtimeClient,
   MessageWriteClient,
+  LessonAssignmentMessageVM,
   TextMessageVM,
   ThreadVM,
   UUID,
@@ -92,6 +96,7 @@ export interface MessagesContainerProps {
   currentUserId?: string;
   currentUserProfile?: UserProfileVM | null;
   readOnly?: boolean;
+  showCreateMessageTypeButton?: boolean;
   realtimeClient?: MessagesRealtimeClient | null;
   messageWriteClient?: MessageWriteClient | null;
   uploadFileMessage?: (input: {
@@ -112,6 +117,13 @@ const isEducatorProfile = (profile: UserProfileVM): profile is EducatorProfileVM
 const MESSAGES_PAGE_SIZE = 40;
 const READ_STATE_PERSIST_DEBOUNCE_MS = 220;
 const TYPING_REMOTE_TIMEOUT_MS = 4000;
+type AssignmentSendInput = {
+  kind?: 'homework' | 'lesson';
+  title: string;
+  description?: string;
+  dueAt: string;
+  subject?: string;
+} | null;
 
 function formatFileSize(size?: number | null): string {
   if (!size || size <= 0) return 'Unknown size';
@@ -121,19 +133,77 @@ function formatFileSize(size?: number | null): string {
   return `${(size / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
-export function getDefaultMessagesTab(
-  channel: ChannelVM,
-  enableScheduleTab: boolean,
-): MessagesContainerTabKey {
-  if (!enableScheduleTab) {
-    return 'messages';
+export function buildOptimisticComposerMessage(input: {
+  orgId: string;
+  sender: UserProfileVM;
+  content: string;
+  mentions?: MessageMentionVM[];
+  homework?: AssignmentSendInput;
+}): TextMessageVM | LessonAssignmentMessageVM {
+  const now = new Date().toISOString();
+  const trimmedContent = input.content.trim();
+  const homework = input.homework;
+
+  if (!homework) {
+    return {
+      ids: { id: `msg-${Date.now()}`, orgId: input.orgId },
+      core: {
+        type: 'text',
+        sender: input.sender,
+        createdAt: now,
+        visibility: { type: 'all' },
+      },
+      social: {
+        reactions: [],
+      },
+      state: {
+        isSaved: false,
+      },
+      content: { text: input.content, mentions: input.mentions },
+    };
   }
 
-  const isLearningSpaceChannel =
-    channel.basics.purpose === 'learning-space' ||
-    channel.context?.primaryEntity?.kind === 'learning_space';
+  const defaultTitle =
+    homework.kind === 'lesson' ? 'Lesson assignment' : 'Homework assignment';
 
-  return isLearningSpaceChannel ? 'schedule' : 'messages';
+  return {
+    ids: { id: `msg-${Date.now()}`, orgId: input.orgId },
+    core: {
+      type: 'lesson-assignment',
+      sender: input.sender,
+      createdAt: now,
+      visibility: { type: 'all' },
+    },
+    social: {
+      reactions: [],
+    },
+    state: {
+      isSaved: false,
+    },
+    content: {
+      text:
+        trimmedContent ||
+        `${homework.kind === 'lesson' ? 'Lesson' : 'Homework'} assignment posted.`,
+      mentions: input.mentions,
+    },
+    assignment: {
+      kind: homework.kind,
+      title: homework.title.trim() || defaultTitle,
+      description:
+        homework.description?.trim() ||
+        trimmedContent ||
+        'Open this assignment to review details.',
+      dueAt: homework.dueAt,
+      subject: homework.subject?.trim() || 'General',
+    },
+  };
+}
+
+export function getDefaultMessagesTab(
+  _channel: ChannelVM,
+  _enableScheduleTab: boolean,
+): MessagesContainerTabKey {
+  return 'messages';
 }
 
 function getFilesTabIcon(item: ChannelFileItemVM) {
@@ -165,6 +235,7 @@ export function MessagesContainer({
   currentUserId: currentUserIdProp,
   currentUserProfile,
   readOnly = false,
+  showCreateMessageTypeButton = true,
   realtimeClient,
   messageWriteClient,
   uploadFileMessage,
@@ -215,7 +286,9 @@ export function MessagesContainer({
   const [savingMessageIds, setSavingMessageIds] = useState<Record<string, true>>({});
   const [hidingMessageIds, setHidingMessageIds] = useState<Record<string, true>>({});
   const [deletingMessageIds, setDeletingMessageIds] = useState<Record<string, true>>({});
-  const [reactionPickerMessageIds, setReactionPickerMessageIds] = useState<Record<string, true>>({});
+  const [reactionPickerMessageIds, setReactionPickerMessageIds] = useState<
+    Record<string, true>
+  >({});
   const [reactionEmojiKeys, setReactionEmojiKeys] = useState<Record<string, true>>({});
   const [hasMoreOlderMessages, setHasMoreOlderMessages] = useState(
     channelMessages.length >= MESSAGES_PAGE_SIZE,
@@ -242,8 +315,7 @@ export function MessagesContainer({
     () => channel.context?.capabilities?.includes('has_schedule') ?? false,
     [channel.context?.capabilities],
   );
-  const enableScheduleTab =
-    hasScheduleCapability || (loadedSchedules?.length ?? 0) > 0;
+  const enableScheduleTab = hasScheduleCapability || (loadedSchedules?.length ?? 0) > 0;
   const containerTabs = useMemo(
     () => getMessagesContainerTabs(enableScheduleTab),
     [enableScheduleTab],
@@ -288,7 +360,13 @@ export function MessagesContainer({
         reactionEmojiKeys,
       });
     },
-    [deletingMessageIds, hidingMessageIds, reactionEmojiKeys, reactionPickerMessageIds, savingMessageIds],
+    [
+      deletingMessageIds,
+      hidingMessageIds,
+      reactionEmojiKeys,
+      reactionPickerMessageIds,
+      savingMessageIds,
+    ],
   );
 
   const participants = useMemo(
@@ -484,7 +562,7 @@ export function MessagesContainer({
   );
 
   const handleSendMessage = useCallback(
-    (content: string, mentions?: MessageMentionVM[]) => {
+    (content: string, mentions?: MessageMentionVM[], homework?: AssignmentSendInput) => {
       if (readOnly) return;
       if (!senderProfile) return;
       if (messageFilter) {
@@ -499,6 +577,7 @@ export function MessagesContainer({
               senderProfileId: currentUserId,
               content,
               mentions,
+              homework,
             }),
           );
           const exists = messagesRef.current.some(
@@ -509,23 +588,14 @@ export function MessagesContainer({
           }
           return;
         }
-        const newMessage: TextMessageVM = {
-          ids: { id: `msg-${Date.now()}`, orgId: channel.ids.orgId },
-          core: {
-            type: 'text',
-            sender: senderProfile,
-            createdAt: new Date().toISOString(),
-            visibility: { type: 'all' },
-          },
-          social: {
-            reactions: [],
-          },
-          state: {
-            isSaved: false,
-          },
-          content: { text: content, mentions },
-        };
-      addMessage(newMessage);
+        const newMessage = buildOptimisticComposerMessage({
+          orgId: channel.ids.orgId,
+          sender: senderProfile,
+          content,
+          mentions,
+          homework,
+        });
+        addMessage(newMessage);
       };
       void sendMessage();
     },
@@ -554,34 +624,35 @@ export function MessagesContainer({
       const trimmed = content.trim();
       if (!trimmed) return;
 
-      const createdMessage = messageWriteClient && currentUserId
-        ? await runWithNetworkActivity(() =>
-            messageWriteClient.sendTextMessage({
-              orgId: channel.ids.orgId,
-              channelId: channel.ids.id,
-              senderProfileId: currentUserId,
-              content: trimmed,
-              mentions,
-              threadId: thread.ids.id,
-              threadParentId: thread.parent.messageId ?? parentMessage.ids.id,
-            }),
-          )
-        : ({
-            ids: { id: `reply-${Date.now()}`, orgId: channel.ids.orgId },
-            core: {
-              type: 'text',
-              sender: senderProfile,
-              createdAt: new Date().toISOString(),
-              visibility: { type: 'all' },
-            },
-            social: {
-              reactions: [],
-            },
-            state: {
-              isSaved: false,
-            },
-            content: { text: trimmed, mentions },
-          } as TextMessageVM);
+      const createdMessage =
+        messageWriteClient && currentUserId
+          ? await runWithNetworkActivity(() =>
+              messageWriteClient.sendTextMessage({
+                orgId: channel.ids.orgId,
+                channelId: channel.ids.id,
+                senderProfileId: currentUserId,
+                content: trimmed,
+                mentions,
+                threadId: thread.ids.id,
+                threadParentId: thread.parent.messageId ?? parentMessage.ids.id,
+              }),
+            )
+          : ({
+              ids: { id: `reply-${Date.now()}`, orgId: channel.ids.orgId },
+              core: {
+                type: 'text',
+                sender: senderProfile,
+                createdAt: new Date().toISOString(),
+                visibility: { type: 'all' },
+              },
+              social: {
+                reactions: [],
+              },
+              state: {
+                isSaved: false,
+              },
+              content: { text: trimmed, mentions },
+            } as TextMessageVM);
 
       const exists = messagesRef.current.some(
         (message) => message.ids.id === createdMessage.ids.id,
@@ -642,13 +713,7 @@ export function MessagesContainer({
       profileId: currentUserId,
       isTyping: true,
     });
-  }, [
-    realtimeClient,
-    currentUserId,
-    channel.ids.orgId,
-    channel.ids.id,
-    readOnly,
-  ]);
+  }, [realtimeClient, currentUserId, channel.ids.orgId, channel.ids.id, readOnly]);
 
   const handleTypingStop = useCallback(() => {
     if (readOnly) return;
@@ -733,7 +798,15 @@ export function MessagesContainer({
         void persistSavedState();
       }
     },
-    [channel.ids.orgId, messageWriteClient, messages, readOnly, runWithNetworkActivity, toggleSaved, setPendingMessageAction],
+    [
+      channel.ids.orgId,
+      messageWriteClient,
+      messages,
+      readOnly,
+      runWithNetworkActivity,
+      toggleSaved,
+      setPendingMessageAction,
+    ],
   );
 
   const handleToggleHidden = useCallback(
@@ -854,8 +927,7 @@ export function MessagesContainer({
   );
   const sessionSummaryCount = useMemo(
     () =>
-      visibleMessages.filter((message) => message.core.type === 'session-summary')
-        .length,
+      visibleMessages.filter((message) => message.core.type === 'session-summary').length,
     [visibleMessages],
   );
 
@@ -869,9 +941,7 @@ export function MessagesContainer({
       );
     }
     if (messageFilter === 'session-summary') {
-      return visibleMessages.filter(
-        (message) => message.core.type === 'session-summary',
-      );
+      return visibleMessages.filter((message) => message.core.type === 'session-summary');
     }
     return visibleMessages;
   }, [messageFilter, visibleMessages]);
@@ -935,7 +1005,11 @@ export function MessagesContainer({
   useEffect(() => {
     const nextHash = `#${tabKeyToHash(activeTab)}`;
     if (window.location.hash === nextHash) return;
-    window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.search}${nextHash}`);
+    window.history.replaceState(
+      window.history.state,
+      '',
+      `${window.location.pathname}${window.location.search}${nextHash}`,
+    );
   }, [activeTab]);
 
   useEffect(() => {
@@ -1153,44 +1227,46 @@ export function MessagesContainer({
       return;
     }
     if (!senderProfile) return;
-    setSendTextMessage(async ({ content, mentions, homework, threadId, threadParentId }) => {
-      if (messageWriteClient && currentUserId) {
-        const sendInput = {
-          orgId: channel.ids.orgId,
-          channelId: channel.ids.id,
-          senderProfileId: currentUserId,
-          content,
-          mentions,
-          homework,
-          threadId,
-          threadParentId,
-        } as Parameters<MessageWriteClient['sendTextMessage']>[0];
-        const created = await messageWriteClient.sendTextMessage(sendInput);
-        const exists = messagesRef.current.some(
-          (message) => message.ids.id === created.ids.id,
-        );
-        if (!exists) {
-          addMessage(created);
+    setSendTextMessage(
+      async ({ content, mentions, homework, threadId, threadParentId }) => {
+        if (messageWriteClient && currentUserId) {
+          const sendInput = {
+            orgId: channel.ids.orgId,
+            channelId: channel.ids.id,
+            senderProfileId: currentUserId,
+            content,
+            mentions,
+            homework,
+            threadId,
+            threadParentId,
+          } as Parameters<MessageWriteClient['sendTextMessage']>[0];
+          const created = await messageWriteClient.sendTextMessage(sendInput);
+          const exists = messagesRef.current.some(
+            (message) => message.ids.id === created.ids.id,
+          );
+          if (!exists) {
+            addMessage(created);
+          }
+          return created;
         }
-        return created;
-      }
-      return {
-        ids: { id: `reply-${Date.now()}`, orgId: channel.ids.orgId },
-        core: {
-          type: 'text',
-          sender: senderProfile,
-          createdAt: new Date().toISOString(),
-          visibility: { type: 'all' },
-        },
-        social: {
-          reactions: [],
-        },
-        state: {
-          isSaved: false,
-        },
-        content: { text: content, mentions },
-      };
-    });
+        return {
+          ids: { id: `reply-${Date.now()}`, orgId: channel.ids.orgId },
+          core: {
+            type: 'text',
+            sender: senderProfile,
+            createdAt: new Date().toISOString(),
+            visibility: { type: 'all' },
+          },
+          social: {
+            reactions: [],
+          },
+          state: {
+            isSaved: false,
+          },
+          content: { text: content, mentions },
+        };
+      },
+    );
   }, [
     senderProfile,
     setSendTextMessage,
@@ -1319,8 +1395,7 @@ export function MessagesContainer({
         if (!isCancelled) {
           const files = payload.files ?? [];
           files.sort(
-            (a, b) =>
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
           );
           setLoadedFiles(files);
         }
@@ -1430,12 +1505,12 @@ export function MessagesContainer({
     if (activeTab === 'messages') {
       return (
         <>
-          <MessageList
-            ref={messageListRef}
-            {...messageListProps}
-          />
+          <MessageList ref={messageListRef} {...messageListProps} />
           {typingParticipants.length ? (
-            <TypingIndicator profiles={typingParticipants} className="border-t border-border" />
+            <TypingIndicator
+              profiles={typingParticipants}
+              className="border-t border-border"
+            />
           ) : null}
           {readOnly ? (
             <div className="border-t border-border px-4 py-3 text-xs text-muted-foreground">
@@ -1463,20 +1538,34 @@ export function MessagesContainer({
                     ) {
                       const nextFiles = createChannelFileItems(
                         channel.ids.id,
-                        created as FileMessageVM | ImageMessageVM | AudioRecordingMessageVM,
+                        created as
+                          | FileMessageVM
+                          | ImageMessageVM
+                          | AudioRecordingMessageVM,
                       );
                       setLoadedFiles((prev) => {
                         if (!prev) {
                           return prev;
                         }
-                        const existingKeys = new Set(prev.map((item) => `${item.messageId}:${item.name}:${item.storagePath}`));
+                        const existingKeys = new Set(
+                          prev.map(
+                            (item) =>
+                              `${item.messageId}:${item.name}:${item.storagePath}`,
+                          ),
+                        );
                         const merged = [
-                          ...nextFiles.filter((item) => !existingKeys.has(`${item.messageId}:${item.name}:${item.storagePath}`)),
+                          ...nextFiles.filter(
+                            (item) =>
+                              !existingKeys.has(
+                                `${item.messageId}:${item.name}:${item.storagePath}`,
+                              ),
+                          ),
                           ...prev,
                         ];
                         return merged.sort(
                           (a, b) =>
-                            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+                            new Date(b.createdAt).getTime() -
+                            new Date(a.createdAt).getTime(),
                         );
                       });
                     }
@@ -1487,6 +1576,7 @@ export function MessagesContainer({
               placeholder={getMessageInputPlaceholder(channel, resolvedCurrentUserId)}
               participants={participants}
               currentUserId={resolvedCurrentUserId}
+              showCreateMessageTypeButton={showCreateMessageTypeButton}
               onTypingStart={handleTypingStart}
               onTypingStop={handleTypingStop}
             />
@@ -1521,7 +1611,7 @@ export function MessagesContainer({
               <p className="text-sm text-muted-foreground">No files yet.</p>
             ) : null}
             {!isLoadingFiles && !filesLoadError
-              ? filesForDisplay.map((item) => (
+              ? filesForDisplay.map((item) =>
                   (() => {
                     const href = buildFileDownloadHref({
                       url: item.url,
@@ -1542,7 +1632,9 @@ export function MessagesContainer({
                           rel="noreferrer"
                           className="flex min-w-0 flex-1 items-center gap-3"
                         >
-                          <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${iconTone}`}>
+                          <div
+                            className={`flex h-9 w-9 items-center justify-center rounded-lg ${iconTone}`}
+                          >
                             <FileIcon className="h-4 w-4" />
                           </div>
                           <div className="min-w-0">
@@ -1551,8 +1643,8 @@ export function MessagesContainer({
                             </p>
                             <p className="truncate text-xs text-muted-foreground">
                               {item.kind === 'design-file'
-                                ? item.tool ?? 'Design file'
-                                : item.mimeType ?? 'File'}
+                                ? (item.tool ?? 'Design file')
+                                : (item.mimeType ?? 'File')}
                               {' • '}
                               {formatFileSize(item.size)}
                               {' • '}
@@ -1560,7 +1652,12 @@ export function MessagesContainer({
                             </p>
                           </div>
                         </a>
-                        <Button asChild variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
+                        <Button
+                          asChild
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 flex-shrink-0"
+                        >
                           <a
                             href={href}
                             target="_blank"
@@ -1572,8 +1669,8 @@ export function MessagesContainer({
                         </Button>
                       </div>
                     );
-                  })()
-                ))
+                  })(),
+                )
               : null}
           </div>
         </ScrollArea>
