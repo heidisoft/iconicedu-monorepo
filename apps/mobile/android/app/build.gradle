@@ -4,13 +4,6 @@ apply plugin: "com.facebook.react"
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
 
-// Load PostHog config from local.properties (gitignored)
-def localProperties = new Properties()
-def localPropertiesFile = rootProject.file("local.properties")
-if (localPropertiesFile.exists()) {
-    localPropertiesFile.withReader('UTF-8') { reader -> localProperties.load(reader) }
-}
-
 /**
  * This is the configuration block to customize your React Native Android app.
  * By default you don't need to apply any configuration, just uncomment the lines you need.
@@ -95,9 +88,6 @@ android {
     compileSdk rootProject.ext.compileSdkVersion
 
     namespace 'com.iconicedu.mobile'
-    buildFeatures {
-        buildConfig true
-    }
     defaultConfig {
         applicationId 'com.iconicedu.mobile'
         minSdkVersion rootProject.ext.minSdkVersion
@@ -106,8 +96,6 @@ android {
         versionName "0.1.0"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
-        buildConfigField "String", "POSTHOG_API_KEY", "\"${localProperties.getProperty('posthog.apiKey', '')}\""
-        buildConfigField "String", "POSTHOG_HOST", "\"${localProperties.getProperty('posthog.host', 'https://us.i.posthog.com')}\""
     }
     signingConfigs {
         debug {
@@ -167,9 +155,6 @@ android {
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
-
-    // PostHog Android SDK for product analytics and error tracking
-    implementation("com.posthog:posthog-android:3.+")
 
     def isGifEnabled = (findProperty('expo.gif.enabled') ?: "") == "true";
     def isWebpEnabled = (findProperty('expo.webp.enabled') ?: "") == "true";

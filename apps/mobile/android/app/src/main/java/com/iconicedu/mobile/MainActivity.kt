@@ -21,9 +21,6 @@ class MainActivity : ReactActivity() {
     SplashScreenManager.registerOnActivity(this)
     // @generated end expo-splashscreen
     super.onCreate(null)
-    // expo-edge-to-edge handles edge-to-edge rendering and system bar appearance
-    // (navigation bar transparency + handle tint) via its native module and
-    // the SystemBars JS component. No manual window flag manipulation needed.
   }
 
   /**

@@ -1,5 +1,8 @@
 PODS:
-  - EXConstants (17.1.8):
+  - EXAV (16.0.8):
+    - ExpoModulesCore
+    - ReactCommon/turbomodule/core
+  - EXConstants (18.0.13):
     - ExpoModulesCore
   - Expo (54.0.25):
     - ExpoModulesCore
@@ -28,13 +31,17 @@ PODS:
     - Yoga
   - ExpoAsset (12.0.10):
     - ExpoModulesCore
-  - ExpoFileSystem (19.0.19):
+  - ExpoDocumentPicker (55.0.8):
+    - ExpoModulesCore
+  - ExpoFileSystem (19.0.21):
     - ExpoModulesCore
   - ExpoFont (14.0.9):
     - ExpoModulesCore
   - ExpoHead (6.0.23):
     - ExpoModulesCore
     - RNScreens
+  - ExpoImagePicker (55.0.10):
+    - ExpoModulesCore
   - ExpoKeepAwake (15.0.7):
     - ExpoModulesCore
   - ExpoLinking (8.0.11):
@@ -64,12 +71,40 @@ PODS:
     - Yoga
   - ExpoSecureStore (15.0.8):
     - ExpoModulesCore
+  - ExpoSharing (14.0.8):
+    - ExpoModulesCore
   - ExpoSplashScreen (31.0.13):
+    - ExpoModulesCore
+  - ExpoWebBrowser (14.0.2):
     - ExpoModulesCore
   - FBLazyVector (0.81.5)
   - hermes-engine (0.81.5):
     - hermes-engine/Pre-built (= 0.81.5)
   - hermes-engine/Pre-built (0.81.5)
+  - PostHog (3.42.1)
+  - posthog-react-native-session-replay (1.5.1):
+    - hermes-engine
+    - PostHog (~> 3.42.0)
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
   - RCTDeprecation (0.81.5)
   - RCTRequired (0.81.5)
   - RCTTypeSafety (0.81.5):
@@ -2030,19 +2065,25 @@ PODS:
   - Yoga (0.0.0)
 
 DEPENDENCIES:
-  - EXConstants (from `../node_modules/expo-constants/ios`)
+  - EXAV (from `../../../node_modules/expo-av/ios`)
+  - EXConstants (from `../../../node_modules/expo-constants/ios`)
   - Expo (from `../../../node_modules/expo`)
   - ExpoAsset (from `../../../node_modules/expo-asset/ios`)
+  - ExpoDocumentPicker (from `../../../node_modules/expo-document-picker/ios`)
   - ExpoFileSystem (from `../../../node_modules/expo-file-system/ios`)
   - ExpoFont (from `../../../node_modules/expo-font/ios`)
   - ExpoHead (from `../../../node_modules/expo-router/ios`)
+  - ExpoImagePicker (from `../../../node_modules/expo-image-picker/ios`)
   - ExpoKeepAwake (from `../../../node_modules/expo-keep-awake/ios`)
   - ExpoLinking (from `../../../node_modules/expo-linking/ios`)
   - ExpoModulesCore (from `../../../node_modules/expo-modules-core`)
   - ExpoSecureStore (from `../../../node_modules/expo-secure-store/ios`)
+  - ExpoSharing (from `../../../node_modules/expo-sharing/ios`)
   - ExpoSplashScreen (from `../../../node_modules/expo-splash-screen/ios`)
+  - ExpoWebBrowser (from `../../../node_modules/expo-web-browser/ios`)
   - FBLazyVector (from `../../../node_modules/react-native/Libraries/FBLazyVector`)
   - hermes-engine (from `../../../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
+  - posthog-react-native-session-replay (from `../../../node_modules/posthog-react-native-session-replay`)
   - RCTDeprecation (from `../../../node_modules/react-native/ReactApple/Libraries/RCTFoundation/RCTDeprecation`)
   - RCTRequired (from `../../../node_modules/react-native/Libraries/Required`)
   - RCTTypeSafety (from `../../../node_modules/react-native/Libraries/TypeSafety`)
@@ -2116,19 +2157,29 @@ DEPENDENCIES:
   - RNWorklets (from `../../../node_modules/react-native-worklets`)
   - Yoga (from `../../../node_modules/react-native/ReactCommon/yoga`)
 
+SPEC REPOS:
+  trunk:
+    - PostHog
+
 EXTERNAL SOURCES:
+  EXAV:
+    :path: "../../../node_modules/expo-av/ios"
   EXConstants:
-    :path: "../node_modules/expo-constants/ios"
+    :path: "../../../node_modules/expo-constants/ios"
   Expo:
     :path: "../../../node_modules/expo"
   ExpoAsset:
     :path: "../../../node_modules/expo-asset/ios"
+  ExpoDocumentPicker:
+    :path: "../../../node_modules/expo-document-picker/ios"
   ExpoFileSystem:
     :path: "../../../node_modules/expo-file-system/ios"
   ExpoFont:
     :path: "../../../node_modules/expo-font/ios"
   ExpoHead:
     :path: "../../../node_modules/expo-router/ios"
+  ExpoImagePicker:
+    :path: "../../../node_modules/expo-image-picker/ios"
   ExpoKeepAwake:
     :path: "../../../node_modules/expo-keep-awake/ios"
   ExpoLinking:
@@ -2137,13 +2188,19 @@ EXTERNAL SOURCES:
     :path: "../../../node_modules/expo-modules-core"
   ExpoSecureStore:
     :path: "../../../node_modules/expo-secure-store/ios"
+  ExpoSharing:
+    :path: "../../../node_modules/expo-sharing/ios"
   ExpoSplashScreen:
     :path: "../../../node_modules/expo-splash-screen/ios"
+  ExpoWebBrowser:
+    :path: "../../../node_modules/expo-web-browser/ios"
   FBLazyVector:
     :path: "../../../node_modules/react-native/Libraries/FBLazyVector"
   hermes-engine:
     :podspec: "../../../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec"
     :tag: hermes-2025-07-07-RNv0.81.0-e0fc67142ec0763c6b6153ca2bf96df815539782
+  posthog-react-native-session-replay:
+    :path: "../../../node_modules/posthog-react-native-session-replay"
   RCTDeprecation:
     :path: "../../../node_modules/react-native/ReactApple/Libraries/RCTFoundation/RCTDeprecation"
   RCTRequired:
@@ -2288,19 +2345,26 @@ EXTERNAL SOURCES:
     :path: "../../../node_modules/react-native/ReactCommon/yoga"
 
 SPEC CHECKSUMS:
-  EXConstants: d3d551cb154718f5161c4247304e96aa59f6cca7
+  EXAV: b60fcf142fae6684d295bc28cd7cfcb3335570ea
+  EXConstants: fce59a631a06c4151602843667f7cfe35f81e271
   Expo: 111394d38f32be09385d4c7f70cc96d2da438d0d
   ExpoAsset: d839c8eae8124470332408427327e8f88beb2dfd
-  ExpoFileSystem: 77157a101e03150a4ea4f854b4dd44883c93ae0a
+  ExpoDocumentPicker: 9d82b922be941a74ba52f82df7ba123b334fbb5a
+  ExpoFileSystem: 858a44267a3e6e9057e0888ad7c7cfbf55d52063
   ExpoFont: cf9d90ec1d3b97c4f513211905724c8171f82961
   ExpoHead: 7e19b2272edf492262acf8afb391a295198a6b23
+  ExpoImagePicker: 550f22a1db18bf74a6fe81e87c934001d67b5074
   ExpoKeepAwake: 1a2e820692e933c94a565ec3fbbe38ac31658ffe
   ExpoLinking: 8f0aaf69aa56f832913030503b6263dc6f647f37
   ExpoModulesCore: e8ec7f8727caf51a49d495598303dd420ca994bf
   ExpoSecureStore: d32f751874a2ceb5aaeebeb3578e165c1ba2b24a
+  ExpoSharing: 0d983394ed4a80334bab5a0d5384f75710feb7e8
   ExpoSplashScreen: bc3cffefca2716e5f22350ca109badd7e50ec14d
+  ExpoWebBrowser: a212e6b480d8857d3e441fba51e0c968333803b3
   FBLazyVector: e95a291ad2dadb88e42b06e0c5fb8262de53ec12
   hermes-engine: 9f4dfe93326146a1c99eb535b1cb0b857a3cd172
+  PostHog: 148d2d62bac68c6da50a2325030b3fb2d6bca95b
+  posthog-react-native-session-replay: 858e7caa8626381a7a5baf8aca7308734448e4fe
   RCTDeprecation: 943572d4be82d480a48f4884f670135ae30bf990
   RCTRequired: 8f3cfc90cc25cf6e420ddb3e7caaaabc57df6043
   RCTTypeSafety: 16a4144ca3f959583ab019b57d5633df10b5e97c

@@ -71,6 +71,8 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
         // Send batched events every 30 s or when the batch reaches 20 events
         flushInterval: 30000,
         flushAt: 20,
+        // Fire Application Opened / Installed / Updated lifecycle events from JS layer
+        captureAppLifecycleEvents: true,
         // Enable session replay (available in posthog-react-native ≥ 3.x)
         enableSessionReplay: true,
         sessionReplayConfig: {
