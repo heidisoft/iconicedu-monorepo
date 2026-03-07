@@ -1,7 +1,8 @@
-import React from 'react';
-import { Pressable, type PressableProps } from 'react-native';
+import React, { useCallback } from 'react';
+import { Pressable, type PressableProps, type GestureResponderEvent } from 'react-native';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@iconicedu/ui-native/lib/utils';
+import { useUiTracking } from '@iconicedu/ui-native/lib/tracking-context';
 
 const iconButtonVariants = cva(
   'items-center justify-center rounded-full active:opacity-70',
@@ -28,6 +29,7 @@ const iconButtonVariants = cva(
 export type IconButtonProps = PressableProps &
   VariantProps<typeof iconButtonVariants> & {
     icon: React.ReactNode;
+    /** Accessibility label — also used as the analytics event label. */
     label: string;
     className?: string;
   };
@@ -39,22 +41,36 @@ export const IconButton: React.FC<IconButtonProps> = ({
   label,
   className,
   disabled,
+  onPress,
   ...rest
-}) => (
-  <Pressable
-    className={cn(
-      iconButtonVariants({ variant, size }),
-      disabled && 'opacity-50',
-      className,
-    )}
-    disabled={disabled}
-    accessibilityRole="button"
-    accessibilityLabel={label}
-    accessibilityState={{ disabled: disabled ?? false }}
-    {...rest}
-  >
-    {icon}
-  </Pressable>
-);
+}) => {
+  const track = useUiTracking();
+
+  const handlePress = useCallback(
+    (e: GestureResponderEvent) => {
+      track('button_clicked', { label });
+      onPress?.(e);
+    },
+    [track, label, onPress],
+  );
+
+  return (
+    <Pressable
+      className={cn(
+        iconButtonVariants({ variant, size }),
+        disabled && 'opacity-50',
+        className,
+      )}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: disabled ?? false }}
+      onPress={handlePress}
+      {...rest}
+    >
+      {icon}
+    </Pressable>
+  );
+};
 
 export { iconButtonVariants };

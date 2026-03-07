@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react-native';
 import { Button } from '../components/Button';
+import { UiTrackingContext } from '../lib/tracking-context';
 
 describe('Button', () => {
   it('renders label text', () => {
@@ -55,5 +56,53 @@ describe('Button', () => {
 
     rerender(<Button label="Large" size="lg" />);
     expect(screen.getByText('Large')).toBeTruthy();
+  });
+
+  describe('analytics tracking', () => {
+    it('fires track with analyticsLabel when provided', () => {
+      const capture = jest.fn();
+      render(
+        <UiTrackingContext.Provider value={capture}>
+          <Button analyticsLabel="Send message" />
+        </UiTrackingContext.Provider>,
+      );
+      fireEvent.press(screen.getByRole('button'));
+      expect(capture).toHaveBeenCalledWith('button_clicked', { label: 'Send message' });
+    });
+
+    it('fires track using label when analyticsLabel is not set', () => {
+      const capture = jest.fn();
+      render(
+        <UiTrackingContext.Provider value={capture}>
+          <Button label="Submit" />
+        </UiTrackingContext.Provider>,
+      );
+      fireEvent.press(screen.getByRole('button'));
+      expect(capture).toHaveBeenCalledWith('button_clicked', { label: 'Submit' });
+    });
+
+    it('does not fire track when neither analyticsLabel nor label is set', () => {
+      const capture = jest.fn();
+      render(
+        <UiTrackingContext.Provider value={capture}>
+          <Button>Children only</Button>
+        </UiTrackingContext.Provider>,
+      );
+      fireEvent.press(screen.getByRole('button'));
+      expect(capture).not.toHaveBeenCalled();
+    });
+
+    it('still calls onPress after tracking', () => {
+      const capture = jest.fn();
+      const onPress = jest.fn();
+      render(
+        <UiTrackingContext.Provider value={capture}>
+          <Button analyticsLabel="Go" onPress={onPress} />
+        </UiTrackingContext.Provider>,
+      );
+      fireEvent.press(screen.getByRole('button'));
+      expect(capture).toHaveBeenCalled();
+      expect(onPress).toHaveBeenCalled();
+    });
   });
 });

@@ -113,6 +113,10 @@ export const AnalyticsEvent = {
   FUNNEL_COMPLETED: 'funnel completed',
   FUNNEL_ABANDONED: 'funnel abandoned',
 
+  // ── App Lifecycle (mobile) ────────────────────────────────────────────────
+  APP_FOREGROUNDED: 'app foregrounded',
+  APP_BACKGROUNDED: 'app backgrounded',
+
   // ── Family / Admin ────────────────────────────────────────────────────────
   FAMILY_INVITE_SENT: 'family invite sent',
   FAMILY_LINK_ACCEPTED: 'family link accepted',

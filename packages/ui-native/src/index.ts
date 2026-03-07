@@ -20,6 +20,11 @@ export * from '@iconicedu/ui-native/components/SettingsRow';
 
 // Utilities
 export { cn, TextClassContext } from '@iconicedu/ui-native/lib/utils';
+export {
+  UiTrackingContext,
+  useUiTracking,
+  type UiTrackCapture,
+} from '@iconicedu/ui-native/lib/tracking-context';
 
 // Constants
 export { NAV_THEME } from '@iconicedu/ui-native/lib/constants';
