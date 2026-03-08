@@ -217,4 +217,338 @@ describe('learning space schedule hash', () => {
 
     expect(existing.fullHash).toBe(incoming.fullHash);
   });
+
+  it('matches saved timezone-backed exceptions and overrides against equivalent payload schedules', () => {
+    const existing = buildLearningSpaceScheduleHashBundleFromExisting({
+      id: 'schedule-1',
+      startAt: '2026-03-10T21:02:00.000Z',
+      endAt: '2026-03-10T22:02:00.000Z',
+      timezone: 'America/New_York',
+      recurrence: {
+        frequency: 'weekly',
+        interval: 1,
+        timezone: 'America/New_York',
+        byday: ['TU'],
+        byhour: [17],
+        byminute: [2],
+        wkst: 'MO',
+      },
+      exceptions: [
+        {
+          occurrenceKey: '2026-03-17T21:02:00.000Z',
+          reason: 'Holiday',
+        },
+      ],
+      overrides: [
+        {
+          occurrenceKey: '2026-03-24T21:02:00.000Z',
+          startAt: '2026-03-25T22:15:00.000Z',
+          endAt: '2026-03-25T23:15:00.000Z',
+          reason: 'Rescheduled',
+        },
+      ],
+    });
+
+    const incoming = buildLearningSpaceScheduleHashBundleFromPayload({
+      startDate: '2026-03-10T12:00:00.000Z',
+      timezone: 'America/New_York',
+      rule: {
+        frequency: 'weekly',
+        byWeekday: ['TU'],
+        weekdayTimes: [{ day: 'TU', time: '17:02' }],
+        timezone: 'America/New_York',
+      },
+      exceptions: [{ date: '2026-03-17', reason: 'Holiday' }],
+      overrides: [
+        {
+          originalDate: '2026-03-24',
+          newDate: '2026-03-25',
+          newTime: '18:15',
+          reason: 'Rescheduled',
+        },
+      ],
+    });
+
+    expect(existing.baseHash).toBe(incoming.baseHash);
+    expect(existing.fullHash).toBe(incoming.fullHash);
+  });
+
+  it('recreates the existing full hash when saved exceptions or overrides change', () => {
+    const baseline = buildLearningSpaceScheduleHashBundleFromExisting({
+      id: 'schedule-1',
+      startAt: '2026-03-10T21:02:00.000Z',
+      endAt: '2026-03-10T22:02:00.000Z',
+      timezone: 'America/New_York',
+      recurrence: {
+        frequency: 'weekly',
+        interval: 1,
+        timezone: 'America/New_York',
+        byday: ['TU'],
+        byhour: [17],
+        byminute: [2],
+        wkst: 'MO',
+      },
+      exceptions: [
+        {
+          occurrenceKey: '2026-03-17T21:02:00.000Z',
+          reason: 'Holiday',
+        },
+      ],
+      overrides: [
+        {
+          occurrenceKey: '2026-03-24T21:02:00.000Z',
+          startAt: '2026-03-25T22:15:00.000Z',
+          endAt: '2026-03-25T23:15:00.000Z',
+          reason: 'Rescheduled',
+        },
+      ],
+    });
+
+    const changed = buildLearningSpaceScheduleHashBundleFromExisting({
+      id: 'schedule-1',
+      startAt: '2026-03-10T21:02:00.000Z',
+      endAt: '2026-03-10T22:02:00.000Z',
+      timezone: 'America/New_York',
+      recurrence: {
+        frequency: 'weekly',
+        interval: 1,
+        timezone: 'America/New_York',
+        byday: ['TU'],
+        byhour: [17],
+        byminute: [2],
+        wkst: 'MO',
+      },
+      exceptions: [
+        {
+          occurrenceKey: '2026-03-31T21:02:00.000Z',
+          reason: 'Break',
+        },
+      ],
+      overrides: [
+        {
+          occurrenceKey: '2026-03-24T21:02:00.000Z',
+          startAt: '2026-03-25T22:15:00.000Z',
+          endAt: '2026-03-25T23:15:00.000Z',
+          reason: 'Rescheduled',
+        },
+      ],
+    });
+
+    expect(changed.baseHash).toBe(baseline.baseHash);
+    expect(changed.fullHash).not.toBe(baseline.fullHash);
+  });
+
+  it('normalizes legacy exception and override timestamps in the same timezone', () => {
+    const existing = buildLearningSpaceScheduleHashBundleFromExisting({
+      id: 'schedule-1',
+      startAt: '2026-03-10T21:02:00.000Z',
+      endAt: '2026-03-10T22:02:00.000Z',
+      timezone: 'America/New_York',
+      recurrence: {
+        frequency: 'weekly',
+        interval: 1,
+        timezone: 'America/New_York',
+        byday: ['TU'],
+        byhour: [17],
+        byminute: [2],
+        wkst: 'MO',
+      },
+      // Legacy UTC-naive timestamps representing local dates/times.
+      exceptions: [{ occurrenceKey: '2026-03-17T17:02:00.000Z', reason: 'Holiday' }],
+      overrides: [
+        {
+          occurrenceKey: '2026-03-24T17:02:00.000Z',
+          startAt: '2026-03-25T22:15:00.000Z',
+          endAt: '2026-03-25T23:15:00.000Z',
+          reason: 'Rescheduled',
+        },
+      ],
+    });
+
+    const incoming = buildLearningSpaceScheduleHashBundleFromPayload({
+      startDate: '2026-03-10T12:00:00.000Z',
+      timezone: 'America/New_York',
+      rule: {
+        frequency: 'weekly',
+        byWeekday: ['TU'],
+        weekdayTimes: [{ day: 'TU', time: '17:02' }],
+        timezone: 'America/New_York',
+      },
+      exceptions: [{ date: '2026-03-17', reason: 'Holiday' }],
+      overrides: [
+        {
+          originalDate: '2026-03-24',
+          newDate: '2026-03-25',
+          newTime: '18:15',
+          reason: 'Rescheduled',
+        },
+      ],
+    });
+
+    expect(existing.baseHash).toBe(incoming.baseHash);
+    expect(existing.fullHash).toBe(incoming.fullHash);
+  });
+
+  it('treats empty override time and blank reasons as omitted values', () => {
+    const first = buildLearningSpaceScheduleHashBundleFromPayload({
+      startDate: '2026-03-11T14:00:00.000Z',
+      timezone: 'UTC',
+      rule: {
+        frequency: 'weekly',
+        byWeekday: ['WE'],
+        weekdayTimes: [{ day: 'WE', time: '14:00' }],
+      },
+      exceptions: [{ date: '2026-03-18', reason: '   ' }],
+      overrides: [
+        {
+          originalDate: '2026-03-25',
+          newDate: '2026-04-01',
+          newTime: '',
+          reason: '',
+        },
+      ],
+    });
+
+    const second = buildLearningSpaceScheduleHashBundleFromPayload({
+      startDate: '2026-03-11T14:00:00.000Z',
+      timezone: 'UTC',
+      rule: {
+        frequency: 'weekly',
+        byWeekday: ['WE'],
+        weekdayTimes: [{ day: 'WE', time: '14:00' }],
+      },
+      exceptions: [{ date: '2026-03-18' }],
+      overrides: [
+        {
+          originalDate: '2026-03-25',
+          newDate: '2026-04-01',
+        },
+      ],
+    });
+
+    expect(first.baseHash).toBe(second.baseHash);
+    expect(first.fullHash).toBe(second.fullHash);
+  });
+
+  it('ignores seconds-level timestamp drift in existing exception and override rows', () => {
+    const first = buildLearningSpaceScheduleHashBundleFromExisting({
+      id: 'schedule-1',
+      startAt: '2026-03-10T21:02:00.000Z',
+      endAt: '2026-03-10T22:02:00.000Z',
+      timezone: 'America/New_York',
+      recurrence: {
+        frequency: 'weekly',
+        interval: 1,
+        timezone: 'America/New_York',
+        byday: ['TU'],
+        byhour: [17],
+        byminute: [2],
+        wkst: 'MO',
+      },
+      exceptions: [{ occurrenceKey: '2026-03-17T21:02:17.999Z', reason: 'Holiday' }],
+      overrides: [
+        {
+          occurrenceKey: '2026-03-24T21:02:47.125Z',
+          startAt: '2026-03-25T22:15:45.900Z',
+          endAt: '2026-03-25T23:15:45.900Z',
+          reason: 'Rescheduled',
+        },
+      ],
+    });
+
+    const second = buildLearningSpaceScheduleHashBundleFromExisting({
+      id: 'schedule-1',
+      startAt: '2026-03-10T21:02:00.000Z',
+      endAt: '2026-03-10T22:02:00.000Z',
+      timezone: 'America/New_York',
+      recurrence: {
+        frequency: 'weekly',
+        interval: 1,
+        timezone: 'America/New_York',
+        byday: ['TU'],
+        byhour: [17],
+        byminute: [2],
+        wkst: 'MO',
+      },
+      exceptions: [{ occurrenceKey: '2026-03-17T21:02:00.000Z', reason: 'Holiday' }],
+      overrides: [
+        {
+          occurrenceKey: '2026-03-24T21:02:00.000Z',
+          startAt: '2026-03-25T22:15:00.000Z',
+          endAt: '2026-03-25T23:15:00.000Z',
+          reason: 'Rescheduled',
+        },
+      ],
+    });
+
+    expect(first.baseHash).toBe(second.baseHash);
+    expect(first.fullHash).toBe(second.fullHash);
+  });
+
+  it('changes full hash when meaningful exception date or override time changes', () => {
+    const baseline = buildLearningSpaceScheduleHashBundleFromPayload({
+      startDate: '2026-03-10T12:00:00.000Z',
+      timezone: 'America/New_York',
+      rule: {
+        frequency: 'weekly',
+        byWeekday: ['TU'],
+        weekdayTimes: [{ day: 'TU', time: '17:02' }],
+        timezone: 'America/New_York',
+      },
+      exceptions: [{ date: '2026-03-17', reason: 'Holiday' }],
+      overrides: [
+        {
+          originalDate: '2026-03-24',
+          newDate: '2026-03-25',
+          newTime: '18:15',
+          reason: 'Rescheduled',
+        },
+      ],
+    });
+
+    const changedExceptionDate = buildLearningSpaceScheduleHashBundleFromPayload({
+      startDate: '2026-03-10T12:00:00.000Z',
+      timezone: 'America/New_York',
+      rule: {
+        frequency: 'weekly',
+        byWeekday: ['TU'],
+        weekdayTimes: [{ day: 'TU', time: '17:02' }],
+        timezone: 'America/New_York',
+      },
+      exceptions: [{ date: '2026-03-18', reason: 'Holiday' }],
+      overrides: [
+        {
+          originalDate: '2026-03-24',
+          newDate: '2026-03-25',
+          newTime: '18:15',
+          reason: 'Rescheduled',
+        },
+      ],
+    });
+
+    const changedOverrideTime = buildLearningSpaceScheduleHashBundleFromPayload({
+      startDate: '2026-03-10T12:00:00.000Z',
+      timezone: 'America/New_York',
+      rule: {
+        frequency: 'weekly',
+        byWeekday: ['TU'],
+        weekdayTimes: [{ day: 'TU', time: '17:02' }],
+        timezone: 'America/New_York',
+      },
+      exceptions: [{ date: '2026-03-17', reason: 'Holiday' }],
+      overrides: [
+        {
+          originalDate: '2026-03-24',
+          newDate: '2026-03-25',
+          newTime: '18:30',
+          reason: 'Rescheduled',
+        },
+      ],
+    });
+
+    expect(changedExceptionDate.baseHash).toBe(baseline.baseHash);
+    expect(changedExceptionDate.fullHash).not.toBe(baseline.fullHash);
+    expect(changedOverrideTime.baseHash).toBe(baseline.baseHash);
+    expect(changedOverrideTime.fullHash).not.toBe(baseline.fullHash);
+  });
 });

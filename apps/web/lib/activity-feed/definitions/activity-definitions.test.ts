@@ -115,15 +115,9 @@ describe('activity event definitions', () => {
       primary: 'Tehara Morgan added',
     });
     expect(rendered.leading).toEqual({
-      kind: 'avatars',
-      avatars: [
-        {
-          name: 'Tehara Morgan',
-          avatar: { source: 'seed', seed: 'tehara-profile-id' },
-          themeKey: null,
-        },
-      ],
-      overflowCount: 0,
+      kind: 'icon',
+      iconKey: 'UserRoundPlus',
+      tone: 'info',
     });
     expect(rendered.summary).toBe('Added: Tehara Morgan. Added to Learning space.');
     expect(rendered.actionButton).toBeUndefined();
@@ -166,20 +160,57 @@ describe('activity event definitions', () => {
       primary: 'Tehara Morgan removed',
     });
     expect(rendered.leading).toEqual({
-      kind: 'avatars',
-      avatars: [
-        {
-          name: 'Tehara Morgan',
-          avatar: { source: 'upload', url: 'https://cdn.test/tehara.png' },
-          themeKey: 'rose',
-        },
-      ],
-      overflowCount: 0,
+      kind: 'icon',
+      iconKey: 'UserRoundMinus',
+      tone: 'danger',
     });
     expect(rendered.summary).toBe(
       'Removed: Tehara Morgan. Removed from Math Foundations.',
     );
     expect(rendered.actionButton).toBeUndefined();
+  });
+
+  it('renders members removed with plural verb and summary', () => {
+    const definition = getActivityEventDefinition('members.removed');
+    if (!definition) {
+      throw new Error('Missing members.removed definition');
+    }
+
+    const rendered = definition.render({
+      id: 'event-members-removed-1',
+      org_id: 'org-1',
+      event_type: 'members.removed',
+      occurred_at: '2026-03-03T12:00:00.000Z',
+      source_kind: 'profile',
+      actor_profile_id: 'profile-1',
+      scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+      object_ref: null,
+      target_ref: { kind: 'learning_space', id: 'space-1' },
+      payload: {
+        learningSpaceId: 'space-1',
+        channelId: 'channel-1',
+        title: 'Math Foundations',
+        memberCount: 2,
+        members: [
+          { profileId: 'p-1', displayName: 'Tehara Morgan' },
+          { profileId: 'p-2', displayName: 'Riley Morgan' },
+        ],
+      },
+      audience_rules: [],
+      dedupe_key: 'members.removed:space-1:batch',
+      projection_status: 'pending',
+      projection_attempts: 0,
+      created_at: '2026-03-03T12:00:00.000Z',
+      updated_at: '2026-03-03T12:00:00.000Z',
+    });
+
+    expect(rendered.verb).toBe('members.removed');
+    expect(rendered.headline).toEqual({
+      primary: '2 participants removed',
+    });
+    expect(rendered.summary).toBe(
+      'Removed: Tehara Morgan, Riley Morgan. Removed from Math Foundations.',
+    );
   });
 
   it('renders grouped member invite with one summary listing added members', () => {

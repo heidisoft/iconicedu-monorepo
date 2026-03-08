@@ -19,6 +19,12 @@ import type {
 
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
+import {
+  buildCanonicalLearningSpaceScheduleFromExisting,
+  createFormDateFromIsoInTimezone,
+  getDateFromISOInTimezone,
+  getTimeFromISOInTimezone,
+} from '@iconicedu/web/lib/admin/learning-space-schedule-hash';
 import { buildUserProfileById } from '@iconicedu/web/lib/profile/builders/user-profile.builder';
 import { mapLearningSpaceLinkRow } from '@iconicedu/web/lib/spaces/mappers/learning-space.mapper';
 import { getAdminLiveSessionConfig } from '@iconicedu/web/lib/admin/live-session-config';
@@ -42,59 +48,70 @@ export type LearningSpaceDetail = {
   schedules: RecurrenceFormData[];
 };
 
-export function getDatePartsInTimezone(value: string, timezone: string) {
+export {
+  createFormDateFromIsoInTimezone,
+  getDateFromISOInTimezone,
+  getTimeFromISOInTimezone,
+} from '@iconicedu/web/lib/admin/learning-space-schedule-hash';
+
+function getUtcDateFromISO(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
     return null;
   }
-
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-  const parts = formatter.formatToParts(date);
-  const year = parts.find((part) => part.type === 'year')?.value;
-  const month = parts.find((part) => part.type === 'month')?.value;
-  const day = parts.find((part) => part.type === 'day')?.value;
-
-  if (!year || !month || !day) {
-    return null;
-  }
-
-  return { year, month, day };
+  return date.toISOString().slice(0, 10);
 }
 
-export function getDateFromISOInTimezone(value: string, timezone: string) {
-  const parts = getDatePartsInTimezone(value, timezone);
-  return parts ? `${parts.year}-${parts.month}-${parts.day}` : null;
-}
-
-export function getTimeFromISOInTimezone(value: string, timezone: string) {
+function getUtcTimeFromISO(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
     return null;
   }
-
-  const formatter = new Intl.DateTimeFormat('en-GB', {
-    timeZone: timezone,
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
-  return formatter.format(date);
+  const hours = date.getUTCHours().toString().padStart(2, '0');
+  const minutes = date.getUTCMinutes().toString().padStart(2, '0');
+  return `${hours}:${minutes}`;
 }
 
-export function createFormDateFromIsoInTimezone(value: string, timezone: string) {
-  const parts = getDatePartsInTimezone(value, timezone);
-  if (!parts) {
-    return undefined;
+export function isUtcNaiveStoredTimestamp(
+  value: string,
+  timezone: string,
+  expectedLocalTime: string,
+) {
+  const localTime = getTimeFromISOInTimezone(value, timezone);
+  const utcTime = getUtcTimeFromISO(value);
+  return localTime !== expectedLocalTime && utcTime === expectedLocalTime;
+}
+
+export function resolveStoredOccurrenceDateForForm(
+  value: string,
+  timezone: string,
+  expectedLocalTime: string,
+) {
+  const localDate = getDateFromISOInTimezone(value, timezone);
+  const utcDate = getUtcDateFromISO(value);
+  return isUtcNaiveStoredTimestamp(value, timezone, expectedLocalTime)
+    ? (utcDate ?? localDate)
+    : (localDate ?? utcDate);
+}
+
+function parseOverridePatchForDetail(patch: Record<string, unknown> | null | undefined) {
+  const parseString = (value: unknown) => (typeof value === 'string' ? value : null);
+  const normalizeReason = (value: unknown) => {
+    const text = parseString(value);
+    if (!text) return null;
+    const trimmed = text.trim();
+    return trimmed.length ? trimmed : null;
+  };
+
+  if (!patch) {
+    return { startAt: null, endAt: null, reason: null };
   }
 
-  return new Date(
-    Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), 12),
-  );
+  return {
+    startAt: parseString(patch.startAt) ?? parseString(patch.start_at),
+    endAt: parseString(patch.endAt) ?? parseString(patch.end_at),
+    reason: normalizeReason(patch.reason) ?? normalizeReason(patch.description),
+  };
 }
 
 export async function getLearningSpaceDetail(learningSpaceId: string) {
@@ -332,62 +349,118 @@ async function buildSchedulesForForm(
       } satisfies RecurrenceFormData;
     }
 
-    const byWeekday = recurrence.byday?.filter(isWeekday) ?? undefined;
-    const timezone = recurrence.timezone ?? schedule.timezone ?? 'UTC';
-    const weekdayTimes = byWeekday?.map((day) => ({
-      day: day as 'MO' | 'TU' | 'WE' | 'TH' | 'FR' | 'SA' | 'SU',
-      time: getTimeFromISOInTimezone(schedule.start_at, timezone) ?? '09:00',
-    }));
-
-    const exceptions = (exceptionsByRecurrence.get(recurrence.id) ?? []).map(
+    const canonical = buildCanonicalLearningSpaceScheduleFromExisting({
+      id: schedule.id,
+      title: schedule.title,
+      startAt: schedule.start_at,
+      endAt: schedule.end_at,
+      timezone: schedule.timezone ?? null,
+      recurrence,
+      exceptions: (exceptionsByRecurrence.get(recurrence.id) ?? []).map((exception) => ({
+        occurrenceKey: exception.occurrence_key,
+        reason: exception.reason ?? null,
+      })),
+      overrides: (overridesByRecurrence.get(recurrence.id) ?? []).map((override) => ({
+        occurrenceKey: override.occurrence_key,
+        ...parseOverridePatchForDetail((override.patch ?? {}) as Record<string, unknown>),
+      })),
+    });
+    const timezone = canonical.timezone;
+    const byWeekday = canonical.recurrence.byday.filter(isWeekday) as WeekdayVM[];
+    const rawExceptions = (exceptionsByRecurrence.get(recurrence.id) ?? []).map(
       (exception) => ({
-        id: exception.id,
-        date:
-          getDateFromISOInTimezone(exception.occurrence_key, timezone) ??
-          exception.occurrence_key.slice(0, 10),
-        reason: exception.reason ?? undefined,
+        occurrenceKey: exception.occurrence_key,
+        reason: exception.reason ?? null,
+      }),
+    );
+    const rawOverrides = (overridesByRecurrence.get(recurrence.id) ?? []).map(
+      (override) => ({
+        occurrenceKey: override.occurrence_key,
+        ...parseOverridePatchForDetail((override.patch ?? {}) as Record<string, unknown>),
       }),
     );
 
-    const overrides = (overridesByRecurrence.get(recurrence.id) ?? []).map((override) => {
-      const patch = (override.patch ?? {}) as Record<string, unknown>;
-      const startAt = typeof patch.startAt === 'string' ? patch.startAt : null;
-      const newDate =
-        (startAt
-          ? getDateFromISOInTimezone(startAt, timezone)
-          : getDateFromISOInTimezone(override.occurrence_key, timezone)) ??
-        override.occurrence_key.slice(0, 10);
-      const newTime =
-        (startAt
-          ? getTimeFromISOInTimezone(startAt, timezone)
-          : getTimeFromISOInTimezone(override.occurrence_key, timezone)) ?? '09:00';
-
-      return {
-        id: override.id,
-        originalDate:
-          getDateFromISOInTimezone(override.occurrence_key, timezone) ??
-          override.occurrence_key.slice(0, 10),
-        newDate,
-        newTime,
-        reason: typeof patch.reason === 'string' ? patch.reason : undefined,
-      };
-    });
-
     return {
       id: schedule.id,
-      startDate: createFormDateFromIsoInTimezone(schedule.start_at, timezone),
+      startDate: createFormDateFromIsoInTimezone(canonical.startAt, timezone),
       timezone,
       rule: {
-        frequency: recurrence.frequency as RecurrenceFormData['rule']['frequency'],
-        interval: recurrence.interval ?? undefined,
+        frequency: canonical.recurrence
+          .frequency as RecurrenceFormData['rule']['frequency'],
+        interval: canonical.recurrence.interval ?? undefined,
         byWeekday: byWeekday ?? undefined,
-        weekdayTimes: weekdayTimes?.length ? weekdayTimes : undefined,
-        count: recurrence.count ?? undefined,
-        until: recurrence.until ?? undefined,
-        timezone: recurrence.timezone ?? undefined,
+        weekdayTimes: canonical.recurrence.weekdayTimes.length
+          ? canonical.recurrence.weekdayTimes.map((entry) => ({
+              day: entry.day as WeekdayVM,
+              time: entry.time,
+            }))
+          : undefined,
+        count: canonical.recurrence.count ?? undefined,
+        until: canonical.recurrence.until ?? undefined,
+        timezone: canonical.recurrence.timezone ?? undefined,
       },
-      exceptions,
-      overrides,
+      exceptions: rawExceptions.map((exception, index) => ({
+        id: `${schedule.id}:exception:${index}`,
+        date:
+          resolveStoredOccurrenceDateForForm(
+            exception.occurrenceKey,
+            timezone,
+            canonical.displayTime,
+          ) ?? exception.occurrenceKey.slice(0, 10),
+        reason: exception.reason ?? undefined,
+      })),
+      overrides: rawOverrides.map((override, index) => {
+        const useUtcNaiveInterpretation = isUtcNaiveStoredTimestamp(
+          override.occurrenceKey,
+          timezone,
+          canonical.displayTime,
+        );
+        const originalDate =
+          resolveStoredOccurrenceDateForForm(
+            override.occurrenceKey,
+            timezone,
+            canonical.displayTime,
+          ) ?? override.occurrenceKey.slice(0, 10);
+        const newDate = (() => {
+          if (!override.startAt) {
+            return originalDate;
+          }
+          if (useUtcNaiveInterpretation) {
+            return (
+              getUtcDateFromISO(override.startAt) ??
+              getDateFromISOInTimezone(override.startAt, timezone) ??
+              override.occurrenceKey.slice(0, 10)
+            );
+          }
+          return (
+            getDateFromISOInTimezone(override.startAt, timezone) ??
+            override.occurrenceKey.slice(0, 10)
+          );
+        })();
+        const newTime = (() => {
+          if (!override.startAt) {
+            return canonical.displayTime;
+          }
+          if (useUtcNaiveInterpretation) {
+            return (
+              getUtcTimeFromISO(override.startAt) ??
+              getTimeFromISOInTimezone(override.startAt, timezone) ??
+              canonical.displayTime
+            );
+          }
+          return (
+            getTimeFromISOInTimezone(override.startAt, timezone) ?? canonical.displayTime
+          );
+        })();
+
+        return {
+          id: `${schedule.id}:override:${index}`,
+          originalDate,
+          newDate,
+          newTime,
+          reason: override.reason ?? undefined,
+        };
+      }),
     } satisfies RecurrenceFormData;
   });
 }

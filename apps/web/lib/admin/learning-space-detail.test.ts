@@ -4,6 +4,8 @@ import {
   createFormDateFromIsoInTimezone,
   getDateFromISOInTimezone,
   getTimeFromISOInTimezone,
+  isUtcNaiveStoredTimestamp,
+  resolveStoredOccurrenceDateForForm,
 } from '@iconicedu/web/lib/admin/learning-space-detail';
 
 describe('learning space detail schedule timezone helpers', () => {
@@ -32,5 +34,31 @@ describe('learning space detail schedule timezone helpers', () => {
     );
 
     expect(formDate?.toISOString()).toBe('2026-03-10T12:00:00.000Z');
+  });
+
+  it('detects legacy UTC-naive occurrence timestamps using expected local time', () => {
+    expect(
+      isUtcNaiveStoredTimestamp('2026-03-09T16:00:00.000Z', 'America/New_York', '16:00'),
+    ).toBe(true);
+    expect(
+      isUtcNaiveStoredTimestamp('2026-03-09T20:00:00.000Z', 'America/New_York', '16:00'),
+    ).toBe(false);
+  });
+
+  it('resolves form occurrence date from legacy and canonical stored timestamps', () => {
+    expect(
+      resolveStoredOccurrenceDateForForm(
+        '2026-03-09T16:00:00.000Z',
+        'America/New_York',
+        '16:00',
+      ),
+    ).toBe('2026-03-09');
+    expect(
+      resolveStoredOccurrenceDateForForm(
+        '2026-03-09T20:00:00.000Z',
+        'America/New_York',
+        '16:00',
+      ),
+    ).toBe('2026-03-09');
   });
 });

@@ -15,6 +15,8 @@ import {
   MessageSquare,
   Paperclip,
   Sparkles,
+  UserRoundMinus,
+  UserRoundPlus,
   Video,
 } from 'lucide-react';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
@@ -55,6 +57,8 @@ const INBOX_ICON_MAP: Record<
   MessageSquare,
   Paperclip,
   Sparkles,
+  UserRoundMinus,
+  UserRoundPlus,
   Video,
 };
 
@@ -121,8 +125,12 @@ const getDefaultIconKey = (activity: ActivityFeedItemVM): InboxIconKeyVM => {
     case 'class.updated':
       return 'GraduationCap';
     case 'member.invited':
-    case 'member.joined':
+    case 'members.invited':
+      return 'UserRoundPlus';
     case 'member.removed':
+    case 'members.removed':
+      return 'UserRoundMinus';
+    case 'member.joined':
     case 'role.changed':
       return 'CheckCircle2';
     default:

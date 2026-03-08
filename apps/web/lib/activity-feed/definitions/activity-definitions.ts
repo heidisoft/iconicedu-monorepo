@@ -894,7 +894,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       const membersSummary = buildMembersSummary('Added', payload);
       return {
         verb: 'member.invited',
-        leading: buildMembersLeading(payload),
+        leading: { kind: 'icon', iconKey: 'UserRoundPlus', tone: 'info' },
         headline: {
           primary:
             memberCount > 1 ? `${memberCount} participants added` : `${memberName} added`,
@@ -931,7 +931,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       const membersSummary = buildMembersSummary('Added', payload);
       return {
         verb: 'members.invited',
-        leading: buildMembersLeading(payload),
+        leading: { kind: 'icon', iconKey: 'UserRoundPlus', tone: 'info' },
         headline: {
           primary: `${Math.max(memberCount, members.length, 1)} participants added`,
         },
@@ -982,6 +982,60 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       };
     },
   },
+  'members.removed': {
+    eventType: 'members.removed',
+    tabKey: 'classes',
+    importance: 'important',
+    group: {
+      groupType: 'class',
+      collapseByDefault: true,
+      buildGroupKey: (event) => buildClassLifecycleGroupKey(event),
+      renderGroup: (event) => {
+        const payload = asRecord(event.payload);
+        if (asOptionalString(payload.activityPhase) === 'created') {
+          return renderClassCreatedGroup(event);
+        }
+        return renderLearningSpaceUpdatedGroup(event);
+      },
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => {
+      const payload = asRecord(event.payload);
+      if (isSessionRosterEvent(payload)) {
+        const leftAt =
+          formatNaturalDateTime(payload.leftAt ?? event.occurred_at, payload.timezone) ??
+          formatNaturalDateTime(event.occurred_at, payload.timezone);
+        return {
+          verb: 'members.removed',
+          leading: { kind: 'icon', iconKey: 'UserRoundMinus', tone: 'danger' },
+          headline: {
+            primary: `${asString(payload.memberDisplayName, 'Participant')} left the session`,
+          },
+          summary: leftAt ? `Left at ${leftAt}` : undefined,
+        };
+      }
+      const members = extractActivityMembers(payload);
+      const memberCountRaw = payload.memberCount;
+      const memberCount =
+        typeof memberCountRaw === 'number' && Number.isFinite(memberCountRaw)
+          ? memberCountRaw
+          : members.length;
+      const memberName =
+        members[0]?.name ?? asString(payload.memberDisplayName, 'Member');
+      const membersSummary = buildMembersSummary('Removed', payload);
+      return {
+        verb: 'members.removed',
+        leading: { kind: 'icon', iconKey: 'UserRoundMinus', tone: 'danger' },
+        headline: {
+          primary:
+            memberCount > 1
+              ? `${memberCount} participants removed`
+              : `${memberName} removed`,
+        },
+        summary: `${membersSummary ? `${membersSummary} ` : ''}Removed from ${className(payload)}.`,
+      };
+    },
+  },
   'member.removed': {
     eventType: 'member.removed',
     tabKey: 'classes',
@@ -1007,7 +1061,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
           formatNaturalDateTime(event.occurred_at, payload.timezone);
         return {
           verb: 'member.removed',
-          leading: buildMembersLeading(payload),
+          leading: { kind: 'icon', iconKey: 'UserRoundMinus', tone: 'danger' },
           headline: {
             primary: `${asString(payload.memberDisplayName, 'Participant')} left the session`,
           },
@@ -1025,7 +1079,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       const membersSummary = buildMembersSummary('Removed', payload);
       return {
         verb: 'member.removed',
-        leading: buildMembersLeading(payload),
+        leading: { kind: 'icon', iconKey: 'UserRoundMinus', tone: 'danger' },
         headline: {
           primary:
             memberCount > 1

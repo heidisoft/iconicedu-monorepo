@@ -122,6 +122,8 @@ export type InboxIconKeyVM =
   | 'MessageSquare'
   | 'Paperclip'
   | 'Sparkles'
+  | 'UserRoundMinus'
+  | 'UserRoundPlus'
   | 'Video';
 
 export type InboxLeadingVM =
