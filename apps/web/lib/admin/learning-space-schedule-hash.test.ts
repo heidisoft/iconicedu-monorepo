@@ -6,7 +6,7 @@ import {
   buildLearningSpaceSchedulesHashKeyFromPayload,
 } from '@iconicedu/web/lib/admin/learning-space-schedule-hash';
 
-describe('learning space schedule hash', () => {
+describe('class schedule hash', () => {
   it('keeps the same hash for equivalent weekly payloads with different anchor dates', () => {
     const first = buildLearningSpaceScheduleHashBundleFromPayload({
       startDate: '2026-03-10T00:00:00.000Z',

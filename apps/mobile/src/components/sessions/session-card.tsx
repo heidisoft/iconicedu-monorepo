@@ -26,10 +26,10 @@ export type ClassSession = {
   isPast: boolean;
   status: ClassScheduleVM['status'];
   meetingLink?: string | null;
-  /** Source channel ID — used to navigate to the learning space */
+  /** Source channel ID — used to navigate to the class */
   channelId?: string | null;
-  /** Display names of child participants */
-  studentNames?: string[];
+  /** Child participants with optional theme color */
+  students?: { name: string; themeKey?: string | null }[];
   variant: 'default' | 'exception' | 'override';
   disabled: boolean;
   reason?: string | null;
@@ -66,6 +66,37 @@ export function formatOriginalTime(iso: string): string {
 
 export function formatOriginalDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+// ─── Theme color helper ─────────────────────────────────────────────────────────
+
+const THEME_COLORS: Record<string, string> = {
+  slate: '#64748b',
+  gray: '#6b7280',
+  zinc: '#71717a',
+  neutral: '#737373',
+  stone: '#78716c',
+  red: '#ef4444',
+  orange: '#f97316',
+  amber: '#f59e0b',
+  yellow: '#ca8a04',
+  lime: '#65a30d',
+  green: '#16a34a',
+  emerald: '#059669',
+  teal: '#0d9488',
+  cyan: '#0891b2',
+  sky: '#0284c7',
+  blue: '#2563eb',
+  indigo: '#4f46e5',
+  violet: '#7c3aed',
+  purple: '#9333ea',
+  fuchsia: '#c026d3',
+  pink: '#db2777',
+  rose: '#e11d48',
+};
+
+function themeKeyColor(themeKey?: string | null, fallback?: string): string {
+  return (themeKey && THEME_COLORS[themeKey]) || fallback || '#64748b';
 }
 
 // ─── SessionCard ────────────────────────────────────────────────────────────────
@@ -185,14 +216,20 @@ export function SessionCard({
           <Text style={[s.sessionTimeTxt, { color: colors.textMuted }]}>
             {session.time}
           </Text>
-          {session.studentNames && session.studentNames.length > 0 && (
+          {session.students && session.students.length > 0 && (
             <>
               <Text style={[s.sessionTimeTxt, { color: colors.textFaint }]}>·</Text>
-              <Text
-                style={[s.sessionTimeTxt, { color: colors.textMuted }]}
-                numberOfLines={1}
-              >
-                {session.studentNames.join(', ')}
+              <Text style={s.sessionTimeTxt} numberOfLines={1}>
+                {session.students.map((student, i) => (
+                  <Text key={student.name + i}>
+                    {i > 0 && <Text style={{ color: colors.textFaint }}>, </Text>}
+                    <Text
+                      style={{ color: themeKeyColor(student.themeKey, colors.textMuted) }}
+                    >
+                      {student.name}
+                    </Text>
+                  </Text>
+                ))}
               </Text>
             </>
           )}

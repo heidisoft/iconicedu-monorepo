@@ -46,7 +46,7 @@ describe('ChannelsTable', () => {
     expect(screen.getByText('3')).toBeInTheDocument();
   });
 
-  it('links learning space channels to learning space pages', () => {
+  it('links class channels to class pages', () => {
     const learningSpaceRow: AdminChannelRow = {
       ...baseRow,
       id: 'channel-2',

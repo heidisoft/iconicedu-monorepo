@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import {
-  updateLearningSpaceFromPayload,
-} from '@iconicedu/web/lib/admin/learning-space-update';
+import { updateLearningSpaceFromPayload } from '@iconicedu/web/lib/admin/learning-space-update';
 import type { LearningSpaceCreatePayload } from '@iconicedu/shared-types';
 
 type UpdateLearningSpaceRequest = {
@@ -20,11 +18,12 @@ function isValidPayload(payload?: LearningSpaceCreatePayload) {
 }
 
 export async function POST(request: Request) {
-  const { learningSpaceId, payload } = (await request.json()) as UpdateLearningSpaceRequest;
+  const { learningSpaceId, payload } =
+    (await request.json()) as UpdateLearningSpaceRequest;
 
   if (!learningSpaceId || !isValidPayload(payload)) {
     return NextResponse.json(
-      { success: false, message: 'Missing required learning space fields.' },
+      { success: false, message: 'Missing required class fields.' },
       { status: 400 },
     );
   }
@@ -34,7 +33,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json(
-      { success: false, message: error instanceof Error ? error.message : 'Unknown error' },
+      {
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error',
+      },
       { status: 500 },
     );
   }

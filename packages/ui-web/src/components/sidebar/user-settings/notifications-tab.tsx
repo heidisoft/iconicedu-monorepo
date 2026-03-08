@@ -75,7 +75,7 @@ export function NotificationsTab({
         },
         {
           key: 'defaults.weekly_digest',
-          label: 'Weekly digest of learning space activity',
+          label: 'Weekly digest of class activity',
         },
         { key: 'defaults.sms_reminders', label: 'SMS reminders for upcoming sessions' },
       ]),

@@ -81,7 +81,7 @@ export default function SpaceDetailScreen() {
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: colors.pageBg }]} edges={['top']}>
       <ConversationHeader
-        title={topic ?? 'Learning Space'}
+        title={topic ?? 'Class'}
         kind="space"
         onBack={() => router.back()}
         onMore={() => setInfoVisible(true)}
@@ -126,7 +126,7 @@ export default function SpaceDetailScreen() {
           <TypingIndicator typingUsers={[]} />
           <MessageInput
             onSend={handleSend}
-            placeholder={`Message ${topic ?? 'Learning Space'}…`}
+            placeholder={`Message ${topic ?? 'Class'}…`}
           />
         </View>
       ) : (
@@ -143,7 +143,7 @@ export default function SpaceDetailScreen() {
       <ChannelInfoSheet
         visible={infoVisible}
         channelId={channelId ?? ''}
-        title={topic ?? 'Learning Space'}
+        title={topic ?? 'Class'}
         subtitle={subtitle}
         kind="space"
         iconEmoji={iconEmoji}

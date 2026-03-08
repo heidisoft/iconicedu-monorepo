@@ -17,6 +17,20 @@ import type {
   InboxTabKeyVM,
 } from '@iconicedu/shared-types';
 
+function getItemReadIds(item: ActivityFeedItemVM): string[] {
+  const metadataReadIds = Array.isArray(item.metadata?.readItemIds)
+    ? item.metadata.readItemIds
+    : [];
+  const ids = [item.ids.id, ...metadataReadIds].filter(
+    (id): id is string => typeof id === 'string' && id.length > 0,
+  );
+  return Array.from(new Set(ids));
+}
+
+function shouldMarkItemRead(item: ActivityFeedItemVM, readIds: Set<string>) {
+  return getItemReadIds(item).some((id) => readIds.has(id));
+}
+
 export function applyReadStateToSections(
   sections: ActivityFeedSectionVM[],
   ids: string[],
@@ -26,7 +40,36 @@ export function applyReadStateToSections(
   return sections.map((section) => ({
     ...section,
     items: section.items.map((item) => {
-      if (readIds.has(item.ids.id)) {
+      if (item.kind === 'group' && item.subActivities?.items) {
+        const markEntireGroup = readIds.has(item.ids.id);
+        const nextSubItems = item.subActivities.items.map(
+          (sub: ActivityFeedLeafItemVM) =>
+            markEntireGroup || shouldMarkItemRead(sub, readIds)
+              ? {
+                  ...sub,
+                  state: {
+                    ...sub.state,
+                    isRead: true,
+                  },
+                }
+              : sub,
+        );
+        const allSubItemsRead = nextSubItems.every(
+          (sub: ActivityFeedLeafItemVM) => sub.state?.isRead,
+        );
+        return {
+          ...item,
+          state: {
+            ...item.state,
+            isRead: markEntireGroup || allSubItemsRead || item.state?.isRead,
+          },
+          subActivities: {
+            ...item.subActivities,
+            items: nextSubItems,
+          },
+        };
+      }
+      if (shouldMarkItemRead(item, readIds)) {
         return {
           ...item,
           state: {
@@ -35,28 +78,43 @@ export function applyReadStateToSections(
           },
         };
       }
-      if (item.kind === 'group' && item.subActivities?.items) {
-        return {
-          ...item,
-          subActivities: {
-            ...item.subActivities,
-            items: item.subActivities.items.map((sub: ActivityFeedLeafItemVM) =>
-              readIds.has(sub.ids.id)
-                ? {
-                    ...sub,
-                    state: {
-                      ...sub.state,
-                      isRead: true,
-                    },
-                  }
-                : sub,
-            ),
-          },
-        };
-      }
       return item;
     }),
   }));
+}
+
+export function resolveReadIdsForActivity(
+  sections: ActivityFeedSectionVM[],
+  id: string,
+): string[] {
+  const dedupeIds = (ids: string[]) =>
+    Array.from(
+      new Set(ids.filter((entry) => typeof entry === 'string' && entry.length > 0)),
+    );
+
+  for (const section of sections) {
+    for (const item of section.items) {
+      if (item.ids.id === id) {
+        if (item.kind === 'group') {
+          const subIds =
+            item.subActivities?.items.flatMap((sub: ActivityFeedLeafItemVM) =>
+              getItemReadIds(sub),
+            ) ?? [];
+          return dedupeIds([id, ...subIds]);
+        }
+        return dedupeIds(getItemReadIds(item));
+      }
+      if (item.kind === 'group') {
+        const matchedSub = item.subActivities?.items.find(
+          (sub: ActivityFeedLeafItemVM) => sub.ids.id === id,
+        );
+        if (matchedSub) {
+          return dedupeIds(getItemReadIds(matchedSub));
+        }
+      }
+    }
+  }
+  return dedupeIds([id]);
 }
 
 function getUnreadCountForItem(item: ActivityFeedItemVM): number {
@@ -169,14 +227,18 @@ export function InboxContainer({
 
   const markAsRead = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    pendingAutoReadIdsRef.current.delete(id);
-    applyReadState([id]);
-    persistReadState([id]);
+    const resolvedIds = resolveReadIdsForActivity(sections, id);
+    resolvedIds.forEach((resolvedId) => {
+      pendingAutoReadIdsRef.current.delete(resolvedId);
+    });
+    applyReadState(resolvedIds);
+    persistReadState(resolvedIds);
   };
 
   const autoMarkAsRead = useCallback(
     (id: string) => {
-      pendingAutoReadIdsRef.current.add(id);
+      const resolvedIds = resolveReadIdsForActivity(sections, id);
+      resolvedIds.forEach((resolvedId) => pendingAutoReadIdsRef.current.add(resolvedId));
       if (flushTimerRef.current) {
         return;
       }
@@ -185,7 +247,7 @@ export function InboxContainer({
         flushAutoReadQueue();
       }, 250);
     },
-    [flushAutoReadQueue],
+    [flushAutoReadQueue, sections],
   );
 
   const renderActivity = (activity: ActivityFeedItemVM) => {

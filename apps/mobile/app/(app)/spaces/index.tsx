@@ -39,7 +39,7 @@ export default function SpacesListScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: NAV_THEME.dark.background }}>
       <View className="gap-3 px-4 pb-2 pt-2">
-        <Typography variant="h3">Learning Spaces</Typography>
+        <Typography variant="h3">Classs</Typography>
         <SearchBar value={search} onChangeText={setSearch} />
       </View>
 
@@ -50,20 +50,18 @@ export default function SpacesListScreen() {
       ) : (
         <FlatList
           data={filteredSpaces}
-          keyExtractor={(item: Record<string, unknown>) =>
-            item.id as string
-          }
+          keyExtractor={(item: Record<string, unknown>) => item.id as string}
           contentContainerStyle={{ paddingHorizontal: 8 }}
           ItemSeparatorComponent={() => <Separator className="ml-14" />}
           ListEmptyComponent={
             <EmptyState
               icon={<Text className="text-4xl">📚</Text>}
-              title="No learning spaces"
-              description="Your learning spaces will appear here"
+              title="No classes"
+              description="Your classes will appear here"
             />
           }
           renderItem={({ item }: { item: Record<string, unknown> }) => {
-            const title = (item.title as string) ?? 'Learning Space';
+            const title = (item.title as string) ?? 'Class';
             const subject = (item.subject as string) ?? '';
             const status = (item.status as string) ?? 'active';
             const primaryChannel = item.primary_channel as

@@ -166,7 +166,7 @@ function makeStyles(C: AppColors) {
     },
     groupTxt: { color: '#fff', fontWeight: '700', fontSize: 13 },
 
-    // ── Learning space avatar ──────────────────────────────────────────────────
+    // ── Class avatar ──────────────────────────────────────────────────
     channelAvatar: {
       width: 52,
       height: 52,
@@ -554,7 +554,7 @@ export default function MessagesScreen() {
   const TABS: { key: Tab; label: string; count: number }[] = [
     { key: 'all', label: 'All', count: unreadAll },
     { key: 'dms', label: 'Direct Messages', count: unreadDms },
-    { key: 'channels', label: 'Learning Spaces', count: unreadChannels },
+    { key: 'channels', label: 'Classs', count: unreadChannels },
   ];
 
   const isLoading = accountLoading || dmsLoading || channelsLoading || supervisedLoading;
@@ -572,7 +572,7 @@ export default function MessagesScreen() {
     },
     channels: {
       icon: '📚',
-      title: 'No learning spaces',
+      title: 'No classes',
       desc: 'Channels you join will appear here',
     },
   }[activeTab];

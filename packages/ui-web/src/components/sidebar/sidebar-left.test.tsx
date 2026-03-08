@@ -1,6 +1,7 @@
 import React from 'react';
 import { describe, expect, it } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
+import type { SidebarLeftDataVM } from '@iconicedu/shared-types';
 
 import { SidebarLeft } from './sidebar-left';
 import { SidebarProvider } from '../../ui/sidebar';
@@ -65,7 +66,7 @@ function makeData() {
       ],
       directMessages: [],
     },
-  } as any;
+  } as unknown as SidebarLeftDataVM;
 }
 
 function makeGuardianData() {
@@ -160,7 +161,7 @@ function makeGuardianData() {
       ],
       directMessages: [],
     },
-  } as any;
+  } as unknown as SidebarLeftDataVM;
 }
 
 function makeGuardianSupervisedDmData() {
@@ -176,8 +177,14 @@ function makeGuardianSupervisedDmData() {
             readState: { unreadCount: 0 },
             messages: { items: [] },
             participants: [
-              { ids: { id: 'profile-guardian', accountId: 'account-guardian' }, profile: { displayName: 'Parent One' } },
-              { ids: { id: 'profile-teacher', accountId: 'account-teacher' }, profile: { displayName: 'Teacher One' } },
+              {
+                ids: { id: 'profile-guardian', accountId: 'account-guardian' },
+                profile: { displayName: 'Parent One' },
+              },
+              {
+                ids: { id: 'profile-teacher', accountId: 'account-teacher' },
+                profile: { displayName: 'Teacher One' },
+              },
             ],
           },
         },
@@ -188,8 +195,14 @@ function makeGuardianSupervisedDmData() {
             readState: { unreadCount: 2 },
             messages: { items: [] },
             participants: [
-              { ids: { id: 'profile-child-1', accountId: 'account-child-1' }, profile: { displayName: 'Child One' } },
-              { ids: { id: 'profile-other-1', accountId: 'account-other-1' }, profile: { displayName: 'Mentor One' } },
+              {
+                ids: { id: 'profile-child-1', accountId: 'account-child-1' },
+                profile: { displayName: 'Child One' },
+              },
+              {
+                ids: { id: 'profile-other-1', accountId: 'account-other-1' },
+                profile: { displayName: 'Mentor One' },
+              },
             ],
           },
         },
@@ -200,14 +213,20 @@ function makeGuardianSupervisedDmData() {
             readState: { unreadCount: 1 },
             messages: { items: [] },
             participants: [
-              { ids: { id: 'profile-child-2', accountId: 'account-child-2' }, profile: { displayName: 'Child Two' } },
-              { ids: { id: 'profile-other-2', accountId: 'account-other-2' }, profile: { displayName: 'Tutor Two' } },
+              {
+                ids: { id: 'profile-child-2', accountId: 'account-child-2' },
+                profile: { displayName: 'Child Two' },
+              },
+              {
+                ids: { id: 'profile-other-2', accountId: 'account-other-2' },
+                profile: { displayName: 'Tutor Two' },
+              },
             ],
           },
         },
       ],
     },
-  } as any;
+  } as unknown as SidebarLeftDataVM;
 }
 
 function makeStudentData() {
@@ -270,7 +289,7 @@ function makeStudentData() {
       ],
       directMessages: [],
     },
-  } as any;
+  } as unknown as SidebarLeftDataVM;
 }
 
 function makeEducatorWithoutLearningSpacesData() {
@@ -318,7 +337,7 @@ function makeEducatorWithoutLearningSpacesData() {
       ],
       directMessages: [],
     },
-  } as any;
+  } as unknown as SidebarLeftDataVM;
 }
 
 describe('SidebarLeft', () => {
@@ -353,14 +372,14 @@ describe('SidebarLeft', () => {
     expect(screen.getByText('Second Campus')).toBeInTheDocument();
   });
 
-  it('shows educator learning spaces on the sidebar', () => {
+  it('shows educator classes on the sidebar', () => {
     render(
       <SidebarProvider>
         <SidebarLeft data={makeData()} />
       </SidebarProvider>,
     );
 
-    expect(screen.getByText('Learning spaces')).toBeInTheDocument();
+    expect(screen.getByText('Classes')).toBeInTheDocument();
     expect(screen.getByText('Algebra 1')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Algebra 1/i })).toHaveAttribute(
       'href',
@@ -385,7 +404,7 @@ describe('SidebarLeft', () => {
     );
   });
 
-  it('keeps all parent learning spaces expanded', () => {
+  it('keeps all parent classes expanded', () => {
     render(
       <SidebarProvider>
         <SidebarLeft data={makeGuardianData()} />
@@ -442,14 +461,14 @@ describe('SidebarLeft', () => {
     expect(screen.getAllByText('1').length).toBeGreaterThanOrEqual(2);
   });
 
-  it('shows student learning spaces with section header when assigned spaces exist', () => {
+  it('shows student classes with section header when assigned spaces exist', () => {
     render(
       <SidebarProvider>
         <SidebarLeft data={makeStudentData()} />
       </SidebarProvider>,
     );
 
-    expect(screen.getByText('Learning spaces')).toBeInTheDocument();
+    expect(screen.getByText('Classes')).toBeInTheDocument();
     expect(screen.getByText('Student Algebra')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Student Algebra/i })).toHaveAttribute(
       'href',
@@ -459,14 +478,14 @@ describe('SidebarLeft', () => {
     expect(screen.getAllByText('2').length).toBeGreaterThanOrEqual(2);
   });
 
-  it('hides learning spaces for educators without assigned spaces', () => {
+  it('hides classes for educators without assigned spaces', () => {
     render(
       <SidebarProvider>
         <SidebarLeft data={makeEducatorWithoutLearningSpacesData()} />
       </SidebarProvider>,
     );
 
-    expect(screen.queryByText('Learning spaces')).not.toBeInTheDocument();
+    expect(screen.queryByText('Classes')).not.toBeInTheDocument();
     expect(screen.queryByText('Other Space')).not.toBeInTheDocument();
   });
 
@@ -485,7 +504,7 @@ describe('SidebarLeft', () => {
     expect(within(sectionHeader as HTMLElement).queryByText('3')).not.toBeInTheDocument();
   });
 
-  it('toggles parent learning spaces groups', () => {
+  it('toggles parent classes groups', () => {
     render(
       <SidebarProvider>
         <SidebarLeft data={makeGuardianData()} />

@@ -315,16 +315,18 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
       resetCreateForm();
       handleRefresh();
     } catch (error) {
-      setCreateError(error instanceof Error ? error.message : 'Unable to create channel.');
+      setCreateError(
+        error instanceof Error ? error.message : 'Unable to create channel.',
+      );
     } finally {
       setIsCreating(false);
     }
   };
 
   return (
-      <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <Dialog
+    <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <Dialog
           open={dialogOpen}
           onOpenChange={(open) => {
             setDialogOpen(open);
@@ -362,228 +364,242 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
             </DialogHeader>
             <div className="no-scrollbar -mx-4 max-h-[65vh] overflow-y-auto px-4">
               <div className="grid gap-4 py-2">
-              <FieldSet data-invalid={isSubmitted && !formState.topic.trim()}>
-                <FieldLegend>Basics</FieldLegend>
-                <FieldGroup>
-                  <Field>
-                    <FieldLabel htmlFor="channel-topic">
-                      Name <span className="text-destructive">*</span>
-                    </FieldLabel>
-                    <Input
-                      id="channel-topic"
-                      value={formState.topic}
-                      onChange={(event) => updateFormState({ topic: event.target.value })}
-                      placeholder="e.g., General updates"
-                      required
-                      aria-required="true"
-                    />
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="channel-kind">Kind</FieldLabel>
-                    <Select
-                      value={formState.kind}
-                      onValueChange={(value) => updateFormState({ kind: value })}
-                      disabled={dialogMode === 'edit'}
-                    >
-                      <SelectTrigger id="channel-kind">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="channel">Channel</SelectItem>
-                        <SelectItem value="group_dm">Group DM</SelectItem>
-                        <SelectItem value="dm">DM</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="channel-purpose">Purpose</FieldLabel>
-                    <Select
-                      value={formState.purpose}
-                      onValueChange={(value) => updateFormState({ purpose: value })}
-                      disabled={dialogMode === 'edit'}
-                    >
-                      <SelectTrigger id="channel-purpose">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="general">General</SelectItem>
-                        <SelectItem value="learning-space">Learning space</SelectItem>
-                        <SelectItem value="support">Support</SelectItem>
-                        <SelectItem value="announcements">Announcements</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="channel-visibility">Visibility</FieldLabel>
-                    <Select
-                      value={formState.visibility}
-                      onValueChange={(value) => updateFormState({ visibility: value })}
-                    >
-                      <SelectTrigger id="channel-visibility">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="private">Private</SelectItem>
-                        <SelectItem value="public">Public</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="channel-description">Description</FieldLabel>
-                    <Textarea
-                      id="channel-description"
-                      value={formState.description}
-                      onChange={(event) =>
-                        updateFormState({ description: event.target.value })
-                      }
-                      placeholder="Optional description"
-                      rows={3}
-                    />
-                  </Field>
-                </FieldGroup>
-              </FieldSet>
-              <FieldSeparator />
-              <FieldSet>
-                <FieldLegend>Posting policy</FieldLegend>
-                <FieldDescription>
-                  Control who can post and whether threads or reactions are enabled.
-                </FieldDescription>
-                <FieldGroup>
-                  <Field>
-                    <FieldLabel htmlFor="channel-posting-policy">Policy</FieldLabel>
-                    <Select
-                      value={formState.postingPolicyKind}
-                      onValueChange={(value) =>
-                        updateFormState({ postingPolicyKind: value as ChannelPostingPolicyVM['kind'] })
-                      }
-                    >
-                      <SelectTrigger id="channel-posting-policy">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="everyone">Everyone</SelectItem>
-                        <SelectItem value="members-only">Members only</SelectItem>
-                        <SelectItem value="staff-only">Staff only</SelectItem>
-                        <SelectItem value="read-only">Read only</SelectItem>
-                        <SelectItem value="owners_only">Owners only</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                  <div className="flex flex-wrap gap-4 pt-2">
-                    <Label className="flex items-center gap-2 text-sm">
-                      <Checkbox
-                        checked={formState.allowThreads}
-                        onCheckedChange={(checked) =>
-                          updateFormState({ allowThreads: checked === true })
+                <FieldSet data-invalid={isSubmitted && !formState.topic.trim()}>
+                  <FieldLegend>Basics</FieldLegend>
+                  <FieldGroup>
+                    <Field>
+                      <FieldLabel htmlFor="channel-topic">
+                        Name <span className="text-destructive">*</span>
+                      </FieldLabel>
+                      <Input
+                        id="channel-topic"
+                        value={formState.topic}
+                        onChange={(event) =>
+                          updateFormState({ topic: event.target.value })
                         }
+                        placeholder="e.g., General updates"
+                        required
+                        aria-required="true"
                       />
-                      Allow threads
-                    </Label>
-                    <Label className="flex items-center gap-2 text-sm">
-                      <Checkbox
-                        checked={formState.allowReactions}
-                        onCheckedChange={(checked) =>
-                          updateFormState({ allowReactions: checked === true })
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="channel-kind">Kind</FieldLabel>
+                      <Select
+                        value={formState.kind}
+                        onValueChange={(value) => updateFormState({ kind: value })}
+                        disabled={dialogMode === 'edit'}
+                      >
+                        <SelectTrigger id="channel-kind">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="channel">Channel</SelectItem>
+                          <SelectItem value="group_dm">Group DM</SelectItem>
+                          <SelectItem value="dm">DM</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="channel-purpose">Purpose</FieldLabel>
+                      <Select
+                        value={formState.purpose}
+                        onValueChange={(value) => updateFormState({ purpose: value })}
+                        disabled={dialogMode === 'edit'}
+                      >
+                        <SelectTrigger id="channel-purpose">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="general">General</SelectItem>
+                          <SelectItem value="learning-space">Class</SelectItem>
+                          <SelectItem value="support">Support</SelectItem>
+                          <SelectItem value="announcements">Announcements</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="channel-visibility">Visibility</FieldLabel>
+                      <Select
+                        value={formState.visibility}
+                        onValueChange={(value) => updateFormState({ visibility: value })}
+                      >
+                        <SelectTrigger id="channel-visibility">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="private">Private</SelectItem>
+                          <SelectItem value="public">Public</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="channel-description">Description</FieldLabel>
+                      <Textarea
+                        id="channel-description"
+                        value={formState.description}
+                        onChange={(event) =>
+                          updateFormState({ description: event.target.value })
                         }
+                        placeholder="Optional description"
+                        rows={3}
                       />
-                      Allow reactions
-                    </Label>
-                  </div>
-                </FieldGroup>
-              </FieldSet>
-              <FieldSeparator />
-              <LiveSessionSettingsSection
-                description="Configure how members can start and join live sessions from the channel header."
-                providerSelectId="channel-live-session-provider"
-                modeSelectId="channel-live-session-mode"
-                joinUrlInputId="channel-live-session-join-url"
-                value={formState.liveSession}
-                onChange={(nextLiveSession) =>
-                  updateFormState({
-                    liveSession: nextLiveSession,
-                  })
-                }
-              />
-              <FieldSeparator />
-              <FieldSet>
-                <FieldLegend>Participants</FieldLegend>
-                <FieldDescription>
-                  Select the participants who should be members of this channel.
-                </FieldDescription>
-                <FieldGroup>
-                  <ParticipantSelector
-                    users={participantOptions}
-                    selectedUsers={formState.participants}
-                    onUserAdd={(user) =>
-                      updateFormState({
-                        participants: formState.participants.some(
-                          (item) => item.ids.id === user.ids.id,
-                        )
-                          ? formState.participants
-                          : [...formState.participants, user],
-                      })
-                    }
-                    onUserRemove={(user) =>
-                      updateFormState({
-                        participants: formState.participants.filter(
-                          (item) => item.ids.id !== user.ids.id,
-                        ),
-                      })
-                    }
-                    placeholder="Add participant"
-                  />
-                </FieldGroup>
-              </FieldSet>
-              <FieldSeparator />
-              <FieldSet>
-                <FieldLegend>Capabilities</FieldLegend>
-                <FieldDescription>
-                  Enable optional features for this channel.
-                </FieldDescription>
-                <FieldGroup>
-                  <div className="flex flex-col gap-2">
-                    {(['has_schedule', 'has_homework', 'has_summaries'] as ChannelCapabilityVM[]).map(
-                      (capability) => (
-                        <Label key={capability} className="flex items-center gap-2 text-sm">
+                    </Field>
+                  </FieldGroup>
+                </FieldSet>
+                <FieldSeparator />
+                <FieldSet>
+                  <FieldLegend>Posting policy</FieldLegend>
+                  <FieldDescription>
+                    Control who can post and whether threads or reactions are enabled.
+                  </FieldDescription>
+                  <FieldGroup>
+                    <Field>
+                      <FieldLabel htmlFor="channel-posting-policy">Policy</FieldLabel>
+                      <Select
+                        value={formState.postingPolicyKind}
+                        onValueChange={(value) =>
+                          updateFormState({
+                            postingPolicyKind: value as ChannelPostingPolicyVM['kind'],
+                          })
+                        }
+                      >
+                        <SelectTrigger id="channel-posting-policy">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="everyone">Everyone</SelectItem>
+                          <SelectItem value="members-only">Members only</SelectItem>
+                          <SelectItem value="staff-only">Staff only</SelectItem>
+                          <SelectItem value="read-only">Read only</SelectItem>
+                          <SelectItem value="owners_only">Owners only</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <div className="flex flex-wrap gap-4 pt-2">
+                      <Label className="flex items-center gap-2 text-sm">
+                        <Checkbox
+                          checked={formState.allowThreads}
+                          onCheckedChange={(checked) =>
+                            updateFormState({ allowThreads: checked === true })
+                          }
+                        />
+                        Allow threads
+                      </Label>
+                      <Label className="flex items-center gap-2 text-sm">
+                        <Checkbox
+                          checked={formState.allowReactions}
+                          onCheckedChange={(checked) =>
+                            updateFormState({ allowReactions: checked === true })
+                          }
+                        />
+                        Allow reactions
+                      </Label>
+                    </div>
+                  </FieldGroup>
+                </FieldSet>
+                <FieldSeparator />
+                <LiveSessionSettingsSection
+                  description="Configure how members can start and join live sessions from the channel header."
+                  providerSelectId="channel-live-session-provider"
+                  modeSelectId="channel-live-session-mode"
+                  joinUrlInputId="channel-live-session-join-url"
+                  value={formState.liveSession}
+                  onChange={(nextLiveSession) =>
+                    updateFormState({
+                      liveSession: nextLiveSession,
+                    })
+                  }
+                />
+                <FieldSeparator />
+                <FieldSet>
+                  <FieldLegend>Participants</FieldLegend>
+                  <FieldDescription>
+                    Select the participants who should be members of this channel.
+                  </FieldDescription>
+                  <FieldGroup>
+                    <ParticipantSelector
+                      users={participantOptions}
+                      selectedUsers={formState.participants}
+                      onUserAdd={(user) =>
+                        updateFormState({
+                          participants: formState.participants.some(
+                            (item) => item.ids.id === user.ids.id,
+                          )
+                            ? formState.participants
+                            : [...formState.participants, user],
+                        })
+                      }
+                      onUserRemove={(user) =>
+                        updateFormState({
+                          participants: formState.participants.filter(
+                            (item) => item.ids.id !== user.ids.id,
+                          ),
+                        })
+                      }
+                      placeholder="Add participant"
+                    />
+                  </FieldGroup>
+                </FieldSet>
+                <FieldSeparator />
+                <FieldSet>
+                  <FieldLegend>Capabilities</FieldLegend>
+                  <FieldDescription>
+                    Enable optional features for this channel.
+                  </FieldDescription>
+                  <FieldGroup>
+                    <div className="flex flex-col gap-2">
+                      {(
+                        [
+                          'has_schedule',
+                          'has_homework',
+                          'has_summaries',
+                        ] as ChannelCapabilityVM[]
+                      ).map((capability) => (
+                        <Label
+                          key={capability}
+                          className="flex items-center gap-2 text-sm"
+                        >
                           <Checkbox
                             checked={formState.capabilities.includes(capability)}
                             onCheckedChange={(checked) =>
                               updateFormState({
-                                capabilities: checked === true
-                                  ? formState.capabilities.includes(capability)
-                                    ? formState.capabilities
-                                    : [...formState.capabilities, capability]
-                                  : formState.capabilities.filter((item) => item !== capability),
+                                capabilities:
+                                  checked === true
+                                    ? formState.capabilities.includes(capability)
+                                      ? formState.capabilities
+                                      : [...formState.capabilities, capability]
+                                    : formState.capabilities.filter(
+                                        (item) => item !== capability,
+                                      ),
                               })
                             }
                           />
                           {capability.replace('has_', '').replace('_', ' ')}
                         </Label>
-                      ),
-                    )}
-                  </div>
-                </FieldGroup>
-              </FieldSet>
-              <FieldSeparator />
-              <ChannelUiDefaultsSettingsSection
-                themeSelectId="channel-theme-key"
-                uiDefaults={formState.uiDefaults}
-                onUiDefaultsChange={(updates) =>
-                  updateFormState({
-                    uiDefaults: {
-                      ...formState.uiDefaults,
-                      ...updates,
-                      infoPanel: {
-                        ...(formState.uiDefaults.infoPanel ?? {}),
-                        ...(updates.infoPanel ?? {}),
+                      ))}
+                    </div>
+                  </FieldGroup>
+                </FieldSet>
+                <FieldSeparator />
+                <ChannelUiDefaultsSettingsSection
+                  themeSelectId="channel-theme-key"
+                  uiDefaults={formState.uiDefaults}
+                  onUiDefaultsChange={(updates) =>
+                    updateFormState({
+                      uiDefaults: {
+                        ...formState.uiDefaults,
+                        ...updates,
+                        infoPanel: {
+                          ...(formState.uiDefaults.infoPanel ?? {}),
+                          ...(updates.infoPanel ?? {}),
+                        },
                       },
-                    },
-                  })
-                }
-              />
-              {createError ? (
-                <p className="text-sm text-destructive">{createError}</p>
-              ) : null}
+                    })
+                  }
+                />
+                {createError ? (
+                  <p className="text-sm text-destructive">{createError}</p>
+                ) : null}
               </div>
             </div>
             <DialogFooter>

@@ -32,7 +32,7 @@ const baseChannel: ChannelVM = {
 };
 
 describe('getDefaultMessagesTab', () => {
-  it('defaults learning space channels with schedule capability to the messages tab', () => {
+  it('defaults class channels with schedule capability to the messages tab', () => {
     const learningSpaceChannel: ChannelVM = {
       ...baseChannel,
       basics: {

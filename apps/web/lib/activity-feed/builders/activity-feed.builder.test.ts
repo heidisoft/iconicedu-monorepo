@@ -56,7 +56,7 @@ describe('buildActivityFeedForProfile', () => {
           verb: 'class.created',
           actor_profile_id: 'actor-1',
           refs: {},
-          content: { headline: { primary: 'Learning space created' } },
+          content: { headline: { primary: 'Class created' } },
           updated_at: '2026-03-03T12:00:00.000Z',
         },
       ],
@@ -91,7 +91,7 @@ describe('buildActivityFeedForProfile', () => {
           verb: 'class.created',
           actor_profile_id: 'actor-1',
           refs: {},
-          content: { headline: { primary: 'Unread learning space item' } },
+          content: { headline: { primary: 'Unread class item' } },
           is_read: false,
           updated_at: '2026-03-03T12:00:00.000Z',
         },
@@ -118,7 +118,7 @@ describe('buildActivityFeedForProfile', () => {
 
     expect(feed.tabs).toEqual([
       { key: 'all', label: 'All', badgeCount: 1 },
-      { key: 'classes', label: 'Learning spaces', badgeCount: 1 },
+      { key: 'classes', label: 'Classes', badgeCount: 1 },
       { key: 'payment', label: 'Payment', badgeCount: 0 },
       { key: 'system', label: 'System', badgeCount: 0 },
     ]);
@@ -143,7 +143,7 @@ describe('buildActivityFeedForProfile', () => {
           verb: 'session.started',
           actor_profile_id: 'actor-1',
           refs: {},
-          content: { headline: { primary: 'Learning space session' } },
+          content: { headline: { primary: 'Class session' } },
           sub_activity_count: 2,
           updated_at: '2026-03-07T16:00:00.000Z',
         },
@@ -225,7 +225,7 @@ describe('buildActivityFeedForProfile', () => {
           refs: {},
           content: {
             headline: {
-              primary: 'Learning space updated',
+              primary: 'Class updated',
               secondary: 'Math Foundations',
             },
           },
@@ -249,7 +249,7 @@ describe('buildActivityFeedForProfile', () => {
           refs: {},
           content: {
             headline: {
-              primary: 'Learning space updated',
+              primary: 'Class updated',
               secondary: 'Math Foundations',
             },
           },
@@ -296,7 +296,7 @@ describe('buildActivityFeedForProfile', () => {
     ]);
   });
 
-  it('keeps learning space created as the parent and shows one grouped participants-added subactivity', async () => {
+  it('keeps class created as the parent and shows one grouped participants-added subactivity', async () => {
     getActivityFeedItemsByOrg.mockResolvedValue({
       data: [
         {
@@ -384,10 +384,10 @@ describe('buildActivityFeedForProfile', () => {
           refs: {},
           content: {
             headline: {
-              primary: 'Learning space created',
+              primary: 'Class created',
               secondary: 'Math Foundations',
             },
-            summary: 'Math learning space created. First session Mar 8 at 2:00 PM.',
+            summary: 'Math class created. First session Mar 8 at 2:00 PM.',
           },
           updated_at: '2026-03-07T15:52:00.000Z',
         },
@@ -438,10 +438,13 @@ describe('buildActivityFeedForProfile', () => {
       throw new Error('Expected grouped item');
     }
 
-    expect(group.content.headline.primary).toBe('Learning space created');
+    expect(group.content.headline.primary).toBe('Class created');
     expect(group.subActivities?.items).toHaveLength(1);
     expect(group.subActivities?.items[0]).toMatchObject({
       verb: 'members.invited',
+      metadata: {
+        readItemIds: expect.arrayContaining(['group-members-1', 'invite-2', 'invite-3']),
+      },
       content: {
         headline: { primary: '3 participants added' },
         summary:
@@ -469,5 +472,6 @@ describe('buildActivityFeedForProfile', () => {
         },
       },
     });
+    expect(feed.unreadCount).toBe(1);
   });
 });

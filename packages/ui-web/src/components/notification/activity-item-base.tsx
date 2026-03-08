@@ -8,6 +8,7 @@ import {
   CalendarDays,
   CalendarX,
   Check,
+  CheckCheck,
   CheckCircle2,
   ChevronDown,
   ClipboardCheck,
@@ -39,12 +40,14 @@ type ActivityItemBaseProps = {
   showSubActivityToggle?: boolean;
   showActionButton?: boolean;
   subActivityCount?: number;
+  unreadSubActivityCount?: number;
   hasUnreadSubActivities?: boolean;
   footer?: React.ReactNode;
   className?: string;
 };
 
 const READ_ICON_CLASS = 'bg-muted text-muted-foreground';
+const AUTO_READ_VIEW_DELAY_MS = 2000;
 const INBOX_ICON_MAP: Record<
   InboxIconKeyVM,
   React.ComponentType<{ className?: string }>
@@ -175,6 +178,7 @@ export function ActivityItemBase({
   showSubActivityToggle = false,
   showActionButton = false,
   subActivityCount,
+  unreadSubActivityCount,
   hasUnreadSubActivities = false,
   footer,
   className,
@@ -190,6 +194,18 @@ export function ActivityItemBase({
   const Icon = INBOX_ICON_MAP[iconKey];
   const timestampLabel = formatRelativeTime(activity.timestamps.occurredAt);
   const secondaryHref = activity.content.actionButton?.href ?? undefined;
+  const isGroupParent = activity.kind === 'group';
+  const groupChildCount = isGroupParent
+    ? (subActivityCount ?? activity.subActivities?.items.length ?? 0)
+    : 0;
+  const showParentReadIndicator =
+    isGroupParent && groupChildCount > 0 && !hasUnreadSubActivities;
+  const groupUnreadCount =
+    typeof unreadSubActivityCount === 'number'
+      ? unreadSubActivityCount
+      : hasUnreadSubActivities
+        ? Math.max(1, groupChildCount)
+        : 0;
   const rootRef = useRef<HTMLDivElement>(null);
   const autoReadTriggeredRef = useRef(false);
 
@@ -223,7 +239,7 @@ export function ActivityItemBase({
             readTimer = setTimeout(() => {
               autoReadTriggeredRef.current = true;
               onAutoRead(activity.ids.id);
-            }, 900);
+            }, AUTO_READ_VIEW_DELAY_MS);
           }
           return;
         }
@@ -259,12 +275,14 @@ export function ActivityItemBase({
         <div className="relative flex shrink-0 flex-col items-center">
           <div
             className={cn(
-              'z-10 flex size-6 items-center justify-center rounded-full',
+              'z-10 flex size-6 items-center justify-center rounded-full transition-colors duration-300 ease-out',
               activity.state?.isRead ? READ_ICON_CLASS : toneClassName,
               !toneClassName && !activity.state?.isRead && READ_ICON_CLASS,
             )}
           >
-            {Icon ? <Icon className="size-3" /> : null}
+            {Icon ? (
+              <Icon className="size-3 transition-colors duration-300 ease-out" />
+            ) : null}
           </div>
         </div>
 
@@ -332,13 +350,13 @@ export function ActivityItemBase({
                   variant="secondary"
                   className="shrink-0 text-[10px] h-4 px-1.5 gap-1"
                 >
-                  {hasUnreadSubActivities ? (
+                  {groupUnreadCount > 0 ? (
                     <span
                       className="size-1.5 rounded-full bg-rose-500"
                       aria-label="Unread sub activities"
                     />
                   ) : null}
-                  {subActivityCount ?? 0}
+                  {groupUnreadCount}
                 </Badge>
                 <ChevronDown
                   className={cn(
@@ -348,6 +366,24 @@ export function ActivityItemBase({
                 />
               </>
             )}
+
+            {showParentReadIndicator ? (
+              <span
+                className="inline-flex shrink-0 items-center text-muted-foreground/90 transition-colors duration-300"
+                aria-label="Read"
+                title="Read"
+              >
+                <CheckCheck className="size-3" />
+              </span>
+            ) : null}
+
+            {isSubActivity && !activity.state?.isRead ? (
+              <span
+                className="inline-flex size-1.5 shrink-0 rounded-full bg-rose-500"
+                aria-label="Unread"
+                title="Unread"
+              />
+            ) : null}
           </div>
 
           {showActionButton && <ActivityWithButton activity={activity} />}

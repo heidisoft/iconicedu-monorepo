@@ -232,7 +232,7 @@ export function SidebarLeft({
       normalizeDashboardUrl(item.url, dashboardBasePath) === dashboardBasePath
         ? activePath === dashboardBasePath
         : (activePath?.startsWith(normalizeDashboardUrl(item.url, dashboardBasePath)) ??
-            false),
+          false),
   }));
   const navSecondary: SidebarSecondaryItem[] = data.navigation.navSecondary.map(
     (item) => ({
@@ -256,8 +256,10 @@ export function SidebarLeft({
     [adminSections, dashboardBasePath],
   );
   const userProfile = data.user.profile;
-  const children: ChildProfileVM[] =
-    userProfile.kind === 'guardian' ? (userProfile.children?.items ?? []) : [];
+  const children = React.useMemo<ChildProfileVM[]>(
+    () => (userProfile.kind === 'guardian' ? (userProfile.children?.items ?? []) : []),
+    [userProfile],
+  );
   const learningSpacesByChild: Array<{
     child: ChildProfileVM;
     learningSpaces: LearningSpaceVM[];
@@ -318,37 +320,38 @@ export function SidebarLeft({
           ),
         )
       : data.collections.directMessages;
-  const supervisedDirectMessagesByChild =
-    userProfile.kind === 'guardian'
-      ? children
-          .map((child) => ({
-            child,
-            dms: data.collections.directMessages.filter((dm) => {
-              const hasChild = dm.collections.participants.some(
-                (participant: UserProfileVM) =>
-                  participant.ids.accountId === child.ids.accountId,
-              );
-              const hasGuardian = dm.collections.participants.some(
-                (participant: UserProfileVM) =>
-                  participant.ids.accountId === userProfile.ids.accountId,
-              );
-              return hasChild && !hasGuardian;
-            }),
-          }))
-          .filter(({ dms }) => dms.length > 0)
-      : [];
+  const supervisedDirectMessagesByChild = React.useMemo(
+    () =>
+      userProfile.kind === 'guardian'
+        ? children
+            .map((child) => ({
+              child,
+              dms: data.collections.directMessages.filter((dm) => {
+                const hasChild = dm.collections.participants.some(
+                  (participant: UserProfileVM) =>
+                    participant.ids.accountId === child.ids.accountId,
+                );
+                const hasGuardian = dm.collections.participants.some(
+                  (participant: UserProfileVM) =>
+                    participant.ids.accountId === userProfile.ids.accountId,
+                );
+                return hasChild && !hasGuardian;
+              }),
+            }))
+            .filter(({ dms }) => dms.length > 0)
+        : [],
+    [children, data.collections.directMessages, userProfile],
+  );
   const hasDirectMessages = ownDirectMessages.length > 0;
   const hasSupervisedDirectMessages = supervisedDirectMessagesByChild.length > 0;
   const totalLearningSpacesUnread = getLearningSpaceUnreadCount(
     visibleLearningSpaces,
     currentUserRef,
   );
-  const [guardianLearningSpaceOpenState, setGuardianLearningSpaceOpenState] = React.useState<
-    Record<string, boolean>
-  >({});
-  const [guardianSupervisedDmOpenState, setGuardianSupervisedDmOpenState] = React.useState<
-    Record<string, boolean>
-  >({});
+  const [guardianLearningSpaceOpenState, setGuardianLearningSpaceOpenState] =
+    React.useState<Record<string, boolean>>({});
+  const [guardianSupervisedDmOpenState, setGuardianSupervisedDmOpenState] =
+    React.useState<Record<string, boolean>>({});
   const guardianLearningSpaceChildAccountIds = React.useMemo(
     () => children.map((child) => child.ids.accountId),
     [children],
@@ -385,7 +388,11 @@ export function SidebarLeft({
       }
       return next;
     });
-  }, [userProfile.kind, guardianLearningSpaceChildAccountIds, guardianLearningSpaceChildAccountIdsKey]);
+  }, [
+    userProfile.kind,
+    guardianLearningSpaceChildAccountIds,
+    guardianLearningSpaceChildAccountIdsKey,
+  ]);
 
   React.useEffect(() => {
     if (userProfile.kind !== 'guardian') {
@@ -406,7 +413,11 @@ export function SidebarLeft({
       }
       return next;
     });
-  }, [userProfile.kind, guardianSupervisedChildAccountIds, guardianSupervisedChildAccountIdsKey]);
+  }, [
+    userProfile.kind,
+    guardianSupervisedChildAccountIds,
+    guardianSupervisedChildAccountIdsKey,
+  ]);
 
   const activeLearningSpaceId = React.useMemo(() => {
     if (!activePath) return null;
@@ -505,7 +516,7 @@ export function SidebarLeft({
               {shouldShowLearningSpacesLabel ? (
                 <SidebarGroupLabel asChild className="uppercase">
                   <span className="inline-flex items-center gap-2">
-                    <span>Learning spaces</span>
+                    <span>Classes</span>
                     {totalLearningSpacesUnread > 0 ? (
                       <Badge className="h-4 px-1.5 text-[10px] bg-rose-500 text-white">
                         {totalLearningSpacesUnread}
@@ -517,9 +528,9 @@ export function SidebarLeft({
               {userProfile.kind === 'guardian' ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <SidebarGroupAction title="Learning space actions">
+                    <SidebarGroupAction title="Class actions">
                       <MoreHorizontal />
-                      <span className="sr-only">Learning space actions</span>
+                      <span className="sr-only">Class actions</span>
                     </SidebarGroupAction>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
@@ -538,7 +549,7 @@ export function SidebarLeft({
                     <DropdownMenuSeparator />
                     <DropdownMenuItem>
                       <Settings className="text-muted-foreground" />
-                      <span>Manage learning spaces</span>
+                      <span>Manage classes</span>
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -588,7 +599,8 @@ export function SidebarLeft({
                 <SidebarMenu>
                   {flatLearningSpaces.map((space) => {
                     const channel = space.channels.primaryChannel;
-                    const iconKey = space.basics.iconKey ?? channel.basics.iconKey ?? null;
+                    const iconKey =
+                      space.basics.iconKey ?? channel.basics.iconKey ?? null;
                     const Icon = getLearningSpaceIcon(iconKey, Languages);
                     const isActive = activeLearningSpaceId === channel.ids.id;
                     const unreadCount = getLearningSpaceItemUnreadCountForUser(
@@ -601,9 +613,9 @@ export function SidebarLeft({
                         <SidebarMenuButton
                           asChild
                           tooltip={space.basics.title}
-                        isActive={isActive}
-                        className="px-2.5"
-                      >
+                          isActive={isActive}
+                          className="px-2.5"
+                        >
                           <a href={`${dashboardBasePath}/spaces/${channel.ids.id}`}>
                             <ThemedIconBadge
                               icon={Icon}

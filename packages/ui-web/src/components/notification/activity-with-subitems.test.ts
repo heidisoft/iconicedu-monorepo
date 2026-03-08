@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  getUnreadSubActivityCount,
   getInitialGroupCollapsedState,
   groupHasUnreadSubActivities,
+  shouldEnableGroupParentAutoRead,
 } from './activity-with-subitems';
 import type {
   ActivityFeedGroupItemVM,
@@ -43,6 +45,18 @@ describe('groupHasUnreadSubActivities', () => {
   });
 });
 
+describe('getUnreadSubActivityCount', () => {
+  it('returns the unread subactivity count', () => {
+    expect(
+      getUnreadSubActivityCount([
+        makeSubActivity(true),
+        makeSubActivity(false),
+        makeSubActivity(false),
+      ]),
+    ).toBe(2);
+  });
+});
+
 describe('getInitialGroupCollapsedState', () => {
   it('defaults grouped inbox activities to collapsed when they have subitems', () => {
     const activity = {
@@ -60,7 +74,7 @@ describe('getInitialGroupCollapsedState', () => {
       verb: 'class.created',
       refs: { actor: {} as never },
       grouping: { groupKey: 'class-created:space-1', groupType: 'class' },
-      content: { headline: { primary: 'Learning space created' } },
+      content: { headline: { primary: 'Class created' } },
       subActivityCount: 2,
       subActivities: {
         items: [makeSubActivity(false), makeSubActivity(true)],
@@ -69,5 +83,15 @@ describe('getInitialGroupCollapsedState', () => {
     } as ActivityFeedGroupItemVM;
 
     expect(getInitialGroupCollapsedState(activity)).toBe(true);
+  });
+});
+
+describe('shouldEnableGroupParentAutoRead', () => {
+  it('disables parent auto-read when subitems are unread', () => {
+    expect(shouldEnableGroupParentAutoRead(true)).toBe(false);
+  });
+
+  it('enables parent auto-read only when all subitems are read', () => {
+    expect(shouldEnableGroupParentAutoRead(false)).toBe(true);
   });
 });

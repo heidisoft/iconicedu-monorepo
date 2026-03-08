@@ -144,7 +144,7 @@ export async function getLearningSpaceDetail(learningSpaceId: string) {
   }
 
   if (!learningSpace) {
-    throw new Error('Learning space not found');
+    throw new Error('Class not found');
   }
 
   const [participantsResponse, linksResponse, schedulesResponse, channelLinksResponse] =

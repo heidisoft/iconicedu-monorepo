@@ -16,7 +16,7 @@ export async function POST(request: Request) {
 
   if (!isValidPayload(payload)) {
     return NextResponse.json(
-      { success: false, message: 'Missing required learning space fields.' },
+      { success: false, message: 'Missing required class fields.' },
       { status: 400 },
     );
   }
@@ -26,7 +26,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, data: result });
   } catch (error) {
     return NextResponse.json(
-      { success: false, message: error instanceof Error ? error.message : 'Unknown error' },
+      {
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error',
+      },
       { status: 500 },
     );
   }

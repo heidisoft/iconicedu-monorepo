@@ -10,7 +10,7 @@ import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 
 export const metadata: Metadata = {
   title: 'Admin · Session attendance',
-  description: 'Review live session attendance across learning spaces and channels.',
+  description: 'Review live session attendance across classes and channels.',
 };
 
 export default async function AdminLiveSessionAttendancePage({

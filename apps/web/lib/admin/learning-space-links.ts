@@ -80,7 +80,7 @@ export async function replaceLearningSpaceLinks(
     throw new Error(error.message);
   }
   if (!data?.length) {
-    throw new Error('Unable to insert learning space links.');
+    throw new Error('Unable to insert class links.');
   }
 }
 

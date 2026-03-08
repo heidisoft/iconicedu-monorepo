@@ -20,7 +20,7 @@ export async function deleteLearningSpaceCascade(learningSpaceId: string) {
   }
 
   if (!learningSpace) {
-    throw new Error('Learning space not found');
+    throw new Error('Class not found');
   }
 
   const { data: channelRows, error: channelError } = await supabase

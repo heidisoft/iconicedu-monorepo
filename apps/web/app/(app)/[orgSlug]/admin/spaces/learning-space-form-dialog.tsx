@@ -295,15 +295,11 @@ export function LearningSpaceFormDialog({
       if (!response.ok || !result.success) {
         toast.error(
           result.message ??
-            (mode === 'edit'
-              ? 'Unable to update learning space.'
-              : 'Unable to create learning space.'),
+            (mode === 'edit' ? 'Unable to update class.' : 'Unable to create class.'),
         );
         return;
       }
-      toast.success(
-        mode === 'edit' ? 'Learning space updated.' : 'Learning space created.',
-      );
+      toast.success(mode === 'edit' ? 'Class updated.' : 'Class created.');
       setDialogOpen(false);
       resetForm();
       router.refresh();
@@ -313,8 +309,8 @@ export function LearningSpaceFormDialog({
         error instanceof Error
           ? error.message
           : mode === 'edit'
-            ? 'Unable to update learning space.'
-            : 'Unable to create learning space.',
+            ? 'Unable to update class.'
+            : 'Unable to create class.',
       );
     } finally {
       setIsSaving(false);
@@ -335,13 +331,11 @@ export function LearningSpaceFormDialog({
         <div className="flex max-h-[90vh] flex-col overflow-hidden rounded-2xl border border-border bg-card">
           <div className="px-6 py-5">
             <DialogHeader>
-              <DialogTitle>
-                {mode === 'edit' ? 'Edit learning space' : 'Create learning space'}
-              </DialogTitle>
+              <DialogTitle>{mode === 'edit' ? 'Edit class' : 'Create class'}</DialogTitle>
               <DialogDescription>
                 {mode === 'edit'
-                  ? 'Update the basics, participants, and resources for the learning space.'
-                  : 'Configure the basics, invite participants, and attach resources for the learning space.'}
+                  ? 'Update the basics, participants, and resources for the class.'
+                  : 'Configure the basics, invite participants, and attach resources for the class.'}
               </DialogDescription>
             </DialogHeader>
           </div>
@@ -389,7 +383,7 @@ export function LearningSpaceFormDialog({
                       </Select>
                       {iconInvalid && (
                         <FieldDescription className="text-destructive">
-                          Please choose an icon for this learning space.
+                          Please choose an icon for this class.
                         </FieldDescription>
                       )}
                     </Field>
@@ -459,7 +453,7 @@ export function LearningSpaceFormDialog({
                       </Select>
                       {kindInvalid && (
                         <FieldDescription className="text-destructive">
-                          Kind is required for the learning space.
+                          Kind is required for the class.
                         </FieldDescription>
                       )}
                     </Field>
@@ -487,7 +481,7 @@ export function LearningSpaceFormDialog({
                 </FieldSet>
                 <FieldSeparator />
                 <LiveSessionSettingsSection
-                  description="Configure the primary channel’s live session provider and mode for this learning space."
+                  description="Configure the primary channel’s live session provider and mode for this class."
                   providerSelectId="ls-live-session-provider"
                   modeSelectId="ls-live-session-mode"
                   joinUrlInputId="ls-live-session-join-url"
@@ -550,7 +544,7 @@ export function LearningSpaceFormDialog({
                 <ChannelUiDefaultsSettingsSection
                   legend="Settings"
                   themeSelectId="ls-theme-key"
-                  description="Sets the accent color used across this learning space message UI."
+                  description="Sets the accent color used across this class message UI."
                   uiDefaults={formState.uiDefaults}
                   onUiDefaultsChange={(updates) =>
                     updateFormState({

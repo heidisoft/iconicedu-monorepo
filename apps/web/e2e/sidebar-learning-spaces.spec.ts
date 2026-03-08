@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('student sidebar shows learning spaces header when spaces exist', async ({ page }) => {
+test('student sidebar shows classes header when spaces exist', async ({ page }) => {
   const orgSlug = process.env.PLAYWRIGHT_ORG_SLUG;
   test.skip(
     !process.env.PLAYWRIGHT_AUTH_STATE || !orgSlug,
@@ -11,5 +11,5 @@ test('student sidebar shows learning spaces header when spaces exist', async ({ 
 
   const learningSpaceLinks = page.locator(`a[href^='/${orgSlug}/spaces/']`);
   await expect(learningSpaceLinks.first()).toBeVisible();
-  await expect(page.getByText('Learning spaces')).toBeVisible();
+  await expect(page.getByText('Classes')).toBeVisible();
 });

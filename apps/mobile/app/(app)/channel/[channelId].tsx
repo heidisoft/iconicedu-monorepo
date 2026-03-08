@@ -1,5 +1,12 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import { MessageCircle, CalendarDays } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,7 +14,14 @@ import type { MessageVM } from '@iconicedu/shared-types';
 import { useAccount } from '@/hooks/use-account';
 import { useMessages } from '@/hooks/use-messages';
 import { useSpaceSessions } from '@/hooks/use-space-sessions';
-import { sendTextMessage, sendFileMessage, sendFilesMessage, uploadChannelFile, buildMessageStoragePath, deleteMessage } from '@/lib/api/queries';
+import {
+  sendTextMessage,
+  sendFileMessage,
+  sendFilesMessage,
+  uploadChannelFile,
+  buildMessageStoragePath,
+  deleteMessage,
+} from '@/lib/api/queries';
 import type { AttachmentPayload } from '@/components/messages/attachment-sheet';
 import type { PendingUpload } from '@/components/messages/pending-message-row';
 import { useTheme } from '@/providers/theme-provider';
@@ -33,15 +47,17 @@ export default function ChannelConversationScreen() {
   const { colors } = useTheme();
 
   const orgId = account?.org_id ?? '';
-  const accountId = (account as Record<string, unknown> | undefined)?.id as string ?? '';
+  const accountId =
+    ((account as Record<string, unknown> | undefined)?.id as string) ?? '';
   // Profile is joined in fetchUserAccount — no extra round-trip needed
-  const profileArr = ((account as Record<string, unknown> | undefined)
-    ?.profile as Array<{ id: string; display_name: string | null; first_name: string | null }> | null);
+  const profileArr = (account as Record<string, unknown> | undefined)?.profile as Array<{
+    id: string;
+    display_name: string | null;
+    first_name: string | null;
+  }> | null;
   const profileId = profileArr?.[0]?.id ?? '';
   const senderName =
-    profileArr?.[0]?.display_name?.trim() ||
-    profileArr?.[0]?.first_name?.trim() ||
-    'Me';
+    profileArr?.[0]?.display_name?.trim() || profileArr?.[0]?.first_name?.trim() || 'Me';
 
   const {
     data: messages,
@@ -55,10 +71,11 @@ export default function ChannelConversationScreen() {
     broadcastTypingStop,
   } = useMessages(channelId ?? '', profileId, accountId, senderName, orgId);
 
-  const { schedules, isLoading: isLoadingSessions, error: sessionsError } = useSpaceSessions(
-    channelId ?? '',
-    orgId,
-  );
+  const {
+    schedules,
+    isLoading: isLoadingSessions,
+    error: sessionsError,
+  } = useSpaceSessions(channelId ?? '', orgId);
 
   // ── Tab state ──
   const [activeTab, setActiveTab] = useState<ChannelTab>('messages');
@@ -120,28 +137,55 @@ export default function ChannelConversationScreen() {
       if (!channelId || !profileId || !orgId || !attachments.length) return;
 
       const type: PendingUpload['type'] =
-        attachments[0].mimeType === 'audio/mp4' ? 'audio'
-        : attachments[0].mimeType.startsWith('image/') ? 'image'
-        : 'file';
+        attachments[0].mimeType === 'audio/mp4'
+          ? 'audio'
+          : attachments[0].mimeType.startsWith('image/')
+            ? 'image'
+            : 'file';
 
       const pendingId = `pending-${Date.now()}`;
 
       // 1. Add local preview immediately — user sees it right away (like WhatsApp)
       setPendingUploads((prev) => [
         ...prev,
-        { id: pendingId, type, attachments, senderName, createdAt: new Date().toISOString(), caption },
+        {
+          id: pendingId,
+          type,
+          attachments,
+          senderName,
+          createdAt: new Date().toISOString(),
+          caption,
+        },
       ]);
 
       try {
         if (type === 'audio') {
           const a = attachments[0];
-          const storagePath = buildMessageStoragePath(orgId, channelId, profileId, a.mimeType, a.name);
+          const storagePath = buildMessageStoragePath(
+            orgId,
+            channelId,
+            profileId,
+            a.mimeType,
+            a.name,
+          );
           await uploadChannelFile(a.uri, storagePath, a.mimeType, a.base64);
-          await sendFileMessage(channelId, profileId, orgId, { ...a, storagePath }, caption);
+          await sendFileMessage(
+            channelId,
+            profileId,
+            orgId,
+            { ...a, storagePath },
+            caption,
+          );
         } else {
           const uploaded = await Promise.all(
             attachments.map(async (a) => {
-              const storagePath = buildMessageStoragePath(orgId, channelId, profileId, a.mimeType, a.name);
+              const storagePath = buildMessageStoragePath(
+                orgId,
+                channelId,
+                profileId,
+                a.mimeType,
+                a.name,
+              );
               await uploadChannelFile(a.uri, storagePath, a.mimeType, a.base64);
               return { ...a, storagePath };
             }),
@@ -171,39 +215,64 @@ export default function ChannelConversationScreen() {
   }, []);
 
   // ── Retry a failed upload ──
-  const handleRetryUpload = useCallback(async (pendingId: string) => {
-    const pending = pendingUploads.find((p) => p.id === pendingId);
-    if (!pending?.failed) return;
+  const handleRetryUpload = useCallback(
+    async (pendingId: string) => {
+      const pending = pendingUploads.find((p) => p.id === pendingId);
+      if (!pending?.failed) return;
 
-    // Reset to uploading state so the spinner shows again
-    setPendingUploads((prev) => prev.map((p) => (p.id === pendingId ? { ...p, failed: false } : p)));
+      // Reset to uploading state so the spinner shows again
+      setPendingUploads((prev) =>
+        prev.map((p) => (p.id === pendingId ? { ...p, failed: false } : p)),
+      );
 
-    try {
-      const { caption } = pending;
-      if (pending.type === 'audio') {
-        const a = pending.attachments[0];
-        const storagePath = buildMessageStoragePath(orgId, channelId!, profileId, a.mimeType, a.name);
-        await uploadChannelFile(a.uri, storagePath, a.mimeType, a.base64);
-        await sendFileMessage(channelId!, profileId, orgId, { ...a, storagePath }, caption);
-      } else {
-        const uploaded = await Promise.all(
-          pending.attachments.map(async (a) => {
-            const storagePath = buildMessageStoragePath(orgId, channelId!, profileId, a.mimeType, a.name);
-            await uploadChannelFile(a.uri, storagePath, a.mimeType, a.base64);
-            return { ...a, storagePath };
-          }),
-        );
-        if (uploaded.length === 1) {
-          await sendFileMessage(channelId!, profileId, orgId, uploaded[0], caption);
+      try {
+        const { caption } = pending;
+        if (pending.type === 'audio') {
+          const a = pending.attachments[0];
+          const storagePath = buildMessageStoragePath(
+            orgId,
+            channelId!,
+            profileId,
+            a.mimeType,
+            a.name,
+          );
+          await uploadChannelFile(a.uri, storagePath, a.mimeType, a.base64);
+          await sendFileMessage(
+            channelId!,
+            profileId,
+            orgId,
+            { ...a, storagePath },
+            caption,
+          );
         } else {
-          await sendFilesMessage(channelId!, profileId, orgId, uploaded, caption);
+          const uploaded = await Promise.all(
+            pending.attachments.map(async (a) => {
+              const storagePath = buildMessageStoragePath(
+                orgId,
+                channelId!,
+                profileId,
+                a.mimeType,
+                a.name,
+              );
+              await uploadChannelFile(a.uri, storagePath, a.mimeType, a.base64);
+              return { ...a, storagePath };
+            }),
+          );
+          if (uploaded.length === 1) {
+            await sendFileMessage(channelId!, profileId, orgId, uploaded[0], caption);
+          } else {
+            await sendFilesMessage(channelId!, profileId, orgId, uploaded, caption);
+          }
         }
+        setPendingUploads((prev) => prev.filter((p) => p.id !== pendingId));
+      } catch {
+        setPendingUploads((prev) =>
+          prev.map((p) => (p.id === pendingId ? { ...p, failed: true } : p)),
+        );
       }
-      setPendingUploads((prev) => prev.filter((p) => p.id !== pendingId));
-    } catch {
-      setPendingUploads((prev) => prev.map((p) => (p.id === pendingId ? { ...p, failed: true } : p)));
-    }
-  }, [pendingUploads, channelId, profileId, orgId]);
+    },
+    [pendingUploads, channelId, profileId, orgId],
+  );
 
   // ── Reaction toggle ──
   const handleReactionToggle = useCallback(
@@ -216,7 +285,7 @@ export default function ChannelConversationScreen() {
   if (!channelId) return null;
 
   const isOwnMessage = (msg: MessageVM) => msg.core.sender.ids.id === profileId;
-  // Show the Sessions tab only for learning space channels (identified by having an iconEmoji)
+  // Show the Sessions tab only for class channels (identified by having an iconEmoji)
   const isSpaceChannel = Boolean(iconEmoji);
 
   return (
@@ -230,7 +299,7 @@ export default function ChannelConversationScreen() {
         onMore={() => setInfoVisible(true)}
       />
 
-      {/* Tab bar: Messages | Sessions — only shown for learning space channels */}
+      {/* Tab bar: Messages | Sessions — only shown for class channels */}
       {isSpaceChannel && (
         <View style={[s.tabBar, { borderBottomColor: colors.border }]}>
           {(['messages', 'sessions'] as ChannelTab[]).map((tab) => {
@@ -243,10 +312,11 @@ export default function ChannelConversationScreen() {
                 onPress={() => setActiveTab(tab)}
                 activeOpacity={0.7}
               >
-                {tab === 'messages'
-                  ? <MessageCircle size={16} color={color} />
-                  : <CalendarDays size={16} color={color} />
-                }
+                {tab === 'messages' ? (
+                  <MessageCircle size={16} color={color} />
+                ) : (
+                  <CalendarDays size={16} color={color} />
+                )}
                 <Text style={[s.tabLabel, { color }]}>
                   {tab === 'messages' ? 'Messages' : 'Sessions'}
                 </Text>
@@ -325,7 +395,12 @@ export default function ChannelConversationScreen() {
   );
 }
 
-function makeStyles(colors: { border: string; teal: string; textMuted: string; pageBg: string }) {
+function makeStyles(_colors: {
+  border: string;
+  teal: string;
+  textMuted: string;
+  pageBg: string;
+}) {
   return StyleSheet.create({
     safe: { flex: 1 },
     flex: { flex: 1 },

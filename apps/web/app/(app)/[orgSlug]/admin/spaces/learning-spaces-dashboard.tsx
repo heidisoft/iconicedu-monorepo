@@ -126,9 +126,7 @@ export function LearningSpacesDashboard({ rows }: LearningSpacesDashboardProps) 
   return (
     <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <LearningSpaceFormDialog
-          participantOptions={participantOptions}
-        />
+        <LearningSpaceFormDialog participantOptions={participantOptions} />
         <LearningSpaceFormDialog
           mode="edit"
           open={editOpen}
@@ -175,7 +173,7 @@ export function LearningSpacesDashboard({ rows }: LearningSpacesDashboardProps) 
             className="px-2"
             onClick={handleRefresh}
             disabled={refreshing}
-            aria-label="Refresh learning spaces"
+            aria-label="Refresh classes"
           >
             {refreshing ? (
               <Loader2 className="size-4 animate-spin text-muted-foreground" />

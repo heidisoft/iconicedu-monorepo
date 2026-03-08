@@ -145,7 +145,7 @@ export type ChannelListItem = {
   last_message_text: string | null;
   last_message_at: string | null;
   last_message_sender: string | null;
-  /** Learning space subject emoji, e.g. "📐". */
+  /** Class subject emoji, e.g. "📐". */
   icon_emoji?: string | null;
   /** Primary student name this space is for. */
   student_name?: string | null;
@@ -914,7 +914,7 @@ export async function fetchLearningSpaces(orgId: string) {
   return data ?? [];
 }
 
-/** Emoji icon for each learning space icon_key (Lucide icon keys mapped to emoji equivalents). */
+/** Emoji icon for each class icon_key (Lucide icon keys mapped to emoji equivalents). */
 const SPACE_ICON_EMOJI: Record<string, string> = {
   'square-pi': '📐',
   languages: '🌐',
@@ -929,7 +929,7 @@ const SPACE_ICON_EMOJI: Record<string, string> = {
 };
 
 /**
- * Fetches learning space primary channels for the messages tab, scoped to
+ * Fetches class primary channels for the messages tab, scoped to
  * spaces the logged-in user participates in.
  * Mirrors web's learning_space_participants filtering pattern.
  */
@@ -939,7 +939,7 @@ export async function fetchLearningSpaceChannels(
 ): Promise<ChannelListItem[]> {
   if (!myProfileId) return [];
 
-  // Step 1: get learning space IDs where the user is a participant
+  // Step 1: get class IDs where the user is a participant
   // Uses learning_space_participants (mirrors web's getLearningSpaceParticipantsByLearningSpaceIds)
   const { data: mySpaces, error: spError } = await supabase
     .from('learning_space_participants')
@@ -953,7 +953,7 @@ export async function fetchLearningSpaceChannels(
 
   const userSpaceIds = mySpaces.map((s) => s.learning_space_id);
 
-  // Step 2: fetch primary channels for those learning spaces
+  // Step 2: fetch primary channels for those classes
   const { data, error } = await supabase
     .from('learning_space_channels')
     .select(

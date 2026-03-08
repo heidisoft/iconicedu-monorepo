@@ -200,7 +200,7 @@ function sourceAction(
   const routeKind = asOptionalRouteKind(payload.channelRouteKind);
   const resolvedLabel =
     routeKind === 'space' || href.includes('/spaces/')
-      ? 'Open learning space'
+      ? 'Open class'
       : routeKind === 'dm' || href.includes('/dm/')
         ? 'Open conversation'
         : 'Open channel';
@@ -243,7 +243,7 @@ const DEFAULT_RECIPIENTS: ActivityEventDefinition['resolveRecipients'] = async (
 ) => resolveRecipientsForActivityEvent(supabase, event);
 
 function className(payload: Record<string, unknown>) {
-  return asString(payload.title, 'Learning space');
+  return asString(payload.title, 'Class');
 }
 
 function sessionName(payload: Record<string, unknown>) {
@@ -383,7 +383,7 @@ function renderGroupedClassActivity(
       primary: input.primary,
       secondary: getContextTitle(payload),
     },
-    summary: 'Open to review the latest learning space activity.',
+    summary: 'Open to review the latest class activity.',
     actionButton: sourceAction(event, payload),
   } satisfies ActivityRenderResult;
 }
@@ -397,8 +397,8 @@ function renderClassCreatedGroup(event: ActivityEventRow) {
   const participantsSummary = buildParticipantNamesSummary(payload, 'Participants');
   const summaryParts = [
     asOptionalString(payload.subject)
-      ? `${asOptionalString(payload.subject)} learning space created`
-      : 'Learning space created',
+      ? `${asOptionalString(payload.subject)} class created`
+      : 'Class created',
     firstSessionLabel ? `First session ${firstSessionLabel}` : undefined,
     participantsSummary,
   ].filter((value): value is string => Boolean(value));
@@ -414,11 +414,11 @@ function renderClassCreatedGroup(event: ActivityEventRow) {
           }
         : buildSystemLeadingAvatar(),
     headline: {
-      primary: 'Learning space created',
+      primary: 'Class created',
       secondary: getContextTitle(payload),
     },
     summary: summaryParts.join('. '),
-    actionButton: sourceAction(event, payload, 'outline', 'Open learning space'),
+    actionButton: sourceAction(event, payload, 'outline', 'Open class'),
   } satisfies ActivityRenderResult;
 }
 
@@ -432,12 +432,10 @@ function renderClassCreatedLeaf(event: ActivityEventRow) {
     verb: 'class.created',
     leading: buildSystemLeadingAvatar(),
     headline: {
-      primary: 'Learning space created',
+      primary: 'Class created',
       secondary: className(payload),
     },
-    summary: firstSessionLabel
-      ? `First session ${firstSessionLabel}.`
-      : 'Learning space created.',
+    summary: firstSessionLabel ? `First session ${firstSessionLabel}.` : 'Class created.',
   } satisfies ActivityRenderResult;
 }
 
@@ -459,14 +457,14 @@ function renderLearningSpaceUpdatedGroup(event: ActivityEventRow) {
           }
         : buildSystemLeadingAvatar(),
     headline: {
-      primary: 'Learning space updated',
+      primary: 'Class updated',
       secondary: getContextTitle(payload),
     },
     summary:
       asOptionalString(payload.changeSummary) ??
       (firstSessionLabel ? `Next session ${firstSessionLabel}.` : null) ??
-      'Learning space details, participants, or schedule changed.',
-    actionButton: sourceAction(event, payload, 'outline', 'Open learning space'),
+      'Class details, participants, or schedule changed.',
+    actionButton: sourceAction(event, payload, 'outline', 'Open class'),
   } satisfies ActivityRenderResult;
 }
 
@@ -476,13 +474,13 @@ function renderLearningSpaceUpdatedLeaf(event: ActivityEventRow) {
     verb: 'class.updated',
     leading: buildSystemLeadingAvatar(),
     headline: {
-      primary: 'Learning space updated',
+      primary: 'Class updated',
       secondary: className(payload),
     },
     summary:
       asOptionalString(payload.changeSummary) ??
       asOptionalString(payload.subject) ??
-      'Learning space details updated.',
+      'Class details updated.',
   } satisfies ActivityRenderResult;
 }
 
@@ -675,7 +673,7 @@ function renderSessionTimelineGroup(event: ActivityEventRow) {
           variant: 'default',
           href: asOptionalString(payload.joinPath),
         }
-      : sourceAction(event, payload, 'outline', 'Open learning space'),
+      : sourceAction(event, payload, 'outline', 'Open class'),
   } satisfies ActivityRenderResult;
 }
 
@@ -862,7 +860,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       return {
         verb: 'class.archived',
         leading: buildSystemLeadingAvatar(),
-        headline: { primary: 'Learning space archived', secondary: className(payload) },
+        headline: { primary: 'Class archived', secondary: className(payload) },
         summary: archivedOn
           ? `${className(payload)} was archived on ${archivedOn}.`
           : undefined,
@@ -956,7 +954,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
         renderGroupedClassActivity(event, {
           iconKey: 'Video',
           tone: 'info',
-          primary: 'Learning space session',
+          primary: 'Class session',
         }),
     },
     resolveRecipients: DEFAULT_RECIPIENTS,
@@ -1145,9 +1143,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
         verb: 'session.scheduled',
         leading: { kind: 'icon', iconKey: 'CalendarDays', tone: 'info' },
         headline: {
-          primary: isUpdated
-            ? 'Session scheduled'
-            : 'Learning space session schedule added',
+          primary: isUpdated ? 'Session scheduled' : 'Class session schedule added',
           secondary: sessionName(payload),
         },
         summary: isUpdated
@@ -1275,7 +1271,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
               variant: 'default',
               href: joinPath,
             }
-          : sourceAction(event, payload, 'outline', 'Open learning space'),
+          : sourceAction(event, payload, 'outline', 'Open class'),
       };
     },
   },

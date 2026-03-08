@@ -18,7 +18,7 @@ import { getProfilesByIds } from '@iconicedu/web/lib/profile/queries/profiles.qu
 
 const FEED_TABS: Array<{ key: InboxTabKeyVM; label: string }> = [
   { key: 'all', label: 'All' },
-  { key: 'classes', label: 'Learning spaces' },
+  { key: 'classes', label: 'Classes' },
   { key: 'payment', label: 'Payment' },
   { key: 'system', label: 'System' },
 ];
@@ -61,8 +61,8 @@ export async function buildActivityFeedForProfile(
       : groupedItems.filter((item) => item.tabKey === activeTab);
 
   const sections = buildActivitySections(filteredItems);
-  const tabs = buildFeedTabs(mappedItems);
-  const unreadCount = mappedItems.filter((item) => !item.state?.isRead).length;
+  const tabs = buildFeedTabs(groupedItems);
+  const unreadCount = countUnreadItems(groupedItems);
 
   return {
     activeTab,
@@ -71,6 +71,26 @@ export async function buildActivityFeedForProfile(
     nextCursor: null,
     unreadCount,
   };
+}
+
+export async function buildActivityFeedUnreadCountForProfile(
+  supabase: SupabaseClient,
+  orgId: string,
+  profileId: string,
+) {
+  const itemsResponse = await getActivityFeedItemsByOrg(supabase, orgId, profileId);
+  const itemRows = itemsResponse.data ?? [];
+  const groupIds = itemRows.filter((row) => row.kind === 'group').map((row) => row.id);
+  const groupMembersResponse = groupIds.length
+    ? await getActivityFeedGroupMembersByGroupIds(supabase, orgId, groupIds)
+    : { data: [] };
+
+  const mappedItems = itemRows.map((row) => mapActivityFeedItemRow(row));
+  const groupedItems = await attachGroupMembers(
+    mappedItems,
+    groupMembersResponse.data ?? [],
+  );
+  return countUnreadItems(groupedItems);
 }
 
 export async function buildActivityFeedByOrg(
@@ -196,7 +216,10 @@ function normalizeGroupedParent(
           refs: parent.refs,
           content: parent.content,
           state: parent.state,
-          metadata: parent.metadata,
+          metadata: {
+            ...(parent.metadata ?? {}),
+            readItemIds: [parent.ids.id],
+          },
         } as ActivityFeedLeafItemVM)
       : null;
 
@@ -250,6 +273,7 @@ function aggregateGroupedSubActivities(
     ? `Added: ${listedNames}${remainingCount > 0 ? ` +${remainingCount} more` : ''}.`
     : undefined;
   const representative = invitedChildren[0] ?? members[0];
+  const readItemIds = collectActivityReadItemIds(invitedChildren, parent.ids.id);
 
   const aggregatedInvite: ActivityFeedLeafItemVM = {
     ...representative,
@@ -274,6 +298,10 @@ function aggregateGroupedSubActivities(
       summary:
         `${summaryPrefix ?? ''}${secondary ? ` Added to ${secondary}.` : ''}`.trim(),
     },
+    metadata: {
+      ...(representative.metadata ?? {}),
+      readItemIds,
+    },
   };
 
   const nonInviteMembers = members.filter(
@@ -281,6 +309,27 @@ function aggregateGroupedSubActivities(
   );
 
   return [aggregatedInvite, ...nonInviteMembers];
+}
+
+function collectActivityReadItemIds(items: ActivityFeedLeafItemVM[], fallbackId: string) {
+  const ids = new Set<string>();
+  for (const item of items) {
+    const metadataReadIds = Array.isArray(item.metadata?.readItemIds)
+      ? item.metadata.readItemIds
+      : [];
+    for (const id of metadataReadIds) {
+      if (typeof id === 'string' && id.length > 0) {
+        ids.add(id);
+      }
+    }
+    ids.add(item.ids.id);
+  }
+
+  if (!ids.size) {
+    ids.add(fallbackId);
+  }
+
+  return Array.from(ids);
 }
 
 function collectUniqueAvatars(leads: Array<ActivityFeedItemVM['content']['leading']>) {
@@ -313,13 +362,7 @@ function collectUniqueAvatars(leads: Array<ActivityFeedItemVM['content']['leadin
 function buildFeedTabs(items: ActivityFeedItemVM[]): ActivityFeedTabVM[] {
   const counts = new Map<InboxTabKeyVM, number>();
   items.forEach((item) => {
-    const unreadItemCount =
-      item.kind === 'group'
-        ? (item.subActivities?.items.filter((subItem) => !subItem.state?.isRead).length ??
-          (!item.state?.isRead ? 1 : 0))
-        : !item.state?.isRead
-          ? 1
-          : 0;
+    const unreadItemCount = getUnreadCountForItem(item);
 
     if (unreadItemCount === 0) {
       return;
@@ -336,6 +379,21 @@ function buildFeedTabs(items: ActivityFeedItemVM[]): ActivityFeedTabVM[] {
         ? Array.from(counts.values()).reduce((total, count) => total + count, 0)
         : (counts.get(tab.key) ?? 0),
   }));
+}
+
+function getUnreadCountForItem(item: ActivityFeedItemVM) {
+  if (item.kind === 'group') {
+    return (
+      item.subActivities?.items.filter((subItem) => !subItem.state?.isRead).length ??
+      (!item.state?.isRead ? 1 : 0)
+    );
+  }
+
+  return item.state?.isRead ? 0 : 1;
+}
+
+function countUnreadItems(items: ActivityFeedItemVM[]) {
+  return items.reduce((total, item) => total + getUnreadCountForItem(item), 0);
 }
 
 function buildActivitySections(items: ActivityFeedItemVM[]) {

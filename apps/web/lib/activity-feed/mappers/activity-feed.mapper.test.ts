@@ -17,7 +17,7 @@ describe('mapActivityFeedItemRow', () => {
         verb: 'class.updated',
         actor_profile_id: 'actor-1',
         content: {
-          headline: { primary: 'Learning space updated' },
+          headline: { primary: 'Class updated' },
           leading: { kind: 'icon', iconKey: 'GraduationCap', tone: 'neutral' },
         },
         updated_at: '2026-03-08T10:00:00.000Z',
@@ -67,7 +67,7 @@ describe('mapActivityFeedItemRow', () => {
         verb: 'member.invited',
         actor_profile_id: 'actor-1',
         content: {
-          headline: { primary: 'Tehara invited to the learning space' },
+          headline: { primary: 'Tehara invited to the class' },
           leading: {
             kind: 'avatars',
             avatars: [

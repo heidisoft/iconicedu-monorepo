@@ -76,7 +76,7 @@ describe('d/spaces/[channelId] page', () => {
     });
   });
 
-  it('enables read-only mode for staff who are not learning space channel participants', async () => {
+  it('enables read-only mode for staff who are not class channel participants', async () => {
     const { getDashboardProfileContext } =
       await import('@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth');
     vi.mocked(getDashboardProfileContext).mockResolvedValueOnce({

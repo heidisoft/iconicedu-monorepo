@@ -24,5 +24,5 @@ pnpm --filter web test:e2e
 ## Specs
 
 - `e2e/marketing-smoke.spec.ts`: public landing page smoke test.
-- `e2e/sidebar-learning-spaces.spec.ts`: student sidebar learning spaces header visibility (requires auth).
+- `e2e/sidebar-learning-spaces.spec.ts`: student sidebar classes header visibility (requires auth).
 - `e2e/supervised-readonly.spec.ts`: supervised view controls disabled + thread open behavior (requires auth).

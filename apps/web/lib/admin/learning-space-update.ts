@@ -934,7 +934,7 @@ export async function updateLearningSpaceFromPayload(
   }
 
   if (!learningSpace) {
-    throw new Error('Learning space not found');
+    throw new Error('Class not found');
   }
 
   const { data: channelRow, error: channelError } = await supabase
@@ -1321,6 +1321,7 @@ export async function updateLearningSpaceFromPayload(
     orgId,
     learningSpaceId,
   });
+  const systemProfileId = await ensureSystemProfileId(serviceClient, orgId);
 
   const infoChangeSummaryParts: string[] = [];
   if ((learningSpace.title ?? null) !== (payload.basics.title ?? null)) {
@@ -1368,8 +1369,8 @@ export async function updateLearningSpaceFromPayload(
       orgId,
       eventType: 'class.updated',
       occurredAt: now,
-      sourceKind: 'profile',
-      actorProfileId,
+      sourceKind: 'system',
+      actorProfileId: systemProfileId,
       scope: { kind: 'learning_space', learningSpaceId },
       targetRef: { kind: 'learning_space', id: learningSpaceId },
       payload: {
@@ -1384,7 +1385,7 @@ export async function updateLearningSpaceFromPayload(
         invitedMembers: invitedMembersSnapshot,
       },
       dedupeKey: `class.updated:${learningSpaceId}:${now}`,
-      createdBy: actorProfileId,
+      createdBy: systemProfileId,
     });
   }
 
@@ -1399,7 +1400,7 @@ export async function updateLearningSpaceFromPayload(
   await publishParticipantInviteActivities({
     supabase: serviceClient,
     orgId,
-    actorProfileId,
+    actorProfileId: systemProfileId,
     learningSpaceId,
     channelId,
     title: payload.basics.title,
@@ -1434,13 +1435,13 @@ export async function updateLearningSpaceFromPayload(
       orgId,
       eventType: removedMembersActivity.eventType,
       occurredAt: now,
-      sourceKind: 'profile',
-      actorProfileId,
+      sourceKind: 'system',
+      actorProfileId: systemProfileId,
       scope: { kind: 'learning_space', learningSpaceId },
       targetRef: { kind: 'learning_space', id: learningSpaceId },
       payload: removedMembersActivity.payload,
       dedupeKey: removedMembersActivity.dedupeKey,
-      createdBy: actorProfileId,
+      createdBy: systemProfileId,
     });
   }
 
@@ -1522,7 +1523,6 @@ export async function updateLearningSpaceFromPayload(
   );
 
   if (scheduleActivities.length > 0) {
-    const systemProfileId = await ensureSystemProfileId(serviceClient, orgId);
     for (const activity of scheduleActivities) {
       await publishActivityEvent({
         supabase: serviceClient,
@@ -1759,7 +1759,7 @@ async function replaceLearningSpaceLinks(
     throw new Error(error.message);
   }
   if (!data?.length) {
-    throw new Error('Unable to insert learning space links.');
+    throw new Error('Unable to insert class links.');
   }
 }
 

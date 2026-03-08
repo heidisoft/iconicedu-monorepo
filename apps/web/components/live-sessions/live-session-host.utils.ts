@@ -2,7 +2,7 @@ import type { LiveSessionProviderVM } from '@iconicedu/shared-types';
 
 function formatChannelPurpose(purpose?: string | null) {
   if (!purpose) return null;
-  if (purpose === 'learning-space') return 'Learning space';
+  if (purpose === 'learning-space') return 'Class';
   return purpose
     .split(/[-_ ]+/)
     .filter(Boolean)
@@ -17,9 +17,7 @@ export function getLiveSessionHostHeading(input: {
   return input.channelTopic?.trim() || `${input.provider} live session`;
 }
 
-export function getLiveSessionHostSubheading(input: {
-  purpose?: string | null;
-}) {
+export function getLiveSessionHostSubheading(input: { purpose?: string | null }) {
   const formattedPurpose = formatChannelPurpose(input.purpose);
   return formattedPurpose
     ? `${formattedPurpose} joined inline without leaving the app.`

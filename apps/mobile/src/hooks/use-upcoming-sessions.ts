@@ -40,9 +40,9 @@ function mapToClassSession(
     meetingLink: s.meetingLink ?? null,
     channelId:
       (s.source?.kind === 'class_session' ? s.source.channelId : undefined) ?? null,
-    studentNames: s.participants
+    students: s.participants
       .filter((p) => p.role === 'child' && p.displayName)
-      .map((p) => p.displayName as string),
+      .map((p) => ({ name: p.displayName as string, themeKey: p.themeKey ?? null })),
     variant: s.uiState?.kind ?? 'default',
     disabled: s.uiState?.disabled ?? false,
     reason: s.uiState?.reason ?? null,

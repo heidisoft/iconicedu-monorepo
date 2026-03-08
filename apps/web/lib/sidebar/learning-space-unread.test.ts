@@ -42,8 +42,8 @@ function makeSidebarData(unreadCount = 0) {
   } as unknown as SidebarLeftDataVM;
 }
 
-describe('learning space unread helpers', () => {
-  it('increments unread count for incoming message in learning space channel', () => {
+describe('class unread helpers', () => {
+  it('increments unread count for incoming message in class channel', () => {
     const updated = applyIncomingLearningSpaceUnread(makeSidebarData(1), {
       channelId: 'channel-space-1',
       senderProfileId: 'profile-other',
@@ -67,7 +67,7 @@ describe('learning space unread helpers', () => {
     expect(updated).toBe(initial);
   });
 
-  it('marks learning space channel as read', () => {
+  it('marks class channel as read', () => {
     const updated = markLearningSpaceChannelRead(makeSidebarData(4), 'channel-space-1', {
       lastReadMessageId: 'message-4',
       lastReadAt: '2026-02-16T00:00:00.000Z',
@@ -83,7 +83,7 @@ describe('learning space unread helpers', () => {
     ).toBe('message-4');
   });
 
-  it('increments unread for related learning space channels', () => {
+  it('increments unread for related class channels', () => {
     const updated = applyIncomingLearningSpaceUnread(makeSidebarData(0), {
       channelId: 'channel-space-1-related',
       senderProfileId: 'profile-other',
@@ -91,8 +91,8 @@ describe('learning space unread helpers', () => {
     });
 
     expect(
-      updated.collections.learningSpaces[0].channels.relatedChannels?.[0].collections.readState
-        ?.unreadCount,
+      updated.collections.learningSpaces[0].channels.relatedChannels?.[0].collections
+        .readState?.unreadCount,
     ).toBe(1);
   });
 });

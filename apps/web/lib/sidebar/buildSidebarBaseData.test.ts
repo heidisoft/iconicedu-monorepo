@@ -20,8 +20,10 @@ vi.mock('@iconicedu/web/lib/channels/queries/channels.query', () => ({
 }));
 
 describe('buildSidebarBaseData', () => {
-  it('builds learning spaces and direct messages with account-scoped read state', async () => {
-    buildLearningSpacesByOrg.mockResolvedValue([{ ids: { id: 'space-1', orgId: 'org-1' } }]);
+  it('builds classes and direct messages with account-scoped read state', async () => {
+    buildLearningSpacesByOrg.mockResolvedValue([
+      { ids: { id: 'space-1', orgId: 'org-1' } },
+    ]);
     buildDirectMessageChannelsWithMessages.mockResolvedValue([
       { ids: { id: 'dm-1', orgId: 'org-1' } },
     ]);
@@ -30,17 +32,15 @@ describe('buildSidebarBaseData', () => {
     });
 
     const result = await buildSidebarBaseData(
-      {} as any,
+      {} as never,
       'org-1',
       'account-1',
       '/iconic-academy',
     );
 
-    expect(buildLearningSpacesByOrg).toHaveBeenCalledWith(
-      expect.anything(),
-      'org-1',
-      { accountId: 'account-1' },
-    );
+    expect(buildLearningSpacesByOrg).toHaveBeenCalledWith(expect.anything(), 'org-1', {
+      accountId: 'account-1',
+    });
     expect(buildDirectMessageChannelsWithMessages).toHaveBeenCalledWith(
       expect.anything(),
       'org-1',

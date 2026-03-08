@@ -23,7 +23,7 @@ export async function archiveLearningSpace(learningSpaceId: string) {
     throw new Error(learningSpaceResponse.error.message);
   }
   if (!learningSpaceResponse.data) {
-    throw new Error('Learning space not found');
+    throw new Error('Class not found');
   }
 
   const channelResponse = await supabase

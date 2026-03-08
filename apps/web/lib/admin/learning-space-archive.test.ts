@@ -93,7 +93,7 @@ describe('archiveLearningSpace', () => {
     ensureSystemProfileIdMock.mockResolvedValue('system-profile-1');
   });
 
-  it('archives the learning space and publishes a system archive activity', async () => {
+  it('archives the class and publishes a system archive activity', async () => {
     await archiveLearningSpace('space-1');
 
     expect(ensureSystemProfileIdMock).toHaveBeenCalled();

@@ -40,7 +40,7 @@ describe('activity event definitions', () => {
     });
   });
 
-  it('routes class-scoped message activities to the learning space page', () => {
+  it('routes class-scoped message activities to the class page', () => {
     const definition = getActivityEventDefinition('message.posted');
     if (!definition) {
       throw new Error('Missing message.posted definition');
@@ -75,7 +75,7 @@ describe('activity event definitions', () => {
 
     expect(rendered.headline.secondary).toBe('Algebra I');
     expect(rendered.actionButton).toEqual({
-      label: 'Open learning space',
+      label: 'Open class',
       variant: 'outline',
       href: '../spaces/channel-1',
     });
@@ -125,7 +125,7 @@ describe('activity event definitions', () => {
       ],
       overflowCount: 0,
     });
-    expect(rendered.summary).toBe('Added: Tehara Morgan. Added to Learning space.');
+    expect(rendered.summary).toBe('Added: Tehara Morgan. Added to Class.');
     expect(rendered.actionButton).toBeUndefined();
   });
 
@@ -300,7 +300,7 @@ describe('activity event definitions', () => {
     });
 
     expect(rendered.headline).toEqual({
-      primary: 'Learning space created',
+      primary: 'Class created',
       secondary: 'Algebra I',
     });
     expect(rendered.summary).toBe('First session Mar 7 at 2:00 PM.');
@@ -318,7 +318,7 @@ describe('activity event definitions', () => {
     expect(rendered.actionButton).toBeUndefined();
   });
 
-  it('renders learning space updated with learning space wording and participant avatar pattern', () => {
+  it('renders class updated with class wording and participant avatar pattern', () => {
     const definition = getActivityEventDefinition('class.updated');
     if (!definition || !definition.group) {
       throw new Error('Missing class.updated definition');
@@ -365,7 +365,7 @@ describe('activity event definitions', () => {
     const grouped = definition.group.renderGroup?.(event);
 
     expect(rendered.headline).toEqual({
-      primary: 'Learning space updated',
+      primary: 'Class updated',
       secondary: 'Algebra I',
     });
     expect(rendered.leading).toEqual({
@@ -381,7 +381,7 @@ describe('activity event definitions', () => {
     });
     expect(rendered.summary).toBe('Schedule changed for next week.');
     expect(rendered.actionButton).toBeUndefined();
-    expect(grouped?.headline.primary).toBe('Learning space updated');
+    expect(grouped?.headline.primary).toBe('Class updated');
     expect(grouped?.leading).toEqual({
       kind: 'avatars',
       avatars: [
@@ -504,7 +504,7 @@ describe('activity event definitions', () => {
         },
       }),
     ).toMatchObject({
-      headline: { primary: 'Learning space created' },
+      headline: { primary: 'Class created' },
       leading: {
         kind: 'avatars',
       },

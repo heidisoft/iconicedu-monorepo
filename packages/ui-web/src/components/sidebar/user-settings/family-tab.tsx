@@ -30,7 +30,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@iconicedu/ui-web/ui/select';
-import { Separator } from '@iconicedu/ui-web/ui/separator';
 import { toast } from 'sonner';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@iconicedu/ui-web/ui/tooltip';
 
@@ -192,7 +191,7 @@ export function FamilyTab({
   timezone,
   location,
   orgId,
-  guardianAccountId,
+  guardianAccountId: _guardianAccountId,
   guardianEmail,
   onFamilyMemberRemove,
   guardianThemeKey,
@@ -267,7 +266,6 @@ export function FamilyTab({
       newChildFirstNameRef.current?.focus();
     });
   }, [isDialogOpen]);
-  const INVITE_SAVE_ERROR = 'Unable to send invite right now. Please try again.';
   const INVITE_REMOVE_ERROR = 'Unable to remove invite right now. Please try again.';
 
   const normalizedGuardianEmail = React.useMemo(
@@ -500,6 +498,7 @@ export function FamilyTab({
     location?.countryCode,
     location?.countryName,
     location?.region,
+    location?.postalCode,
     newChildBirthYear,
     newChildEmail,
     newChildEmailError,
@@ -605,7 +604,7 @@ export function FamilyTab({
             <h3 className="text-base font-semibold">Parental controls</h3>
             <p className="text-sm text-muted-foreground">
               Parents can link accounts to set limits, manage permissions, and keep the
-              family safe across learning spaces.
+              family safe across classes.
             </p>
           </div>
         </div>

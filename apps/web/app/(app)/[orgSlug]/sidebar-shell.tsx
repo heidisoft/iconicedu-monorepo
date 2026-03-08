@@ -271,26 +271,20 @@ export function SidebarShell({
     sidebarData.user.account?.ids?.id ?? sidebarProfile.ids?.accountId ?? null;
 
   const refreshInboxUnreadCount = React.useCallback(async () => {
-    const orgId = sidebarProfile.ids?.orgId;
-    const profileId = sidebarProfile.ids?.id;
-    if (!orgId || !profileId) {
+    const response = await window.fetch('/api/activity-feed/unread-count', {
+      method: 'GET',
+      headers: { 'content-type': 'application/json' },
+      cache: 'no-store',
+    });
+    if (!response.ok) {
       return;
     }
+    const payload = (await response.json().catch(() => null)) as {
+      unreadCount?: number;
+    } | null;
 
-    const response = await supabase
-      .from('activity_feed_items')
-      .select('id', { count: 'exact', head: true })
-      .eq('org_id', orgId)
-      .eq('recipient_profile_id', profileId)
-      .eq('is_read', false)
-      .is('deleted_at', null);
-
-    if (response.error) {
-      return;
-    }
-
-    setSidebarData((prev) => applyInboxUnreadCount(prev, response.count ?? 0));
-  }, [sidebarProfile.ids?.id, sidebarProfile.ids?.orgId, supabase]);
+    setSidebarData((prev) => applyInboxUnreadCount(prev, payload?.unreadCount ?? 0));
+  }, []);
 
   React.useEffect(() => {
     void refreshInboxUnreadCount();

@@ -737,11 +737,7 @@ export function ChannelInfoSheet({
 
   const isDm = kind === 'dm';
   const seed = avatarSeed ?? title;
-  const typeLabel = isDm
-    ? 'Direct Message'
-    : kind === 'space'
-      ? 'Learning Space'
-      : 'Channel';
+  const typeLabel = isDm ? 'Direct Message' : kind === 'space' ? 'Class' : 'Channel';
 
   // ── Files: fetch directly from channel_files + channel_media tables ─────────
   // Messages are paginated (last ~40), so we can't extract files from them reliably.

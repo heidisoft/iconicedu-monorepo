@@ -70,15 +70,13 @@ export function LearningSpacesTable({ rows, onEdit }: LearningSpacesTableProps) 
       });
       const payload = (await response.json()) as { success?: boolean; message?: string };
       if (!response.ok || !payload.success) {
-        toast.error(payload.message ?? 'Unable to delete learning space.');
+        toast.error(payload.message ?? 'Unable to delete class.');
         return;
       }
-      toast.success('Learning space deleted.');
+      toast.success('Class deleted.');
       router.refresh();
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : 'Unable to delete learning space.',
-      );
+      toast.error(error instanceof Error ? error.message : 'Unable to delete class.');
     } finally {
       setDeletingId(null);
       setConfirmDeleteRow(null);
@@ -95,15 +93,13 @@ export function LearningSpacesTable({ rows, onEdit }: LearningSpacesTableProps) 
       });
       const payload = (await response.json()) as { success?: boolean; message?: string };
       if (!response.ok || !payload.success) {
-        toast.error(payload.message ?? 'Unable to archive learning space.');
+        toast.error(payload.message ?? 'Unable to archive class.');
         return;
       }
-      toast.success('Learning space archived.');
+      toast.success('Class archived.');
       router.refresh();
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : 'Unable to archive learning space.',
-      );
+      toast.error(error instanceof Error ? error.message : 'Unable to archive class.');
     } finally {
       setArchivingId(null);
     }
@@ -119,15 +115,13 @@ export function LearningSpacesTable({ rows, onEdit }: LearningSpacesTableProps) 
       });
       const payload = (await response.json()) as { success?: boolean; message?: string };
       if (!response.ok || !payload.success) {
-        toast.error(payload.message ?? 'Unable to unarchive learning space.');
+        toast.error(payload.message ?? 'Unable to unarchive class.');
         return;
       }
-      toast.success('Learning space restored.');
+      toast.success('Class restored.');
       router.refresh();
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : 'Unable to unarchive learning space.',
-      );
+      toast.error(error instanceof Error ? error.message : 'Unable to unarchive class.');
     } finally {
       setUnarchivingId(null);
     }
@@ -306,10 +300,9 @@ export function LearningSpacesTable({ rows, onEdit }: LearningSpacesTableProps) 
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete learning space?</AlertDialogTitle>
+            <AlertDialogTitle>Delete class?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently remove the learning space, its channels, and
-              schedules.
+              This will permanently remove the class, its channels, and schedules.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

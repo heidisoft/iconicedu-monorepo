@@ -60,7 +60,7 @@ export const CORE_BENEFITS = [
   {
     title: 'Built for modern education',
     description:
-      'Live sessions, structured learning spaces, and messaging in one secure platform.',
+      'Live sessions, structured classes, and messaging in one secure platform.',
   },
 ] as const;
 

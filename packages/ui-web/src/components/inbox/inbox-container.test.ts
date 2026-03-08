@@ -3,7 +3,11 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { applyReadStateToSections, buildUnreadTabCounts } from './inbox-container';
+import {
+  applyReadStateToSections,
+  buildUnreadTabCounts,
+  resolveReadIdsForActivity,
+} from './inbox-container';
 import type { ActivityFeedSectionVM, ActivityFeedTabVM } from '@iconicedu/shared-types';
 
 const SECTIONS: ActivityFeedSectionVM[] = [
@@ -88,7 +92,151 @@ describe('applyReadStateToSections', () => {
     }
 
     expect(group.subActivities?.items[0]?.state?.isRead).toBe(true);
-    expect(group.state?.isRead).toBe(false);
+    expect(group.state?.isRead).toBe(true);
+  });
+
+  it('marks all group subactivities as read when parent group id is marked', () => {
+    const next = applyReadStateToSections(SECTIONS, ['group-1']);
+    const group = next[0]?.items[1];
+
+    expect(group?.kind).toBe('group');
+    if (group?.kind !== 'group') {
+      throw new Error('Expected group item');
+    }
+
+    expect(group.subActivities?.items.every((sub) => sub.state?.isRead)).toBe(true);
+    expect(group.state?.isRead).toBe(true);
+  });
+
+  it('marks grouped synthetic subactivity as read when backing DB id is read', () => {
+    const sections: ActivityFeedSectionVM[] = [
+      {
+        label: 'Today',
+        items: [
+          {
+            kind: 'group',
+            ids: { id: 'group-aggregate', orgId: 'org-1' },
+            timestamps: {
+              occurredAt: '2026-03-04T12:00:00.000Z',
+              createdAt: '2026-03-04T12:00:00.000Z',
+            },
+            tabKey: 'all',
+            audience: { scope: { kind: 'global' }, visibility: 'public' },
+            verb: 'class.created',
+            refs: { actor: {} as never },
+            grouping: { groupKey: 'group-aggregate', groupType: 'class' },
+            content: { headline: { primary: 'Class created' } },
+            subActivityCount: 1,
+            subActivities: {
+              items: [
+                {
+                  kind: 'leaf',
+                  ids: { id: 'group-aggregate:members-invited', orgId: 'org-1' },
+                  timestamps: {
+                    occurredAt: '2026-03-04T12:00:00.000Z',
+                    createdAt: '2026-03-04T12:00:00.000Z',
+                  },
+                  tabKey: 'all',
+                  audience: { scope: { kind: 'global' }, visibility: 'public' },
+                  verb: 'members.invited',
+                  refs: { actor: {} as never },
+                  content: { headline: { primary: '2 participants added' } },
+                  metadata: {
+                    readItemIds: [
+                      '11111111-1111-4111-8111-111111111111',
+                      '22222222-2222-4222-8222-222222222222',
+                    ],
+                  },
+                  state: { isRead: false },
+                },
+              ],
+              total: 1,
+            },
+            state: { isRead: false },
+          },
+        ],
+      },
+    ];
+
+    const next = applyReadStateToSections(sections, [
+      '11111111-1111-4111-8111-111111111111',
+    ]);
+    const group = next[0]?.items[0];
+
+    expect(group?.kind).toBe('group');
+    if (group?.kind !== 'group') {
+      throw new Error('Expected group item');
+    }
+
+    expect(group.subActivities?.items[0]?.state?.isRead).toBe(true);
+    expect(group.state?.isRead).toBe(true);
+  });
+});
+
+describe('resolveReadIdsForActivity', () => {
+  it('returns parent and child ids when group parent is marked', () => {
+    expect(resolveReadIdsForActivity(SECTIONS, 'group-1')).toEqual(['group-1', 'sub-1']);
+  });
+
+  it('returns only sub id when subactivity is marked', () => {
+    expect(resolveReadIdsForActivity(SECTIONS, 'sub-1')).toEqual(['sub-1']);
+  });
+
+  it('returns backing DB ids for aggregated synthetic subactivities', () => {
+    const sections: ActivityFeedSectionVM[] = [
+      {
+        label: 'Today',
+        items: [
+          {
+            kind: 'group',
+            ids: { id: 'group-aggregate', orgId: 'org-1' },
+            timestamps: {
+              occurredAt: '2026-03-04T12:00:00.000Z',
+              createdAt: '2026-03-04T12:00:00.000Z',
+            },
+            tabKey: 'all',
+            audience: { scope: { kind: 'global' }, visibility: 'public' },
+            verb: 'class.created',
+            refs: { actor: {} as never },
+            grouping: { groupKey: 'group-aggregate', groupType: 'class' },
+            content: { headline: { primary: 'Class created' } },
+            subActivityCount: 1,
+            subActivities: {
+              items: [
+                {
+                  kind: 'leaf',
+                  ids: { id: 'group-aggregate:members-invited', orgId: 'org-1' },
+                  timestamps: {
+                    occurredAt: '2026-03-04T12:00:00.000Z',
+                    createdAt: '2026-03-04T12:00:00.000Z',
+                  },
+                  tabKey: 'all',
+                  audience: { scope: { kind: 'global' }, visibility: 'public' },
+                  verb: 'members.invited',
+                  refs: { actor: {} as never },
+                  content: { headline: { primary: '2 participants added' } },
+                  metadata: {
+                    readItemIds: [
+                      '11111111-1111-4111-8111-111111111111',
+                      '22222222-2222-4222-8222-222222222222',
+                    ],
+                  },
+                },
+              ],
+              total: 1,
+            },
+          },
+        ],
+      },
+    ];
+
+    expect(
+      resolveReadIdsForActivity(sections, 'group-aggregate:members-invited'),
+    ).toEqual([
+      'group-aggregate:members-invited',
+      '11111111-1111-4111-8111-111111111111',
+      '22222222-2222-4222-8222-222222222222',
+    ]);
   });
 });
 

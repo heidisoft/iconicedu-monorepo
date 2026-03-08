@@ -26,7 +26,7 @@ describe('live-session-host.utils', () => {
 
   it('formats purpose-aware subheading copy', () => {
     expect(getLiveSessionHostSubheading({ purpose: 'learning-space' })).toBe(
-      'Learning space joined inline without leaving the app.',
+      'Class joined inline without leaving the app.',
     );
     expect(getLiveSessionHostSubheading({ purpose: 'general' })).toBe(
       'General joined inline without leaving the app.',

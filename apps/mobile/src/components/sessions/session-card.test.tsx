@@ -78,12 +78,23 @@ describe('SessionCard', () => {
   });
 
   it('shows student names next to the time', () => {
-    render(<SessionCard session={{ ...baseSession, studentNames: ['Alice', 'Bob'] }} />);
-    expect(screen.getByText('Alice, Bob')).toBeTruthy();
+    render(
+      <SessionCard
+        session={{
+          ...baseSession,
+          students: [
+            { name: 'Alice', themeKey: 'blue' },
+            { name: 'Bob', themeKey: 'teal' },
+          ],
+        }}
+      />,
+    );
+    expect(screen.getByText('Alice')).toBeTruthy();
+    expect(screen.getByText('Bob')).toBeTruthy();
   });
 
-  it('does not render student separator when no studentNames', () => {
-    render(<SessionCard session={{ ...baseSession, studentNames: [] }} />);
+  it('does not render student separator when no students', () => {
+    render(<SessionCard session={{ ...baseSession, students: [] }} />);
     expect(screen.queryByText('·')).toBeNull();
   });
 });

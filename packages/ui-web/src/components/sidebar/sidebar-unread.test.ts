@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { ChannelVM, LearningSpaceVM } from '@iconicedu/shared-types';
 
 import {
   getDirectMessageItemUnreadCount,
@@ -15,7 +16,7 @@ describe('getDirectMessageUnreadCount', () => {
       { collections: { readState: { unreadCount: 3 } } },
       { collections: { readState: null } },
       { collections: {} },
-    ] as any);
+    ] as unknown as ChannelVM[]);
 
     expect(total).toBe(5);
   });
@@ -24,7 +25,7 @@ describe('getDirectMessageUnreadCount', () => {
     const total = getDirectMessageUnreadCount([
       { collections: { readState: { unreadCount: -10 } } },
       { collections: { readState: { unreadCount: 4 } } },
-    ] as any);
+    ] as unknown as ChannelVM[]);
 
     expect(total).toBe(4);
   });
@@ -46,7 +47,7 @@ describe('getDirectMessageUnreadCount', () => {
             },
           },
         },
-      ] as any,
+      ] as unknown as ChannelVM[],
       'account-self',
     );
 
@@ -72,7 +73,7 @@ describe('getDirectMessageUnreadCount', () => {
             ],
           },
         },
-      } as any,
+      } as unknown as ChannelVM,
       'account-self',
     );
 
@@ -80,26 +81,30 @@ describe('getDirectMessageUnreadCount', () => {
   });
 });
 
-describe('learning space unread helpers', () => {
-  it('sums unread counts across learning spaces', () => {
+describe('class unread helpers', () => {
+  it('sums unread counts across classes', () => {
     const total = getLearningSpaceUnreadCount([
-      { channels: { primaryChannel: { collections: { readState: { unreadCount: 2 } } } } },
-      { channels: { primaryChannel: { collections: { readState: { unreadCount: 3 } } } } },
+      {
+        channels: { primaryChannel: { collections: { readState: { unreadCount: 2 } } } },
+      },
+      {
+        channels: { primaryChannel: { collections: { readState: { unreadCount: 3 } } } },
+      },
       { channels: { primaryChannel: { collections: { readState: null } } } },
-    ] as any);
+    ] as unknown as LearningSpaceVM[]);
 
     expect(total).toBe(5);
   });
 
-  it('ignores negative unread counts for learning spaces', () => {
+  it('ignores negative unread counts for classes', () => {
     const unread = getLearningSpaceItemUnreadCount({
       channels: { primaryChannel: { collections: { readState: { unreadCount: -7 } } } },
-    } as any);
+    } as unknown as LearningSpaceVM);
 
     expect(unread).toBe(0);
   });
 
-  it('falls back to one unread for first incoming learning space message', () => {
+  it('falls back to one unread for first incoming class message', () => {
     const unread = getLearningSpaceItemUnreadCountForUser(
       {
         channels: {
@@ -118,7 +123,7 @@ describe('learning space unread helpers', () => {
             },
           },
         },
-      } as any,
+      } as unknown as LearningSpaceVM,
       { accountId: 'account-self', profileId: 'profile-self' },
     );
 
@@ -137,7 +142,7 @@ describe('learning space unread helpers', () => {
             ],
           },
         },
-      ] as any,
+      ] as unknown as LearningSpaceVM[],
       { accountId: 'account-self', profileId: 'profile-self' },
     );
 
@@ -163,7 +168,7 @@ describe('learning space unread helpers', () => {
             },
           },
         },
-      } as any,
+      } as unknown as LearningSpaceVM,
       { accountId: 'account-educator', profileId: 'profile-educator' },
     );
 

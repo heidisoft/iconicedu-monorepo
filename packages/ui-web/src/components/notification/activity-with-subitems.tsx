@@ -25,6 +25,10 @@ export function groupHasUnreadSubActivities(subActivities: ActivityFeedLeafItemV
   return subActivities.some((sub: ActivityFeedLeafItemVM) => !sub.state?.isRead);
 }
 
+export function getUnreadSubActivityCount(subActivities: ActivityFeedLeafItemVM[]) {
+  return subActivities.filter((sub: ActivityFeedLeafItemVM) => !sub.state?.isRead).length;
+}
+
 export function getInitialGroupCollapsedState(activity: ActivityFeedGroupItemVM) {
   const subActivityCount =
     activity.subActivityCount ??
@@ -37,6 +41,10 @@ export function getInitialGroupCollapsedState(activity: ActivityFeedGroupItemVM)
   }
 
   return true;
+}
+
+export function shouldEnableGroupParentAutoRead(hasUnreadSubActivities: boolean) {
+  return !hasUnreadSubActivities;
 }
 
 export function ActivityWithSubitems({
@@ -52,7 +60,11 @@ export function ActivityWithSubitems({
   const subActivityCount =
     activity.subActivityCount ?? activity.subActivities?.total ?? subActivities.length;
   const hasSubActivities = subActivityCount > 0;
-  const hasUnreadSubActivities = groupHasUnreadSubActivities(subActivities);
+  const unreadSubActivityCount = getUnreadSubActivityCount(subActivities);
+  const hasUnreadSubActivities = unreadSubActivityCount > 0;
+  const parentAutoRead = shouldEnableGroupParentAutoRead(hasUnreadSubActivities)
+    ? onAutoRead
+    : undefined;
   const [isCollapsed, setIsCollapsed] = useState(() =>
     getInitialGroupCollapsedState(activity),
   );
@@ -71,7 +83,7 @@ export function ActivityWithSubitems({
       <ActivityItemBase
         activity={activity}
         onMarkRead={onMarkRead}
-        onAutoRead={onAutoRead}
+        onAutoRead={parentAutoRead}
         onToggle={handleToggle}
         isSubActivity={isSubActivity}
         parentExpanded={parentExpanded}
@@ -79,6 +91,7 @@ export function ActivityWithSubitems({
         showSubActivityToggle={hasSubActivities}
         showActionButton={showActionButton && Boolean(activity.content.actionButton)}
         subActivityCount={subActivityCount}
+        unreadSubActivityCount={unreadSubActivityCount}
         hasUnreadSubActivities={hasUnreadSubActivities}
       />
 

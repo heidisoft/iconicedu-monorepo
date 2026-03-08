@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { publishActivityEvent } from '@iconicedu/web/lib/activity-feed/publisher/activity-publisher';
 import { compileLearningSpaceReminderJobs } from '@iconicedu/web/lib/automation/reminder-jobs';
+import { ensureSystemProfileId } from '@iconicedu/web/lib/automation/system-profile';
 import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
 import { toStoredLiveSessionConfig } from '@iconicedu/web/lib/admin/live-session-config';
@@ -90,7 +91,7 @@ export async function publishParticipantInviteActivities(
     orgId: input.orgId,
     eventType: isPlural ? 'members.invited' : 'member.invited',
     occurredAt: input.occurredAt,
-    sourceKind: 'profile',
+    sourceKind: 'system',
     actorProfileId: input.actorProfileId,
     scope: { kind: 'learning_space', learningSpaceId: input.learningSpaceId },
     targetRef: { kind: 'learning_space', id: input.learningSpaceId },
@@ -224,6 +225,7 @@ export async function createLearningSpaceFromPayload(
   });
 
   const serviceClient = createSupabaseServiceClient();
+  const systemProfileId = await ensureSystemProfileId(serviceClient, orgId);
   await compileLearningSpaceReminderJobs({
     supabase: serviceClient,
     orgId,
@@ -258,8 +260,8 @@ export async function createLearningSpaceFromPayload(
     orgId,
     eventType: 'class.created',
     occurredAt: now,
-    sourceKind: 'profile',
-    actorProfileId,
+    sourceKind: 'system',
+    actorProfileId: systemProfileId,
     scope: { kind: 'learning_space', learningSpaceId },
     targetRef: { kind: 'learning_space', id: learningSpaceId },
     payload: {
@@ -277,13 +279,13 @@ export async function createLearningSpaceFromPayload(
       scheduleHashKey,
     },
     dedupeKey: `class.created:${learningSpaceId}`,
-    createdBy: actorProfileId,
+    createdBy: systemProfileId,
   });
 
   await publishParticipantInviteActivities({
     supabase: serviceClient,
     orgId,
-    actorProfileId,
+    actorProfileId: systemProfileId,
     learningSpaceId,
     channelId,
     title: payload.basics.title,
@@ -559,7 +561,7 @@ async function insertLearningSpaceLinks(
     throw new Error(error.message);
   }
   if (!data?.length) {
-    throw new Error('Unable to insert learning space links.');
+    throw new Error('Unable to insert class links.');
   }
 }
 

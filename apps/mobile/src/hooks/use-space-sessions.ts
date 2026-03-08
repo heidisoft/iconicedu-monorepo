@@ -3,7 +3,7 @@ import { fetchSpaceSchedulesByChannelId, queryKeys } from '@/lib/api/queries';
 import type { ClassScheduleVM } from '@iconicedu/shared-types';
 
 /**
- * Fetches sessions for the learning space that owns the given channel.
+ * Fetches sessions for the class that owns the given channel.
  * Intentionally decoupled from channel/message logic.
  */
 export function useSpaceSessions(
@@ -24,6 +24,10 @@ export function useSpaceSessions(
   return {
     schedules: data ?? [],
     isLoading,
-    error: error ? (error instanceof Error ? error.message : 'Failed to load sessions') : null,
+    error: error
+      ? error instanceof Error
+        ? error.message
+        : 'Failed to load sessions'
+      : null,
   };
 }

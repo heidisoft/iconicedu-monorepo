@@ -21,7 +21,9 @@ export interface RoleOnboardingSubmitInput {
 
 type RoleOnboardingModalProps = {
   open: boolean;
-  onSubmit: (input: RoleOnboardingSubmitInput) => Promise<{ success: boolean; message?: string }>;
+  onSubmit: (
+    input: RoleOnboardingSubmitInput,
+  ) => Promise<{ success: boolean; message?: string }>;
 };
 
 const ROLE_OPTIONS: Array<{
@@ -32,12 +34,12 @@ const ROLE_OPTIONS: Array<{
   {
     value: 'parent',
     title: 'Parent',
-    description: 'Set up your family learning space and continue immediately.',
+    description: 'Set up your family class and continue immediately.',
   },
   {
     value: 'student',
     title: 'Student',
-    description: 'Join your learning space with your invite or join code.',
+    description: 'Join your class with your invite or join code.',
   },
   {
     value: 'educator',

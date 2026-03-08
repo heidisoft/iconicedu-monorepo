@@ -5,6 +5,7 @@ const {
   createSupabaseServiceClientMock,
   publishActivityEventMock,
   compileLearningSpaceReminderJobsMock,
+  ensureSystemProfileIdMock,
   getAccountByAuthUserIdMock,
   getProfileByAccountIdMock,
   insertClassSchedulesMock,
@@ -13,6 +14,7 @@ const {
   createSupabaseServiceClientMock: vi.fn(),
   publishActivityEventMock: vi.fn(),
   compileLearningSpaceReminderJobsMock: vi.fn(),
+  ensureSystemProfileIdMock: vi.fn(),
   getAccountByAuthUserIdMock: vi.fn(),
   getProfileByAccountIdMock: vi.fn(),
   insertClassSchedulesMock: vi.fn(),
@@ -32,6 +34,10 @@ vi.mock('@iconicedu/web/lib/activity-feed/publisher/activity-publisher', () => (
 
 vi.mock('@iconicedu/web/lib/automation/reminder-jobs', () => ({
   compileLearningSpaceReminderJobs: compileLearningSpaceReminderJobsMock,
+}));
+
+vi.mock('@iconicedu/web/lib/automation/system-profile', () => ({
+  ensureSystemProfileId: ensureSystemProfileIdMock,
 }));
 
 vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
@@ -80,6 +86,7 @@ describe('createLearningSpaceFromPayload', () => {
       error: null,
     });
     insertClassSchedulesMock.mockResolvedValue(['schedule-1']);
+    ensureSystemProfileIdMock.mockResolvedValue('system-profile-1');
   });
 
   it('publishes class creation and one plural participant activity without initial session activity items', async () => {
@@ -132,6 +139,12 @@ describe('createLearningSpaceFromPayload', () => {
     expect(publishActivityEventMock).toHaveBeenCalledTimes(2);
     expect(publishActivityEventMock.mock.calls.map(([input]) => input.eventType)).toEqual(
       ['class.created', 'members.invited'],
+    );
+    expect(publishActivityEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceKind: 'system',
+        actorProfileId: 'system-profile-1',
+      }),
     );
     expect(publishActivityEventMock).not.toHaveBeenCalledWith(
       expect.objectContaining({ eventType: 'session.scheduled' }),
