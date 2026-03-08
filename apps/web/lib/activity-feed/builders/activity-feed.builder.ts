@@ -123,6 +123,21 @@ async function attachGroupMembers(
   });
 
   const groupedMemberIds = new Set<string>();
+  const isParentDuplicate = (
+    parent: ActivityFeedItemVM,
+    child: ActivityFeedLeafItemVM,
+  ) => {
+    const sameVerb = child.verb === parent.verb;
+    const samePrimary =
+      child.content.headline.primary === parent.content.headline.primary;
+    const sameSecondary =
+      (child.content.headline.secondary ?? null) ===
+      (parent.content.headline.secondary ?? null);
+
+    // A grouped leaf that repeats the parent's activity should not be shown again.
+    return (sameVerb && samePrimary) || (samePrimary && sameSecondary);
+  };
+
   const withGroups = items.map((item) => {
     if (item.kind !== 'group') {
       return item;
@@ -134,7 +149,13 @@ async function attachGroupMembers(
       .filter(
         (member): member is ActivityFeedLeafItemVM =>
           member !== undefined && member.kind === 'leaf',
-      );
+      )
+      .filter((member) => !isParentDuplicate(item, member))
+      .sort((a, b) => {
+        const aTime = new Date(a.timestamps.occurredAt).getTime();
+        const bTime = new Date(b.timestamps.occurredAt).getTime();
+        return bTime - aTime;
+      });
 
     memberIds.forEach((memberId) => groupedMemberIds.add(memberId));
 

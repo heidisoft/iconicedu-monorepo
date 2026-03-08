@@ -5,46 +5,24 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Linking,
   ActivityIndicator,
 } from 'react-native';
-import {
-  CalendarDays,
-  ChevronDown,
-  Video,
-  Clock3,
-  CalendarPlus,
-  CheckCircle2,
-  ChevronRight,
-} from 'lucide-react-native';
+import { CalendarDays, ChevronDown, CheckCircle2 } from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 import type { ClassScheduleVM } from '@iconicedu/shared-types';
+import {
+  ClassSession,
+  SessionCard,
+  formatWeekTitle,
+  formatTimeBadge,
+  formatOriginalTime,
+  formatOriginalDate,
+} from '../sessions/session-card';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
 type SessionSubTab = 'upcoming' | 'past';
-
-type ClassSession = {
-  id: string;
-  label: string;
-  time: string;
-  dayName: string;
-  dayNum: string;
-  isToday: boolean;
-  /** True while startAt <= now <= endAt — mirrors web isEventLive() */
-  isLive: boolean;
-  isPast: boolean;
-  status: ClassScheduleVM['status'];
-  meetingLink?: string | null;
-  variant: 'default' | 'exception' | 'override';
-  disabled: boolean;
-  reason?: string | null;
-  originalTime?: string | null;
-  originalDate?: string | null;
-  startAt: string;
-  endAt: string;
-};
 
 type MonthGroup = {
   monthKey: string;
@@ -56,7 +34,7 @@ type MonthGroup = {
   sessions: ClassSession[];
 };
 
-type DisplaySchedule = ClassScheduleVM & {
+export type DisplaySchedule = ClassScheduleVM & {
   uiState?: {
     kind: 'default' | 'exception' | 'override';
     disabled?: boolean;
@@ -69,7 +47,13 @@ type DisplaySchedule = ClassScheduleVM & {
 // ─── Recurring expansion helpers ───────────────────────────────────────────────
 
 const weekdayTokens: Record<number, string> = {
-  0: 'SU', 1: 'MO', 2: 'TU', 3: 'WE', 4: 'TH', 5: 'FR', 6: 'SA',
+  0: 'SU',
+  1: 'MO',
+  2: 'TU',
+  3: 'WE',
+  4: 'TH',
+  5: 'FR',
+  6: 'SA',
 };
 
 function startOfDay(date: Date): Date {
@@ -86,7 +70,7 @@ function occurrenceDayKey(iso: string): string {
   return iso.slice(0, 10);
 }
 
-function expandRecurringSchedules(
+export function expandRecurringSchedules(
   schedules: ClassScheduleVM[],
   rangeStart: Date,
   rangeEnd: Date,
@@ -111,9 +95,7 @@ function expandRecurringSchedules(
     const baseDate = startOfDay(baseStart);
     const durationMs = new Date(event.endAt).getTime() - baseStart.getTime();
 
-    const exceptions = new Set(
-      recurrence.exceptions?.map((e) => e.occurrenceKey) ?? [],
-    );
+    const exceptions = new Set(recurrence.exceptions?.map((e) => e.occurrenceKey) ?? []);
     const exceptionsByDay = new Set(
       recurrence.exceptions?.map((e) => occurrenceDayKey(e.occurrenceKey)) ?? [],
     );
@@ -121,7 +103,8 @@ function expandRecurringSchedules(
       recurrence.overrides?.map((o) => [o.occurrenceKey, o.patch]) ?? [],
     );
     const overridesByDay = new Map(
-      recurrence.overrides?.map((o) => [occurrenceDayKey(o.occurrenceKey), o.patch]) ?? [],
+      recurrence.overrides?.map((o) => [occurrenceDayKey(o.occurrenceKey), o.patch]) ??
+        [],
     );
 
     const byWeekday = rule.byWeekday?.length
@@ -187,11 +170,17 @@ function expandRecurringSchedules(
       const hasOverride = Boolean(override);
 
       if (!matches && !hasOverride) continue;
-      if ((exceptions.has(occurrenceKey) || exceptionsByDay.has(occDayKey)) && !hasOverride) continue;
+      if (
+        (exceptions.has(occurrenceKey) || exceptionsByDay.has(occDayKey)) &&
+        !hasOverride
+      )
+        continue;
       if (rule.count && occurrenceCount >= rule.count) break;
 
       const occurrenceEnd = new Date(occurrenceStart.getTime() + durationMs);
-      const effectiveStart = override?.startAt ? new Date(override.startAt) : occurrenceStart;
+      const effectiveStart = override?.startAt
+        ? new Date(override.startAt)
+        : occurrenceStart;
       const effectiveEnd = override?.endAt ? new Date(override.endAt) : occurrenceEnd;
 
       expanded.push({
@@ -231,46 +220,6 @@ function expandRecurringSchedules(
   }
 
   return Array.from(deduped.values());
-}
-
-// ─── Format helpers ─────────────────────────────────────────────────────────────
-
-function formatWeekTitle(startAt: string): string {
-  const start = new Date(startAt);
-  const weekNumber = Math.min(5, Math.floor((start.getDate() - 1) / 7) + 1);
-  const month = start.toLocaleDateString('en-US', { month: 'short' });
-  return `${month} · Week ${weekNumber}`;
-}
-
-function formatTimeBadge(startAt: string): string {
-  return new Date(startAt).toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
-}
-
-function formatOriginalTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
-}
-
-function formatOriginalDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
-function createGoogleCalendarUrl(session: ClassSession): string {
-  const fmt = (iso: string) =>
-    new Date(iso).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
-  const params = new URLSearchParams({
-    action: 'TEMPLATE',
-    text: session.label,
-    dates: `${fmt(session.startAt)}/${fmt(session.endAt)}`,
-  });
-  return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
 
 // ─── Split + group ──────────────────────────────────────────────────────────────
@@ -360,129 +309,6 @@ function splitAndGroupSessions(schedules: ClassScheduleVM[]): {
   return { upcoming: groupByMonth(upcoming), past: groupByMonth(past) };
 }
 
-// ─── SessionCard ────────────────────────────────────────────────────────────────
-
-function SessionCard({
-  session,
-  colors,
-  s,
-}: {
-  session: ClassSession;
-  colors: AppColors;
-  s: ReturnType<typeof makeStyles>;
-}) {
-  // Mirrors web isEventLive — true while startAt <= now <= endAt
-  const { isLive, isPast } = session;
-  const isDisabled = session.disabled;
-
-  const badgeBg = isDisabled
-    ? colors.inputBg
-    : isLive
-      ? colors.teal
-      : isPast
-        ? colors.inputBg
-        : colors.card;
-  const badgeTxt = isLive ? '#fff' : isPast || isDisabled ? colors.textMuted : colors.text;
-
-  const cardExtra = isLive ? s.sessionCardLive : isPast ? s.sessionCardPast : null;
-
-  return (
-    <View style={[s.sessionCard, cardExtra]}>
-      {/* Day badge */}
-      <View style={[s.sessionDayBadge, { backgroundColor: badgeBg }]}>
-        {isLive && <Text style={[s.sessionDayExtra, { color: '#fff' }]}>Today</Text>}
-        <Text style={[s.sessionDayName, { color: badgeTxt }]}>{session.dayName}</Text>
-        <Text style={[s.sessionDayNum, { color: badgeTxt }]}>{session.dayNum}</Text>
-      </View>
-
-      {/* Info */}
-      <View style={s.sessionInfo}>
-        <View style={s.sessionTitleRow}>
-          <Text
-            style={[s.sessionLabel, (isDisabled || isPast) && { color: colors.textMuted }]}
-            numberOfLines={1}
-          >
-            {session.label}
-          </Text>
-          {isLive && (
-            <View style={s.liveBadge}>
-              <Text style={s.liveBadgeText}>LIVE</Text>
-            </View>
-          )}
-          {session.variant === 'exception' && (
-            <View style={s.variantBadge}>
-              <Text style={s.variantBadgeText}>Skipped</Text>
-            </View>
-          )}
-          {session.variant === 'override' && (
-            <View style={[s.variantBadge, s.variantBadgeOutline]}>
-              <Text style={s.variantBadgeText}>Changed</Text>
-            </View>
-          )}
-          {isPast && session.variant !== 'exception' && (
-            <View style={s.variantBadge}>
-              <Text style={s.variantBadgeText}>Completed</Text>
-            </View>
-          )}
-        </View>
-
-        <View style={s.sessionTimeRow}>
-          <Clock3 size={11} color={colors.textMuted} />
-          <Text style={s.sessionTimeTxt}>{session.time}</Text>
-        </View>
-
-        {session.variant === 'override' && session.originalTime && (
-          <Text style={s.sessionOriginalTimeTxt}>
-            Was{' '}
-            {session.originalDate ? `${session.originalDate} ` : ''}
-            <Text style={s.sessionOriginalTimeStrike}>{session.originalTime}</Text>
-          </Text>
-        )}
-
-        {session.variant === 'exception' && session.reason && (
-          <Text style={s.sessionReasonTxt}>{session.reason}</Text>
-        )}
-      </View>
-
-      {/* Action buttons */}
-      <View style={s.sessionActions}>
-        {!isPast && !isDisabled ? (
-          <TouchableOpacity
-            style={[s.joinBtn, isLive ? s.joinBtnLive : s.joinBtnUpcoming]}
-            onPress={session.meetingLink ? () => void Linking.openURL(session.meetingLink!) : undefined}
-            disabled={!session.meetingLink}
-            activeOpacity={0.7}
-          >
-            <Video size={11} color={isLive ? '#fff' : colors.teal} />
-            <Text style={[s.joinBtnTxt, { color: isLive ? '#fff' : colors.teal }]}>
-              {isLive ? 'Join Now' : 'Join'}
-            </Text>
-          </TouchableOpacity>
-        ) : isDisabled ? (
-          <View style={[s.joinBtn, s.joinBtnDisabled]}>
-            <Video size={11} color={colors.textMuted} />
-            <Text style={[s.joinBtnTxt, { color: colors.textMuted }]}>Unavailable</Text>
-          </View>
-        ) : (
-          <TouchableOpacity style={[s.joinBtn, s.joinBtnRecording]} activeOpacity={0.7}>
-            <Video size={11} color={colors.textMuted} />
-            <Text style={[s.joinBtnTxt, { color: colors.textMuted }]}>Recording</Text>
-          </TouchableOpacity>
-        )}
-        <TouchableOpacity
-          style={s.calBtn}
-          hitSlop={6}
-          activeOpacity={0.7}
-          onPress={() => void Linking.openURL(createGoogleCalendarUrl(session))}
-        >
-          <CalendarPlus size={14} color={colors.textMuted} />
-        </TouchableOpacity>
-        <ChevronRight size={15} color={colors.textFaint} />
-      </View>
-    </View>
-  );
-}
-
 // ─── Main component ─────────────────────────────────────────────────────────────
 
 export function SpaceSessionsTab({
@@ -568,7 +394,9 @@ export function SpaceSessionsTab({
         <View style={s.emptyState}>
           <CalendarDays size={40} color={colors.textMuted} style={{ opacity: 0.4 }} />
           <Text style={s.emptyTitle}>
-            {activeSubTab === 'upcoming' ? 'No upcoming sessions' : 'No past sessions yet'}
+            {activeSubTab === 'upcoming'
+              ? 'No upcoming sessions'
+              : 'No past sessions yet'}
           </Text>
           {activeSubTab === 'upcoming' && past.length > 0 && (
             <TouchableOpacity onPress={() => setActiveSubTab('past')} activeOpacity={0.7}>
@@ -578,7 +406,10 @@ export function SpaceSessionsTab({
             </TouchableOpacity>
           )}
           {activeSubTab === 'past' && upcoming.length > 0 && (
-            <TouchableOpacity onPress={() => setActiveSubTab('upcoming')} activeOpacity={0.7}>
+            <TouchableOpacity
+              onPress={() => setActiveSubTab('upcoming')}
+              activeOpacity={0.7}
+            >
               <Text style={[s.emptySubtitle, { color: colors.teal }]}>
                 View {upcoming.reduce((n, g) => n + g.totalCount, 0)} upcoming sessions →
               </Text>
@@ -589,15 +420,23 @@ export function SpaceSessionsTab({
           )}
         </View>
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingVertical: 12 }}
+        >
           {groups.map((group) => {
             const isOpen = expandedMonths.has(group.monthKey);
-            const progressPercent = group.totalCount > 0
-              ? Math.round((group.completedCount / group.totalCount) * 100)
-              : 0;
-            const allComplete = group.completedCount === group.totalCount && group.totalCount > 0;
+            const progressPercent =
+              group.totalCount > 0
+                ? Math.round((group.completedCount / group.totalCount) * 100)
+                : 0;
+            const allComplete =
+              group.completedCount === group.totalCount && group.totalCount > 0;
             return (
-              <View key={group.monthKey} style={[s.monthSection, group.isCurrentMonth && s.monthSectionCurrent]}>
+              <View
+                key={group.monthKey}
+                style={[s.monthSection, group.isCurrentMonth && s.monthSectionCurrent]}
+              >
                 {/* Month header - collapsible */}
                 <TouchableOpacity
                   style={[s.monthHeader, group.isCurrentMonth && s.monthHeaderCurrent]}
@@ -606,27 +445,33 @@ export function SpaceSessionsTab({
                 >
                   <View style={{ flex: 1 }}>
                     <View style={s.monthTitleRow}>
-                      <Text style={s.monthTitle}>{group.month} {group.year}</Text>
+                      <Text style={s.monthTitle}>
+                        {group.month} {group.year}
+                      </Text>
                       {group.isCurrentMonth && (
                         <View style={s.currentMonthBadge}>
                           <Text style={s.currentMonthBadgeTxt}>Current</Text>
                         </View>
                       )}
-                      {allComplete && (
-                        <CheckCircle2 size={14} color={colors.teal} />
-                      )}
+                      {allComplete && <CheckCircle2 size={14} color={colors.teal} />}
                     </View>
                     <Text style={s.monthMeta}>
-                      {group.totalCount}{' '}
-                      {group.totalCount === 1 ? 'session' : 'sessions'}
-                      {group.completedCount > 0 ? ` · ${group.completedCount} completed` : ''}
+                      {group.totalCount} {group.totalCount === 1 ? 'session' : 'sessions'}
+                      {group.completedCount > 0
+                        ? ` · ${group.completedCount} completed`
+                        : ''}
                     </Text>
                   </View>
 
                   {/* Progress bar */}
                   <View style={s.progressBarWrap}>
                     <View style={s.progressBarTrack}>
-                      <View style={[s.progressBarFill, { width: `${Math.max(0, Math.min(100, progressPercent))}%` }]} />
+                      <View
+                        style={[
+                          s.progressBarFill,
+                          { width: `${Math.max(0, Math.min(100, progressPercent))}%` },
+                        ]}
+                      />
                     </View>
                     <Text style={s.progressPct}>{progressPercent}%</Text>
                   </View>
@@ -641,7 +486,11 @@ export function SpaceSessionsTab({
                 {/* Session cards */}
                 {isOpen &&
                   group.sessions.map((session) => (
-                    <SessionCard key={session.id} session={session} colors={colors} s={s} />
+                    <SessionCard
+                      key={session.id}
+                      session={session}
+                      style={s.sessionCardItem}
+                    />
                   ))}
               </View>
             );
@@ -780,168 +629,10 @@ function makeStyles(C: AppColors) {
       minWidth: 24,
     },
 
-    // Session card
-    sessionCard: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-      paddingHorizontal: 14,
-      paddingVertical: 10,
+    // SessionCard spacing within the channel sessions list
+    sessionCardItem: {
       marginHorizontal: 12,
       marginBottom: 6,
-      borderRadius: 12,
-      backgroundColor: C.card,
-      borderWidth: hairline,
-      borderColor: C.border,
-    },
-    sessionCardLive: {
-      borderColor: C.teal,
-      borderWidth: 1.5,
-      backgroundColor: C.tealBg,
-    },
-    sessionCardPast: {
-      backgroundColor: C.inputBg,
-      opacity: 0.85,
-    },
-
-    // Day badge
-    sessionDayBadge: {
-      minWidth: 44,
-      paddingHorizontal: 6,
-      paddingVertical: 6,
-      borderRadius: 10,
-      backgroundColor: C.inputBg,
-      alignItems: 'center',
-      justifyContent: 'center',
-      flexShrink: 0,
-    },
-    sessionDayExtra: {
-      fontSize: 8,
-      fontWeight: '700',
-      letterSpacing: 0.5,
-      textTransform: 'uppercase',
-    },
-    sessionDayName: {
-      fontSize: 10,
-      fontWeight: '600',
-      color: C.textMuted,
-    },
-    sessionDayNum: {
-      fontSize: 16,
-      fontWeight: '700',
-      color: C.text,
-      lineHeight: 20,
-    },
-
-    // Session info column
-    sessionInfo: {
-      flex: 1,
-      gap: 3,
-    },
-    sessionTitleRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      flexWrap: 'wrap',
-    },
-    sessionLabel: {
-      fontSize: 13,
-      fontWeight: '600',
-      color: C.text,
-    },
-    sessionTimeRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 3,
-    },
-    sessionTimeTxt: {
-      fontSize: 11,
-      color: C.textMuted,
-    },
-    sessionOriginalTimeTxt: {
-      fontSize: 11,
-      color: C.textMuted,
-    },
-    sessionOriginalTimeStrike: {
-      textDecorationLine: 'line-through',
-    },
-    sessionReasonTxt: {
-      fontSize: 11,
-      color: C.textMuted,
-      fontStyle: 'italic',
-    },
-
-    // LIVE badge
-    liveBadge: {
-      backgroundColor: C.teal,
-      paddingHorizontal: 5,
-      paddingVertical: 1,
-      borderRadius: 4,
-    },
-    liveBadgeText: {
-      color: '#fff',
-      fontSize: 9,
-      fontWeight: '700',
-      letterSpacing: 0.5,
-    },
-
-    // Variant badges
-    variantBadge: {
-      backgroundColor: C.inputBg,
-      paddingHorizontal: 5,
-      paddingVertical: 1,
-      borderRadius: 4,
-    },
-    variantBadgeOutline: {
-      backgroundColor: 'transparent',
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: C.border,
-    },
-    variantBadgeText: {
-      fontSize: 9,
-      color: C.textMuted,
-      fontWeight: '500',
-    },
-
-    // Action buttons row
-    sessionActions: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      flexShrink: 0,
-    },
-    joinBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 3,
-      paddingHorizontal: 8,
-      paddingVertical: 5,
-      borderRadius: 20,
-    },
-    joinBtnLive: {
-      backgroundColor: C.teal,
-    },
-    joinBtnUpcoming: {
-      backgroundColor: C.tealBg,
-    },
-    joinBtnDisabled: {
-      backgroundColor: C.inputBg,
-      opacity: 0.5,
-    },
-    joinBtnRecording: {
-      backgroundColor: C.inputBg,
-    },
-    joinBtnTxt: {
-      fontSize: 11,
-      fontWeight: '600',
-    },
-    calBtn: {
-      width: 26,
-      height: 26,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: 13,
-      backgroundColor: C.inputBg,
     },
   });
 }

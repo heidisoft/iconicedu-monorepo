@@ -1,10 +1,4 @@
-import React, {
-  useMemo,
-  useState,
-  useEffect,
-  useRef,
-  useCallback,
-} from 'react';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import {
   Modal,
   View,
@@ -32,11 +26,7 @@ import {
 } from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
-import type {
-  MessageVM,
-  TextMessageVM,
-  UserProfileVM,
-} from '@iconicedu/shared-types';
+import type { MessageVM, TextMessageVM, UserProfileVM } from '@iconicedu/shared-types';
 
 const CHANNEL_FILES_BUCKET = 'channel-files';
 
@@ -49,7 +39,15 @@ const PARTIAL_HEIGHT = SCREEN_HEIGHT * 0.58;
 
 // ─── Avatar helpers ────────────────────────────────────────────────────────────
 
-const AVATAR_COLORS = ['#5B8DEF', '#E07B54', '#6CC070', '#A86CC1', '#E0A854', '#54B8C4', '#E06C8A'];
+const AVATAR_COLORS = [
+  '#5B8DEF',
+  '#E07B54',
+  '#6CC070',
+  '#A86CC1',
+  '#E0A854',
+  '#54B8C4',
+  '#E06C8A',
+];
 
 function avatarColor(seed: string): string {
   let h = 0;
@@ -66,7 +64,9 @@ function getInitials(name: string): string {
 // ─── Sender name helper ────────────────────────────────────────────────────────
 
 function getSenderName(sender: UserProfileVM): string {
-  return sender.profile.displayName?.trim() || sender.profile.firstName?.trim() || 'Unknown';
+  return (
+    sender.profile.displayName?.trim() || sender.profile.firstName?.trim() || 'Unknown'
+  );
 }
 
 // ─── Data extraction helpers ───────────────────────────────────────────────────
@@ -81,7 +81,6 @@ type FileItem = {
   createdAt: string;
   kind: 'image' | 'file';
 };
-
 
 function formatFileSize(bytes?: number): string {
   if (!bytes) return '';
@@ -102,15 +101,22 @@ function formatRelativeDate(iso: string): string {
 
 function getMessagePreview(msg: MessageVM): string {
   switch (msg.core.type) {
-    case 'text': return (msg as TextMessageVM).content.text.slice(0, 120);
-    case 'image': return '📷 Photo';
-    case 'file': return `📎 ${(msg as unknown as { attachment: { name: string } }).attachment.name}`;
-    case 'audio-recording': return '🎤 Voice message';
-    default: return 'Message';
+    case 'text':
+      return (msg as TextMessageVM).content.text.slice(0, 120);
+    case 'image':
+      return '📷 Photo';
+    case 'file':
+      return `📎 ${(msg as unknown as { attachment: { name: string } }).attachment.name}`;
+    case 'audio-recording':
+      return '🎤 Voice message';
+    default:
+      return 'Message';
   }
 }
 
-function extractSaved(messages: MessageVM[]): Array<{ id: string; senderName: string; preview: string; createdAt: string }> {
+function extractSaved(
+  messages: MessageVM[],
+): Array<{ id: string; senderName: string; preview: string; createdAt: string }> {
   return messages
     .filter((m) => m.state?.isSaved)
     .map((m) => ({
@@ -166,8 +172,8 @@ export type ChannelInfoSheetProps = {
 // ─── Tab definitions ───────────────────────────────────────────────────────────
 
 const TABS: Array<{ key: ChannelTab; label: string }> = [
-  { key: 'files',   label: 'Files' },
-  { key: 'saved',   label: 'Saved' },
+  { key: 'files', label: 'Files' },
+  { key: 'saved', label: 'Saved' },
   { key: 'members', label: 'Members' },
 ];
 
@@ -182,7 +188,15 @@ function TabIcon({ tabKey, color }: { tabKey: ChannelTab; color: string }) {
 
 // ─── File item row (images + documents) ────────────────────────────────────────
 
-function FileItemRow({ item, colors, s }: { item: FileItem; colors: AppColors; s: ReturnType<typeof makeStyles> }) {
+function FileItemRow({
+  item,
+  colors,
+  s,
+}: {
+  item: FileItem;
+  colors: AppColors;
+  s: ReturnType<typeof makeStyles>;
+}) {
   const [opening, setOpening] = useState(false);
   const isImage = item.kind === 'image';
 
@@ -219,16 +233,25 @@ function FileItemRow({ item, colors, s }: { item: FileItem; colors: AppColors; s
   return (
     <TouchableOpacity style={s.fileItem} onPress={handleOpen} activeOpacity={0.7}>
       <View style={[s.fileIconBox, { backgroundColor: iconBg }]}>
-        {isImage ? <ImageIcon size={20} color={iconColor} /> : <File size={20} color={iconColor} />}
+        {isImage ? (
+          <ImageIcon size={20} color={iconColor} />
+        ) : (
+          <File size={20} color={iconColor} />
+        )}
       </View>
       <View style={s.fileInfo}>
-        <Text style={s.fileName} numberOfLines={1}>{item.name}</Text>
-        <Text style={s.fileMeta} numberOfLines={1}>{meta.filter(Boolean).join(' • ')}</Text>
+        <Text style={s.fileName} numberOfLines={1}>
+          {item.name}
+        </Text>
+        <Text style={s.fileMeta} numberOfLines={1}>
+          {meta.filter(Boolean).join(' • ')}
+        </Text>
       </View>
-      {opening
-        ? <ActivityIndicator size="small" color={colors.textMuted} />
-        : <Download size={16} color={colors.textMuted} />
-      }
+      {opening ? (
+        <ActivityIndicator size="small" color={colors.textMuted} />
+      ) : (
+        <Download size={16} color={colors.textMuted} />
+      )}
     </TouchableOpacity>
   );
 }
@@ -239,7 +262,12 @@ type TabContentProps = {
   activeTab: ChannelTab;
   fileItems: FileItem[];
   filesLoading: boolean;
-  savedItems: Array<{ id: string; senderName: string; preview: string; createdAt: string }>;
+  savedItems: Array<{
+    id: string;
+    senderName: string;
+    preview: string;
+    createdAt: string;
+  }>;
   memberItems: Array<{ id: string; name: string; seed: string }>;
   colors: AppColors;
   s: ReturnType<typeof makeStyles>;
@@ -290,7 +318,9 @@ function TabContent({
         <View style={s.emptyState}>
           <Bookmark size={44} color={colors.textMuted} style={{ opacity: 0.4 }} />
           <Text style={s.emptyTitle}>No saved messages</Text>
-          <Text style={s.emptySubtitle}>Long-press any message and tap "Save" to find it here</Text>
+          <Text style={s.emptySubtitle}>
+            {'Long-press any message and tap "Save" to find it here'}
+          </Text>
         </View>
       );
     }
@@ -308,7 +338,9 @@ function TabContent({
                   <Text style={s.savedSenderName}>{item.senderName}</Text>
                   <Text style={s.savedDate}>{formatRelativeDate(item.createdAt)}</Text>
                 </View>
-                <Text style={s.savedPreview} numberOfLines={2}>{item.preview}</Text>
+                <Text style={s.savedPreview} numberOfLines={2}>
+                  {item.preview}
+                </Text>
               </View>
             </View>
           );
@@ -459,7 +491,12 @@ function makeStyles(C: AppColors) {
     iconEmojiTxt: { fontSize: 36 },
     iconEmojiTxtCompact: { fontSize: 28 },
     heroName: { fontSize: 22, fontWeight: '700', color: C.text, textAlign: 'center' },
-    heroNameCompact: { fontSize: 18, fontWeight: '700', color: C.text, textAlign: 'center' },
+    heroNameCompact: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: C.text,
+      textAlign: 'center',
+    },
     heroSub: { fontSize: 14, color: C.textMuted, textAlign: 'center' },
 
     // ── Info rows (DM only) ───────────────────────────────────────────────────
@@ -666,7 +703,6 @@ function makeStyles(C: AppColors) {
       color: C.text,
       flex: 1,
     },
-
   });
 }
 
@@ -701,7 +737,11 @@ export function ChannelInfoSheet({
 
   const isDm = kind === 'dm';
   const seed = avatarSeed ?? title;
-  const typeLabel = isDm ? 'Direct Message' : kind === 'space' ? 'Learning Space' : 'Channel';
+  const typeLabel = isDm
+    ? 'Direct Message'
+    : kind === 'space'
+      ? 'Learning Space'
+      : 'Channel';
 
   // ── Files: fetch directly from channel_files + channel_media tables ─────────
   // Messages are paginated (last ~40), so we can't extract files from them reliably.
@@ -736,7 +776,7 @@ export function ChannelInfoSheet({
 
         const items: FileItem[] = [];
 
-        for (const f of (filesResult.data ?? [])) {
+        for (const f of filesResult.data ?? []) {
           items.push({
             id: String(f.id),
             name: String(f.name ?? 'file'),
@@ -749,7 +789,7 @@ export function ChannelInfoSheet({
           });
         }
 
-        for (const m of (mediaResult.data ?? [])) {
+        for (const m of mediaResult.data ?? []) {
           items.push({
             id: String(m.id),
             name: String(m.name ?? 'image'),
@@ -760,7 +800,9 @@ export function ChannelInfoSheet({
           });
         }
 
-        items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        items.sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        );
         setFileItems(items);
       } catch {
         // silently fail — empty files tab
@@ -772,7 +814,10 @@ export function ChannelInfoSheet({
 
   // Derived data for saved/members tabs (from messages prop)
   const savedItems = useMemo(() => extractSaved(messages), [messages]);
-  const memberItems = useMemo(() => extractMembers(messages, members), [messages, members]);
+  const memberItems = useMemo(
+    () => extractMembers(messages, members),
+    [messages, members],
+  );
 
   // ── Open animation ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -815,32 +860,27 @@ export function ChannelInfoSheet({
     }).start();
   }, [sheetTranslateY]);
 
-  // ── Collapse back to partial ────────────────────────────────────────────────
-  const collapseToPartial = useCallback(() => {
-    isFullScreenRef.current = false;
-    setIsFullScreen(false);
-    Animated.spring(sheetTranslateY, {
-      toValue: SCREEN_HEIGHT - PARTIAL_HEIGHT,
-      useNativeDriver: true,
-      tension: 80,
-      friction: 12,
-    }).start();
-  }, [sheetTranslateY]);
-
   // ── Stable refs for partial overlay pan responder ──────────────────────────
   const expandToFullRef = useRef<() => void>(() => {});
   const handleCloseRef = useRef<() => void>(() => {});
-  useEffect(() => { expandToFullRef.current = expandToFull; }, [expandToFull]);
-  useEffect(() => { handleCloseRef.current = handleClose; }, [handleClose]);
+  useEffect(() => {
+    expandToFullRef.current = expandToFull;
+  }, [expandToFull]);
+  useEffect(() => {
+    handleCloseRef.current = handleClose;
+  }, [handleClose]);
 
   // ── Partial overlay PanResponder — swipe down closes, tap/swipe-up expands ─
   const partialOverlayPanResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       // Only steal the gesture once there's clear vertical movement
-      onMoveShouldSetPanResponder: (_, { dy, dx }) => Math.abs(dy) > 6 && Math.abs(dy) > Math.abs(dx),
+      onMoveShouldSetPanResponder: (_, { dy, dx }) =>
+        Math.abs(dy) > 6 && Math.abs(dy) > Math.abs(dx),
       onPanResponderGrant: () => {
-        sheetTranslateY.stopAnimation((val) => { panRef.current = val; });
+        sheetTranslateY.stopAnimation((val) => {
+          panRef.current = val;
+        });
       },
       onPanResponderMove: (_, { dy }) => {
         // Only allow dragging downward from partial mode
@@ -943,10 +983,7 @@ export function ChannelInfoSheet({
       navigationBarTranslucent
     >
       {/* Backdrop — tapping closes sheet when in partial mode */}
-      <Pressable
-        style={s.backdrop}
-        onPress={!isFullScreen ? handleClose : undefined}
-      />
+      <Pressable style={s.backdrop} onPress={!isFullScreen ? handleClose : undefined} />
 
       {/* Animated sheet — full height container, translated to show partial */}
       <Animated.View
@@ -996,7 +1033,9 @@ export function ChannelInfoSheet({
                   <View style={s.row}>
                     <Text style={s.rowIcon}>📝</Text>
                     <Text style={s.rowLabel}>Description</Text>
-                    <Text style={s.rowValue} numberOfLines={2}>{description}</Text>
+                    <Text style={s.rowValue} numberOfLines={2}>
+                      {description}
+                    </Text>
                   </View>
                 </>
               )}
@@ -1004,14 +1043,20 @@ export function ChannelInfoSheet({
 
             {/* Partial overlay — swipe down closes, tap expands */}
             {!isFullScreen && (
-              <View style={StyleSheet.absoluteFill} {...partialOverlayPanResponder.panHandlers} />
+              <View
+                style={StyleSheet.absoluteFill}
+                {...partialOverlayPanResponder.panHandlers}
+              />
             )}
           </ScrollView>
         ) : (
           /* ── Channel / Space: compact hero + fixed tabs + scrollable content ── */
           <>
             {/* Compact hero — also handles swipe-down when fully open */}
-            <View style={s.heroCompact} {...(isFullScreen ? panResponder.panHandlers : {})}>
+            <View
+              style={s.heroCompact}
+              {...(isFullScreen ? panResponder.panHandlers : {})}
+            >
               <View style={[s.iconBoxCompact, { backgroundColor: colors.tealBg }]}>
                 <Text style={s.iconEmojiTxtCompact}>{iconEmoji ?? '📚'}</Text>
               </View>
@@ -1057,7 +1102,10 @@ export function ChannelInfoSheet({
 
             {/* Partial overlay — swipe down closes, tap expands */}
             {!isFullScreen && (
-              <View style={StyleSheet.absoluteFill} {...partialOverlayPanResponder.panHandlers} />
+              <View
+                style={StyleSheet.absoluteFill}
+                {...partialOverlayPanResponder.panHandlers}
+              />
             )}
           </>
         )}

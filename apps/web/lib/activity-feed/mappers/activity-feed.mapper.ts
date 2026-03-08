@@ -11,7 +11,41 @@ import type {
   ActivityVerbVM,
   InboxTabKeyVM,
   ActivityItemGroupingVM,
+  InboxLeadingVM,
 } from '@iconicedu/shared-types';
+
+function applyActorAvatarLeading(
+  leading: ActivityItemContentVM['leading'],
+  actor: ActivityActorVM | null | undefined,
+): ActivityItemContentVM['leading'] {
+  if (!actor) {
+    return leading;
+  }
+
+  const actorName = actor.profile?.displayName;
+  const actorAvatar = actor.profile?.avatar;
+  if (!actorName || !actorAvatar) {
+    return leading;
+  }
+
+  const avatarLeading: InboxLeadingVM = {
+    kind: 'avatars',
+    avatars: [
+      {
+        name: actorName,
+        avatar: actorAvatar,
+        themeKey: actor.ui?.themeKey ?? null,
+      },
+    ],
+    overflowCount: 0,
+  };
+
+  if (!leading || leading.kind === 'icon') {
+    return avatarLeading;
+  }
+
+  return leading;
+}
 
 export function mapActivityFeedItemRow(
   row: ActivityFeedItemRow,
@@ -31,6 +65,7 @@ export function mapActivityFeedItemRow(
       contentBase.actionButton ??
       ((row.action_button ?? undefined) as ActivityItemContentVM['actionButton']),
     expandedContent: contentBase.expandedContent ?? row.expanded_content ?? undefined,
+    leading: applyActorAvatarLeading(contentBase.leading, options.actor ?? null),
   };
   const refsBase = (row.refs ?? {}) as Partial<ActivityItemRefsVM>;
   const refs = {

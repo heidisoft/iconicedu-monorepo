@@ -14,7 +14,15 @@ import type { MessageVM } from '@iconicedu/shared-types';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 import { EmojiPicker } from './emoji-picker';
-import { MessageCircle, Bookmark, Copy, Forward, EyeOff, Trash2, SmilePlus } from 'lucide-react-native';
+import {
+  MessageCircle,
+  Bookmark,
+  Copy,
+  Forward,
+  EyeOff,
+  Trash2,
+  SmilePlus,
+} from 'lucide-react-native';
 
 // Facebook Messenger-style quick reactions
 const QUICK_REACTIONS = ['❤️', '😂', '😮', '😢', '😡', '👍'];
@@ -23,6 +31,8 @@ type MessageActionsSheetProps = {
   visible: boolean;
   message: MessageVM | null;
   isOwn: boolean;
+  /** When true, hides reactions, thread reply, and destructive actions (supervised read-only mode). */
+  isReadOnly?: boolean;
   onClose: () => void;
   onReact: (messageId: string, emoji: string) => void;
   onThread: (message: MessageVM) => void;
@@ -102,9 +112,13 @@ function makeStyles(C: AppColors) {
       paddingBottom: 40,
     },
     handle: {
-      width: 36, height: 4, borderRadius: 2,
+      width: 36,
+      height: 4,
+      borderRadius: 2,
       backgroundColor: C.border,
-      alignSelf: 'center', marginTop: 10, marginBottom: 20,
+      alignSelf: 'center',
+      marginTop: 10,
+      marginBottom: 20,
     },
 
     // Reaction row
@@ -118,17 +132,24 @@ function makeStyles(C: AppColors) {
       alignItems: 'center',
     },
     moreEmojiBtn: {
-      width: 46, height: 46, borderRadius: 23,
+      width: 46,
+      height: 46,
+      borderRadius: 23,
       backgroundColor: C.inputBg,
-      borderWidth: 1, borderColor: C.border,
-      alignItems: 'center', justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: C.border,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     moreTxt: { fontSize: 20, color: C.textMuted, fontWeight: '700', lineHeight: 24 },
 
     // Action items
     actionItem: {
-      flexDirection: 'row', alignItems: 'center', gap: 14,
-      paddingHorizontal: 20, paddingVertical: 15,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 14,
+      paddingHorizontal: 20,
+      paddingVertical: 15,
     },
     actionIcon: { fontSize: 20, width: 28, textAlign: 'center' },
     actionLabel: { fontSize: 16, color: C.text },
@@ -148,6 +169,7 @@ export const MessageActionsSheet: React.FC<MessageActionsSheetProps> = ({
   visible,
   message,
   isOwn,
+  isReadOnly = false,
   onClose,
   onReact,
   onThread,
@@ -159,11 +181,14 @@ export const MessageActionsSheet: React.FC<MessageActionsSheetProps> = ({
   const s = React.useMemo(() => makeStyles(colors), [colors]);
   const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
   const [saved, setSaved] = useState(false);
+  const messageId = message?.ids.id;
+  const isMessageSaved =
+    (message?.state as { isSaved?: boolean } | undefined)?.isSaved ?? false;
 
   // Sync saved state when the message changes
   useEffect(() => {
-    setSaved((message?.state as { isSaved?: boolean } | undefined)?.isSaved ?? false);
-  }, [message?.ids.id]);
+    setSaved(isMessageSaved);
+  }, [messageId, isMessageSaved]);
 
   const handleReact = useCallback(
     (emoji: string) => {
@@ -248,21 +273,33 @@ export const MessageActionsSheet: React.FC<MessageActionsSheetProps> = ({
             <View style={s.sheet}>
               <View style={s.handle} />
 
-              {/* Facebook Messenger-style animated quick reactions */}
-              <View style={s.reactionsRow}>
-                {QUICK_REACTIONS.map((e) => (
-                  <ReactionBubble key={e} emoji={e} onPress={handleReact} colors={colors} />
-                ))}
-                <TouchableOpacity style={s.moreEmojiBtn} onPress={() => setEmojiPickerVisible(true)}>
-                  <SmilePlus size={22} color={colors.textMuted} />
-                </TouchableOpacity>
-              </View>
+              {/* Facebook Messenger-style animated quick reactions — hidden in read-only mode */}
+              {!isReadOnly && (
+                <View style={s.reactionsRow}>
+                  {QUICK_REACTIONS.map((e) => (
+                    <ReactionBubble
+                      key={e}
+                      emoji={e}
+                      onPress={handleReact}
+                      colors={colors}
+                    />
+                  ))}
+                  <TouchableOpacity
+                    style={s.moreEmojiBtn}
+                    onPress={() => setEmojiPickerVisible(true)}
+                  >
+                    <SmilePlus size={22} color={colors.textMuted} />
+                  </TouchableOpacity>
+                </View>
+              )}
 
-              {/* Reply in thread */}
-              <TouchableOpacity style={s.actionItem} onPress={handleThread}>
-                <MessageCircle size={20} color={colors.text} />
-                <Text style={s.actionLabel}>Reply in thread</Text>
-              </TouchableOpacity>
+              {/* Reply in thread — hidden in read-only mode */}
+              {!isReadOnly && (
+                <TouchableOpacity style={s.actionItem} onPress={handleThread}>
+                  <MessageCircle size={20} color={colors.text} />
+                  <Text style={s.actionLabel}>Reply in thread</Text>
+                </TouchableOpacity>
+              )}
 
               {/* Save / Unsave */}
               <TouchableOpacity style={s.actionItem} onPress={handleSave}>
@@ -287,8 +324,8 @@ export const MessageActionsSheet: React.FC<MessageActionsSheetProps> = ({
                 </>
               )}
 
-              {/* Own message destructive actions */}
-              {isOwn && (
+              {/* Own message destructive actions — hidden in read-only mode */}
+              {!isReadOnly && isOwn && (
                 <>
                   <View style={s.divider} />
                   {!!onHide && (

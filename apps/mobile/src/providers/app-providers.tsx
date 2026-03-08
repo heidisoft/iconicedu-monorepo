@@ -4,6 +4,7 @@ import { AuthProvider } from '@/providers/auth-provider';
 import { QueryProvider } from '@/providers/query-provider';
 import { ThemeProvider } from '@/providers/theme-provider';
 import { AnalyticsProvider, useAnalytics } from '@/providers/analytics-provider';
+import { FlagsProvider } from '@/providers/feature-flags-provider';
 import { CrashBoundary } from '@/components/analytics/crash-boundary';
 
 /**
@@ -33,13 +34,15 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider>
       <AnalyticsProvider>
-        <CrashBoundaryBridge>
-          <UiTrackingBridge>
-            <QueryProvider>
-              <AuthProvider>{children}</AuthProvider>
-            </QueryProvider>
-          </UiTrackingBridge>
-        </CrashBoundaryBridge>
+        <FlagsProvider>
+          <CrashBoundaryBridge>
+            <UiTrackingBridge>
+              <QueryProvider>
+                <AuthProvider>{children}</AuthProvider>
+              </QueryProvider>
+            </UiTrackingBridge>
+          </CrashBoundaryBridge>
+        </FlagsProvider>
       </AnalyticsProvider>
     </ThemeProvider>
   );

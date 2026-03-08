@@ -5,10 +5,14 @@ import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
-import { insertClassSchedules } from '@iconicedu/web/lib/admin/learning-space-create';
+import {
+  buildScheduleStart,
+  insertClassSchedules,
+} from '@iconicedu/web/lib/admin/learning-space-create';
 import { toStoredLiveSessionConfig } from '@iconicedu/web/lib/admin/live-session-config';
 import { publishActivityEvent } from '@iconicedu/web/lib/activity-feed/publisher/activity-publisher';
 import { compileLearningSpaceReminderJobs } from '@iconicedu/web/lib/automation/reminder-jobs';
+import { ensureSystemProfileId } from '@iconicedu/web/lib/automation/system-profile';
 import type {
   ChannelUiDefaultsVM,
   LearningSpaceCreatePayload,
@@ -17,31 +21,412 @@ import type {
   LearningSpaceSchedulePayload,
 } from '@iconicedu/shared-types';
 
-type ExpandedSchedule = {
-  startAt: string;
-  endAt: string;
+type ParticipantProfileSnapshotRow = {
+  id: string;
+  display_name?: string | null;
+  avatar_url?: string | null;
+  ui_theme_key?: string | null;
 };
 
-function buildScheduleStartForActivity(
-  schedule: LearningSpaceSchedulePayload,
-): ExpandedSchedule {
-  const baseDate = new Date(schedule.startDate);
+type LearningSpaceLinkSnapshotRow = {
+  label: string;
+  icon_key?: string | null;
+  url?: string | null;
+  status?: string | null;
+  hidden?: boolean | null;
+};
+
+type ExistingScheduleSnapshot = {
+  id: string;
+  title: string;
+  start_at: string;
+  end_at: string;
+  timezone?: string | null;
+};
+
+type ExistingRecurrenceSnapshot = {
+  id: string;
+  schedule_id: string;
+};
+
+type ExistingExceptionSnapshot = {
+  recurrence_id: string;
+  occurrence_key: string;
+  reason?: string | null;
+};
+
+type ExistingOverrideSnapshot = {
+  recurrence_id: string;
+  occurrence_key: string;
+  patch?: Record<string, unknown> | null;
+};
+
+type NormalizedIncomingSchedule = {
+  startAt: string;
+  endAt: string;
+  timezone: string | null;
+  signature: string;
+  payload: LearningSpaceSchedulePayload;
+};
+
+type NormalizedExistingSchedule = {
+  id: string;
+  title: string;
+  startAt: string;
+  endAt: string;
+  timezone: string | null;
+  signature: string;
+};
+
+export type LearningSpaceScheduleDiffPlan = {
+  added: NormalizedIncomingSchedule[];
+  removed: NormalizedExistingSchedule[];
+  rescheduled: Array<{
+    previous: NormalizedExistingSchedule;
+    next: NormalizedIncomingSchedule;
+  }>;
+};
+
+function canonicalJson(value: unknown) {
+  return JSON.stringify(normalizeForCompare(value));
+}
+
+function normalizeForCompare(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((entry) => normalizeForCompare(entry));
+  }
+
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    const sortedKeys = Object.keys(record).sort();
+    const normalized: Record<string, unknown> = {};
+    for (const key of sortedKeys) {
+      const normalizedValue = normalizeForCompare(record[key]);
+      if (normalizedValue !== undefined) {
+        normalized[key] = normalizedValue;
+      }
+    }
+    return normalized;
+  }
+
+  return value;
+}
+
+const DEFAULT_SCHEDULE_TIME = '09:00';
+const DEFAULT_DURATION_MINUTES = 60;
+
+function normalizeLinksForCompare(links: Array<LearningSpaceLinkSnapshotRow>) {
+  return [...links]
+    .map((link) => ({
+      label: link.label?.trim() ?? '',
+      iconKey: link.icon_key ?? null,
+      url: link.url ?? null,
+      status: link.status ?? 'active',
+      hidden: link.hidden ?? null,
+    }))
+    .filter((link) => link.label.length > 0)
+    .sort((a, b) => canonicalJson(a).localeCompare(canonicalJson(b)));
+}
+
+function normalizeIncomingLinksForCompare(
+  links: LearningSpaceResourcePayload[] | null | undefined,
+) {
+  return [...(links ?? [])]
+    .map((link) => ({
+      label: link.label?.trim() ?? '',
+      iconKey: link.iconKey ?? null,
+      url: link.url ?? null,
+      status: link.status ?? 'active',
+      hidden: link.hidden ?? null,
+    }))
+    .filter((link) => link.label.length > 0)
+    .sort((a, b) => canonicalJson(a).localeCompare(canonicalJson(b)));
+}
+
+function normalizeParticipantIds(ids: string[]) {
+  return [...ids].sort();
+}
+
+function formatSessionTime(
+  isoDateTime: string | null | undefined,
+  timezone: string | null | undefined,
+) {
+  if (!isoDateTime) {
+    return null;
+  }
+  const date = new Date(isoDateTime);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  const zone = timezone && timezone.length ? timezone : 'UTC';
+  const weekday = new Intl.DateTimeFormat('en-US', {
+    weekday: 'short',
+    timeZone: zone,
+  }).format(date);
+  const time = new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: zone,
+  }).format(date);
+  return { weekday, time };
+}
+
+async function loadLearningSpaceParticipantSnapshot(input: {
+  supabase: SupabaseClient;
+  orgId: string;
+  learningSpaceId: string;
+}) {
+  const participantsResponse = await input.supabase
+    .from('learning_space_participants')
+    .select('profile_id')
+    .eq('org_id', input.orgId)
+    .eq('learning_space_id', input.learningSpaceId)
+    .is('deleted_at', null)
+    .returns<Array<{ profile_id: string }>>();
+
+  if (participantsResponse.error) {
+    throw new Error(participantsResponse.error.message);
+  }
+
+  const participantIds = (participantsResponse.data ?? []).map((row) => row.profile_id);
+  if (!participantIds.length) {
+    return [];
+  }
+
+  return loadProfileSnapshotsByIds({
+    supabase: input.supabase,
+    orgId: input.orgId,
+    profileIds: participantIds,
+  });
+}
+
+async function loadProfileSnapshotsByIds(input: {
+  supabase: SupabaseClient;
+  orgId: string;
+  profileIds: string[];
+}) {
+  const participantIds = input.profileIds.filter(Boolean);
+  if (!participantIds.length) {
+    return [];
+  }
+
+  const profilesResponse = await input.supabase
+    .from('profiles')
+    .select('id, display_name, avatar_url, ui_theme_key')
+    .eq('org_id', input.orgId)
+    .in('id', participantIds)
+    .is('deleted_at', null)
+    .returns<ParticipantProfileSnapshotRow[]>();
+
+  if (profilesResponse.error) {
+    throw new Error(profilesResponse.error.message);
+  }
+
+  const profileById = new Map((profilesResponse.data ?? []).map((row) => [row.id, row]));
+  return participantIds.map((profileId) => {
+    const profile = profileById.get(profileId);
+    return {
+      profileId,
+      name: profile?.display_name ?? 'Participant',
+      avatarUrl: profile?.avatar_url ?? null,
+      themeKey: profile?.ui_theme_key ?? null,
+    };
+  });
+}
+
+function normalizeExistingSchedulesForCompare(
+  schedules: ExistingScheduleSnapshot[],
+): NormalizedExistingSchedule[] {
+  return [...schedules]
+    .map((schedule) => {
+      const timezone = schedule.timezone ?? null;
+      const signature = getScheduleSignatureFromStartAt(schedule.start_at, timezone);
+      return {
+        id: schedule.id,
+        title: schedule.title,
+        startAt: schedule.start_at,
+        endAt: schedule.end_at,
+        timezone,
+        signature,
+      };
+    })
+    .sort((a, b) =>
+      canonicalJson([a.signature, a.startAt, a.endAt]).localeCompare(
+        canonicalJson([b.signature, b.startAt, b.endAt]),
+      ),
+    );
+}
+
+function normalizeIncomingSchedulesForCompare(
+  schedules: LearningSpaceSchedulePayload[] | null | undefined,
+): NormalizedIncomingSchedule[] {
+  return [...(schedules ?? [])]
+    .map((payload) => {
+      const expanded = buildScheduleStart(payload);
+      return {
+        startAt: expanded.startAt,
+        endAt: expanded.endAt,
+        timezone: payload.timezone ?? null,
+        signature: getScheduleSignatureFromPayload(payload),
+        payload,
+      };
+    })
+    .sort((a, b) =>
+      canonicalJson([a.signature, a.startAt, a.endAt]).localeCompare(
+        canonicalJson([b.signature, b.startAt, b.endAt]),
+      ),
+    );
+}
+
+function schedulesMatch(
+  previous: NormalizedExistingSchedule,
+  next: NormalizedIncomingSchedule,
+) {
+  return previous.signature === next.signature;
+}
+
+function getScheduleSignatureFromStartAt(startAt: string, timezone: string | null) {
+  const date = new Date(startAt);
+  if (Number.isNaN(date.getTime())) {
+    return `invalid:${startAt}:${timezone ?? 'UTC'}`;
+  }
+  const timeZone = timezone && timezone.length > 0 ? timezone : 'UTC';
+  const weekdayLabel = new Intl.DateTimeFormat('en-US', {
+    weekday: 'short',
+    timeZone,
+  }).format(date);
+  const weekday = weekdayLabelToCode(weekdayLabel);
+  const time = new Intl.DateTimeFormat('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone,
+  }).format(date);
+  return `${weekday}:${time}:${timeZone}`;
+}
+
+function getScheduleSignatureFromPayload(schedule: LearningSpaceSchedulePayload) {
+  const timezone =
+    schedule.timezone && schedule.timezone.length > 0 ? schedule.timezone : 'UTC';
   const weekdayTime = schedule.rule.weekdayTimes?.[0];
-  const time = weekdayTime?.time ?? '09:00';
-  const [hour, minute] = time
-    .split(':')
-    .map((value: string) => Number.parseInt(value, 10));
-  baseDate.setUTCHours(
-    Number.isFinite(hour) ? hour : 9,
-    Number.isFinite(minute) ? minute : 0,
-    0,
-    0,
+  const weekday =
+    weekdayTime?.day ?? schedule.rule.byWeekday?.[0] ?? getIsoWeekday(schedule.startDate);
+  const time = weekdayTime?.time ?? DEFAULT_SCHEDULE_TIME;
+  const normalizedTime = normalizeTimeLabel(time);
+  return `${weekday}:${normalizedTime}:${timezone}`;
+}
+
+function schedulePrimaryTime(schedule: LearningSpaceSchedulePayload) {
+  const weekdayTime = schedule.rule.weekdayTimes?.[0];
+  return normalizeTimeLabel(weekdayTime?.time ?? DEFAULT_SCHEDULE_TIME);
+}
+
+function addMinutesToIso(isoDateTime: string, minutes: number) {
+  const date = new Date(isoDateTime);
+  date.setUTCMinutes(date.getUTCMinutes() + minutes);
+  return date.toISOString();
+}
+
+function toOccurrenceKey(isoDate: string, time: string) {
+  const [year, month, day] = isoDate.split('-').map((value) => Number(value));
+  const [hours, minutes] = time.split(':').map((value) => Number(value));
+  const date = new Date(
+    Date.UTC(year ?? 1970, (month ?? 1) - 1, day ?? 1, hours ?? 0, minutes ?? 0, 0, 0),
   );
-  const endDate = new Date(baseDate.getTime() + 60 * 60 * 1000);
+  return date.toISOString();
+}
+
+function parseOverridePatch(patch: Record<string, unknown> | null | undefined): {
+  startAt: string | null;
+  endAt: string | null;
+  reason: string | null;
+} {
+  if (!patch) {
+    return { startAt: null, endAt: null, reason: null };
+  }
   return {
-    startAt: baseDate.toISOString(),
-    endAt: endDate.toISOString(),
+    startAt: typeof patch.startAt === 'string' ? patch.startAt : null,
+    endAt: typeof patch.endAt === 'string' ? patch.endAt : null,
+    reason: typeof patch.reason === 'string' ? patch.reason : null,
   };
+}
+
+function getIsoWeekday(isoDateTime: string) {
+  const date = new Date(isoDateTime);
+  if (Number.isNaN(date.getTime())) {
+    return 'MO';
+  }
+  const weekday = new Intl.DateTimeFormat('en-US', {
+    weekday: 'short',
+    timeZone: 'UTC',
+  }).format(date);
+  return weekdayLabelToCode(weekday);
+}
+
+function normalizeTimeLabel(value: string) {
+  const [hoursText, minutesText] = value.split(':');
+  const hours = Number.parseInt(hoursText ?? '', 10);
+  const minutes = Number.parseInt(minutesText ?? '', 10);
+  const safeHours = Number.isFinite(hours) ? Math.min(Math.max(hours, 0), 23) : 0;
+  const safeMinutes = Number.isFinite(minutes) ? Math.min(Math.max(minutes, 0), 59) : 0;
+  return `${safeHours.toString().padStart(2, '0')}:${safeMinutes.toString().padStart(2, '0')}`;
+}
+
+function weekdayLabelToCode(weekday: string) {
+  switch (weekday) {
+    case 'Sun':
+      return 'SU';
+    case 'Mon':
+      return 'MO';
+    case 'Tue':
+      return 'TU';
+    case 'Wed':
+      return 'WE';
+    case 'Thu':
+      return 'TH';
+    case 'Fri':
+      return 'FR';
+    case 'Sat':
+      return 'SA';
+    default:
+      return 'MO';
+  }
+}
+
+export function buildLearningSpaceScheduleDiffPlan(input: {
+  previousSchedules: ExistingScheduleSnapshot[];
+  nextSchedules: LearningSpaceSchedulePayload[] | null | undefined;
+}): LearningSpaceScheduleDiffPlan {
+  const previous = normalizeExistingSchedulesForCompare(input.previousSchedules);
+  const next = normalizeIncomingSchedulesForCompare(input.nextSchedules);
+  const plan: LearningSpaceScheduleDiffPlan = {
+    added: [],
+    removed: [],
+    rescheduled: [],
+  };
+  const pairCount = Math.min(previous.length, next.length);
+
+  for (let index = 0; index < pairCount; index += 1) {
+    const previousSchedule = previous[index];
+    const nextSchedule = next[index];
+    if (!schedulesMatch(previousSchedule, nextSchedule)) {
+      plan.rescheduled.push({
+        previous: previousSchedule,
+        next: nextSchedule,
+      });
+    }
+  }
+
+  if (previous.length > pairCount) {
+    plan.removed.push(...previous.slice(pairCount));
+  }
+
+  if (next.length > pairCount) {
+    plan.added.push(...next.slice(pairCount));
+  }
+
+  return plan;
 }
 
 export async function updateLearningSpaceFromPayload(
@@ -70,10 +455,11 @@ export async function updateLearningSpaceFromPayload(
   const orgId = accountResponse.data.org_id;
   const actorProfileId = profileResponse.data.id;
   const now = new Date().toISOString();
+  const nextParticipantsSnapshot = payload.participants ?? [];
 
   const { data: learningSpace, error: learningSpaceError } = await supabase
     .from('learning_spaces')
-    .select('id, org_id')
+    .select('id, org_id, kind, title, icon_key, subject, description')
     .eq('id', learningSpaceId)
     .eq('org_id', orgId)
     .is('deleted_at', null)
@@ -106,7 +492,15 @@ export async function updateLearningSpaceFromPayload(
   }
 
   const serviceClient = createSupabaseServiceClient();
-  const [existingParticipantsResponse, existingSchedulesResponse] = await Promise.all([
+  const [
+    existingParticipantsResponse,
+    existingSchedulesResponse,
+    existingRecurrenceResponse,
+    existingExceptionsResponse,
+    existingOverridesResponse,
+    existingLinksResponse,
+    channelStateResponse,
+  ] = await Promise.all([
     serviceClient
       .from('learning_space_participants')
       .select('profile_id')
@@ -116,11 +510,50 @@ export async function updateLearningSpaceFromPayload(
       .returns<Array<{ profile_id: string }>>(),
     serviceClient
       .from('class_schedules')
-      .select('id, title, start_at, end_at')
+      .select('id, title, start_at, end_at, timezone')
       .eq('org_id', orgId)
       .eq('source_learning_space_id', learningSpaceId)
       .is('deleted_at', null)
-      .returns<Array<{ id: string; title: string; start_at: string; end_at: string }>>(),
+      .returns<ExistingScheduleSnapshot[]>(),
+    serviceClient
+      .from('class_schedule_recurrence')
+      .select('id, schedule_id')
+      .eq('org_id', orgId)
+      .is('deleted_at', null)
+      .returns<ExistingRecurrenceSnapshot[]>(),
+    serviceClient
+      .from('class_schedule_recurrence_exceptions')
+      .select('recurrence_id, occurrence_key, reason')
+      .eq('org_id', orgId)
+      .returns<ExistingExceptionSnapshot[]>(),
+    serviceClient
+      .from('class_schedule_recurrence_overrides')
+      .select('recurrence_id, occurrence_key, patch')
+      .eq('org_id', orgId)
+      .returns<ExistingOverrideSnapshot[]>(),
+    serviceClient
+      .from('learning_space_links')
+      .select('label, icon_key, url, status, hidden')
+      .eq('org_id', orgId)
+      .eq('learning_space_id', learningSpaceId)
+      .is('deleted_at', null)
+      .returns<LearningSpaceLinkSnapshotRow[]>(),
+    serviceClient
+      .from('channels')
+      .select(
+        'topic, description, icon_key, ui_theme_key, ui_defaults, live_session_config',
+      )
+      .eq('org_id', orgId)
+      .eq('id', channelId)
+      .is('deleted_at', null)
+      .maybeSingle<{
+        topic?: string | null;
+        description?: string | null;
+        icon_key?: string | null;
+        ui_theme_key?: string | null;
+        ui_defaults?: unknown;
+        live_session_config?: unknown;
+      }>(),
   ]);
 
   if (existingParticipantsResponse.error) {
@@ -128,6 +561,173 @@ export async function updateLearningSpaceFromPayload(
   }
   if (existingSchedulesResponse.error) {
     throw new Error(existingSchedulesResponse.error.message);
+  }
+  if (existingLinksResponse.error) {
+    throw new Error(existingLinksResponse.error.message);
+  }
+  if (existingRecurrenceResponse.error) {
+    throw new Error(existingRecurrenceResponse.error.message);
+  }
+  if (existingExceptionsResponse.error) {
+    throw new Error(existingExceptionsResponse.error.message);
+  }
+  if (existingOverridesResponse.error) {
+    throw new Error(existingOverridesResponse.error.message);
+  }
+  if (channelStateResponse.error) {
+    throw new Error(channelStateResponse.error.message);
+  }
+
+  const existingParticipantIdList = normalizeParticipantIds(
+    (existingParticipantsResponse.data ?? []).map((row) => row.profile_id),
+  );
+  const existingParticipantSnapshots = await loadProfileSnapshotsByIds({
+    supabase: serviceClient,
+    orgId,
+    profileIds: existingParticipantIdList,
+  });
+  const existingParticipantById = new Map(
+    existingParticipantSnapshots.map((participant) => [
+      participant.profileId,
+      participant,
+    ]),
+  );
+  const incomingParticipantIds = normalizeParticipantIds(
+    nextParticipantsSnapshot.map((participant) => participant.profileId),
+  );
+  const hasParticipantChanges =
+    canonicalJson(existingParticipantIdList) !== canonicalJson(incomingParticipantIds);
+
+  const hasBasicsChanges =
+    (learningSpace.kind ?? null) !== (payload.basics.kind ?? null) ||
+    (learningSpace.title ?? null) !== (payload.basics.title ?? null) ||
+    (learningSpace.icon_key ?? null) !== (payload.basics.iconKey ?? null) ||
+    (learningSpace.subject ?? null) !== (payload.basics.subject ?? null) ||
+    (learningSpace.description ?? null) !== (payload.basics.description ?? null);
+
+  const existingChannel = channelStateResponse.data ?? {};
+  const hasChannelSettingsChanges =
+    (existingChannel.topic ?? null) !== (payload.basics.title ?? null) ||
+    (existingChannel.description ?? null) !== (payload.basics.description ?? null) ||
+    (existingChannel.icon_key ?? null) !== (payload.basics.iconKey ?? null) ||
+    (existingChannel.ui_theme_key ?? null) !== (payload.settings?.themeKey ?? null) ||
+    canonicalJson(existingChannel.ui_defaults ?? null) !==
+      canonicalJson(payload.settings?.uiDefaults ?? null) ||
+    canonicalJson(existingChannel.live_session_config ?? null) !==
+      canonicalJson(toStoredLiveSessionConfig(payload.liveSession));
+
+  const hasLinkChanges =
+    canonicalJson(normalizeLinksForCompare(existingLinksResponse.data ?? [])) !==
+    canonicalJson(normalizeIncomingLinksForCompare(payload.resources ?? []));
+
+  const previousSchedules = existingSchedulesResponse.data ?? [];
+  const previousSchedulesById = new Map(
+    previousSchedules.map((schedule) => [schedule.id, schedule]),
+  );
+  const filteredRecurrences = (existingRecurrenceResponse.data ?? []).filter((row) =>
+    previousSchedulesById.has(row.schedule_id),
+  );
+  const recurrenceToScheduleId = new Map(
+    filteredRecurrences.map((row) => [row.id, row.schedule_id]),
+  );
+  const previousExceptionsByScheduleId = new Map<string, Set<string>>();
+  for (const row of existingExceptionsResponse.data ?? []) {
+    const scheduleId = recurrenceToScheduleId.get(row.recurrence_id);
+    if (!scheduleId) continue;
+    const current = previousExceptionsByScheduleId.get(scheduleId) ?? new Set<string>();
+    current.add(row.occurrence_key);
+    previousExceptionsByScheduleId.set(scheduleId, current);
+  }
+  const previousOverridesByScheduleId = new Map<
+    string,
+    Map<string, { startAt: string | null; endAt: string | null; reason: string | null }>
+  >();
+  for (const row of existingOverridesResponse.data ?? []) {
+    const scheduleId = recurrenceToScheduleId.get(row.recurrence_id);
+    if (!scheduleId) continue;
+    const current = previousOverridesByScheduleId.get(scheduleId) ?? new Map();
+    current.set(row.occurrence_key, parseOverridePatch(row.patch ?? null));
+    previousOverridesByScheduleId.set(scheduleId, current);
+  }
+  const scheduleDiffPlan = buildLearningSpaceScheduleDiffPlan({
+    previousSchedules,
+    nextSchedules: payload.schedules ?? [],
+  });
+  const pairedSchedules = (() => {
+    const previous = normalizeExistingSchedulesForCompare(previousSchedules);
+    const next = normalizeIncomingSchedulesForCompare(payload.schedules ?? []);
+    const pairCount = Math.min(previous.length, next.length);
+    const pairs: Array<{
+      previous: NormalizedExistingSchedule;
+      next: NormalizedIncomingSchedule;
+    }> = [];
+    for (let index = 0; index < pairCount; index += 1) {
+      const previousItem = previous[index];
+      const nextItem = next[index];
+      if (previousItem && nextItem) {
+        pairs.push({ previous: previousItem, next: nextItem });
+      }
+    }
+    return pairs;
+  })();
+  const hasRecurrenceScheduleChanges = pairedSchedules.some((pair) => {
+    const previousExceptionKeys =
+      previousExceptionsByScheduleId.get(pair.previous.id) ?? new Set<string>();
+    const incomingExceptionKeys = new Set(
+      (pair.next.payload.exceptions ?? []).map((entry) =>
+        toOccurrenceKey(entry.date, schedulePrimaryTime(pair.next.payload)),
+      ),
+    );
+    for (const key of incomingExceptionKeys) {
+      if (!previousExceptionKeys.has(key)) {
+        return true;
+      }
+    }
+
+    const previousOverrides =
+      previousOverridesByScheduleId.get(pair.previous.id) ?? new Map();
+    for (const entry of pair.next.payload.overrides ?? []) {
+      const time = normalizeTimeLabel(
+        entry.newTime ?? schedulePrimaryTime(pair.next.payload),
+      );
+      const occurrenceKey = toOccurrenceKey(
+        entry.originalDate,
+        schedulePrimaryTime(pair.next.payload),
+      );
+      const startAt = toOccurrenceKey(entry.newDate, time);
+      const nextPatch = {
+        startAt,
+        endAt: addMinutesToIso(startAt, DEFAULT_DURATION_MINUTES),
+        reason: entry.reason ?? null,
+      };
+      const previousPatch = previousOverrides.get(occurrenceKey);
+      if (
+        !previousPatch ||
+        previousPatch.startAt !== nextPatch.startAt ||
+        previousPatch.endAt !== nextPatch.endAt ||
+        previousPatch.reason !== nextPatch.reason
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  });
+  const hasScheduleChanges =
+    scheduleDiffPlan.added.length > 0 ||
+    scheduleDiffPlan.removed.length > 0 ||
+    scheduleDiffPlan.rescheduled.length > 0 ||
+    hasRecurrenceScheduleChanges;
+
+  const hasAnyChanges =
+    hasBasicsChanges ||
+    hasChannelSettingsChanges ||
+    hasParticipantChanges ||
+    hasLinkChanges ||
+    hasScheduleChanges;
+
+  if (!hasAnyChanges) {
+    return;
   }
 
   await updateLearningSpace(supabase, {
@@ -198,62 +798,100 @@ export async function updateLearningSpaceFromPayload(
     learningSpaceId,
   });
 
-  await publishActivityEvent({
+  const invitedMembersSnapshot = await loadLearningSpaceParticipantSnapshot({
     supabase: serviceClient,
     orgId,
-    eventType: 'class.updated',
-    occurredAt: now,
-    sourceKind: 'profile',
-    actorProfileId,
-    scope: { kind: 'learning_space', learningSpaceId },
-    targetRef: { kind: 'learning_space', id: learningSpaceId },
-    payload: {
-      learningSpaceId,
-      channelId,
-      title: payload.basics.title,
-      kind: payload.basics.kind,
-      subject: payload.basics.subject ?? null,
-      changeSummary: 'Class details updated',
-    },
-    dedupeKey: `class.updated:${learningSpaceId}:${now}`,
-    createdBy: actorProfileId,
+    learningSpaceId,
   });
 
-  const existingParticipantIds = new Set(
-    (existingParticipantsResponse.data ?? []).map((row) => row.profile_id),
-  );
-  const nextParticipants = payload.participants ?? [];
-  const nextParticipantIds = new Set(
-    nextParticipants.map((participant) => participant.profileId),
-  );
-
-  for (const participant of nextParticipants) {
-    if (!existingParticipantIds.has(participant.profileId)) {
-      await publishActivityEvent({
-        supabase: serviceClient,
-        orgId,
-        eventType: 'member.joined',
-        occurredAt: now,
-        sourceKind: 'profile',
-        actorProfileId,
-        scope: { kind: 'learning_space', learningSpaceId },
-        targetRef: { kind: 'learning_space', id: learningSpaceId },
-        payload: {
-          learningSpaceId,
-          channelId,
-          memberProfileId: participant.profileId,
-          memberDisplayName: participant.displayName ?? null,
-          role: participant.kind,
-        },
-        dedupeKey: `member.joined:${learningSpaceId}:${participant.profileId}:${now}`,
-        createdBy: actorProfileId,
-      });
-    }
+  if (hasAnyChanges) {
+    await publishActivityEvent({
+      supabase: serviceClient,
+      orgId,
+      eventType: 'class.updated',
+      occurredAt: now,
+      sourceKind: 'profile',
+      actorProfileId,
+      scope: { kind: 'learning_space', learningSpaceId },
+      targetRef: { kind: 'learning_space', id: learningSpaceId },
+      payload: {
+        learningSpaceId,
+        channelId,
+        title: payload.basics.title,
+        kind: payload.basics.kind,
+        subject: payload.basics.subject ?? null,
+        changeSummary: 'Learning space details updated',
+        activityPhase: 'updated',
+        invitedCount: invitedMembersSnapshot.length,
+        invitedMembers: invitedMembersSnapshot,
+      },
+      dedupeKey: `class.updated:${learningSpaceId}:${now}`,
+      createdBy: actorProfileId,
+    });
   }
 
-  for (const removedProfileId of existingParticipantIds) {
-    if (nextParticipantIds.has(removedProfileId)) {
-      continue;
+  const existingParticipantIds = new Set(existingParticipantIdList);
+  const nextParticipantIds = new Set(
+    nextParticipantsSnapshot.map((participant) => participant.profileId),
+  );
+
+  const addedParticipants = nextParticipantsSnapshot.filter(
+    (participant) => !existingParticipantIds.has(participant.profileId),
+  );
+  if (addedParticipants.length > 0) {
+    const firstAdded = addedParticipants[0];
+    if (!firstAdded) {
+      throw new Error('Unable to resolve added participant.');
+    }
+    await publishActivityEvent({
+      supabase: serviceClient,
+      orgId,
+      eventType: 'member.invited',
+      occurredAt: now,
+      sourceKind: 'profile',
+      actorProfileId,
+      scope: { kind: 'learning_space', learningSpaceId },
+      targetRef: { kind: 'learning_space', id: learningSpaceId },
+      payload: {
+        learningSpaceId,
+        channelId,
+        title: payload.basics.title,
+        memberProfileId: firstAdded.profileId,
+        memberDisplayName: firstAdded.displayName ?? null,
+        memberAvatarUrl: firstAdded.avatarUrl ?? null,
+        memberThemeKey: firstAdded.themeKey ?? null,
+        role: firstAdded.kind,
+        memberCount: addedParticipants.length,
+        members: addedParticipants.map((participant) => ({
+          profileId: participant.profileId,
+          displayName: participant.displayName ?? null,
+          avatarUrl: participant.avatarUrl ?? null,
+          themeKey: participant.themeKey ?? null,
+          role: participant.kind,
+        })),
+        invitedCount: invitedMembersSnapshot.length,
+        invitedMembers: invitedMembersSnapshot,
+        activityPhase: 'updated',
+      },
+      dedupeKey: `member.invited:${learningSpaceId}:${addedParticipants
+        .map((participant) => participant.profileId)
+        .sort()
+        .join(',')}:${now}`,
+      createdBy: actorProfileId,
+    });
+  }
+
+  const removedParticipants = [...existingParticipantIds]
+    .filter((profileId) => !nextParticipantIds.has(profileId))
+    .map((profileId) => ({
+      profileId,
+      snapshot: existingParticipantById.get(profileId),
+    }));
+
+  if (removedParticipants.length > 0) {
+    const firstRemoved = removedParticipants[0];
+    if (!firstRemoved) {
+      throw new Error('Unable to resolve removed participant.');
     }
     await publishActivityEvent({
       supabase: serviceClient,
@@ -267,85 +905,162 @@ export async function updateLearningSpaceFromPayload(
       payload: {
         learningSpaceId,
         channelId,
-        memberProfileId: removedProfileId,
+        title: payload.basics.title,
+        memberProfileId: firstRemoved.profileId,
+        memberDisplayName: firstRemoved.snapshot?.name ?? null,
+        memberAvatarUrl: firstRemoved.snapshot?.avatarUrl ?? null,
+        memberThemeKey: firstRemoved.snapshot?.themeKey ?? null,
+        memberCount: removedParticipants.length,
+        members: removedParticipants.map((participant) => ({
+          profileId: participant.profileId,
+          displayName: participant.snapshot?.name ?? null,
+          avatarUrl: participant.snapshot?.avatarUrl ?? null,
+          themeKey: participant.snapshot?.themeKey ?? null,
+        })),
+        invitedCount: invitedMembersSnapshot.length,
+        invitedMembers: invitedMembersSnapshot,
+        activityPhase: 'updated',
       },
-      dedupeKey: `member.removed:${learningSpaceId}:${removedProfileId}:${now}`,
+      dedupeKey: `member.removed:${learningSpaceId}:${removedParticipants
+        .map((participant) => participant.profileId)
+        .sort()
+        .join(',')}:${now}`,
       createdBy: actorProfileId,
     });
   }
 
-  const previousSchedules = existingSchedulesResponse.data ?? [];
-  if (!previousSchedules.length && payload.schedules?.length) {
-    for (const schedule of payload.schedules) {
-      const expanded = buildScheduleStartForActivity(schedule);
-      await publishActivityEvent({
-        supabase: serviceClient,
-        orgId,
-        eventType: 'session.scheduled',
-        occurredAt: now,
-        sourceKind: 'profile',
-        actorProfileId,
-        scope: { kind: 'learning_space', learningSpaceId },
-        targetRef: { kind: 'learning_space', id: learningSpaceId },
-        payload: {
-          learningSpaceId,
-          channelId,
-          scheduleId: 'pending',
-          title: payload.basics.title,
-          startAt: expanded.startAt,
-          endAt: expanded.endAt,
-        },
-        dedupeKey: `session.scheduled:${learningSpaceId}:${expanded.startAt}`,
-        createdBy: actorProfileId,
+  const systemProfileId = await ensureSystemProfileId(serviceClient, orgId);
+  const scheduleChangeLines: string[] = [];
+  let cancellationCount = 0;
+  let rescheduleCount = 0;
+
+  for (const schedule of scheduleDiffPlan.removed) {
+    cancellationCount += 1;
+    const oldTime = formatSessionTime(schedule.startAt, schedule.timezone ?? null);
+    scheduleChangeLines.push(
+      oldTime
+        ? `Canceled ${schedule.title} (${oldTime.weekday} ${oldTime.time})`
+        : `Canceled ${schedule.title}`,
+    );
+  }
+
+  for (const schedule of scheduleDiffPlan.added) {
+    const newTime = formatSessionTime(schedule.startAt, schedule.timezone ?? null);
+    scheduleChangeLines.push(
+      newTime ? `Added session (${newTime.weekday} ${newTime.time})` : `Added session`,
+    );
+  }
+
+  for (const change of scheduleDiffPlan.rescheduled) {
+    rescheduleCount += 1;
+    const oldTime = formatSessionTime(
+      change.previous.startAt,
+      change.previous.timezone ?? change.next.timezone ?? null,
+    );
+    const newTime = formatSessionTime(change.next.startAt, change.next.timezone ?? null);
+    scheduleChangeLines.push(
+      oldTime && newTime
+        ? `${change.previous.title} moved ${oldTime.weekday} ${oldTime.time} -> ${newTime.weekday} ${newTime.time}`
+        : `${change.previous.title} was rescheduled`,
+    );
+  }
+
+  for (const pair of pairedSchedules) {
+    const previousExceptionKeys =
+      previousExceptionsByScheduleId.get(pair.previous.id) ?? new Set<string>();
+    const incomingExceptionKeys = new Set(
+      (pair.next.payload.exceptions ?? []).map((entry) =>
+        toOccurrenceKey(entry.date, schedulePrimaryTime(pair.next.payload)),
+      ),
+    );
+    for (const key of incomingExceptionKeys) {
+      if (!previousExceptionKeys.has(key)) {
+        cancellationCount += 1;
+        scheduleChangeLines.push(`Canceled occurrence ${key.slice(0, 16)} via exception`);
+      }
+    }
+
+    const previousOverrides =
+      previousOverridesByScheduleId.get(pair.previous.id) ?? new Map();
+    const incomingOverrides = new Map<
+      string,
+      { startAt: string; endAt: string; reason: string | null }
+    >();
+    for (const entry of pair.next.payload.overrides ?? []) {
+      const time = normalizeTimeLabel(
+        entry.newTime ?? schedulePrimaryTime(pair.next.payload),
+      );
+      const occurrenceKey = toOccurrenceKey(
+        entry.originalDate,
+        schedulePrimaryTime(pair.next.payload),
+      );
+      const startAt = toOccurrenceKey(entry.newDate, time);
+      incomingOverrides.set(occurrenceKey, {
+        startAt,
+        endAt: addMinutesToIso(startAt, DEFAULT_DURATION_MINUTES),
+        reason: entry.reason ?? null,
       });
     }
-  } else if (previousSchedules.length && !payload.schedules?.length) {
-    for (const schedule of previousSchedules) {
-      await publishActivityEvent({
-        supabase: serviceClient,
-        orgId,
-        eventType: 'session.canceled',
-        occurredAt: now,
-        sourceKind: 'profile',
-        actorProfileId,
-        scope: { kind: 'learning_space', learningSpaceId },
-        targetRef: { kind: 'learning_space', id: learningSpaceId },
-        payload: {
-          learningSpaceId,
-          channelId,
-          scheduleId: schedule.id,
-          title: schedule.title,
-          startAt: schedule.start_at,
-          endAt: schedule.end_at,
-        },
-        dedupeKey: `session.canceled:${schedule.id}:${now}`,
-        createdBy: actorProfileId,
-      });
+
+    for (const [occurrenceKey, incoming] of incomingOverrides) {
+      const previous = previousOverrides.get(occurrenceKey);
+      const changed =
+        !previous ||
+        previous.startAt !== incoming.startAt ||
+        previous.endAt !== incoming.endAt ||
+        previous.reason !== incoming.reason;
+      if (changed) {
+        rescheduleCount += 1;
+        const oldTime = previous?.startAt
+          ? formatSessionTime(
+              previous.startAt,
+              pair.previous.timezone ?? pair.next.timezone ?? null,
+            )
+          : null;
+        const newTime = formatSessionTime(
+          incoming.startAt,
+          pair.previous.timezone ?? pair.next.timezone ?? null,
+        );
+        scheduleChangeLines.push(
+          oldTime && newTime
+            ? `${pair.previous.title} override ${oldTime.weekday} ${oldTime.time} -> ${newTime.weekday} ${newTime.time}`
+            : `${pair.previous.title} override updated`,
+        );
+      }
     }
-  } else if (previousSchedules.length && payload.schedules?.length) {
-    for (const schedule of payload.schedules) {
-      const expanded = buildScheduleStartForActivity(schedule);
-      await publishActivityEvent({
-        supabase: serviceClient,
-        orgId,
-        eventType: 'session.rescheduled',
-        occurredAt: now,
-        sourceKind: 'profile',
-        actorProfileId,
-        scope: { kind: 'learning_space', learningSpaceId },
-        targetRef: { kind: 'learning_space', id: learningSpaceId },
-        payload: {
-          learningSpaceId,
-          channelId,
-          scheduleId: previousSchedules[0]?.id ?? 'pending',
-          title: payload.basics.title,
-          startAt: expanded.startAt,
-          endAt: expanded.endAt,
-        },
-        dedupeKey: `session.rescheduled:${learningSpaceId}:${expanded.startAt}:${now}`,
-        createdBy: actorProfileId,
-      });
-    }
+  }
+
+  if (scheduleChangeLines.length > 0) {
+    const eventType =
+      cancellationCount > 0 && rescheduleCount === 0
+        ? 'session.canceled'
+        : 'session.rescheduled';
+    const summaryPrefix = `${scheduleChangeLines.length} schedule changes: ${cancellationCount} cancellations, ${rescheduleCount} reschedules.`;
+    const details = scheduleChangeLines.join(' | ');
+    await publishActivityEvent({
+      supabase: serviceClient,
+      orgId,
+      eventType,
+      occurredAt: now,
+      sourceKind: 'system',
+      actorProfileId: systemProfileId,
+      scope: { kind: 'learning_space', learningSpaceId },
+      targetRef: { kind: 'learning_space', id: learningSpaceId },
+      payload: {
+        learningSpaceId,
+        channelId,
+        scheduleId: 'batch',
+        title: payload.basics.title,
+        activityPhase: 'updated',
+        invitedCount: invitedMembersSnapshot.length,
+        invitedMembers: invitedMembersSnapshot,
+        description: `${summaryPrefix} ${details}`,
+        changeSummary: summaryPrefix,
+        changeCount: scheduleChangeLines.length,
+      },
+      dedupeKey: `schedule.updated:${learningSpaceId}:${now}`,
+      createdBy: systemProfileId,
+    });
   }
 }
 

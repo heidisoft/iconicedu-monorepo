@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { MessageVM } from '@iconicedu/shared-types';
@@ -13,32 +13,53 @@ import { TypingIndicator } from '@/components/messages/typing-indicator';
 import { ConversationHeader } from '@/components/messages/conversation-header';
 import { MessageActionsSheet } from '@/components/messages/message-actions-sheet';
 import { ChannelInfoSheet } from '@/components/messages/channel-info-sheet';
+import { MessageBubblesSkeleton } from '@/components/skeletons';
 
 export default function DmConversationScreen() {
-  const { channelId, topic, avatarSeed, subtitle } = useLocalSearchParams<{
+  const {
+    channelId,
+    topic,
+    avatarSeed,
+    avatarUrl,
+    subtitle,
+    isSupervisedReadOnly,
+    supervisedChildName,
+  } = useLocalSearchParams<{
     channelId: string;
     topic?: string;
     avatarSeed?: string;
+    avatarUrl?: string;
     subtitle?: string;
+    isSupervisedReadOnly?: string;
+    supervisedChildName?: string;
   }>();
+
+  const isSupervised = isSupervisedReadOnly === '1';
+  const headerSubtitle = isSupervised
+    ? supervisedChildName
+      ? `Supervising ${supervisedChildName}'s conversation`
+      : 'Supervised Inbox'
+    : (subtitle ?? 'Direct Message');
   const router = useRouter();
   const { data: account } = useAccount();
   const { colors } = useTheme();
 
   const orgId = account?.org_id ?? '';
-  const accountId = (account as Record<string, unknown> | undefined)?.id as string ?? '';
+  const accountId =
+    ((account as Record<string, unknown> | undefined)?.id as string) ?? '';
   // Profile is joined in fetchUserAccount — no extra round-trip needed
-  const profileArr = ((account as Record<string, unknown> | undefined)
-    ?.profile as Array<{ id: string; display_name: string | null; first_name: string | null }> | null);
+  const profileArr = (account as Record<string, unknown> | undefined)?.profile as Array<{
+    id: string;
+    display_name: string | null;
+    first_name: string | null;
+  }> | null;
   const profileId = profileArr?.[0]?.id ?? '';
   const senderName =
-    profileArr?.[0]?.display_name?.trim() ||
-    profileArr?.[0]?.first_name?.trim() ||
-    'Me';
+    profileArr?.[0]?.display_name?.trim() || profileArr?.[0]?.first_name?.trim() || 'Me';
 
   const {
     data: messages,
-    isLoading,
+    isPending: isLoading,
     isRefetching,
     refetch,
     loadMore,
@@ -110,12 +131,20 @@ export default function DmConversationScreen() {
   const isOwnMessage = (msg: MessageVM) => msg.core.sender.ids.id === profileId;
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: colors.pageBg }]} edges={['top']}>
+    <SafeAreaView
+      style={[styles.safe, { backgroundColor: colors.pageBg }]}
+      edges={['top']}
+    >
       <ConversationHeader
         title={topic ?? 'Direct Message'}
-        subtitle={subtitle ?? 'Direct Message'}
+        subtitle={headerSubtitle}
         kind="dm"
         avatarSeed={avatarSeed}
+        avatarUrl={avatarUrl || undefined}
+        secondaryAvatarSeed={
+          isSupervised && supervisedChildName ? supervisedChildName : undefined
+        }
+        isReadOnly={isSupervised}
         onBack={() => router.back()}
         onMore={() => setInfoVisible(true)}
       />
@@ -124,27 +153,52 @@ export default function DmConversationScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={0}
       >
-        <MessageList
-          messages={messages ?? []}
-          currentProfileId={profileId}
-          currentAccountId={accountId}
-          onLoadMore={loadMore}
-          loading={isLoading}
-          refreshing={isRefetching}
-          onRefresh={refetch}
-          onMessageLongPress={handleLongPress}
-          onReactionToggle={handleReactionToggle}
-          onThreadOpen={handleThreadOpen}
-        />
+        {isLoading ? (
+          <MessageBubblesSkeleton />
+        ) : (
+          <MessageList
+            messages={messages ?? []}
+            currentProfileId={profileId}
+            currentAccountId={accountId}
+            onLoadMore={loadMore}
+            loading={false}
+            refreshing={isRefetching}
+            onRefresh={refetch}
+            onMessageLongPress={isSupervised ? undefined : handleLongPress}
+            onReactionToggle={isSupervised ? undefined : handleReactionToggle}
+            onThreadOpen={isSupervised ? undefined : handleThreadOpen}
+            isReadOnly={isSupervised}
+          />
+        )}
         <TypingIndicator typingUsers={typingUsers} />
-        <MessageInput
-          onSend={handleSend}
-          placeholder={`Message ${topic ?? ''}…`}
-          onTypingChange={broadcastTyping}
-          onTypingStop={broadcastTypingStop}
-          replyTo={threadReplyTarget}
-          onCancelReply={() => setThreadReplyTarget(null)}
-        />
+        {isSupervised ? (
+          <View
+            style={[
+              styles.supervisedNotice,
+              { backgroundColor: colors.tealBg, borderTopColor: colors.teal },
+            ]}
+          >
+            <Text
+              style={{
+                fontSize: 13,
+                color: colors.teal,
+                textAlign: 'center',
+                fontWeight: '600',
+              }}
+            >
+              You are viewing this conversation in read-only mode
+            </Text>
+          </View>
+        ) : (
+          <MessageInput
+            onSend={handleSend}
+            placeholder={`Message ${topic ?? ''}…`}
+            onTypingChange={broadcastTyping}
+            onTypingStop={broadcastTypingStop}
+            replyTo={threadReplyTarget}
+            onCancelReply={() => setThreadReplyTarget(null)}
+          />
+        )}
       </KeyboardAvoidingView>
 
       {/* Info sheet */}
@@ -162,6 +216,7 @@ export default function DmConversationScreen() {
         visible={actionsVisible}
         message={actionsMessage}
         isOwn={actionsMessage ? isOwnMessage(actionsMessage) : false}
+        isReadOnly={isSupervised}
         onClose={() => setActionsVisible(false)}
         onReact={handleReactionToggle}
         onThread={handleThreadOpen}
@@ -174,4 +229,10 @@ export default function DmConversationScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   flex: { flex: 1 },
+  supervisedNotice: {
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+  },
 });

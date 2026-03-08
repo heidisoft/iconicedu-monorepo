@@ -56,6 +56,9 @@ export const queryKeys = {
     ['childProfiles', orgId, accountIds] as const,
   spaceSchedules: (channelId: string, orgId: string) =>
     ['space-sessions', channelId, orgId] as const,
+  orgSessions: (orgId: string) => ['org-sessions', orgId] as const,
+  supervisedDirectMessages: (orgId: string, accountId: string) =>
+    ['supervisedDirectMessages', orgId, accountId] as const,
 } as const;
 
 /**
@@ -148,6 +151,10 @@ export type ChannelListItem = {
   student_name?: string | null;
   /** DM channel participants (other people, self excluded). */
   participants?: DmParticipant[];
+  /** True when guardian is viewing a child's DM they do not participate in. */
+  is_supervised?: boolean;
+  /** Display name of the child whose conversation this is. */
+  supervised_child_name?: string | null;
 };
 
 export async function fetchDirectMessages(
@@ -223,6 +230,145 @@ export async function fetchDirectMessages(
       last_message_sender: last?.sender ?? null,
       participants: participantMap.get(ch.id) ?? [],
     };
+  });
+}
+
+export async function fetchSupervisedDirectMessages(
+  orgId: string,
+  guardianAccountId: string,
+  guardianProfileId: string,
+): Promise<ChannelListItem[]> {
+  if (!orgId || !guardianAccountId || !guardianProfileId) return [];
+
+  // Step 1: get child account IDs from family_links
+  const { data: links } = await supabase
+    .from('family_links')
+    .select('child_account_id')
+    .eq('guardian_account_id', guardianAccountId)
+    .eq('org_id', orgId)
+    .is('deleted_at', null);
+  if (!links?.length) return [];
+
+  const childAccountIds = links
+    .map((l: { child_account_id: string }) => l.child_account_id)
+    .filter(Boolean);
+
+  // Step 2: get child profiles (id + display name for the supervised label)
+  const { data: childProfiles } = await supabase
+    .from('profiles')
+    .select('id, display_name, first_name, last_name, account_id')
+    .in('account_id', childAccountIds)
+    .is('deleted_at', null);
+  if (!childProfiles?.length) return [];
+
+  // Step 3: get all channel IDs the guardian is already a member of (to exclude)
+  const { data: guardianMemberships } = await supabase
+    .from('channel_members')
+    .select('channel_id')
+    .eq('profile_id', guardianProfileId)
+    .eq('org_id', orgId)
+    .is('deleted_at', null);
+  const guardianChannelIds = new Set(
+    (guardianMemberships ?? []).map((m: { channel_id: string }) => m.channel_id),
+  );
+
+  // Step 4: for each child, fetch DM channels where child is member but guardian is not
+  const results: ChannelListItem[] = [];
+
+  for (const child of childProfiles as Array<{
+    id: string;
+    display_name: string | null;
+    first_name: string | null;
+    last_name: string | null;
+    account_id: string;
+  }>) {
+    const childName =
+      child.display_name?.trim() ||
+      [child.first_name, child.last_name].filter(Boolean).join(' ').trim() ||
+      'Child';
+
+    const { data: childMemberships } = await supabase
+      .from('channel_members')
+      .select('channel_id')
+      .eq('profile_id', child.id)
+      .eq('org_id', orgId)
+      .is('deleted_at', null);
+
+    const childOnlyChannelIds = (childMemberships ?? [])
+      .map((m: { channel_id: string }) => m.channel_id)
+      .filter((id: string) => !guardianChannelIds.has(id));
+    if (!childOnlyChannelIds.length) continue;
+
+    const { data: chRows } = await supabase
+      .from('channels')
+      .select('id, org_id, topic, description, kind, updated_at')
+      .in('id', childOnlyChannelIds)
+      .eq('org_id', orgId)
+      .eq('kind', 'dm')
+      .eq('status', 'active')
+      .is('deleted_at', null)
+      .order('updated_at', { ascending: false });
+    if (!chRows?.length) continue;
+
+    // Fetch participants for display (exclude the child — show the other party)
+    const { data: memberRows } = await supabase
+      .from('channel_members')
+      .select(
+        'channel_id, profile_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed)',
+      )
+      .in(
+        'channel_id',
+        chRows.map((c: { id: string }) => c.id),
+      )
+      .is('deleted_at', null);
+
+    const participantsMap = new Map<string, DmParticipant[]>();
+    for (const m of memberRows ?? []) {
+      const row = m as {
+        channel_id: string;
+        profile_id: string;
+        profile: DmParticipant | null;
+      };
+      if (row.profile_id === child.id) continue;
+      const p = row.profile;
+      if (!p) continue;
+      const list = participantsMap.get(row.channel_id) ?? [];
+      list.push(p);
+      participantsMap.set(row.channel_id, list);
+    }
+
+    for (const ch of chRows as Array<{
+      id: string;
+      org_id: string;
+      topic: string | null;
+      description: string | null;
+      kind: string;
+      updated_at: string;
+    }>) {
+      results.push({
+        id: ch.id,
+        org_id: ch.org_id,
+        topic: ch.topic ?? null,
+        description: ch.description ?? null,
+        kind: ch.kind,
+        updated_at: ch.updated_at,
+        unread_count: 0,
+        last_message_text: null,
+        last_message_at: null,
+        last_message_sender: null,
+        participants: participantsMap.get(ch.id) ?? [],
+        is_supervised: true,
+        supervised_child_name: childName,
+      });
+    }
+  }
+
+  // Deduplicate by channel id (a channel could theoretically have multiple children)
+  const seen = new Set<string>();
+  return results.filter((r) => {
+    if (seen.has(r.id)) return false;
+    seen.add(r.id);
+    return true;
   });
 }
 
@@ -1757,6 +1903,24 @@ export async function fetchSpaceSchedulesByChannelId(
     .eq('org_id', orgId)
     .eq('source_kind', 'class_session')
     .eq('source_channel_id', channelId)
+    .is('deleted_at', null)
+    .order('start_at', { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []).map((row) => mapClassScheduleRow(row as Record<string, unknown>));
+}
+
+/**
+ * Fetches all class schedules for an org (across all channels).
+ * Used for the home screen "Upcoming sessions" section.
+ * Recurring expansion is done client-side.
+ */
+export async function fetchOrgSessions(orgId: string): Promise<ClassScheduleVM[]> {
+  const { data, error } = await supabase
+    .from('class_schedules')
+    .select(CLASS_SCHEDULE_SELECT)
+    .eq('org_id', orgId)
+    .eq('source_kind', 'class_session')
     .is('deleted_at', null)
     .order('start_at', { ascending: true });
 

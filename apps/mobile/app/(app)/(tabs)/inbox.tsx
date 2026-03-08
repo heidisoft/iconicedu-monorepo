@@ -23,6 +23,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/providers/theme-provider';
 import { useActivityFeed } from '@/hooks/use-activity-feed';
+import { ActivityFeedSkeleton } from '@/components/skeletons';
 import type { AppColors } from '@/lib/theme';
 import type {
   ActivityFeedItemVM,
@@ -522,7 +523,7 @@ export default function InboxScreen() {
   const { colors, isDark } = useTheme();
   const s = React.useMemo(() => makeStyles(colors), [colors]);
 
-  const { data: feed, isLoading: feedLoading, refetch: refetchFeed } = useActivityFeed();
+  const { data: feed, isPending: feedLoading, refetch: refetchFeed } = useActivityFeed();
 
   const [activeTab, setActiveTab] = useState<InboxTabKeyVM>('all');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -651,23 +652,8 @@ export default function InboxScreen() {
       </View>
 
       {/* Content */}
-      {feedLoading ? (
-        <View style={{ paddingTop: 8, paddingHorizontal: 16, gap: 8 }}>
-          {[0, 1, 2, 3].map((i) => (
-            <View
-              key={i}
-              style={[
-                s.itemWrap,
-                {
-                  minHeight: 80,
-                  backgroundColor: colors.card,
-                  borderColor: colors.border,
-                  opacity: 0.5,
-                },
-              ]}
-            />
-          ))}
-        </View>
+      {feedLoading || refreshing ? (
+        <ActivityFeedSkeleton count={4} />
       ) : filteredSections.length === 0 ? (
         <View style={s.emptyWrap}>
           <View style={[s.emptyIcon, { backgroundColor: colors.inputBg }]}>

@@ -11,6 +11,9 @@ type ActivityBadgeProps = {
   className?: string;
 };
 
+const ACTIVITY_AVATAR_SIZE_CLASS = 'size-6';
+const MAX_VISIBLE_ACTIVITY_AVATARS = 3;
+
 const getInitials = (name: string) =>
   name
     .split(' ')
@@ -24,7 +27,7 @@ export function ActivityBadge({ activity, className }: ActivityBadgeProps) {
   const leading = activity.content.leading;
 
   if (leading?.kind === 'avatars' && leading.avatars.length > 0) {
-    const avatars = leading.avatars.slice(0, 2);
+    const avatars = leading.avatars.slice(0, MAX_VISIBLE_ACTIVITY_AVATARS);
     const overflowCount =
       leading.overflowCount ?? Math.max(0, leading.avatars.length - avatars.length);
 
@@ -37,13 +40,13 @@ export function ActivityBadge({ activity, className }: ActivityBadgeProps) {
             avatar={avatarItem.avatar}
             themeKey={avatarItem.themeKey}
             showStatus={false}
-            sizeClassName="size-6 border-2 border-background"
+            sizeClassName={ACTIVITY_AVATAR_SIZE_CLASS}
             fallbackClassName="text-[10px]"
             initialsLength={1}
           />
         ))}
         {overflowCount > 0 && (
-          <AvatarGroupCount className="text-[10px] size-6">
+          <AvatarGroupCount className={`text-[10px] ${ACTIVITY_AVATAR_SIZE_CLASS}`}>
             +{overflowCount}
           </AvatarGroupCount>
         )}
@@ -62,7 +65,7 @@ export function ActivityBadge({ activity, className }: ActivityBadgeProps) {
       avatar={actorAvatar}
       themeKey={actor.ui?.themeKey}
       showStatus={false}
-      sizeClassName={cn('size-6 shrink-0', className)}
+      sizeClassName={cn(ACTIVITY_AVATAR_SIZE_CLASS, 'shrink-0', className)}
       fallbackClassName="text-[10px]"
       fallbackText={initials}
       initialsLength={1}

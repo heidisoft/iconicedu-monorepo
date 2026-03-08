@@ -12,13 +12,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { Audio } from 'expo-av';
-import {
-  ImageIcon,
-  Paperclip,
-  Mic,
-  Square,
-  X,
-} from 'lucide-react-native';
+import { ImageIcon, Paperclip, Mic, Square } from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 
@@ -190,7 +184,7 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      timerRef.current && clearInterval(timerRef.current);
+      if (timerRef.current) clearInterval(timerRef.current);
       recordingRef.current?.stopAndUnloadAsync().catch(() => null);
     };
   }, []);
@@ -200,7 +194,10 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
   const handlePickImage = useCallback(async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission required', 'Please allow access to your photo library in Settings.');
+      Alert.alert(
+        'Permission required',
+        'Please allow access to your photo library in Settings.',
+      );
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -214,7 +211,13 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
       const mimeType = asset.mimeType ?? 'image/jpeg';
       const ext = mimeType.split('/')[1] ?? 'jpg';
       const name = asset.fileName ?? `photo_${Date.now()}_${i}.${ext}`;
-      return { uri: asset.uri, name, mimeType, size: asset.fileSize, base64: asset.base64 ?? undefined };
+      return {
+        uri: asset.uri,
+        name,
+        mimeType,
+        size: asset.fileSize,
+        base64: asset.base64 ?? undefined,
+      };
     });
     onClose();
     onAttach(payloads);
@@ -248,7 +251,10 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
       return;
     }
     try {
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
       const { recording } = await Audio.Recording.createAsync(
         Audio.RecordingOptionsPresets.HIGH_QUALITY,
       );
@@ -269,7 +275,7 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
   const handleStopRecording = useCallback(async () => {
     if (!recordingRef.current || isStopping) return;
     setIsStopping(true);
-    timerRef.current && clearInterval(timerRef.current);
+    if (timerRef.current) clearInterval(timerRef.current);
     try {
       await recordingRef.current.stopAndUnloadAsync();
       const uri = recordingRef.current.getURI();
@@ -279,12 +285,14 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
       await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
       if (uri) {
         onClose();
-        onAttach([{
-          uri,
-          name: `voice_${Date.now()}.m4a`,
-          mimeType: 'audio/mp4',
-          durationSeconds: Math.max(1, durationSeconds),
-        }]);
+        onAttach([
+          {
+            uri,
+            name: `voice_${Date.now()}.m4a`,
+            mimeType: 'audio/mp4',
+            durationSeconds: Math.max(1, durationSeconds),
+          },
+        ]);
       } else {
         setMode('menu');
       }
@@ -298,12 +306,14 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
   }, [isStopping, recordingMs, onClose, onAttach]);
 
   const handleCancelRecording = useCallback(async () => {
-    timerRef.current && clearInterval(timerRef.current);
+    if (timerRef.current) clearInterval(timerRef.current);
     try {
       await recordingRef.current?.stopAndUnloadAsync();
       recordingRef.current = null;
       await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     setMode('menu');
     setRecordingMs(0);
     setIsStopping(false);
@@ -332,10 +342,7 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
       onRequestClose={mode === 'recording' ? handleCancelRecording : onClose}
       statusBarTranslucent
     >
-      <Pressable
-        style={s.overlay}
-        onPress={mode === 'recording' ? undefined : onClose}
-      >
+      <Pressable style={s.overlay} onPress={mode === 'recording' ? undefined : onClose}>
         <Pressable>
           <View style={s.sheet}>
             <View style={s.handle} />
@@ -422,10 +429,11 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
                   activeOpacity={0.8}
                   accessibilityLabel="Stop recording"
                 >
-                  {isStopping
-                    ? <ActivityIndicator color="#fff" />
-                    : <Square size={24} color="#fff" fill="#fff" />
-                  }
+                  {isStopping ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Square size={24} color="#fff" fill="#fff" />
+                  )}
                 </TouchableOpacity>
 
                 <TouchableOpacity

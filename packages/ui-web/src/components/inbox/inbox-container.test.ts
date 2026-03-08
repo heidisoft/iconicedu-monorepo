@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { applyReadStateToSections, buildUnreadTabCounts } from './inbox-container';
 import type { ActivityFeedSectionVM, ActivityFeedTabVM } from '@iconicedu/shared-types';
@@ -166,5 +169,18 @@ describe('buildUnreadTabCounts', () => {
     expect(counts.classes).toBe(2);
     expect(counts.payment).toBe(0);
     expect(counts.system).toBe(0);
+  });
+});
+
+describe('InboxContainer rendering behavior', () => {
+  it('does not force-hide action buttons for grouped or expanded activities', () => {
+    const filename = fileURLToPath(import.meta.url);
+    const source = readFileSync(
+      resolve(dirname(filename), 'inbox-container.tsx'),
+      'utf8',
+    );
+
+    expect(source).not.toContain('showActionButton={false}');
+    expect(source).toContain('showActionButton={Boolean(activity.content.actionButton)}');
   });
 });

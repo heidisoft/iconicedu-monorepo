@@ -1,6 +1,7 @@
 import {
   fetchSpaceSchedulesByChannelId,
   fetchActivityFeed,
+  fetchSupervisedDirectMessages,
   toggleReaction,
   queryKeys,
 } from './queries';
@@ -547,6 +548,325 @@ describe('toggleReaction', () => {
 
     expect(deleteReactionChain.delete).toHaveBeenCalled();
     expect(deleteCountChain.delete).toHaveBeenCalled();
+  });
+});
+
+// ─── fetchSupervisedDirectMessages ─────────────────────────────────────────────
+
+// Chain that terminates at .is() (used by most supervised query steps)
+function createIsChain(resolvedValue: { data: unknown; error: unknown }) {
+  const chain: Record<string, jest.Mock> = {};
+  const returnChain = () => chain;
+  chain.select = jest.fn(returnChain);
+  chain.eq = jest.fn(returnChain);
+  chain.in = jest.fn(returnChain);
+  chain.order = jest.fn(returnChain);
+  chain.is = jest.fn().mockResolvedValue(resolvedValue);
+  return chain;
+}
+
+// Chain that terminates at .order() with .in() support (used by channels query)
+function createOrderChainWithIn(resolvedValue: { data: unknown; error: unknown }) {
+  const chain: Record<string, jest.Mock> = {};
+  const returnChain = () => chain;
+  chain.select = jest.fn(returnChain);
+  chain.eq = jest.fn(returnChain);
+  chain.in = jest.fn(returnChain);
+  chain.is = jest.fn(returnChain);
+  chain.order = jest.fn().mockResolvedValue(resolvedValue);
+  return chain;
+}
+
+const SUP_ORG = 'org-sup-1';
+const GUARDIAN_ACCOUNT_ID = 'acct-guardian-1';
+const GUARDIAN_PROFILE_ID = 'prof-guardian-1';
+const CHILD_ACCOUNT_ID = 'acct-child-1';
+const CHILD_PROFILE_ID = 'prof-child-1';
+
+describe('fetchSupervisedDirectMessages', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('returns [] when family_links has no rows', async () => {
+    // Step 1: family_links → empty
+    mockFrom.mockReturnValueOnce(createIsChain({ data: [], error: null }));
+
+    const result = await fetchSupervisedDirectMessages(
+      SUP_ORG,
+      GUARDIAN_ACCOUNT_ID,
+      GUARDIAN_PROFILE_ID,
+    );
+    expect(result).toEqual([]);
+  });
+
+  it('returns [] when any required param is empty', async () => {
+    const result = await fetchSupervisedDirectMessages(
+      '',
+      GUARDIAN_ACCOUNT_ID,
+      GUARDIAN_PROFILE_ID,
+    );
+    expect(result).toEqual([]);
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
+  it('returns [] when child has no DM channels', async () => {
+    // family_links
+    mockFrom.mockReturnValueOnce(
+      createIsChain({ data: [{ child_account_id: CHILD_ACCOUNT_ID }], error: null }),
+    );
+    // child profiles
+    mockFrom.mockReturnValueOnce(
+      createIsChain({
+        data: [
+          {
+            id: CHILD_PROFILE_ID,
+            display_name: 'Alice',
+            first_name: null,
+            last_name: null,
+            account_id: CHILD_ACCOUNT_ID,
+          },
+        ],
+        error: null,
+      }),
+    );
+    // guardian memberships
+    mockFrom.mockReturnValueOnce(createIsChain({ data: [], error: null }));
+    // child memberships → no channels
+    mockFrom.mockReturnValueOnce(createIsChain({ data: [], error: null }));
+
+    const result = await fetchSupervisedDirectMessages(
+      SUP_ORG,
+      GUARDIAN_ACCOUNT_ID,
+      GUARDIAN_PROFILE_ID,
+    );
+    expect(result).toEqual([]);
+  });
+
+  it('excludes channels where guardian is already a member', async () => {
+    const SHARED_CH = 'ch-shared';
+    // family_links
+    mockFrom.mockReturnValueOnce(
+      createIsChain({ data: [{ child_account_id: CHILD_ACCOUNT_ID }], error: null }),
+    );
+    // child profiles
+    mockFrom.mockReturnValueOnce(
+      createIsChain({
+        data: [
+          {
+            id: CHILD_PROFILE_ID,
+            display_name: 'Alice',
+            first_name: null,
+            last_name: null,
+            account_id: CHILD_ACCOUNT_ID,
+          },
+        ],
+        error: null,
+      }),
+    );
+    // guardian memberships — guardian is already in SHARED_CH
+    mockFrom.mockReturnValueOnce(
+      createIsChain({ data: [{ channel_id: SHARED_CH }], error: null }),
+    );
+    // child memberships — only the shared channel
+    mockFrom.mockReturnValueOnce(
+      createIsChain({ data: [{ channel_id: SHARED_CH }], error: null }),
+    );
+    // childOnlyChannelIds would be empty after exclusion → no more calls
+
+    const result = await fetchSupervisedDirectMessages(
+      SUP_ORG,
+      GUARDIAN_ACCOUNT_ID,
+      GUARDIAN_PROFILE_ID,
+    );
+    expect(result).toEqual([]);
+  });
+
+  it('returns supervised channel with is_supervised=true and supervised_child_name', async () => {
+    const SUPERVISED_CH = 'ch-supervised-1';
+    // family_links
+    mockFrom.mockReturnValueOnce(
+      createIsChain({ data: [{ child_account_id: CHILD_ACCOUNT_ID }], error: null }),
+    );
+    // child profiles
+    mockFrom.mockReturnValueOnce(
+      createIsChain({
+        data: [
+          {
+            id: CHILD_PROFILE_ID,
+            display_name: 'Alice',
+            first_name: null,
+            last_name: null,
+            account_id: CHILD_ACCOUNT_ID,
+          },
+        ],
+        error: null,
+      }),
+    );
+    // guardian memberships — guardian is NOT in supervised channel
+    mockFrom.mockReturnValueOnce(createIsChain({ data: [], error: null }));
+    // child memberships
+    mockFrom.mockReturnValueOnce(
+      createIsChain({ data: [{ channel_id: SUPERVISED_CH }], error: null }),
+    );
+    // channels fetch — terminates at .order()
+    mockFrom.mockReturnValueOnce(
+      createOrderChainWithIn({
+        data: [
+          {
+            id: SUPERVISED_CH,
+            org_id: SUP_ORG,
+            topic: null,
+            description: null,
+            kind: 'dm',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
+        error: null,
+      }),
+    );
+    // member rows for participant display
+    mockFrom.mockReturnValueOnce(
+      createIsChain({
+        data: [
+          {
+            channel_id: SUPERVISED_CH,
+            profile_id: 'prof-teacher-1',
+            profile: {
+              id: 'prof-teacher-1',
+              display_name: 'Ms Smith',
+              first_name: null,
+              last_name: null,
+              avatar_url: null,
+              avatar_seed: null,
+            },
+          },
+          {
+            channel_id: SUPERVISED_CH,
+            profile_id: CHILD_PROFILE_ID,
+            profile: {
+              id: CHILD_PROFILE_ID,
+              display_name: 'Alice',
+              first_name: null,
+              last_name: null,
+              avatar_url: null,
+              avatar_seed: null,
+            },
+          },
+        ],
+        error: null,
+      }),
+    );
+
+    const result = await fetchSupervisedDirectMessages(
+      SUP_ORG,
+      GUARDIAN_ACCOUNT_ID,
+      GUARDIAN_PROFILE_ID,
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0]!.id).toBe(SUPERVISED_CH);
+    expect(result[0]!.is_supervised).toBe(true);
+    expect(result[0]!.supervised_child_name).toBe('Alice');
+    // Child's own profile excluded from participants; only the teacher remains
+    expect(result[0]!.participants).toHaveLength(1);
+    expect(result[0]!.participants![0]!.id).toBe('prof-teacher-1');
+  });
+
+  it('deduplicates when two children share a supervised channel', async () => {
+    const SUPERVISED_CH = 'ch-shared-children';
+    const CHILD_2_ACCOUNT_ID = 'acct-child-2';
+    const CHILD_2_PROFILE_ID = 'prof-child-2';
+
+    // family_links — two children
+    mockFrom.mockReturnValueOnce(
+      createIsChain({
+        data: [
+          { child_account_id: CHILD_ACCOUNT_ID },
+          { child_account_id: CHILD_2_ACCOUNT_ID },
+        ],
+        error: null,
+      }),
+    );
+    // child profiles — both children
+    mockFrom.mockReturnValueOnce(
+      createIsChain({
+        data: [
+          {
+            id: CHILD_PROFILE_ID,
+            display_name: 'Alice',
+            first_name: null,
+            last_name: null,
+            account_id: CHILD_ACCOUNT_ID,
+          },
+          {
+            id: CHILD_2_PROFILE_ID,
+            display_name: 'Bob',
+            first_name: null,
+            last_name: null,
+            account_id: CHILD_2_ACCOUNT_ID,
+          },
+        ],
+        error: null,
+      }),
+    );
+    // guardian memberships — not in supervised channel
+    mockFrom.mockReturnValueOnce(createIsChain({ data: [], error: null }));
+
+    // Child 1 memberships
+    mockFrom.mockReturnValueOnce(
+      createIsChain({ data: [{ channel_id: SUPERVISED_CH }], error: null }),
+    );
+    // channels fetch for child 1
+    mockFrom.mockReturnValueOnce(
+      createOrderChainWithIn({
+        data: [
+          {
+            id: SUPERVISED_CH,
+            org_id: SUP_ORG,
+            topic: null,
+            description: null,
+            kind: 'dm',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
+        error: null,
+      }),
+    );
+    // member rows for child 1
+    mockFrom.mockReturnValueOnce(createIsChain({ data: [], error: null }));
+
+    // Child 2 memberships — same channel
+    mockFrom.mockReturnValueOnce(
+      createIsChain({ data: [{ channel_id: SUPERVISED_CH }], error: null }),
+    );
+    // channels fetch for child 2
+    mockFrom.mockReturnValueOnce(
+      createOrderChainWithIn({
+        data: [
+          {
+            id: SUPERVISED_CH,
+            org_id: SUP_ORG,
+            topic: null,
+            description: null,
+            kind: 'dm',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
+        error: null,
+      }),
+    );
+    // member rows for child 2
+    mockFrom.mockReturnValueOnce(createIsChain({ data: [], error: null }));
+
+    const result = await fetchSupervisedDirectMessages(
+      SUP_ORG,
+      GUARDIAN_ACCOUNT_ID,
+      GUARDIAN_PROFILE_ID,
+    );
+    // Should appear only once despite being found via two children
+    expect(result).toHaveLength(1);
+    expect(result[0]!.id).toBe(SUPERVISED_CH);
   });
 });
 

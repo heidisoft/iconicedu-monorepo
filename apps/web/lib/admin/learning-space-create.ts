@@ -160,6 +160,26 @@ export async function createLearningSpaceFromPayload(
     learningSpaceId,
   });
 
+  const schedulesWithExpanded = (payload.schedules ?? []).map((schedule) => ({
+    schedule,
+    expanded: buildScheduleStart(schedule),
+  }));
+  const invitedMembers = payload.participants.map((participant) => ({
+    profileId: participant.profileId,
+    name: participant.displayName ?? 'Participant',
+    avatarUrl: participant.avatarUrl ?? null,
+    themeKey: participant.themeKey ?? null,
+  }));
+  const firstScheduled = schedulesWithExpanded.reduce<{
+    schedule: LearningSpaceSchedulePayload;
+    expanded: ExpandedSchedule;
+  } | null>((earliest, current) => {
+    if (!earliest) {
+      return current;
+    }
+    return current.expanded.startAt < earliest.expanded.startAt ? current : earliest;
+  }, null);
+
   await publishActivityEvent({
     supabase: serviceClient,
     orgId,
@@ -176,6 +196,11 @@ export async function createLearningSpaceFromPayload(
       kind: payload.basics.kind,
       subject: payload.basics.subject ?? null,
       status: 'active',
+      activityPhase: 'created',
+      invitedCount: payload.participants.length,
+      invitedMembers,
+      firstSessionStartAt: firstScheduled?.expanded.startAt ?? null,
+      firstSessionTimezone: firstScheduled?.schedule.timezone ?? null,
     },
     dedupeKey: `class.created:${learningSpaceId}`,
     createdBy: actorProfileId,
@@ -196,7 +221,14 @@ export async function createLearningSpaceFromPayload(
         channelId,
         memberProfileId: participant.profileId,
         memberDisplayName: participant.displayName ?? null,
+        memberAvatarUrl: participant.avatarUrl ?? null,
+        memberThemeKey: participant.themeKey ?? null,
         role: participant.kind,
+        activityPhase: 'created',
+        invitedCount: payload.participants.length,
+        invitedMembers,
+        firstSessionStartAt: firstScheduled?.expanded.startAt ?? null,
+        firstSessionTimezone: firstScheduled?.schedule.timezone ?? null,
       },
       dedupeKey: `member.invited:${learningSpaceId}:${participant.profileId}`,
       createdBy: actorProfileId,
@@ -204,7 +236,8 @@ export async function createLearningSpaceFromPayload(
   }
 
   for (const [index, schedule] of (payload.schedules ?? []).entries()) {
-    const expanded = buildScheduleStart(schedule);
+    const expanded =
+      schedulesWithExpanded[index]?.expanded ?? buildScheduleStart(schedule);
     await publishActivityEvent({
       supabase: serviceClient,
       orgId,
@@ -221,6 +254,12 @@ export async function createLearningSpaceFromPayload(
         title: payload.basics.title,
         startAt: expanded.startAt,
         endAt: expanded.endAt,
+        timezone: schedule.timezone ?? null,
+        activityPhase: 'created',
+        invitedCount: payload.participants.length,
+        invitedMembers,
+        firstSessionStartAt: firstScheduled?.expanded.startAt ?? null,
+        firstSessionTimezone: firstScheduled?.schedule.timezone ?? null,
       },
       dedupeKey: `session.scheduled:${scheduleIds[index]}`,
       createdBy: actorProfileId,
@@ -771,9 +810,11 @@ async function insertClassScheduleRecurrenceOverrides(
   }
 }
 
-function buildScheduleStart(schedule: LearningSpaceSchedulePayload): ExpandedSchedule {
+export function buildScheduleStart(
+  schedule: LearningSpaceSchedulePayload,
+): ExpandedSchedule {
   const startDate = new Date(schedule.startDate);
-  startDate.setHours(0, 0, 0, 0);
+  startDate.setUTCHours(0, 0, 0, 0);
 
   const times = normalizeWeekdayTimes(schedule);
   if (!times.length) {
@@ -907,7 +948,7 @@ function buildRawRRule(rule: LearningSpaceScheduleRulePayload, fields: RRuleFiel
 
 function getTimeFromISO(isoDateTime: string) {
   const date = new Date(isoDateTime);
-  return `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+  return `${pad2(date.getUTCHours())}:${pad2(date.getUTCMinutes())}`;
 }
 
 function formatUtcDateTime(date: Date) {
@@ -923,24 +964,24 @@ function pad2(value: number) {
 }
 
 function toWeekdayValue(date: Date): WeekdayValue | null {
-  const dayIndex = date.getDay();
+  const dayIndex = date.getUTCDay();
   const entry = Object.entries(WEEKDAY_INDEX).find(([, value]) => value === dayIndex);
   return entry ? (entry[0] as WeekdayValue) : null;
 }
 
 function getNextWeekdayDate(startDate: Date, weekday: WeekdayValue) {
   const targetIndex = WEEKDAY_INDEX[weekday];
-  const currentIndex = startDate.getDay();
+  const currentIndex = startDate.getUTCDay();
   const diff = (targetIndex - currentIndex + 7) % 7;
   const date = new Date(startDate);
-  date.setDate(date.getDate() + diff);
+  date.setUTCDate(date.getUTCDate() + diff);
   return date;
 }
 
 function applyTime(date: Date, time: string) {
   const [hours, minutes] = time.split(':').map((value) => Number(value));
   const withTime = new Date(date);
-  withTime.setHours(hours ?? 0, minutes ?? 0, 0, 0);
+  withTime.setUTCHours(hours ?? 0, minutes ?? 0, 0, 0);
   return withTime;
 }
 

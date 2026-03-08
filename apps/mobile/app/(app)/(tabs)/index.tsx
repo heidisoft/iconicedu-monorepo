@@ -27,7 +27,12 @@ import {
 import { useAuth } from '@/providers/auth-provider';
 import { useProfile } from '@/hooks/use-profile';
 import { useActivityFeed } from '@/hooks/use-activity-feed';
+import { useUpcomingSessions } from '@/hooks/use-upcoming-sessions';
 import { useTheme } from '@/providers/theme-provider';
+import { useFlag } from '@/providers/feature-flags-provider';
+import { ActivityFeedSkeleton } from '@/components/skeletons';
+import { PulseBox } from '@/components/skeletons/pulse-box';
+import { SessionCard } from '@/components/sessions/session-card';
 import type { AppColors } from '@/lib/theme';
 import type {
   ActivityFeedItemVM,
@@ -467,6 +472,7 @@ function makeStyles(C: AppColors) {
       padding: 16,
       gap: 6,
     },
+    gridTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     gridLabel: { fontSize: 14, fontWeight: '700', color: C.text },
     gridDesc: { fontSize: 12, color: C.textMuted, lineHeight: 17 },
     // Activity section header
@@ -556,14 +562,15 @@ function makeStyles(C: AppColors) {
 export default function HomeScreen() {
   const { user } = useAuth();
   const { data: profile } = useProfile();
+  const { data: feed, isPending: feedLoading, refetch: refetchFeed } = useActivityFeed();
   const {
-    data: feed,
-    isLoading: feedLoading,
-    isRefetching: feedRefetching,
-    refetch: refetchFeed,
-  } = useActivityFeed();
+    sessions,
+    isPending: sessionsLoading,
+    refetch: refetchSessions,
+  } = useUpcomingSessions();
   const { colors, isDark } = useTheme();
   const router = useRouter();
+  const showQuickAccess = useFlag('enable-quick-access');
   const s = React.useMemo(() => makeStyles(colors), [colors]);
 
   const profileData = profile as {
@@ -606,8 +613,8 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    refetchFeed().finally(() => setRefreshing(false));
-  }, [refetchFeed]);
+    Promise.all([refetchFeed(), refetchSessions()]).finally(() => setRefreshing(false));
+  }, [refetchFeed, refetchSessions]);
 
   return (
     <SafeAreaView style={s.safe}>
@@ -656,28 +663,75 @@ export default function HomeScreen() {
           <Text style={s.headline}>Welcome back</Text>
         </View>
 
-        {/* Quick nav */}
-        <View style={{ gap: 10 }}>
-          <Text style={s.sectionLabel}>Quick access</Text>
-          <View style={s.grid}>
-            {quickNav.map((item) => (
-              <TouchableOpacity
-                key={item.label}
-                style={s.gridItem}
-                onPress={() => router.push(item.route as never)}
-                activeOpacity={0.75}
-                accessibilityLabel={item.label}
-              >
-                <item.Icon size={24} color={colors.text} />
-                <Text style={s.gridLabel}>{item.label}</Text>
-                <Text style={s.gridDesc}>{item.desc}</Text>
-              </TouchableOpacity>
-            ))}
+        {/* Quick nav — shown only when the feature flag is enabled */}
+        {showQuickAccess && (
+          <View style={{ gap: 10 }}>
+            <Text style={s.sectionLabel}>Quick access</Text>
+            <View style={s.grid}>
+              {quickNav.map((item) => (
+                <TouchableOpacity
+                  key={item.label}
+                  style={s.gridItem}
+                  onPress={() => router.push(item.route as never)}
+                  activeOpacity={0.75}
+                  accessibilityLabel={item.label}
+                >
+                  <View style={s.gridTitleRow}>
+                    <item.Icon size={20} color={colors.text} />
+                    <Text style={s.gridLabel}>{item.label}</Text>
+                  </View>
+                  <Text style={s.gridDesc}>{item.desc}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
-        </View>
+        )}
+
+        {/* Upcoming sessions */}
+        {(sessionsLoading || sessions.length > 0) && (
+          <View style={{ gap: 10 }}>
+            <View style={s.activityHeader}>
+              <Text style={s.sectionLabel}>Upcoming sessions</Text>
+            </View>
+            {sessionsLoading || refreshing ? (
+              // Skeleton: 2 placeholder session cards matching SessionCard layout
+              <View style={{ gap: 6 }}>
+                {[0, 1].map((i) => (
+                  <View
+                    key={i}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 10,
+                      paddingHorizontal: 14,
+                      paddingVertical: 10,
+                      borderRadius: 12,
+                      borderWidth: StyleSheet.hairlineWidth,
+                      borderColor: colors.border,
+                      backgroundColor: colors.card,
+                    }}
+                  >
+                    <PulseBox width={44} height={60} radius={10} />
+                    <View style={{ flex: 1, gap: 6 }}>
+                      <PulseBox width={i === 0 ? 140 : 120} height={13} radius={4} />
+                      <PulseBox width={80} height={11} radius={4} />
+                    </View>
+                    <PulseBox width={50} height={26} radius={20} />
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <View style={{ gap: 6 }}>
+                {sessions.map((session) => (
+                  <SessionCard key={session.id} session={session} />
+                ))}
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Class activity */}
-        {(feedLoading || feedRefetching || recentItems.length > 0) && (
+        {(feedLoading || refreshing || recentItems.length > 0) && (
           <View style={{ gap: 10 }}>
             <View style={s.activityHeader}>
               <Text style={s.sectionLabel}>Class activity</Text>
@@ -689,33 +743,22 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
             <View style={s.activityList}>
-              {feedLoading
-                ? [0, 1, 2].map((i) => (
-                    <View
-                      key={i}
-                      style={[
-                        s.itemWrap,
-                        {
-                          minHeight: 80,
-                          backgroundColor: colors.card,
-                          borderColor: colors.border,
-                          opacity: 0.5,
-                        },
-                      ]}
-                    />
-                  ))
-                : recentItems.map((item) => (
-                    <ActivityItem
-                      key={item.ids.id}
-                      item={item}
-                      colors={colors}
-                      isDark={isDark}
-                      s={s}
-                      onMarkRead={onMarkRead}
-                      expandedIds={expandedIds}
-                      onToggle={onToggle}
-                    />
-                  ))}
+              {feedLoading || refreshing ? (
+                <ActivityFeedSkeleton count={3} />
+              ) : (
+                recentItems.map((item) => (
+                  <ActivityItem
+                    key={item.ids.id}
+                    item={item}
+                    colors={colors}
+                    isDark={isDark}
+                    s={s}
+                    onMarkRead={onMarkRead}
+                    expandedIds={expandedIds}
+                    onToggle={onToggle}
+                  />
+                ))
+              )}
             </View>
           </View>
         )}

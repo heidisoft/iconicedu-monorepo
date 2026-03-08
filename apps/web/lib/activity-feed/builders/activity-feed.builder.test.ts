@@ -49,7 +49,10 @@ describe('buildActivityFeedForProfile', () => {
           occurred_at: '2026-03-03T12:00:00.000Z',
           created_at: '2026-03-03T12:00:00.000Z',
           tab_key: 'classes',
-          audience: { scope: { kind: 'learning_space', learningSpaceId: 'space-1' }, visibility: 'scope_only' },
+          audience: {
+            scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+            visibility: 'scope_only',
+          },
           verb: 'class.created',
           actor_profile_id: 'actor-1',
           refs: {},
@@ -61,7 +64,11 @@ describe('buildActivityFeedForProfile', () => {
 
     const feed = await buildActivityFeedForProfile({} as never, 'org-1', 'profile-1');
 
-    expect(getActivityFeedItemsByOrg).toHaveBeenCalledWith(expect.anything(), 'org-1', 'profile-1');
+    expect(getActivityFeedItemsByOrg).toHaveBeenCalledWith(
+      expect.anything(),
+      'org-1',
+      'profile-1',
+    );
     expect(feed.sections).toHaveLength(1);
     expect(feed.sections[0]?.items[0]?.ids.id).toBe('item-1');
   });
@@ -77,7 +84,10 @@ describe('buildActivityFeedForProfile', () => {
           occurred_at: '2026-03-03T12:00:00.000Z',
           created_at: '2026-03-03T12:00:00.000Z',
           tab_key: 'classes',
-          audience: { scope: { kind: 'learning_space', learningSpaceId: 'space-1' }, visibility: 'scope_only' },
+          audience: {
+            scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+            visibility: 'scope_only',
+          },
           verb: 'class.created',
           actor_profile_id: 'actor-1',
           refs: {},
@@ -113,5 +123,169 @@ describe('buildActivityFeedForProfile', () => {
       { key: 'system', label: 'System', badgeCount: 0 },
     ]);
     expect(feed.unreadCount).toBe(1);
+  });
+
+  it('sorts grouped sub-activities from most recent to oldest', async () => {
+    getActivityFeedItemsByOrg.mockResolvedValue({
+      data: [
+        {
+          id: 'group-1',
+          org_id: 'org-1',
+          recipient_profile_id: 'profile-1',
+          kind: 'group',
+          occurred_at: '2026-03-07T16:00:00.000Z',
+          created_at: '2026-03-07T16:00:00.000Z',
+          tab_key: 'classes',
+          audience: {
+            scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+            visibility: 'scope_only',
+          },
+          verb: 'session.started',
+          actor_profile_id: 'actor-1',
+          refs: {},
+          content: { headline: { primary: 'Class session' } },
+          sub_activity_count: 2,
+          updated_at: '2026-03-07T16:00:00.000Z',
+        },
+        {
+          id: 'item-old',
+          org_id: 'org-1',
+          recipient_profile_id: 'profile-1',
+          kind: 'leaf',
+          occurred_at: '2026-03-07T14:00:00.000Z',
+          created_at: '2026-03-07T14:00:00.000Z',
+          tab_key: 'classes',
+          audience: {
+            scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+            visibility: 'scope_only',
+          },
+          verb: 'session.started',
+          actor_profile_id: 'actor-1',
+          refs: {},
+          content: { headline: { primary: 'Older item' } },
+          updated_at: '2026-03-07T14:00:00.000Z',
+        },
+        {
+          id: 'item-new',
+          org_id: 'org-1',
+          recipient_profile_id: 'profile-1',
+          kind: 'leaf',
+          occurred_at: '2026-03-07T15:00:00.000Z',
+          created_at: '2026-03-07T15:00:00.000Z',
+          tab_key: 'classes',
+          audience: {
+            scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+            visibility: 'scope_only',
+          },
+          verb: 'session.ended',
+          actor_profile_id: 'actor-1',
+          refs: {},
+          content: { headline: { primary: 'Newer item' } },
+          updated_at: '2026-03-07T15:00:00.000Z',
+        },
+      ],
+    });
+    getActivityFeedGroupMembersByGroupIds.mockResolvedValue({
+      data: [
+        { group_id: 'group-1', item_id: 'item-old' },
+        { group_id: 'group-1', item_id: 'item-new' },
+      ],
+    });
+
+    const feed = await buildActivityFeedForProfile({} as never, 'org-1', 'profile-1');
+    const todayItems = feed.sections[0]?.items ?? [];
+    const group = todayItems.find((item) => item.kind === 'group');
+    if (!group || group.kind !== 'group') {
+      throw new Error('Expected grouped item');
+    }
+
+    expect(group.subActivities?.items.map((item) => item.ids.id)).toEqual([
+      'item-new',
+      'item-old',
+    ]);
+  });
+
+  it('does not repeat parent item as a child activity', async () => {
+    getActivityFeedItemsByOrg.mockResolvedValue({
+      data: [
+        {
+          id: 'group-2',
+          org_id: 'org-1',
+          recipient_profile_id: 'profile-1',
+          kind: 'group',
+          occurred_at: '2026-03-07T16:00:00.000Z',
+          created_at: '2026-03-07T16:00:00.000Z',
+          tab_key: 'classes',
+          audience: {
+            scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+            visibility: 'scope_only',
+          },
+          verb: 'class.updated',
+          actor_profile_id: 'actor-1',
+          refs: {},
+          content: {
+            headline: { primary: 'Class updated', secondary: 'Math Foundations' },
+          },
+          sub_activity_count: 2,
+          updated_at: '2026-03-07T16:00:00.000Z',
+        },
+        {
+          id: 'item-duplicate-parent',
+          org_id: 'org-1',
+          recipient_profile_id: 'profile-1',
+          kind: 'leaf',
+          occurred_at: '2026-03-07T15:50:00.000Z',
+          created_at: '2026-03-07T15:50:00.000Z',
+          tab_key: 'classes',
+          audience: {
+            scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+            visibility: 'scope_only',
+          },
+          verb: 'class.updated',
+          actor_profile_id: 'actor-1',
+          refs: {},
+          content: {
+            headline: { primary: 'Class updated', secondary: 'Math Foundations' },
+          },
+          updated_at: '2026-03-07T15:50:00.000Z',
+        },
+        {
+          id: 'item-actual-child',
+          org_id: 'org-1',
+          recipient_profile_id: 'profile-1',
+          kind: 'leaf',
+          occurred_at: '2026-03-07T15:55:00.000Z',
+          created_at: '2026-03-07T15:55:00.000Z',
+          tab_key: 'classes',
+          audience: {
+            scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+            visibility: 'scope_only',
+          },
+          verb: 'session.scheduled',
+          actor_profile_id: 'actor-1',
+          refs: {},
+          content: {
+            headline: { primary: 'Session scheduled', secondary: 'Math Foundations' },
+          },
+          updated_at: '2026-03-07T15:55:00.000Z',
+        },
+      ],
+    });
+    getActivityFeedGroupMembersByGroupIds.mockResolvedValue({
+      data: [
+        { group_id: 'group-2', item_id: 'item-duplicate-parent' },
+        { group_id: 'group-2', item_id: 'item-actual-child' },
+      ],
+    });
+
+    const feed = await buildActivityFeedForProfile({} as never, 'org-1', 'profile-1');
+    const group = feed.sections[0]?.items.find((item) => item.kind === 'group');
+    if (!group || group.kind !== 'group') {
+      throw new Error('Expected grouped item');
+    }
+
+    expect(group.subActivities?.items.map((item) => item.ids.id)).toEqual([
+      'item-actual-child',
+    ]);
   });
 });

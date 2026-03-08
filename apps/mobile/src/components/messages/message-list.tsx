@@ -23,7 +23,11 @@ function formatDateHeader(iso: string): string {
 
   const diffDays = Math.floor((today.getTime() - d.getTime()) / 86_400_000);
   if (diffDays < 7) return d.toLocaleDateString([], { weekday: 'long' });
-  return d.toLocaleDateString([], { month: 'long', day: 'numeric', year: diffDays > 365 ? 'numeric' : undefined });
+  return d.toLocaleDateString([], {
+    month: 'long',
+    day: 'numeric',
+    year: diffDays > 365 ? 'numeric' : undefined,
+  });
 }
 
 // ─── List item types ──────────────────────────────────────────────────────────
@@ -40,7 +44,11 @@ export function buildListData(messages: MessageVM[]): MessageListItem[] {
   for (const msg of messages) {
     const key = getDateKey(msg.core.createdAt);
     if (key !== lastDateKey) {
-      items.push({ _type: 'date-separator', dateKey: key, label: formatDateHeader(msg.core.createdAt) });
+      items.push({
+        _type: 'date-separator',
+        dateKey: key,
+        label: formatDateHeader(msg.core.createdAt),
+      });
       lastDateKey = key;
     }
     items.push(msg);
@@ -59,7 +67,12 @@ function DateSeparator({ label, colors }: { label: string; colors: AppColors }) 
   return (
     <View style={sepStyles.row}>
       <View style={[sepStyles.line, { backgroundColor: colors.border }]} />
-      <Text style={[sepStyles.label, { color: colors.textMuted, backgroundColor: colors.pageBg }]}>
+      <Text
+        style={[
+          sepStyles.label,
+          { color: colors.textMuted, backgroundColor: colors.pageBg },
+        ]}
+      >
         {label}
       </Text>
       <View style={[sepStyles.line, { backgroundColor: colors.border }]} />
@@ -68,8 +81,14 @@ function DateSeparator({ label, colors }: { label: string; colors: AppColors }) 
 }
 
 const sepStyles = StyleSheet.create({
-  row:   { flexDirection: 'row', alignItems: 'center', marginVertical: 12, paddingHorizontal: 16, gap: 8 },
-  line:  { flex: 1, height: 1 },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 12,
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  line: { flex: 1, height: 1 },
   label: { fontSize: 12, fontWeight: '600', paddingHorizontal: 8 },
 });
 
@@ -90,6 +109,7 @@ type MessageListProps = {
   pendingUploads?: PendingUpload[];
   /** Called when the user taps "retry" on a failed upload row. */
   onRetryUpload?: (pendingId: string) => void;
+  isReadOnly?: boolean;
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -107,6 +127,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   onThreadOpen,
   pendingUploads,
   onRetryUpload,
+  isReadOnly,
 }) => {
   const flatListRef = useRef<FlatList>(null);
   const { colors } = useTheme();
@@ -140,14 +161,19 @@ export const MessageList: React.FC<MessageListProps> = ({
       let prevMsg: MessageVM | null = null;
       for (let i = index + 1; i < listData.length; i++) {
         const candidate = listData[i];
-        if (!isDateSeparator(candidate)) { prevMsg = candidate; break; }
+        if (!isDateSeparator(candidate)) {
+          prevMsg = candidate;
+          break;
+        }
       }
 
       const isOwn = item.core.sender.ids.id === currentProfileId;
 
       // A new group starts if: different sender, no prev message, or >5 min gap
       const timeDiffMinutes = prevMsg
-        ? (new Date(item.core.createdAt).getTime() - new Date(prevMsg.core.createdAt).getTime()) / 60_000
+        ? (new Date(item.core.createdAt).getTime() -
+            new Date(prevMsg.core.createdAt).getTime()) /
+          60_000
         : Infinity;
       const isGroupStart =
         !prevMsg ||
@@ -165,10 +191,20 @@ export const MessageList: React.FC<MessageListProps> = ({
           onThreadOpen={onThreadOpen}
           currentProfileId={currentProfileId}
           currentAccountId={currentAccountId}
+          isReadOnly={isReadOnly}
         />
       );
     },
-    [currentProfileId, currentAccountId, listData, colors, onMessageLongPress, onReactionToggle, onThreadOpen],
+    [
+      currentProfileId,
+      currentAccountId,
+      listData,
+      colors,
+      onMessageLongPress,
+      onReactionToggle,
+      onThreadOpen,
+      isReadOnly,
+    ],
   );
 
   const keyExtractor = useCallback((item: MessageListItem) => {
@@ -194,7 +230,12 @@ export const MessageList: React.FC<MessageListProps> = ({
         pendingUploads && pendingUploads.length > 0 ? (
           <View>
             {pendingUploads.map((p) => (
-              <PendingMessageRow key={p.id} pending={p} colors={colors} onRetry={() => onRetryUpload?.(p.id)} />
+              <PendingMessageRow
+                key={p.id}
+                pending={p}
+                colors={colors}
+                onRetry={() => onRetryUpload?.(p.id)}
+              />
             ))}
           </View>
         ) : null

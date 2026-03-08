@@ -195,7 +195,7 @@ export function InboxContainer({
           activity={activity}
           onMarkRead={markAsRead}
           onAutoRead={autoMarkAsRead}
-          showActionButton={false}
+          showActionButton={Boolean(activity.content.actionButton)}
         />
       );
     }
@@ -206,7 +206,7 @@ export function InboxContainer({
           activity={activity}
           onMarkRead={markAsRead}
           onAutoRead={autoMarkAsRead}
-          showActionButton={false}
+          showActionButton={Boolean(activity.content.actionButton)}
         />
       );
     }

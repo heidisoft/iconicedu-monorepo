@@ -19,11 +19,12 @@ import { SpaceSessionsTab } from '@/components/messages/space-sessions-tab';
 type SpaceTab = 'messages' | 'sessions';
 
 export default function SpaceDetailScreen() {
-  const { channelId, topic, iconEmoji, subtitle } = useLocalSearchParams<{
+  const { channelId, topic, iconEmoji, subtitle, tab } = useLocalSearchParams<{
     channelId: string;
     topic?: string;
     iconEmoji?: string;
     subtitle?: string;
+    tab?: string;
   }>();
   const router = useRouter();
   const { data: account } = useAccount();
@@ -31,29 +32,36 @@ export default function SpaceDetailScreen() {
   const { colors } = useTheme();
 
   const orgId = account?.org_id ?? '';
-  const accountId = (account as Record<string, unknown> | undefined)?.id as string ?? '';
-  const profileId = (profile as Record<string, unknown> | undefined)?.id as string ?? '';
+  const accountId =
+    ((account as Record<string, unknown> | undefined)?.id as string) ?? '';
+  const profileId =
+    ((profile as Record<string, unknown> | undefined)?.id as string) ?? '';
 
   const { data: messages, isLoading, loadMore } = useMessages(channelId ?? '');
 
-  const { schedules, isLoading: isLoadingSessions, error: sessionsError } = useSpaceSessions(
-    channelId ?? '',
-    orgId,
-  );
+  const {
+    schedules,
+    isLoading: isLoadingSessions,
+    error: sessionsError,
+  } = useSpaceSessions(channelId ?? '', orgId);
 
   // ── Live session detection — mirrors web channel.context?.liveSession?.enabled check ──
   const liveSession = useMemo(() => {
     if (!schedules?.length) return null;
     const now = Date.now();
-    return schedules.find((s) => {
-      const start = Date.parse(s.startAt);
-      const end = Date.parse(s.endAt);
-      return start <= now && end >= now && !!s.meetingLink;
-    }) ?? null;
+    return (
+      schedules.find((s) => {
+        const start = Date.parse(s.startAt);
+        const end = Date.parse(s.endAt);
+        return start <= now && end >= now && !!s.meetingLink;
+      }) ?? null
+    );
   }, [schedules]);
 
   // ── Tab state ──
-  const [activeTab, setActiveTab] = useState<SpaceTab>('messages');
+  const [activeTab, setActiveTab] = useState<SpaceTab>(
+    tab === 'sessions' ? 'sessions' : 'messages',
+  );
 
   // ── Info sheet state ──
   const [infoVisible, setInfoVisible] = useState(false);
@@ -92,10 +100,11 @@ export default function SpaceDetailScreen() {
               onPress={() => setActiveTab(tab)}
               activeOpacity={0.7}
             >
-              {tab === 'messages'
-                ? <MessageCircle size={16} color={color} />
-                : <CalendarDays size={16} color={color} />
-              }
+              {tab === 'messages' ? (
+                <MessageCircle size={16} color={color} />
+              ) : (
+                <CalendarDays size={16} color={color} />
+              )}
               <Text style={[s.tabLabel, { color }]}>
                 {tab === 'messages' ? 'Messages' : 'Sessions'}
               </Text>
@@ -115,7 +124,10 @@ export default function SpaceDetailScreen() {
             loading={isLoading}
           />
           <TypingIndicator typingUsers={[]} />
-          <MessageInput onSend={handleSend} placeholder={`Message ${topic ?? 'Learning Space'}…`} />
+          <MessageInput
+            onSend={handleSend}
+            placeholder={`Message ${topic ?? 'Learning Space'}…`}
+          />
         </View>
       ) : (
         <View style={[s.flex, { backgroundColor: colors.pageBg }]}>
@@ -142,7 +154,7 @@ export default function SpaceDetailScreen() {
   );
 }
 
-const makeStyles = (colors: { border: string; teal: string; textMuted: string }) =>
+const makeStyles = (_colors: { border: string; teal: string; textMuted: string }) =>
   StyleSheet.create({
     safe: { flex: 1 },
     flex: { flex: 1 },

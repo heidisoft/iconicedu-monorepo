@@ -5,12 +5,9 @@ import {
   getDashboardAccountContext,
   getDashboardProfileContext,
 } from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
+// import { INBOX_ACTIVITY_FEED } from '@iconicedu/web/lib/data/inbox-activities';
 
-export default async function Page({
-  params,
-}: {
-  params: Promise<{ orgSlug: string }>;
-}) {
+export default async function Page({ params }: { params: Promise<{ orgSlug: string }> }) {
   const { orgSlug } = await params;
   const { supabase, account } = await getDashboardAccountContext(orgSlug);
   const { profileResponse } = await getDashboardProfileContext(supabase, account.id);

@@ -81,6 +81,27 @@ function getScopeKind(event: ActivityEventRow) {
   return typeof scope.kind === 'string' ? scope.kind : undefined;
 }
 
+function getScopeLearningSpaceId(event: ActivityEventRow) {
+  const scope = asRecord(event.scope);
+  if (scope.kind === 'learning_space' && typeof scope.learningSpaceId === 'string') {
+    return scope.learningSpaceId;
+  }
+  return undefined;
+}
+
+function getLearningSpaceId(event: ActivityEventRow, payload: Record<string, unknown>) {
+  return asOptionalString(payload.learningSpaceId) ?? getScopeLearningSpaceId(event);
+}
+
+function resolveSessionAnchor(payload: Record<string, unknown>, fallback: string) {
+  const explicit =
+    asOptionalString(payload.occurrenceStart) ??
+    asOptionalString(payload.startAt) ??
+    asOptionalString(payload.startedAt);
+  const value = explicit ?? fallback;
+  return value.slice(0, 16);
+}
+
 function getContextTitle(payload: Record<string, unknown>) {
   return (
     asOptionalString(payload.learningSpaceTitle) ??
@@ -144,6 +165,19 @@ function sourceAction(
   };
 }
 
+function sourceScheduleAction(event: ActivityEventRow, payload: Record<string, unknown>) {
+  const href = buildInboxSourceHref(event, payload);
+  if (!href) {
+    return undefined;
+  }
+
+  return {
+    label: 'View schedule',
+    variant: 'outline' as const,
+    href: `${href}${href.includes('?') ? '&' : '?'}tab=schedule`,
+  };
+}
+
 function paymentAction(
   payload: Record<string, unknown>,
 ): InboxActionButtonVM | undefined {
@@ -162,11 +196,54 @@ const DEFAULT_RECIPIENTS: ActivityEventDefinition['resolveRecipients'] = async (
 ) => resolveRecipientsForActivityEvent(supabase, event);
 
 function className(payload: Record<string, unknown>) {
-  return asString(payload.title, 'Class');
+  return asString(payload.title, 'Learning space');
 }
 
 function sessionName(payload: Record<string, unknown>) {
   return asString(payload.title, 'Session');
+}
+
+function formatSessionLabel(startAt: unknown, timezone: unknown) {
+  if (typeof startAt !== 'string' || startAt.length === 0) {
+    return undefined;
+  }
+  const date = new Date(startAt);
+  if (Number.isNaN(date.getTime())) {
+    return undefined;
+  }
+  const timeZone =
+    typeof timezone === 'string' && timezone.length > 0 ? timezone : undefined;
+  const weekday = new Intl.DateTimeFormat('en-US', {
+    weekday: 'short',
+    timeZone,
+  }).format(date);
+  const timeWithZone = new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZone,
+    timeZoneName: 'short',
+  }).format(date);
+  return `${weekday} ${timeWithZone}`;
+}
+
+function formatWeeklyTimeLabel(startAt: unknown, timezone: unknown) {
+  if (typeof startAt !== 'string' || startAt.length === 0) {
+    return undefined;
+  }
+  const date = new Date(startAt);
+  if (Number.isNaN(date.getTime())) {
+    return undefined;
+  }
+  const timeZone =
+    typeof timezone === 'string' && timezone.length > 0 ? timezone : undefined;
+  return new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZone,
+    timeZoneName: 'short',
+  }).format(date);
 }
 
 function buildHourlyLearningSpaceGroupKey(
@@ -174,7 +251,7 @@ function buildHourlyLearningSpaceGroupKey(
   event: ActivityEventRow,
   payload: Record<string, unknown>,
 ) {
-  const learningSpaceId = asOptionalString(payload.learningSpaceId);
+  const learningSpaceId = getLearningSpaceId(event, payload);
   if (!learningSpaceId) {
     return null;
   }
@@ -188,7 +265,7 @@ function buildWeeklyLearningSpaceGroupKey(
   event: ActivityEventRow,
   payload: Record<string, unknown>,
 ) {
-  const learningSpaceId = asOptionalString(payload.learningSpaceId);
+  const learningSpaceId = getLearningSpaceId(event, payload);
   if (!learningSpaceId) {
     return null;
   }
@@ -206,16 +283,41 @@ function buildWeeklyLearningSpaceGroupKey(
   return `${prefix}:${learningSpaceId}:${occurredAt.toISOString().slice(0, 10)}`;
 }
 
-function buildReminderHourlyGroupKey(
-  event: ActivityEventRow,
-  payload: Record<string, unknown>,
-) {
-  const learningSpaceId = asOptionalString(payload.learningSpaceId);
-  const occurrence = asOptionalString(payload.occurrenceStart) ?? event.occurred_at;
+function buildClassCreatedGroupKey(event: ActivityEventRow) {
+  const payload = asRecord(event.payload);
+  const learningSpaceId = getLearningSpaceId(event, payload);
   if (!learningSpaceId) {
     return null;
   }
-  return `reminder:${learningSpaceId}:${occurrence.slice(0, 13)}`;
+  return `class-created:${learningSpaceId}`;
+}
+
+function buildClassUpdatedGroupKey(event: ActivityEventRow) {
+  const payload = asRecord(event.payload);
+  const learningSpaceId = getLearningSpaceId(event, payload);
+  if (!learningSpaceId) {
+    return null;
+  }
+  return `class-updated:${learningSpaceId}:${event.occurred_at.slice(0, 10)}`;
+}
+
+function buildSessionGroupKey(event: ActivityEventRow) {
+  const payload = asRecord(event.payload);
+  const learningSpaceId = getLearningSpaceId(event, payload);
+  if (!learningSpaceId) {
+    return null;
+  }
+  const sessionAnchor = resolveSessionAnchor(payload, event.occurred_at);
+  return `class-session:${learningSpaceId}:${sessionAnchor}`;
+}
+
+function buildClassLifecycleGroupKey(event: ActivityEventRow) {
+  const payload = asRecord(event.payload);
+  const phase = asOptionalString(payload.activityPhase);
+  if (phase === 'updated') {
+    return buildClassUpdatedGroupKey(event);
+  }
+  return buildClassCreatedGroupKey(event);
 }
 
 function renderGroupedClassActivity(
@@ -237,6 +339,209 @@ function renderGroupedClassActivity(
     summary: 'Open to review the latest class activity.',
     actionButton: sourceAction(event, payload),
   } satisfies ActivityRenderResult;
+}
+
+function renderClassCreatedGroup(event: ActivityEventRow) {
+  const payload = asRecord(event.payload);
+  const invitedMembers = buildParticipantAvatars(payload);
+  const invitedMembersOverflow = Math.max(0, invitedMembers.length - 3);
+  const invitedCountRaw = payload.invitedCount;
+  const invitedCount =
+    typeof invitedCountRaw === 'number' && Number.isFinite(invitedCountRaw)
+      ? invitedCountRaw
+      : undefined;
+  const firstSessionLabel =
+    formatSessionLabel(payload.firstSessionStartAt, payload.firstSessionTimezone) ??
+    asOptionalString(payload.firstSessionLabel);
+  const summaryParts: string[] = [];
+  if (typeof invitedCount === 'number') {
+    summaryParts.push(`${invitedCount} invited`);
+  }
+  if (firstSessionLabel) {
+    summaryParts.push(`first lesson ${firstSessionLabel}`);
+  }
+
+  return {
+    verb: event.event_type as ActivityVerbVM,
+    leading:
+      invitedMembers.length > 0
+        ? {
+            kind: 'avatars',
+            avatars: invitedMembers,
+            overflowCount: invitedMembersOverflow,
+          }
+        : { kind: 'icon', iconKey: 'GraduationCap', tone: 'info' },
+    headline: {
+      primary: 'Learning space created and assigned',
+      secondary: getContextTitle(payload),
+    },
+    summary: summaryParts.length
+      ? summaryParts.join(', ')
+      : 'Learning space setup completed.',
+    actionButton: sourceAction(event, payload, 'outline', 'View your learning space'),
+  } satisfies ActivityRenderResult;
+}
+
+function renderLearningSpaceUpdatedGroup(event: ActivityEventRow) {
+  const payload = asRecord(event.payload);
+  const invitedMembers = buildParticipantAvatars(payload);
+  const invitedMembersOverflow = Math.max(0, invitedMembers.length - 3);
+  return {
+    verb: event.event_type as ActivityVerbVM,
+    leading:
+      invitedMembers.length > 0
+        ? {
+            kind: 'avatars',
+            avatars: invitedMembers,
+            overflowCount: invitedMembersOverflow,
+          }
+        : buildSystemLeadingAvatar(),
+    headline: {
+      primary: 'Learning space updated',
+      secondary: getContextTitle(payload),
+    },
+    summary:
+      asOptionalString(payload.changeSummary) ??
+      'Schedule, roster, or settings were updated.',
+    actionButton: sourceAction(event, payload, 'outline', 'View your learning space'),
+  } satisfies ActivityRenderResult;
+}
+
+function buildParticipantAvatars(payload: Record<string, unknown>) {
+  const invitedMembersRaw = Array.isArray(payload.invitedMembers)
+    ? payload.invitedMembers
+    : [];
+  return invitedMembersRaw
+    .map((entry) =>
+      entry && typeof entry === 'object' ? (entry as Record<string, unknown>) : null,
+    )
+    .filter((entry): entry is Record<string, unknown> => entry !== null)
+    .map((entry) => ({
+      name: asString(entry.name, 'Participant'),
+      avatar: {
+        source: asOptionalString(entry.avatarUrl)
+          ? ('upload' as const)
+          : ('seed' as const),
+        ...(asOptionalString(entry.avatarUrl)
+          ? { url: asOptionalString(entry.avatarUrl) }
+          : {
+              seed:
+                asOptionalString(entry.profileId) ?? asString(entry.name, 'participant'),
+            }),
+      },
+      themeKey: asOptionalString(entry.themeKey) ?? null,
+    }));
+}
+
+type ActivityMemberSummary = {
+  profileId: string;
+  name: string;
+  avatarUrl: string | null;
+  themeKey: string | null;
+};
+
+function seedFromName(name: string) {
+  return name.toLowerCase().replace(/\s+/g, '-');
+}
+
+function extractActivityMembers(
+  payload: Record<string, unknown>,
+): ActivityMemberSummary[] {
+  const membersRaw = Array.isArray(payload.members) ? payload.members : [];
+  const membersFromArray = membersRaw
+    .map((entry) =>
+      entry && typeof entry === 'object' ? (entry as Record<string, unknown>) : null,
+    )
+    .filter((entry): entry is Record<string, unknown> => entry !== null)
+    .map((entry) => {
+      const name = asString(entry.displayName, asString(entry.name, 'Member'));
+      return {
+        profileId:
+          asOptionalString(entry.profileId) ??
+          asOptionalString(entry.memberProfileId) ??
+          seedFromName(name),
+        name,
+        avatarUrl: asOptionalString(entry.avatarUrl) ?? null,
+        themeKey: asOptionalString(entry.themeKey) ?? null,
+      };
+    });
+
+  if (membersFromArray.length > 0) {
+    return membersFromArray;
+  }
+
+  const memberName = asOptionalString(payload.memberDisplayName);
+  if (!memberName) {
+    return [];
+  }
+
+  return [
+    {
+      profileId: asOptionalString(payload.memberProfileId) ?? seedFromName(memberName),
+      name: memberName,
+      avatarUrl: asOptionalString(payload.memberAvatarUrl) ?? null,
+      themeKey: asOptionalString(payload.memberThemeKey) ?? null,
+    },
+  ];
+}
+
+function buildMembersLeading(payload: Record<string, unknown>): InboxLeadingVM {
+  const members = extractActivityMembers(payload);
+  if (!members.length) {
+    return {
+      kind: 'avatars',
+      avatars: [
+        {
+          name: 'Member',
+          avatar: { source: 'seed', seed: 'member' },
+          themeKey: null,
+        },
+      ],
+      overflowCount: 0,
+    };
+  }
+  const visible = members.slice(0, 3);
+  return {
+    kind: 'avatars',
+    avatars: visible.map((member) => ({
+      name: member.name,
+      avatar: member.avatarUrl
+        ? { source: 'upload', url: member.avatarUrl }
+        : { source: 'seed', seed: member.profileId },
+      themeKey: member.themeKey,
+    })),
+    overflowCount: Math.max(0, members.length - visible.length),
+  };
+}
+
+function buildMembersSummary(
+  prefix: 'Added' | 'Removed',
+  payload: Record<string, unknown>,
+) {
+  const names = extractActivityMembers(payload)
+    .map((member) => member.name)
+    .filter(Boolean);
+  if (!names.length) {
+    return undefined;
+  }
+  const listed = names.slice(0, 3).join(', ');
+  const remaining = names.length - 3;
+  const suffix = remaining > 0 ? ` +${remaining} more` : '';
+  return `${prefix}: ${listed}${suffix}.`;
+}
+
+function buildSystemLeadingAvatar(): InboxLeadingVM {
+  return {
+    kind: 'avatars',
+    avatars: [
+      {
+        name: 'System',
+        avatar: { source: 'seed', seed: 'system' },
+        themeKey: null,
+      },
+    ],
+    overflowCount: 0,
+  };
 }
 
 export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition> = {
@@ -374,16 +679,24 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     eventType: 'class.created',
     tabKey: 'classes',
     importance: 'normal',
-    group: null,
+    group: {
+      groupType: 'class',
+      collapseByDefault: true,
+      buildGroupKey: (event) => buildClassCreatedGroupKey(event),
+      renderGroup: (event) => renderClassCreatedGroup(event),
+    },
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => {
       const payload = asRecord(event.payload);
       return {
         verb: 'class.created',
-        leading: { kind: 'icon', iconKey: 'GraduationCap', tone: 'info' },
-        headline: { primary: 'Class created', secondary: className(payload) },
-        summary: asOptionalString(payload.subject),
-        actionButton: sourceAction(event, payload),
+        leading: buildSystemLeadingAvatar(),
+        headline: {
+          primary: 'Learning space created and assigned',
+          secondary: className(payload),
+        },
+        summary: renderClassCreatedGroup(event).summary,
+        actionButton: sourceAction(event, payload, 'outline', 'View your learning space'),
       };
     },
   },
@@ -394,27 +707,20 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     group: {
       groupType: 'class',
       collapseByDefault: true,
-      buildGroupKey: (event) => {
-        const payload = asRecord(event.payload);
-        return buildHourlyLearningSpaceGroupKey('class', event, payload);
-      },
-      renderGroup: (event) =>
-        renderGroupedClassActivity(event, {
-          iconKey: 'GraduationCap',
-          tone: 'neutral',
-          primary: 'Class updates',
-        }),
+      buildGroupKey: (event) => buildClassUpdatedGroupKey(event),
+      renderGroup: (event) => renderLearningSpaceUpdatedGroup(event),
     },
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => {
       const payload = asRecord(event.payload);
+      const grouped = renderLearningSpaceUpdatedGroup(event);
       return {
         verb: 'class.updated',
-        leading: { kind: 'icon', iconKey: 'GraduationCap', tone: 'neutral' },
-        headline: { primary: 'Class updated', secondary: className(payload) },
+        leading: grouped.leading,
+        headline: { primary: 'Learning space updated', secondary: className(payload) },
         summary:
           asOptionalString(payload.changeSummary) ?? asOptionalString(payload.subject),
-        actionButton: sourceAction(event, payload),
+        actionButton: sourceAction(event, payload, 'outline', 'View your learning space'),
       };
     },
   },
@@ -438,19 +744,40 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     eventType: 'member.invited',
     tabKey: 'classes',
     importance: 'normal',
-    group: null,
+    group: {
+      groupType: 'class',
+      collapseByDefault: true,
+      buildGroupKey: (event) => buildClassLifecycleGroupKey(event),
+      renderGroup: (event) => {
+        const payload = asRecord(event.payload);
+        if (asOptionalString(payload.activityPhase) === 'created') {
+          return renderClassCreatedGroup(event);
+        }
+        return renderLearningSpaceUpdatedGroup(event);
+      },
+    },
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => {
       const payload = asRecord(event.payload);
+      const members = extractActivityMembers(payload);
+      const memberCountRaw = payload.memberCount;
+      const memberCount =
+        typeof memberCountRaw === 'number' && Number.isFinite(memberCountRaw)
+          ? memberCountRaw
+          : members.length;
+      const memberName =
+        members[0]?.name ?? asString(payload.memberDisplayName, 'Member');
+      const membersSummary = buildMembersSummary('Added', payload);
       return {
         verb: 'member.invited',
-        leading: { kind: 'icon', iconKey: 'CheckCircle2', tone: 'info' },
+        leading: buildMembersLeading(payload),
         headline: {
-          primary: 'Member invited',
-          secondary: asString(payload.memberDisplayName, 'New member'),
+          primary:
+            memberCount > 1
+              ? `${memberCount} members invited to the learning space`
+              : `${memberName} invited to the learning space`,
         },
-        summary: asOptionalString(payload.role),
-        actionButton: sourceAction(event, payload),
+        summary: `${membersSummary ? `${membersSummary} ` : ''}Added to ${className(payload)} with access and notifications enabled.`,
       };
     },
   },
@@ -458,15 +785,25 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     eventType: 'member.joined',
     tabKey: 'classes',
     importance: 'normal',
-    group: null,
+    group: {
+      groupType: 'class',
+      collapseByDefault: true,
+      buildGroupKey: (event) => buildSessionGroupKey(event),
+      renderGroup: (event) =>
+        renderGroupedClassActivity(event, {
+          iconKey: 'Video',
+          tone: 'info',
+          primary: 'Class session',
+        }),
+    },
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => {
       const payload = asRecord(event.payload);
       return {
         verb: 'member.joined',
-        leading: { kind: 'icon', iconKey: 'CheckCircle2', tone: 'success' },
+        leading: { kind: 'icon', iconKey: 'CheckCircle2', tone: 'info' },
         headline: {
-          primary: 'Member joined',
+          primary: `${asString(payload.memberDisplayName, 'Participant')} joined class`,
           secondary: asString(payload.memberDisplayName, 'New member'),
         },
         summary: asOptionalString(payload.role),
@@ -478,18 +815,40 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     eventType: 'member.removed',
     tabKey: 'classes',
     importance: 'important',
-    group: null,
+    group: {
+      groupType: 'class',
+      collapseByDefault: true,
+      buildGroupKey: (event) => buildClassLifecycleGroupKey(event),
+      renderGroup: (event) => {
+        const payload = asRecord(event.payload);
+        if (asOptionalString(payload.activityPhase) === 'created') {
+          return renderClassCreatedGroup(event);
+        }
+        return renderLearningSpaceUpdatedGroup(event);
+      },
+    },
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => {
       const payload = asRecord(event.payload);
+      const members = extractActivityMembers(payload);
+      const memberCountRaw = payload.memberCount;
+      const memberCount =
+        typeof memberCountRaw === 'number' && Number.isFinite(memberCountRaw)
+          ? memberCountRaw
+          : members.length;
+      const memberName =
+        members[0]?.name ?? asString(payload.memberDisplayName, 'Member');
+      const membersSummary = buildMembersSummary('Removed', payload);
       return {
         verb: 'member.removed',
-        leading: { kind: 'icon', iconKey: 'CheckCircle2', tone: 'warning' },
+        leading: buildMembersLeading(payload),
         headline: {
-          primary: 'Member removed',
-          secondary: asString(payload.memberDisplayName, 'Member'),
+          primary:
+            memberCount > 1
+              ? `${memberCount} members removed from the learning space`
+              : `${memberName} removed from the learning space`,
         },
-        actionButton: sourceAction(event, payload),
+        summary: `${membersSummary ? `${membersSummary} ` : ''}Removed from ${className(payload)} and access notifications disabled.`,
       };
     },
   },
@@ -520,26 +879,29 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     group: {
       groupType: 'class',
       collapseByDefault: true,
-      buildGroupKey: (event) => {
+      buildGroupKey: (event) => buildClassLifecycleGroupKey(event),
+      renderGroup: (event) => {
         const payload = asRecord(event.payload);
-        return buildHourlyLearningSpaceGroupKey('session', event, payload);
+        if (asOptionalString(payload.activityPhase) === 'created') {
+          return renderClassCreatedGroup(event);
+        }
+        return renderLearningSpaceUpdatedGroup(event);
       },
-      renderGroup: (event) =>
-        renderGroupedClassActivity(event, {
-          iconKey: 'GraduationCap',
-          tone: 'info',
-          primary: 'Lesson schedule updates',
-        }),
     },
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => {
       const payload = asRecord(event.payload);
+      const firstSessionLabel = formatSessionLabel(payload.startAt, payload.timezone);
+      const weeklyTime = formatWeeklyTimeLabel(payload.startAt, payload.timezone);
       return {
         verb: 'session.scheduled',
-        leading: { kind: 'icon', iconKey: 'GraduationCap', tone: 'info' },
+        leading: buildSystemLeadingAvatar(),
         headline: { primary: 'Session scheduled', secondary: sessionName(payload) },
-        summary: asOptionalString(payload.startAt),
-        actionButton: sourceAction(event, payload),
+        summary:
+          firstSessionLabel && weeklyTime
+            ? `First session: ${firstSessionLabel}, then weekly ${weeklyTime}`
+            : (asOptionalString(payload.startAt) ?? undefined),
+        actionButton: sourceScheduleAction(event, payload),
       };
     },
   },
@@ -550,16 +912,8 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     group: {
       groupType: 'class',
       collapseByDefault: true,
-      buildGroupKey: (event) => {
-        const payload = asRecord(event.payload);
-        return buildHourlyLearningSpaceGroupKey('session', event, payload);
-      },
-      renderGroup: (event) =>
-        renderGroupedClassActivity(event, {
-          iconKey: 'GraduationCap',
-          tone: 'warning',
-          primary: 'Lesson schedule updates',
-        }),
+      buildGroupKey: (event) => buildClassUpdatedGroupKey(event),
+      renderGroup: (event) => renderLearningSpaceUpdatedGroup(event),
     },
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => {
@@ -567,9 +921,12 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       return {
         verb: 'session.rescheduled',
         leading: { kind: 'icon', iconKey: 'GraduationCap', tone: 'warning' },
-        headline: { primary: 'Session rescheduled', secondary: sessionName(payload) },
-        summary: asOptionalString(payload.startAt),
-        actionButton: sourceAction(event, payload),
+        headline: {
+          primary: 'Class session rescheduled',
+          secondary: sessionName(payload),
+        },
+        summary:
+          asOptionalString(payload.description) ?? asOptionalString(payload.startAt),
       };
     },
   },
@@ -580,16 +937,8 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     group: {
       groupType: 'class',
       collapseByDefault: true,
-      buildGroupKey: (event) => {
-        const payload = asRecord(event.payload);
-        return buildHourlyLearningSpaceGroupKey('session', event, payload);
-      },
-      renderGroup: (event) =>
-        renderGroupedClassActivity(event, {
-          iconKey: 'GraduationCap',
-          tone: 'warning',
-          primary: 'Lesson schedule updates',
-        }),
+      buildGroupKey: (event) => buildClassUpdatedGroupKey(event),
+      renderGroup: (event) => renderLearningSpaceUpdatedGroup(event),
     },
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => {
@@ -597,8 +946,8 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       return {
         verb: 'session.canceled',
         leading: { kind: 'icon', iconKey: 'GraduationCap', tone: 'danger' },
-        headline: { primary: 'Session canceled', secondary: sessionName(payload) },
-        actionButton: sourceAction(event, payload),
+        headline: { primary: 'Class session cancelled', secondary: sessionName(payload) },
+        summary: asOptionalString(payload.description),
       };
     },
   },
@@ -606,7 +955,17 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     eventType: 'session.started',
     tabKey: 'classes',
     importance: 'important',
-    group: null,
+    group: {
+      groupType: 'class',
+      collapseByDefault: true,
+      buildGroupKey: (event) => buildSessionGroupKey(event),
+      renderGroup: (event) =>
+        renderGroupedClassActivity(event, {
+          iconKey: 'Video',
+          tone: 'success',
+          primary: 'Class session',
+        }),
+    },
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => {
       const payload = asRecord(event.payload);
@@ -614,7 +973,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       return {
         verb: 'session.started',
         leading: { kind: 'icon', iconKey: 'Video', tone: 'success' },
-        headline: { primary: 'Class started', secondary: sessionName(payload) },
+        headline: { primary: 'Class is live now', secondary: sessionName(payload) },
         actionButton: joinPath
           ? {
               label: 'Join now',
@@ -629,7 +988,17 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     eventType: 'session.ended',
     tabKey: 'classes',
     importance: 'normal',
-    group: null,
+    group: {
+      groupType: 'class',
+      collapseByDefault: true,
+      buildGroupKey: (event) => buildSessionGroupKey(event),
+      renderGroup: (event) =>
+        renderGroupedClassActivity(event, {
+          iconKey: 'Video',
+          tone: 'neutral',
+          primary: 'Class session',
+        }),
+    },
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => {
       const payload = asRecord(event.payload);
@@ -664,15 +1033,14 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     group: {
       groupType: 'class',
       collapseByDefault: true,
-      buildGroupKey: (event) =>
-        buildReminderHourlyGroupKey(event, asRecord(event.payload)),
+      buildGroupKey: (event) => buildSessionGroupKey(event),
       renderGroup: (event) => {
         const payload = asRecord(event.payload);
         return {
           verb: 'session.reminder.sent',
           leading: { kind: 'icon', iconKey: 'Bell', tone: 'info' },
           headline: {
-            primary: 'Class reminders',
+            primary: 'Class session',
             secondary: getContextTitle(payload),
           },
           actionButton: sourceAction(event, payload),
@@ -686,7 +1054,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
         verb: 'session.reminder.sent',
         leading: { kind: 'icon', iconKey: 'Bell', tone: 'info' },
         headline: {
-          primary: 'Upcoming class reminder',
+          primary: 'Class starts in 5 mins',
           secondary: sessionName(payload),
         },
         summary:
@@ -702,15 +1070,14 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     group: {
       groupType: 'class',
       collapseByDefault: true,
-      buildGroupKey: (event) =>
-        buildReminderHourlyGroupKey(event, asRecord(event.payload)),
+      buildGroupKey: (event) => buildSessionGroupKey(event),
       renderGroup: (event) => {
         const payload = asRecord(event.payload);
         return {
           verb: 'session.feedback_request.sent',
           leading: { kind: 'icon', iconKey: 'ClipboardCheck', tone: 'info' },
           headline: {
-            primary: 'Feedback requests',
+            primary: 'Class session',
             secondary: getContextTitle(payload),
           },
           actionButton: sourceAction(event, payload),
@@ -722,9 +1089,9 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       const payload = asRecord(event.payload);
       return {
         verb: 'session.feedback_request.sent',
-        leading: { kind: 'icon', iconKey: 'ClipboardCheck', tone: 'info' },
+        leading: { kind: 'icon', iconKey: 'Sparkles', tone: 'info' },
         headline: {
-          primary: 'Session feedback requested',
+          primary: 'Class feedback requested',
           secondary: sessionName(payload),
         },
         summary: asOptionalString(payload.summary),
