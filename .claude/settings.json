@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(pnpm --filter ui-native exec jest --testPathPattern=\"Button|IconButton|ListItem|Chip|Tabs|SettingsRow\" --silent)",
-      "Bash(pnpm --filter mobile exec jest --testPathPattern=\"analytics-provider|app-providers\" --silent)"
+      "Bash(pnpm --filter mobile exec jest --testPathPattern=\"analytics-provider|app-providers\" --silent)",
+      "Bash(pnpm --filter mobile exec jest --testPathPattern=\"analytics-provider|app-lifecycle-tracker\" --silent)",
+      "Bash(git add apps/mobile/src/providers/analytics-provider.tsx apps/mobile/src/providers/analytics-provider.test.tsx apps/mobile/src/components/analytics/app-lifecycle-tracker.tsx apps/mobile/src/components/analytics/app-lifecycle-tracker.test.tsx packages/utils/src/analytics.ts)",
+      "Bash(pnpm --filter mobile exec jest --testPathPattern=\"screen-tracker|screen-name|app-providers\" --silent)",
+      "Bash(git add apps/mobile/src/lib/screen-name.ts apps/mobile/src/lib/screen-name.test.ts apps/mobile/src/components/analytics/screen-tracker.tsx apps/mobile/src/components/analytics/screen-tracker.test.tsx apps/mobile/src/providers/app-providers.tsx apps/mobile/src/providers/app-providers.test.tsx)"
     ]
   }
 }

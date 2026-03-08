@@ -617,15 +617,9 @@ describe('activity event definitions', () => {
       'First session: Sat 2:00 PM PST, then weekly 2:00 PM PST',
     );
     expect(rendered.leading).toEqual({
-      kind: 'avatars',
-      avatars: [
-        {
-          name: 'System',
-          avatar: { source: 'seed', seed: 'system' },
-          themeKey: null,
-        },
-      ],
-      overflowCount: 0,
+      kind: 'icon',
+      iconKey: 'CalendarDays',
+      tone: 'info',
     });
     expect(rendered.actionButton).toEqual({
       label: 'View schedule',
@@ -665,7 +659,9 @@ describe('activity event definitions', () => {
       created_at: '2026-03-08T12:00:00.000Z',
       updated_at: '2026-03-08T12:00:00.000Z',
     });
-    expect(rescheduledRendered.headline.primary).toBe('Class schedule updated');
+    expect(rescheduledRendered.headline.primary).toBe(
+      'Learning space session schedule updated',
+    );
     expect(rescheduledRendered.summary).toBe(
       'Session: Math Foundations weekly session (Sat) moved from 2:00 PM to 2:30 PM PT',
     );
@@ -695,7 +691,9 @@ describe('activity event definitions', () => {
       created_at: '2026-03-08T12:00:00.000Z',
       updated_at: '2026-03-08T12:00:00.000Z',
     });
-    expect(canceledRendered.headline.primary).toBe('Class schedule updated');
+    expect(canceledRendered.headline.primary).toBe(
+      'Learning space session schedule updated',
+    );
     expect(canceledRendered.summary).toBe(
       'Session: Math Foundations weekly session (Sat 2:30 PM PT) canceled due to schedule update',
     );

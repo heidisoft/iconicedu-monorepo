@@ -53,6 +53,7 @@ import type {
   UserProfileVM,
 } from '@iconicedu/shared-types';
 import {
+  buildSchedulesHashKeyFromFormSchedules,
   mapSchedulesToPayload,
   normalizeSchedules,
 } from '@iconicedu/web/app/(app)/[orgSlug]/admin/spaces/learning-space-form-dialog.utils';
@@ -180,6 +181,14 @@ export function LearningSpaceFormDialog({
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [isSubmitted, setIsSubmitted] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
+  const initialScheduleHashKey = React.useMemo(
+    () => buildSchedulesHashKeyFromFormSchedules(initialData?.schedules ?? []),
+    [initialData?.schedules],
+  );
+  const currentScheduleHashKey = React.useMemo(
+    () => buildSchedulesHashKeyFromFormSchedules(formState.schedules),
+    [formState.schedules],
+  );
   const iconInvalid = isSubmitted && !formState.iconKey;
   const titleInvalid = isSubmitted && !formState.title.trim();
   const kindInvalid = isSubmitted && !formState.kind;
@@ -196,8 +205,8 @@ export function LearningSpaceFormDialog({
         title: initialData.basics.title,
         subject: initialData.basics.subject ?? '',
         description: initialData.basics.description ?? '',
-        iconKey:
-          (initialData.basics.iconKey ?? DEFAULT_LEARNING_SPACE_ICON_KEY) as LearningSpaceIconKey,
+        iconKey: (initialData.basics.iconKey ??
+          DEFAULT_LEARNING_SPACE_ICON_KEY) as LearningSpaceIconKey,
         uiDefaults: {
           ...createDefaultChannelUiDefaults(),
           ...(initialData.settings?.uiDefaults ?? {}),
@@ -265,7 +274,13 @@ export function LearningSpaceFormDialog({
         mode === 'edit' ? '/api/admin/spaces/update' : '/api/admin/spaces/create';
       const body =
         mode === 'edit'
-          ? JSON.stringify({ learningSpaceId: editingId, payload })
+          ? JSON.stringify({
+              learningSpaceId: editingId,
+              payload,
+              initialScheduleHashKey,
+              scheduleHashKey: currentScheduleHashKey,
+              hasScheduleChanges: initialScheduleHashKey !== currentScheduleHashKey,
+            })
           : JSON.stringify(payload);
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -286,7 +301,9 @@ export function LearningSpaceFormDialog({
         );
         return;
       }
-      toast.success(mode === 'edit' ? 'Learning space updated.' : 'Learning space created.');
+      toast.success(
+        mode === 'edit' ? 'Learning space updated.' : 'Learning space created.',
+      );
       setDialogOpen(false);
       resetForm();
       router.refresh();
@@ -383,7 +400,9 @@ export function LearningSpaceFormDialog({
                       <Input
                         id="ls-title"
                         value={formState.title}
-                        onChange={(event) => updateFormState({ title: event.target.value })}
+                        onChange={(event) =>
+                          updateFormState({ title: event.target.value })
+                        }
                         required
                         aria-invalid={titleInvalid}
                       />
@@ -450,7 +469,9 @@ export function LearningSpaceFormDialog({
                     <Textarea
                       id="ls-description"
                       value={formState.description}
-                      onChange={(event) => updateFormState({ description: event.target.value })}
+                      onChange={(event) =>
+                        updateFormState({ description: event.target.value })
+                      }
                       rows={3}
                     />
                   </Field>
@@ -459,7 +480,9 @@ export function LearningSpaceFormDialog({
                 <FieldSet>
                   <ResourceLinksEditor
                     links={formState.resources}
-                    onLinksChange={(nextLinks) => updateFormState({ resources: nextLinks })}
+                    onLinksChange={(nextLinks) =>
+                      updateFormState({ resources: nextLinks })
+                    }
                   />
                 </FieldSet>
                 <FieldSeparator />
@@ -547,7 +570,11 @@ export function LearningSpaceFormDialog({
             </ScrollArea>
             <div className="border-t border-border bg-card px-6 py-4">
               <DialogFooter className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-                <Button variant="ghost" onClick={() => setDialogOpen(false)} type="button">
+                <Button
+                  variant="ghost"
+                  onClick={() => setDialogOpen(false)}
+                  type="button"
+                >
                   Cancel
                 </Button>
                 <Button

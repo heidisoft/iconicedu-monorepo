@@ -8,6 +8,7 @@ import { compileLearningSpaceReminderJobs } from '@iconicedu/web/lib/automation/
 import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
 import { toStoredLiveSessionConfig } from '@iconicedu/web/lib/admin/live-session-config';
+import { buildLearningSpaceSchedulesHashKeyFromPayload } from '@iconicedu/web/lib/admin/learning-space-schedule-hash';
 import type {
   ChannelUiDefaultsVM,
   LearningSpaceCreatePayload,
@@ -255,6 +256,9 @@ export async function createLearningSpaceFromPayload(
     }
     return current.expanded.startAt < earliest.expanded.startAt ? current : earliest;
   }, null);
+  const scheduleHashKey = buildLearningSpaceSchedulesHashKeyFromPayload(
+    payload.schedules ?? [],
+  );
 
   await publishActivityEvent({
     supabase: serviceClient,
@@ -277,6 +281,7 @@ export async function createLearningSpaceFromPayload(
       invitedMembers,
       firstSessionStartAt: firstScheduled?.expanded.startAt ?? null,
       firstSessionTimezone: firstScheduled?.schedule.timezone ?? null,
+      scheduleHashKey,
     },
     dedupeKey: `class.created:${learningSpaceId}`,
     createdBy: actorProfileId,

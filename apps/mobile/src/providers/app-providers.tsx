@@ -1,6 +1,7 @@
 import React, { useCallback } from 'react';
 import { UiTrackingContext } from '@iconicedu/ui-native';
 import { usePathname } from 'expo-router';
+import { getScreenName } from '@/lib/screen-name';
 import { AuthProvider } from '@/providers/auth-provider';
 import { QueryProvider } from '@/providers/query-provider';
 import { ThemeProvider } from '@/providers/theme-provider';
@@ -20,7 +21,7 @@ function UiTrackingBridge({ children }: { children: React.ReactNode }) {
 
   const capture = useCallback(
     (event: string, props?: Record<string, unknown>) =>
-      analytics.capture(event, { screen_name: pathname, ...props }),
+      analytics.capture(event, { screen_name: getScreenName(pathname), ...props }),
     [analytics, pathname],
   );
 

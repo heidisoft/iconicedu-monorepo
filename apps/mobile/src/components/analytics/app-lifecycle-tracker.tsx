@@ -21,6 +21,8 @@ export function AppLifecycleTracker() {
         analytics.capture(AnalyticsEvent.APP_FOREGROUNDED);
       } else if (nextState === 'background' || nextState === 'inactive') {
         analytics.capture(AnalyticsEvent.APP_BACKGROUNDED, { state: nextState });
+        // Flush queued events immediately — the OS may suspend the process seconds later.
+        analytics.flush?.();
       }
     });
 

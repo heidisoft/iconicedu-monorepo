@@ -37,6 +37,7 @@ const mockPh = {
 
 import { useCallback } from 'react';
 import { usePathname } from 'expo-router';
+import { getScreenName } from '@/lib/screen-name';
 
 function UiTrackingBridge({ children }: { children: React.ReactNode }) {
   const analytics = useAnalytics();
@@ -44,7 +45,7 @@ function UiTrackingBridge({ children }: { children: React.ReactNode }) {
 
   const capture = useCallback(
     (event: string, props?: Record<string, unknown>) =>
-      analytics.capture(event, { screen_name: pathname, ...props }),
+      analytics.capture(event, { screen_name: getScreenName(pathname), ...props }),
     [analytics, pathname],
   );
 
@@ -91,24 +92,34 @@ describe('UiTrackingBridge', () => {
     mockPathname.mockReturnValue('/home');
   });
 
-  it('injects screen_name from current pathname into captured events', () => {
-    mockPathname.mockReturnValue('/schedule');
+  it('injects human-readable screen_name into captured UI events', () => {
+    mockPathname.mockReturnValue('/(app)/(tabs)/schedule');
     renderWithProviders(<TrackingConsumer onCapture={jest.fn()} />);
     fireEvent.press(screen.getByTestId('trigger'));
     expect(mockPh.capture).toHaveBeenCalledWith(
       'button clicked',
-      expect.objectContaining({ screen_name: '/schedule', button_name: 'Submit' }),
+      expect.objectContaining({ screen_name: 'Schedule', button_name: 'Submit' }),
+    );
+  });
+
+  it('uses "Home" as screen_name on the home tab', () => {
+    mockPathname.mockReturnValue('/(app)/(tabs)');
+    renderWithProviders(<TrackingConsumer onCapture={jest.fn()} />);
+    fireEvent.press(screen.getByTestId('trigger'));
+    expect(mockPh.capture).toHaveBeenCalledWith(
+      'button clicked',
+      expect.objectContaining({ screen_name: 'Home' }),
     );
   });
 
   it('allows component props to override screen_name', () => {
-    // The bridge spreads { screen_name: pathname, ...props } so component props win.
+    // The bridge spreads { screen_name: getScreenName(pathname), ...props } so component props win.
     // Verify the merge order: later spread wins.
     const overrideProps = {
-      ...{ screen_name: '/home' },
-      ...{ screen_name: '/override', button_name: 'Submit' },
+      ...{ screen_name: 'Home' },
+      ...{ screen_name: 'Custom Screen', button_name: 'Submit' },
     };
-    expect(overrideProps.screen_name).toBe('/override');
+    expect(overrideProps.screen_name).toBe('Custom Screen');
   });
 
   it('renders children', () => {

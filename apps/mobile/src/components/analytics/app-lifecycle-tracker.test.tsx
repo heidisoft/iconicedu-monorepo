@@ -4,6 +4,7 @@ import { AppState, type AppStateStatus } from 'react-native';
 import { AnalyticsEvent } from '@iconicedu/utils';
 
 const mockCapture = jest.fn();
+const mockFlush = jest.fn();
 
 jest.mock('@/providers/analytics-provider', () => ({
   useAnalytics: () => ({
@@ -11,6 +12,7 @@ jest.mock('@/providers/analytics-provider', () => ({
     capture: mockCapture,
     identify: jest.fn(),
     reset: jest.fn(),
+    flush: mockFlush,
   }),
 }));
 
@@ -62,7 +64,7 @@ describe('AppLifecycleTracker', () => {
     expect(mockCapture).toHaveBeenCalledWith(AnalyticsEvent.APP_FOREGROUNDED);
   });
 
-  it('fires APP_BACKGROUNDED when transitioning to background', () => {
+  it('fires APP_BACKGROUNDED and flushes when transitioning to background', () => {
     render(<AppLifecycleTracker />);
 
     act(() => {
@@ -72,9 +74,10 @@ describe('AppLifecycleTracker', () => {
     expect(mockCapture).toHaveBeenCalledWith(AnalyticsEvent.APP_BACKGROUNDED, {
       state: 'background',
     });
+    expect(mockFlush).toHaveBeenCalledTimes(1);
   });
 
-  it('fires APP_BACKGROUNDED when transitioning to inactive', () => {
+  it('fires APP_BACKGROUNDED and flushes when transitioning to inactive', () => {
     render(<AppLifecycleTracker />);
 
     act(() => {
@@ -84,6 +87,21 @@ describe('AppLifecycleTracker', () => {
     expect(mockCapture).toHaveBeenCalledWith(AnalyticsEvent.APP_BACKGROUNDED, {
       state: 'inactive',
     });
+    expect(mockFlush).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not flush when foregrounding', () => {
+    Object.defineProperty(AppState, 'currentState', {
+      value: 'background',
+      configurable: true,
+    });
+    render(<AppLifecycleTracker />);
+
+    act(() => {
+      changeListener?.('active');
+    });
+
+    expect(mockFlush).not.toHaveBeenCalled();
   });
 
   it('does not fire when staying active', () => {

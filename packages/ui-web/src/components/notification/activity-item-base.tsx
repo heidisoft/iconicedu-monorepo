@@ -4,6 +4,7 @@ import type React from 'react';
 import { useEffect, useRef } from 'react';
 import {
   Bell,
+  CalendarDays,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -45,6 +46,7 @@ const INBOX_ICON_MAP: Record<
   React.ComponentType<{ className?: string }>
 > = {
   Bell,
+  CalendarDays,
   CheckCircle2,
   ClipboardCheck,
   CreditCard,
@@ -113,6 +115,7 @@ const getDefaultIconKey = (activity: ActivityFeedItemVM): InboxIconKeyVM => {
     case 'session.scheduled':
     case 'session.rescheduled':
     case 'session.canceled':
+      return 'CalendarDays';
     case 'session.completed':
     case 'class.created':
     case 'class.updated':

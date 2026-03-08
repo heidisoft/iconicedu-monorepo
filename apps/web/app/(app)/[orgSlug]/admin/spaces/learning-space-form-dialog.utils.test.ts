@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { RecurrenceFormData } from '@iconicedu/ui-web/lib/recurrence-types';
 import {
+  buildSchedulesHashKeyFromFormSchedules,
   mapSchedulesToPayload,
   normalizeSchedules,
 } from '@iconicedu/web/app/(app)/[orgSlug]/admin/spaces/learning-space-form-dialog.utils';
@@ -33,7 +34,7 @@ describe('learning-space-form-dialog schedule utils', () => {
 
     expect(mapSchedulesToPayload(schedules)).toEqual([
       {
-        startDate: '2026-03-10T14:00:00.000Z',
+        startDate: '2026-03-10T12:00:00.000Z',
         timezone: 'UTC',
         rule: {
           frequency: 'weekly',
@@ -51,6 +52,27 @@ describe('learning-space-form-dialog schedule utils', () => {
         ],
       },
     ]);
+  });
+
+  it('serializes start dates as stable date-only UTC values', () => {
+    const schedules: RecurrenceFormData[] = [
+      {
+        id: 'schedule-1',
+        startDate: new Date('2026-03-10T12:00:00.000Z'),
+        timezone: 'America/New_York',
+        rule: {
+          frequency: 'weekly',
+          byWeekday: ['TU'],
+          weekdayTimes: [{ day: 'TU', time: '17:02' }],
+        },
+        exceptions: [],
+        overrides: [],
+      },
+    ];
+
+    expect(mapSchedulesToPayload(schedules)[0]?.startDate).toBe(
+      '2026-03-10T12:00:00.000Z',
+    );
   });
 
   it('normalizes schedules without sharing nested references', () => {
@@ -85,5 +107,52 @@ describe('learning-space-form-dialog schedule utils', () => {
     expect(normalized[0]?.exceptions).not.toBe(source[0]?.exceptions);
     expect(normalized[0]?.overrides).not.toBe(source[0]?.overrides);
     expect(normalized[0]?.rule.weekdayTimes).not.toBe(source[0]?.rule.weekdayTimes);
+  });
+
+  it('builds the same hash for reordered exception and override entries', () => {
+    const first: RecurrenceFormData[] = [
+      {
+        id: 'schedule-1',
+        startDate: new Date('2026-03-10T14:00:00.000Z'),
+        timezone: 'UTC',
+        rule: {
+          frequency: 'weekly',
+          byWeekday: ['TU'],
+          weekdayTimes: [{ day: 'TU', time: '14:00' }],
+        },
+        exceptions: [
+          { id: 'exception-1', date: '2026-03-24', reason: 'Break' },
+          { id: 'exception-2', date: '2026-03-17', reason: 'Holiday' },
+        ],
+        overrides: [
+          {
+            id: 'override-1',
+            originalDate: '2026-04-07',
+            newDate: '2026-04-08',
+            newTime: '15:30',
+            reason: 'Moved again',
+          },
+          {
+            id: 'override-2',
+            originalDate: '2026-03-31',
+            newDate: '2026-04-01',
+            newTime: '15:00',
+            reason: 'Moved',
+          },
+        ],
+      },
+    ];
+
+    const second: RecurrenceFormData[] = [
+      {
+        ...first[0]!,
+        exceptions: [...first[0]!.exceptions].reverse(),
+        overrides: [...first[0]!.overrides].reverse(),
+      },
+    ];
+
+    expect(buildSchedulesHashKeyFromFormSchedules(first)).toBe(
+      buildSchedulesHashKeyFromFormSchedules(second),
+    );
   });
 });

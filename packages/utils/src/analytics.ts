@@ -14,6 +14,8 @@ export interface AnalyticsClient {
   screen(name: string, properties?: Record<string, unknown>): void;
   /** Clear the current identity (e.g. on sign-out). */
   reset(): void;
+  /** Flush all queued events immediately. Call when the app backgrounds so events are not lost. */
+  flush?(): void;
 }
 
 /** Drop-in no-op — safe default before the real provider mounts. */
@@ -23,6 +25,7 @@ export function createNoopAnalytics(): AnalyticsClient {
     capture: () => undefined,
     screen: () => undefined,
     reset: () => undefined,
+    flush: () => undefined,
   };
 }
 

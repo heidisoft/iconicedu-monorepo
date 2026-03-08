@@ -10,6 +10,12 @@ import {
   insertClassSchedules,
   publishParticipantInviteActivities,
 } from '@iconicedu/web/lib/admin/learning-space-create';
+import {
+  buildLearningSpaceScheduleHashBundleFromExisting,
+  buildLearningSpaceScheduleHashBundleFromPayload,
+  buildLearningSpaceSchedulesHashKeyFromExisting,
+  buildLearningSpaceSchedulesHashKeyFromPayload,
+} from '@iconicedu/web/lib/admin/learning-space-schedule-hash';
 import { toStoredLiveSessionConfig } from '@iconicedu/web/lib/admin/live-session-config';
 import { publishActivityEvent } from '@iconicedu/web/lib/activity-feed/publisher/activity-publisher';
 import { compileLearningSpaceReminderJobs } from '@iconicedu/web/lib/automation/reminder-jobs';
@@ -48,6 +54,21 @@ type ExistingScheduleSnapshot = {
 type ExistingRecurrenceSnapshot = {
   id: string;
   schedule_id: string;
+  frequency?: string | null;
+  interval?: number | null;
+  count?: number | null;
+  until?: string | null;
+  timezone?: string | null;
+  bysecond?: number[] | null;
+  byminute?: number[] | null;
+  byhour?: number[] | null;
+  byday?: string[] | null;
+  bymonthday?: number[] | null;
+  byyearday?: number[] | null;
+  byweekno?: number[] | null;
+  bymonth?: number[] | null;
+  bysetpos?: number[] | null;
+  wkst?: string | null;
 };
 
 type ExistingExceptionSnapshot = {
@@ -66,7 +87,8 @@ type NormalizedIncomingSchedule = {
   startAt: string;
   endAt: string;
   timezone: string | null;
-  signature: string;
+  baseHash: string;
+  fullHash: string;
   payload: LearningSpaceSchedulePayload;
 };
 
@@ -76,7 +98,8 @@ type NormalizedExistingSchedule = {
   startAt: string;
   endAt: string;
   timezone: string | null;
-  signature: string;
+  baseHash: string;
+  fullHash: string;
 };
 
 export type LearningSpaceScheduleDiffPlan = {
@@ -248,23 +271,49 @@ async function loadProfileSnapshotsByIds(input: {
 
 function normalizeExistingSchedulesForCompare(
   schedules: ExistingScheduleSnapshot[],
+  recurrencesByScheduleId: Map<string, ExistingRecurrenceSnapshot>,
+  exceptionsByScheduleId: Map<string, Set<string>>,
+  overridesByScheduleId: Map<
+    string,
+    Map<string, { startAt: string | null; endAt: string | null; reason: string | null }>
+  >,
 ): NormalizedExistingSchedule[] {
   return [...schedules]
     .map((schedule) => {
       const timezone = schedule.timezone ?? null;
-      const signature = getScheduleSignatureFromStartAt(schedule.start_at, timezone);
+      const hashes = buildLearningSpaceScheduleHashBundleFromExisting({
+        id: schedule.id,
+        startAt: schedule.start_at,
+        endAt: schedule.end_at,
+        timezone,
+        recurrence: recurrencesByScheduleId.get(schedule.id) ?? null,
+        exceptions: [
+          ...(exceptionsByScheduleId.get(schedule.id) ?? new Set<string>()),
+        ].map((occurrenceKey) => ({
+          occurrenceKey,
+        })),
+        overrides: [
+          ...(overridesByScheduleId.get(schedule.id) ?? new Map()).entries(),
+        ].map(([occurrenceKey, patch]) => ({
+          occurrenceKey,
+          startAt: patch.startAt,
+          endAt: patch.endAt,
+          reason: patch.reason,
+        })),
+      });
       return {
         id: schedule.id,
         title: schedule.title,
         startAt: schedule.start_at,
         endAt: schedule.end_at,
         timezone,
-        signature,
+        baseHash: hashes.baseHash,
+        fullHash: hashes.fullHash,
       };
     })
     .sort((a, b) =>
-      canonicalJson([a.signature, a.startAt, a.endAt]).localeCompare(
-        canonicalJson([b.signature, b.startAt, b.endAt]),
+      canonicalJson([a.baseHash, a.fullHash, a.startAt, a.endAt]).localeCompare(
+        canonicalJson([b.baseHash, b.fullHash, b.startAt, b.endAt]),
       ),
     );
 }
@@ -275,17 +324,19 @@ function normalizeIncomingSchedulesForCompare(
   return [...(schedules ?? [])]
     .map((payload) => {
       const expanded = buildScheduleStart(payload);
+      const hashes = buildLearningSpaceScheduleHashBundleFromPayload(payload);
       return {
         startAt: expanded.startAt,
         endAt: expanded.endAt,
         timezone: payload.timezone ?? null,
-        signature: getScheduleSignatureFromPayload(payload),
+        baseHash: hashes.baseHash,
+        fullHash: hashes.fullHash,
         payload,
       };
     })
     .sort((a, b) =>
-      canonicalJson([a.signature, a.startAt, a.endAt]).localeCompare(
-        canonicalJson([b.signature, b.startAt, b.endAt]),
+      canonicalJson([a.baseHash, a.fullHash, a.startAt, a.endAt]).localeCompare(
+        canonicalJson([b.baseHash, b.fullHash, b.startAt, b.endAt]),
       ),
     );
 }
@@ -294,38 +345,7 @@ function schedulesMatch(
   previous: NormalizedExistingSchedule,
   next: NormalizedIncomingSchedule,
 ) {
-  return previous.signature === next.signature;
-}
-
-function getScheduleSignatureFromStartAt(startAt: string, timezone: string | null) {
-  const date = new Date(startAt);
-  if (Number.isNaN(date.getTime())) {
-    return `invalid:${startAt}:${timezone ?? 'UTC'}`;
-  }
-  const timeZone = timezone && timezone.length > 0 ? timezone : 'UTC';
-  const weekdayLabel = new Intl.DateTimeFormat('en-US', {
-    weekday: 'short',
-    timeZone,
-  }).format(date);
-  const weekday = weekdayLabelToCode(weekdayLabel);
-  const time = new Intl.DateTimeFormat('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZone,
-  }).format(date);
-  return `${weekday}:${time}:${timeZone}`;
-}
-
-function getScheduleSignatureFromPayload(schedule: LearningSpaceSchedulePayload) {
-  const timezone =
-    schedule.timezone && schedule.timezone.length > 0 ? schedule.timezone : 'UTC';
-  const weekdayTime = schedule.rule.weekdayTimes?.[0];
-  const weekday =
-    weekdayTime?.day ?? schedule.rule.byWeekday?.[0] ?? getIsoWeekday(schedule.startDate);
-  const time = weekdayTime?.time ?? DEFAULT_SCHEDULE_TIME;
-  const normalizedTime = normalizeTimeLabel(time);
-  return `${weekday}:${normalizedTime}:${timezone}`;
+  return previous.baseHash === next.baseHash;
 }
 
 function schedulePrimaryTime(schedule: LearningSpaceSchedulePayload) {
@@ -363,18 +383,6 @@ function parseOverridePatch(patch: Record<string, unknown> | null | undefined): 
   };
 }
 
-function getIsoWeekday(isoDateTime: string) {
-  const date = new Date(isoDateTime);
-  if (Number.isNaN(date.getTime())) {
-    return 'MO';
-  }
-  const weekday = new Intl.DateTimeFormat('en-US', {
-    weekday: 'short',
-    timeZone: 'UTC',
-  }).format(date);
-  return weekdayLabelToCode(weekday);
-}
-
 function normalizeTimeLabel(value: string) {
   const [hoursText, minutesText] = value.split(':');
   const hours = Number.parseInt(hoursText ?? '', 10);
@@ -384,32 +392,16 @@ function normalizeTimeLabel(value: string) {
   return `${safeHours.toString().padStart(2, '0')}:${safeMinutes.toString().padStart(2, '0')}`;
 }
 
-function weekdayLabelToCode(weekday: string) {
-  switch (weekday) {
-    case 'Sun':
-      return 'SU';
-    case 'Mon':
-      return 'MO';
-    case 'Tue':
-      return 'TU';
-    case 'Wed':
-      return 'WE';
-    case 'Thu':
-      return 'TH';
-    case 'Fri':
-      return 'FR';
-    case 'Sat':
-      return 'SA';
-    default:
-      return 'MO';
-  }
-}
-
 export function buildLearningSpaceScheduleDiffPlan(input: {
   previousSchedules: ExistingScheduleSnapshot[];
   nextSchedules: LearningSpaceSchedulePayload[] | null | undefined;
 }): LearningSpaceScheduleDiffPlan {
-  const previous = normalizeExistingSchedulesForCompare(input.previousSchedules);
+  const previous = normalizeExistingSchedulesForCompare(
+    input.previousSchedules,
+    new Map(),
+    new Map(),
+    new Map(),
+  );
   const next = normalizeIncomingSchedulesForCompare(input.nextSchedules);
   const plan: LearningSpaceScheduleDiffPlan = {
     added: [],
@@ -528,7 +520,9 @@ export async function updateLearningSpaceFromPayload(
       .returns<ExistingScheduleSnapshot[]>(),
     serviceClient
       .from('class_schedule_recurrence')
-      .select('id, schedule_id')
+      .select(
+        'id, schedule_id, frequency, interval, count, until, timezone, bysecond, byminute, byhour, byday, bymonthday, byyearday, byweekno, bymonth, bysetpos, wkst',
+      )
       .eq('org_id', orgId)
       .is('deleted_at', null)
       .returns<ExistingRecurrenceSnapshot[]>(),
@@ -641,6 +635,9 @@ export async function updateLearningSpaceFromPayload(
   const recurrenceToScheduleId = new Map(
     filteredRecurrences.map((row) => [row.id, row.schedule_id]),
   );
+  const recurrencesByScheduleId = new Map(
+    filteredRecurrences.map((row) => [row.schedule_id, row]),
+  );
   const previousExceptionsByScheduleId = new Map<string, Set<string>>();
   for (const row of existingExceptionsResponse.data ?? []) {
     const scheduleId = recurrenceToScheduleId.get(row.recurrence_id);
@@ -664,8 +661,38 @@ export async function updateLearningSpaceFromPayload(
     previousSchedules,
     nextSchedules: payload.schedules ?? [],
   });
+  const previousSchedulesHashKey = buildLearningSpaceSchedulesHashKeyFromExisting(
+    previousSchedules.map((schedule) => ({
+      id: schedule.id,
+      startAt: schedule.start_at,
+      endAt: schedule.end_at,
+      timezone: schedule.timezone ?? null,
+      recurrence: recurrencesByScheduleId.get(schedule.id) ?? null,
+      exceptions: [
+        ...(previousExceptionsByScheduleId.get(schedule.id) ?? new Set<string>()),
+      ].map((occurrenceKey) => ({
+        occurrenceKey,
+      })),
+      overrides: [
+        ...(previousOverridesByScheduleId.get(schedule.id) ?? new Map()).entries(),
+      ].map(([occurrenceKey, patch]) => ({
+        occurrenceKey,
+        startAt: patch.startAt,
+        endAt: patch.endAt,
+        reason: patch.reason,
+      })),
+    })),
+  );
+  const nextSchedulesHashKey = buildLearningSpaceSchedulesHashKeyFromPayload(
+    payload.schedules ?? [],
+  );
   const pairedSchedules = (() => {
-    const previous = normalizeExistingSchedulesForCompare(previousSchedules);
+    const previous = normalizeExistingSchedulesForCompare(
+      previousSchedules,
+      recurrencesByScheduleId,
+      previousExceptionsByScheduleId,
+      previousOverridesByScheduleId,
+    );
     const next = normalizeIncomingSchedulesForCompare(payload.schedules ?? []);
     const pairCount = Math.min(previous.length, next.length);
     const pairs: Array<{
@@ -681,49 +708,9 @@ export async function updateLearningSpaceFromPayload(
     }
     return pairs;
   })();
-  const hasRecurrenceScheduleChanges = pairedSchedules.some((pair) => {
-    const previousExceptionKeys =
-      previousExceptionsByScheduleId.get(pair.previous.id) ?? new Set<string>();
-    const incomingExceptionKeys = new Set(
-      (pair.next.payload.exceptions ?? []).map((entry) =>
-        toOccurrenceKey(entry.date, schedulePrimaryTime(pair.next.payload)),
-      ),
-    );
-    for (const key of incomingExceptionKeys) {
-      if (!previousExceptionKeys.has(key)) {
-        return true;
-      }
-    }
-
-    const previousOverrides =
-      previousOverridesByScheduleId.get(pair.previous.id) ?? new Map();
-    for (const entry of pair.next.payload.overrides ?? []) {
-      const time = normalizeTimeLabel(
-        entry.newTime ?? schedulePrimaryTime(pair.next.payload),
-      );
-      const occurrenceKey = toOccurrenceKey(
-        entry.originalDate,
-        schedulePrimaryTime(pair.next.payload),
-      );
-      const startAt = toOccurrenceKey(entry.newDate, time);
-      const nextPatch = {
-        startAt,
-        endAt: addMinutesToIso(startAt, DEFAULT_DURATION_MINUTES),
-        reason: entry.reason ?? null,
-      };
-      const previousPatch = previousOverrides.get(occurrenceKey);
-      if (
-        !previousPatch ||
-        previousPatch.startAt !== nextPatch.startAt ||
-        previousPatch.endAt !== nextPatch.endAt ||
-        previousPatch.reason !== nextPatch.reason
-      ) {
-        return true;
-      }
-    }
-
-    return false;
-  });
+  const hasRecurrenceScheduleChanges =
+    previousSchedulesHashKey !== nextSchedulesHashKey ||
+    pairedSchedules.some((pair) => pair.previous.fullHash !== pair.next.fullHash);
   const hasScheduleChanges =
     scheduleDiffPlan.added.length > 0 ||
     scheduleDiffPlan.removed.length > 0 ||
@@ -791,18 +778,20 @@ export async function updateLearningSpaceFromPayload(
     links: payload.resources ?? [],
   });
 
-  await replaceLearningSpaceSchedules(supabase, {
-    orgId,
-    learningSpaceId,
-    channelId,
-    createdBy: actorProfileId,
-    createdAt: now,
-    title: payload.basics.title,
-    description: payload.basics.description ?? null,
-    themeKey: payload.settings?.themeKey ?? null,
-    participants: payload.participants,
-    schedules: payload.schedules ?? [],
-  });
+  if (hasScheduleChanges) {
+    await replaceLearningSpaceSchedules(supabase, {
+      orgId,
+      learningSpaceId,
+      channelId,
+      createdBy: actorProfileId,
+      createdAt: now,
+      title: payload.basics.title,
+      description: payload.basics.description ?? null,
+      themeKey: payload.settings?.themeKey ?? null,
+      participants: payload.participants,
+      schedules: payload.schedules ?? [],
+    });
+  }
 
   await compileLearningSpaceReminderJobs({
     supabase: serviceClient,
@@ -1078,6 +1067,8 @@ export async function updateLearningSpaceFromPayload(
         description: `${summaryPrefix} ${details}`,
         changeSummary: summaryPrefix,
         changeCount: scheduleChangeLines.length,
+        previousScheduleHashKey: previousSchedulesHashKey,
+        scheduleHashKey: nextSchedulesHashKey,
       },
       dedupeKey: `schedule.updated:${learningSpaceId}:${now}`,
       createdBy: systemProfileId,

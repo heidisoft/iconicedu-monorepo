@@ -1079,8 +1079,11 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       const weeklyTime = formatWeeklyTimeLabel(payload.startAt, payload.timezone);
       return {
         verb: 'session.scheduled',
-        leading: buildSystemLeadingAvatar(),
-        headline: { primary: 'Class schedule added', secondary: sessionName(payload) },
+        leading: { kind: 'icon', iconKey: 'CalendarDays', tone: 'info' },
+        headline: {
+          primary: 'Learning space session schedule added',
+          secondary: sessionName(payload),
+        },
         summary:
           firstSessionLabel && weeklyTime
             ? `First session: ${firstSessionLabel}, then weekly ${weeklyTime}`
@@ -1104,9 +1107,9 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       const payload = asRecord(event.payload);
       return {
         verb: 'session.rescheduled',
-        leading: buildSystemLeadingAvatar(),
+        leading: { kind: 'icon', iconKey: 'CalendarDays', tone: 'info' },
         headline: {
-          primary: 'Class schedule updated',
+          primary: 'Learning space session schedule updated',
           secondary: sessionName(payload),
         },
         summary:
@@ -1129,8 +1132,11 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       const payload = asRecord(event.payload);
       return {
         verb: 'session.canceled',
-        leading: buildSystemLeadingAvatar(),
-        headline: { primary: 'Class schedule updated', secondary: sessionName(payload) },
+        leading: { kind: 'icon', iconKey: 'CalendarDays', tone: 'info' },
+        headline: {
+          primary: 'Learning space session schedule updated',
+          secondary: sessionName(payload),
+        },
         summary: asOptionalString(payload.description),
       };
     },

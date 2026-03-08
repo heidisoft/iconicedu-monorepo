@@ -4,6 +4,14 @@ import type {
   RecurrenceFormData,
   RecurrenceOverride,
 } from '@iconicedu/ui-web/lib/recurrence-types';
+import { buildLearningSpaceSchedulesHashKeyFromPayload } from '@iconicedu/web/lib/admin/learning-space-schedule-hash';
+
+function toUtcDateOnlyIso(value: Date) {
+  const year = value.getUTCFullYear();
+  const month = value.getUTCMonth();
+  const day = value.getUTCDate();
+  return new Date(Date.UTC(year, month, day, 12, 0, 0, 0)).toISOString();
+}
 
 function cloneException(exception: RecurrenceException): RecurrenceException {
   return {
@@ -31,7 +39,7 @@ export function mapSchedulesToPayload(
     .map((schedule) => ({
       startDate:
         schedule.startDate instanceof Date
-          ? schedule.startDate.toISOString()
+          ? toUtcDateOnlyIso(schedule.startDate)
           : new Date(schedule.startDate as unknown as string).toISOString(),
       timezone: schedule.timezone,
       rule: {
@@ -55,6 +63,10 @@ export function mapSchedulesToPayload(
         reason: override.reason ?? undefined,
       })),
     }));
+}
+
+export function buildSchedulesHashKeyFromFormSchedules(items: RecurrenceFormData[]) {
+  return buildLearningSpaceSchedulesHashKeyFromPayload(mapSchedulesToPayload(items));
 }
 
 export function normalizeSchedules(items: RecurrenceFormData[]): RecurrenceFormData[] {

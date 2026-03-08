@@ -12,7 +12,10 @@ import type {
   ThemeKey,
   UserProfileVM,
 } from '@iconicedu/shared-types';
-import type { RecurrenceFormData, WeekdayVM } from '@iconicedu/ui-web/lib/recurrence-types';
+import type {
+  RecurrenceFormData,
+  WeekdayVM,
+} from '@iconicedu/ui-web/lib/recurrence-types';
 
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
@@ -38,6 +41,61 @@ export type LearningSpaceDetail = {
   resources: LearningSpaceLinkVM[];
   schedules: RecurrenceFormData[];
 };
+
+export function getDatePartsInTimezone(value: string, timezone: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const parts = formatter.formatToParts(date);
+  const year = parts.find((part) => part.type === 'year')?.value;
+  const month = parts.find((part) => part.type === 'month')?.value;
+  const day = parts.find((part) => part.type === 'day')?.value;
+
+  if (!year || !month || !day) {
+    return null;
+  }
+
+  return { year, month, day };
+}
+
+export function getDateFromISOInTimezone(value: string, timezone: string) {
+  const parts = getDatePartsInTimezone(value, timezone);
+  return parts ? `${parts.year}-${parts.month}-${parts.day}` : null;
+}
+
+export function getTimeFromISOInTimezone(value: string, timezone: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const formatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: timezone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+  return formatter.format(date);
+}
+
+export function createFormDateFromIsoInTimezone(value: string, timezone: string) {
+  const parts = getDatePartsInTimezone(value, timezone);
+  if (!parts) {
+    return undefined;
+  }
+
+  return new Date(
+    Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), 12),
+  );
+}
 
 export async function getLearningSpaceDetail(learningSpaceId: string) {
   const supabase = await createSupabaseServerClient();
@@ -72,37 +130,38 @@ export async function getLearningSpaceDetail(learningSpaceId: string) {
     throw new Error('Learning space not found');
   }
 
-  const [participantsResponse, linksResponse, schedulesResponse, channelLinksResponse] = await Promise.all([
-    supabase
-      .from('learning_space_participants')
-      .select('*')
-      .eq('org_id', orgId)
-      .eq('learning_space_id', learningSpaceId)
-      .is('deleted_at', null)
-      .returns<LearningSpaceParticipantRow[]>(),
-    supabase
-      .from('learning_space_links')
-      .select('*')
-      .eq('org_id', orgId)
-      .eq('learning_space_id', learningSpaceId)
-      .is('deleted_at', null)
-      .returns<LearningSpaceLinkRow[]>(),
-    supabase
-      .from('class_schedules')
-      .select('*')
-      .eq('org_id', orgId)
-      .eq('source_learning_space_id', learningSpaceId)
-      .is('deleted_at', null)
-      .returns<ClassScheduleRow[]>(),
-    supabase
-      .from('learning_space_channels')
-      .select('channel_id')
-      .eq('org_id', orgId)
-      .eq('learning_space_id', learningSpaceId)
-      .eq('is_primary', true)
-      .is('deleted_at', null)
-      .maybeSingle<{ channel_id: string }>(),
-  ]);
+  const [participantsResponse, linksResponse, schedulesResponse, channelLinksResponse] =
+    await Promise.all([
+      supabase
+        .from('learning_space_participants')
+        .select('*')
+        .eq('org_id', orgId)
+        .eq('learning_space_id', learningSpaceId)
+        .is('deleted_at', null)
+        .returns<LearningSpaceParticipantRow[]>(),
+      supabase
+        .from('learning_space_links')
+        .select('*')
+        .eq('org_id', orgId)
+        .eq('learning_space_id', learningSpaceId)
+        .is('deleted_at', null)
+        .returns<LearningSpaceLinkRow[]>(),
+      supabase
+        .from('class_schedules')
+        .select('*')
+        .eq('org_id', orgId)
+        .eq('source_learning_space_id', learningSpaceId)
+        .is('deleted_at', null)
+        .returns<ClassScheduleRow[]>(),
+      supabase
+        .from('learning_space_channels')
+        .select('channel_id')
+        .eq('org_id', orgId)
+        .eq('learning_space_id', learningSpaceId)
+        .eq('is_primary', true)
+        .is('deleted_at', null)
+        .maybeSingle<{ channel_id: string }>(),
+    ]);
 
   if (participantsResponse.error) {
     throw new Error(participantsResponse.error.message);
@@ -146,13 +205,19 @@ export async function getLearningSpaceDetail(learningSpaceId: string) {
   }
 
   const participantProfiles = await Promise.all(
-    (participantsResponse.data ?? []).map((row) => buildUserProfileById(supabase, row.profile_id)),
+    (participantsResponse.data ?? []).map((row) =>
+      buildUserProfileById(supabase, row.profile_id),
+    ),
   );
-  const participants = participantProfiles.filter(
-    (profile): profile is UserProfileVM => Boolean(profile),
+  const participants = participantProfiles.filter((profile): profile is UserProfileVM =>
+    Boolean(profile),
   );
 
-  const schedules = await buildSchedulesForForm(supabase, orgId, schedulesResponse.data ?? []);
+  const schedules = await buildSchedulesForForm(
+    supabase,
+    orgId,
+    schedulesResponse.data ?? [],
+  );
 
   return {
     ids: { id: learningSpace.id, orgId },
@@ -238,8 +303,14 @@ async function buildSchedulesForForm(
     throw new Error(overridesResponse.error.message);
   }
 
-  const exceptionsByRecurrence = groupBy(exceptionsResponse.data ?? [], (row) => row.recurrence_id);
-  const overridesByRecurrence = groupBy(overridesResponse.data ?? [], (row) => row.recurrence_id);
+  const exceptionsByRecurrence = groupBy(
+    exceptionsResponse.data ?? [],
+    (row) => row.recurrence_id,
+  );
+  const overridesByRecurrence = groupBy(
+    overridesResponse.data ?? [],
+    (row) => row.recurrence_id,
+  );
   const recurrenceBySchedule = new Map(
     (recurrences ?? []).map((row) => [row.schedule_id, row]),
   );
@@ -247,10 +318,11 @@ async function buildSchedulesForForm(
   return schedules.map((schedule) => {
     const recurrence = recurrenceBySchedule.get(schedule.id);
     if (!recurrence) {
+      const timezone = schedule.timezone ?? 'UTC';
       return {
         id: schedule.id,
-        startDate: new Date(schedule.start_at),
-        timezone: schedule.timezone ?? 'UTC',
+        startDate: createFormDateFromIsoInTimezone(schedule.start_at, timezone),
+        timezone,
         rule: {
           frequency: 'weekly',
           interval: 1,
@@ -261,26 +333,40 @@ async function buildSchedulesForForm(
     }
 
     const byWeekday = recurrence.byday?.filter(isWeekday) ?? undefined;
+    const timezone = recurrence.timezone ?? schedule.timezone ?? 'UTC';
     const weekdayTimes = byWeekday?.map((day) => ({
       day: day as 'MO' | 'TU' | 'WE' | 'TH' | 'FR' | 'SA' | 'SU',
-      time: getTimeFromISO(schedule.start_at),
+      time: getTimeFromISOInTimezone(schedule.start_at, timezone) ?? '09:00',
     }));
 
-    const exceptions = (exceptionsByRecurrence.get(recurrence.id) ?? []).map((exception) => ({
-      id: exception.id,
-      date: getDateFromISO(exception.occurrence_key),
-      reason: exception.reason ?? undefined,
-    }));
+    const exceptions = (exceptionsByRecurrence.get(recurrence.id) ?? []).map(
+      (exception) => ({
+        id: exception.id,
+        date:
+          getDateFromISOInTimezone(exception.occurrence_key, timezone) ??
+          exception.occurrence_key.slice(0, 10),
+        reason: exception.reason ?? undefined,
+      }),
+    );
 
     const overrides = (overridesByRecurrence.get(recurrence.id) ?? []).map((override) => {
       const patch = (override.patch ?? {}) as Record<string, unknown>;
       const startAt = typeof patch.startAt === 'string' ? patch.startAt : null;
-      const newDate = startAt ? getDateFromISO(startAt) : getDateFromISO(override.occurrence_key);
-      const newTime = startAt ? getTimeFromISO(startAt) : getTimeFromISO(override.occurrence_key);
+      const newDate =
+        (startAt
+          ? getDateFromISOInTimezone(startAt, timezone)
+          : getDateFromISOInTimezone(override.occurrence_key, timezone)) ??
+        override.occurrence_key.slice(0, 10);
+      const newTime =
+        (startAt
+          ? getTimeFromISOInTimezone(startAt, timezone)
+          : getTimeFromISOInTimezone(override.occurrence_key, timezone)) ?? '09:00';
 
       return {
         id: override.id,
-        originalDate: getDateFromISO(override.occurrence_key),
+        originalDate:
+          getDateFromISOInTimezone(override.occurrence_key, timezone) ??
+          override.occurrence_key.slice(0, 10),
         newDate,
         newTime,
         reason: typeof patch.reason === 'string' ? patch.reason : undefined,
@@ -289,8 +375,8 @@ async function buildSchedulesForForm(
 
     return {
       id: schedule.id,
-      startDate: new Date(schedule.start_at),
-      timezone: recurrence.timezone ?? schedule.timezone ?? 'UTC',
+      startDate: createFormDateFromIsoInTimezone(schedule.start_at, timezone),
+      timezone,
       rule: {
         frequency: recurrence.frequency as RecurrenceFormData['rule']['frequency'],
         interval: recurrence.interval ?? undefined,
@@ -304,17 +390,6 @@ async function buildSchedulesForForm(
       overrides,
     } satisfies RecurrenceFormData;
   });
-}
-
-function getDateFromISO(value: string) {
-  return new Date(value).toISOString().slice(0, 10);
-}
-
-function getTimeFromISO(value: string) {
-  const date = new Date(value);
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  return `${hours}:${minutes}`;
 }
 
 function groupBy<T, K extends string>(rows: T[], getKey: (row: T) => K): Map<K, T[]> {

@@ -29,6 +29,7 @@ const mockPh = {
   identify: jest.fn(),
   screen: jest.fn(),
   reset: jest.fn(),
+  flush: jest.fn(),
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -43,6 +44,7 @@ function AnalyticsConsumer() {
         analytics.identify('user_1');
         analytics.screen('HomeScreen');
         analytics.reset();
+        analytics.flush?.();
       }}
     >
       ready
@@ -94,6 +96,12 @@ describe('AnalyticsProvider / useAnalytics', () => {
     screen.getByTestId('result').props.onPress();
     expect(mockPh.reset).toHaveBeenCalled();
   });
+
+  it('forwards flush to PostHog', () => {
+    renderWrapped();
+    screen.getByTestId('result').props.onPress();
+    expect(mockPh.flush).toHaveBeenCalled();
+  });
 });
 
 // The noop path (no POSTHOG_KEY) uses createNoopAnalytics() directly.
@@ -105,5 +113,6 @@ describe('noop analytics client (fallback when no PostHog key)', () => {
     expect(() => noop.identify('user')).not.toThrow();
     expect(() => noop.screen('Screen')).not.toThrow();
     expect(() => noop.reset()).not.toThrow();
+    expect(() => noop.flush?.()).not.toThrow();
   });
 });
