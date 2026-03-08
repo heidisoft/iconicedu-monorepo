@@ -73,7 +73,7 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
         flushAt: 20,
         // Fire Application Opened / Installed / Updated lifecycle events from JS layer
         captureAppLifecycleEvents: true,
-        // Enable session replay (available in posthog-react-native ≥ 3.x)
+        // Enable session replay (requires posthog-react-native ≥ 3.2.0 + posthog-react-native-session-replay)
         enableSessionReplay: true,
         sessionReplayConfig: {
           maskAllTextInputs: false,

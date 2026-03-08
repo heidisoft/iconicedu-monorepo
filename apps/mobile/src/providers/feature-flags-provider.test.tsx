@@ -1,25 +1,15 @@
 import React from 'react';
 import { Text } from 'react-native';
-import { render, screen, act } from '@testing-library/react-native';
+import { render, screen } from '@testing-library/react-native';
 import { FlagsProvider, useFlag } from './feature-flags-provider';
 import { mobileFlags } from '@/lib/flags';
 
 // ─── Mock posthog-react-native ────────────────────────────────────────────────
 
-const mockIsFeatureEnabled = jest.fn();
-let capturedOnFeatureFlags: (() => void) | null = null;
+const mockUseFeatureFlag = jest.fn();
 
 jest.mock('posthog-react-native', () => ({
-  usePostHog: () => ({
-    isFeatureEnabled: mockIsFeatureEnabled,
-    onFeatureFlags: (cb: () => void) => {
-      capturedOnFeatureFlags = cb;
-      // Return a noop unsubscribe
-      return () => {
-        capturedOnFeatureFlags = null;
-      };
-    },
-  }),
+  useFeatureFlag: (key: string) => mockUseFeatureFlag(key),
 }));
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
@@ -41,41 +31,31 @@ function renderWithFlags(flagKey: Parameters<typeof useFlag>[0]) {
 
 describe('FlagsProvider / useFlag', () => {
   beforeEach(() => {
-    mockIsFeatureEnabled.mockReset();
-    capturedOnFeatureFlags = null;
+    mockUseFeatureFlag.mockReset();
   });
 
-  it('returns defaultValue (false) when PostHog returns undefined', () => {
-    mockIsFeatureEnabled.mockReturnValue(undefined);
+  it('returns defaultValue (false) when PostHog returns undefined (not loaded yet)', () => {
+    mockUseFeatureFlag.mockReturnValue(undefined);
     renderWithFlags('enable-quick-access');
     expect(screen.getByTestId('flag-value').props.children).toBe('false');
   });
 
   it('returns true when PostHog returns true for the flag', () => {
-    mockIsFeatureEnabled.mockReturnValue(true);
+    mockUseFeatureFlag.mockReturnValue(true);
     renderWithFlags('enable-quick-access');
     expect(screen.getByTestId('flag-value').props.children).toBe('true');
   });
 
   it('returns false when PostHog returns false for the flag', () => {
-    mockIsFeatureEnabled.mockReturnValue(false);
+    mockUseFeatureFlag.mockReturnValue(false);
     renderWithFlags('enable-quick-access');
     expect(screen.getByTestId('flag-value').props.children).toBe('false');
   });
 
-  it('updates from false to true when onFeatureFlags fires after async load', () => {
-    // Initially flags not loaded — isFeatureEnabled returns undefined → default false
-    mockIsFeatureEnabled.mockReturnValue(undefined);
+  it('passes the correct flag key to useFeatureFlag', () => {
+    mockUseFeatureFlag.mockReturnValue(undefined);
     renderWithFlags('enable-quick-access');
-    expect(screen.getByTestId('flag-value').props.children).toBe('false');
-
-    // PostHog loads flags from network — now returns true
-    mockIsFeatureEnabled.mockReturnValue(true);
-    act(() => {
-      capturedOnFeatureFlags?.();
-    });
-
-    expect(screen.getByTestId('flag-value').props.children).toBe('true');
+    expect(mockUseFeatureFlag).toHaveBeenCalledWith('enable-quick-access');
   });
 
   it('default values in catalog match expected defaults', () => {
