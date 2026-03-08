@@ -1,5 +1,13 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import { View, Text, ScrollView, StyleSheet, Alert, RefreshControl } from 'react-native';
+import {
+  View,
+  Text,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Alert,
+  RefreshControl,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   User,
@@ -162,6 +170,7 @@ export default function AccountScreen() {
     user?.email?.split('@')[0] ??
     'User';
   const initial = displayName[0]?.toUpperCase() ?? 'U';
+  const avatarUrl = prof?.avatar_url as string | null | undefined;
   const { bg: avatarBg, fg: avatarFg } = resolveAvatarColor(
     prof?.ui_theme_key as string | null,
     (prof?.avatar_seed as string | null) ?? user?.id ?? user?.email,
@@ -207,9 +216,13 @@ export default function AccountScreen() {
         {/* Profile card */}
         <View style={s.profileCard}>
           <View style={s.profileRow}>
-            <View style={[s.avatarWrap, { backgroundColor: avatarBg }]}>
-              <Text style={[s.avatarTxt, { color: avatarFg }]}>{initial}</Text>
-            </View>
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={s.avatarWrap} />
+            ) : (
+              <View style={[s.avatarWrap, { backgroundColor: avatarBg }]}>
+                <Text style={[s.avatarTxt, { color: avatarFg }]}>{initial}</Text>
+              </View>
+            )}
             <View style={s.profileInfo}>
               <Text style={s.profileName}>{displayName}</Text>
               <Text style={s.profileEmail}>{user?.email ?? ''}</Text>

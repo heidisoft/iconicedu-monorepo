@@ -1049,7 +1049,9 @@ export async function fetchProfilesByAccountIds(orgId: string, accountIds: strin
   if (!accountIds.length) return [];
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, account_id, display_name, first_name, last_name, avatar_seed, kind')
+    .select(
+      'id, account_id, display_name, first_name, last_name, avatar_url, avatar_seed, kind',
+    )
     .eq('org_id', orgId)
     .in('account_id', accountIds)
     .is('deleted_at', null);

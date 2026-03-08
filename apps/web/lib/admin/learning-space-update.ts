@@ -8,6 +8,7 @@ import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profil
 import {
   buildScheduleStart,
   insertClassSchedules,
+  publishParticipantInviteActivities,
 } from '@iconicedu/web/lib/admin/learning-space-create';
 import { toStoredLiveSessionConfig } from '@iconicedu/web/lib/admin/live-session-config';
 import { publishActivityEvent } from '@iconicedu/web/lib/activity-feed/publisher/activity-publisher';
@@ -170,6 +171,16 @@ function formatSessionTime(
     timeZone: zone,
   }).format(date);
   return { weekday, time };
+}
+
+function joinNaturalList(values: string[]) {
+  if (values.length <= 1) {
+    return values[0] ?? '';
+  }
+  if (values.length === 2) {
+    return `${values[0]} and ${values[1]}`;
+  }
+  return `${values.slice(0, -1).join(', ')}, and ${values[values.length - 1]}`;
 }
 
 async function loadLearningSpaceParticipantSnapshot(input: {
@@ -725,6 +736,7 @@ export async function updateLearningSpaceFromPayload(
     hasParticipantChanges ||
     hasLinkChanges ||
     hasScheduleChanges;
+  const hasInfoChanges = hasBasicsChanges || hasChannelSettingsChanges || hasLinkChanges;
 
   if (!hasAnyChanges) {
     return;
@@ -804,7 +816,47 @@ export async function updateLearningSpaceFromPayload(
     learningSpaceId,
   });
 
-  if (hasAnyChanges) {
+  const infoChangeSummaryParts: string[] = [];
+  if ((learningSpace.title ?? null) !== (payload.basics.title ?? null)) {
+    infoChangeSummaryParts.push(`Renamed class to ${payload.basics.title}`);
+  }
+  if ((learningSpace.subject ?? null) !== (payload.basics.subject ?? null)) {
+    infoChangeSummaryParts.push(
+      payload.basics.subject
+        ? `Updated subject to ${payload.basics.subject}`
+        : 'Removed subject',
+    );
+  }
+  if ((learningSpace.description ?? null) !== (payload.basics.description ?? null)) {
+    infoChangeSummaryParts.push(
+      payload.basics.description
+        ? 'Updated class description'
+        : 'Removed class description',
+    );
+  }
+  if ((learningSpace.kind ?? null) !== (payload.basics.kind ?? null)) {
+    infoChangeSummaryParts.push('Changed class type');
+  }
+  if ((existingChannel.ui_theme_key ?? null) !== (payload.settings?.themeKey ?? null)) {
+    infoChangeSummaryParts.push('Updated class theme');
+  }
+  if (
+    canonicalJson(existingChannel.ui_defaults ?? null) !==
+    canonicalJson(payload.settings?.uiDefaults ?? null)
+  ) {
+    infoChangeSummaryParts.push('Updated class defaults');
+  }
+  if (
+    canonicalJson(existingChannel.live_session_config ?? null) !==
+    canonicalJson(toStoredLiveSessionConfig(payload.liveSession))
+  ) {
+    infoChangeSummaryParts.push('Updated live session settings');
+  }
+  if (hasLinkChanges) {
+    infoChangeSummaryParts.push('Updated class resources');
+  }
+
+  if (hasInfoChanges) {
     await publishActivityEvent({
       supabase: serviceClient,
       orgId,
@@ -820,7 +872,7 @@ export async function updateLearningSpaceFromPayload(
         title: payload.basics.title,
         kind: payload.basics.kind,
         subject: payload.basics.subject ?? null,
-        changeSummary: 'Learning space details updated',
+        changeSummary: joinNaturalList(infoChangeSummaryParts) || 'Updated class details',
         activityPhase: 'updated',
         invitedCount: invitedMembersSnapshot.length,
         invitedMembers: invitedMembersSnapshot,
@@ -838,48 +890,22 @@ export async function updateLearningSpaceFromPayload(
   const addedParticipants = nextParticipantsSnapshot.filter(
     (participant) => !existingParticipantIds.has(participant.profileId),
   );
-  if (addedParticipants.length > 0) {
-    const firstAdded = addedParticipants[0];
-    if (!firstAdded) {
-      throw new Error('Unable to resolve added participant.');
-    }
-    await publishActivityEvent({
-      supabase: serviceClient,
-      orgId,
-      eventType: 'member.invited',
-      occurredAt: now,
-      sourceKind: 'profile',
-      actorProfileId,
-      scope: { kind: 'learning_space', learningSpaceId },
-      targetRef: { kind: 'learning_space', id: learningSpaceId },
-      payload: {
-        learningSpaceId,
-        channelId,
-        title: payload.basics.title,
-        memberProfileId: firstAdded.profileId,
-        memberDisplayName: firstAdded.displayName ?? null,
-        memberAvatarUrl: firstAdded.avatarUrl ?? null,
-        memberThemeKey: firstAdded.themeKey ?? null,
-        role: firstAdded.kind,
-        memberCount: addedParticipants.length,
-        members: addedParticipants.map((participant) => ({
-          profileId: participant.profileId,
-          displayName: participant.displayName ?? null,
-          avatarUrl: participant.avatarUrl ?? null,
-          themeKey: participant.themeKey ?? null,
-          role: participant.kind,
-        })),
-        invitedCount: invitedMembersSnapshot.length,
-        invitedMembers: invitedMembersSnapshot,
-        activityPhase: 'updated',
-      },
-      dedupeKey: `member.invited:${learningSpaceId}:${addedParticipants
-        .map((participant) => participant.profileId)
-        .sort()
-        .join(',')}:${now}`,
-      createdBy: actorProfileId,
-    });
-  }
+  await publishParticipantInviteActivities({
+    supabase: serviceClient,
+    orgId,
+    actorProfileId,
+    learningSpaceId,
+    channelId,
+    title: payload.basics.title,
+    participants: addedParticipants,
+    invitedMembers: invitedMembersSnapshot,
+    occurredAt: now,
+    activityPhase: 'updated',
+    dedupeKey:
+      addedParticipants.length > 1
+        ? `members.invited:${learningSpaceId}:${now}`
+        : `member.invited:${learningSpaceId}:${addedParticipants[0]?.profileId ?? 'unknown'}:${now}`,
+  });
 
   const removedParticipants = [...existingParticipantIds]
     .filter((profileId) => !nextParticipantIds.has(profileId))
@@ -888,11 +914,7 @@ export async function updateLearningSpaceFromPayload(
       snapshot: existingParticipantById.get(profileId),
     }));
 
-  if (removedParticipants.length > 0) {
-    const firstRemoved = removedParticipants[0];
-    if (!firstRemoved) {
-      throw new Error('Unable to resolve removed participant.');
-    }
+  for (const removedParticipant of removedParticipants) {
     await publishActivityEvent({
       supabase: serviceClient,
       orgId,
@@ -906,30 +928,28 @@ export async function updateLearningSpaceFromPayload(
         learningSpaceId,
         channelId,
         title: payload.basics.title,
-        memberProfileId: firstRemoved.profileId,
-        memberDisplayName: firstRemoved.snapshot?.name ?? null,
-        memberAvatarUrl: firstRemoved.snapshot?.avatarUrl ?? null,
-        memberThemeKey: firstRemoved.snapshot?.themeKey ?? null,
-        memberCount: removedParticipants.length,
-        members: removedParticipants.map((participant) => ({
-          profileId: participant.profileId,
-          displayName: participant.snapshot?.name ?? null,
-          avatarUrl: participant.snapshot?.avatarUrl ?? null,
-          themeKey: participant.snapshot?.themeKey ?? null,
-        })),
+        memberProfileId: removedParticipant.profileId,
+        memberDisplayName: removedParticipant.snapshot?.name ?? null,
+        memberAvatarUrl: removedParticipant.snapshot?.avatarUrl ?? null,
+        memberThemeKey: removedParticipant.snapshot?.themeKey ?? null,
+        memberCount: 1,
+        members: [
+          {
+            profileId: removedParticipant.profileId,
+            displayName: removedParticipant.snapshot?.name ?? null,
+            avatarUrl: removedParticipant.snapshot?.avatarUrl ?? null,
+            themeKey: removedParticipant.snapshot?.themeKey ?? null,
+          },
+        ],
         invitedCount: invitedMembersSnapshot.length,
         invitedMembers: invitedMembersSnapshot,
         activityPhase: 'updated',
       },
-      dedupeKey: `member.removed:${learningSpaceId}:${removedParticipants
-        .map((participant) => participant.profileId)
-        .sort()
-        .join(',')}:${now}`,
+      dedupeKey: `member.removed:${learningSpaceId}:${removedParticipant.profileId}:${now}`,
       createdBy: actorProfileId,
     });
   }
 
-  const systemProfileId = await ensureSystemProfileId(serviceClient, orgId);
   const scheduleChangeLines: string[] = [];
   let cancellationCount = 0;
   let rescheduleCount = 0;
@@ -1031,6 +1051,7 @@ export async function updateLearningSpaceFromPayload(
   }
 
   if (scheduleChangeLines.length > 0) {
+    const systemProfileId = await ensureSystemProfileId(serviceClient, orgId);
     const eventType =
       cancellationCount > 0 && rescheduleCount === 0
         ? 'session.canceled'

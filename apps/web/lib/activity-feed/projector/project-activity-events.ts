@@ -1,19 +1,10 @@
-import type {
-  ActivityEventRow,
-  ActivityFeedItemRow,
-} from '@iconicedu/shared-types';
+import type { ActivityEventRow } from '@iconicedu/shared-types';
 import type { SupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 
 import { getActivityEventDefinition } from '@iconicedu/web/lib/activity-feed/definitions/activity-definitions';
+import { shouldReplaceGroupParent } from '@iconicedu/web/lib/activity-feed/projector/group-parent-priority';
 
 const MAX_ATTEMPTS = 10;
-
-function asRecord(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return {};
-  }
-  return value as Record<string, unknown>;
-}
 
 async function loadEvents(
   supabase: SupabaseServiceClient,
@@ -87,50 +78,73 @@ async function ensureGroupParent(input: {
   importance: string | undefined;
 }) {
   const dedupeKey = `group:${input.groupKey}`;
+  const row = {
+    org_id: input.event.org_id,
+    recipient_profile_id: input.recipientProfileId,
+    source_event_id: null,
+    dedupe_key: dedupeKey,
+    kind: 'group',
+    occurred_at: input.event.occurred_at,
+    tab_key: input.tabKey,
+    audience: {
+      scope: input.event.scope,
+      visibility: 'scope_only',
+    },
+    verb: input.rendered.verb,
+    actor_profile_id: input.event.actor_profile_id ?? null,
+    refs: {
+      actor: null,
+      object: input.event.object_ref ?? undefined,
+      target: input.event.target_ref ?? undefined,
+    },
+    group_key: input.groupKey,
+    group_type: input.groupType,
+    is_collapsed: true,
+    content: {
+      headline: input.rendered.headline,
+      summary: input.rendered.summary,
+      leading: input.rendered.leading,
+      actionButton: input.rendered.actionButton,
+      expandedContent: input.rendered.expandedContent,
+      preview: input.rendered.preview,
+    },
+    summary: input.rendered.summary ?? input.rendered.headline.primary,
+    preview: input.rendered.preview ?? null,
+    action_button: input.rendered.actionButton ?? null,
+    expanded_content: input.rendered.expandedContent ?? null,
+    importance: input.importance ?? 'normal',
+    is_read: false,
+    created_at: input.event.occurred_at,
+    updated_at: new Date().toISOString(),
+  };
+
+  const existingResponse = await input.supabase
+    .from('activity_feed_items')
+    .select('id, verb')
+    .eq('org_id', input.event.org_id)
+    .eq('recipient_profile_id', input.recipientProfileId)
+    .eq('dedupe_key', dedupeKey)
+    .is('deleted_at', null)
+    .maybeSingle<{ id: string; verb?: string | null }>();
+
+  if (existingResponse.error) {
+    throw new Error(existingResponse.error.message);
+  }
+
+  if (
+    existingResponse.data &&
+    !shouldReplaceGroupParent({
+      groupKey: input.groupKey,
+      existingVerb: existingResponse.data.verb ?? null,
+      nextVerb: input.rendered.verb,
+    })
+  ) {
+    return existingResponse.data.id;
+  }
+
   const response = await input.supabase
     .from('activity_feed_items')
-    .upsert(
-      {
-        org_id: input.event.org_id,
-        recipient_profile_id: input.recipientProfileId,
-        source_event_id: null,
-        dedupe_key: dedupeKey,
-        kind: 'group',
-        occurred_at: input.event.occurred_at,
-        tab_key: input.tabKey,
-        audience: {
-          scope: input.event.scope,
-          visibility: 'scope_only',
-        },
-        verb: input.rendered.verb,
-        actor_profile_id: input.event.actor_profile_id ?? null,
-        refs: {
-          actor: null,
-          object: input.event.object_ref ?? undefined,
-          target: input.event.target_ref ?? undefined,
-        },
-        group_key: input.groupKey,
-        group_type: input.groupType,
-        is_collapsed: true,
-        content: {
-          headline: input.rendered.headline,
-          summary: input.rendered.summary,
-          leading: input.rendered.leading,
-          actionButton: input.rendered.actionButton,
-          expandedContent: input.rendered.expandedContent,
-          preview: input.rendered.preview,
-        },
-        summary: input.rendered.summary ?? input.rendered.headline.primary,
-        preview: input.rendered.preview ?? null,
-        action_button: input.rendered.actionButton ?? null,
-        expanded_content: input.rendered.expandedContent ?? null,
-        importance: input.importance ?? 'normal',
-        is_read: false,
-        created_at: input.event.occurred_at,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'recipient_profile_id,dedupe_key' },
-    )
+    .upsert(row, { onConflict: 'recipient_profile_id,dedupe_key' })
     .select('id')
     .single<{ id: string }>();
 
@@ -147,27 +161,22 @@ async function attachGroupMember(
   groupId: string,
   itemId: string,
 ) {
-  const response = await supabase
-    .from('activity_feed_group_members')
-    .upsert(
-      {
-        org_id: orgId,
-        group_id: groupId,
-        item_id: itemId,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'org_id,group_id,item_id' },
-    );
+  const response = await supabase.from('activity_feed_group_members').upsert(
+    {
+      org_id: orgId,
+      group_id: groupId,
+      item_id: itemId,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'org_id,group_id,item_id' },
+  );
 
   if (response.error) {
     throw new Error(response.error.message);
   }
 }
 
-async function incrementGroupCount(
-  supabase: SupabaseServiceClient,
-  groupId: string,
-) {
+async function incrementGroupCount(supabase: SupabaseServiceClient, groupId: string) {
   const currentResponse = await supabase
     .from('activity_feed_group_members')
     .select('id', { count: 'exact', head: true })

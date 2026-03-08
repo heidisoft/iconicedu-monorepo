@@ -56,7 +56,7 @@ describe('buildActivityFeedForProfile', () => {
           verb: 'class.created',
           actor_profile_id: 'actor-1',
           refs: {},
-          content: { headline: { primary: 'Class created' } },
+          content: { headline: { primary: 'Learning space created' } },
           updated_at: '2026-03-03T12:00:00.000Z',
         },
       ],
@@ -91,7 +91,7 @@ describe('buildActivityFeedForProfile', () => {
           verb: 'class.created',
           actor_profile_id: 'actor-1',
           refs: {},
-          content: { headline: { primary: 'Unread class item' } },
+          content: { headline: { primary: 'Unread learning space item' } },
           is_read: false,
           updated_at: '2026-03-03T12:00:00.000Z',
         },
@@ -118,7 +118,7 @@ describe('buildActivityFeedForProfile', () => {
 
     expect(feed.tabs).toEqual([
       { key: 'all', label: 'All', badgeCount: 1 },
-      { key: 'classes', label: 'Classes', badgeCount: 1 },
+      { key: 'classes', label: 'Learning spaces', badgeCount: 1 },
       { key: 'payment', label: 'Payment', badgeCount: 0 },
       { key: 'system', label: 'System', badgeCount: 0 },
     ]);
@@ -143,7 +143,7 @@ describe('buildActivityFeedForProfile', () => {
           verb: 'session.started',
           actor_profile_id: 'actor-1',
           refs: {},
-          content: { headline: { primary: 'Class session' } },
+          content: { headline: { primary: 'Learning space session' } },
           sub_activity_count: 2,
           updated_at: '2026-03-07T16:00:00.000Z',
         },
@@ -224,7 +224,10 @@ describe('buildActivityFeedForProfile', () => {
           actor_profile_id: 'actor-1',
           refs: {},
           content: {
-            headline: { primary: 'Class updated', secondary: 'Math Foundations' },
+            headline: {
+              primary: 'Learning space updated',
+              secondary: 'Math Foundations',
+            },
           },
           sub_activity_count: 2,
           updated_at: '2026-03-07T16:00:00.000Z',
@@ -245,7 +248,10 @@ describe('buildActivityFeedForProfile', () => {
           actor_profile_id: 'actor-1',
           refs: {},
           content: {
-            headline: { primary: 'Class updated', secondary: 'Math Foundations' },
+            headline: {
+              primary: 'Learning space updated',
+              secondary: 'Math Foundations',
+            },
           },
           updated_at: '2026-03-07T15:50:00.000Z',
         },
@@ -287,5 +293,180 @@ describe('buildActivityFeedForProfile', () => {
     expect(group.subActivities?.items.map((item) => item.ids.id)).toEqual([
       'item-actual-child',
     ]);
+  });
+
+  it('keeps learning space created as the parent and shows one grouped participants-added subactivity', async () => {
+    getActivityFeedItemsByOrg.mockResolvedValue({
+      data: [
+        {
+          id: 'group-members-1',
+          org_id: 'org-1',
+          recipient_profile_id: 'profile-1',
+          kind: 'group',
+          occurred_at: '2026-03-07T16:00:00.000Z',
+          created_at: '2026-03-07T16:00:00.000Z',
+          tab_key: 'classes',
+          audience: {
+            scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+            visibility: 'scope_only',
+          },
+          verb: 'member.invited',
+          actor_profile_id: 'actor-1',
+          refs: {},
+          group_key: 'class-created:space-1',
+          group_type: 'class',
+          content: {
+            headline: {
+              primary: 'Tehara Morgan added',
+              secondary: 'Math Foundations',
+            },
+            leading: {
+              kind: 'avatars',
+              avatars: [
+                {
+                  name: 'Tehara Morgan',
+                  avatar: { source: 'seed', seed: 'tehara' },
+                  themeKey: 'rose',
+                },
+              ],
+              overflowCount: 0,
+            },
+          },
+          sub_activity_count: 3,
+          updated_at: '2026-03-07T16:00:00.000Z',
+        },
+        {
+          id: 'invite-2',
+          org_id: 'org-1',
+          recipient_profile_id: 'profile-1',
+          kind: 'leaf',
+          occurred_at: '2026-03-07T15:55:00.000Z',
+          created_at: '2026-03-07T15:55:00.000Z',
+          tab_key: 'classes',
+          audience: {
+            scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+            visibility: 'scope_only',
+          },
+          verb: 'member.invited',
+          actor_profile_id: 'actor-1',
+          refs: {},
+          content: {
+            headline: { primary: 'Riley Morgan added', secondary: 'Math Foundations' },
+            leading: {
+              kind: 'avatars',
+              avatars: [
+                {
+                  name: 'Riley Morgan',
+                  avatar: { source: 'seed', seed: 'riley' },
+                  themeKey: 'emerald',
+                },
+              ],
+              overflowCount: 0,
+            },
+          },
+          updated_at: '2026-03-07T15:55:00.000Z',
+        },
+        {
+          id: 'class-created-child',
+          org_id: 'org-1',
+          recipient_profile_id: 'profile-1',
+          kind: 'leaf',
+          occurred_at: '2026-03-07T15:52:00.000Z',
+          created_at: '2026-03-07T15:52:00.000Z',
+          tab_key: 'classes',
+          audience: {
+            scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+            visibility: 'scope_only',
+          },
+          verb: 'class.created',
+          actor_profile_id: 'actor-1',
+          refs: {},
+          content: {
+            headline: {
+              primary: 'Learning space created',
+              secondary: 'Math Foundations',
+            },
+            summary: 'Math learning space created. First session Mar 8 at 2:00 PM.',
+          },
+          updated_at: '2026-03-07T15:52:00.000Z',
+        },
+        {
+          id: 'invite-3',
+          org_id: 'org-1',
+          recipient_profile_id: 'profile-1',
+          kind: 'leaf',
+          occurred_at: '2026-03-07T15:50:00.000Z',
+          created_at: '2026-03-07T15:50:00.000Z',
+          tab_key: 'classes',
+          audience: {
+            scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+            visibility: 'scope_only',
+          },
+          verb: 'member.invited',
+          actor_profile_id: 'actor-1',
+          refs: {},
+          content: {
+            headline: { primary: 'Alex Stone added', secondary: 'Math Foundations' },
+            leading: {
+              kind: 'avatars',
+              avatars: [
+                {
+                  name: 'Alex Stone',
+                  avatar: { source: 'seed', seed: 'alex' },
+                  themeKey: 'blue',
+                },
+              ],
+              overflowCount: 0,
+            },
+          },
+          updated_at: '2026-03-07T15:50:00.000Z',
+        },
+      ],
+    });
+    getActivityFeedGroupMembersByGroupIds.mockResolvedValue({
+      data: [
+        { group_id: 'group-members-1', item_id: 'invite-2' },
+        { group_id: 'group-members-1', item_id: 'class-created-child' },
+        { group_id: 'group-members-1', item_id: 'invite-3' },
+      ],
+    });
+
+    const feed = await buildActivityFeedForProfile({} as never, 'org-1', 'profile-1');
+    const group = feed.sections[0]?.items.find((item) => item.kind === 'group');
+    if (!group || group.kind !== 'group') {
+      throw new Error('Expected grouped item');
+    }
+
+    expect(group.content.headline.primary).toBe('Learning space created');
+    expect(group.subActivities?.items).toHaveLength(1);
+    expect(group.subActivities?.items[0]).toMatchObject({
+      verb: 'members.invited',
+      content: {
+        headline: { primary: '3 participants added' },
+        summary:
+          'Added: Tehara Morgan, Riley Morgan, Alex Stone. Added to Math Foundations.',
+        leading: {
+          kind: 'avatars',
+          avatars: [
+            {
+              name: 'Tehara Morgan',
+              avatar: { source: 'seed', seed: 'tehara' },
+              themeKey: 'rose',
+            },
+            {
+              name: 'Riley Morgan',
+              avatar: { source: 'seed', seed: 'riley' },
+              themeKey: 'emerald',
+            },
+            {
+              name: 'Alex Stone',
+              avatar: { source: 'seed', seed: 'alex' },
+              themeKey: 'blue',
+            },
+          ],
+          overflowCount: 0,
+        },
+      },
+    });
   });
 });

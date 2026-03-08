@@ -50,8 +50,18 @@ export interface ClassActivityEventPayload {
 export interface MemberActivityEventPayload {
   learningSpaceId?: UUID | null;
   channelId?: UUID | null;
-  memberProfileId: UUID;
+  memberProfileId?: UUID | null;
   memberDisplayName?: string | null;
+  memberAvatarUrl?: string | null;
+  memberThemeKey?: string | null;
+  memberCount?: number | null;
+  members?: Array<{
+    profileId: UUID;
+    displayName?: string | null;
+    avatarUrl?: string | null;
+    themeKey?: string | null;
+    role?: string | null;
+  }> | null;
   role?: string | null;
 }
 

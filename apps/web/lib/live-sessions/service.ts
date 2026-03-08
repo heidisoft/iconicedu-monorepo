@@ -1,7 +1,14 @@
-import type { LiveSessionModeVM, LiveSessionProviderVM, ProfileRow } from '@iconicedu/shared-types';
+import type {
+  LiveSessionModeVM,
+  LiveSessionProviderVM,
+  ProfileRow,
+} from '@iconicedu/shared-types';
 
 import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
-import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import {
+  getProfileByAccountId,
+  getProfilesByIds,
+} from '@iconicedu/web/lib/profile/queries/profiles.query';
 import { getLiveSessionProvider } from '@iconicedu/web/lib/live-sessions/providers';
 import { snapshotExpectedParticipantsForLiveSession } from '@iconicedu/web/lib/live-sessions/expected-participants';
 import {
@@ -82,7 +89,14 @@ type ChannelLiveSessionParticipantRowRecord = {
   join_count: number;
   total_seconds?: number | null;
   expected_to_attend?: boolean | null;
-  attendance_status?: 'expected' | 'attended' | 'partial' | 'full' | 'no_show' | 'excused' | null;
+  attendance_status?:
+    | 'expected'
+    | 'attended'
+    | 'partial'
+    | 'full'
+    | 'no_show'
+    | 'excused'
+    | null;
   attendance_ratio?: number | null;
   qualified_full_attendance?: boolean | null;
   required_seconds?: number | null;
@@ -96,7 +110,16 @@ type ChannelLiveSessionParticipantRowRecord = {
   app_metadata?: Record<string, unknown> | null;
 };
 
-function parseChannelLiveSessionConfig(value: unknown): ChannelLiveSessionConfigRecord | null {
+type ActivityParticipantSummary = {
+  profileId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  themeKey: string | null;
+};
+
+function parseChannelLiveSessionConfig(
+  value: unknown,
+): ChannelLiveSessionConfigRecord | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return null;
   }
@@ -118,7 +141,8 @@ function parseChannelLiveSessionConfig(value: unknown): ChannelLiveSessionConfig
   return {
     enabled: true,
     provider: candidate.provider,
-    mode: candidate.mode === 'audio' || candidate.mode === 'video' ? candidate.mode : null,
+    mode:
+      candidate.mode === 'audio' || candidate.mode === 'video' ? candidate.mode : null,
     joinUrl:
       candidate.provider === 'custom' &&
       typeof candidate.joinUrl === 'string' &&
@@ -172,6 +196,32 @@ async function findSystemProfileId(supabase: SupabaseServiceClient, orgId: strin
     .maybeSingle<{ id: string }>();
 
   return response.data?.id ?? null;
+}
+
+async function loadActivityParticipants(input: {
+  supabase: SupabaseServiceClient;
+  orgId: string;
+  profileIds: string[];
+}) {
+  const uniqueProfileIds = Array.from(new Set(input.profileIds.filter(Boolean)));
+  if (!uniqueProfileIds.length) {
+    return [] satisfies ActivityParticipantSummary[];
+  }
+
+  const response = await getProfilesByIds(input.supabase, input.orgId, uniqueProfileIds);
+  if ('error' in response && response.error) {
+    throw new Error(response.error.message);
+  }
+
+  return (response.data ?? []).map((profile) => ({
+    profileId: profile.id,
+    displayName:
+      profile.display_name ??
+      [profile.first_name, profile.last_name].filter(Boolean).join(' ') ??
+      'Participant',
+    avatarUrl: profile.avatar_url ?? null,
+    themeKey: profile.ui_theme_key ?? null,
+  }));
 }
 
 async function getActiveLiveSession(
@@ -241,22 +291,24 @@ async function insertParticipantEvent(input: {
   occurredAt?: string;
   source?: 'app' | 'provider_webhook';
 }) {
-  const response = await input.supabase.from('channel_live_session_participant_events').insert({
-    org_id: input.orgId,
-    live_session_id: input.liveSessionId,
-    channel_id: input.channelId,
-    profile_id: input.profileId,
-    provider_participant_id: input.providerParticipantId ?? null,
-    provider: input.provider,
-    event_type: input.eventType,
-    occurred_at: input.occurredAt ?? new Date().toISOString(),
-    source: input.source ?? 'app',
-    provider_event_id: input.providerEventId ?? null,
-    normalized_event_version: input.normalizedEventVersion ?? null,
-    raw_provider_payload: input.rawProviderPayload ?? {},
-    correlation_key: input.correlationKey ?? null,
-    payload: input.payload,
-  });
+  const response = await input.supabase
+    .from('channel_live_session_participant_events')
+    .insert({
+      org_id: input.orgId,
+      live_session_id: input.liveSessionId,
+      channel_id: input.channelId,
+      profile_id: input.profileId,
+      provider_participant_id: input.providerParticipantId ?? null,
+      provider: input.provider,
+      event_type: input.eventType,
+      occurred_at: input.occurredAt ?? new Date().toISOString(),
+      source: input.source ?? 'app',
+      provider_event_id: input.providerEventId ?? null,
+      normalized_event_version: input.normalizedEventVersion ?? null,
+      raw_provider_payload: input.rawProviderPayload ?? {},
+      correlation_key: input.correlationKey ?? null,
+      payload: input.payload,
+    });
 
   if (response.error) {
     if (input.providerEventId && response.error.code === '23505') {
@@ -345,9 +397,12 @@ async function upsertProviderParticipantState(input: {
         live_session_id: input.session.id,
         channel_id: input.session.channel_id,
         profile_id: input.profileId,
-        join_requested_at: input.eventType === 'participant_joined' ? input.occurredAt : null,
-        first_joined_at: input.eventType === 'participant_joined' ? input.occurredAt : null,
-        last_joined_at: input.eventType === 'participant_joined' ? input.occurredAt : null,
+        join_requested_at:
+          input.eventType === 'participant_joined' ? input.occurredAt : null,
+        first_joined_at:
+          input.eventType === 'participant_joined' ? input.occurredAt : null,
+        last_joined_at:
+          input.eventType === 'participant_joined' ? input.occurredAt : null,
         last_left_at: input.eventType === 'participant_left' ? input.occurredAt : null,
         join_count: joinCount,
         last_known_status: input.eventType === 'participant_joined' ? 'joined' : 'left',
@@ -363,7 +418,8 @@ async function upsertProviderParticipantState(input: {
   }
 
   const updates: Record<string, unknown> = {
-    provider_participant_id: input.providerParticipantId ?? existing.provider_participant_id ?? null,
+    provider_participant_id:
+      input.providerParticipantId ?? existing.provider_participant_id ?? null,
     provider_metadata: {
       ...(existing.provider_metadata ?? {}),
       ...(input.providerMetadata ?? {}),
@@ -373,7 +429,9 @@ async function upsertProviderParticipantState(input: {
 
   if (input.eventType === 'participant_joined') {
     const nextJoinCount =
-      existing.last_known_status === 'joined' ? existing.join_count : existing.join_count + 1;
+      existing.last_known_status === 'joined'
+        ? existing.join_count
+        : existing.join_count + 1;
     updates.join_requested_at = existing.join_requested_at ?? input.occurredAt;
     updates.first_joined_at = existing.first_joined_at ?? input.occurredAt;
     updates.last_joined_at = input.occurredAt;
@@ -486,7 +544,10 @@ export async function createOrJoinLiveSession(input: {
     throw new Error('Account not found');
   }
 
-  const profileResponse = await getProfileByAccountId(input.supabase, accountResponse.data.id);
+  const profileResponse = await getProfileByAccountId(
+    input.supabase,
+    accountResponse.data.id,
+  );
   if (!profileResponse.data) {
     throw new Error('Profile not found');
   }
@@ -570,7 +631,7 @@ export async function createOrJoinLiveSession(input: {
   const now = new Date().toISOString();
   const joinPath =
     liveSessionConfig.provider === 'custom'
-      ? liveSessionConfig.joinUrl ?? ''
+      ? (liveSessionConfig.joinUrl ?? '')
       : `/${input.orgSlug}/live-sessions/temp`;
 
   if (liveSessionConfig.provider === 'custom' && !joinPath) {
@@ -590,6 +651,7 @@ export async function createOrJoinLiveSession(input: {
       attendance_policy: null,
       report_status: 'pending',
       app_metadata: {
+        learningSpaceId: channelResponse.data.primary_entity_id ?? null,
         occurrenceEndAt: scope.occurrenceEndAt ?? null,
         occurrenceLabel: scope.occurrenceLabel ?? null,
         scheduleId: scope.schedule?.ids.id ?? null,
@@ -647,6 +709,15 @@ export async function createOrJoinLiveSession(input: {
   }
 
   const session = insertResponse.data;
+  const sessionActivityParticipants = await loadActivityParticipants({
+    supabase: input.serviceSupabase,
+    orgId: session.org_id,
+    profileIds: [profileResponse.data.id],
+  });
+  const sessionTitle =
+    scope.schedule?.title ??
+    channelResponse.data.topic ??
+    (channelResponse.data.purpose === 'learning-space' ? 'Class' : 'Live session');
 
   try {
     await snapshotExpectedParticipantsForLiveSession({
@@ -676,7 +747,8 @@ export async function createOrJoinLiveSession(input: {
       }
 
       const messageSenderProfileId =
-        (await findSystemProfileId(input.serviceSupabase, session.org_id)) ?? profileResponse.data.id;
+        (await findSystemProfileId(input.serviceSupabase, session.org_id)) ??
+        profileResponse.data.id;
       const title =
         channelResponse.data.purpose === 'learning-space'
           ? 'Class started'
@@ -691,7 +763,8 @@ export async function createOrJoinLiveSession(input: {
           profileResponse.data.display_name ??
           ([profileResponse.data.first_name, profileResponse.data.last_name]
             .filter(Boolean)
-            .join(' ') || 'User'),
+            .join(' ') ||
+            'User'),
         title,
         joinUrl: joinPath,
         provider: liveSessionConfig.provider,
@@ -737,10 +810,12 @@ export async function createOrJoinLiveSession(input: {
         occurredAt: now,
         sourceKind: 'profile',
         actorProfileId: profileResponse.data.id,
-        scope:
-          channelResponse.data.primary_entity_id
-            ? { kind: 'learning_space', learningSpaceId: channelResponse.data.primary_entity_id }
-            : { kind: 'channel', channelId: session.channel_id },
+        scope: channelResponse.data.primary_entity_id
+          ? {
+              kind: 'learning_space',
+              learningSpaceId: channelResponse.data.primary_entity_id,
+            }
+          : { kind: 'channel', channelId: session.channel_id },
         objectRef: { kind: 'session', id: session.id },
         targetRef: channelResponse.data.primary_entity_id
           ? { kind: 'learning_space', id: channelResponse.data.primary_entity_id }
@@ -749,9 +824,12 @@ export async function createOrJoinLiveSession(input: {
           liveSessionId: session.id,
           channelId: session.channel_id,
           learningSpaceId: channelResponse.data.primary_entity_id ?? null,
-          title,
+          title: sessionTitle,
           joinPath,
           startedAt: now,
+          occurrenceStart: scope.occurrenceKey ?? null,
+          occurrenceLabel: scope.occurrenceLabel ?? null,
+          participants: sessionActivityParticipants,
         },
         dedupeKey: `session.started:${session.id}`,
         createdBy: profileResponse.data.id,
@@ -810,7 +888,8 @@ export async function createOrJoinLiveSession(input: {
     }
 
     const messageSenderProfileId =
-      (await findSystemProfileId(input.serviceSupabase, session.org_id)) ?? profileResponse.data.id;
+      (await findSystemProfileId(input.serviceSupabase, session.org_id)) ??
+      profileResponse.data.id;
     const title =
       channelResponse.data.purpose === 'learning-space'
         ? 'Class started'
@@ -825,7 +904,8 @@ export async function createOrJoinLiveSession(input: {
         profileResponse.data.display_name ??
         ([profileResponse.data.first_name, profileResponse.data.last_name]
           .filter(Boolean)
-          .join(' ') || 'User'),
+          .join(' ') ||
+          'User'),
       title,
       joinUrl: resolvedJoinPath,
       provider: liveSessionConfig.provider,
@@ -858,11 +938,11 @@ export async function createOrJoinLiveSession(input: {
       provider: liveSessionConfig.provider,
       eventType: 'session_started',
       profileId: profileResponse.data.id,
-        payload: {
-          startedMessageId,
-        },
-        normalizedEventVersion: 'v1',
-      });
+      payload: {
+        startedMessageId,
+      },
+      normalizedEventVersion: 'v1',
+    });
     await publishActivityEvent({
       supabase: input.serviceSupabase,
       orgId: session.org_id,
@@ -870,10 +950,12 @@ export async function createOrJoinLiveSession(input: {
       occurredAt: now,
       sourceKind: 'profile',
       actorProfileId: profileResponse.data.id,
-      scope:
-        channelResponse.data.primary_entity_id
-          ? { kind: 'learning_space', learningSpaceId: channelResponse.data.primary_entity_id }
-          : { kind: 'channel', channelId: session.channel_id },
+      scope: channelResponse.data.primary_entity_id
+        ? {
+            kind: 'learning_space',
+            learningSpaceId: channelResponse.data.primary_entity_id,
+          }
+        : { kind: 'channel', channelId: session.channel_id },
       objectRef: { kind: 'session', id: session.id },
       targetRef: channelResponse.data.primary_entity_id
         ? { kind: 'learning_space', id: channelResponse.data.primary_entity_id }
@@ -882,9 +964,12 @@ export async function createOrJoinLiveSession(input: {
         liveSessionId: session.id,
         channelId: session.channel_id,
         learningSpaceId: channelResponse.data.primary_entity_id ?? null,
-        title,
+        title: sessionTitle,
         joinPath: resolvedJoinPath,
         startedAt: now,
+        occurrenceStart: scope.occurrenceKey ?? null,
+        occurrenceLabel: scope.occurrenceLabel ?? null,
+        participants: sessionActivityParticipants,
       },
       dedupeKey: `session.started:${session.id}`,
       createdBy: profileResponse.data.id,
@@ -897,11 +982,11 @@ export async function createOrJoinLiveSession(input: {
       provider: liveSessionConfig.provider,
       eventType: 'join_requested',
       profileId: profileResponse.data.id,
-        payload: {
-          created: true,
-        },
-        normalizedEventVersion: 'v1',
-      });
+      payload: {
+        created: true,
+      },
+      normalizedEventVersion: 'v1',
+    });
 
     return {
       sessionId: session.id,
@@ -943,7 +1028,10 @@ export async function resolveLiveSessionJoinAccess(input: {
   liveSessionId: string;
   profile: ProfileRow;
 }) {
-  const sessionResponse = await getLiveSessionById(input.serviceSupabase, input.liveSessionId);
+  const sessionResponse = await getLiveSessionById(
+    input.serviceSupabase,
+    input.liveSessionId,
+  );
   if (sessionResponse.error) {
     throw new Error(sessionResponse.error.message);
   }
@@ -964,10 +1052,13 @@ export async function resolveLiveSessionJoinAccess(input: {
     throw new Error('Unauthorized');
   }
 
-  const provider = getLiveSessionProvider(sessionResponse.data.provider as LiveSessionProviderVM);
+  const provider = getLiveSessionProvider(
+    sessionResponse.data.provider as LiveSessionProviderVM,
+  );
   const displayName =
     input.profile.display_name ??
-    ([input.profile.first_name, input.profile.last_name].filter(Boolean).join(' ') || 'User');
+    ([input.profile.first_name, input.profile.last_name].filter(Boolean).join(' ') ||
+      'User');
   const joinAccess = await provider.getJoinAccess({
     sessionId: sessionResponse.data.id,
     providerSessionId: sessionResponse.data.provider_session_id ?? null,
@@ -1046,7 +1137,10 @@ export async function processLiveSessionProviderWebhook(input: {
         .update({
           status: 'live',
           started_at: session.started_at ?? event.occurredAt,
-          report_status: session.report_status === 'generated' ? 'stale' : session.report_status ?? 'pending',
+          report_status:
+            session.report_status === 'generated'
+              ? 'stale'
+              : (session.report_status ?? 'pending'),
           updated_at: new Date().toISOString(),
         })
         .eq('id', session.id)
@@ -1057,7 +1151,77 @@ export async function processLiveSessionProviderWebhook(input: {
       }
     }
 
-    if (event.eventType === 'participant_joined' || event.eventType === 'participant_left') {
+    if (
+      event.eventType === 'participant_joined' ||
+      event.eventType === 'participant_left'
+    ) {
+      if (event.profileId) {
+        const activityParticipants = await loadActivityParticipants({
+          supabase: input.supabase,
+          orgId: session.org_id,
+          profileIds: [event.profileId],
+        });
+        const participant = activityParticipants[0];
+        await publishActivityEvent({
+          supabase: input.supabase,
+          orgId: session.org_id,
+          eventType:
+            event.eventType === 'participant_joined' ? 'member.joined' : 'member.removed',
+          occurredAt: event.occurredAt,
+          sourceKind: 'provider_webhook',
+          actorProfileId: null,
+          scope:
+            typeof session.app_metadata?.learningSpaceId === 'string'
+              ? {
+                  kind: 'learning_space',
+                  learningSpaceId: session.app_metadata.learningSpaceId,
+                }
+              : { kind: 'channel', channelId: session.channel_id },
+          objectRef: { kind: 'session', id: session.id },
+          targetRef:
+            typeof session.app_metadata?.learningSpaceId === 'string'
+              ? { kind: 'learning_space', id: session.app_metadata.learningSpaceId }
+              : undefined,
+          payload: {
+            liveSessionId: session.id,
+            channelId: session.channel_id,
+            learningSpaceId:
+              typeof session.app_metadata?.learningSpaceId === 'string'
+                ? session.app_metadata.learningSpaceId
+                : null,
+            title:
+              typeof session.app_metadata?.scheduleTitle === 'string'
+                ? session.app_metadata.scheduleTitle
+                : 'Class',
+            occurrenceStart:
+              typeof session.occurrence_key === 'string' ? session.occurrence_key : null,
+            occurrenceLabel:
+              typeof session.app_metadata?.occurrenceLabel === 'string'
+                ? session.app_metadata.occurrenceLabel
+                : null,
+            memberProfileId: participant?.profileId ?? event.profileId,
+            memberDisplayName:
+              participant?.displayName ?? event.participantDisplayName ?? 'Participant',
+            memberAvatarUrl: participant?.avatarUrl ?? null,
+            memberThemeKey: participant?.themeKey ?? null,
+            members: participant
+              ? [
+                  {
+                    profileId: participant.profileId,
+                    displayName: participant.displayName,
+                    avatarUrl: participant.avatarUrl,
+                    themeKey: participant.themeKey,
+                  },
+                ]
+              : undefined,
+            ...(event.eventType === 'participant_joined'
+              ? { joinedAt: event.occurredAt }
+              : { leftAt: event.occurredAt }),
+          },
+          dedupeKey: `${event.eventType}:${session.id}:${event.profileId}:${event.occurredAt}`,
+        });
+      }
+
       if (session.report_status === 'generated') {
         await markLiveSessionReportStatus(input.supabase, session, 'stale');
       }
@@ -1091,6 +1255,14 @@ export async function processLiveSessionProviderWebhook(input: {
         throw new Error(participantsResponse.error.message);
       }
 
+      const sessionParticipants = await loadActivityParticipants({
+        supabase: input.supabase,
+        orgId: session.org_id,
+        profileIds: (participantsResponse.data ?? []).map(
+          (participant) => participant.profile_id,
+        ),
+      });
+
       for (const participant of participantsResponse.data ?? []) {
         await upsertProviderParticipantState({
           supabase: input.supabase,
@@ -1117,18 +1289,36 @@ export async function processLiveSessionProviderWebhook(input: {
         sourceKind: 'provider_webhook',
         actorProfileId: null,
         scope:
-          typeof session.app_metadata?.scheduleId === 'string'
-            ? { kind: 'channel', channelId: session.channel_id }
+          typeof session.app_metadata?.learningSpaceId === 'string'
+            ? {
+                kind: 'learning_space',
+                learningSpaceId: session.app_metadata.learningSpaceId,
+              }
             : { kind: 'channel', channelId: session.channel_id },
         objectRef: { kind: 'session', id: session.id },
+        targetRef:
+          typeof session.app_metadata?.learningSpaceId === 'string'
+            ? { kind: 'learning_space', id: session.app_metadata.learningSpaceId }
+            : undefined,
         payload: {
           liveSessionId: session.id,
           channelId: session.channel_id,
+          learningSpaceId:
+            typeof session.app_metadata?.learningSpaceId === 'string'
+              ? session.app_metadata.learningSpaceId
+              : null,
           title:
             typeof session.app_metadata?.scheduleTitle === 'string'
               ? session.app_metadata.scheduleTitle
               : 'Live session',
+          occurrenceStart:
+            typeof session.occurrence_key === 'string' ? session.occurrence_key : null,
+          occurrenceLabel:
+            typeof session.app_metadata?.occurrenceLabel === 'string'
+              ? session.app_metadata.occurrenceLabel
+              : null,
           endedAt: event.occurredAt,
+          participants: sessionParticipants,
         },
         dedupeKey: `session.ended:${session.id}`,
       });

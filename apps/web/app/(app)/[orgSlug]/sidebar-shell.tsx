@@ -44,6 +44,7 @@ import {
 import { upsertDirectMessageChannel } from '@iconicedu/web/lib/sidebar/direct-message-realtime';
 import { persistDirectMessageUnreadCount } from '@iconicedu/web/lib/sidebar/direct-message-unread-persistence';
 import { applyInboxUnreadCount } from '@iconicedu/web/lib/sidebar/inbox-count';
+import { shouldRetryDirectMessageBootstrap } from '@iconicedu/web/lib/sidebar/direct-message-bootstrap';
 import { mapProfilePresenceRowToVM } from '@iconicedu/web/lib/profile/mappers/presence.mapper';
 import {
   applyPresenceToSidebarData,
@@ -520,6 +521,7 @@ export function SidebarShell({
       channelId: string,
       senderProfileId: string | null | undefined,
       attempt: number,
+      options?: { waitForMessages?: boolean },
     ) => {
       if (attempt > maxRetryAttempts) {
         if (!exhaustedChannelIds.has(channelId)) {
@@ -531,7 +533,7 @@ export function SidebarShell({
       const retryDelayMs = Math.min(250 * attempt, 2500);
       const timer = window.setTimeout(() => {
         retryTimers.delete(timer);
-        void addOrRefreshDmChannel(channelId, senderProfileId, attempt);
+        void addOrRefreshDmChannel(channelId, senderProfileId, attempt, options);
       }, retryDelayMs);
       retryTimers.add(timer);
     };
@@ -540,6 +542,7 @@ export function SidebarShell({
       channelId: string,
       senderProfileId?: string | null,
       attempt = 0,
+      options?: { waitForMessages?: boolean },
     ) => {
       if (
         !shouldAttemptDirectMessageSync(
@@ -561,7 +564,7 @@ export function SidebarShell({
           messagesLimit: 50,
         });
         if (!nextChannel) {
-          scheduleRetry(channelId, senderProfileId, attempt + 1);
+          scheduleRetry(channelId, senderProfileId, attempt + 1, options);
           return;
         }
 
@@ -572,10 +575,19 @@ export function SidebarShell({
 
         const hasMessages = (nextChannel.collections.messages?.items?.length ?? 0) > 0;
         const existsInSidebar = directMessageIdsRef.current.has(channelId);
+        if (
+          shouldRetryDirectMessageBootstrap({
+            hasMessages,
+            existsInSidebar,
+            senderProfileId,
+            waitForMessages: options?.waitForMessages,
+          })
+        ) {
+          scheduleRetry(channelId, senderProfileId, attempt + 1, options);
+          return;
+        }
+
         if (!hasMessages && !existsInSidebar) {
-          if (senderProfileId) {
-            scheduleRetry(channelId, senderProfileId, attempt + 1);
-          }
           return;
         }
 
@@ -659,7 +671,9 @@ export function SidebarShell({
           return;
         }
 
-        await addOrRefreshDmChannel(row.id, null);
+        await addOrRefreshDmChannel(row.id, null, 0, {
+          waitForMessages: true,
+        });
       },
     );
 
@@ -680,7 +694,9 @@ export function SidebarShell({
           return;
         }
 
-        await addOrRefreshDmChannel(row.channel_id, null);
+        await addOrRefreshDmChannel(row.channel_id, null, 0, {
+          waitForMessages: true,
+        });
       },
     );
 

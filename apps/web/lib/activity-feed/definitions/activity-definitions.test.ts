@@ -75,7 +75,7 @@ describe('activity event definitions', () => {
 
     expect(rendered.headline.secondary).toBe('Algebra I');
     expect(rendered.actionButton).toEqual({
-      label: 'Open class',
+      label: 'Open learning space',
       variant: 'outline',
       href: '../spaces/channel-1',
     });
@@ -112,7 +112,7 @@ describe('activity event definitions', () => {
     });
 
     expect(rendered.headline).toEqual({
-      primary: 'Tehara Morgan invited to the learning space',
+      primary: 'Tehara Morgan added',
     });
     expect(rendered.leading).toEqual({
       kind: 'avatars',
@@ -125,9 +125,7 @@ describe('activity event definitions', () => {
       ],
       overflowCount: 0,
     });
-    expect(rendered.summary).toBe(
-      'Added: Tehara Morgan. Added to Learning space with access and notifications enabled.',
-    );
+    expect(rendered.summary).toBe('Added: Tehara Morgan. Added to Learning space.');
     expect(rendered.actionButton).toBeUndefined();
   });
 
@@ -165,7 +163,7 @@ describe('activity event definitions', () => {
     });
 
     expect(rendered.headline).toEqual({
-      primary: 'Tehara Morgan removed from the learning space',
+      primary: 'Tehara Morgan removed',
     });
     expect(rendered.leading).toEqual({
       kind: 'avatars',
@@ -179,21 +177,21 @@ describe('activity event definitions', () => {
       overflowCount: 0,
     });
     expect(rendered.summary).toBe(
-      'Removed: Tehara Morgan. Removed from Math Foundations and access notifications disabled.',
+      'Removed: Tehara Morgan. Removed from Math Foundations.',
     );
     expect(rendered.actionButton).toBeUndefined();
   });
 
   it('renders grouped member invite with one summary listing added members', () => {
-    const definition = getActivityEventDefinition('member.invited');
+    const definition = getActivityEventDefinition('members.invited');
     if (!definition) {
-      throw new Error('Missing member.invited definition');
+      throw new Error('Missing members.invited definition');
     }
 
     const rendered = definition.render({
       id: 'event-member-invited-2',
       org_id: 'org-1',
-      event_type: 'member.invited',
+      event_type: 'members.invited',
       occurred_at: '2026-03-03T12:00:00.000Z',
       source_kind: 'profile',
       actor_profile_id: 'profile-1',
@@ -212,7 +210,7 @@ describe('activity event definitions', () => {
         ],
       },
       audience_rules: [],
-      dedupe_key: 'member.invited:space-1:batch',
+      dedupe_key: 'members.invited:space-1:batch',
       projection_status: 'pending',
       projection_attempts: 0,
       created_at: '2026-03-03T12:00:00.000Z',
@@ -220,14 +218,14 @@ describe('activity event definitions', () => {
     });
 
     expect(rendered.headline).toEqual({
-      primary: '3 members invited to the learning space',
+      primary: '3 participants added',
     });
     expect(rendered.summary).toBe(
-      'Added: Tehara Morgan, Riley Morgan, Alex Stone. Added to Math Foundations with access and notifications enabled.',
+      'Added: Tehara Morgan, Riley Morgan, Alex Stone. Added to Math Foundations.',
     );
   });
 
-  it('adds a class link for learning-space events', () => {
+  it('adds a learning space link for learning-space events', () => {
     const definition = getActivityEventDefinition('class.created');
     if (!definition) {
       throw new Error('Missing class.created definition');
@@ -257,7 +255,7 @@ describe('activity event definitions', () => {
     });
 
     expect(rendered.actionButton).toEqual({
-      label: 'View your learning space',
+      label: 'Open learning space',
       variant: 'outline',
       href: '../spaces/channel-1',
     });
@@ -274,7 +272,7 @@ describe('activity event definitions', () => {
     });
   });
 
-  it('renders class updated with learning-space wording and system avatar pattern', () => {
+  it('renders learning space updated with learning space wording and participant avatar pattern', () => {
     const definition = getActivityEventDefinition('class.updated');
     if (!definition || !definition.group) {
       throw new Error('Missing class.updated definition');
@@ -338,7 +336,7 @@ describe('activity event definitions', () => {
       overflowCount: 0,
     });
     expect(rendered.actionButton).toEqual({
-      label: 'View your learning space',
+      label: 'Open learning space',
       variant: 'outline',
       href: '../spaces/channel-1',
     });
@@ -450,7 +448,7 @@ describe('activity event definitions', () => {
         },
       }),
     ).toMatchObject({
-      headline: { primary: 'Learning space created and assigned' },
+      headline: { primary: 'Learning space created' },
       leading: {
         kind: 'avatars',
       },
@@ -654,7 +652,7 @@ describe('activity event definitions', () => {
       created_at: '2026-03-08T12:00:00.000Z',
       updated_at: '2026-03-08T12:00:00.000Z',
     });
-    expect(rescheduledRendered.headline.primary).toBe('Class session rescheduled');
+    expect(rescheduledRendered.headline.primary).toBe('Class schedule updated');
     expect(rescheduledRendered.summary).toBe(
       'Session: Math Foundations weekly session (Sat) moved from 2:00 PM to 2:30 PM PT',
     );
@@ -684,7 +682,7 @@ describe('activity event definitions', () => {
       created_at: '2026-03-08T12:00:00.000Z',
       updated_at: '2026-03-08T12:00:00.000Z',
     });
-    expect(canceledRendered.headline.primary).toBe('Class session cancelled');
+    expect(canceledRendered.headline.primary).toBe('Class schedule updated');
     expect(canceledRendered.summary).toBe(
       'Session: Math Foundations weekly session (Sat 2:30 PM PT) canceled due to schedule update',
     );
@@ -795,13 +793,88 @@ describe('activity event definitions', () => {
     );
     expect(definition.render(event)).toMatchObject({
       headline: {
-        primary: 'Class starts in 5 mins',
+        primary: 'Class starts in 5 minutes',
         secondary: 'Algebra',
       },
       actionButton: {
-        label: 'Open class',
+        label: 'Join class',
         href: '../spaces/channel-1',
       },
+    });
+  });
+
+  it('renders session participant join and leave activities with participant avatars', () => {
+    const joined = getActivityEventDefinition('member.joined');
+    const left = getActivityEventDefinition('member.removed');
+    if (!joined || !left) {
+      throw new Error('Missing member session activity definitions');
+    }
+
+    const baseEvent = {
+      id: 'event-session-member-1',
+      org_id: 'org-1',
+      occurred_at: '2026-03-07T19:05:00.000Z',
+      source_kind: 'provider_webhook' as const,
+      actor_profile_id: null,
+      scope: { kind: 'learning_space' as const, learningSpaceId: 'space-1' },
+      object_ref: { kind: 'session' as const, id: 'live-session-1' },
+      target_ref: { kind: 'learning_space' as const, id: 'space-1' },
+      audience_rules: [],
+      projection_status: 'pending' as const,
+      projection_attempts: 0,
+      created_at: '2026-03-07T19:05:00.000Z',
+      updated_at: '2026-03-07T19:05:00.000Z',
+      payload: {
+        liveSessionId: 'live-session-1',
+        learningSpaceId: 'space-1',
+        channelId: 'channel-1',
+        title: 'Math with Ms Charmain',
+        occurrenceStart: '2026-03-07T19:00:00.000Z',
+        memberProfileId: 'student-1',
+        memberDisplayName: 'Tehara Morgan',
+        members: [
+          {
+            profileId: 'student-1',
+            displayName: 'Tehara Morgan',
+            avatarUrl: 'https://cdn.test/tehara.png',
+            themeKey: 'rose',
+          },
+        ],
+      },
+    };
+
+    expect(
+      joined.render({
+        ...baseEvent,
+        event_type: 'member.joined',
+        dedupe_key: 'participant_joined:1',
+        payload: { ...baseEvent.payload, joinedAt: '2026-03-07T19:05:00.000Z' },
+      }),
+    ).toMatchObject({
+      headline: { primary: 'Tehara Morgan joined the session' },
+      leading: {
+        kind: 'avatars',
+        avatars: [
+          {
+            name: 'Tehara Morgan',
+            avatar: { source: 'upload', url: 'https://cdn.test/tehara.png' },
+            themeKey: 'rose',
+          },
+        ],
+      },
+      summary: 'Joined at Mar 7 at 2:05 PM',
+    });
+
+    expect(
+      left.render({
+        ...baseEvent,
+        event_type: 'member.removed',
+        dedupe_key: 'participant_left:1',
+        payload: { ...baseEvent.payload, leftAt: '2026-03-07T19:45:00.000Z' },
+      }),
+    ).toMatchObject({
+      headline: { primary: 'Tehara Morgan left the session' },
+      summary: 'Left at Mar 7 at 2:45 PM',
     });
   });
 });

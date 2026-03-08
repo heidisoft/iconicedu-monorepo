@@ -6,14 +6,23 @@ vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
 
 vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
   getProfileByAccountId: vi.fn(),
+  getProfilesByIds: vi.fn(),
 }));
 
 vi.mock('@iconicedu/web/lib/live-sessions/scope', () => ({
   resolveChannelLiveSessionScope: vi.fn(),
 }));
 
+vi.mock('@iconicedu/web/lib/activity-feed/publisher/activity-publisher', () => ({
+  publishActivityEvent: vi.fn(),
+}));
+
 import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
-import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import {
+  getProfileByAccountId,
+  getProfilesByIds,
+} from '@iconicedu/web/lib/profile/queries/profiles.query';
+import { publishActivityEvent } from '@iconicedu/web/lib/activity-feed/publisher/activity-publisher';
 import { resolveChannelLiveSessionScope } from '@iconicedu/web/lib/live-sessions/scope';
 import { createOrJoinLiveSession } from '@iconicedu/web/lib/live-sessions/service';
 
@@ -257,6 +266,7 @@ function createServiceSupabaseStub() {
 
 describe('createOrJoinLiveSession', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.mocked(getAccountByAuthUserId).mockResolvedValue({
       data: {
         id: 'account-1',
@@ -272,6 +282,18 @@ describe('createOrJoinLiveSession', () => {
         first_name: 'Taylor',
         last_name: 'Reed',
       },
+      error: null,
+    } as never);
+
+    vi.mocked(getProfilesByIds).mockResolvedValue({
+      data: [
+        {
+          id: 'profile-1',
+          display_name: 'Taylor Reed',
+          avatar_url: null,
+          ui_theme_key: null,
+        },
+      ],
       error: null,
     } as never);
 
@@ -313,9 +335,23 @@ describe('createOrJoinLiveSession', () => {
     expect(serviceSupabase.state.participantUpserted).toBe(true);
     expect(serviceSupabase.state.expectedParticipantsInserted).toBe(1);
     expect(serviceSupabase.state.participantEvents).toHaveLength(2);
-    expect(serviceSupabase.state.participantEvents.map((event) => event.event_type)).toEqual([
-      'session_started',
-      'join_requested',
-    ]);
+    expect(
+      serviceSupabase.state.participantEvents.map((event) => event.event_type),
+    ).toEqual(['session_started', 'join_requested']);
+    expect(vi.mocked(publishActivityEvent)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'session.started',
+        payload: expect.objectContaining({
+          title: 'Math',
+          occurrenceStart: '2026-03-02T10:00:00.000Z',
+          participants: [
+            expect.objectContaining({
+              profileId: 'profile-1',
+              displayName: 'Taylor Reed',
+            }),
+          ],
+        }),
+      }),
+    );
   });
 });

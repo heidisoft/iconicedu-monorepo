@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import {
   View,
   Text,
+  Image,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -18,35 +19,75 @@ import type { AppColors } from '@/lib/theme';
 const ROLE_LABELS: Record<string, string> = {
   educator: 'Educator',
   guardian: 'Parent / Guardian',
-  child:    'Student',
-  staff:    'Staff',
-  admin:    'Admin',
-  owner:    'Owner',
+  child: 'Student',
+  staff: 'Staff',
+  admin: 'Admin',
+  owner: 'Owner',
 };
 
 function makeStyles(C: AppColors) {
   return StyleSheet.create({
-    safe:         { flex: 1, backgroundColor: C.pageBg },
-    nav:          { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border },
-    navBack:      { padding: 8, borderRadius: 8 },
-    navTitle:     { flex: 1, fontSize: 17, fontWeight: '700', color: C.text, textAlign: 'center', marginRight: 40 },
-    scroll:       { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 48, gap: 6 },
-    sectionLabel: { fontSize: 12, fontWeight: '700', color: C.textFaint, textTransform: 'uppercase', letterSpacing: 0.8, paddingHorizontal: 4, paddingTop: 14, paddingBottom: 6 },
-    card:         { borderRadius: 14, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, overflow: 'hidden' },
-    divider:      { height: 1, backgroundColor: C.border, marginLeft: 60 },
-    valueText:    { fontSize: 13, color: C.textMuted, maxWidth: 160, textAlign: 'right' },
-    emptyValue:   { fontSize: 13, color: C.textFaint, fontStyle: 'italic' },
-    avatarSection:{ alignItems: 'center', paddingVertical: 24, gap: 10 },
-    avatar:       { width: 80, height: 80, borderRadius: 40, backgroundColor: C.teal, alignItems: 'center', justifyContent: 'center' },
-    avatarTxt:    { color: C.tealFg, fontWeight: '800', fontSize: 32 },
-    avatarName:   { fontSize: 20, fontWeight: '800', color: C.text, letterSpacing: -0.3 },
-    avatarSub:    { fontSize: 13, color: C.teal, fontWeight: '600' },
+    safe: { flex: 1, backgroundColor: C.pageBg },
+    nav: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 8,
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: C.border,
+    },
+    navBack: { padding: 8, borderRadius: 8 },
+    navTitle: {
+      flex: 1,
+      fontSize: 17,
+      fontWeight: '700',
+      color: C.text,
+      textAlign: 'center',
+      marginRight: 40,
+    },
+    scroll: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 48, gap: 6 },
+    sectionLabel: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: C.textFaint,
+      textTransform: 'uppercase',
+      letterSpacing: 0.8,
+      paddingHorizontal: 4,
+      paddingTop: 14,
+      paddingBottom: 6,
+    },
+    card: {
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.card,
+      overflow: 'hidden',
+    },
+    divider: { height: 1, backgroundColor: C.border, marginLeft: 60 },
+    valueText: { fontSize: 13, color: C.textMuted, maxWidth: 160, textAlign: 'right' },
+    emptyValue: { fontSize: 13, color: C.textFaint, fontStyle: 'italic' },
+    avatarSection: { alignItems: 'center', paddingVertical: 24, gap: 10 },
+    avatar: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: C.teal,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarTxt: { color: C.tealFg, fontWeight: '800', fontSize: 32 },
+    avatarName: { fontSize: 20, fontWeight: '800', color: C.text, letterSpacing: -0.3 },
+    avatarSub: { fontSize: 13, color: C.teal, fontWeight: '600' },
   });
 }
 
 function Val({ value, s }: { value?: string | null; s: ReturnType<typeof makeStyles> }) {
   if (!value) return <Text style={s.emptyValue}>Not set</Text>;
-  return <Text style={s.valueText} numberOfLines={2}>{value}</Text>;
+  return (
+    <Text style={s.valueText} numberOfLines={2}>
+      {value}
+    </Text>
+  );
 }
 
 export default function ProfileSettingsScreen() {
@@ -63,6 +104,7 @@ export default function ProfileSettingsScreen() {
     user?.email?.split('@')[0] ??
     'User';
   const initial = displayName[0]?.toUpperCase() ?? 'U';
+  const avatarUrl = prof?.avatar_url as string | null | undefined;
   const kind = prof?.kind as string | undefined;
 
   return (
@@ -77,13 +119,15 @@ export default function ProfileSettingsScreen() {
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         {/* Avatar section */}
         <View style={s.avatarSection}>
-          <View style={s.avatar}>
-            <Text style={s.avatarTxt}>{initial}</Text>
-          </View>
-          <Text style={s.avatarName}>{displayName}</Text>
-          {!!kind && (
-            <Text style={s.avatarSub}>{ROLE_LABELS[kind] ?? kind}</Text>
+          {avatarUrl ? (
+            <Image source={{ uri: avatarUrl }} style={s.avatar} />
+          ) : (
+            <View style={s.avatar}>
+              <Text style={s.avatarTxt}>{initial}</Text>
+            </View>
           )}
+          <Text style={s.avatarName}>{displayName}</Text>
+          {!!kind && <Text style={s.avatarSub}>{ROLE_LABELS[kind] ?? kind}</Text>}
         </View>
 
         {/* Identity */}
@@ -123,7 +167,7 @@ export default function ProfileSettingsScreen() {
         </View>
 
         {/* Bio */}
-        {!!(prof?.bio) && (
+        {!!prof?.bio && (
           <>
             <Text style={s.sectionLabel}>About</Text>
             <View style={s.card}>

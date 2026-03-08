@@ -3,6 +3,7 @@ import type {
   ActivityFeedLeafItemVM,
   ActivityFeedVM,
   ActivityFeedTabVM,
+  InboxLeadingVM,
   InboxTabKeyVM,
 } from '@iconicedu/shared-types';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -17,7 +18,7 @@ import { getProfilesByIds } from '@iconicedu/web/lib/profile/queries/profiles.qu
 
 const FEED_TABS: Array<{ key: InboxTabKeyVM; label: string }> = [
   { key: 'all', label: 'All' },
-  { key: 'classes', label: 'Classes' },
+  { key: 'classes', label: 'Learning spaces' },
   { key: 'payment', label: 'Payment' },
   { key: 'system', label: 'System' },
 ];
@@ -156,21 +157,172 @@ async function attachGroupMembers(
         const bTime = new Date(b.timestamps.occurredAt).getTime();
         return bTime - aTime;
       });
+    const normalized = normalizeGroupedParent(item, members);
+    const aggregatedMembers = aggregateGroupedSubActivities(
+      normalized.parent,
+      normalized.members,
+    );
 
     memberIds.forEach((memberId) => groupedMemberIds.add(memberId));
 
     return {
-      ...item,
+      ...normalized.parent,
       subActivities: {
-        items: members,
+        items: aggregatedMembers,
       },
-      subActivityCount: item.subActivityCount ?? members.length,
+      subActivityCount: item.subActivityCount ?? aggregatedMembers.length,
     } as ActivityFeedItemVM;
   });
 
   return withGroups.filter(
     (item) => item.kind === 'group' || !groupedMemberIds.has(item.ids.id),
   );
+}
+
+function normalizeGroupedParent(
+  parent: Extract<ActivityFeedItemVM, { kind: 'group' }>,
+  members: ActivityFeedLeafItemVM[],
+) {
+  if (parent.grouping?.groupKey?.startsWith('class-created:') !== true) {
+    return { parent, members };
+  }
+
+  if (parent.verb === 'class.created') {
+    return { parent, members };
+  }
+
+  const classCreatedChild = members.find((member) => member.verb === 'class.created');
+  if (!classCreatedChild) {
+    return { parent, members };
+  }
+
+  const parentAsInviteChild =
+    parent.verb === 'member.invited' || parent.verb === 'members.invited'
+      ? ({
+          kind: 'leaf',
+          ids: {
+            ...parent.ids,
+            id: `${parent.ids.id}:original-parent`,
+          },
+          timestamps: parent.timestamps,
+          tabKey: parent.tabKey,
+          audience: parent.audience,
+          verb: parent.verb,
+          refs: parent.refs,
+          content: parent.content,
+          state: parent.state,
+          metadata: parent.metadata,
+        } as ActivityFeedLeafItemVM)
+      : null;
+
+  return {
+    parent: {
+      ...parent,
+      verb: 'class.created',
+      content: classCreatedChild.content,
+      refs: classCreatedChild.refs,
+      timestamps: {
+        ...parent.timestamps,
+        occurredAt: classCreatedChild.timestamps.occurredAt,
+      },
+    },
+    members: [
+      ...(parentAsInviteChild ? [parentAsInviteChild] : []),
+      ...members.filter((member) => member.ids.id !== classCreatedChild.ids.id),
+    ],
+  };
+}
+
+function aggregateGroupedSubActivities(
+  parent: Extract<ActivityFeedItemVM, { kind: 'group' }>,
+  members: ActivityFeedLeafItemVM[],
+) {
+  if (!members.length || parent.verb !== 'class.created') {
+    return members;
+  }
+
+  const invitedChildren = members.filter(
+    (member) => member.verb === 'member.invited' || member.verb === 'members.invited',
+  );
+  if (!invitedChildren.length) {
+    return members;
+  }
+
+  const aggregatedAvatars = collectUniqueAvatars([
+    ...invitedChildren.map((member) => member.content.leading),
+  ]);
+  const inviteCount = Math.max(aggregatedAvatars.length, invitedChildren.length);
+
+  const listedNames = aggregatedAvatars
+    .map((avatar) => avatar.name)
+    .filter(Boolean)
+    .slice(0, 3)
+    .join(', ');
+  const remainingCount = aggregatedAvatars.length - 3;
+  const secondary =
+    parent.content.headline.secondary ?? invitedChildren[0]?.content.headline.secondary;
+  const summaryPrefix = listedNames
+    ? `Added: ${listedNames}${remainingCount > 0 ? ` +${remainingCount} more` : ''}.`
+    : undefined;
+  const representative = invitedChildren[0] ?? members[0];
+
+  const aggregatedInvite: ActivityFeedLeafItemVM = {
+    ...representative,
+    ids: {
+      ...representative.ids,
+      id: `${parent.ids.id}:members-invited`,
+    },
+    verb: 'members.invited',
+    content: {
+      ...representative.content,
+      leading:
+        aggregatedAvatars.length > 0
+          ? ({
+              kind: 'avatars',
+              avatars: aggregatedAvatars.slice(0, 3),
+              overflowCount: Math.max(0, aggregatedAvatars.length - 3),
+            } satisfies InboxLeadingVM)
+          : representative.content.leading,
+      headline: {
+        primary: `${inviteCount} participants added`,
+      },
+      summary:
+        `${summaryPrefix ?? ''}${secondary ? ` Added to ${secondary}.` : ''}`.trim(),
+    },
+  };
+
+  const nonInviteMembers = members.filter(
+    (member) => member.verb !== 'member.invited' && member.verb !== 'members.invited',
+  );
+
+  return [aggregatedInvite, ...nonInviteMembers];
+}
+
+function collectUniqueAvatars(leads: Array<ActivityFeedItemVM['content']['leading']>) {
+  const avatars: NonNullable<Extract<InboxLeadingVM, { kind: 'avatars' }>['avatars']> =
+    [];
+  const seen = new Set<string>();
+
+  for (const lead of leads) {
+    if (!lead || lead.kind !== 'avatars') {
+      continue;
+    }
+
+    for (const avatar of lead.avatars) {
+      const avatarKey =
+        avatar.avatar.source === 'upload'
+          ? `upload:${avatar.avatar.url}`
+          : `seed:${avatar.avatar.seed}`;
+      const key = `${avatar.name}:${avatarKey}`;
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      avatars.push(avatar);
+    }
+  }
+
+  return avatars;
 }
 
 function buildFeedTabs(items: ActivityFeedItemVM[]): ActivityFeedTabVM[] {

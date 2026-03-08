@@ -79,7 +79,10 @@ function createSupabaseMock() {
               eq: vi.fn(() => ({
                 is: vi.fn(() => ({
                   returns: vi.fn(async () => ({
-                    data: [{ profile_id: 'child-profile-1' }, { profile_id: 'educator-profile-1' }],
+                    data: [
+                      { profile_id: 'child-profile-1' },
+                      { profile_id: 'educator-profile-1' },
+                    ],
                     error: null,
                   })),
                 })),
@@ -90,7 +93,14 @@ function createSupabaseMock() {
       }
 
       if (table === 'activity_feed_items') {
+        const selectChain = {
+          eq: vi.fn(() => selectChain),
+          is: vi.fn(() => selectChain),
+          maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+        };
+
         return {
+          select: vi.fn(() => selectChain),
           upsert: vi.fn((payload: Record<string, unknown>) => ({
             select: vi.fn(() => ({
               single: vi.fn(async () => {
@@ -136,10 +146,17 @@ describe('projectActivityEvents', () => {
       data: [{ id: 'child-profile-1', account_id: 'child-account-1', kind: 'child' }],
     });
     getFamilyLinksByOrg.mockResolvedValue({
-      data: [{ guardian_account_id: 'guardian-account-1', child_account_id: 'child-account-1' }],
+      data: [
+        {
+          guardian_account_id: 'guardian-account-1',
+          child_account_id: 'child-account-1',
+        },
+      ],
     });
     getProfilesByAccountIds.mockResolvedValue({
-      data: [{ id: 'guardian-profile-1', account_id: 'guardian-account-1', kind: 'guardian' }],
+      data: [
+        { id: 'guardian-profile-1', account_id: 'guardian-account-1', kind: 'guardian' },
+      ],
     });
   });
 
@@ -150,15 +167,16 @@ describe('projectActivityEvents', () => {
 
     expect(result).toEqual({ processed: 1 });
     const itemUpserts = upserts.filter((entry) => entry.table === 'activity_feed_items');
-    expect(itemUpserts).toHaveLength(2);
-    expect(itemUpserts.map((entry) => entry.payload.recipient_profile_id)).toEqual(
+    const leafUpserts = itemUpserts.filter((entry) => entry.payload.kind === 'leaf');
+    expect(leafUpserts).toHaveLength(2);
+    expect(leafUpserts.map((entry) => entry.payload.recipient_profile_id)).toEqual(
       expect.arrayContaining(['child-profile-1', 'guardian-profile-1']),
     );
-    expect(itemUpserts.map((entry) => entry.payload.recipient_profile_id)).not.toContain(
+    expect(leafUpserts.map((entry) => entry.payload.recipient_profile_id)).not.toContain(
       'educator-profile-1',
     );
-    expect(itemUpserts[0]?.payload.action_button).toEqual({
-      label: 'Open class',
+    expect(leafUpserts[0]?.payload.action_button).toEqual({
+      label: 'Open learning space',
       variant: 'outline',
       href: '../spaces/channel-1',
     });
@@ -233,7 +251,10 @@ describe('projectActivityEvents', () => {
               eq: vi.fn(() => ({
                 is: vi.fn(() => ({
                   returns: vi.fn(async () => ({
-                    data: [{ profile_id: 'child-profile-1' }, { profile_id: 'educator-profile-1' }],
+                    data: [
+                      { profile_id: 'child-profile-1' },
+                      { profile_id: 'educator-profile-1' },
+                    ],
                     error: null,
                   })),
                 })),
@@ -281,9 +302,13 @@ describe('projectActivityEvents', () => {
 
     await projectActivityEvents(supabase as never);
 
-    const feedItemUpserts = upserts.filter((entry) => entry.table === 'activity_feed_items');
+    const feedItemUpserts = upserts.filter(
+      (entry) => entry.table === 'activity_feed_items',
+    );
     expect(feedItemUpserts.some((entry) => entry.payload.kind === 'group')).toBe(true);
-    expect(feedItemUpserts.find((entry) => entry.payload.kind === 'group')?.payload).toMatchObject({
+    expect(
+      feedItemUpserts.find((entry) => entry.payload.kind === 'group')?.payload,
+    ).toMatchObject({
       group_key: 'files:space-1:2026-03-03T12',
       group_type: 'class',
       content: expect.objectContaining({

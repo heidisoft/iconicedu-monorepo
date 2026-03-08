@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import {
   View,
   Text,
+  Image,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -9,7 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, Users, CirclePlus, Mail } from 'lucide-react-native';
+import { ChevronLeft, CirclePlus, Mail } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { SettingsRow } from '@iconicedu/ui-native';
 import { useFamilyLinks } from '@/hooks/use-family-links';
@@ -18,23 +19,59 @@ import type { AppColors } from '@/lib/theme';
 
 function makeStyles(C: AppColors) {
   return StyleSheet.create({
-    safe:         { flex: 1, backgroundColor: C.pageBg },
-    nav:          { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border },
-    navBack:      { padding: 8, borderRadius: 8 },
-    navTitle:     { flex: 1, fontSize: 17, fontWeight: '700', color: C.text, textAlign: 'center', marginRight: 40 },
-    scroll:       { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 48, gap: 6 },
-    sectionLabel: { fontSize: 12, fontWeight: '700', color: C.textFaint, textTransform: 'uppercase', letterSpacing: 0.8, paddingHorizontal: 4, paddingTop: 14, paddingBottom: 6 },
-    card:         { borderRadius: 14, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, overflow: 'hidden' },
-    divider:      { height: 1, backgroundColor: C.border, marginLeft: 60 },
-    valueText:    { fontSize: 13, color: C.textMuted, maxWidth: 140, textAlign: 'right' },
-    loading:      { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    emptyCard:    { padding: 28, alignItems: 'center', gap: 10 },
-    emptyEmoji:   { fontSize: 40 },
-    emptyTitle:   { fontSize: 16, fontWeight: '700', color: C.text },
-    emptyDesc:    { fontSize: 13, color: C.textMuted, textAlign: 'center', lineHeight: 20 },
-    childAvatar:  { width: 36, height: 36, borderRadius: 18, backgroundColor: C.tealBg, alignItems: 'center', justifyContent: 'center' },
+    safe: { flex: 1, backgroundColor: C.pageBg },
+    nav: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 8,
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: C.border,
+    },
+    navBack: { padding: 8, borderRadius: 8 },
+    navTitle: {
+      flex: 1,
+      fontSize: 17,
+      fontWeight: '700',
+      color: C.text,
+      textAlign: 'center',
+      marginRight: 40,
+    },
+    scroll: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 48, gap: 6 },
+    sectionLabel: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: C.textFaint,
+      textTransform: 'uppercase',
+      letterSpacing: 0.8,
+      paddingHorizontal: 4,
+      paddingTop: 14,
+      paddingBottom: 6,
+    },
+    card: {
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.card,
+      overflow: 'hidden',
+    },
+    divider: { height: 1, backgroundColor: C.border, marginLeft: 60 },
+    valueText: { fontSize: 13, color: C.textMuted, maxWidth: 140, textAlign: 'right' },
+    loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    emptyCard: { padding: 28, alignItems: 'center', gap: 10 },
+    emptyEmoji: { fontSize: 40 },
+    emptyTitle: { fontSize: 16, fontWeight: '700', color: C.text },
+    emptyDesc: { fontSize: 13, color: C.textMuted, textAlign: 'center', lineHeight: 20 },
+    childAvatar: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: C.tealBg,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     childInitial: { fontSize: 15, fontWeight: '700', color: C.teal },
-    hint:         { fontSize: 12, color: C.textFaint, paddingHorizontal: 4 },
+    hint: { fontSize: 12, color: C.textFaint, paddingHorizontal: 4 },
   });
 }
 
@@ -90,7 +127,8 @@ export default function FamilyScreen() {
             <Text style={s.emptyEmoji}>👨‍👩‍👧</Text>
             <Text style={s.emptyTitle}>No family links yet</Text>
             <Text style={s.emptyDesc}>
-              Invite a child using their email or phone number to link them to your account.
+              Invite a child using their email or phone number to link them to your
+              account.
             </Text>
           </View>
         ) : (
@@ -105,6 +143,7 @@ export default function FamilyScreen() {
                   : null) ??
                 'Child';
               const childInitial = childName[0]?.toUpperCase() ?? 'C';
+              const childAvatarUrl = childProf?.avatar_url as string | null | undefined;
               const relation = (link.relation as string)?.replace(/_/g, ' ') ?? 'child';
 
               return (
@@ -112,9 +151,13 @@ export default function FamilyScreen() {
                   {i > 0 && <View style={s.divider} />}
                   <SettingsRow
                     icon={
-                      <View style={s.childAvatar}>
-                        <Text style={s.childInitial}>{childInitial}</Text>
-                      </View>
+                      childAvatarUrl ? (
+                        <Image source={{ uri: childAvatarUrl }} style={s.childAvatar} />
+                      ) : (
+                        <View style={s.childAvatar}>
+                          <Text style={s.childInitial}>{childInitial}</Text>
+                        </View>
+                      )
                     }
                     label={childName}
                     labelColor={colors.text}
@@ -153,7 +196,8 @@ export default function FamilyScreen() {
 
         {links.length > 0 && (
           <Text style={s.hint}>
-            {links.length} {links.length === 1 ? 'child' : 'children'} linked to your account.
+            {links.length} {links.length === 1 ? 'child' : 'children'} linked to your
+            account.
           </Text>
         )}
       </ScrollView>

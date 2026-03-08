@@ -46,6 +46,82 @@ type CreateLearningSpaceResult = {
   scheduleIds: string[];
 };
 
+type PublishParticipantInviteActivitiesInput = {
+  supabase: ReturnType<typeof createSupabaseServiceClient>;
+  orgId: string;
+  actorProfileId: string;
+  learningSpaceId: string;
+  channelId: string;
+  title: string;
+  participants: Array<{
+    profileId: string;
+    kind: string;
+    displayName?: string | null;
+    avatarUrl?: string | null;
+    themeKey?: string | null;
+  }>;
+  invitedMembers: Array<{
+    profileId: string;
+    name: string;
+    avatarUrl?: string | null;
+    themeKey?: string | null;
+  }>;
+  occurredAt: string;
+  activityPhase: 'created' | 'updated';
+  dedupeKey: string;
+  firstSessionStartAt?: string | null;
+  firstSessionTimezone?: string | null;
+};
+
+export async function publishParticipantInviteActivities(
+  input: PublishParticipantInviteActivitiesInput,
+) {
+  if (!input.participants.length) {
+    return;
+  }
+
+  const members = input.participants.map((participant) => ({
+    profileId: participant.profileId,
+    displayName: participant.displayName ?? null,
+    avatarUrl: participant.avatarUrl ?? null,
+    themeKey: participant.themeKey ?? null,
+    role: participant.kind,
+  }));
+
+  const isPlural = members.length > 1;
+  const firstParticipant = input.participants[0];
+
+  await publishActivityEvent({
+    supabase: input.supabase,
+    orgId: input.orgId,
+    eventType: isPlural ? 'members.invited' : 'member.invited',
+    occurredAt: input.occurredAt,
+    sourceKind: 'profile',
+    actorProfileId: input.actorProfileId,
+    scope: { kind: 'learning_space', learningSpaceId: input.learningSpaceId },
+    targetRef: { kind: 'learning_space', id: input.learningSpaceId },
+    payload: {
+      learningSpaceId: input.learningSpaceId,
+      channelId: input.channelId,
+      title: input.title,
+      memberProfileId: firstParticipant?.profileId ?? null,
+      memberDisplayName: firstParticipant?.displayName ?? null,
+      memberAvatarUrl: firstParticipant?.avatarUrl ?? null,
+      memberThemeKey: firstParticipant?.themeKey ?? null,
+      role: firstParticipant?.kind ?? null,
+      memberCount: members.length,
+      members,
+      activityPhase: input.activityPhase,
+      invitedCount: input.invitedMembers.length,
+      invitedMembers: input.invitedMembers,
+      firstSessionStartAt: input.firstSessionStartAt ?? null,
+      firstSessionTimezone: input.firstSessionTimezone ?? null,
+    },
+    dedupeKey: input.dedupeKey,
+    createdBy: input.actorProfileId,
+  });
+}
+
 export async function createLearningSpaceFromPayload(
   payload: LearningSpaceCreatePayload,
 ): Promise<CreateLearningSpaceResult> {
@@ -206,65 +282,24 @@ export async function createLearningSpaceFromPayload(
     createdBy: actorProfileId,
   });
 
-  for (const participant of payload.participants) {
-    await publishActivityEvent({
-      supabase: serviceClient,
-      orgId,
-      eventType: 'member.invited',
-      occurredAt: now,
-      sourceKind: 'profile',
-      actorProfileId,
-      scope: { kind: 'learning_space', learningSpaceId },
-      targetRef: { kind: 'learning_space', id: learningSpaceId },
-      payload: {
-        learningSpaceId,
-        channelId,
-        memberProfileId: participant.profileId,
-        memberDisplayName: participant.displayName ?? null,
-        memberAvatarUrl: participant.avatarUrl ?? null,
-        memberThemeKey: participant.themeKey ?? null,
-        role: participant.kind,
-        activityPhase: 'created',
-        invitedCount: payload.participants.length,
-        invitedMembers,
-        firstSessionStartAt: firstScheduled?.expanded.startAt ?? null,
-        firstSessionTimezone: firstScheduled?.schedule.timezone ?? null,
-      },
-      dedupeKey: `member.invited:${learningSpaceId}:${participant.profileId}`,
-      createdBy: actorProfileId,
-    });
-  }
-
-  for (const [index, schedule] of (payload.schedules ?? []).entries()) {
-    const expanded =
-      schedulesWithExpanded[index]?.expanded ?? buildScheduleStart(schedule);
-    await publishActivityEvent({
-      supabase: serviceClient,
-      orgId,
-      eventType: 'session.scheduled',
-      occurredAt: now,
-      sourceKind: 'profile',
-      actorProfileId,
-      scope: { kind: 'learning_space', learningSpaceId },
-      targetRef: { kind: 'learning_space', id: learningSpaceId },
-      payload: {
-        learningSpaceId,
-        channelId,
-        scheduleId: scheduleIds[index],
-        title: payload.basics.title,
-        startAt: expanded.startAt,
-        endAt: expanded.endAt,
-        timezone: schedule.timezone ?? null,
-        activityPhase: 'created',
-        invitedCount: payload.participants.length,
-        invitedMembers,
-        firstSessionStartAt: firstScheduled?.expanded.startAt ?? null,
-        firstSessionTimezone: firstScheduled?.schedule.timezone ?? null,
-      },
-      dedupeKey: `session.scheduled:${scheduleIds[index]}`,
-      createdBy: actorProfileId,
-    });
-  }
+  await publishParticipantInviteActivities({
+    supabase: serviceClient,
+    orgId,
+    actorProfileId,
+    learningSpaceId,
+    channelId,
+    title: payload.basics.title,
+    participants: payload.participants,
+    invitedMembers,
+    occurredAt: now,
+    activityPhase: 'created',
+    dedupeKey:
+      payload.participants.length > 1
+        ? `members.invited:${learningSpaceId}:${now}`
+        : `member.invited:${learningSpaceId}:${payload.participants[0]?.profileId ?? 'unknown'}`,
+    firstSessionStartAt: firstScheduled?.expanded.startAt ?? null,
+    firstSessionTimezone: firstScheduled?.schedule.timezone ?? null,
+  });
 
   return { learningSpaceId, channelId, scheduleIds };
 }

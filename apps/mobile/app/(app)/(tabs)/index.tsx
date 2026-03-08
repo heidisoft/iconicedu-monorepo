@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
+  Image,
   ScrollView,
   TouchableOpacity,
   Pressable,
@@ -576,6 +577,7 @@ export default function HomeScreen() {
   const profileData = profile as {
     first_name?: string | null;
     display_name?: string | null;
+    avatar_url?: string | null;
     avatar_seed?: string | null;
     ui_theme_key?: string | null;
   } | null;
@@ -585,6 +587,7 @@ export default function HomeScreen() {
     user?.email?.split('@')[0] ||
     'there';
   const initial = firstName[0]?.toUpperCase() ?? 'U';
+  const avatarUrl = profileData?.avatar_url ?? null;
   const { bg: avatarBg, fg: avatarFg } = resolveAvatarColor(
     profileData?.ui_theme_key,
     profileData?.avatar_seed ?? user?.id ?? user?.email,
@@ -638,12 +641,22 @@ export default function HomeScreen() {
           }}
         >
           <TouchableOpacity
-            style={[s.avatar, { backgroundColor: avatarBg }]}
+            style={[
+              s.avatar,
+              {
+                backgroundColor: avatarUrl ? 'transparent' : avatarBg,
+                overflow: 'hidden',
+              },
+            ]}
             onPress={() => router.push('/(app)/(tabs)/account')}
             activeOpacity={0.8}
             accessibilityLabel="Open account"
           >
-            <Text style={[s.avatarTxt, { color: avatarFg }]}>{initial}</Text>
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={{ width: 44, height: 44 }} />
+            ) : (
+              <Text style={[s.avatarTxt, { color: avatarFg }]}>{initial}</Text>
+            )}
           </TouchableOpacity>
           <TouchableOpacity
             style={s.bellBtn}

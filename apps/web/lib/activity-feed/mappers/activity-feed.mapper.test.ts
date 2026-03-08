@@ -17,7 +17,7 @@ describe('mapActivityFeedItemRow', () => {
         verb: 'class.updated',
         actor_profile_id: 'actor-1',
         content: {
-          headline: { primary: 'Class updated' },
+          headline: { primary: 'Learning space updated' },
           leading: { kind: 'icon', iconKey: 'GraduationCap', tone: 'neutral' },
         },
         updated_at: '2026-03-08T10:00:00.000Z',

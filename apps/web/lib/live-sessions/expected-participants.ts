@@ -13,6 +13,7 @@ type ChannelLiveSessionRowRecord = {
   channel_id: string;
   occurrence_key?: string | null;
   attendance_policy?: Record<string, unknown> | null;
+  app_metadata?: Record<string, unknown> | null;
 };
 
 type ChannelMemberSummaryRow = {
@@ -188,7 +189,7 @@ export async function snapshotExpectedParticipantsForLiveSession(input: {
   }
 
   const appMetadata = {
-    ...(input.session.attendance_policy ? {} : {}),
+    ...(input.session.app_metadata ?? {}),
     occurrenceEndAt: input.scope.occurrenceEndAt ?? null,
     occurrenceLabel: input.scope.occurrenceLabel ?? null,
     scheduleId: input.scope.schedule?.ids.id ?? null,

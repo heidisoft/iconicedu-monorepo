@@ -167,7 +167,7 @@ const LESSON_ASSIGNMENT_ASSIGNED: ActivityFeedItemVM = {
     expandedContent:
       'Students will solve 8 ratio problems and present one solution approach in class.',
     actionButton: {
-      label: 'Open class',
+      label: 'Open learning space',
       variant: 'outline',
       href: `/iconic-academy/spaces/${CHANNEL_IDS.mathSpace}`,
     },
@@ -198,7 +198,7 @@ const HOMEWORK_ATTACHMENT_UPLOADED: ActivityFeedItemVM = {
     },
     summary: 'Worksheet and answer template uploaded',
     actionButton: {
-      label: 'Open class',
+      label: 'Open learning space',
       variant: 'outline',
       href: `/iconic-academy/spaces/${CHANNEL_IDS.mathSpace}`,
     },
@@ -310,7 +310,7 @@ const CLASS_SESSION_GROUP: ActivityFeedItemVM = {
     },
     summary: 'Welcome to Class session Sat, Mar 7 at 2:00 PM PT for Math Foundations.',
     actionButton: {
-      label: 'Open class',
+      label: 'Open learning space',
       variant: 'outline',
       href: `/iconic-academy/spaces/${CHANNEL_IDS.mathSpace}`,
     },
@@ -403,7 +403,7 @@ const SCHEDULE_UPDATED: ActivityFeedItemVM = {
     },
     summary: 'Weekly session now starts at 2:00 PM PT',
     actionButton: {
-      label: 'Open class',
+      label: 'Open learning space',
       variant: 'outline',
       href: `/iconic-academy/spaces/${CHANNEL_IDS.mathSpace}`,
     },
@@ -778,7 +778,7 @@ const CLASS_SETUP_GROUP: ActivityFeedItemVM = {
       overflowCount: 0,
     },
     headline: {
-      primary: 'Class created and assigned',
+      primary: 'Learning space created and assigned',
       secondary: 'Math Foundations',
     },
     summary: 'Initial setup completed with first weekly session scheduled.',
@@ -880,7 +880,7 @@ const CLASS_SETUP_GROUP: ActivityFeedItemVM = {
         },
         content: {
           headline: {
-            primary: 'Class created',
+            primary: 'Learning space created',
             secondary: 'Math Foundations',
           },
           summary: 'Weekly small-group class initialized.',
@@ -933,7 +933,7 @@ const CLASS_UPDATED_GROUP: ActivityFeedItemVM = {
       overflowCount: 0,
     },
     headline: {
-      primary: 'Class updated',
+      primary: 'Learning space updated',
       secondary: 'Math Foundations',
     },
     summary: 'Schedule changes, cancellations, and new participant invites.',
@@ -1019,7 +1019,7 @@ export const INBOX_ACTIVITY_FEED: ActivityFeedVM = {
   activeTab: 'all',
   tabs: [
     { key: 'all', label: 'All', badgeCount: countUnread(ALL_ITEMS) },
-    { key: 'classes', label: 'Classes', badgeCount: countUnread(CLASSES_ITEMS) },
+    { key: 'classes', label: 'Learning spaces', badgeCount: countUnread(CLASSES_ITEMS) },
     { key: 'payment', label: 'Payment', badgeCount: countUnread(PAYMENT_ITEMS) },
     { key: 'system', label: 'System', badgeCount: countUnread(SYSTEM_ITEMS) },
   ],

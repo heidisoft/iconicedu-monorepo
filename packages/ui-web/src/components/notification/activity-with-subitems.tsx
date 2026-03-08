@@ -25,6 +25,21 @@ export function groupHasUnreadSubActivities(subActivities: ActivityFeedLeafItemV
   return subActivities.some((sub: ActivityFeedLeafItemVM) => !sub.state?.isRead);
 }
 
+export function getInitialGroupCollapsedState(activity: ActivityFeedGroupItemVM) {
+  const subActivityCount =
+    activity.subActivityCount ??
+    activity.subActivities?.total ??
+    activity.subActivities?.items.length ??
+    0;
+
+  if (subActivityCount === 0) {
+    return false;
+  }
+
+  // Inbox groups should show child activities immediately instead of hiding them behind a toggle.
+  return false;
+}
+
 export function ActivityWithSubitems({
   activity,
   isSubActivity = false,
@@ -39,7 +54,9 @@ export function ActivityWithSubitems({
     activity.subActivityCount ?? activity.subActivities?.total ?? subActivities.length;
   const hasSubActivities = subActivityCount > 0;
   const hasUnreadSubActivities = groupHasUnreadSubActivities(subActivities);
-  const [isCollapsed, setIsCollapsed] = useState(hasSubActivities);
+  const [isCollapsed, setIsCollapsed] = useState(() =>
+    getInitialGroupCollapsedState(activity),
+  );
 
   const handleToggle = (event: React.MouseEvent) => {
     const target = event.target as HTMLElement;
