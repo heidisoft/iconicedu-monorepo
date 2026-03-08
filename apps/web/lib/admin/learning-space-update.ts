@@ -13,6 +13,8 @@ import {
   type CanonicalLearningSpaceSchedule,
   buildCanonicalLearningSpaceSchedulesFromExisting,
   buildCanonicalLearningSpaceSchedulesFromPayload,
+  getDateFromISOInTimezone,
+  getTimeFromISOInTimezone,
   buildLearningSpaceScheduleHashBundleFromCanonical,
   buildLearningSpaceSchedulesHashKeyFromExisting,
   buildLearningSpaceSchedulesHashKeyFromPayload,
@@ -167,6 +169,34 @@ type RemovedMembersActivity = {
   };
 };
 
+type ScheduleChangeActivity = {
+  eventType: 'session.scheduled' | 'session.canceled' | 'session.rescheduled';
+  dedupeKey: string;
+  payload: {
+    learningSpaceId: string;
+    channelId: string;
+    scheduleId: string;
+    title: string;
+    activityPhase: 'updated';
+    invitedCount: number;
+    invitedMembers: Array<{
+      profileId: string;
+      name: string;
+      avatarUrl?: string | null;
+      themeKey?: string | null;
+    }>;
+    firstSessionStartAt?: string | null;
+    firstSessionTimezone?: string | null;
+    startAt?: string | null;
+    timezone?: string | null;
+    canceledStartAt?: string | null;
+    canceledReason?: string | null;
+    rescheduledFromStartAt?: string | null;
+    rescheduledToStartAt?: string | null;
+    rescheduledReason?: string | null;
+  };
+};
+
 function canonicalJson(value: unknown) {
   return JSON.stringify(normalizeForCompare(value));
 }
@@ -224,31 +254,6 @@ function normalizeParticipantIds(ids: string[]) {
   return [...ids].sort();
 }
 
-function formatSessionTime(
-  isoDateTime: string | null | undefined,
-  timezone: string | null | undefined,
-) {
-  if (!isoDateTime) {
-    return null;
-  }
-  const date = new Date(isoDateTime);
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-  const zone = timezone && timezone.length ? timezone : 'UTC';
-  const weekday = new Intl.DateTimeFormat('en-US', {
-    weekday: 'short',
-    timeZone: zone,
-  }).format(date);
-  const time = new Intl.DateTimeFormat('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-    timeZone: zone,
-  }).format(date);
-  return { weekday, time };
-}
-
 function joinNaturalList(values: string[]) {
   if (values.length <= 1) {
     return values[0] ?? '';
@@ -259,15 +264,14 @@ function joinNaturalList(values: string[]) {
   return `${values.slice(0, -1).join(', ')}, and ${values[values.length - 1]}`;
 }
 
-const SCHEDULE_HASH_DEBUG_ENABLED =
-  process.env.DEBUG_LEARNING_SPACE_SCHEDULE_HASH === '1';
+const SCHEDULE_DIFF_DEBUG_ENABLED =
+  process.env.DEBUG_LEARNING_SPACE_SCHEDULE_DIFF === '1';
 
-function debugScheduleHash(stage: string, details: Record<string, unknown>) {
-  if (!SCHEDULE_HASH_DEBUG_ENABLED) {
+function debugScheduleDiff(stage: string, details: Record<string, unknown>) {
+  if (!SCHEDULE_DIFF_DEBUG_ENABLED) {
     return;
   }
-  // Intentional debug trace for schedule hash drift investigations.
-  console.log('[learning-space:update:schedule-hash]', stage, details);
+  console.log('[learning-space:update:schedule-diff]', stage, details);
 }
 
 export function buildRemovedMembersActivity(input: {
@@ -316,6 +320,321 @@ export function buildRemovedMembersActivity(input: {
       activityPhase: 'updated',
     },
   };
+}
+
+export function buildExceptionAndOverrideScheduleChangeActivities(input: {
+  learningSpaceId: string;
+  channelId: string;
+  title: string;
+  occurredAt: string;
+  invitedMembers: Array<{
+    profileId: string;
+    name: string;
+    avatarUrl?: string | null;
+    themeKey?: string | null;
+  }>;
+  pairs: Array<{
+    scheduleId: string;
+    timezone: string | null;
+    previousFullHash?: string;
+    nextFullHash?: string;
+    previous: {
+      exceptions: Array<{ occurrenceKey: string; reason: string | null }>;
+      overrides: Array<{
+        occurrenceKey: string;
+        startAt: string | null;
+        endAt: string | null;
+        reason: string | null;
+      }>;
+    };
+    next: {
+      exceptions: Array<{ occurrenceKey: string; reason: string | null }>;
+      overrides: Array<{
+        occurrenceKey: string;
+        startAt: string | null;
+        endAt: string | null;
+        reason: string | null;
+      }>;
+    };
+  }>;
+  nextSessionStartAt?: string | null;
+}): ScheduleChangeActivity[] {
+  const activities: ScheduleChangeActivity[] = [];
+
+  input.pairs.forEach((pair, pairIndex) => {
+    if (
+      pair.previousFullHash &&
+      pair.nextFullHash &&
+      pair.previousFullHash === pair.nextFullHash
+    ) {
+      debugScheduleDiff('pair-diff-skip-full-hash-equal', {
+        learningSpaceId: input.learningSpaceId,
+        scheduleId: pair.scheduleId,
+        pairIndex,
+      });
+      return;
+    }
+
+    const timezone = pair.timezone ?? 'UTC';
+    const normalizeReason = (value: string | null | undefined) => {
+      if (typeof value !== 'string') return null;
+      const trimmed = value.trim();
+      return trimmed.length ? trimmed : null;
+    };
+    const toOccurrenceDate = (occurrenceKey: string) =>
+      getDateFromISOInTimezone(occurrenceKey, timezone) ?? occurrenceKey;
+
+    const previousExceptions = new Map(
+      pair.previous.exceptions.map((entry) => [
+        toOccurrenceDate(entry.occurrenceKey),
+        entry,
+      ]),
+    );
+    const nextExceptions = new Map(
+      pair.next.exceptions.map((entry) => [toOccurrenceDate(entry.occurrenceKey), entry]),
+    );
+
+    const toOverrideSemantic = (entry: {
+      occurrenceKey: string;
+      startAt: string | null;
+      endAt: string | null;
+      reason: string | null;
+    }) => {
+      const occurrenceDate = toOccurrenceDate(entry.occurrenceKey);
+      const newDate = entry.startAt
+        ? getDateFromISOInTimezone(entry.startAt, timezone)
+        : null;
+      const newTime = entry.startAt
+        ? getTimeFromISOInTimezone(entry.startAt, timezone)
+        : null;
+      const durationMinutes =
+        entry.startAt && entry.endAt
+          ? Math.max(
+              1,
+              Math.round(
+                (new Date(entry.endAt).getTime() - new Date(entry.startAt).getTime()) /
+                  60000,
+              ),
+            )
+          : null;
+      return {
+        occurrenceDate,
+        newDate,
+        newTime,
+        durationMinutes,
+        reason: normalizeReason(entry.reason),
+        raw: entry,
+      };
+    };
+
+    const previousOverrides = new Map(
+      pair.previous.overrides.map((entry) => {
+        const semantic = toOverrideSemantic(entry);
+        return [semantic.occurrenceDate, semantic] as const;
+      }),
+    );
+    const nextOverrides = new Map(
+      pair.next.overrides.map((entry) => {
+        const semantic = toOverrideSemantic(entry);
+        return [semantic.occurrenceDate, semantic] as const;
+      }),
+    );
+    const changedKeys = new Set([
+      ...previousExceptions.keys(),
+      ...nextExceptions.keys(),
+      ...previousOverrides.keys(),
+      ...nextOverrides.keys(),
+    ]);
+
+    const pairDiffs: Array<{
+      occurrenceKey: string;
+      transition: string;
+      eventType: ScheduleChangeActivity['eventType'];
+    }> = [];
+
+    for (const occurrenceKey of changedKeys) {
+      const previousOverrideSemantic = previousOverrides.get(occurrenceKey) ?? null;
+      const nextOverrideSemantic = nextOverrides.get(occurrenceKey) ?? null;
+      const previousOverride = previousOverrideSemantic?.raw ?? null;
+      const nextOverride = nextOverrideSemantic?.raw ?? null;
+      const previousException = previousExceptions.get(occurrenceKey) ?? null;
+      const nextException = nextExceptions.get(occurrenceKey) ?? null;
+      const previousState = previousOverride
+        ? 'override'
+        : previousException
+          ? 'exception'
+          : 'scheduled';
+      const nextState = nextOverride
+        ? 'override'
+        : nextException
+          ? 'exception'
+          : 'scheduled';
+
+      if (
+        previousState === nextState &&
+        previousState === 'exception' &&
+        normalizeReason(previousException?.reason) ===
+          normalizeReason(nextException?.reason)
+      ) {
+        continue;
+      }
+      if (
+        previousState === nextState &&
+        previousState === 'override' &&
+        previousOverrideSemantic?.newDate === nextOverrideSemantic?.newDate &&
+        previousOverrideSemantic?.newTime === nextOverrideSemantic?.newTime &&
+        previousOverrideSemantic?.durationMinutes ===
+          nextOverrideSemantic?.durationMinutes &&
+        previousOverrideSemantic?.reason === nextOverrideSemantic?.reason
+      ) {
+        continue;
+      }
+      if (previousState === nextState && previousState === 'scheduled') {
+        continue;
+      }
+
+      if (nextState === 'scheduled') {
+        const scheduledStartAt =
+          previousOverride?.occurrenceKey ??
+          previousException?.occurrenceKey ??
+          occurrenceKey;
+        pairDiffs.push({
+          occurrenceKey,
+          transition: `${previousState}->scheduled`,
+          eventType: 'session.scheduled',
+        });
+        activities.push({
+          eventType: 'session.scheduled',
+          dedupeKey: `schedule.unscheduled-change:${input.learningSpaceId}:${pair.scheduleId}:${pairIndex}:${occurrenceKey}:${input.occurredAt}`,
+          payload: {
+            learningSpaceId: input.learningSpaceId,
+            channelId: input.channelId,
+            scheduleId: pair.scheduleId,
+            title: input.title,
+            activityPhase: 'updated',
+            invitedCount: input.invitedMembers.length,
+            invitedMembers: input.invitedMembers,
+            firstSessionStartAt: input.nextSessionStartAt ?? scheduledStartAt,
+            firstSessionTimezone: pair.timezone,
+            startAt: scheduledStartAt,
+            timezone: pair.timezone,
+          },
+        });
+        continue;
+      }
+
+      if (nextState === 'exception') {
+        pairDiffs.push({
+          occurrenceKey,
+          transition: `${previousState}->exception`,
+          eventType: 'session.canceled',
+        });
+        activities.push({
+          eventType: 'session.canceled',
+          dedupeKey: `schedule.exception:${input.learningSpaceId}:${pair.scheduleId}:${pairIndex}:${occurrenceKey}:${input.occurredAt}`,
+          payload: {
+            learningSpaceId: input.learningSpaceId,
+            channelId: input.channelId,
+            scheduleId: pair.scheduleId,
+            title: input.title,
+            activityPhase: 'updated',
+            invitedCount: input.invitedMembers.length,
+            invitedMembers: input.invitedMembers,
+            firstSessionStartAt: input.nextSessionStartAt ?? occurrenceKey,
+            firstSessionTimezone: pair.timezone,
+            canceledStartAt: nextException?.occurrenceKey ?? occurrenceKey,
+            canceledReason: nextException?.reason ?? null,
+            timezone: pair.timezone,
+          },
+        });
+        continue;
+      }
+
+      const fromStartAt =
+        previousOverride?.startAt ??
+        previousOverride?.occurrenceKey ??
+        previousException?.occurrenceKey ??
+        occurrenceKey;
+      const toStartAt =
+        nextOverride?.startAt ??
+        nextOverride?.occurrenceKey ??
+        nextException?.occurrenceKey ??
+        occurrenceKey;
+      pairDiffs.push({
+        occurrenceKey,
+        transition: `${previousState}->override`,
+        eventType: 'session.rescheduled',
+      });
+      activities.push({
+        eventType: 'session.rescheduled',
+        dedupeKey: `schedule.override:${input.learningSpaceId}:${pair.scheduleId}:${pairIndex}:${occurrenceKey}:${input.occurredAt}`,
+        payload: {
+          learningSpaceId: input.learningSpaceId,
+          channelId: input.channelId,
+          scheduleId: pair.scheduleId,
+          title: input.title,
+          activityPhase: 'updated',
+          invitedCount: input.invitedMembers.length,
+          invitedMembers: input.invitedMembers,
+          firstSessionStartAt: input.nextSessionStartAt ?? toStartAt,
+          firstSessionTimezone: pair.timezone,
+          rescheduledFromStartAt: fromStartAt,
+          rescheduledToStartAt: toStartAt,
+          rescheduledReason: nextOverride?.reason ?? null,
+          timezone: pair.timezone,
+        },
+      });
+    }
+
+    if (pairDiffs.length) {
+      debugScheduleDiff('pair-diff', {
+        learningSpaceId: input.learningSpaceId,
+        scheduleId: pair.scheduleId,
+        pairIndex,
+        diffCount: pairDiffs.length,
+        pairDiffs,
+      });
+    }
+    debugScheduleDiff('pair-semantic-compare', {
+      learningSpaceId: input.learningSpaceId,
+      scheduleId: pair.scheduleId,
+      pairIndex,
+      timezone,
+      previousExceptionDates: [...previousExceptions.keys()],
+      nextExceptionDates: [...nextExceptions.keys()],
+      previousOverrideDates: [...previousOverrides.keys()],
+      nextOverrideDates: [...nextOverrides.keys()],
+    });
+  });
+
+  return activities;
+}
+
+function resolveNextSessionStartAtFromIncomingSchedules(input: {
+  schedules: NormalizedIncomingSchedule[];
+  nowIso: string;
+}) {
+  const nowTime = new Date(input.nowIso).getTime();
+  const candidates = input.schedules.flatMap((schedule) => {
+    const exceptionKeys = new Set(
+      schedule.canonical.exceptions.map((entry) => entry.occurrenceKey),
+    );
+    const base = exceptionKeys.has(schedule.startAt) ? [] : [schedule.startAt];
+    const overrides = schedule.canonical.overrides
+      .map((entry) => entry.startAt ?? entry.occurrenceKey)
+      .filter((value): value is string => Boolean(value));
+    return [...base, ...overrides];
+  });
+  const normalized = [...new Set(candidates)]
+    .map((value) => ({ value, time: new Date(value).getTime() }))
+    .filter((entry) => Number.isFinite(entry.time))
+    .sort((a, b) => a.time - b.time);
+
+  return (
+    normalized.find((entry) => entry.time >= nowTime)?.value ??
+    normalized[0]?.value ??
+    null
+  );
 }
 
 async function loadLearningSpaceParticipantSnapshot(input: {
@@ -449,6 +768,46 @@ function normalizeIncomingSchedulesForCompare(
     timezone: canonical.timezone,
     canonical,
   }));
+}
+
+function pairSchedulesForCompare(
+  previous: NormalizedExistingSchedule[],
+  next: NormalizedIncomingSchedule[],
+) {
+  const remainingPrevious = [...previous];
+  const pairs: Array<{
+    previous: NormalizedExistingSchedule;
+    next: NormalizedIncomingSchedule;
+  }> = [];
+
+  const toTimestamp = (value: string) => {
+    const parsed = new Date(value).getTime();
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  for (const nextItem of next) {
+    const matchingIndexes = remainingPrevious
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => item.baseHash === nextItem.baseHash);
+
+    if (!matchingIndexes.length) {
+      continue;
+    }
+
+    const nextTime = toTimestamp(nextItem.startAt);
+    const best = matchingIndexes.reduce((currentBest, candidate) => {
+      const candidateDiff = Math.abs(toTimestamp(candidate.item.startAt) - nextTime);
+      const bestDiff = Math.abs(toTimestamp(currentBest.item.startAt) - nextTime);
+      return candidateDiff < bestDiff ? candidate : currentBest;
+    });
+
+    const matched = remainingPrevious.splice(best.index, 1)[0];
+    if (matched) {
+      pairs.push({ previous: matched, next: nextItem });
+    }
+  }
+
+  return pairs;
 }
 
 function schedulesMatch(
@@ -728,7 +1087,7 @@ export async function updateLearningSpaceFromPayload(
     canonicalJson(normalizeIncomingLinksForCompare(payload.resources ?? []));
 
   const previousSchedules = existingSchedulesResponse.data ?? [];
-  debugScheduleHash('loaded-raw-rows', {
+  debugScheduleDiff('loaded-raw-rows', {
     learningSpaceId,
     scheduleCount: previousSchedules.length,
     recurrenceCount: (existingRecurrenceResponse.data ?? []).length,
@@ -780,39 +1139,71 @@ export async function updateLearningSpaceFromPayload(
     exceptionsByScheduleId: previousExceptionsByScheduleId,
     overridesByScheduleId: previousOverridesByScheduleId,
   });
+  const normalizedPreviousSchedules = normalizeExistingSchedulesForCompare(
+    previousScheduleCompareInputs,
+  );
+  const normalizedIncomingSchedules = normalizeIncomingSchedulesForCompare(
+    payload.schedules ?? [],
+  );
+  const nextSessionStartAt = resolveNextSessionStartAtFromIncomingSchedules({
+    schedules: normalizedIncomingSchedules,
+    nowIso: now,
+  });
+  const pairedSchedules = pairSchedulesForCompare(
+    normalizedPreviousSchedules,
+    normalizedIncomingSchedules,
+  );
+  const exceptionOverrideActivities = buildExceptionAndOverrideScheduleChangeActivities({
+    learningSpaceId,
+    channelId,
+    title: payload.basics.title,
+    occurredAt: now,
+    invitedMembers: [],
+    nextSessionStartAt,
+    pairs: pairedSchedules.map((pair) => ({
+      scheduleId: pair.previous.id,
+      timezone: pair.previous.timezone ?? pair.next.timezone ?? null,
+      previousFullHash: pair.previous.fullHash,
+      nextFullHash: pair.next.fullHash,
+      previous: {
+        exceptions: pair.previous.canonical.exceptions.map((entry) => ({
+          occurrenceKey: entry.occurrenceKey,
+          reason: entry.reason ?? null,
+        })),
+        overrides: pair.previous.canonical.overrides.map((entry) => ({
+          occurrenceKey: entry.occurrenceKey,
+          startAt: entry.startAt ?? null,
+          endAt: entry.endAt ?? null,
+          reason: entry.reason ?? null,
+        })),
+      },
+      next: {
+        exceptions: pair.next.canonical.exceptions.map((entry) => ({
+          occurrenceKey: entry.occurrenceKey,
+          reason: entry.reason ?? null,
+        })),
+        overrides: pair.next.canonical.overrides.map((entry) => ({
+          occurrenceKey: entry.occurrenceKey,
+          startAt: entry.startAt ?? null,
+          endAt: entry.endAt ?? null,
+          reason: entry.reason ?? null,
+        })),
+      },
+    })),
+  });
   const previousSchedulesHashKey = buildLearningSpaceSchedulesHashKeyFromExisting(
     previousScheduleCompareInputs,
   );
   const nextSchedulesHashKey = buildLearningSpaceSchedulesHashKeyFromPayload(
     payload.schedules ?? [],
   );
-  debugScheduleHash('hash-keys', {
+  debugScheduleDiff('hash-keys', {
     previousSchedulesHashKey,
     nextSchedulesHashKey,
     previousScheduleCount: previousScheduleCompareInputs.length,
     nextScheduleCount: (payload.schedules ?? []).length,
   });
-  const pairedSchedules = (() => {
-    const previous = normalizeExistingSchedulesForCompare(previousScheduleCompareInputs);
-    const next = normalizeIncomingSchedulesForCompare(payload.schedules ?? []);
-    const pairCount = Math.min(previous.length, next.length);
-    const pairs: Array<{
-      previous: NormalizedExistingSchedule;
-      next: NormalizedIncomingSchedule;
-    }> = [];
-    for (let index = 0; index < pairCount; index += 1) {
-      const previousItem = previous[index];
-      const nextItem = next[index];
-      if (previousItem && nextItem) {
-        pairs.push({ previous: previousItem, next: nextItem });
-      }
-    }
-    return pairs;
-  })();
-  const hasScheduleHashChanges =
-    previousSchedulesHashKey !== nextSchedulesHashKey ||
-    pairedSchedules.some((pair) => pair.previous.fullHash !== pair.next.fullHash);
-  debugScheduleHash('paired-hash-compare', {
+  debugScheduleDiff('paired-compare', {
     pairedCount: pairedSchedules.length,
     pairDiffs: pairedSchedules.map((pair) => ({
       scheduleId: pair.previous.id,
@@ -832,10 +1223,10 @@ export async function updateLearningSpaceFromPayload(
     scheduleDiffPlan.added.length > 0 ||
     scheduleDiffPlan.removed.length > 0 ||
     scheduleDiffPlan.rescheduled.length > 0 ||
-    hasScheduleHashChanges;
-  debugScheduleHash('change-decision', {
+    exceptionOverrideActivities.length > 0;
+  debugScheduleDiff('change-decision', {
     hasScheduleChanges,
-    hasScheduleHashChanges,
+    exceptionOverrideActivityCount: exceptionOverrideActivities.length,
     addedCount: scheduleDiffPlan.added.length,
     removedCount: scheduleDiffPlan.removed.length,
     rescheduledCount: scheduleDiffPlan.rescheduled.length,
@@ -1053,126 +1444,104 @@ export async function updateLearningSpaceFromPayload(
     });
   }
 
-  const scheduleChangeLines: string[] = [];
-  let cancellationCount = 0;
-  let rescheduleCount = 0;
-
-  for (const schedule of scheduleDiffPlan.removed) {
-    cancellationCount += 1;
-    const oldTime = formatSessionTime(schedule.startAt, schedule.timezone ?? null);
-    scheduleChangeLines.push(
-      oldTime
-        ? `Canceled ${schedule.title} (${oldTime.weekday} ${oldTime.time})`
-        : `Canceled ${schedule.title}`,
-    );
-  }
+  const scheduleActivities: ScheduleChangeActivity[] = [];
 
   for (const schedule of scheduleDiffPlan.added) {
-    const newTime = formatSessionTime(schedule.startAt, schedule.timezone ?? null);
-    scheduleChangeLines.push(
-      newTime ? `Added session (${newTime.weekday} ${newTime.time})` : `Added session`,
-    );
-  }
-
-  for (const change of scheduleDiffPlan.rescheduled) {
-    rescheduleCount += 1;
-    const oldTime = formatSessionTime(
-      change.previous.startAt,
-      change.previous.timezone ?? change.next.timezone ?? null,
-    );
-    const newTime = formatSessionTime(change.next.startAt, change.next.timezone ?? null);
-    scheduleChangeLines.push(
-      oldTime && newTime
-        ? `${change.previous.title} moved ${oldTime.weekday} ${oldTime.time} -> ${newTime.weekday} ${newTime.time}`
-        : `${change.previous.title} was rescheduled`,
-    );
-  }
-
-  for (const pair of pairedSchedules) {
-    const previousExceptions = new Map(
-      pair.previous.canonical.exceptions.map((entry) => [entry.occurrenceKey, entry]),
-    );
-    const nextExceptions = new Map(
-      pair.next.canonical.exceptions.map((entry) => [entry.occurrenceKey, entry]),
-    );
-    for (const [key] of nextExceptions) {
-      if (!previousExceptions.has(key)) {
-        cancellationCount += 1;
-        scheduleChangeLines.push(`Canceled occurrence ${key.slice(0, 16)} via exception`);
-      }
-    }
-
-    const previousOverrides = new Map(
-      pair.previous.canonical.overrides.map((entry) => [entry.occurrenceKey, entry]),
-    );
-    const nextOverrides = new Map(
-      pair.next.canonical.overrides.map((entry) => [entry.occurrenceKey, entry]),
-    );
-
-    for (const [occurrenceKey, incoming] of nextOverrides) {
-      const previous = previousOverrides.get(occurrenceKey);
-      const changed =
-        !previous ||
-        previous.startAt !== incoming.startAt ||
-        previous.endAt !== incoming.endAt ||
-        previous.reason !== incoming.reason;
-      if (changed) {
-        rescheduleCount += 1;
-        const oldTime = previous?.startAt
-          ? formatSessionTime(
-              previous.startAt,
-              pair.previous.timezone ?? pair.next.timezone ?? null,
-            )
-          : null;
-        const newTime = incoming.startAt
-          ? formatSessionTime(
-              incoming.startAt,
-              pair.previous.timezone ?? pair.next.timezone ?? null,
-            )
-          : null;
-        scheduleChangeLines.push(
-          oldTime && newTime
-            ? `${pair.previous.title} override ${oldTime.weekday} ${oldTime.time} -> ${newTime.weekday} ${newTime.time}`
-            : `${pair.previous.title} override updated`,
-        );
-      }
-    }
-  }
-
-  if (scheduleChangeLines.length > 0) {
-    const systemProfileId = await ensureSystemProfileId(serviceClient, orgId);
-    const eventType =
-      cancellationCount > 0 && rescheduleCount === 0
-        ? 'session.canceled'
-        : 'session.rescheduled';
-    const summaryPrefix = `${scheduleChangeLines.length} schedule changes: ${cancellationCount} cancellations, ${rescheduleCount} reschedules.`;
-    const details = scheduleChangeLines.join(' | ');
-    await publishActivityEvent({
-      supabase: serviceClient,
-      orgId,
-      eventType,
-      occurredAt: now,
-      sourceKind: 'system',
-      actorProfileId: systemProfileId,
-      scope: { kind: 'learning_space', learningSpaceId },
-      targetRef: { kind: 'learning_space', id: learningSpaceId },
+    scheduleActivities.push({
+      eventType: 'session.scheduled',
+      dedupeKey: `schedule.added:${learningSpaceId}:${schedule.startAt}:${now}`,
       payload: {
         learningSpaceId,
         channelId,
-        scheduleId: 'batch',
+        scheduleId: 'added',
         title: payload.basics.title,
         activityPhase: 'updated',
         invitedCount: invitedMembersSnapshot.length,
         invitedMembers: invitedMembersSnapshot,
-        description: `${summaryPrefix} ${details}`,
-        changeSummary: summaryPrefix,
-        changeCount: scheduleChangeLines.length,
-        previousScheduleHashKey: previousSchedulesHashKey,
-        scheduleHashKey: nextSchedulesHashKey,
+        firstSessionStartAt: nextSessionStartAt ?? schedule.startAt,
+        firstSessionTimezone: schedule.timezone ?? null,
+        startAt: schedule.startAt,
+        timezone: schedule.timezone ?? null,
       },
-      dedupeKey: `schedule.updated:${learningSpaceId}:${now}`,
-      createdBy: systemProfileId,
     });
+  }
+
+  for (const schedule of scheduleDiffPlan.removed) {
+    scheduleActivities.push({
+      eventType: 'session.canceled',
+      dedupeKey: `schedule.removed:${learningSpaceId}:${schedule.id}:${schedule.startAt}:${now}`,
+      payload: {
+        learningSpaceId,
+        channelId,
+        scheduleId: schedule.id,
+        title: payload.basics.title,
+        activityPhase: 'updated',
+        invitedCount: invitedMembersSnapshot.length,
+        invitedMembers: invitedMembersSnapshot,
+        firstSessionStartAt: nextSessionStartAt ?? schedule.startAt,
+        firstSessionTimezone: schedule.timezone ?? null,
+        canceledStartAt: schedule.startAt,
+        canceledReason: null,
+        timezone: schedule.timezone ?? null,
+      },
+    });
+  }
+
+  for (const change of scheduleDiffPlan.rescheduled) {
+    scheduleActivities.push({
+      eventType: 'session.rescheduled',
+      dedupeKey: `schedule.rescheduled:${learningSpaceId}:${change.previous.id}:${change.previous.startAt}:${change.next.startAt}:${now}`,
+      payload: {
+        learningSpaceId,
+        channelId,
+        scheduleId: change.previous.id,
+        title: payload.basics.title,
+        activityPhase: 'updated',
+        invitedCount: invitedMembersSnapshot.length,
+        invitedMembers: invitedMembersSnapshot,
+        firstSessionStartAt: nextSessionStartAt ?? change.next.startAt,
+        firstSessionTimezone: change.next.timezone ?? change.previous.timezone ?? null,
+        rescheduledFromStartAt: change.previous.startAt,
+        rescheduledToStartAt: change.next.startAt,
+        rescheduledReason: null,
+        timezone: change.next.timezone ?? change.previous.timezone ?? null,
+      },
+    });
+  }
+
+  scheduleActivities.push(
+    ...exceptionOverrideActivities.map((activity) => ({
+      ...activity,
+      payload: {
+        ...activity.payload,
+        invitedCount: invitedMembersSnapshot.length,
+        invitedMembers: invitedMembersSnapshot,
+        firstSessionStartAt: activity.payload.firstSessionStartAt ?? nextSessionStartAt,
+      },
+    })),
+  );
+
+  if (scheduleActivities.length > 0) {
+    const systemProfileId = await ensureSystemProfileId(serviceClient, orgId);
+    for (const activity of scheduleActivities) {
+      await publishActivityEvent({
+        supabase: serviceClient,
+        orgId,
+        eventType: activity.eventType,
+        occurredAt: now,
+        sourceKind: 'system',
+        actorProfileId: systemProfileId,
+        scope: { kind: 'learning_space', learningSpaceId },
+        targetRef: { kind: 'learning_space', id: learningSpaceId },
+        payload: {
+          ...activity.payload,
+          previousScheduleHashKey: previousSchedulesHashKey,
+          scheduleHashKey: nextSchedulesHashKey,
+        },
+        dedupeKey: activity.dedupeKey,
+        createdBy: systemProfileId,
+      });
+    }
   }
 }
 

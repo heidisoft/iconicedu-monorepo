@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildExceptionAndOverrideScheduleChangeActivities,
   buildLearningSpaceScheduleDiffPlan,
   buildRemovedMembersActivity,
 } from '@iconicedu/web/lib/admin/learning-space-update';
@@ -148,5 +149,148 @@ describe('buildLearningSpaceScheduleDiffPlan', () => {
     expect(activity?.dedupeKey).toBe(
       'member.removed:space-1:profile-1:2026-03-08T10:00:00.000Z',
     );
+  });
+
+  it('builds one activity per new exception and changed override', () => {
+    const activities = buildExceptionAndOverrideScheduleChangeActivities({
+      learningSpaceId: 'space-1',
+      channelId: 'channel-1',
+      title: 'Math Foundations',
+      occurredAt: '2026-03-08T10:00:00.000Z',
+      invitedMembers: [],
+      pairs: [
+        {
+          scheduleId: 'schedule-1',
+          timezone: 'America/New_York',
+          previous: {
+            exceptions: [{ occurrenceKey: '2026-03-10T21:00:00.000Z', reason: null }],
+            overrides: [
+              {
+                occurrenceKey: '2026-03-17T21:00:00.000Z',
+                startAt: '2026-03-18T21:00:00.000Z',
+                endAt: '2026-03-18T22:00:00.000Z',
+                reason: null,
+              },
+            ],
+          },
+          next: {
+            exceptions: [
+              { occurrenceKey: '2026-03-10T21:00:00.000Z', reason: null },
+              { occurrenceKey: '2026-03-24T21:00:00.000Z', reason: 'Holiday' },
+            ],
+            overrides: [
+              {
+                occurrenceKey: '2026-03-17T21:00:00.000Z',
+                startAt: '2026-03-19T21:30:00.000Z',
+                endAt: '2026-03-19T22:30:00.000Z',
+                reason: 'Rescheduled due to event',
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    expect(activities).toHaveLength(2);
+    expect(activities.map((entry) => entry.eventType)).toEqual([
+      'session.canceled',
+      'session.rescheduled',
+    ]);
+    expect(activities[0]?.payload.canceledStartAt).toBe('2026-03-24T21:00:00.000Z');
+    expect(activities[0]?.payload.canceledReason).toBe('Holiday');
+    expect(activities[1]?.payload.rescheduledFromStartAt).toBe(
+      '2026-03-18T21:00:00.000Z',
+    );
+    expect(activities[1]?.payload.rescheduledToStartAt).toBe('2026-03-19T21:30:00.000Z');
+    expect(activities[1]?.payload.rescheduledReason).toBe('Rescheduled due to event');
+  });
+
+  it('emits session.scheduled when an exception or override is removed', () => {
+    const activities = buildExceptionAndOverrideScheduleChangeActivities({
+      learningSpaceId: 'space-1',
+      channelId: 'channel-1',
+      title: 'Math Foundations',
+      occurredAt: '2026-03-08T10:00:00.000Z',
+      invitedMembers: [],
+      nextSessionStartAt: '2026-03-31T21:00:00.000Z',
+      pairs: [
+        {
+          scheduleId: 'schedule-1',
+          timezone: 'America/New_York',
+          previous: {
+            exceptions: [
+              { occurrenceKey: '2026-03-10T21:00:00.000Z', reason: 'Holiday' },
+            ],
+            overrides: [
+              {
+                occurrenceKey: '2026-03-17T21:00:00.000Z',
+                startAt: '2026-03-18T21:30:00.000Z',
+                endAt: '2026-03-18T22:30:00.000Z',
+                reason: null,
+              },
+            ],
+          },
+          next: {
+            exceptions: [],
+            overrides: [],
+          },
+        },
+      ],
+    });
+
+    expect(activities).toHaveLength(2);
+    expect(activities.map((entry) => entry.eventType)).toEqual([
+      'session.scheduled',
+      'session.scheduled',
+    ]);
+    expect(activities[0]?.payload.startAt).toBe('2026-03-10T21:00:00.000Z');
+    expect(activities[1]?.payload.startAt).toBe('2026-03-17T21:00:00.000Z');
+    expect(activities[0]?.payload.firstSessionStartAt).toBe('2026-03-31T21:00:00.000Z');
+  });
+
+  it('does not emit diffs for timezone-shifted keys when full hash is equal', () => {
+    const activities = buildExceptionAndOverrideScheduleChangeActivities({
+      learningSpaceId: 'space-1',
+      channelId: 'channel-1',
+      title: 'Math Foundations',
+      occurredAt: '2026-03-08T10:00:00.000Z',
+      invitedMembers: [],
+      pairs: [
+        {
+          scheduleId: 'schedule-1',
+          timezone: 'America/New_York',
+          previousFullHash: 'same-hash',
+          nextFullHash: 'same-hash',
+          previous: {
+            exceptions: [
+              { occurrenceKey: '2026-03-09T16:00:00.000Z', reason: 'Holiday' },
+            ],
+            overrides: [
+              {
+                occurrenceKey: '2026-03-23T16:00:00.000Z',
+                startAt: '2026-03-30T16:00:00.000Z',
+                endAt: '2026-03-30T17:00:00.000Z',
+                reason: null,
+              },
+            ],
+          },
+          next: {
+            exceptions: [
+              { occurrenceKey: '2026-03-09T20:00:00.000Z', reason: 'Holiday' },
+            ],
+            overrides: [
+              {
+                occurrenceKey: '2026-03-23T20:00:00.000Z',
+                startAt: '2026-03-30T20:00:00.000Z',
+                endAt: '2026-03-30T21:00:00.000Z',
+                reason: null,
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    expect(activities).toEqual([]);
   });
 });

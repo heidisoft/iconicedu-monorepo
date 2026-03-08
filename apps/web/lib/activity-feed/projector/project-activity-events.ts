@@ -139,6 +139,21 @@ async function ensureGroupParent(input: {
       nextVerb: input.rendered.verb,
     })
   ) {
+    // Keep the preferred parent verb/content, but refresh occurred_at so recency sorting
+    // reflects the latest leaf activity in this group.
+    const touchResponse = await input.supabase
+      .from('activity_feed_items')
+      .update({
+        occurred_at: input.event.occurred_at,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', existingResponse.data.id)
+      .is('deleted_at', null);
+
+    if (touchResponse.error) {
+      throw new Error(touchResponse.error.message);
+    }
+
     return existingResponse.data.id;
   }
 

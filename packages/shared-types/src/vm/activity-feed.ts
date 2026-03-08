@@ -113,7 +113,9 @@ export type InboxTabKeyVM = 'all' | 'classes' | 'payment' | 'system';
 
 export type InboxIconKeyVM =
   | 'Bell'
+  | 'CalendarCheck'
   | 'CalendarDays'
+  | 'CalendarX'
   | 'CheckCircle2'
   | 'ClipboardCheck'
   | 'CreditCard'

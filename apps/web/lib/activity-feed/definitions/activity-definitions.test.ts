@@ -115,9 +115,15 @@ describe('activity event definitions', () => {
       primary: 'Tehara Morgan added',
     });
     expect(rendered.leading).toEqual({
-      kind: 'icon',
-      iconKey: 'UserRoundPlus',
-      tone: 'info',
+      kind: 'avatars',
+      avatars: [
+        {
+          name: 'Tehara Morgan',
+          avatar: { source: 'seed', seed: 'tehara-profile-id' },
+          themeKey: null,
+        },
+      ],
+      overflowCount: 0,
     });
     expect(rendered.summary).toBe('Added: Tehara Morgan. Added to Learning space.');
     expect(rendered.actionButton).toBeUndefined();
@@ -160,9 +166,15 @@ describe('activity event definitions', () => {
       primary: 'Tehara Morgan removed',
     });
     expect(rendered.leading).toEqual({
-      kind: 'icon',
-      iconKey: 'UserRoundMinus',
-      tone: 'danger',
+      kind: 'avatars',
+      avatars: [
+        {
+          name: 'Tehara Morgan',
+          avatar: { source: 'upload', url: 'https://cdn.test/tehara.png' },
+          themeKey: 'rose',
+        },
+      ],
+      overflowCount: 0,
     });
     expect(rendered.summary).toBe(
       'Removed: Tehara Morgan. Removed from Math Foundations.',
@@ -659,7 +671,43 @@ describe('activity event definitions', () => {
     });
   });
 
-  it('renders rescheduled and cancelled sessions with explicit description text', () => {
+  it('renders update-phase session scheduled as Session scheduled [DATE TIME]', () => {
+    const definition = getActivityEventDefinition('session.scheduled');
+    if (!definition) {
+      throw new Error('Missing session.scheduled definition');
+    }
+
+    const rendered = definition.render({
+      id: 'event-session-scheduled-updated-1',
+      org_id: 'org-1',
+      event_type: 'session.scheduled',
+      occurred_at: '2026-03-03T12:00:00.000Z',
+      source_kind: 'system',
+      actor_profile_id: 'system-profile-1',
+      scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+      object_ref: null,
+      target_ref: { kind: 'learning_space', id: 'space-1' },
+      payload: {
+        learningSpaceId: 'space-1',
+        channelId: 'channel-1',
+        title: 'Math Foundations',
+        activityPhase: 'updated',
+        startAt: '2026-03-07T22:00:00.000Z',
+        timezone: 'America/Los_Angeles',
+      },
+      audience_rules: [],
+      dedupe_key: 'session.scheduled:space-1:2026-03-07',
+      projection_status: 'pending',
+      projection_attempts: 0,
+      created_at: '2026-03-03T12:00:00.000Z',
+      updated_at: '2026-03-03T12:00:00.000Z',
+    });
+
+    expect(rendered.headline.primary).toBe('Session scheduled');
+    expect(rendered.summary).toBe('Session scheduled Mar 7 at 2:00 PM.');
+  });
+
+  it('renders rescheduled and cancelled sessions with calendar-check/calendar-x and first-session summary', () => {
     const rescheduled = getActivityEventDefinition('session.rescheduled');
     const canceled = getActivityEventDefinition('session.canceled');
     if (!rescheduled || !canceled) {
@@ -680,8 +728,10 @@ describe('activity event definitions', () => {
         learningSpaceId: 'space-1',
         channelId: 'channel-1',
         title: 'Math Foundations',
-        description:
-          'Session: Math Foundations weekly session (Sat) moved from 2:00 PM to 2:30 PM PT',
+        firstSessionStartAt: '2026-03-15T21:30:00.000Z',
+        firstSessionTimezone: 'America/Los_Angeles',
+        rescheduledFromStartAt: '2026-03-08T22:00:00.000Z',
+        rescheduledToStartAt: '2026-03-15T21:30:00.000Z',
       },
       audience_rules: [],
       dedupe_key: 'session.rescheduled:space-1:1',
@@ -691,11 +741,14 @@ describe('activity event definitions', () => {
       updated_at: '2026-03-08T12:00:00.000Z',
     });
     expect(rescheduledRendered.headline.primary).toBe(
-      'Learning space session schedule updated',
+      'Session Mar 8 at 3:00 PM rescheduled to Mar 15 at 2:30 PM',
     );
-    expect(rescheduledRendered.summary).toBe(
-      'Session: Math Foundations weekly session (Sat) moved from 2:00 PM to 2:30 PM PT',
-    );
+    expect(rescheduledRendered.summary).toBe('Next session Mar 15 at 2:30 PM.');
+    expect(rescheduledRendered.leading).toEqual({
+      kind: 'icon',
+      iconKey: 'CalendarCheck',
+      tone: 'info',
+    });
     expect(rescheduledRendered.actionButton).toBeUndefined();
 
     const canceledRendered = canceled.render({
@@ -712,8 +765,10 @@ describe('activity event definitions', () => {
         learningSpaceId: 'space-1',
         channelId: 'channel-1',
         title: 'Math Foundations',
-        description:
-          'Session: Math Foundations weekly session (Sat 2:30 PM PT) canceled due to schedule update',
+        firstSessionStartAt: '2026-03-22T21:30:00.000Z',
+        firstSessionTimezone: 'America/Los_Angeles',
+        canceledStartAt: '2026-03-15T21:30:00.000Z',
+        canceledReason: 'Holiday',
       },
       audience_rules: [],
       dedupe_key: 'session.canceled:space-1:1',
@@ -723,11 +778,14 @@ describe('activity event definitions', () => {
       updated_at: '2026-03-08T12:00:00.000Z',
     });
     expect(canceledRendered.headline.primary).toBe(
-      'Learning space session schedule updated',
+      'Session Mar 15 at 2:30 PM cancelled Holiday',
     );
-    expect(canceledRendered.summary).toBe(
-      'Session: Math Foundations weekly session (Sat 2:30 PM PT) canceled due to schedule update',
-    );
+    expect(canceledRendered.summary).toBe('Next session Mar 22 at 2:30 PM.');
+    expect(canceledRendered.leading).toEqual({
+      kind: 'icon',
+      iconKey: 'CalendarX',
+      tone: 'warning',
+    });
     expect(canceledRendered.actionButton).toBeUndefined();
   });
 

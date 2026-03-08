@@ -175,11 +175,7 @@ describe('projectActivityEvents', () => {
     expect(leafUpserts.map((entry) => entry.payload.recipient_profile_id)).not.toContain(
       'educator-profile-1',
     );
-    expect(leafUpserts[0]?.payload.action_button).toEqual({
-      label: 'Open learning space',
-      variant: 'outline',
-      href: '../spaces/channel-1',
-    });
+    expect(leafUpserts.every((entry) => entry.payload.action_button === null)).toBe(true);
     expect(updates).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -265,7 +261,14 @@ describe('projectActivityEvents', () => {
       }
 
       if (table === 'activity_feed_items') {
+        const selectChain = {
+          eq: vi.fn(() => selectChain),
+          is: vi.fn(() => selectChain),
+          maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+        };
+
         return {
+          select: vi.fn(() => selectChain),
           upsert: vi.fn((payload: Record<string, unknown>) => ({
             select: vi.fn(() => ({
               single: vi.fn(async () => {
@@ -324,5 +327,179 @@ describe('projectActivityEvents', () => {
       group_id: 'group-1',
       item_id: 'leaf-1',
     });
+  });
+
+  it('updates existing group parent occurred_at when a newer leaf event is projected', async () => {
+    getFamilyLinksByOrg.mockResolvedValue({ data: [] });
+    getProfilesByAccountIds.mockResolvedValue({ data: [] });
+
+    const events = [
+      {
+        id: 'event-class-updated-1',
+        org_id: 'org-1',
+        event_type: 'class.updated',
+        occurred_at: '2026-03-08T12:00:00.000Z',
+        source_kind: 'profile',
+        actor_profile_id: 'educator-profile-1',
+        scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+        object_ref: null,
+        target_ref: { kind: 'learning_space', id: 'space-1' },
+        payload: {
+          learningSpaceId: 'space-1',
+          channelId: 'channel-1',
+          title: 'Algebra I',
+          activityPhase: 'updated',
+        },
+        audience_rules: [],
+        dedupe_key: 'class.updated:space-1:2026-03-08T12',
+        projection_status: 'pending',
+        projection_attempts: 0,
+        created_at: '2026-03-08T12:00:00.000Z',
+        updated_at: '2026-03-08T12:00:00.000Z',
+      },
+      {
+        id: 'event-member-removed-1',
+        org_id: 'org-1',
+        event_type: 'member.removed',
+        occurred_at: '2026-03-08T13:00:00.000Z',
+        source_kind: 'profile',
+        actor_profile_id: 'educator-profile-1',
+        scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+        object_ref: null,
+        target_ref: { kind: 'learning_space', id: 'space-1' },
+        payload: {
+          learningSpaceId: 'space-1',
+          channelId: 'channel-1',
+          title: 'Algebra I',
+          activityPhase: 'updated',
+          memberCount: 1,
+          members: [{ profileId: 'child-profile-1', displayName: 'Child One' }],
+        },
+        audience_rules: [],
+        dedupe_key: 'member.removed:space-1:child-profile-1',
+        projection_status: 'pending',
+        projection_attempts: 0,
+        created_at: '2026-03-08T13:00:00.000Z',
+        updated_at: '2026-03-08T13:00:00.000Z',
+      },
+    ];
+    const updates: Array<{ table: string; payload: Record<string, unknown> }> = [];
+    const upserts: Array<{ table: string; payload: Record<string, unknown> }> = [];
+    let groupParentLookupCount = 0;
+
+    const supabase = {
+      from: vi.fn((table: string) => {
+        if (table === 'activity_events') {
+          return {
+            select: vi.fn(() => ({
+              is: vi.fn(() => ({
+                lt: vi.fn(() => ({
+                  order: vi.fn(() => ({
+                    limit: vi.fn(() => ({
+                      in: vi.fn(() => ({
+                        returns: vi.fn(async () => ({ data: events, error: null })),
+                      })),
+                    })),
+                  })),
+                })),
+              })),
+            })),
+            update: vi.fn((payload: Record<string, unknown>) => ({
+              eq: vi.fn(() => ({
+                is: vi.fn(async () => {
+                  updates.push({ table, payload });
+                  return { error: null };
+                }),
+              })),
+            })),
+          };
+        }
+
+        if (table === 'learning_space_participants') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                eq: vi.fn(() => ({
+                  is: vi.fn(() => ({
+                    returns: vi.fn(async () => ({
+                      data: [{ profile_id: 'child-profile-1' }],
+                      error: null,
+                    })),
+                  })),
+                })),
+              })),
+            })),
+          };
+        }
+
+        if (table === 'activity_feed_items') {
+          const selectChain = {
+            eq: vi.fn(() => selectChain),
+            is: vi.fn(() => selectChain),
+            maybeSingle: vi.fn(async () => {
+              groupParentLookupCount += 1;
+              if (groupParentLookupCount === 1) {
+                return { data: null, error: null };
+              }
+              return { data: { id: 'group-1', verb: 'class.updated' }, error: null };
+            }),
+          };
+
+          return {
+            select: vi.fn(() => selectChain),
+            upsert: vi.fn((payload: Record<string, unknown>) => ({
+              select: vi.fn(() => ({
+                single: vi.fn(async () => {
+                  upserts.push({ table, payload });
+                  return {
+                    data: {
+                      id:
+                        payload.kind === 'group'
+                          ? 'group-1'
+                          : `leaf-${String(payload.source_event_id)}`,
+                    },
+                    error: null,
+                  };
+                }),
+              })),
+            })),
+            update: vi.fn((payload: Record<string, unknown>) => ({
+              eq: vi.fn(() => ({
+                is: vi.fn(async () => {
+                  updates.push({ table, payload });
+                  return { error: null };
+                }),
+              })),
+            })),
+          };
+        }
+
+        if (table === 'activity_feed_group_members') {
+          return {
+            upsert: vi.fn(async (payload: Record<string, unknown>) => {
+              upserts.push({ table, payload });
+              return { error: null };
+            }),
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                is: vi.fn(async () => ({ count: 2, error: null })),
+              })),
+            })),
+          };
+        }
+
+        throw new Error(`Unexpected table ${table}`);
+      }),
+    };
+
+    await projectActivityEvents(supabase as never);
+
+    expect(
+      updates.some(
+        (entry) =>
+          entry.table === 'activity_feed_items' &&
+          entry.payload.occurred_at === '2026-03-08T13:00:00.000Z',
+      ),
+    ).toBe(true);
   });
 });

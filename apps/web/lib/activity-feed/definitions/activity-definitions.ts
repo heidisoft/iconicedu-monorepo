@@ -444,6 +444,10 @@ function renderClassCreatedLeaf(event: ActivityEventRow) {
 function renderLearningSpaceUpdatedGroup(event: ActivityEventRow) {
   const payload = asRecord(event.payload);
   const invitedMembers = buildParticipantAvatars(payload);
+  const firstSessionLabel = formatNaturalDateTime(
+    payload.firstSessionStartAt,
+    payload.firstSessionTimezone ?? payload.timezone,
+  );
   return {
     verb: event.event_type as ActivityVerbVM,
     leading:
@@ -460,6 +464,7 @@ function renderLearningSpaceUpdatedGroup(event: ActivityEventRow) {
     },
     summary:
       asOptionalString(payload.changeSummary) ??
+      (firstSessionLabel ? `Next session ${firstSessionLabel}.` : null) ??
       'Learning space details, participants, or schedule changed.',
     actionButton: sourceAction(event, payload, 'outline', 'Open learning space'),
   } satisfies ActivityRenderResult;
@@ -894,7 +899,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       const membersSummary = buildMembersSummary('Added', payload);
       return {
         verb: 'member.invited',
-        leading: { kind: 'icon', iconKey: 'UserRoundPlus', tone: 'info' },
+        leading: buildMembersLeading(payload),
         headline: {
           primary:
             memberCount > 1 ? `${memberCount} participants added` : `${memberName} added`,
@@ -931,7 +936,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       const membersSummary = buildMembersSummary('Added', payload);
       return {
         verb: 'members.invited',
-        leading: { kind: 'icon', iconKey: 'UserRoundPlus', tone: 'info' },
+        leading: buildMembersLeading(payload),
         headline: {
           primary: `${Math.max(memberCount, members.length, 1)} participants added`,
         },
@@ -1007,7 +1012,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
           formatNaturalDateTime(event.occurred_at, payload.timezone);
         return {
           verb: 'members.removed',
-          leading: { kind: 'icon', iconKey: 'UserRoundMinus', tone: 'danger' },
+          leading: buildMembersLeading(payload),
           headline: {
             primary: `${asString(payload.memberDisplayName, 'Participant')} left the session`,
           },
@@ -1025,7 +1030,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       const membersSummary = buildMembersSummary('Removed', payload);
       return {
         verb: 'members.removed',
-        leading: { kind: 'icon', iconKey: 'UserRoundMinus', tone: 'danger' },
+        leading: buildMembersLeading(payload),
         headline: {
           primary:
             memberCount > 1
@@ -1061,7 +1066,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
           formatNaturalDateTime(event.occurred_at, payload.timezone);
         return {
           verb: 'member.removed',
-          leading: { kind: 'icon', iconKey: 'UserRoundMinus', tone: 'danger' },
+          leading: buildMembersLeading(payload),
           headline: {
             primary: `${asString(payload.memberDisplayName, 'Participant')} left the session`,
           },
@@ -1079,7 +1084,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       const membersSummary = buildMembersSummary('Removed', payload);
       return {
         verb: 'member.removed',
-        leading: { kind: 'icon', iconKey: 'UserRoundMinus', tone: 'danger' },
+        leading: buildMembersLeading(payload),
         headline: {
           primary:
             memberCount > 1
@@ -1131,15 +1136,25 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       const payload = asRecord(event.payload);
       const firstSessionLabel = formatSessionLabel(payload.startAt, payload.timezone);
       const weeklyTime = formatWeeklyTimeLabel(payload.startAt, payload.timezone);
+      const scheduledLabel = formatNaturalDateTime(
+        payload.startAt ?? payload.firstSessionStartAt,
+        payload.timezone ?? payload.firstSessionTimezone,
+      );
+      const isUpdated = asOptionalString(payload.activityPhase) === 'updated';
       return {
         verb: 'session.scheduled',
         leading: { kind: 'icon', iconKey: 'CalendarDays', tone: 'info' },
         headline: {
-          primary: 'Learning space session schedule added',
+          primary: isUpdated
+            ? 'Session scheduled'
+            : 'Learning space session schedule added',
           secondary: sessionName(payload),
         },
-        summary:
-          firstSessionLabel && weeklyTime
+        summary: isUpdated
+          ? scheduledLabel
+            ? `Session scheduled ${scheduledLabel}.`
+            : asOptionalString(payload.startAt)
+          : firstSessionLabel && weeklyTime
             ? `First session: ${firstSessionLabel}, then weekly ${weeklyTime}`
             : (asOptionalString(payload.startAt) ?? undefined),
         actionButton: sourceScheduleAction(event, payload),
@@ -1159,15 +1174,35 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => {
       const payload = asRecord(event.payload);
+      const timezone = payload.firstSessionTimezone ?? payload.timezone;
+      const fromLabel = formatNaturalDateTime(
+        payload.rescheduledFromStartAt ?? payload.startAt,
+        timezone,
+      );
+      const toLabel = formatNaturalDateTime(
+        payload.rescheduledToStartAt ?? payload.newStartAt,
+        timezone,
+      );
+      const firstSessionLabel = formatNaturalDateTime(
+        payload.firstSessionStartAt,
+        timezone,
+      );
+      const reason =
+        asOptionalString(payload.rescheduledReason) ?? asOptionalString(payload.reason);
+      const baseSummary = firstSessionLabel
+        ? `Next session ${firstSessionLabel}.`
+        : (asOptionalString(payload.description) ?? asOptionalString(payload.startAt));
       return {
         verb: 'session.rescheduled',
-        leading: { kind: 'icon', iconKey: 'CalendarDays', tone: 'info' },
+        leading: { kind: 'icon', iconKey: 'CalendarCheck', tone: 'info' },
         headline: {
-          primary: 'Learning space session schedule updated',
+          primary:
+            fromLabel && toLabel
+              ? `Session ${fromLabel} rescheduled to ${toLabel}`
+              : 'Session rescheduled',
           secondary: sessionName(payload),
         },
-        summary:
-          asOptionalString(payload.description) ?? asOptionalString(payload.startAt),
+        summary: reason ? `${baseSummary ?? ''} Reason: ${reason}.`.trim() : baseSummary,
       };
     },
   },
@@ -1184,14 +1219,29 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => {
       const payload = asRecord(event.payload);
+      const timezone = payload.firstSessionTimezone ?? payload.timezone;
+      const canceledLabel = formatNaturalDateTime(
+        payload.canceledStartAt ?? payload.startAt,
+        timezone,
+      );
+      const reason =
+        asOptionalString(payload.canceledReason) ?? asOptionalString(payload.reason);
+      const firstSessionLabel = formatNaturalDateTime(
+        payload.firstSessionStartAt,
+        timezone,
+      );
       return {
         verb: 'session.canceled',
-        leading: { kind: 'icon', iconKey: 'CalendarDays', tone: 'info' },
+        leading: { kind: 'icon', iconKey: 'CalendarX', tone: 'warning' },
         headline: {
-          primary: 'Learning space session schedule updated',
+          primary: canceledLabel
+            ? `Session ${canceledLabel} cancelled${reason ? ` ${reason}` : ''}`
+            : 'Session cancelled',
           secondary: sessionName(payload),
         },
-        summary: asOptionalString(payload.description),
+        summary: firstSessionLabel
+          ? `Next session ${firstSessionLabel}.`
+          : asOptionalString(payload.description),
       };
     },
   },
