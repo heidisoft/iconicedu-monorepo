@@ -225,7 +225,7 @@ describe('activity event definitions', () => {
     );
   });
 
-  it('adds a learning space link for learning-space events', () => {
+  it('renders class created leaf items as simple summaries without action buttons', () => {
     const definition = getActivityEventDefinition('class.created');
     if (!definition) {
       throw new Error('Missing class.created definition');
@@ -245,6 +245,8 @@ describe('activity event definitions', () => {
         learningSpaceId: 'space-1',
         channelId: 'channel-1',
         title: 'Algebra I',
+        firstSessionStartAt: '2026-03-07T22:00:00.000Z',
+        firstSessionTimezone: 'America/Los_Angeles',
       },
       audience_rules: [],
       dedupe_key: 'class.created:space-1',
@@ -254,11 +256,11 @@ describe('activity event definitions', () => {
       updated_at: '2026-03-03T12:00:00.000Z',
     });
 
-    expect(rendered.actionButton).toEqual({
-      label: 'Open learning space',
-      variant: 'outline',
-      href: '../spaces/channel-1',
+    expect(rendered.headline).toEqual({
+      primary: 'Learning space created',
+      secondary: 'Algebra I',
     });
+    expect(rendered.summary).toBe('First session Mar 7 at 2:00 PM.');
     expect(rendered.leading).toEqual({
       kind: 'avatars',
       avatars: [
@@ -270,6 +272,7 @@ describe('activity event definitions', () => {
       ],
       overflowCount: 0,
     });
+    expect(rendered.actionButton).toBeUndefined();
   });
 
   it('renders learning space updated with learning space wording and participant avatar pattern', () => {
@@ -318,8 +321,25 @@ describe('activity event definitions', () => {
     const rendered = definition.render(event);
     const grouped = definition.group.renderGroup?.(event);
 
-    expect(rendered.headline.primary).toBe('Learning space updated');
+    expect(rendered.headline).toEqual({
+      primary: 'Learning space updated',
+      secondary: 'Algebra I',
+    });
     expect(rendered.leading).toEqual({
+      kind: 'avatars',
+      avatars: [
+        {
+          name: 'System',
+          avatar: { source: 'seed', seed: 'system' },
+          themeKey: null,
+        },
+      ],
+      overflowCount: 0,
+    });
+    expect(rendered.summary).toBe('Schedule changed for next week.');
+    expect(rendered.actionButton).toBeUndefined();
+    expect(grouped?.headline.primary).toBe('Learning space updated');
+    expect(grouped?.leading).toEqual({
       kind: 'avatars',
       avatars: [
         {
@@ -335,13 +355,6 @@ describe('activity event definitions', () => {
       ],
       overflowCount: 0,
     });
-    expect(rendered.actionButton).toEqual({
-      label: 'Open learning space',
-      variant: 'outline',
-      href: '../spaces/channel-1',
-    });
-    expect(grouped?.headline.primary).toBe('Learning space updated');
-    expect(grouped?.leading).toEqual(rendered.leading);
   });
 
   it('keeps full participant avatars in group payload and sets overflow count for more than 3', () => {

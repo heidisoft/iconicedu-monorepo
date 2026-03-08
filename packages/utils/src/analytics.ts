@@ -55,6 +55,10 @@ export const AnalyticsEvent = {
   LINK_CLICKED: 'link clicked',
   MENU_ITEM_CLICKED: 'menu item clicked',
   CTA_CLICKED: 'cta clicked',
+  LIST_ITEM_SELECTED: 'list item selected',
+  CHIP_SELECTED: 'chip selected',
+  TAB_SELECTED: 'tab selected',
+  SETTINGS_ROW_TAPPED: 'settings row tapped',
 
   // ── Form Interactions ──────────────────────────────────────────────────────
   FORM_STARTED: 'form started',
@@ -135,8 +139,22 @@ export interface ScreenViewedProps {
 
 export interface ButtonClickedProps {
   button_name: string;
+  component_type:
+    | 'button'
+    | 'icon_button'
+    | 'list_item'
+    | 'chip'
+    | 'tab'
+    | 'settings_row';
   screen_name?: string;
+  variant?: string;
   context?: string;
+}
+
+export interface TabSelectedProps {
+  tab_key: string;
+  tab_label: string;
+  screen_name?: string;
 }
 
 export interface FormEventProps {

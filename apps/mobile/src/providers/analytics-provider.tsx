@@ -78,6 +78,15 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
         sessionReplayConfig: {
           maskAllTextInputs: false,
           maskAllImages: false,
+          captureNetworkTelemetry: true,
+          throttleDelayMs: 500,
+        },
+        // Automatically capture unhandled exceptions and promise rejections
+        errorTracking: {
+          autocapture: {
+            uncaughtExceptions: true,
+            unhandledRejections: true,
+          },
         },
       }}
     >

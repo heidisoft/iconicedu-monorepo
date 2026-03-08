@@ -2,6 +2,7 @@ import React from 'react';
 import { Text } from 'react-native';
 import { render, screen, fireEvent } from '@testing-library/react-native';
 import { ListItem } from '../components/ListItem';
+import { UiTrackingContext } from '../lib/tracking-context';
 
 describe('ListItem', () => {
   it('renders title', () => {
@@ -15,19 +16,12 @@ describe('ListItem', () => {
   });
 
   it('renders leading content', () => {
-    render(
-      <ListItem title="John" leading={<Text testID="avatar">JD</Text>} />,
-    );
+    render(<ListItem title="John" leading={<Text testID="avatar">JD</Text>} />);
     expect(screen.getByTestId('avatar')).toBeTruthy();
   });
 
   it('renders trailing content', () => {
-    render(
-      <ListItem
-        title="John"
-        trailing={<Text testID="badge">3</Text>}
-      />,
-    );
+    render(<ListItem title="John" trailing={<Text testID="badge">3</Text>} />);
     expect(screen.getByTestId('badge')).toBeTruthy();
   });
 
@@ -42,5 +36,32 @@ describe('ListItem', () => {
     render(<ListItem title="John" active />);
     const item = screen.getByRole('button');
     expect(item.props.accessibilityState).toEqual({ selected: true });
+  });
+
+  describe('analytics tracking', () => {
+    it('fires track with title on press', () => {
+      const capture = jest.fn();
+      render(
+        <UiTrackingContext.Provider value={capture}>
+          <ListItem title="Math Class" onPress={jest.fn()} />
+        </UiTrackingContext.Provider>,
+      );
+      fireEvent.press(screen.getByRole('button'));
+      expect(capture).toHaveBeenCalledWith('list item selected', {
+        button_name: 'Math Class',
+        component_type: 'list_item',
+      });
+    });
+
+    it('does not fire track when no onPress is provided', () => {
+      const capture = jest.fn();
+      render(
+        <UiTrackingContext.Provider value={capture}>
+          <ListItem title="Read only" />
+        </UiTrackingContext.Provider>,
+      );
+      fireEvent.press(screen.getByRole('button'));
+      expect(capture).not.toHaveBeenCalled();
+    });
   });
 });

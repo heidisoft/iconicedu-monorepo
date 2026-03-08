@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { ChevronRight } from 'lucide-react-native';
+import { useUiTracking } from '@iconicedu/ui-native/lib/tracking-context';
 
 export type SettingsRowProps = {
   icon: React.ReactNode;
@@ -23,25 +24,37 @@ export const SettingsRow: React.FC<SettingsRowProps> = ({
   hideChevron = false,
   labelColor = '#0f172a',
   chevronColor = '#94a3b8',
-}) => (
-  <TouchableOpacity
-    style={styles.row}
-    onPress={onPress}
-    activeOpacity={onPress ? 0.6 : 1}
-    disabled={!onPress}
-    accessibilityRole={onPress ? 'button' : 'text'}
-    accessibilityLabel={label}
-  >
-    <View style={styles.iconWrap}>{icon}</View>
-    <Text style={[styles.label, { color: labelColor }]}>{label}</Text>
-    <View style={styles.trailing}>
-      {trailing}
-      {!hideChevron && !trailing && (
-        <ChevronRight size={16} color={chevronColor} />
-      )}
-    </View>
-  </TouchableOpacity>
-);
+}) => {
+  const track = useUiTracking();
+
+  const handlePress = onPress
+    ? () => {
+        track('settings row tapped', {
+          button_name: label,
+          component_type: 'settings_row',
+        });
+        onPress();
+      }
+    : undefined;
+
+  return (
+    <TouchableOpacity
+      style={styles.row}
+      onPress={handlePress}
+      activeOpacity={onPress ? 0.6 : 1}
+      disabled={!onPress}
+      accessibilityRole={onPress ? 'button' : 'text'}
+      accessibilityLabel={label}
+    >
+      <View style={styles.iconWrap}>{icon}</View>
+      <Text style={[styles.label, { color: labelColor }]}>{label}</Text>
+      <View style={styles.trailing}>
+        {trailing}
+        {!hideChevron && !trailing && <ChevronRight size={16} color={chevronColor} />}
+      </View>
+    </TouchableOpacity>
+  );
+};
 
 const styles = StyleSheet.create({
   row: {

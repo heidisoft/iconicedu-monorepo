@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm --filter ui-native exec jest --testPathPattern=\"Button|IconButton|ListItem|Chip|Tabs|SettingsRow\" --silent)",
+      "Bash(pnpm --filter mobile exec jest --testPathPattern=\"analytics-provider|app-providers\" --silent)"
+    ]
+  }
+}

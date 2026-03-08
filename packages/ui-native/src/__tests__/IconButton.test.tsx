@@ -51,7 +51,10 @@ describe('IconButton', () => {
         </UiTrackingContext.Provider>,
       );
       fireEvent.press(screen.getByRole('button'));
-      expect(capture).toHaveBeenCalledWith('button_clicked', { label: 'Close' });
+      expect(capture).toHaveBeenCalledWith('button clicked', {
+        button_name: 'Close',
+        component_type: 'icon_button',
+      });
     });
 
     it('still calls onPress after tracking', () => {
@@ -63,7 +66,10 @@ describe('IconButton', () => {
         </UiTrackingContext.Provider>,
       );
       fireEvent.press(screen.getByRole('button'));
-      expect(capture).toHaveBeenCalledWith('button_clicked', { label: 'Close' });
+      expect(capture).toHaveBeenCalledWith('button clicked', {
+        button_name: 'Close',
+        component_type: 'icon_button',
+      });
       expect(onPress).toHaveBeenCalledTimes(1);
     });
 

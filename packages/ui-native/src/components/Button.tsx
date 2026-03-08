@@ -88,11 +88,15 @@ export const Button: React.FC<ButtonProps> = ({
     (e: GestureResponderEvent) => {
       const trackLabel = analyticsLabel ?? label;
       if (trackLabel) {
-        track('button_clicked', { label: trackLabel });
+        track('button clicked', {
+          button_name: trackLabel,
+          component_type: 'button',
+          variant: variant ?? 'default',
+        });
       }
       onPress?.(e);
     },
-    [track, analyticsLabel, label, onPress],
+    [track, analyticsLabel, label, variant, onPress],
   );
 
   return (

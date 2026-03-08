@@ -67,7 +67,11 @@ describe('Button', () => {
         </UiTrackingContext.Provider>,
       );
       fireEvent.press(screen.getByRole('button'));
-      expect(capture).toHaveBeenCalledWith('button_clicked', { label: 'Send message' });
+      expect(capture).toHaveBeenCalledWith('button clicked', {
+        button_name: 'Send message',
+        component_type: 'button',
+        variant: 'default',
+      });
     });
 
     it('fires track using label when analyticsLabel is not set', () => {
@@ -78,7 +82,11 @@ describe('Button', () => {
         </UiTrackingContext.Provider>,
       );
       fireEvent.press(screen.getByRole('button'));
-      expect(capture).toHaveBeenCalledWith('button_clicked', { label: 'Submit' });
+      expect(capture).toHaveBeenCalledWith('button clicked', {
+        button_name: 'Submit',
+        component_type: 'button',
+        variant: 'default',
+      });
     });
 
     it('does not fire track when neither analyticsLabel nor label is set', () => {

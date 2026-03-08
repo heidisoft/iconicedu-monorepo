@@ -44,7 +44,7 @@ describe('groupHasUnreadSubActivities', () => {
 });
 
 describe('getInitialGroupCollapsedState', () => {
-  it('defaults grouped inbox activities to expanded so subitems are visible', () => {
+  it('defaults grouped inbox activities to collapsed when they have subitems', () => {
     const activity = {
       kind: 'group',
       ids: { id: 'group-1', orgId: 'org-1' },
@@ -68,6 +68,6 @@ describe('getInitialGroupCollapsedState', () => {
       },
     } as ActivityFeedGroupItemVM;
 
-    expect(getInitialGroupCollapsedState(activity)).toBe(false);
+    expect(getInitialGroupCollapsedState(activity)).toBe(true);
   });
 });

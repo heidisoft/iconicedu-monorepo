@@ -422,6 +422,25 @@ function renderClassCreatedGroup(event: ActivityEventRow) {
   } satisfies ActivityRenderResult;
 }
 
+function renderClassCreatedLeaf(event: ActivityEventRow) {
+  const payload = asRecord(event.payload);
+  const firstSessionLabel =
+    formatNaturalDateTime(payload.firstSessionStartAt, payload.firstSessionTimezone) ??
+    asOptionalString(payload.firstSessionLabel);
+
+  return {
+    verb: 'class.created',
+    leading: buildSystemLeadingAvatar(),
+    headline: {
+      primary: 'Learning space created',
+      secondary: className(payload),
+    },
+    summary: firstSessionLabel
+      ? `First session ${firstSessionLabel}.`
+      : 'Learning space created.',
+  } satisfies ActivityRenderResult;
+}
+
 function renderLearningSpaceUpdatedGroup(event: ActivityEventRow) {
   const payload = asRecord(event.payload);
   const invitedMembers = buildParticipantAvatars(payload);
@@ -443,6 +462,22 @@ function renderLearningSpaceUpdatedGroup(event: ActivityEventRow) {
       asOptionalString(payload.changeSummary) ??
       'Learning space details, participants, or schedule changed.',
     actionButton: sourceAction(event, payload, 'outline', 'Open learning space'),
+  } satisfies ActivityRenderResult;
+}
+
+function renderLearningSpaceUpdatedLeaf(event: ActivityEventRow) {
+  const payload = asRecord(event.payload);
+  return {
+    verb: 'class.updated',
+    leading: buildSystemLeadingAvatar(),
+    headline: {
+      primary: 'Learning space updated',
+      secondary: className(payload),
+    },
+    summary:
+      asOptionalString(payload.changeSummary) ??
+      asOptionalString(payload.subject) ??
+      'Learning space details updated.',
   } satisfies ActivityRenderResult;
 }
 
@@ -795,20 +830,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       renderGroup: (event) => renderClassCreatedGroup(event),
     },
     resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) => {
-      const payload = asRecord(event.payload);
-      const grouped = renderClassCreatedGroup(event);
-      return {
-        verb: 'class.created',
-        leading: grouped.leading,
-        headline: {
-          primary: 'Learning space created',
-          secondary: className(payload),
-        },
-        summary: grouped.summary,
-        actionButton: sourceAction(event, payload, 'outline', 'Open learning space'),
-      };
-    },
+    render: (event) => renderClassCreatedLeaf(event),
   },
   'class.updated': {
     eventType: 'class.updated',
@@ -821,20 +843,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       renderGroup: (event) => renderLearningSpaceUpdatedGroup(event),
     },
     resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) => {
-      const payload = asRecord(event.payload);
-      const grouped = renderLearningSpaceUpdatedGroup(event);
-      return {
-        verb: 'class.updated',
-        leading: grouped.leading,
-        headline: { primary: 'Learning space updated', secondary: className(payload) },
-        summary:
-          asOptionalString(payload.changeSummary) ??
-          asOptionalString(payload.subject) ??
-          'Learning space details updated.',
-        actionButton: sourceAction(event, payload, 'outline', 'Open learning space'),
-      };
-    },
+    render: (event) => renderLearningSpaceUpdatedLeaf(event),
   },
   'class.archived': {
     eventType: 'class.archived',

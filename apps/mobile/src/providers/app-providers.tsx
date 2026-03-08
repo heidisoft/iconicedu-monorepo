@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { UiTrackingContext } from '@iconicedu/ui-native';
+import { usePathname } from 'expo-router';
 import { AuthProvider } from '@/providers/auth-provider';
 import { QueryProvider } from '@/providers/query-provider';
 import { ThemeProvider } from '@/providers/theme-provider';
@@ -10,14 +11,21 @@ import { CrashBoundary } from '@/components/analytics/crash-boundary';
 /**
  * Wires the vendor-agnostic UiTrackingContext so all ui-native Buttons and
  * IconButtons automatically fire analytics events without touching PostHog directly.
+ * Enriches every event with screen_name from the current route.
  * Must be mounted inside AnalyticsProvider.
  */
 function UiTrackingBridge({ children }: { children: React.ReactNode }) {
   const analytics = useAnalytics();
+  const pathname = usePathname();
+
+  const capture = useCallback(
+    (event: string, props?: Record<string, unknown>) =>
+      analytics.capture(event, { screen_name: pathname, ...props }),
+    [analytics, pathname],
+  );
+
   return (
-    <UiTrackingContext.Provider value={analytics.capture}>
-      {children}
-    </UiTrackingContext.Provider>
+    <UiTrackingContext.Provider value={capture}>{children}</UiTrackingContext.Provider>
   );
 }
 

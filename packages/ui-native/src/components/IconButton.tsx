@@ -48,7 +48,7 @@ export const IconButton: React.FC<IconButtonProps> = ({
 
   const handlePress = useCallback(
     (e: GestureResponderEvent) => {
-      track('button_clicked', { label });
+      track('button clicked', { button_name: label, component_type: 'icon_button' });
       onPress?.(e);
     },
     [track, label, onPress],

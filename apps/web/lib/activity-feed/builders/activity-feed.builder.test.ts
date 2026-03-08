@@ -205,7 +205,7 @@ describe('buildActivityFeedForProfile', () => {
     ]);
   });
 
-  it('does not repeat parent item as a child activity', async () => {
+  it('shows all grouped leaf items even when one matches the parent headline', async () => {
     getActivityFeedItemsByOrg.mockResolvedValue({
       data: [
         {
@@ -292,6 +292,7 @@ describe('buildActivityFeedForProfile', () => {
 
     expect(group.subActivities?.items.map((item) => item.ids.id)).toEqual([
       'item-actual-child',
+      'item-duplicate-parent',
     ]);
   });
 

@@ -36,8 +36,7 @@ export function getInitialGroupCollapsedState(activity: ActivityFeedGroupItemVM)
     return false;
   }
 
-  // Inbox groups should show child activities immediately instead of hiding them behind a toggle.
-  return false;
+  return true;
 }
 
 export function ActivityWithSubitems({
