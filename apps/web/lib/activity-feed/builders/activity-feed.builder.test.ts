@@ -474,4 +474,215 @@ describe('buildActivityFeedForProfile', () => {
     });
     expect(feed.unreadCount).toBe(1);
   });
+
+  it('updates grouped DM parent headline with sender and direct message count', async () => {
+    getActivityFeedItemsByOrg.mockResolvedValue({
+      data: [
+        {
+          id: 'group-dm-1',
+          org_id: 'org-1',
+          recipient_profile_id: 'profile-1',
+          kind: 'group',
+          occurred_at: '2026-03-07T16:00:00.000Z',
+          created_at: '2026-03-07T16:00:00.000Z',
+          tab_key: 'all',
+          audience: {
+            scope: { kind: 'channel', channelId: 'channel-dm-1' },
+            visibility: 'scope_only',
+          },
+          verb: 'dms.posted',
+          actor_profile_id: 'actor-1',
+          refs: {},
+          group_key: 'dm-posted:channel-dm-1:2026-03-07T16',
+          group_type: 'message',
+          content: {
+            headline: {
+              primary: 'Sender sent you direct messages',
+              secondary: 'Priya + Riley',
+            },
+          },
+          sub_activity_count: 2,
+          updated_at: '2026-03-07T16:00:00.000Z',
+        },
+        {
+          id: 'dm-item-1',
+          org_id: 'org-1',
+          recipient_profile_id: 'profile-1',
+          kind: 'leaf',
+          occurred_at: '2026-03-07T15:59:00.000Z',
+          created_at: '2026-03-07T15:59:00.000Z',
+          tab_key: 'all',
+          audience: {
+            scope: { kind: 'channel', channelId: 'channel-dm-1' },
+            visibility: 'scope_only',
+          },
+          verb: 'dm.posted',
+          actor_profile_id: 'actor-1',
+          refs: {},
+          content: {
+            headline: {
+              primary: 'Sender sent you a direct message',
+              secondary: 'Priya + Riley',
+            },
+          },
+          updated_at: '2026-03-07T15:59:00.000Z',
+        },
+        {
+          id: 'dm-item-2',
+          org_id: 'org-1',
+          recipient_profile_id: 'profile-1',
+          kind: 'leaf',
+          occurred_at: '2026-03-07T15:58:00.000Z',
+          created_at: '2026-03-07T15:58:00.000Z',
+          tab_key: 'all',
+          audience: {
+            scope: { kind: 'channel', channelId: 'channel-dm-1' },
+            visibility: 'scope_only',
+          },
+          verb: 'dm.posted',
+          actor_profile_id: 'actor-1',
+          refs: {},
+          content: {
+            headline: {
+              primary: 'Sender sent you a direct message',
+              secondary: 'Priya + Riley',
+            },
+          },
+          updated_at: '2026-03-07T15:58:00.000Z',
+        },
+      ],
+    });
+    getActivityFeedGroupMembersByGroupIds.mockResolvedValue({
+      data: [
+        { group_id: 'group-dm-1', item_id: 'dm-item-1' },
+        { group_id: 'group-dm-1', item_id: 'dm-item-2' },
+      ],
+    });
+
+    const feed = await buildActivityFeedForProfile({} as never, 'org-1', 'profile-1');
+    const group = feed.sections[0]?.items.find((item) => item.kind === 'group');
+    if (!group || group.kind !== 'group') {
+      throw new Error('Expected grouped item');
+    }
+
+    expect(group.content.headline.primary).toBe('Educator sent you 2 direct messages');
+    expect(group.content.headline.secondary).toBe('Priya + Riley');
+  });
+
+  it('keeps DM parent count based on dm.posted leaves when reaction leaves are present', async () => {
+    getActivityFeedItemsByOrg.mockResolvedValue({
+      data: [
+        {
+          id: 'group-dm-2',
+          org_id: 'org-1',
+          recipient_profile_id: 'profile-1',
+          kind: 'group',
+          occurred_at: '2026-03-07T16:00:00.000Z',
+          created_at: '2026-03-07T16:00:00.000Z',
+          tab_key: 'all',
+          audience: {
+            scope: { kind: 'channel', channelId: 'channel-dm-1' },
+            visibility: 'scope_only',
+          },
+          verb: 'dms.posted',
+          actor_profile_id: 'actor-1',
+          refs: {},
+          group_key: 'dm-posted:channel-dm-1:2026-03-07T16',
+          group_type: 'message',
+          content: {
+            headline: {
+              primary: 'Sender sent you direct messages',
+              secondary: 'Priya + Riley',
+            },
+          },
+          sub_activity_count: 3,
+          updated_at: '2026-03-07T16:00:00.000Z',
+        },
+        {
+          id: 'dm-item-msg-1',
+          org_id: 'org-1',
+          recipient_profile_id: 'profile-1',
+          kind: 'leaf',
+          occurred_at: '2026-03-07T15:59:00.000Z',
+          created_at: '2026-03-07T15:59:00.000Z',
+          tab_key: 'all',
+          audience: {
+            scope: { kind: 'channel', channelId: 'channel-dm-1' },
+            visibility: 'scope_only',
+          },
+          verb: 'dm.posted',
+          actor_profile_id: 'actor-1',
+          refs: {},
+          content: {
+            headline: {
+              primary: 'Sender sent you a direct message',
+              secondary: 'Priya + Riley',
+            },
+          },
+          updated_at: '2026-03-07T15:59:00.000Z',
+        },
+        {
+          id: 'dm-item-msg-2',
+          org_id: 'org-1',
+          recipient_profile_id: 'profile-1',
+          kind: 'leaf',
+          occurred_at: '2026-03-07T15:58:00.000Z',
+          created_at: '2026-03-07T15:58:00.000Z',
+          tab_key: 'all',
+          audience: {
+            scope: { kind: 'channel', channelId: 'channel-dm-1' },
+            visibility: 'scope_only',
+          },
+          verb: 'dm.posted',
+          actor_profile_id: 'actor-1',
+          refs: {},
+          content: {
+            headline: {
+              primary: 'Sender sent you a direct message',
+              secondary: 'Priya + Riley',
+            },
+          },
+          updated_at: '2026-03-07T15:58:00.000Z',
+        },
+        {
+          id: 'dm-item-reaction',
+          org_id: 'org-1',
+          recipient_profile_id: 'profile-1',
+          kind: 'leaf',
+          occurred_at: '2026-03-07T15:57:00.000Z',
+          created_at: '2026-03-07T15:57:00.000Z',
+          tab_key: 'all',
+          audience: {
+            scope: { kind: 'channel', channelId: 'channel-dm-1' },
+            visibility: 'scope_only',
+          },
+          verb: 'dm.reaction.added',
+          actor_profile_id: 'actor-1',
+          refs: {},
+          content: {
+            headline: {
+              primary: 'Sender reacted 👍 to your direct message',
+              secondary: 'Priya + Riley',
+            },
+          },
+          updated_at: '2026-03-07T15:57:00.000Z',
+        },
+      ],
+    });
+    getActivityFeedGroupMembersByGroupIds.mockResolvedValue({
+      data: [
+        { group_id: 'group-dm-2', item_id: 'dm-item-msg-1' },
+        { group_id: 'group-dm-2', item_id: 'dm-item-msg-2' },
+        { group_id: 'group-dm-2', item_id: 'dm-item-reaction' },
+      ],
+    });
+
+    const feed = await buildActivityFeedForProfile({} as never, 'org-1', 'profile-1');
+    const group = feed.sections[0]?.items.find((item) => item.kind === 'group');
+    if (!group || group.kind !== 'group') {
+      throw new Error('Expected grouped item');
+    }
+
+    expect(group.content.headline.primary).toBe('Educator sent you 2 direct messages');
+  });
 });

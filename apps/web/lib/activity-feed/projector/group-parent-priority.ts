@@ -8,6 +8,7 @@ const GROUP_PARENT_PRIORITY: Array<{
   prefix: string;
   preferredVerb: string;
 }> = [
+  { prefix: 'dm-posted:', preferredVerb: 'dms.posted' },
   { prefix: 'class-created:', preferredVerb: 'class.created' },
   { prefix: 'class-updated:', preferredVerb: 'class.updated' },
 ];

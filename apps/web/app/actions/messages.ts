@@ -266,10 +266,14 @@ async function createChannelMessageActivity(input: {
   activityContext: ActivityChannelContext;
   now: string;
 }) {
+  const isDmRoute = input.activityContext.channelRouteKind === 'dm';
+  const eventType = isDmRoute ? 'dm.posted' : 'message.posted';
+  const dedupePrefix = isDmRoute ? 'dm.posted' : 'message.posted';
+
   await publishActivityEvent({
     supabase: input.serviceSupabase,
     orgId: input.orgId,
-    eventType: 'message.posted',
+    eventType,
     occurredAt: input.now,
     sourceKind: 'profile',
     actorProfileId: input.senderProfileId,
@@ -288,7 +292,7 @@ async function createChannelMessageActivity(input: {
       channelTopic: input.activityContext.channelTopic ?? null,
       channelRouteKind: input.activityContext.channelRouteKind,
     },
-    dedupeKey: `message.posted:${input.messageId}`,
+    dedupeKey: `${dedupePrefix}:${input.messageId}`,
     createdBy: input.senderProfileId,
   });
 }
@@ -363,6 +367,7 @@ async function createFileUploadActivity(input: {
   orgId: string;
   channelId: string;
   senderProfileId: string;
+  senderName: string;
   messageId: string;
   name: string;
   content?: string | null;
@@ -372,10 +377,21 @@ async function createFileUploadActivity(input: {
   activityContext: ActivityChannelContext;
   now: string;
 }) {
+  const isDmRoute = input.activityContext.channelRouteKind === 'dm';
+  const eventType = isDmRoute ? 'dm.posted' : 'file.uploaded';
+  const dedupePrefix = isDmRoute ? 'dm.posted' : 'file.uploaded';
+  const activityContent = input.content?.trim() || input.name;
+  const dmMessageKind =
+    typeof input.mimeType === 'string' && input.mimeType.startsWith('image/')
+      ? 'image'
+      : typeof input.mimeType === 'string' && input.mimeType.startsWith('audio/')
+        ? 'audio'
+        : 'file';
+
   await publishActivityEvent({
     supabase: input.serviceSupabase,
     orgId: input.orgId,
-    eventType: 'file.uploaded',
+    eventType,
     occurredAt: input.now,
     sourceKind: 'profile',
     actorProfileId: input.senderProfileId,
@@ -385,17 +401,19 @@ async function createFileUploadActivity(input: {
     payload: {
       channelId: input.channelId,
       messageId: input.messageId,
+      senderName: input.senderName,
+      content: activityContent,
       name: input.name,
-      content: input.content ?? null,
       mimeType: input.mimeType ?? null,
       storagePath: input.storagePath ?? null,
       fileCount: input.fileCount ?? 1,
+      dmMessageKind,
       learningSpaceId: input.activityContext.learningSpaceId ?? null,
       learningSpaceTitle: input.activityContext.learningSpaceTitle ?? null,
       channelTopic: input.activityContext.channelTopic ?? null,
       channelRouteKind: input.activityContext.channelRouteKind,
     },
-    dedupeKey: `file.uploaded:${input.messageId}`,
+    dedupeKey: `${dedupePrefix}:${input.messageId}`,
     createdBy: input.senderProfileId,
   });
 }
@@ -654,6 +672,237 @@ async function bumpThreadReplyCount(input: {
   if (updateThread.error) {
     throw new Error(updateThread.error.message);
   }
+}
+
+async function recallMessageActivities(input: {
+  serviceSupabase: SupabaseServiceClient;
+  orgId: string;
+  messageId: string;
+  actorProfileId: string;
+  now: string;
+}) {
+  const eventIdsResponse = await input.serviceSupabase
+    .from('activity_events')
+    .select('id')
+    .eq('org_id', input.orgId)
+    .contains('object_ref', { kind: 'message', id: input.messageId })
+    .is('deleted_at', null)
+    .returns<Array<{ id: string }>>();
+
+  if (eventIdsResponse.error) {
+    throw new Error(eventIdsResponse.error.message);
+  }
+
+  const eventIds = (eventIdsResponse.data ?? []).map((row) => row.id);
+  if (!eventIds.length) {
+    return;
+  }
+
+  const softDeleteAudit = {
+    deleted_at: input.now,
+    deleted_by: input.actorProfileId,
+    updated_at: input.now,
+    updated_by: input.actorProfileId,
+  };
+
+  const deleteEventsResponse = await input.serviceSupabase
+    .from('activity_events')
+    .update(softDeleteAudit)
+    .eq('org_id', input.orgId)
+    .in('id', eventIds)
+    .is('deleted_at', null);
+
+  if (deleteEventsResponse.error) {
+    throw new Error(deleteEventsResponse.error.message);
+  }
+
+  const itemIdsResponse = await input.serviceSupabase
+    .from('activity_feed_items')
+    .select('id')
+    .eq('org_id', input.orgId)
+    .in('source_event_id', eventIds)
+    .is('deleted_at', null)
+    .returns<Array<{ id: string }>>();
+
+  if (itemIdsResponse.error) {
+    throw new Error(itemIdsResponse.error.message);
+  }
+
+  const itemIds = (itemIdsResponse.data ?? []).map((row) => row.id);
+  if (!itemIds.length) {
+    return;
+  }
+
+  const deleteItemsResponse = await input.serviceSupabase
+    .from('activity_feed_items')
+    .update(softDeleteAudit)
+    .eq('org_id', input.orgId)
+    .in('id', itemIds)
+    .is('deleted_at', null);
+
+  if (deleteItemsResponse.error) {
+    throw new Error(deleteItemsResponse.error.message);
+  }
+
+  const groupMembersResponse = await input.serviceSupabase
+    .from('activity_feed_group_members')
+    .select('group_id,item_id')
+    .eq('org_id', input.orgId)
+    .in('item_id', itemIds)
+    .is('deleted_at', null)
+    .returns<Array<{ group_id: string; item_id: string }>>();
+
+  if (groupMembersResponse.error) {
+    throw new Error(groupMembersResponse.error.message);
+  }
+
+  const touchedGroupIds = Array.from(
+    new Set((groupMembersResponse.data ?? []).map((row) => row.group_id)),
+  );
+  if (!touchedGroupIds.length) {
+    return;
+  }
+
+  const deleteGroupMembersResponse = await input.serviceSupabase
+    .from('activity_feed_group_members')
+    .update(softDeleteAudit)
+    .eq('org_id', input.orgId)
+    .in('item_id', itemIds)
+    .is('deleted_at', null);
+
+  if (deleteGroupMembersResponse.error) {
+    throw new Error(deleteGroupMembersResponse.error.message);
+  }
+
+  for (const groupId of touchedGroupIds) {
+    const remainingMembersResponse = await input.serviceSupabase
+      .from('activity_feed_group_members')
+      .select('id')
+      .eq('org_id', input.orgId)
+      .eq('group_id', groupId)
+      .is('deleted_at', null)
+      .returns<Array<{ id: string }>>();
+
+    if (remainingMembersResponse.error) {
+      throw new Error(remainingMembersResponse.error.message);
+    }
+
+    const remainingCount = remainingMembersResponse.data?.length ?? 0;
+    if (remainingCount === 0) {
+      const deleteGroupResponse = await input.serviceSupabase
+        .from('activity_feed_items')
+        .update(softDeleteAudit)
+        .eq('org_id', input.orgId)
+        .eq('id', groupId)
+        .eq('kind', 'group')
+        .is('deleted_at', null);
+
+      if (deleteGroupResponse.error) {
+        throw new Error(deleteGroupResponse.error.message);
+      }
+      continue;
+    }
+
+    const updateGroupCountResponse = await input.serviceSupabase
+      .from('activity_feed_items')
+      .update({
+        sub_activity_count: remainingCount,
+        updated_at: input.now,
+        updated_by: input.actorProfileId,
+      })
+      .eq('org_id', input.orgId)
+      .eq('id', groupId)
+      .eq('kind', 'group')
+      .is('deleted_at', null);
+
+    if (updateGroupCountResponse.error) {
+      throw new Error(updateGroupCountResponse.error.message);
+    }
+  }
+}
+
+async function emitDmReactionActivity(input: {
+  supabase: SupabaseServerClient;
+  serviceSupabase: SupabaseServiceClient;
+  orgId: string;
+  messageId: string;
+  channelId?: string | null;
+  senderProfileId: string;
+  emoji: string;
+  eventType: 'dm.reaction.added' | 'dm.reaction.removed';
+  now: string;
+}) {
+  if (!input.channelId) {
+    return;
+  }
+
+  const activityContext = await resolveActivityChannelContext({
+    supabase: input.supabase,
+    orgId: input.orgId,
+    channelId: input.channelId,
+  });
+
+  if (activityContext.channelRouteKind !== 'dm') {
+    return;
+  }
+
+  const sender = await buildUserProfileById(input.supabase, input.senderProfileId);
+  const senderName =
+    ('profile' in (sender ?? {}) &&
+    sender?.profile &&
+    typeof sender.profile === 'object' &&
+    'displayName' in sender.profile &&
+    typeof sender.profile.displayName === 'string'
+      ? sender.profile.displayName
+      : undefined) ?? 'Someone';
+
+  const membersResponse = await input.supabase
+    .from('channel_members')
+    .select('profile_id')
+    .eq('org_id', input.orgId)
+    .eq('channel_id', input.channelId)
+    .is('deleted_at', null)
+    .returns<Array<{ profile_id: string }>>();
+
+  if (membersResponse.error) {
+    throw new Error(membersResponse.error.message);
+  }
+
+  const recipientIds = Array.from(
+    new Set(
+      (membersResponse.data ?? [])
+        .map((row) => row.profile_id)
+        .filter((id) => id && id !== input.senderProfileId),
+    ),
+  );
+
+  if (!recipientIds.length) {
+    return;
+  }
+
+  await publishActivityEvent({
+    supabase: input.serviceSupabase,
+    orgId: input.orgId,
+    eventType: input.eventType,
+    occurredAt: input.now,
+    sourceKind: 'profile',
+    actorProfileId: input.senderProfileId,
+    scope: activityContext.scope,
+    objectRef: { kind: 'message', id: input.messageId },
+    targetRef: activityContext.targetRef,
+    audienceRules: [{ kind: 'users_only', userIds: recipientIds }],
+    payload: {
+      channelId: input.channelId,
+      messageId: input.messageId,
+      senderName,
+      emoji: input.emoji,
+      channelTopic: activityContext.channelTopic ?? null,
+      channelRouteKind: activityContext.channelRouteKind,
+      learningSpaceId: activityContext.learningSpaceId ?? null,
+      learningSpaceTitle: activityContext.learningSpaceTitle ?? null,
+    },
+    createdBy: input.senderProfileId,
+  });
 }
 
 export async function sendTextMessageAction(
@@ -1118,17 +1367,26 @@ export async function sendFileMessageAction(
   if (!sender) {
     throw new Error('Sender not found');
   }
+  const senderDisplayName =
+    ('profile' in sender &&
+    sender.profile &&
+    typeof sender.profile === 'object' &&
+    'displayName' in sender.profile &&
+    typeof sender.profile.displayName === 'string'
+      ? sender.profile.displayName
+      : undefined) ?? 'Someone';
 
   const thread = threadId
     ? await buildThreadById(supabase, accountResponse.data.org_id, threadId)
     : null;
 
-  if (!isAudioUpload) {
+  if (!isAudioUpload || activityContext.channelRouteKind === 'dm') {
     await createFileUploadActivity({
       serviceSupabase,
       orgId: input.orgId,
       channelId: input.channelId,
       senderProfileId: currentProfileId,
+      senderName: senderDisplayName,
       messageId: messageInsert.data.id,
       name: input.name,
       content: input.content?.trim() ?? null,
@@ -1347,6 +1605,14 @@ export async function sendFilesMessageAction(
   if (!sender) {
     throw new Error('Sender not found');
   }
+  const senderDisplayName =
+    ('profile' in sender &&
+    sender.profile &&
+    typeof sender.profile === 'object' &&
+    'displayName' in sender.profile &&
+    typeof sender.profile.displayName === 'string'
+      ? sender.profile.displayName
+      : undefined) ?? 'Someone';
 
   const thread = threadId
     ? await buildThreadById(supabase, accountResponse.data.org_id, threadId)
@@ -1357,6 +1623,7 @@ export async function sendFilesMessageAction(
     orgId: input.orgId,
     channelId: input.channelId,
     senderProfileId: currentProfileId,
+    senderName: senderDisplayName,
     messageId: messageInsert.data.id,
     name:
       input.assets.length > 1
@@ -1393,6 +1660,7 @@ export async function toggleMessageReactionAction(
   input: MessageToggleReactionInput,
 ): Promise<void> {
   const supabase = await createSupabaseServerClient();
+  const serviceSupabase = createSupabaseServiceClient();
   const authUser = await requireAuthedUser(supabase);
   const accountResponse = await getAccountByAuthUserId(supabase, authUser.id);
 
@@ -1410,12 +1678,17 @@ export async function toggleMessageReactionAction(
 
   const messageResponse = await supabase
     .from('messages')
-    .select('id, org_id')
+    .select('id, org_id, channel_id')
     .eq('id', input.messageId)
-    .maybeSingle<{ id: string; org_id: string }>();
+    .maybeSingle<{ id: string; org_id: string; channel_id?: string | null }>();
 
   if (!messageResponse.data || messageResponse.data.org_id !== input.orgId) {
     throw new Error('Message not found');
+  }
+
+  const profileResponse = await getProfileByAccountId(supabase, accountResponse.data.id);
+  if (!profileResponse.data) {
+    throw new Error('Profile not found');
   }
 
   const reactionResponse = await supabase
@@ -1467,6 +1740,18 @@ export async function toggleMessageReactionAction(
       }
     }
 
+    await emitDmReactionActivity({
+      supabase,
+      serviceSupabase,
+      orgId: input.orgId,
+      messageId: input.messageId,
+      channelId: messageResponse.data.channel_id ?? null,
+      senderProfileId: profileResponse.data.id,
+      emoji: input.emoji,
+      eventType: 'dm.reaction.removed',
+      now: new Date().toISOString(),
+    });
+
     return;
   }
 
@@ -1492,6 +1777,18 @@ export async function toggleMessageReactionAction(
     if (updateCount.error) {
       throw new Error(updateCount.error.message);
     }
+
+    await emitDmReactionActivity({
+      supabase,
+      serviceSupabase,
+      orgId: input.orgId,
+      messageId: input.messageId,
+      channelId: messageResponse.data.channel_id ?? null,
+      senderProfileId: profileResponse.data.id,
+      emoji: input.emoji,
+      eventType: 'dm.reaction.added',
+      now,
+    });
     return;
   }
 
@@ -1507,6 +1804,18 @@ export async function toggleMessageReactionAction(
   if (insertCount.error) {
     throw new Error(insertCount.error.message);
   }
+
+  await emitDmReactionActivity({
+    supabase,
+    serviceSupabase,
+    orgId: input.orgId,
+    messageId: input.messageId,
+    channelId: messageResponse.data.channel_id ?? null,
+    senderProfileId: profileResponse.data.id,
+    emoji: input.emoji,
+    eventType: 'dm.reaction.added',
+    now,
+  });
 }
 
 export async function deleteMessageAction(input: {
@@ -1561,6 +1870,14 @@ export async function deleteMessageAction(input: {
   if (deleteResult.error) {
     throw new Error(deleteResult.error.message);
   }
+
+  await recallMessageActivities({
+    serviceSupabase,
+    orgId: input.orgId,
+    messageId: input.messageId,
+    actorProfileId: profileResponse.data.id,
+    now,
+  });
 }
 
 export async function toggleHiddenMessageAction(input: {

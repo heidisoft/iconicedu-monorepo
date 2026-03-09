@@ -3,6 +3,144 @@ import { describe, expect, it } from 'vitest';
 import { getActivityEventDefinition } from '@iconicedu/web/lib/activity-feed/definitions/activity-definitions';
 
 describe('activity event definitions', () => {
+  it('renders direct message activity headline and no action button', () => {
+    const definition = getActivityEventDefinition('dm.posted');
+    if (!definition) {
+      throw new Error('Missing dm.posted definition');
+    }
+
+    const rendered = definition.render({
+      id: 'event-dm-1',
+      org_id: 'org-1',
+      event_type: 'dm.posted',
+      occurred_at: '2026-03-03T12:00:00.000Z',
+      source_kind: 'profile',
+      actor_profile_id: 'profile-1',
+      scope: { kind: 'channel', channelId: 'channel-dm-1' },
+      object_ref: { kind: 'message', id: 'message-1' },
+      target_ref: null,
+      payload: {
+        channelId: 'channel-dm-1',
+        messageId: 'message-1',
+        senderName: 'Jane',
+        content: 'Hello there',
+        channelRouteKind: 'dm',
+      },
+      audience_rules: [],
+      dedupe_key: 'dm.posted:message-1',
+      projection_status: 'pending',
+      projection_attempts: 0,
+      created_at: '2026-03-03T12:00:00.000Z',
+      updated_at: '2026-03-03T12:00:00.000Z',
+    });
+
+    expect(rendered.headline.primary).toBe('Jane sent you a direct message');
+    expect(rendered.actionButton).toBeUndefined();
+  });
+
+  it('groups direct messages by channel and hour', () => {
+    const definition = getActivityEventDefinition('dm.posted');
+    if (!definition || !definition.group) {
+      throw new Error('Missing dm.posted grouping');
+    }
+
+    const key = definition.group.buildGroupKey({
+      id: 'event-dm-2',
+      org_id: 'org-1',
+      event_type: 'dm.posted',
+      occurred_at: '2026-03-03T12:45:00.000Z',
+      source_kind: 'profile',
+      actor_profile_id: 'profile-1',
+      scope: { kind: 'channel', channelId: 'channel-dm-1' },
+      object_ref: { kind: 'message', id: 'message-2' },
+      target_ref: null,
+      payload: {
+        channelId: 'channel-dm-1',
+        messageId: 'message-2',
+        senderName: 'Jane',
+        content: 'Second message',
+        channelRouteKind: 'dm',
+      },
+      audience_rules: [],
+      dedupe_key: 'dm.posted:message-2',
+      projection_status: 'pending',
+      projection_attempts: 0,
+      created_at: '2026-03-03T12:45:00.000Z',
+      updated_at: '2026-03-03T12:45:00.000Z',
+    });
+
+    expect(key).toBe('dm-posted:channel-dm-1:2026-03-03T12');
+  });
+
+  it('renders direct message reaction added activity', () => {
+    const definition = getActivityEventDefinition('dm.reaction.added');
+    if (!definition) {
+      throw new Error('Missing dm.reaction.added definition');
+    }
+
+    const rendered = definition.render({
+      id: 'event-dm-reaction-1',
+      org_id: 'org-1',
+      event_type: 'dm.reaction.added',
+      occurred_at: '2026-03-03T12:00:00.000Z',
+      source_kind: 'profile',
+      actor_profile_id: 'profile-1',
+      scope: { kind: 'channel', channelId: 'channel-dm-1' },
+      object_ref: { kind: 'message', id: 'message-1' },
+      target_ref: null,
+      payload: {
+        channelId: 'channel-dm-1',
+        messageId: 'message-1',
+        senderName: 'Jane',
+        emoji: '👍',
+        channelRouteKind: 'dm',
+      },
+      audience_rules: [],
+      dedupe_key: null,
+      projection_status: 'pending',
+      projection_attempts: 0,
+      created_at: '2026-03-03T12:00:00.000Z',
+      updated_at: '2026-03-03T12:00:00.000Z',
+    });
+
+    expect(rendered.headline.primary).toBe('Jane reacted 👍 to your direct message');
+    expect(rendered.actionButton).toBeUndefined();
+  });
+
+  it('groups direct message reactions into the dm posted hourly group key', () => {
+    const definition = getActivityEventDefinition('dm.reaction.added');
+    if (!definition || !definition.group) {
+      throw new Error('Missing dm.reaction.added grouping');
+    }
+
+    const key = definition.group.buildGroupKey({
+      id: 'event-dm-reaction-2',
+      org_id: 'org-1',
+      event_type: 'dm.reaction.added',
+      occurred_at: '2026-03-03T12:25:00.000Z',
+      source_kind: 'profile',
+      actor_profile_id: 'profile-1',
+      scope: { kind: 'channel', channelId: 'channel-dm-1' },
+      object_ref: { kind: 'message', id: 'message-2' },
+      target_ref: null,
+      payload: {
+        channelId: 'channel-dm-1',
+        messageId: 'message-2',
+        senderName: 'Jane',
+        emoji: '👍',
+        channelRouteKind: 'dm',
+      },
+      audience_rules: [],
+      dedupe_key: null,
+      projection_status: 'pending',
+      projection_attempts: 0,
+      created_at: '2026-03-03T12:25:00.000Z',
+      updated_at: '2026-03-03T12:25:00.000Z',
+    });
+
+    expect(key).toBe('dm-posted:channel-dm-1:2026-03-03T12');
+  });
+
   it('adds a channel link for posted messages', () => {
     const definition = getActivityEventDefinition('message.posted');
     if (!definition) {

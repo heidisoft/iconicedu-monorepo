@@ -288,8 +288,8 @@ describe('sendTextMessageAction', () => {
 
     expect(publishActivityEvent).toHaveBeenCalledWith(
       expect.objectContaining({
-        eventType: 'message.posted',
-        dedupeKey: 'message.posted:message-dm-1',
+        eventType: 'dm.posted',
+        dedupeKey: 'dm.posted:message-dm-1',
         payload: expect.objectContaining({
           channelRouteKind: 'dm',
           channelTopic: 'Priya + Riley',
@@ -904,6 +904,187 @@ describe('sendTextMessageAction', () => {
     );
     expect(publishActivityEvent).not.toHaveBeenCalled();
     expect(result).toEqual({ ids: { id: 'audio-message-1', orgId: 'org-1' } });
+  });
+
+  it('emits dm.posted for direct-message file uploads', async () => {
+    const supabase = {
+      from: vi.fn(),
+      storage: {
+        from: vi.fn(() => ({
+          createSignedUrl: vi.fn(async () => ({
+            data: { signedUrl: 'https://signed.example.com/channel-files/brief.pdf' },
+            error: null,
+          })),
+        })),
+      },
+    };
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    const { createSupabaseServiceClient } =
+      await import('@iconicedu/web/lib/supabase/service');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
+    (
+      createSupabaseServiceClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue({
+      from: vi.fn(),
+    });
+
+    const insertMessage = vi.fn().mockReturnValue({
+      select: () => ({
+        single: async () => ({
+          data: {
+            id: 'file-message-dm-1',
+            org_id: 'org-1',
+            channel_id: 'channel-dm-1',
+            sender_profile_id: 'profile-1',
+            type: 'file',
+            created_at: new Date().toISOString(),
+          },
+          error: null,
+        }),
+      }),
+    });
+    const insertMessageFile = vi.fn(async () => ({ error: null }));
+    const insertChannelFile = vi.fn(async () => ({ error: null }));
+    const channelLookup = createChannelLookupChain({
+      id: 'channel-dm-1',
+      kind: 'dm',
+      topic: 'Priya + Riley',
+      primary_entity_kind: null,
+      primary_entity_id: null,
+    });
+
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'channels') return { select: () => channelLookup };
+      if (table === 'messages') return { insert: insertMessage };
+      if (table === 'message_file') return { insert: insertMessageFile };
+      if (table === 'channel_files') return { insert: insertChannelFile };
+      return {};
+    });
+
+    buildUserProfileById.mockResolvedValueOnce({
+      ids: { id: 'profile-1', orgId: 'org-1' },
+      profile: { displayName: 'Priya' },
+    });
+    mapMessageRowToVM.mockReturnValueOnce({
+      ids: { id: 'file-message-dm-1', orgId: 'org-1' },
+    });
+
+    await sendFileMessageAction({
+      orgId: 'org-1',
+      channelId: 'channel-dm-1',
+      senderProfileId: 'profile-1',
+      name: 'brief.pdf',
+      storagePath: 'org-1/channel-dm-1/files/profile-1/brief.pdf',
+      size: 11,
+      mimeType: 'application/pdf',
+      content: 'See attached',
+    });
+
+    expect(publishActivityEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'dm.posted',
+        dedupeKey: 'dm.posted:file-message-dm-1',
+        payload: expect.objectContaining({
+          channelRouteKind: 'dm',
+          dmMessageKind: 'file',
+          senderName: 'Priya',
+        }),
+      }),
+    );
+  });
+
+  it('emits dm.posted for direct-message audio uploads', async () => {
+    const supabase = {
+      from: vi.fn(),
+      storage: {
+        from: vi.fn(() => ({
+          createSignedUrl: vi.fn(async () => ({
+            data: { signedUrl: 'https://signed.example.com/channel-files/voice.webm' },
+            error: null,
+          })),
+        })),
+      },
+    };
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    const { createSupabaseServiceClient } =
+      await import('@iconicedu/web/lib/supabase/service');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
+    (
+      createSupabaseServiceClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue({
+      from: vi.fn(),
+    });
+
+    const insertMessage = vi.fn().mockReturnValue({
+      select: () => ({
+        single: async () => ({
+          data: {
+            id: 'audio-message-dm-1',
+            org_id: 'org-1',
+            channel_id: 'channel-dm-1',
+            sender_profile_id: 'profile-1',
+            type: 'audio-recording',
+            created_at: new Date().toISOString(),
+          },
+          error: null,
+        }),
+      }),
+    });
+    const insertAudioRecording = vi.fn(async () => ({ error: null }));
+    const insertChannelFile = vi.fn(async () => ({ error: null }));
+    const channelLookup = createChannelLookupChain({
+      id: 'channel-dm-1',
+      kind: 'dm',
+      topic: 'Priya + Riley',
+      primary_entity_kind: null,
+      primary_entity_id: null,
+    });
+
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'channels') return { select: () => channelLookup };
+      if (table === 'messages') return { insert: insertMessage };
+      if (table === 'message_audio_recording') return { insert: insertAudioRecording };
+      if (table === 'channel_files') return { insert: insertChannelFile };
+      return {};
+    });
+
+    buildUserProfileById.mockResolvedValueOnce({
+      ids: { id: 'profile-1', orgId: 'org-1' },
+      profile: { displayName: 'Priya' },
+    });
+    mapMessageRowToVM.mockReturnValueOnce({
+      ids: { id: 'audio-message-dm-1', orgId: 'org-1' },
+    });
+
+    await sendFileMessageAction({
+      orgId: 'org-1',
+      channelId: 'channel-dm-1',
+      senderProfileId: 'profile-1',
+      name: 'voice-message.webm',
+      storagePath: 'org-1/channel-dm-1/audio/profile-1/voice-message.webm',
+      size: 55,
+      mimeType: 'audio/webm',
+      durationSeconds: 9,
+      content: 'Voice note',
+    });
+
+    expect(publishActivityEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'dm.posted',
+        dedupeKey: 'dm.posted:audio-message-dm-1',
+        payload: expect.objectContaining({
+          channelRouteKind: 'dm',
+          dmMessageKind: 'audio',
+          senderName: 'Priya',
+        }),
+      }),
+    );
   });
 
   it('stores grouped file uploads as one file message with multiple attachments', async () => {
@@ -1793,6 +1974,172 @@ describe('toggleMessageReactionAction', () => {
     expect(deleteReaction).toHaveBeenCalled();
     expect(deleteCount).toHaveBeenCalled();
   });
+
+  it('publishes dm.reaction.added for direct-message reactions', async () => {
+    const supabase = {
+      auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
+      from: vi.fn(),
+    };
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
+
+    const makeSelectChain = (response: { data: any }) => {
+      const chain: any = {};
+      chain.eq = vi.fn(() => chain);
+      chain.is = vi.fn(() => chain);
+      chain.maybeSingle = vi.fn(async () => response);
+      chain.returns = vi.fn(async () => response);
+      return chain;
+    };
+
+    const selectMessage = vi.fn().mockReturnValue(
+      makeSelectChain({
+        data: { id: 'message-1', org_id: 'org-1', channel_id: 'channel-dm-1' },
+      }),
+    );
+    const selectReaction = vi.fn().mockReturnValue(makeSelectChain({ data: null }));
+    const selectCount = vi.fn().mockReturnValue(makeSelectChain({ data: null }));
+    const insertReaction = vi.fn().mockResolvedValue({ error: null });
+    const insertCount = vi.fn().mockResolvedValue({ error: null });
+    const channelLookup = createChannelLookupChain({
+      id: 'channel-dm-1',
+      kind: 'dm',
+      topic: 'Priya + Riley',
+      primary_entity_kind: null,
+      primary_entity_id: null,
+    });
+    const channelMembersChain: any = {};
+    channelMembersChain.eq = vi.fn(() => channelMembersChain);
+    channelMembersChain.is = vi.fn(() => channelMembersChain);
+    channelMembersChain.returns = vi.fn(async () => ({
+      data: [{ profile_id: 'profile-1' }, { profile_id: 'profile-2' }],
+      error: null,
+    }));
+
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'messages') return { select: selectMessage };
+      if (table === 'message_reactions')
+        return { select: selectReaction, insert: insertReaction };
+      if (table === 'message_reaction_counts')
+        return { select: selectCount, insert: insertCount };
+      if (table === 'channels') return { select: () => channelLookup };
+      if (table === 'channel_members') return { select: () => channelMembersChain };
+      return {};
+    });
+    buildUserProfileById.mockResolvedValueOnce({
+      ids: { id: 'profile-1', orgId: 'org-1' },
+      profile: { displayName: 'Priya' },
+    });
+
+    const { toggleMessageReactionAction } =
+      await import('@iconicedu/web/app/actions/messages');
+    await toggleMessageReactionAction({
+      orgId: 'org-1',
+      messageId: 'message-1',
+      emoji: '👍',
+    });
+
+    expect(publishActivityEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'dm.reaction.added',
+        payload: expect.objectContaining({
+          messageId: 'message-1',
+          channelId: 'channel-dm-1',
+          senderName: 'Priya',
+          emoji: '👍',
+        }),
+        audienceRules: [{ kind: 'users_only', userIds: ['profile-2'] }],
+      }),
+    );
+  });
+
+  it('publishes dm.reaction.removed for direct-message reaction removals', async () => {
+    const supabase = {
+      auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
+      from: vi.fn(),
+    };
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
+
+    const makeSelectChain = (response: { data: any }) => {
+      const chain: any = {};
+      chain.eq = vi.fn(() => chain);
+      chain.is = vi.fn(() => chain);
+      chain.maybeSingle = vi.fn(async () => response);
+      chain.returns = vi.fn(async () => response);
+      return chain;
+    };
+
+    const selectMessage = vi.fn().mockReturnValue(
+      makeSelectChain({
+        data: { id: 'message-1', org_id: 'org-1', channel_id: 'channel-dm-1' },
+      }),
+    );
+    const selectReaction = vi
+      .fn()
+      .mockReturnValue(makeSelectChain({ data: { id: 'reaction-1' } }));
+    const selectCount = vi
+      .fn()
+      .mockReturnValue(makeSelectChain({ data: { id: 'count-1', count: 1 } }));
+    const deleteReaction = vi.fn().mockResolvedValue({ error: null });
+    const deleteCount = vi.fn().mockResolvedValue({ error: null });
+    const channelLookup = createChannelLookupChain({
+      id: 'channel-dm-1',
+      kind: 'dm',
+      topic: 'Priya + Riley',
+      primary_entity_kind: null,
+      primary_entity_id: null,
+    });
+    const channelMembersChain: any = {};
+    channelMembersChain.eq = vi.fn(() => channelMembersChain);
+    channelMembersChain.is = vi.fn(() => channelMembersChain);
+    channelMembersChain.returns = vi.fn(async () => ({
+      data: [{ profile_id: 'profile-1' }, { profile_id: 'profile-2' }],
+      error: null,
+    }));
+
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'messages') return { select: selectMessage };
+      if (table === 'message_reactions')
+        return { select: selectReaction, delete: () => ({ eq: deleteReaction }) };
+      if (table === 'message_reaction_counts')
+        return { select: selectCount, delete: () => ({ eq: deleteCount }) };
+      if (table === 'channels') return { select: () => channelLookup };
+      if (table === 'channel_members') return { select: () => channelMembersChain };
+      return {};
+    });
+    buildUserProfileById.mockResolvedValueOnce({
+      ids: { id: 'profile-1', orgId: 'org-1' },
+      profile: { displayName: 'Priya' },
+    });
+
+    const { toggleMessageReactionAction } =
+      await import('@iconicedu/web/app/actions/messages');
+    await toggleMessageReactionAction({
+      orgId: 'org-1',
+      messageId: 'message-1',
+      emoji: '👍',
+    });
+
+    expect(publishActivityEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'dm.reaction.removed',
+        payload: expect.objectContaining({
+          messageId: 'message-1',
+          channelId: 'channel-dm-1',
+          senderName: 'Priya',
+          emoji: '👍',
+        }),
+        audienceRules: [{ kind: 'users_only', userIds: ['profile-2'] }],
+      }),
+    );
+  });
 });
 
 describe('deleteMessageAction', () => {
@@ -1825,6 +2172,11 @@ describe('deleteMessageAction', () => {
     deleteUpdateChain.eq = vi.fn(() => deleteUpdateChain);
     deleteUpdateChain.is = vi.fn(async () => ({ error: null }));
     const updateMessage = vi.fn(() => deleteUpdateChain);
+    const activityEventSelectChain: any = {};
+    activityEventSelectChain.eq = vi.fn(() => activityEventSelectChain);
+    activityEventSelectChain.contains = vi.fn(() => activityEventSelectChain);
+    activityEventSelectChain.is = vi.fn(() => activityEventSelectChain);
+    activityEventSelectChain.returns = vi.fn(async () => ({ data: [], error: null }));
 
     supabase.from.mockImplementation((table: string) => {
       if (table === 'messages') {
@@ -1835,6 +2187,9 @@ describe('deleteMessageAction', () => {
     serviceSupabase.from.mockImplementation((table: string) => {
       if (table === 'messages') {
         return { update: updateMessage };
+      }
+      if (table === 'activity_events') {
+        return { select: () => activityEventSelectChain };
       }
       return {};
     });
@@ -1851,6 +2206,154 @@ describe('deleteMessageAction', () => {
     expect(deleteUpdateChain.eq).toHaveBeenCalledWith('org_id', 'org-1');
     expect(deleteUpdateChain.eq).toHaveBeenCalledWith('sender_profile_id', 'profile-1');
     expect(deleteUpdateChain.is).toHaveBeenCalledWith('deleted_at', null);
+  });
+
+  it('recalls related activity events/items and updates affected groups', async () => {
+    const supabase = {
+      auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
+      from: vi.fn(),
+    };
+    const serviceSupabase = {
+      from: vi.fn(),
+    };
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    const { createSupabaseServiceClient } =
+      await import('@iconicedu/web/lib/supabase/service');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
+    (
+      createSupabaseServiceClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(serviceSupabase);
+
+    const messageSelectChain: any = {};
+    messageSelectChain.eq = vi.fn(() => messageSelectChain);
+    messageSelectChain.maybeSingle = vi.fn(async () => ({
+      data: { id: 'message-1', org_id: 'org-1', sender_profile_id: 'profile-1' },
+    }));
+
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'messages') {
+        return { select: () => messageSelectChain };
+      }
+      return {};
+    });
+
+    const deleteMessageChain: any = {};
+    deleteMessageChain.eq = vi.fn(() => deleteMessageChain);
+    deleteMessageChain.is = vi.fn(async () => ({ error: null }));
+    const updateMessage = vi.fn(() => deleteMessageChain);
+
+    const activityEventSelectChain: any = {};
+    activityEventSelectChain.eq = vi.fn(() => activityEventSelectChain);
+    activityEventSelectChain.contains = vi.fn(() => activityEventSelectChain);
+    activityEventSelectChain.is = vi.fn(() => activityEventSelectChain);
+    activityEventSelectChain.returns = vi.fn(async () => ({
+      data: [{ id: 'event-1' }, { id: 'event-2' }],
+      error: null,
+    }));
+
+    const activityEventsUpdateChain: any = {};
+    activityEventsUpdateChain.eq = vi.fn(() => activityEventsUpdateChain);
+    activityEventsUpdateChain.in = vi.fn(() => activityEventsUpdateChain);
+    activityEventsUpdateChain.is = vi.fn(async () => ({ error: null }));
+    const updateActivityEvents = vi.fn(() => activityEventsUpdateChain);
+
+    const feedItemsSelectChain: any = {};
+    feedItemsSelectChain.eq = vi.fn(() => feedItemsSelectChain);
+    feedItemsSelectChain.in = vi.fn(() => feedItemsSelectChain);
+    feedItemsSelectChain.is = vi.fn(() => feedItemsSelectChain);
+    feedItemsSelectChain.returns = vi.fn(async () => ({
+      data: [{ id: 'leaf-1' }, { id: 'leaf-2' }],
+      error: null,
+    }));
+
+    const feedItemsDeleteChain: any = {};
+    feedItemsDeleteChain.eq = vi.fn(() => feedItemsDeleteChain);
+    feedItemsDeleteChain.in = vi.fn(() => feedItemsDeleteChain);
+    feedItemsDeleteChain.is = vi.fn(async () => ({ error: null }));
+    const updateFeedItems = vi.fn(() => feedItemsDeleteChain);
+
+    const feedItemsGroupUpdateChain: any = {};
+    feedItemsGroupUpdateChain.eq = vi.fn(() => feedItemsGroupUpdateChain);
+    feedItemsGroupUpdateChain.is = vi.fn(async () => ({ error: null }));
+    const updateFeedItemsForGroup = vi.fn(() => feedItemsGroupUpdateChain);
+
+    const groupMembersSelectChain: any = {};
+    groupMembersSelectChain.eq = vi.fn(() => groupMembersSelectChain);
+    groupMembersSelectChain.in = vi.fn(() => groupMembersSelectChain);
+    groupMembersSelectChain.is = vi.fn(() => groupMembersSelectChain);
+    groupMembersSelectChain.returns = vi.fn(async () => ({
+      data: [{ group_id: 'group-1', item_id: 'leaf-1' }],
+      error: null,
+    }));
+
+    const groupMembersDeleteChain: any = {};
+    groupMembersDeleteChain.eq = vi.fn(() => groupMembersDeleteChain);
+    groupMembersDeleteChain.in = vi.fn(() => groupMembersDeleteChain);
+    groupMembersDeleteChain.is = vi.fn(async () => ({ error: null }));
+    const updateGroupMembers = vi.fn(() => groupMembersDeleteChain);
+
+    const remainingGroupMembersChain: any = {};
+    remainingGroupMembersChain.eq = vi.fn(() => remainingGroupMembersChain);
+    remainingGroupMembersChain.is = vi.fn(() => remainingGroupMembersChain);
+    remainingGroupMembersChain.returns = vi.fn(async () => ({ data: [], error: null }));
+
+    let activityFeedItemsSelectCalls = 0;
+    let activityFeedItemsUpdateCalls = 0;
+    let groupMembersSelectCalls = 0;
+
+    serviceSupabase.from.mockImplementation((table: string) => {
+      if (table === 'messages') {
+        return { update: updateMessage };
+      }
+      if (table === 'activity_events') {
+        return { select: () => activityEventSelectChain, update: updateActivityEvents };
+      }
+      if (table === 'activity_feed_items') {
+        return {
+          select: () => {
+            activityFeedItemsSelectCalls += 1;
+            if (activityFeedItemsSelectCalls === 1) {
+              return feedItemsSelectChain;
+            }
+            return remainingGroupMembersChain;
+          },
+          update: (payload: Record<string, unknown>) => {
+            activityFeedItemsUpdateCalls += 1;
+            if (activityFeedItemsUpdateCalls === 1) {
+              return updateFeedItems(payload);
+            }
+            return updateFeedItemsForGroup(payload);
+          },
+        };
+      }
+      if (table === 'activity_feed_group_members') {
+        return {
+          select: () => {
+            groupMembersSelectCalls += 1;
+            return groupMembersSelectCalls === 1
+              ? groupMembersSelectChain
+              : remainingGroupMembersChain;
+          },
+          update: updateGroupMembers,
+        };
+      }
+      return {};
+    });
+
+    await deleteMessageAction({ orgId: 'org-1', messageId: 'message-1' });
+
+    expect(updateActivityEvents).toHaveBeenCalled();
+    expect(updateFeedItems).toHaveBeenCalled();
+    expect(updateGroupMembers).toHaveBeenCalled();
+    expect(updateFeedItemsForGroup).toHaveBeenCalledWith(
+      expect.objectContaining({
+        deleted_at: expect.any(String),
+        deleted_by: 'profile-1',
+      }),
+    );
   });
 });
 

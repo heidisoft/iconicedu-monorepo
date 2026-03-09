@@ -307,6 +307,20 @@ function buildHourlyLearningSpaceGroupKey(
   return `${prefix}:${learningSpaceId}:${hourBucket}`;
 }
 
+function buildHourlyChannelGroupKey(
+  prefix: string,
+  event: ActivityEventRow,
+  payload: Record<string, unknown>,
+) {
+  const channelId = asOptionalString(payload.channelId);
+  if (!channelId) {
+    return null;
+  }
+
+  const hourBucket = event.occurred_at.slice(0, 13);
+  return `${prefix}:${channelId}:${hourBucket}`;
+}
+
 function buildWeeklyLearningSpaceGroupKey(
   prefix: string,
   event: ActivityEventRow,
@@ -692,6 +706,162 @@ function buildSystemLeadingAvatar(): InboxLeadingVM {
 }
 
 export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition> = {
+  'dm.posted': {
+    eventType: 'dm.posted',
+    tabKey: 'all',
+    importance: 'normal',
+    group: {
+      groupType: 'message',
+      collapseByDefault: true,
+      buildGroupKey: (event) => {
+        const payload = asRecord(event.payload);
+        return buildHourlyChannelGroupKey('dm-posted', event, payload);
+      },
+      renderGroup: (event) => {
+        const payload = asRecord(event.payload);
+        const senderName = asString(payload.senderName, 'Someone');
+        return {
+          verb: 'dms.posted',
+          leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'info' },
+          headline: {
+            primary: `${senderName} sent you direct messages`,
+            secondary: getContextTitle(payload),
+          },
+          summary: undefined,
+          metadata: {
+            channelId: payload.channelId,
+            messageId: payload.messageId,
+            dmGroup: true,
+          },
+        };
+      },
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => {
+      const payload = asRecord(event.payload);
+      const senderName = asString(payload.senderName, 'Someone');
+      const content = asString(payload.content).slice(0, 160);
+      return {
+        verb: 'dm.posted',
+        leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'info' },
+        headline: {
+          primary: `${senderName} sent you a direct message`,
+          secondary: getContextTitle(payload),
+        },
+        summary: undefined,
+        expandedContent: content || undefined,
+        actionButton: undefined,
+        metadata: {
+          channelId: payload.channelId,
+          messageId: payload.messageId,
+        },
+      };
+    },
+  },
+  'dm.reaction.added': {
+    eventType: 'dm.reaction.added',
+    tabKey: 'all',
+    importance: 'normal',
+    group: {
+      groupType: 'message',
+      collapseByDefault: true,
+      buildGroupKey: (event) => {
+        const payload = asRecord(event.payload);
+        return buildHourlyChannelGroupKey('dm-posted', event, payload);
+      },
+      renderGroup: (event) => {
+        const payload = asRecord(event.payload);
+        const senderName = asString(payload.senderName, 'Someone');
+        return {
+          verb: 'dms.reactions.added',
+          leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'info' },
+          headline: {
+            primary: `${senderName} reacted to your direct messages`,
+            secondary: getContextTitle(payload),
+          },
+          summary: undefined,
+          metadata: {
+            channelId: payload.channelId,
+            messageId: payload.messageId,
+            dmReactionGroup: 'added',
+          },
+        };
+      },
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => {
+      const payload = asRecord(event.payload);
+      const senderName = asString(payload.senderName, 'Someone');
+      const emoji = asString(payload.emoji, '😀');
+      return {
+        verb: 'dm.reaction.added',
+        leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'info' },
+        headline: {
+          primary: `${senderName} reacted ${emoji} to your direct message`,
+          secondary: getContextTitle(payload),
+        },
+        summary: undefined,
+        actionButton: undefined,
+        metadata: {
+          channelId: payload.channelId,
+          messageId: payload.messageId,
+          emoji,
+        },
+      };
+    },
+  },
+  'dm.reaction.removed': {
+    eventType: 'dm.reaction.removed',
+    tabKey: 'all',
+    importance: 'normal',
+    group: {
+      groupType: 'message',
+      collapseByDefault: true,
+      buildGroupKey: (event) => {
+        const payload = asRecord(event.payload);
+        return buildHourlyChannelGroupKey('dm-posted', event, payload);
+      },
+      renderGroup: (event) => {
+        const payload = asRecord(event.payload);
+        const senderName = asString(payload.senderName, 'Someone');
+        return {
+          verb: 'dms.reactions.removed',
+          leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'neutral' },
+          headline: {
+            primary: `${senderName} removed reactions from your direct messages`,
+            secondary: getContextTitle(payload),
+          },
+          summary: undefined,
+          metadata: {
+            channelId: payload.channelId,
+            messageId: payload.messageId,
+            dmReactionGroup: 'removed',
+          },
+        };
+      },
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => {
+      const payload = asRecord(event.payload);
+      const senderName = asString(payload.senderName, 'Someone');
+      const emoji = asString(payload.emoji, '😀');
+      return {
+        verb: 'dm.reaction.removed',
+        leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'neutral' },
+        headline: {
+          primary: `${senderName} removed ${emoji} from your direct message`,
+          secondary: getContextTitle(payload),
+        },
+        summary: undefined,
+        actionButton: undefined,
+        metadata: {
+          channelId: payload.channelId,
+          messageId: payload.messageId,
+          emoji,
+        },
+      };
+    },
+  },
   'message.posted': {
     eventType: 'message.posted',
     tabKey: 'all',
@@ -703,7 +873,6 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       const senderName = asString(payload.senderName, 'Someone');
       const content = asString(payload.content).slice(0, 160);
       const mentionedProfileId = asOptionalString(payload.mentionedProfileId);
-      const isDirectMessage = asOptionalRouteKind(payload.channelRouteKind) === 'dm';
       const isThreadReply = Boolean(payload.threadReply);
       const isMention = Boolean(mentionedProfileId);
       return {
@@ -712,11 +881,9 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
         headline: {
           primary: isMention
             ? `${senderName} mentioned you`
-            : isDirectMessage
-              ? `${senderName} sent you a message`
-              : isThreadReply
-                ? `${senderName} replied in a thread`
-                : `${senderName} sent a message`,
+            : isThreadReply
+              ? `${senderName} replied in a thread`
+              : `${senderName} sent a message`,
           secondary: getContextTitle(payload),
         },
         summary: undefined,

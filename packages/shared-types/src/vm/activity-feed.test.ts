@@ -8,6 +8,12 @@ describe('ActivityVerbVM', () => {
     expectTypeOf<'members.invited'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'class.created'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'classes.created'>().toMatchTypeOf<ActivityVerbVM>();
+    expectTypeOf<'dm.posted'>().toMatchTypeOf<ActivityVerbVM>();
+    expectTypeOf<'dms.posted'>().toMatchTypeOf<ActivityVerbVM>();
+    expectTypeOf<'dm.reaction.added'>().toMatchTypeOf<ActivityVerbVM>();
+    expectTypeOf<'dms.reactions.added'>().toMatchTypeOf<ActivityVerbVM>();
+    expectTypeOf<'dm.reaction.removed'>().toMatchTypeOf<ActivityVerbVM>();
+    expectTypeOf<'dms.reactions.removed'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'message.posted'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'messages.posted'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'summary.posted'>().toMatchTypeOf<ActivityVerbVM>();

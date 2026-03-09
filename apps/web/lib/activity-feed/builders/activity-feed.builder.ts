@@ -167,11 +167,12 @@ async function attachGroupMembers(
       normalized.parent,
       normalized.members,
     );
+    const nextParent = normalizeDmGroupedParent(normalized.parent, aggregatedMembers);
 
     memberIds.forEach((memberId) => groupedMemberIds.add(memberId));
 
     return {
-      ...normalized.parent,
+      ...nextParent,
       subActivities: {
         items: aggregatedMembers,
       },
@@ -309,6 +310,34 @@ function aggregateGroupedSubActivities(
   );
 
   return [aggregatedInvite, ...nonInviteMembers];
+}
+
+function normalizeDmGroupedParent(
+  parent: Extract<ActivityFeedItemVM, { kind: 'group' }>,
+  members: ActivityFeedLeafItemVM[],
+) {
+  if (parent.verb !== 'dms.posted' || !members.length) {
+    return parent;
+  }
+
+  const dmMessageCount = members.filter((member) => member.verb === 'dm.posted').length;
+  const messageCount =
+    dmMessageCount > 0
+      ? dmMessageCount
+      : Math.max(parent.subActivityCount ?? members.length, members.length);
+  const senderName = members[0]?.refs.actor?.profile?.displayName ?? 'Someone';
+  const contextTitle = parent.content.headline.secondary;
+
+  return {
+    ...parent,
+    content: {
+      ...parent.content,
+      headline: {
+        primary: `${senderName} sent you ${messageCount} direct messages`,
+        secondary: contextTitle,
+      },
+    },
+  };
 }
 
 function collectActivityReadItemIds(items: ActivityFeedLeafItemVM[], fallbackId: string) {
