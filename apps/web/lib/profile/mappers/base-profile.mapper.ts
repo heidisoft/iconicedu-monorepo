@@ -1,5 +1,6 @@
 import type {
   NotificationDefaultsVM,
+  NotificationScopedPreferenceVM,
   PresenceVM,
   UserProfileVM,
 } from '@iconicedu/shared-types';
@@ -31,6 +32,7 @@ export function mapBaseProfile(
   profileRow: ProfileRow,
   input: {
     notificationDefaults: NotificationDefaultsVM | null;
+    notificationScopedDefaults: NotificationScopedPreferenceVM[] | null;
     presence: PresenceVM | null;
     avatarUrlOverride?: string | null;
     accountEmail?: string | null;
@@ -64,6 +66,7 @@ export function mapBaseProfile(
       locale: profileRow.locale,
       languagesSpoken: profileRow.languages_spoken,
       notificationDefaults: input.notificationDefaults,
+      notificationScopedDefaults: input.notificationScopedDefaults,
     },
     presence: input.presence,
     status: profileRow.status ?? undefined,

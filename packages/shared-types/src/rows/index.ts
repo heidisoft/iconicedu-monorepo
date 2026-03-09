@@ -1,5 +1,6 @@
 export * from './account';
 export * from './activity-event';
+export * from './activity-event-suppression-rule';
 export * from './activity-feed';
 export * from './base';
 export * from './channel';

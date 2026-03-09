@@ -34,6 +34,7 @@ function mapProfileToUserProfile(
 ): UserProfileVM {
   const base = mapBaseProfile(profile, {
     notificationDefaults: null,
+    notificationScopedDefaults: null,
     presence: null,
     accountEmail,
   });
@@ -75,7 +76,9 @@ function mapProfileToUserProfile(
   }
 }
 
-export async function getActiveParticipantProfiles(orgId: string): Promise<UserProfileVM[]> {
+export async function getActiveParticipantProfiles(
+  orgId: string,
+): Promise<UserProfileVM[]> {
   if (!orgId) {
     return [];
   }
@@ -128,7 +131,7 @@ export async function getActiveParticipantProfiles(orgId: string): Promise<UserP
         profile,
         account.email ?? null,
         profile.kind === 'child'
-          ? guardianNamesByChildAccountId.get(profile.account_id) ?? null
+          ? (guardianNamesByChildAccountId.get(profile.account_id) ?? null)
           : null,
       ),
     ),

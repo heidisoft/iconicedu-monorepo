@@ -1,6 +1,7 @@
 import type {
   FamilyLinkInviteRow,
   NotificationDefaultsVM,
+  NotificationScopedPreferenceVM,
   NotificationPreferenceVM,
   PresenceVM,
   UserAccountVM,
@@ -23,6 +24,7 @@ import {
 } from '@iconicedu/web/lib/profile/derive';
 import { getAccountById } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { getNotificationDefaults } from '@iconicedu/web/lib/profile/queries/notification-defaults.query';
+import { getNotificationScopedDefaults } from '@iconicedu/web/lib/profile/queries/notification-scoped-defaults.query';
 import { getPresence } from '@iconicedu/web/lib/profile/queries/presence.query';
 import { mapProfilePresenceRowToVM } from '@iconicedu/web/lib/profile/mappers/presence.mapper';
 import {
@@ -149,14 +151,17 @@ export async function buildSidebarUser(
     }
   }
 
-  const [notificationDefaults, presence, avatarUrl] = await Promise.all([
-    loadNotificationDefaults(supabase, profileRow.org_id, profileRow.id),
-    loadPresence(supabase, profileRow.org_id, profileRow.id),
-    resolveAvatarUrl(supabase, profileRow.avatar_source, profileRow.avatar_url ?? null),
-  ]);
+  const [notificationDefaults, notificationScopedDefaults, presence, avatarUrl] =
+    await Promise.all([
+      loadNotificationDefaults(supabase, profileRow.org_id, profileRow.id),
+      loadNotificationScopedDefaults(supabase, profileRow.org_id, profileRow.id),
+      loadPresence(supabase, profileRow.org_id, profileRow.id),
+      resolveAvatarUrl(supabase, profileRow.avatar_source, profileRow.avatar_url ?? null),
+    ]);
 
   const baseProfile = mapBaseProfile(profileRow, {
     notificationDefaults,
+    notificationScopedDefaults,
     presence,
     avatarUrlOverride: avatarUrl,
   });
@@ -233,6 +238,32 @@ async function loadNotificationDefaults(
   });
 
   return defaults;
+}
+
+async function loadNotificationScopedDefaults(
+  supabase: SupabaseClient,
+  orgId: string,
+  profileId: string,
+): Promise<NotificationScopedPreferenceVM[] | null> {
+  const { data } = await getNotificationScopedDefaults(supabase, orgId, profileId);
+
+  if (!data?.length) {
+    return null;
+  }
+
+  return data
+    .map((item) => ({
+      scopeKind: item.scope_kind,
+      scopeId: item.scope_id,
+      prefKey: item.pref_key,
+      channels: Array.isArray(item.channels)
+        ? (item.channels.filter(Boolean) as NotificationPreferenceVM['channels'])
+        : [],
+      muted: item.muted ?? null,
+    }))
+    .filter(
+      (item) => item.scopeKind === 'channel' || item.scopeKind === 'learning_space',
+    );
 }
 
 async function loadPresence(

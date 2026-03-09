@@ -58,6 +58,7 @@ export interface UserPrefsVM {
   locale?: string | null;
   languagesSpoken?: string[] | null;
   notificationDefaults?: NotificationDefaultsVM | null;
+  notificationScopedDefaults?: NotificationScopedPreferenceVM[] | null;
 }
 
 export type NotificationChannelVM = 'push' | 'email' | 'sms' | 'whatsapp';
@@ -67,11 +68,20 @@ export interface NotificationPreferenceVM {
   muted?: boolean | null;
 }
 
+export type NotificationScopeKindVM = 'channel' | 'learning_space';
+
+export interface NotificationScopedPreferenceVM extends NotificationPreferenceVM {
+  scopeKind: NotificationScopeKindVM;
+  scopeId: UUID;
+  prefKey: NotificationKey | string;
+}
+
 export type NotificationKey =
   | 'defaults.message_updates'
   | 'defaults.weekly_digest'
   | 'defaults.sms_reminders'
   | 'system.alerts'
+  | 'system.notice'
   | 'messages.direct_message'
   | 'messages.teacher_message'
   | 'messages.mentions'
@@ -106,7 +116,33 @@ export type NotificationKey =
   | 'digest.instant'
   | 'digest.daily'
   | 'digest.weekly'
-  | 'digest.urgent_only';
+  | 'digest.urgent_only'
+  | 'dm.posted'
+  | 'dm.reaction.added'
+  | 'dm.reaction.removed'
+  | 'message.posted'
+  | 'file.uploaded'
+  | 'class.created'
+  | 'class.updated'
+  | 'class.archived'
+  | 'member.invited'
+  | 'members.invited'
+  | 'member.joined'
+  | 'member.removed'
+  | 'members.removed'
+  | 'role.changed'
+  | 'session.scheduled'
+  | 'session.rescheduled'
+  | 'session.canceled'
+  | 'session.started'
+  | 'session.ended'
+  | 'session.completed'
+  | 'session.reminder.sent'
+  | 'session.feedback_request.sent'
+  | 'payment.reminder'
+  | 'payment.reminder.sent'
+  | 'payment.received'
+  | 'payment.failed';
 
 export type NotificationDefaultsVM = Partial<
   Record<NotificationKey, NotificationPreferenceVM>

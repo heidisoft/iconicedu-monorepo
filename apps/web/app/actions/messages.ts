@@ -29,6 +29,10 @@ import {
   fetchLinkPreviewMetadata,
 } from '@iconicedu/web/lib/messages/link-preview';
 import { publishActivityEvent } from '@iconicedu/web/lib/activity-feed/publisher/activity-publisher';
+import {
+  filterDmRecipientsByLastReadRecency,
+  isDmActivitySuppressionDebugEnabled,
+} from '@iconicedu/web/lib/activity-feed/dm-activity-suppression';
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
 type SupabaseServiceClient = ReturnType<typeof createSupabaseServiceClient>;
@@ -254,6 +258,7 @@ async function createMentionNotifications(input: {
 }
 
 async function createChannelMessageActivity(input: {
+  supabase: SupabaseServerClient;
   serviceSupabase: SupabaseServiceClient;
   orgId: string;
   channelId: string;
@@ -269,6 +274,20 @@ async function createChannelMessageActivity(input: {
   const isDmRoute = input.activityContext.channelRouteKind === 'dm';
   const eventType = isDmRoute ? 'dm.posted' : 'message.posted';
   const dedupePrefix = isDmRoute ? 'dm.posted' : 'message.posted';
+  const dmRecipients = isDmRoute
+    ? await resolveDmActivityRecipientProfileIds({
+        supabase: input.supabase,
+        orgId: input.orgId,
+        channelId: input.channelId,
+        senderProfileId: input.senderProfileId,
+        now: input.now,
+        eventType: 'dm.posted',
+      })
+    : null;
+
+  if (isDmRoute && (!dmRecipients || dmRecipients.length === 0)) {
+    return;
+  }
 
   await publishActivityEvent({
     supabase: input.serviceSupabase,
@@ -280,6 +299,10 @@ async function createChannelMessageActivity(input: {
     scope: input.activityContext.scope,
     objectRef: { kind: 'message', id: input.messageId },
     targetRef: input.activityContext.targetRef,
+    audienceRules:
+      isDmRoute && dmRecipients
+        ? [{ kind: 'users_only', userIds: dmRecipients }]
+        : undefined,
     payload: {
       channelId: input.channelId,
       messageId: input.messageId,
@@ -363,6 +386,7 @@ async function createThreadReplyNotifications(input: {
 }
 
 async function createFileUploadActivity(input: {
+  supabase: SupabaseServerClient;
   serviceSupabase: SupabaseServiceClient;
   orgId: string;
   channelId: string;
@@ -387,6 +411,20 @@ async function createFileUploadActivity(input: {
       : typeof input.mimeType === 'string' && input.mimeType.startsWith('audio/')
         ? 'audio'
         : 'file';
+  const dmRecipients = isDmRoute
+    ? await resolveDmActivityRecipientProfileIds({
+        supabase: input.supabase,
+        orgId: input.orgId,
+        channelId: input.channelId,
+        senderProfileId: input.senderProfileId,
+        now: input.now,
+        eventType: 'dm.posted',
+      })
+    : null;
+
+  if (isDmRoute && (!dmRecipients || dmRecipients.length === 0)) {
+    return;
+  }
 
   await publishActivityEvent({
     supabase: input.serviceSupabase,
@@ -398,6 +436,10 @@ async function createFileUploadActivity(input: {
     scope: input.activityContext.scope,
     objectRef: { kind: 'message', id: input.messageId },
     targetRef: input.activityContext.targetRef,
+    audienceRules:
+      isDmRoute && dmRecipients
+        ? [{ kind: 'users_only', userIds: dmRecipients }]
+        : undefined,
     payload: {
       channelId: input.channelId,
       messageId: input.messageId,
@@ -845,6 +887,18 @@ async function emitDmReactionActivity(input: {
   if (activityContext.channelRouteKind !== 'dm') {
     return;
   }
+  const recipientIds = await resolveDmActivityRecipientProfileIds({
+    supabase: input.supabase,
+    orgId: input.orgId,
+    channelId: input.channelId,
+    senderProfileId: input.senderProfileId,
+    now: input.now,
+    eventType: input.eventType,
+  });
+
+  if (!recipientIds.length) {
+    return;
+  }
 
   const sender = await buildUserProfileById(input.supabase, input.senderProfileId);
   const senderName =
@@ -855,30 +909,6 @@ async function emitDmReactionActivity(input: {
     typeof sender.profile.displayName === 'string'
       ? sender.profile.displayName
       : undefined) ?? 'Someone';
-
-  const membersResponse = await input.supabase
-    .from('channel_members')
-    .select('profile_id')
-    .eq('org_id', input.orgId)
-    .eq('channel_id', input.channelId)
-    .is('deleted_at', null)
-    .returns<Array<{ profile_id: string }>>();
-
-  if (membersResponse.error) {
-    throw new Error(membersResponse.error.message);
-  }
-
-  const recipientIds = Array.from(
-    new Set(
-      (membersResponse.data ?? [])
-        .map((row) => row.profile_id)
-        .filter((id) => id && id !== input.senderProfileId),
-    ),
-  );
-
-  if (!recipientIds.length) {
-    return;
-  }
 
   await publishActivityEvent({
     supabase: input.serviceSupabase,
@@ -903,6 +933,117 @@ async function emitDmReactionActivity(input: {
     },
     createdBy: input.senderProfileId,
   });
+}
+
+async function resolveDmActivityRecipientProfileIds(input: {
+  supabase: SupabaseServerClient;
+  orgId: string;
+  channelId: string;
+  senderProfileId: string;
+  now: string;
+  eventType: 'dm.posted' | 'dm.reaction.added' | 'dm.reaction.removed';
+}) {
+  const membersResponse = await input.supabase
+    .from('channel_members')
+    .select('profile_id')
+    .eq('org_id', input.orgId)
+    .eq('channel_id', input.channelId)
+    .is('deleted_at', null)
+    .returns<Array<{ profile_id: string }>>();
+
+  if (membersResponse.error) {
+    throw new Error(membersResponse.error.message);
+  }
+
+  const candidateProfileIds = Array.from(
+    new Set(
+      (membersResponse.data ?? [])
+        .map((row) => row.profile_id)
+        .filter((id) => id && id !== input.senderProfileId),
+    ),
+  );
+
+  if (!candidateProfileIds.length) {
+    return [];
+  }
+
+  const profilesResponse = await input.supabase
+    .from('profiles')
+    .select('id, account_id')
+    .eq('org_id', input.orgId)
+    .in('id', candidateProfileIds)
+    .is('deleted_at', null)
+    .returns<Array<{ id: string; account_id: string | null }>>();
+
+  if (profilesResponse.error) {
+    throw new Error(profilesResponse.error.message);
+  }
+
+  const accountIdByProfileId = new Map(
+    (profilesResponse.data ?? [])
+      .filter((row) => row.id && row.account_id)
+      .map((row) => [row.id, row.account_id as string]),
+  );
+
+  const accountIds = Array.from(new Set(Array.from(accountIdByProfileId.values())));
+  if (!accountIds.length) {
+    if (isDmActivitySuppressionDebugEnabled()) {
+      console.log('[activity-feed:dm-suppression]', 'decision', {
+        eventType: input.eventType,
+        channelId: input.channelId,
+        candidateRecipients: candidateProfileIds,
+        suppressedRecipients: [],
+        emittedRecipients: candidateProfileIds,
+        reason: 'missing_account_mapping',
+      });
+    }
+    return candidateProfileIds;
+  }
+
+  const readStatesResponse = await input.supabase
+    .from('channel_read_states')
+    .select('account_id,last_read_at')
+    .eq('org_id', input.orgId)
+    .eq('channel_id', input.channelId)
+    .in('account_id', accountIds)
+    .is('deleted_at', null)
+    .returns<Array<{ account_id: string; last_read_at: string | null }>>();
+
+  if (readStatesResponse.error) {
+    throw new Error(readStatesResponse.error.message);
+  }
+
+  const lastReadAtByAccountId = new Map(
+    (readStatesResponse.data ?? []).map((row) => [row.account_id, row.last_read_at]),
+  );
+  const profileLastReadAtById = new Map<string, string | null | undefined>();
+  for (const profileId of candidateProfileIds) {
+    const accountId = accountIdByProfileId.get(profileId);
+    profileLastReadAtById.set(
+      profileId,
+      accountId ? lastReadAtByAccountId.get(accountId) : undefined,
+    );
+  }
+
+  const decision = filterDmRecipientsByLastReadRecency({
+    candidateProfileIds,
+    profileLastReadAtById,
+    now: input.now,
+  });
+
+  if (isDmActivitySuppressionDebugEnabled()) {
+    console.log('[activity-feed:dm-suppression]', 'decision', {
+      eventType: input.eventType,
+      channelId: input.channelId,
+      candidateRecipients: candidateProfileIds,
+      suppressedRecipients: decision.suppressedProfileIds,
+      emittedRecipients: decision.emittedProfileIds,
+      reason: 'recent_read_state',
+      cutoffAt: decision.cutoffIso,
+    });
+  }
+
+  return decision.emittedProfileIds;
 }
 
 export async function sendTextMessageAction(
@@ -1112,6 +1253,7 @@ export async function sendTextMessageAction(
     });
   } else if (activityContext.channelRouteKind === 'dm') {
     await createChannelMessageActivity({
+      supabase,
       serviceSupabase,
       orgId: accountResponse.data.org_id,
       channelId: input.channelId,
@@ -1382,6 +1524,7 @@ export async function sendFileMessageAction(
 
   if (!isAudioUpload || activityContext.channelRouteKind === 'dm') {
     await createFileUploadActivity({
+      supabase,
       serviceSupabase,
       orgId: input.orgId,
       channelId: input.channelId,
@@ -1619,6 +1762,7 @@ export async function sendFilesMessageAction(
     : null;
 
   await createFileUploadActivity({
+    supabase,
     serviceSupabase,
     orgId: input.orgId,
     channelId: input.channelId,

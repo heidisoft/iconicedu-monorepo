@@ -13,6 +13,7 @@ import type {
   GradeLevel,
   NotificationChannelVM,
   NotificationKey,
+  NotificationScopedPreferenceVM,
   SidebarLeftDataVM,
   StaffProfileSaveInput,
   ThemeKey,
@@ -1765,9 +1766,75 @@ export function SidebarShell({
       orgId: string;
       prefKey: string;
       channels: string[];
+      scopeKind?: 'channel' | 'learning_space';
+      scopeId?: string;
     }) => {
       try {
         const channels = normalizeNotificationChannels(input.channels);
+        const isScoped = Boolean(input.scopeKind && input.scopeId);
+
+        if (isScoped) {
+          const response = await fetch('/api/notification-preference-scopes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              orgId: input.orgId,
+              profileId: input.profileId,
+              prefKey: input.prefKey,
+              channels,
+              scopeKind: input.scopeKind,
+              scopeId: input.scopeId,
+            }),
+          });
+          const payload = (await response.json()) as {
+            success?: boolean;
+            message?: string;
+            data?: {
+              scopeKind: 'channel' | 'learning_space';
+              scopeId: string;
+              prefKey: string;
+              channels: NotificationChannelVM[];
+              muted?: boolean | null;
+            };
+          };
+          if (!response.ok || !payload.success || !payload.data) {
+            throw new Error(
+              payload.message ?? 'Unable to update scoped notification preferences',
+            );
+          }
+          const scopedRow = payload.data;
+
+          setSidebarData((prev) => {
+            const existingScoped =
+              prev.user.profile.prefs.notificationScopedDefaults ?? [];
+            const nextScoped = [
+              ...existingScoped.filter(
+                (row) =>
+                  !(
+                    row.scopeKind === scopedRow.scopeKind &&
+                    row.scopeId === scopedRow.scopeId &&
+                    row.prefKey === scopedRow.prefKey
+                  ),
+              ),
+              scopedRow satisfies NotificationScopedPreferenceVM,
+            ];
+            return {
+              ...prev,
+              user: {
+                ...prev.user,
+                profile: {
+                  ...prev.user.profile,
+                  prefs: {
+                    ...prev.user.profile.prefs,
+                    notificationScopedDefaults: nextScoped,
+                  },
+                },
+              },
+            };
+          });
+          return;
+        }
+
         const { error } = await supabase.from('notification_preferences').upsert(
           {
             org_id: input.orgId,
@@ -1813,6 +1880,60 @@ export function SidebarShell({
       }
     },
     [supabase],
+  );
+
+  const handleNotificationPreferenceScopeDelete = React.useCallback(
+    async (input: {
+      profileId: string;
+      orgId: string;
+      prefKey: string;
+      scopeKind: 'channel' | 'learning_space';
+      scopeId: string;
+    }) => {
+      try {
+        const response = await fetch('/api/notification-preference-scopes', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(input),
+        });
+        const payload = (await response.json()) as {
+          success?: boolean;
+          message?: string;
+        };
+        if (!response.ok || !payload.success) {
+          throw new Error(
+            payload.message ?? 'Unable to remove scoped notification preference',
+          );
+        }
+
+        setSidebarData((prev) => ({
+          ...prev,
+          user: {
+            ...prev.user,
+            profile: {
+              ...prev.user.profile,
+              prefs: {
+                ...prev.user.profile.prefs,
+                notificationScopedDefaults: (
+                  prev.user.profile.prefs.notificationScopedDefaults ?? []
+                ).filter(
+                  (row) =>
+                    !(
+                      row.scopeKind === input.scopeKind &&
+                      row.scopeId === input.scopeId &&
+                      row.prefKey === input.prefKey
+                    ),
+                ),
+              },
+            },
+          },
+        }));
+      } catch (error) {
+        showErrorToast('Unable to reset scoped notification preferences', error);
+        throw error;
+      }
+    },
+    [],
   );
 
   const handleLocationUpdate = React.useCallback(
@@ -2070,6 +2191,7 @@ export function SidebarShell({
         onAvatarUpload={handleAvatarUpload}
         onAvatarRemove={handleAvatarRemove}
         onNotificationPreferenceSave={handleNotificationPreferenceSave}
+        onNotificationPreferenceScopeDelete={handleNotificationPreferenceScopeDelete}
         onFamilyInviteCreate={handleFamilyInviteCreate}
         onFamilyInviteRemove={handleFamilyInviteRemove}
         onChildThemeSave={handleChildThemeSave}

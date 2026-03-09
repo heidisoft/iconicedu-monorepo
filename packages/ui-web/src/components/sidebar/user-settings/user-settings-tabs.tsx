@@ -18,13 +18,21 @@ import { Separator } from '@iconicedu/ui-web/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@iconicedu/ui-web/ui/tabs';
 import { useSidebar } from '@iconicedu/ui-web/ui/sidebar';
 import { cn } from '@iconicedu/ui-web/lib/utils';
-import { getProfileDisplayName, getProfileFullName } from '@iconicedu/ui-web/lib/display-name';
-import { AccountTab, type AccountSectionKey } from '@iconicedu/ui-web/components/sidebar/user-settings/account-tab';
-import { Button } from '@iconicedu/ui-web/ui/button';
+import {
+  getProfileDisplayName,
+  getProfileFullName,
+} from '@iconicedu/ui-web/lib/display-name';
+import {
+  AccountTab,
+  type AccountSectionKey,
+} from '@iconicedu/ui-web/components/sidebar/user-settings/account-tab';
 import { FamilyTab } from '@iconicedu/ui-web/components/sidebar/user-settings/family-tab';
 import { LocationTab } from '@iconicedu/ui-web/components/sidebar/user-settings/location-tab';
 import { NotificationsTab } from '@iconicedu/ui-web/components/sidebar/user-settings/notifications-tab';
-import { PreferencesTab, type PreferencesSectionKey } from '@iconicedu/ui-web/components/sidebar/user-settings/preferences-tab';
+import {
+  PreferencesTab,
+  type PreferencesSectionKey,
+} from '@iconicedu/ui-web/components/sidebar/user-settings/preferences-tab';
 import {
   ProfileTab,
   type ProfileAvatarInput,
@@ -41,9 +49,7 @@ import {
   SETTINGS_TABS,
   type UserSettingsTab,
 } from '@iconicedu/ui-web/components/sidebar/user-settings/constants';
-import {
-  USER_SETTINGS_TAB_TRIGGER_CLASS,
-} from '@iconicedu/ui-web/components/sidebar/user-settings/user-settings.theme';
+import { USER_SETTINGS_TAB_TRIGGER_CLASS } from '@iconicedu/ui-web/components/sidebar/user-settings/user-settings.theme';
 import {
   dedupeChildMembersByEmail,
   filterInvitesWithExistingAccounts,
@@ -79,7 +85,18 @@ export type UserSettingsTabsProps = {
     prefKey: string;
     channels: string[];
     muted?: boolean | null;
+    scopeKind?: 'channel' | 'learning_space';
+    scopeId?: string;
   }) => Promise<void> | void;
+  onNotificationPreferenceScopeDelete?: (input: {
+    profileId: string;
+    orgId: string;
+    prefKey: string;
+    scopeKind: 'channel' | 'learning_space';
+    scopeId: string;
+  }) => Promise<void> | void;
+  availableAlertChannels?: Array<{ id: string; label: string }>;
+  availableAlertLearningSpaces?: Array<{ id: string; label: string }>;
   onLocationContinue?: (input: {
     city: string;
     region: string;
@@ -150,6 +167,9 @@ export function UserSettingsTabs({
   onAvatarRemove,
   onPrefsSave,
   onNotificationPreferenceSave,
+  onNotificationPreferenceScopeDelete,
+  availableAlertChannels,
+  availableAlertLearningSpaces,
   onLocationContinue,
   onAccountUpdate,
   onFamilyInviteCreate,
@@ -167,6 +187,18 @@ export function UserSettingsTabs({
   const profileBlock = profile.profile;
   const profileFullName = getProfileFullName(profileBlock);
   const prefs = profile.prefs;
+  const scopedNotificationDefaults =
+    (
+      prefs as typeof prefs & {
+        notificationScopedDefaults?: Array<{
+          scopeKind: 'channel' | 'learning_space';
+          scopeId: string;
+          prefKey: string;
+          channels: string[];
+          muted?: boolean | null;
+        }> | null;
+      }
+    ).notificationScopedDefaults ?? [];
   const contacts = account?.contacts;
   const email = contacts?.email ?? '';
   const preferredChannels = contacts?.preferredContactChannels ?? ['email'];
@@ -243,8 +275,10 @@ export function UserSettingsTabs({
       ]),
     );
   });
-  const guardianChildren: ChildProfileVM[] =
-    profile.kind === 'guardian' ? (profile.children?.items ?? []) : [];
+  const guardianChildren = React.useMemo<ChildProfileVM[]>(
+    () => (profile.kind === 'guardian' ? (profile.children?.items ?? []) : []),
+    [profile],
+  );
   const familyMembers = React.useMemo(() => {
     const members: Array<{
       id: string;
@@ -308,7 +342,12 @@ export function UserSettingsTabs({
     return dedupeChildMembersByEmail(members);
   }, [
     profile.ids.id,
+    profile.ids.orgId,
+    profile.ids.accountId,
     profileBlock.avatar,
+    profileBlock.firstName,
+    profileBlock.lastName,
+    profileBlock.bio,
     profileFullName,
     contacts?.email,
     profile.ui?.themeKey,
@@ -384,7 +423,7 @@ export function UserSettingsTabs({
               );
             })}
           </TabsList>
-          {Boolean(onboardingStep) ? (
+          {onboardingStep ? (
             <>
               <Separator className="my-2" />
               <div className="px-2">
@@ -441,17 +480,17 @@ export function UserSettingsTabs({
               value="educator-availability"
               className="mt-0 space-y-8 w-full px-1"
             >
-            <EducatorAvailabilityTab
-              initialClassTypes={educatorProfile.availability?.classTypes ?? undefined}
-              initialWeeklyCommitment={
-                educatorProfile.availability?.weeklyCommitment ?? undefined
-              }
-              initialAvailability={
-                educatorProfile.availability?.availability ?? undefined
-              }
-              onSave={onEducatorAvailabilitySave}
-              isEducatorAvailabilityOnboarding={isEducatorAvailabilityOnboarding}
-            />
+              <EducatorAvailabilityTab
+                initialClassTypes={educatorProfile.availability?.classTypes ?? undefined}
+                initialWeeklyCommitment={
+                  educatorProfile.availability?.weeklyCommitment ?? undefined
+                }
+                initialAvailability={
+                  educatorProfile.availability?.availability ?? undefined
+                }
+                onSave={onEducatorAvailabilitySave}
+                isEducatorAvailabilityOnboarding={isEducatorAvailabilityOnboarding}
+              />
             </TabsContent>
           ) : null}
           {childProfile ? (
@@ -542,6 +581,10 @@ export function UserSettingsTabs({
               profileId={profile.ids.id}
               orgId={profile.ids.orgId}
               onNotificationPreferenceSave={onNotificationPreferenceSave}
+              onNotificationPreferenceScopeDelete={onNotificationPreferenceScopeDelete}
+              availableAlertChannels={availableAlertChannels ?? []}
+              availableAlertLearningSpaces={availableAlertLearningSpaces ?? []}
+              notificationScopedDefaults={scopedNotificationDefaults}
             />
           </TabsContent>
         </ScrollArea>

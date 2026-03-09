@@ -473,7 +473,7 @@ async function processReminderJob(supabase: SupabaseServiceClient, job: Reminder
     orgId: job.org_id,
     jobId: job.id,
     messageId,
-    activityEventId: activityEvent.id,
+    activityEventId: activityEvent?.id ?? null,
     result: 'succeeded',
     details: {
       eventType,

@@ -147,6 +147,17 @@ export interface NotificationPreferenceRow extends Partial<AuditRow> {
   muted?: boolean | null;
 }
 
+export interface NotificationPreferenceScopeRow extends Partial<AuditRow> {
+  id: UUID;
+  org_id: UUID;
+  profile_id: UUID;
+  scope_kind: 'channel' | 'learning_space';
+  scope_id: UUID;
+  pref_key: string;
+  channels: string[];
+  muted?: boolean | null;
+}
+
 export interface FamilyLinkRow extends Partial<AuditRow> {
   id: UUID;
   org_id: UUID;

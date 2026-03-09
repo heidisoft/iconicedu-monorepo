@@ -1,6 +1,9 @@
 import { describe, expectTypeOf, it } from 'vitest';
 
-import type { ActivityVerbVM } from '@iconicedu/shared-types/vm/activity-feed';
+import type {
+  ActivityVerbSuppressionRuleVM,
+  ActivityVerbVM,
+} from '@iconicedu/shared-types/vm/activity-feed';
 
 describe('ActivityVerbVM', () => {
   it('accepts singular and plural activity verbs', () => {
@@ -22,5 +25,17 @@ describe('ActivityVerbVM', () => {
     expectTypeOf<'sessions.feedback_request.sent'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'system.notice'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'systems.notice'>().toMatchTypeOf<ActivityVerbVM>();
+  });
+
+  it('supports activity suppression rule types', () => {
+    expectTypeOf<ActivityVerbSuppressionRuleVM>().toMatchTypeOf<{
+      id: string;
+      orgId: string;
+      eventType: string;
+      scope: 'org' | 'actor';
+      isEnabled: boolean;
+      createdAt: string;
+      updatedAt: string;
+    }>();
   });
 });

@@ -23,3 +23,5 @@ export * from './rows';
 export * from './shared/grades';
 export * from './payloads/learning-space';
 export * from './payloads/channel';
+export * from './payloads/activity-feed';
+export * from './payloads/notification-preferences';

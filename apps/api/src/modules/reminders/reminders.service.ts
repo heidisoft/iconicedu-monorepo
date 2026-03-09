@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { FeedScopeVM, ReminderJobRow } from '@iconicedu/shared-types';
-import { projectActivityEvents } from '@iconicedu/web/lib/activity-feed/projector/project-activity-events';
+import { publishActivityEvent } from '@iconicedu/web/lib/activity-feed/publisher/activity-publisher';
 import { randomUUID } from 'crypto';
 
 import {
@@ -223,72 +223,6 @@ export class RemindersService {
     return profileResponse.data.id;
   }
 
-  private async publishActivityEvent(input: {
-    orgId: string;
-    eventType: string;
-    sourceKind: 'system' | 'profile';
-    actorProfileId: string;
-    scope: FeedScopeVM;
-    objectRef: { kind: 'message'; id: string };
-    targetRef?: { kind: 'learning_space'; id: string };
-    payload: Record<string, unknown>;
-    dedupeKey: string;
-    occurredAt: string;
-  }) {
-    const now = new Date().toISOString();
-    const insertResponse = await this.supabase
-      .from('activity_events')
-      .insert({
-        org_id: input.orgId,
-        event_type: input.eventType,
-        occurred_at: input.occurredAt,
-        source_kind: input.sourceKind,
-        actor_profile_id: input.actorProfileId,
-        scope: input.scope,
-        object_ref: input.objectRef,
-        target_ref: input.targetRef ?? null,
-        payload: input.payload,
-        audience_rules: [],
-        dedupe_key: input.dedupeKey,
-        projection_status: 'pending',
-        projection_attempts: 0,
-        created_at: now,
-        updated_at: now,
-        created_by: input.actorProfileId,
-        updated_by: input.actorProfileId,
-      })
-      .select('id')
-      .single<{ id: string }>();
-
-    if (insertResponse.error) {
-      if (insertResponse.error.code === '23505') {
-        const existing = await this.supabase
-          .from('activity_events')
-          .select('id')
-          .eq('org_id', input.orgId)
-          .eq('dedupe_key', input.dedupeKey)
-          .is('deleted_at', null)
-          .maybeSingle<{ id: string }>();
-
-        if (existing.error) {
-          throw new Error(existing.error.message);
-        }
-        if (existing.data) {
-          return existing.data;
-        }
-      }
-      throw new Error(insertResponse.error.message);
-    }
-
-    // Reuse existing projector implementation during transition.
-    await projectActivityEvents(this.supabase as never, {
-      eventIds: [insertResponse.data.id],
-      limit: 1,
-    });
-
-    return insertResponse.data;
-  }
-
   private async logDispatch(input: {
     supabase: SupabaseServiceClient;
     orgId: string;
@@ -407,9 +341,11 @@ export class RemindersService {
       ? { kind: 'learning_space', learningSpaceId: payload.learningSpaceId }
       : { kind: 'channel', channelId: payload.channelId };
 
-    const activityEvent = await this.publishActivityEvent({
+    const activityEvent = await publishActivityEvent({
+      supabase: this.supabase as never,
       orgId: job.org_id,
       eventType,
+      emitterLabel: 'api:reminders',
       occurredAt: now,
       sourceKind: 'system',
       actorProfileId: systemProfileId,
@@ -453,7 +389,7 @@ export class RemindersService {
       orgId: job.org_id,
       jobId: job.id,
       messageId,
-      activityEventId: activityEvent.id,
+      activityEventId: activityEvent?.id ?? null,
       result: 'succeeded',
       details: {
         event_type: eventType,

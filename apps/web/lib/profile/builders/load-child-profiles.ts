@@ -67,6 +67,7 @@ export async function loadChildProfiles(
   return profilesWithAvatar.map(({ row, avatarUrl }) => {
     const baseProfile: Omit<UserProfileVM, 'kind'> = mapBaseProfile(row as ProfileRow, {
       notificationDefaults: null,
+      notificationScopedDefaults: null,
       presence: null,
       avatarUrlOverride: avatarUrl,
     });

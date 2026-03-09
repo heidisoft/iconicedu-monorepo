@@ -7,8 +7,6 @@ import {
   FileText,
   Megaphone,
   MessageCircle,
-  ShieldCheck,
-  SlidersHorizontal,
   Wallet,
 } from 'lucide-react';
 
@@ -20,6 +18,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@iconicedu/ui-web/ui/dropdown-menu';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@iconicedu/ui-web/ui/select';
 import { Switch } from '@iconicedu/ui-web/ui/switch';
 import { toast } from 'sonner';
 import { notificationChannelOptions } from '@iconicedu/ui-web/components/sidebar/user-settings/constants';
@@ -34,6 +39,14 @@ type NotificationSection = {
   title: string;
   icon: React.ComponentType<{ className?: string }>;
   items: NotificationSectionItem[];
+};
+
+type ScopedNotificationPreference = {
+  scopeKind: 'channel' | 'learning_space';
+  scopeId: string;
+  prefKey: string;
+  channels: string[];
+  muted?: boolean | null;
 };
 
 const defineNotificationItems = <T extends NotificationSectionItem[]>(items: T) => items;
@@ -52,7 +65,19 @@ type NotificationsTabProps = {
     prefKey: string;
     channels: string[];
     muted?: boolean | null;
+    scopeKind?: 'channel' | 'learning_space';
+    scopeId?: string;
   }) => Promise<void> | void;
+  onNotificationPreferenceScopeDelete?: (input: {
+    profileId: string;
+    orgId: string;
+    prefKey: string;
+    scopeKind: 'channel' | 'learning_space';
+    scopeId: string;
+  }) => Promise<void> | void;
+  notificationScopedDefaults?: ScopedNotificationPreference[];
+  availableAlertChannels: Array<{ id: string; label: string }>;
+  availableAlertLearningSpaces: Array<{ id: string; label: string }>;
 };
 
 export function NotificationsTab({
@@ -62,22 +87,27 @@ export function NotificationsTab({
   profileId,
   orgId,
   onNotificationPreferenceSave,
+  onNotificationPreferenceScopeDelete,
+  notificationScopedDefaults = [],
+  availableAlertChannels,
+  availableAlertLearningSpaces,
 }: NotificationsTabProps) {
   const sections = [
     {
-      key: 'defaults',
-      title: 'Defaults',
+      key: 'general',
+      title: 'General Notifications',
       icon: Bell,
       items: defineNotificationItems([
         {
           key: 'defaults.message_updates',
-          label: 'Email updates about new messages and schedule changes',
+          label: 'Master message update setting',
         },
         {
           key: 'defaults.weekly_digest',
           label: 'Weekly digest of class activity',
         },
         { key: 'defaults.sms_reminders', label: 'SMS reminders for upcoming sessions' },
+        { key: 'system.alerts', label: 'System alerts and service notices' },
       ]),
     },
     {
@@ -85,14 +115,11 @@ export function NotificationsTab({
       title: 'Messages',
       icon: MessageCircle,
       items: defineNotificationItems([
-        { key: 'messages.direct_message', label: 'Email me when I get a direct message' },
-        { key: 'messages.teacher_message', label: 'Email me when a teacher messages me' },
-        { key: 'messages.mentions', label: 'Notify me about @mentions' },
-        { key: 'messages.replies', label: 'Notify me about replies to my messages' },
-        {
-          key: 'messages.mute_busy',
-          label: 'Mute busy channels (only @mentions and DMs)',
-        },
+        { key: 'dm.posted', label: 'Direct message posted' },
+        { key: 'dm.reaction.added', label: 'Direct message reaction added' },
+        { key: 'dm.reaction.removed', label: 'Direct message reaction removed' },
+        { key: 'message.posted', label: 'Channel/class message posted' },
+        { key: 'file.uploaded', label: 'File uploaded' },
       ]),
     },
     {
@@ -100,53 +127,33 @@ export function NotificationsTab({
       title: 'Schedule & Sessions',
       icon: Clock,
       items: defineNotificationItems([
-        { key: 'schedule.upcoming_reminder', label: 'Upcoming session reminder' },
-        { key: 'schedule.starting_soon', label: 'Session starting soon' },
-        { key: 'schedule.rescheduled', label: 'Session rescheduled' },
-        { key: 'schedule.canceled', label: 'Session canceled' },
-        { key: 'schedule.no_show', label: 'Tutor running late / no-show alert' },
-        { key: 'schedule.makeup', label: 'Make-up session scheduled' },
+        { key: 'session.scheduled', label: 'Session scheduled' },
+        { key: 'session.rescheduled', label: 'Session rescheduled' },
+        { key: 'session.canceled', label: 'Session canceled' },
+        { key: 'session.started', label: 'Session started' },
+        { key: 'session.ended', label: 'Session ended' },
+        { key: 'session.completed', label: 'Session completed' },
+        { key: 'session.reminder.sent', label: 'Session reminder sent' },
+        {
+          key: 'session.feedback_request.sent',
+          label: 'Session feedback request sent',
+        },
       ]),
     },
     {
-      key: 'homework',
-      title: 'Homework & Classwork',
+      key: 'classrooms',
+      title: 'Classrooms',
       icon: BookOpen,
       items: defineNotificationItems([
-        { key: 'homework.assigned', label: 'New homework assigned' },
-        { key: 'homework.due_reminder', label: 'Homework due reminder' },
-        { key: 'homework.feedback', label: 'Homework feedback posted' },
-        {
-          key: 'homework.new_resource',
-          label: 'New resource/material added (PDF, link, worksheet)',
-        },
-      ]),
-    },
-    {
-      key: 'progress',
-      title: 'Progress & Reports',
-      icon: FileText,
-      items: defineNotificationItems([
-        { key: 'progress.weekly_report', label: 'Weekly progress report' },
-        { key: 'progress.monthly_report', label: 'Monthly progress report' },
-        { key: 'progress.attendance_summary', label: 'Attendance summary' },
-        { key: 'progress.milestones', label: 'Milestones/achievements (optional)' },
-      ]),
-    },
-    {
-      key: 'announcements',
-      title: 'Announcements',
-      icon: Megaphone,
-      items: defineNotificationItems([
-        { key: 'announcements.important', label: 'Important announcements from ICONIC' },
-        {
-          key: 'announcements.class_posts',
-          label: 'Class announcements (teacher posts)',
-        },
-        {
-          key: 'announcements.policy_updates',
-          label: 'Policy or calendar updates (holidays, closures)',
-        },
+        { key: 'class.created', label: 'Class created' },
+        { key: 'class.updated', label: 'Class updated' },
+        { key: 'class.archived', label: 'Class archived' },
+        { key: 'member.invited', label: 'Participant invited' },
+        { key: 'members.invited', label: 'Participants invited' },
+        { key: 'member.joined', label: 'Participant joined' },
+        { key: 'member.removed', label: 'Participant removed' },
+        { key: 'members.removed', label: 'Participants removed' },
+        { key: 'role.changed', label: 'Participant role changed' },
       ]),
     },
     ...(isGuardianOrAdmin
@@ -156,40 +163,28 @@ export function NotificationsTab({
             title: 'Billing & Payments',
             icon: Wallet,
             items: defineNotificationItems([
-              { key: 'billing.receipt', label: 'Payment receipt' },
-              { key: 'billing.failed', label: 'Payment failed' },
-              { key: 'billing.invoice_ready', label: 'Invoice ready' },
-              { key: 'billing.refund', label: 'Refund processed' },
-              { key: 'billing.renewal', label: 'Plan ending / renewal reminder' },
+              { key: 'payment.reminder', label: 'Payment reminder' },
+              { key: 'payment.reminder.sent', label: 'Payment reminder sent' },
+              { key: 'payment.received', label: 'Payment received' },
+              { key: 'payment.failed', label: 'Payment failed' },
             ]),
           },
         ]
       : []),
     {
-      key: 'app',
-      title: 'App & Account',
-      icon: ShieldCheck,
+      key: 'homework',
+      title: 'Homework',
+      icon: FileText,
       items: defineNotificationItems([
-        {
-          key: 'app.security_alerts',
-          label: 'Security alerts (new login, password change) (recommended always on)',
-        },
-        { key: 'app.new_device', label: 'New device sign-in' },
-        { key: 'app.account_changes', label: 'Account changes (role/invite accepted)' },
+        { key: 'homework.assigned', label: 'Homework assigned' },
       ]),
     },
     {
-      key: 'digest',
-      title: 'Digest & Frequency',
-      icon: SlidersHorizontal,
+      key: 'system',
+      title: 'System Verb Notifications',
+      icon: Megaphone,
       items: defineNotificationItems([
-        { key: 'digest.instant', label: 'Instant notifications' },
-        { key: 'digest.daily', label: 'Daily digest' },
-        { key: 'digest.weekly', label: 'Weekly digest' },
-        {
-          key: 'digest.urgent_only',
-          label: 'Only urgent (schedule changes + direct messages)',
-        },
+        { key: 'system.notice', label: 'System notice events' },
       ]),
     },
   ] satisfies NotificationSection[];
@@ -208,6 +203,42 @@ export function NotificationsTab({
     );
     return Object.fromEntries(entries);
   }, [notificationChannels, notificationKeys]);
+  const scopedVerbKeys = React.useMemo(
+    () =>
+      sections
+        .filter((section) => section.key !== 'general')
+        .flatMap((section) => section.items.map((item) => item.key)),
+    [sections],
+  );
+  const scopedVerbLabels = React.useMemo(
+    () =>
+      new Map(
+        sections
+          .filter((section) => section.key !== 'general')
+          .flatMap((section) =>
+            section.items.map((item) => [item.key, item.label] as const),
+          ),
+      ),
+    [sections],
+  );
+
+  const [selectedScopedChannelId, setSelectedScopedChannelId] = React.useState<string>(
+    availableAlertChannels[0]?.id ?? '',
+  );
+  const [selectedScopedLearningSpaceId, setSelectedScopedLearningSpaceId] =
+    React.useState<string>(availableAlertLearningSpaces[0]?.id ?? '');
+
+  React.useEffect(() => {
+    if (!selectedScopedChannelId && availableAlertChannels[0]?.id) {
+      setSelectedScopedChannelId(availableAlertChannels[0].id);
+    }
+  }, [availableAlertChannels, selectedScopedChannelId]);
+
+  React.useEffect(() => {
+    if (!selectedScopedLearningSpaceId && availableAlertLearningSpaces[0]?.id) {
+      setSelectedScopedLearningSpaceId(availableAlertLearningSpaces[0].id);
+    }
+  }, [availableAlertLearningSpaces, selectedScopedLearningSpaceId]);
 
   const [, setPendingPreferenceToasts] = React.useState<Record<string, boolean>>({});
   const pendingToastTimers = React.useRef<Record<string, number>>({});
@@ -292,6 +323,94 @@ export function NotificationsTab({
       .join(', ');
   };
 
+  const scopedPreferenceByKey = React.useMemo(() => {
+    return new Map<string, ScopedNotificationPreference>(
+      notificationScopedDefaults.map((row) => [
+        `${row.scopeKind}:${row.scopeId}:${row.prefKey}`,
+        row,
+      ]),
+    );
+  }, [notificationScopedDefaults]);
+
+  const getScopedChannels = React.useCallback(
+    (input: {
+      scopeKind: 'channel' | 'learning_space';
+      scopeId: string;
+      prefKey: string;
+    }): string[] => {
+      const row = scopedPreferenceByKey.get(
+        `${input.scopeKind}:${input.scopeId}:${input.prefKey}`,
+      );
+      if (row) {
+        return row.channels ?? [];
+      }
+      return notificationChannels[input.prefKey] ?? [];
+    },
+    [notificationChannels, scopedPreferenceByKey],
+  );
+
+  const saveScopedPreference = React.useCallback(
+    (input: {
+      scopeKind: 'channel' | 'learning_space';
+      scopeId: string;
+      prefKey: string;
+      channels: string[];
+    }) => {
+      if (!onNotificationPreferenceSave) {
+        return;
+      }
+      return onNotificationPreferenceSave({
+        profileId,
+        orgId,
+        prefKey: input.prefKey,
+        channels: input.channels,
+        scopeKind: input.scopeKind,
+        scopeId: input.scopeId,
+      });
+    },
+    [onNotificationPreferenceSave, orgId, profileId],
+  );
+
+  const resetScopedPreference = React.useCallback(
+    (input: {
+      scopeKind: 'channel' | 'learning_space';
+      scopeId: string;
+      prefKey: string;
+    }) => {
+      if (!onNotificationPreferenceScopeDelete) {
+        return;
+      }
+      return onNotificationPreferenceScopeDelete({
+        profileId,
+        orgId,
+        prefKey: input.prefKey,
+        scopeKind: input.scopeKind,
+        scopeId: input.scopeId,
+      });
+    },
+    [onNotificationPreferenceScopeDelete, orgId, profileId],
+  );
+
+  const formatScopedChannels = React.useCallback(
+    (input: {
+      scopeKind: 'channel' | 'learning_space';
+      scopeId: string;
+      prefKey: string;
+    }) => {
+      const selected = getScopedChannels(input);
+      if (!selected.length) {
+        return 'Off';
+      }
+      return selected
+        .map(
+          (key) => notificationChannelOptions.find((option) => option.key === key)?.label,
+        )
+        .filter(Boolean)
+        .join(', ');
+    },
+    [getScopedChannels],
+  );
+
   return (
     <div className="space-y-8 w-full">
       <div className="space-y-3">
@@ -368,6 +487,226 @@ export function NotificationsTab({
             );
           })}
         </div>
+      </div>
+
+      <div className="space-y-3">
+        <UserSettingsTabSection
+          icon={<MessageCircle className="h-5 w-5" />}
+          title="Channel alerts"
+          subtitle="Per-verb overrides for a specific channel"
+          showSeparator={true}
+        >
+          {availableAlertChannels.length ? (
+            <div className="space-y-3">
+              <Select
+                value={selectedScopedChannelId}
+                onValueChange={setSelectedScopedChannelId}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a channel" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableAlertChannels.map((channel) => (
+                    <SelectItem key={channel.id} value={channel.id}>
+                      {channel.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {scopedVerbKeys.map((prefKey) => (
+                <div
+                  key={`channel-${prefKey}`}
+                  className="flex items-center justify-between gap-2"
+                >
+                  <span className="text-sm">
+                    {scopedVerbLabels.get(prefKey) ?? prefKey}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 gap-1 px-2 text-xs"
+                        >
+                          {formatScopedChannels({
+                            scopeKind: 'channel',
+                            scopeId: selectedScopedChannelId,
+                            prefKey,
+                          })}
+                          <ChevronDown className="h-3 w-3" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {notificationChannelOptions.map((option) => {
+                          const currentChannels = getScopedChannels({
+                            scopeKind: 'channel',
+                            scopeId: selectedScopedChannelId,
+                            prefKey,
+                          });
+                          const isChecked = currentChannels.includes(option.key);
+                          return (
+                            <DropdownMenuItem
+                              key={option.key}
+                              onSelect={(event) => event.preventDefault()}
+                              className="flex items-center justify-between gap-3"
+                            >
+                              <span>{option.label}</span>
+                              <Switch
+                                checked={isChecked}
+                                onCheckedChange={(checked) => {
+                                  const nextChannels = checked
+                                    ? [...currentChannels, option.key]
+                                    : currentChannels.filter(
+                                        (item) => item !== option.key,
+                                      );
+                                  void saveScopedPreference({
+                                    scopeKind: 'channel',
+                                    scopeId: selectedScopedChannelId,
+                                    prefKey,
+                                    channels: Array.from(new Set(nextChannels)),
+                                  });
+                                }}
+                                aria-label={`${option.label} notifications for ${scopedVerbLabels.get(prefKey) ?? prefKey}`}
+                              />
+                            </DropdownMenuItem>
+                          );
+                        })}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-2 text-xs"
+                      onClick={() =>
+                        void resetScopedPreference({
+                          scopeKind: 'channel',
+                          scopeId: selectedScopedChannelId,
+                          prefKey,
+                        })
+                      }
+                    >
+                      Reset
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No channels available.</p>
+          )}
+        </UserSettingsTabSection>
+      </div>
+
+      <div className="space-y-3">
+        <UserSettingsTabSection
+          icon={<BookOpen className="h-5 w-5" />}
+          title="Classroom alerts"
+          subtitle="Per-verb overrides for a specific classroom"
+          showSeparator={false}
+        >
+          {availableAlertLearningSpaces.length ? (
+            <div className="space-y-3">
+              <Select
+                value={selectedScopedLearningSpaceId}
+                onValueChange={setSelectedScopedLearningSpaceId}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a classroom" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableAlertLearningSpaces.map((space) => (
+                    <SelectItem key={space.id} value={space.id}>
+                      {space.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {scopedVerbKeys.map((prefKey) => (
+                <div
+                  key={`learning-space-${prefKey}`}
+                  className="flex items-center justify-between gap-2"
+                >
+                  <span className="text-sm">
+                    {scopedVerbLabels.get(prefKey) ?? prefKey}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 gap-1 px-2 text-xs"
+                        >
+                          {formatScopedChannels({
+                            scopeKind: 'learning_space',
+                            scopeId: selectedScopedLearningSpaceId,
+                            prefKey,
+                          })}
+                          <ChevronDown className="h-3 w-3" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {notificationChannelOptions.map((option) => {
+                          const currentChannels = getScopedChannels({
+                            scopeKind: 'learning_space',
+                            scopeId: selectedScopedLearningSpaceId,
+                            prefKey,
+                          });
+                          const isChecked = currentChannels.includes(option.key);
+                          return (
+                            <DropdownMenuItem
+                              key={option.key}
+                              onSelect={(event) => event.preventDefault()}
+                              className="flex items-center justify-between gap-3"
+                            >
+                              <span>{option.label}</span>
+                              <Switch
+                                checked={isChecked}
+                                onCheckedChange={(checked) => {
+                                  const nextChannels = checked
+                                    ? [...currentChannels, option.key]
+                                    : currentChannels.filter(
+                                        (item) => item !== option.key,
+                                      );
+                                  void saveScopedPreference({
+                                    scopeKind: 'learning_space',
+                                    scopeId: selectedScopedLearningSpaceId,
+                                    prefKey,
+                                    channels: Array.from(new Set(nextChannels)),
+                                  });
+                                }}
+                                aria-label={`${option.label} notifications for ${scopedVerbLabels.get(prefKey) ?? prefKey}`}
+                              />
+                            </DropdownMenuItem>
+                          );
+                        })}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-2 text-xs"
+                      onClick={() =>
+                        void resetScopedPreference({
+                          scopeKind: 'learning_space',
+                          scopeId: selectedScopedLearningSpaceId,
+                          prefKey,
+                        })
+                      }
+                    >
+                      Reset
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No classrooms available.</p>
+          )}
+        </UserSettingsTabSection>
       </div>
     </div>
   );

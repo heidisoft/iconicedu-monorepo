@@ -274,3 +274,34 @@ export type ActivityFeedVM = {
   nextCursor?: string | null;
   unreadCount?: number;
 };
+
+export type ActivityVerbSuppressionScopeVM = 'org' | 'actor';
+
+export type ActivityVerbSuppressionRuleVM = {
+  id: UUID;
+  orgId: UUID;
+  eventType: string;
+  actorProfileId?: UUID | null;
+  scope: ActivityVerbSuppressionScopeVM;
+  isEnabled: boolean;
+  createdAt: ISODateTime;
+  updatedAt: ISODateTime;
+};
+
+export type ActivityVerbCatalogItemVM = {
+  eventType: string;
+  isKnown: boolean;
+  isReadOnly: boolean;
+};
+
+export type ActivityVerbSuppressionProfileOptionVM = {
+  profileId: UUID;
+  displayName: string;
+};
+
+export type ActivityVerbSuppressionSnapshotVM = {
+  orgRules: ActivityVerbSuppressionRuleVM[];
+  actorRules: ActivityVerbSuppressionRuleVM[];
+  verbCatalog: ActivityVerbCatalogItemVM[];
+  profiles: ActivityVerbSuppressionProfileOptionVM[];
+};

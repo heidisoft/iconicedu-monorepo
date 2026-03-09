@@ -1655,3 +1655,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
 export function getActivityEventDefinition(eventType: string) {
   return ACTIVITY_EVENT_DEFINITIONS[eventType];
 }
+
+export function listActivityEventDefinitionTypes() {
+  return Object.keys(ACTIVITY_EVENT_DEFINITIONS).sort();
+}

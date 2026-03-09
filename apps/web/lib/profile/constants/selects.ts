@@ -36,6 +36,8 @@ export const PROFILE_SUMMARY_SELECT = [
 ].join(',');
 
 export const NOTIFICATION_DEFAULTS_SELECT = 'pref_key, channels, muted';
+export const NOTIFICATION_SCOPED_DEFAULTS_SELECT =
+  'scope_kind, scope_id, pref_key, channels, muted';
 
 export const PRESENCE_SELECT = [
   'state_text',

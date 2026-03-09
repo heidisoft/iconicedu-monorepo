@@ -44,6 +44,7 @@ describe('mapBaseProfile', () => {
       },
       {
         notificationDefaults: null,
+        notificationScopedDefaults: null,
         presence: null,
       },
     );
@@ -61,6 +62,7 @@ describe('mapBaseProfile', () => {
       },
       {
         notificationDefaults: null,
+        notificationScopedDefaults: null,
         presence: null,
       },
     );
@@ -78,6 +80,7 @@ describe('mapBaseProfile', () => {
       },
       {
         notificationDefaults: null,
+        notificationScopedDefaults: null,
         presence: null,
       },
     );
@@ -95,6 +98,7 @@ describe('mapBaseProfile', () => {
       },
       {
         notificationDefaults: null,
+        notificationScopedDefaults: null,
         presence: null,
       },
     );

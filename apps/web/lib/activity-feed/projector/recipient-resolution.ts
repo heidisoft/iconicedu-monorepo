@@ -1,8 +1,15 @@
-import type { ActivityEventRow, FamilyLinkRow, ProfileRow } from '@iconicedu/shared-types';
+import type {
+  ActivityEventRow,
+  FamilyLinkRow,
+  ProfileRow,
+} from '@iconicedu/shared-types';
 import type { SupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 
 import { getFamilyLinksByOrg } from '@iconicedu/web/lib/family/queries/families.query';
-import { getProfilesByAccountIds, getProfilesByIds } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import {
+  getProfilesByAccountIds,
+  getProfilesByIds,
+} from '@iconicedu/web/lib/profile/queries/profiles.query';
 
 function asRecord(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -43,6 +50,91 @@ function applyRecipientExclusions(
   }
 
   return unique(recipients.filter((recipientId) => !excludedIds.has(recipientId)));
+}
+
+async function applyNotificationPreferenceFiltering(
+  supabase: SupabaseServiceClient,
+  event: ActivityEventRow,
+  recipients: string[],
+) {
+  if (!recipients.length) {
+    return recipients;
+  }
+
+  const scope = asRecord(event.scope);
+  const scopeKind =
+    scope.kind === 'channel'
+      ? 'channel'
+      : scope.kind === 'learning_space'
+        ? 'learning_space'
+        : null;
+  const scopeId =
+    scope.kind === 'channel'
+      ? typeof scope.channelId === 'string'
+        ? scope.channelId
+        : null
+      : scope.kind === 'learning_space'
+        ? typeof scope.learningSpaceId === 'string'
+          ? scope.learningSpaceId
+          : null
+        : null;
+
+  const [scopedResponse, globalResponse] = await Promise.all([
+    scopeKind && scopeId
+      ? supabase
+          .from('notification_preference_scopes')
+          .select('profile_id, channels, muted')
+          .eq('org_id', event.org_id)
+          .eq('pref_key', event.event_type)
+          .eq('scope_kind', scopeKind)
+          .eq('scope_id', scopeId)
+          .in('profile_id', recipients)
+          .is('deleted_at', null)
+          .returns<
+            Array<{
+              profile_id: string;
+              channels: string[] | null;
+              muted?: boolean | null;
+            }>
+          >()
+      : Promise.resolve({ data: [], error: null }),
+    supabase
+      .from('notification_preferences')
+      .select('profile_id, channels, muted')
+      .eq('org_id', event.org_id)
+      .eq('pref_key', event.event_type)
+      .in('profile_id', recipients)
+      .is('deleted_at', null)
+      .returns<
+        Array<{ profile_id: string; channels: string[] | null; muted?: boolean | null }>
+      >(),
+  ]);
+
+  if (scopedResponse.error) {
+    throw new Error(scopedResponse.error.message);
+  }
+  if (globalResponse.error) {
+    throw new Error(globalResponse.error.message);
+  }
+
+  const scopedByProfileId = new Map(
+    (scopedResponse.data ?? []).map((row) => [row.profile_id, row]),
+  );
+  const globalByProfileId = new Map(
+    (globalResponse.data ?? []).map((row) => [row.profile_id, row]),
+  );
+
+  return recipients.filter((recipientId) => {
+    const preference =
+      scopedByProfileId.get(recipientId) ?? globalByProfileId.get(recipientId);
+    if (!preference) {
+      return true;
+    }
+    if (preference.muted) {
+      return false;
+    }
+    return Array.isArray(preference.channels) && preference.channels.length > 0;
+  });
 }
 
 async function loadGuardianProfileIdsForChildProfileIds(
@@ -89,7 +181,9 @@ async function loadGuardianProfileIdsForChildProfileIds(
     throw new Error(guardianProfilesResponse.error.message);
   }
 
-  return unique((guardianProfilesResponse.data ?? []).map((profile: ProfileRow) => profile.id));
+  return unique(
+    (guardianProfilesResponse.data ?? []).map((profile: ProfileRow) => profile.id),
+  );
 }
 
 async function resolveLearningSpaceRecipients(
@@ -109,8 +203,14 @@ async function resolveLearningSpaceRecipients(
     throw new Error(participantsResponse.error.message);
   }
 
-  const participantIds = unique((participantsResponse.data ?? []).map((row) => row.profile_id));
-  const guardianIds = await loadGuardianProfileIdsForChildProfileIds(supabase, orgId, participantIds);
+  const participantIds = unique(
+    (participantsResponse.data ?? []).map((row) => row.profile_id),
+  );
+  const guardianIds = await loadGuardianProfileIdsForChildProfileIds(
+    supabase,
+    orgId,
+    participantIds,
+  );
   return unique([...participantIds, ...guardianIds]);
 }
 
@@ -132,7 +232,11 @@ async function resolveChannelRecipients(
   }
 
   const memberIds = unique((membersResponse.data ?? []).map((row) => row.profile_id));
-  const guardianIds = await loadGuardianProfileIdsForChildProfileIds(supabase, orgId, memberIds);
+  const guardianIds = await loadGuardianProfileIdsForChildProfileIds(
+    supabase,
+    orgId,
+    memberIds,
+  );
   return unique([...memberIds, ...guardianIds]);
 }
 
@@ -141,28 +245,37 @@ export async function resolveRecipientsForActivityEvent(
   event: ActivityEventRow,
 ) {
   const scope = asRecord(event.scope);
-  const audienceRules = (Array.isArray(event.audience_rules) ? event.audience_rules : []).filter(
+  const audienceRules = (
+    Array.isArray(event.audience_rules) ? event.audience_rules : []
+  ).filter(
     (rule): rule is Record<string, unknown> =>
       Boolean(rule) && typeof rule === 'object' && !Array.isArray(rule),
   );
   const scopeKind = typeof scope.kind === 'string' ? scope.kind : 'global';
 
   if (scopeKind === 'user' && typeof scope.userId === 'string') {
-    return applyRecipientExclusions([scope.userId], event, audienceRules);
+    const recipients = applyRecipientExclusions([scope.userId], event, audienceRules);
+    return applyNotificationPreferenceFiltering(supabase, event, recipients);
   }
 
   if (scopeKind === 'learning_space' && typeof scope.learningSpaceId === 'string') {
-    const recipients = await resolveLearningSpaceRecipients(
+    const resolved = await resolveLearningSpaceRecipients(
       supabase,
       event.org_id,
       scope.learningSpaceId,
     );
-    return applyRecipientExclusions(recipients, event, audienceRules);
+    const recipients = applyRecipientExclusions(resolved, event, audienceRules);
+    return applyNotificationPreferenceFiltering(supabase, event, recipients);
   }
 
   if (scopeKind === 'channel' && typeof scope.channelId === 'string') {
-    const recipients = await resolveChannelRecipients(supabase, event.org_id, scope.channelId);
-    return applyRecipientExclusions(recipients, event, audienceRules);
+    const resolved = await resolveChannelRecipients(
+      supabase,
+      event.org_id,
+      scope.channelId,
+    );
+    const recipients = applyRecipientExclusions(resolved, event, audienceRules);
+    return applyNotificationPreferenceFiltering(supabase, event, recipients);
   }
 
   const usersOnlyRule = audienceRules.find(
@@ -174,12 +287,14 @@ export async function resolveRecipientsForActivityEvent(
   ) as Record<string, unknown> | undefined;
 
   if (usersOnlyRule && Array.isArray(usersOnlyRule.userIds)) {
-    return applyRecipientExclusions(
+    const recipients = applyRecipientExclusions(
       usersOnlyRule.userIds.filter((value): value is string => typeof value === 'string'),
       event,
       audienceRules,
     );
+    return applyNotificationPreferenceFiltering(supabase, event, recipients);
   }
 
-  return applyRecipientExclusions([], event, audienceRules);
+  const recipients = applyRecipientExclusions([], event, audienceRules);
+  return applyNotificationPreferenceFiltering(supabase, event, recipients);
 }

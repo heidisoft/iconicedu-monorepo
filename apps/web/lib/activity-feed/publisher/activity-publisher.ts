@@ -9,11 +9,16 @@ import type { ActivityEventRow } from '@iconicedu/shared-types';
 import type { SupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 
 import { projectActivityEvents } from '@iconicedu/web/lib/activity-feed/projector/project-activity-events';
+import {
+  isActivityVerbSuppressionDebugEnabled,
+  resolveActivityVerbSuppressionDecision,
+} from '@iconicedu/web/lib/activity-feed/suppression/activity-verb-suppression';
 
 type PublishActivityEventInput<TPayload extends object = Record<string, unknown>> = {
   supabase: SupabaseServiceClient;
   orgId: string;
   eventType: ActivityEventTypeVM;
+  emitterLabel?: string;
   occurredAt?: string;
   sourceKind: ActivityEventRow['source_kind'];
   actorProfileId?: string | null;
@@ -29,6 +34,30 @@ type PublishActivityEventInput<TPayload extends object = Record<string, unknown>
 export async function publishActivityEvent<TPayload extends object>(
   input: PublishActivityEventInput<TPayload>,
 ) {
+  const suppressionDecision = await resolveActivityVerbSuppressionDecision({
+    supabase: input.supabase,
+    orgId: input.orgId,
+    eventType: input.eventType,
+    actorProfileId: input.actorProfileId ?? null,
+  });
+
+  if (isActivityVerbSuppressionDebugEnabled()) {
+    console.log('[activity-feed:verb-suppression]', 'decision', {
+      emitter: input.emitterLabel ?? 'web:publishActivityEvent',
+      orgId: input.orgId,
+      eventType: input.eventType,
+      actorProfileId: input.actorProfileId ?? null,
+      action: suppressionDecision.shouldPublish ? 'published' : 'suppressed',
+      source: suppressionDecision.source,
+      ruleId: suppressionDecision.rule?.id ?? null,
+      ruleEnabled: suppressionDecision.rule?.is_enabled ?? null,
+    });
+  }
+
+  if (!suppressionDecision.shouldPublish) {
+    return null;
+  }
+
   const now = new Date().toISOString();
   const insertResponse = await input.supabase
     .from('activity_events')
@@ -77,7 +106,10 @@ export async function publishActivityEvent<TPayload extends object>(
   }
 
   try {
-    await projectActivityEvents(input.supabase, { eventIds: [insertResponse.data.id], limit: 1 });
+    await projectActivityEvents(input.supabase, {
+      eventIds: [insertResponse.data.id],
+      limit: 1,
+    });
   } catch {
     // Keep the event durable even if immediate projection fails.
   }
@@ -89,7 +121,9 @@ export async function publishSystemNoticeActivity(input: {
   supabase: SupabaseServiceClient;
   orgId: string;
   actorProfileId?: string | null;
-  audienceRules: NonNullable<PublishActivityEventInput<SystemNoticeActivityEventPayload>['audienceRules']>;
+  audienceRules: NonNullable<
+    PublishActivityEventInput<SystemNoticeActivityEventPayload>['audienceRules']
+  >;
   payload: SystemNoticeActivityEventPayload;
   dedupeKey?: string | null;
 }) {

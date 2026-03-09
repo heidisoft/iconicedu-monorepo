@@ -22,7 +22,10 @@ import type {
 } from '@iconicedu/ui-web/components/sidebar/user-settings/profile-tab';
 import { ResponsiveDialog } from '@iconicedu/ui-web/components/shared/responsive-dialog';
 import { UserSettingsTabs } from '@iconicedu/ui-web/components/sidebar/user-settings/user-settings-tabs';
-import { OnboardingStep, type UserSettingsTab } from '@iconicedu/ui-web/components/sidebar/user-settings/constants';
+import {
+  OnboardingStep,
+  type UserSettingsTab,
+} from '@iconicedu/ui-web/components/sidebar/user-settings/constants';
 import {
   USER_SETTINGS_DIALOG_SURFACE_CLASS,
   USER_SETTINGS_DRAWER_SURFACE_CLASS,
@@ -79,7 +82,18 @@ type UserSettingsDialogProps = {
     prefKey: string;
     channels: string[];
     muted?: boolean | null;
+    scopeKind?: 'channel' | 'learning_space';
+    scopeId?: string;
   }) => Promise<void> | void;
+  onNotificationPreferenceScopeDelete?: (input: {
+    profileId: string;
+    orgId: string;
+    prefKey: string;
+    scopeKind: 'channel' | 'learning_space';
+    scopeId: string;
+  }) => Promise<void> | void;
+  availableAlertChannels?: Array<{ id: string; label: string }>;
+  availableAlertLearningSpaces?: Array<{ id: string; label: string }>;
   onFamilyInviteCreate?: (input: {
     invitedRole: FamilyLinkInviteRole;
     invitedEmail: string;
@@ -134,6 +148,9 @@ export function UserSettingsDialog({
   onPrefsSave,
   onChildThemeSave,
   onNotificationPreferenceSave,
+  onNotificationPreferenceScopeDelete,
+  availableAlertChannels,
+  availableAlertLearningSpaces,
   onLocationSave,
   onAvatarUpload,
   onAvatarRemove,
@@ -239,6 +256,9 @@ export function UserSettingsDialog({
       onPrefsSave={onPrefsSave}
       onChildThemeSave={onChildThemeSave}
       onNotificationPreferenceSave={onNotificationPreferenceSave}
+      onNotificationPreferenceScopeDelete={onNotificationPreferenceScopeDelete}
+      availableAlertChannels={availableAlertChannels}
+      availableAlertLearningSpaces={availableAlertLearningSpaces}
       onLocationContinue={handleLocationContinue}
       onAccountUpdate={onAccountUpdate}
       onFamilyInviteCreate={onFamilyInviteCreate}

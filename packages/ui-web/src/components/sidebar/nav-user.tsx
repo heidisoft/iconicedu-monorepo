@@ -59,7 +59,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  useSidebar,
 } from '@iconicedu/ui-web/ui/sidebar';
 import {
   ONBOARDING_STEP_TO_TAB,
@@ -93,6 +92,9 @@ export function NavUser({
   onAvatarUpload,
   onAvatarRemove,
   onNotificationPreferenceSave,
+  onNotificationPreferenceScopeDelete,
+  availableAlertChannels,
+  availableAlertLearningSpaces,
   onFamilyInviteCreate,
   onFamilyInviteRemove,
   onChildThemeSave,
@@ -143,7 +145,18 @@ export function NavUser({
     prefKey: string;
     channels: string[];
     muted?: boolean | null;
+    scopeKind?: 'channel' | 'learning_space';
+    scopeId?: string;
   }) => Promise<void> | void;
+  onNotificationPreferenceScopeDelete?: (input: {
+    profileId: string;
+    orgId: string;
+    prefKey: string;
+    scopeKind: 'channel' | 'learning_space';
+    scopeId: string;
+  }) => Promise<void> | void;
+  availableAlertChannels?: Array<{ id: string; label: string }>;
+  availableAlertLearningSpaces?: Array<{ id: string; label: string }>;
   onChildThemeSave?: (input: {
     profileId: string;
     orgId: string;
@@ -182,7 +195,6 @@ export function NavUser({
   }) => Promise<void> | void;
   onOnboardingComplete?: () => void;
 }) {
-  const { isMobile } = useSidebar();
   const profileDisplayName = getProfileFullName(profile.profile);
   const secondaryLabel =
     account?.contacts.email ?? profile.prefs.locale ?? profile.prefs.timezone ?? '';
@@ -192,7 +204,8 @@ export function NavUser({
   const [statusDialogOpen, setStatusDialogOpen] = React.useState(false);
   const [statusText, setStatusText] = React.useState('');
   const [statusEmoji, setStatusEmoji] = React.useState('');
-  const [statusClearAfter, setStatusClearAfter] = React.useState<StatusClearAfterOption>('never');
+  const [statusClearAfter, setStatusClearAfter] =
+    React.useState<StatusClearAfterOption>('never');
   const [statusSaveError, setStatusSaveError] = React.useState<string | null>(null);
   const [isSavingStatus, setIsSavingStatus] = React.useState(false);
 
@@ -214,8 +227,9 @@ export function NavUser({
   }, [onLogout]);
 
   React.useEffect(() => {
-    const step =
-      onboardingStatus?.currentStep as keyof typeof ONBOARDING_STEP_TO_TAB | undefined;
+    const step = onboardingStatus?.currentStep as
+      | keyof typeof ONBOARDING_STEP_TO_TAB
+      | undefined;
     if (!step) {
       return;
     }
@@ -234,7 +248,12 @@ export function NavUser({
     setStatusEmoji(profile.presence?.state?.emoji?.trim() ?? '');
     setStatusClearAfter(profile.presence?.state?.expiresAt ? 'today' : 'never');
     setStatusSaveError(null);
-  }, [statusDialogOpen, profile.presence?.state?.emoji, profile.presence?.state?.expiresAt, profile.presence?.state?.text]);
+  }, [
+    statusDialogOpen,
+    profile.presence?.state?.emoji,
+    profile.presence?.state?.expiresAt,
+    profile.presence?.state?.text,
+  ]);
 
   const openStatusDialog = React.useCallback(() => {
     setStatusDialogOpen(true);
@@ -262,7 +281,9 @@ export function NavUser({
       }
       setStatusDialogOpen(false);
     } catch (error) {
-      setStatusSaveError(error instanceof Error ? error.message : 'Unable to save status');
+      setStatusSaveError(
+        error instanceof Error ? error.message : 'Unable to save status',
+      );
     } finally {
       setIsSavingStatus(false);
     }
@@ -279,7 +300,9 @@ export function NavUser({
       await onStatusOverrideSave({ clearState: true });
       setStatusDialogOpen(false);
     } catch (error) {
-      setStatusSaveError(error instanceof Error ? error.message : 'Unable to clear status');
+      setStatusSaveError(
+        error instanceof Error ? error.message : 'Unable to clear status',
+      );
     } finally {
       setIsSavingStatus(false);
     }
@@ -309,9 +332,7 @@ export function NavUser({
                 initialsLength={1}
               />
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">
-                  {profileDisplayName}
-                </span>
+                <span className="truncate font-medium">{profileDisplayName}</span>
                 {secondaryLabel ? (
                   <span className="truncate text-xs">{secondaryLabel}</span>
                 ) : null}
@@ -337,9 +358,7 @@ export function NavUser({
                   initialsLength={1}
                 />
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-medium">
-                      {profileDisplayName}
-                  </span>
+                  <span className="truncate font-medium">{profileDisplayName}</span>
                   {secondaryLabel ? (
                     <span className="truncate text-xs">{secondaryLabel}</span>
                   ) : null}
@@ -394,123 +413,134 @@ export function NavUser({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={handleLogout} disabled={isLoggingOut}>
-          <LogOut />
-          Log out
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  <UserSettingsDialog
-        open={settingsOpen}
-        onOpenChange={setSettingsOpen}
-        activeTab={settingsTab}
-        onTabChange={setSettingsTab}
-        profile={profile}
-        account={account}
-        onLogout={onLogout}
-        onProfileSave={onProfileSave}
-        onChildProfileSave={onChildProfileSave}
-        onAccountUpdate={onAccountUpdate}
-        onPrefsSave={onPrefsSave}
-        onChildThemeSave={onChildThemeSave}
-        onLocationSave={onLocationSave}
-        onAvatarUpload={onAvatarUpload}
-        onAvatarRemove={onAvatarRemove}
-        onNotificationPreferenceSave={onNotificationPreferenceSave}
-        onFamilyInviteCreate={onFamilyInviteCreate}
-        onFamilyInviteRemove={onFamilyInviteRemove}
-        onChildProfileCreate={onChildProfileCreate}
-        onFamilyMemberRemove={onFamilyMemberRemove}
-        onEducatorProfileSave={onEducatorProfileSave}
-        onEducatorAvailabilitySave={onEducatorAvailabilitySave}
-        onStaffProfileSave={onStaffProfileSave}
-        onboardingStep={onboardingStatus?.currentStep ?? null}
-        onOnboardingComplete={onOnboardingComplete}
-      />
-      <Dialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Set a status</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Select
-                value={statusEmoji || '__none__'}
-                onValueChange={(value) => setStatusEmoji(value === '__none__' ? '' : value)}
-              >
-                <SelectTrigger className="w-28">
-                  <SelectValue placeholder="Emoji" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">None</SelectItem>
-                  {STATUS_EMOJI_OPTIONS.map((emoji) => (
-                    <SelectItem key={emoji} value={emoji}>
-                      {emoji}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Input
-                placeholder="What's your status?"
-                value={statusText}
-                maxLength={80}
-                onChange={(event) => setStatusText(event.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
-              {STATUS_PRESETS.map((preset) => (
-                <button
-                  key={preset.label}
-                  type="button"
-                  className="hover:bg-accent w-full rounded-md px-2 py-1.5 text-left text-sm"
-                  onClick={() => {
-                    setStatusEmoji(preset.emoji);
-                    setStatusText(preset.text);
-                    setStatusClearAfter(preset.clearAfter);
-                  }}
+            <DropdownMenuItem onSelect={handleLogout} disabled={isLoggingOut}>
+              <LogOut />
+              Log out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <UserSettingsDialog
+          open={settingsOpen}
+          onOpenChange={setSettingsOpen}
+          activeTab={settingsTab}
+          onTabChange={setSettingsTab}
+          profile={profile}
+          account={account}
+          onLogout={onLogout}
+          onProfileSave={onProfileSave}
+          onChildProfileSave={onChildProfileSave}
+          onAccountUpdate={onAccountUpdate}
+          onPrefsSave={onPrefsSave}
+          onChildThemeSave={onChildThemeSave}
+          onLocationSave={onLocationSave}
+          onAvatarUpload={onAvatarUpload}
+          onAvatarRemove={onAvatarRemove}
+          onNotificationPreferenceSave={onNotificationPreferenceSave}
+          onNotificationPreferenceScopeDelete={onNotificationPreferenceScopeDelete}
+          availableAlertChannels={availableAlertChannels}
+          availableAlertLearningSpaces={availableAlertLearningSpaces}
+          onFamilyInviteCreate={onFamilyInviteCreate}
+          onFamilyInviteRemove={onFamilyInviteRemove}
+          onChildProfileCreate={onChildProfileCreate}
+          onFamilyMemberRemove={onFamilyMemberRemove}
+          onEducatorProfileSave={onEducatorProfileSave}
+          onEducatorAvailabilitySave={onEducatorAvailabilitySave}
+          onStaffProfileSave={onStaffProfileSave}
+          onboardingStep={onboardingStatus?.currentStep ?? null}
+          onOnboardingComplete={onOnboardingComplete}
+        />
+        <Dialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Set a status</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Select
+                  value={statusEmoji || '__none__'}
+                  onValueChange={(value) =>
+                    setStatusEmoji(value === '__none__' ? '' : value)
+                  }
                 >
-                  <span className="inline-flex items-center gap-2">
-                    <span>{preset.emoji}</span>
-                    <span>{preset.label}</span>
-                  </span>
-                </button>
-              ))}
+                  <SelectTrigger className="w-28">
+                    <SelectValue placeholder="Emoji" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">None</SelectItem>
+                    {STATUS_EMOJI_OPTIONS.map((emoji) => (
+                      <SelectItem key={emoji} value={emoji}>
+                        {emoji}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  placeholder="What's your status?"
+                  value={statusText}
+                  maxLength={80}
+                  onChange={(event) => setStatusText(event.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                {STATUS_PRESETS.map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    className="hover:bg-accent w-full rounded-md px-2 py-1.5 text-left text-sm"
+                    onClick={() => {
+                      setStatusEmoji(preset.emoji);
+                      setStatusText(preset.text);
+                      setStatusClearAfter(preset.clearAfter);
+                    }}
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <span>{preset.emoji}</span>
+                      <span>{preset.label}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <div className="space-y-1">
+                <p className="text-muted-foreground inline-flex items-center gap-1 text-xs">
+                  <Clock3 className="size-3" />
+                  Clear after
+                </p>
+                <Select
+                  value={statusClearAfter}
+                  onValueChange={(value) =>
+                    setStatusClearAfter(value as StatusClearAfterOption)
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUS_CLEAR_AFTER_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {statusSaveError ? (
+                <p className="text-destructive text-xs">{statusSaveError}</p>
+              ) : null}
             </div>
-            <div className="space-y-1">
-              <p className="text-muted-foreground inline-flex items-center gap-1 text-xs">
-                <Clock3 className="size-3" />
-                Clear after
-              </p>
-              <Select
-                value={statusClearAfter}
-                onValueChange={(value) => setStatusClearAfter(value as StatusClearAfterOption)}
+            <DialogFooter>
+              <Button
+                variant="ghost"
+                onClick={handleClearStatus}
+                disabled={isSavingStatus}
               >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {STATUS_CLEAR_AFTER_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {statusSaveError ? (
-              <p className="text-destructive text-xs">{statusSaveError}</p>
-            ) : null}
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={handleClearStatus} disabled={isSavingStatus}>
-              Clear
-            </Button>
-            <Button onClick={handleSaveStatus} disabled={isSavingStatus}>
-              Save
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+                Clear
+              </Button>
+              <Button onClick={handleSaveStatus} disabled={isSavingStatus}>
+                Save
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </SidebarMenuItem>
     </SidebarMenu>
   );

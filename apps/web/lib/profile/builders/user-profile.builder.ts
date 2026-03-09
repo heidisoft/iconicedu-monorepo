@@ -1,6 +1,7 @@
 import type {
   FamilyLinkInviteRow,
   NotificationDefaultsVM,
+  NotificationScopedPreferenceVM,
   NotificationPreferenceVM,
   PresenceVM,
   UserProfileVM,
@@ -11,6 +12,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { mapBaseProfile } from '@iconicedu/web/lib/profile/mappers/base-profile.mapper';
 import { resolveProfileAvatarUrl } from '@iconicedu/web/lib/profile/avatar-url';
 import { getNotificationDefaults } from '@iconicedu/web/lib/profile/queries/notification-defaults.query';
+import { getNotificationScopedDefaults } from '@iconicedu/web/lib/profile/queries/notification-scoped-defaults.query';
 import { getPresence } from '@iconicedu/web/lib/profile/queries/presence.query';
 import { mapProfilePresenceRowToVM } from '@iconicedu/web/lib/profile/mappers/presence.mapper';
 import {
@@ -86,14 +88,17 @@ export async function buildUserProfileFromRow(
   profileRow: ProfileRow,
   options: BuildUserProfileOptions = {},
 ): Promise<UserProfileVM> {
-  const [notificationDefaults, presence, avatarUrl] = await Promise.all([
-    loadNotificationDefaults(supabase, profileRow.org_id, profileRow.id),
-    loadPresence(supabase, profileRow.org_id, profileRow.id),
-    resolveAvatarUrl(supabase, profileRow.avatar_source, profileRow.avatar_url ?? null),
-  ]);
+  const [notificationDefaults, notificationScopedDefaults, presence, avatarUrl] =
+    await Promise.all([
+      loadNotificationDefaults(supabase, profileRow.org_id, profileRow.id),
+      loadNotificationScopedDefaults(supabase, profileRow.org_id, profileRow.id),
+      loadPresence(supabase, profileRow.org_id, profileRow.id),
+      resolveAvatarUrl(supabase, profileRow.avatar_source, profileRow.avatar_url ?? null),
+    ]);
 
   const baseProfile = mapBaseProfile(profileRow, {
     notificationDefaults,
+    notificationScopedDefaults,
     presence,
     avatarUrlOverride: avatarUrl,
     accountEmail: options.accountEmail ?? null,
@@ -138,6 +143,28 @@ export async function buildUserProfileFromRow(
     ...baseProfile,
     kind: 'system',
   };
+}
+
+async function loadNotificationScopedDefaults(
+  supabase: SupabaseClient,
+  orgId: string,
+  profileId: string,
+): Promise<NotificationScopedPreferenceVM[] | null> {
+  const { data } = await getNotificationScopedDefaults(supabase, orgId, profileId);
+
+  if (!data?.length) {
+    return null;
+  }
+
+  return data.map((item) => ({
+    scopeKind: item.scope_kind,
+    scopeId: item.scope_id,
+    prefKey: item.pref_key,
+    channels: Array.isArray(item.channels)
+      ? (item.channels.filter(Boolean) as NotificationPreferenceVM['channels'])
+      : [],
+    muted: item.muted ?? null,
+  }));
 }
 
 async function loadNotificationDefaults(

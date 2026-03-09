@@ -257,10 +257,42 @@ describe('sendTextMessageAction', () => {
       primary_entity_kind: null,
       primary_entity_id: null,
     });
+    const channelMembersChain: any = {};
+    channelMembersChain.eq = vi.fn(() => channelMembersChain);
+    channelMembersChain.is = vi.fn(() => channelMembersChain);
+    channelMembersChain.returns = vi.fn(async () => ({
+      data: [{ profile_id: 'profile-1' }, { profile_id: 'profile-2' }],
+      error: null,
+    }));
+    const profilesChain: any = {};
+    profilesChain.eq = vi.fn(() => profilesChain);
+    profilesChain.in = vi.fn(() => profilesChain);
+    profilesChain.is = vi.fn(() => profilesChain);
+    profilesChain.returns = vi.fn(async () => ({
+      data: [{ id: 'profile-2', account_id: 'account-2' }],
+      error: null,
+    }));
+    const readStateChain: any = {};
+    readStateChain.eq = vi.fn(() => readStateChain);
+    readStateChain.in = vi.fn(() => readStateChain);
+    readStateChain.is = vi.fn(() => readStateChain);
+    readStateChain.returns = vi.fn(async () => ({
+      data: [{ account_id: 'account-2', last_read_at: '2026-03-09T09:55:00.000Z' }],
+      error: null,
+    }));
 
     supabase.from.mockImplementation((table: string) => {
       if (table === 'channels') {
         return { select: () => channelLookup };
+      }
+      if (table === 'channel_members') {
+        return { select: () => channelMembersChain };
+      }
+      if (table === 'profiles') {
+        return { select: () => profilesChain };
+      }
+      if (table === 'channel_read_states') {
+        return { select: () => readStateChain };
       }
       if (table === 'messages') {
         return { insert: insertMessage };
@@ -294,6 +326,191 @@ describe('sendTextMessageAction', () => {
           channelRouteKind: 'dm',
           channelTopic: 'Priya + Riley',
         }),
+      }),
+    );
+  });
+
+  it('suppresses dm.posted activity when recipient is actively reading the DM', async () => {
+    const supabase = {
+      auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
+      from: vi.fn(),
+    };
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
+    const insertMessage = vi.fn().mockReturnValue({
+      select: () => ({
+        single: async () => ({
+          data: {
+            id: 'message-dm-suppressed-1',
+            org_id: 'org-1',
+            channel_id: 'channel-dm-1',
+            sender_profile_id: 'profile-1',
+            type: 'text',
+            created_at: '2026-03-09T10:02:00.000Z',
+          },
+          error: null,
+        }),
+      }),
+    });
+    const insertMessageText = vi.fn().mockResolvedValue({ error: null });
+    const channelLookup = createChannelLookupChain({
+      id: 'channel-dm-1',
+      kind: 'dm',
+      topic: 'Priya + Riley',
+      primary_entity_kind: null,
+      primary_entity_id: null,
+    });
+    const channelMembersChain: any = {};
+    channelMembersChain.eq = vi.fn(() => channelMembersChain);
+    channelMembersChain.is = vi.fn(() => channelMembersChain);
+    channelMembersChain.returns = vi.fn(async () => ({
+      data: [{ profile_id: 'profile-1' }, { profile_id: 'profile-2' }],
+      error: null,
+    }));
+    const profilesChain: any = {};
+    profilesChain.eq = vi.fn(() => profilesChain);
+    profilesChain.in = vi.fn(() => profilesChain);
+    profilesChain.is = vi.fn(() => profilesChain);
+    profilesChain.returns = vi.fn(async () => ({
+      data: [{ id: 'profile-2', account_id: 'account-2' }],
+      error: null,
+    }));
+    const readStateChain: any = {};
+    readStateChain.eq = vi.fn(() => readStateChain);
+    readStateChain.in = vi.fn(() => readStateChain);
+    readStateChain.is = vi.fn(() => readStateChain);
+    readStateChain.returns = vi.fn(async () => ({
+      data: [{ account_id: 'account-2', last_read_at: '2099-01-01T00:00:00.000Z' }],
+      error: null,
+    }));
+
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'channels') return { select: () => channelLookup };
+      if (table === 'channel_members') return { select: () => channelMembersChain };
+      if (table === 'profiles') return { select: () => profilesChain };
+      if (table === 'channel_read_states') return { select: () => readStateChain };
+      if (table === 'messages') return { insert: insertMessage };
+      if (table === 'message_text') return { insert: insertMessageText };
+      return { insert: vi.fn() };
+    });
+
+    buildUserProfileById.mockResolvedValueOnce({
+      ids: { id: 'profile-1', orgId: 'org-1' },
+      profile: { displayName: 'Priya' },
+    });
+    mapMessageRowToVM.mockReturnValueOnce({
+      ids: { id: 'message-dm-suppressed-1', orgId: 'org-1' },
+    });
+
+    await sendTextMessageAction({
+      orgId: 'org-1',
+      channelId: 'channel-dm-1',
+      senderProfileId: 'profile-1',
+      content: 'Hello in DM',
+    });
+
+    expect(publishActivityEvent).not.toHaveBeenCalled();
+  });
+
+  it('emits dm.posted for inactive recipients only in group DM', async () => {
+    const supabase = {
+      auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
+      from: vi.fn(),
+    };
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
+    const insertMessage = vi.fn().mockReturnValue({
+      select: () => ({
+        single: async () => ({
+          data: {
+            id: 'message-group-dm-1',
+            org_id: 'org-1',
+            channel_id: 'channel-group-dm-1',
+            sender_profile_id: 'profile-1',
+            type: 'text',
+            created_at: '2026-03-09T10:02:00.000Z',
+          },
+          error: null,
+        }),
+      }),
+    });
+    const insertMessageText = vi.fn().mockResolvedValue({ error: null });
+    const channelLookup = createChannelLookupChain({
+      id: 'channel-group-dm-1',
+      kind: 'group_dm',
+      topic: 'Priya + Riley + Alex',
+      primary_entity_kind: null,
+      primary_entity_id: null,
+    });
+    const channelMembersChain: any = {};
+    channelMembersChain.eq = vi.fn(() => channelMembersChain);
+    channelMembersChain.is = vi.fn(() => channelMembersChain);
+    channelMembersChain.returns = vi.fn(async () => ({
+      data: [
+        { profile_id: 'profile-1' },
+        { profile_id: 'profile-2' },
+        { profile_id: 'profile-3' },
+      ],
+      error: null,
+    }));
+    const profilesChain: any = {};
+    profilesChain.eq = vi.fn(() => profilesChain);
+    profilesChain.in = vi.fn(() => profilesChain);
+    profilesChain.is = vi.fn(() => profilesChain);
+    profilesChain.returns = vi.fn(async () => ({
+      data: [
+        { id: 'profile-2', account_id: 'account-2' },
+        { id: 'profile-3', account_id: 'account-3' },
+      ],
+      error: null,
+    }));
+    const readStateChain: any = {};
+    readStateChain.eq = vi.fn(() => readStateChain);
+    readStateChain.in = vi.fn(() => readStateChain);
+    readStateChain.is = vi.fn(() => readStateChain);
+    readStateChain.returns = vi.fn(async () => ({
+      data: [
+        { account_id: 'account-2', last_read_at: '2099-01-01T00:00:00.000Z' },
+        { account_id: 'account-3', last_read_at: '2026-03-09T09:58:00.000Z' },
+      ],
+      error: null,
+    }));
+
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'channels') return { select: () => channelLookup };
+      if (table === 'channel_members') return { select: () => channelMembersChain };
+      if (table === 'profiles') return { select: () => profilesChain };
+      if (table === 'channel_read_states') return { select: () => readStateChain };
+      if (table === 'messages') return { insert: insertMessage };
+      if (table === 'message_text') return { insert: insertMessageText };
+      return { insert: vi.fn() };
+    });
+
+    buildUserProfileById.mockResolvedValueOnce({
+      ids: { id: 'profile-1', orgId: 'org-1' },
+      profile: { displayName: 'Priya' },
+    });
+    mapMessageRowToVM.mockReturnValueOnce({
+      ids: { id: 'message-group-dm-1', orgId: 'org-1' },
+    });
+
+    await sendTextMessageAction({
+      orgId: 'org-1',
+      channelId: 'channel-group-dm-1',
+      senderProfileId: 'profile-1',
+      content: 'Hello group DM',
+    });
+
+    expect(publishActivityEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'dm.posted',
+        audienceRules: [{ kind: 'users_only', userIds: ['profile-3'] }],
       }),
     );
   });
@@ -955,9 +1172,35 @@ describe('sendTextMessageAction', () => {
       primary_entity_kind: null,
       primary_entity_id: null,
     });
+    const channelMembersChain: any = {};
+    channelMembersChain.eq = vi.fn(() => channelMembersChain);
+    channelMembersChain.is = vi.fn(() => channelMembersChain);
+    channelMembersChain.returns = vi.fn(async () => ({
+      data: [{ profile_id: 'profile-1' }, { profile_id: 'profile-2' }],
+      error: null,
+    }));
+    const profilesChain: any = {};
+    profilesChain.eq = vi.fn(() => profilesChain);
+    profilesChain.in = vi.fn(() => profilesChain);
+    profilesChain.is = vi.fn(() => profilesChain);
+    profilesChain.returns = vi.fn(async () => ({
+      data: [{ id: 'profile-2', account_id: 'account-2' }],
+      error: null,
+    }));
+    const readStateChain: any = {};
+    readStateChain.eq = vi.fn(() => readStateChain);
+    readStateChain.in = vi.fn(() => readStateChain);
+    readStateChain.is = vi.fn(() => readStateChain);
+    readStateChain.returns = vi.fn(async () => ({
+      data: [{ account_id: 'account-2', last_read_at: '2026-03-09T09:55:00.000Z' }],
+      error: null,
+    }));
 
     supabase.from.mockImplementation((table: string) => {
       if (table === 'channels') return { select: () => channelLookup };
+      if (table === 'channel_members') return { select: () => channelMembersChain };
+      if (table === 'profiles') return { select: () => profilesChain };
+      if (table === 'channel_read_states') return { select: () => readStateChain };
       if (table === 'messages') return { insert: insertMessage };
       if (table === 'message_file') return { insert: insertMessageFile };
       if (table === 'channel_files') return { insert: insertChannelFile };
@@ -1045,9 +1288,35 @@ describe('sendTextMessageAction', () => {
       primary_entity_kind: null,
       primary_entity_id: null,
     });
+    const channelMembersChain: any = {};
+    channelMembersChain.eq = vi.fn(() => channelMembersChain);
+    channelMembersChain.is = vi.fn(() => channelMembersChain);
+    channelMembersChain.returns = vi.fn(async () => ({
+      data: [{ profile_id: 'profile-1' }, { profile_id: 'profile-2' }],
+      error: null,
+    }));
+    const profilesChain: any = {};
+    profilesChain.eq = vi.fn(() => profilesChain);
+    profilesChain.in = vi.fn(() => profilesChain);
+    profilesChain.is = vi.fn(() => profilesChain);
+    profilesChain.returns = vi.fn(async () => ({
+      data: [{ id: 'profile-2', account_id: 'account-2' }],
+      error: null,
+    }));
+    const readStateChain: any = {};
+    readStateChain.eq = vi.fn(() => readStateChain);
+    readStateChain.in = vi.fn(() => readStateChain);
+    readStateChain.is = vi.fn(() => readStateChain);
+    readStateChain.returns = vi.fn(async () => ({
+      data: [{ account_id: 'account-2', last_read_at: '2026-03-09T09:55:00.000Z' }],
+      error: null,
+    }));
 
     supabase.from.mockImplementation((table: string) => {
       if (table === 'channels') return { select: () => channelLookup };
+      if (table === 'channel_members') return { select: () => channelMembersChain };
+      if (table === 'profiles') return { select: () => profilesChain };
+      if (table === 'channel_read_states') return { select: () => readStateChain };
       if (table === 'messages') return { insert: insertMessage };
       if (table === 'message_audio_recording') return { insert: insertAudioRecording };
       if (table === 'channel_files') return { insert: insertChannelFile };
@@ -2018,6 +2287,22 @@ describe('toggleMessageReactionAction', () => {
       data: [{ profile_id: 'profile-1' }, { profile_id: 'profile-2' }],
       error: null,
     }));
+    const profilesChain: any = {};
+    profilesChain.eq = vi.fn(() => profilesChain);
+    profilesChain.in = vi.fn(() => profilesChain);
+    profilesChain.is = vi.fn(() => profilesChain);
+    profilesChain.returns = vi.fn(async () => ({
+      data: [{ id: 'profile-2', account_id: 'account-2' }],
+      error: null,
+    }));
+    const readStateChain: any = {};
+    readStateChain.eq = vi.fn(() => readStateChain);
+    readStateChain.in = vi.fn(() => readStateChain);
+    readStateChain.is = vi.fn(() => readStateChain);
+    readStateChain.returns = vi.fn(async () => ({
+      data: [{ account_id: 'account-2', last_read_at: '2026-03-09T09:55:00.000Z' }],
+      error: null,
+    }));
 
     supabase.from.mockImplementation((table: string) => {
       if (table === 'messages') return { select: selectMessage };
@@ -2027,6 +2312,8 @@ describe('toggleMessageReactionAction', () => {
         return { select: selectCount, insert: insertCount };
       if (table === 'channels') return { select: () => channelLookup };
       if (table === 'channel_members') return { select: () => channelMembersChain };
+      if (table === 'profiles') return { select: () => profilesChain };
+      if (table === 'channel_read_states') return { select: () => readStateChain };
       return {};
     });
     buildUserProfileById.mockResolvedValueOnce({
@@ -2103,6 +2390,22 @@ describe('toggleMessageReactionAction', () => {
       data: [{ profile_id: 'profile-1' }, { profile_id: 'profile-2' }],
       error: null,
     }));
+    const profilesChain: any = {};
+    profilesChain.eq = vi.fn(() => profilesChain);
+    profilesChain.in = vi.fn(() => profilesChain);
+    profilesChain.is = vi.fn(() => profilesChain);
+    profilesChain.returns = vi.fn(async () => ({
+      data: [{ id: 'profile-2', account_id: 'account-2' }],
+      error: null,
+    }));
+    const readStateChain: any = {};
+    readStateChain.eq = vi.fn(() => readStateChain);
+    readStateChain.in = vi.fn(() => readStateChain);
+    readStateChain.is = vi.fn(() => readStateChain);
+    readStateChain.returns = vi.fn(async () => ({
+      data: [{ account_id: 'account-2', last_read_at: '2026-03-09T09:55:00.000Z' }],
+      error: null,
+    }));
 
     supabase.from.mockImplementation((table: string) => {
       if (table === 'messages') return { select: selectMessage };
@@ -2112,6 +2415,8 @@ describe('toggleMessageReactionAction', () => {
         return { select: selectCount, delete: () => ({ eq: deleteCount }) };
       if (table === 'channels') return { select: () => channelLookup };
       if (table === 'channel_members') return { select: () => channelMembersChain };
+      if (table === 'profiles') return { select: () => profilesChain };
+      if (table === 'channel_read_states') return { select: () => readStateChain };
       return {};
     });
     buildUserProfileById.mockResolvedValueOnce({

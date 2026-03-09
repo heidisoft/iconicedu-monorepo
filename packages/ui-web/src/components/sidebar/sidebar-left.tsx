@@ -128,6 +128,7 @@ export function SidebarLeft({
   onAvatarUpload,
   onAvatarRemove,
   onNotificationPreferenceSave,
+  onNotificationPreferenceScopeDelete,
   onFamilyInviteCreate,
   onFamilyInviteRemove,
   onChildThemeSave,
@@ -199,6 +200,15 @@ export function SidebarLeft({
     prefKey: string;
     channels: string[];
     muted?: boolean | null;
+    scopeKind?: 'channel' | 'learning_space';
+    scopeId?: string;
+  }) => Promise<void> | void;
+  onNotificationPreferenceScopeDelete?: (input: {
+    profileId: string;
+    orgId: string;
+    prefKey: string;
+    scopeKind: 'channel' | 'learning_space';
+    scopeId: string;
   }) => Promise<void> | void;
   onFamilyInviteCreate?: (input: {
     invitedRole: FamilyLinkInviteRole;
@@ -703,6 +713,25 @@ export function SidebarLeft({
           onAvatarUpload={onAvatarUpload}
           onAvatarRemove={onAvatarRemove}
           onNotificationPreferenceSave={onNotificationPreferenceSave}
+          onNotificationPreferenceScopeDelete={onNotificationPreferenceScopeDelete}
+          availableAlertChannels={Array.from(
+            new Map(
+              [
+                ...data.collections.directMessages,
+                ...data.collections.learningSpaces.flatMap((space) => [
+                  space.channels.primaryChannel,
+                  ...(space.channels.relatedChannels ?? []),
+                ]),
+              ].map((channel) => [channel.ids.id, channel]),
+            ).values(),
+          ).map((channel) => ({
+            id: channel.ids.id,
+            label: channel.basics.topic,
+          }))}
+          availableAlertLearningSpaces={data.collections.learningSpaces.map((space) => ({
+            id: space.ids.id,
+            label: space.basics.title,
+          }))}
           onFamilyInviteCreate={onFamilyInviteCreate}
           onFamilyInviteRemove={onFamilyInviteRemove}
           onChildThemeSave={onChildThemeSave}

@@ -3,14 +3,25 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { publishActivityEvent } from '@iconicedu/web/lib/activity-feed/publisher/activity-publisher';
 
 const projectActivityEvents = vi.fn();
+const resolveActivityVerbSuppressionDecision = vi.fn();
 
 vi.mock('@iconicedu/web/lib/activity-feed/projector/project-activity-events', () => ({
   projectActivityEvents: (...args: unknown[]) => projectActivityEvents(...args),
 }));
 
+vi.mock('@iconicedu/web/lib/activity-feed/suppression/activity-verb-suppression', () => ({
+  resolveActivityVerbSuppressionDecision: (...args: unknown[]) =>
+    resolveActivityVerbSuppressionDecision(...args),
+  isActivityVerbSuppressionDebugEnabled: () => false,
+}));
+
 describe('publishActivityEvent', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resolveActivityVerbSuppressionDecision.mockResolvedValue({
+      shouldPublish: true,
+      source: 'default',
+    });
   });
 
   it('inserts event and immediately attempts projection', async () => {
@@ -46,7 +57,7 @@ describe('publishActivityEvent', () => {
       dedupeKey: 'dedupe-1',
     });
 
-    expect(result.id).toBe('event-1');
+    expect(result?.id).toBe('event-1');
     expect(projectActivityEvents).toHaveBeenCalledWith(supabase, {
       eventIds: ['event-1'],
       limit: 1,
@@ -86,7 +97,7 @@ describe('publishActivityEvent', () => {
       dedupeKey: 'dedupe-2',
     });
 
-    expect(result.id).toBe('event-2');
+    expect(result?.id).toBe('event-2');
   });
 
   it('returns existing event on dedupe conflict', async () => {
@@ -136,7 +147,40 @@ describe('publishActivityEvent', () => {
       dedupeKey: 'dedupe-existing',
     });
 
-    expect(result.id).toBe('event-existing');
+    expect(result?.id).toBe('event-existing');
+    expect(projectActivityEvents).not.toHaveBeenCalled();
+  });
+
+  it('returns null and skips insert when event type is suppressed', async () => {
+    resolveActivityVerbSuppressionDecision.mockResolvedValueOnce({
+      shouldPublish: false,
+      source: 'org',
+      rule: { id: 'rule-1', is_enabled: false },
+    });
+
+    const supabase = {
+      from: vi.fn(() => ({
+        insert: vi.fn(() => ({
+          select: vi.fn(() => ({
+            single: vi.fn(),
+          })),
+        })),
+      })),
+    };
+
+    const result = await publishActivityEvent({
+      supabase: supabase as never,
+      orgId: 'org-1',
+      eventType: 'message.posted',
+      sourceKind: 'profile',
+      actorProfileId: 'profile-1',
+      scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+      payload: { messageId: 'message-4' },
+      dedupeKey: 'dedupe-4',
+    });
+
+    expect(result).toBeNull();
+    expect(supabase.from).not.toHaveBeenCalled();
     expect(projectActivityEvents).not.toHaveBeenCalled();
   });
 });
