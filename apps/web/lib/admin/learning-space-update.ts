@@ -459,15 +459,15 @@ export function buildExceptionAndOverrideScheduleChangeActivities(input: {
       const nextOverride = nextOverrideSemantic?.raw ?? null;
       const previousException = previousExceptions.get(occurrenceKey) ?? null;
       const nextException = nextExceptions.get(occurrenceKey) ?? null;
-      const previousState = previousOverride
-        ? 'override'
-        : previousException
-          ? 'exception'
+      const previousState = previousException
+        ? 'exception'
+        : previousOverride
+          ? 'override'
           : 'scheduled';
-      const nextState = nextOverride
-        ? 'override'
-        : nextException
-          ? 'exception'
+      const nextState = nextException
+        ? 'exception'
+        : nextOverride
+          ? 'override'
           : 'scheduled';
 
       if (
@@ -551,10 +551,15 @@ export function buildExceptionAndOverrideScheduleChangeActivities(input: {
       }
 
       const fromStartAt =
-        previousOverride?.startAt ??
-        previousOverride?.occurrenceKey ??
-        previousException?.occurrenceKey ??
-        occurrenceKey;
+        previousState === 'override'
+          ? (previousOverride?.startAt ??
+            previousOverride?.occurrenceKey ??
+            previousException?.occurrenceKey ??
+            occurrenceKey)
+          : (previousException?.occurrenceKey ??
+            previousOverride?.startAt ??
+            previousOverride?.occurrenceKey ??
+            occurrenceKey);
       const toStartAt =
         nextOverride?.startAt ??
         nextOverride?.occurrenceKey ??
@@ -1197,6 +1202,7 @@ export async function updateLearningSpaceFromPayload(
   const nextSchedulesHashKey = buildLearningSpaceSchedulesHashKeyFromPayload(
     payload.schedules ?? [],
   );
+  const hasScheduleHashChanges = previousSchedulesHashKey !== nextSchedulesHashKey;
   debugScheduleDiff('hash-keys', {
     previousSchedulesHashKey,
     nextSchedulesHashKey,
@@ -1223,9 +1229,11 @@ export async function updateLearningSpaceFromPayload(
     scheduleDiffPlan.added.length > 0 ||
     scheduleDiffPlan.removed.length > 0 ||
     scheduleDiffPlan.rescheduled.length > 0 ||
-    exceptionOverrideActivities.length > 0;
+    exceptionOverrideActivities.length > 0 ||
+    hasScheduleHashChanges;
   debugScheduleDiff('change-decision', {
     hasScheduleChanges,
+    hasScheduleHashChanges,
     exceptionOverrideActivityCount: exceptionOverrideActivities.length,
     addedCount: scheduleDiffPlan.added.length,
     removedCount: scheduleDiffPlan.removed.length,

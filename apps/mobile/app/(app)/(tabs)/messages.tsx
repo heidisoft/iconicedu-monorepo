@@ -554,7 +554,7 @@ export default function MessagesScreen() {
   const TABS: { key: Tab; label: string; count: number }[] = [
     { key: 'all', label: 'All', count: unreadAll },
     { key: 'dms', label: 'Direct Messages', count: unreadDms },
-    { key: 'channels', label: 'Classs', count: unreadChannels },
+    { key: 'channels', label: 'Classrooms', count: unreadChannels },
   ];
 
   const isLoading = accountLoading || dmsLoading || channelsLoading || supervisedLoading;

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,19 +10,14 @@ import {
 import { Bell } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/providers/theme-provider';
-import { useActivityFeed } from '@/hooks/use-activity-feed';
+import { useActivityFeed, useMarkActivityFeedRead } from '@/hooks/use-activity-feed';
 import { ActivityFeedSkeleton } from '@/components/skeletons';
 import {
   ActivityItem,
   makeActivityItemStyles,
 } from '@/components/activity/activity-item';
 import type { AppColors } from '@/lib/theme';
-import type {
-  ActivityFeedItemVM,
-  ActivityFeedGroupItemVM,
-  ActivityFeedLeafItemVM,
-  InboxTabKeyVM,
-} from '@iconicedu/shared-types';
+import type { ActivityFeedItemVM, InboxTabKeyVM } from '@iconicedu/shared-types';
 
 // ---------------------------------------------------------------------------
 // Styles
@@ -112,27 +107,25 @@ const FALLBACK_TABS: Array<{ key: InboxTabKeyVM; label: string }> = [
   { key: 'system', label: 'System' },
 ];
 
+// Auto-read: item must be 60% visible for 1500ms
+const VIEWABILITY_CONFIG = { minimumViewTime: 1500, itemVisiblePercentThreshold: 60 };
+
 export default function InboxScreen() {
   const { colors, isDark } = useTheme();
   const s = React.useMemo(() => makeStyles(colors), [colors]);
   const activityS = React.useMemo(() => makeActivityItemStyles(colors), [colors]);
 
   const { data: feed, isPending: feedLoading, refetch: refetchFeed } = useActivityFeed();
+  const { mutate: markRead } = useMarkActivityFeedRead();
 
   const [activeTab, setActiveTab] = useState<InboxTabKeyVM>('all');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [refreshing, setRefreshing] = useState(false);
 
-  // Local read-state overlay (optimistic until next refetch)
-  const [localReadIds, setLocalReadIds] = useState<Set<string>>(new Set());
-
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    refetchFeed().finally(() => {
-      setLocalReadIds(new Set());
-      setExpandedIds(new Set());
-      setRefreshing(false);
-    });
+    setExpandedIds(new Set());
+    refetchFeed().finally(() => setRefreshing(false));
   }, [refetchFeed]);
 
   const onToggle = useCallback((id: string) => {
@@ -144,50 +137,32 @@ export default function InboxScreen() {
     });
   }, []);
 
-  const onMarkRead = useCallback((id: string) => {
-    setLocalReadIds((prev) => new Set(prev).add(id));
-  }, []);
+  // Press-to-read: immediately mark via mutation (optimistic cache update)
+  const onMarkRead = useCallback((id: string) => markRead([id]), [markRead]);
+
+  // Auto-read via SectionList viewability — stable ref pattern to avoid re-renders
+  const markReadRef = useRef(markRead);
+  markReadRef.current = markRead;
+
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: Array<{ item: ActivityFeedItemVM }> }) => {
+      const unreadIds = viewableItems
+        .filter(({ item }) => !item.state?.isRead)
+        .map(({ item }) => item.ids.id);
+      if (unreadIds.length) markReadRef.current(unreadIds);
+    },
+  ).current;
 
   const feedSections = useMemo(() => feed?.sections ?? [], [feed?.sections]);
   const feedTabs =
     feed?.tabs ??
     FALLBACK_TABS.map((t) => ({ key: t.key, label: t.label, badgeCount: 0 }));
 
-  // Apply local read overlay
-  const sectionsWithLocalRead = useMemo(() => {
-    if (!localReadIds.size) return feedSections;
-    return feedSections.map((section) => ({
-      ...section,
-      items: section.items.map((item) => {
-        if (localReadIds.has(item.ids.id))
-          return { ...item, state: { ...item.state, isRead: true } };
-        if (
-          item.kind === 'group' &&
-          (item as ActivityFeedGroupItemVM).subActivities?.items
-        ) {
-          return {
-            ...item,
-            subActivities: {
-              ...(item as ActivityFeedGroupItemVM).subActivities,
-              items: (item as ActivityFeedGroupItemVM).subActivities!.items.map(
-                (sub: ActivityFeedLeafItemVM) =>
-                  localReadIds.has(sub.ids.id)
-                    ? { ...sub, state: { ...sub.state, isRead: true } }
-                    : sub,
-              ),
-            },
-          };
-        }
-        return item;
-      }),
-    }));
-  }, [feedSections, localReadIds]);
-
-  // Unread counts per tab (driven by real data + local overlay)
+  // Unread counts per tab
   const tabCounts = useMemo(() => {
     return feedTabs.reduce(
       (acc, tab) => {
-        acc[tab.key] = sectionsWithLocalRead.reduce((total, section) => {
+        acc[tab.key] = feedSections.reduce((total, section) => {
           return (
             total +
             section.items.filter(
@@ -200,11 +175,11 @@ export default function InboxScreen() {
       },
       {} as Record<string, number>,
     );
-  }, [sectionsWithLocalRead, feedTabs]);
+  }, [feedSections, feedTabs]);
 
   // Filter sections by active tab, drop empty
   const filteredSections = useMemo<FeedSection[]>(() => {
-    return sectionsWithLocalRead
+    return feedSections
       .map((section) => ({
         label: section.label,
         data: section.items.filter(
@@ -212,7 +187,7 @@ export default function InboxScreen() {
         ),
       }))
       .filter((section) => section.data.length > 0);
-  }, [sectionsWithLocalRead, activeTab]);
+  }, [feedSections, activeTab]);
 
   return (
     <SafeAreaView style={s.safe}>
@@ -264,6 +239,8 @@ export default function InboxScreen() {
           keyExtractor={(item) => item.ids.id}
           stickySectionHeadersEnabled={false}
           contentContainerStyle={{ paddingTop: 8, paddingBottom: 40 }}
+          viewabilityConfig={VIEWABILITY_CONFIG}
+          onViewableItemsChanged={onViewableItemsChanged}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

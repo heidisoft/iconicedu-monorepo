@@ -10,10 +10,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Bell, MessageCircle, User } from 'lucide-react-native';
+import { Bell, MessageCircle, BookOpen } from 'lucide-react-native';
 import { useAuth } from '@/providers/auth-provider';
 import { useProfile } from '@/hooks/use-profile';
-import { useActivityFeed } from '@/hooks/use-activity-feed';
+import { useActivityFeed, useMarkActivityFeedRead } from '@/hooks/use-activity-feed';
 import { useUpcomingSessions } from '@/hooks/use-upcoming-sessions';
 import { useTheme } from '@/providers/theme-provider';
 import { useFlag } from '@/providers/feature-flags-provider';
@@ -108,10 +108,10 @@ const quickNav = [
     desc: 'Your conversations',
   },
   {
-    label: 'Account',
-    Icon: User,
-    route: '/(app)/(tabs)/account',
-    desc: 'Profile & settings',
+    label: 'Classrooms',
+    Icon: BookOpen,
+    route: '/(app)/(tabs)/messages',
+    desc: 'Your classes',
   },
 ] as const;
 
@@ -181,6 +181,7 @@ export default function HomeScreen() {
   const { user } = useAuth();
   const { data: profile } = useProfile();
   const { data: feed, isPending: feedLoading, refetch: refetchFeed } = useActivityFeed();
+  const { mutate: markRead } = useMarkActivityFeedRead();
   const {
     sessions,
     isPending: sessionsLoading,
@@ -232,7 +233,7 @@ export default function HomeScreen() {
       return next;
     });
   }, []);
-  const onMarkRead = useCallback((_id: string) => {}, []);
+  const onMarkRead = useCallback((id: string) => markRead([id]), [markRead]);
 
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(() => {

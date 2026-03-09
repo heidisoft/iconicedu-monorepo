@@ -516,7 +516,7 @@ export function SidebarLeft({
               {shouldShowLearningSpacesLabel ? (
                 <SidebarGroupLabel asChild className="uppercase">
                   <span className="inline-flex items-center gap-2">
-                    <span>Classes</span>
+                    <span>Classrooms</span>
                     {totalLearningSpacesUnread > 0 ? (
                       <Badge className="h-4 px-1.5 text-[10px] bg-rose-500 text-white">
                         {totalLearningSpacesUnread}
@@ -549,7 +549,7 @@ export function SidebarLeft({
                     <DropdownMenuSeparator />
                     <DropdownMenuItem>
                       <Settings className="text-muted-foreground" />
-                      <span>Manage classes</span>
+                      <span>Manage classrooms</span>
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>

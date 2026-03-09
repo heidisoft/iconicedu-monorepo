@@ -293,4 +293,48 @@ describe('buildLearningSpaceScheduleDiffPlan', () => {
 
     expect(activities).toEqual([]);
   });
+
+  it('emits session.canceled when exception is added on a date that already has an override', () => {
+    const activities = buildExceptionAndOverrideScheduleChangeActivities({
+      learningSpaceId: 'space-1',
+      channelId: 'channel-1',
+      title: 'Math Foundations',
+      occurredAt: '2026-03-08T10:00:00.000Z',
+      invitedMembers: [],
+      pairs: [
+        {
+          scheduleId: 'schedule-1',
+          timezone: 'America/New_York',
+          previous: {
+            exceptions: [],
+            overrides: [
+              {
+                occurrenceKey: '2026-03-26T16:00:00.000Z',
+                startAt: '2026-03-26T17:00:00.000Z',
+                endAt: '2026-03-26T18:00:00.000Z',
+                reason: null,
+              },
+            ],
+          },
+          next: {
+            exceptions: [
+              { occurrenceKey: '2026-03-26T16:00:00.000Z', reason: 'Holiday' },
+            ],
+            overrides: [
+              {
+                occurrenceKey: '2026-03-26T16:00:00.000Z',
+                startAt: '2026-03-26T17:00:00.000Z',
+                endAt: '2026-03-26T18:00:00.000Z',
+                reason: null,
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    expect(activities).toHaveLength(1);
+    expect(activities[0]?.eventType).toBe('session.canceled');
+    expect(activities[0]?.payload.canceledReason).toBe('Holiday');
+  });
 });

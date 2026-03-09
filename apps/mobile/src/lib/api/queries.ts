@@ -2174,3 +2174,33 @@ export async function fetchActivityFeed(
     unreadCount,
   };
 }
+
+export async function markActivityFeedRead(
+  orgId: string,
+  profileId: string,
+  ids: string[],
+): Promise<void> {
+  if (!ids.length) return;
+
+  // Expand any group IDs to include their child member IDs
+  const { data: members } = await supabase
+    .from('activity_feed_group_members')
+    .select('item_id')
+    .eq('org_id', orgId)
+    .in('group_id', ids);
+
+  const childIds = (members ?? []).map((m) => m.item_id as string);
+  const allIds = [...new Set([...ids, ...childIds])];
+
+  await supabase
+    .from('activity_feed_items')
+    .update({
+      is_read: true,
+      read_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      updated_by: profileId,
+    })
+    .eq('org_id', orgId)
+    .eq('recipient_profile_id', profileId)
+    .in('id', allIds);
+}

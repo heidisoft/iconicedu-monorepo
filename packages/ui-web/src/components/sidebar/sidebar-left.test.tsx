@@ -379,7 +379,7 @@ describe('SidebarLeft', () => {
       </SidebarProvider>,
     );
 
-    expect(screen.getByText('Classes')).toBeInTheDocument();
+    expect(screen.getByText('Classrooms')).toBeInTheDocument();
     expect(screen.getByText('Algebra 1')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Algebra 1/i })).toHaveAttribute(
       'href',
@@ -468,7 +468,7 @@ describe('SidebarLeft', () => {
       </SidebarProvider>,
     );
 
-    expect(screen.getByText('Classes')).toBeInTheDocument();
+    expect(screen.getByText('Classrooms')).toBeInTheDocument();
     expect(screen.getByText('Student Algebra')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Student Algebra/i })).toHaveAttribute(
       'href',
@@ -485,7 +485,7 @@ describe('SidebarLeft', () => {
       </SidebarProvider>,
     );
 
-    expect(screen.queryByText('Classes')).not.toBeInTheDocument();
+    expect(screen.queryByText('Classrooms')).not.toBeInTheDocument();
     expect(screen.queryByText('Other Space')).not.toBeInTheDocument();
   });
 
