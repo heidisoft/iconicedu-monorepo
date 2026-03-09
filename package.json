@@ -19,7 +19,7 @@
     "build:api": "turbo run build --filter=api...",
     "build:packages": "turbo run build --filter='./packages/*'",
     "----------- QUALITY -----------": "",
-    "lint": "turbo run lint",
+    "lint": "pnpm guard:activity-feed-writes && turbo run lint",
     "lint:fix": "turbo run lint:fix",
     "lint:web": "turbo run lint --filter=web...",
     "lint:mobile": "turbo run lint --filter=mobile...",
@@ -27,7 +27,7 @@
     "typecheck:web": "turbo run typecheck --filter=web...",
     "typecheck:mobile": "turbo run typecheck --filter=mobile...",
     "----------- TESTING -----------": "",
-    "test": "turbo run test",
+    "test": "pnpm test:guard:activity-feed-writes && turbo run test",
     "test:web": "turbo run test --filter=web --filter=@iconicedu/ui-web",
     "test:mobile": "turbo run test --filter=mobile --filter=@iconicedu/ui-native",
     "test:api": "turbo run test --filter=api",
@@ -51,6 +51,8 @@
     "clean:all": "turbo run clean && rm -rf node_modules",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "guard:activity-feed-writes": "node scripts/check-activity-feed-writes.mjs",
+    "test:guard:activity-feed-writes": "node --test scripts/check-activity-feed-writes.test.mjs",
     "prepare": "husky"
   },
   "devDependencies": {

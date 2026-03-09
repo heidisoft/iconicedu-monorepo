@@ -147,7 +147,7 @@ export default function InboxScreen() {
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: Array<{ item: ActivityFeedItemVM }> }) => {
       const unreadIds = viewableItems
-        .filter(({ item }) => !item.state?.isRead)
+        .filter(({ item }) => item?.ids?.id && !item.state?.isRead)
         .map(({ item }) => item.ids.id);
       if (unreadIds.length) markReadRef.current(unreadIds);
     },
@@ -236,7 +236,7 @@ export default function InboxScreen() {
       ) : (
         <SectionList<ActivityFeedItemVM, FeedSection>
           sections={filteredSections}
-          keyExtractor={(item) => item.ids.id}
+          keyExtractor={(item, index) => item?.ids?.id ?? String(index)}
           stickySectionHeadersEnabled={false}
           contentContainerStyle={{ paddingTop: 8, paddingBottom: 40 }}
           viewabilityConfig={VIEWABILITY_CONFIG}

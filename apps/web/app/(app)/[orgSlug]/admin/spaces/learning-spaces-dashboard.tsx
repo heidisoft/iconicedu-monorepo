@@ -173,7 +173,7 @@ export function LearningSpacesDashboard({ rows }: LearningSpacesDashboardProps) 
             className="px-2"
             onClick={handleRefresh}
             disabled={refreshing}
-            aria-label="Refresh classes"
+            aria-label="Refresh classrooms"
           >
             {refreshing ? (
               <Loader2 className="size-4 animate-spin text-muted-foreground" />

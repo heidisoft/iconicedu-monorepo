@@ -16,7 +16,6 @@ import { useProfile } from '@/hooks/use-profile';
 import { useActivityFeed, useMarkActivityFeedRead } from '@/hooks/use-activity-feed';
 import { useUpcomingSessions } from '@/hooks/use-upcoming-sessions';
 import { useTheme } from '@/providers/theme-provider';
-import { useFlag } from '@/providers/feature-flags-provider';
 import { ActivityFeedSkeleton } from '@/components/skeletons';
 import { PulseBox } from '@/components/skeletons/pulse-box';
 import { SessionCard } from '@/components/sessions/session-card';
@@ -100,20 +99,28 @@ function getGreeting() {
   return 'Good evening';
 }
 
-const quickNav = [
+const quickNav: Array<{
+  label: string;
+  Icon: React.ComponentType<{ size: number; color: string }>;
+  pathname: string;
+  params?: Record<string, string>;
+  desc: string;
+}> = [
   {
     label: 'Messages',
     Icon: MessageCircle,
-    route: '/(app)/(tabs)/messages',
+    pathname: '/(app)/(tabs)/messages',
+    params: { tab: 'all' },
     desc: 'Your conversations',
   },
   {
     label: 'Classrooms',
     Icon: BookOpen,
-    route: '/(app)/(tabs)/messages',
+    pathname: '/(app)/(tabs)/messages',
+    params: { tab: 'channels' },
     desc: 'Your classes',
   },
-] as const;
+];
 
 function makeStyles(C: AppColors) {
   return StyleSheet.create({
@@ -189,7 +196,6 @@ export default function HomeScreen() {
   } = useUpcomingSessions();
   const { colors, isDark } = useTheme();
   const router = useRouter();
-  const showQuickAccess = useFlag('enable-quick-access');
   const s = React.useMemo(() => makeStyles(colors), [colors]);
   const activityS = React.useMemo(
     () => ({ ...makeActivityItemStyles(colors), itemOuter: {} }),
@@ -298,29 +304,29 @@ export default function HomeScreen() {
           <Text style={s.headline}>Welcome back</Text>
         </View>
 
-        {/* Quick nav — shown only when the feature flag is enabled */}
-        {showQuickAccess && (
-          <View style={{ gap: 10 }}>
-            <Text style={s.sectionLabel}>Quick access</Text>
-            <View style={s.grid}>
-              {quickNav.map((item) => (
-                <TouchableOpacity
-                  key={item.label}
-                  style={s.gridItem}
-                  onPress={() => router.push(item.route as never)}
-                  activeOpacity={0.75}
-                  accessibilityLabel={item.label}
-                >
-                  <View style={s.gridTitleRow}>
-                    <item.Icon size={20} color={colors.text} />
-                    <Text style={s.gridLabel}>{item.label}</Text>
-                  </View>
-                  <Text style={s.gridDesc}>{item.desc}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+        {/* Quick nav */}
+        <View style={{ gap: 10 }}>
+          <Text style={s.sectionLabel}>Quick access</Text>
+          <View style={s.grid}>
+            {quickNav.map((item) => (
+              <TouchableOpacity
+                key={item.label}
+                style={s.gridItem}
+                onPress={() =>
+                  router.push({ pathname: item.pathname, params: item.params } as never)
+                }
+                activeOpacity={0.75}
+                accessibilityLabel={item.label}
+              >
+                <View style={s.gridTitleRow}>
+                  <item.Icon size={20} color={colors.text} />
+                  <Text style={s.gridLabel}>{item.label}</Text>
+                </View>
+                <Text style={s.gridDesc}>{item.desc}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
-        )}
+        </View>
 
         {/* Upcoming sessions */}
         {(sessionsLoading || sessions.length > 0) && (

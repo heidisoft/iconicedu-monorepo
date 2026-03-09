@@ -9,8 +9,8 @@ import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { LearningSpacesDashboard } from '@iconicedu/web/app/(app)/[orgSlug]/admin/spaces/learning-spaces-dashboard';
 
 export const metadata: Metadata = {
-  title: 'Admin · Classes',
-  description: 'Review and manage classes, subjects, and visibility settings.',
+  title: 'Admin · Classrooms',
+  description: 'Review and manage classrooms, subjects, and visibility settings.',
 };
 
 export default async function AdminLearningSpacesPage({
@@ -30,7 +30,7 @@ export default async function AdminLearningSpacesPage({
 
   return (
     <div className="flex flex-1 flex-col">
-      <DashboardHeader title="Classes" />
+      <DashboardHeader title="Classrooms" />
       <div className="flex flex-1 flex-col gap-4 p-4">
         <LearningSpacesDashboard rows={rows} />
       </div>

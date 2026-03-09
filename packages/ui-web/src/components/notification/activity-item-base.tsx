@@ -47,6 +47,7 @@ type ActivityItemBaseProps = {
 };
 
 const READ_ICON_CLASS = 'bg-muted text-muted-foreground';
+const UNREAD_ICON_CLASS = 'bg-sky-100 text-sky-700';
 const AUTO_READ_VIEW_DELAY_MS = 2000;
 const INBOX_ICON_MAP: Record<
   InboxIconKeyVM,
@@ -191,6 +192,9 @@ export function ActivityItemBase({
     activity.content.leading?.kind === 'icon' && activity.content.leading.tone
       ? TONE_CLASSNAMES[activity.content.leading.tone]
       : undefined;
+  const iconColorClass = activity.state?.isRead
+    ? READ_ICON_CLASS
+    : (toneClassName ?? UNREAD_ICON_CLASS);
   const Icon = INBOX_ICON_MAP[iconKey];
   const timestampLabel = formatRelativeTime(activity.timestamps.occurredAt);
   const secondaryHref = activity.content.actionButton?.href ?? undefined;
@@ -276,8 +280,7 @@ export function ActivityItemBase({
           <div
             className={cn(
               'z-10 flex size-6 items-center justify-center rounded-full transition-colors duration-300 ease-out',
-              activity.state?.isRead ? READ_ICON_CLASS : toneClassName,
-              !toneClassName && !activity.state?.isRead && READ_ICON_CLASS,
+              iconColorClass,
             )}
           >
             {Icon ? (

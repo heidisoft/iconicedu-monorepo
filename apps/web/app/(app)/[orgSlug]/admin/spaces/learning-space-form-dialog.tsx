@@ -295,11 +295,13 @@ export function LearningSpaceFormDialog({
       if (!response.ok || !result.success) {
         toast.error(
           result.message ??
-            (mode === 'edit' ? 'Unable to update class.' : 'Unable to create class.'),
+            (mode === 'edit'
+              ? 'Unable to update classroom.'
+              : 'Unable to create classroom.'),
         );
         return;
       }
-      toast.success(mode === 'edit' ? 'Class updated.' : 'Class created.');
+      toast.success(mode === 'edit' ? 'Classroom updated.' : 'Classroom created.');
       setDialogOpen(false);
       resetForm();
       router.refresh();
@@ -309,8 +311,8 @@ export function LearningSpaceFormDialog({
         error instanceof Error
           ? error.message
           : mode === 'edit'
-            ? 'Unable to update class.'
-            : 'Unable to create class.',
+            ? 'Unable to update classroom.'
+            : 'Unable to create classroom.',
       );
     } finally {
       setIsSaving(false);
@@ -331,11 +333,13 @@ export function LearningSpaceFormDialog({
         <div className="flex max-h-[90vh] flex-col overflow-hidden rounded-2xl border border-border bg-card">
           <div className="px-6 py-5">
             <DialogHeader>
-              <DialogTitle>{mode === 'edit' ? 'Edit class' : 'Create class'}</DialogTitle>
+              <DialogTitle>
+                {mode === 'edit' ? 'Edit classroom' : 'Create classroom'}
+              </DialogTitle>
               <DialogDescription>
                 {mode === 'edit'
-                  ? 'Update the basics, participants, and resources for the class.'
-                  : 'Configure the basics, invite participants, and attach resources for the class.'}
+                  ? 'Update the basics, participants, and resources for the classroom.'
+                  : 'Configure the basics, invite participants, and attach resources for the classroom.'}
               </DialogDescription>
             </DialogHeader>
           </div>
@@ -383,7 +387,7 @@ export function LearningSpaceFormDialog({
                       </Select>
                       {iconInvalid && (
                         <FieldDescription className="text-destructive">
-                          Please choose an icon for this class.
+                          Please choose an icon for this classroom.
                         </FieldDescription>
                       )}
                     </Field>
@@ -453,7 +457,7 @@ export function LearningSpaceFormDialog({
                       </Select>
                       {kindInvalid && (
                         <FieldDescription className="text-destructive">
-                          Kind is required for the class.
+                          Kind is required for the classroom.
                         </FieldDescription>
                       )}
                     </Field>
@@ -481,7 +485,7 @@ export function LearningSpaceFormDialog({
                 </FieldSet>
                 <FieldSeparator />
                 <LiveSessionSettingsSection
-                  description="Configure the primary channel’s live session provider and mode for this class."
+                  description="Configure the primary channel’s live session provider and mode for this classroom."
                   providerSelectId="ls-live-session-provider"
                   modeSelectId="ls-live-session-mode"
                   joinUrlInputId="ls-live-session-join-url"
@@ -544,7 +548,7 @@ export function LearningSpaceFormDialog({
                 <ChannelUiDefaultsSettingsSection
                   legend="Settings"
                   themeSelectId="ls-theme-key"
-                  description="Sets the accent color used across this class message UI."
+                  description="Sets the accent color used across this classroom message UI."
                   uiDefaults={formState.uiDefaults}
                   onUiDefaultsChange={(updates) =>
                     updateFormState({

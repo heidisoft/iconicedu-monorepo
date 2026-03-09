@@ -9,7 +9,7 @@ import {
   Pressable,
   RefreshControl,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAccount } from '@/hooks/use-account';
 import { useDirectMessages } from '@/hooks/use-direct-messages';
@@ -463,7 +463,15 @@ function ChannelRow({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function MessagesScreen() {
-  const [activeTab, setActiveTab] = useState<Tab>('all');
+  const { tab: tabParam } = useLocalSearchParams<{ tab?: string }>();
+  const resolvedTab: Tab =
+    tabParam === 'channels' || tabParam === 'dms' ? tabParam : 'all';
+  const [activeTab, setActiveTab] = useState<Tab>(resolvedTab);
+
+  React.useEffect(() => {
+    setActiveTab(resolvedTab);
+  }, [resolvedTab]);
+
   const { data: account, isPending: accountLoading } = useAccount();
   const { colors } = useTheme();
   const router = useRouter();

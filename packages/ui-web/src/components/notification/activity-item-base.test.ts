@@ -17,6 +17,8 @@ describe('ActivityItemBase read behavior', () => {
 
   it('animates icon color change and shows a read indicator', () => {
     expect(source).toContain('transition-colors duration-300 ease-out');
+    expect(source).toContain("const UNREAD_ICON_CLASS = 'bg-sky-100 text-sky-700';");
+    expect(source).toContain('const iconColorClass = activity.state?.isRead');
     expect(source).toContain('CheckCheck');
     expect(source).toContain('showParentReadIndicator');
     expect(source).toContain('aria-label="Read"');
