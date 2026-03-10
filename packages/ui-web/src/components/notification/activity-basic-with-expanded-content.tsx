@@ -13,6 +13,7 @@ type ActivityBasicWithExpandedContentProps = {
   isSubActivity?: boolean;
   parentExpanded?: boolean;
   className?: string;
+  children?: React.ReactNode;
 };
 
 export function ActivityBasicWithExpandedContent({
@@ -23,6 +24,7 @@ export function ActivityBasicWithExpandedContent({
   isSubActivity,
   parentExpanded,
   className,
+  children,
 }: ActivityBasicWithExpandedContentProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -43,11 +45,14 @@ export function ActivityBasicWithExpandedContent({
       showActionButton={showActionButton}
       className={className}
       footer={
-        isExpanded && activity.content.expandedContent ? (
-          <div className="animate-in slide-in-from-top-2 fade-in duration-300 rounded-md bg-muted/50 p-3 text-[12px] text-muted-foreground">
-            {activity.content.expandedContent}
-          </div>
-        ) : null
+        <>
+          {isExpanded && activity.content.expandedContent ? (
+            <div className="animate-in slide-in-from-top-2 fade-in duration-300 rounded-md bg-muted/50 p-3 text-[12px] text-muted-foreground">
+              {activity.content.expandedContent}
+            </div>
+          ) : null}
+          {children}
+        </>
       }
     />
   );

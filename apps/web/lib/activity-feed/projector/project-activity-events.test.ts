@@ -46,6 +46,21 @@ function createSupabaseMock() {
 
   const supabase = {
     from: vi.fn((table: string) => {
+      if (
+        table === 'notification_preferences' ||
+        table === 'notification_preference_scopes'
+      ) {
+        const selectChain = {
+          eq: vi.fn(() => selectChain),
+          in: vi.fn(() => selectChain),
+          is: vi.fn(() => selectChain),
+          returns: vi.fn(async () => ({ data: [], error: null })),
+        };
+        return {
+          select: vi.fn(() => selectChain),
+        };
+      }
+
       if (table === 'activity_events') {
         return {
           select: vi.fn(() => ({
@@ -217,6 +232,21 @@ describe('projectActivityEvents', () => {
     };
 
     (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
+      if (
+        table === 'notification_preferences' ||
+        table === 'notification_preference_scopes'
+      ) {
+        const selectChain = {
+          eq: vi.fn(() => selectChain),
+          in: vi.fn(() => selectChain),
+          is: vi.fn(() => selectChain),
+          returns: vi.fn(async () => ({ data: [], error: null })),
+        };
+        return {
+          select: vi.fn(() => selectChain),
+        };
+      }
+
       if (table === 'activity_events') {
         return {
           select: vi.fn(() => ({
@@ -389,6 +419,21 @@ describe('projectActivityEvents', () => {
 
     const supabase = {
       from: vi.fn((table: string) => {
+        if (
+          table === 'notification_preferences' ||
+          table === 'notification_preference_scopes'
+        ) {
+          const selectChain = {
+            eq: vi.fn(() => selectChain),
+            in: vi.fn(() => selectChain),
+            is: vi.fn(() => selectChain),
+            returns: vi.fn(async () => ({ data: [], error: null })),
+          };
+          return {
+            select: vi.fn(() => selectChain),
+          };
+        }
+
         if (table === 'activity_events') {
           return {
             select: vi.fn(() => ({

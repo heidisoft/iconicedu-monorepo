@@ -29,6 +29,12 @@ type ReminderJobPayload = {
   amount?: number | null;
   currency?: string | null;
   channelRouteKind?: 'space' | 'dm' | 'channel' | null;
+  members?: Array<{
+    profileId: string;
+    displayName?: string | null;
+    avatarUrl?: string | null;
+    themeKey?: string | null;
+  }> | null;
 };
 
 function normalizeBaseScheduleId(scheduleId: string) {
@@ -140,6 +146,12 @@ export async function compileLearningSpaceReminderJobs(input: {
       location: occurrence.location ?? null,
       meetingLink: occurrence.meetingLink ?? null,
       channelRouteKind: 'space',
+      members: occurrence.participants.map((participant) => ({
+        profileId: participant.ids.id,
+        displayName: participant.displayName ?? null,
+        avatarUrl: participant.avatarUrl ?? null,
+        themeKey: participant.themeKey ?? null,
+      })),
     };
 
     const reminderDedupe = `session.reminder:${input.orgId}:${normalizedScheduleId}:${occurrence.startAt}`;
@@ -177,7 +189,7 @@ export async function compileLearningSpaceReminderJobs(input: {
       source_learning_space_id: occurrence.source.learningSpaceId,
       source_schedule_id: normalizedScheduleId,
       occurrence_start_at: occurrence.startAt,
-      run_at: new Date(occurrenceStart.getTime() + 60 * 60 * 1000).toISOString(),
+      run_at: new Date(occurrenceStart.getTime() + 2 * 60 * 60 * 1000).toISOString(),
       timezone: occurrence.timezone ?? 'UTC',
       payload,
       dedupe_key: feedbackDedupe,
@@ -380,6 +392,10 @@ async function processReminderJob(supabase: SupabaseServiceClient, job: Reminder
           prompt: buildFeedbackPrompt(payload),
           text: buildFeedbackPrompt(payload),
           sessionTitle: payload.title,
+          scheduleId: payload.scheduleId ?? null,
+          learningSpaceId: payload.learningSpaceId ?? null,
+          channelId: payload.channelId,
+          occurrenceStart: payload.occurrenceStart ?? payload.startAt ?? now,
         }
       : job.job_type === 'payment.reminder'
         ? {
@@ -449,6 +465,7 @@ async function processReminderJob(supabase: SupabaseServiceClient, job: Reminder
       summary: payload.summary ?? null,
       channelRouteKind:
         payload.channelRouteKind ?? (payload.learningSpaceId ? 'space' : 'channel'),
+      members: payload.members ?? null,
     },
     dedupeKey: `${job.dedupe_key}:activity`,
     createdBy: systemProfileId,

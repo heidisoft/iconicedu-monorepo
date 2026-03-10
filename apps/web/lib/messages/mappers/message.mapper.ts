@@ -256,6 +256,11 @@ export function mapMessageRowToVM(row: MessageRow, input: MessageMapperInput): M
         feedback: {
           prompt: String(payload?.prompt ?? ''),
           sessionTitle: (payload?.sessionTitle as string | null) ?? null,
+          classSessionId: (payload?.scheduleId as string | null) ?? null,
+          classroomId: (payload?.learningSpaceId as string | null) ?? null,
+          channelId: (payload?.channelId as string | null) ?? null,
+          occurrenceStart: (payload?.occurrenceStart as string | null) ?? null,
+          sourceEventId: (payload?.sourceEventId as string | null) ?? null,
           submittedAt: (payload?.submittedAt as string | null) ?? null,
           rating: (payload?.rating as number | null) ?? null,
           comment: (payload?.comment as string | null) ?? null,

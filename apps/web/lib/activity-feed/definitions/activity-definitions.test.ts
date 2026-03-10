@@ -1031,13 +1031,73 @@ describe('activity event definitions', () => {
     );
     expect(definition.render(event)).toMatchObject({
       headline: {
-        primary: 'Class starts in 5 minutes',
+        primary: 'Upcoming class reminder',
         secondary: 'Algebra',
       },
       actionButton: {
         label: 'Join class',
         href: '../spaces/channel-1',
       },
+      leading: {
+        kind: 'icon',
+        iconKey: 'Video',
+        tone: 'info',
+      },
+    });
+
+    expect(definition.group.renderGroup?.(event)).toMatchObject({
+      headline: {
+        primary: 'Class session 2026-03-03T12:40:00.000Z',
+        secondary: 'Algebra',
+      },
+      actionButton: undefined,
+      metadata: {
+        hideActionButton: true,
+        sessionGroupLocalTime: true,
+      },
+    });
+  });
+
+  it('renders session feedback request with class feedback headline', () => {
+    const definition = getActivityEventDefinition('session.feedback_request.sent');
+    if (!definition) {
+      throw new Error('Missing session.feedback_request.sent definition');
+    }
+
+    const rendered = definition.render({
+      id: 'event-feedback-1',
+      org_id: 'org-1',
+      event_type: 'session.feedback_request.sent',
+      occurred_at: '2026-03-03T14:40:00.000Z',
+      source_kind: 'system',
+      actor_profile_id: 'profile-system',
+      scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+      object_ref: { kind: 'message', id: 'message-feedback-1' },
+      target_ref: { kind: 'learning_space', id: 'space-1' },
+      payload: {
+        channelId: 'channel-1',
+        messageId: 'message-feedback-1',
+        learningSpaceId: 'space-1',
+        title: 'Algebra',
+        occurrenceStart: '2026-03-03T12:40:00.000Z',
+        channelRouteKind: 'space',
+      },
+      audience_rules: [],
+      dedupe_key:
+        'session.feedback_request:org-1:schedule-1:2026-03-03T12:40:00.000Z:activity',
+      projection_status: 'pending',
+      projection_attempts: 0,
+      created_at: '2026-03-03T14:40:00.000Z',
+      updated_at: '2026-03-03T14:40:00.000Z',
+    });
+
+    expect(rendered.headline).toEqual({
+      primary: 'Class feedback requested',
+      secondary: "How was today's session?",
+    });
+    expect(rendered.metadata).toMatchObject({
+      messageId: 'message-feedback-1',
+      occurrenceStart: '2026-03-03T12:40:00.000Z',
     });
   });
 

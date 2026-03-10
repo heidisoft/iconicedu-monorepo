@@ -7,6 +7,7 @@ import { ScrollArea } from '@iconicedu/ui-web/ui/scroll-area';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@iconicedu/ui-web/ui/tabs';
 import { ActivityBasic } from '@iconicedu/ui-web/components/notification/activity-basic';
 import { ActivityBasicWithExpandedContent } from '@iconicedu/ui-web/components/notification/activity-basic-with-expanded-content';
+import { ActivityFeedbackRequest } from '@iconicedu/ui-web/components/notification/activity-feedback-request';
 import { ActivityWithSubitems } from '@iconicedu/ui-web/components/notification/activity-with-subitems';
 import type {
   ActivityFeedItemVM,
@@ -158,6 +159,46 @@ export function buildUnreadTabCounts(
   return counts;
 }
 
+export function applySessionParentLocalHeadline(
+  activity: ActivityFeedItemVM,
+): ActivityFeedItemVM {
+  const metadata = activity.metadata as Record<string, unknown> | undefined;
+  if (!metadata?.sessionGroupLocalTime) {
+    return activity;
+  }
+
+  const occurrenceStart = metadata.occurrenceStart;
+  if (typeof occurrenceStart !== 'string' || occurrenceStart.length === 0) {
+    return activity;
+  }
+
+  const date = new Date(occurrenceStart);
+  if (Number.isNaN(date.getTime())) {
+    return activity;
+  }
+
+  const localLabel = date
+    .toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    })
+    .replace(',', ' at');
+
+  return {
+    ...activity,
+    content: {
+      ...activity.content,
+      headline: {
+        ...activity.content.headline,
+        primary: `Class session ${localLabel}`,
+      },
+    },
+  };
+}
+
 export function InboxContainer({
   feed,
   markReadEndpoint = '/api/activity-feed/read',
@@ -251,31 +292,47 @@ export function InboxContainer({
   );
 
   const renderActivity = (activity: ActivityFeedItemVM) => {
-    if (activity.kind === 'group') {
+    const displayActivity = applySessionParentLocalHeadline(activity);
+
+    if (displayActivity.kind === 'group') {
       return (
         <ActivityWithSubitems
-          activity={activity}
+          activity={displayActivity}
           onMarkRead={markAsRead}
           onAutoRead={autoMarkAsRead}
-          showActionButton={Boolean(activity.content.actionButton)}
+          showActionButton={Boolean(displayActivity.content.actionButton)}
         />
       );
     }
 
-    if (activity.content.expandedContent) {
+    if (displayActivity.verb === 'session.feedback_request.sent') {
       return (
         <ActivityBasicWithExpandedContent
-          activity={activity}
+          activity={displayActivity}
           onMarkRead={markAsRead}
           onAutoRead={autoMarkAsRead}
-          showActionButton={Boolean(activity.content.actionButton)}
+          showActionButton={false}
+          className="pb-0"
+        >
+          <ActivityFeedbackRequest activity={displayActivity as ActivityFeedLeafItemVM} />
+        </ActivityBasicWithExpandedContent>
+      );
+    }
+
+    if (displayActivity.content.expandedContent) {
+      return (
+        <ActivityBasicWithExpandedContent
+          activity={displayActivity}
+          onMarkRead={markAsRead}
+          onAutoRead={autoMarkAsRead}
+          showActionButton={Boolean(displayActivity.content.actionButton)}
         />
       );
     }
 
     return (
       <ActivityBasic
-        activity={activity}
+        activity={displayActivity}
         onMarkRead={markAsRead}
         onAutoRead={autoMarkAsRead}
       />

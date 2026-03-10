@@ -30,6 +30,12 @@ type ReminderJobPayload = {
   amount?: number | null;
   currency?: string | null;
   channelRouteKind?: 'space' | 'dm' | 'channel' | null;
+  members?: Array<{
+    profileId: string;
+    displayName?: string | null;
+    avatarUrl?: string | null;
+    themeKey?: string | null;
+  }> | null;
 };
 
 @Injectable()
@@ -295,6 +301,10 @@ export class RemindersService {
             prompt: this.buildFeedbackPrompt(payload),
             text: this.buildFeedbackPrompt(payload),
             sessionTitle: payload.title,
+            scheduleId: payload.scheduleId ?? null,
+            learningSpaceId: payload.learningSpaceId ?? null,
+            channelId: payload.channelId,
+            occurrenceStart: payload.occurrenceStart ?? payload.startAt ?? now,
           }
         : job.job_type === 'payment.reminder'
           ? {
@@ -366,6 +376,7 @@ export class RemindersService {
         summary: payload.summary ?? null,
         channelRouteKind:
           payload.channelRouteKind ?? (payload.learningSpaceId ? 'space' : 'channel'),
+        members: payload.members ?? null,
       },
       dedupeKey: `${job.dedupe_key}:activity`,
     });

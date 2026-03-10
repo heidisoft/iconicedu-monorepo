@@ -19,6 +19,7 @@ import {
   getMessagePaymentRemindersByMessageIds,
   getMessageEventRemindersByMessageIds,
   getMessageFeedbackRequestsByMessageIds,
+  getMessageSessionFeedbackByMessageIds,
   getMessageLessonAssignmentsByMessageIds,
   getMessageProgressUpdatesByMessageIds,
   getMessageSessionBookingsByMessageIds,
@@ -51,13 +52,13 @@ export async function buildMessagesByChannelId(
 ): Promise<MessageVM[]> {
   const rows =
     options.limit || options.beforeCreatedAt
-      ? (
+      ? ((
           await getMessagesPageByChannelId(supabase, orgId, channelId, {
             limit: options.limit ?? 50,
             beforeCreatedAt: options.beforeCreatedAt,
           })
-        ).data ?? []
-      : (await getMessagesByChannelId(supabase, orgId, channelId)).data ?? [];
+        ).data ?? [])
+      : ((await getMessagesByChannelId(supabase, orgId, channelId)).data ?? []);
   if (!rows.length) {
     return [];
   }
@@ -110,17 +111,18 @@ export async function buildMessageById(
     return null;
   }
 
-  const [payloadsById, reactionsByMessageId, sender, thread, savedMessageIds] = await Promise.all([
-    loadPayloadsByMessageIds(supabase, orgId, [row]),
-    loadReactionsByMessageIds(supabase, orgId, [row.id]),
-    buildUserProfileById(supabase, row.sender_profile_id),
-    row.thread_id
-      ? buildThreadById(supabase, orgId, row.thread_id, {
-          accountId: options.accountId,
-        })
-      : Promise.resolve(null),
-    loadSavedMessageIds(supabase, orgId, options.profileId, [row.id]),
-  ]);
+  const [payloadsById, reactionsByMessageId, sender, thread, savedMessageIds] =
+    await Promise.all([
+      loadPayloadsByMessageIds(supabase, orgId, [row]),
+      loadReactionsByMessageIds(supabase, orgId, [row.id]),
+      buildUserProfileById(supabase, row.sender_profile_id),
+      row.thread_id
+        ? buildThreadById(supabase, orgId, row.thread_id, {
+            accountId: options.accountId,
+          })
+        : Promise.resolve(null),
+      loadSavedMessageIds(supabase, orgId, options.profileId, [row.id]),
+    ]);
 
   if (!sender) {
     return null;
@@ -132,10 +134,11 @@ export async function buildMessageById(
       is_saved: savedMessageIds.has(row.id),
     },
     {
-    sender,
-    payload: payloadsById.get(row.id) ?? null,
-    reactions: reactionsByMessageId.get(row.id) ?? [],
-    thread: thread ?? (row.thread_id ? options.threadsById?.get(row.thread_id) : undefined),
+      sender,
+      payload: payloadsById.get(row.id) ?? null,
+      reactions: reactionsByMessageId.get(row.id) ?? [],
+      thread:
+        thread ?? (row.thread_id ? options.threadsById?.get(row.thread_id) : undefined),
     },
   );
 }
@@ -144,7 +147,11 @@ export async function buildMessagesByThreadId(
   supabase: SupabaseClient,
   orgId: string,
   threadId: string,
-  options: { accountId?: string; profileId?: string; parentMessageId?: string | null } = {},
+  options: {
+    accountId?: string;
+    profileId?: string;
+    parentMessageId?: string | null;
+  } = {},
 ): Promise<MessageVM[]> {
   const response = await getMessagesByThreadId(supabase, orgId, threadId, {
     parentMessageId: options.parentMessageId,
@@ -232,7 +239,10 @@ async function loadPayloadsByMessageIds(
 
   await Promise.all(loaders);
   rows
-    .filter((row) => row.type === 'file' || row.type === 'image' || row.type === 'audio-recording')
+    .filter(
+      (row) =>
+        row.type === 'file' || row.type === 'image' || row.type === 'audio-recording',
+    )
     .forEach((row) => {
       const payload = payloadMap.get(row.id);
       if (!payload || typeof payload.url !== 'string') {
@@ -261,7 +271,8 @@ async function loadPayloadsByMessageIds(
 
       payloadMap.set(row.id, {
         ...payload,
-        storagePath: typeof payload.storagePath === 'string' ? payload.storagePath : payload.url,
+        storagePath:
+          typeof payload.storagePath === 'string' ? payload.storagePath : payload.url,
         ...(normalizedAttachments ? { attachments: normalizedAttachments } : {}),
       });
     });
@@ -269,7 +280,13 @@ async function loadPayloadsByMessageIds(
   return payloadMap;
 
   async function loadPayloads(
-    fetcher: (supabase: SupabaseClient, orgId: string, ids: string[]) => Promise<{ data: { message_id: string; payload: Record<string, unknown> }[] | null }>,
+    fetcher: (
+      supabase: SupabaseClient,
+      orgId: string,
+      ids: string[],
+    ) => Promise<{
+      data: { message_id: string; payload: Record<string, unknown> }[] | null;
+    }>,
     type: string,
   ) {
     const ids = idsByType.get(type) ?? [];
@@ -331,15 +348,23 @@ async function mapRowsToMessages(
   options: Pick<MessageBuildOptions, 'threadsById' | 'profileId' | 'accountId'> = {},
 ) {
   const messageIds = rows.map((row) => row.id);
-  const [payloadsById, reactionsByMessageId, profilesById, savedMessageIds] = await Promise.all([
-    loadPayloadsByMessageIds(supabase, orgId, rows),
-    loadReactionsByMessageIds(supabase, orgId, messageIds),
-    resolveProfilesById(
-      supabase,
-      Array.from(new Set(rows.map((row) => row.sender_profile_id))),
-    ),
-    loadSavedMessageIds(supabase, orgId, options.profileId, messageIds),
-  ]);
+  const [payloadsById, reactionsByMessageId, profilesById, savedMessageIds] =
+    await Promise.all([
+      loadPayloadsByMessageIds(supabase, orgId, rows),
+      loadReactionsByMessageIds(supabase, orgId, messageIds),
+      resolveProfilesById(
+        supabase,
+        Array.from(new Set(rows.map((row) => row.sender_profile_id))),
+      ),
+      loadSavedMessageIds(supabase, orgId, options.profileId, messageIds),
+    ]);
+  await applySessionFeedbackResponsesToPayloads(
+    supabase,
+    orgId,
+    options.profileId,
+    messageIds,
+    payloadsById,
+  );
 
   return rows
     .map((row) => {
@@ -353,14 +378,52 @@ async function mapRowsToMessages(
           is_saved: savedMessageIds.has(row.id),
         },
         {
-        sender,
-        payload: payloadsById.get(row.id) ?? null,
-        reactions: reactionsByMessageId.get(row.id) ?? [],
-        thread: row.thread_id ? options.threadsById?.get(row.thread_id) : undefined,
+          sender,
+          payload: payloadsById.get(row.id) ?? null,
+          reactions: reactionsByMessageId.get(row.id) ?? [],
+          thread: row.thread_id ? options.threadsById?.get(row.thread_id) : undefined,
         },
       );
     })
     .filter((message): message is MessageVM => Boolean(message));
+}
+
+async function applySessionFeedbackResponsesToPayloads(
+  supabase: SupabaseClient,
+  orgId: string,
+  profileId: string | undefined,
+  messageIds: string[],
+  payloadsById: Map<string, Record<string, unknown>>,
+) {
+  if (!profileId || !messageIds.length) {
+    return;
+  }
+
+  const response = await getMessageSessionFeedbackByMessageIds(
+    supabase,
+    orgId,
+    profileId,
+    messageIds,
+  );
+  const rows = response.data ?? [];
+
+  rows.forEach((row) => {
+    if (!row.message_id) {
+      return;
+    }
+    const existing = payloadsById.get(row.message_id) ?? {};
+    payloadsById.set(row.message_id, {
+      ...existing,
+      sourceEventId: row.source_event_id ?? null,
+      scheduleId: row.class_session_id,
+      learningSpaceId: row.classroom_id,
+      channelId: row.channel_id,
+      occurrenceStart: row.occurrence_start_at ?? null,
+      submittedAt: row.submitted_at,
+      rating: row.rating,
+      comment: row.comment ?? null,
+    });
+  });
 }
 
 async function loadSavedMessageIds(
@@ -373,14 +436,16 @@ async function loadSavedMessageIds(
     return new Set();
   }
 
-  const response = await getMessageSavesByMessageIds(supabase, orgId, profileId, messageIds);
+  const response = await getMessageSavesByMessageIds(
+    supabase,
+    orgId,
+    profileId,
+    messageIds,
+  );
   return new Set((response.data ?? []).map((row) => row.message_id));
 }
 
-function groupBy<T, K extends string>(
-  rows: T[],
-  getKey: (row: T) => K,
-): Map<K, T[]> {
+function groupBy<T, K extends string>(rows: T[], getKey: (row: T) => K): Map<K, T[]> {
   const map = new Map<K, T[]>();
   rows.forEach((row) => {
     const key = getKey(row);

@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   applyReadStateToSections,
+  applySessionParentLocalHeadline,
   buildUnreadTabCounts,
   resolveReadIdsForActivity,
 } from './inbox-container';
@@ -328,7 +329,36 @@ describe('InboxContainer rendering behavior', () => {
       'utf8',
     );
 
-    expect(source).not.toContain('showActionButton={false}');
-    expect(source).toContain('showActionButton={Boolean(activity.content.actionButton)}');
+    expect(source).toContain(
+      'showActionButton={Boolean(displayActivity.content.actionButton)}',
+    );
+    expect(source).toContain(
+      "if (displayActivity.verb === 'session.feedback_request.sent')",
+    );
+  });
+
+  it('formats session parent headline using viewer local time metadata', () => {
+    const activity = {
+      kind: 'group' as const,
+      ids: { id: 'group-1', orgId: 'org-1' },
+      timestamps: {
+        occurredAt: '2026-03-04T12:00:00.000Z',
+        createdAt: '2026-03-04T12:00:00.000Z',
+      },
+      tabKey: 'classes' as const,
+      audience: { scope: { kind: 'global' as const }, visibility: 'public' as const },
+      verb: 'session.reminder.sent' as const,
+      refs: { actor: {} as never },
+      content: { headline: { primary: 'Class session', secondary: 'Algebra' } },
+      metadata: {
+        sessionGroupLocalTime: true,
+        occurrenceStart: '2026-03-04T12:40:00.000Z',
+      },
+      subActivities: { items: [] },
+    };
+
+    const next = applySessionParentLocalHeadline(activity);
+    expect(next.content.headline.primary).toContain('Class session ');
+    expect(next.content.headline.primary).not.toBe('Class session');
   });
 });

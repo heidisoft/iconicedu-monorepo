@@ -74,6 +74,14 @@ describe('reminder-jobs', () => {
           learningSpaceId: 'space-1',
           channelId: 'channel-1',
         },
+        participants: [
+          {
+            ids: { id: 'profile-1', orgId: 'org-1' },
+            displayName: 'Alex Student',
+            avatarUrl: 'https://cdn.test/alex.png',
+            themeKey: 'blue',
+          },
+        ],
       },
     ]);
 
@@ -104,6 +112,18 @@ describe('reminder-jobs', () => {
 
     expect(result.compiledCount).toBe(2);
     expect(reminderJobsTable.upsert).toHaveBeenCalledTimes(1);
+    const compiledRows = reminderJobsTable.upsert.mock.calls[0]?.[0] as Array<{
+      job_type: string;
+      run_at: string;
+      payload: { members?: Array<{ profileId: string }> };
+    }>;
+    const feedbackRow = compiledRows.find(
+      (row) => row.job_type === 'session.feedback_request',
+    );
+    expect(feedbackRow?.run_at).toBe('2026-03-06T12:00:00.000Z');
+    expect(feedbackRow?.payload.members?.[0]).toMatchObject({
+      profileId: 'profile-1',
+    });
   });
 
   it('dispatches claimed jobs and publishes activity events', async () => {
@@ -122,6 +142,14 @@ describe('reminder-jobs', () => {
         learningSpaceId: 'space-1',
         scheduleId: 'schedule-1',
         occurrenceStart: '2026-03-06T10:00:00.000Z',
+        members: [
+          {
+            profileId: 'profile-1',
+            displayName: 'Alex Student',
+            avatarUrl: 'https://cdn.test/alex.png',
+            themeKey: 'blue',
+          },
+        ],
       },
       dedupe_key: 'session.reminder:org-1:schedule-1:2026-03-06T10:00:00.000Z',
       attempt_count: 0,
@@ -192,6 +220,17 @@ describe('reminder-jobs', () => {
       deadLettered: 0,
     });
     expect(publishActivityEventMock).toHaveBeenCalledTimes(1);
+    expect(publishActivityEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          members: [
+            expect.objectContaining({
+              profileId: 'profile-1',
+            }),
+          ],
+        }),
+      }),
+    );
     expect(payloadTable.insert).toHaveBeenCalledTimes(1);
     expect(dispatchLogsTable.insert).toHaveBeenCalledTimes(1);
   });

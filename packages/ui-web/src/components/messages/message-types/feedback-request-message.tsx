@@ -3,11 +3,16 @@ import { Star } from 'lucide-react';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { Textarea } from '@iconicedu/ui-web/ui/textarea';
 import type { FeedbackRequestMessageVM as FeedbackRequestMessageType } from '@iconicedu/shared-types';
-import { MessageBase, type MessageBaseProps } from '@iconicedu/ui-web/components/messages/message-base';
+import {
+  MessageBase,
+  type MessageBaseProps,
+} from '@iconicedu/ui-web/components/messages/message-base';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 
-interface FeedbackRequestMessageProps
-  extends Omit<MessageBaseProps, 'message' | 'children'> {
+interface FeedbackRequestMessageProps extends Omit<
+  MessageBaseProps,
+  'message' | 'children'
+> {
   message: FeedbackRequestMessageType;
 }
 
@@ -27,8 +32,17 @@ export const FeedbackRequestMessage = memo(function FeedbackRequestMessage(
   const [showComment, setShowComment] = useState(
     !hasInitialSubmit && initialRating > 0 && initialRating < 5,
   );
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const isFiveStar = rating === 5;
+  const canSubmit =
+    typeof feedback.classSessionId === 'string' &&
+    feedback.classSessionId.length > 0 &&
+    typeof feedback.classroomId === 'string' &&
+    feedback.classroomId.length > 0 &&
+    typeof feedback.channelId === 'string' &&
+    feedback.channelId.length > 0;
 
   const headerLabel = useMemo(() => {
     if (feedback.sessionTitle) {
@@ -37,23 +51,66 @@ export const FeedbackRequestMessage = memo(function FeedbackRequestMessage(
     return 'Quick feedback';
   }, [feedback.sessionTitle]);
 
-  const handleSelectRating = (value: number) => {
-    if (isSubmitted) return;
+  const submitFeedback = async (nextRating: number, nextComment?: string) => {
+    if (!canSubmit || isSubmitted || nextRating < 1 || nextRating > 5) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/activity-feed/feedback', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          orgId: message.ids.orgId,
+          classSessionId: feedback.classSessionId,
+          classroomId: feedback.classroomId,
+          channelId: feedback.channelId,
+          messageId: message.ids.id,
+          sourceEventId: feedback.sourceEventId ?? null,
+          occurrenceStartAt: feedback.occurrenceStart ?? null,
+          rating: nextRating,
+          comment: nextComment ?? null,
+        }),
+      });
+
+      const payload = (await response.json().catch(() => null)) as {
+        error?: string;
+        data?: { submittedAt?: string | null };
+      } | null;
+
+      if (!response.ok) {
+        setError(payload?.error ?? 'Unable to submit feedback');
+        return;
+      }
+
+      setRating(nextRating);
+      setComment(nextComment ?? '');
+      setIsSubmitted(true);
+      setShowComment(false);
+    } catch {
+      setError('Unable to submit feedback');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSelectRating = async (value: number) => {
+    if (isSubmitted || isSubmitting) return;
     setRating(value);
 
     if (value === 5) {
-      setIsSubmitted(true);
-      setShowComment(false);
+      await submitFeedback(value);
       return;
     }
 
     setShowComment(true);
   };
 
-  const handleSubmit = () => {
-    if (isSubmitted || rating === 0) return;
-    setIsSubmitted(true);
-    setShowComment(false);
+  const handleSubmit = async () => {
+    if (isSubmitted || isSubmitting || rating === 0) return;
+    await submitFeedback(rating, comment);
   };
 
   return (
@@ -62,9 +119,7 @@ export const FeedbackRequestMessage = memo(function FeedbackRequestMessage(
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
           {headerLabel}
         </p>
-        <p className="mt-2 text-sm font-semibold text-foreground">
-          {feedback.prompt}
-        </p>
+        <p className="mt-2 text-sm font-semibold text-foreground">{feedback.prompt}</p>
 
         <div className="mt-3 flex items-center gap-2">
           {Array.from({ length: 5 }).map((_, index) => {
@@ -74,15 +129,15 @@ export const FeedbackRequestMessage = memo(function FeedbackRequestMessage(
               <button
                 key={value}
                 type="button"
-                onClick={() => handleSelectRating(value)}
+                onClick={() => void handleSelectRating(value)}
                 className={cn(
                   'flex h-9 w-9 items-center justify-center rounded-full border border-border transition',
-                  isSubmitted
+                  isSubmitted || isSubmitting
                     ? 'cursor-default'
                     : 'hover:border-primary/40 hover:bg-primary/10',
                 )}
                 aria-label={`Rate ${value} star${value === 1 ? '' : 's'}`}
-                disabled={isSubmitted}
+                disabled={isSubmitted || isSubmitting || !canSubmit}
               >
                 <Star
                   className={cn(
@@ -118,8 +173,8 @@ export const FeedbackRequestMessage = memo(function FeedbackRequestMessage(
             <Button
               type="button"
               size="sm"
-              onClick={handleSubmit}
-              disabled={rating === 0}
+              onClick={() => void handleSubmit()}
+              disabled={rating === 0 || isSubmitting}
             >
               Submit feedback
             </Button>
@@ -132,6 +187,14 @@ export const FeedbackRequestMessage = memo(function FeedbackRequestMessage(
               Add comment
             </Button>
           </div>
+        ) : null}
+
+        {error ? <p className="mt-3 text-xs text-rose-600">{error}</p> : null}
+
+        {!isSubmitted && !canSubmit ? (
+          <p className="mt-3 text-xs text-muted-foreground">
+            Feedback is unavailable for this session.
+          </p>
         ) : null}
 
         {!isSubmitted && rating === 0 ? (

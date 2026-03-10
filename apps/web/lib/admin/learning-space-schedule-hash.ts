@@ -2,12 +2,13 @@ import type {
   LearningSpaceSchedulePayload,
   LearningSpaceScheduleRulePayload,
   LearningSpaceScheduleWeekdayTimePayload,
+  WeekdayVM,
 } from '@iconicedu/shared-types';
 
 export const DEFAULT_SCHEDULE_TIME = '09:00';
 export const DEFAULT_DURATION_MINUTES = 60;
 
-const WEEKDAY_INDEX: Record<string, number> = {
+const WEEKDAY_INDEX: Record<WeekdayVM, number> = {
   SU: 0,
   MO: 1,
   TU: 2,
@@ -393,14 +394,14 @@ function getUtcTimeLabel(isoDateTime: string) {
     .padStart(2, '0')}`;
 }
 
-function toWeekdayValue(date: Date) {
+function toWeekdayValue(date: Date): WeekdayVM | null {
   const entry = Object.entries(WEEKDAY_INDEX).find(
     ([, index]) => index === date.getUTCDay(),
   );
-  return entry?.[0] ?? null;
+  return (entry?.[0] as WeekdayVM | undefined) ?? null;
 }
 
-function getNextWeekdayDate(startDate: Date, weekday: string) {
+function getNextWeekdayDate(startDate: Date, weekday: WeekdayVM) {
   const targetIndex = WEEKDAY_INDEX[weekday] ?? WEEKDAY_INDEX.MO;
   const currentIndex = startDate.getUTCDay();
   const diff = (targetIndex - currentIndex + 7) % 7;

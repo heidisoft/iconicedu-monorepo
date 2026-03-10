@@ -110,6 +110,11 @@ export function mapActivityFeedItemRow(
     subActivities: (content as Partial<ActivityFeedItemVM>).subActivities,
     subActivityCount: row.sub_activity_count ?? undefined,
     isCollapsed: row.is_collapsed ?? undefined,
+    metadata: {
+      ...(row.metadata ?? {}),
+      sourceEventId:
+        row.source_event_id ?? (row.metadata?.sourceEventId as string | null),
+    },
   } as ActivityFeedItemVM;
 }
 

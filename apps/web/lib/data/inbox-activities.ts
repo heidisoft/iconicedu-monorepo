@@ -272,7 +272,7 @@ const CLASS_SESSION_GROUP: ActivityFeedItemVM = {
     scope: { kind: 'learning_space', learningSpaceId: LEARNING_SPACE_IDS.math },
     visibility: 'scope_only',
   },
-  verb: 'session.updated',
+  verb: 'sessions.rescheduled',
   refs: {
     actor: EDUCATOR_PRIYA_PROFILE,
     target: { kind: 'learning_space', id: LEARNING_SPACE_IDS.math },
@@ -361,7 +361,7 @@ const CLASS_SESSION_GROUP: ActivityFeedItemVM = {
           scope: { kind: 'learning_space', learningSpaceId: LEARNING_SPACE_IDS.math },
           visibility: 'scope_only',
         },
-        verb: 'session.reminder',
+        verb: 'session.reminder.sent',
         refs: {
           actor: SYSTEM_PROFILE,
           target: { kind: 'learning_space', id: LEARNING_SPACE_IDS.math },

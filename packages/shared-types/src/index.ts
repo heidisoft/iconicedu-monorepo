@@ -25,3 +25,4 @@ export * from './payloads/learning-space';
 export * from './payloads/channel';
 export * from './payloads/activity-feed';
 export * from './payloads/notification-preferences';
+export * from './payloads/session-feedback';

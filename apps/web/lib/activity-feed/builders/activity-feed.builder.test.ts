@@ -685,4 +685,73 @@ describe('buildActivityFeedForProfile', () => {
 
     expect(group.content.headline.primary).toBe('Educator sent you 2 direct messages');
   });
+
+  it('attaches persisted recipient feedback metadata to feedback request activities', async () => {
+    getActivityFeedItemsByOrg.mockResolvedValue({
+      data: [
+        {
+          id: 'feedback-item-1',
+          org_id: 'org-1',
+          recipient_profile_id: 'profile-1',
+          source_event_id: 'event-feedback-1',
+          kind: 'leaf',
+          occurred_at: '2026-03-07T16:00:00.000Z',
+          created_at: '2026-03-07T16:00:00.000Z',
+          tab_key: 'classes',
+          audience: {
+            scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+            visibility: 'scope_only',
+          },
+          verb: 'session.feedback_request.sent',
+          actor_profile_id: 'actor-1',
+          refs: {},
+          content: { headline: { primary: 'Class feedback requested' } },
+          metadata: {
+            classSessionId: 'schedule-1',
+          },
+          updated_at: '2026-03-07T16:00:00.000Z',
+        },
+      ],
+    });
+
+    const feedbackSelectChain = {
+      eq: vi.fn(() => feedbackSelectChain),
+      in: vi.fn(() => feedbackSelectChain),
+      is: vi.fn(() => feedbackSelectChain),
+      returns: vi.fn(async () => ({
+        data: [
+          {
+            source_event_id: 'event-feedback-1',
+            class_session_id: 'schedule-1',
+            message_id: 'message-feedback-1',
+            rating: 4,
+            comment: 'Need slower pacing',
+            submitted_at: '2026-03-07T16:05:00.000Z',
+          },
+        ],
+        error: null,
+      })),
+    };
+
+    const supabase = {
+      from: vi.fn((table: string) => {
+        if (table !== 'message_session_feedback') {
+          throw new Error(`Unexpected table ${table}`);
+        }
+        return {
+          select: vi.fn(() => feedbackSelectChain),
+        };
+      }),
+    } as never;
+
+    const feed = await buildActivityFeedForProfile(supabase, 'org-1', 'profile-1');
+    const activity = feed.sections[0]?.items[0];
+    expect(activity?.metadata?.feedbackResponse).toMatchObject({
+      sourceEventId: 'event-feedback-1',
+      classSessionId: 'schedule-1',
+      messageId: 'message-feedback-1',
+      rating: 4,
+      comment: 'Need slower pacing',
+    });
+  });
 });

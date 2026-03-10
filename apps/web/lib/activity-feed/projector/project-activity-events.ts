@@ -112,6 +112,7 @@ async function ensureGroupParent(input: {
     preview: input.rendered.preview ?? null,
     action_button: input.rendered.actionButton ?? null,
     expanded_content: input.rendered.expandedContent ?? null,
+    metadata: input.rendered.metadata ?? {},
     importance: input.importance ?? 'normal',
     is_read: false,
     created_at: input.event.occurred_at,

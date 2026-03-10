@@ -671,23 +671,25 @@ function buildSessionTimelineLabel(payload: Record<string, unknown>) {
 
 function renderSessionTimelineGroup(event: ActivityEventRow) {
   const payload = asRecord(event.payload);
-  const timelineLabel = buildSessionTimelineLabel(payload);
+  const occurrenceStart =
+    asOptionalString(payload.occurrenceStart) ??
+    asOptionalString(payload.scheduledStartAt) ??
+    asOptionalString(payload.startAt) ??
+    asOptionalString(payload.startedAt);
   return {
     verb: event.event_type as ActivityVerbVM,
     leading: buildSessionParticipantsLeading(payload),
     headline: {
-      primary: timelineLabel
-        ? `${sessionName(payload)} session ${timelineLabel}`
-        : `${sessionName(payload)} session`,
+      primary: occurrenceStart ? `Class session ${occurrenceStart}` : 'Class session',
+      secondary: sessionName(payload),
     },
     summary: 'Session activity and follow-up updates.',
-    actionButton: asOptionalString(payload.joinPath)
-      ? {
-          label: 'Join class',
-          variant: 'default',
-          href: asOptionalString(payload.joinPath),
-        }
-      : sourceAction(event, payload, 'outline', 'Open class'),
+    actionButton: undefined,
+    metadata: {
+      sessionGroupLocalTime: true,
+      occurrenceStart,
+      hideActionButton: true,
+    },
   } satisfies ActivityRenderResult;
 }
 
@@ -1500,9 +1502,9 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       const payload = asRecord(event.payload);
       return {
         verb: 'session.reminder.sent',
-        leading: buildSystemLeadingAvatar(),
+        leading: buildSessionParticipantsLeading(payload),
         headline: {
-          primary: 'Class starts in 5 minutes',
+          primary: 'Upcoming class reminder',
           secondary: sessionName(payload),
         },
         summary:
@@ -1530,12 +1532,22 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       const payload = asRecord(event.payload);
       return {
         verb: 'session.feedback_request.sent',
-        leading: buildSystemLeadingAvatar(),
+        leading: buildSessionParticipantsLeading(payload),
         headline: {
-          primary: "How was today's session?",
-          secondary: sessionName(payload),
+          primary: 'Class feedback requested',
+          secondary: "How was today's session?",
         },
-        summary: asOptionalString(payload.summary),
+        summary: asOptionalString(payload.summary) ?? 'Rate this class in one minute.',
+        metadata: {
+          sourceEventId: event.id,
+          messageId: asOptionalString(payload.messageId),
+          classSessionId: asOptionalString(payload.scheduleId),
+          classroomId: asOptionalString(payload.learningSpaceId),
+          channelId: asOptionalString(payload.channelId),
+          occurrenceStart:
+            asOptionalString(payload.occurrenceStart) ??
+            asOptionalString(payload.startAt),
+        },
       };
     },
   },

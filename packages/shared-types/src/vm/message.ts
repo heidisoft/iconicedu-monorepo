@@ -214,6 +214,11 @@ export interface FeedbackRequestMessageVM extends BaseMessageVM {
   feedback: {
     prompt: string;
     sessionTitle?: string | null;
+    classSessionId?: UUID | null;
+    classroomId?: UUID | null;
+    channelId?: UUID | null;
+    occurrenceStart?: ISODateTime | null;
+    sourceEventId?: UUID | null;
     submittedAt?: ISODateTime | null;
     rating?: number | null;
     comment?: string | null;

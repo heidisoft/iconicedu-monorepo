@@ -65,6 +65,7 @@ export function ActivityWithSubitems({
   const parentAutoRead = shouldEnableGroupParentAutoRead(hasUnreadSubActivities)
     ? onAutoRead
     : undefined;
+  const hideParentActionButton = Boolean(activity.metadata?.hideActionButton);
   const [isCollapsed, setIsCollapsed] = useState(() =>
     getInitialGroupCollapsedState(activity),
   );
@@ -89,7 +90,11 @@ export function ActivityWithSubitems({
         parentExpanded={parentExpanded}
         isCollapsed={isCollapsed}
         showSubActivityToggle={hasSubActivities}
-        showActionButton={showActionButton && Boolean(activity.content.actionButton)}
+        showActionButton={
+          showActionButton &&
+          !hideParentActionButton &&
+          Boolean(activity.content.actionButton)
+        }
         subActivityCount={subActivityCount}
         unreadSubActivityCount={unreadSubActivityCount}
         hasUnreadSubActivities={hasUnreadSubActivities}

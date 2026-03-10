@@ -102,6 +102,12 @@ export interface SessionReminderSentActivityEventPayload {
   title: string;
   summary?: string | null;
   channelRouteKind?: 'space' | 'dm' | 'channel' | null;
+  members?: Array<{
+    profileId: UUID;
+    displayName?: string | null;
+    avatarUrl?: string | null;
+    themeKey?: string | null;
+  }> | null;
 }
 
 export interface SessionFeedbackRequestSentActivityEventPayload {
@@ -113,6 +119,12 @@ export interface SessionFeedbackRequestSentActivityEventPayload {
   title: string;
   summary?: string | null;
   channelRouteKind?: 'space' | 'dm' | 'channel' | null;
+  members?: Array<{
+    profileId: UUID;
+    displayName?: string | null;
+    avatarUrl?: string | null;
+    themeKey?: string | null;
+  }> | null;
 }
 
 export interface PaymentReminderSentActivityEventPayload {
