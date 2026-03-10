@@ -90,31 +90,31 @@ export default [
   },
   withProject(
     ['apps/web/**/*.{ts,tsx,js,jsx}'],
-    path.join(__dirname, 'apps/web/tsconfig.json')
+    path.join(__dirname, 'apps/web/tsconfig.json'),
   ),
   withProject(
     ['apps/mobile/**/*.{ts,tsx,js,jsx}'],
-    path.join(__dirname, 'apps/mobile/tsconfig.eslint.json')
+    path.join(__dirname, 'apps/mobile/tsconfig.eslint.json'),
   ),
   withProject(
     ['apps/api/**/*.{ts,tsx,js,jsx}'],
-    path.join(__dirname, 'apps/api/tsconfig.json')
+    path.join(__dirname, 'apps/api/tsconfig.json'),
   ),
   withProject(
     ['packages/ui-web/**/*.{ts,tsx,js,jsx}'],
-    path.join(__dirname, 'packages/ui-web/tsconfig.json')
+    path.join(__dirname, 'packages/ui-web/tsconfig.json'),
   ),
   withProject(
     ['packages/ui-native/**/*.{ts,tsx,js,jsx}'],
-    path.join(__dirname, 'packages/ui-native/tsconfig.eslint.json')
+    path.join(__dirname, 'packages/ui-native/tsconfig.eslint.json'),
   ),
   withProject(
     ['packages/utils/**/*.{ts,tsx,js,jsx}'],
-    path.join(__dirname, 'packages/utils/tsconfig.json')
+    path.join(__dirname, 'packages/utils/tsconfig.json'),
   ),
   withProject(
     ['packages/shared-types/**/*.{ts,tsx,js,jsx}'],
-    path.join(__dirname, 'packages/shared-types/tsconfig.json')
+    path.join(__dirname, 'packages/shared-types/tsconfig.json'),
   ),
   {
     files: ['apps/web/tailwind.config.ts', 'packages/ui-web/tailwind.config.ts'],
