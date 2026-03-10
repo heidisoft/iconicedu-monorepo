@@ -11,6 +11,7 @@ const DEFAULT_LEASE_SECONDS = 120;
 const DEFAULT_MAX_ATTEMPTS = 8;
 const RETRY_BASE_MS = 15_000;
 const RETRY_MAX_MS = 10 * 60_000;
+const SESSION_REMINDER_OFFSETS_MINUTES = [30, 5] as const;
 
 type ReminderJobPayload = {
   title: string;
@@ -43,32 +44,8 @@ function normalizeBaseScheduleId(scheduleId: string) {
   return index === -1 ? scheduleId : scheduleId.slice(0, index);
 }
 
-function buildReminderText(payload: ReminderJobPayload) {
-  if (payload.summary?.trim()) {
-    return payload.summary.trim();
-  }
-  return `${payload.title} is starting soon.`;
-}
-
-function buildFeedbackPrompt(payload: ReminderJobPayload) {
-  if (payload.summary?.trim()) {
-    return payload.summary.trim();
-  }
-  return `How was "${payload.title}"?`;
-}
-
-function buildPaymentText(payload: ReminderJobPayload) {
-  const amount =
-    typeof payload.amount === 'number'
-      ? `${payload.currency ?? 'USD'} ${payload.amount.toFixed(2)}`
-      : null;
-  if (amount && payload.dueAt) {
-    return `Payment reminder: ${amount} due ${new Date(payload.dueAt).toLocaleString('en-US')}.`;
-  }
-  if (amount) {
-    return `Payment reminder: ${amount} is due.`;
-  }
-  return payload.summary?.trim() || 'Payment reminder';
+function formatStartsInSummary(offsetMinutes: number) {
+  return `Class starts in ${offsetMinutes} minutes`;
 }
 
 function resolveRetryDelayMs(attemptCount: number) {
@@ -154,30 +131,37 @@ export async function compileLearningSpaceReminderJobs(input: {
       })),
     };
 
-    const reminderDedupe = `session.reminder:${input.orgId}:${normalizedScheduleId}:${occurrence.startAt}`;
-    dedupeKeys.add(reminderDedupe);
-    rows.push({
-      org_id: input.orgId,
-      job_type: 'session.reminder',
-      target_kind: 'channel',
-      target_id: occurrence.source.channelId,
-      source_learning_space_id: occurrence.source.learningSpaceId,
-      source_schedule_id: normalizedScheduleId,
-      occurrence_start_at: occurrence.startAt,
-      run_at: new Date(occurrenceStart.getTime() - 10 * 60 * 1000).toISOString(),
-      timezone: occurrence.timezone ?? 'UTC',
-      payload,
-      dedupe_key: reminderDedupe,
-      status: 'pending',
-      max_attempts: DEFAULT_MAX_ATTEMPTS,
-      created_at: createdAt,
-      updated_at: createdAt,
-      next_attempt_at: null,
-      lease_owner: null,
-      lease_until: null,
-      last_error: null,
-      deleted_at: null,
-    });
+    for (const offsetMinutes of SESSION_REMINDER_OFFSETS_MINUTES) {
+      const reminderDedupe = `session.reminder:${input.orgId}:${normalizedScheduleId}:${occurrence.startAt}:${offsetMinutes}`;
+      dedupeKeys.add(reminderDedupe);
+      rows.push({
+        org_id: input.orgId,
+        job_type: 'session.reminder',
+        target_kind: 'channel',
+        target_id: occurrence.source.channelId,
+        source_learning_space_id: occurrence.source.learningSpaceId,
+        source_schedule_id: normalizedScheduleId,
+        occurrence_start_at: occurrence.startAt,
+        run_at: new Date(
+          occurrenceStart.getTime() - offsetMinutes * 60 * 1000,
+        ).toISOString(),
+        timezone: occurrence.timezone ?? 'UTC',
+        payload: {
+          ...payload,
+          summary: formatStartsInSummary(offsetMinutes),
+        },
+        dedupe_key: reminderDedupe,
+        status: 'pending',
+        max_attempts: DEFAULT_MAX_ATTEMPTS,
+        created_at: createdAt,
+        updated_at: createdAt,
+        next_attempt_at: null,
+        lease_owner: null,
+        lease_until: null,
+        last_error: null,
+        deleted_at: null,
+      });
+    }
 
     const feedbackDedupe = `session.feedback_request:${input.orgId}:${normalizedScheduleId}:${occurrence.startAt}`;
     dedupeKeys.add(feedbackDedupe);
@@ -351,85 +335,7 @@ async function processReminderJob(supabase: SupabaseServiceClient, job: Reminder
   const now = new Date().toISOString();
 
   const systemProfileId = await ensureSystemProfileId(supabase, job.org_id);
-  const messageType =
-    job.job_type === 'payment.reminder'
-      ? 'payment-reminder'
-      : job.job_type === 'session.feedback_request'
-        ? 'feedback-request'
-        : 'event-reminder';
-
-  const messageInsert = await supabase
-    .from('messages')
-    .insert({
-      org_id: job.org_id,
-      channel_id: job.target_id,
-      sender_profile_id: systemProfileId,
-      type: messageType,
-      visibility_type: 'all',
-      created_at: now,
-      updated_at: now,
-      created_by: systemProfileId,
-      updated_by: systemProfileId,
-    })
-    .select('id')
-    .single<{ id: string }>();
-
-  if (messageInsert.error) {
-    throw new Error(messageInsert.error.message);
-  }
-
-  const messageId = messageInsert.data.id;
-  const payloadTable =
-    job.job_type === 'payment.reminder'
-      ? 'message_payment_reminder'
-      : job.job_type === 'session.feedback_request'
-        ? 'message_feedback_request'
-        : 'message_event_reminder';
-
-  const payloadBody =
-    job.job_type === 'session.feedback_request'
-      ? {
-          prompt: buildFeedbackPrompt(payload),
-          text: buildFeedbackPrompt(payload),
-          sessionTitle: payload.title,
-          scheduleId: payload.scheduleId ?? null,
-          learningSpaceId: payload.learningSpaceId ?? null,
-          channelId: payload.channelId,
-          occurrenceStart: payload.occurrenceStart ?? payload.startAt ?? now,
-        }
-      : job.job_type === 'payment.reminder'
-        ? {
-            text: buildPaymentText(payload),
-            amount: payload.amount ?? null,
-            currency: payload.currency ?? 'USD',
-            dueAt: payload.dueAt ?? null,
-            status: 'pending',
-            invoiceId: payload.invoiceId ?? null,
-            description: payload.summary ?? null,
-          }
-        : {
-            text: buildReminderText(payload),
-            status: 'scheduled',
-            title: payload.title,
-            startAt: payload.startAt ?? payload.occurrenceStart ?? now,
-            endAt: payload.endAt ?? null,
-            location: payload.location ?? null,
-            meetingLink: payload.meetingLink ?? null,
-          };
-
-  const payloadInsert = await supabase.from(payloadTable).insert({
-    message_id: messageId,
-    org_id: job.org_id,
-    payload: payloadBody,
-    created_at: now,
-    updated_at: now,
-    created_by: systemProfileId,
-    updated_by: systemProfileId,
-  });
-
-  if (payloadInsert.error) {
-    throw new Error(payloadInsert.error.message);
-  }
+  const messageId: string | null = null;
 
   const eventType =
     job.job_type === 'payment.reminder'
@@ -449,13 +355,13 @@ async function processReminderJob(supabase: SupabaseServiceClient, job: Reminder
     sourceKind: 'system',
     actorProfileId: systemProfileId,
     scope,
-    objectRef: { kind: 'message', id: messageId },
+    objectRef: messageId ? { kind: 'message', id: messageId } : undefined,
     targetRef: payload.learningSpaceId
       ? { kind: 'learning_space', id: payload.learningSpaceId as string }
       : undefined,
     payload: {
       channelId: payload.channelId,
-      messageId,
+      messageId: messageId ?? null,
       learningSpaceId: payload.learningSpaceId ?? null,
       scheduleId: payload.scheduleId ?? null,
       occurrenceStart: payload.occurrenceStart ?? payload.startAt ?? now,
@@ -494,7 +400,6 @@ async function processReminderJob(supabase: SupabaseServiceClient, job: Reminder
     result: 'succeeded',
     details: {
       eventType,
-      payloadTable,
     },
   });
 }

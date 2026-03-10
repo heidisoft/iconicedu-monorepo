@@ -27,14 +27,6 @@ import {
   dispatchDueReminderJobs,
 } from '@iconicedu/web/lib/automation/reminder-jobs';
 
-function createInsertChain<T>(result: T) {
-  const chain = {
-    select: vi.fn(() => chain),
-    single: vi.fn(async () => ({ data: result, error: null })),
-  };
-  return chain;
-}
-
 describe('reminder-jobs', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -110,13 +102,28 @@ describe('reminder-jobs', () => {
       learningSpaceId: 'space-1',
     });
 
-    expect(result.compiledCount).toBe(2);
+    expect(result.compiledCount).toBe(3);
     expect(reminderJobsTable.upsert).toHaveBeenCalledTimes(1);
     const compiledRows = reminderJobsTable.upsert.mock.calls[0]?.[0] as Array<{
       job_type: string;
+      dedupe_key: string;
       run_at: string;
-      payload: { members?: Array<{ profileId: string }> };
+      payload: { summary?: string | null; members?: Array<{ profileId: string }> };
     }>;
+    const reminderRows = compiledRows
+      .filter((row) => row.job_type === 'session.reminder')
+      .sort((a, b) => a.run_at.localeCompare(b.run_at));
+    expect(reminderRows).toHaveLength(2);
+    expect(reminderRows.map((row) => row.run_at)).toEqual([
+      '2026-03-06T09:30:00.000Z',
+      '2026-03-06T09:55:00.000Z',
+    ]);
+    expect(reminderRows.map((row) => row.payload.summary)).toEqual([
+      'Class starts in 30 minutes',
+      'Class starts in 5 minutes',
+    ]);
+    expect(reminderRows[0]?.dedupe_key).toContain(':30');
+    expect(reminderRows[1]?.dedupe_key).toContain(':5');
     const feedbackRow = compiledRows.find(
       (row) => row.job_type === 'session.feedback_request',
     );
@@ -164,8 +171,6 @@ describe('reminder-jobs', () => {
       maybeSingle: vi.fn(async () => ({ data: { id: 'system-profile-1' }, error: null })),
     };
 
-    const messagesInsertChain = createInsertChain({ id: 'message-1' });
-
     const reminderJobsUpdateChain = {
       eq: vi.fn(() => reminderJobsUpdateChain),
     };
@@ -178,10 +183,6 @@ describe('reminder-jobs', () => {
       insert: vi.fn(async () => ({ error: null })),
     };
 
-    const payloadTable = {
-      insert: vi.fn(async () => ({ error: null })),
-    };
-
     const supabase = {
       rpc: vi.fn(async () => ({ data: [claimedJob], error: null })),
       from: vi.fn((table: string) => {
@@ -190,16 +191,15 @@ describe('reminder-jobs', () => {
             return {
               select: vi.fn(() => profilesSelectChain),
             };
-          case 'messages':
-            return {
-              insert: vi.fn(() => messagesInsertChain),
-            };
-          case 'message_event_reminder':
-            return payloadTable;
           case 'reminder_jobs':
             return reminderJobsTable;
           case 'reminder_dispatch_logs':
             return dispatchLogsTable;
+          case 'messages':
+          case 'message_event_reminder':
+          case 'message_payment_reminder':
+          case 'message_feedback_request':
+            throw new Error(`Unexpected table ${table}`);
           default:
             throw new Error(`Unexpected table ${table}`);
         }
@@ -222,7 +222,9 @@ describe('reminder-jobs', () => {
     expect(publishActivityEventMock).toHaveBeenCalledTimes(1);
     expect(publishActivityEventMock).toHaveBeenCalledWith(
       expect.objectContaining({
+        objectRef: undefined,
         payload: expect.objectContaining({
+          messageId: null,
           members: [
             expect.objectContaining({
               profileId: 'profile-1',
@@ -231,7 +233,97 @@ describe('reminder-jobs', () => {
         }),
       }),
     );
-    expect(payloadTable.insert).toHaveBeenCalledTimes(1);
     expect(dispatchLogsTable.insert).toHaveBeenCalledTimes(1);
+  });
+
+  it('dispatches session.feedback_request without creating message rows', async () => {
+    publishActivityEventMock.mockResolvedValue({ id: 'activity-event-1' });
+
+    const claimedJob = {
+      id: 'job-feedback-1',
+      org_id: 'org-1',
+      job_type: 'session.feedback_request',
+      target_kind: 'channel',
+      target_id: 'channel-1',
+      payload: {
+        title: 'Algebra',
+        channelId: 'channel-1',
+        learningSpaceId: 'space-1',
+        scheduleId: 'schedule-1',
+        occurrenceStart: '2026-03-06T10:00:00.000Z',
+      },
+      dedupe_key: 'session.feedback_request:org-1:schedule-1:2026-03-06T10:00:00.000Z',
+      attempt_count: 0,
+      max_attempts: 8,
+    };
+
+    const profilesSelectChain = {
+      eq: vi.fn(() => profilesSelectChain),
+      is: vi.fn(() => profilesSelectChain),
+      order: vi.fn(() => profilesSelectChain),
+      limit: vi.fn(() => profilesSelectChain),
+      maybeSingle: vi.fn(async () => ({ data: { id: 'system-profile-1' }, error: null })),
+    };
+
+    const reminderJobsUpdateChain = {
+      eq: vi.fn(() => reminderJobsUpdateChain),
+    };
+
+    const reminderJobsTable = {
+      update: vi.fn(() => reminderJobsUpdateChain),
+    };
+
+    const dispatchLogsTable = {
+      insert: vi.fn(async () => ({ error: null })),
+    };
+
+    const supabase = {
+      rpc: vi.fn(async () => ({ data: [claimedJob], error: null })),
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case 'profiles':
+            return {
+              select: vi.fn(() => profilesSelectChain),
+            };
+          case 'reminder_jobs':
+            return reminderJobsTable;
+          case 'reminder_dispatch_logs':
+            return dispatchLogsTable;
+          case 'messages':
+          case 'message_feedback_request':
+            throw new Error(`Unexpected table ${table}`);
+          default:
+            throw new Error(`Unexpected table ${table}`);
+        }
+      }),
+    } as never;
+
+    const result = await dispatchDueReminderJobs({
+      supabase,
+      leaseOwner: 'test-worker',
+      limit: 10,
+      leaseSeconds: 90,
+    });
+
+    expect(result).toEqual({
+      claimed: 1,
+      succeeded: 1,
+      failed: 0,
+      deadLettered: 0,
+    });
+    expect(publishActivityEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'session.feedback_request.sent',
+        objectRef: undefined,
+        payload: expect.objectContaining({
+          messageId: null,
+        }),
+      }),
+    );
+    expect(dispatchLogsTable.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message_id: null,
+      }),
+    );
   });
 });
