@@ -33,26 +33,24 @@ jest.mock('lucide-react-native', () => ({
 
 // Capture the tabBar render prop so we can test it in isolation.
 let capturedTabBar: ((props: unknown) => React.ReactNode) | undefined;
-let capturedSceneContainerStyle: object | undefined;
+let capturedSceneStyle: object | undefined;
 
 jest.mock('expo-router', () => {
   const { View } = require('react-native');
 
-  const Screen = ({ name }: { name: string }) => (
-    <View testID={`screen-${name}`} />
-  );
+  const Screen = ({ name }: { name: string }) => <View testID={`screen-${name}`} />;
 
   const Tabs = ({
     children,
     tabBar,
-    sceneContainerStyle,
+    screenOptions,
   }: {
     children: React.ReactNode;
     tabBar?: (props: unknown) => React.ReactNode;
-    sceneContainerStyle?: object;
+    screenOptions?: { sceneStyle?: object };
   }) => {
     capturedTabBar = tabBar;
-    capturedSceneContainerStyle = sceneContainerStyle;
+    capturedSceneStyle = screenOptions?.sceneStyle;
     return <View testID="tabs">{children}</View>;
   };
 
@@ -68,10 +66,10 @@ import { useTablet } from '@/hooks/use-tablet';
 const mockTabBarProps = {
   state: {
     routes: [
-      { name: 'index',    key: 'index' },
+      { name: 'index', key: 'index' },
       { name: 'messages', key: 'messages' },
-      { name: 'inbox',    key: 'inbox' },
-      { name: 'account',  key: 'account' },
+      { name: 'inbox', key: 'inbox' },
+      { name: 'account', key: 'account' },
       { name: 'schedule', key: 'schedule' },
     ],
     index: 0,
@@ -84,7 +82,7 @@ describe('TabsLayout', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     capturedTabBar = undefined;
-    capturedSceneContainerStyle = undefined;
+    capturedSceneStyle = undefined;
   });
 
   describe('on phone (isTablet = false)', () => {
@@ -102,9 +100,9 @@ describe('TabsLayout', () => {
       expect(capturedTabBar).toBeUndefined();
     });
 
-    it('does not add paddingLeft to sceneContainerStyle', () => {
+    it('does not add paddingLeft to sceneStyle', () => {
       render(<TabsLayout />);
-      expect(capturedSceneContainerStyle).toBeUndefined();
+      expect(capturedSceneStyle).toBeUndefined();
     });
   });
 
@@ -123,9 +121,9 @@ describe('TabsLayout', () => {
       expect(capturedTabBar).toBeInstanceOf(Function);
     });
 
-    it('adds paddingLeft to sceneContainerStyle for side rail offset', () => {
+    it('adds paddingLeft to sceneStyle for side rail offset', () => {
       render(<TabsLayout />);
-      expect(capturedSceneContainerStyle).toEqual({ paddingLeft: 72 });
+      expect(capturedSceneStyle).toEqual({ paddingLeft: 72 });
     });
 
     it('SideRail renders a pressable item for each visible tab', () => {

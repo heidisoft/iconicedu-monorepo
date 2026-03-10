@@ -96,9 +96,9 @@ export default function TabsLayout() {
   return (
     <Tabs
       tabBar={isTablet ? (props) => <SideRail {...props} /> : undefined}
-      sceneContainerStyle={isTablet ? { paddingLeft: SIDE_RAIL_WIDTH } : undefined}
       screenOptions={{
         headerShown: false,
+        sceneStyle: isTablet ? { paddingLeft: SIDE_RAIL_WIDTH } : undefined,
         tabBarStyle: {
           backgroundColor: colors.tabBg,
           borderTopColor: colors.tabBorder,
