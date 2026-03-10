@@ -10,20 +10,16 @@ describe('TypingIndicator', () => {
 
   it('shows single user typing', () => {
     render(<TypingIndicator typingUsers={['Alice']} />);
-    expect(screen.getByText('Alice is typing...')).toBeTruthy();
+    expect(screen.getByText('Alice is typing…')).toBeTruthy();
   });
 
   it('shows two users typing', () => {
     render(<TypingIndicator typingUsers={['Alice', 'Bob']} />);
-    expect(screen.getByText('Alice and Bob are typing...')).toBeTruthy();
+    expect(screen.getByText('Alice and Bob are typing…')).toBeTruthy();
   });
 
   it('shows multiple users with count', () => {
-    render(
-      <TypingIndicator typingUsers={['Alice', 'Bob', 'Charlie']} />,
-    );
-    expect(
-      screen.getByText('Alice and 2 others are typing...'),
-    ).toBeTruthy();
+    render(<TypingIndicator typingUsers={['Alice', 'Bob', 'Charlie']} />);
+    expect(screen.getByText('Alice and 2 others are typing…')).toBeTruthy();
   });
 });

@@ -3,8 +3,40 @@ import { describe, expect, it } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import type { SidebarLeftDataVM } from '@iconicedu/shared-types';
 
-import { SidebarLeft } from './sidebar-left';
-import { SidebarProvider } from '../../ui/sidebar';
+import { SidebarLeft } from '@iconicedu/ui-web/components/sidebar/sidebar-left';
+import { SidebarProvider } from '@iconicedu/ui-web/ui/sidebar';
+
+vi.mock('@iconicedu/ui-web/ui/sidebar', () => {
+  const React = require('react');
+  const passthrough = ({ children, ...props }: { children?: React.ReactNode }) =>
+    React.createElement('div', props, children);
+  return {
+    SidebarProvider: passthrough,
+    Sidebar: passthrough,
+    SidebarContent: passthrough,
+    SidebarFooter: passthrough,
+    SidebarGroup: passthrough,
+    SidebarGroupAction: ({ children, ...props }: { children?: React.ReactNode }) =>
+      React.createElement('button', props, children),
+    SidebarGroupContent: passthrough,
+    SidebarGroupLabel: passthrough,
+    SidebarHeader: passthrough,
+    SidebarMenu: ({ children, ...props }: { children?: React.ReactNode }) =>
+      React.createElement('ul', props, children),
+    SidebarMenuButton: ({
+      children,
+      asChild,
+      ...props
+    }: {
+      children?: React.ReactNode;
+      asChild?: boolean;
+    }) => (asChild ? children : React.createElement('button', props, children)),
+    SidebarMenuItem: ({ children, ...props }: { children?: React.ReactNode }) =>
+      React.createElement('li', props, children),
+    SidebarSeparator: passthrough,
+    useSidebar: () => ({ isMobile: false, state: 'expanded' }),
+  };
+});
 
 function makeData() {
   return {

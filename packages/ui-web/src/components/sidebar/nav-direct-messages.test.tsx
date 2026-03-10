@@ -3,8 +3,35 @@ import React from 'react';
 import { act, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { NavDirectMessages } from './nav-direct-messages';
-import { SidebarProvider } from '../../ui/sidebar';
+import { NavDirectMessages } from '@iconicedu/ui-web/components/sidebar/nav-direct-messages';
+import { SidebarProvider } from '@iconicedu/ui-web/ui/sidebar';
+
+vi.mock('@iconicedu/ui-web/ui/sidebar', () => {
+  const React = require('react');
+  return {
+    SidebarProvider: ({ children }: { children: React.ReactNode }) =>
+      React.createElement('div', {}, children),
+    SidebarGroup: ({ children }: { children: React.ReactNode }) =>
+      React.createElement('section', {}, children),
+    SidebarGroupLabel: ({ children }: { children: React.ReactNode }) =>
+      React.createElement('h3', {}, children),
+    SidebarMenu: ({ children }: { children: React.ReactNode }) =>
+      React.createElement('ul', {}, children),
+    SidebarMenuItem: ({ children }: { children: React.ReactNode }) =>
+      React.createElement('li', {}, children),
+    SidebarMenuButton: ({
+      children,
+      asChild,
+      ...props
+    }: {
+      children: React.ReactNode;
+      asChild?: boolean;
+    }) => (asChild ? children : React.createElement('button', props, children)),
+    SidebarMenuAction: ({ children }: { children: React.ReactNode }) =>
+      React.createElement('button', {}, children),
+    useSidebar: () => ({ isMobile: false, state: 'expanded' }),
+  };
+});
 
 describe('NavDirectMessages', () => {
   afterEach(() => {

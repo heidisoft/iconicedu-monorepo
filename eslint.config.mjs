@@ -128,6 +128,17 @@ export default [
     },
   },
   {
+    files: ['**/vitest.config.ts', '**/vite.config.ts'],
+    languageOptions: {
+      parser: tsParser,
+      parserOptions: {
+        project: null,
+        ecmaVersion: 2020,
+        sourceType: 'module',
+      },
+    },
+  },
+  {
     files: [
       '**/*.test.{ts,tsx,js,jsx}',
       '**/*.spec.{ts,tsx,js,jsx}',

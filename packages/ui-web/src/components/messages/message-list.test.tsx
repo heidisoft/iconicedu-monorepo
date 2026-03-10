@@ -1,18 +1,17 @@
 import React from 'react';
-import { render, act } from '@testing-library/react';
+import { render, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-import { MessageList } from './message-list';
+import { MessageList } from '@iconicedu/ui-web/components/messages/message-list';
 import type { MessageVM, ThreadVM } from '@iconicedu/shared-types';
 
-vi.mock('./message-item', () => ({
+vi.mock('@iconicedu/ui-web/components/messages/message-item', () => ({
   MessageItem: () => null,
 }));
 
-vi.mock('./empty-state', () => ({
+vi.mock('@iconicedu/ui-web/components/messages/empty-state', () => ({
   EmptyMessagesState: () => null,
 }));
-
 
 const baseMessage: MessageVM = {
   ids: { id: 'message-1', orgId: 'org-1' },
@@ -54,7 +53,9 @@ describe('MessageList', () => {
     const { rerender } = render(
       <MessageList
         messages={[baseMessage]}
-        onOpenThread={vi.fn() as unknown as (thread: ThreadVM, message: MessageVM) => void}
+        onOpenThread={
+          vi.fn() as unknown as (thread: ThreadVM, message: MessageVM) => void
+        }
         onProfileClick={vi.fn()}
       />,
     );
@@ -63,7 +64,9 @@ describe('MessageList', () => {
       rerender(
         <MessageList
           messages={[baseMessage, newerMessage]}
-          onOpenThread={vi.fn() as unknown as (thread: ThreadVM, message: MessageVM) => void}
+          onOpenThread={
+            vi.fn() as unknown as (thread: ThreadVM, message: MessageVM) => void
+          }
           onProfileClick={vi.fn()}
         />,
       );
@@ -94,7 +97,9 @@ describe('MessageList', () => {
     const { getByText } = render(
       <MessageList
         messages={[older, newer]}
-        onOpenThread={vi.fn() as unknown as (thread: ThreadVM, message: MessageVM) => void}
+        onOpenThread={
+          vi.fn() as unknown as (thread: ThreadVM, message: MessageVM) => void
+        }
         onProfileClick={vi.fn()}
         lastReadMessageId="message-older"
         currentUserId="profile-1"
@@ -126,7 +131,9 @@ describe('MessageList', () => {
     const { queryByText } = render(
       <MessageList
         messages={[older, myNewer]}
-        onOpenThread={vi.fn() as unknown as (thread: ThreadVM, message: MessageVM) => void}
+        onOpenThread={
+          vi.fn() as unknown as (thread: ThreadVM, message: MessageVM) => void
+        }
         onProfileClick={vi.fn()}
         lastReadMessageId="message-older"
         currentUserId="profile-1"
@@ -159,7 +166,9 @@ describe('MessageList', () => {
     const { queryByText, rerender } = render(
       <MessageList
         messages={[older, newer]}
-        onOpenThread={vi.fn() as unknown as (thread: ThreadVM, message: MessageVM) => void}
+        onOpenThread={
+          vi.fn() as unknown as (thread: ThreadVM, message: MessageVM) => void
+        }
         onProfileClick={vi.fn()}
         lastReadMessageId="message-older"
         currentUserId="profile-1"
@@ -176,7 +185,9 @@ describe('MessageList', () => {
     rerender(
       <MessageList
         messages={[older, newer]}
-        onOpenThread={vi.fn() as unknown as (thread: ThreadVM, message: MessageVM) => void}
+        onOpenThread={
+          vi.fn() as unknown as (thread: ThreadVM, message: MessageVM) => void
+        }
         onProfileClick={vi.fn()}
         lastReadMessageId="message-older"
         currentUserId="profile-1"
@@ -217,7 +228,9 @@ describe('MessageList', () => {
     const { queryByText, unmount } = render(
       <MessageList
         messages={[older, newer]}
-        onOpenThread={vi.fn() as unknown as (thread: ThreadVM, message: MessageVM) => void}
+        onOpenThread={
+          vi.fn() as unknown as (thread: ThreadVM, message: MessageVM) => void
+        }
         onProfileClick={vi.fn()}
         lastReadMessageId="message-older"
         currentUserId="profile-1"
@@ -229,7 +242,9 @@ describe('MessageList', () => {
     const { queryByText: queryAfterRemount } = render(
       <MessageList
         messages={[older, newer]}
-        onOpenThread={vi.fn() as unknown as (thread: ThreadVM, message: MessageVM) => void}
+        onOpenThread={
+          vi.fn() as unknown as (thread: ThreadVM, message: MessageVM) => void
+        }
         onProfileClick={vi.fn()}
         lastReadMessageId="message-newer"
         currentUserId="profile-1"
@@ -239,7 +254,7 @@ describe('MessageList', () => {
     vi.useRealTimers();
   });
 
-  it('calls unread viewed callback when newest incoming message is visible', () => {
+  it('calls unread viewed callback when newest incoming message is visible', async () => {
     const older = {
       ...baseMessage,
       ids: { ...baseMessage.ids, id: 'message-older' },
@@ -262,7 +277,9 @@ describe('MessageList', () => {
     render(
       <MessageList
         messages={[older, newer]}
-        onOpenThread={vi.fn() as unknown as (thread: ThreadVM, message: MessageVM) => void}
+        onOpenThread={
+          vi.fn() as unknown as (thread: ThreadVM, message: MessageVM) => void
+        }
         onProfileClick={vi.fn()}
         lastReadMessageId="message-older"
         currentUserId="profile-1"
@@ -270,6 +287,8 @@ describe('MessageList', () => {
       />,
     );
 
-    expect(onUnreadViewed).toHaveBeenCalledWith('message-newer');
+    await waitFor(() => {
+      expect(onUnreadViewed).toHaveBeenCalledWith('message-newer');
+    });
   });
 });
