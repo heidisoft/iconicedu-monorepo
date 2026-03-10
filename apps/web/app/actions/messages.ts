@@ -1001,7 +1001,7 @@ async function resolveDmActivityRecipientProfileIds(input: {
   }
 
   const readStatesResponse = await input.supabase
-    .from('channel_read_states')
+    .from('channel_read_state')
     .select('account_id,last_read_at')
     .eq('org_id', input.orgId)
     .eq('channel_id', input.channelId)

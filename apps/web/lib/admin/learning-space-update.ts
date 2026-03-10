@@ -197,6 +197,44 @@ type ScheduleChangeActivity = {
   };
 };
 
+function toTimestamp(value: string | null | undefined) {
+  if (!value) return null;
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : null;
+}
+
+function shouldPublishScheduleChangeActivity(
+  activity: ScheduleChangeActivity,
+  nowIso: string,
+) {
+  const nowTime = toTimestamp(nowIso);
+  if (nowTime === null) {
+    return true;
+  }
+
+  const payload = activity.payload;
+  const referenceAt =
+    activity.eventType === 'session.canceled'
+      ? (payload.canceledStartAt ??
+        payload.startAt ??
+        payload.firstSessionStartAt ??
+        null)
+      : activity.eventType === 'session.rescheduled'
+        ? (payload.rescheduledToStartAt ??
+          payload.rescheduledFromStartAt ??
+          payload.startAt ??
+          payload.firstSessionStartAt ??
+          null)
+        : (payload.startAt ?? payload.firstSessionStartAt ?? null);
+
+  const referenceTime = toTimestamp(referenceAt);
+  if (referenceTime === null) {
+    return true;
+  }
+
+  return referenceTime >= nowTime;
+}
+
 function canonicalJson(value: unknown) {
   return JSON.stringify(normalizeForCompare(value));
 }
@@ -503,7 +541,7 @@ export function buildExceptionAndOverrideScheduleChangeActivities(input: {
           transition: `${previousState}->scheduled`,
           eventType: 'session.scheduled',
         });
-        activities.push({
+        const activity: ScheduleChangeActivity = {
           eventType: 'session.scheduled',
           dedupeKey: `schedule.unscheduled-change:${input.learningSpaceId}:${pair.scheduleId}:${pairIndex}:${occurrenceKey}:${input.occurredAt}`,
           payload: {
@@ -519,7 +557,10 @@ export function buildExceptionAndOverrideScheduleChangeActivities(input: {
             startAt: scheduledStartAt,
             timezone: pair.timezone,
           },
-        });
+        };
+        if (shouldPublishScheduleChangeActivity(activity, input.occurredAt)) {
+          activities.push(activity);
+        }
         continue;
       }
 
@@ -529,7 +570,7 @@ export function buildExceptionAndOverrideScheduleChangeActivities(input: {
           transition: `${previousState}->exception`,
           eventType: 'session.canceled',
         });
-        activities.push({
+        const activity: ScheduleChangeActivity = {
           eventType: 'session.canceled',
           dedupeKey: `schedule.exception:${input.learningSpaceId}:${pair.scheduleId}:${pairIndex}:${occurrenceKey}:${input.occurredAt}`,
           payload: {
@@ -546,7 +587,10 @@ export function buildExceptionAndOverrideScheduleChangeActivities(input: {
             canceledReason: nextException?.reason ?? null,
             timezone: pair.timezone,
           },
-        });
+        };
+        if (shouldPublishScheduleChangeActivity(activity, input.occurredAt)) {
+          activities.push(activity);
+        }
         continue;
       }
 
@@ -570,7 +614,7 @@ export function buildExceptionAndOverrideScheduleChangeActivities(input: {
         transition: `${previousState}->override`,
         eventType: 'session.rescheduled',
       });
-      activities.push({
+      const activity: ScheduleChangeActivity = {
         eventType: 'session.rescheduled',
         dedupeKey: `schedule.override:${input.learningSpaceId}:${pair.scheduleId}:${pairIndex}:${occurrenceKey}:${input.occurredAt}`,
         payload: {
@@ -588,7 +632,10 @@ export function buildExceptionAndOverrideScheduleChangeActivities(input: {
           rescheduledReason: nextOverride?.reason ?? null,
           timezone: pair.timezone,
         },
-      });
+      };
+      if (shouldPublishScheduleChangeActivity(activity, input.occurredAt)) {
+        activities.push(activity);
+      }
     }
 
     if (pairDiffs.length) {
@@ -1531,7 +1578,10 @@ export async function updateLearningSpaceFromPayload(
   );
 
   if (scheduleActivities.length > 0) {
-    for (const activity of scheduleActivities) {
+    const publishableScheduleActivities = scheduleActivities.filter((activity) =>
+      shouldPublishScheduleChangeActivity(activity, now),
+    );
+    for (const activity of publishableScheduleActivities) {
       await publishActivityEvent({
         supabase: serviceClient,
         orgId,

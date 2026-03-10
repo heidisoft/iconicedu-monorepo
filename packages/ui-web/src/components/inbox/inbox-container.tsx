@@ -199,6 +199,149 @@ export function applySessionParentLocalHeadline(
   };
 }
 
+function formatLocalDateTimeLabel(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date
+    .toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    })
+    .replace(',', ' at');
+}
+
+function formatLocalTimeLabel(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
+export function applyScheduleActivityLocalTime(
+  activity: ActivityFeedItemVM,
+): ActivityFeedItemVM {
+  const metadata = activity.metadata as Record<string, unknown> | undefined;
+  if (!metadata?.sessionLocalTime) {
+    return activity;
+  }
+
+  if (activity.verb === 'session.scheduled') {
+    const startAt = typeof metadata.startAt === 'string' ? metadata.startAt : undefined;
+    const firstSessionStartAt =
+      typeof metadata.firstSessionStartAt === 'string'
+        ? metadata.firstSessionStartAt
+        : undefined;
+    const localStart = startAt ? formatLocalDateTimeLabel(startAt) : null;
+    const localFirst = formatLocalDateTimeLabel(firstSessionStartAt ?? startAt ?? '');
+    const weeklyLocalTime = startAt ? formatLocalTimeLabel(startAt) : null;
+    const isUpdated = metadata.activityPhase === 'updated';
+    return {
+      ...activity,
+      content: {
+        ...activity.content,
+        summary: isUpdated
+          ? localStart
+            ? `Session scheduled ${localStart}.`
+            : activity.content.summary
+          : localFirst && weeklyLocalTime
+            ? `First session: ${localFirst}, then weekly ${weeklyLocalTime}`
+            : activity.content.summary,
+      },
+    };
+  }
+
+  if (activity.verb === 'session.rescheduled') {
+    const fromValue =
+      typeof metadata.rescheduledFromStartAt === 'string'
+        ? metadata.rescheduledFromStartAt
+        : typeof metadata.startAt === 'string'
+          ? metadata.startAt
+          : undefined;
+    const toValue =
+      typeof metadata.rescheduledToStartAt === 'string'
+        ? metadata.rescheduledToStartAt
+        : undefined;
+    const reason =
+      typeof metadata.rescheduledReason === 'string'
+        ? metadata.rescheduledReason
+        : undefined;
+    const nextSessionValue =
+      typeof metadata.firstSessionStartAt === 'string'
+        ? metadata.firstSessionStartAt
+        : undefined;
+    const fromLabel = fromValue ? formatLocalDateTimeLabel(fromValue) : null;
+    const toLabel = toValue ? formatLocalDateTimeLabel(toValue) : null;
+    const nextSessionLabel = nextSessionValue
+      ? formatLocalDateTimeLabel(nextSessionValue)
+      : null;
+    const baseSummary = nextSessionLabel
+      ? `Next session ${nextSessionLabel}.`
+      : activity.content.summary;
+    return {
+      ...activity,
+      content: {
+        ...activity.content,
+        headline: {
+          ...activity.content.headline,
+          primary:
+            fromLabel && toLabel
+              ? `Session ${fromLabel} rescheduled to ${toLabel}`
+              : activity.content.headline.primary,
+        },
+        summary: reason ? `${baseSummary ?? ''} Reason: ${reason}.`.trim() : baseSummary,
+      },
+    };
+  }
+
+  if (activity.verb === 'session.canceled') {
+    const canceledValue =
+      typeof metadata.canceledStartAt === 'string'
+        ? metadata.canceledStartAt
+        : typeof metadata.startAt === 'string'
+          ? metadata.startAt
+          : undefined;
+    const reason =
+      typeof metadata.canceledReason === 'string' ? metadata.canceledReason : undefined;
+    const nextSessionValue =
+      typeof metadata.firstSessionStartAt === 'string'
+        ? metadata.firstSessionStartAt
+        : undefined;
+    const canceledLabel = canceledValue ? formatLocalDateTimeLabel(canceledValue) : null;
+    const nextSessionLabel = nextSessionValue
+      ? formatLocalDateTimeLabel(nextSessionValue)
+      : null;
+    return {
+      ...activity,
+      content: {
+        ...activity.content,
+        headline: {
+          ...activity.content.headline,
+          primary: canceledLabel
+            ? `Session ${canceledLabel} cancelled${reason ? ` ${reason}` : ''}`
+            : 'Session cancelled',
+        },
+        summary: nextSessionLabel
+          ? `Next session ${nextSessionLabel}.`
+          : activity.content.summary,
+      },
+    };
+  }
+
+  return activity;
+}
+
 export function InboxContainer({
   feed,
   markReadEndpoint = '/api/activity-feed/read',
@@ -292,7 +435,9 @@ export function InboxContainer({
   );
 
   const renderActivity = (activity: ActivityFeedItemVM) => {
-    const displayActivity = applySessionParentLocalHeadline(activity);
+    const displayActivity = applyScheduleActivityLocalTime(
+      applySessionParentLocalHeadline(activity),
+    );
 
     if (displayActivity.kind === 'group') {
       return (

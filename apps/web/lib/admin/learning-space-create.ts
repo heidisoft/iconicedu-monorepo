@@ -728,7 +728,11 @@ async function insertClassScheduleRecurrence(
   supabase: SupabaseClient,
   payload: ClassScheduleRecurrenceInsertPayload,
 ) {
-  const rruleFields = buildRRuleFields(payload.rule, payload.startDate);
+  const rruleFields = buildRRuleFields(
+    payload.rule,
+    payload.startDate,
+    payload.timezone ?? payload.rule.timezone ?? 'UTC',
+  );
   const rawRRule = buildRawRRule(payload.rule, rruleFields);
 
   const { error } = await supabase.from('class_schedule_recurrence').insert({

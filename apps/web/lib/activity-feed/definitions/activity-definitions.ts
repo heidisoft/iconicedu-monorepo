@@ -1323,6 +1323,12 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
             ? `First session: ${firstSessionLabel}, then weekly ${weeklyTime}`
             : (asOptionalString(payload.startAt) ?? undefined),
         actionButton: sourceScheduleAction(event, payload),
+        metadata: {
+          sessionLocalTime: true,
+          activityPhase: asOptionalString(payload.activityPhase),
+          startAt: asOptionalString(payload.startAt),
+          firstSessionStartAt: asOptionalString(payload.firstSessionStartAt),
+        },
       };
     },
   },
@@ -1368,6 +1374,14 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
           secondary: sessionName(payload),
         },
         summary: reason ? `${baseSummary ?? ''} Reason: ${reason}.`.trim() : baseSummary,
+        metadata: {
+          sessionLocalTime: true,
+          startAt: asOptionalString(payload.startAt),
+          firstSessionStartAt: asOptionalString(payload.firstSessionStartAt),
+          rescheduledFromStartAt: asOptionalString(payload.rescheduledFromStartAt),
+          rescheduledToStartAt: asOptionalString(payload.rescheduledToStartAt),
+          rescheduledReason: reason,
+        },
       };
     },
   },
@@ -1407,6 +1421,13 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
         summary: firstSessionLabel
           ? `Next session ${firstSessionLabel}.`
           : asOptionalString(payload.description),
+        metadata: {
+          sessionLocalTime: true,
+          startAt: asOptionalString(payload.startAt),
+          firstSessionStartAt: asOptionalString(payload.firstSessionStartAt),
+          canceledStartAt: asOptionalString(payload.canceledStartAt),
+          canceledReason: reason,
+        },
       };
     },
   },

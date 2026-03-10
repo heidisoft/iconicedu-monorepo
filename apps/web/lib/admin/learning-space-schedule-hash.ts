@@ -8,16 +8,6 @@ import type {
 export const DEFAULT_SCHEDULE_TIME = '09:00';
 export const DEFAULT_DURATION_MINUTES = 60;
 
-const WEEKDAY_INDEX: Record<WeekdayVM, number> = {
-  SU: 0,
-  MO: 1,
-  TU: 2,
-  WE: 3,
-  TH: 4,
-  FR: 5,
-  SA: 6,
-};
-
 type ExistingScheduleRecurrenceHashInput = {
   frequency?: string | null;
   interval?: number | null;
@@ -394,27 +384,63 @@ function getUtcTimeLabel(isoDateTime: string) {
     .padStart(2, '0')}`;
 }
 
-function toWeekdayValue(date: Date): WeekdayVM | null {
-  const entry = Object.entries(WEEKDAY_INDEX).find(
-    ([, index]) => index === date.getUTCDay(),
-  );
-  return (entry?.[0] as WeekdayVM | undefined) ?? null;
+function toWeekdayValueInTimezone(
+  isoDateTime: string,
+  timezone: string,
+): WeekdayVM | null {
+  const date = new Date(isoDateTime);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const weekday = new Intl.DateTimeFormat('en-US', {
+    weekday: 'short',
+    timeZone: timezone,
+  }).format(date);
+
+  switch (weekday) {
+    case 'Sun':
+      return 'SU';
+    case 'Mon':
+      return 'MO';
+    case 'Tue':
+      return 'TU';
+    case 'Wed':
+      return 'WE';
+    case 'Thu':
+      return 'TH';
+    case 'Fri':
+      return 'FR';
+    case 'Sat':
+      return 'SA';
+    default:
+      return null;
+  }
 }
 
-function getNextWeekdayDate(startDate: Date, weekday: WeekdayVM) {
-  const targetIndex = WEEKDAY_INDEX[weekday] ?? WEEKDAY_INDEX.MO;
-  const currentIndex = startDate.getUTCDay();
-  const diff = (targetIndex - currentIndex + 7) % 7;
-  const date = new Date(startDate);
-  date.setUTCDate(date.getUTCDate() + diff);
-  return date;
-}
+function getNextWeekdayDateInTimezone(
+  startDate: string,
+  weekday: WeekdayVM,
+  timezone: string,
+) {
+  const startAnchor = toOccurrenceKeyInTimezone(startDate, '12:00', timezone);
+  const base = new Date(startAnchor);
+  if (Number.isNaN(base.getTime())) {
+    return startDate;
+  }
 
-function applyTime(date: Date, time: string) {
-  const [hours, minutes] = time.split(':').map((value) => Number(value));
-  const next = new Date(date);
-  next.setUTCHours(hours ?? 0, minutes ?? 0, 0, 0);
-  return next;
+  for (let offset = 0; offset < 7; offset += 1) {
+    const next = new Date(base);
+    next.setUTCDate(base.getUTCDate() + offset);
+    const iso = next.toISOString();
+    const code = toWeekdayValueInTimezone(iso, timezone);
+    const localDate = getDateFromISOInTimezone(iso, timezone);
+    if (code === weekday && localDate) {
+      return localDate;
+    }
+  }
+
+  return startDate;
 }
 
 function buildExpandedSchedule(startAtDate: Date, time: string): ExpandedSchedule {
@@ -428,6 +454,7 @@ function buildExpandedSchedule(startAtDate: Date, time: string): ExpandedSchedul
 
 function normalizePayloadWeekdayTimes(
   schedule: LearningSpaceSchedulePayload,
+  timezone: string,
 ): LearningSpaceScheduleWeekdayTimePayload[] {
   if (schedule.rule.weekdayTimes?.length) {
     return [...schedule.rule.weekdayTimes]
@@ -444,25 +471,36 @@ function normalizePayloadWeekdayTimes(
       .sort((a, b) => `${a.day}:${a.time}`.localeCompare(`${b.day}:${b.time}`));
   }
 
-  const fallbackDay = toWeekdayValue(new Date(schedule.startDate));
+  const fallbackDay = toWeekdayValueInTimezone(schedule.startDate, timezone);
   return fallbackDay ? [{ day: fallbackDay, time: DEFAULT_SCHEDULE_TIME }] : [];
 }
 
 export function buildScheduleStart(
   schedule: LearningSpaceSchedulePayload,
 ): ExpandedSchedule {
-  const startDate = new Date(schedule.startDate);
-  startDate.setUTCHours(0, 0, 0, 0);
+  const timezone = schedule.timezone ?? schedule.rule.timezone ?? 'UTC';
+  const localAnchorDate =
+    getDateFromISOInTimezone(schedule.startDate, timezone) ??
+    schedule.startDate.slice(0, 10);
 
-  const weekdayTimes = normalizePayloadWeekdayTimes(schedule);
+  const weekdayTimes = normalizePayloadWeekdayTimes(schedule, timezone);
   if (!weekdayTimes.length) {
-    const startAt = applyTime(startDate, DEFAULT_SCHEDULE_TIME);
-    return buildExpandedSchedule(startAt, DEFAULT_SCHEDULE_TIME);
+    const startAt = toOccurrenceKeyInTimezone(
+      localAnchorDate,
+      DEFAULT_SCHEDULE_TIME,
+      timezone,
+    );
+    return buildExpandedSchedule(new Date(startAt), DEFAULT_SCHEDULE_TIME);
   }
 
   const candidates = weekdayTimes.map((entry) => {
-    const dateForWeekday = getNextWeekdayDate(startDate, entry.day);
-    return buildExpandedSchedule(applyTime(dateForWeekday, entry.time), entry.time);
+    const dateForWeekday = getNextWeekdayDateInTimezone(
+      localAnchorDate,
+      entry.day,
+      timezone,
+    );
+    const startAt = toOccurrenceKeyInTimezone(dateForWeekday, entry.time, timezone);
+    return buildExpandedSchedule(new Date(startAt), entry.time);
   });
 
   return candidates.reduce((earliest, candidate) =>
@@ -473,6 +511,7 @@ export function buildScheduleStart(
 export function buildRRuleFields(
   rule: LearningSpaceScheduleRulePayload,
   startDate: string,
+  timezone?: string | null,
 ): RRuleFields {
   const weekdayTimes = rule.weekdayTimes ?? [];
   const byday = rule.byWeekday?.length
@@ -484,7 +523,12 @@ export function buildRRuleFields(
   const times = weekdayTimes.length
     ? weekdayTimes.map((entry) => normalizeTimeLabel(entry.time))
     : rule.frequency !== 'weekly'
-      ? [getUtcTimeLabel(startDate)]
+      ? [
+          normalizeTimeLabel(
+            getTimeFromISOInTimezone(startDate, timezone ?? 'UTC') ??
+              getUtcTimeLabel(startDate),
+          ),
+        ]
       : [];
 
   const hours = new Set<number>();
@@ -542,7 +586,7 @@ function buildWeekdayTimesFromRecurrence(input: {
 
 function buildCanonicalRecurrenceFromPayload(schedule: LearningSpaceSchedulePayload) {
   const timezone = schedule.timezone ?? schedule.rule.timezone ?? 'UTC';
-  const fields = buildRRuleFields(schedule.rule, schedule.startDate);
+  const fields = buildRRuleFields(schedule.rule, schedule.startDate, timezone);
   const weekdayTimes = buildWeekdayTimesFromRecurrence({
     byday: fields.byday,
     byhour: fields.byhour,

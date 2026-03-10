@@ -1,12 +1,48 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildRRuleFields,
+  buildScheduleStart,
+  getDateFromISOInTimezone,
+  getTimeFromISOInTimezone,
   buildLearningSpaceScheduleHashBundleFromExisting,
   buildLearningSpaceScheduleHashBundleFromPayload,
   buildLearningSpaceSchedulesHashKeyFromPayload,
 } from '@iconicedu/web/lib/admin/learning-space-schedule-hash';
 
 describe('class schedule hash', () => {
+  it('builds schedule start using schedule timezone local date and time', () => {
+    const expanded = buildScheduleStart({
+      startDate: '2026-03-10T00:00:00.000Z',
+      timezone: 'America/New_York',
+      rule: {
+        frequency: 'weekly',
+        byWeekday: ['TU'],
+        weekdayTimes: [{ day: 'TU', time: '14:00' }],
+      },
+      exceptions: [],
+      overrides: [],
+    });
+
+    expect(getDateFromISOInTimezone(expanded.startAt, 'America/New_York')).toBe(
+      '2026-03-10',
+    );
+    expect(getTimeFromISOInTimezone(expanded.startAt, 'America/New_York')).toBe('14:00');
+  });
+
+  it('builds recurrence time fields using schedule timezone for non-weekly rules', () => {
+    const fields = buildRRuleFields(
+      {
+        frequency: 'daily',
+      },
+      '2026-03-10T18:30:00.000Z',
+      'America/New_York',
+    );
+
+    expect(fields.byhour).toEqual([14]);
+    expect(fields.byminute).toEqual([30]);
+  });
+
   it('keeps the same hash for equivalent weekly payloads with different anchor dates', () => {
     const first = buildLearningSpaceScheduleHashBundleFromPayload({
       startDate: '2026-03-10T00:00:00.000Z',

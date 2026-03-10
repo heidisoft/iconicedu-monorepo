@@ -248,6 +248,97 @@ describe('buildLearningSpaceScheduleDiffPlan', () => {
     expect(activities[0]?.payload.firstSessionStartAt).toBe('2026-03-31T21:00:00.000Z');
   });
 
+  it('does not emit canceled/rescheduled/scheduled changes for past session dates', () => {
+    const canceledActivities = buildExceptionAndOverrideScheduleChangeActivities({
+      learningSpaceId: 'space-1',
+      channelId: 'channel-1',
+      title: 'Math Foundations',
+      occurredAt: '2026-03-30T10:00:00.000Z',
+      invitedMembers: [],
+      pairs: [
+        {
+          scheduleId: 'schedule-1',
+          timezone: 'America/New_York',
+          previous: {
+            exceptions: [],
+            overrides: [],
+          },
+          next: {
+            exceptions: [
+              { occurrenceKey: '2026-03-10T21:00:00.000Z', reason: 'Holiday' },
+            ],
+            overrides: [],
+          },
+        },
+      ],
+    });
+
+    const rescheduledActivities = buildExceptionAndOverrideScheduleChangeActivities({
+      learningSpaceId: 'space-1',
+      channelId: 'channel-1',
+      title: 'Math Foundations',
+      occurredAt: '2026-03-30T10:00:00.000Z',
+      invitedMembers: [],
+      pairs: [
+        {
+          scheduleId: 'schedule-1',
+          timezone: 'America/New_York',
+          previous: {
+            exceptions: [],
+            overrides: [],
+          },
+          next: {
+            exceptions: [],
+            overrides: [
+              {
+                occurrenceKey: '2026-03-17T21:00:00.000Z',
+                startAt: '2026-03-18T21:30:00.000Z',
+                endAt: '2026-03-18T22:30:00.000Z',
+                reason: 'Late bus',
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    const unscheduledRemovalActivities =
+      buildExceptionAndOverrideScheduleChangeActivities({
+        learningSpaceId: 'space-1',
+        channelId: 'channel-1',
+        title: 'Math Foundations',
+        occurredAt: '2026-03-30T10:00:00.000Z',
+        invitedMembers: [],
+        pairs: [
+          {
+            scheduleId: 'schedule-1',
+            timezone: 'America/New_York',
+            previous: {
+              exceptions: [
+                { occurrenceKey: '2026-03-10T21:00:00.000Z', reason: 'Holiday' },
+              ],
+              overrides: [
+                {
+                  occurrenceKey: '2026-03-17T21:00:00.000Z',
+                  startAt: '2026-03-18T21:30:00.000Z',
+                  endAt: '2026-03-18T22:30:00.000Z',
+                  reason: null,
+                },
+              ],
+            },
+            next: {
+              exceptions: [],
+              overrides: [],
+            },
+          },
+        ],
+      });
+
+    expect(canceledActivities).toEqual([]);
+    expect(rescheduledActivities).toEqual([]);
+    expect(unscheduledRemovalActivities).toEqual([]);
+  });
+
   it('does not emit diffs for timezone-shifted keys when full hash is equal', () => {
     const activities = buildExceptionAndOverrideScheduleChangeActivities({
       learningSpaceId: 'space-1',

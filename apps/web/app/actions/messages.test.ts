@@ -291,7 +291,7 @@ describe('sendTextMessageAction', () => {
       if (table === 'profiles') {
         return { select: () => profilesChain };
       }
-      if (table === 'channel_read_states') {
+      if (table === 'channel_read_state') {
         return { select: () => readStateChain };
       }
       if (table === 'messages') {
@@ -391,7 +391,7 @@ describe('sendTextMessageAction', () => {
       if (table === 'channels') return { select: () => channelLookup };
       if (table === 'channel_members') return { select: () => channelMembersChain };
       if (table === 'profiles') return { select: () => profilesChain };
-      if (table === 'channel_read_states') return { select: () => readStateChain };
+      if (table === 'channel_read_state') return { select: () => readStateChain };
       if (table === 'messages') return { insert: insertMessage };
       if (table === 'message_text') return { insert: insertMessageText };
       return { insert: vi.fn() };
@@ -486,7 +486,7 @@ describe('sendTextMessageAction', () => {
       if (table === 'channels') return { select: () => channelLookup };
       if (table === 'channel_members') return { select: () => channelMembersChain };
       if (table === 'profiles') return { select: () => profilesChain };
-      if (table === 'channel_read_states') return { select: () => readStateChain };
+      if (table === 'channel_read_state') return { select: () => readStateChain };
       if (table === 'messages') return { insert: insertMessage };
       if (table === 'message_text') return { insert: insertMessageText };
       return { insert: vi.fn() };
@@ -1200,7 +1200,7 @@ describe('sendTextMessageAction', () => {
       if (table === 'channels') return { select: () => channelLookup };
       if (table === 'channel_members') return { select: () => channelMembersChain };
       if (table === 'profiles') return { select: () => profilesChain };
-      if (table === 'channel_read_states') return { select: () => readStateChain };
+      if (table === 'channel_read_state') return { select: () => readStateChain };
       if (table === 'messages') return { insert: insertMessage };
       if (table === 'message_file') return { insert: insertMessageFile };
       if (table === 'channel_files') return { insert: insertChannelFile };
@@ -1316,7 +1316,7 @@ describe('sendTextMessageAction', () => {
       if (table === 'channels') return { select: () => channelLookup };
       if (table === 'channel_members') return { select: () => channelMembersChain };
       if (table === 'profiles') return { select: () => profilesChain };
-      if (table === 'channel_read_states') return { select: () => readStateChain };
+      if (table === 'channel_read_state') return { select: () => readStateChain };
       if (table === 'messages') return { insert: insertMessage };
       if (table === 'message_audio_recording') return { insert: insertAudioRecording };
       if (table === 'channel_files') return { insert: insertChannelFile };
@@ -2313,7 +2313,7 @@ describe('toggleMessageReactionAction', () => {
       if (table === 'channels') return { select: () => channelLookup };
       if (table === 'channel_members') return { select: () => channelMembersChain };
       if (table === 'profiles') return { select: () => profilesChain };
-      if (table === 'channel_read_states') return { select: () => readStateChain };
+      if (table === 'channel_read_state') return { select: () => readStateChain };
       return {};
     });
     buildUserProfileById.mockResolvedValueOnce({
@@ -2416,7 +2416,7 @@ describe('toggleMessageReactionAction', () => {
       if (table === 'channels') return { select: () => channelLookup };
       if (table === 'channel_members') return { select: () => channelMembersChain };
       if (table === 'profiles') return { select: () => profilesChain };
-      if (table === 'channel_read_states') return { select: () => readStateChain };
+      if (table === 'channel_read_state') return { select: () => readStateChain };
       return {};
     });
     buildUserProfileById.mockResolvedValueOnce({

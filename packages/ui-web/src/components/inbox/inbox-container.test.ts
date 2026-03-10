@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   applyReadStateToSections,
+  applyScheduleActivityLocalTime,
   applySessionParentLocalHeadline,
   buildUnreadTabCounts,
   resolveReadIdsForActivity,
@@ -360,5 +361,82 @@ describe('InboxContainer rendering behavior', () => {
     const next = applySessionParentLocalHeadline(activity);
     expect(next.content.headline.primary).toContain('Class session ');
     expect(next.content.headline.primary).not.toBe('Class session');
+  });
+
+  it('formats schedule and reschedule/cancel activity labels using local time metadata', () => {
+    const scheduled = applyScheduleActivityLocalTime({
+      kind: 'leaf',
+      ids: { id: 'leaf-scheduled', orgId: 'org-1' },
+      timestamps: {
+        occurredAt: '2026-03-04T12:00:00.000Z',
+        createdAt: '2026-03-04T12:00:00.000Z',
+      },
+      tabKey: 'classes',
+      audience: { scope: { kind: 'global' }, visibility: 'public' },
+      verb: 'session.scheduled',
+      refs: { actor: {} as never },
+      content: {
+        headline: { primary: 'Session scheduled' },
+        summary: 'Session scheduled 2026-03-04T12:40:00.000Z.',
+      },
+      metadata: {
+        sessionLocalTime: true,
+        activityPhase: 'updated',
+        startAt: '2026-03-04T12:40:00.000Z',
+      },
+    });
+
+    const rescheduled = applyScheduleActivityLocalTime({
+      kind: 'leaf',
+      ids: { id: 'leaf-rescheduled', orgId: 'org-1' },
+      timestamps: {
+        occurredAt: '2026-03-04T12:00:00.000Z',
+        createdAt: '2026-03-04T12:00:00.000Z',
+      },
+      tabKey: 'classes',
+      audience: { scope: { kind: 'global' }, visibility: 'public' },
+      verb: 'session.rescheduled',
+      refs: { actor: {} as never },
+      content: {
+        headline: { primary: 'Session rescheduled' },
+        summary: 'Next session later.',
+      },
+      metadata: {
+        sessionLocalTime: true,
+        rescheduledFromStartAt: '2026-03-04T12:40:00.000Z',
+        rescheduledToStartAt: '2026-03-11T12:40:00.000Z',
+        firstSessionStartAt: '2026-03-11T12:40:00.000Z',
+      },
+    });
+
+    const canceled = applyScheduleActivityLocalTime({
+      kind: 'leaf',
+      ids: { id: 'leaf-canceled', orgId: 'org-1' },
+      timestamps: {
+        occurredAt: '2026-03-04T12:00:00.000Z',
+        createdAt: '2026-03-04T12:00:00.000Z',
+      },
+      tabKey: 'classes',
+      audience: { scope: { kind: 'global' }, visibility: 'public' },
+      verb: 'session.canceled',
+      refs: { actor: {} as never },
+      content: {
+        headline: { primary: 'Session cancelled' },
+        summary: 'Next session later.',
+      },
+      metadata: {
+        sessionLocalTime: true,
+        canceledStartAt: '2026-03-04T12:40:00.000Z',
+        firstSessionStartAt: '2026-03-11T12:40:00.000Z',
+      },
+    });
+
+    expect(scheduled.content.summary).toContain('Session scheduled ');
+    expect(scheduled.content.summary).not.toContain('2026-03-04T12:40:00.000Z');
+    expect(rescheduled.content.headline.primary).toContain('rescheduled to');
+    expect(rescheduled.content.headline.primary).not.toContain('2026-03');
+    expect(canceled.content.headline.primary).toContain('Session ');
+    expect(canceled.content.headline.primary).toContain('cancelled');
+    expect(canceled.content.headline.primary).not.toContain('2026-03');
   });
 });

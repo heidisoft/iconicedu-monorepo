@@ -105,6 +105,17 @@ All policies are built on these shared helpers:
 
 ---
 
+#### `educator_availabilities` _(gap fixed — migration 032)_
+
+| Operation | Who                                              |
+| --------- | ------------------------------------------------ |
+| SELECT    | All org members (needed for scheduling/matching) |
+| ALL       | Profile owner (educator self) OR org admin       |
+
+> **Note:** This table existed in the live DB but had no migration. Migration 032 creates it idempotently and adds RLS.
+
+---
+
 ### Profile Specialisation
 
 All six sub-tables (`educator_profile_subjects`, `educator_profile_grade_levels`, `educator_profile_curriculum_tags`, `educator_profile_badges`, `child_profile_grade_level`, `staff_profile_specialties`) share the same pattern:
@@ -351,6 +362,17 @@ All 15 payload tables (`message_text`, `message_image`, `message_file`, `message
 
 ### Activity & Automation
 
+#### `auth_telemetry_events` _(migration 020 + 032)_
+
+| Operation            | Who                                                 |
+| -------------------- | --------------------------------------------------- |
+| SELECT               | Org admin only _(added — migration 032)_            |
+| INSERT/UPDATE/DELETE | Deny for clients; backend service_role bypasses RLS |
+
+> Append-only audit table. No `deleted_at`. Correct security posture: clients cannot write; only the NestJS API (service_role) can.
+
+---
+
 #### `activity_events` _(migration 023)_
 
 | Operation | Who            |
@@ -406,7 +428,9 @@ All 15 payload tables (`message_text`, `message_image`, `message_file`, `message
 
 ---
 
-## Security Gaps Fixed (migration 031)
+## Security Gaps Fixed
+
+### Migration 031 (`rls_security_hardening`)
 
 | Table                                        | Gap                                                                                   | Fix                                                                          |
 | -------------------------------------------- | ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
@@ -418,6 +442,13 @@ All 15 payload tables (`message_text`, `message_image`, `message_file`, `message
 | `channel_live_session_participant_events`    | SELECT-only                                                                           | Add admin ALL policy                                                         |
 | `channel_live_session_expected_participants` | SELECT-only                                                                           | Add admin ALL policy                                                         |
 | `message_live_session_started`               | SELECT-only                                                                           | Add admin ALL policy                                                         |
+
+### Migration 032 (`rls_missing_tables`)
+
+| Table                     | Gap                                                                                                    | Fix                                                                            |
+| ------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| `educator_availabilities` | Table existed in live DB with no migration and no RLS — fully unprotected                              | Create table idempotently; enable RLS; add org-member read + owner/admin write |
+| `auth_telemetry_events`   | RLS enabled but zero policies — implicit deny-all is correct for writes, but admins had no read access | Add admin SELECT policy for audit visibility                                   |
 
 ---
 
