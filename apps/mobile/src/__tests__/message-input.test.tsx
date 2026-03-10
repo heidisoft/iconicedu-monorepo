@@ -10,6 +10,7 @@ describe('MessageInput', () => {
 
   it('renders send button', () => {
     render(<MessageInput onSend={jest.fn()} />);
+    fireEvent.changeText(screen.getByLabelText('Message input'), 'Hello');
     expect(screen.getByLabelText('Send message')).toBeTruthy();
   });
 
@@ -38,7 +39,7 @@ describe('MessageInput', () => {
     const onSend = jest.fn();
     render(<MessageInput onSend={onSend} />);
 
-    fireEvent.press(screen.getByLabelText('Send message'));
+    expect(screen.queryByLabelText('Send message')).toBeNull();
     expect(onSend).not.toHaveBeenCalled();
   });
 
@@ -47,7 +48,7 @@ describe('MessageInput', () => {
     render(<MessageInput onSend={onSend} />);
 
     fireEvent.changeText(screen.getByLabelText('Message input'), '   ');
-    fireEvent.press(screen.getByLabelText('Send message'));
+    expect(screen.queryByLabelText('Send message')).toBeNull();
 
     expect(onSend).not.toHaveBeenCalled();
   });

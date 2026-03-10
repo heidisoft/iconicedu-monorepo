@@ -37,3 +37,48 @@ jest.mock('react-native/Libraries/BatchedBridge/NativeModules', () => ({
   __esModule: true,
   default: mockNativeModules,
 }));
+
+// Provide a lightweight mock for expo-av in Jest/node environments where the
+// native ExponentAV module is unavailable.
+jest.mock('expo-av', () => ({
+  Audio: {
+    requestPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted' }),
+    setAudioModeAsync: jest.fn().mockResolvedValue(undefined),
+    Recording: jest.fn().mockImplementation(() => ({
+      prepareToRecordAsync: jest.fn().mockResolvedValue(undefined),
+      startAsync: jest.fn().mockResolvedValue(undefined),
+      stopAndUnloadAsync: jest.fn().mockResolvedValue(undefined),
+      getURI: jest.fn().mockReturnValue('file:///mock-audio.m4a'),
+      createNewLoadedSoundAsync: jest.fn().mockResolvedValue({
+        sound: {
+          playAsync: jest.fn().mockResolvedValue(undefined),
+          stopAsync: jest.fn().mockResolvedValue(undefined),
+          unloadAsync: jest.fn().mockResolvedValue(undefined),
+          setOnPlaybackStatusUpdate: jest.fn(),
+          getStatusAsync: jest.fn().mockResolvedValue({ isLoaded: true }),
+        },
+      }),
+    })),
+    Sound: {
+      createAsync: jest.fn().mockResolvedValue({
+        sound: {
+          playAsync: jest.fn().mockResolvedValue(undefined),
+          stopAsync: jest.fn().mockResolvedValue(undefined),
+          unloadAsync: jest.fn().mockResolvedValue(undefined),
+          setOnPlaybackStatusUpdate: jest.fn(),
+          getStatusAsync: jest.fn().mockResolvedValue({ isLoaded: true }),
+        },
+      }),
+    },
+  },
+}));
+
+jest.mock('react-native-safe-area-context', () => {
+  const insets = { top: 0, right: 0, bottom: 0, left: 0 };
+  return {
+    SafeAreaProvider: ({ children }) => children,
+    SafeAreaConsumer: ({ children }) => children(insets),
+    useSafeAreaInsets: () => insets,
+    useSafeAreaFrame: () => ({ x: 0, y: 0, width: 390, height: 844 }),
+  };
+});

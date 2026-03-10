@@ -10,8 +10,21 @@ const mockOnAuthStateChange = jest.fn().mockReturnValue({
   data: { subscription: { unsubscribe: jest.fn() } },
 });
 const mockSignInWithOtp = jest.fn().mockResolvedValue({ error: null });
-const mockVerifyOtp = jest.fn().mockResolvedValue({ error: null });
+const mockVerifyOtp = jest.fn().mockResolvedValue({
+  data: { session: null, user: null },
+  error: null,
+});
+const mockSetSession = jest.fn().mockResolvedValue({ error: null });
 const mockSignOut = jest.fn().mockResolvedValue({});
+const mockMaybeSingle = jest.fn().mockResolvedValue({ data: null, error: null });
+const mockEq = jest.fn(() => ({ maybeSingle: mockMaybeSingle }));
+const mockSelect = jest.fn(() => ({ eq: mockEq }));
+const mockFrom = jest.fn(() => ({ select: mockSelect }));
+const mockActivateAccount = jest.fn().mockResolvedValue(undefined);
+
+jest.mock('@/lib/api/queries', () => ({
+  activateAccount: () => mockActivateAccount(),
+}));
 
 jest.mock('../lib/supabase/client', () => ({
   supabase: {
@@ -20,8 +33,10 @@ jest.mock('../lib/supabase/client', () => ({
       onAuthStateChange: (cb: unknown) => mockOnAuthStateChange(cb),
       signInWithOtp: (params: unknown) => mockSignInWithOtp(params),
       verifyOtp: (params: unknown) => mockVerifyOtp(params),
+      setSession: (params: unknown) => mockSetSession(params),
       signOut: () => mockSignOut(),
     },
+    from: (table: unknown) => mockFrom(table),
   },
 }));
 
@@ -32,6 +47,10 @@ function wrapper({ children }: { children: React.ReactNode }) {
 describe('AuthProvider', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockVerifyOtp.mockResolvedValue({
+      data: { session: null, user: null },
+      error: null,
+    });
   });
 
   it('starts in loading state', async () => {
@@ -63,6 +82,7 @@ describe('AuthProvider', () => {
 
     expect(mockSignInWithOtp).toHaveBeenCalledWith({
       email: 'test@example.com',
+      options: { shouldCreateUser: false },
     });
   });
 
@@ -81,6 +101,7 @@ describe('AuthProvider', () => {
       token: '123456',
       type: 'email',
     });
+    expect(mockActivateAccount).toHaveBeenCalled();
   });
 
   it('signOut calls supabase', async () => {
