@@ -327,10 +327,10 @@ export async function fetchSupervisedDirectMessages(
       const row = m as {
         channel_id: string;
         profile_id: string;
-        profile: DmParticipant | null;
+        profile: DmParticipant | DmParticipant[] | null;
       };
       if (row.profile_id === child.id) continue;
-      const p = row.profile;
+      const p = Array.isArray(row.profile) ? (row.profile[0] ?? null) : row.profile;
       if (!p) continue;
       const list = participantsMap.get(row.channel_id) ?? [];
       list.push(p);

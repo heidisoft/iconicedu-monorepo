@@ -198,7 +198,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const s = React.useMemo(() => makeStyles(colors), [colors]);
   const activityS = React.useMemo(
-    () => ({ ...makeActivityItemStyles(colors), itemOuter: {} }),
+    () => ({ ...makeActivityItemStyles(colors), itemOuter: { marginHorizontal: 0 } }),
     [colors],
   );
 

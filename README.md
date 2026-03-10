@@ -6,18 +6,18 @@ A communication-first education platform connecting **guardians, educators, chil
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Web | Next.js 15 (App Router) |
-| Mobile | Expo 54 + React Native 0.81 |
-| API | NestJS 11 |
-| ORM | Prisma 7 |
-| Database | Supabase PostgreSQL + RLS |
-| Auth | Supabase Auth |
-| Storage | Supabase Storage |
-| Styling | Tailwind CSS (web) · NativeWind v4 (mobile) |
-| Monorepo | Turborepo 2 |
-| Package manager | pnpm 9.12.0 |
+| Layer           | Technology                                  |
+| --------------- | ------------------------------------------- |
+| Web             | Next.js 15 (App Router)                     |
+| Mobile          | Expo 54 + React Native 0.81                 |
+| API             | NestJS 11                                   |
+| ORM             | Prisma 7                                    |
+| Database        | Supabase PostgreSQL + RLS                   |
+| Auth            | Supabase Auth                               |
+| Storage         | Supabase Storage                            |
+| Styling         | Tailwind CSS (web) · NativeWind v4 (mobile) |
+| Monorepo        | Turborepo 2                                 |
+| Package manager | pnpm 9.12.0                                 |
 
 ---
 
@@ -118,9 +118,15 @@ pnpm lint                # Lint all packages
 pnpm typecheck           # Type-check all packages
 pnpm test                # Run all tests
 pnpm ci                  # Full pipeline (lint + typecheck + test + build)
+pnpm prepush:check       # Local pre-push gate (repo-wide typecheck)
 pnpm clean               # Clear build caches
 pnpm clean:all           # Clear build caches + node_modules
 ```
+
+### Git hooks
+
+- `pre-commit`: runs `pnpm lint-staged` (fast staged lint/format)
+- `pre-push`: runs `pnpm prepush:check` (repo-wide typecheck)
 
 ### Scoped commands
 
@@ -153,23 +159,23 @@ pnpm --filter api db:studio    # Open Prisma Studio
 
 ## Documentation
 
-| Document | Description |
-|---|---|
-| [docs/setup.md](docs/setup.md) | Full local environment setup, Supabase, env vars |
-| [docs/contributing.md](docs/contributing.md) | Branch naming, commits, PR process |
-| [docs/best-practices.md](docs/best-practices.md) | Code conventions, patterns, adding packages |
-| [docs/AGENTS.md](docs/AGENTS.md) | Architecture deep-dive, type system, data flow |
+| Document                                         | Description                                      |
+| ------------------------------------------------ | ------------------------------------------------ |
+| [docs/setup.md](docs/setup.md)                   | Full local environment setup, Supabase, env vars |
+| [docs/contributing.md](docs/contributing.md)     | Branch naming, commits, PR process               |
+| [docs/best-practices.md](docs/best-practices.md) | Code conventions, patterns, adding packages      |
+| [docs/AGENTS.md](docs/AGENTS.md)                 | Architecture deep-dive, type system, data flow   |
 
 ---
 
 ## Supported Platforms
 
-| Platform | Status | Notes |
-|---|---|---|
-| macOS | Best | Required for iOS Simulator |
-| Linux (Ubuntu/Debian) | Supported | Fastest CI builds |
-| Windows (native) | Not supported | Expo/Metro issues |
-| Windows (WSL2) | Supported | Works well for API/web |
+| Platform              | Status        | Notes                      |
+| --------------------- | ------------- | -------------------------- |
+| macOS                 | Best          | Required for iOS Simulator |
+| Linux (Ubuntu/Debian) | Supported     | Fastest CI builds          |
+| Windows (native)      | Not supported | Expo/Metro issues          |
+| Windows (WSL2)        | Supported     | Works well for API/web     |
 
 ---
 
@@ -178,6 +184,7 @@ pnpm --filter api db:studio    # Open Prisma Studio
 **`ERR_PNPM_FETCH_404`** — You forgot to use `workspace:*` in a local dependency.
 
 **Corepack signature error** — Use Node 20 and re-activate corepack:
+
 ```bash
 nvm use 20
 corepack prepare pnpm@9.12.0 --activate

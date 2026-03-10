@@ -29,6 +29,9 @@ export const ACTIVITY_ICON_MAP: Record<
   React.ComponentType<{ size: number; color: string }>
 > = {
   Bell,
+  CalendarCheck: Bell,
+  CalendarDays: Bell,
+  CalendarX: Bell,
   CheckCircle2: CheckCircle,
   ClipboardCheck,
   CreditCard,
@@ -37,6 +40,8 @@ export const ACTIVITY_ICON_MAP: Record<
   MessageSquare,
   Paperclip,
   Sparkles,
+  UserRoundMinus: Bell,
+  UserRoundPlus: Bell,
   Video,
 };
 
