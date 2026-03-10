@@ -15,6 +15,7 @@ const base = {
     '**/.next/**',
     'apps/web/next-env.d.ts',
     'apps/web/playwright.config.js',
+    'apps/web/app/.well-known/vercel/flags/**',
   ],
   languageOptions: {
     parser: tsParser,
@@ -80,6 +81,7 @@ export default [
       '**/dist/**',
       'apps/web/next-env.d.ts',
       'apps/web/playwright.config.js',
+      'apps/web/app/.well-known/vercel/flags/**',
     ],
   },
   {
