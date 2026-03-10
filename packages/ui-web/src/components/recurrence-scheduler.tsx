@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { format, parseISO } from 'date-fns';
-import { Plus, Pencil, Trash2, CalendarDays, Clock, MapPin } from 'lucide-react';
+import { Plus, Pencil, Trash2, CalendarDays, MapPin, RefreshCw } from 'lucide-react';
 
 import { RecurrenceForm } from '@iconicedu/ui-web/components/recurrence-form';
 import {
@@ -107,12 +107,6 @@ export function RecurrenceScheduler({
   const getFrequencyLabel = (freq: string) =>
     FREQUENCIES.find((f) => f.value === freq)?.label || freq;
 
-  const getWeekdayLabels = (days: string[]) =>
-    days
-      .map((day) => WEEKDAYS.find((weekday) => weekday.value === day)?.label)
-      .filter(Boolean)
-      .join(', ');
-
   return (
     <div className={className}>
       <div className="mb-4 flex justify-end">
@@ -168,7 +162,6 @@ export function RecurrenceScheduler({
                 onEdit={() => handleEdit(schedule)}
                 onDelete={() => handleDelete(schedule.id ?? '')}
                 getFrequencyLabel={getFrequencyLabel}
-                getWeekdayLabels={getWeekdayLabels}
               />
             ))}
           </div>
@@ -183,7 +176,75 @@ interface ScheduleCardProps {
   onEdit: () => void;
   onDelete: () => void;
   getFrequencyLabel: (freq: string) => string;
-  getWeekdayLabels: (days: string[]) => string;
+}
+
+export function formatInlineScheduleTime(
+  startDate: Date,
+  startTime: string,
+  endTime: string,
+) {
+  return `${format(startDate, 'EEE')} ${startTime} - ${endTime}`;
+}
+
+export function formatDaysSummary(byWeekday: string[]) {
+  return byWeekday
+    .map((day) => WEEKDAYS.find((weekday) => weekday.value === day)?.short)
+    .filter(Boolean)
+    .join(', ');
+}
+
+export function formatWeeklyRecurrenceSummary(byWeekday: string[]) {
+  const labels = byWeekday
+    .map((day) => WEEKDAYS.find((weekday) => weekday.value === day)?.label)
+    .filter(Boolean);
+
+  if (!labels.length) return 'Weekly';
+  return `Weekly · Every ${labels.join(', ')}`;
+}
+
+export function formatTimeWithMeridiem(value: string) {
+  const [rawHour, rawMinute] = value.split(':');
+  const hour = Number(rawHour);
+  const minute = Number(rawMinute);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return value;
+  const period = hour >= 12 ? 'PM' : 'AM';
+  const twelveHour = hour % 12 || 12;
+  return `${twelveHour}:${String(minute).padStart(2, '0')} ${period}`;
+}
+
+export function formatTimeRangeWithMeridiem(startTime: string, endTime: string) {
+  return `${formatTimeWithMeridiem(startTime)} - ${formatTimeWithMeridiem(endTime)}`;
+}
+
+export function formatScheduleSummaryWithTime(
+  schedule: Pick<RecurrenceFormData, 'startDate' | 'startTime' | 'endTime' | 'rule'>,
+) {
+  const timeRange = formatTimeRangeWithMeridiem(schedule.startTime, schedule.endTime);
+  if (!schedule.rule) {
+    return `No repeat · ${timeRange}`;
+  }
+
+  if (schedule.rule.frequency === 'weekly') {
+    return `${formatWeeklyRecurrenceSummary(schedule.rule.byWeekday ?? [])} · ${timeRange}`;
+  }
+
+  if (schedule.rule.frequency === 'daily') {
+    return `Daily · Every day · ${timeRange}`;
+  }
+
+  if (schedule.rule.frequency === 'monthly') {
+    return `Monthly · Every month · ${timeRange}`;
+  }
+
+  return `Yearly · Every year · ${timeRange}`;
+}
+
+export function formatWeeklyRecurrenceSummaryWithTime(
+  byWeekday: string[],
+  startTime: string,
+  endTime: string,
+) {
+  return `${formatWeeklyRecurrenceSummary(byWeekday)} · ${formatTimeRangeWithMeridiem(startTime, endTime)}`;
 }
 
 function ScheduleCard({
@@ -191,7 +252,6 @@ function ScheduleCard({
   onEdit,
   onDelete,
   getFrequencyLabel,
-  getWeekdayLabels,
 }: ScheduleCardProps) {
   const { rule, exceptions, overrides, startDate, startTime, endTime, timezone } =
     schedule;
@@ -211,9 +271,24 @@ function ScheduleCard({
         <div className="flex items-start justify-between">
           <div>
             <CardTitle className="text-sm">{scheduleTitle}</CardTitle>
-            <CardDescription className="mt-0.5 text-xs">
-              {scheduleDescription}
-            </CardDescription>
+            {rule?.frequency !== 'weekly' && (
+              <CardDescription className="mt-0.5 text-xs">
+                {scheduleDescription}
+              </CardDescription>
+            )}
+            {(rule?.frequency || !rule) && (
+              <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                <RefreshCw className="h-3.5 w-3.5" />
+                <span>
+                  {formatScheduleSummaryWithTime({
+                    startDate,
+                    startTime,
+                    endTime,
+                    rule,
+                  })}
+                </span>
+              </div>
+            )}
           </div>
           <div className="flex gap-1">
             <Button
@@ -256,43 +331,15 @@ function ScheduleCard({
         </div>
       </CardHeader>
       <CardContent className="space-y-2 pt-0">
-        {startDate && (
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <CalendarDays className="h-4 w-4 text-muted-foreground" />
-            <span className="text-foreground">Starts {format(startDate, 'PPP')}</span>
-            <Badge variant="secondary" className="font-mono text-[11px]">
-              <Clock className="mr-1 h-3 w-3" />
-              {startTime} - {endTime}
-            </Badge>
-          </div>
-        )}
-
         <div className="flex items-center gap-2 text-xs">
           <MapPin className="h-4 w-4 text-muted-foreground" />
           <span className="text-muted-foreground">{timezone}</span>
         </div>
 
-        {rule?.byWeekday && rule.byWeekday.length > 0 && (
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">
-              {getWeekdayLabels(rule.byWeekday)}
-            </p>
-            {rule.weekdayTimes && rule.weekdayTimes.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {rule.weekdayTimes.map((weekdayTime) => (
-                  <Badge
-                    key={weekdayTime.day}
-                    variant="secondary"
-                    className="font-mono text-[11px]"
-                  >
-                    <Clock className="mr-1 h-3 w-3" />
-                    {WEEKDAYS.find((day) => day.value === weekdayTime.day)?.short}{' '}
-                    {weekdayTime.time}
-                  </Badge>
-                ))}
-              </div>
-            )}
-          </div>
+        {rule?.byWeekday && rule.byWeekday.length > 1 && (
+          <p className="text-xs text-muted-foreground">
+            Days: {formatDaysSummary(rule.byWeekday)}
+          </p>
         )}
 
         {(rule?.count || rule?.until) && (

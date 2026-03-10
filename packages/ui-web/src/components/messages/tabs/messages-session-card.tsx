@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { CalendarPlus, ChevronRight, Clock3, Loader2, Video } from 'lucide-react';
+import { Clock3, Loader2, Video } from 'lucide-react';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
@@ -191,15 +191,6 @@ export function SessionCard({ session, canJoin = false }: SessionCardProps) {
             Recording
           </Button>
         )}
-        <Button
-          size="icon-sm"
-          variant="ghost"
-          className="text-muted-foreground hover:text-foreground"
-          aria-label="Add to calendar"
-        >
-          <CalendarPlus className="size-4" />
-        </Button>
-        <ChevronRight className="size-4 text-muted-foreground/50 transition-colors group-hover:text-muted-foreground" />
       </div>
     </div>
   );
