@@ -620,6 +620,30 @@ function buildSessionTimelineLabel(payload: Record<string, unknown>) {
   );
 }
 
+function resolveReminderOffsetMinutes(payload: Record<string, unknown>) {
+  const explicit = payload.reminderOffsetMinutes;
+  if (typeof explicit === 'number' && Number.isFinite(explicit) && explicit > 0) {
+    return Math.round(explicit);
+  }
+
+  const summary = asOptionalString(payload.summary);
+  if (!summary) {
+    return undefined;
+  }
+
+  const match = summary.match(/(\d+)\s+minutes?/i);
+  if (!match) {
+    return undefined;
+  }
+
+  const parsed = Number.parseInt(match[1] ?? '', 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return undefined;
+  }
+
+  return parsed;
+}
+
 function renderSessionTimelineGroup(event: ActivityEventRow) {
   const payload = asRecord(event.payload);
   const occurrenceStart =
@@ -1472,17 +1496,21 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => {
       const payload = asRecord(event.payload);
+      const reminderOffsetMinutes = resolveReminderOffsetMinutes(payload);
+      const classNameLabel = sessionName(payload);
+      const sessionTimelineLabel =
+        buildSessionTimelineLabel(payload) ?? asOptionalString(payload.occurrenceStart);
       return {
         verb: 'session.reminder.sent',
         leading: buildSessionParticipantsLeading(payload),
         headline: {
-          primary: 'Upcoming class reminder',
-          secondary: sessionName(payload),
+          primary: reminderOffsetMinutes
+            ? `Your class session will start in ${reminderOffsetMinutes} minutes`
+            : 'Your class session will start soon',
         },
-        summary:
-          buildSessionTimelineLabel(payload) ??
-          asOptionalString(payload.summary) ??
-          asOptionalString(payload.occurrenceStart),
+        summary: sessionTimelineLabel
+          ? `Your session for ${classNameLabel} will start on ${sessionTimelineLabel}`
+          : asOptionalString(payload.summary),
         actionButton: sourceAction(event, payload, 'default', 'Join class'),
       };
     },

@@ -88,6 +88,13 @@ export function isNoRepeatDefault(values?: Partial<RecurrenceFormData>) {
   return !rule;
 }
 
+export function shouldShowExceptionsAndOverrides(
+  isEditing: boolean,
+  repeatOption: RepeatOptionValue,
+) {
+  return isEditing && repeatOption !== 'none';
+}
+
 export function addOneHour(time: string) {
   const [hourValue, minuteValue] = time.split(':').map((value) => Number(value));
   const hour = Number.isFinite(hourValue) ? hourValue : 9;
@@ -771,7 +778,7 @@ export function RecurrenceForm({
           </div>
         )}
 
-        {repeatOption !== 'none' && (
+        {shouldShowExceptionsAndOverrides(isEditing, repeatOption) && (
           <>
             <Separator />
 

@@ -25,8 +25,13 @@ export type AdminLearningSpaceRow = LearningSpaceRow & {
   }[];
   primaryChannelId?: string | null;
   scheduleSummary?: string | null;
-  scheduleItems?: string[] | null;
+  scheduleItems?: AdminLearningSpaceScheduleItem[] | null;
   updatedByDisplayName?: string | null;
+};
+
+export type AdminLearningSpaceScheduleItem = {
+  kind: 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
+  summary: string;
 };
 
 function getProfileDisplayName(profile: ProfileRow) {
@@ -193,40 +198,94 @@ function formatScheduleItem(
     ClassScheduleRecurrenceRow,
     'frequency' | 'byday' | 'timezone'
   > | null,
-) {
+): AdminLearningSpaceScheduleItem {
   const timezone = recurrence?.timezone ?? schedule.timezone ?? undefined;
   const startAt = new Date(schedule.start_at);
   const endAt = new Date(schedule.end_at);
-  const startDate = formatDateShort(startAt, timezone);
-  const endDate = formatDateShort(endAt, timezone);
-  const startTime = formatTimeShort(startAt, timezone);
-  const endTime = formatTimeShort(endAt, timezone);
-  const sessionType = recurrence?.frequency
-    ? `${recurrence.frequency.charAt(0).toUpperCase()}${recurrence.frequency.slice(1)} session`
-    : 'One-time session';
-
-  const startsFromDate = startDate || endDate;
-  return `${sessionType} starts from ${startsFromDate}\n${startTime} to ${endTime}`;
-}
-
-function formatDateShort(date: Date, timezone?: string) {
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    timeZone: timezone ?? undefined,
-  }).format(date);
+  return buildAdminScheduleSummary(
+    {
+      startAt,
+      endAt,
+    },
+    {
+      frequency: recurrence?.frequency,
+      byday: recurrence?.byday ?? null,
+      timezone,
+    },
+  );
 }
 
 function formatTimeShort(date: Date, timezone?: string) {
-  const formatted = new Intl.DateTimeFormat('en-US', {
+  return new Intl.DateTimeFormat('en-US', {
     hour: 'numeric',
     minute: '2-digit',
     timeZone: timezone ?? undefined,
   }).format(date);
-  const cleaned = formatted
-    .replace(':00', '')
-    .replace(' AM', ' am')
-    .replace(' PM', ' pm');
-  return cleaned;
+}
+
+const WEEKDAY_FULL_LABELS: Record<string, string> = {
+  MO: 'Monday',
+  TU: 'Tuesday',
+  WE: 'Wednesday',
+  TH: 'Thursday',
+  FR: 'Friday',
+  SA: 'Saturday',
+  SU: 'Sunday',
+};
+
+function formatWeeklySummary(byday?: string[] | null) {
+  const labels = (byday ?? [])
+    .map((day) => WEEKDAY_FULL_LABELS[day] ?? day)
+    .filter(Boolean);
+  if (!labels.length) return 'Weekly';
+  return `Weekly · Every ${labels.join(', ')}`;
+}
+
+export function buildAdminScheduleSummary(
+  schedule: {
+    startAt: Date;
+    endAt: Date;
+  },
+  recurrence?: {
+    frequency?: string | null;
+    byday?: string[] | null;
+    timezone?: string | null;
+  } | null,
+): AdminLearningSpaceScheduleItem {
+  const timezone = recurrence?.timezone ?? undefined;
+  const timeRange = `${formatTimeShort(schedule.startAt, timezone)} - ${formatTimeShort(schedule.endAt, timezone)}`;
+  const frequency = recurrence?.frequency?.toLowerCase();
+
+  if (frequency === 'weekly') {
+    return {
+      kind: 'weekly',
+      summary: `${formatWeeklySummary(recurrence?.byday)} · ${timeRange}`,
+    };
+  }
+
+  if (frequency === 'daily') {
+    return {
+      kind: 'daily',
+      summary: `Daily · Every day · ${timeRange}`,
+    };
+  }
+
+  if (frequency === 'monthly') {
+    return {
+      kind: 'monthly',
+      summary: `Monthly · Every month · ${timeRange}`,
+    };
+  }
+
+  if (frequency === 'yearly') {
+    return {
+      kind: 'yearly',
+      summary: `Yearly · Every year · ${timeRange}`,
+    };
+  }
+
+  return {
+    kind: 'none',
+    summary: `No repeat · ${timeRange}`,
+  };
 }

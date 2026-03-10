@@ -948,28 +948,43 @@ export function buildLearningSpaceScheduleDiffPlan(input: {
 export async function updateLearningSpaceFromPayload(
   learningSpaceId: string,
   payload: LearningSpaceCreatePayload,
+  actorContext?: {
+    orgId: string;
+    actorProfileId: string;
+  },
 ) {
   const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let orgId: string;
+  let actorProfileId: string;
 
-  if (!user) {
-    throw new Error('Unauthorized');
+  if (actorContext) {
+    orgId = actorContext.orgId;
+    actorProfileId = actorContext.actorProfileId;
+  } else {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      throw new Error('Unauthorized');
+    }
+
+    const accountResponse = await getAccountByAuthUserId(supabase, user.id);
+    if (!accountResponse.data) {
+      throw new Error('Account not found');
+    }
+
+    const profileResponse = await getProfileByAccountId(
+      supabase,
+      accountResponse.data.id,
+    );
+    if (!profileResponse.data) {
+      throw new Error('Profile not found');
+    }
+
+    orgId = accountResponse.data.org_id;
+    actorProfileId = profileResponse.data.id;
   }
-
-  const accountResponse = await getAccountByAuthUserId(supabase, user.id);
-  if (!accountResponse.data) {
-    throw new Error('Account not found');
-  }
-
-  const profileResponse = await getProfileByAccountId(supabase, accountResponse.data.id);
-  if (!profileResponse.data) {
-    throw new Error('Profile not found');
-  }
-
-  const orgId = accountResponse.data.org_id;
-  const actorProfileId = profileResponse.data.id;
   const now = new Date().toISOString();
   const nextParticipantsSnapshot = payload.participants ?? [];
 

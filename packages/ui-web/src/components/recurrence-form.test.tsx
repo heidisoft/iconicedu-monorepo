@@ -6,6 +6,7 @@ import {
   buildWeekdayEndTimes,
   getWeekdayFromDate,
   isNoRepeatDefault,
+  shouldShowExceptionsAndOverrides,
 } from './recurrence-form';
 
 describe('addOneHour', () => {
@@ -60,5 +61,17 @@ describe('isNoRepeatDefault', () => {
         overrides: [],
       }),
     ).toBe(false);
+  });
+});
+
+describe('shouldShowExceptionsAndOverrides', () => {
+  it('hides exceptions/overrides while creating new schedules', () => {
+    expect(shouldShowExceptionsAndOverrides(false, 'weekly')).toBe(false);
+    expect(shouldShowExceptionsAndOverrides(false, 'daily')).toBe(false);
+  });
+
+  it('shows exceptions/overrides only while editing repeating schedules', () => {
+    expect(shouldShowExceptionsAndOverrides(true, 'weekly')).toBe(true);
+    expect(shouldShowExceptionsAndOverrides(true, 'none')).toBe(false);
   });
 });

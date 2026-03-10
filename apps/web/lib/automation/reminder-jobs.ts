@@ -17,6 +17,8 @@ type ReminderJobPayload = {
   title: string;
   summary?: string | null;
   description?: string | null;
+  reminderOffsetMinutes?: number | null;
+  timezone?: string | null;
   channelId: string;
   learningSpaceId?: string | null;
   scheduleId?: string | null;
@@ -114,6 +116,7 @@ export async function compileLearningSpaceReminderJobs(input: {
       title: occurrence.title,
       summary: occurrence.description ?? null,
       description: occurrence.description ?? null,
+      timezone: occurrence.timezone ?? 'UTC',
       channelId: occurrence.source.channelId,
       learningSpaceId: occurrence.source.learningSpaceId,
       scheduleId: normalizedScheduleId,
@@ -149,6 +152,7 @@ export async function compileLearningSpaceReminderJobs(input: {
         payload: {
           ...payload,
           summary: formatStartsInSummary(offsetMinutes),
+          reminderOffsetMinutes: offsetMinutes,
         },
         dedupe_key: reminderDedupe,
         status: 'pending',
@@ -365,6 +369,8 @@ async function processReminderJob(supabase: SupabaseServiceClient, job: Reminder
       learningSpaceId: payload.learningSpaceId ?? null,
       scheduleId: payload.scheduleId ?? null,
       occurrenceStart: payload.occurrenceStart ?? payload.startAt ?? now,
+      reminderOffsetMinutes: payload.reminderOffsetMinutes ?? null,
+      timezone: payload.timezone ?? job.timezone ?? 'UTC',
       invoiceId: payload.invoiceId ?? null,
       dueAt: payload.dueAt ?? null,
       title: payload.title,

@@ -3,7 +3,13 @@
 import * as React from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { CheckCircle2, CircleDot, PauseCircle } from 'lucide-react';
+import {
+  CalendarDays,
+  CheckCircle2,
+  CircleDot,
+  PauseCircle,
+  RefreshCw,
+} from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -231,14 +237,21 @@ export function LearningSpacesTable({ rows, onEdit }: LearningSpacesTableProps) 
                       {row.scheduleItems.map((item, index) => (
                         <li
                           key={`${row.id}-schedule-${index}`}
-                          className="space-y-1 whitespace-pre-wrap break-words leading-5"
+                          className="space-y-1 break-words leading-5"
                         >
                           {index > 0 ? (
                             <>
                               <p className="text-muted-foreground/50">---</p>
                             </>
                           ) : null}
-                          <p>{item}</p>
+                          <div className="flex items-center gap-2">
+                            {item.kind === 'none' ? (
+                              <CalendarDays className="size-3.5 text-muted-foreground" />
+                            ) : (
+                              <RefreshCw className="size-3.5 text-muted-foreground" />
+                            )}
+                            <p>{item.summary}</p>
+                          </div>
                         </li>
                       ))}
                     </ul>

@@ -1009,6 +1009,8 @@ describe('activity event definitions', () => {
         learningSpaceId: 'space-1',
         title: 'Algebra',
         occurrenceStart: '2026-03-03T12:40:00.000Z',
+        reminderOffsetMinutes: 5,
+        timezone: 'UTC',
         summary: 'Class starts in 10 minutes',
         channelRouteKind: 'space',
       },
@@ -1029,11 +1031,12 @@ describe('activity event definitions', () => {
     expect(sessionEnded.group.buildGroupKey(event)).toBe(
       'class-session:space-1:2026-03-03T12:40',
     );
-    expect(definition.render(event)).toMatchObject({
+    const renderedReminder = definition.render(event);
+    expect(renderedReminder).toMatchObject({
       headline: {
-        primary: 'Upcoming class reminder',
-        secondary: 'Algebra',
+        primary: 'Your class session will start in 5 minutes',
       },
+      summary: 'Your session for Algebra will start on Mar 3 at 12:40 PM',
       actionButton: {
         label: 'Join class',
         href: '../spaces/channel-1',
@@ -1044,6 +1047,7 @@ describe('activity event definitions', () => {
         tone: 'info',
       },
     });
+    expect(renderedReminder).not.toHaveProperty('expandedContent');
 
     expect(definition.group.renderGroup?.(event)).toMatchObject({
       headline: {
