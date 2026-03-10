@@ -105,7 +105,10 @@ describe('messages-schedule-tab.utils', () => {
         ],
       },
     };
-    const { upcoming } = splitSchedulesByTimeline([schedule], new Date('2026-03-01T09:00:00.000Z'));
+    const { upcoming } = splitSchedulesByTimeline(
+      [schedule],
+      new Date('2026-03-01T09:00:00.000Z'),
+    );
     expect(upcoming).toHaveLength(4);
     expect(
       upcoming.find((item) => item.uiState?.kind === 'exception')?.uiState?.reason,
@@ -136,13 +139,21 @@ describe('messages-schedule-tab.utils', () => {
       },
     };
 
-    const { upcoming } = splitSchedulesByTimeline([schedule], new Date('2026-03-01T09:00:00.000Z'));
+    const { upcoming } = splitSchedulesByTimeline(
+      [schedule],
+      new Date('2026-03-01T09:00:00.000Z'),
+    );
     const changed = upcoming.find((item) => item.uiState?.kind === 'override');
 
     expect(changed?.startAt).toBe('2026-03-03T12:00:00.000Z');
     expect(changed?.uiState?.originalStartAt).toBe('2026-03-02T10:00:00.000Z');
-    const mapped = toMonthGroups(groupSchedulesByMonth(upcoming), new Date('2026-03-01T09:00:00.000Z'));
-    const changedSession = mapped[0]?.sessions.find((item) => item.variant === 'override');
+    const mapped = toMonthGroups(
+      groupSchedulesByMonth(upcoming),
+      new Date('2026-03-01T09:00:00.000Z'),
+    );
+    const changedSession = mapped[0]?.sessions.find(
+      (item) => item.variant === 'override',
+    );
     expect(changedSession?.originalDate).toBe('Mar 2');
   });
 
@@ -168,7 +179,10 @@ describe('messages-schedule-tab.utils', () => {
       },
     };
 
-    const { upcoming } = splitSchedulesByTimeline([schedule], new Date('2026-03-01T00:00:00.000Z'));
+    const { upcoming } = splitSchedulesByTimeline(
+      [schedule],
+      new Date('2026-03-01T00:00:00.000Z'),
+    );
 
     expect(upcoming.map((item) => item.startAt)).toEqual([
       '2026-03-02T12:00:00.000Z',
@@ -273,18 +287,88 @@ describe('messages-schedule-tab.utils', () => {
         dayNum: '3',
         endAt: '2026-03-03T17:00:00.000Z',
         isToday: true,
+        isLive: false,
         variant: 'default',
       }),
     );
   });
 
+  it('counts week labels from the combined monthly timeline for upcoming and past', () => {
+    const schedules = [
+      buildSchedule('w1', '2026-03-01T16:00:00.000Z'),
+      buildSchedule('w1b', '2026-03-03T16:00:00.000Z'),
+      buildSchedule('w2', '2026-03-08T16:00:00.000Z'),
+    ];
+
+    const upcoming = toMonthGroups(
+      groupSchedulesByMonth(schedules),
+      new Date('2026-02-25T00:00:00.000Z'),
+    );
+    expect(upcoming[0]?.sessions.map((session) => session.label)).toEqual([
+      'Mar · Week 1 · Session 1',
+      'Mar · Week 1 · Session 2',
+      'Mar · Week 2 · Session 1',
+    ]);
+
+    const past = toMonthGroups(
+      groupSchedulesByMonth([...schedules].reverse()),
+      new Date('2026-03-30T00:00:00.000Z'),
+    );
+    expect(past[0]?.sessions.map((session) => session.label)).toEqual([
+      'Mar · Week 2 · Session 1',
+      'Mar · Week 1 · Session 1',
+      'Mar · Week 1 · Session 2',
+    ]);
+  });
+
+  it('uses actual calendar week-of-month in labels', () => {
+    const mapped = toMonthGroups(
+      groupSchedulesByMonth([buildSchedule('wk3', '2026-03-20T15:00:00.000Z')]),
+      new Date('2026-03-10T00:00:00.000Z'),
+    );
+
+    expect(mapped[0]?.sessions[0]?.label).toBe('Mar · Week 3 · Session 1');
+  });
+
+  it('formats session time as short weekday and compact meridiem time', () => {
+    const mapped = toMonthGroups(
+      groupSchedulesByMonth([buildSchedule('time-1', '2026-03-03T15:00:00.000Z')]),
+      new Date('2026-03-01T00:00:00.000Z'),
+    );
+
+    expect(mapped[0]?.sessions[0]?.time).toMatch(/^Tue \d{1,2}:\d{2}(am|pm)$/);
+  });
+
+  it('marks sessions live only while current time is within session window', () => {
+    const groups = groupSchedulesByMonth([
+      buildSchedule('live-1', '2026-03-03T15:00:00.000Z'),
+    ]);
+
+    const before = toMonthGroups(groups, new Date('2026-03-03T14:59:00.000Z'));
+    const during = toMonthGroups(groups, new Date('2026-03-03T15:30:00.000Z'));
+    const after = toMonthGroups(groups, new Date('2026-03-03T16:00:00.000Z'));
+
+    expect(before[0]?.sessions[0]?.isLive).toBe(false);
+    expect(during[0]?.sessions[0]?.isLive).toBe(true);
+    expect(after[0]?.sessions[0]?.isLive).toBe(false);
+  });
+
   it('builds month progress stats from all scheduled sessions in the month', () => {
-    const stats = getMonthProgressStatsByKey([
-      buildSchedule('1', '2026-03-03T16:00:00.000Z'),
-      { ...buildSchedule('2', '2026-03-10T16:00:00.000Z'), status: 'completed' as const },
-      { ...buildSchedule('3', '2026-03-12T16:00:00.000Z'), status: 'cancelled' as const },
-      buildSchedule('4', '2026-04-02T16:00:00.000Z'),
-    ], new Date('2026-03-09T00:00:00.000Z'));
+    const stats = getMonthProgressStatsByKey(
+      [
+        buildSchedule('1', '2026-03-03T16:00:00.000Z'),
+        {
+          ...buildSchedule('2', '2026-03-10T16:00:00.000Z'),
+          status: 'completed' as const,
+        },
+        {
+          ...buildSchedule('3', '2026-03-12T16:00:00.000Z'),
+          status: 'cancelled' as const,
+        },
+        buildSchedule('4', '2026-04-02T16:00:00.000Z'),
+      ],
+      new Date('2026-03-09T00:00:00.000Z'),
+    );
 
     expect(stats.get('2026-03')).toEqual({
       scheduledCount: 2,
@@ -301,7 +385,10 @@ describe('messages-schedule-tab.utils', () => {
       [
         buildSchedule('past-scheduled', '2026-03-03T16:00:00.000Z'),
         buildSchedule('future-scheduled', '2026-03-20T16:00:00.000Z'),
-        { ...buildSchedule('cancelled', '2026-03-05T16:00:00.000Z'), status: 'cancelled' as const },
+        {
+          ...buildSchedule('cancelled', '2026-03-05T16:00:00.000Z'),
+          status: 'cancelled' as const,
+        },
       ],
       new Date('2026-03-10T00:00:00.000Z'),
     );

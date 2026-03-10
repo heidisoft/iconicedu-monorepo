@@ -49,10 +49,10 @@ All policies are built on these shared helpers:
 
 #### `user_roles`
 
-| Operation | Who            |
-| --------- | -------------- |
-| SELECT    | Org admin only |
-| ALL       | Org admin only |
+| Operation | Who                                        |
+| --------- | ------------------------------------------ |
+| SELECT    | Own account OR org admin _(migration 034)_ |
+| ALL       | Org admin only                             |
 
 ---
 
@@ -426,6 +426,13 @@ All 15 payload tables (`message_text`, `message_image`, `message_file`, `message
 | ALL       | Profile owner OR org admin                    |
 | SELECT    | Org admin (additional explicit select policy) |
 
+#### `student_access_codes` _(migration 020; policies restored in migration 034)_
+
+| Operation | Who            |
+| --------- | -------------- |
+| SELECT    | Org admin only |
+| ALL       | Org admin only |
+
 ---
 
 ## Security Gaps Fixed
@@ -449,6 +456,14 @@ All 15 payload tables (`message_text`, `message_image`, `message_file`, `message
 | ------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
 | `educator_availabilities` | Table existed in live DB with no migration and no RLS — fully unprotected                              | Create table idempotently; enable RLS; add org-member read + owner/admin write |
 | `auth_telemetry_events`   | RLS enabled but zero policies — implicit deny-all is correct for writes, but admins had no read access | Add admin SELECT policy for audit visibility                                   |
+
+### Migration 034 (`rls_post_reset_fixes`)
+
+| Table                     | Gap                                                                                                                  | Fix                                                                                        |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `user_roles`              | Migration 033 set SELECT to admin-only; non-admin users (educators, guardians, students) cannot read their own roles | Add self-SELECT: `account_id = current_account_id()`                                       |
+| `message_reaction_counts` | Migration 033 set ALL writes to admin-only; mobile app directly INSERTs/UPDATEs/DELETEs counts with user JWT         | Replace admin ALL with member ALL using `can_access_message` (same as `message_reactions`) |
+| `student_access_codes`    | Migration 033's dynamic DROP removed migration 020's admin-only policies; migration 033 did not recreate them        | Recreate admin-only SELECT + ALL policies                                                  |
 
 ---
 

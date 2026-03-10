@@ -6,7 +6,21 @@
       "Bash(pnpm --filter mobile exec jest --testPathPattern=\"analytics-provider|app-lifecycle-tracker\" --silent)",
       "Bash(git add apps/mobile/src/providers/analytics-provider.tsx apps/mobile/src/providers/analytics-provider.test.tsx apps/mobile/src/components/analytics/app-lifecycle-tracker.tsx apps/mobile/src/components/analytics/app-lifecycle-tracker.test.tsx packages/utils/src/analytics.ts)",
       "Bash(pnpm --filter mobile exec jest --testPathPattern=\"screen-tracker|screen-name|app-providers\" --silent)",
-      "Bash(git add apps/mobile/src/lib/screen-name.ts apps/mobile/src/lib/screen-name.test.ts apps/mobile/src/components/analytics/screen-tracker.tsx apps/mobile/src/components/analytics/screen-tracker.test.tsx apps/mobile/src/providers/app-providers.tsx apps/mobile/src/providers/app-providers.test.tsx)"
+      "Bash(git add apps/mobile/src/lib/screen-name.ts apps/mobile/src/lib/screen-name.test.ts apps/mobile/src/components/analytics/screen-tracker.tsx apps/mobile/src/components/analytics/screen-tracker.test.tsx apps/mobile/src/providers/app-providers.tsx apps/mobile/src/providers/app-providers.test.tsx)",
+      "Read(//Users/hwanigasooriya/Workspace/hobby/iconicedu-monorepo/**)",
+      "Bash(for table in activity_event_suppression_rules activity_events auth_telemetry_events channel_live_session_expected_participants channel_live_session_participant_events channel_live_session_participants channel_live_sessions educator_availabilities family_link_invites message_live_session_started message_saves message_session_feedback notification_preference_scopes reminder_dispatch_logs reminder_jobs student_access_codes)",
+      "Bash(do)",
+      "Bash(if grep -q \"on public.$table\" /Users/hwanigasooriya/Workspace/hobby/iconicedu-monorepo/supabase/migrations/20260309180000_033_rls_full_reset.sql)",
+      "Bash(then)",
+      "Bash(echo \"FOUND: $table\")",
+      "Bash(else)",
+      "Bash(echo \"MISSING: $table\")",
+      "Bash(fi)",
+      "Bash(done)",
+      "Bash(cat:*)"
+    ],
+    "additionalDirectories": [
+      "/Users/hwanigasooriya/Workspace/hobby/iconicedu-monorepo/supabase/migrations"
     ]
   }
 }

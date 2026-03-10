@@ -13,9 +13,9 @@ concurrency:
 
 jobs:
   ci:
-    name: Lint · Typecheck · Test · Build
+    name: Lint · Format · Typecheck · Test · Build
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
 
     steps:
       - name: Checkout
@@ -35,6 +35,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Cache Turborepo's local task output cache between runs.
+      # The cache key includes the commit hash so it always writes a new entry,
+      # but restores from the most recent matching prefix on cache miss.
+      - name: Restore Turbo cache
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-
+
       # Generate Prisma client from schema — required before API typecheck.
       # Does not connect to a real database; it only reads prisma/schema.prisma.
       - name: Generate Prisma client
@@ -44,6 +55,9 @@ jobs:
       # Turborepo handles the correct build order automatically.
       - name: Build shared packages
         run: pnpm build:packages
+
+      - name: Format check
+        run: pnpm format:check
 
       - name: Lint
         run: pnpm lint
@@ -55,6 +69,18 @@ jobs:
         run: pnpm test
         env:
           CI: true
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: |
+            apps/web/coverage/
+            apps/api/coverage/
+            packages/*/coverage/
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Build apps
         run: pnpm build

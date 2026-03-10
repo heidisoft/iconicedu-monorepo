@@ -7,11 +7,12 @@ import {
 
 const baseSession: ClassSession = {
   id: 'session-1',
-  label: 'Mar · Week 1',
-  time: '4:00 PM',
+  label: 'Mar · Week 1 · Session 1',
+  time: 'Tue 4:00pm',
   dayName: 'Tue',
   dayNum: '3',
   isToday: false,
+  isLive: false,
   isPast: false,
   endAt: '2026-03-03T17:00:00.000Z',
   status: 'scheduled',
@@ -19,18 +20,20 @@ const baseSession: ClassSession = {
 };
 
 describe('messages-session-card', () => {
-  it('marks sessions as live only when today and not past', () => {
-    expect(getSessionCardState({ ...baseSession, isToday: false, isPast: false })).toEqual({
-      isLive: false,
-      isPast: false,
-      isDisabled: false,
-    });
-    expect(getSessionCardState({ ...baseSession, isToday: true, isPast: false })).toEqual({
+  it('marks sessions as live only when currently active and not past', () => {
+    expect(getSessionCardState({ ...baseSession, isLive: false, isPast: false })).toEqual(
+      {
+        isLive: false,
+        isPast: false,
+        isDisabled: false,
+      },
+    );
+    expect(getSessionCardState({ ...baseSession, isLive: true, isPast: false })).toEqual({
       isLive: true,
       isPast: false,
       isDisabled: false,
     });
-    expect(getSessionCardState({ ...baseSession, isToday: true, isPast: true })).toEqual({
+    expect(getSessionCardState({ ...baseSession, isLive: true, isPast: true })).toEqual({
       isLive: false,
       isPast: true,
       isDisabled: false,

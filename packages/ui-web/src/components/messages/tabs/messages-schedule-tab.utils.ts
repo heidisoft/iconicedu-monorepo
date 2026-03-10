@@ -32,7 +32,9 @@ function getDisplaySchedulePriority(schedule: DisplaySchedule) {
 
 function getDisplayScheduleBaseId(schedule: DisplaySchedule) {
   const separatorIndex = schedule.ids.id.indexOf('__');
-  return separatorIndex === -1 ? schedule.ids.id : schedule.ids.id.slice(0, separatorIndex);
+  return separatorIndex === -1
+    ? schedule.ids.id
+    : schedule.ids.id.slice(0, separatorIndex);
 }
 
 function dedupeDisplaySchedules(schedules: DisplaySchedule[]) {
@@ -42,7 +44,10 @@ function dedupeDisplaySchedules(schedules: DisplaySchedule[]) {
     const key = `${getDisplayScheduleBaseId(schedule)}|${schedule.startAt.slice(0, 10)}`;
     const existing = deduped.get(key);
 
-    if (!existing || getDisplaySchedulePriority(schedule) > getDisplaySchedulePriority(existing)) {
+    if (
+      !existing ||
+      getDisplaySchedulePriority(schedule) > getDisplaySchedulePriority(existing)
+    ) {
       deduped.set(key, schedule);
     }
   });
@@ -57,6 +62,7 @@ export interface ClassSession {
   dayName: string;
   dayNum: string;
   isToday: boolean;
+  isLive: boolean;
   isPast: boolean;
   endAt: string;
   status: ClassScheduleVM['status'];
@@ -165,7 +171,7 @@ export function expandSchedulesForDisplay(
         ...schedule,
         description:
           schedule.uiState.kind === 'exception'
-            ? schedule.uiState.reason ?? schedule.description ?? null
+            ? (schedule.uiState.reason ?? schedule.description ?? null)
             : null,
         uiState: schedule.uiState,
       };
@@ -186,10 +192,9 @@ export function expandSchedulesForDisplay(
         getOccurrenceDayKey(item.occurrenceKey) === getOccurrenceDayKey(occurrenceKey),
     );
     const originalStartAt = occurrenceKey;
-    const durationMs =
-      baseSchedule
-        ? new Date(baseSchedule.endAt).getTime() - new Date(baseSchedule.startAt).getTime()
-        : 0;
+    const durationMs = baseSchedule
+      ? new Date(baseSchedule.endAt).getTime() - new Date(baseSchedule.startAt).getTime()
+      : 0;
     const originalEndAt = durationMs
       ? new Date(new Date(originalStartAt).getTime() + durationMs).toISOString()
       : undefined;
@@ -207,10 +212,7 @@ export function expandSchedulesForDisplay(
     };
   });
 
-  return dedupeDisplaySchedules([
-    ...normalizedNonRecurring,
-    ...normalizedRecurring,
-  ]);
+  return dedupeDisplaySchedules([...normalizedNonRecurring, ...normalizedRecurring]);
 }
 
 export function splitSchedulesByTimeline(
@@ -231,12 +233,8 @@ export function splitSchedulesByTimeline(
     past.push(schedule);
   });
 
-  upcoming.sort(
-    (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime(),
-  );
-  past.sort(
-    (a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime(),
-  );
+  upcoming.sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
+  past.sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime());
 
   return { upcoming, past };
 }
@@ -263,7 +261,11 @@ export function formatScheduleDayBadge(
   now = new Date(),
 ): string {
   const start = new Date(schedule.startAt);
-  const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime();
+  const startDay = new Date(
+    start.getFullYear(),
+    start.getMonth(),
+    start.getDate(),
+  ).getTime();
   const nowDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   if (startDay === nowDay) return 'Today';
   return shortWeekdayFormatter.format(start);
@@ -282,6 +284,16 @@ export function formatScheduleWeekTitle(schedule: ClassScheduleVM): string {
   const start = new Date(schedule.startAt);
   const weekNumber = Math.min(5, Math.floor((start.getDate() - 1) / 7) + 1);
   return `${monthFormatter.format(start)} · Week ${weekNumber}`;
+}
+
+function getCalendarWeekOfMonth(date: Date): number {
+  const firstDayOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+  const firstWeekdayOffset = firstDayOfMonth.getDay();
+  return Math.floor((date.getDate() + firstWeekdayOffset - 1) / 7) + 1;
+}
+
+function formatCompactMeridiemTime(date: Date): string {
+  return timeFormatter.format(date).replace(' AM', 'am').replace(' PM', 'pm');
 }
 
 export function getScheduleMonthKey(schedule: ClassScheduleVM): string {
@@ -328,25 +340,32 @@ export function toMonthGroups(
   groups: MonthScheduleGroup[],
   now = new Date(),
 ): MonthGroup[] {
+  const nowMs = now.getTime();
   const nowDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   return groups.map((group) => {
     const [year, month] = group.monthKey.split('-');
     const monthDate = new Date(Number(year), Number(month) - 1, 1);
+    const sessionCountByWeekNumber = new Map<number, number>();
     const sessions: ClassSession[] = group.schedules.map((schedule) => {
       const start = new Date(schedule.startAt);
+      const end = new Date(schedule.endAt);
       const startDay = new Date(
         start.getFullYear(),
         start.getMonth(),
         start.getDate(),
       ).getTime();
+      const weekNumber = getCalendarWeekOfMonth(start);
+      const nextSessionNumber = (sessionCountByWeekNumber.get(weekNumber) ?? 0) + 1;
+      sessionCountByWeekNumber.set(weekNumber, nextSessionNumber);
       return {
         id: schedule.ids.id,
-        label: formatScheduleWeekTitle(schedule),
-        time: formatScheduleTimeBadge(schedule),
+        label: `${monthFormatter.format(start)} · Week ${weekNumber} · Session ${nextSessionNumber}`,
+        time: `${shortWeekdayFormatter.format(start)} ${formatCompactMeridiemTime(start)}`,
         dayName: shortWeekdayFormatter.format(start),
         dayNum: String(start.getDate()),
         isToday: startDay === nowDay,
-        isPast: new Date(schedule.endAt).getTime() < now.getTime(),
+        isLive: start.getTime() <= nowMs && nowMs < end.getTime(),
+        isPast: end.getTime() < nowMs,
         endAt: schedule.endAt,
         status: schedule.status,
         meetingLink: schedule.meetingLink ?? null,
@@ -423,8 +442,14 @@ export function calculateScheduleCompletionPercent(
 }
 
 export function createGoogleCalendarUrl(schedule: ClassScheduleVM): string {
-  const start = new Date(schedule.startAt).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
-  const end = new Date(schedule.endAt).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+  const start = new Date(schedule.startAt)
+    .toISOString()
+    .replace(/[-:]/g, '')
+    .replace(/\.\d{3}Z$/, 'Z');
+  const end = new Date(schedule.endAt)
+    .toISOString()
+    .replace(/[-:]/g, '')
+    .replace(/\.\d{3}Z$/, 'Z');
   const params = new URLSearchParams({
     action: 'TEMPLATE',
     text: schedule.title,

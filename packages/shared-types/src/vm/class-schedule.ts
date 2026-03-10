@@ -74,6 +74,11 @@ export interface RecurrenceRuleVM {
   frequency: RecurrenceFrequencyVM;
   interval?: number;
   byWeekday?: WeekdayVM[];
+  byMonthDay?: number[];
+  bySetPos?: number[];
+  byMonth?: number[];
+  monthlyMode?: 'day_of_month' | 'weekday_of_month';
+  yearlyMode?: 'date_of_month' | 'weekday_of_month';
   count?: number;
   until?: ISODateTime;
   timezone?: IANATimezone;

@@ -1160,7 +1160,7 @@ describe('activity event definitions', () => {
           },
         ],
       },
-      summary: 'Joined at Mar 7 at 2:05 PM',
+      summary: 'Joined at Mar 7 at 7:05 PM',
     });
 
     expect(
@@ -1172,7 +1172,7 @@ describe('activity event definitions', () => {
       }),
     ).toMatchObject({
       headline: { primary: 'Tehara Morgan left the session' },
-      summary: 'Left at Mar 7 at 2:45 PM',
+      summary: 'Left at Mar 7 at 7:45 PM',
     });
   });
 });

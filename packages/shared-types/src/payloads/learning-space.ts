@@ -1,6 +1,16 @@
-import type { IANATimezone, ISODateTime, ThemeKey } from '@iconicedu/shared-types/shared/shared';
-import type { RecurrenceFrequencyVM, WeekdayVM } from '@iconicedu/shared-types/vm/class-schedule';
-import type { ChannelLiveSessionConfigVM, ChannelUiDefaultsVM } from '@iconicedu/shared-types/vm/channel';
+import type {
+  IANATimezone,
+  ISODateTime,
+  ThemeKey,
+} from '@iconicedu/shared-types/shared/shared';
+import type {
+  RecurrenceFrequencyVM,
+  WeekdayVM,
+} from '@iconicedu/shared-types/vm/class-schedule';
+import type {
+  ChannelLiveSessionConfigVM,
+  ChannelUiDefaultsVM,
+} from '@iconicedu/shared-types/vm/channel';
 
 export type LearningSpaceScheduleWeekdayTimePayload = {
   day: WeekdayVM;
@@ -12,6 +22,11 @@ export type LearningSpaceScheduleRulePayload = {
   interval?: number | null;
   byWeekday?: WeekdayVM[] | null;
   weekdayTimes?: LearningSpaceScheduleWeekdayTimePayload[] | null;
+  byMonthDay?: number[] | null;
+  bySetPos?: number[] | null;
+  byMonth?: number[] | null;
+  monthlyMode?: 'day_of_month' | 'weekday_of_month' | null;
+  yearlyMode?: 'date_of_month' | 'weekday_of_month' | null;
   count?: number | null;
   until?: ISODateTime | null;
   timezone?: IANATimezone | null;
@@ -31,8 +46,10 @@ export type LearningSpaceScheduleOverridePayload = {
 
 export type LearningSpaceSchedulePayload = {
   startDate: ISODateTime;
+  startTime: string;
+  endTime: string;
   timezone: IANATimezone;
-  rule: LearningSpaceScheduleRulePayload;
+  rule?: LearningSpaceScheduleRulePayload | null;
   exceptions?: LearningSpaceScheduleExceptionPayload[] | null;
   overrides?: LearningSpaceScheduleOverridePayload[] | null;
 };

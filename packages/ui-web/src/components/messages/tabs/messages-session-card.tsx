@@ -23,7 +23,7 @@ export function getSessionCardState(session: ClassSession): {
   return {
     isPast,
     isDisabled: Boolean(session.disabled),
-    isLive: session.isToday && !isPast,
+    isLive: session.isLive && !isPast,
   };
 }
 

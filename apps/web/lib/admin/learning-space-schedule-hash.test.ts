@@ -14,6 +14,8 @@ describe('class schedule hash', () => {
   it('builds schedule start using schedule timezone local date and time', () => {
     const expanded = buildScheduleStart({
       startDate: '2026-03-10T00:00:00.000Z',
+      startTime: '14:00',
+      endTime: '15:00',
       timezone: 'America/New_York',
       rule: {
         frequency: 'weekly',
@@ -28,19 +30,47 @@ describe('class schedule hash', () => {
       '2026-03-10',
     );
     expect(getTimeFromISOInTimezone(expanded.startAt, 'America/New_York')).toBe('14:00');
+    expect(getTimeFromISOInTimezone(expanded.endAt, 'America/New_York')).toBe('15:00');
+  });
+
+  it('handles overnight end times in schedule timezone', () => {
+    const expanded = buildScheduleStart({
+      startDate: '2026-03-10T00:00:00.000Z',
+      startTime: '23:30',
+      endTime: '00:30',
+      timezone: 'America/New_York',
+      rule: {
+        frequency: 'weekly',
+        byWeekday: ['TU'],
+        weekdayTimes: [{ day: 'TU', time: '23:30' }],
+      },
+      exceptions: [],
+      overrides: [],
+    });
+
+    expect(getDateFromISOInTimezone(expanded.startAt, 'America/New_York')).toBe(
+      '2026-03-10',
+    );
+    expect(getTimeFromISOInTimezone(expanded.startAt, 'America/New_York')).toBe('23:30');
+    expect(getDateFromISOInTimezone(expanded.endAt, 'America/New_York')).toBe(
+      '2026-03-11',
+    );
+    expect(getTimeFromISOInTimezone(expanded.endAt, 'America/New_York')).toBe('00:30');
   });
 
   it('builds recurrence time fields using schedule timezone for non-weekly rules', () => {
     const fields = buildRRuleFields(
       {
         frequency: 'daily',
+        weekdayTimes: [{ day: 'TU', time: '16:45' }],
       },
       '2026-03-10T18:30:00.000Z',
       'America/New_York',
     );
 
-    expect(fields.byhour).toEqual([14]);
-    expect(fields.byminute).toEqual([30]);
+    expect(fields.byhour).toEqual([16]);
+    expect(fields.byminute).toEqual([45]);
+    expect(fields.byday).toBeNull();
   });
 
   it('keeps the same hash for equivalent weekly payloads with different anchor dates', () => {
@@ -106,6 +136,42 @@ describe('class schedule hash', () => {
 
     expect(changed.baseHash).toBe(baseline.baseHash);
     expect(changed.fullHash).not.toBe(baseline.fullHash);
+  });
+
+  it('changes schedules hash key when schedule end time changes', () => {
+    const baseline = buildLearningSpaceSchedulesHashKeyFromPayload([
+      {
+        startDate: '2026-03-10T00:00:00.000Z',
+        startTime: '14:00',
+        endTime: '15:00',
+        timezone: 'UTC',
+        rule: {
+          frequency: 'weekly',
+          byWeekday: ['TU'],
+          weekdayTimes: [{ day: 'TU', time: '14:00' }],
+        },
+        exceptions: [],
+        overrides: [],
+      },
+    ]);
+
+    const changed = buildLearningSpaceSchedulesHashKeyFromPayload([
+      {
+        startDate: '2026-03-10T00:00:00.000Z',
+        startTime: '14:00',
+        endTime: '16:00',
+        timezone: 'UTC',
+        rule: {
+          frequency: 'weekly',
+          byWeekday: ['TU'],
+          weekdayTimes: [{ day: 'TU', time: '14:00' }],
+        },
+        exceptions: [],
+        overrides: [],
+      },
+    ]);
+
+    expect(changed).not.toBe(baseline);
   });
 
   it('treats reordered exception and override lists as the same schedule', () => {

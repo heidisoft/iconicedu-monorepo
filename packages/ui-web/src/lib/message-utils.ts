@@ -1,23 +1,28 @@
+import {
+  formatDate as formatDateInTimezone,
+  formatDateTime as formatDateTimeInTimezone,
+  formatTime as formatTimeInTimezone,
+  getBrowserTimezone,
+  resolveViewerTimezone,
+} from '@iconicedu/utils';
+
 const toDate = (value: Date | string): Date =>
   value instanceof Date ? value : new Date(value);
 
+const getViewerTimezone = () => resolveViewerTimezone(null, getBrowserTimezone());
+
 export const formatTime = (date: Date | string): string => {
-  return toDate(date).toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
+  return formatTimeInViewerZone(date);
 };
 
 export const formatFullDate = (date: Date | string): string => {
-  return toDate(date).toLocaleString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
+  return (
+    formatDateTimeInTimezone(
+      toDate(date).toISOString(),
+      getViewerTimezone(),
+      'weekdayAndTimeWithZone',
+    ) ?? ''
+  );
 };
 
 export const formatThreadTime = (date: Date | string): string => {
@@ -29,11 +34,7 @@ export const formatThreadTime = (date: Date | string): string => {
 
   if (minutes < 60) return `${minutes}m ago`;
   if (hours < 24) return `${hours}h ago`;
-  return dateValue.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
+  return formatTimeInViewerZone(dateValue);
 };
 
 export const formatDuration = (seconds: number): string => {
@@ -59,10 +60,18 @@ export const formatDateHeader = (date: Date | string): string => {
   } else if (dateValue.toDateString() === yesterday.toDateString()) {
     return 'Yesterday';
   } else {
-    return dateValue.toLocaleDateString('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-    });
+    return (
+      formatDateInTimezone(
+        toDate(date).toISOString(),
+        getViewerTimezone(),
+        'weekdayLong',
+      ) ?? ''
+    );
   }
 };
+
+function formatTimeInViewerZone(date: Date | string) {
+  return (
+    formatTimeInTimezone(toDate(date).toISOString(), getViewerTimezone(), 'short') ?? ''
+  );
+}

@@ -1,19 +1,15 @@
 import * as React from 'react';
-import {
-  ArrowRight,
-  Check,
-  ChevronRight,
-  Clock,
-  Globe,
-  Languages,
-  Palette,
-  X,
-} from 'lucide-react';
+import { Check, Clock, Globe, Languages, Palette, X } from 'lucide-react';
 
-import { getAllTimezones } from 'countries-and-timezones';
 import type { ThemeKey, UserProfileVM } from '@iconicedu/shared-types';
+import {
+  countryCodeToEmoji,
+  DEFAULT_TIMEZONE,
+  getBrowserTimezone,
+  getTimezoneOptions,
+  normalizeTimezone,
+} from '@iconicedu/utils';
 import { Button } from '@iconicedu/ui-web/ui/button';
-import { Input } from '@iconicedu/ui-web/ui/input';
 import { Label } from '@iconicedu/ui-web/ui/label';
 import {
   Select,
@@ -30,28 +26,6 @@ import {
 } from '@iconicedu/ui-web/components/sidebar/user-settings/constants';
 import { useSequentialHighlight } from '@iconicedu/ui-web/components/sidebar/user-settings/hooks/use-sequential-highlight';
 import { BorderBeam } from '@iconicedu/ui-web/ui/border-beam';
-
-const DEFAULT_TIMEZONE = 'UTC';
-const normalizeTimezone = (value?: string | null) => {
-  const next = value?.trim() ?? '';
-  return next === DEFAULT_TIMEZONE ? '' : next;
-};
-
-type TimezoneOption = {
-  name: string;
-  countryCode: string | null;
-};
-
-const countryCodeToEmoji = (code?: string | null) => {
-  if (!code) {
-    return null;
-  }
-  return code
-    .toUpperCase()
-    .split('')
-    .map((char) => String.fromCodePoint(char.charCodeAt(0) + 127397))
-    .join('');
-};
 
 export type PreferencesSectionKey = 'accent' | 'timezone' | 'locale' | 'languages';
 
@@ -91,30 +65,10 @@ export function PreferencesTab({
   onboardingRequiredSection = null,
   lockSections = false,
 }: PreferencesTabProps) {
-  const timezoneOptions = React.useMemo<TimezoneOption[]>(() => {
-    const options = Object.values(getAllTimezones()).reduce<TimezoneOption[]>(
-      (acc, timezone) => {
-        if (!timezone.name) {
-          return acc;
-        }
-        acc.push({
-          name: timezone.name,
-          countryCode: timezone.countries?.[0] ?? null,
-        });
-        return acc;
-      },
-      [],
-    );
-    return options.sort((a, b) =>
-      a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
-    );
-  }, []);
+  const timezoneOptions = React.useMemo(() => getTimezoneOptions(), []);
 
   const browserTimezone = React.useMemo(() => {
-    if (typeof Intl === 'undefined' || typeof Intl.DateTimeFormat !== 'function') {
-      return null;
-    }
-    return Intl.DateTimeFormat().resolvedOptions().timeZone ?? null;
+    return getBrowserTimezone();
   }, []);
 
   const [timezoneValue, setTimezoneValue] = React.useState(() => {

@@ -30,6 +30,7 @@ export function LearningSpacesDashboard({ rows }: LearningSpacesDashboardProps) 
   const router = useRouter();
   const [search, setSearch] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState<'all' | string>('all');
+  const [participantFilter, setParticipantFilter] = React.useState<'all' | string>('all');
   const [pageIndex, setPageIndex] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(PAGE_SIZES[0]);
   const [isPending, startTransition] = React.useTransition();
@@ -57,7 +58,7 @@ export function LearningSpacesDashboard({ rows }: LearningSpacesDashboardProps) 
 
   React.useEffect(() => {
     setPageIndex(1);
-  }, [search, statusFilter, pageSize]);
+  }, [search, statusFilter, participantFilter, pageSize]);
 
   React.useEffect(() => {
     void loadParticipants();
@@ -68,6 +69,14 @@ export function LearningSpacesDashboard({ rows }: LearningSpacesDashboardProps) 
   const filteredRows = React.useMemo(() => {
     return rows.filter((row) => {
       if (statusFilter !== 'all' && row.status !== statusFilter) {
+        return false;
+      }
+      if (
+        participantFilter !== 'all' &&
+        !row.participantDetails.some(
+          (participant) => participant.id === participantFilter,
+        )
+      ) {
         return false;
       }
       if (!normalizedSearch) {
@@ -84,7 +93,22 @@ export function LearningSpacesDashboard({ rows }: LearningSpacesDashboardProps) 
       }
       return false;
     });
-  }, [rows, normalizedSearch, statusFilter]);
+  }, [rows, normalizedSearch, statusFilter, participantFilter]);
+
+  const participantFilterOptions = React.useMemo(
+    () =>
+      [...participantOptions]
+        .sort((a, b) =>
+          (a.profile.displayName ?? '').localeCompare(b.profile.displayName ?? '', 'en', {
+            sensitivity: 'base',
+          }),
+        )
+        .map((participant) => ({
+          id: participant.ids.id,
+          name: participant.profile.displayName ?? 'Unknown',
+        })),
+    [participantOptions],
+  );
 
   const sortedRows = React.useMemo(() => {
     const collator = new Intl.Collator('en', { sensitivity: 'base', numeric: true });
@@ -164,6 +188,25 @@ export function LearningSpacesDashboard({ rows }: LearningSpacesDashboardProps) 
                 <SelectItem value="active">Active</SelectItem>
                 <SelectItem value="archived">Archived</SelectItem>
                 <SelectItem value="paused">Paused</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span>Participant:</span>
+            <Select
+              value={participantFilter}
+              onValueChange={(value) => setParticipantFilter(value as 'all' | string)}
+            >
+              <SelectTrigger size="sm" className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                {participantFilterOptions.map((participant) => (
+                  <SelectItem key={participant.id} value={participant.id}>
+                    {participant.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

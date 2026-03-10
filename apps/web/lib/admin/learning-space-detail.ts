@@ -336,14 +336,15 @@ async function buildSchedulesForForm(
     const recurrence = recurrenceBySchedule.get(schedule.id);
     if (!recurrence) {
       const timezone = schedule.timezone ?? 'UTC';
+      const startTime = getTimeFromISOInTimezone(schedule.start_at, timezone) ?? '09:00';
+      const endTime = getTimeFromISOInTimezone(schedule.end_at, timezone) ?? '10:00';
       return {
         id: schedule.id,
         startDate: createFormDateFromIsoInTimezone(schedule.start_at, timezone),
+        startTime,
+        endTime,
         timezone,
-        rule: {
-          frequency: 'weekly',
-          interval: 1,
-        },
+        rule: undefined,
         exceptions: [],
         overrides: [],
       } satisfies RecurrenceFormData;
@@ -383,10 +384,15 @@ async function buildSchedulesForForm(
     return {
       id: schedule.id,
       startDate: createFormDateFromIsoInTimezone(canonical.startAt, timezone),
+      startTime:
+        getTimeFromISOInTimezone(canonical.startAt, timezone) ?? canonical.displayTime,
+      endTime:
+        getTimeFromISOInTimezone(canonical.endAt, timezone) ?? canonical.displayTime,
       timezone,
       rule: {
-        frequency: canonical.recurrence
-          .frequency as RecurrenceFormData['rule']['frequency'],
+        frequency: canonical.recurrence.frequency as NonNullable<
+          RecurrenceFormData['rule']
+        >['frequency'],
         interval: canonical.recurrence.interval ?? undefined,
         byWeekday: byWeekday ?? undefined,
         weekdayTimes: canonical.recurrence.weekdayTimes.length
@@ -398,6 +404,27 @@ async function buildSchedulesForForm(
         count: canonical.recurrence.count ?? undefined,
         until: canonical.recurrence.until ?? undefined,
         timezone: canonical.recurrence.timezone ?? undefined,
+        byMonthDay: canonical.recurrence.bymonthday.length
+          ? [...canonical.recurrence.bymonthday]
+          : undefined,
+        bySetPos: canonical.recurrence.bysetpos.length
+          ? [...canonical.recurrence.bysetpos]
+          : undefined,
+        byMonth: canonical.recurrence.bymonth.length
+          ? [...canonical.recurrence.bymonth]
+          : undefined,
+        monthlyMode:
+          canonical.recurrence.frequency === 'monthly'
+            ? canonical.recurrence.bysetpos.length
+              ? 'weekday_of_month'
+              : 'day_of_month'
+            : undefined,
+        yearlyMode:
+          canonical.recurrence.frequency === 'yearly'
+            ? canonical.recurrence.bysetpos.length
+              ? 'weekday_of_month'
+              : 'date_of_month'
+            : undefined,
       },
       exceptions: rawExceptions.map((exception, index) => ({
         id: `${schedule.id}:exception:${index}`,

@@ -9,6 +9,12 @@ import type {
   InboxTabKeyVM,
   ThemeKey,
 } from '@iconicedu/shared-types';
+import {
+  formatDate,
+  formatDateTime,
+  formatTime,
+  resolveViewerTimezone,
+} from '@iconicedu/utils';
 import type { ActivityEventRow } from '@iconicedu/shared-types';
 import type { SupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 
@@ -65,37 +71,27 @@ function asOptionalThemeKey(value: unknown) {
   return typeof value === 'string' && value.length > 0 ? (value as ThemeKey) : null;
 }
 
-function formatShortDate(value: unknown) {
-  if (typeof value !== 'string' || !value) {
-    return undefined;
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return undefined;
-  }
-
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-  });
+function resolveDisplayTimezone(preferred: unknown, fallback?: unknown) {
+  return resolveViewerTimezone(
+    typeof preferred === 'string' ? preferred : null,
+    typeof fallback === 'string' ? fallback : null,
+  );
 }
 
-function formatNaturalDate(value: unknown) {
+function formatShortDate(value: unknown, timezone?: unknown) {
   if (typeof value !== 'string' || !value) {
     return undefined;
   }
 
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
+  return formatDate(value, resolveDisplayTimezone(timezone), 'short');
+}
+
+function formatNaturalDate(value: unknown, timezone?: unknown) {
+  if (typeof value !== 'string' || !value) {
     return undefined;
   }
 
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  return formatDate(value, resolveDisplayTimezone(timezone), 'natural');
 }
 
 function formatNaturalDateTime(value: unknown, timezone: unknown) {
@@ -103,23 +99,7 @@ function formatNaturalDateTime(value: unknown, timezone: unknown) {
     return undefined;
   }
 
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return undefined;
-  }
-
-  const timeZone =
-    typeof timezone === 'string' && timezone.length > 0 ? timezone : undefined;
-  const formatted = new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-    timeZone,
-  }).format(date);
-
-  return formatted.replace(',', ' at');
+  return formatDateTime(value, resolveDisplayTimezone(timezone), 'natural');
 }
 
 function getScopeKind(event: ActivityEventRow) {
@@ -254,43 +234,14 @@ function formatSessionLabel(startAt: unknown, timezone: unknown) {
   if (typeof startAt !== 'string' || startAt.length === 0) {
     return undefined;
   }
-  const date = new Date(startAt);
-  if (Number.isNaN(date.getTime())) {
-    return undefined;
-  }
-  const timeZone =
-    typeof timezone === 'string' && timezone.length > 0 ? timezone : undefined;
-  const weekday = new Intl.DateTimeFormat('en-US', {
-    weekday: 'short',
-    timeZone,
-  }).format(date);
-  const timeWithZone = new Intl.DateTimeFormat('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-    timeZone,
-    timeZoneName: 'short',
-  }).format(date);
-  return `${weekday} ${timeWithZone}`;
+  return formatDateTime(startAt, resolveDisplayTimezone(timezone), 'weekdayTimeWithZone');
 }
 
 function formatWeeklyTimeLabel(startAt: unknown, timezone: unknown) {
   if (typeof startAt !== 'string' || startAt.length === 0) {
     return undefined;
   }
-  const date = new Date(startAt);
-  if (Number.isNaN(date.getTime())) {
-    return undefined;
-  }
-  const timeZone =
-    typeof timezone === 'string' && timezone.length > 0 ? timezone : undefined;
-  return new Intl.DateTimeFormat('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-    timeZone,
-    timeZoneName: 'short',
-  }).format(date);
+  return formatTime(startAt, resolveDisplayTimezone(timezone), 'withZone');
 }
 
 function buildHourlyLearningSpaceGroupKey(

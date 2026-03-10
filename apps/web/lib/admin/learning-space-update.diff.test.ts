@@ -70,6 +70,41 @@ describe('buildLearningSpaceScheduleDiffPlan', () => {
     expect(plan.rescheduled[0]?.next.startAt).toBe('2026-03-14T14:30:00.000Z');
   });
 
+  it('returns one rescheduled change when only end time changes', () => {
+    const plan = buildLearningSpaceScheduleDiffPlan({
+      previousSchedules: [
+        {
+          id: 'schedule-1',
+          title: 'Math Foundations',
+          start_at: '2026-03-14T14:00:00.000Z',
+          end_at: '2026-03-14T15:00:00.000Z',
+          timezone: 'UTC',
+        },
+      ],
+      nextSchedules: [
+        {
+          startDate: '2026-03-14T14:00:00.000Z',
+          startTime: '14:00',
+          endTime: '16:00',
+          timezone: 'UTC',
+          rule: {
+            frequency: 'weekly',
+            byWeekday: ['SA'],
+            weekdayTimes: [{ day: 'SA', time: '14:00' }],
+          },
+          exceptions: [],
+          overrides: [],
+        },
+      ],
+    });
+
+    expect(plan.added).toHaveLength(0);
+    expect(plan.removed).toHaveLength(0);
+    expect(plan.rescheduled).toHaveLength(1);
+    expect(plan.rescheduled[0]?.previous.endAt).toBe('2026-03-14T15:00:00.000Z');
+    expect(plan.rescheduled[0]?.next.endAt).toBe('2026-03-14T16:00:00.000Z');
+  });
+
   it('does not mark rescheduled when payload startDate differs but resolves to same weekday occurrence', () => {
     const plan = buildLearningSpaceScheduleDiffPlan({
       previousSchedules: [

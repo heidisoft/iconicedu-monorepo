@@ -635,37 +635,39 @@ export async function insertClassSchedules(
       participants: payload.participants,
     });
 
-    const recurrenceId = randomUUID();
-    await insertClassScheduleRecurrence(supabase, {
-      id: recurrenceId,
-      orgId: payload.orgId,
-      scheduleId,
-      createdBy: payload.createdBy,
-      createdAt: payload.createdAt,
-      rule: schedule.rule,
-      timezone: schedule.timezone,
-      startDate: schedule.startDate,
-    });
+    if (schedule.rule) {
+      const recurrenceId = randomUUID();
+      await insertClassScheduleRecurrence(supabase, {
+        id: recurrenceId,
+        orgId: payload.orgId,
+        scheduleId,
+        createdBy: payload.createdBy,
+        createdAt: payload.createdAt,
+        rule: schedule.rule,
+        timezone: schedule.timezone,
+        startDate: schedule.startDate,
+      });
 
-    await insertClassScheduleRecurrenceExceptions(supabase, {
-      orgId: payload.orgId,
-      recurrenceId,
-      createdBy: payload.createdBy,
-      createdAt: payload.createdAt,
-      exceptions: schedule.exceptions ?? [],
-      time: expanded.time,
-      timezone: schedule.timezone ?? schedule.rule.timezone ?? null,
-    });
+      await insertClassScheduleRecurrenceExceptions(supabase, {
+        orgId: payload.orgId,
+        recurrenceId,
+        createdBy: payload.createdBy,
+        createdAt: payload.createdAt,
+        exceptions: schedule.exceptions ?? [],
+        time: expanded.time,
+        timezone: schedule.timezone ?? schedule.rule.timezone ?? null,
+      });
 
-    await insertClassScheduleRecurrenceOverrides(supabase, {
-      orgId: payload.orgId,
-      recurrenceId,
-      createdBy: payload.createdBy,
-      createdAt: payload.createdAt,
-      overrides: schedule.overrides ?? [],
-      time: expanded.time,
-      timezone: schedule.timezone ?? schedule.rule.timezone ?? null,
-    });
+      await insertClassScheduleRecurrenceOverrides(supabase, {
+        orgId: payload.orgId,
+        recurrenceId,
+        createdBy: payload.createdBy,
+        createdAt: payload.createdAt,
+        overrides: schedule.overrides ?? [],
+        time: expanded.time,
+        timezone: schedule.timezone ?? schedule.rule.timezone ?? null,
+      });
+    }
   }
 
   return scheduleIds;

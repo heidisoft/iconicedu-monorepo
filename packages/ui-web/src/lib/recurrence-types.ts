@@ -34,6 +34,11 @@ export interface RecurrenceRuleVM {
   interval?: number;
   byWeekday?: WeekdayVM[];
   weekdayTimes?: WeekdayTime[];
+  byMonthDay?: number[];
+  bySetPos?: number[];
+  byMonth?: number[];
+  monthlyMode?: 'day_of_month' | 'weekday_of_month';
+  yearlyMode?: 'date_of_month' | 'weekday_of_month';
   count?: number;
   until?: ISODateTime;
   timezone?: IANATimezone;
@@ -42,8 +47,10 @@ export interface RecurrenceRuleVM {
 export interface RecurrenceFormData {
   id?: string;
   startDate: Date | undefined;
+  startTime: TimeString;
+  endTime: TimeString;
   timezone: IANATimezone;
-  rule: RecurrenceRuleVM;
+  rule?: RecurrenceRuleVM;
   exceptions: RecurrenceException[];
   overrides: RecurrenceOverride[];
 }

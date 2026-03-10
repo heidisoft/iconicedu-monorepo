@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { CheckCircle2, CircleDot, PauseCircle } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,8 +13,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AvatarGroup,
-  Badge,
   Button,
   DropdownMenu,
   DropdownMenuContent,
@@ -137,25 +136,24 @@ export function LearningSpacesTable({ rows, onEdit }: LearningSpacesTableProps) 
 
   return (
     <div className="w-full border-y border-border bg-card">
-      <Table className="min-w-full table-fixed">
+      <Table className="min-w-full table-auto">
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[32rem] whitespace-normal">Title</TableHead>
-            <TableHead>Participants</TableHead>
-            <TableHead>Schedule</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Created</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
+            <TableHead className="whitespace-normal">Title</TableHead>
+            <TableHead className="whitespace-normal">Schedule</TableHead>
+            <TableHead className="whitespace-nowrap">Updated</TableHead>
+            <TableHead className="whitespace-nowrap">Status</TableHead>
+            <TableHead className="whitespace-nowrap text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {rows.map((row) => (
             <TableRow key={row.id} className="border-b border-border/60 last:border-b-0">
-              <TableCell className="w-[32rem] whitespace-normal align-top">
+              <TableCell className="whitespace-normal align-top">
                 {(() => {
                   const TitleIcon = getLearningSpaceIcon(row.icon_key);
                   return (
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-start gap-2">
                       <div className="flex size-8 items-center justify-center rounded-full border border-border bg-muted">
                         <TitleIcon className="size-4 text-muted-foreground" />
                       </div>
@@ -163,67 +161,85 @@ export function LearningSpacesTable({ rows, onEdit }: LearningSpacesTableProps) 
                         {row.primaryChannelId ? (
                           <Link
                             href={`${dashboardBasePath}/spaces/${row.primaryChannelId}`}
-                            className="text-sm font-semibold hover:underline whitespace-normal break-words"
+                            className="text-sm font-medium hover:underline whitespace-normal break-words"
                           >
                             {row.title}
                           </Link>
                         ) : (
-                          <p className="text-sm font-semibold whitespace-normal break-words">
+                          <p className="text-sm font-medium whitespace-normal break-words">
                             {row.title}
                           </p>
                         )}
                         {row.description && (
-                          <p className="text-xs text-muted-foreground whitespace-normal break-words">
+                          <p className="text-xs text-muted-foreground whitespace-normal break-words line-clamp-2">
                             {row.description}
                           </p>
                         )}
+                        {row.participantDetails.length ? (
+                          <ul className="my-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+                            {row.participantDetails.map((participant) => (
+                              <li
+                                key={participant.id}
+                                className="flex items-center gap-1.5 px-1.5 first:pl-0"
+                              >
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="inline-flex">
+                                      <AvatarWithStatus
+                                        name={participant.displayName}
+                                        avatar={{
+                                          source: participant.avatarUrl
+                                            ? 'upload'
+                                            : 'seed',
+                                          url: participant.avatarUrl ?? null,
+                                        }}
+                                        themeKey={
+                                          (participant.themeKey as ThemeKey | null) ??
+                                          null
+                                        }
+                                        showStatus={false}
+                                        sizeClassName="size-5"
+                                        initialsLength={1}
+                                      />
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="text-xs font-medium">
+                                      {participant.displayName}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground capitalize">
+                                      {participant.kind}
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                                <span className="text-[11px] text-foreground">
+                                  {participant.displayName}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
                       </div>
                     </div>
                   );
                 })()}
               </TableCell>
-              <TableCell>
-                {row.participantDetails.length ? (
-                  <AvatarGroup className="justify-start">
-                    {row.participantDetails.map((participant) => (
-                      <Tooltip key={participant.id}>
-                        <TooltipTrigger asChild>
-                          <span className="inline-flex">
-                            <AvatarWithStatus
-                              name={participant.displayName}
-                              avatar={{
-                                source: participant.avatarUrl ? 'upload' : 'seed',
-                                url: participant.avatarUrl ?? null,
-                              }}
-                              themeKey={(participant.themeKey as ThemeKey | null) ?? null}
-                              showStatus={false}
-                              sizeClassName="size-8"
-                              initialsLength={1}
-                            />
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="text-xs font-medium">{participant.displayName}</p>
-                          <p className="text-xs text-muted-foreground capitalize">
-                            {participant.kind}
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                    ))}
-                  </AvatarGroup>
-                ) : (
-                  <p className="text-sm text-muted-foreground">—</p>
-                )}
-              </TableCell>
-              <TableCell>
+              <TableCell className="align-top">
                 {row.scheduleItems?.length ? (
-                  <div className="text-sm text-muted-foreground space-y-1">
-                    {row.scheduleSummary && (
-                      <p className="font-medium text-foreground">{row.scheduleSummary}</p>
-                    )}
-                    <ul className="list-disc pl-4 space-y-1">
-                      {row.scheduleItems.map((item) => (
-                        <li key={item}>{item}</li>
+                  <div className="text-xs text-muted-foreground">
+                    <ul className="space-y-2">
+                      {row.scheduleItems.map((item, index) => (
+                        <li
+                          key={`${row.id}-schedule-${index}`}
+                          className="space-y-1 whitespace-pre-wrap break-words leading-5"
+                        >
+                          {index > 0 ? (
+                            <>
+                              <p className="text-muted-foreground/50">---</p>
+                            </>
+                          ) : null}
+                          <p>{item}</p>
+                        </li>
                       ))}
                     </ul>
                   </div>
@@ -231,26 +247,39 @@ export function LearningSpacesTable({ rows, onEdit }: LearningSpacesTableProps) 
                   <span className="text-sm text-muted-foreground">—</span>
                 )}
               </TableCell>
-              <TableCell>
-                <Badge
-                  variant={
-                    row.status === 'active'
-                      ? 'secondary'
-                      : row.status === 'archived'
-                        ? 'outline'
-                        : 'ghost'
-                  }
-                  className="text-xs px-3"
-                >
-                  {row.status}
-                </Badge>
+              <TableCell className="whitespace-nowrap align-top">
+                <div className="text-xs leading-5">
+                  <p className="text-foreground">
+                    {new Date(row.updated_at ?? row.created_at).toLocaleDateString()}
+                  </p>
+                  <p className="text-muted-foreground">
+                    by {row.updatedByDisplayName ?? 'Unknown'}
+                  </p>
+                </div>
               </TableCell>
-              <TableCell>
-                <span className="text-sm">
-                  {new Date(row.created_at).toLocaleDateString()}
-                </span>
+              <TableCell className="whitespace-nowrap align-top">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex">
+                      {row.status === 'active' ? (
+                        <CheckCircle2 className="size-4 text-emerald-600" />
+                      ) : row.status === 'archived' ? (
+                        <Archive className="size-4 text-muted-foreground" />
+                      ) : row.status === 'paused' ? (
+                        <PauseCircle className="size-4 text-amber-600" />
+                      ) : row.status === 'completed' ? (
+                        <CheckCircle2 className="size-4 text-blue-600" />
+                      ) : (
+                        <CircleDot className="size-4 text-muted-foreground" />
+                      )}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-xs capitalize">{row.status}</p>
+                  </TooltipContent>
+                </Tooltip>
               </TableCell>
-              <TableCell className="text-right">
+              <TableCell className="whitespace-nowrap text-right align-top">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm" className="px-2">

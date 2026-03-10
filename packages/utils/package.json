@@ -3,6 +3,11 @@
   "version": "0.1.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "dependencies": {
+    "countries-and-timezones": "^3.6.0",
+    "date-fns": "^4.1.0",
+    "date-fns-tz": "^3.2.0"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch",

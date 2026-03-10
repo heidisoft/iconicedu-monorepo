@@ -4,6 +4,13 @@ import type {
   LearningSpaceScheduleWeekdayTimePayload,
   WeekdayVM,
 } from '@iconicedu/shared-types';
+import {
+  buildOccurrenceKey,
+  getLocalDate,
+  getLocalDateParts,
+  getLocalTime,
+  resolveViewerTimezone,
+} from '@iconicedu/utils';
 
 export const DEFAULT_SCHEDULE_TIME = '09:00';
 export const DEFAULT_DURATION_MINUTES = 60;
@@ -215,120 +222,37 @@ export function toOccurrenceKey(isoDate: string, time: string) {
   return date.toISOString();
 }
 
-function getLocalDateTimePartsInTimezone(value: string, timezone: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(date);
-
-  const year = parts.find((part) => part.type === 'year')?.value;
-  const month = parts.find((part) => part.type === 'month')?.value;
-  const day = parts.find((part) => part.type === 'day')?.value;
-  const hour = parts.find((part) => part.type === 'hour')?.value;
-  const minute = parts.find((part) => part.type === 'minute')?.value;
-
-  if (!year || !month || !day || !hour || !minute) {
-    return null;
-  }
-
-  return { year, month, day, hour, minute };
-}
-
 export function toOccurrenceKeyInTimezone(
   isoDate: string,
   time: string,
   timezone: string | null | undefined,
 ) {
-  const zone = timezone && timezone.length ? timezone : 'UTC';
-  const [yearText, monthText, dayText] = isoDate.split('-');
-  const [hourText, minuteText] = normalizeTimeLabel(time).split(':');
-  const year = Number(yearText ?? '1970');
-  const month = Number(monthText ?? '1');
-  const day = Number(dayText ?? '1');
-  const hour = Number(hourText ?? '0');
-  const minute = Number(minuteText ?? '0');
-
-  let guess = Date.UTC(year, month - 1, day, hour, minute, 0, 0);
-
-  for (let attempt = 0; attempt < 4; attempt += 1) {
-    const actual = getLocalDateTimePartsInTimezone(new Date(guess).toISOString(), zone);
-    if (!actual) {
-      break;
-    }
-
-    const targetUtc = Date.UTC(year, month - 1, day, hour, minute, 0, 0);
-    const actualUtc = Date.UTC(
-      Number(actual.year),
-      Number(actual.month) - 1,
-      Number(actual.day),
-      Number(actual.hour),
-      Number(actual.minute),
-      0,
-      0,
-    );
-    const deltaMinutes = Math.round((targetUtc - actualUtc) / 60000);
-
-    if (deltaMinutes === 0) {
-      return new Date(guess).toISOString();
-    }
-
-    guess += deltaMinutes * 60000;
+  const zone = resolveViewerTimezone(timezone);
+  const occurrenceKey = buildOccurrenceKey(isoDate, normalizeTimeLabel(time), zone);
+  if (occurrenceKey) {
+    return occurrenceKey;
   }
-
-  return new Date(guess).toISOString();
+  return toOccurrenceKey(isoDate, normalizeTimeLabel(time));
 }
 
 export function getDatePartsInTimezone(value: string, timezone: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
+  const parts = getLocalDateParts(value, resolveViewerTimezone(timezone));
+  if (!parts) {
     return null;
   }
-
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-  const parts = formatter.formatToParts(date);
-  const year = parts.find((part) => part.type === 'year')?.value;
-  const month = parts.find((part) => part.type === 'month')?.value;
-  const day = parts.find((part) => part.type === 'day')?.value;
-
-  if (!year || !month || !day) {
-    return null;
-  }
-
-  return { year, month, day };
+  return {
+    year: parts.year,
+    month: parts.month,
+    day: parts.day,
+  };
 }
 
 export function getDateFromISOInTimezone(value: string, timezone: string) {
-  const parts = getDatePartsInTimezone(value, timezone);
-  return parts ? `${parts.year}-${parts.month}-${parts.day}` : null;
+  return getLocalDate(value, resolveViewerTimezone(timezone));
 }
 
 export function getTimeFromISOInTimezone(value: string, timezone: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  return new Intl.DateTimeFormat('en-GB', {
-    timeZone: timezone,
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(date);
+  return getLocalTime(value, resolveViewerTimezone(timezone));
 }
 
 export function createFormDateFromIsoInTimezone(value: string, timezone: string) {
@@ -443,12 +367,40 @@ function getNextWeekdayDateInTimezone(
   return startDate;
 }
 
-function buildExpandedSchedule(startAtDate: Date, time: string): ExpandedSchedule {
-  const startAt = startAtDate.toISOString();
+function addDaysToIsoDate(date: string, days: number) {
+  const [yearText, monthText, dayText] = date.split('-');
+  const year = Number.parseInt(yearText ?? '1970', 10);
+  const month = Number.parseInt(monthText ?? '1', 10);
+  const day = Number.parseInt(dayText ?? '1', 10);
+  const next = new Date(Date.UTC(year, Math.max(0, month - 1), day));
+  next.setUTCDate(next.getUTCDate() + days);
+  return next.toISOString().slice(0, 10);
+}
+
+function buildExpandedSchedule(input: {
+  localDate: string;
+  startTime: string;
+  endTime?: string;
+  timezone: string;
+}): ExpandedSchedule {
+  const startAt = toOccurrenceKeyInTimezone(
+    input.localDate,
+    input.startTime,
+    input.timezone,
+  );
+  const endAt = input.endTime
+    ? (() => {
+        const endDate =
+          input.endTime <= input.startTime
+            ? addDaysToIsoDate(input.localDate, 1)
+            : input.localDate;
+        return toOccurrenceKeyInTimezone(endDate, input.endTime, input.timezone);
+      })()
+    : addMinutesToIso(startAt, DEFAULT_DURATION_MINUTES);
   return {
     startAt,
-    endAt: addMinutesToIso(startAt, DEFAULT_DURATION_MINUTES),
-    time,
+    endAt,
+    time: input.startTime,
   };
 }
 
@@ -456,8 +408,16 @@ function normalizePayloadWeekdayTimes(
   schedule: LearningSpaceSchedulePayload,
   timezone: string,
 ): LearningSpaceScheduleWeekdayTimePayload[] {
-  if (schedule.rule.weekdayTimes?.length) {
-    return [...schedule.rule.weekdayTimes]
+  const rule = schedule.rule;
+  if (!rule) {
+    const fallbackDay = toWeekdayValueInTimezone(schedule.startDate, timezone);
+    return fallbackDay
+      ? [{ day: fallbackDay, time: normalizeTimeLabel(schedule.startTime) }]
+      : [];
+  }
+
+  if (rule.weekdayTimes?.length) {
+    return [...rule.weekdayTimes]
       .map((entry) => ({
         day: entry.day,
         time: normalizeTimeLabel(entry.time),
@@ -465,9 +425,9 @@ function normalizePayloadWeekdayTimes(
       .sort((a, b) => `${a.day}:${a.time}`.localeCompare(`${b.day}:${b.time}`));
   }
 
-  if (schedule.rule.byWeekday?.length) {
-    return [...schedule.rule.byWeekday]
-      .map((day) => ({ day, time: DEFAULT_SCHEDULE_TIME }))
+  if (rule.byWeekday?.length) {
+    return [...rule.byWeekday]
+      .map((day) => ({ day, time: normalizeTimeLabel(schedule.startTime) }))
       .sort((a, b) => `${a.day}:${a.time}`.localeCompare(`${b.day}:${b.time}`));
   }
 
@@ -478,19 +438,42 @@ function normalizePayloadWeekdayTimes(
 export function buildScheduleStart(
   schedule: LearningSpaceSchedulePayload,
 ): ExpandedSchedule {
-  const timezone = schedule.timezone ?? schedule.rule.timezone ?? 'UTC';
+  const timezone = schedule.timezone ?? schedule.rule?.timezone ?? 'UTC';
   const localAnchorDate =
     getDateFromISOInTimezone(schedule.startDate, timezone) ??
     schedule.startDate.slice(0, 10);
+  const normalizedStartTime = normalizeTimeLabel(
+    schedule.startTime ?? DEFAULT_SCHEDULE_TIME,
+  );
+  const normalizedEndTime = normalizeTimeLabel(
+    schedule.endTime ??
+      (() => {
+        const [hourText, minuteText] = normalizedStartTime.split(':');
+        const hour = Number.parseInt(hourText ?? '9', 10);
+        const minute = Number.parseInt(minuteText ?? '0', 10);
+        return `${((hour + 1) % 24).toString().padStart(2, '0')}:${minute
+          .toString()
+          .padStart(2, '0')}`;
+      })(),
+  );
+
+  if (!schedule.rule) {
+    return buildExpandedSchedule({
+      localDate: localAnchorDate,
+      startTime: normalizedStartTime,
+      endTime: normalizedEndTime,
+      timezone,
+    });
+  }
 
   const weekdayTimes = normalizePayloadWeekdayTimes(schedule, timezone);
   if (!weekdayTimes.length) {
-    const startAt = toOccurrenceKeyInTimezone(
-      localAnchorDate,
-      DEFAULT_SCHEDULE_TIME,
+    return buildExpandedSchedule({
+      localDate: localAnchorDate,
+      startTime: normalizedStartTime,
+      endTime: normalizedEndTime,
       timezone,
-    );
-    return buildExpandedSchedule(new Date(startAt), DEFAULT_SCHEDULE_TIME);
+    });
   }
 
   const candidates = weekdayTimes.map((entry) => {
@@ -499,8 +482,12 @@ export function buildScheduleStart(
       entry.day,
       timezone,
     );
-    const startAt = toOccurrenceKeyInTimezone(dateForWeekday, entry.time, timezone);
-    return buildExpandedSchedule(new Date(startAt), entry.time);
+    return buildExpandedSchedule({
+      localDate: dateForWeekday,
+      startTime: entry.time,
+      endTime: normalizedEndTime,
+      timezone,
+    });
   });
 
   return candidates.reduce((earliest, candidate) =>
@@ -514,11 +501,16 @@ export function buildRRuleFields(
   timezone?: string | null,
 ): RRuleFields {
   const weekdayTimes = rule.weekdayTimes ?? [];
-  const byday = rule.byWeekday?.length
-    ? rule.byWeekday
-    : weekdayTimes.length
-      ? weekdayTimes.map((entry) => entry.day)
-      : null;
+  const byday =
+    rule.frequency === 'weekly'
+      ? rule.byWeekday?.length
+        ? rule.byWeekday
+        : weekdayTimes.length
+          ? weekdayTimes.map((entry) => entry.day)
+          : null
+      : rule.byWeekday?.length
+        ? rule.byWeekday
+        : null;
 
   const times = weekdayTimes.length
     ? weekdayTimes.map((entry) => normalizeTimeLabel(entry.time))
@@ -544,11 +536,13 @@ export function buildRRuleFields(
     byminute: minutes.size ? Array.from(minutes).sort((a, b) => a - b) : null,
     byhour: hours.size ? Array.from(hours).sort((a, b) => a - b) : null,
     byday: byday?.length ? Array.from(new Set(byday)).sort() : null,
-    bymonthday: null,
+    bymonthday: rule.byMonthDay?.length
+      ? [...rule.byMonthDay].sort((a, b) => a - b)
+      : null,
     byyearday: null,
     byweekno: null,
-    bymonth: null,
-    bysetpos: null,
+    bymonth: rule.byMonth?.length ? [...rule.byMonth].sort((a, b) => a - b) : null,
+    bysetpos: rule.bySetPos?.length ? [...rule.bySetPos].sort((a, b) => a - b) : null,
     wkst: 'MO',
   };
 }
@@ -585,8 +579,15 @@ function buildWeekdayTimesFromRecurrence(input: {
 }
 
 function buildCanonicalRecurrenceFromPayload(schedule: LearningSpaceSchedulePayload) {
-  const timezone = schedule.timezone ?? schedule.rule.timezone ?? 'UTC';
-  const fields = buildRRuleFields(schedule.rule, schedule.startDate, timezone);
+  const rule = schedule.rule ?? {
+    frequency: 'weekly' as const,
+    interval: 1,
+    timezone: schedule.timezone,
+    byWeekday: [],
+    weekdayTimes: [],
+  };
+  const timezone = schedule.timezone ?? rule.timezone ?? 'UTC';
+  const fields = buildRRuleFields(rule, schedule.startDate, timezone);
   const weekdayTimes = buildWeekdayTimesFromRecurrence({
     byday: fields.byday,
     byhour: fields.byhour,
@@ -595,10 +596,10 @@ function buildCanonicalRecurrenceFromPayload(schedule: LearningSpaceSchedulePayl
   });
 
   return {
-    frequency: schedule.rule.frequency,
-    interval: schedule.rule.interval ?? 1,
-    count: schedule.rule.count ?? null,
-    until: schedule.rule.until ?? null,
+    frequency: rule.frequency,
+    interval: rule.interval ?? 1,
+    count: rule.count ?? null,
+    until: rule.until ?? null,
     timezone,
     bysecond: normalizeNumberArray(fields.bysecond),
     byminute: normalizeNumberArray(fields.byminute),
@@ -612,7 +613,7 @@ function buildCanonicalRecurrenceFromPayload(schedule: LearningSpaceSchedulePayl
     wkst: fields.wkst ?? null,
     weekdayTimes,
     startAnchorDate:
-      schedule.rule.frequency === 'weekly' && weekdayTimes.length > 0
+      rule.frequency === 'weekly' && weekdayTimes.length > 0
         ? null
         : (getDateFromISOInTimezone(schedule.startDate, timezone) ??
           schedule.startDate.slice(0, 10)),
@@ -940,7 +941,16 @@ export function buildLearningSpaceSchedulesHashKeyFromPayload(
   schedules: LearningSpaceSchedulePayload[] | null | undefined,
 ) {
   const bundles = buildCanonicalLearningSpaceSchedulesFromPayload(schedules).map(
-    (schedule) => buildHashBundleFromCanonical(schedule),
+    (schedule) => {
+      const timezone = schedule.recurrence.timezone ?? schedule.timezone ?? 'UTC';
+      const endTime =
+        getTimeFromISOInTimezone(schedule.endAt, timezone) ??
+        getUtcTimeLabel(schedule.endAt);
+      return {
+        ...buildHashBundleFromCanonical(schedule),
+        endTime,
+      };
+    },
   );
   return fnv1aHash(stableSerialize(bundles));
 }
@@ -949,7 +959,16 @@ export function buildLearningSpaceSchedulesHashKeyFromExisting(
   schedules: ExistingLearningSpaceScheduleHashInput[],
 ) {
   const bundles = buildCanonicalLearningSpaceSchedulesFromExisting(schedules).map(
-    (schedule) => buildHashBundleFromCanonical(schedule),
+    (schedule) => {
+      const timezone = schedule.recurrence.timezone ?? schedule.timezone ?? 'UTC';
+      const endTime =
+        getTimeFromISOInTimezone(schedule.endAt, timezone) ??
+        getUtcTimeLabel(schedule.endAt);
+      return {
+        ...buildHashBundleFromCanonical(schedule),
+        endTime,
+      };
+    },
   );
   return fnv1aHash(stableSerialize(bundles));
 }

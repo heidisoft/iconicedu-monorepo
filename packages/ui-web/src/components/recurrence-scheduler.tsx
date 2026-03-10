@@ -4,7 +4,6 @@ import * as React from 'react';
 import { format, parseISO } from 'date-fns';
 import { Plus, Pencil, Trash2, CalendarDays, Clock, MapPin } from 'lucide-react';
 
-import { cn } from '@iconicedu/ui-web/lib/utils';
 import { RecurrenceForm } from '@iconicedu/ui-web/components/recurrence-form';
 import {
   RecurrenceFormData,
@@ -12,7 +11,13 @@ import {
   FREQUENCIES,
 } from '@iconicedu/ui-web/lib/recurrence-types';
 import { Button } from '@iconicedu/ui-web/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@iconicedu/ui-web/ui/card';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from '@iconicedu/ui-web/ui/card';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
 import {
   Dialog,
@@ -110,7 +115,12 @@ export function RecurrenceScheduler({
 
   return (
     <div className={className}>
-      <div className="mb-4" />
+      <div className="mb-4 flex justify-end">
+        <Button onClick={handleOpenCreate} type="button" size="sm">
+          <Plus className="mr-2 h-4 w-4" />
+          Add schedule
+        </Button>
+      </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg">
@@ -145,10 +155,6 @@ export function RecurrenceScheduler({
               <p className="mt-1 text-sm text-muted-foreground">
                 Create your first recurring schedule to get started.
               </p>
-              <Button className="mt-4" onClick={handleOpenCreate} type="button">
-                <Plus className="mr-2 h-4 w-4" />
-                Create Schedule
-              </Button>
             </CardContent>
           </Card>
         )}
@@ -187,27 +193,33 @@ function ScheduleCard({
   getFrequencyLabel,
   getWeekdayLabels,
 }: ScheduleCardProps) {
-  const { rule, exceptions, overrides, startDate, timezone } = schedule;
+  const { rule, exceptions, overrides, startDate, startTime, endTime, timezone } =
+    schedule;
+  const isNoRepeatSchedule = !rule;
+  const scheduleTitle = isNoRepeatSchedule
+    ? 'No repeat'
+    : `${getFrequencyLabel(rule.frequency)} Schedule`;
+  const scheduleDescription = isNoRepeatSchedule
+    ? 'Single event'
+    : rule.interval && rule.interval > 1
+      ? `Every ${rule.interval} ${rule.frequency.replace('ly', '')}s`
+      : `Every ${rule.frequency.replace('ly', '')}`;
 
   return (
     <Card className="gap-0">
-      <CardHeader className="pb-3">
+      <CardHeader className="pb-2">
         <div className="flex items-start justify-between">
           <div>
-            <CardTitle className="text-base">
-              {getFrequencyLabel(rule.frequency)} Schedule
-            </CardTitle>
-            <CardDescription className="mt-1">
-              {rule.interval && rule.interval > 1
-                ? `Every ${rule.interval} ${rule.frequency.replace('ly', '')}s`
-                : `Every ${rule.frequency.replace('ly', '')}`}
+            <CardTitle className="text-sm">{scheduleTitle}</CardTitle>
+            <CardDescription className="mt-0.5 text-xs">
+              {scheduleDescription}
             </CardDescription>
           </div>
           <div className="flex gap-1">
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8"
+              className="h-7 w-7"
               onClick={onEdit}
               type="button"
             >
@@ -219,7 +231,7 @@ function ScheduleCard({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 text-destructive hover:text-destructive"
+                  className="h-7 w-7 text-destructive hover:text-destructive"
                   type="button"
                 >
                   <Trash2 className="h-4 w-4" />
@@ -243,28 +255,36 @@ function ScheduleCard({
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-2 pt-0">
         {startDate && (
-          <div className="flex items-center gap-2 text-sm">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
             <CalendarDays className="h-4 w-4 text-muted-foreground" />
             <span className="text-foreground">Starts {format(startDate, 'PPP')}</span>
+            <Badge variant="secondary" className="font-mono text-[11px]">
+              <Clock className="mr-1 h-3 w-3" />
+              {startTime} - {endTime}
+            </Badge>
           </div>
         )}
 
-        <div className="flex items-center gap-2 text-sm">
+        <div className="flex items-center gap-2 text-xs">
           <MapPin className="h-4 w-4 text-muted-foreground" />
           <span className="text-muted-foreground">{timezone}</span>
         </div>
 
-        {rule.byWeekday && rule.byWeekday.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">
+        {rule?.byWeekday && rule.byWeekday.length > 0 && (
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">
               {getWeekdayLabels(rule.byWeekday)}
             </p>
             {rule.weekdayTimes && rule.weekdayTimes.length > 0 && (
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1.5">
                 {rule.weekdayTimes.map((weekdayTime) => (
-                  <Badge key={weekdayTime.day} variant="secondary" className="font-mono">
+                  <Badge
+                    key={weekdayTime.day}
+                    variant="secondary"
+                    className="font-mono text-[11px]"
+                  >
                     <Clock className="mr-1 h-3 w-3" />
                     {WEEKDAYS.find((day) => day.value === weekdayTime.day)?.short}{' '}
                     {weekdayTime.time}
@@ -275,21 +295,21 @@ function ScheduleCard({
           </div>
         )}
 
-        {(rule.count || rule.until) && (
-          <p className="text-sm text-muted-foreground">
-            {rule.count && `Ends after ${rule.count} occurrences`}
-            {rule.until && `Ends on ${format(parseISO(rule.until), 'PPP')}`}
+        {(rule?.count || rule?.until) && (
+          <p className="text-xs text-muted-foreground">
+            {rule?.count && `Ends after ${rule.count} occurrences`}
+            {rule?.until && `Ends on ${format(parseISO(rule.until), 'PPP')}`}
           </p>
         )}
 
-        <div className="flex flex-wrap gap-2 pt-1">
+        <div className="flex flex-wrap gap-1.5 pt-0.5">
           {exceptions.length > 0 && (
-            <Badge variant="outline">
+            <Badge variant="outline" className="text-[11px]">
               {exceptions.length} exception{exceptions.length !== 1 ? 's' : ''}
             </Badge>
           )}
           {overrides.length > 0 && (
-            <Badge variant="outline">
+            <Badge variant="outline" className="text-[11px]">
               {overrides.length} override{overrides.length !== 1 ? 's' : ''}
             </Badge>
           )}
