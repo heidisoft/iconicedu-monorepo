@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react-native';
-import { Button } from '../components/Button';
-import { UiTrackingContext } from '../lib/tracking-context';
+import { Button } from '@iconicedu/ui-native/components/Button';
+import { UiTrackingContext } from '@iconicedu/ui-native/lib/tracking-context';
 
 describe('Button', () => {
   it('renders label text', () => {

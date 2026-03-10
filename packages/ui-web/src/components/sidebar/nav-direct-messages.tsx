@@ -26,7 +26,7 @@ import {
   getDirectMessageItemUnreadCount,
   getDirectMessageUnreadCount,
 } from './sidebar-unread';
-import { cn } from '../../lib/utils';
+import { cn } from '@iconicedu/ui-web/lib/utils';
 
 export function NavDirectMessages({
   dms,

@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import type { MessageMentionVM, UserProfileVM } from '@iconicedu/shared-types';
-import { Button } from '../../ui/button';
+import { Button } from '@iconicedu/ui-web/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -10,7 +10,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '../../ui/dialog';
+} from '@iconicedu/ui-web/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,19 +18,19 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '../../ui/dropdown-menu';
-import { Input } from '../../ui/input';
-import { Label } from '../../ui/label';
-import { Textarea } from '../../ui/textarea';
-import { Avatar, AvatarFallback, AvatarImage } from '../../ui/avatar';
+} from '@iconicedu/ui-web/ui/dropdown-menu';
+import { Input } from '@iconicedu/ui-web/ui/input';
+import { Label } from '@iconicedu/ui-web/ui/label';
+import { Textarea } from '@iconicedu/ui-web/ui/textarea';
+import { Avatar, AvatarFallback, AvatarImage } from '@iconicedu/ui-web/ui/avatar';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '../../ui/tooltip';
+} from '@iconicedu/ui-web/ui/tooltip';
 import { EmojiPicker } from './emoji-picker';
-import { cn } from '../../lib/utils';
+import { cn } from '@iconicedu/ui-web/lib/utils';
 import {
   getMentionCandidates,
   getMentionPopupPosition,

@@ -1,4 +1,4 @@
-import { buildListData } from '../components/messages/message-list';
+import { buildListData } from '@/components/messages/message-list';
 import type { MessageVM } from '@iconicedu/shared-types';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -9,14 +9,24 @@ function makeSender(id: string, name = 'Sender') {
     ids: { id, orgId: 'org-1', accountId: `acc-${id}` },
     profile: {
       displayName: name,
-      avatar: { source: 'seed' as const, seed: id, url: null, updatedAt: '2025-01-01T00:00:00Z' },
+      avatar: {
+        source: 'seed' as const,
+        seed: id,
+        url: null,
+        updatedAt: '2025-01-01T00:00:00Z',
+      },
     },
     prefs: {},
     meta: { createdAt: '2025-01-01T00:00:00Z', updatedAt: '2025-01-01T00:00:00Z' },
   } as unknown as MessageVM['core']['sender'];
 }
 
-function makeMsg(id: string, senderId: string, createdAt: string, senderName = 'Sender'): MessageVM {
+function makeMsg(
+  id: string,
+  senderId: string,
+  createdAt: string,
+  senderName = 'Sender',
+): MessageVM {
   return {
     ids: { id, orgId: 'org-1' },
     core: {
@@ -55,7 +65,7 @@ describe('buildListData', () => {
     expect(isDateSep(items[0]!)).toBe(true);
     expect(isDateSep(items[1]!)).toBe(false); // message a
     expect(isDateSep(items[2]!)).toBe(false); // message b
-    expect(isDateSep(items[3]!)).toBe(true);  // sep for Dec 18
+    expect(isDateSep(items[3]!)).toBe(true); // sep for Dec 18
     expect(isDateSep(items[4]!)).toBe(false); // message c
   });
 
@@ -122,9 +132,9 @@ describe('buildListData', () => {
     // In inverted FlatList this renders visually: sep-Dec17, a, sep-Dec18, b
     // Sep for Dec 18 should appear at index 1 (just above b at index 0)
     expect(isDateSep(reversed[0]!)).toBe(false); // b (newest) at bottom
-    expect(isDateSep(reversed[1]!)).toBe(true);  // sep-Dec18 above b
+    expect(isDateSep(reversed[1]!)).toBe(true); // sep-Dec18 above b
     expect(isDateSep(reversed[2]!)).toBe(false); // a
-    expect(isDateSep(reversed[3]!)).toBe(true);  // sep-Dec17 at top
+    expect(isDateSep(reversed[3]!)).toBe(true); // sep-Dec17 at top
   });
 });
 
@@ -143,12 +153,16 @@ describe('isGroupStart logic', () => {
     let prevMsg: MessageVM | null = null;
     for (let i = targetIndex + 1; i < reversed.length; i++) {
       const candidate = reversed[i];
-      if (!isDateSep(candidate)) { prevMsg = candidate as MessageVM; break; }
+      if (!isDateSep(candidate)) {
+        prevMsg = candidate as MessageVM;
+        break;
+      }
     }
 
     const timeDiffMinutes = prevMsg
       ? (new Date((item as MessageVM).core.createdAt).getTime() -
-          new Date(prevMsg.core.createdAt).getTime()) / 60_000
+          new Date(prevMsg.core.createdAt).getTime()) /
+        60_000
       : Infinity;
 
     return (

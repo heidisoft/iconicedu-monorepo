@@ -2,9 +2,12 @@
 
 import { memo } from 'react';
 import type { LinkPreviewMessageVM as LinkPreviewMessageType } from '@iconicedu/shared-types';
-import { MessageBase, type MessageBaseProps } from '@iconicedu/ui-web/components/messages/message-base';
+import {
+  MessageBase,
+  type MessageBaseProps,
+} from '@iconicedu/ui-web/components/messages/message-base';
 import { MessageTextContent } from '@iconicedu/ui-web/components/messages/message-text-content';
-import { LinkPreviewCard } from '../link-preview-card';
+import { LinkPreviewCard } from '@iconicedu/ui-web/components/messages/link-preview-card';
 
 interface LinkPreviewMessageProps extends Omit<MessageBaseProps, 'message' | 'children'> {
   message: LinkPreviewMessageType;

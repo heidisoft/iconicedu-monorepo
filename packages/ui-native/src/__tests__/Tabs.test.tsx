@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react-native';
-import { Tabs } from '../components/Tabs';
-import { UiTrackingContext } from '../lib/tracking-context';
+import { Tabs } from '@iconicedu/ui-native/components/Tabs';
+import { UiTrackingContext } from '@iconicedu/ui-native/lib/tracking-context';
 
 const mockItems = [
   { key: 'all', label: 'All' },

@@ -4,7 +4,7 @@ import { render, screen } from '@testing-library/react';
 import type { LearningSpaceVM, UserProfileVM } from '@iconicedu/shared-types';
 
 import { NavLearningSpaces } from './nav-learning-spaces';
-import { SidebarProvider } from '../../ui/sidebar';
+import { SidebarProvider } from '@iconicedu/ui-web/ui/sidebar';
 
 describe('NavLearningSpaces', () => {
   it('shows unread badge for classes with unread messages', () => {

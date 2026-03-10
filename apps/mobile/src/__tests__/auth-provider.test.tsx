@@ -1,6 +1,6 @@
 import React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react-native';
-import { AuthProvider, useAuth } from '../providers/auth-provider';
+import { AuthProvider, useAuth } from '@/providers/auth-provider';
 
 // Mock Supabase client
 const mockGetSession = jest.fn().mockResolvedValue({

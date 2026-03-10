@@ -24,9 +24,9 @@ import {
   hashToTabKey,
   tabKeyToHash,
 } from '@iconicedu/ui-web/components/messages/tabs/messages-container-tab-hash';
-import { Tabs, TabsList, TabsTrigger } from '../../ui/tabs';
-import { ScrollArea } from '../../ui/scroll-area';
-import { Button } from '../../ui/button';
+import { Tabs, TabsList, TabsTrigger } from '@iconicedu/ui-web/ui/tabs';
+import { ScrollArea } from '@iconicedu/ui-web/ui/scroll-area';
+import { Button } from '@iconicedu/ui-web/ui/button';
 import {
   createChannelFileItems,
   formatChannelFileUploadedDate,

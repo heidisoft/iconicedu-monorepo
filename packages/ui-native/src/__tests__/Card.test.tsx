@@ -8,7 +8,7 @@ import {
   CardDescription,
   CardContent,
   CardFooter,
-} from '../components/Card';
+} from '@iconicedu/ui-native/components/Card';
 
 describe('Card', () => {
   it('renders children', () => {

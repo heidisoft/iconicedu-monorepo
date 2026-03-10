@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react-native';
-import { MessageInput } from '../components/messages/message-input';
+import { MessageInput } from '@/components/messages/message-input';
 
 describe('MessageInput', () => {
   it('renders input field', () => {
@@ -53,11 +53,7 @@ describe('MessageInput', () => {
   });
 
   it('renders custom placeholder', () => {
-    render(
-      <MessageInput onSend={jest.fn()} placeholder="Write something..." />,
-    );
-    expect(
-      screen.getByPlaceholderText('Write something...'),
-    ).toBeTruthy();
+    render(<MessageInput onSend={jest.fn()} placeholder="Write something..." />);
+    expect(screen.getByPlaceholderText('Write something...')).toBeTruthy();
   });
 });

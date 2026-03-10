@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react-native';
-import { Typography } from '../components/Text';
+import { Typography } from '@iconicedu/ui-native/components/Text';
 
 describe('Typography', () => {
   it('renders children text', () => {
@@ -32,9 +32,7 @@ describe('Typography', () => {
     ] as const;
 
     variants.forEach((variant) => {
-      const { unmount } = render(
-        <Typography variant={variant}>{variant}</Typography>,
-      );
+      const { unmount } = render(<Typography variant={variant}>{variant}</Typography>);
       expect(screen.getByText(variant)).toBeTruthy();
       unmount();
     });

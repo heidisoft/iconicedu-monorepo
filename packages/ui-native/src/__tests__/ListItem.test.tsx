@@ -1,8 +1,8 @@
 import React from 'react';
 import { Text } from 'react-native';
 import { render, screen, fireEvent } from '@testing-library/react-native';
-import { ListItem } from '../components/ListItem';
-import { UiTrackingContext } from '../lib/tracking-context';
+import { ListItem } from '@iconicedu/ui-native/components/ListItem';
+import { UiTrackingContext } from '@iconicedu/ui-native/lib/tracking-context';
 
 describe('ListItem', () => {
   it('renders title', () => {

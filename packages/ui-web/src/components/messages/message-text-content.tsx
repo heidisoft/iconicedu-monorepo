@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import type { MessageMentionVM } from '@iconicedu/shared-types';
 
-import { cn } from '../../lib/utils';
+import { cn } from '@iconicedu/ui-web/lib/utils';
 import { buildMessageTextSegments } from './message-mentions.utils';
 
 type MessageTextContentProps = {
@@ -58,7 +58,12 @@ export const MessageTextContent = memo(function MessageTextContent({
   };
 
   return (
-    <p className={cn('text-sm leading-relaxed whitespace-pre-wrap break-words text-foreground', className)}>
+    <p
+      className={cn(
+        'text-sm leading-relaxed whitespace-pre-wrap break-words text-foreground',
+        className,
+      )}
+    >
       {segments.map((segment, index) => {
         if (segment.type === 'text') {
           return <span key={`text-${index}`}>{renderFormattedText(segment.text)}</span>;

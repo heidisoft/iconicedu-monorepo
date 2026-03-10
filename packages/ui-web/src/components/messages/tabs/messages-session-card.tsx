@@ -5,7 +5,7 @@ import { Clock3, Loader2, Video } from 'lucide-react';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
-import { useMessagesState } from '../context/messages-state-provider';
+import { useMessagesState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
 import type { ClassSession } from './messages-schedule-tab.utils';
 
 interface SessionCardProps {

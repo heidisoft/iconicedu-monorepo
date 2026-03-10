@@ -168,4 +168,19 @@ export default [
       '@typescript-eslint/no-require-imports': 'off',
     },
   },
+  {
+    files: [
+      'apps/mobile/src/**/*.{ts,tsx,js,jsx}',
+      'packages/ui-web/src/**/*.{ts,tsx,js,jsx}',
+      'packages/ui-native/src/**/*.{ts,tsx,js,jsx}',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: ['../*', '../../*', '../../../*', '../../../../*'],
+        },
+      ],
+    },
+  },
 ];

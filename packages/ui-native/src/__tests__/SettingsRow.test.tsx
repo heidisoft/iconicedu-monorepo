@@ -1,8 +1,8 @@
 import React from 'react';
 import { Text } from 'react-native';
 import { render, screen, fireEvent } from '@testing-library/react-native';
-import { SettingsRow } from '../components/SettingsRow';
-import { UiTrackingContext } from '../lib/tracking-context';
+import { SettingsRow } from '@iconicedu/ui-native/components/SettingsRow';
+import { UiTrackingContext } from '@iconicedu/ui-native/lib/tracking-context';
 
 const icon = <Text>🔔</Text>;
 

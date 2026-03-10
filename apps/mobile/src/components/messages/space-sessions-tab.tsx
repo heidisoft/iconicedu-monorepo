@@ -18,7 +18,7 @@ import {
   formatTimeBadge,
   formatOriginalTime,
   formatOriginalDate,
-} from '../sessions/session-card';
+} from '@/components/sessions/session-card';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 

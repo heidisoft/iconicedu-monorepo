@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react-native';
-import { Chip } from '../components/Chip';
-import { UiTrackingContext } from '../lib/tracking-context';
+import { Chip } from '@iconicedu/ui-native/components/Chip';
+import { UiTrackingContext } from '@iconicedu/ui-native/lib/tracking-context';
 
 describe('Chip', () => {
   it('renders label', () => {

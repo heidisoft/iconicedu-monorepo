@@ -1,9 +1,12 @@
 import { memo } from 'react';
 import { FileText, Download } from 'lucide-react';
-import { Button } from '../../../ui/button';
+import { Button } from '@iconicedu/ui-web/ui/button';
 import type { FileMessageVM as FileMessageType } from '@iconicedu/shared-types';
-import { MessageBase, type MessageBaseProps } from '../message-base';
-import { buildFileDownloadHref } from '../file-download.utils';
+import {
+  MessageBase,
+  type MessageBaseProps,
+} from '@iconicedu/ui-web/components/messages/message-base';
+import { buildFileDownloadHref } from '@iconicedu/ui-web/components/messages/file-download.utils';
 
 interface FileMessageProps extends Omit<MessageBaseProps, 'message' | 'children'> {
   message: FileMessageType;
@@ -48,9 +51,13 @@ export const FileMessage = memo(function FileMessage(props: FileMessageProps) {
               <FileText className="h-5 w-5 text-primary" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-foreground">{attachment.name}</p>
+              <p className="truncate text-sm font-medium text-foreground">
+                {attachment.name}
+              </p>
               {attachment.size ? (
-                <p className="text-xs text-muted-foreground">{formatFileSize(attachment.size)}</p>
+                <p className="text-xs text-muted-foreground">
+                  {formatFileSize(attachment.size)}
+                </p>
               ) : null}
             </div>
             <Button

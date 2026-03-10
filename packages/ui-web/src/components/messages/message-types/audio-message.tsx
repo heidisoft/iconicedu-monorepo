@@ -3,10 +3,13 @@
 import { memo, useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Play, Pause } from 'lucide-react';
 import type { AudioRecordingMessageVM } from '@iconicedu/shared-types';
-import { Button } from '../../../ui/button';
-import { MessageBase, type MessageBaseProps } from '../message-base';
-import { cn } from '../../../lib/utils';
-import { buildFileAccessHref } from '../file-download.utils';
+import { Button } from '@iconicedu/ui-web/ui/button';
+import {
+  MessageBase,
+  type MessageBaseProps,
+} from '@iconicedu/ui-web/components/messages/message-base';
+import { cn } from '@iconicedu/ui-web/lib/utils';
+import { buildFileAccessHref } from '@iconicedu/ui-web/components/messages/file-download.utils';
 
 interface AudioMessageProps extends Omit<MessageBaseProps, 'message' | 'children'> {
   message: AudioRecordingMessageVM;
@@ -35,7 +38,10 @@ export function buildAudioWaveformBars(
   });
 }
 
-export function resolveAudioDuration(messageDurationSeconds?: number, loadedDuration?: number) {
+export function resolveAudioDuration(
+  messageDurationSeconds?: number,
+  loadedDuration?: number,
+) {
   const safeMessageDuration =
     typeof messageDurationSeconds === 'number' && Number.isFinite(messageDurationSeconds)
       ? messageDurationSeconds
@@ -79,7 +85,7 @@ export const AudioMessage = memo(function AudioMessage(props: AudioMessageProps)
       const nextDuration =
         Number.isFinite(audio.duration) && audio.duration > 0
           ? audio.duration
-          : message.audio.durationSeconds ?? 0;
+          : (message.audio.durationSeconds ?? 0);
       setDuration(nextDuration);
     };
     const handleEnded = () => {
@@ -165,44 +171,53 @@ export const AudioMessage = memo(function AudioMessage(props: AudioMessageProps)
     setIsPlaying(true);
   }, [audioSrc, isPlaying, message.audio.storagePath, message.audio.url]);
 
-  const seekToRatio = useCallback((ratio: number) => {
-    const audio = audioRef.current;
-    if (!audio || !duration) return;
-    const boundedRatio = Math.max(0, Math.min(1, ratio));
-    const nextTime = boundedRatio * duration;
-    audio.currentTime = nextTime;
-    setCurrentTime(nextTime);
-  }, [duration]);
+  const seekToRatio = useCallback(
+    (ratio: number) => {
+      const audio = audioRef.current;
+      if (!audio || !duration) return;
+      const boundedRatio = Math.max(0, Math.min(1, ratio));
+      const nextTime = boundedRatio * duration;
+      audio.currentTime = nextTime;
+      setCurrentTime(nextTime);
+    },
+    [duration],
+  );
 
-  const handleWaveformClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    if (!rect.width) return;
-    seekToRatio((event.clientX - rect.left) / rect.width);
-  }, [seekToRatio]);
+  const handleWaveformClick = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      const rect = event.currentTarget.getBoundingClientRect();
+      if (!rect.width) return;
+      seekToRatio((event.clientX - rect.left) / rect.width);
+    },
+    [seekToRatio],
+  );
 
-  const handleWaveformKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!duration) return;
+  const handleWaveformKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (!duration) return;
 
-    if (event.key === 'Home') {
-      event.preventDefault();
-      seekToRatio(0);
-      return;
-    }
-    if (event.key === 'End') {
-      event.preventDefault();
-      seekToRatio(1);
-      return;
-    }
-    if (event.key === 'ArrowRight') {
-      event.preventDefault();
-      seekToRatio((currentTime + 5) / duration);
-      return;
-    }
-    if (event.key === 'ArrowLeft') {
-      event.preventDefault();
-      seekToRatio((currentTime - 5) / duration);
-    }
-  }, [currentTime, duration, seekToRatio]);
+      if (event.key === 'Home') {
+        event.preventDefault();
+        seekToRatio(0);
+        return;
+      }
+      if (event.key === 'End') {
+        event.preventDefault();
+        seekToRatio(1);
+        return;
+      }
+      if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        seekToRatio((currentTime + 5) / duration);
+        return;
+      }
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        seekToRatio((currentTime - 5) / duration);
+      }
+    },
+    [currentTime, duration, seekToRatio],
+  );
 
   const resolvedDuration = resolveAudioDuration(message.audio.durationSeconds, duration);
   const progressRatio = resolvedDuration > 0 ? currentTime / resolvedDuration : 0;
@@ -254,7 +269,9 @@ export const AudioMessage = memo(function AudioMessage(props: AudioMessageProps)
               aria-valuetext={`${formatAudioTime(currentTime)} of ${formatAudioTime(resolvedDuration)}`}
               className={cn(
                 'flex h-6 cursor-pointer items-end gap-0.5 rounded-xl border border-border/70 bg-muted/70 px-2 outline-none shadow-inner',
-                canPlay ? 'focus-visible:ring-2 focus-visible:ring-ring' : 'cursor-not-allowed opacity-60',
+                canPlay
+                  ? 'focus-visible:ring-2 focus-visible:ring-ring'
+                  : 'cursor-not-allowed opacity-60',
               )}
               onClick={canPlay ? handleWaveformClick : undefined}
               onKeyDown={canPlay ? handleWaveformKeyDown : undefined}

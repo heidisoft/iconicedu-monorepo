@@ -1,4 +1,4 @@
-import { cn } from '../lib/utils';
+import { cn } from '@iconicedu/ui-native/lib/utils';
 
 describe('cn', () => {
   it('merges class strings', () => {
@@ -20,9 +20,7 @@ describe('cn', () => {
   it('merges conditional classes', () => {
     const active = true;
     const disabled = false;
-    expect(cn('base', active && 'active', disabled && 'disabled')).toBe(
-      'base active',
-    );
+    expect(cn('base', active && 'active', disabled && 'disabled')).toBe('base active');
   });
 
   it('handles array inputs', () => {

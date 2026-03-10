@@ -18,8 +18,12 @@ import type {
   MessagesRightPanelRegistry,
   MessagesRightPanelIntent,
 } from '@iconicedu/shared-types';
-import { useHasHydrated, useIsMobile } from '../../hooks/use-mobile';
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '../../ui/resizable';
+import { useHasHydrated, useIsMobile } from '@iconicedu/ui-web/hooks/use-mobile';
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from '@iconicedu/ui-web/ui/resizable';
 
 interface MessagesRightPanelProps {
   intent: MessagesRightPanelIntent;

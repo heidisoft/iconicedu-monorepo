@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react-native';
-import { Input } from '../components/Input';
+import { Input } from '@iconicedu/ui-native/components/Input';
 
 describe('Input', () => {
   it('renders with label', () => {
@@ -25,11 +25,7 @@ describe('Input', () => {
 
   it('hides helper text when error is present', () => {
     render(
-      <Input
-        label="Email"
-        error="Required"
-        helperText="We'll never share your email"
-      />,
+      <Input label="Email" error="Required" helperText="We'll never share your email" />,
     );
     expect(screen.getByText('Required')).toBeTruthy();
     expect(screen.queryByText("We'll never share your email")).toBeNull();

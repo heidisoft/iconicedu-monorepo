@@ -1,11 +1,11 @@
 'use client';
 
 import type { UserProfileVM } from '@iconicedu/shared-types';
-import { AvatarWithStatus } from '../../shared/avatar-with-status';
-import { getProfileDisplayName } from '../../../lib/display-name';
-import { resolveDashboardBasePathFromWindow } from '../../../lib/dashboard-base-path';
-import { Button } from '../../../ui/button';
-import { ScrollArea } from '../../../ui/scroll-area';
+import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
+import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
+import { resolveDashboardBasePathFromWindow } from '@iconicedu/ui-web/lib/dashboard-base-path';
+import { Button } from '@iconicedu/ui-web/ui/button';
+import { ScrollArea } from '@iconicedu/ui-web/ui/scroll-area';
 import { MessageCircle } from 'lucide-react';
 
 interface MessagesMembersTabProps {
@@ -71,12 +71,16 @@ export function MessagesMembersTab({
                     {memberName}
                   </button>
                 ) : (
-                  <div className="truncate text-sm font-medium text-foreground">{memberName}</div>
+                  <div className="truncate text-sm font-medium text-foreground">
+                    {memberName}
+                  </div>
                 )}
                 {(member.presence?.state?.emoji || member.presence?.state?.text) && (
                   <div className="truncate text-xs text-muted-foreground">
                     <span className="inline-flex items-center gap-1.5">
-                      {member.presence?.state?.emoji ? <span>{member.presence.state.emoji}</span> : null}
+                      {member.presence?.state?.emoji ? (
+                        <span>{member.presence.state.emoji}</span>
+                      ) : null}
                       {member.presence?.state?.text ? (
                         <span className="truncate">{member.presence.state.text}</span>
                       ) : null}

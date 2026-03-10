@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react-native';
-import { Avatar } from '../components/Avatar';
+import { Avatar } from '@iconicedu/ui-native/components/Avatar';
 
 describe('Avatar', () => {
   it('renders initials when no image src', () => {

@@ -2,7 +2,7 @@
 
 import { useEffect, useCallback } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { initPostHog, posthog } from '../lib/analytics/posthog-browser';
+import { initPostHog, posthog } from '@iconicedu/web/lib/analytics/posthog-browser';
 import type { AnalyticsClient } from '@iconicedu/utils';
 
 // Initialise once on mount, then track every navigation.

@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react-native';
-import { TypingIndicator } from '../components/messages/typing-indicator';
+import { TypingIndicator } from '@/components/messages/typing-indicator';
 
 describe('TypingIndicator', () => {
   it('renders nothing when no users are typing', () => {

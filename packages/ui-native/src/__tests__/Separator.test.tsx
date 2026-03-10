@@ -1,6 +1,6 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react-native';
-import { Separator } from '../components/Separator';
+import { render } from '@testing-library/react-native';
+import { Separator } from '@iconicedu/ui-native/components/Separator';
 
 describe('Separator', () => {
   it('renders without error', () => {

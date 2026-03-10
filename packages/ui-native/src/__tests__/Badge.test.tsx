@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react-native';
-import { Badge } from '../components/Badge';
+import { Badge } from '@iconicedu/ui-native/components/Badge';
 
 describe('Badge', () => {
   it('renders count', () => {

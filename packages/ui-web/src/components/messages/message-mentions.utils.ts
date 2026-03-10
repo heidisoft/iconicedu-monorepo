@@ -1,6 +1,6 @@
 import type { MessageMentionVM, UserProfileVM } from '@iconicedu/shared-types';
 
-import { getProfileDisplayName } from '../../lib/display-name';
+import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
 
 export type MessageTextSegment =
   | { type: 'text'; text: string }
@@ -67,7 +67,10 @@ export function buildMessageTextSegments(
   }
 
   const sortedMentions = [...mentions]
-    .filter((mention) => mention.start >= 0 && mention.end > mention.start && mention.end <= text.length)
+    .filter(
+      (mention) =>
+        mention.start >= 0 && mention.end > mention.start && mention.end <= text.length,
+    )
     .sort((a, b) => a.start - b.start);
 
   const segments: MessageTextSegment[] = [];

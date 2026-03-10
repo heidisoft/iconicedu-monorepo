@@ -1,8 +1,8 @@
 import React from 'react';
 import { Text } from 'react-native';
 import { render, screen, fireEvent } from '@testing-library/react-native';
-import { IconButton } from '../components/IconButton';
-import { UiTrackingContext } from '../lib/tracking-context';
+import { IconButton } from '@iconicedu/ui-native/components/IconButton';
+import { UiTrackingContext } from '@iconicedu/ui-native/lib/tracking-context';
 
 describe('IconButton', () => {
   const icon = <Text>✕</Text>;

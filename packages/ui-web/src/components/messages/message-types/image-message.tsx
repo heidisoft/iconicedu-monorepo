@@ -3,10 +3,16 @@
 import { memo, useState } from 'react';
 import { Download } from 'lucide-react';
 import type { ImageMessageVM as ImageMessageType } from '@iconicedu/shared-types';
-import { Button } from '../../../ui/button';
-import { Dialog, DialogContent, DialogTitle } from '../../../ui/dialog';
-import { MessageBase, type MessageBaseProps } from '../message-base';
-import { buildFileDownloadHref, buildImageRenderHref } from '../file-download.utils';
+import { Button } from '@iconicedu/ui-web/ui/button';
+import { Dialog, DialogContent, DialogTitle } from '@iconicedu/ui-web/ui/dialog';
+import {
+  MessageBase,
+  type MessageBaseProps,
+} from '@iconicedu/ui-web/components/messages/message-base';
+import {
+  buildFileDownloadHref,
+  buildImageRenderHref,
+} from '@iconicedu/ui-web/components/messages/file-download.utils';
 
 interface ImageMessageProps extends Omit<MessageBaseProps, 'message' | 'children'> {
   message: ImageMessageType;

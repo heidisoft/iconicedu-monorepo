@@ -1,6 +1,9 @@
 import type { UserProfileVM } from '@iconicedu/shared-types';
 
-import { getProfileDisplayName, getProfileFullName } from '../../lib/display-name';
+import {
+  getProfileDisplayName,
+  getProfileFullName,
+} from '@iconicedu/ui-web/lib/display-name';
 
 export type MentionState = {
   query: string;
@@ -97,7 +100,8 @@ function getCaretCoordinates(textarea: HTMLTextAreaElement, caretPosition: numbe
 
   const left = marker.offsetLeft - textarea.scrollLeft;
   const top = marker.offsetTop - textarea.scrollTop;
-  const lineHeight = Number.parseFloat(computed.lineHeight) || Number.parseFloat(computed.fontSize) || 16;
+  const lineHeight =
+    Number.parseFloat(computed.lineHeight) || Number.parseFloat(computed.fontSize) || 16;
 
   document.body.removeChild(mirror);
 
