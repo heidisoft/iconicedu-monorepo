@@ -57,7 +57,7 @@ jobs:
         run: pnpm build:packages
 
       - name: Format check
-        run: pnpm format:check
+        run: pnpm format:check:changed
 
       - name: Lint
         run: pnpm lint

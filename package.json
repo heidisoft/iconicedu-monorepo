@@ -51,6 +51,7 @@
     "clean:all": "turbo run clean && rm -rf node_modules",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "format:check:changed": "node scripts/prettier-check-changed.mjs",
     "guard:activity-feed-writes": "node scripts/check-activity-feed-writes.mjs",
     "test:guard:activity-feed-writes": "node --test scripts/check-activity-feed-writes.test.mjs",
     "prepare": "husky"
