@@ -520,6 +520,10 @@ describe('activity event definitions', () => {
     expect(rendered.summary).toBe('Schedule changed for next week.');
     expect(rendered.actionButton).toBeUndefined();
     expect(grouped?.headline.primary).toBe('Class updated');
+    expect(grouped?.actionButton).toMatchObject({
+      label: 'Open classroom',
+      href: '../spaces/channel-1',
+    });
     expect(grouped?.leading).toEqual({
       kind: 'avatars',
       avatars: [

@@ -383,7 +383,7 @@ function renderClassCreatedGroup(event: ActivityEventRow) {
       secondary: getContextTitle(payload),
     },
     summary: summaryParts.join('. '),
-    actionButton: sourceAction(event, payload, 'outline', 'Open class'),
+    actionButton: sourceAction(event, payload, 'outline', 'Open classroom'),
   } satisfies ActivityRenderResult;
 }
 
@@ -429,7 +429,7 @@ function renderLearningSpaceUpdatedGroup(event: ActivityEventRow) {
       asOptionalString(payload.changeSummary) ??
       (firstSessionLabel ? `Next session ${firstSessionLabel}.` : null) ??
       'Class details, participants, or schedule changed.',
-    actionButton: sourceAction(event, payload, 'outline', 'Open class'),
+    actionButton: sourceAction(event, payload, 'outline', 'Open classroom'),
   } satisfies ActivityRenderResult;
 }
 
