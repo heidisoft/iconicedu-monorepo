@@ -1,6 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, expect, it, vi } from 'vitest';
 
-import { CHANNEL_FILE_BUCKET, CHANNEL_FILE_SIGNED_URL_TTL, createSignedChannelFileUrl } from '@iconicedu/web/lib/messages/queries/file-url.query';
+import {
+  CHANNEL_FILE_BUCKET,
+  CHANNEL_FILE_SIGNED_URL_TTL,
+  createSignedChannelFileUrl,
+} from '@iconicedu/web/lib/messages/queries/file-url.query';
 
 describe('createSignedChannelFileUrl', () => {
   it('returns absolute urls unchanged', async () => {

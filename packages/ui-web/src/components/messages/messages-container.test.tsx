@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
 import { render, waitFor, screen, act, fireEvent } from '@testing-library/react';
 import { vi } from 'vitest';
@@ -79,7 +80,7 @@ const makeParticipant = (id: string, kind: UserProfileVM['kind']): UserProfileVM
     meta: {},
     ui: { themeKey: null },
     joinedDate: new Date().toISOString(),
-  } as unknown as UserProfileVM);
+  }) as unknown as UserProfileVM;
 
 const channel: ChannelVM = {
   ids: { id: 'channel-1', orgId: 'org-1' },
@@ -102,13 +103,15 @@ const channel: ChannelVM = {
     allowReactions: true,
   },
   collections: {
-    participants: [makeParticipant('profile-1', 'guardian'), makeParticipant('profile-2', 'educator')],
+    participants: [
+      makeParticipant('profile-1', 'guardian'),
+      makeParticipant('profile-2', 'educator'),
+    ],
     messages: { items: [], total: 0 },
     media: { items: [], total: 0 },
     files: { items: [], total: 0 },
   },
 };
-
 
 describe('MessagesContainer', () => {
   beforeEach(() => {
@@ -271,7 +274,9 @@ describe('MessagesContainer', () => {
       'parent-1',
       expect.objectContaining({
         social: expect.objectContaining({
-          thread: expect.objectContaining({ ids: expect.objectContaining({ id: 'thread-1' }) }),
+          thread: expect.objectContaining({
+            ids: expect.objectContaining({ id: 'thread-1' }),
+          }),
         }),
       }),
     );

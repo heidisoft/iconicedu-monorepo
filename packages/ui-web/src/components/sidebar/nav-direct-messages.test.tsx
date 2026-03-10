@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
 import { act, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -14,10 +15,7 @@ describe('NavDirectMessages', () => {
     render(
       <SidebarProvider>
         <NavDirectMessages
-          dms={[
-            makeDm('dm-1', 'account-self', 2),
-            makeDm('dm-2', 'account-self', 3),
-          ]}
+          dms={[makeDm('dm-1', 'account-self', 2), makeDm('dm-2', 'account-self', 3)]}
           currentUserId="account-self"
         />
       </SidebarProvider>,

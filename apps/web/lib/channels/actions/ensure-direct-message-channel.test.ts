@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, expect, it, vi } from 'vitest';
 
 const getChannelByDmKey = vi.fn();
@@ -6,9 +7,8 @@ vi.mock('@iconicedu/web/lib/channels/queries/channels.query', () => ({
   getChannelByDmKey: (...args: unknown[]) => getChannelByDmKey(...args),
 }));
 
-const { ensureDirectMessageChannel } = await import(
-  '@iconicedu/web/lib/channels/actions/ensure-direct-message-channel'
-);
+const { ensureDirectMessageChannel } =
+  await import('@iconicedu/web/lib/channels/actions/ensure-direct-message-channel');
 
 describe('ensureDirectMessageChannel', () => {
   it('returns existing channel when dm_key exists', async () => {

@@ -9,7 +9,13 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const base = {
-  ignores: ['**/node_modules/**', '**/dist/**', '**/.next/**', 'apps/web/next-env.d.ts'],
+  ignores: [
+    '**/node_modules/**',
+    '**/dist/**',
+    '**/.next/**',
+    'apps/web/next-env.d.ts',
+    'apps/web/playwright.config.js',
+  ],
   languageOptions: {
     parser: tsParser,
     parserOptions: {
@@ -68,7 +74,13 @@ const withProject = (pattern, tsconfigPath) => ({
 
 export default [
   {
-    ignores: ['**/node_modules/**', '**/.next/**', '**/dist/**', 'apps/web/next-env.d.ts'],
+    ignores: [
+      '**/node_modules/**',
+      '**/.next/**',
+      '**/dist/**',
+      'apps/web/next-env.d.ts',
+      'apps/web/playwright.config.js',
+    ],
   },
   {
     ...base,

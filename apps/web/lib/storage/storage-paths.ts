@@ -39,14 +39,12 @@ export function buildStorageFileKey(input: {
 }) {
   const hasExplicitExtension = /\.[^./]+$/.test(input.name);
   const rawExt = hasExplicitExtension ? input.name.split('.').pop()?.toLowerCase() : null;
-  const extension =
-    rawExt
-      ? rawExt
-      : (input.fallbackExtension ?? null);
+  const extension = rawExt ? rawExt : (input.fallbackExtension ?? null);
   const timestamp = Date.now();
+  const cryptoApi = globalThis.crypto;
   const randomSuffix =
-    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-      ? crypto.randomUUID().slice(0, 8)
+    cryptoApi && typeof cryptoApi.randomUUID === 'function'
+      ? cryptoApi.randomUUID().slice(0, 8)
       : Math.random().toString(36).slice(2, 10);
   const baseName = sanitizeStorageFileName(
     input.name.replace(/\.[^/.]+$/, ''),

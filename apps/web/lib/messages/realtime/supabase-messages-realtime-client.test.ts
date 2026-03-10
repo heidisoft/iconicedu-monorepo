@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import { createSupabaseMessagesRealtimeClient } from './supabase-messages-realtime-client';
@@ -195,7 +196,9 @@ describe('createSupabaseMessagesRealtimeClient', () => {
         message: expect.objectContaining({
           ids: expect.objectContaining({ id: 'parent-1' }),
           social: expect.objectContaining({
-            thread: expect.objectContaining({ ids: expect.objectContaining({ id: 'thread-1' }) }),
+            thread: expect.objectContaining({
+              ids: expect.objectContaining({ id: 'thread-1' }),
+            }),
           }),
         }),
       }),

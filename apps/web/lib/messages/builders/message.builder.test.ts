@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { buildMessageById } from '@iconicedu/web/lib/messages/builders/message.builder';
@@ -16,8 +17,10 @@ vi.mock('@iconicedu/web/lib/messages/queries/messages.query', () => ({
   getMessageById: (...args: unknown[]) => getMessageById(...args),
   getMessagesByChannelId: vi.fn(async () => ({ data: [] })),
   getMessageTextByMessageIds: vi.fn(async () => ({ data: [] })),
-  getMessageImagesByMessageIds: (...args: unknown[]) => getMessageImagesByMessageIds(...args),
-  getMessageFilesByMessageIds: (...args: unknown[]) => getMessageFilesByMessageIds(...args),
+  getMessageImagesByMessageIds: (...args: unknown[]) =>
+    getMessageImagesByMessageIds(...args),
+  getMessageFilesByMessageIds: (...args: unknown[]) =>
+    getMessageFilesByMessageIds(...args),
   getMessageDesignFileUpdatesByMessageIds: vi.fn(async () => ({ data: [] })),
   getMessagePaymentRemindersByMessageIds: vi.fn(async () => ({ data: [] })),
   getMessageEventRemindersByMessageIds: vi.fn(async () => ({ data: [] })),
@@ -34,7 +37,8 @@ vi.mock('@iconicedu/web/lib/messages/queries/messages.query', () => ({
   getMessageLiveSessionStartedByMessageIds: (...args: unknown[]) =>
     getMessageLiveSessionStartedByMessageIds(...args),
   getMessageReactionCountsByMessageIds: vi.fn(async () => ({ data: [] })),
-  getMessageSavesByMessageIds: (...args: unknown[]) => getMessageSavesByMessageIds(...args),
+  getMessageSavesByMessageIds: (...args: unknown[]) =>
+    getMessageSavesByMessageIds(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/profile/builders/user-profile.builder', () => ({
@@ -79,7 +83,9 @@ describe('buildMessageById', () => {
       created_at: new Date().toISOString(),
     };
     getMessageById.mockResolvedValueOnce({ data: row });
-    buildUserProfileById.mockResolvedValueOnce({ ids: { id: 'profile-1', orgId: 'org-1' } });
+    buildUserProfileById.mockResolvedValueOnce({
+      ids: { id: 'profile-1', orgId: 'org-1' },
+    });
     mapMessageRowToVM.mockReturnValueOnce({ ids: { id: 'message-1', orgId: 'org-1' } });
 
     const result = await buildMessageById({} as any, 'org-1', 'message-1');
@@ -109,10 +115,16 @@ describe('buildMessageById', () => {
     getMessageSavesByMessageIds.mockResolvedValueOnce({
       data: [{ message_id: 'message-saved' }],
     });
-    buildUserProfileById.mockResolvedValueOnce({ ids: { id: 'profile-1', orgId: 'org-1' } });
-    mapMessageRowToVM.mockReturnValueOnce({ ids: { id: 'message-saved', orgId: 'org-1' } });
+    buildUserProfileById.mockResolvedValueOnce({
+      ids: { id: 'profile-1', orgId: 'org-1' },
+    });
+    mapMessageRowToVM.mockReturnValueOnce({
+      ids: { id: 'message-saved', orgId: 'org-1' },
+    });
 
-    await buildMessageById({} as any, 'org-1', 'message-saved', { profileId: 'profile-1' });
+    await buildMessageById({} as any, 'org-1', 'message-saved', {
+      profileId: 'profile-1',
+    });
 
     expect(mapMessageRowToVM).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -133,7 +145,9 @@ describe('buildMessageById', () => {
       created_at: new Date().toISOString(),
     };
     getMessageById.mockResolvedValueOnce({ data: row });
-    buildUserProfileById.mockResolvedValueOnce({ ids: { id: 'profile-1', orgId: 'org-1' } });
+    buildUserProfileById.mockResolvedValueOnce({
+      ids: { id: 'profile-1', orgId: 'org-1' },
+    });
     buildThreadById.mockResolvedValueOnce({ ids: { id: 'thread-1', orgId: 'org-1' } });
     mapMessageRowToVM.mockReturnValueOnce({ ids: { id: 'message-2', orgId: 'org-1' } });
 
@@ -161,8 +175,12 @@ describe('buildMessageById', () => {
         },
       ],
     });
-    buildUserProfileById.mockResolvedValueOnce({ ids: { id: 'profile-1', orgId: 'org-1' } });
-    mapMessageRowToVM.mockReturnValueOnce({ ids: { id: 'message-image', orgId: 'org-1' } });
+    buildUserProfileById.mockResolvedValueOnce({
+      ids: { id: 'profile-1', orgId: 'org-1' },
+    });
+    mapMessageRowToVM.mockReturnValueOnce({
+      ids: { id: 'message-image', orgId: 'org-1' },
+    });
 
     await buildMessageById({} as any, 'org-1', 'message-image');
 
@@ -195,8 +213,12 @@ describe('buildMessageById', () => {
         },
       ],
     });
-    buildUserProfileById.mockResolvedValueOnce({ ids: { id: 'profile-1', orgId: 'org-1' } });
-    mapMessageRowToVM.mockReturnValueOnce({ ids: { id: 'message-audio', orgId: 'org-1' } });
+    buildUserProfileById.mockResolvedValueOnce({
+      ids: { id: 'profile-1', orgId: 'org-1' },
+    });
+    mapMessageRowToVM.mockReturnValueOnce({
+      ids: { id: 'message-audio', orgId: 'org-1' },
+    });
 
     await buildMessageById({} as any, 'org-1', 'message-audio');
 
@@ -246,8 +268,12 @@ describe('buildMessageById', () => {
         },
       ],
     });
-    buildUserProfileById.mockResolvedValueOnce({ ids: { id: 'profile-1', orgId: 'org-1' } });
-    mapMessageRowToVM.mockReturnValueOnce({ ids: { id: 'message-gallery', orgId: 'org-1' } });
+    buildUserProfileById.mockResolvedValueOnce({
+      ids: { id: 'profile-1', orgId: 'org-1' },
+    });
+    mapMessageRowToVM.mockReturnValueOnce({
+      ids: { id: 'message-gallery', orgId: 'org-1' },
+    });
 
     await buildMessageById({} as any, 'org-1', 'message-gallery');
 

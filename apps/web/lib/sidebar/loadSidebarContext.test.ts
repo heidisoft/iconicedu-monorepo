@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { loadSidebarContext } from '@iconicedu/web/lib/sidebar/loadSidebarContext';
@@ -48,7 +49,10 @@ const makeChannel = (id: string, participantIds: string[]) =>
     collections: {
       participants: participantIds.map((participantId) => ({
         ids: { id: participantId, orgId: 'org-1', accountId: `account-${participantId}` },
-        profile: { displayName: `User ${participantId}`, avatar: { url: null, source: 'seed' } },
+        profile: {
+          displayName: `User ${participantId}`,
+          avatar: { url: null, source: 'seed' },
+        },
       })),
     },
   }) as any;
@@ -155,9 +159,9 @@ describe('loadSidebarContext', () => {
       'org-1',
       { accountId: 'account-child' },
     );
-    expect(result.sidebarData.collections.directMessages.map((channel: any) => channel.ids.id)).toEqual(
-      expect.arrayContaining(['dm-guardian', 'dm-child']),
-    );
+    expect(
+      result.sidebarData.collections.directMessages.map((channel: any) => channel.ids.id),
+    ).toEqual(expect.arrayContaining(['dm-guardian', 'dm-child']));
   });
 
   it('adds organization switcher items from all auth-user accounts', async () => {
@@ -169,10 +173,7 @@ describe('loadSidebarContext', () => {
       },
     });
     getAccountsByAuthUserId.mockResolvedValueOnce({
-      data: [
-        { org_id: 'org-2' },
-        { org_id: 'org-1' },
-      ],
+      data: [{ org_id: 'org-2' }, { org_id: 'org-1' }],
     });
     getOrgsByIds.mockResolvedValueOnce({
       data: [

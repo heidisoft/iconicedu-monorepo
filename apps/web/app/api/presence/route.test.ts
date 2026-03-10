@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, expect, it, vi } from 'vitest';
 
 import { POST } from '@iconicedu/web/app/api/presence/route';
@@ -24,7 +25,9 @@ vi.mock('@iconicedu/web/lib/supabase/service', () => ({
 }));
 
 vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
-  getAccountByAuthUserId: vi.fn(async () => ({ data: { id: 'account-1', org_id: 'org-1' } })),
+  getAccountByAuthUserId: vi.fn(async () => ({
+    data: { id: 'account-1', org_id: 'org-1' },
+  })),
 }));
 
 vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({

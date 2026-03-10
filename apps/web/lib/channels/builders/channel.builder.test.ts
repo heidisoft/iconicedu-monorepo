@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, expect, it, vi } from 'vitest';
 
 import { buildDirectMessageChannelsWithMessages } from '@iconicedu/web/lib/channels/builders/channel.builder';
@@ -73,7 +74,12 @@ describe('buildDirectMessageChannelsWithMessages', () => {
     getChannelReadStatesByAccountId.mockResolvedValue({ data: [] });
     getProfilesByIds.mockResolvedValue({
       data: [
-        { id: 'profile-1', org_id: 'org-1', account_id: 'account-1', display_name: 'User 1' },
+        {
+          id: 'profile-1',
+          org_id: 'org-1',
+          account_id: 'account-1',
+          display_name: 'User 1',
+        },
       ],
     });
 
@@ -84,9 +90,8 @@ describe('buildDirectMessageChannelsWithMessages', () => {
     // Ensure mocks are invoked for membership filtering
     expect(getChannelParticipantsByChannelIds).toHaveBeenCalled();
     expect(getProfilesByIds).toHaveBeenCalled();
-    const { buildUserProfileFromRow } = await import(
-      '@iconicedu/web/lib/profile/builders/user-profile.builder'
-    );
+    const { buildUserProfileFromRow } =
+      await import('@iconicedu/web/lib/profile/builders/user-profile.builder');
     expect(buildUserProfileFromRow).toHaveBeenCalled();
 
     expect(results).toHaveLength(1);
@@ -95,7 +100,9 @@ describe('buildDirectMessageChannelsWithMessages', () => {
 
   it('provides a default channel read state when no persisted row exists', async () => {
     getChannelsByOrg.mockResolvedValue({
-      data: [{ id: 'dm-1', org_id: 'org-1', kind: 'dm', topic: 'DM', purpose: 'general' }],
+      data: [
+        { id: 'dm-1', org_id: 'org-1', kind: 'dm', topic: 'DM', purpose: 'general' },
+      ],
     });
     getChannelParticipantsByChannelIds.mockResolvedValue({
       data: [{ channel_id: 'dm-1', profile_id: 'profile-1' }],
@@ -103,7 +110,14 @@ describe('buildDirectMessageChannelsWithMessages', () => {
     getChannelCapabilitiesByChannelIds.mockResolvedValue({ data: [] });
     getChannelReadStatesByAccountId.mockResolvedValue({ data: [] });
     getProfilesByIds.mockResolvedValue({
-      data: [{ id: 'profile-1', org_id: 'org-1', account_id: 'account-1', display_name: 'User 1' }],
+      data: [
+        {
+          id: 'profile-1',
+          org_id: 'org-1',
+          account_id: 'account-1',
+          display_name: 'User 1',
+        },
+      ],
     });
 
     const [result] = await buildDirectMessageChannelsWithMessages({} as any, 'org-1', {

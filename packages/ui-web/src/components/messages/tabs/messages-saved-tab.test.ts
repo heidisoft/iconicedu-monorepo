@@ -1,12 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, expect, it } from 'vitest';
 import type { MessageVM } from '@iconicedu/shared-types';
 import { getSavedMessages } from './messages-saved-tab';
 
-function buildMessage(
-  id: string,
-  createdAt: string,
-  isSaved: boolean,
-): MessageVM {
+function buildMessage(id: string, createdAt: string, isSaved: boolean): MessageVM {
   return {
     ids: { id, orgId: 'org-1' },
     core: {

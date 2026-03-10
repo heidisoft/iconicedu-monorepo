@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, expect, it } from 'vitest';
 
 import { isStaffObserverReadOnlyChannel } from '@iconicedu/web/lib/channels/read-only';

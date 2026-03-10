@@ -31,7 +31,7 @@ import { ThemedIconBadge } from '@iconicedu/ui-web/components/shared/themed-icon
 import type { ChannelVM, UserProfileVM } from '@iconicedu/shared-types';
 import { useMessagesState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
 
-interface HeaderSubtitleItem {
+interface HeaderSubtitleEntry {
   icon?: LucideIcon;
   label: string;
   onClick?: () => void;
@@ -132,7 +132,7 @@ const HeaderTitle = memo(function HeaderTitle({
 const HeaderSubtitleRow = memo(function HeaderSubtitleRow({
   items,
 }: {
-  items: HeaderSubtitleItem[];
+  items: HeaderSubtitleEntry[];
 }) {
   return (
     <TooltipProvider>
@@ -181,15 +181,8 @@ const getOtherParticipant = (participants: UserProfileVM[], currentUserId: strin
 export const MessagesContainerHeader = memo(function MessagesContainerHeader({
   channel,
 }: MessagesContainerHeaderProps) {
-  const {
-    savedCount,
-    homeworkCount,
-    sessionSummaryCount,
-    currentUserId,
-    toggle,
-    messageFilter,
-    toggleMessageFilter,
-  } = useMessagesState();
+  const { savedCount, currentUserId, toggle, messageFilter, toggleMessageFilter } =
+    useMessagesState();
 
   const otherParticipant = useMemo(
     () =>
@@ -201,10 +194,7 @@ export const MessagesContainerHeader = memo(function MessagesContainerHeader({
 
   const otherParticipantName =
     otherParticipant && channel.basics.topic
-      ? getProfileDisplayName(
-          otherParticipant.profile,
-          channel.basics.topic ?? 'User',
-        )
+      ? getProfileDisplayName(otherParticipant.profile, channel.basics.topic ?? 'User')
       : otherParticipant
         ? getProfileDisplayName(otherParticipant.profile)
         : channel.basics.topic;
@@ -214,81 +204,73 @@ export const MessagesContainerHeader = memo(function MessagesContainerHeader({
     if (channel.basics.kind === 'dm') {
       if (!otherParticipant) return null;
       return (
-          <button
-            type="button"
-            onClick={() => toggle({ key: 'profile', userId: otherParticipant.ids.id })}
-            className="rounded-full"
-            aria-label={`View ${otherParticipantName} profile`}
-          >
-            <AvatarWithStatus
-              name={otherParticipantName}
-              avatar={otherParticipant.profile.avatar}
-              presence={otherParticipant.presence}
-              showStatus={false}
-              themeKey={otherParticipant.ui?.themeKey}
-              sizeClassName="h-8 w-8"
-              initialsLength={1}
-            />
+        <button
+          type="button"
+          onClick={() => toggle({ key: 'profile', userId: otherParticipant.ids.id })}
+          className="rounded-full"
+          aria-label={`View ${otherParticipantName} profile`}
+        >
+          <AvatarWithStatus
+            name={otherParticipantName}
+            avatar={otherParticipant.profile.avatar}
+            presence={otherParticipant.presence}
+            showStatus={false}
+            themeKey={otherParticipant.ui?.themeKey}
+            sizeClassName="h-8 w-8"
+            initialsLength={1}
+          />
         </button>
       );
     }
     const Icon = CHANNEL_ICON_MAP[channel.basics.iconKey ?? ''] ?? Sparkles;
     return (
-      <ThemedIconBadge
-        icon={Icon}
-        themeKey={channel.ui?.themeKey ?? null}
-        size="sm"
-      />
+      <ThemedIconBadge icon={Icon} themeKey={channel.ui?.themeKey ?? null} size="sm" />
     );
   }, [
     channel.basics.kind,
     channel.basics.iconKey,
     channel.ui?.themeKey,
     otherParticipant,
+    otherParticipantName,
     toggle,
   ]);
 
-  const subtitleItems: HeaderSubtitleItem[] = useMemo(
-    () => {
-      const quickMetaItems = (channel.ui?.headerQuickMetaActions ?? []).map((item) => ({
-        icon: HEADER_ICON_MAP[item.key],
-        label:
-          item.key === 'saved'
-            ? `${savedCount}`
-            : item.key === 'homework'
-              ? 'HW'
-              : item.key === 'session-summary'
-                ? 'SS'
-                : item.label,
-        tooltip: item.tooltip ?? undefined,
-        onClick:
-          item.key === 'saved'
-            ? () => toggle({ key: 'saved' })
-            : item.key === 'homework'
-              ? () => toggleMessageFilter('homework')
-              : item.key === 'session-summary'
-                ? () => toggleMessageFilter('session-summary')
-                : undefined,
-        isActive:
-          item.key === 'homework'
-            ? messageFilter === 'homework'
+  const subtitleItems: HeaderSubtitleEntry[] = useMemo(() => {
+    const quickMetaItems = (channel.ui?.headerQuickMetaActions ?? []).map((item) => ({
+      icon: HEADER_ICON_MAP[item.key],
+      label:
+        item.key === 'saved'
+          ? `${savedCount}`
+          : item.key === 'homework'
+            ? 'HW'
             : item.key === 'session-summary'
-              ? messageFilter === 'session-summary'
+              ? 'SS'
+              : item.label,
+      tooltip: item.tooltip ?? undefined,
+      onClick:
+        item.key === 'saved'
+          ? () => toggle({ key: 'saved' })
+          : item.key === 'homework'
+            ? () => toggleMessageFilter('homework')
+            : item.key === 'session-summary'
+              ? () => toggleMessageFilter('session-summary')
               : undefined,
-      }));
+      isActive:
+        item.key === 'homework'
+          ? messageFilter === 'homework'
+          : item.key === 'session-summary'
+            ? messageFilter === 'session-summary'
+            : undefined,
+    }));
 
-      return quickMetaItems;
-    },
-    [
-      channel.ui?.headerQuickMetaActions,
-      savedCount,
-      homeworkCount,
-      sessionSummaryCount,
-      toggle,
-      toggleMessageFilter,
-      messageFilter,
-    ],
-  );
+    return quickMetaItems;
+  }, [
+    channel.ui?.headerQuickMetaActions,
+    savedCount,
+    toggle,
+    toggleMessageFilter,
+    messageFilter,
+  ]);
   const inlineStatusLabel = useMemo(() => {
     if (channel.basics.kind !== 'dm') {
       return null;
@@ -297,7 +279,11 @@ export const MessagesContainerHeader = memo(function MessagesContainerHeader({
     const statusEmoji = otherParticipant?.presence?.state?.emoji?.trim();
     const value = [statusEmoji, statusText].filter(Boolean).join(' ').trim();
     return value || null;
-  }, [channel.basics.kind, otherParticipant?.presence?.state?.emoji, otherParticipant?.presence?.state?.text]);
+  }, [
+    channel.basics.kind,
+    otherParticipant?.presence?.state?.emoji,
+    otherParticipant?.presence?.state?.text,
+  ]);
 
   return (
     <div className="flex min-w-0 flex-col">

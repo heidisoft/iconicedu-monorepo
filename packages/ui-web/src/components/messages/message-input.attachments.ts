@@ -32,7 +32,7 @@ export function getDroppedAttachmentFiles(dataTransfer: DataTransfer | null | un
 }
 
 export function splitComposerAttachmentsByKind<
-  T extends { kind: ComposerAttachmentKind }
+  T extends { kind: ComposerAttachmentKind },
 >(attachments: T[]) {
   return {
     images: attachments.filter((attachment) => attachment.kind === 'image'),
@@ -88,7 +88,10 @@ export function buildRecordedAudioFileName(now = Date.now(), mimeType?: string) 
 }
 
 export function getSupportedAudioRecordingMimeType() {
-  if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') {
+  if (
+    typeof MediaRecorder === 'undefined' ||
+    typeof MediaRecorder.isTypeSupported !== 'function'
+  ) {
     return '';
   }
 
@@ -106,7 +109,12 @@ export async function resolveAudioDurationSeconds(
   file: File,
   fallbackSeconds?: number,
 ): Promise<number | undefined> {
-  if (typeof Audio === 'undefined' || typeof URL === 'undefined' || !URL.createObjectURL) {
+  const AudioConstructor = globalThis.Audio;
+  if (
+    typeof AudioConstructor === 'undefined' ||
+    typeof URL === 'undefined' ||
+    !URL.createObjectURL
+  ) {
     return fallbackSeconds;
   }
 
@@ -114,7 +122,7 @@ export async function resolveAudioDurationSeconds(
 
   try {
     const duration = await new Promise<number | null>((resolve) => {
-      const audio = new Audio();
+      const audio = new AudioConstructor();
       const cleanup = () => {
         audio.removeAttribute('src');
         audio.load?.();
@@ -153,7 +161,12 @@ export async function createImageThumbnailFile(file: File): Promise<File | null>
   }
 
   return new Promise<File | null>((resolve) => {
-    const image = new Image();
+    const ImageConstructor = globalThis.Image;
+    if (typeof ImageConstructor === 'undefined') {
+      resolve(null);
+      return;
+    }
+    const image = new ImageConstructor();
     const objectUrl = URL.createObjectURL(file);
 
     image.onload = () => {

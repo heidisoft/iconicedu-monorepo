@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
@@ -59,7 +60,10 @@ describe('ProfileContent', () => {
         expect.objectContaining({ label: 'Headline', value: 'Senior tutor' }),
         expect.objectContaining({ label: 'Role', value: 'Teacher' }),
         expect.objectContaining({ label: 'Email', value: 'sara@example.com' }),
-        expect.objectContaining({ label: 'Location', value: 'New York, NY, United States' }),
+        expect.objectContaining({
+          label: 'Location',
+          value: 'New York, NY, United States',
+        }),
         expect.objectContaining({ label: 'Timezone', value: 'America/New_York' }),
         expect.objectContaining({ label: 'Languages', value: 'English, Spanish' }),
       ]),
@@ -99,7 +103,10 @@ describe('ProfileContent', () => {
             profile: { displayName: 'Ava Parras', avatar: { source: 'seed', url: null } },
           },
           {
-            profile: { displayName: 'Noah Parras', avatar: { source: 'seed', url: null } },
+            profile: {
+              displayName: 'Noah Parras',
+              avatar: { source: 'seed', url: null },
+            },
           },
         ],
       },

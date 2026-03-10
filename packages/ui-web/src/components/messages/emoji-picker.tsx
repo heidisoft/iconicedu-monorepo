@@ -138,7 +138,7 @@ export const EmojiPicker = memo(function EmojiPicker({
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(RECENT_EMOJIS_KEY);
+      const stored = globalThis.localStorage?.getItem(RECENT_EMOJIS_KEY);
       if (stored) {
         setRecentEmojis(JSON.parse(stored));
       }
@@ -153,7 +153,7 @@ export const EmojiPicker = memo(function EmojiPicker({
       const updated = [emoji, ...filtered].slice(0, MAX_RECENT_EMOJIS);
 
       try {
-        localStorage.setItem(RECENT_EMOJIS_KEY, JSON.stringify(updated));
+        globalThis.localStorage?.setItem(RECENT_EMOJIS_KEY, JSON.stringify(updated));
       } catch (error) {
         console.error('Failed to save recent emojis:', error);
       }
