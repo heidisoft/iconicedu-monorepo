@@ -15,6 +15,8 @@ const {
   mockUpdateAccountRoleState,
   mockGetUserRoles,
   mockResolveOrgDashboardPath,
+  mockGetProfileByAccountId,
+  mockSeedSignupDefaultNotificationPreferences,
 } = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
   mockFrom: vi.fn(),
@@ -26,6 +28,8 @@ const {
   mockUpdateAccountRoleState: vi.fn(),
   mockGetUserRoles: vi.fn(),
   mockResolveOrgDashboardPath: vi.fn(),
+  mockGetProfileByAccountId: vi.fn(),
+  mockSeedSignupDefaultNotificationPreferences: vi.fn(),
 }));
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
@@ -54,6 +58,14 @@ vi.mock('@iconicedu/web/lib/profile/queries/roles.query', () => ({
   upsertUserRole: mockUpsertUserRole,
 }));
 
+vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
+  getProfileByAccountId: mockGetProfileByAccountId,
+}));
+
+vi.mock('@iconicedu/web/lib/profile/queries/notification-defaults-seed.query', () => ({
+  seedSignupDefaultNotificationPreferences: mockSeedSignupDefaultNotificationPreferences,
+}));
+
 vi.mock('@iconicedu/web/lib/org/resolve-dashboard-path', () => ({
   resolveOrgDashboardPath: mockResolveOrgDashboardPath,
 }));
@@ -70,6 +82,8 @@ describe('POST /api/orgs/bootstrap', () => {
     mockUpdateAccountRoleState.mockReset();
     mockGetUserRoles.mockReset();
     mockResolveOrgDashboardPath.mockReset();
+    mockGetProfileByAccountId.mockReset();
+    mockSeedSignupDefaultNotificationPreferences.mockReset();
   });
 
   it('returns 400 for invalid slug', async () => {
@@ -94,6 +108,7 @@ describe('POST /api/orgs/bootstrap', () => {
     mockGetOrCreateAccount.mockResolvedValueOnce({
       account: { id: 'account-1', org_id: 'org-1' },
     });
+    mockGetProfileByAccountId.mockResolvedValueOnce({ data: null, error: null });
     mockUpsertUserRole.mockResolvedValueOnce({ error: null });
     mockUpdateAccountRoleState.mockResolvedValueOnce({
       error: null,
@@ -125,7 +140,7 @@ describe('POST /api/orgs/bootstrap', () => {
         throw new Error(`Unexpected table ${table}`);
       }
       return {
-        select: vi.fn((columns: string, options?: { head?: boolean }) => {
+        select: vi.fn((_columns: string, _options?: { head?: boolean }) => {
           return {
             eq: vi.fn(() => ({
               is: vi.fn(() => ({
@@ -170,6 +185,7 @@ describe('POST /api/orgs/bootstrap', () => {
     mockGetOrCreateAccount.mockResolvedValueOnce({
       account: { id: 'account-2', org_id: 'org-2' },
     });
+    mockGetProfileByAccountId.mockResolvedValueOnce({ data: null, error: null });
     mockUpsertUserRole.mockResolvedValueOnce({ error: null });
     mockUpdateAccountRoleState.mockResolvedValueOnce({
       error: null,

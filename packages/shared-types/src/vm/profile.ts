@@ -118,6 +118,8 @@ export type NotificationKey =
   | 'digest.weekly'
   | 'digest.urgent_only'
   | 'dm.posted'
+  | 'dm.edited'
+  | 'dm.deleted'
   | 'dm.reaction.added'
   | 'dm.reaction.removed'
   | 'message.posted'

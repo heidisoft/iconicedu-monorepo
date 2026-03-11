@@ -13,6 +13,10 @@ describe('ActivityVerbVM', () => {
     expectTypeOf<'classes.created'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'dm.posted'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'dms.posted'>().toMatchTypeOf<ActivityVerbVM>();
+    expectTypeOf<'dm.edited'>().toMatchTypeOf<ActivityVerbVM>();
+    expectTypeOf<'dms.edited'>().toMatchTypeOf<ActivityVerbVM>();
+    expectTypeOf<'dm.deleted'>().toMatchTypeOf<ActivityVerbVM>();
+    expectTypeOf<'dms.deleted'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'dm.reaction.added'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'dms.reactions.added'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'dm.reaction.removed'>().toMatchTypeOf<ActivityVerbVM>();

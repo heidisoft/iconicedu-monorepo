@@ -103,14 +103,12 @@ export function getIconKey(item: ActivityFeedItemVM): InboxIconKeyVM {
       return 'Paperclip';
     case 'summary.posted':
       return 'Sparkles';
-    case 'notes.posted':
     case 'file.uploaded':
       return 'FileText';
     case 'message.posted':
     case 'message.edited':
       return 'MessageSquare';
     case 'session.scheduled':
-    case 'session.completed':
     case 'class.created':
       return 'GraduationCap';
     case 'member.joined':

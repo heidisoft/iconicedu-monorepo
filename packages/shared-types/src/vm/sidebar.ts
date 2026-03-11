@@ -67,6 +67,7 @@ export interface SidebarPrimaryNavVM {
 export interface SidebarCollectionsVM {
   learningSpaces: LearningSpaceVM[];
   directMessages: ChannelVM[];
+  alertChannels?: ChannelVM[];
 }
 
 export interface SidebarOrganizationSwitchItemVM {

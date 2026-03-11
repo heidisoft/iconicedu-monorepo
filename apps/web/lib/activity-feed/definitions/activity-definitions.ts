@@ -1465,22 +1465,6 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       };
     },
   },
-  'session.completed': {
-    eventType: 'session.completed',
-    tabKey: 'classes',
-    importance: 'normal',
-    group: null,
-    resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) => {
-      const payload = asRecord(event.payload);
-      return {
-        verb: 'session.completed',
-        leading: { kind: 'icon', iconKey: 'CheckCircle2', tone: 'success' },
-        headline: { primary: 'Session completed', secondary: sessionName(payload) },
-        actionButton: sourceAction(event, payload),
-      };
-    },
-  },
   'session.reminder.sent': {
     eventType: 'session.reminder.sent',
     tabKey: 'classes',

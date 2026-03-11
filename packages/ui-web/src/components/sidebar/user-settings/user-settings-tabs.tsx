@@ -95,7 +95,11 @@ export type UserSettingsTabsProps = {
     scopeKind: 'channel' | 'learning_space';
     scopeId: string;
   }) => Promise<void> | void;
-  availableAlertChannels?: Array<{ id: string; label: string }>;
+  availableAlertChannels?: Array<{
+    id: string;
+    label: string;
+    kind?: 'channel' | 'dm' | 'group_dm';
+  }>;
   availableAlertLearningSpaces?: Array<{ id: string; label: string }>;
   onLocationContinue?: (input: {
     city: string;

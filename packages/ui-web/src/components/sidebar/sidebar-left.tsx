@@ -64,6 +64,7 @@ import { getLearningSpaceIcon } from '@iconicedu/ui-web/lib/icons';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
 import type {
   ChildProfileSaveInput,
+  ChannelVM,
   ChildProfileVM,
   EducatorAvailabilityInput,
   EducatorProfileSaveInput,
@@ -112,6 +113,44 @@ function normalizeDashboardUrl(url: string, dashboardBasePath: string): string {
     return `${dashboardBasePath}${url.slice('/dashboard'.length)}`;
   }
   return url;
+}
+
+function resolveAlertChannelLabel(
+  channel: ChannelVM,
+  currentUserAccountId: string,
+): string {
+  if (channel.basics.kind !== 'dm' && channel.basics.kind !== 'group_dm') {
+    return channel.basics.topic;
+  }
+
+  const participantNames = channel.collections.participants
+    .filter(
+      (participant: UserProfileVM) => participant.ids.accountId !== currentUserAccountId,
+    )
+    .map((participant: UserProfileVM) =>
+      getProfileDisplayName(participant.profile, 'User'),
+    )
+    .filter((name: string) => Boolean(name));
+
+  if (participantNames.length === 0) {
+    return channel.basics.topic;
+  }
+
+  if (channel.basics.kind === 'dm') {
+    return `Direct messages with ${participantNames[0]}`;
+  }
+
+  if (participantNames.length === 1) {
+    return `Direct messages with ${participantNames[0]}`;
+  }
+
+  if (participantNames.length === 2) {
+    return `Direct messages with ${participantNames[0]}, ${participantNames[1]}`;
+  }
+
+  return `Direct messages with ${participantNames[0]}, ${participantNames[1]} and ${
+    participantNames.length - 2
+  } others`;
 }
 
 export function SidebarLeft({
@@ -351,6 +390,10 @@ export function SidebarLeft({
             .filter(({ dms }) => dms.length > 0)
         : [],
     [children, data.collections.directMessages, userProfile],
+  );
+  const alertChannels: ChannelVM[] = React.useMemo(
+    () => data.collections.alertChannels ?? data.collections.directMessages,
+    [data.collections.alertChannels, data.collections.directMessages],
   );
   const hasDirectMessages = ownDirectMessages.length > 0;
   const hasSupervisedDirectMessages = supervisedDirectMessagesByChild.length > 0;
@@ -715,18 +758,11 @@ export function SidebarLeft({
           onNotificationPreferenceSave={onNotificationPreferenceSave}
           onNotificationPreferenceScopeDelete={onNotificationPreferenceScopeDelete}
           availableAlertChannels={Array.from(
-            new Map(
-              [
-                ...data.collections.directMessages,
-                ...data.collections.learningSpaces.flatMap((space) => [
-                  space.channels.primaryChannel,
-                  ...(space.channels.relatedChannels ?? []),
-                ]),
-              ].map((channel) => [channel.ids.id, channel]),
-            ).values(),
+            new Map(alertChannels.map((channel) => [channel.ids.id, channel])).values(),
           ).map((channel) => ({
             id: channel.ids.id,
-            label: channel.basics.topic,
+            label: resolveAlertChannelLabel(channel, data.user.profile.ids.accountId),
+            kind: channel.basics.kind,
           }))}
           availableAlertLearningSpaces={data.collections.learningSpaces.map((space) => ({
             id: space.ids.id,

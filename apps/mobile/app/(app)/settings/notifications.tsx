@@ -17,36 +17,63 @@ import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 
 const NOTIF_LABELS: Record<string, string> = {
-  'message.posted':    'New Messages',
+  'message.posted': 'New Messages',
   'homework.assigned': 'Homework Assigned',
-  'homework.submitted':'Homework Submitted',
+  'homework.submitted': 'Homework Submitted',
   'homework.reviewed': 'Homework Reviewed',
   'session.scheduled': 'Session Scheduled',
-  'session.completed': 'Session Completed',
-  'class.created':     'New Class',
-  'member.joined':     'Member Joined',
-  'member.invited':    'Invitations',
-  'summary.posted':    'AI Summary',
-  'notes.posted':      'Notes Posted',
-  'file.uploaded':     'File Uploaded',
+  'class.created': 'New Class',
+  'member.joined': 'Member Joined',
+  'member.invited': 'Invitations',
+  'summary.posted': 'AI Summary',
+  'file.uploaded': 'File Uploaded',
 };
 
 function makeStyles(C: AppColors) {
   return StyleSheet.create({
-    safe:         { flex: 1, backgroundColor: C.pageBg },
-    nav:          { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border },
-    navBack:      { padding: 8, borderRadius: 8 },
-    navTitle:     { flex: 1, fontSize: 17, fontWeight: '700', color: C.text, textAlign: 'center', marginRight: 40 },
-    scroll:       { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 48, gap: 6 },
-    sectionLabel: { fontSize: 12, fontWeight: '700', color: C.textFaint, textTransform: 'uppercase', letterSpacing: 0.8, paddingHorizontal: 4, paddingTop: 14, paddingBottom: 6 },
-    card:         { borderRadius: 14, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, overflow: 'hidden' },
-    divider:      { height: 1, backgroundColor: C.border, marginLeft: 60 },
-    loading:      { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    emptyCard:    { padding: 24, alignItems: 'center', gap: 8 },
-    emptyIcon:    { fontSize: 32 },
-    emptyTitle:   { fontSize: 15, fontWeight: '600', color: C.text },
-    emptyDesc:    { fontSize: 13, color: C.textMuted, textAlign: 'center' },
-    hint:         { fontSize: 12, color: C.textFaint, paddingHorizontal: 4 },
+    safe: { flex: 1, backgroundColor: C.pageBg },
+    nav: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 8,
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: C.border,
+    },
+    navBack: { padding: 8, borderRadius: 8 },
+    navTitle: {
+      flex: 1,
+      fontSize: 17,
+      fontWeight: '700',
+      color: C.text,
+      textAlign: 'center',
+      marginRight: 40,
+    },
+    scroll: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 48, gap: 6 },
+    sectionLabel: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: C.textFaint,
+      textTransform: 'uppercase',
+      letterSpacing: 0.8,
+      paddingHorizontal: 4,
+      paddingTop: 14,
+      paddingBottom: 6,
+    },
+    card: {
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.card,
+      overflow: 'hidden',
+    },
+    divider: { height: 1, backgroundColor: C.border, marginLeft: 60 },
+    loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    emptyCard: { padding: 24, alignItems: 'center', gap: 8 },
+    emptyIcon: { fontSize: 32 },
+    emptyTitle: { fontSize: 15, fontWeight: '600', color: C.text },
+    emptyDesc: { fontSize: 13, color: C.textMuted, textAlign: 'center' },
+    hint: { fontSize: 12, color: C.textFaint, paddingHorizontal: 4 },
   });
 }
 
@@ -126,7 +153,8 @@ export default function NotificationsScreen() {
               <Text style={s.emptyIcon}>🔔</Text>
               <Text style={s.emptyTitle}>No preferences configured</Text>
               <Text style={s.emptyDesc}>
-                Notification categories will appear here once they are available for your account.
+                Notification categories will appear here once they are available for your
+                account.
               </Text>
             </View>
           </>
@@ -138,9 +166,11 @@ export default function NotificationsScreen() {
                 const key = pref.pref_key as string;
                 const label = NOTIF_LABELS[key] ?? key;
                 const isMuted = mutedMap[key] ?? (pref.muted as boolean) ?? false;
-                const icon = isMuted
-                  ? <BellOff size={20} color={colors.textFaint} />
-                  : <Bell size={20} color={colors.textMuted} />;
+                const icon = isMuted ? (
+                  <BellOff size={20} color={colors.textFaint} />
+                ) : (
+                  <Bell size={20} color={colors.textMuted} />
+                );
                 return (
                   <React.Fragment key={key}>
                     {i > 0 && <View style={s.divider} />}

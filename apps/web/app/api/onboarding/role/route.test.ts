@@ -15,6 +15,7 @@ const {
   mockUpdateAccountRoleState,
   mockGetUserRoles,
   mockResolveOrgDashboardPath,
+  mockSeedSignupDefaultNotificationPreferences,
 } = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
   mockGetOrCreateAccount: vi.fn(),
@@ -26,6 +27,7 @@ const {
   mockUpdateAccountRoleState: vi.fn(),
   mockGetUserRoles: vi.fn(),
   mockResolveOrgDashboardPath: vi.fn(),
+  mockSeedSignupDefaultNotificationPreferences: vi.fn(),
 }));
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
@@ -64,6 +66,10 @@ vi.mock('@iconicedu/web/lib/org/resolve-dashboard-path', () => ({
   resolveOrgDashboardPath: mockResolveOrgDashboardPath,
 }));
 
+vi.mock('@iconicedu/web/lib/profile/queries/notification-defaults-seed.query', () => ({
+  seedSignupDefaultNotificationPreferences: mockSeedSignupDefaultNotificationPreferences,
+}));
+
 describe('POST /api/onboarding/role', () => {
   it('returns 400 for invalid role', async () => {
     const response = await POST(
@@ -81,8 +87,12 @@ describe('POST /api/onboarding/role', () => {
   });
 
   it('returns 403 when staff validation fails', async () => {
-    mockGetUser.mockResolvedValueOnce({ data: { user: { id: 'auth-1', email: 'user@example.com' } } });
-    mockGetAccountByAuthUserId.mockResolvedValueOnce({ data: { id: 'account-1', org_id: 'org-1' } });
+    mockGetUser.mockResolvedValueOnce({
+      data: { user: { id: 'auth-1', email: 'user@example.com' } },
+    });
+    mockGetAccountByAuthUserId.mockResolvedValueOnce({
+      data: { id: 'account-1', org_id: 'org-1' },
+    });
     mockGetOrCreateAccount.mockResolvedValueOnce({
       account: { id: 'account-1', org_id: 'org-1' },
     });
@@ -104,13 +114,18 @@ describe('POST /api/onboarding/role', () => {
   it('assigns parent role and completes onboarding', async () => {
     const now = new Date().toISOString();
     mockResolveOrgDashboardPath.mockResolvedValueOnce('/iconic-academy');
-    mockGetUser.mockResolvedValueOnce({ data: { user: { id: 'auth-1', email: 'parent@example.com' } } });
-    mockGetAccountByAuthUserId.mockResolvedValueOnce({ data: { id: 'account-1', org_id: 'org-1' } });
+    mockGetUser.mockResolvedValueOnce({
+      data: { user: { id: 'auth-1', email: 'parent@example.com' } },
+    });
+    mockGetAccountByAuthUserId.mockResolvedValueOnce({
+      data: { id: 'account-1', org_id: 'org-1' },
+    });
     mockGetOrCreateAccount.mockResolvedValueOnce({
       account: { id: 'account-1', org_id: 'org-1' },
     });
     mockGetProfileByAccountId.mockResolvedValueOnce({ data: null });
     mockInsertProfileForAccount.mockResolvedValueOnce({ error: null });
+    mockSeedSignupDefaultNotificationPreferences.mockResolvedValueOnce({ error: null });
     mockUpsertUserRole.mockResolvedValueOnce({ error: null });
     mockUpdateAccountRoleState.mockResolvedValueOnce({
       error: null,

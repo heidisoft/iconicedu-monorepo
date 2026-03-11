@@ -113,7 +113,6 @@ const getDefaultIconKey = (activity: ActivityFeedItemVM): InboxIconKeyVM => {
       return 'Paperclip';
     case 'summary.posted':
       return 'Sparkles';
-    case 'notes.posted':
     case 'file.uploaded':
     case 'file.deleted':
       return 'FileText';
@@ -130,7 +129,6 @@ const getDefaultIconKey = (activity: ActivityFeedItemVM): InboxIconKeyVM => {
       return 'CalendarCheck';
     case 'session.canceled':
       return 'CalendarX';
-    case 'session.completed':
     case 'class.created':
     case 'class.updated':
       return 'GraduationCap';

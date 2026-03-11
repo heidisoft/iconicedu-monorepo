@@ -17,6 +17,7 @@ const {
   mockUpdateAccountRoleState,
   mockGetUserRoles,
   mockResolveOrgDashboardPath,
+  mockSeedSignupDefaultNotificationPreferences,
 } = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
   mockGetOrCreateAccount: vi.fn(),
@@ -29,6 +30,7 @@ const {
   mockUpdateAccountRoleState: vi.fn(),
   mockGetUserRoles: vi.fn(),
   mockResolveOrgDashboardPath: vi.fn(),
+  mockSeedSignupDefaultNotificationPreferences: vi.fn(),
 }));
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
@@ -69,6 +71,10 @@ vi.mock('@iconicedu/web/lib/org/resolve-dashboard-path', () => ({
   resolveOrgDashboardPath: mockResolveOrgDashboardPath,
 }));
 
+vi.mock('@iconicedu/web/lib/profile/queries/notification-defaults-seed.query', () => ({
+  seedSignupDefaultNotificationPreferences: mockSeedSignupDefaultNotificationPreferences,
+}));
+
 describe('POST /api/onboarding/student', () => {
   it('returns 400 when invite code is missing', async () => {
     const response = await POST(
@@ -86,7 +92,9 @@ describe('POST /api/onboarding/student', () => {
   });
 
   it('returns 400 when invite code is invalid', async () => {
-    mockGetUser.mockResolvedValueOnce({ data: { user: { id: 'auth-1', email: 'student@example.com' } } });
+    mockGetUser.mockResolvedValueOnce({
+      data: { user: { id: 'auth-1', email: 'student@example.com' } },
+    });
     mockGetAccountByAuthUserId.mockResolvedValueOnce({
       data: { id: 'account-1', org_id: 'org-1' },
     });
@@ -126,7 +134,9 @@ describe('POST /api/onboarding/student', () => {
     const inviteCode = 'JOIN-123';
     const inviteHash = createHash('sha256').update(inviteCode).digest('hex');
     mockResolveOrgDashboardPath.mockResolvedValueOnce('/iconic-academy');
-    mockGetUser.mockResolvedValueOnce({ data: { user: { id: 'auth-1', email: 'student@example.com' } } });
+    mockGetUser.mockResolvedValueOnce({
+      data: { user: { id: 'auth-1', email: 'student@example.com' } },
+    });
     mockGetAccountByAuthUserId.mockResolvedValueOnce({
       data: { id: 'account-1', org_id: 'org-1' },
     });
@@ -175,6 +185,7 @@ describe('POST /api/onboarding/student', () => {
 
     mockGetProfileByAccountId.mockResolvedValueOnce({ data: null });
     mockInsertProfileForAccount.mockResolvedValueOnce({ error: null });
+    mockSeedSignupDefaultNotificationPreferences.mockResolvedValueOnce({ error: null });
     mockUpsertUserRole.mockResolvedValueOnce({ error: null });
     mockUpdateAccountRoleState.mockResolvedValueOnce({
       error: null,

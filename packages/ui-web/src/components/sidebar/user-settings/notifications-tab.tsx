@@ -1,14 +1,5 @@
 import * as React from 'react';
-import {
-  Bell,
-  BookOpen,
-  ChevronDown,
-  Clock,
-  FileText,
-  Megaphone,
-  MessageCircle,
-  Wallet,
-} from 'lucide-react';
+import { Bell, ChevronDown, Megaphone, Wallet } from 'lucide-react';
 
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { UserSettingsTabSection } from '@iconicedu/ui-web/components/sidebar/user-settings/components/user-settings-tab-section';
@@ -28,6 +19,9 @@ import {
 import { Switch } from '@iconicedu/ui-web/ui/switch';
 import { toast } from 'sonner';
 import { notificationChannelOptions } from '@iconicedu/ui-web/components/sidebar/user-settings/constants';
+import type { ActivityVerbVM } from '@iconicedu/shared-types';
+
+const GLOBAL_ALERT_SCOPE_ID = '__global__';
 
 type NotificationSectionItem = {
   key: string;
@@ -50,6 +44,206 @@ type ScopedNotificationPreference = {
 };
 
 const defineNotificationItems = <T extends NotificationSectionItem[]>(items: T) => items;
+
+const ACTIVITY_SCOPED_VERB_KEYS: ActivityVerbVM[] = [
+  'class.created',
+  'classes.created',
+  'class.updated',
+  'classes.updated',
+  'class.archived',
+  'classes.archived',
+  'session.scheduled',
+  'sessions.scheduled',
+  'session.rescheduled',
+  'sessions.rescheduled',
+  'session.canceled',
+  'sessions.canceled',
+  'session.started',
+  'sessions.started',
+  'session.ended',
+  'sessions.ended',
+  'dm.posted',
+  'dms.posted',
+  'dm.edited',
+  'dms.edited',
+  'dm.deleted',
+  'dms.deleted',
+  'dm.reaction.added',
+  'dms.reactions.added',
+  'dm.reaction.removed',
+  'dms.reactions.removed',
+  'message.posted',
+  'messages.posted',
+  'message.edited',
+  'messages.edited',
+  'message.deleted',
+  'messages.deleted',
+  'reaction.added',
+  'reactions.added',
+  'reaction.removed',
+  'reactions.removed',
+  'homework.assigned',
+  'homeworks.assigned',
+  'homework.submitted',
+  'homeworks.submitted',
+  'homework.reviewed',
+  'homeworks.reviewed',
+  'summary.posted',
+  'summaries.posted',
+  'file.uploaded',
+  'files.uploaded',
+  'file.deleted',
+  'files.deleted',
+  'member.invited',
+  'members.invited',
+  'members.joined',
+  'members.removed',
+  'member.joined',
+  'member.removed',
+  'payment.reminder',
+  'payments.reminder',
+  'payment.reminder.sent',
+  'payments.reminder.sent',
+  'payment.received',
+  'payments.received',
+  'payment.failed',
+  'payments.failed',
+  'session.reminder.sent',
+  'sessions.reminder.sent',
+  'session.feedback_request.sent',
+  'sessions.feedback_request.sent',
+  'system.notice',
+  'systems.notice',
+];
+
+const ACTIVITY_VERB_CONTEXT_ORDER = [
+  'Class',
+  'Session',
+  'Direct Message',
+  'Channel Message',
+  'Homework',
+  'Files & Notes',
+  'Membership',
+  'Billing',
+  'System',
+  'Other',
+] as const;
+
+function resolveActivityVerbContext(
+  verb: ActivityVerbVM,
+): (typeof ACTIVITY_VERB_CONTEXT_ORDER)[number] {
+  if (verb.startsWith('class.') || verb.startsWith('classes.')) {
+    return 'Class';
+  }
+  if (verb.startsWith('session.') || verb.startsWith('sessions.')) {
+    return 'Session';
+  }
+  if (verb.startsWith('dm.') || verb.startsWith('dms.')) {
+    return 'Direct Message';
+  }
+  if (
+    verb.startsWith('message.') ||
+    verb.startsWith('messages.') ||
+    verb.startsWith('reaction.') ||
+    verb.startsWith('reactions.')
+  ) {
+    return 'Channel Message';
+  }
+  if (verb.startsWith('homework.') || verb.startsWith('homeworks.')) {
+    return 'Homework';
+  }
+  if (verb.startsWith('summary.') || verb.startsWith('summaries.')) {
+    return 'Session';
+  }
+  if (
+    verb.startsWith('file.') ||
+    verb.startsWith('files.') ||
+    verb.startsWith('notes.')
+  ) {
+    return 'Files & Notes';
+  }
+  if (
+    verb.startsWith('member.') ||
+    verb.startsWith('members.') ||
+    verb.startsWith('role.') ||
+    verb.startsWith('roles.')
+  ) {
+    return 'Membership';
+  }
+  if (verb.startsWith('payment.') || verb.startsWith('payments.')) {
+    return 'Billing';
+  }
+  if (verb.startsWith('system.') || verb.startsWith('systems.')) {
+    return 'System';
+  }
+  return 'Other';
+}
+
+function toTitleCaseToken(token: string): string {
+  if (!token.length) {
+    return token;
+  }
+  return token[0].toUpperCase() + token.slice(1).toLowerCase();
+}
+
+function formatActivityVerbLabel(verb: ActivityVerbVM): string {
+  if (verb === 'session.reminder.sent' || verb === 'sessions.reminder.sent') {
+    return 'Session - Reminders';
+  }
+  if (
+    verb === 'session.feedback_request.sent' ||
+    verb === 'sessions.feedback_request.sent'
+  ) {
+    return 'Session - Feedback Request';
+  }
+
+  return verb
+    .split('.')
+    .map((segment) =>
+      segment
+        .split('_')
+        .map((token) => {
+          if (token === 'dm' || token === 'dms') {
+            return 'Direct Message';
+          }
+          if (token === 'class' || token === 'classes') {
+            return 'Classroom';
+          }
+          return toTitleCaseToken(token);
+        })
+        .join(' '),
+    )
+    .join(' - ');
+}
+
+type VerbContext = (typeof ACTIVITY_VERB_CONTEXT_ORDER)[number];
+
+type ScopedVerbFamily = {
+  primaryKey: ActivityVerbVM;
+  keys: ActivityVerbVM[];
+  context: VerbContext;
+  label: string;
+};
+
+function singularizeVerbToken(token: string): string {
+  if (token === 'classes') {
+    return 'class';
+  }
+  if (token === 'class') {
+    return 'class';
+  }
+  if (token.endsWith('s')) {
+    return token.slice(0, -1);
+  }
+  return token;
+}
+
+function normalizeVerbSignature(verb: ActivityVerbVM): string {
+  return verb
+    .split('.')
+    .map((token) => singularizeVerbToken(token))
+    .join('.');
+}
 
 type NotificationsTabProps = {
   isGuardianOrAdmin: boolean;
@@ -76,7 +270,11 @@ type NotificationsTabProps = {
     scopeId: string;
   }) => Promise<void> | void;
   notificationScopedDefaults?: ScopedNotificationPreference[];
-  availableAlertChannels: Array<{ id: string; label: string }>;
+  availableAlertChannels: Array<{
+    id: string;
+    label: string;
+    kind?: 'channel' | 'dm' | 'group_dm';
+  }>;
   availableAlertLearningSpaces: Array<{ id: string; label: string }>;
 };
 
@@ -95,65 +293,13 @@ export function NotificationsTab({
   const sections = [
     {
       key: 'general',
-      title: 'General Notifications',
+      title: 'General',
       icon: Bell,
       items: defineNotificationItems([
-        {
-          key: 'defaults.message_updates',
-          label: 'Master message update setting',
-        },
         {
           key: 'defaults.weekly_digest',
           label: 'Weekly digest of class activity',
         },
-        { key: 'defaults.sms_reminders', label: 'SMS reminders for upcoming sessions' },
-        { key: 'system.alerts', label: 'System alerts and service notices' },
-      ]),
-    },
-    {
-      key: 'messages',
-      title: 'Messages',
-      icon: MessageCircle,
-      items: defineNotificationItems([
-        { key: 'dm.posted', label: 'Direct message posted' },
-        { key: 'dm.reaction.added', label: 'Direct message reaction added' },
-        { key: 'dm.reaction.removed', label: 'Direct message reaction removed' },
-        { key: 'message.posted', label: 'Channel/class message posted' },
-        { key: 'file.uploaded', label: 'File uploaded' },
-      ]),
-    },
-    {
-      key: 'schedule',
-      title: 'Schedule & Sessions',
-      icon: Clock,
-      items: defineNotificationItems([
-        { key: 'session.scheduled', label: 'Session scheduled' },
-        { key: 'session.rescheduled', label: 'Session rescheduled' },
-        { key: 'session.canceled', label: 'Session canceled' },
-        { key: 'session.started', label: 'Session started' },
-        { key: 'session.ended', label: 'Session ended' },
-        { key: 'session.completed', label: 'Session completed' },
-        { key: 'session.reminder.sent', label: 'Session reminder sent' },
-        {
-          key: 'session.feedback_request.sent',
-          label: 'Session feedback request sent',
-        },
-      ]),
-    },
-    {
-      key: 'classrooms',
-      title: 'Classrooms',
-      icon: BookOpen,
-      items: defineNotificationItems([
-        { key: 'class.created', label: 'Class created' },
-        { key: 'class.updated', label: 'Class updated' },
-        { key: 'class.archived', label: 'Class archived' },
-        { key: 'member.invited', label: 'Participant invited' },
-        { key: 'members.invited', label: 'Participants invited' },
-        { key: 'member.joined', label: 'Participant joined' },
-        { key: 'member.removed', label: 'Participant removed' },
-        { key: 'members.removed', label: 'Participants removed' },
-        { key: 'role.changed', label: 'Participant role changed' },
       ]),
     },
     ...(isGuardianOrAdmin
@@ -164,7 +310,6 @@ export function NotificationsTab({
             icon: Wallet,
             items: defineNotificationItems([
               { key: 'payment.reminder', label: 'Payment reminder' },
-              { key: 'payment.reminder.sent', label: 'Payment reminder sent' },
               { key: 'payment.received', label: 'Payment received' },
               { key: 'payment.failed', label: 'Payment failed' },
             ]),
@@ -172,20 +317,10 @@ export function NotificationsTab({
         ]
       : []),
     {
-      key: 'homework',
-      title: 'Homework',
-      icon: FileText,
-      items: defineNotificationItems([
-        { key: 'homework.assigned', label: 'Homework assigned' },
-      ]),
-    },
-    {
       key: 'system',
       title: 'System Verb Notifications',
       icon: Megaphone,
-      items: defineNotificationItems([
-        { key: 'system.notice', label: 'System notice events' },
-      ]),
+      items: defineNotificationItems([{ key: 'system.notice', label: 'System notices' }]),
     },
   ] satisfies NotificationSection[];
 
@@ -203,42 +338,130 @@ export function NotificationsTab({
     );
     return Object.fromEntries(entries);
   }, [notificationChannels, notificationKeys]);
-  const scopedVerbKeys = React.useMemo(
-    () =>
-      sections
-        .filter((section) => section.key !== 'general')
-        .flatMap((section) => section.items.map((item) => item.key)),
-    [sections],
-  );
   const scopedVerbLabels = React.useMemo(
     () =>
-      new Map(
-        sections
-          .filter((section) => section.key !== 'general')
-          .flatMap((section) =>
-            section.items.map((item) => [item.key, item.label] as const),
-          ),
+      new Map<string, string>(
+        ACTIVITY_SCOPED_VERB_KEYS.map((verb) => [verb, formatActivityVerbLabel(verb)]),
       ),
-    [sections],
+    [],
   );
+  const scopedVerbFamilies = React.useMemo(() => {
+    const verbsBySignature = new Map<string, ActivityVerbVM[]>();
+    for (const verb of ACTIVITY_SCOPED_VERB_KEYS) {
+      const signature = normalizeVerbSignature(verb);
+      const existing = verbsBySignature.get(signature) ?? [];
+      existing.push(verb);
+      verbsBySignature.set(signature, existing);
+    }
 
-  const [selectedScopedChannelId, setSelectedScopedChannelId] = React.useState<string>(
-    availableAlertChannels[0]?.id ?? '',
+    const families: ScopedVerbFamily[] = [];
+    for (const [signature, keys] of verbsBySignature.entries()) {
+      const primaryKey = (keys.find((key) => key === (signature as ActivityVerbVM)) ??
+        keys[0]) as ActivityVerbVM;
+      families.push({
+        primaryKey,
+        keys,
+        context: resolveActivityVerbContext(primaryKey),
+        label: scopedVerbLabels.get(primaryKey) ?? formatActivityVerbLabel(primaryKey),
+      });
+    }
+
+    families.sort(
+      (a, b) =>
+        ACTIVITY_SCOPED_VERB_KEYS.indexOf(a.primaryKey) -
+        ACTIVITY_SCOPED_VERB_KEYS.indexOf(b.primaryKey),
+    );
+    return families;
+  }, [scopedVerbLabels]);
+  const scopedVerbGroups = React.useMemo(() => {
+    const grouped = new Map<VerbContext, ScopedVerbFamily[]>();
+    for (const verbFamily of scopedVerbFamilies) {
+      const context = verbFamily.context;
+      const existing = grouped.get(context) ?? [];
+      existing.push(verbFamily);
+      grouped.set(context, existing);
+    }
+    return ACTIVITY_VERB_CONTEXT_ORDER.map((context) => ({
+      context,
+      verbs: grouped.get(context) ?? [],
+    })).filter((group) => group.verbs.length > 0);
+  }, [scopedVerbFamilies]);
+  const channelAlertVerbGroups = React.useMemo(
+    () =>
+      scopedVerbGroups
+        .filter(
+          (group) =>
+            group.context !== 'Direct Message' &&
+            group.context !== 'Class' &&
+            group.context !== 'Session' &&
+            group.context !== 'Homework' &&
+            group.context !== 'Billing' &&
+            group.context !== 'System',
+        )
+        .map((group) => ({
+          ...group,
+          verbs: group.verbs.filter(
+            (verbFamily) =>
+              !verbFamily.keys.includes('summary.posted') &&
+              !verbFamily.keys.includes('summaries.posted'),
+          ),
+        }))
+        .filter((group) => group.verbs.length > 0),
+    [scopedVerbGroups],
   );
+  const classroomAlertVerbGroups = React.useMemo(
+    () =>
+      scopedVerbGroups.filter(
+        (group) =>
+          group.context !== 'Direct Message' &&
+          group.context !== 'Billing' &&
+          group.context !== 'System',
+      ),
+    [scopedVerbGroups],
+  );
+  const availableNonDmAlertChannels = React.useMemo(
+    () =>
+      availableAlertChannels.filter(
+        (channel) => channel.kind !== 'dm' && channel.kind !== 'group_dm',
+      ),
+    [availableAlertChannels],
+  );
+  const availableDirectMessageAlertChannels = React.useMemo(
+    () =>
+      availableAlertChannels.filter(
+        (channel) => channel.kind === 'dm' || channel.kind === 'group_dm',
+      ),
+    [availableAlertChannels],
+  );
+  const directMessageAlertVerbGroups = React.useMemo(() => {
+    const directMessageGroups = scopedVerbGroups.filter(
+      (group) => group.context === 'Direct Message',
+    );
+    const dmFileVerbFamilies = scopedVerbFamilies.filter(
+      (verbFamily) =>
+        verbFamily.keys.includes('file.uploaded') ||
+        verbFamily.keys.includes('files.uploaded') ||
+        verbFamily.keys.includes('file.deleted') ||
+        verbFamily.keys.includes('files.deleted'),
+    );
+    if (!dmFileVerbFamilies.length) {
+      return directMessageGroups;
+    }
+    return [
+      ...directMessageGroups,
+      {
+        context: 'Files & Notes' as const,
+        verbs: dmFileVerbFamilies,
+      },
+    ];
+  }, [scopedVerbFamilies, scopedVerbGroups]);
+
+  const [selectedScopedChannelId, setSelectedScopedChannelId] =
+    React.useState<string>(GLOBAL_ALERT_SCOPE_ID);
+  const [selectedScopedDmChannelId, setSelectedScopedDmChannelId] =
+    React.useState<string>(GLOBAL_ALERT_SCOPE_ID);
   const [selectedScopedLearningSpaceId, setSelectedScopedLearningSpaceId] =
-    React.useState<string>(availableAlertLearningSpaces[0]?.id ?? '');
-
-  React.useEffect(() => {
-    if (!selectedScopedChannelId && availableAlertChannels[0]?.id) {
-      setSelectedScopedChannelId(availableAlertChannels[0].id);
-    }
-  }, [availableAlertChannels, selectedScopedChannelId]);
-
-  React.useEffect(() => {
-    if (!selectedScopedLearningSpaceId && availableAlertLearningSpaces[0]?.id) {
-      setSelectedScopedLearningSpaceId(availableAlertLearningSpaces[0].id);
-    }
-  }, [availableAlertLearningSpaces, selectedScopedLearningSpaceId]);
+    React.useState<string>(GLOBAL_ALERT_SCOPE_ID);
 
   const [, setPendingPreferenceToasts] = React.useState<Record<string, boolean>>({});
   const pendingToastTimers = React.useRef<Record<string, number>>({});
@@ -410,6 +633,165 @@ export function NotificationsTab({
     },
     [getScopedChannels],
   );
+  const getScopedChannelsForVerbFamily = React.useCallback(
+    (input: {
+      scopeKind: 'channel' | 'learning_space';
+      scopeId: string;
+      prefKeys: ActivityVerbVM[];
+    }): string[] =>
+      input.scopeId === GLOBAL_ALERT_SCOPE_ID
+        ? Array.from(
+            new Set(
+              input.prefKeys.flatMap((prefKey) => notificationChannels[prefKey] ?? []),
+            ),
+          )
+        : Array.from(
+            new Set(
+              input.prefKeys.flatMap((prefKey) =>
+                getScopedChannels({
+                  scopeKind: input.scopeKind,
+                  scopeId: input.scopeId,
+                  prefKey,
+                }),
+              ),
+            ),
+          ),
+    [getScopedChannels, notificationChannels],
+  );
+
+  const saveScopedPreferenceForVerbFamily = React.useCallback(
+    async (input: {
+      scopeKind: 'channel' | 'learning_space';
+      scopeId: string;
+      prefKeys: ActivityVerbVM[];
+      channels: string[];
+    }) => {
+      await Promise.all(
+        input.prefKeys.map((prefKey) =>
+          Promise.resolve(
+            saveScopedPreference({
+              scopeKind: input.scopeKind,
+              scopeId: input.scopeId,
+              prefKey,
+              channels: input.channels,
+            }),
+          ),
+        ),
+      );
+    },
+    [saveScopedPreference],
+  );
+
+  const savePreferenceForVerbFamily = React.useCallback(
+    async (input: {
+      scopeKind: 'channel' | 'learning_space';
+      scopeId: string;
+      prefKeys: ActivityVerbVM[];
+      channels: string[];
+    }) => {
+      if (input.scopeId === GLOBAL_ALERT_SCOPE_ID) {
+        onNotificationChannelsChange((prev) => {
+          const next = { ...prev };
+          input.prefKeys.forEach((prefKey) => {
+            next[prefKey] = input.channels;
+          });
+          return next;
+        });
+
+        if (!onNotificationPreferenceSave) {
+          return;
+        }
+
+        await Promise.all(
+          input.prefKeys.map((prefKey) =>
+            Promise.resolve(
+              onNotificationPreferenceSave({
+                profileId,
+                orgId,
+                prefKey,
+                channels: input.channels,
+              }),
+            ),
+          ),
+        );
+        return;
+      }
+
+      await saveScopedPreferenceForVerbFamily(input);
+    },
+    [
+      onNotificationChannelsChange,
+      onNotificationPreferenceSave,
+      orgId,
+      profileId,
+      saveScopedPreferenceForVerbFamily,
+    ],
+  );
+
+  const resetScopedPreferenceForVerbFamily = React.useCallback(
+    async (input: {
+      scopeKind: 'channel' | 'learning_space';
+      scopeId: string;
+      prefKeys: ActivityVerbVM[];
+    }) => {
+      await Promise.all(
+        input.prefKeys.map((prefKey) =>
+          Promise.resolve(
+            resetScopedPreference({
+              scopeKind: input.scopeKind,
+              scopeId: input.scopeId,
+              prefKey,
+            }),
+          ),
+        ),
+      );
+    },
+    [resetScopedPreference],
+  );
+  const resetPreferenceForVerbFamily = React.useCallback(
+    async (input: {
+      scopeKind: 'channel' | 'learning_space';
+      scopeId: string;
+      prefKeys: ActivityVerbVM[];
+    }) => {
+      if (input.scopeId === GLOBAL_ALERT_SCOPE_ID) {
+        onNotificationChannelsChange((prev) => {
+          const next = { ...prev };
+          input.prefKeys.forEach((prefKey) => {
+            next[prefKey] = [];
+          });
+          return next;
+        });
+
+        if (!onNotificationPreferenceSave) {
+          return;
+        }
+
+        await Promise.all(
+          input.prefKeys.map((prefKey) =>
+            Promise.resolve(
+              onNotificationPreferenceSave({
+                profileId,
+                orgId,
+                prefKey,
+                channels: [],
+              }),
+            ),
+          ),
+        );
+        return;
+      }
+
+      await resetScopedPreferenceForVerbFamily(input);
+    },
+    [
+      onNotificationChannelsChange,
+      onNotificationPreferenceSave,
+      orgId,
+      profileId,
+      resetScopedPreferenceForVerbFamily,
+    ],
+  );
 
   return (
     <div className="space-y-8 w-full">
@@ -491,221 +873,358 @@ export function NotificationsTab({
 
       <div className="space-y-3">
         <UserSettingsTabSection
-          icon={<MessageCircle className="h-5 w-5" />}
+          icon={<Bell className="h-5 w-5" />}
           title="Channel alerts"
           subtitle="Per-verb overrides for a specific channel"
           showSeparator={true}
         >
-          {availableAlertChannels.length ? (
-            <div className="space-y-3">
-              <Select
-                value={selectedScopedChannelId}
-                onValueChange={setSelectedScopedChannelId}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a channel" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableAlertChannels.map((channel) => (
-                    <SelectItem key={channel.id} value={channel.id}>
-                      {channel.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <div className="space-y-3">
+            <Select
+              value={selectedScopedChannelId}
+              onValueChange={setSelectedScopedChannelId}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select a channel" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={GLOBAL_ALERT_SCOPE_ID}>
+                  Global (all channels)
+                </SelectItem>
+                {availableNonDmAlertChannels.map((channel) => (
+                  <SelectItem key={channel.id} value={channel.id}>
+                    {channel.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-              {scopedVerbKeys.map((prefKey) => (
-                <div
-                  key={`channel-${prefKey}`}
-                  className="flex items-center justify-between gap-2"
-                >
-                  <span className="text-sm">
-                    {scopedVerbLabels.get(prefKey) ?? prefKey}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 gap-1 px-2 text-xs"
-                        >
-                          {formatScopedChannels({
-                            scopeKind: 'channel',
-                            scopeId: selectedScopedChannelId,
-                            prefKey,
+            {channelAlertVerbGroups.map((group) => (
+              <div key={`channel-group-${group.context}`} className="space-y-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {group.context}
+                </p>
+                {group.verbs.map((verbFamily) => (
+                  <div
+                    key={`channel-${verbFamily.primaryKey}`}
+                    className="flex items-center justify-between gap-2"
+                  >
+                    <span className="text-sm">{verbFamily.label}</span>
+                    <div className="flex items-center gap-2">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 gap-1 px-2 text-xs"
+                          >
+                            {formatScopedChannels({
+                              scopeKind: 'channel',
+                              scopeId: selectedScopedChannelId,
+                              prefKey: verbFamily.primaryKey,
+                            })}
+                            <ChevronDown className="h-3 w-3" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {notificationChannelOptions.map((option) => {
+                            const currentChannels = getScopedChannelsForVerbFamily({
+                              scopeKind: 'channel',
+                              scopeId: selectedScopedChannelId,
+                              prefKeys: verbFamily.keys,
+                            });
+                            const isChecked = currentChannels.includes(option.key);
+                            return (
+                              <DropdownMenuItem
+                                key={option.key}
+                                onSelect={(event) => event.preventDefault()}
+                                className="flex items-center justify-between gap-3"
+                              >
+                                <span>{option.label}</span>
+                                <Switch
+                                  checked={isChecked}
+                                  onCheckedChange={(checked) => {
+                                    const nextChannels = checked
+                                      ? [...currentChannels, option.key]
+                                      : currentChannels.filter(
+                                          (item) => item !== option.key,
+                                        );
+                                    void savePreferenceForVerbFamily({
+                                      scopeKind: 'channel',
+                                      scopeId: selectedScopedChannelId,
+                                      prefKeys: verbFamily.keys,
+                                      channels: Array.from(new Set(nextChannels)),
+                                    });
+                                  }}
+                                  aria-label={`${option.label} notifications for ${verbFamily.label}`}
+                                />
+                              </DropdownMenuItem>
+                            );
                           })}
-                          <ChevronDown className="h-3 w-3" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {notificationChannelOptions.map((option) => {
-                          const currentChannels = getScopedChannels({
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-xs"
+                        onClick={() =>
+                          void resetPreferenceForVerbFamily({
                             scopeKind: 'channel',
                             scopeId: selectedScopedChannelId,
-                            prefKey,
-                          });
-                          const isChecked = currentChannels.includes(option.key);
-                          return (
-                            <DropdownMenuItem
-                              key={option.key}
-                              onSelect={(event) => event.preventDefault()}
-                              className="flex items-center justify-between gap-3"
-                            >
-                              <span>{option.label}</span>
-                              <Switch
-                                checked={isChecked}
-                                onCheckedChange={(checked) => {
-                                  const nextChannels = checked
-                                    ? [...currentChannels, option.key]
-                                    : currentChannels.filter(
-                                        (item) => item !== option.key,
-                                      );
-                                  void saveScopedPreference({
-                                    scopeKind: 'channel',
-                                    scopeId: selectedScopedChannelId,
-                                    prefKey,
-                                    channels: Array.from(new Set(nextChannels)),
-                                  });
-                                }}
-                                aria-label={`${option.label} notifications for ${scopedVerbLabels.get(prefKey) ?? prefKey}`}
-                              />
-                            </DropdownMenuItem>
-                          );
-                        })}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 px-2 text-xs"
-                      onClick={() =>
-                        void resetScopedPreference({
-                          scopeKind: 'channel',
-                          scopeId: selectedScopedChannelId,
-                          prefKey,
-                        })
-                      }
-                    >
-                      Reset
-                    </Button>
+                            prefKeys: verbFamily.keys,
+                          })
+                        }
+                      >
+                        Reset
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">No channels available.</p>
-          )}
+                ))}
+              </div>
+            ))}
+            {availableNonDmAlertChannels.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No non-direct-message channels available for overrides.
+              </p>
+            ) : null}
+          </div>
         </UserSettingsTabSection>
       </div>
 
       <div className="space-y-3">
         <UserSettingsTabSection
-          icon={<BookOpen className="h-5 w-5" />}
+          icon={<Bell className="h-5 w-5" />}
+          title="Direct message alerts"
+          subtitle="Per-verb overrides for direct and group direct messages"
+          showSeparator={true}
+        >
+          <div className="space-y-3">
+            <Select
+              value={selectedScopedDmChannelId}
+              onValueChange={setSelectedScopedDmChannelId}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select a direct message" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={GLOBAL_ALERT_SCOPE_ID}>
+                  Global (all direct messages)
+                </SelectItem>
+                {availableDirectMessageAlertChannels.map((channel) => (
+                  <SelectItem key={channel.id} value={channel.id}>
+                    {channel.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {directMessageAlertVerbGroups.map((group) => (
+              <div key={`dm-group-${group.context}`} className="space-y-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {group.context}
+                </p>
+                {group.verbs.map((verbFamily) => (
+                  <div
+                    key={`dm-${verbFamily.primaryKey}`}
+                    className="flex items-center justify-between gap-2"
+                  >
+                    <span className="text-sm">{verbFamily.label}</span>
+                    <div className="flex items-center gap-2">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 gap-1 px-2 text-xs"
+                          >
+                            {formatScopedChannels({
+                              scopeKind: 'channel',
+                              scopeId: selectedScopedDmChannelId,
+                              prefKey: verbFamily.primaryKey,
+                            })}
+                            <ChevronDown className="h-3 w-3" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {notificationChannelOptions.map((option) => {
+                            const currentChannels = getScopedChannelsForVerbFamily({
+                              scopeKind: 'channel',
+                              scopeId: selectedScopedDmChannelId,
+                              prefKeys: verbFamily.keys,
+                            });
+                            const isChecked = currentChannels.includes(option.key);
+                            return (
+                              <DropdownMenuItem
+                                key={option.key}
+                                onSelect={(event) => event.preventDefault()}
+                                className="flex items-center justify-between gap-3"
+                              >
+                                <span>{option.label}</span>
+                                <Switch
+                                  checked={isChecked}
+                                  onCheckedChange={(checked) => {
+                                    const nextChannels = checked
+                                      ? [...currentChannels, option.key]
+                                      : currentChannels.filter(
+                                          (item) => item !== option.key,
+                                        );
+                                    void savePreferenceForVerbFamily({
+                                      scopeKind: 'channel',
+                                      scopeId: selectedScopedDmChannelId,
+                                      prefKeys: verbFamily.keys,
+                                      channels: Array.from(new Set(nextChannels)),
+                                    });
+                                  }}
+                                  aria-label={`${option.label} notifications for ${verbFamily.label}`}
+                                />
+                              </DropdownMenuItem>
+                            );
+                          })}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-xs"
+                        onClick={() =>
+                          void resetPreferenceForVerbFamily({
+                            scopeKind: 'channel',
+                            scopeId: selectedScopedDmChannelId,
+                            prefKeys: verbFamily.keys,
+                          })
+                        }
+                      >
+                        Reset
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
+            {availableDirectMessageAlertChannels.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No direct message channels available for overrides.
+              </p>
+            ) : null}
+          </div>
+        </UserSettingsTabSection>
+      </div>
+
+      <div className="space-y-3">
+        <UserSettingsTabSection
+          icon={<Megaphone className="h-5 w-5" />}
           title="Classroom alerts"
           subtitle="Per-verb overrides for a specific classroom"
           showSeparator={false}
         >
-          {availableAlertLearningSpaces.length ? (
-            <div className="space-y-3">
-              <Select
-                value={selectedScopedLearningSpaceId}
-                onValueChange={setSelectedScopedLearningSpaceId}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a classroom" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableAlertLearningSpaces.map((space) => (
-                    <SelectItem key={space.id} value={space.id}>
-                      {space.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <div className="space-y-3">
+            <Select
+              value={selectedScopedLearningSpaceId}
+              onValueChange={setSelectedScopedLearningSpaceId}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select a classroom" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={GLOBAL_ALERT_SCOPE_ID}>
+                  Global (all classrooms)
+                </SelectItem>
+                {availableAlertLearningSpaces.map((space) => (
+                  <SelectItem key={space.id} value={space.id}>
+                    {space.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-              {scopedVerbKeys.map((prefKey) => (
-                <div
-                  key={`learning-space-${prefKey}`}
-                  className="flex items-center justify-between gap-2"
-                >
-                  <span className="text-sm">
-                    {scopedVerbLabels.get(prefKey) ?? prefKey}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 gap-1 px-2 text-xs"
-                        >
-                          {formatScopedChannels({
-                            scopeKind: 'learning_space',
-                            scopeId: selectedScopedLearningSpaceId,
-                            prefKey,
+            {classroomAlertVerbGroups.map((group) => (
+              <div key={`learning-space-group-${group.context}`} className="space-y-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {group.context}
+                </p>
+                {group.verbs.map((verbFamily) => (
+                  <div
+                    key={`learning-space-${verbFamily.primaryKey}`}
+                    className="flex items-center justify-between gap-2"
+                  >
+                    <span className="text-sm">{verbFamily.label}</span>
+                    <div className="flex items-center gap-2">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 gap-1 px-2 text-xs"
+                          >
+                            {formatScopedChannels({
+                              scopeKind: 'learning_space',
+                              scopeId: selectedScopedLearningSpaceId,
+                              prefKey: verbFamily.primaryKey,
+                            })}
+                            <ChevronDown className="h-3 w-3" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {notificationChannelOptions.map((option) => {
+                            const currentChannels = getScopedChannelsForVerbFamily({
+                              scopeKind: 'learning_space',
+                              scopeId: selectedScopedLearningSpaceId,
+                              prefKeys: verbFamily.keys,
+                            });
+                            const isChecked = currentChannels.includes(option.key);
+                            return (
+                              <DropdownMenuItem
+                                key={option.key}
+                                onSelect={(event) => event.preventDefault()}
+                                className="flex items-center justify-between gap-3"
+                              >
+                                <span>{option.label}</span>
+                                <Switch
+                                  checked={isChecked}
+                                  onCheckedChange={(checked) => {
+                                    const nextChannels = checked
+                                      ? [...currentChannels, option.key]
+                                      : currentChannels.filter(
+                                          (item) => item !== option.key,
+                                        );
+                                    void savePreferenceForVerbFamily({
+                                      scopeKind: 'learning_space',
+                                      scopeId: selectedScopedLearningSpaceId,
+                                      prefKeys: verbFamily.keys,
+                                      channels: Array.from(new Set(nextChannels)),
+                                    });
+                                  }}
+                                  aria-label={`${option.label} notifications for ${verbFamily.label}`}
+                                />
+                              </DropdownMenuItem>
+                            );
                           })}
-                          <ChevronDown className="h-3 w-3" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {notificationChannelOptions.map((option) => {
-                          const currentChannels = getScopedChannels({
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-xs"
+                        onClick={() =>
+                          void resetPreferenceForVerbFamily({
                             scopeKind: 'learning_space',
                             scopeId: selectedScopedLearningSpaceId,
-                            prefKey,
-                          });
-                          const isChecked = currentChannels.includes(option.key);
-                          return (
-                            <DropdownMenuItem
-                              key={option.key}
-                              onSelect={(event) => event.preventDefault()}
-                              className="flex items-center justify-between gap-3"
-                            >
-                              <span>{option.label}</span>
-                              <Switch
-                                checked={isChecked}
-                                onCheckedChange={(checked) => {
-                                  const nextChannels = checked
-                                    ? [...currentChannels, option.key]
-                                    : currentChannels.filter(
-                                        (item) => item !== option.key,
-                                      );
-                                  void saveScopedPreference({
-                                    scopeKind: 'learning_space',
-                                    scopeId: selectedScopedLearningSpaceId,
-                                    prefKey,
-                                    channels: Array.from(new Set(nextChannels)),
-                                  });
-                                }}
-                                aria-label={`${option.label} notifications for ${scopedVerbLabels.get(prefKey) ?? prefKey}`}
-                              />
-                            </DropdownMenuItem>
-                          );
-                        })}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 px-2 text-xs"
-                      onClick={() =>
-                        void resetScopedPreference({
-                          scopeKind: 'learning_space',
-                          scopeId: selectedScopedLearningSpaceId,
-                          prefKey,
-                        })
-                      }
-                    >
-                      Reset
-                    </Button>
+                            prefKeys: verbFamily.keys,
+                          })
+                        }
+                      >
+                        Reset
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">No classrooms available.</p>
-          )}
+                ))}
+              </div>
+            ))}
+            {availableAlertLearningSpaces.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No classrooms available for overrides.
+              </p>
+            ) : null}
+          </div>
         </UserSettingsTabSection>
       </div>
     </div>

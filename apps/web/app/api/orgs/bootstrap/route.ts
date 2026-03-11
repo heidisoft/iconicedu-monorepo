@@ -7,6 +7,8 @@ import {
   getUserRoles,
   upsertUserRole,
 } from '@iconicedu/web/lib/profile/queries/roles.query';
+import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import { seedSignupDefaultNotificationPreferences } from '@iconicedu/web/lib/profile/queries/notification-defaults-seed.query';
 import { updateAccountRoleState } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { buildAuthOnboardingState } from '@iconicedu/web/lib/onboarding/auth-state';
 import { getOrgBySlug } from '@iconicedu/web/lib/org/queries/org.query';
@@ -35,8 +37,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         success: false,
-        message:
-          'Slug must use lowercase letters, numbers, and hyphens only.',
+        message: 'Slug must use lowercase letters, numbers, and hyphens only.',
       },
       { status: 400 },
     );
@@ -48,7 +49,10 @@ export async function POST(request: Request) {
   } = await sessionSupabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json(
+      { success: false, message: 'Unauthorized' },
+      { status: 401 },
+    );
   }
 
   const serviceSupabase = createSupabaseServiceClient();
@@ -106,6 +110,28 @@ export async function POST(request: Request) {
     );
   }
 
+  const profileResponse = await getProfileByAccountId(serviceSupabase, account.id);
+  if (profileResponse.error) {
+    return NextResponse.json(
+      { success: false, message: profileResponse.error.message },
+      { status: 500 },
+    );
+  }
+
+  if (profileResponse.data?.id) {
+    const seedResponse = await seedSignupDefaultNotificationPreferences(
+      serviceSupabase,
+      org.id,
+      profileResponse.data.id,
+    );
+    if (seedResponse.error) {
+      return NextResponse.json(
+        { success: false, message: seedResponse.error.message },
+        { status: 500 },
+      );
+    }
+  }
+
   const now = new Date().toISOString();
   const accountRoleStateResponse = await updateAccountRoleState(serviceSupabase, {
     accountId: account.id,
@@ -121,8 +147,7 @@ export async function POST(request: Request) {
       {
         success: false,
         message:
-          accountRoleStateResponse.error?.message ??
-          'Unable to update account role.',
+          accountRoleStateResponse.error?.message ?? 'Unable to update account role.',
       },
       { status: 500 },
     );

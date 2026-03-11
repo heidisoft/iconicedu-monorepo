@@ -24,6 +24,7 @@ import {
 } from '@iconicedu/web/lib/profile/derive';
 import { getAccountById } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { getNotificationDefaults } from '@iconicedu/web/lib/profile/queries/notification-defaults.query';
+import { seedSignupDefaultNotificationPreferences } from '@iconicedu/web/lib/profile/queries/notification-defaults-seed.query';
 import { getNotificationScopedDefaults } from '@iconicedu/web/lib/profile/queries/notification-scoped-defaults.query';
 import { getPresence } from '@iconicedu/web/lib/profile/queries/presence.query';
 import { mapProfilePresenceRowToVM } from '@iconicedu/web/lib/profile/mappers/presence.mapper';
@@ -71,6 +72,7 @@ export async function buildSidebarUser(
   });
 
   let profileRow = profileResponse.data as ProfileRow | null;
+  let createdProfile = false;
   const externalAvatarUrl = resolveExternalAvatarUrl(user);
   const inviteRow =
     familyInvite ??
@@ -122,15 +124,28 @@ export async function buildSidebarUser(
       }
 
       profileRow = fallback.data ?? null;
+      createdProfile = Boolean(profileRow);
     } else if (upserted.error) {
       throw upserted.error;
     } else {
       profileRow = upserted.data ?? null;
+      createdProfile = Boolean(profileRow);
     }
   }
 
   if (!profileRow) {
     throw new Error('Profile record missing for authenticated user.');
+  }
+
+  if (createdProfile) {
+    const seedResponse = await seedSignupDefaultNotificationPreferences(
+      supabase,
+      profileRow.org_id,
+      profileRow.id,
+    );
+    if (seedResponse.error) {
+      throw seedResponse.error;
+    }
   }
 
   if (

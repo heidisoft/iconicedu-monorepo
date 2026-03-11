@@ -63,6 +63,18 @@ export async function loadSidebarContext(
             (participant) => participant.ids.id === profileVM.ids.id,
           ),
         );
+  const baseAlertChannels = input.baseSidebarData.collections.alertChannels ?? [];
+  const nonDmAlertChannels = baseAlertChannels.filter(
+    (channel) => channel.basics.kind !== 'dm' && channel.basics.kind !== 'group_dm',
+  );
+  const alertChannels = Array.from(
+    new Map(
+      [...nonDmAlertChannels, ...directMessages].map((channel) => [
+        channel.ids.id,
+        channel,
+      ]),
+    ).values(),
+  );
   const organizations = await resolveSidebarOrganizations(
     supabase,
     input.authUser.id,
@@ -113,6 +125,7 @@ export async function loadSidebarContext(
       collections: {
         ...input.baseSidebarData.collections,
         directMessages,
+        alertChannels,
       },
       organizations,
     },
@@ -170,10 +183,11 @@ async function resolveGuardianDirectMessages(
   },
   profileVM: Extract<UserProfileVM, { kind: 'guardian' }>,
 ) {
-  const guardianChannels = input.baseSidebarData.collections.directMessages.filter((channel) =>
-    channel.collections.participants.some(
-      (participant) => participant.ids.id === profileVM.ids.id,
-    ),
+  const guardianChannels = input.baseSidebarData.collections.directMessages.filter(
+    (channel) =>
+      channel.collections.participants.some(
+        (participant) => participant.ids.id === profileVM.ids.id,
+      ),
   );
 
   const childAccountIds = (profileVM.children?.items ?? [])

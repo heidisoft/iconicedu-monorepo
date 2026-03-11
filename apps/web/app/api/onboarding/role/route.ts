@@ -7,12 +7,16 @@ import {
   getAccountByAuthUserId,
   updateAccountRoleState,
 } from '@iconicedu/web/lib/accounts/queries/accounts.query';
-import { getUserRoles, upsertUserRole } from '@iconicedu/web/lib/profile/queries/roles.query';
+import {
+  getUserRoles,
+  upsertUserRole,
+} from '@iconicedu/web/lib/profile/queries/roles.query';
 import {
   getProfileByAccountId,
   insertProfileForAccount,
   updateProfileForAccount,
 } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import { seedSignupDefaultNotificationPreferences } from '@iconicedu/web/lib/profile/queries/notification-defaults-seed.query';
 import { buildAuthOnboardingState } from '@iconicedu/web/lib/onboarding/auth-state';
 import { resolveOrgDashboardPath } from '@iconicedu/web/lib/org/resolve-dashboard-path';
 import { resolveOrgLoginPath } from '@iconicedu/web/lib/org/resolve-auth-path';
@@ -21,7 +25,12 @@ import { getDefaultOrg, getOrgBySlug } from '@iconicedu/web/lib/org/queries/org.
 type RoleChoice = 'parent' | 'educator' | 'student' | 'staff';
 
 function parseRole(value: unknown): RoleChoice | null {
-  if (value === 'parent' || value === 'educator' || value === 'student' || value === 'staff') {
+  if (
+    value === 'parent' ||
+    value === 'educator' ||
+    value === 'student' ||
+    value === 'staff'
+  ) {
     return value;
   }
   return null;
@@ -72,12 +81,16 @@ async function resolveOrgIdForUser(input: {
 }
 
 export async function POST(request: Request) {
-  const body = (await request.json().catch(() => null)) as
-    | { role?: unknown; staffAccessCode?: unknown }
-    | null;
+  const body = (await request.json().catch(() => null)) as {
+    role?: unknown;
+    staffAccessCode?: unknown;
+  } | null;
   const role = parseRole(body?.role);
   if (!role) {
-    return NextResponse.json({ success: false, message: 'Valid role is required' }, { status: 400 });
+    return NextResponse.json(
+      { success: false, message: 'Valid role is required' },
+      { status: 400 },
+    );
   }
 
   if (role === 'student') {
@@ -93,7 +106,10 @@ export async function POST(request: Request) {
   } = await sessionSupabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json(
+      { success: false, message: 'Unauthorized' },
+      { status: 401 },
+    );
   }
 
   const serviceSupabase = createSupabaseServiceClient();
@@ -140,6 +156,7 @@ export async function POST(request: Request) {
   const roleStatus = role === 'educator' ? 'pending' : 'active';
 
   const currentProfile = await getProfileByAccountId(serviceSupabase, account.id);
+  let profileId = currentProfile.data?.id ?? null;
   const profilePayload = {
     orgId: account.org_id,
     accountId: account.id,
@@ -164,6 +181,21 @@ export async function POST(request: Request) {
     if (profileResponse.error) {
       return NextResponse.json(
         { success: false, message: profileResponse.error.message },
+        { status: 500 },
+      );
+    }
+    profileId = profileResponse.data?.id ?? profileId;
+  }
+
+  if (profileId) {
+    const seedResponse = await seedSignupDefaultNotificationPreferences(
+      serviceSupabase,
+      account.org_id,
+      profileId,
+    );
+    if (seedResponse.error) {
+      return NextResponse.json(
+        { success: false, message: seedResponse.error.message },
         { status: 500 },
       );
     }
@@ -205,7 +237,10 @@ export async function POST(request: Request) {
 
   const rolesResponse = await getUserRoles(serviceSupabase, account.id, account.org_id);
   if (rolesResponse.error) {
-    return NextResponse.json({ success: false, message: rolesResponse.error.message }, { status: 500 });
+    return NextResponse.json(
+      { success: false, message: rolesResponse.error.message },
+      { status: 500 },
+    );
   }
 
   const onboarding = buildAuthOnboardingState(
