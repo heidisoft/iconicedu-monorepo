@@ -8,6 +8,7 @@ import {
   applyScheduleActivityLocalTime,
   applySessionParentLocalHeadline,
   buildUnreadTabCounts,
+  limitSectionsByItemCount,
   resolveReadIdsForActivity,
 } from './inbox-container';
 import type { ActivityFeedSectionVM, ActivityFeedTabVM } from '@iconicedu/shared-types';
@@ -319,6 +320,46 @@ describe('buildUnreadTabCounts', () => {
     expect(counts.classes).toBe(2);
     expect(counts.payment).toBe(0);
     expect(counts.system).toBe(0);
+  });
+});
+
+describe('limitSectionsByItemCount', () => {
+  it('limits items across sections while preserving section order', () => {
+    const sections: ActivityFeedSectionVM[] = [
+      {
+        label: 'Today',
+        items: [SECTIONS[0]!.items[0]!, SECTIONS[0]!.items[1]!],
+      },
+      {
+        label: 'This week',
+        items: [SECTIONS[0]!.items[0]!],
+      },
+    ];
+
+    const limited = limitSectionsByItemCount(sections, 2);
+
+    expect(limited).toHaveLength(1);
+    expect(limited[0]?.label).toBe('Today');
+    expect(limited[0]?.items).toHaveLength(2);
+  });
+
+  it('includes next section when remaining capacity exists', () => {
+    const sections: ActivityFeedSectionVM[] = [
+      {
+        label: 'Today',
+        items: [SECTIONS[0]!.items[0]!],
+      },
+      {
+        label: 'Yesterday',
+        items: [SECTIONS[0]!.items[1]!],
+      },
+    ];
+
+    const limited = limitSectionsByItemCount(sections, 2);
+
+    expect(limited).toHaveLength(2);
+    expect(limited[0]?.items).toHaveLength(1);
+    expect(limited[1]?.items).toHaveLength(1);
   });
 });
 

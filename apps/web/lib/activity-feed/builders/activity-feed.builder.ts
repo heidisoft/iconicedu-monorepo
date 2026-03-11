@@ -573,10 +573,13 @@ function buildActivitySections(items: ActivityFeedItemVM[]) {
   const now = new Date();
   const startOfToday = new Date(now);
   startOfToday.setHours(0, 0, 0, 0);
+  const startOfYesterday = new Date(startOfToday);
+  startOfYesterday.setDate(startOfYesterday.getDate() - 1);
   const startOfWeek = new Date(startOfToday);
   startOfWeek.setDate(startOfWeek.getDate() - 7);
 
   const today: ActivityFeedItemVM[] = [];
+  const yesterday: ActivityFeedItemVM[] = [];
   const thisWeek: ActivityFeedItemVM[] = [];
   const older: ActivityFeedItemVM[] = [];
 
@@ -584,6 +587,11 @@ function buildActivitySections(items: ActivityFeedItemVM[]) {
     const occurredAt = new Date(item.timestamps.occurredAt);
     if (occurredAt >= startOfToday) {
       today.push(item);
+      return;
+    }
+
+    if (occurredAt >= startOfYesterday) {
+      yesterday.push(item);
       return;
     }
 
@@ -598,6 +606,9 @@ function buildActivitySections(items: ActivityFeedItemVM[]) {
   const sections = [];
   if (today.length) {
     sections.push({ label: 'Today', items: today });
+  }
+  if (yesterday.length) {
+    sections.push({ label: 'Yesterday', items: yesterday });
   }
   if (thisWeek.length) {
     sections.push({ label: 'This week', items: thisWeek });

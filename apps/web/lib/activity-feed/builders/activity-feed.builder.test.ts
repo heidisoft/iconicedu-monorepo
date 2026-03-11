@@ -125,6 +125,85 @@ describe('buildActivityFeedForProfile', () => {
     expect(feed.unreadCount).toBe(1);
   });
 
+  it('splits sections into Today, Yesterday, This week and Earlier', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-11T12:00:00.000Z'));
+    getActivityFeedItemsByOrg.mockResolvedValue({
+      data: [
+        {
+          id: 'today-item',
+          org_id: 'org-1',
+          recipient_profile_id: 'profile-1',
+          kind: 'leaf',
+          occurred_at: '2026-03-11T09:00:00.000Z',
+          created_at: '2026-03-11T09:00:00.000Z',
+          tab_key: 'classes',
+          audience: { scope: { kind: 'global' }, visibility: 'public' },
+          verb: 'class.created',
+          actor_profile_id: 'actor-1',
+          refs: {},
+          content: { headline: { primary: 'Today item' } },
+          updated_at: '2026-03-11T09:00:00.000Z',
+        },
+        {
+          id: 'yesterday-item',
+          org_id: 'org-1',
+          recipient_profile_id: 'profile-1',
+          kind: 'leaf',
+          occurred_at: '2026-03-10T09:00:00.000Z',
+          created_at: '2026-03-10T09:00:00.000Z',
+          tab_key: 'classes',
+          audience: { scope: { kind: 'global' }, visibility: 'public' },
+          verb: 'class.created',
+          actor_profile_id: 'actor-1',
+          refs: {},
+          content: { headline: { primary: 'Yesterday item' } },
+          updated_at: '2026-03-10T09:00:00.000Z',
+        },
+        {
+          id: 'this-week-item',
+          org_id: 'org-1',
+          recipient_profile_id: 'profile-1',
+          kind: 'leaf',
+          occurred_at: '2026-03-08T09:00:00.000Z',
+          created_at: '2026-03-08T09:00:00.000Z',
+          tab_key: 'classes',
+          audience: { scope: { kind: 'global' }, visibility: 'public' },
+          verb: 'class.created',
+          actor_profile_id: 'actor-1',
+          refs: {},
+          content: { headline: { primary: 'This week item' } },
+          updated_at: '2026-03-08T09:00:00.000Z',
+        },
+        {
+          id: 'earlier-item',
+          org_id: 'org-1',
+          recipient_profile_id: 'profile-1',
+          kind: 'leaf',
+          occurred_at: '2026-02-20T09:00:00.000Z',
+          created_at: '2026-02-20T09:00:00.000Z',
+          tab_key: 'classes',
+          audience: { scope: { kind: 'global' }, visibility: 'public' },
+          verb: 'class.created',
+          actor_profile_id: 'actor-1',
+          refs: {},
+          content: { headline: { primary: 'Earlier item' } },
+          updated_at: '2026-02-20T09:00:00.000Z',
+        },
+      ],
+    });
+
+    const feed = await buildActivityFeedForProfile({} as never, 'org-1', 'profile-1');
+
+    expect(feed.sections.map((section) => section.label)).toEqual([
+      'Today',
+      'Yesterday',
+      'This week',
+      'Earlier',
+    ]);
+    vi.useRealTimers();
+  });
+
   it('sorts grouped sub-activities from most recent to oldest', async () => {
     getActivityFeedItemsByOrg.mockResolvedValue({
       data: [

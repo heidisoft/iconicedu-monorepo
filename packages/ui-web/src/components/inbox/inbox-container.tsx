@@ -18,6 +18,39 @@ import type {
   InboxTabKeyVM,
 } from '@iconicedu/shared-types';
 
+const INBOX_PAGE_SIZE = 20;
+
+export function limitSectionsByItemCount(
+  sections: ActivityFeedSectionVM[],
+  maxItems: number,
+): ActivityFeedSectionVM[] {
+  if (maxItems <= 0) {
+    return [];
+  }
+
+  let remaining = maxItems;
+  const limited: ActivityFeedSectionVM[] = [];
+
+  for (const section of sections) {
+    if (remaining <= 0) {
+      break;
+    }
+
+    const items = section.items.slice(0, remaining);
+    if (!items.length) {
+      continue;
+    }
+
+    limited.push({
+      ...section,
+      items,
+    });
+    remaining -= items.length;
+  }
+
+  return limited;
+}
+
 function getItemReadIds(item: ActivityFeedItemVM): string[] {
   const metadataReadIds = Array.isArray(item.metadata?.readItemIds)
     ? item.metadata.readItemIds
@@ -351,8 +384,10 @@ export function InboxContainer({
 }) {
   const [sections, setSections] = useState(feed.sections);
   const [activeTab, setActiveTab] = useState<InboxTabKeyVM>(feed.activeTab);
+  const [visibleItemCount, setVisibleItemCount] = useState(INBOX_PAGE_SIZE);
   const pendingAutoReadIdsRef = useRef<Set<string>>(new Set());
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   const applyReadState = useCallback((ids: string[]) => {
     setSections((prev) => applyReadStateToSections(prev, ids));
@@ -404,6 +439,41 @@ export function InboxContainer({
       ),
     }))
     .filter((section) => section.items.length > 0);
+  const filteredItemCount = filteredSections.reduce(
+    (total, section) => total + section.items.length,
+    0,
+  );
+  const hasMore = filteredItemCount > visibleItemCount;
+  const visibleSections = limitSectionsByItemCount(filteredSections, visibleItemCount);
+
+  useEffect(() => {
+    setVisibleItemCount(INBOX_PAGE_SIZE);
+  }, [activeTab, sections]);
+
+  useEffect(() => {
+    if (!hasMore) {
+      return;
+    }
+
+    const target = loadMoreRef.current;
+    if (!target || typeof IntersectionObserver === 'undefined') {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setVisibleItemCount((current) =>
+            Math.min(current + INBOX_PAGE_SIZE, filteredItemCount),
+          );
+        }
+      },
+      { rootMargin: '200px 0px', threshold: 0.1 },
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [filteredItemCount, hasMore, visibleItemCount]);
 
   const handleTabChange = (value: string) => {
     setActiveTab(value as InboxTabKeyVM);
@@ -508,7 +578,7 @@ export function InboxContainer({
       <TabsContent value={activeTab} className="mt-0">
         <ScrollArea className="h-[calc(100vh-180px)]">
           <div className="p-4 space-y-8">
-            {filteredSections.map((section) => (
+            {visibleSections.map((section) => (
               <div key={section.label} className="space-y-1">
                 <h2 className="sticky top-0 z-30 -mx-4 mb-4 bg-background/95 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground shadow-sm backdrop-blur">
                   {section.label}
@@ -522,6 +592,9 @@ export function InboxContainer({
                 </div>
               </div>
             ))}
+            {hasMore ? (
+              <div ref={loadMoreRef} aria-hidden className="h-6 w-full" />
+            ) : null}
           </div>
         </ScrollArea>
       </TabsContent>
