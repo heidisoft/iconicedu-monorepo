@@ -21,7 +21,12 @@
       "Bash(pnpm --filter web --filter @iconicedu/ui-web add -D @vitest/coverage-v8)",
       "Bash(pnpm --filter web --filter @iconicedu/ui-web add -D @vitest/coverage-v8@^3.2.4)",
       "WebFetch(domain:www.npmjs.com)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(pnpm --filter mobile test -- --testPathPattern=\"pulse-box\")",
+      "WebFetch(domain:expo.dev)",
+      "Bash(npx expo install --fix)",
+      "Bash(pnpm test:mobile)",
+      "Bash(pnpm test:web)"
     ],
     "additionalDirectories": [
       "/Users/hwanigasooriya/Workspace/hobby/iconicedu-monorepo/supabase/migrations"
