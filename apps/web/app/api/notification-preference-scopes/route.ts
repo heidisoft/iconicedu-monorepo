@@ -16,6 +16,12 @@ function isScopeKind(value: unknown): value is ScopeKind {
   return value === 'channel' || value === 'learning_space';
 }
 
+function normalizeNotificationChannels(channels: string[]) {
+  return channels
+    .map((channel) => (channel === 'text' ? 'sms' : channel))
+    .filter((channel) => ['push', 'email', 'sms', 'whatsapp'].includes(channel));
+}
+
 async function requireOwnerContext() {
   const supabase = await createSupabaseServerClient();
   const authUser = await requireAuthedUser(supabase);
@@ -161,6 +167,7 @@ export async function POST(request: Request) {
     });
 
     const now = new Date().toISOString();
+    const channels = normalizeNotificationChannels(body.channels);
     const response = await owner.supabase
       .from('notification_preference_scopes')
       .upsert(
@@ -170,11 +177,11 @@ export async function POST(request: Request) {
           scope_kind: scopeKind,
           scope_id: scopeId,
           pref_key: body.prefKey,
-          channels: body.channels,
+          channels,
           muted:
             typeof body.muted === 'boolean'
               ? body.muted
-              : body.channels.length === 0
+              : channels.length === 0
                 ? true
                 : null,
           updated_at: now,
@@ -203,7 +210,7 @@ export async function POST(request: Request) {
         scopeKind: response.data.scope_kind,
         scopeId: response.data.scope_id,
         prefKey: response.data.pref_key,
-        channels: response.data.channels ?? [],
+        channels: normalizeNotificationChannels(response.data.channels ?? []),
         muted: response.data.muted ?? null,
       },
     });

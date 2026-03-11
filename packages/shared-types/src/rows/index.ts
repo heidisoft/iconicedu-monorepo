@@ -11,6 +11,7 @@ export * from './family-link-invite';
 export * from './learning-space';
 export * from './message';
 export * from './message-session-feedback';
+export * from './notification-dispatch-job';
 export * from './org';
 export * from './profile';
 export * from './reminder-job';

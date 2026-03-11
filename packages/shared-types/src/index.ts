@@ -13,6 +13,7 @@ export * from './vm/roles';
 export * from './vm/family';
 export * from './vm/account';
 export * from './vm/profile';
+export * from './vm/notification';
 export * from './vm/family-link-invite';
 export * from './vm/learning-space';
 export * from './vm/org';

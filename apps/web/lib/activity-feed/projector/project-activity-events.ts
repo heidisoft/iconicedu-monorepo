@@ -3,6 +3,7 @@ import type { SupabaseServiceClient } from '@iconicedu/web/lib/supabase/service'
 
 import { getActivityEventDefinition } from '@iconicedu/web/lib/activity-feed/definitions/activity-definitions';
 import { shouldReplaceGroupParent } from '@iconicedu/web/lib/activity-feed/projector/group-parent-priority';
+import { enqueueNotificationDispatchJobs } from '@iconicedu/web/lib/notifications/dispatch-jobs';
 
 const MAX_ATTEMPTS = 10;
 
@@ -224,6 +225,11 @@ async function projectEvent(supabase: SupabaseServiceClient, event: ActivityEven
 
   const rendered = definition.render(event);
   const recipientProfileIds = await definition.resolveRecipients(supabase, event);
+  await enqueueNotificationDispatchJobs({
+    supabase,
+    event,
+    recipientProfileIds,
+  });
   const refs = {
     actor: null,
     object: event.object_ref ?? undefined,

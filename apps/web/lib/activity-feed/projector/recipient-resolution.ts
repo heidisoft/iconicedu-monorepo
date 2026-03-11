@@ -52,91 +52,6 @@ function applyRecipientExclusions(
   return unique(recipients.filter((recipientId) => !excludedIds.has(recipientId)));
 }
 
-async function applyNotificationPreferenceFiltering(
-  supabase: SupabaseServiceClient,
-  event: ActivityEventRow,
-  recipients: string[],
-) {
-  if (!recipients.length) {
-    return recipients;
-  }
-
-  const scope = asRecord(event.scope);
-  const scopeKind =
-    scope.kind === 'channel'
-      ? 'channel'
-      : scope.kind === 'learning_space'
-        ? 'learning_space'
-        : null;
-  const scopeId =
-    scope.kind === 'channel'
-      ? typeof scope.channelId === 'string'
-        ? scope.channelId
-        : null
-      : scope.kind === 'learning_space'
-        ? typeof scope.learningSpaceId === 'string'
-          ? scope.learningSpaceId
-          : null
-        : null;
-
-  const [scopedResponse, globalResponse] = await Promise.all([
-    scopeKind && scopeId
-      ? supabase
-          .from('notification_preference_scopes')
-          .select('profile_id, channels, muted')
-          .eq('org_id', event.org_id)
-          .eq('pref_key', event.event_type)
-          .eq('scope_kind', scopeKind)
-          .eq('scope_id', scopeId)
-          .in('profile_id', recipients)
-          .is('deleted_at', null)
-          .returns<
-            Array<{
-              profile_id: string;
-              channels: string[] | null;
-              muted?: boolean | null;
-            }>
-          >()
-      : Promise.resolve({ data: [], error: null }),
-    supabase
-      .from('notification_preferences')
-      .select('profile_id, channels, muted')
-      .eq('org_id', event.org_id)
-      .eq('pref_key', event.event_type)
-      .in('profile_id', recipients)
-      .is('deleted_at', null)
-      .returns<
-        Array<{ profile_id: string; channels: string[] | null; muted?: boolean | null }>
-      >(),
-  ]);
-
-  if (scopedResponse.error) {
-    throw new Error(scopedResponse.error.message);
-  }
-  if (globalResponse.error) {
-    throw new Error(globalResponse.error.message);
-  }
-
-  const scopedByProfileId = new Map(
-    (scopedResponse.data ?? []).map((row) => [row.profile_id, row]),
-  );
-  const globalByProfileId = new Map(
-    (globalResponse.data ?? []).map((row) => [row.profile_id, row]),
-  );
-
-  return recipients.filter((recipientId) => {
-    const preference =
-      scopedByProfileId.get(recipientId) ?? globalByProfileId.get(recipientId);
-    if (!preference) {
-      return true;
-    }
-    if (preference.muted) {
-      return false;
-    }
-    return Array.isArray(preference.channels) && preference.channels.length > 0;
-  });
-}
-
 async function loadGuardianProfileIdsForChildProfileIds(
   supabase: SupabaseServiceClient,
   orgId: string,
@@ -254,8 +169,7 @@ export async function resolveRecipientsForActivityEvent(
   const scopeKind = typeof scope.kind === 'string' ? scope.kind : 'global';
 
   if (scopeKind === 'user' && typeof scope.userId === 'string') {
-    const recipients = applyRecipientExclusions([scope.userId], event, audienceRules);
-    return applyNotificationPreferenceFiltering(supabase, event, recipients);
+    return applyRecipientExclusions([scope.userId], event, audienceRules);
   }
 
   if (scopeKind === 'learning_space' && typeof scope.learningSpaceId === 'string') {
@@ -265,7 +179,7 @@ export async function resolveRecipientsForActivityEvent(
       scope.learningSpaceId,
     );
     const recipients = applyRecipientExclusions(resolved, event, audienceRules);
-    return applyNotificationPreferenceFiltering(supabase, event, recipients);
+    return recipients;
   }
 
   if (scopeKind === 'channel' && typeof scope.channelId === 'string') {
@@ -275,7 +189,7 @@ export async function resolveRecipientsForActivityEvent(
       scope.channelId,
     );
     const recipients = applyRecipientExclusions(resolved, event, audienceRules);
-    return applyNotificationPreferenceFiltering(supabase, event, recipients);
+    return recipients;
   }
 
   const usersOnlyRule = audienceRules.find(
@@ -292,9 +206,8 @@ export async function resolveRecipientsForActivityEvent(
       event,
       audienceRules,
     );
-    return applyNotificationPreferenceFiltering(supabase, event, recipients);
+    return recipients;
   }
 
-  const recipients = applyRecipientExclusions([], event, audienceRules);
-  return applyNotificationPreferenceFiltering(supabase, event, recipients);
+  return applyRecipientExclusions([], event, audienceRules);
 }

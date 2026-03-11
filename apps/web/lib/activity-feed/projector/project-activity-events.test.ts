@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { projectActivityEvents } from '@iconicedu/web/lib/activity-feed/projector/project-activity-events';
+const enqueueNotificationDispatchJobs = vi.fn();
 
 const getFamilyLinksByOrg = vi.fn();
 const getProfilesByIds = vi.fn();
@@ -13,6 +14,11 @@ vi.mock('@iconicedu/web/lib/family/queries/families.query', () => ({
 vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
   getProfilesByIds: (...args: unknown[]) => getProfilesByIds(...args),
   getProfilesByAccountIds: (...args: unknown[]) => getProfilesByAccountIds(...args),
+}));
+
+vi.mock('@iconicedu/web/lib/notifications/dispatch-jobs', () => ({
+  enqueueNotificationDispatchJobs: (...args: unknown[]) =>
+    enqueueNotificationDispatchJobs(...args),
 }));
 
 function createSupabaseMock() {
@@ -157,6 +163,7 @@ function createSupabaseMock() {
 describe('projectActivityEvents', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    enqueueNotificationDispatchJobs.mockResolvedValue({ enqueued: 0 });
     getProfilesByIds.mockResolvedValue({
       data: [{ id: 'child-profile-1', account_id: 'child-account-1', kind: 'child' }],
     });

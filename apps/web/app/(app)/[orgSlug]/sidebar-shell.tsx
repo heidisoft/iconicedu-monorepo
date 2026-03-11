@@ -103,9 +103,11 @@ const normalizeThemeKey = (value?: string | null): ThemeKey | null | undefined =
 
 const normalizeNotificationChannels = (channels: string[]): NotificationChannelVM[] => {
   const allowed: NotificationChannelVM[] = ['push', 'email', 'sms', 'whatsapp'];
-  return channels.filter((channel): channel is NotificationChannelVM =>
-    allowed.includes(channel as NotificationChannelVM),
-  );
+  return channels
+    .map((channel) => (channel === 'text' ? 'sms' : channel))
+    .filter((channel): channel is NotificationChannelVM =>
+      allowed.includes(channel as NotificationChannelVM),
+    );
 };
 
 const getPreferenceSuccessMessage = (input: {
