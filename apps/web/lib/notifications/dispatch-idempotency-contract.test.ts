@@ -29,8 +29,8 @@ describe('notification dispatch idempotency contract', () => {
     expect(migrationSql).toContain('delivery_channel');
     expect(migrationSql).toContain('attempt_bucket');
 
-    expect(dispatchJobsSource).toContain(
-      "onConflict: 'activity_event_id,recipient_profile_id,delivery_channel,attempt_bucket'",
+    expect(dispatchJobsSource).toMatch(
+      /onConflict:\s*['"]activity_event_id,recipient_profile_id,delivery_channel,attempt_bucket['"]/,
     );
   });
 });
