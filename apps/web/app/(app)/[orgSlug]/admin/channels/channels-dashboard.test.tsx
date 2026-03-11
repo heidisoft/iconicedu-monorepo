@@ -6,6 +6,11 @@ import { vi } from 'vitest';
 import { ChannelsDashboard } from '@iconicedu/web/app/(app)/[orgSlug]/admin/channels/channels-dashboard';
 import type { AdminChannelRow } from '@iconicedu/web/lib/admin/channels';
 
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/iconic-academy/admin/channels',
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
 const makeRow = (overrides: Partial<AdminChannelRow>): AdminChannelRow => ({
   id: 'channel-1',
   org_id: 'org-1',
@@ -49,7 +54,10 @@ describe('ChannelsDashboard', () => {
   it('filters rows by search input', async () => {
     mockFetch();
     const user = userEvent.setup();
-    const rows = [makeRow({ topic: 'General' }), makeRow({ id: 'channel-2', topic: 'Algebra' })];
+    const rows = [
+      makeRow({ topic: 'General' }),
+      makeRow({ id: 'channel-2', topic: 'Algebra' }),
+    ];
 
     render(<ChannelsDashboard rows={rows} />);
 
@@ -65,7 +73,10 @@ describe('ChannelsDashboard', () => {
   it('shows all rows when search is cleared', async () => {
     mockFetch();
     const user = userEvent.setup();
-    const rows = [makeRow({ topic: 'General' }), makeRow({ id: 'channel-2', topic: 'Algebra' })];
+    const rows = [
+      makeRow({ topic: 'General' }),
+      makeRow({ id: 'channel-2', topic: 'Algebra' }),
+    ];
 
     render(<ChannelsDashboard rows={rows} />);
     await user.type(screen.getByPlaceholderText('Search name or type'), 'alg');

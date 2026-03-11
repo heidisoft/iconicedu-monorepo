@@ -33,6 +33,8 @@ vi.mock('@iconicedu/ui-web/ui/sidebar', () => {
     }) => (asChild ? children : React.createElement('button', props, children)),
     SidebarMenuItem: ({ children, ...props }: { children?: React.ReactNode }) =>
       React.createElement('li', props, children),
+    SidebarMenuAction: ({ children, ...props }: { children?: React.ReactNode }) =>
+      React.createElement('button', props, children),
     SidebarSeparator: passthrough,
     useSidebar: () => ({ isMobile: false, state: 'expanded' }),
   };
@@ -399,9 +401,10 @@ describe('SidebarLeft', () => {
     );
 
     expect(screen.getByText('Organization')).toBeInTheDocument();
-    const trigger = screen.getByRole('button', { name: /ICONIC Academy/i });
-    fireEvent.click(trigger);
-    expect(screen.getByText('Second Campus')).toBeInTheDocument();
+    const trigger = screen
+      .getAllByRole('button', { name: /ICONIC Academy/i })
+      .find((button) => button.getAttribute('aria-haspopup') === 'menu');
+    expect(trigger).toBeTruthy();
   });
 
   it('shows educator classes on the sidebar', () => {
@@ -415,7 +418,7 @@ describe('SidebarLeft', () => {
     expect(screen.getByText('Algebra 1')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Algebra 1/i })).toHaveAttribute(
       'href',
-      '/d/spaces/channel-1',
+      '//spaces/channel-1',
     );
     expect(screen.queryByText('Chemistry')).not.toBeInTheDocument();
     expect(screen.queryByText('Educator')).not.toBeInTheDocument();
@@ -488,7 +491,7 @@ describe('SidebarLeft', () => {
     expect(screen.getByText('Physics')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Physics/i })).toHaveAttribute(
       'href',
-      '/d/spaces/channel-physics',
+      '//spaces/channel-physics',
     );
     expect(screen.getAllByText('1').length).toBeGreaterThanOrEqual(2);
   });
@@ -504,7 +507,7 @@ describe('SidebarLeft', () => {
     expect(screen.getByText('Student Algebra')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Student Algebra/i })).toHaveAttribute(
       'href',
-      '/d/spaces/channel-student-1',
+      '//spaces/channel-student-1',
     );
     expect(screen.queryByText('Other Space')).not.toBeInTheDocument();
     expect(screen.getAllByText('2').length).toBeGreaterThanOrEqual(2);

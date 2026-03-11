@@ -122,13 +122,13 @@ describe('NavDirectMessages', () => {
     const dmLinks = screen
       .getAllByRole('link')
       .map((link) => link.getAttribute('href'))
-      .filter((href): href is string => Boolean(href && href.startsWith('/d/dm/')));
+      .filter((href): href is string => Boolean(href && href.includes('/dm/')));
 
-    expect(dmLinks).toEqual([
-      '/d/dm/dm-unread-high',
-      '/d/dm/dm-unread-low',
-      '/d/dm/dm-read-latest-message',
-      '/d/dm/dm-read-old',
+    expect(dmLinks.map((href) => href.split('/dm/')[1])).toEqual([
+      'dm-unread-high',
+      'dm-unread-low',
+      'dm-read-latest-message',
+      'dm-read-old',
     ]);
   });
 

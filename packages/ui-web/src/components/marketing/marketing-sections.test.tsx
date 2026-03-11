@@ -26,7 +26,9 @@ describe('marketing sections', () => {
   it('renders subjects carousel', () => {
     render(<MarketingSubjectsSection />);
 
-    expect(screen.getByRole('region', { name: 'Hero subjects carousel' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('region', { name: 'Hero subjects carousel' }),
+    ).toBeInTheDocument();
     expect(screen.getByText('Math')).toBeInTheDocument();
     expect(screen.getByText('Competition Prep')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Previous slide' })).toBeInTheDocument();
@@ -37,13 +39,17 @@ describe('marketing sections', () => {
     render(<MarketingTrustStatsSection />);
 
     expect(screen.getByText('4.9/5')).toBeInTheDocument();
-    expect(screen.getByText('Average parent rating')).toBeInTheDocument();
+    expect(
+      screen.getByText('Trusted by parents who see real results'),
+    ).toBeInTheDocument();
   });
 
   it('renders how-it-works section content', () => {
     render(<MarketingHowItWorksSection />);
 
-    expect(screen.getByText('One platform for students, parents, and educators')).toBeInTheDocument();
+    expect(
+      screen.getByText('One platform for students, parents, and educators'),
+    ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Explore and sign up' })).toHaveAttribute(
       'href',
       '/iconic-academy/login',
@@ -53,7 +59,13 @@ describe('marketing sections', () => {
   it('renders footer section links', () => {
     render(<MarketingFooterSection />);
 
-    expect(screen.getByRole('link', { name: 'Privacy' })).toHaveAttribute('href', '/privacy');
-    expect(screen.getByRole('link', { name: 'Programs' })).toHaveAttribute('href', '#subjects');
+    expect(screen.getByRole('link', { name: 'Privacy' })).toHaveAttribute(
+      'href',
+      '/privacy',
+    );
+    expect(screen.getByRole('link', { name: 'Programs' })).toHaveAttribute(
+      'href',
+      '#subjects',
+    );
   });
 });

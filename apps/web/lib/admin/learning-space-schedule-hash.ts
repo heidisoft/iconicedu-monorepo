@@ -445,17 +445,17 @@ export function buildScheduleStart(
   const normalizedStartTime = normalizeTimeLabel(
     schedule.startTime ?? DEFAULT_SCHEDULE_TIME,
   );
-  const normalizedEndTime = normalizeTimeLabel(
-    schedule.endTime ??
-      (() => {
-        const [hourText, minuteText] = normalizedStartTime.split(':');
-        const hour = Number.parseInt(hourText ?? '9', 10);
-        const minute = Number.parseInt(minuteText ?? '0', 10);
-        return `${((hour + 1) % 24).toString().padStart(2, '0')}:${minute
-          .toString()
-          .padStart(2, '0')}`;
-      })(),
-  );
+  const defaultEndTimeForStart = (startTime: string) => {
+    const [hourText, minuteText] = startTime.split(':');
+    const hour = Number.parseInt(hourText ?? '9', 10);
+    const minute = Number.parseInt(minuteText ?? '0', 10);
+    return `${((hour + 1) % 24).toString().padStart(2, '0')}:${minute
+      .toString()
+      .padStart(2, '0')}`;
+  };
+  const resolveEndTime = (startTime: string) =>
+    normalizeTimeLabel(schedule.endTime ?? defaultEndTimeForStart(startTime));
+  const normalizedEndTime = resolveEndTime(normalizedStartTime);
 
   if (!schedule.rule) {
     return buildExpandedSchedule({
@@ -485,7 +485,7 @@ export function buildScheduleStart(
     return buildExpandedSchedule({
       localDate: dateForWeekday,
       startTime: entry.time,
-      endTime: normalizedEndTime,
+      endTime: resolveEndTime(entry.time),
       timezone,
     });
   });
@@ -806,6 +806,7 @@ export function buildCanonicalLearningSpaceScheduleFromExisting(
 function buildCanonicalBaseSnapshot(schedule: CanonicalLearningSpaceSchedule) {
   return {
     recurrence: schedule.recurrence,
+    endAt: schedule.endAt,
   };
 }
 

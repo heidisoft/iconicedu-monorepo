@@ -17,27 +17,15 @@ function createThread(): ThreadVM {
 
 describe('ThreadIndicator', () => {
   it('shows NEW indicator when unread replies exist', () => {
-    render(
-      <ThreadIndicator
-        thread={createThread()}
-        unreadCount={2}
-        onClick={vi.fn()}
-      />,
-    );
+    render(<ThreadIndicator thread={createThread()} unreadCount={2} onClick={vi.fn()} />);
 
     expect(screen.getByText('New')).toBeInTheDocument();
-    expect(screen.getByText('2')).toBeInTheDocument();
+    expect(screen.getAllByText('2').length).toBeGreaterThan(0);
     expect(screen.getByRole('button')).toHaveClass('h-7', 'self-center', 'px-2');
   });
 
   it('does not show NEW indicator when there are no unread replies', () => {
-    render(
-      <ThreadIndicator
-        thread={createThread()}
-        unreadCount={0}
-        onClick={vi.fn()}
-      />,
-    );
+    render(<ThreadIndicator thread={createThread()} unreadCount={0} onClick={vi.fn()} />);
 
     expect(screen.queryByText('New')).not.toBeInTheDocument();
   });

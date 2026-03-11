@@ -11,18 +11,56 @@ export default defineConfig({
   plugins: [react(), tsconfigPaths()],
   resolve: {
     dedupe: ['react', 'react-dom'],
-    alias: {
-      '@iconicedu/ui-web': resolve(__dirname, 'src'),
-      '@iconicedu/ui-web/': resolve(__dirname, 'src/'),
-      '@iconicedu/shared-types': resolve(__dirname, '../shared-types/src'),
-      '@iconicedu/shared-types/': resolve(__dirname, '../shared-types/src/'),
-      '@iconicedu/utils': resolve(__dirname, '../utils/src'),
-      '@iconicedu/utils/': resolve(__dirname, '../utils/src/'),
-    },
+    alias: [
+      {
+        find: /^react$/,
+        replacement: resolve(__dirname, '../../node_modules/react'),
+      },
+      {
+        find: /^react\/jsx-runtime$/,
+        replacement: resolve(__dirname, '../../node_modules/react/jsx-runtime.js'),
+      },
+      {
+        find: /^react\/jsx-dev-runtime$/,
+        replacement: resolve(__dirname, '../../node_modules/react/jsx-dev-runtime.js'),
+      },
+      {
+        find: /^react-dom$/,
+        replacement: resolve(__dirname, '../../node_modules/react-dom'),
+      },
+      {
+        find: /^react-dom\/client$/,
+        replacement: resolve(__dirname, '../../node_modules/react-dom/client.js'),
+      },
+      {
+        find: /^@iconicedu\/ui-web$/,
+        replacement: resolve(__dirname, 'src/index.ts'),
+      },
+      {
+        find: /^@iconicedu\/ui-web\/(.*)$/,
+        replacement: resolve(__dirname, 'src/$1'),
+      },
+      {
+        find: /^@iconicedu\/shared-types$/,
+        replacement: resolve(__dirname, '../shared-types/src/index.ts'),
+      },
+      {
+        find: /^@iconicedu\/shared-types\/(.*)$/,
+        replacement: resolve(__dirname, '../shared-types/src/$1'),
+      },
+      {
+        find: /^@iconicedu\/utils$/,
+        replacement: resolve(__dirname, '../utils/src/index.ts'),
+      },
+      {
+        find: /^@iconicedu\/utils\/(.*)$/,
+        replacement: resolve(__dirname, '../utils/src/$1'),
+      },
+    ],
   },
   test: {
     environment: 'jsdom',
-    setupFiles: ['./vitest.setup.ts'],
+    setupFiles: ['./src/vitest.setup.ts'],
     globals: true,
     css: false,
   },

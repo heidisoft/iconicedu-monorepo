@@ -21,6 +21,8 @@ describe('buildLearningSpaceScheduleDiffPlan', () => {
       nextSchedules: [
         {
           startDate: '2026-03-14T14:00:00.000Z',
+          startTime: '14:00',
+          endTime: '15:00',
           timezone: 'UTC',
           rule: {
             frequency: 'weekly',
@@ -120,6 +122,8 @@ describe('buildLearningSpaceScheduleDiffPlan', () => {
         {
           // Tuesday base date, but weekly Saturday at 14:00 resolves to 2026-03-14T14:00:00.000Z
           startDate: '2026-03-10T00:00:00.000Z',
+          startTime: '14:00',
+          endTime: '15:00',
           timezone: 'UTC',
           rule: {
             frequency: 'weekly',

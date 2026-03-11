@@ -1,4 +1,3 @@
-import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import Page from '@iconicedu/web/app/(app)/[orgSlug]/dm/page';
@@ -11,7 +10,25 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
-  createSupabaseServerClient: vi.fn(() => ({})),
+  createSupabaseServerClient: vi.fn(() => {
+    const orgQuery = {
+      eq: vi.fn(() => orgQuery),
+      is: vi.fn(() => orgQuery),
+      maybeSingle: vi.fn(async () => ({
+        data: {
+          id: 'org-1',
+          slug: 'iconic-academy',
+          name: 'Iconic Academy',
+        },
+        error: null,
+      })),
+    };
+    return {
+      from: vi.fn(() => ({
+        select: vi.fn(() => orgQuery),
+      })),
+    };
+  }),
 }));
 
 vi.mock('@iconicedu/web/lib/auth/requireAuthedUser', () => ({
@@ -19,7 +36,9 @@ vi.mock('@iconicedu/web/lib/auth/requireAuthedUser', () => ({
 }));
 
 vi.mock('@iconicedu/web/lib/accounts/getOrCreateAccount', () => ({
-  getOrCreateAccount: vi.fn(async () => ({ account: { id: 'account-1', org_id: 'org-1' } })),
+  getOrCreateAccount: vi.fn(async () => ({
+    account: { id: 'account-1', org_id: 'org-1' },
+  })),
 }));
 
 vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
@@ -58,7 +77,10 @@ describe('d/dm page', () => {
       ids: { id: 'channel-9' },
       basics: { kind: 'dm' },
     });
-    await Page({ params: Promise.resolve({ orgSlug: 'iconic-academy' }), searchParams: { channelId: 'channel-9' } });
+    await Page({
+      params: Promise.resolve({ orgSlug: 'iconic-academy' }),
+      searchParams: { channelId: 'channel-9' },
+    });
     expect(redirectMock).toHaveBeenCalledWith('/iconic-academy/dm/channel-9');
   });
 
@@ -66,7 +88,10 @@ describe('d/dm page', () => {
     buildChannelByIdMock.mockResolvedValueOnce(null);
     buildChannelByDmKeyMock.mockResolvedValueOnce(null);
     ensureDmMock.mockResolvedValueOnce({ channelId: 'channel-new' });
-    await Page({ params: Promise.resolve({ orgSlug: 'iconic-academy' }), searchParams: { userId: 'profile-2' } });
+    await Page({
+      params: Promise.resolve({ orgSlug: 'iconic-academy' }),
+      searchParams: { userId: 'profile-2' },
+    });
     expect(ensureDmMock).toHaveBeenCalled();
     expect(redirectMock).toHaveBeenCalledWith('/iconic-academy/dm/channel-new');
   });

@@ -53,15 +53,23 @@ function createSelectSingleChain<T>(result: {
   data: T;
   error: { message: string } | null;
 }) {
-  const chain = {
+  const selectChain = {
     eq: vi.fn(() => chain),
     is: vi.fn(() => chain),
     maybeSingle: vi.fn(async () => result),
     returns: vi.fn(() => chain),
   };
+  const chain = selectChain;
+
+  const updateChain = {
+    error: null as { message: string } | null,
+    eq: vi.fn(() => updateChain),
+    is: vi.fn(() => updateChain),
+  };
 
   return {
     select: vi.fn(() => chain),
+    update: vi.fn(() => updateChain),
   };
 }
 
@@ -70,14 +78,45 @@ function createSelectManyChain<T>(result: {
   error: { message: string } | null;
 }) {
   const chain = {
+    error: null as { message: string } | null,
     eq: vi.fn(() => chain),
     in: vi.fn(() => chain),
     is: vi.fn(() => chain),
     returns: vi.fn(async () => result),
   };
+  const mutationChain = {
+    error: null as { message: string } | null,
+    eq: vi.fn(() => mutationChain),
+    is: vi.fn(() => mutationChain),
+  };
+  const insertChain = {
+    select: vi.fn(async () => ({
+      data: [{ id: 'mock-row-id' }],
+      error: null as { message: string } | null,
+    })),
+  };
 
   return {
     select: vi.fn(() => chain),
+    delete: vi.fn(() => mutationChain),
+    update: vi.fn(() => mutationChain),
+    insert: vi.fn(() => insertChain),
+    upsert: vi.fn(() => insertChain),
+  };
+}
+
+function createMutationTable() {
+  const chain = {
+    error: null as { message: string } | null,
+    eq: vi.fn(() => chain),
+    is: vi.fn(() => chain),
+  };
+
+  return {
+    delete: vi.fn(() => chain),
+    update: vi.fn(() => chain),
+    insert: vi.fn(async () => ({ error: null })),
+    upsert: vi.fn(async () => ({ error: null })),
   };
 }
 
@@ -121,6 +160,8 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
       schedules: [
         {
           startDate: '2026-03-14T14:00:00.000Z',
+          startTime: '14:00',
+          endTime: '15:00',
           timezone: 'UTC',
           rule: {
             frequency: 'weekly',
@@ -151,6 +192,7 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
       error: null,
     });
 
+    const mutationTable = createMutationTable();
     const serverClient = {
       auth: {
         getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user-1' } } })),
@@ -161,8 +203,10 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
             return learningSpacesTable;
           case 'learning_space_channels':
             return learningSpaceChannelsTable;
+          case 'channels':
+            return channelsTable;
           default:
-            throw new Error(`Unexpected server table: ${table}`);
+            return mutationTable;
         }
       }),
     };
@@ -230,6 +274,10 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
       error: null,
     });
 
+    const serviceMutationTable = createSelectManyChain({
+      data: [],
+      error: null,
+    });
     const serviceClient = {
       from: vi.fn((table: string) => {
         switch (table) {
@@ -250,7 +298,7 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
           case 'profiles':
             return profilesTable;
           default:
-            throw new Error(`Unexpected service table: ${table}`);
+            return serviceMutationTable;
         }
       }),
     };
@@ -325,6 +373,7 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
       error: null,
     });
 
+    const mutationTable = createMutationTable();
     const serverClient = {
       auth: {
         getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user-1' } } })),
@@ -335,8 +384,10 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
             return learningSpacesTable;
           case 'learning_space_channels':
             return learningSpaceChannelsTable;
+          case 'channels':
+            return channelsTable;
           default:
-            throw new Error(`Unexpected server table: ${table}`);
+            return mutationTable;
         }
       }),
     };
@@ -388,6 +439,10 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
       error: null,
     });
 
+    const serviceMutationTable = createSelectManyChain({
+      data: [],
+      error: null,
+    });
     const serviceClient = {
       from: vi.fn((table: string) => {
         switch (table) {
@@ -408,7 +463,7 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
           case 'profiles':
             return profilesTable;
           default:
-            throw new Error(`Unexpected service table: ${table}`);
+            return serviceMutationTable;
         }
       }),
     };
@@ -457,6 +512,8 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
       schedules: [
         {
           startDate: '2026-03-10T12:00:00.000Z',
+          startTime: '17:02',
+          endTime: '18:02',
           timezone: 'America/New_York',
           rule: {
             frequency: 'weekly',
@@ -498,6 +555,7 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
       error: null,
     });
 
+    const mutationTable = createMutationTable();
     const serverClient = {
       auth: {
         getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user-1' } } })),
@@ -508,8 +566,10 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
             return learningSpacesTable;
           case 'learning_space_channels':
             return learningSpaceChannelsTable;
+          case 'channels':
+            return channelsTable;
           default:
-            throw new Error(`Unexpected server table: ${table}`);
+            return mutationTable;
         }
       }),
     };
@@ -610,6 +670,10 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
       error: null,
     });
 
+    const serviceMutationTable = createSelectManyChain({
+      data: [],
+      error: null,
+    });
     const serviceClient = {
       from: vi.fn((table: string) => {
         switch (table) {
@@ -630,7 +694,7 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
           case 'profiles':
             return profilesTable;
           default:
-            throw new Error(`Unexpected service table: ${table}`);
+            return serviceMutationTable;
         }
       }),
     };
@@ -679,6 +743,8 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
       schedules: [
         {
           startDate: '2026-03-10T12:00:00.000Z',
+          startTime: '17:02',
+          endTime: '18:02',
           timezone: 'America/New_York',
           rule: {
             frequency: 'weekly',
@@ -717,6 +783,7 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
       error: null,
     });
 
+    const mutationTable = createMutationTable();
     const serverClient = {
       auth: {
         getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user-1' } } })),
@@ -727,8 +794,10 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
             return learningSpacesTable;
           case 'learning_space_channels':
             return learningSpaceChannelsTable;
+          case 'channels':
+            return channelsTable;
           default:
-            throw new Error(`Unexpected server table: ${table}`);
+            return mutationTable;
         }
       }),
     };
@@ -824,6 +893,10 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
       error: null,
     });
 
+    const serviceMutationTable = createSelectManyChain({
+      data: [],
+      error: null,
+    });
     const serviceClient = {
       from: vi.fn((table: string) => {
         switch (table) {
@@ -844,7 +917,7 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
           case 'profiles':
             return profilesTable;
           default:
-            throw new Error(`Unexpected service table: ${table}`);
+            return serviceMutationTable;
         }
       }),
     };

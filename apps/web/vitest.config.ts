@@ -12,10 +12,9 @@ export default defineConfig({
   resolve: {
     alias: {
       '@iconicedu/shared-types': resolve(__dirname, '../../packages/shared-types/src'),
-      '@iconicedu/shared-types/': resolve(
-        __dirname,
-        '../../packages/shared-types/src/',
-      ),
+      '@iconicedu/shared-types/': resolve(__dirname, '../../packages/shared-types/src/'),
+      '@iconicedu/utils': resolve(__dirname, '../../packages/utils/src'),
+      '@iconicedu/utils/': resolve(__dirname, '../../packages/utils/src/'),
     },
   },
   test: {
@@ -23,5 +22,15 @@ export default defineConfig({
     setupFiles: ['./vitest.setup.ts'],
     globals: true,
     css: false,
+    include: [
+      'app/**/*.test.ts',
+      'app/**/*.test.tsx',
+      'components/**/*.test.ts',
+      'components/**/*.test.tsx',
+      'lib/**/*.test.ts',
+      'lib/**/*.test.tsx',
+      'flags.test.ts',
+    ],
+    exclude: ['e2e/**', '**/node_modules/**'],
   },
 });

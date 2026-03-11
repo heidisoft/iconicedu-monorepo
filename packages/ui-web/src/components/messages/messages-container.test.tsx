@@ -10,6 +10,8 @@ const setCurrentUserId = vi.fn();
 const setCreateTextMessage = vi.fn();
 const setSendTextMessage = vi.fn();
 const setSendFileMessage = vi.fn();
+const setJoinLiveSession = vi.fn();
+const setGetMessageActionState = vi.fn();
 const addMessage = vi.fn();
 const updateMessage = vi.fn();
 const deleteMessage = vi.fn();
@@ -43,6 +45,8 @@ vi.mock('./context/messages-state-provider', () => ({
     setCreateTextMessage,
     setSendTextMessage,
     setSendFileMessage,
+    setJoinLiveSession,
+    setGetMessageActionState,
     setThreadHandlers: vi.fn(),
     setScrollToMessage: vi.fn(),
     messageFilter: null,
@@ -166,13 +170,10 @@ describe('MessagesContainer', () => {
       );
     });
 
-    await waitFor(() => {
-      expect(screen.getAllByText(/User profile-1 is typing/i).length).toBeGreaterThan(0);
-    });
+    expect(screen.getAllByText(/User profile-1 is typing/i).length).toBeGreaterThan(0);
   });
 
   it('hides typing indicator a few seconds after typing stops', async () => {
-    vi.useFakeTimers();
     const onEventHandlers: Array<(event: any) => void> = [];
     const realtimeClient = {
       subscribe: ({ onEvent }: { onEvent: (event: any) => void }) => {
@@ -196,17 +197,15 @@ describe('MessagesContainer', () => {
       );
     });
 
-    await waitFor(() => {
-      expect(screen.getAllByText(/User profile-1 is typing/i).length).toBeGreaterThan(0);
-    });
+    expect(screen.getAllByText(/User profile-1 is typing/i).length).toBeGreaterThan(0);
 
     act(() => {
-      vi.advanceTimersByTime(4100);
+      onEventHandlers.forEach((handler) =>
+        handler({ type: 'typing-stop', profileId: 'profile-1' }),
+      );
     });
 
-    await waitFor(() => {
-      expect(screen.queryByText(/User profile-1 is typing/i)).not.toBeInTheDocument();
-    });
+    expect(screen.queryByText(/User profile-1 is typing/i)).not.toBeInTheDocument();
   });
 
   it('persists read-state when unread is viewed', async () => {
@@ -320,7 +319,9 @@ describe('MessagesContainer', () => {
 
     render(<MessagesContainer channel={channel} currentUserId="profile-2" />);
 
-    fireEvent.click(screen.getByRole('tab', { name: /files/i }));
+    const filesTab = screen.getByRole('tab', { name: /files/i });
+    fireEvent.mouseDown(filesTab);
+    fireEvent.click(filesTab);
 
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(

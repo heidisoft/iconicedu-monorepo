@@ -1,5 +1,11 @@
 import '@testing-library/jest-dom/vitest';
 
+// React 19 + Vitest requires this flag to ensure updates are flushed in `act`.
+if (typeof globalThis !== 'undefined') {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+}
+
 if (!window.matchMedia) {
   window.matchMedia = ((query: string) => ({
     matches: false,
