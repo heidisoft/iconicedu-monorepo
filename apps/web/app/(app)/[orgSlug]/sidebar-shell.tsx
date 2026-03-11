@@ -37,7 +37,10 @@ import {
   markDirectMessageChannelRead,
   touchDirectMessageChannelOrder,
 } from '@iconicedu/web/lib/sidebar/direct-message-unread';
-import { shouldAttemptDirectMessageSync } from '@iconicedu/web/lib/sidebar/direct-message-sync';
+import {
+  shouldAttemptDirectMessageSync,
+  shouldRunDirectMessageSync,
+} from '@iconicedu/web/lib/sidebar/direct-message-sync';
 import {
   applyIncomingLearningSpaceUnread,
   markLearningSpaceChannelRead,
@@ -539,14 +542,15 @@ export function SidebarShell({
       channelId: string,
       senderProfileId?: string | null,
       attempt = 0,
-      options?: { waitForMessages?: boolean },
+      options?: { waitForMessages?: boolean; allowExistingSync?: boolean },
     ) => {
       if (
-        !shouldAttemptDirectMessageSync(
+        !shouldRunDirectMessageSync({
           channelId,
-          directMessageIdsRef.current,
-          excludedDirectMessageSyncIdsRef.current,
-        )
+          directMessageIds: directMessageIdsRef.current,
+          excludedChannelIds: excludedDirectMessageSyncIdsRef.current,
+          allowExistingSync: options?.allowExistingSync,
+        })
       ) {
         return;
       }
@@ -714,7 +718,9 @@ export function SidebarShell({
         if (!row?.channel_id) {
           return;
         }
-        await addOrRefreshDmChannel(row.channel_id, row.sender_profile_id ?? null);
+        await addOrRefreshDmChannel(row.channel_id, row.sender_profile_id ?? null, 0, {
+          allowExistingSync: true,
+        });
       },
     );
     channel.subscribe();
