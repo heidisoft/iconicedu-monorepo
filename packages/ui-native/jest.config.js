@@ -27,8 +27,10 @@ module.exports = {
     '^@iconicedu/shared-types/(.*)$': '<rootDir>/../shared-types/src/$1',
   },
   collectCoverageFrom: [
-    'src/components/**/*.{ts,tsx}',
-    'src/utils/**/*.{ts,tsx}',
+    'src/**/*.{ts,tsx}',
+    '!src/**/*.test.{ts,tsx}',
     '!src/**/*.d.ts',
   ],
+  coverageDirectory: 'coverage',
+  coverageReporters: ['text', 'json-summary', 'html'],
 };

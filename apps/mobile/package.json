@@ -12,7 +12,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint app src --ext .ts,.tsx",
     "lint:fix": "eslint app src --ext .ts,.tsx --fix",
-    "test": "jest --passWithNoTests --watchman=false",
+    "test": "jest --passWithNoTests --watchman=false --coverage",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage --passWithNoTests",
     "clean": "rm -rf .expo dist android ios",

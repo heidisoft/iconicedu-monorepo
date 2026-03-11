@@ -77,8 +77,9 @@ jobs:
           name: coverage
           path: |
             apps/web/coverage/
-            apps/api/coverage/
-            packages/*/coverage/
+            apps/mobile/coverage/
+            packages/ui-web/coverage/
+            packages/ui-native/coverage/
           if-no-files-found: ignore
           retention-days: 14
 

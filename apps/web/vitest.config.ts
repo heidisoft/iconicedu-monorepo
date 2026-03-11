@@ -32,5 +32,12 @@ export default defineConfig({
       'flags.test.ts',
     ],
     exclude: ['e2e/**', '**/node_modules/**'],
+    coverage: {
+      provider: 'v8',
+      reportsDirectory: './coverage',
+      reporter: ['text', 'json-summary', 'html'],
+      include: ['app/**/*.{ts,tsx}', 'lib/**/*.{ts,tsx}'],
+      exclude: ['**/*.test.{ts,tsx}', '**/*.d.ts', '**/node_modules/**'],
+    },
   },
 });

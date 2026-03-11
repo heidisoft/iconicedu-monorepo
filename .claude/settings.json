@@ -17,7 +17,9 @@
       "Bash(echo \"MISSING: $table\")",
       "Bash(fi)",
       "Bash(done)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(pnpm --filter web --filter @iconicedu/ui-web add -D @vitest/coverage-v8)",
+      "Bash(pnpm --filter web --filter @iconicedu/ui-web add -D @vitest/coverage-v8@^3.2.4)"
     ],
     "additionalDirectories": [
       "/Users/hwanigasooriya/Workspace/hobby/iconicedu-monorepo/supabase/migrations"
