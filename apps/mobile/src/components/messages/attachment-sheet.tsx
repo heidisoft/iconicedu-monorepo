@@ -12,11 +12,12 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import {
-  AudioRecorder,
+  AudioModule,
   RecordingPresets,
   setAudioModeAsync,
   requestRecordingPermissionsAsync,
 } from 'expo-audio';
+import type { AudioRecorder } from 'expo-audio';
 import { ImageIcon, Paperclip, Mic, Square } from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
@@ -257,10 +258,10 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
     }
     try {
       await setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
+        allowsRecording: true,
+        playsInSilentMode: true,
       });
-      const recording = new AudioRecorder(RecordingPresets.HIGH_QUALITY);
+      const recording = new AudioModule.AudioRecorder(RecordingPresets.HIGH_QUALITY);
       await recording.prepareToRecordAsync();
       recording.record();
       recordingRef.current = recording;
@@ -286,7 +287,7 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
       await recordingRef.current.stop();
       const uri = recordingRef.current.uri;
       recordingRef.current = null;
-      await setAudioModeAsync({ allowsRecordingIOS: false });
+      await setAudioModeAsync({ allowsRecording: false });
       if (uri) {
         onClose();
         onAttach([
@@ -314,7 +315,7 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
     try {
       await recordingRef.current?.stop();
       recordingRef.current = null;
-      await setAudioModeAsync({ allowsRecordingIOS: false });
+      await setAudioModeAsync({ allowsRecording: false });
     } catch {
       /* ignore */
     }

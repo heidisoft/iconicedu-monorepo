@@ -1527,7 +1527,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         // First press — load and play
         setAudioLoading(true);
         try {
-          await setAudioModeAsync({ playsInSilentModeIOS: true });
+          await setAudioModeAsync({ playsInSilentMode: true });
           const player = createAudioPlayer({ uri: url });
           audioSubRef.current = player.addListener(
             'playbackStatusUpdate',

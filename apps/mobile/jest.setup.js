@@ -64,8 +64,10 @@ jest.mock('expo-audio', () => {
     requestRecordingPermissionsAsync: jest.fn().mockResolvedValue({ granted: true }),
     setAudioModeAsync: jest.fn().mockResolvedValue(undefined),
     createAudioPlayer: jest.fn().mockReturnValue(mockPlayer),
-    AudioPlayer: jest.fn().mockImplementation(() => mockPlayer),
-    AudioRecorder: jest.fn().mockImplementation(() => mockRecorder),
+    AudioModule: {
+      AudioPlayer: jest.fn().mockImplementation(() => mockPlayer),
+      AudioRecorder: jest.fn().mockImplementation(() => mockRecorder),
+    },
     RecordingPresets: {
       HIGH_QUALITY: {},
       LOW_QUALITY: {},
