@@ -10,11 +10,23 @@ const __dirname = dirname(__filename);
 export default defineConfig({
   plugins: [react(), tsconfigPaths()],
   resolve: {
+    dedupe: ['react', 'react-dom'],
+    preserveSymlinks: false,
     alias: {
+      react: resolve(__dirname, '../../node_modules/react'),
+      'react/jsx-runtime': resolve(__dirname, '../../node_modules/react/jsx-runtime.js'),
+      'react/jsx-dev-runtime': resolve(
+        __dirname,
+        '../../node_modules/react/jsx-dev-runtime.js',
+      ),
+      'react-dom': resolve(__dirname, '../../node_modules/react-dom'),
+      'react-dom/client': resolve(__dirname, '../../node_modules/react-dom/client.js'),
       '@iconicedu/shared-types': resolve(__dirname, '../../packages/shared-types/src'),
       '@iconicedu/shared-types/': resolve(__dirname, '../../packages/shared-types/src/'),
       '@iconicedu/utils': resolve(__dirname, '../../packages/utils/src'),
       '@iconicedu/utils/': resolve(__dirname, '../../packages/utils/src/'),
+      '@iconicedu/ui-web': resolve(__dirname, '../../packages/ui-web/src'),
+      '@iconicedu/ui-web/': resolve(__dirname, '../../packages/ui-web/src/'),
     },
   },
   test: {
@@ -22,6 +34,11 @@ export default defineConfig({
     setupFiles: ['./vitest.setup.ts'],
     globals: true,
     css: false,
+    server: {
+      deps: {
+        inline: [/.*/],
+      },
+    },
     include: [
       'app/**/*.test.ts',
       'app/**/*.test.tsx',

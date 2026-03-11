@@ -18,7 +18,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src --ext .ts,.tsx",
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
-    "test": "vitest run --coverage",
+    "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "tailwind:build": "node ../../node_modules/@tailwindcss/cli/dist/index.mjs -i ./src/styles/global.css -o ./dist/ui-web.css",
@@ -27,8 +27,8 @@
     "shadcn:add": "pnpm dlx shadcn@latest add"
   },
   "peerDependencies": {
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
   },
   "devDependencies": {
     "@iconicedu/shared-types": "workspace:*",
