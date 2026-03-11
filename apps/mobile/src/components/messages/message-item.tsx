@@ -48,7 +48,8 @@ import {
   Pause,
   Video,
 } from 'lucide-react-native';
-import { Audio } from 'expo-av';
+import { AudioPlayer, createAudioPlayer, setAudioModeAsync } from 'expo-audio';
+import type { AudioStatus } from 'expo-audio';
 import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '@/lib/supabase/client';
 
@@ -1427,15 +1428,17 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   const [audioLoading, setAudioLoading] = useState(false);
   const [audioPositionMs, setAudioPositionMs] = useState(0);
   const [audioDurationMs, setAudioDurationMs] = useState(0);
-  const soundRef = useRef<Audio.Sound | null>(null);
+  const soundRef = useRef<AudioPlayer | null>(null);
+  const audioSubRef = useRef<{ remove(): void } | null>(null);
   const [openingFile, setOpeningFile] = useState<string | null>(null);
   const [imageSignedUrls, setImageSignedUrls] = useState<Record<string, string>>({});
   const [audioSignedUrl, setAudioSignedUrl] = useState<string | null>(null);
 
-  // Unload sound when the message item unmounts
+  // Release sound when the message item unmounts
   useEffect(() => {
     return () => {
-      soundRef.current?.unloadAsync().catch(() => null);
+      audioSubRef.current?.remove();
+      soundRef.current?.remove();
     };
   }, []);
 
@@ -1516,31 +1519,31 @@ export const MessageItem: React.FC<MessageItemProps> = ({
       if (soundRef.current) {
         // Sound already loaded — toggle play/pause
         if (isAudioPlaying) {
-          await soundRef.current.pauseAsync();
+          soundRef.current.pause();
         } else {
-          await soundRef.current.playAsync();
+          soundRef.current.play();
         }
       } else {
         // First press — load and play
         setAudioLoading(true);
         try {
-          await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
-          const { sound } = await Audio.Sound.createAsync(
-            { uri: url },
-            { shouldPlay: true },
-            (status) => {
-              if (!status.isLoaded) return;
-              setIsAudioPlaying(status.isPlaying ?? false);
-              setAudioPositionMs(status.positionMillis ?? 0);
-              if (status.durationMillis) setAudioDurationMs(status.durationMillis);
+          await setAudioModeAsync({ playsInSilentModeIOS: true });
+          const player = createAudioPlayer({ uri: url });
+          audioSubRef.current = player.addListener(
+            'playbackStatusUpdate',
+            (status: AudioStatus) => {
+              setIsAudioPlaying(status.playing);
+              setAudioPositionMs(Math.round(status.currentTime * 1000));
+              if (status.duration) setAudioDurationMs(Math.round(status.duration * 1000));
               if (status.didJustFinish) {
                 // Reset to start after finishing
-                soundRef.current?.setPositionAsync(0).catch(() => null);
+                soundRef.current?.seekTo(0).catch(() => null);
                 setAudioPositionMs(0);
               }
             },
           );
-          soundRef.current = sound;
+          soundRef.current = player;
+          player.play();
           setIsAudioPlaying(true);
         } catch (err) {
           console.warn('[Audio] playback error:', err);
@@ -1816,7 +1819,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         return Math.max(0.28, Math.min(0.92, 0.55 + curve * 0.28));
       });
 
-    // Use real duration from expo-av once loaded, fall back to message metadata
+    // Use real duration from expo-audio once loaded, fall back to message metadata
     const totalMs =
       audioDurationMs > 0 ? audioDurationMs : (am.audio.durationSeconds ?? 0) * 1000;
     const fmtMs = (ms: number) => {

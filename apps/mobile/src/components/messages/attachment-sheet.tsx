@@ -11,7 +11,12 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import { Audio } from 'expo-av';
+import {
+  AudioRecorder,
+  RecordingPresets,
+  setAudioModeAsync,
+  requestRecordingPermissionsAsync,
+} from 'expo-audio';
 import { ImageIcon, Paperclip, Mic, Square } from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
@@ -169,7 +174,7 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
   // Recording state
   const [recordingMs, setRecordingMs] = useState(0);
   const [isStopping, setIsStopping] = useState(false);
-  const recordingRef = useRef<Audio.Recording | null>(null);
+  const recordingRef = useRef<AudioRecorder | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Reset when sheet closes
@@ -185,7 +190,7 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
-      recordingRef.current?.stopAndUnloadAsync().catch(() => null);
+      recordingRef.current?.stop().catch(() => null);
     };
   }, []);
 
@@ -245,19 +250,19 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
   // ── Audio recording ───────────────────────────────────────────────────────
 
   const handleStartRecording = useCallback(async () => {
-    const { status } = await Audio.requestPermissionsAsync();
-    if (status !== 'granted') {
+    const permission = await requestRecordingPermissionsAsync();
+    if (!permission.granted) {
       Alert.alert('Permission required', 'Please allow microphone access in Settings.');
       return;
     }
     try {
-      await Audio.setAudioModeAsync({
+      await setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
       });
-      const { recording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY,
-      );
+      const recording = new AudioRecorder(RecordingPresets.HIGH_QUALITY);
+      await recording.prepareToRecordAsync();
+      recording.record();
       recordingRef.current = recording;
       setMode('recording');
       setRecordingMs(0);
@@ -277,12 +282,11 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
     setIsStopping(true);
     if (timerRef.current) clearInterval(timerRef.current);
     try {
-      await recordingRef.current.stopAndUnloadAsync();
-      const uri = recordingRef.current.getURI();
-      const status = await recordingRef.current.getStatusAsync();
-      const durationSeconds = Math.round((status.durationMillis ?? recordingMs) / 1000);
+      const durationSeconds = Math.round(recordingRef.current.currentTime);
+      await recordingRef.current.stop();
+      const uri = recordingRef.current.uri;
       recordingRef.current = null;
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
+      await setAudioModeAsync({ allowsRecordingIOS: false });
       if (uri) {
         onClose();
         onAttach([
@@ -303,14 +307,14 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
       setIsStopping(false);
       setRecordingMs(0);
     }
-  }, [isStopping, recordingMs, onClose, onAttach]);
+  }, [isStopping, onClose, onAttach]);
 
   const handleCancelRecording = useCallback(async () => {
     if (timerRef.current) clearInterval(timerRef.current);
     try {
-      await recordingRef.current?.stopAndUnloadAsync();
+      await recordingRef.current?.stop();
       recordingRef.current = null;
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
+      await setAudioModeAsync({ allowsRecordingIOS: false });
     } catch {
       /* ignore */
     }

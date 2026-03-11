@@ -38,40 +38,43 @@ jest.mock('react-native/Libraries/BatchedBridge/NativeModules', () => ({
   default: mockNativeModules,
 }));
 
-// Provide a lightweight mock for expo-av in Jest/node environments where the
-// native ExponentAV module is unavailable.
-jest.mock('expo-av', () => ({
-  Audio: {
-    requestPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted' }),
+// Provide a lightweight mock for expo-audio in Jest/node environments where
+// native audio modules are unavailable.
+jest.mock('expo-audio', () => {
+  const mockPlayer = {
+    play: jest.fn(),
+    pause: jest.fn(),
+    seekTo: jest.fn().mockResolvedValue(undefined),
+    remove: jest.fn(),
+    playing: false,
+    currentTime: 0,
+    duration: 0,
+    addListener: jest.fn().mockReturnValue({ remove: jest.fn() }),
+  };
+  const mockRecorder = {
+    prepareToRecordAsync: jest.fn().mockResolvedValue(undefined),
+    record: jest.fn(),
+    stop: jest.fn().mockResolvedValue(undefined),
+    uri: 'file:///mock-audio.m4a',
+    currentTime: 0,
+    isRecording: false,
+    addListener: jest.fn().mockReturnValue({ remove: jest.fn() }),
+  };
+  return {
+    requestRecordingPermissionsAsync: jest.fn().mockResolvedValue({ granted: true }),
     setAudioModeAsync: jest.fn().mockResolvedValue(undefined),
-    Recording: jest.fn().mockImplementation(() => ({
-      prepareToRecordAsync: jest.fn().mockResolvedValue(undefined),
-      startAsync: jest.fn().mockResolvedValue(undefined),
-      stopAndUnloadAsync: jest.fn().mockResolvedValue(undefined),
-      getURI: jest.fn().mockReturnValue('file:///mock-audio.m4a'),
-      createNewLoadedSoundAsync: jest.fn().mockResolvedValue({
-        sound: {
-          playAsync: jest.fn().mockResolvedValue(undefined),
-          stopAsync: jest.fn().mockResolvedValue(undefined),
-          unloadAsync: jest.fn().mockResolvedValue(undefined),
-          setOnPlaybackStatusUpdate: jest.fn(),
-          getStatusAsync: jest.fn().mockResolvedValue({ isLoaded: true }),
-        },
-      }),
-    })),
-    Sound: {
-      createAsync: jest.fn().mockResolvedValue({
-        sound: {
-          playAsync: jest.fn().mockResolvedValue(undefined),
-          stopAsync: jest.fn().mockResolvedValue(undefined),
-          unloadAsync: jest.fn().mockResolvedValue(undefined),
-          setOnPlaybackStatusUpdate: jest.fn(),
-          getStatusAsync: jest.fn().mockResolvedValue({ isLoaded: true }),
-        },
-      }),
+    createAudioPlayer: jest.fn().mockReturnValue(mockPlayer),
+    AudioPlayer: jest.fn().mockImplementation(() => mockPlayer),
+    AudioRecorder: jest.fn().mockImplementation(() => mockRecorder),
+    RecordingPresets: {
+      HIGH_QUALITY: {},
+      LOW_QUALITY: {},
     },
-  },
-}));
+    useAudioRecorderPermissions: jest
+      .fn()
+      .mockReturnValue([{ granted: true }, jest.fn().mockResolvedValue({ granted: true })]),
+  };
+});
 
 jest.mock('react-native-safe-area-context', () => {
   const insets = { top: 0, right: 0, bottom: 0, left: 0 };

@@ -10,7 +10,8 @@ import {
   ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Audio } from 'expo-av';
+import { AudioPlayer, createAudioPlayer } from 'expo-audio';
+import type { AudioStatus } from 'expo-audio';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 import type { MessageVM } from '@iconicedu/shared-types';
@@ -41,7 +42,10 @@ function fmtDuration(s: number): string {
 type MessageInputProps = {
   onSend: (text: string) => void | Promise<void>;
   /** Called with picked/recorded attachments and optional caption — caller handles upload + send. */
-  onSendAttachment?: (attachments: AttachmentPayload[], caption?: string) => Promise<void>;
+  onSendAttachment?: (
+    attachments: AttachmentPayload[],
+    caption?: string,
+  ) => Promise<void>;
   placeholder?: string;
   disabled?: boolean;
   /** When true, an upload is in flight — shows spinner on the + button and blocks new uploads. */
@@ -271,12 +275,16 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const [pendingAttachments, setPendingAttachments] = useState<AttachmentPayload[]>([]);
   const [loadedImageUris, setLoadedImageUris] = useState<Set<string>>(new Set());
   const [audioPlaying, setAudioPlaying] = useState(false);
-  const audioSoundRef = useRef<Audio.Sound | null>(null);
+  const audioSoundRef = useRef<AudioPlayer | null>(null);
+  const audioSubRef = useRef<{ remove(): void } | null>(null);
   const MAX_INPUT_HEIGHT = 120;
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
-  const s = React.useMemo(() => makeStyles(colors, insets.bottom), [colors, insets.bottom]);
+  const s = React.useMemo(
+    () => makeStyles(colors, insets.bottom),
+    [colors, insets.bottom],
+  );
 
   // Auto-focus the input whenever a reply target is set
   useEffect(() => {
@@ -293,48 +301,55 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   // Cleanup audio on unmount
   useEffect(() => {
     return () => {
-      audioSoundRef.current?.stopAsync().catch(() => null);
-      audioSoundRef.current?.unloadAsync().catch(() => null);
+      audioSubRef.current?.remove();
+      audioSoundRef.current?.remove();
     };
   }, []);
 
-  const clearPendingAudio = useCallback(async () => {
-    if (audioSoundRef.current) {
-      await audioSoundRef.current.stopAsync().catch(() => null);
-      await audioSoundRef.current.unloadAsync().catch(() => null);
-      audioSoundRef.current = null;
-    }
+  const clearPendingAudio = useCallback(() => {
+    audioSubRef.current?.remove();
+    audioSubRef.current = null;
+    audioSoundRef.current?.remove();
+    audioSoundRef.current = null;
     setAudioPlaying(false);
   }, []);
 
-  const handleToggleAudio = useCallback(async (uri: string) => {
-    if (!audioSoundRef.current) {
-      const { sound } = await Audio.Sound.createAsync({ uri }, { shouldPlay: true });
-      audioSoundRef.current = sound;
-      setAudioPlaying(true);
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded) {
-          setAudioPlaying(status.isPlaying);
-          if (status.didJustFinish) {
-            sound.setPositionAsync(0).catch(() => null);
-            setAudioPlaying(false);
-          }
-        }
-      });
-    } else if (audioPlaying) {
-      await audioSoundRef.current.pauseAsync().catch(() => null);
-    } else {
-      await audioSoundRef.current.playAsync().catch(() => null);
-    }
-  }, [audioPlaying]);
+  const handleToggleAudio = useCallback(
+    (uri: string) => {
+      if (!audioSoundRef.current) {
+        const player = createAudioPlayer({ uri });
+        audioSoundRef.current = player;
+        setAudioPlaying(true);
+        audioSubRef.current = player.addListener(
+          'playbackStatusUpdate',
+          (status: AudioStatus) => {
+            setAudioPlaying(status.playing);
+            if (status.didJustFinish) {
+              player.seekTo(0).catch(() => null);
+              setAudioPlaying(false);
+            }
+          },
+        );
+        player.play();
+      } else if (audioPlaying) {
+        audioSoundRef.current.pause();
+      } else {
+        audioSoundRef.current.play();
+      }
+    },
+    [audioPlaying],
+  );
 
-  const handleRemovePending = useCallback(async (index: number) => {
-    const removing = pendingAttachments[index];
-    if (removing?.mimeType.startsWith('audio/')) {
-      await clearPendingAudio();
-    }
-    setPendingAttachments((prev) => prev.filter((_, i) => i !== index));
-  }, [pendingAttachments, clearPendingAudio]);
+  const handleRemovePending = useCallback(
+    async (index: number) => {
+      const removing = pendingAttachments[index];
+      if (removing?.mimeType.startsWith('audio/')) {
+        await clearPendingAudio();
+      }
+      setPendingAttachments((prev) => prev.filter((_, i) => i !== index));
+    },
+    [pendingAttachments, clearPendingAudio],
+  );
 
   const handleSend = useCallback(async () => {
     if (pendingAttachments.length > 0) {
@@ -354,7 +369,14 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     setInputHeight(20);
     onTypingStop?.();
     await onSend(trimmed);
-  }, [text, pendingAttachments, onSend, onSendAttachment, onTypingStop, clearPendingAudio]);
+  }, [
+    text,
+    pendingAttachments,
+    onSend,
+    onSendAttachment,
+    onTypingStop,
+    clearPendingAudio,
+  ]);
 
   const handleChangeText = useCallback(
     (t: string) => {
@@ -451,10 +473,11 @@ export const MessageInput: React.FC<MessageInputProps> = ({
                       onPress={() => handleToggleAudio(a.uri)}
                       activeOpacity={0.8}
                     >
-                      {audioPlaying
-                        ? <Pause size={14} color={colors.tealFg} />
-                        : <Play size={14} color={colors.tealFg} />
-                      }
+                      {audioPlaying ? (
+                        <Pause size={14} color={colors.tealFg} />
+                      ) : (
+                        <Play size={14} color={colors.tealFg} />
+                      )}
                     </TouchableOpacity>
                     <View style={{ flex: 1 }}>
                       <Text style={s.attachAudioLabel}>Voice</Text>
@@ -476,7 +499,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
               return (
                 <View key={i} style={s.attachFileItem}>
                   <FileText size={16} color={colors.teal} />
-                  <Text style={s.attachFileName} numberOfLines={2}>{a.name}</Text>
+                  <Text style={s.attachFileName} numberOfLines={2}>
+                    {a.name}
+                  </Text>
                   <TouchableOpacity
                     onPress={() => handleRemovePending(i)}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -499,10 +524,11 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           onPress={() => setAttachmentSheetVisible(true)}
           accessibilityLabel="Add attachment"
         >
-          {uploading
-            ? <ActivityIndicator size="small" color={colors.teal} />
-            : <Plus size={22} color={colors.textMuted} />
-          }
+          {uploading ? (
+            <ActivityIndicator size="small" color={colors.teal} />
+          ) : (
+            <Plus size={22} color={colors.textMuted} />
+          )}
         </TouchableOpacity>
 
         {/* Pill: text input + smiley */}

@@ -26,7 +26,9 @@
       "WebFetch(domain:expo.dev)",
       "Bash(npx expo install --fix)",
       "Bash(pnpm test:mobile)",
-      "Bash(pnpm test:web)"
+      "Bash(pnpm test:web)",
+      "Bash(grep -n \"^export\" /Users/hwanigasooriya/Workspace/hobby/iconicedu-monorepo/apps/mobile/app/\\\\\\(app\\\\\\)/channel/[channelId].tsx /Users/hwanigasooriya/Workspace/hobby/iconicedu-monorepo/apps/mobile/app/\\\\\\(app\\\\\\)/dm/[channelId].tsx /Users/hwanigasooriya/Workspace/hobby/iconicedu-monorepo/apps/mobile/app/\\\\\\(app\\\\\\)/spaces/[channelId].tsx)",
+      "Bash(npx expo install expo-audio)"
     ],
     "additionalDirectories": [
       "/Users/hwanigasooriya/Workspace/hobby/iconicedu-monorepo/supabase/migrations"
