@@ -113,6 +113,57 @@ function createSupabaseMock() {
         };
       }
 
+      if (table === 'profiles') {
+        const chain = {
+          eq: vi.fn(() => chain),
+          in: vi.fn(() => chain),
+          is: vi.fn(() => chain),
+          returns: vi.fn(async () => ({
+            data: [
+              { id: 'child-profile-1', account_id: 'child-account-1' },
+              { id: 'guardian-profile-1', account_id: 'guardian-account-1' },
+            ],
+            error: null,
+          })),
+        };
+        return { select: vi.fn(() => chain) };
+      }
+
+      if (table === 'profile_presence') {
+        const chain = {
+          eq: vi.fn(() => chain),
+          in: vi.fn(() => chain),
+          is: vi.fn(() => chain),
+          returns: vi.fn(async () => ({
+            data: [
+              { profile_id: 'child-profile-1', live_status: 'away' },
+              { profile_id: 'guardian-profile-1', live_status: 'away' },
+            ],
+            error: null,
+          })),
+        };
+        return { select: vi.fn(() => chain) };
+      }
+
+      if (table === 'channel_read_state') {
+        const chain = {
+          eq: vi.fn(() => chain),
+          in: vi.fn(() => chain),
+          is: vi.fn(() => chain),
+          returns: vi.fn(async () => ({
+            data: [
+              { account_id: 'child-account-1', last_read_at: '2026-03-03T11:00:00.000Z' },
+              {
+                account_id: 'guardian-account-1',
+                last_read_at: '2026-03-03T11:00:00.000Z',
+              },
+            ],
+            error: null,
+          })),
+        };
+        return { select: vi.fn(() => chain) };
+      }
+
       if (table === 'activity_feed_items') {
         const selectChain = {
           eq: vi.fn(() => selectChain),
@@ -295,6 +346,57 @@ describe('projectActivityEvents', () => {
             })),
           })),
         };
+      }
+
+      if (table === 'profiles') {
+        const chain = {
+          eq: vi.fn(() => chain),
+          in: vi.fn(() => chain),
+          is: vi.fn(() => chain),
+          returns: vi.fn(async () => ({
+            data: [
+              { id: 'child-profile-1', account_id: 'child-account-1' },
+              { id: 'guardian-profile-1', account_id: 'guardian-account-1' },
+            ],
+            error: null,
+          })),
+        };
+        return { select: vi.fn(() => chain) };
+      }
+
+      if (table === 'profile_presence') {
+        const chain = {
+          eq: vi.fn(() => chain),
+          in: vi.fn(() => chain),
+          is: vi.fn(() => chain),
+          returns: vi.fn(async () => ({
+            data: [
+              { profile_id: 'child-profile-1', live_status: 'away' },
+              { profile_id: 'guardian-profile-1', live_status: 'away' },
+            ],
+            error: null,
+          })),
+        };
+        return { select: vi.fn(() => chain) };
+      }
+
+      if (table === 'channel_read_state') {
+        const chain = {
+          eq: vi.fn(() => chain),
+          in: vi.fn(() => chain),
+          is: vi.fn(() => chain),
+          returns: vi.fn(async () => ({
+            data: [
+              { account_id: 'child-account-1', last_read_at: '2026-03-03T11:00:00.000Z' },
+              {
+                account_id: 'guardian-account-1',
+                last_read_at: '2026-03-03T11:00:00.000Z',
+              },
+            ],
+            error: null,
+          })),
+        };
+        return { select: vi.fn(() => chain) };
       }
 
       if (table === 'activity_feed_items') {
@@ -553,5 +655,210 @@ describe('projectActivityEvents', () => {
           entry.payload.occurred_at === '2026-03-08T13:00:00.000Z',
       ),
     ).toBe(true);
+  });
+
+  it('suppresses conversational inbox + dispatch for active recipients', async () => {
+    getProfilesByIds.mockResolvedValue({
+      data: [
+        { id: 'profile-1', account_id: 'account-1', kind: 'guardian' },
+        { id: 'profile-2', account_id: 'account-2', kind: 'guardian' },
+      ],
+    });
+    getFamilyLinksByOrg.mockResolvedValue({ data: [] });
+    getProfilesByAccountIds.mockResolvedValue({ data: [] });
+
+    const event = {
+      id: 'event-message-1',
+      org_id: 'org-1',
+      event_type: 'message.posted',
+      occurred_at: '2026-03-12T10:01:00.000Z',
+      source_kind: 'profile',
+      actor_profile_id: 'sender-profile',
+      scope: { kind: 'channel', channelId: 'channel-1' },
+      object_ref: { kind: 'message', id: 'message-1' },
+      target_ref: null,
+      payload: {
+        channelId: 'channel-1',
+        senderName: 'Taylor',
+        content: 'Hello channel',
+      },
+      audience_rules: [],
+      dedupe_key: 'message.posted:message-1',
+      projection_status: 'pending',
+      projection_attempts: 0,
+      created_at: '2026-03-12T10:01:00.000Z',
+      updated_at: '2026-03-12T10:01:00.000Z',
+    };
+
+    const upserts: Array<{ table: string; payload: Record<string, unknown> }> = [];
+    const supabase = {
+      from: vi.fn((table: string) => {
+        if (table === 'activity_events') {
+          return {
+            select: vi.fn(() => ({
+              is: vi.fn(() => ({
+                lt: vi.fn(() => ({
+                  order: vi.fn(() => ({
+                    limit: vi.fn(() => ({
+                      in: vi.fn(() => ({
+                        returns: vi.fn(async () => ({ data: [event], error: null })),
+                      })),
+                    })),
+                  })),
+                })),
+              })),
+            })),
+            update: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                is: vi.fn(async () => ({ error: null })),
+              })),
+            })),
+          };
+        }
+
+        if (table === 'channel_members') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                eq: vi.fn(() => ({
+                  is: vi.fn(() => ({
+                    returns: vi.fn(async () => ({
+                      data: [{ profile_id: 'profile-1' }, { profile_id: 'profile-2' }],
+                      error: null,
+                    })),
+                  })),
+                })),
+              })),
+            })),
+          };
+        }
+
+        if (table === 'profiles') {
+          const chain = {
+            eq: vi.fn(() => chain),
+            in: vi.fn(() => chain),
+            is: vi.fn(() => chain),
+            returns: vi.fn(async () => ({
+              data: [
+                { id: 'profile-1', account_id: 'account-1' },
+                { id: 'profile-2', account_id: 'account-2' },
+              ],
+              error: null,
+            })),
+          };
+          return { select: vi.fn(() => chain) };
+        }
+
+        if (table === 'profile_presence') {
+          const chain = {
+            eq: vi.fn(() => chain),
+            in: vi.fn(() => chain),
+            is: vi.fn(() => chain),
+            returns: vi.fn(async () => ({
+              data: [
+                { profile_id: 'profile-1', live_status: 'online' },
+                { profile_id: 'profile-2', live_status: 'away' },
+              ],
+              error: null,
+            })),
+          };
+          return { select: vi.fn(() => chain) };
+        }
+
+        if (table === 'channel_read_state') {
+          const chain = {
+            eq: vi.fn(() => chain),
+            in: vi.fn(() => chain),
+            is: vi.fn(() => chain),
+            returns: vi.fn(async () => ({
+              data: [
+                { account_id: 'account-1', last_read_at: '2026-03-12T10:00:30.000Z' },
+                { account_id: 'account-2', last_read_at: '2026-03-12T09:40:00.000Z' },
+              ],
+              error: null,
+            })),
+          };
+          return { select: vi.fn(() => chain) };
+        }
+
+        if (table === 'activity_feed_items') {
+          const selectChain = {
+            eq: vi.fn(() => selectChain),
+            is: vi.fn(() => selectChain),
+            maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+          };
+
+          return {
+            select: vi.fn(() => selectChain),
+            upsert: vi.fn((payload: Record<string, unknown>) => ({
+              select: vi.fn(() => ({
+                single: vi.fn(async () => {
+                  upserts.push({ table, payload });
+                  return { data: { id: 'feed-item-1' }, error: null };
+                }),
+              })),
+            })),
+            update: vi.fn(() => ({
+              eq: vi.fn(async () => ({ error: null })),
+            })),
+          };
+        }
+
+        if (
+          table === 'notification_preferences' ||
+          table === 'notification_preference_scopes'
+        ) {
+          const chain = {
+            eq: vi.fn(() => chain),
+            in: vi.fn(() => chain),
+            is: vi.fn(() => chain),
+            returns: vi.fn(async () => ({ data: [], error: null })),
+          };
+          return { select: vi.fn(() => chain) };
+        }
+
+        if (table === 'activity_feed_group_members') {
+          return {
+            upsert: vi.fn(async () => ({ error: null })),
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                is: vi.fn(async () => ({ count: 1, error: null })),
+              })),
+            })),
+          };
+        }
+
+        throw new Error(`Unexpected table ${table}`);
+      }),
+    };
+
+    await projectActivityEvents(supabase as never);
+
+    expect(enqueueNotificationDispatchJobs).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recipientProfileIds: ['profile-2'],
+      }),
+    );
+    const leafUpserts = upserts.filter((entry) => entry.payload.kind === 'leaf');
+    expect(leafUpserts).toHaveLength(1);
+    expect(leafUpserts[0]?.payload.recipient_profile_id).toBe('profile-2');
+  });
+
+  it('does not suppress non-conversational events', async () => {
+    const { supabase, upserts } = createSupabaseMock();
+    await projectActivityEvents(supabase as never);
+
+    expect(enqueueNotificationDispatchJobs).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recipientProfileIds: expect.arrayContaining([
+          'child-profile-1',
+          'guardian-profile-1',
+        ]),
+      }),
+    );
+    const leafUpserts = upserts.filter(
+      (entry) => entry.table === 'activity_feed_items' && entry.payload.kind === 'leaf',
+    );
+    expect(leafUpserts).toHaveLength(2);
   });
 });

@@ -3,6 +3,7 @@ import type { SupabaseServiceClient } from '@iconicedu/web/lib/supabase/service'
 
 import { getActivityEventDefinition } from '@iconicedu/web/lib/activity-feed/definitions/activity-definitions';
 import { shouldReplaceGroupParent } from '@iconicedu/web/lib/activity-feed/projector/group-parent-priority';
+import { resolveActiveConversationSuppressedRecipients } from '@iconicedu/web/lib/activity-feed/suppression/active-conversation-suppression';
 import { enqueueNotificationDispatchJobs } from '@iconicedu/web/lib/notifications/dispatch-jobs';
 
 const MAX_ATTEMPTS = 10;
@@ -224,7 +225,30 @@ async function projectEvent(supabase: SupabaseServiceClient, event: ActivityEven
   }
 
   const rendered = definition.render(event);
-  const recipientProfileIds = await definition.resolveRecipients(supabase, event);
+  const resolvedRecipientProfileIds = await definition.resolveRecipients(supabase, event);
+  const suppressionResult = await resolveActiveConversationSuppressedRecipients({
+    supabase,
+    event,
+    recipientProfileIds: resolvedRecipientProfileIds,
+    now: event.occurred_at,
+  });
+  const recipientProfileIds = suppressionResult.recipientProfileIds;
+
+  if (suppressionResult.suppressedProfileIds.length) {
+    console.log('[activity-feed:active-conversation-suppression]', 'decision', {
+      eventType: event.event_type,
+      eventId: event.id,
+      channelId: suppressionResult.channelId,
+      suppressedRecipientProfileIds: suppressionResult.suppressedProfileIds,
+      emittedRecipientProfileIds: recipientProfileIds,
+      reason: 'active_channel_conversation',
+    });
+  }
+
+  if (!recipientProfileIds.length) {
+    return;
+  }
+
   await enqueueNotificationDispatchJobs({
     supabase,
     event,

@@ -47,11 +47,7 @@ import {
 } from '@iconicedu/web/lib/sidebar/learning-space-unread';
 import { upsertDirectMessageChannel } from '@iconicedu/web/lib/sidebar/direct-message-realtime';
 import { persistDirectMessageUnreadCount } from '@iconicedu/web/lib/sidebar/direct-message-unread-persistence';
-import {
-  applyInboxUnreadCount,
-  applyInboxUnreadDelta,
-  getInboxUnreadDeltaFromRealtime,
-} from '@iconicedu/web/lib/sidebar/inbox-count';
+import { applyInboxUnreadCount } from '@iconicedu/web/lib/sidebar/inbox-count';
 import { shouldRetryDirectMessageBootstrap } from '@iconicedu/web/lib/sidebar/direct-message-bootstrap';
 import {
   bindDirectMessageRecoveryTriggers,
@@ -465,25 +461,13 @@ export function SidebarShell({
     }
 
     let refreshTimer: number | null = null;
-    const scheduleInboxRefresh = (payload: {
-      eventType: 'INSERT' | 'UPDATE' | 'DELETE';
-      new?: { recipient_profile_id?: string | null; is_read?: boolean | null } | null;
-      old?: { recipient_profile_id?: string | null; is_read?: boolean | null } | null;
-    }) => {
+    const scheduleInboxRefresh = () => {
       if (refreshTimer) {
         window.clearTimeout(refreshTimer);
       }
 
       refreshTimer = window.setTimeout(() => {
-        const delta = getInboxUnreadDeltaFromRealtime({
-          eventType: payload.eventType,
-          currentProfileId: profileId,
-          nextRow: payload.new ?? null,
-          previousRow: payload.old ?? null,
-        });
-        if (delta !== 0) {
-          setSidebarData((prev) => applyInboxUnreadDelta(prev, delta));
-        }
+        void refreshInboxUnreadCount();
         if (pathname?.startsWith(`${dashboardBasePath}/inbox`)) {
           React.startTransition(() => {
             router.refresh();
@@ -501,20 +485,7 @@ export function SidebarShell({
         table: 'activity_feed_items',
         filter: `recipient_profile_id=eq.${profileId}`,
       },
-      (payload) =>
-        scheduleInboxRefresh(
-          payload as {
-            eventType: 'INSERT' | 'UPDATE' | 'DELETE';
-            new?: {
-              recipient_profile_id?: string | null;
-              is_read?: boolean | null;
-            } | null;
-            old?: {
-              recipient_profile_id?: string | null;
-              is_read?: boolean | null;
-            } | null;
-          },
-        ),
+      () => scheduleInboxRefresh(),
     );
     channel.subscribe((status) => {
       if (status === 'SUBSCRIBED') {
