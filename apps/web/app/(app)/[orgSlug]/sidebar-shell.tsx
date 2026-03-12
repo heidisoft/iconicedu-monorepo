@@ -47,8 +47,16 @@ import {
 } from '@iconicedu/web/lib/sidebar/learning-space-unread';
 import { upsertDirectMessageChannel } from '@iconicedu/web/lib/sidebar/direct-message-realtime';
 import { persistDirectMessageUnreadCount } from '@iconicedu/web/lib/sidebar/direct-message-unread-persistence';
-import { applyInboxUnreadCount } from '@iconicedu/web/lib/sidebar/inbox-count';
+import {
+  applyInboxUnreadDelta,
+  getInboxUnreadDeltaFromRealtime,
+} from '@iconicedu/web/lib/sidebar/inbox-count';
 import { shouldRetryDirectMessageBootstrap } from '@iconicedu/web/lib/sidebar/direct-message-bootstrap';
+import {
+  bindDirectMessageRecoveryTriggers,
+  DM_RECOVERY_SYNC_INTERVAL_MS,
+  handleDirectMessageSubscribeStatus,
+} from '@iconicedu/web/lib/sidebar/direct-message-recovery';
 import { mapProfilePresenceRowToVM } from '@iconicedu/web/lib/profile/mappers/presence.mapper';
 import {
   applyPresenceToSidebarData,
@@ -276,26 +284,6 @@ export function SidebarShell({
   const sidebarAccountId =
     sidebarData.user.account?.ids?.id ?? sidebarProfile.ids?.accountId ?? null;
 
-  const refreshInboxUnreadCount = React.useCallback(async () => {
-    const response = await window.fetch('/api/activity-feed/unread-count', {
-      method: 'GET',
-      headers: { 'content-type': 'application/json' },
-      cache: 'no-store',
-    });
-    if (!response.ok) {
-      return;
-    }
-    const payload = (await response.json().catch(() => null)) as {
-      unreadCount?: number;
-    } | null;
-
-    setSidebarData((prev) => applyInboxUnreadCount(prev, payload?.unreadCount ?? 0));
-  }, []);
-
-  React.useEffect(() => {
-    void refreshInboxUnreadCount();
-  }, [refreshInboxUnreadCount]);
-
   const computedOnboardingStep = React.useMemo(
     () => determineOnboardingStep(sidebarProfile, sidebarAccount),
     [sidebarProfile, sidebarAccount],
@@ -460,13 +448,25 @@ export function SidebarShell({
     }
 
     let refreshTimer: number | null = null;
-    const scheduleInboxRefresh = () => {
+    const scheduleInboxRefresh = (payload: {
+      eventType: 'INSERT' | 'UPDATE' | 'DELETE';
+      new?: { recipient_profile_id?: string | null; is_read?: boolean | null } | null;
+      old?: { recipient_profile_id?: string | null; is_read?: boolean | null } | null;
+    }) => {
       if (refreshTimer) {
         window.clearTimeout(refreshTimer);
       }
 
       refreshTimer = window.setTimeout(() => {
-        void refreshInboxUnreadCount();
+        const delta = getInboxUnreadDeltaFromRealtime({
+          eventType: payload.eventType,
+          currentProfileId: profileId,
+          nextRow: payload.new ?? null,
+          previousRow: payload.old ?? null,
+        });
+        if (delta !== 0) {
+          setSidebarData((prev) => applyInboxUnreadDelta(prev, delta));
+        }
         if (pathname?.startsWith(`${dashboardBasePath}/inbox`)) {
           React.startTransition(() => {
             router.refresh();
@@ -484,7 +484,20 @@ export function SidebarShell({
         table: 'activity_feed_items',
         filter: `recipient_profile_id=eq.${profileId}`,
       },
-      scheduleInboxRefresh,
+      (payload) =>
+        scheduleInboxRefresh(
+          payload as {
+            eventType: 'INSERT' | 'UPDATE' | 'DELETE';
+            new?: {
+              recipient_profile_id?: string | null;
+              is_read?: boolean | null;
+            } | null;
+            old?: {
+              recipient_profile_id?: string | null;
+              is_read?: boolean | null;
+            } | null;
+          },
+        ),
     );
     channel.subscribe();
 
@@ -497,7 +510,6 @@ export function SidebarShell({
   }, [
     dashboardBasePath,
     pathname,
-    refreshInboxUnreadCount,
     router,
     sidebarProfile.ids?.id,
     sidebarProfile.ids?.orgId,
@@ -648,6 +660,12 @@ export function SidebarShell({
     };
 
     void syncDirectMessageMemberships();
+    const cleanupRecovery = bindDirectMessageRecoveryTriggers({
+      syncDirectMessageMemberships: () => {
+        void syncDirectMessageMemberships();
+      },
+      intervalMs: DM_RECOVERY_SYNC_INTERVAL_MS,
+    });
 
     channel.on(
       'postgres_changes',
@@ -723,7 +741,11 @@ export function SidebarShell({
         });
       },
     );
-    channel.subscribe();
+    channel.subscribe((status) => {
+      handleDirectMessageSubscribeStatus(status, () => {
+        void syncDirectMessageMemberships();
+      });
+    });
 
     return () => {
       retryTimers.forEach((timer) => {
@@ -731,6 +753,7 @@ export function SidebarShell({
       });
       retryTimers.clear();
       exhaustedChannelIds.clear();
+      cleanupRecovery();
       void channel.unsubscribe();
     };
   }, [
