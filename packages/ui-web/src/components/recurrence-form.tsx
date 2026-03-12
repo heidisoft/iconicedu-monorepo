@@ -116,6 +116,27 @@ export function buildWeekdayEndTimes(values?: WeekdayTime[]) {
   }));
 }
 
+export function deriveEndTimeOnStartTimeChange(input: { nextStartTime: string }) {
+  return addOneHour(input.nextStartTime);
+}
+
+export function toMinutesSinceMidnight(time: string) {
+  const [hourValue, minuteValue] = time.split(':').map((value) => Number(value));
+  if (!Number.isFinite(hourValue) || !Number.isFinite(minuteValue)) {
+    return null;
+  }
+  return hourValue * 60 + minuteValue;
+}
+
+export function isEndTimeAfterStartTime(startTime: string, endTime: string) {
+  const startMinutes = toMinutesSinceMidnight(startTime);
+  const endMinutes = toMinutesSinceMidnight(endTime);
+  if (startMinutes === null || endMinutes === null) {
+    return false;
+  }
+  return endMinutes > startMinutes;
+}
+
 export function RecurrenceForm({
   defaultValues,
   onSubmit,
@@ -187,6 +208,17 @@ export function RecurrenceForm({
   const [newOverrideTime, setNewOverrideTime] = React.useState('');
   const [newOverrideReason, setNewOverrideReason] = React.useState('');
   const [editingOverrideId, setEditingOverrideId] = React.useState<string | null>(null);
+
+  const handleStartTimeChange = React.useCallback((nextStartTime: string) => {
+    setStartTime(nextStartTime);
+    setEndTime(deriveEndTimeOnStartTimeChange({ nextStartTime }));
+  }, []);
+
+  const endTimeInvalid =
+    isSubmitted &&
+    Boolean(startTime) &&
+    Boolean(endTime) &&
+    !isEndTimeAfterStartTime(startTime, endTime);
 
   const startDateInvalid = isSubmitted && !startDate;
   const timezoneInvalid = isSubmitted && !timezone;
@@ -304,6 +336,7 @@ export function RecurrenceForm({
       !timezone ||
       !startTime ||
       !endTime ||
+      !isEndTimeAfterStartTime(startTime, endTime) ||
       (repeatOption !== 'none' && frequency === 'weekly' && byWeekday.length === 0)
     ) {
       return;
@@ -537,7 +570,7 @@ export function RecurrenceForm({
               id="start-time"
               type="time"
               value={startTime}
-              onChange={(event) => setStartTime(event.target.value)}
+              onChange={(event) => handleStartTimeChange(event.target.value)}
             />
           </div>
           <div className="space-y-2">
@@ -548,8 +581,14 @@ export function RecurrenceForm({
               id="end-time"
               type="time"
               value={endTime}
+              min={startTime || undefined}
               onChange={(event) => setEndTime(event.target.value)}
             />
+            {endTimeInvalid && (
+              <p className="text-xs text-destructive">
+                End time must be after start time.
+              </p>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="timezone">

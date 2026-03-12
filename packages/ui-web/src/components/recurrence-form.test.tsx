@@ -4,7 +4,9 @@ import {
   addOneHour,
   buildSingleDayWeekdayTime,
   buildWeekdayEndTimes,
+  deriveEndTimeOnStartTimeChange,
   getWeekdayFromDate,
+  isEndTimeAfterStartTime,
   isNoRepeatDefault,
   shouldShowExceptionsAndOverrides,
 } from './recurrence-form';
@@ -73,5 +75,28 @@ describe('shouldShowExceptionsAndOverrides', () => {
   it('shows exceptions/overrides only while editing repeating schedules', () => {
     expect(shouldShowExceptionsAndOverrides(true, 'weekly')).toBe(true);
     expect(shouldShowExceptionsAndOverrides(true, 'none')).toBe(false);
+  });
+});
+
+describe('RecurrenceForm time defaults', () => {
+  it('always sets end time to one hour ahead when start time changes', () => {
+    expect(
+      deriveEndTimeOnStartTimeChange({
+        nextStartTime: '12:30',
+      }),
+    ).toBe('13:30');
+    expect(
+      deriveEndTimeOnStartTimeChange({
+        nextStartTime: '12:00',
+      }),
+    ).toBe('13:00');
+  });
+});
+
+describe('isEndTimeAfterStartTime', () => {
+  it('requires end time to be after start time', () => {
+    expect(isEndTimeAfterStartTime('09:00', '10:00')).toBe(true);
+    expect(isEndTimeAfterStartTime('09:00', '09:00')).toBe(false);
+    expect(isEndTimeAfterStartTime('09:00', '08:59')).toBe(false);
   });
 });
