@@ -5,10 +5,16 @@ import { render, screen } from '@testing-library/react-native';
 
 const mockUseLocalSearchParams = jest.fn();
 const mockUseRouter = jest.fn(() => ({ back: jest.fn() }));
+const mockUseIsFocused = jest.fn(() => true);
 
 jest.mock('expo-router', () => ({
   useLocalSearchParams: (...args: unknown[]) => mockUseLocalSearchParams(...args),
   useRouter: (...args: unknown[]) => mockUseRouter(...args),
+}));
+
+jest.mock('@react-navigation/native', () => ({
+  ...jest.requireActual('@react-navigation/native'),
+  useIsFocused: (...args: unknown[]) => mockUseIsFocused(...args),
 }));
 
 jest.mock('@/hooks/use-account', () => ({

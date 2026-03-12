@@ -26,7 +26,7 @@
     "typecheck": "turbo run typecheck",
     "typecheck:web": "turbo run typecheck --filter=web...",
     "typecheck:mobile": "turbo run typecheck --filter=mobile...",
-    "prepush:check": "pnpm typecheck && pnpm test:affected",
+    "prepush:check": "pnpm typecheck && pnpm test:affected && pnpm test:mobile",
     "----------- TESTING -----------": "",
     "test": "pnpm test:guard:activity-feed-writes && turbo run test",
     "test:web": "turbo run test --filter=web --filter=@iconicedu/ui-web",
