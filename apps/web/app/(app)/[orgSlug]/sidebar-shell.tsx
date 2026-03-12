@@ -48,6 +48,7 @@ import {
 import { upsertDirectMessageChannel } from '@iconicedu/web/lib/sidebar/direct-message-realtime';
 import { persistDirectMessageUnreadCount } from '@iconicedu/web/lib/sidebar/direct-message-unread-persistence';
 import {
+  applyInboxUnreadCount,
   applyInboxUnreadDelta,
   getInboxUnreadDeltaFromRealtime,
 } from '@iconicedu/web/lib/sidebar/inbox-count';
@@ -284,6 +285,22 @@ export function SidebarShell({
   const sidebarAccountId =
     sidebarData.user.account?.ids?.id ?? sidebarProfile.ids?.accountId ?? null;
 
+  const refreshInboxUnreadCount = React.useCallback(async () => {
+    const response = await window.fetch('/api/activity-feed/unread-count', {
+      method: 'GET',
+      headers: { 'content-type': 'application/json' },
+      cache: 'no-store',
+    });
+    if (!response.ok) {
+      return;
+    }
+    const payload = (await response.json().catch(() => null)) as {
+      unreadCount?: number;
+    } | null;
+
+    setSidebarData((prev) => applyInboxUnreadCount(prev, payload?.unreadCount ?? 0));
+  }, []);
+
   const computedOnboardingStep = React.useMemo(
     () => determineOnboardingStep(sidebarProfile, sidebarAccount),
     [sidebarProfile, sidebarAccount],
@@ -499,9 +516,28 @@ export function SidebarShell({
           },
         ),
     );
-    channel.subscribe();
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        void refreshInboxUnreadCount();
+      }
+    });
+
+    void refreshInboxUnreadCount();
+
+    const onFocus = () => {
+      void refreshInboxUnreadCount();
+    };
+    const onVisibilityChange = () => {
+      if (!document.hidden) {
+        void refreshInboxUnreadCount();
+      }
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibilityChange);
 
     return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       if (refreshTimer) {
         window.clearTimeout(refreshTimer);
       }
@@ -510,6 +546,7 @@ export function SidebarShell({
   }, [
     dashboardBasePath,
     pathname,
+    refreshInboxUnreadCount,
     router,
     sidebarProfile.ids?.id,
     sidebarProfile.ids?.orgId,
