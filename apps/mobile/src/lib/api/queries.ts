@@ -2204,3 +2204,58 @@ export async function markActivityFeedRead(
     .eq('recipient_profile_id', profileId)
     .in('id', allIds);
 }
+
+export async function markChannelReadState(input: {
+  orgId: string;
+  accountId: string;
+  profileId: string;
+  channelId: string;
+  lastReadMessageId: string;
+}): Promise<number> {
+  const membershipLookup = await supabase
+    .from('channel_members')
+    .select('id')
+    .eq('org_id', input.orgId)
+    .eq('channel_id', input.channelId)
+    .eq('profile_id', input.profileId)
+    .is('deleted_at', null)
+    .maybeSingle<{ id: string }>();
+
+  if (membershipLookup.error) {
+    throw membershipLookup.error;
+  }
+  if (!membershipLookup.data) {
+    throw new Error('Channel not found or access denied');
+  }
+
+  const messageLookup = await supabase
+    .from('messages')
+    .select('id')
+    .eq('org_id', input.orgId)
+    .eq('channel_id', input.channelId)
+    .eq('id', input.lastReadMessageId)
+    .is('deleted_at', null)
+    .maybeSingle<{ id: string }>();
+
+  if (messageLookup.error) {
+    throw messageLookup.error;
+  }
+  if (!messageLookup.data) {
+    throw new Error('Invalid lastReadMessageId for channel');
+  }
+
+  const { data, error } = await supabase.rpc('recompute_unread_for_account_channel', {
+    p_org_id: input.orgId,
+    p_channel_id: input.channelId,
+    p_account_id: input.accountId,
+    p_last_read_message_id: input.lastReadMessageId,
+    p_last_read_at: new Date().toISOString(),
+    p_actor_profile_id: input.profileId,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return typeof data === 'number' ? data : 0;
+}

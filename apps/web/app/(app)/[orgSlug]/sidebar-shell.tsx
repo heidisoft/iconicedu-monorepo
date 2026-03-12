@@ -33,7 +33,6 @@ import { saveEducatorAvailabilityAction } from '@iconicedu/web/app/actions/educa
 import { upsertUserOnboardingStatusAction } from '@iconicedu/web/app/actions/onboarding-status';
 import { determineOnboardingStep } from '@iconicedu/web/lib/onboarding/determineOnboardingStep';
 import {
-  applyIncomingDirectMessageUnread,
   markDirectMessageChannelRead,
   touchDirectMessageChannelOrder,
 } from '@iconicedu/web/lib/sidebar/direct-message-unread';
@@ -41,12 +40,8 @@ import {
   shouldAttemptDirectMessageSync,
   shouldRunDirectMessageSync,
 } from '@iconicedu/web/lib/sidebar/direct-message-sync';
-import {
-  applyIncomingLearningSpaceUnread,
-  markLearningSpaceChannelRead,
-} from '@iconicedu/web/lib/sidebar/learning-space-unread';
+import { markLearningSpaceChannelRead } from '@iconicedu/web/lib/sidebar/learning-space-unread';
 import { upsertDirectMessageChannel } from '@iconicedu/web/lib/sidebar/direct-message-realtime';
-import { persistDirectMessageUnreadCount } from '@iconicedu/web/lib/sidebar/direct-message-unread-persistence';
 import { applyInboxUnreadCount } from '@iconicedu/web/lib/sidebar/inbox-count';
 import { shouldRetryDirectMessageBootstrap } from '@iconicedu/web/lib/sidebar/direct-message-bootstrap';
 import {
@@ -277,7 +272,6 @@ export function SidebarShell({
 
   const sidebarProfile = sidebarData.user.profile;
   const sidebarAccount = sidebarData.user.account ?? null;
-  const sidebarOrgId = sidebarProfile.ids?.orgId;
   const sidebarAccountId =
     sidebarData.user.account?.ids?.id ?? sidebarProfile.ids?.accountId ?? null;
 
@@ -300,35 +294,6 @@ export function SidebarShell({
   const computedOnboardingStep = React.useMemo(
     () => determineOnboardingStep(sidebarProfile, sidebarAccount),
     [sidebarProfile, sidebarAccount],
-  );
-
-  const persistUnread = React.useCallback(
-    async (
-      channelId: string,
-      unreadCount: number,
-      options?: {
-        markRead?: boolean;
-        lastReadMessageId?: string;
-        lastReadAt?: string;
-      },
-    ) => {
-      if (!sidebarOrgId || !sidebarAccountId) {
-        return;
-      }
-      const { error } = await persistDirectMessageUnreadCount(supabase, {
-        orgId: sidebarOrgId,
-        accountId: sidebarAccountId,
-        channelId,
-        unreadCount,
-        markRead: options?.markRead,
-        lastReadMessageId: options?.lastReadMessageId,
-        lastReadAt: options?.lastReadAt,
-      });
-      if (error) {
-        console.error('Failed to persist direct message unread count', error);
-      }
-    },
-    [sidebarOrgId, sidebarAccountId, supabase],
   );
 
   React.useEffect(() => {
@@ -354,27 +319,21 @@ export function SidebarShell({
           lastReadAt,
         });
       });
-      void persistUnread(channelId, 0, {
-        markRead: true,
-        lastReadMessageId,
-        lastReadAt,
-      });
     };
 
     window.addEventListener('dm:mark-read', handleMarkRead as EventListener);
     return () => {
       window.removeEventListener('dm:mark-read', handleMarkRead as EventListener);
     };
-  }, [persistUnread]);
+  }, []);
 
   React.useEffect(() => {
     const orgId = sidebarProfile.ids?.orgId;
-    const profileId = sidebarProfile.ids?.id;
-    if (!orgId || !profileId) {
+    if (!orgId) {
       return;
     }
 
-    const channel = supabase.channel(`sidebar-dm-unread:${orgId}:${profileId}`);
+    const channel = supabase.channel(`sidebar-dm-unread:${orgId}`);
     channel.on(
       'postgres_changes',
       {
@@ -386,64 +345,13 @@ export function SidebarShell({
       (payload) => {
         const row = payload.new as {
           channel_id?: string;
-          sender_profile_id?: string | null;
         } | null;
         if (!row?.channel_id) {
           return;
         }
         const channelId = row.channel_id;
 
-        setSidebarData((prev) => {
-          const ordered = touchDirectMessageChannelOrder(prev, channelId);
-          const directNext = applyIncomingDirectMessageUnread(ordered, {
-            channelId,
-            senderProfileId: row.sender_profile_id ?? null,
-            currentProfileId: profileId,
-          });
-          const next = applyIncomingLearningSpaceUnread(directNext, {
-            channelId,
-            senderProfileId: row.sender_profile_id ?? null,
-            currentProfileId: profileId,
-          });
-
-          const nextDirectChannel = next.collections.directMessages.find(
-            (channel) => channel.ids.id === channelId,
-          );
-          if (nextDirectChannel) {
-            const nextUnread = Math.max(
-              0,
-              nextDirectChannel.collections.readState?.unreadCount ?? 0,
-            );
-            void persistUnread(channelId, nextUnread, {
-              markRead: nextUnread === 0,
-            });
-            return next;
-          }
-
-          const nextLearningSpaceChannel = next.collections.learningSpaces.find(
-            (space) =>
-              space.channels.primaryChannel.ids.id === channelId ||
-              (space.channels.relatedChannels ?? []).some(
-                (channel) => channel.ids.id === channelId,
-              ),
-          );
-          const matchedLearningSpaceChannel =
-            nextLearningSpaceChannel?.channels.primaryChannel.ids.id === channelId
-              ? nextLearningSpaceChannel.channels.primaryChannel
-              : (nextLearningSpaceChannel?.channels.relatedChannels ?? []).find(
-                  (channel) => channel.ids.id === channelId,
-                );
-          if (matchedLearningSpaceChannel) {
-            const nextUnread = Math.max(
-              0,
-              matchedLearningSpaceChannel.collections.readState?.unreadCount ?? 0,
-            );
-            void persistUnread(channelId, nextUnread, {
-              markRead: nextUnread === 0,
-            });
-          }
-          return next;
-        });
+        setSidebarData((prev) => touchDirectMessageChannelOrder(prev, channelId));
       },
     );
     channel.subscribe();
@@ -451,7 +359,152 @@ export function SidebarShell({
     return () => {
       void channel.unsubscribe();
     };
-  }, [supabase, sidebarProfile.ids?.orgId, sidebarProfile.ids?.id, persistUnread]);
+  }, [supabase, sidebarProfile.ids?.orgId]);
+
+  React.useEffect(() => {
+    const orgId = sidebarProfile.ids?.orgId;
+    if (!orgId || !sidebarAccountId) {
+      return;
+    }
+
+    const applyChannelReadState = (
+      row: {
+        channel_id?: string | null;
+        unread_count?: number | null;
+        last_read_at?: string | null;
+        last_read_message_id?: string | null;
+      } | null,
+    ) => {
+      const channelId = row?.channel_id;
+      if (!channelId) {
+        return;
+      }
+
+      setSidebarData((prev) => {
+        let changed = false;
+        const unreadCount = Math.max(0, row?.unread_count ?? 0);
+        const patch = {
+          channelId,
+          unreadCount,
+          lastReadAt: row?.last_read_at ?? undefined,
+          lastReadMessageId: row?.last_read_message_id ?? undefined,
+        };
+
+        const nextDirectMessages = prev.collections.directMessages.map((channel) => {
+          if (channel.ids.id !== channelId) {
+            return channel;
+          }
+          changed = true;
+          return {
+            ...channel,
+            collections: {
+              ...channel.collections,
+              readState: {
+                ...channel.collections.readState,
+                ...patch,
+              },
+            },
+          };
+        });
+
+        const nextLearningSpaces = prev.collections.learningSpaces.map((space) => {
+          const primary = space.channels.primaryChannel;
+          const related = space.channels.relatedChannels ?? [];
+          const nextPrimary =
+            primary.ids.id === channelId
+              ? {
+                  ...primary,
+                  collections: {
+                    ...primary.collections,
+                    readState: {
+                      ...primary.collections.readState,
+                      ...patch,
+                    },
+                  },
+                }
+              : primary;
+          const nextRelated = related.map((channel) =>
+            channel.ids.id === channelId
+              ? {
+                  ...channel,
+                  collections: {
+                    ...channel.collections,
+                    readState: {
+                      ...channel.collections.readState,
+                      ...patch,
+                    },
+                  },
+                }
+              : channel,
+          );
+
+          const matched =
+            nextPrimary !== primary ||
+            nextRelated.some((channel, index) => channel !== related[index]);
+          if (!matched) {
+            return space;
+          }
+          changed = true;
+          return {
+            ...space,
+            channels: {
+              ...space.channels,
+              primaryChannel: nextPrimary,
+              relatedChannels: nextRelated,
+            },
+          };
+        });
+
+        if (!changed) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          collections: {
+            ...prev.collections,
+            directMessages: nextDirectMessages,
+            learningSpaces: nextLearningSpaces,
+          },
+        };
+      });
+    };
+
+    const channel = supabase.channel(
+      `sidebar-channel-read-state:${orgId}:${sidebarAccountId}`,
+    );
+    channel.on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'channel_read_state',
+        filter: `account_id=eq.${sidebarAccountId}`,
+      },
+      (payload) => {
+        const row =
+          payload.eventType === 'DELETE'
+            ? ((payload.old as {
+                channel_id?: string | null;
+                unread_count?: number | null;
+                last_read_at?: string | null;
+                last_read_message_id?: string | null;
+              }) ?? null)
+            : ((payload.new as {
+                channel_id?: string | null;
+                unread_count?: number | null;
+                last_read_at?: string | null;
+                last_read_message_id?: string | null;
+              }) ?? null);
+        applyChannelReadState(row);
+      },
+    );
+    channel.subscribe();
+
+    return () => {
+      void channel.unsubscribe();
+    };
+  }, [sidebarAccountId, sidebarProfile.ids?.orgId, supabase]);
 
   React.useEffect(() => {
     const orgId = sidebarProfile.ids?.orgId;
@@ -614,11 +667,6 @@ export function SidebarShell({
 
         const minimumUnreadCount =
           senderProfileId && senderProfileId !== profileId ? 1 : 0;
-        const persistedUnread = Math.max(
-          0,
-          nextChannel.collections.readState?.unreadCount ?? 0,
-        );
-        const nextUnreadCount = Math.max(minimumUnreadCount, persistedUnread);
 
         setSidebarData((prev) =>
           upsertDirectMessageChannel(prev, nextChannel, {
@@ -626,10 +674,6 @@ export function SidebarShell({
             moveToTop: true,
           }),
         );
-
-        if (nextUnreadCount > 0) {
-          void persistUnread(channelId, nextUnreadCount);
-        }
       } finally {
         pendingChannelFetches.delete(channelId);
       }
@@ -769,7 +813,6 @@ export function SidebarShell({
     sidebarProfile.ids?.orgId,
     sidebarProfile.ids?.id,
     sidebarProfile.ids?.accountId,
-    persistUnread,
     router,
   ]);
 

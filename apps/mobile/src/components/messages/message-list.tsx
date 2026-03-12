@@ -1,5 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { View, Text, FlatList, ActivityIndicator, StyleSheet } from 'react-native';
+import {
+  View,
+  Text,
+  FlatList,
+  ActivityIndicator,
+  StyleSheet,
+  AppState,
+} from 'react-native';
 import type { MessageVM } from '@iconicedu/shared-types';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
@@ -110,6 +117,8 @@ type MessageListProps = {
   /** Called when the user taps "retry" on a failed upload row. */
   onRetryUpload?: (pendingId: string) => void;
   isReadOnly?: boolean;
+  onUnreadViewed?: (lastReadMessageId: string) => void;
+  isScreenActive?: boolean;
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -128,12 +137,42 @@ export const MessageList: React.FC<MessageListProps> = ({
   pendingUploads,
   onRetryUpload,
   isReadOnly,
+  onUnreadViewed,
+  isScreenActive = true,
 }) => {
   const flatListRef = useRef<FlatList>(null);
   const { colors } = useTheme();
+  const isNearBottomRef = useRef(true);
+  const lastNotifiedReadIdRef = useRef<string | null>(null);
 
   // Build items newest-first so inverted FlatList renders newest at the bottom
   const listData = useMemo(() => [...buildListData(messages)].reverse(), [messages]);
+  const latestIncomingMessageId = useMemo(() => {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index];
+      if (message.core.sender.ids.id !== currentProfileId) {
+        return message.ids.id;
+      }
+    }
+    return null;
+  }, [messages, currentProfileId]);
+
+  const maybeMarkUnreadAsViewed = useCallback(() => {
+    if (!onUnreadViewed || !latestIncomingMessageId || !isScreenActive || isReadOnly) {
+      return;
+    }
+    if (!isNearBottomRef.current) {
+      return;
+    }
+    if (AppState.currentState !== 'active') {
+      return;
+    }
+    if (lastNotifiedReadIdRef.current === latestIncomingMessageId) {
+      return;
+    }
+    lastNotifiedReadIdRef.current = latestIncomingMessageId;
+    onUnreadViewed(latestIncomingMessageId);
+  }, [isReadOnly, isScreenActive, latestIncomingMessageId, onUnreadViewed]);
 
   // Scroll to the newest message (offset 0 in an inverted list = visual bottom)
   // when a new message is appended. Loading older messages prepends to the front
@@ -147,7 +186,12 @@ export const MessageList: React.FC<MessageListProps> = ({
       });
     }
     lastMessageIdRef.current = newLastId;
-  }, [messages]);
+    maybeMarkUnreadAsViewed();
+  }, [messages, maybeMarkUnreadAsViewed]);
+
+  useEffect(() => {
+    maybeMarkUnreadAsViewed();
+  }, [maybeMarkUnreadAsViewed]);
 
   const renderItem = useCallback(
     ({ item, index }: { item: MessageListItem; index: number }) => {
@@ -224,6 +268,12 @@ export const MessageList: React.FC<MessageListProps> = ({
       refreshing={refreshing}
       onEndReached={onLoadMore}
       onEndReachedThreshold={0.3}
+      onScroll={(event) => {
+        const offsetY = event.nativeEvent.contentOffset.y;
+        isNearBottomRef.current = offsetY <= 40;
+        maybeMarkUnreadAsViewed();
+      }}
+      scrollEventThrottle={120}
       // In an inverted FlatList, ListHeaderComponent renders at the VISUAL BOTTOM —
       // perfect for pending uploads that appear just above the input bar.
       ListHeaderComponent={

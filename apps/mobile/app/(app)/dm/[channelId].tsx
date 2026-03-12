@@ -1,11 +1,12 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { MessageVM } from '@iconicedu/shared-types';
 import { useAccount } from '@/hooks/use-account';
 import { useMessages } from '@/hooks/use-messages';
-import { sendTextMessage, deleteMessage } from '@/lib/api/queries';
+import { sendTextMessage, deleteMessage, markChannelReadState } from '@/lib/api/queries';
 import { useTheme } from '@/providers/theme-provider';
 import { MessageList } from '@/components/messages/message-list';
 import { MessageInput } from '@/components/messages/message-input';
@@ -41,6 +42,7 @@ export default function DmConversationScreen() {
       : 'Supervised Inbox'
     : (subtitle ?? 'Direct Message');
   const router = useRouter();
+  const isFocused = useIsFocused();
   const { data: account } = useAccount();
   const { colors } = useTheme();
 
@@ -126,6 +128,30 @@ export default function DmConversationScreen() {
     [toggleReaction],
   );
 
+  const lastMarkedReadIdRef = React.useRef<string | null>(null);
+  const handleUnreadViewed = useCallback(
+    async (lastReadMessageId: string) => {
+      if (!channelId || !orgId || !accountId || !profileId || !lastReadMessageId) {
+        return;
+      }
+      if (lastMarkedReadIdRef.current === lastReadMessageId) {
+        return;
+      }
+      lastMarkedReadIdRef.current = lastReadMessageId;
+      try {
+        await markChannelReadState({
+          orgId,
+          accountId,
+          profileId,
+          channelId,
+          lastReadMessageId,
+        });
+      } catch {
+        // best effort read-state sync
+      }
+    },
+    [accountId, channelId, orgId, profileId],
+  );
   if (!channelId) return null;
 
   const isOwnMessage = (msg: MessageVM) => msg.core.sender.ids.id === profileId;
@@ -168,6 +194,8 @@ export default function DmConversationScreen() {
             onReactionToggle={isSupervised ? undefined : handleReactionToggle}
             onThreadOpen={isSupervised ? undefined : handleThreadOpen}
             isReadOnly={isSupervised}
+            onUnreadViewed={handleUnreadViewed}
+            isScreenActive={isFocused}
           />
         )}
         <TypingIndicator typingUsers={typingUsers} />

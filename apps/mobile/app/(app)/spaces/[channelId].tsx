@@ -2,12 +2,13 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MessageCircle, CalendarDays } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAccount } from '@/hooks/use-account';
 import { useProfile } from '@/hooks/use-profile';
 import { useMessages } from '@/hooks/use-messages';
 import { useSpaceSessions } from '@/hooks/use-space-sessions';
-import { sendTextMessage } from '@/lib/api/queries';
+import { sendTextMessage, markChannelReadState } from '@/lib/api/queries';
 import { useTheme } from '@/providers/theme-provider';
 import { MessageList } from '@/components/messages/message-list';
 import { MessageInput } from '@/components/messages/message-input';
@@ -27,6 +28,7 @@ export default function SpaceDetailScreen() {
     tab?: string;
   }>();
   const router = useRouter();
+  const isFocused = useIsFocused();
   const { data: account } = useAccount();
   const { data: profile } = useProfile();
   const { colors } = useTheme();
@@ -76,6 +78,30 @@ export default function SpaceDetailScreen() {
 
   const s = useMemo(() => makeStyles(colors), [colors]);
 
+  const lastMarkedReadIdRef = React.useRef<string | null>(null);
+  const handleUnreadViewed = useCallback(
+    async (lastReadMessageId: string) => {
+      if (!channelId || !orgId || !accountId || !profileId || !lastReadMessageId) {
+        return;
+      }
+      if (lastMarkedReadIdRef.current === lastReadMessageId) {
+        return;
+      }
+      lastMarkedReadIdRef.current = lastReadMessageId;
+      try {
+        await markChannelReadState({
+          orgId,
+          accountId,
+          profileId,
+          channelId,
+          lastReadMessageId,
+        });
+      } catch {
+        // best effort read-state sync
+      }
+    },
+    [accountId, channelId, orgId, profileId],
+  );
   if (!channelId) return null;
 
   return (
@@ -122,6 +148,8 @@ export default function SpaceDetailScreen() {
             currentAccountId={accountId}
             onLoadMore={loadMore}
             loading={isLoading}
+            onUnreadViewed={handleUnreadViewed}
+            isScreenActive={isFocused && activeTab === 'messages'}
           />
           <TypingIndicator typingUsers={[]} />
           <MessageInput

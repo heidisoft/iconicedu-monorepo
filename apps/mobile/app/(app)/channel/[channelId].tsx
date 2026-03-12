@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { MessageCircle, CalendarDays } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { MessageVM } from '@iconicedu/shared-types';
 import { useAccount } from '@/hooks/use-account';
@@ -21,6 +22,7 @@ import {
   uploadChannelFile,
   buildMessageStoragePath,
   deleteMessage,
+  markChannelReadState,
 } from '@/lib/api/queries';
 import type { AttachmentPayload } from '@/components/messages/attachment-sheet';
 import type { PendingUpload } from '@/components/messages/pending-message-row';
@@ -43,6 +45,7 @@ export default function ChannelConversationScreen() {
     subtitle?: string;
   }>();
   const router = useRouter();
+  const isFocused = useIsFocused();
   const { data: account } = useAccount();
   const { colors } = useTheme();
 
@@ -282,6 +285,30 @@ export default function ChannelConversationScreen() {
     [toggleReaction],
   );
 
+  const lastMarkedReadIdRef = React.useRef<string | null>(null);
+  const handleUnreadViewed = useCallback(
+    async (lastReadMessageId: string) => {
+      if (!channelId || !orgId || !accountId || !profileId || !lastReadMessageId) {
+        return;
+      }
+      if (lastMarkedReadIdRef.current === lastReadMessageId) {
+        return;
+      }
+      lastMarkedReadIdRef.current = lastReadMessageId;
+      try {
+        await markChannelReadState({
+          orgId,
+          accountId,
+          profileId,
+          channelId,
+          lastReadMessageId,
+        });
+      } catch {
+        // best effort read-state sync
+      }
+    },
+    [accountId, channelId, orgId, profileId],
+  );
   if (!channelId) return null;
 
   const isOwnMessage = (msg: MessageVM) => msg.core.sender.ids.id === profileId;
@@ -354,6 +381,8 @@ export default function ChannelConversationScreen() {
             onThreadOpen={handleThreadOpen}
             pendingUploads={pendingUploads}
             onRetryUpload={handleRetryUpload}
+            onUnreadViewed={handleUnreadViewed}
+            isScreenActive={isFocused && activeTab === 'messages'}
           />
           <TypingIndicator typingUsers={typingUsers} />
           <MessageInput
