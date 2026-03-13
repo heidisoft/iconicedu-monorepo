@@ -280,7 +280,7 @@ const groupRow = {
   id: 'item-2',
   kind: 'group',
   tab_key: 'classes',
-  verb: 'session.scheduled',
+  verb: 'class.session.scheduled',
   group_key: 'sessions-week',
   group_type: 'class',
   sub_activity_count: 2,

@@ -14,17 +14,20 @@ function mkActor(id: string, name: string): UserProfileVM {
     ids: { id, orgId: ORG, accountId: `acct-${id}` },
     profile: { displayName: name, avatar: { source: 'seed', seed: id } },
     prefs: {},
-    meta: { createdAt: '2025-01-01T00:00:00.000Z', updatedAt: '2025-01-01T00:00:00.000Z' },
+    meta: {
+      createdAt: '2025-01-01T00:00:00.000Z',
+      updatedAt: '2025-01-01T00:00:00.000Z',
+    },
   } as unknown as UserProfileVM;
 }
 
 // Dynamic dates so sections (Today / This week / Earlier) stay correct at runtime
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
-const daysAgo  = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString();
+const daysAgo = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString();
 
-const PRIYA  = mkActor('priya-001',  'Priya S.');
-const TEVIN  = mkActor('tevin-001',  'Tevin T.');
-const RILEY  = mkActor('riley-001',  'Riley T.');
+const PRIYA = mkActor('priya-001', 'Priya S.');
+const TEVIN = mkActor('tevin-001', 'Tevin T.');
+const RILEY = mkActor('riley-001', 'Riley T.');
 const SYSTEM = mkActor('system-001', 'ICONIC System');
 
 const TODAY_ITEMS: ActivityFeedItemVM[] = [
@@ -101,9 +104,11 @@ const SUB_ITEMS: ActivityFeedLeafItemVM[] = [
     timestamps: { occurredAt: daysAgo(3), createdAt: daysAgo(3) },
     tabKey: 'classes',
     audience: { scope: { kind: 'global' }, visibility: 'public' },
-    verb: 'session.scheduled',
+    verb: 'class.session.scheduled',
     refs: { actor: PRIYA },
-    content: { headline: { primary: 'Math Foundations', secondary: '— Wed Dec 25, 5:00 PM' } },
+    content: {
+      headline: { primary: 'Math Foundations', secondary: '— Wed Dec 25, 5:00 PM' },
+    },
     state: { isRead: true },
   },
   {
@@ -112,9 +117,11 @@ const SUB_ITEMS: ActivityFeedLeafItemVM[] = [
     timestamps: { occurredAt: daysAgo(3), createdAt: daysAgo(3) },
     tabKey: 'classes',
     audience: { scope: { kind: 'global' }, visibility: 'public' },
-    verb: 'session.scheduled',
+    verb: 'class.session.scheduled',
     refs: { actor: PRIYA },
-    content: { headline: { primary: 'Writing Workshop', secondary: '— Thu Dec 26, 4:00 PM' } },
+    content: {
+      headline: { primary: 'Writing Workshop', secondary: '— Thu Dec 26, 4:00 PM' },
+    },
     state: { isRead: true },
   },
   {
@@ -123,9 +130,11 @@ const SUB_ITEMS: ActivityFeedLeafItemVM[] = [
     timestamps: { occurredAt: daysAgo(3), createdAt: daysAgo(3) },
     tabKey: 'classes',
     audience: { scope: { kind: 'global' }, visibility: 'public' },
-    verb: 'session.scheduled',
+    verb: 'class.session.scheduled',
     refs: { actor: PRIYA },
-    content: { headline: { primary: 'Chess Strategy Lab', secondary: '— Fri Dec 27, 4:30 PM' } },
+    content: {
+      headline: { primary: 'Chess Strategy Lab', secondary: '— Fri Dec 27, 4:30 PM' },
+    },
     state: { isRead: true },
   },
 ];
@@ -148,7 +157,13 @@ const THIS_WEEK_ITEMS: ActivityFeedItemVM[] = [
         emphasis: 'December tutoring sessions',
       },
       summary: '$480.00 due by Dec 31',
-      actionButton: { label: 'View Invoice', variant: 'outline', href: null, actionKey: null, payload: null },
+      actionButton: {
+        label: 'View Invoice',
+        variant: 'outline',
+        href: null,
+        actionKey: null,
+        payload: null,
+      },
     },
     state: { isRead: false, importance: 'important' },
   } as ActivityFeedLeafItemVM,
@@ -160,7 +175,7 @@ const THIS_WEEK_ITEMS: ActivityFeedItemVM[] = [
     timestamps: { occurredAt: daysAgo(3), createdAt: daysAgo(3) },
     tabKey: 'classes',
     audience: { scope: { kind: 'global' }, visibility: 'public' },
-    verb: 'session.scheduled',
+    verb: 'class.session.scheduled',
     refs: { actor: PRIYA },
     grouping: { groupType: 'class', groupKey: 'sessions-week-group' },
     subActivityCount: 3,
@@ -219,15 +234,15 @@ const EARLIER_ITEMS: ActivityFeedItemVM[] = [
 export const DEMO_ACTIVITY_FEED: ActivityFeedVM = {
   activeTab: 'all',
   tabs: [
-    { key: 'all',     label: 'All' },
+    { key: 'all', label: 'All' },
     { key: 'classes', label: 'Classes' },
     { key: 'payment', label: 'Payment' },
-    { key: 'system',  label: 'System' },
+    { key: 'system', label: 'System' },
   ],
   sections: [
-    { label: 'Today',     items: TODAY_ITEMS },
+    { label: 'Today', items: TODAY_ITEMS },
     { label: 'This week', items: THIS_WEEK_ITEMS },
-    { label: 'Earlier',   items: EARLIER_ITEMS },
+    { label: 'Earlier', items: EARLIER_ITEMS },
   ],
   unreadCount: 4,
 };

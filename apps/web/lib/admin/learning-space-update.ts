@@ -170,7 +170,10 @@ type RemovedMembersActivity = {
 };
 
 type ScheduleChangeActivity = {
-  eventType: 'session.scheduled' | 'session.canceled' | 'session.rescheduled';
+  eventType:
+    | 'class.session.scheduled'
+    | 'class.session.canceled'
+    | 'class.session.rescheduled';
   dedupeKey: string;
   payload: {
     learningSpaceId: string;
@@ -214,12 +217,12 @@ function shouldPublishScheduleChangeActivity(
 
   const payload = activity.payload;
   const referenceAt =
-    activity.eventType === 'session.canceled'
+    activity.eventType === 'class.session.canceled'
       ? (payload.canceledStartAt ??
         payload.startAt ??
         payload.firstSessionStartAt ??
         null)
-      : activity.eventType === 'session.rescheduled'
+      : activity.eventType === 'class.session.rescheduled'
         ? (payload.rescheduledToStartAt ??
           payload.rescheduledFromStartAt ??
           payload.startAt ??
@@ -539,10 +542,10 @@ export function buildExceptionAndOverrideScheduleChangeActivities(input: {
         pairDiffs.push({
           occurrenceKey,
           transition: `${previousState}->scheduled`,
-          eventType: 'session.scheduled',
+          eventType: 'class.session.scheduled',
         });
         const activity: ScheduleChangeActivity = {
-          eventType: 'session.scheduled',
+          eventType: 'class.session.scheduled',
           dedupeKey: `schedule.unscheduled-change:${input.learningSpaceId}:${pair.scheduleId}:${pairIndex}:${occurrenceKey}:${input.occurredAt}`,
           payload: {
             learningSpaceId: input.learningSpaceId,
@@ -568,10 +571,10 @@ export function buildExceptionAndOverrideScheduleChangeActivities(input: {
         pairDiffs.push({
           occurrenceKey,
           transition: `${previousState}->exception`,
-          eventType: 'session.canceled',
+          eventType: 'class.session.canceled',
         });
         const activity: ScheduleChangeActivity = {
-          eventType: 'session.canceled',
+          eventType: 'class.session.canceled',
           dedupeKey: `schedule.exception:${input.learningSpaceId}:${pair.scheduleId}:${pairIndex}:${occurrenceKey}:${input.occurredAt}`,
           payload: {
             learningSpaceId: input.learningSpaceId,
@@ -612,10 +615,10 @@ export function buildExceptionAndOverrideScheduleChangeActivities(input: {
       pairDiffs.push({
         occurrenceKey,
         transition: `${previousState}->override`,
-        eventType: 'session.rescheduled',
+        eventType: 'class.session.rescheduled',
       });
       const activity: ScheduleChangeActivity = {
-        eventType: 'session.rescheduled',
+        eventType: 'class.session.rescheduled',
         dedupeKey: `schedule.override:${input.learningSpaceId}:${pair.scheduleId}:${pairIndex}:${occurrenceKey}:${input.occurredAt}`,
         payload: {
           learningSpaceId: input.learningSpaceId,
@@ -1437,7 +1440,7 @@ export async function updateLearningSpaceFromPayload(
     const hasRescheduledSessionChanges =
       scheduleDiffPlan.rescheduled.length > 0 ||
       exceptionOverrideActivities.some(
-        (activity) => activity.eventType === 'session.rescheduled',
+        (activity) => activity.eventType === 'class.session.rescheduled',
       );
     infoChangeSummaryParts.push(
       hasRescheduledSessionChanges ? 'Class rescheduled' : 'Updated class schedule',

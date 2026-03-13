@@ -244,6 +244,124 @@ function formatWeeklyTimeLabel(startAt: unknown, timezone: unknown) {
   return formatTime(startAt, resolveDisplayTimezone(timezone), 'withZone');
 }
 
+function formatScheduleChangePart(
+  value: string,
+  timezone: unknown,
+  options: Intl.DateTimeFormatOptions,
+) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: resolveDisplayTimezone(timezone),
+    ...options,
+  }).format(date);
+}
+
+function formatScheduleDayLabel(value: string, timezone: unknown) {
+  return formatScheduleChangePart(value, timezone, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+function formatScheduleTimeLabel(value: string, timezone: unknown, includeZone = false) {
+  return formatScheduleChangePart(value, timezone, {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    ...(includeZone ? { timeZoneName: 'shortGeneric' } : {}),
+  });
+}
+
+function formatScheduleDateTimeLabel(
+  value: string,
+  timezone: unknown,
+  includeComma = true,
+) {
+  const dayLabel = formatScheduleDayLabel(value, timezone);
+  const timeLabel = formatScheduleTimeLabel(value, timezone, true);
+  if (!dayLabel || !timeLabel) {
+    return null;
+  }
+  return includeComma ? `${dayLabel}, ${timeLabel}` : `${dayLabel} ${timeLabel}`;
+}
+
+function isSameScheduleDay(a: string, b: string, timezone: unknown) {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: resolveDisplayTimezone(timezone),
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+
+  return formatter.format(new Date(a)) === formatter.format(new Date(b));
+}
+
+function buildRescheduledSessionSummary(payload: Record<string, unknown>) {
+  const timezone = payload.firstSessionTimezone ?? payload.timezone;
+  const title = sessionName(payload);
+  const fromValue =
+    asOptionalString(payload.rescheduledFromStartAt) ?? asOptionalString(payload.startAt);
+  const toValue =
+    asOptionalString(payload.rescheduledToStartAt) ??
+    asOptionalString(payload.newStartAt);
+  const reason =
+    asOptionalString(payload.rescheduledReason) ?? asOptionalString(payload.reason);
+
+  if (!fromValue || !toValue) {
+    return undefined;
+  }
+
+  const sameDay = isSameScheduleDay(fromValue, toValue, timezone);
+  if (sameDay) {
+    const dayLabel = formatScheduleDayLabel(fromValue, timezone);
+    const fromTime = formatScheduleTimeLabel(fromValue, timezone);
+    const toTime = formatScheduleTimeLabel(toValue, timezone, true);
+    if (!dayLabel || !fromTime || !toTime) {
+      return undefined;
+    }
+    return `Session: ${title} weekly session (${dayLabel}) moved from ${fromTime} to ${toTime}${
+      reason ? ` due to ${reason}` : ''
+    }`;
+  }
+
+  const fromDateTime = formatScheduleDateTimeLabel(fromValue, timezone);
+  const toDateTime = formatScheduleDateTimeLabel(toValue, timezone);
+  if (!fromDateTime || !toDateTime) {
+    return undefined;
+  }
+
+  return `Session: ${title} weekly session moved from ${fromDateTime} to ${toDateTime}${
+    reason ? ` due to ${reason}` : ''
+  }`;
+}
+
+function buildCanceledSessionSummary(payload: Record<string, unknown>) {
+  const timezone = payload.firstSessionTimezone ?? payload.timezone;
+  const title = sessionName(payload);
+  const canceledValue =
+    asOptionalString(payload.canceledStartAt) ?? asOptionalString(payload.startAt);
+  const reason =
+    asOptionalString(payload.canceledReason) ?? asOptionalString(payload.reason);
+
+  if (!canceledValue) {
+    return undefined;
+  }
+
+  const dateTimeLabel = formatScheduleDateTimeLabel(canceledValue, timezone, false);
+  if (!dateTimeLabel) {
+    return undefined;
+  }
+
+  return `Session: ${title} weekly session (${dateTimeLabel}) canceled${
+    reason ? ` due to ${reason}` : ''
+  }`;
+}
+
 function buildHourlyLearningSpaceGroupKey(
   prefix: string,
   event: ActivityEventRow,
@@ -1258,8 +1376,8 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       };
     },
   },
-  'session.scheduled': {
-    eventType: 'session.scheduled',
+  'class.session.scheduled': {
+    eventType: 'class.session.scheduled',
     tabKey: 'classes',
     importance: 'normal',
     group: {
@@ -1285,10 +1403,10 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       );
       const isUpdated = asOptionalString(payload.activityPhase) === 'updated';
       return {
-        verb: 'session.scheduled',
+        verb: 'class.session.scheduled',
         leading: { kind: 'icon', iconKey: 'CalendarDays', tone: 'info' },
         headline: {
-          primary: isUpdated ? 'Session scheduled' : 'Class session schedule added',
+          primary: isUpdated ? 'Class session scheduled' : 'Class session schedule added',
           secondary: sessionName(payload),
         },
         summary: isUpdated
@@ -1308,8 +1426,8 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       };
     },
   },
-  'session.rescheduled': {
-    eventType: 'session.rescheduled',
+  'class.session.rescheduled': {
+    eventType: 'class.session.rescheduled',
     tabKey: 'classes',
     importance: 'important',
     group: {
@@ -1321,48 +1439,35 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => {
       const payload = asRecord(event.payload);
-      const timezone = payload.firstSessionTimezone ?? payload.timezone;
-      const fromLabel = formatNaturalDateTime(
-        payload.rescheduledFromStartAt ?? payload.startAt,
-        timezone,
-      );
-      const toLabel = formatNaturalDateTime(
-        payload.rescheduledToStartAt ?? payload.newStartAt,
-        timezone,
-      );
-      const firstSessionLabel = formatNaturalDateTime(
-        payload.firstSessionStartAt,
-        timezone,
-      );
-      const reason =
-        asOptionalString(payload.rescheduledReason) ?? asOptionalString(payload.reason);
-      const baseSummary = firstSessionLabel
-        ? `Next session ${firstSessionLabel}.`
-        : (asOptionalString(payload.description) ?? asOptionalString(payload.startAt));
       return {
-        verb: 'session.rescheduled',
+        verb: 'class.session.rescheduled',
         leading: { kind: 'icon', iconKey: 'CalendarCheck', tone: 'info' },
         headline: {
-          primary:
-            fromLabel && toLabel
-              ? `Session ${fromLabel} rescheduled to ${toLabel}`
-              : 'Session rescheduled',
+          primary: 'Class session rescheduled',
           secondary: sessionName(payload),
         },
-        summary: reason ? `${baseSummary ?? ''} Reason: ${reason}.`.trim() : baseSummary,
+        summary:
+          buildRescheduledSessionSummary(payload) ??
+          asOptionalString(payload.description) ??
+          asOptionalString(payload.startAt),
         metadata: {
           sessionLocalTime: true,
+          title: asOptionalString(payload.title),
           startAt: asOptionalString(payload.startAt),
           firstSessionStartAt: asOptionalString(payload.firstSessionStartAt),
+          timezone: asOptionalString(payload.timezone),
+          firstSessionTimezone: asOptionalString(payload.firstSessionTimezone),
           rescheduledFromStartAt: asOptionalString(payload.rescheduledFromStartAt),
           rescheduledToStartAt: asOptionalString(payload.rescheduledToStartAt),
-          rescheduledReason: reason,
+          rescheduledReason:
+            asOptionalString(payload.rescheduledReason) ??
+            asOptionalString(payload.reason),
         },
       };
     },
   },
-  'session.canceled': {
-    eventType: 'session.canceled',
+  'class.session.canceled': {
+    eventType: 'class.session.canceled',
     tabKey: 'classes',
     importance: 'important',
     group: {
@@ -1374,35 +1479,27 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => {
       const payload = asRecord(event.payload);
-      const timezone = payload.firstSessionTimezone ?? payload.timezone;
-      const canceledLabel = formatNaturalDateTime(
-        payload.canceledStartAt ?? payload.startAt,
-        timezone,
-      );
-      const reason =
-        asOptionalString(payload.canceledReason) ?? asOptionalString(payload.reason);
-      const firstSessionLabel = formatNaturalDateTime(
-        payload.firstSessionStartAt,
-        timezone,
-      );
       return {
-        verb: 'session.canceled',
+        verb: 'class.session.canceled',
         leading: { kind: 'icon', iconKey: 'CalendarX', tone: 'warning' },
         headline: {
-          primary: canceledLabel
-            ? `Session ${canceledLabel} cancelled${reason ? ` ${reason}` : ''}`
-            : 'Session cancelled',
+          primary: 'Class session cancelled',
           secondary: sessionName(payload),
         },
-        summary: firstSessionLabel
-          ? `Next session ${firstSessionLabel}.`
-          : asOptionalString(payload.description),
+        summary:
+          buildCanceledSessionSummary(payload) ??
+          asOptionalString(payload.description) ??
+          asOptionalString(payload.startAt),
         metadata: {
           sessionLocalTime: true,
+          title: asOptionalString(payload.title),
           startAt: asOptionalString(payload.startAt),
           firstSessionStartAt: asOptionalString(payload.firstSessionStartAt),
+          timezone: asOptionalString(payload.timezone),
+          firstSessionTimezone: asOptionalString(payload.firstSessionTimezone),
           canceledStartAt: asOptionalString(payload.canceledStartAt),
-          canceledReason: reason,
+          canceledReason:
+            asOptionalString(payload.canceledReason) ?? asOptionalString(payload.reason),
         },
       };
     },

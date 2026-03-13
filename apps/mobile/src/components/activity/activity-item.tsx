@@ -108,7 +108,9 @@ export function getIconKey(item: ActivityFeedItemVM): InboxIconKeyVM {
     case 'message.posted':
     case 'message.edited':
       return 'MessageSquare';
-    case 'session.scheduled':
+    case 'class.session.scheduled':
+    case 'class.session.rescheduled':
+    case 'class.session.canceled':
     case 'class.created':
       return 'GraduationCap';
     case 'member.joined':

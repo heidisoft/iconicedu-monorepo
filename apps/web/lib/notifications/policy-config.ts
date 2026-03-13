@@ -1,12 +1,12 @@
 import type { NotificationPolicyConfig } from '@iconicedu/shared-types';
 
 const CRITICAL_PREF_KEYS = new Set<string>([
-  'session.scheduled',
-  'sessions.scheduled',
-  'session.rescheduled',
-  'sessions.rescheduled',
-  'session.canceled',
-  'sessions.canceled',
+  'class.session.scheduled',
+  'class.sessions.scheduled',
+  'class.session.rescheduled',
+  'class.sessions.rescheduled',
+  'class.session.canceled',
+  'class.sessions.canceled',
   'session.started',
   'sessions.started',
   'session.reminder.sent',

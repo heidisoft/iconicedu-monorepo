@@ -147,7 +147,7 @@ describe('createLearningSpaceFromPayload', () => {
       }),
     );
     expect(publishActivityEventMock).not.toHaveBeenCalledWith(
-      expect.objectContaining({ eventType: 'session.scheduled' }),
+      expect.objectContaining({ eventType: 'class.session.scheduled' }),
     );
   });
 

@@ -346,7 +346,7 @@ describe('buildActivityFeedForProfile', () => {
             scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
             visibility: 'scope_only',
           },
-          verb: 'session.scheduled',
+          verb: 'class.session.scheduled',
           actor_profile_id: 'actor-1',
           refs: {},
           content: {

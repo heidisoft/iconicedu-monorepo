@@ -272,7 +272,7 @@ const CLASS_SESSION_GROUP: ActivityFeedItemVM = {
     scope: { kind: 'learning_space', learningSpaceId: LEARNING_SPACE_IDS.math },
     visibility: 'scope_only',
   },
-  verb: 'sessions.rescheduled',
+  verb: 'class.sessions.rescheduled',
   refs: {
     actor: EDUCATOR_PRIYA_PROFILE,
     target: { kind: 'learning_space', id: LEARNING_SPACE_IDS.math },
@@ -470,7 +470,7 @@ const CLASS_UPDATE_SESSION_RESCHEDULED: ActivityFeedItemVM = {
     scope: { kind: 'learning_space', learningSpaceId: LEARNING_SPACE_IDS.math },
     visibility: 'scope_only',
   },
-  verb: 'session.rescheduled',
+  verb: 'class.session.rescheduled',
   refs: {
     actor: EDUCATOR_PRIYA_PROFILE,
     target: { kind: 'learning_space', id: LEARNING_SPACE_IDS.math },
@@ -482,7 +482,7 @@ const CLASS_UPDATE_SESSION_RESCHEDULED: ActivityFeedItemVM = {
       secondary: 'Math Foundations',
     },
     summary:
-      'Session: Math Foundations weekly session (Sat) moved from 2:00 PM to 2:30 PM PT',
+      'Session: Math Foundations weekly session (Sat Mar 7) moved from 2:00 PM to 2:30 PM PT',
   },
   state: unread(false),
 };
@@ -496,7 +496,7 @@ const CLASS_UPDATE_SESSION_CANCELLED: ActivityFeedItemVM = {
     scope: { kind: 'learning_space', learningSpaceId: LEARNING_SPACE_IDS.math },
     visibility: 'scope_only',
   },
-  verb: 'session.canceled',
+  verb: 'class.session.canceled',
   refs: {
     actor: EDUCATOR_PRIYA_PROFILE,
     target: { kind: 'learning_space', id: LEARNING_SPACE_IDS.math },
@@ -508,7 +508,7 @@ const CLASS_UPDATE_SESSION_CANCELLED: ActivityFeedItemVM = {
       secondary: 'Math Foundations',
     },
     summary:
-      'Session: Math Foundations weekly session (Sat 2:30 PM PT) canceled due to holiday closure',
+      'Session: Math Foundations weekly session (Sat Mar 14, 2:30 PM PT) canceled due to holiday closure',
   },
   state: unread(false),
 };
@@ -802,7 +802,7 @@ const CLASS_SETUP_GROUP: ActivityFeedItemVM = {
           scope: { kind: 'learning_space', learningSpaceId: LEARNING_SPACE_IDS.math },
           visibility: 'scope_only',
         },
-        verb: 'session.scheduled',
+        verb: 'class.session.scheduled',
         refs: {
           actor: EDUCATOR_PRIYA_PROFILE,
           target: { kind: 'learning_space', id: LEARNING_SPACE_IDS.math },

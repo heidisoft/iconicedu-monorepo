@@ -232,8 +232,8 @@ describe('buildLearningSpaceScheduleDiffPlan', () => {
 
     expect(activities).toHaveLength(2);
     expect(activities.map((entry) => entry.eventType)).toEqual([
-      'session.canceled',
-      'session.rescheduled',
+      'class.session.canceled',
+      'class.session.rescheduled',
     ]);
     expect(activities[0]?.payload.canceledStartAt).toBe('2026-03-24T21:00:00.000Z');
     expect(activities[0]?.payload.canceledReason).toBe('Holiday');
@@ -244,7 +244,7 @@ describe('buildLearningSpaceScheduleDiffPlan', () => {
     expect(activities[1]?.payload.rescheduledReason).toBe('Rescheduled due to event');
   });
 
-  it('emits session.scheduled when an exception or override is removed', () => {
+  it('emits class.session.scheduled when an exception or override is removed', () => {
     const activities = buildExceptionAndOverrideScheduleChangeActivities({
       learningSpaceId: 'space-1',
       channelId: 'channel-1',
@@ -279,8 +279,8 @@ describe('buildLearningSpaceScheduleDiffPlan', () => {
 
     expect(activities).toHaveLength(2);
     expect(activities.map((entry) => entry.eventType)).toEqual([
-      'session.scheduled',
-      'session.scheduled',
+      'class.session.scheduled',
+      'class.session.scheduled',
     ]);
     expect(activities[0]?.payload.startAt).toBe('2026-03-10T21:00:00.000Z');
     expect(activities[1]?.payload.startAt).toBe('2026-03-17T21:00:00.000Z');
@@ -424,7 +424,7 @@ describe('buildLearningSpaceScheduleDiffPlan', () => {
     expect(activities).toEqual([]);
   });
 
-  it('emits session.canceled when exception is added on a date that already has an override', () => {
+  it('emits class.session.canceled when exception is added on a date that already has an override', () => {
     const activities = buildExceptionAndOverrideScheduleChangeActivities({
       learningSpaceId: 'space-1',
       channelId: 'channel-1',
@@ -464,7 +464,7 @@ describe('buildLearningSpaceScheduleDiffPlan', () => {
     });
 
     expect(activities).toHaveLength(1);
-    expect(activities[0]?.eventType).toBe('session.canceled');
+    expect(activities[0]?.eventType).toBe('class.session.canceled');
     expect(activities[0]?.payload.canceledReason).toBe('Holiday');
   });
 });

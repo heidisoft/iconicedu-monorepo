@@ -414,16 +414,18 @@ describe('InboxContainer rendering behavior', () => {
       },
       tabKey: 'classes',
       audience: { scope: { kind: 'global' }, visibility: 'public' },
-      verb: 'session.scheduled',
+      verb: 'class.session.scheduled',
       refs: { actor: {} as never },
       content: {
-        headline: { primary: 'Session scheduled' },
+        headline: { primary: 'Class session scheduled', secondary: 'Math Foundations' },
         summary: 'Session scheduled 2026-03-04T12:40:00.000Z.',
       },
       metadata: {
         sessionLocalTime: true,
         activityPhase: 'updated',
         startAt: '2026-03-04T12:40:00.000Z',
+        title: 'Math Foundations',
+        timezone: 'America/Los_Angeles',
       },
     });
 
@@ -436,10 +438,35 @@ describe('InboxContainer rendering behavior', () => {
       },
       tabKey: 'classes',
       audience: { scope: { kind: 'global' }, visibility: 'public' },
-      verb: 'session.rescheduled',
+      verb: 'class.session.rescheduled',
       refs: { actor: {} as never },
       content: {
-        headline: { primary: 'Session rescheduled' },
+        headline: { primary: 'Class session rescheduled', secondary: 'Math Foundations' },
+        summary: 'Next session later.',
+      },
+      metadata: {
+        sessionLocalTime: true,
+        rescheduledFromStartAt: '2026-03-04T12:40:00.000Z',
+        rescheduledToStartAt: '2026-03-04T13:10:00.000Z',
+        firstSessionStartAt: '2026-03-11T12:40:00.000Z',
+        title: 'Math Foundations',
+        timezone: 'America/Los_Angeles',
+      },
+    });
+
+    const crossDayRescheduled = applyScheduleActivityLocalTime({
+      kind: 'leaf',
+      ids: { id: 'leaf-rescheduled-cross-day', orgId: 'org-1' },
+      timestamps: {
+        occurredAt: '2026-03-04T12:00:00.000Z',
+        createdAt: '2026-03-04T12:00:00.000Z',
+      },
+      tabKey: 'classes',
+      audience: { scope: { kind: 'global' }, visibility: 'public' },
+      verb: 'class.session.rescheduled',
+      refs: { actor: {} as never },
+      content: {
+        headline: { primary: 'Class session rescheduled', secondary: 'Math Foundations' },
         summary: 'Next session later.',
       },
       metadata: {
@@ -447,6 +474,8 @@ describe('InboxContainer rendering behavior', () => {
         rescheduledFromStartAt: '2026-03-04T12:40:00.000Z',
         rescheduledToStartAt: '2026-03-11T12:40:00.000Z',
         firstSessionStartAt: '2026-03-11T12:40:00.000Z',
+        title: 'Math Foundations',
+        timezone: 'America/Los_Angeles',
       },
     });
 
@@ -459,25 +488,34 @@ describe('InboxContainer rendering behavior', () => {
       },
       tabKey: 'classes',
       audience: { scope: { kind: 'global' }, visibility: 'public' },
-      verb: 'session.canceled',
+      verb: 'class.session.canceled',
       refs: { actor: {} as never },
       content: {
-        headline: { primary: 'Session cancelled' },
+        headline: { primary: 'Class session cancelled', secondary: 'Math Foundations' },
         summary: 'Next session later.',
       },
       metadata: {
         sessionLocalTime: true,
         canceledStartAt: '2026-03-04T12:40:00.000Z',
         firstSessionStartAt: '2026-03-11T12:40:00.000Z',
+        canceledReason: 'Holiday',
+        title: 'Math Foundations',
+        timezone: 'America/Los_Angeles',
       },
     });
 
     expect(scheduled.content.summary).toContain('Session scheduled ');
     expect(scheduled.content.summary).not.toContain('2026-03-04T12:40:00.000Z');
-    expect(rescheduled.content.headline.primary).toContain('rescheduled to');
-    expect(rescheduled.content.headline.primary).not.toContain('2026-03');
-    expect(canceled.content.headline.primary).toContain('Session ');
-    expect(canceled.content.headline.primary).toContain('cancelled');
-    expect(canceled.content.headline.primary).not.toContain('2026-03');
+    expect(rescheduled.content.headline.primary).toBe('Class session rescheduled');
+    expect(rescheduled.content.summary).toBe(
+      'Session: Math Foundations weekly session (Wed, Mar 4) moved from 4:40 AM to 5:10 AM PT',
+    );
+    expect(crossDayRescheduled.content.summary).toBe(
+      'Session: Math Foundations weekly session moved from Wed, Mar 4, 4:40 AM PT to Wed, Mar 11, 5:40 AM PT',
+    );
+    expect(canceled.content.headline.primary).toBe('Class session cancelled');
+    expect(canceled.content.summary).toBe(
+      'Session: Math Foundations weekly session (Wed, Mar 4 4:40 AM PT) canceled due to Holiday',
+    );
   });
 });

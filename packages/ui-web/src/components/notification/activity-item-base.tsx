@@ -123,11 +123,11 @@ const getDefaultIconKey = (activity: ActivityFeedItemVM): InboxIconKeyVM => {
     case 'reaction.added':
     case 'reaction.removed':
       return 'Bell';
-    case 'session.scheduled':
+    case 'class.session.scheduled':
       return 'CalendarDays';
-    case 'session.rescheduled':
+    case 'class.session.rescheduled':
       return 'CalendarCheck';
-    case 'session.canceled':
+    case 'class.session.canceled':
       return 'CalendarX';
     case 'class.created':
     case 'class.updated':

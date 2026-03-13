@@ -14,9 +14,9 @@ const SIGNUP_DEFAULT_NOTIFICATION_PREFERENCES: SignupDefaultPreference[] = [
   { prefKey: 'dm.posted', channels: ['push', 'email'] },
   { prefKey: 'dm.reaction.added', channels: ['push', 'email'] },
   { prefKey: 'class.created', channels: ['push', 'email'] },
-  { prefKey: 'session.scheduled', channels: ['push', 'email'] },
-  { prefKey: 'session.rescheduled', channels: ['push', 'email'] },
-  { prefKey: 'session.canceled', channels: ['push', 'email'] },
+  { prefKey: 'class.session.scheduled', channels: ['push', 'email'] },
+  { prefKey: 'class.session.rescheduled', channels: ['push', 'email'] },
+  { prefKey: 'class.session.canceled', channels: ['push', 'email'] },
   { prefKey: 'session.started', channels: ['push', 'email'] },
   { prefKey: 'session.reminder.sent', channels: ['push', 'email'] },
 ];

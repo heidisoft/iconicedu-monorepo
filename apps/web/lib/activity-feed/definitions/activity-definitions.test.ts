@@ -593,7 +593,7 @@ describe('activity event definitions', () => {
   it('groups class setup activities under class-created by default', () => {
     const classCreated = getActivityEventDefinition('class.created');
     const memberInvited = getActivityEventDefinition('member.invited');
-    const sessionScheduled = getActivityEventDefinition('session.scheduled');
+    const sessionScheduled = getActivityEventDefinition('class.session.scheduled');
 
     if (!classCreated?.group || !memberInvited?.group || !sessionScheduled?.group) {
       throw new Error('Missing class setup group definitions');
@@ -629,7 +629,7 @@ describe('activity event definitions', () => {
     });
     const sessionKey = sessionScheduled.group.buildGroupKey({
       ...event,
-      event_type: 'session.scheduled',
+      event_type: 'class.session.scheduled',
     });
 
     expect(classKey).toBe('class-created:space-1');
@@ -657,8 +657,8 @@ describe('activity event definitions', () => {
   it('groups update-phase class activities under class-updated weekly buckets', () => {
     const memberInvited = getActivityEventDefinition('member.invited');
     const memberRemoved = getActivityEventDefinition('member.removed');
-    const sessionScheduled = getActivityEventDefinition('session.scheduled');
-    const sessionCanceled = getActivityEventDefinition('session.canceled');
+    const sessionScheduled = getActivityEventDefinition('class.session.scheduled');
+    const sessionCanceled = getActivityEventDefinition('class.session.canceled');
     const classUpdated = getActivityEventDefinition('class.updated');
 
     if (
@@ -706,11 +706,11 @@ describe('activity event definitions', () => {
     });
     const sessionScheduledKey = sessionScheduled.group.buildGroupKey({
       ...event,
-      event_type: 'session.scheduled',
+      event_type: 'class.session.scheduled',
     });
     const sessionCanceledKey = sessionCanceled.group.buildGroupKey({
       ...event,
-      event_type: 'session.canceled',
+      event_type: 'class.session.canceled',
     });
 
     expect(classUpdatedKey).toBe('class-updated:space-1:2026-03-06');
@@ -769,15 +769,15 @@ describe('activity event definitions', () => {
   });
 
   it('renders session scheduled summary and schedule-tab action', () => {
-    const definition = getActivityEventDefinition('session.scheduled');
+    const definition = getActivityEventDefinition('class.session.scheduled');
     if (!definition) {
-      throw new Error('Missing session.scheduled definition');
+      throw new Error('Missing class.session.scheduled definition');
     }
 
     const rendered = definition.render({
       id: 'event-session-scheduled-1',
       org_id: 'org-1',
-      event_type: 'session.scheduled',
+      event_type: 'class.session.scheduled',
       occurred_at: '2026-03-03T12:00:00.000Z',
       source_kind: 'profile',
       actor_profile_id: 'profile-1',
@@ -792,7 +792,7 @@ describe('activity event definitions', () => {
         timezone: 'America/Los_Angeles',
       },
       audience_rules: [],
-      dedupe_key: 'session.scheduled:space-1:2026-03-07',
+      dedupe_key: 'class.session.scheduled:space-1:2026-03-07',
       projection_status: 'pending',
       projection_attempts: 0,
       created_at: '2026-03-03T12:00:00.000Z',
@@ -815,15 +815,15 @@ describe('activity event definitions', () => {
   });
 
   it('renders update-phase session scheduled as Session scheduled [DATE TIME]', () => {
-    const definition = getActivityEventDefinition('session.scheduled');
+    const definition = getActivityEventDefinition('class.session.scheduled');
     if (!definition) {
-      throw new Error('Missing session.scheduled definition');
+      throw new Error('Missing class.session.scheduled definition');
     }
 
     const rendered = definition.render({
       id: 'event-session-scheduled-updated-1',
       org_id: 'org-1',
-      event_type: 'session.scheduled',
+      event_type: 'class.session.scheduled',
       occurred_at: '2026-03-03T12:00:00.000Z',
       source_kind: 'system',
       actor_profile_id: 'system-profile-1',
@@ -839,20 +839,20 @@ describe('activity event definitions', () => {
         timezone: 'America/Los_Angeles',
       },
       audience_rules: [],
-      dedupe_key: 'session.scheduled:space-1:2026-03-07',
+      dedupe_key: 'class.session.scheduled:space-1:2026-03-07',
       projection_status: 'pending',
       projection_attempts: 0,
       created_at: '2026-03-03T12:00:00.000Z',
       updated_at: '2026-03-03T12:00:00.000Z',
     });
 
-    expect(rendered.headline.primary).toBe('Session scheduled');
+    expect(rendered.headline.primary).toBe('Class session scheduled');
     expect(rendered.summary).toBe('Session scheduled Mar 7 at 2:00 PM.');
   });
 
-  it('renders rescheduled and cancelled sessions with calendar-check/calendar-x and first-session summary', () => {
-    const rescheduled = getActivityEventDefinition('session.rescheduled');
-    const canceled = getActivityEventDefinition('session.canceled');
+  it('renders rescheduled and cancelled sessions with class-session copy for overrides and exceptions', () => {
+    const rescheduled = getActivityEventDefinition('class.session.rescheduled');
+    const canceled = getActivityEventDefinition('class.session.canceled');
     if (!rescheduled || !canceled) {
       throw new Error('Missing session schedule change definitions');
     }
@@ -860,7 +860,7 @@ describe('activity event definitions', () => {
     const rescheduledRendered = rescheduled.render({
       id: 'event-session-rescheduled-1',
       org_id: 'org-1',
-      event_type: 'session.rescheduled',
+      event_type: 'class.session.rescheduled',
       occurred_at: '2026-03-08T12:00:00.000Z',
       source_kind: 'system',
       actor_profile_id: 'system-profile-1',
@@ -877,16 +877,17 @@ describe('activity event definitions', () => {
         rescheduledToStartAt: '2026-03-15T21:30:00.000Z',
       },
       audience_rules: [],
-      dedupe_key: 'session.rescheduled:space-1:1',
+      dedupe_key: 'class.session.rescheduled:space-1:1',
       projection_status: 'pending',
       projection_attempts: 0,
       created_at: '2026-03-08T12:00:00.000Z',
       updated_at: '2026-03-08T12:00:00.000Z',
     });
-    expect(rescheduledRendered.headline.primary).toBe(
-      'Session Mar 8 at 3:00 PM rescheduled to Mar 15 at 2:30 PM',
+    expect(rescheduledRendered.headline.primary).toBe('Class session rescheduled');
+    expect(rescheduledRendered.headline.secondary).toBe('Math Foundations');
+    expect(rescheduledRendered.summary).toBe(
+      'Session: Math Foundations weekly session moved from Sun, Mar 8, 3:00 PM PT to Sun, Mar 15, 2:30 PM PT',
     );
-    expect(rescheduledRendered.summary).toBe('Next session Mar 15 at 2:30 PM.');
     expect(rescheduledRendered.leading).toEqual({
       kind: 'icon',
       iconKey: 'CalendarCheck',
@@ -897,7 +898,7 @@ describe('activity event definitions', () => {
     const canceledRendered = canceled.render({
       id: 'event-session-canceled-1',
       org_id: 'org-1',
-      event_type: 'session.canceled',
+      event_type: 'class.session.canceled',
       occurred_at: '2026-03-08T12:00:00.000Z',
       source_kind: 'system',
       actor_profile_id: 'system-profile-1',
@@ -914,16 +915,17 @@ describe('activity event definitions', () => {
         canceledReason: 'Holiday',
       },
       audience_rules: [],
-      dedupe_key: 'session.canceled:space-1:1',
+      dedupe_key: 'class.session.canceled:space-1:1',
       projection_status: 'pending',
       projection_attempts: 0,
       created_at: '2026-03-08T12:00:00.000Z',
       updated_at: '2026-03-08T12:00:00.000Z',
     });
-    expect(canceledRendered.headline.primary).toBe(
-      'Session Mar 15 at 2:30 PM cancelled Holiday',
+    expect(canceledRendered.headline.primary).toBe('Class session cancelled');
+    expect(canceledRendered.headline.secondary).toBe('Math Foundations');
+    expect(canceledRendered.summary).toBe(
+      'Session: Math Foundations weekly session (Sun, Mar 15 2:30 PM PT) canceled due to Holiday',
     );
-    expect(canceledRendered.summary).toBe('Next session Mar 22 at 2:30 PM.');
     expect(canceledRendered.leading).toEqual({
       kind: 'icon',
       iconKey: 'CalendarX',

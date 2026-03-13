@@ -262,6 +262,63 @@ function formatLocalTimeLabel(value: string) {
   });
 }
 
+function formatSchedulePart(
+  value: string,
+  timezone?: string,
+  options?: Intl.DateTimeFormatOptions,
+) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return new Intl.DateTimeFormat('en-US', {
+    ...(timezone ? { timeZone: timezone } : {}),
+    ...options,
+  }).format(date);
+}
+
+function formatScheduleDayLabel(value: string, timezone?: string) {
+  return formatSchedulePart(value, timezone, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+function formatScheduleTimeLabel(value: string, timezone?: string, includeZone = false) {
+  return formatSchedulePart(value, timezone, {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    ...(includeZone ? { timeZoneName: 'shortGeneric' } : {}),
+  });
+}
+
+function formatScheduleDateTimeLabel(
+  value: string,
+  timezone?: string,
+  includeComma = true,
+) {
+  const dayLabel = formatScheduleDayLabel(value, timezone);
+  const timeLabel = formatScheduleTimeLabel(value, timezone, true);
+  if (!dayLabel || !timeLabel) {
+    return null;
+  }
+  return includeComma ? `${dayLabel}, ${timeLabel}` : `${dayLabel} ${timeLabel}`;
+}
+
+function isSameScheduleDay(a: string, b: string, timezone?: string) {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    ...(timezone ? { timeZone: timezone } : {}),
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+
+  return formatter.format(new Date(a)) === formatter.format(new Date(b));
+}
+
 export function applyScheduleActivityLocalTime(
   activity: ActivityFeedItemVM,
 ): ActivityFeedItemVM {
@@ -270,7 +327,7 @@ export function applyScheduleActivityLocalTime(
     return activity;
   }
 
-  if (activity.verb === 'session.scheduled') {
+  if (activity.verb === 'class.session.scheduled') {
     const startAt = typeof metadata.startAt === 'string' ? metadata.startAt : undefined;
     const firstSessionStartAt =
       typeof metadata.firstSessionStartAt === 'string'
@@ -295,7 +352,17 @@ export function applyScheduleActivityLocalTime(
     };
   }
 
-  if (activity.verb === 'session.rescheduled') {
+  if (activity.verb === 'class.session.rescheduled') {
+    const title =
+      typeof metadata.title === 'string'
+        ? metadata.title
+        : (activity.content.headline.secondary ?? 'Class');
+    const timezone =
+      typeof metadata.firstSessionTimezone === 'string'
+        ? metadata.firstSessionTimezone
+        : typeof metadata.timezone === 'string'
+          ? metadata.timezone
+          : undefined;
     const fromValue =
       typeof metadata.rescheduledFromStartAt === 'string'
         ? metadata.rescheduledFromStartAt
@@ -310,35 +377,51 @@ export function applyScheduleActivityLocalTime(
       typeof metadata.rescheduledReason === 'string'
         ? metadata.rescheduledReason
         : undefined;
-    const nextSessionValue =
-      typeof metadata.firstSessionStartAt === 'string'
-        ? metadata.firstSessionStartAt
-        : undefined;
-    const fromLabel = fromValue ? formatLocalDateTimeLabel(fromValue) : null;
-    const toLabel = toValue ? formatLocalDateTimeLabel(toValue) : null;
-    const nextSessionLabel = nextSessionValue
-      ? formatLocalDateTimeLabel(nextSessionValue)
-      : null;
-    const baseSummary = nextSessionLabel
-      ? `Next session ${nextSessionLabel}.`
-      : activity.content.summary;
+    let summary = activity.content.summary;
+    if (fromValue && toValue) {
+      if (isSameScheduleDay(fromValue, toValue, timezone)) {
+        const dayLabel = formatScheduleDayLabel(fromValue, timezone);
+        const fromTime = formatScheduleTimeLabel(fromValue, timezone);
+        const toTime = formatScheduleTimeLabel(toValue, timezone, true);
+        if (dayLabel && fromTime && toTime) {
+          summary = `Session: ${title} weekly session (${dayLabel}) moved from ${fromTime} to ${toTime}${
+            reason ? ` due to ${reason}` : ''
+          }`;
+        }
+      } else {
+        const fromDateTime = formatScheduleDateTimeLabel(fromValue, timezone);
+        const toDateTime = formatScheduleDateTimeLabel(toValue, timezone);
+        if (fromDateTime && toDateTime) {
+          summary = `Session: ${title} weekly session moved from ${fromDateTime} to ${toDateTime}${
+            reason ? ` due to ${reason}` : ''
+          }`;
+        }
+      }
+    }
     return {
       ...activity,
       content: {
         ...activity.content,
         headline: {
           ...activity.content.headline,
-          primary:
-            fromLabel && toLabel
-              ? `Session ${fromLabel} rescheduled to ${toLabel}`
-              : activity.content.headline.primary,
+          primary: 'Class session rescheduled',
         },
-        summary: reason ? `${baseSummary ?? ''} Reason: ${reason}.`.trim() : baseSummary,
+        summary,
       },
     };
   }
 
-  if (activity.verb === 'session.canceled') {
+  if (activity.verb === 'class.session.canceled') {
+    const title =
+      typeof metadata.title === 'string'
+        ? metadata.title
+        : (activity.content.headline.secondary ?? 'Class');
+    const timezone =
+      typeof metadata.firstSessionTimezone === 'string'
+        ? metadata.firstSessionTimezone
+        : typeof metadata.timezone === 'string'
+          ? metadata.timezone
+          : undefined;
     const canceledValue =
       typeof metadata.canceledStartAt === 'string'
         ? metadata.canceledStartAt
@@ -347,27 +430,28 @@ export function applyScheduleActivityLocalTime(
           : undefined;
     const reason =
       typeof metadata.canceledReason === 'string' ? metadata.canceledReason : undefined;
-    const nextSessionValue =
-      typeof metadata.firstSessionStartAt === 'string'
-        ? metadata.firstSessionStartAt
-        : undefined;
-    const canceledLabel = canceledValue ? formatLocalDateTimeLabel(canceledValue) : null;
-    const nextSessionLabel = nextSessionValue
-      ? formatLocalDateTimeLabel(nextSessionValue)
-      : null;
+    let summary = activity.content.summary;
+    if (canceledValue) {
+      const canceledDateTime = formatScheduleDateTimeLabel(
+        canceledValue,
+        timezone,
+        false,
+      );
+      if (canceledDateTime) {
+        summary = `Session: ${title} weekly session (${canceledDateTime}) canceled${
+          reason ? ` due to ${reason}` : ''
+        }`;
+      }
+    }
     return {
       ...activity,
       content: {
         ...activity.content,
         headline: {
           ...activity.content.headline,
-          primary: canceledLabel
-            ? `Session ${canceledLabel} cancelled${reason ? ` ${reason}` : ''}`
-            : 'Session cancelled',
+          primary: 'Class session cancelled',
         },
-        summary: nextSessionLabel
-          ? `Next session ${nextSessionLabel}.`
-          : activity.content.summary,
+        summary,
       },
     };
   }
