@@ -1,0 +1,67 @@
+/* @vitest-environment jsdom */
+import React from 'react';
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+
+import { ActivityItemBase } from './activity-item-base';
+import type { ActivityFeedItemVM } from '@iconicedu/shared-types';
+
+vi.mock('@iconicedu/ui-web/components/notification/activity-badge', () => ({
+  ActivityBadge: () => null,
+}));
+
+vi.mock('@iconicedu/ui-web/components/notification/activity-with-button', () => ({
+  ActivityWithButton: () => null,
+}));
+
+function createActivity(): ActivityFeedItemVM {
+  return {
+    kind: 'item',
+    ids: { id: 'activity-1', orgId: 'org-1' },
+    timestamps: {
+      occurredAt: '2026-03-13T10:00:00.000Z',
+      createdAt: '2026-03-13T10:00:00.000Z',
+    },
+    tabKey: 'all',
+    audience: {
+      scope: { kind: 'personal' },
+      visibility: 'visible',
+    },
+    verb: 'dm.posted',
+    refs: {
+      actor: {
+        profileId: 'profile-1',
+        displayName: 'Dinithi D',
+      },
+    },
+    content: {
+      headline: {
+        primary: 'Dinithi D sent you a direct message',
+        secondary: 'Direct message',
+        secondaryHref: '../dm/channel-dm-1',
+      },
+      expandedContent: 'Hello there',
+    },
+    state: {
+      isRead: false,
+    },
+  } as ActivityFeedItemVM;
+}
+
+describe('ActivityItemBase', () => {
+  it('links the secondary headline to the conversation when secondaryHref is provided', () => {
+    render(<ActivityItemBase activity={createActivity()} onMarkRead={vi.fn()} />);
+
+    const link = screen.getByRole('link', { name: 'Direct message' });
+    expect(link).toHaveAttribute('href', '../dm/channel-dm-1');
+  });
+
+  it('renders secondary headline as text when no headline link is provided', () => {
+    const activity = createActivity();
+    activity.content.headline.secondaryHref = undefined;
+
+    render(<ActivityItemBase activity={activity} onMarkRead={vi.fn()} />);
+
+    expect(screen.getByText('Direct message').tagName).toBe('SPAN');
+  });
+});

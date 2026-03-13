@@ -195,7 +195,10 @@ export function ActivityItemBase({
     : (toneClassName ?? UNREAD_ICON_CLASS);
   const Icon = INBOX_ICON_MAP[iconKey];
   const timestampLabel = formatRelativeTime(activity.timestamps.occurredAt);
-  const secondaryHref = activity.content.actionButton?.href ?? undefined;
+  const secondaryHref =
+    activity.content.headline.secondaryHref ??
+    activity.content.actionButton?.href ??
+    undefined;
   const isGroupParent = activity.kind === 'group';
   const groupChildCount = isGroupParent
     ? (subActivityCount ?? activity.subActivities?.items.length ?? 0)

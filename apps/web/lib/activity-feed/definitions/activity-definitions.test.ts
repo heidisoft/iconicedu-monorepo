@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { getActivityEventDefinition } from '@iconicedu/web/lib/activity-feed/definitions/activity-definitions';
 
 describe('activity event definitions', () => {
-  it('renders direct message activity headline and no action button', () => {
+  it('renders direct message activity headline with a linked conversation context and no action button', () => {
     const definition = getActivityEventDefinition('dm.posted');
     if (!definition) {
       throw new Error('Missing dm.posted definition');
@@ -35,6 +35,7 @@ describe('activity event definitions', () => {
     });
 
     expect(rendered.headline.primary).toBe('Jane sent you a direct message');
+    expect(rendered.headline.secondaryHref).toBe('../dm/channel-dm-1');
     expect(rendered.actionButton).toBeUndefined();
   });
 

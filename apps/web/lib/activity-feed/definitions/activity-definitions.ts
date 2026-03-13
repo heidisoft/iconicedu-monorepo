@@ -724,6 +724,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
         headline: {
           primary: `${senderName} sent you a direct message`,
           secondary: getContextTitle(payload),
+          secondaryHref: buildInboxSourceHref(event, payload),
         },
         summary: undefined,
         expandedContent: content || undefined,

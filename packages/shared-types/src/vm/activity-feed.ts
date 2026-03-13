@@ -154,6 +154,7 @@ export type InboxLeadingVM =
 export type InboxHeadlineVM = {
   primary: string;
   secondary?: string;
+  secondaryHref?: string;
   emphasis?: string;
 };
 
