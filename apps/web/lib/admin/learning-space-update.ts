@@ -1287,14 +1287,14 @@ export async function updateLearningSpaceFromPayload(
       nextOverrides: pair.next.canonical.overrides.length,
     })),
   });
-  const hasScheduleChanges =
+  const hasSemanticScheduleChanges =
     scheduleDiffPlan.added.length > 0 ||
     scheduleDiffPlan.removed.length > 0 ||
     scheduleDiffPlan.rescheduled.length > 0 ||
-    exceptionOverrideActivities.length > 0 ||
-    hasScheduleHashChanges;
+    exceptionOverrideActivities.length > 0;
   debugScheduleDiff('change-decision', {
-    hasScheduleChanges,
+    hasScheduleChanges: hasSemanticScheduleChanges,
+    hasSemanticScheduleChanges,
     hasScheduleHashChanges,
     exceptionOverrideActivityCount: exceptionOverrideActivities.length,
     addedCount: scheduleDiffPlan.added.length,
@@ -1307,7 +1307,7 @@ export async function updateLearningSpaceFromPayload(
     hasChannelSettingsChanges ||
     hasParticipantChanges ||
     hasLinkChanges ||
-    hasScheduleChanges;
+    hasSemanticScheduleChanges;
   const hasInfoChanges = hasBasicsChanges || hasChannelSettingsChanges || hasLinkChanges;
 
   if (!hasAnyChanges) {
@@ -1363,7 +1363,7 @@ export async function updateLearningSpaceFromPayload(
     links: payload.resources ?? [],
   });
 
-  if (hasScheduleChanges) {
+  if (hasSemanticScheduleChanges) {
     await replaceLearningSpaceSchedules(supabase, {
       orgId,
       learningSpaceId,
@@ -1378,11 +1378,12 @@ export async function updateLearningSpaceFromPayload(
     });
   }
 
-  if (hasScheduleChanges) {
+  if (hasSemanticScheduleChanges) {
     await compileLearningSpaceReminderJobs({
       supabase: serviceClient,
       orgId,
       learningSpaceId,
+      compileMode: 'suppress_session_activity',
     });
   }
 
@@ -1432,8 +1433,18 @@ export async function updateLearningSpaceFromPayload(
   if (hasLinkChanges) {
     infoChangeSummaryParts.push('Updated class resources');
   }
+  if (hasSemanticScheduleChanges) {
+    const hasRescheduledSessionChanges =
+      scheduleDiffPlan.rescheduled.length > 0 ||
+      exceptionOverrideActivities.some(
+        (activity) => activity.eventType === 'session.rescheduled',
+      );
+    infoChangeSummaryParts.push(
+      hasRescheduledSessionChanges ? 'Class rescheduled' : 'Updated class schedule',
+    );
+  }
 
-  if (hasInfoChanges) {
+  if (hasInfoChanges || hasSemanticScheduleChanges) {
     await publishActivityEvent({
       supabase: serviceClient,
       orgId,
@@ -1513,108 +1524,6 @@ export async function updateLearningSpaceFromPayload(
       dedupeKey: removedMembersActivity.dedupeKey,
       createdBy: systemProfileId,
     });
-  }
-
-  const scheduleActivities: ScheduleChangeActivity[] = [];
-
-  for (const schedule of scheduleDiffPlan.added) {
-    scheduleActivities.push({
-      eventType: 'session.scheduled',
-      dedupeKey: `schedule.added:${learningSpaceId}:${schedule.startAt}:${now}`,
-      payload: {
-        learningSpaceId,
-        channelId,
-        scheduleId: 'added',
-        title: payload.basics.title,
-        activityPhase: 'updated',
-        invitedCount: invitedMembersSnapshot.length,
-        invitedMembers: invitedMembersSnapshot,
-        firstSessionStartAt: nextSessionStartAt ?? schedule.startAt,
-        firstSessionTimezone: schedule.timezone ?? null,
-        startAt: schedule.startAt,
-        timezone: schedule.timezone ?? null,
-      },
-    });
-  }
-
-  for (const schedule of scheduleDiffPlan.removed) {
-    scheduleActivities.push({
-      eventType: 'session.canceled',
-      dedupeKey: `schedule.removed:${learningSpaceId}:${schedule.id}:${schedule.startAt}:${now}`,
-      payload: {
-        learningSpaceId,
-        channelId,
-        scheduleId: schedule.id,
-        title: payload.basics.title,
-        activityPhase: 'updated',
-        invitedCount: invitedMembersSnapshot.length,
-        invitedMembers: invitedMembersSnapshot,
-        firstSessionStartAt: nextSessionStartAt ?? schedule.startAt,
-        firstSessionTimezone: schedule.timezone ?? null,
-        canceledStartAt: schedule.startAt,
-        canceledReason: null,
-        timezone: schedule.timezone ?? null,
-      },
-    });
-  }
-
-  for (const change of scheduleDiffPlan.rescheduled) {
-    scheduleActivities.push({
-      eventType: 'session.rescheduled',
-      dedupeKey: `schedule.rescheduled:${learningSpaceId}:${change.previous.id}:${change.previous.startAt}:${change.next.startAt}:${now}`,
-      payload: {
-        learningSpaceId,
-        channelId,
-        scheduleId: change.previous.id,
-        title: payload.basics.title,
-        activityPhase: 'updated',
-        invitedCount: invitedMembersSnapshot.length,
-        invitedMembers: invitedMembersSnapshot,
-        firstSessionStartAt: nextSessionStartAt ?? change.next.startAt,
-        firstSessionTimezone: change.next.timezone ?? change.previous.timezone ?? null,
-        rescheduledFromStartAt: change.previous.startAt,
-        rescheduledToStartAt: change.next.startAt,
-        rescheduledReason: null,
-        timezone: change.next.timezone ?? change.previous.timezone ?? null,
-      },
-    });
-  }
-
-  scheduleActivities.push(
-    ...exceptionOverrideActivities.map((activity) => ({
-      ...activity,
-      payload: {
-        ...activity.payload,
-        invitedCount: invitedMembersSnapshot.length,
-        invitedMembers: invitedMembersSnapshot,
-        firstSessionStartAt: activity.payload.firstSessionStartAt ?? nextSessionStartAt,
-      },
-    })),
-  );
-
-  if (scheduleActivities.length > 0) {
-    const publishableScheduleActivities = scheduleActivities.filter((activity) =>
-      shouldPublishScheduleChangeActivity(activity, now),
-    );
-    for (const activity of publishableScheduleActivities) {
-      await publishActivityEvent({
-        supabase: serviceClient,
-        orgId,
-        eventType: activity.eventType,
-        occurredAt: now,
-        sourceKind: 'system',
-        actorProfileId: systemProfileId,
-        scope: { kind: 'learning_space', learningSpaceId },
-        targetRef: { kind: 'learning_space', id: learningSpaceId },
-        payload: {
-          ...activity.payload,
-          previousScheduleHashKey: previousSchedulesHashKey,
-          scheduleHashKey: nextSchedulesHashKey,
-        },
-        dedupeKey: activity.dedupeKey,
-        createdBy: systemProfileId,
-      });
-    }
   }
 }
 

@@ -38,8 +38,8 @@ describe('reminder-jobs', () => {
         ids: { id: 'schedule-1', orgId: 'org-1' },
         title: 'Algebra',
         description: 'Bring your workbook',
-        startAt: '2026-03-06T10:00:00.000Z',
-        endAt: '2026-03-06T11:00:00.000Z',
+        startAt: '2030-03-06T10:00:00.000Z',
+        endAt: '2030-03-06T11:00:00.000Z',
         timezone: 'UTC',
         status: 'scheduled',
         source: {
@@ -52,11 +52,11 @@ describe('reminder-jobs', () => {
 
     expandRecurringEventsMock.mockReturnValue([
       {
-        ids: { id: 'schedule-1__2026-03-06T10:00:00.000Z', orgId: 'org-1' },
+        ids: { id: 'schedule-1__2030-03-06T10:00:00.000Z', orgId: 'org-1' },
         title: 'Algebra',
         description: 'Bring your workbook',
-        startAt: '2026-03-06T10:00:00.000Z',
-        endAt: '2026-03-06T11:00:00.000Z',
+        startAt: '2030-03-06T10:00:00.000Z',
+        endAt: '2030-03-06T11:00:00.000Z',
         timezone: 'UTC',
         status: 'scheduled',
         location: null,
@@ -115,8 +115,8 @@ describe('reminder-jobs', () => {
       .sort((a, b) => a.run_at.localeCompare(b.run_at));
     expect(reminderRows).toHaveLength(2);
     expect(reminderRows.map((row) => row.run_at)).toEqual([
-      '2026-03-06T09:30:00.000Z',
-      '2026-03-06T09:55:00.000Z',
+      '2030-03-06T09:30:00.000Z',
+      '2030-03-06T09:55:00.000Z',
     ]);
     expect(reminderRows.map((row) => row.payload.summary)).toEqual([
       'Class starts in 30 minutes',
@@ -127,10 +127,251 @@ describe('reminder-jobs', () => {
     const feedbackRow = compiledRows.find(
       (row) => row.job_type === 'session.feedback_request',
     );
-    expect(feedbackRow?.run_at).toBe('2026-03-06T12:00:00.000Z');
+    expect(feedbackRow?.run_at).toBe('2030-03-06T11:15:00.000Z');
     expect(feedbackRow?.payload.members?.[0]).toMatchObject({
       profileId: 'profile-1',
     });
+  });
+
+  it('falls back to start time when end time is invalid for feedback scheduling', async () => {
+    buildClassSchedulesByOrgMock.mockResolvedValue([
+      {
+        ids: { id: 'schedule-1', orgId: 'org-1' },
+        title: 'Algebra',
+        description: 'Bring your workbook',
+        startAt: '2030-03-06T10:00:00.000Z',
+        endAt: '2030-03-06T11:00:00.000Z',
+        timezone: 'UTC',
+        status: 'scheduled',
+        source: {
+          kind: 'class_session',
+          learningSpaceId: 'space-1',
+          channelId: 'channel-1',
+        },
+      },
+    ]);
+
+    expandRecurringEventsMock.mockReturnValue([
+      {
+        ids: { id: 'schedule-1__2030-03-06T10:00:00.000Z', orgId: 'org-1' },
+        title: 'Algebra',
+        description: 'Bring your workbook',
+        startAt: '2030-03-06T10:00:00.000Z',
+        endAt: 'not-a-date',
+        timezone: 'UTC',
+        status: 'scheduled',
+        location: null,
+        meetingLink: null,
+        source: {
+          kind: 'class_session',
+          learningSpaceId: 'space-1',
+          channelId: 'channel-1',
+        },
+        participants: [],
+      },
+    ]);
+
+    const reminderJobsTable = {
+      upsert: vi.fn(async () => ({ error: null })),
+      select: vi.fn(() => reminderJobsTable),
+      eq: vi.fn(() => reminderJobsTable),
+      in: vi.fn(() => reminderJobsTable),
+      is: vi.fn(() => reminderJobsTable),
+      returns: vi
+        .fn()
+        .mockResolvedValueOnce({ data: [], error: null })
+        .mockResolvedValueOnce({ data: [], error: null }),
+      update: vi.fn(() => reminderJobsTable),
+    };
+
+    const supabase = {
+      from: vi.fn((table: string) => {
+        if (table !== 'reminder_jobs') {
+          throw new Error(`Unexpected table ${table}`);
+        }
+        return reminderJobsTable;
+      }),
+    } as never;
+
+    await compileLearningSpaceReminderJobs({
+      supabase,
+      orgId: 'org-1',
+      learningSpaceId: 'space-1',
+    });
+
+    const compiledRows = reminderJobsTable.upsert.mock.calls[0]?.[0] as Array<{
+      job_type: string;
+      run_at: string;
+    }>;
+    const feedbackRow = compiledRows.find(
+      (row) => row.job_type === 'session.feedback_request',
+    );
+    expect(feedbackRow?.run_at).toBe('2030-03-06T10:15:00.000Z');
+  });
+
+  it('does not reactivate succeeded reminder jobs when schedule ids change', async () => {
+    buildClassSchedulesByOrgMock.mockResolvedValue([
+      {
+        ids: { id: 'schedule-2', orgId: 'org-1' },
+        title: 'Algebra',
+        description: 'Bring your workbook',
+        startAt: '2030-03-06T10:00:00.000Z',
+        endAt: '2030-03-06T11:00:00.000Z',
+        timezone: 'UTC',
+        status: 'scheduled',
+        source: {
+          kind: 'class_session',
+          learningSpaceId: 'space-1',
+          channelId: 'channel-1',
+        },
+      },
+    ]);
+
+    expandRecurringEventsMock.mockReturnValue([
+      {
+        ids: { id: 'schedule-2__2030-03-06T10:00:00.000Z', orgId: 'org-1' },
+        title: 'Algebra',
+        description: 'Bring your workbook',
+        startAt: '2030-03-06T10:00:00.000Z',
+        endAt: '2030-03-06T11:00:00.000Z',
+        timezone: 'UTC',
+        status: 'scheduled',
+        location: null,
+        meetingLink: null,
+        source: {
+          kind: 'class_session',
+          learningSpaceId: 'space-1',
+          channelId: 'channel-1',
+        },
+        participants: [],
+      },
+    ]);
+
+    const reminderJobsTable = {
+      upsert: vi.fn(async () => ({ error: null })),
+      select: vi.fn(() => reminderJobsTable),
+      eq: vi.fn(() => reminderJobsTable),
+      in: vi.fn(() => reminderJobsTable),
+      is: vi.fn(() => reminderJobsTable),
+      returns: vi
+        .fn()
+        .mockResolvedValueOnce({
+          data: [
+            {
+              dedupe_key:
+                'session.reminder:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z:30',
+              status: 'succeeded',
+            },
+            {
+              dedupe_key:
+                'session.reminder:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z:5',
+              status: 'succeeded',
+            },
+            {
+              dedupe_key:
+                'session.feedback_request:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z',
+              status: 'succeeded',
+            },
+          ],
+          error: null,
+        })
+        .mockResolvedValueOnce({ data: [], error: null }),
+      update: vi.fn(() => reminderJobsTable),
+    };
+
+    const supabase = {
+      from: vi.fn((table: string) => {
+        if (table !== 'reminder_jobs') {
+          throw new Error(`Unexpected table ${table}`);
+        }
+        return reminderJobsTable;
+      }),
+    } as never;
+
+    const result = await compileLearningSpaceReminderJobs({
+      supabase,
+      orgId: 'org-1',
+      learningSpaceId: 'space-1',
+    });
+
+    expect(result.compiledCount).toBe(0);
+    expect(reminderJobsTable.upsert).not.toHaveBeenCalled();
+  });
+
+  it('does not compile session reminders when reminder run_at is in the past', async () => {
+    const now = Date.now();
+    const occurrenceStart = new Date(now - 10 * 60 * 1000).toISOString();
+    const occurrenceEnd = new Date(now + 50 * 60 * 1000).toISOString();
+
+    buildClassSchedulesByOrgMock.mockResolvedValue([
+      {
+        ids: { id: 'schedule-1', orgId: 'org-1' },
+        title: 'Algebra',
+        description: 'Bring your workbook',
+        startAt: occurrenceStart,
+        endAt: occurrenceEnd,
+        timezone: 'UTC',
+        status: 'scheduled',
+        source: {
+          kind: 'class_session',
+          learningSpaceId: 'space-1',
+          channelId: 'channel-1',
+        },
+      },
+    ]);
+
+    expandRecurringEventsMock.mockReturnValue([
+      {
+        ids: { id: `schedule-1__${occurrenceStart}`, orgId: 'org-1' },
+        title: 'Algebra',
+        description: 'Bring your workbook',
+        startAt: occurrenceStart,
+        endAt: occurrenceEnd,
+        timezone: 'UTC',
+        status: 'scheduled',
+        location: null,
+        meetingLink: null,
+        source: {
+          kind: 'class_session',
+          learningSpaceId: 'space-1',
+          channelId: 'channel-1',
+        },
+        participants: [],
+      },
+    ]);
+
+    const reminderJobsTable = {
+      upsert: vi.fn(async () => ({ error: null })),
+      select: vi.fn(() => reminderJobsTable),
+      eq: vi.fn(() => reminderJobsTable),
+      in: vi.fn(() => reminderJobsTable),
+      is: vi.fn(() => reminderJobsTable),
+      returns: vi
+        .fn()
+        .mockResolvedValueOnce({ data: [], error: null })
+        .mockResolvedValueOnce({ data: [], error: null }),
+      update: vi.fn(() => reminderJobsTable),
+    };
+
+    const supabase = {
+      from: vi.fn((table: string) => {
+        if (table !== 'reminder_jobs') {
+          throw new Error(`Unexpected table ${table}`);
+        }
+        return reminderJobsTable;
+      }),
+    } as never;
+
+    await compileLearningSpaceReminderJobs({
+      supabase,
+      orgId: 'org-1',
+      learningSpaceId: 'space-1',
+    });
+
+    const compiledRows = reminderJobsTable.upsert.mock.calls[0]?.[0] as
+      | Array<{ job_type: string }>
+      | undefined;
+    expect(compiledRows?.some((row) => row.job_type === 'session.reminder')).toBe(false);
   });
 
   it('dispatches claimed jobs and publishes activity events', async () => {
@@ -323,6 +564,90 @@ describe('reminder-jobs', () => {
     expect(dispatchLogsTable.insert).toHaveBeenCalledWith(
       expect.objectContaining({
         message_id: null,
+      }),
+    );
+  });
+
+  it('marks suppressed session feedback jobs as succeeded without publishing activity', async () => {
+    const claimedJob = {
+      id: 'job-feedback-2',
+      org_id: 'org-1',
+      job_type: 'session.feedback_request',
+      target_kind: 'channel',
+      target_id: 'channel-1',
+      payload: {
+        title: 'Algebra',
+        channelId: 'channel-1',
+        learningSpaceId: 'space-1',
+        scheduleId: 'schedule-1',
+        occurrenceStart: '2026-03-06T10:00:00.000Z',
+        suppressSessionActivity: true,
+      },
+      dedupe_key:
+        'session.feedback_request:org-1:space-1:channel-1:2026-03-06T10:00:00.000Z',
+      attempt_count: 0,
+      max_attempts: 8,
+    };
+
+    const profilesSelectChain = {
+      eq: vi.fn(() => profilesSelectChain),
+      is: vi.fn(() => profilesSelectChain),
+      order: vi.fn(() => profilesSelectChain),
+      limit: vi.fn(() => profilesSelectChain),
+      maybeSingle: vi.fn(async () => ({ data: { id: 'system-profile-1' }, error: null })),
+    };
+
+    const reminderJobsUpdateChain = {
+      eq: vi.fn(() => reminderJobsUpdateChain),
+    };
+
+    const reminderJobsTable = {
+      update: vi.fn(() => reminderJobsUpdateChain),
+    };
+
+    const dispatchLogsTable = {
+      insert: vi.fn(async () => ({ error: null })),
+    };
+
+    const supabase = {
+      rpc: vi.fn(async () => ({ data: [claimedJob], error: null })),
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case 'profiles':
+            return {
+              select: vi.fn(() => profilesSelectChain),
+            };
+          case 'reminder_jobs':
+            return reminderJobsTable;
+          case 'reminder_dispatch_logs':
+            return dispatchLogsTable;
+          default:
+            throw new Error(`Unexpected table ${table}`);
+        }
+      }),
+    } as never;
+
+    const result = await dispatchDueReminderJobs({
+      supabase,
+      leaseOwner: 'test-worker',
+      limit: 10,
+      leaseSeconds: 90,
+    });
+
+    expect(result).toEqual({
+      claimed: 1,
+      succeeded: 1,
+      failed: 0,
+      deadLettered: 0,
+    });
+    expect(publishActivityEventMock).not.toHaveBeenCalled();
+    expect(dispatchLogsTable.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        result: 'succeeded',
+        activity_event_id: null,
+        details: expect.objectContaining({
+          suppressSessionActivity: true,
+        }),
       }),
     );
   });

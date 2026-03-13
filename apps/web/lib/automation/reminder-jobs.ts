@@ -12,6 +12,7 @@ const DEFAULT_MAX_ATTEMPTS = 8;
 const RETRY_BASE_MS = 15_000;
 const RETRY_MAX_MS = 10 * 60_000;
 const SESSION_REMINDER_OFFSETS_MINUTES = [30, 5] as const;
+const SESSION_FEEDBACK_OFFSET_MINUTES = 15;
 
 type ReminderJobPayload = {
   title: string;
@@ -38,6 +39,7 @@ type ReminderJobPayload = {
     avatarUrl?: string | null;
     themeKey?: string | null;
   }> | null;
+  suppressSessionActivity?: boolean | null;
 };
 
 function normalizeBaseScheduleId(scheduleId: string) {
@@ -48,6 +50,27 @@ function normalizeBaseScheduleId(scheduleId: string) {
 
 function formatStartsInSummary(offsetMinutes: number) {
   return `Class starts in ${offsetMinutes} minutes`;
+}
+
+function buildSessionReminderDedupeKey(input: {
+  orgId: string;
+  learningSpaceId?: string | null;
+  channelId: string;
+  occurrenceStart: string;
+  offsetMinutes: number;
+}) {
+  const learningSpaceId = input.learningSpaceId ?? 'unknown-space';
+  return `session.reminder:${input.orgId}:${learningSpaceId}:${input.channelId}:${input.occurrenceStart}:${input.offsetMinutes}`;
+}
+
+function buildSessionFeedbackDedupeKey(input: {
+  orgId: string;
+  learningSpaceId?: string | null;
+  channelId: string;
+  occurrenceStart: string;
+}) {
+  const learningSpaceId = input.learningSpaceId ?? 'unknown-space';
+  return `session.feedback_request:${input.orgId}:${learningSpaceId}:${input.channelId}:${input.occurrenceStart}`;
 }
 
 function resolveRetryDelayMs(attemptCount: number) {
@@ -82,6 +105,7 @@ export async function compileLearningSpaceReminderJobs(input: {
   supabase: SupabaseServiceClient;
   orgId: string;
   learningSpaceId: string;
+  compileMode?: 'default' | 'suppress_session_activity';
 }) {
   const schedules = await buildClassSchedulesByOrg(input.supabase, input.orgId);
   const relevant = schedules.filter(
@@ -100,6 +124,7 @@ export async function compileLearningSpaceReminderJobs(input: {
   const dedupeKeys = new Set<string>();
   const rows: Array<Record<string, unknown>> = [];
   const createdAt = new Date().toISOString();
+  const suppressSessionActivity = input.compileMode === 'suppress_session_activity';
 
   for (const occurrence of occurrences) {
     if (occurrence.source.kind !== 'class_session' || !occurrence.source.channelId) {
@@ -110,6 +135,10 @@ export async function compileLearningSpaceReminderJobs(input: {
     if (Number.isNaN(occurrenceStart.getTime())) {
       continue;
     }
+    const occurrenceEnd = new Date(occurrence.endAt);
+    const feedbackBaseTime = Number.isNaN(occurrenceEnd.getTime())
+      ? occurrenceStart
+      : occurrenceEnd;
 
     const normalizedScheduleId = normalizeBaseScheduleId(occurrence.ids.id);
     const payload: ReminderJobPayload = {
@@ -135,7 +164,19 @@ export async function compileLearningSpaceReminderJobs(input: {
     };
 
     for (const offsetMinutes of SESSION_REMINDER_OFFSETS_MINUTES) {
-      const reminderDedupe = `session.reminder:${input.orgId}:${normalizedScheduleId}:${occurrence.startAt}:${offsetMinutes}`;
+      const reminderRunAt = new Date(
+        occurrenceStart.getTime() - offsetMinutes * 60 * 1000,
+      );
+      if (reminderRunAt.getTime() <= now.getTime()) {
+        continue;
+      }
+      const reminderDedupe = buildSessionReminderDedupeKey({
+        orgId: input.orgId,
+        learningSpaceId: occurrence.source.learningSpaceId,
+        channelId: occurrence.source.channelId,
+        occurrenceStart: occurrence.startAt,
+        offsetMinutes,
+      });
       dedupeKeys.add(reminderDedupe);
       rows.push({
         org_id: input.orgId,
@@ -145,14 +186,13 @@ export async function compileLearningSpaceReminderJobs(input: {
         source_learning_space_id: occurrence.source.learningSpaceId,
         source_schedule_id: normalizedScheduleId,
         occurrence_start_at: occurrence.startAt,
-        run_at: new Date(
-          occurrenceStart.getTime() - offsetMinutes * 60 * 1000,
-        ).toISOString(),
+        run_at: reminderRunAt.toISOString(),
         timezone: occurrence.timezone ?? 'UTC',
         payload: {
           ...payload,
           summary: formatStartsInSummary(offsetMinutes),
           reminderOffsetMinutes: offsetMinutes,
+          suppressSessionActivity,
         },
         dedupe_key: reminderDedupe,
         status: 'pending',
@@ -167,7 +207,12 @@ export async function compileLearningSpaceReminderJobs(input: {
       });
     }
 
-    const feedbackDedupe = `session.feedback_request:${input.orgId}:${normalizedScheduleId}:${occurrence.startAt}`;
+    const feedbackDedupe = buildSessionFeedbackDedupeKey({
+      orgId: input.orgId,
+      learningSpaceId: occurrence.source.learningSpaceId,
+      channelId: occurrence.source.channelId,
+      occurrenceStart: occurrence.startAt,
+    });
     dedupeKeys.add(feedbackDedupe);
     rows.push({
       org_id: input.orgId,
@@ -177,9 +222,14 @@ export async function compileLearningSpaceReminderJobs(input: {
       source_learning_space_id: occurrence.source.learningSpaceId,
       source_schedule_id: normalizedScheduleId,
       occurrence_start_at: occurrence.startAt,
-      run_at: new Date(occurrenceStart.getTime() + 2 * 60 * 60 * 1000).toISOString(),
+      run_at: new Date(
+        feedbackBaseTime.getTime() + SESSION_FEEDBACK_OFFSET_MINUTES * 60 * 1000,
+      ).toISOString(),
       timezone: occurrence.timezone ?? 'UTC',
-      payload,
+      payload: {
+        ...payload,
+        suppressSessionActivity,
+      },
       dedupe_key: feedbackDedupe,
       status: 'pending',
       max_attempts: DEFAULT_MAX_ATTEMPTS,
@@ -193,7 +243,35 @@ export async function compileLearningSpaceReminderJobs(input: {
     });
   }
 
-  await upsertReminderJobs(input.supabase, rows);
+  const dedupeKeyList = Array.from(dedupeKeys);
+  const existingByDedupe = new Map<string, ReminderJobRow['status']>();
+  if (dedupeKeyList.length) {
+    const existingResponse = await input.supabase
+      .from('reminder_jobs')
+      .select('dedupe_key, status')
+      .eq('org_id', input.orgId)
+      .in('dedupe_key', dedupeKeyList)
+      .is('deleted_at', null)
+      .returns<Array<{ dedupe_key: string; status: ReminderJobRow['status'] }>>();
+
+    if (existingResponse.error) {
+      throw new Error(existingResponse.error.message);
+    }
+
+    for (const row of existingResponse.data ?? []) {
+      existingByDedupe.set(row.dedupe_key, row.status);
+    }
+  }
+
+  const rowsToUpsert = rows.filter((row) => {
+    const dedupeKey = typeof row.dedupe_key === 'string' ? row.dedupe_key : null;
+    if (!dedupeKey) {
+      return true;
+    }
+    return existingByDedupe.get(dedupeKey) !== 'succeeded';
+  });
+
+  await upsertReminderJobs(input.supabase, rowsToUpsert);
 
   const staleCandidatesResponse = await input.supabase
     .from('reminder_jobs')
@@ -231,7 +309,7 @@ export async function compileLearningSpaceReminderJobs(input: {
   }
 
   return {
-    compiledCount: rows.length,
+    compiledCount: rowsToUpsert.length,
     canceledCount: staleIds.length,
   };
 }
@@ -347,41 +425,45 @@ async function processReminderJob(supabase: SupabaseServiceClient, job: Reminder
       : job.job_type === 'session.feedback_request'
         ? 'session.feedback_request.sent'
         : 'session.reminder.sent';
+  const shouldSuppressSessionActivity =
+    payload.suppressSessionActivity === true &&
+    (job.job_type === 'session.reminder' || job.job_type === 'session.feedback_request');
 
-  const scope: FeedScopeVM = payload.learningSpaceId
-    ? { kind: 'learning_space', learningSpaceId: payload.learningSpaceId as string }
-    : { kind: 'channel', channelId: payload.channelId };
-  const activityEvent = await publishActivityEvent({
-    supabase,
-    orgId: job.org_id,
-    eventType,
-    occurredAt: now,
-    sourceKind: 'system',
-    actorProfileId: systemProfileId,
-    scope,
-    objectRef: messageId ? { kind: 'message', id: messageId } : undefined,
-    targetRef: payload.learningSpaceId
-      ? { kind: 'learning_space', id: payload.learningSpaceId as string }
-      : undefined,
-    payload: {
-      channelId: payload.channelId,
-      messageId: messageId ?? null,
-      learningSpaceId: payload.learningSpaceId ?? null,
-      scheduleId: payload.scheduleId ?? null,
-      occurrenceStart: payload.occurrenceStart ?? payload.startAt ?? now,
-      reminderOffsetMinutes: payload.reminderOffsetMinutes ?? null,
-      timezone: payload.timezone ?? job.timezone ?? 'UTC',
-      invoiceId: payload.invoiceId ?? null,
-      dueAt: payload.dueAt ?? null,
-      title: payload.title,
-      summary: payload.summary ?? null,
-      channelRouteKind:
-        payload.channelRouteKind ?? (payload.learningSpaceId ? 'space' : 'channel'),
-      members: payload.members ?? null,
-    },
-    dedupeKey: `${job.dedupe_key}:activity`,
-    createdBy: systemProfileId,
-  });
+  const activityEvent = shouldSuppressSessionActivity
+    ? null
+    : await publishActivityEvent({
+        supabase,
+        orgId: job.org_id,
+        eventType,
+        occurredAt: now,
+        sourceKind: 'system',
+        actorProfileId: systemProfileId,
+        scope: payload.learningSpaceId
+          ? { kind: 'learning_space', learningSpaceId: payload.learningSpaceId as string }
+          : ({ kind: 'channel', channelId: payload.channelId } as FeedScopeVM),
+        objectRef: messageId ? { kind: 'message', id: messageId } : undefined,
+        targetRef: payload.learningSpaceId
+          ? { kind: 'learning_space', id: payload.learningSpaceId as string }
+          : undefined,
+        payload: {
+          channelId: payload.channelId,
+          messageId: messageId ?? null,
+          learningSpaceId: payload.learningSpaceId ?? null,
+          scheduleId: payload.scheduleId ?? null,
+          occurrenceStart: payload.occurrenceStart ?? payload.startAt ?? now,
+          reminderOffsetMinutes: payload.reminderOffsetMinutes ?? null,
+          timezone: payload.timezone ?? job.timezone ?? 'UTC',
+          invoiceId: payload.invoiceId ?? null,
+          dueAt: payload.dueAt ?? null,
+          title: payload.title,
+          summary: payload.summary ?? null,
+          channelRouteKind:
+            payload.channelRouteKind ?? (payload.learningSpaceId ? 'space' : 'channel'),
+          members: payload.members ?? null,
+        },
+        dedupeKey: `${job.dedupe_key}:activity`,
+        createdBy: systemProfileId,
+      });
 
   await supabase
     .from('reminder_jobs')
@@ -406,6 +488,7 @@ async function processReminderJob(supabase: SupabaseServiceClient, job: Reminder
     result: 'succeeded',
     details: {
       eventType,
+      suppressSessionActivity: shouldSuppressSessionActivity,
     },
   });
 }

@@ -320,6 +320,425 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
     expect(ensureSystemProfileIdMock).not.toHaveBeenCalled();
   });
 
+  it('emits class.updated only for info-only edits with unchanged schedule semantics', async () => {
+    const payload: LearningSpaceCreatePayload = {
+      basics: {
+        title: 'Math Foundations',
+        kind: 'small_group',
+        iconKey: 'book-open',
+        subject: 'Math',
+        description: 'Weekly math fundamentals (updated)',
+      },
+      settings: {
+        themeKey: 'teal',
+        uiDefaults: null,
+      },
+      liveSession: null,
+      participants: [
+        {
+          profileId: 'profile-1',
+          kind: 'educator',
+          displayName: 'Alex Educator',
+          avatarUrl: null,
+          themeKey: null,
+        },
+      ],
+      resources: [
+        {
+          label: 'Syllabus',
+          iconKey: 'file-text',
+          url: 'https://example.com/syllabus',
+          status: 'active',
+          hidden: false,
+        },
+      ],
+      schedules: [
+        {
+          startDate: '2026-03-14T14:00:00.000Z',
+          startTime: '14:00',
+          endTime: '15:00',
+          timezone: 'UTC',
+          rule: {
+            frequency: 'weekly',
+            byWeekday: ['SA'],
+            weekdayTimes: [{ day: 'SA', time: '14:00' }],
+          },
+          exceptions: [],
+          overrides: [],
+        },
+      ],
+    };
+
+    const learningSpacesTable = createSelectSingleChain({
+      data: {
+        id: 'space-1',
+        org_id: 'org-1',
+        kind: payload.basics.kind,
+        title: payload.basics.title,
+        icon_key: payload.basics.iconKey,
+        subject: payload.basics.subject,
+        description: 'Weekly math fundamentals',
+      },
+      error: null,
+    });
+
+    const learningSpaceChannelsTable = createSelectSingleChain({
+      data: { channel_id: 'channel-1' },
+      error: null,
+    });
+
+    const mutationTable = createMutationTable();
+    const serverClient = {
+      auth: {
+        getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user-1' } } })),
+      },
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case 'learning_spaces':
+            return learningSpacesTable;
+          case 'learning_space_channels':
+            return learningSpaceChannelsTable;
+          case 'channels':
+            return channelsTable;
+          default:
+            return mutationTable;
+        }
+      }),
+    };
+
+    const participantsTable = createSelectManyChain({
+      data: [{ profile_id: 'profile-1' }],
+      error: null,
+    });
+    const schedulesTable = createSelectManyChain({
+      data: [
+        {
+          id: 'schedule-1',
+          title: payload.basics.title,
+          start_at: '2026-03-14T14:00:00.000Z',
+          end_at: '2026-03-14T15:00:00.000Z',
+          timezone: 'UTC',
+        },
+      ],
+      error: null,
+    });
+    const recurrencesTable = createSelectManyChain({
+      data: [{ id: 'recurrence-1', schedule_id: 'schedule-1' }],
+      error: null,
+    });
+    const recurrenceExceptionsTable = createSelectManyChain({
+      data: [],
+      error: null,
+    });
+    const recurrenceOverridesTable = createSelectManyChain({
+      data: [],
+      error: null,
+    });
+    const linksTable = createSelectManyChain({
+      data: [
+        {
+          label: 'Syllabus',
+          icon_key: 'file-text',
+          url: 'https://example.com/syllabus',
+          status: 'active',
+          hidden: false,
+        },
+      ],
+      error: null,
+    });
+    const channelsTable = createSelectSingleChain({
+      data: {
+        topic: payload.basics.title,
+        description: 'Weekly math fundamentals',
+        icon_key: payload.basics.iconKey,
+        ui_theme_key: payload.settings?.themeKey,
+        ui_defaults: payload.settings?.uiDefaults ?? null,
+        live_session_config: null,
+      },
+      error: null,
+    });
+    const profilesTable = createSelectManyChain({
+      data: [
+        {
+          id: 'profile-1',
+          display_name: 'Alex Educator',
+          avatar_url: null,
+          ui_theme_key: null,
+        },
+      ],
+      error: null,
+    });
+
+    const serviceMutationTable = createSelectManyChain({
+      data: [],
+      error: null,
+    });
+    const serviceClient = {
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case 'learning_space_participants':
+            return participantsTable;
+          case 'class_schedules':
+            return schedulesTable;
+          case 'learning_space_links':
+            return linksTable;
+          case 'class_schedule_recurrence':
+            return recurrencesTable;
+          case 'class_schedule_recurrence_exceptions':
+            return recurrenceExceptionsTable;
+          case 'class_schedule_recurrence_overrides':
+            return recurrenceOverridesTable;
+          case 'channels':
+            return channelsTable;
+          case 'profiles':
+            return profilesTable;
+          default:
+            return serviceMutationTable;
+        }
+      }),
+    };
+
+    createSupabaseServerClientMock.mockResolvedValue(serverClient);
+    createSupabaseServiceClientMock.mockReturnValue(serviceClient);
+    getAccountByAuthUserIdMock.mockResolvedValue({
+      data: {
+        id: 'account-1',
+        org_id: 'org-1',
+      },
+    });
+    getProfileByAccountIdMock.mockResolvedValue({ data: { id: 'profile-actor-1' } });
+    ensureSystemProfileIdMock.mockResolvedValue('system-profile-1');
+    publishActivityEventMock.mockResolvedValue({ id: 'activity-1' });
+
+    await updateLearningSpaceFromPayload('space-1', payload);
+
+    expect(compileLearningSpaceReminderJobsMock).not.toHaveBeenCalled();
+    expect(publishActivityEventMock).toHaveBeenCalledTimes(1);
+    expect(publishActivityEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'class.updated',
+      }),
+    );
+  });
+
+  it('emits only class.updated and compiles reminders in suppress mode for schedule override edits', async () => {
+    const payload: LearningSpaceCreatePayload = {
+      basics: {
+        title: 'Math Foundations',
+        kind: 'small_group',
+        iconKey: 'book-open',
+        subject: 'Math',
+        description: 'Weekly math fundamentals',
+      },
+      settings: {
+        themeKey: 'teal',
+        uiDefaults: null,
+      },
+      liveSession: null,
+      participants: [
+        {
+          profileId: 'profile-1',
+          kind: 'educator',
+          displayName: 'Alex Educator',
+          avatarUrl: null,
+          themeKey: null,
+        },
+      ],
+      resources: [
+        {
+          label: 'Syllabus',
+          iconKey: 'file-text',
+          url: 'https://example.com/syllabus',
+          status: 'active',
+          hidden: false,
+        },
+      ],
+      schedules: [
+        {
+          startDate: '2026-03-14T14:00:00.000Z',
+          startTime: '14:00',
+          endTime: '15:00',
+          timezone: 'UTC',
+          rule: {
+            frequency: 'weekly',
+            byWeekday: ['SA'],
+            weekdayTimes: [{ day: 'SA', time: '14:00' }],
+          },
+          exceptions: [],
+          overrides: [
+            {
+              originalDate: '2026-03-21',
+              newDate: '2026-03-21',
+              newTime: '15:00',
+              reason: 'Rescheduled',
+            },
+          ],
+        },
+      ],
+    };
+
+    const learningSpacesTable = createSelectSingleChain({
+      data: {
+        id: 'space-1',
+        org_id: 'org-1',
+        kind: payload.basics.kind,
+        title: payload.basics.title,
+        icon_key: payload.basics.iconKey,
+        subject: payload.basics.subject,
+        description: payload.basics.description,
+      },
+      error: null,
+    });
+
+    const learningSpaceChannelsTable = createSelectSingleChain({
+      data: { channel_id: 'channel-1' },
+      error: null,
+    });
+
+    const mutationTable = createMutationTable();
+    const serverClient = {
+      auth: {
+        getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user-1' } } })),
+      },
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case 'learning_spaces':
+            return learningSpacesTable;
+          case 'learning_space_channels':
+            return learningSpaceChannelsTable;
+          case 'channels':
+            return channelsTable;
+          default:
+            return mutationTable;
+        }
+      }),
+    };
+
+    const participantsTable = createSelectManyChain({
+      data: [{ profile_id: 'profile-1' }],
+      error: null,
+    });
+    const schedulesTable = createSelectManyChain({
+      data: [
+        {
+          id: 'schedule-1',
+          title: payload.basics.title,
+          start_at: '2026-03-14T14:00:00.000Z',
+          end_at: '2026-03-14T15:00:00.000Z',
+          timezone: 'UTC',
+        },
+      ],
+      error: null,
+    });
+    const recurrencesTable = createSelectManyChain({
+      data: [{ id: 'recurrence-1', schedule_id: 'schedule-1' }],
+      error: null,
+    });
+    const recurrenceExceptionsTable = createSelectManyChain({
+      data: [],
+      error: null,
+    });
+    const recurrenceOverridesTable = createSelectManyChain({
+      data: [],
+      error: null,
+    });
+    const linksTable = createSelectManyChain({
+      data: [
+        {
+          label: 'Syllabus',
+          icon_key: 'file-text',
+          url: 'https://example.com/syllabus',
+          status: 'active',
+          hidden: false,
+        },
+      ],
+      error: null,
+    });
+    const channelsTable = createSelectSingleChain({
+      data: {
+        topic: payload.basics.title,
+        description: payload.basics.description,
+        icon_key: payload.basics.iconKey,
+        ui_theme_key: payload.settings?.themeKey,
+        ui_defaults: payload.settings?.uiDefaults ?? null,
+        live_session_config: null,
+      },
+      error: null,
+    });
+    const profilesTable = createSelectManyChain({
+      data: [
+        {
+          id: 'profile-1',
+          display_name: 'Alex Educator',
+          avatar_url: null,
+          ui_theme_key: null,
+        },
+      ],
+      error: null,
+    });
+
+    const serviceMutationTable = createSelectManyChain({
+      data: [],
+      error: null,
+    });
+    const serviceClient = {
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case 'learning_space_participants':
+            return participantsTable;
+          case 'class_schedules':
+            return schedulesTable;
+          case 'learning_space_links':
+            return linksTable;
+          case 'class_schedule_recurrence':
+            return recurrencesTable;
+          case 'class_schedule_recurrence_exceptions':
+            return recurrenceExceptionsTable;
+          case 'class_schedule_recurrence_overrides':
+            return recurrenceOverridesTable;
+          case 'channels':
+            return channelsTable;
+          case 'profiles':
+            return profilesTable;
+          default:
+            return serviceMutationTable;
+        }
+      }),
+    };
+
+    createSupabaseServerClientMock.mockResolvedValue(serverClient);
+    createSupabaseServiceClientMock.mockReturnValue(serviceClient);
+    getAccountByAuthUserIdMock.mockResolvedValue({
+      data: {
+        id: 'account-1',
+        org_id: 'org-1',
+      },
+    });
+    getProfileByAccountIdMock.mockResolvedValue({ data: { id: 'profile-actor-1' } });
+    ensureSystemProfileIdMock.mockResolvedValue('system-profile-1');
+    publishActivityEventMock.mockResolvedValue({ id: 'activity-1' });
+
+    await updateLearningSpaceFromPayload('space-1', payload);
+
+    expect(compileLearningSpaceReminderJobsMock).toHaveBeenCalledTimes(1);
+    expect(compileLearningSpaceReminderJobsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orgId: 'org-1',
+        learningSpaceId: 'space-1',
+        compileMode: 'suppress_session_activity',
+      }),
+    );
+    expect(publishActivityEventMock).toHaveBeenCalledTimes(1);
+    expect(publishActivityEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'class.updated',
+        payload: expect.objectContaining({
+          changeSummary: expect.stringContaining('Class rescheduled'),
+        }),
+      }),
+    );
+  });
+
   it('treats empty resource placeholder rows as no-op changes', async () => {
     const payload: LearningSpaceCreatePayload = {
       basics: {
