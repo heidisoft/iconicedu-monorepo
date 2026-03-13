@@ -659,6 +659,9 @@ describe('activity event definitions', () => {
     const memberRemoved = getActivityEventDefinition('member.removed');
     const sessionScheduled = getActivityEventDefinition('class.session.scheduled');
     const sessionCanceled = getActivityEventDefinition('class.session.canceled');
+    const sessionsScheduled = getActivityEventDefinition('class.sessions.scheduled');
+    const sessionsRescheduled = getActivityEventDefinition('class.sessions.rescheduled');
+    const sessionsCanceled = getActivityEventDefinition('class.sessions.canceled');
     const classUpdated = getActivityEventDefinition('class.updated');
 
     if (
@@ -666,6 +669,9 @@ describe('activity event definitions', () => {
       !memberRemoved?.group ||
       !sessionScheduled?.group ||
       !sessionCanceled?.group ||
+      !sessionsScheduled?.group ||
+      !sessionsRescheduled?.group ||
+      !sessionsCanceled?.group ||
       !classUpdated?.group
     ) {
       throw new Error('Missing update group definitions');
@@ -712,12 +718,27 @@ describe('activity event definitions', () => {
       ...event,
       event_type: 'class.session.canceled',
     });
+    const sessionsScheduledKey = sessionsScheduled.group.buildGroupKey({
+      ...event,
+      event_type: 'class.sessions.scheduled',
+    });
+    const sessionsRescheduledKey = sessionsRescheduled.group.buildGroupKey({
+      ...event,
+      event_type: 'class.sessions.rescheduled',
+    });
+    const sessionsCanceledKey = sessionsCanceled.group.buildGroupKey({
+      ...event,
+      event_type: 'class.sessions.canceled',
+    });
 
     expect(classUpdatedKey).toBe('class-updated:space-1:2026-03-06');
     expect(memberKey).toBe(classUpdatedKey);
     expect(memberRemovedKey).toBe(classUpdatedKey);
     expect(sessionScheduledKey).toBe(classUpdatedKey);
     expect(sessionCanceledKey).toBe(classUpdatedKey);
+    expect(sessionsScheduledKey).toBe(classUpdatedKey);
+    expect(sessionsRescheduledKey).toBe(classUpdatedKey);
+    expect(sessionsCanceledKey).toBe(classUpdatedKey);
 
     const nextDayKey = classUpdated.group.buildGroupKey({
       ...event,
@@ -932,6 +953,12 @@ describe('activity event definitions', () => {
       tone: 'warning',
     });
     expect(canceledRendered.actionButton).toBeUndefined();
+  });
+
+  it('defines plural class session schedule activity events', () => {
+    expect(getActivityEventDefinition('class.sessions.scheduled')).toBeDefined();
+    expect(getActivityEventDefinition('class.sessions.rescheduled')).toBeDefined();
+    expect(getActivityEventDefinition('class.sessions.canceled')).toBeDefined();
   });
 
   it('renders homework activities using the assignment pattern and weekly grouping', () => {

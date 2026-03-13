@@ -33,6 +33,23 @@ describe('shouldReplaceGroupParent', () => {
     ).toBe(false);
   });
 
+  it('keeps class.updated as the parent when plural class session updates arrive', () => {
+    expect(
+      shouldReplaceGroupParent({
+        groupKey: 'class-updated:space-1:2026-03-08',
+        existingVerb: 'class.updated',
+        nextVerb: 'class.sessions.rescheduled',
+      }),
+    ).toBe(false);
+    expect(
+      shouldReplaceGroupParent({
+        groupKey: 'class-updated:space-1:2026-03-08',
+        existingVerb: 'class.updated',
+        nextVerb: 'class.sessions.canceled',
+      }),
+    ).toBe(false);
+  });
+
   it('falls back to replacing for unrelated group keys', () => {
     expect(
       shouldReplaceGroupParent({

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   createSupabaseServerClientMock,
@@ -123,6 +123,11 @@ function createMutationTable() {
 describe('updateLearningSpaceFromPayload no-op behavior', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it('does not emit activity events for unchanged payload', async () => {
@@ -521,7 +526,10 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
     );
   });
 
-  it('emits only class.updated and compiles reminders in suppress mode for schedule override edits', async () => {
+  it('emits class.updated and class.session.rescheduled for schedule override edits', async () => {
+    vi.stubEnv('DEBUG_LEARNING_SPACE_SCHEDULE_DIFF', '1');
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
     const payload: LearningSpaceCreatePayload = {
       basics: {
         title: 'Math Foundations',
@@ -728,15 +736,455 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
         compileMode: 'suppress_session_activity',
       }),
     );
-    expect(publishActivityEventMock).toHaveBeenCalledTimes(1);
-    expect(publishActivityEventMock).toHaveBeenCalledWith(
+    expect(publishActivityEventMock).toHaveBeenCalledTimes(2);
+    expect(publishActivityEventMock.mock.calls.map(([input]) => input.eventType)).toEqual(
+      ['class.updated', 'class.session.rescheduled'],
+    );
+    expect(publishActivityEventMock).toHaveBeenNthCalledWith(
+      1,
       expect.objectContaining({
         eventType: 'class.updated',
         payload: expect.objectContaining({
-          changeSummary: expect.stringContaining('Class rescheduled'),
+          changeSummary: expect.stringContaining('Class schedule has been updated'),
         }),
       }),
     );
+    expect(publishActivityEventMock).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        eventType: 'class.session.rescheduled',
+        payload: expect.objectContaining({
+          title: 'Math Foundations',
+          invitedMembers: [],
+          rescheduledFromStartAt: '2026-03-21',
+          rescheduledToStartAt: '2026-03-21T15:00:00.000Z',
+          rescheduledReason: 'Rescheduled',
+        }),
+      }),
+    );
+
+    const publishAttemptLogs = logSpy.mock.calls
+      .filter(
+        (call) =>
+          call[0] === '[learning-space:update:schedule-diff]' &&
+          call[1] === 'schedule-change-publish-attempt',
+      )
+      .map((call) => call[2] as Record<string, unknown>);
+    const publishSuccessLogs = logSpy.mock.calls
+      .filter(
+        (call) =>
+          call[0] === '[learning-space:update:schedule-diff]' &&
+          call[1] === 'schedule-change-publish-success',
+      )
+      .map((call) => call[2] as Record<string, unknown>);
+
+    expect(
+      publishAttemptLogs.some(
+        (entry) =>
+          entry.eventType === 'class.session.rescheduled' &&
+          typeof entry.dedupeKey === 'string',
+      ),
+    ).toBe(true);
+    expect(
+      publishSuccessLogs.some(
+        (entry) =>
+          entry.eventType === 'class.session.rescheduled' &&
+          entry.activityEventId === 'activity-1',
+      ),
+    ).toBe(true);
+  });
+
+  it('emits class.session.canceled for added exceptions even when base schedule also changes', async () => {
+    const payload: LearningSpaceCreatePayload = {
+      basics: {
+        title: 'Math Foundations',
+        kind: 'small_group',
+        iconKey: 'book-open',
+        subject: 'Math',
+        description: 'Weekly math fundamentals',
+      },
+      settings: {
+        themeKey: 'teal',
+        uiDefaults: null,
+      },
+      liveSession: null,
+      participants: [
+        {
+          profileId: 'profile-1',
+          kind: 'educator',
+          displayName: 'Alex Educator',
+          avatarUrl: null,
+          themeKey: null,
+        },
+      ],
+      resources: [],
+      schedules: [
+        {
+          startDate: '2026-03-14T14:30:00.000Z',
+          startTime: '14:30',
+          endTime: '15:30',
+          timezone: 'UTC',
+          rule: {
+            frequency: 'weekly',
+            byWeekday: ['SA'],
+            weekdayTimes: [{ day: 'SA', time: '14:30' }],
+          },
+          exceptions: [{ date: '2026-03-21', reason: 'Holiday' }],
+          overrides: [],
+        },
+      ],
+    };
+
+    const learningSpacesTable = createSelectSingleChain({
+      data: {
+        id: 'space-1',
+        org_id: 'org-1',
+        kind: payload.basics.kind,
+        title: payload.basics.title,
+        icon_key: payload.basics.iconKey,
+        subject: payload.basics.subject,
+        description: payload.basics.description,
+      },
+      error: null,
+    });
+
+    const learningSpaceChannelsTable = createSelectSingleChain({
+      data: { channel_id: 'channel-1' },
+      error: null,
+    });
+
+    const mutationTable = createMutationTable();
+    const serverClient = {
+      auth: {
+        getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user-1' } } })),
+      },
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case 'learning_spaces':
+            return learningSpacesTable;
+          case 'learning_space_channels':
+            return learningSpaceChannelsTable;
+          case 'channels':
+            return channelsTable;
+          default:
+            return mutationTable;
+        }
+      }),
+    };
+
+    const participantsTable = createSelectManyChain({
+      data: [{ profile_id: 'profile-1' }],
+      error: null,
+    });
+    const schedulesTable = createSelectManyChain({
+      data: [
+        {
+          id: 'schedule-1',
+          title: payload.basics.title,
+          start_at: '2026-03-14T14:00:00.000Z',
+          end_at: '2026-03-14T15:00:00.000Z',
+          timezone: 'UTC',
+        },
+      ],
+      error: null,
+    });
+    const recurrencesTable = createSelectManyChain({
+      data: [{ id: 'recurrence-1', schedule_id: 'schedule-1' }],
+      error: null,
+    });
+    const recurrenceExceptionsTable = createSelectManyChain({
+      data: [],
+      error: null,
+    });
+    const recurrenceOverridesTable = createSelectManyChain({
+      data: [],
+      error: null,
+    });
+    const linksTable = createSelectManyChain({
+      data: [],
+      error: null,
+    });
+    const channelsTable = createSelectSingleChain({
+      data: {
+        topic: payload.basics.title,
+        description: payload.basics.description,
+        icon_key: payload.basics.iconKey,
+        ui_theme_key: payload.settings?.themeKey,
+        ui_defaults: payload.settings?.uiDefaults ?? null,
+        live_session_config: null,
+      },
+      error: null,
+    });
+    const profilesTable = createSelectManyChain({
+      data: [
+        {
+          id: 'profile-1',
+          display_name: 'Alex Educator',
+          avatar_url: null,
+          ui_theme_key: null,
+        },
+      ],
+      error: null,
+    });
+
+    const serviceMutationTable = createSelectManyChain({
+      data: [],
+      error: null,
+    });
+    const serviceClient = {
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case 'learning_space_participants':
+            return participantsTable;
+          case 'class_schedules':
+            return schedulesTable;
+          case 'learning_space_links':
+            return linksTable;
+          case 'class_schedule_recurrence':
+            return recurrencesTable;
+          case 'class_schedule_recurrence_exceptions':
+            return recurrenceExceptionsTable;
+          case 'class_schedule_recurrence_overrides':
+            return recurrenceOverridesTable;
+          case 'channels':
+            return channelsTable;
+          case 'profiles':
+            return profilesTable;
+          default:
+            return serviceMutationTable;
+        }
+      }),
+    };
+
+    createSupabaseServerClientMock.mockResolvedValue(serverClient);
+    createSupabaseServiceClientMock.mockReturnValue(serviceClient);
+    getAccountByAuthUserIdMock.mockResolvedValue({
+      data: {
+        id: 'account-1',
+        org_id: 'org-1',
+      },
+    });
+    getProfileByAccountIdMock.mockResolvedValue({ data: { id: 'profile-actor-1' } });
+    ensureSystemProfileIdMock.mockResolvedValue('system-profile-1');
+    publishActivityEventMock.mockResolvedValue({ id: 'activity-1' });
+
+    await updateLearningSpaceFromPayload('space-1', payload);
+
+    const eventTypes = publishActivityEventMock.mock.calls.map(
+      ([input]) => input.eventType,
+    );
+    expect(eventTypes).toContain('class.updated');
+    expect(eventTypes).toContain('class.session.rescheduled');
+    expect(eventTypes).toContain('class.session.canceled');
+  });
+
+  it('emits plural class.sessions.rescheduled when multiple schedules are rescheduled', async () => {
+    const payload: LearningSpaceCreatePayload = {
+      basics: {
+        title: 'Math Foundations',
+        kind: 'small_group',
+        iconKey: 'book-open',
+        subject: 'Math',
+        description: 'Weekly math fundamentals',
+      },
+      settings: {
+        themeKey: 'teal',
+        uiDefaults: null,
+      },
+      liveSession: null,
+      participants: [
+        {
+          profileId: 'profile-1',
+          kind: 'educator',
+          displayName: 'Alex Educator',
+          avatarUrl: null,
+          themeKey: null,
+        },
+      ],
+      resources: [],
+      schedules: [
+        {
+          startDate: '2026-03-14T14:30:00.000Z',
+          startTime: '14:30',
+          endTime: '15:30',
+          timezone: 'UTC',
+          rule: {
+            frequency: 'weekly',
+            byWeekday: ['SA'],
+            weekdayTimes: [{ day: 'SA', time: '14:30' }],
+          },
+          exceptions: [],
+          overrides: [],
+        },
+        {
+          startDate: '2026-03-14T16:30:00.000Z',
+          startTime: '16:30',
+          endTime: '17:30',
+          timezone: 'UTC',
+          rule: {
+            frequency: 'weekly',
+            byWeekday: ['SA'],
+            weekdayTimes: [{ day: 'SA', time: '16:30' }],
+          },
+          exceptions: [],
+          overrides: [],
+        },
+      ],
+    };
+
+    const learningSpacesTable = createSelectSingleChain({
+      data: {
+        id: 'space-1',
+        org_id: 'org-1',
+        kind: payload.basics.kind,
+        title: payload.basics.title,
+        icon_key: payload.basics.iconKey,
+        subject: payload.basics.subject,
+        description: payload.basics.description,
+      },
+      error: null,
+    });
+
+    const learningSpaceChannelsTable = createSelectSingleChain({
+      data: { channel_id: 'channel-1' },
+      error: null,
+    });
+
+    const mutationTable = createMutationTable();
+    const serverClient = {
+      auth: {
+        getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user-1' } } })),
+      },
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case 'learning_spaces':
+            return learningSpacesTable;
+          case 'learning_space_channels':
+            return learningSpaceChannelsTable;
+          case 'channels':
+            return channelsTable;
+          default:
+            return mutationTable;
+        }
+      }),
+    };
+
+    const participantsTable = createSelectManyChain({
+      data: [{ profile_id: 'profile-1' }],
+      error: null,
+    });
+    const schedulesTable = createSelectManyChain({
+      data: [
+        {
+          id: 'schedule-1',
+          title: payload.basics.title,
+          start_at: '2026-03-14T14:00:00.000Z',
+          end_at: '2026-03-14T15:00:00.000Z',
+          timezone: 'UTC',
+        },
+        {
+          id: 'schedule-2',
+          title: payload.basics.title,
+          start_at: '2026-03-14T16:00:00.000Z',
+          end_at: '2026-03-14T17:00:00.000Z',
+          timezone: 'UTC',
+        },
+      ],
+      error: null,
+    });
+    const recurrencesTable = createSelectManyChain({
+      data: [
+        { id: 'recurrence-1', schedule_id: 'schedule-1' },
+        { id: 'recurrence-2', schedule_id: 'schedule-2' },
+      ],
+      error: null,
+    });
+    const recurrenceExceptionsTable = createSelectManyChain({
+      data: [],
+      error: null,
+    });
+    const recurrenceOverridesTable = createSelectManyChain({
+      data: [],
+      error: null,
+    });
+    const linksTable = createSelectManyChain({
+      data: [],
+      error: null,
+    });
+    const channelsTable = createSelectSingleChain({
+      data: {
+        topic: payload.basics.title,
+        description: payload.basics.description,
+        icon_key: payload.basics.iconKey,
+        ui_theme_key: payload.settings?.themeKey,
+        ui_defaults: payload.settings?.uiDefaults ?? null,
+        live_session_config: null,
+      },
+      error: null,
+    });
+    const profilesTable = createSelectManyChain({
+      data: [
+        {
+          id: 'profile-1',
+          display_name: 'Alex Educator',
+          avatar_url: null,
+          ui_theme_key: null,
+        },
+      ],
+      error: null,
+    });
+
+    const serviceMutationTable = createSelectManyChain({
+      data: [],
+      error: null,
+    });
+    const serviceClient = {
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case 'learning_space_participants':
+            return participantsTable;
+          case 'class_schedules':
+            return schedulesTable;
+          case 'learning_space_links':
+            return linksTable;
+          case 'class_schedule_recurrence':
+            return recurrencesTable;
+          case 'class_schedule_recurrence_exceptions':
+            return recurrenceExceptionsTable;
+          case 'class_schedule_recurrence_overrides':
+            return recurrenceOverridesTable;
+          case 'channels':
+            return channelsTable;
+          case 'profiles':
+            return profilesTable;
+          default:
+            return serviceMutationTable;
+        }
+      }),
+    };
+
+    createSupabaseServerClientMock.mockResolvedValue(serverClient);
+    createSupabaseServiceClientMock.mockReturnValue(serviceClient);
+    getAccountByAuthUserIdMock.mockResolvedValue({
+      data: {
+        id: 'account-1',
+        org_id: 'org-1',
+      },
+    });
+    getProfileByAccountIdMock.mockResolvedValue({ data: { id: 'profile-actor-1' } });
+    ensureSystemProfileIdMock.mockResolvedValue('system-profile-1');
+    publishActivityEventMock.mockResolvedValue({ id: 'activity-1' });
+
+    await updateLearningSpaceFromPayload('space-1', payload);
+
+    const eventTypes = publishActivityEventMock.mock.calls.map(
+      ([input]) => input.eventType,
+    );
+    expect(eventTypes).toContain('class.updated');
+    expect(eventTypes).not.toContain('class.session.rescheduled');
+    expect(
+      eventTypes.filter((eventType) => eventType === 'class.sessions.rescheduled'),
+    ).toHaveLength(2);
   });
 
   it('treats empty resource placeholder rows as no-op changes', async () => {

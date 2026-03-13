@@ -346,11 +346,11 @@ describe('buildActivityFeedForProfile', () => {
             scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
             visibility: 'scope_only',
           },
-          verb: 'class.session.scheduled',
+          verb: 'class.sessions.scheduled',
           actor_profile_id: 'actor-1',
           refs: {},
           content: {
-            headline: { primary: 'Session scheduled', secondary: 'Math Foundations' },
+            headline: { primary: 'Sessions scheduled', secondary: 'Math Foundations' },
           },
           updated_at: '2026-03-07T15:55:00.000Z',
         },

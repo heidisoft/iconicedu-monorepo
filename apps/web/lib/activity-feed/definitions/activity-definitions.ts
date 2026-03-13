@@ -1426,6 +1426,58 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       };
     },
   },
+  'class.sessions.scheduled': {
+    eventType: 'class.sessions.scheduled',
+    tabKey: 'classes',
+    importance: 'normal',
+    group: {
+      groupType: 'class',
+      collapseByDefault: true,
+      buildGroupKey: (event) => buildClassLifecycleGroupKey(event),
+      renderGroup: (event) => {
+        const payload = asRecord(event.payload);
+        if (asOptionalString(payload.activityPhase) === 'created') {
+          return renderClassCreatedGroup(event);
+        }
+        return renderLearningSpaceUpdatedGroup(event);
+      },
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => {
+      const payload = asRecord(event.payload);
+      const firstSessionLabel = formatSessionLabel(payload.startAt, payload.timezone);
+      const weeklyTime = formatWeeklyTimeLabel(payload.startAt, payload.timezone);
+      const scheduledLabel = formatNaturalDateTime(
+        payload.startAt ?? payload.firstSessionStartAt,
+        payload.timezone ?? payload.firstSessionTimezone,
+      );
+      const isUpdated = asOptionalString(payload.activityPhase) === 'updated';
+      return {
+        verb: 'class.sessions.scheduled',
+        leading: { kind: 'icon', iconKey: 'CalendarDays', tone: 'info' },
+        headline: {
+          primary: isUpdated
+            ? 'Class sessions scheduled'
+            : 'Class session schedule added',
+          secondary: sessionName(payload),
+        },
+        summary: isUpdated
+          ? scheduledLabel
+            ? `Session scheduled ${scheduledLabel}.`
+            : asOptionalString(payload.startAt)
+          : firstSessionLabel && weeklyTime
+            ? `First session: ${firstSessionLabel}, then weekly ${weeklyTime}`
+            : (asOptionalString(payload.startAt) ?? undefined),
+        actionButton: sourceScheduleAction(event, payload),
+        metadata: {
+          sessionLocalTime: true,
+          activityPhase: asOptionalString(payload.activityPhase),
+          startAt: asOptionalString(payload.startAt),
+          firstSessionStartAt: asOptionalString(payload.firstSessionStartAt),
+        },
+      };
+    },
+  },
   'class.session.rescheduled': {
     eventType: 'class.session.rescheduled',
     tabKey: 'classes',
@@ -1466,6 +1518,46 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       };
     },
   },
+  'class.sessions.rescheduled': {
+    eventType: 'class.sessions.rescheduled',
+    tabKey: 'classes',
+    importance: 'important',
+    group: {
+      groupType: 'class',
+      collapseByDefault: true,
+      buildGroupKey: (event) => buildClassUpdatedGroupKey(event),
+      renderGroup: (event) => renderLearningSpaceUpdatedGroup(event),
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => {
+      const payload = asRecord(event.payload);
+      return {
+        verb: 'class.sessions.rescheduled',
+        leading: { kind: 'icon', iconKey: 'CalendarCheck', tone: 'info' },
+        headline: {
+          primary: 'Class sessions rescheduled',
+          secondary: sessionName(payload),
+        },
+        summary:
+          buildRescheduledSessionSummary(payload) ??
+          asOptionalString(payload.description) ??
+          asOptionalString(payload.startAt),
+        metadata: {
+          sessionLocalTime: true,
+          title: asOptionalString(payload.title),
+          startAt: asOptionalString(payload.startAt),
+          firstSessionStartAt: asOptionalString(payload.firstSessionStartAt),
+          timezone: asOptionalString(payload.timezone),
+          firstSessionTimezone: asOptionalString(payload.firstSessionTimezone),
+          rescheduledFromStartAt: asOptionalString(payload.rescheduledFromStartAt),
+          rescheduledToStartAt: asOptionalString(payload.rescheduledToStartAt),
+          rescheduledReason:
+            asOptionalString(payload.rescheduledReason) ??
+            asOptionalString(payload.reason),
+        },
+      };
+    },
+  },
   'class.session.canceled': {
     eventType: 'class.session.canceled',
     tabKey: 'classes',
@@ -1484,6 +1576,44 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
         leading: { kind: 'icon', iconKey: 'CalendarX', tone: 'warning' },
         headline: {
           primary: 'Class session cancelled',
+          secondary: sessionName(payload),
+        },
+        summary:
+          buildCanceledSessionSummary(payload) ??
+          asOptionalString(payload.description) ??
+          asOptionalString(payload.startAt),
+        metadata: {
+          sessionLocalTime: true,
+          title: asOptionalString(payload.title),
+          startAt: asOptionalString(payload.startAt),
+          firstSessionStartAt: asOptionalString(payload.firstSessionStartAt),
+          timezone: asOptionalString(payload.timezone),
+          firstSessionTimezone: asOptionalString(payload.firstSessionTimezone),
+          canceledStartAt: asOptionalString(payload.canceledStartAt),
+          canceledReason:
+            asOptionalString(payload.canceledReason) ?? asOptionalString(payload.reason),
+        },
+      };
+    },
+  },
+  'class.sessions.canceled': {
+    eventType: 'class.sessions.canceled',
+    tabKey: 'classes',
+    importance: 'important',
+    group: {
+      groupType: 'class',
+      collapseByDefault: true,
+      buildGroupKey: (event) => buildClassUpdatedGroupKey(event),
+      renderGroup: (event) => renderLearningSpaceUpdatedGroup(event),
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => {
+      const payload = asRecord(event.payload);
+      return {
+        verb: 'class.sessions.canceled',
+        leading: { kind: 'icon', iconKey: 'CalendarX', tone: 'warning' },
+        headline: {
+          primary: 'Class sessions cancelled',
           secondary: sessionName(payload),
         },
         summary:

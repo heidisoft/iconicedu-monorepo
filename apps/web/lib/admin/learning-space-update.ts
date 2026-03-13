@@ -172,8 +172,11 @@ type RemovedMembersActivity = {
 type ScheduleChangeActivity = {
   eventType:
     | 'class.session.scheduled'
+    | 'class.sessions.scheduled'
     | 'class.session.canceled'
-    | 'class.session.rescheduled';
+    | 'class.sessions.canceled'
+    | 'class.session.rescheduled'
+    | 'class.sessions.rescheduled';
   dedupeKey: string;
   payload: {
     learningSpaceId: string;
@@ -200,6 +203,90 @@ type ScheduleChangeActivity = {
   };
 };
 
+type ScheduleChangeCategory = 'scheduled' | 'canceled' | 'rescheduled';
+
+type SchedulePairingReason =
+  | 'exact_structural'
+  | 'fallback_nearest_same_timezone'
+  | 'fallback_nearest_any_timezone';
+
+type SchedulePairingResult = {
+  pairs: Array<{
+    previous: NormalizedExistingSchedule;
+    next: NormalizedIncomingSchedule;
+    reason: SchedulePairingReason;
+  }>;
+  unpairedPrevious: NormalizedExistingSchedule[];
+  unpairedNext: NormalizedIncomingSchedule[];
+};
+
+function isScheduledEventType(eventType: ScheduleChangeActivity['eventType']) {
+  return (
+    eventType === 'class.session.scheduled' || eventType === 'class.sessions.scheduled'
+  );
+}
+
+function isCanceledEventType(eventType: ScheduleChangeActivity['eventType']) {
+  return (
+    eventType === 'class.session.canceled' || eventType === 'class.sessions.canceled'
+  );
+}
+
+function isRescheduledEventType(eventType: ScheduleChangeActivity['eventType']) {
+  return (
+    eventType === 'class.session.rescheduled' ||
+    eventType === 'class.sessions.rescheduled'
+  );
+}
+
+function getScheduleChangeCategory(
+  eventType: ScheduleChangeActivity['eventType'],
+): ScheduleChangeCategory {
+  if (isScheduledEventType(eventType)) return 'scheduled';
+  if (isCanceledEventType(eventType)) return 'canceled';
+  return 'rescheduled';
+}
+
+function getPluralizedScheduleEventType(
+  category: ScheduleChangeCategory,
+): ScheduleChangeActivity['eventType'] {
+  if (category === 'scheduled') return 'class.sessions.scheduled';
+  if (category === 'canceled') return 'class.sessions.canceled';
+  return 'class.sessions.rescheduled';
+}
+
+function getSingularScheduleEventType(
+  category: ScheduleChangeCategory,
+): ScheduleChangeActivity['eventType'] {
+  if (category === 'scheduled') return 'class.session.scheduled';
+  if (category === 'canceled') return 'class.session.canceled';
+  return 'class.session.rescheduled';
+}
+
+function durationMinutesBetween(startAt: string, endAt: string) {
+  const start = new Date(startAt).getTime();
+  const end = new Date(endAt).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+    return null;
+  }
+  return Math.max(1, Math.round((end - start) / 60000));
+}
+
+function buildStructuralSignature(
+  schedule: NormalizedExistingSchedule | NormalizedIncomingSchedule,
+) {
+  return JSON.stringify({
+    timezone: schedule.timezone ?? null,
+    recurrence: schedule.canonical.recurrence,
+    durationMinutes: durationMinutesBetween(schedule.startAt, schedule.endAt),
+  });
+}
+
+function toTimeOrZero(value: string) {
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 function toTimestamp(value: string | null | undefined) {
   if (!value) return null;
   const time = new Date(value).getTime();
@@ -212,30 +299,55 @@ function shouldPublishScheduleChangeActivity(
 ) {
   const nowTime = toTimestamp(nowIso);
   if (nowTime === null) {
+    debugScheduleDiff('schedule-change-publish-decision', {
+      eventType: activity.eventType,
+      nowIso,
+      nowTime,
+      referenceAt: null,
+      referenceTime: null,
+      decision: 'publish',
+      reason: 'invalid_now',
+    });
     return true;
   }
 
   const payload = activity.payload;
-  const referenceAt =
-    activity.eventType === 'class.session.canceled'
-      ? (payload.canceledStartAt ??
+  const referenceAt = isCanceledEventType(activity.eventType)
+    ? (payload.canceledStartAt ?? payload.startAt ?? payload.firstSessionStartAt ?? null)
+    : isRescheduledEventType(activity.eventType)
+      ? (payload.rescheduledToStartAt ??
+        payload.rescheduledFromStartAt ??
         payload.startAt ??
         payload.firstSessionStartAt ??
         null)
-      : activity.eventType === 'class.session.rescheduled'
-        ? (payload.rescheduledToStartAt ??
-          payload.rescheduledFromStartAt ??
-          payload.startAt ??
-          payload.firstSessionStartAt ??
-          null)
-        : (payload.startAt ?? payload.firstSessionStartAt ?? null);
+      : (payload.startAt ?? payload.firstSessionStartAt ?? null);
 
   const referenceTime = toTimestamp(referenceAt);
   if (referenceTime === null) {
+    debugScheduleDiff('schedule-change-publish-decision', {
+      eventType: activity.eventType,
+      nowIso,
+      nowTime,
+      referenceAt,
+      referenceTime,
+      decision: 'publish',
+      reason: 'missing_reference_time',
+    });
     return true;
   }
 
-  return referenceTime >= nowTime;
+  const shouldPublish = referenceTime >= nowTime;
+  debugScheduleDiff('schedule-change-publish-decision', {
+    eventType: activity.eventType,
+    nowIso,
+    nowTime,
+    referenceAt,
+    referenceTime,
+    decision: shouldPublish ? 'publish' : 'skip',
+    reason: shouldPublish ? 'future_or_now_reference_time' : 'past_reference_time',
+  });
+
+  return shouldPublish;
 }
 
 function canonicalJson(value: unknown) {
@@ -305,11 +417,12 @@ function joinNaturalList(values: string[]) {
   return `${values.slice(0, -1).join(', ')}, and ${values[values.length - 1]}`;
 }
 
-const SCHEDULE_DIFF_DEBUG_ENABLED =
-  process.env.DEBUG_LEARNING_SPACE_SCHEDULE_DIFF === '1';
+function isScheduleDiffDebugEnabled() {
+  return process.env.DEBUG_LEARNING_SPACE_SCHEDULE_DIFF === '1';
+}
 
 function debugScheduleDiff(stage: string, details: Record<string, unknown>) {
-  if (!SCHEDULE_DIFF_DEBUG_ENABLED) {
+  if (!isScheduleDiffDebugEnabled()) {
     return;
   }
   console.log('[learning-space:update:schedule-diff]', stage, details);
@@ -665,6 +778,125 @@ export function buildExceptionAndOverrideScheduleChangeActivities(input: {
   return activities;
 }
 
+function buildBaseScheduleChangeActivities(input: {
+  learningSpaceId: string;
+  channelId: string;
+  title: string;
+  occurredAt: string;
+  invitedMembers: Array<{
+    profileId: string;
+    name: string;
+    avatarUrl?: string | null;
+    themeKey?: string | null;
+  }>;
+  nextSessionStartAt?: string | null;
+  scheduleDiffPlan: LearningSpaceScheduleDiffPlan;
+}): ScheduleChangeActivity[] {
+  const activities: ScheduleChangeActivity[] = [];
+
+  input.scheduleDiffPlan.added.forEach((schedule, index) => {
+    const activity: ScheduleChangeActivity = {
+      eventType: 'class.session.scheduled',
+      dedupeKey: `schedule.base-added:${input.learningSpaceId}:${index}:${schedule.startAt}:${input.occurredAt}`,
+      payload: {
+        learningSpaceId: input.learningSpaceId,
+        channelId: input.channelId,
+        scheduleId: `incoming:${index}`,
+        title: input.title,
+        activityPhase: 'updated',
+        invitedCount: input.invitedMembers.length,
+        invitedMembers: input.invitedMembers,
+        firstSessionStartAt: input.nextSessionStartAt ?? schedule.startAt,
+        firstSessionTimezone: schedule.timezone,
+        startAt: schedule.startAt,
+        timezone: schedule.timezone,
+      },
+    };
+    if (shouldPublishScheduleChangeActivity(activity, input.occurredAt)) {
+      activities.push(activity);
+    }
+  });
+
+  input.scheduleDiffPlan.removed.forEach((schedule, index) => {
+    const activity: ScheduleChangeActivity = {
+      eventType: 'class.session.canceled',
+      dedupeKey: `schedule.base-removed:${input.learningSpaceId}:${schedule.id}:${index}:${schedule.startAt}:${input.occurredAt}`,
+      payload: {
+        learningSpaceId: input.learningSpaceId,
+        channelId: input.channelId,
+        scheduleId: schedule.id,
+        title: input.title,
+        activityPhase: 'updated',
+        invitedCount: input.invitedMembers.length,
+        invitedMembers: input.invitedMembers,
+        firstSessionStartAt: input.nextSessionStartAt ?? schedule.startAt,
+        firstSessionTimezone: schedule.timezone,
+        canceledStartAt: schedule.startAt,
+        timezone: schedule.timezone,
+      },
+    };
+    if (shouldPublishScheduleChangeActivity(activity, input.occurredAt)) {
+      activities.push(activity);
+    }
+  });
+
+  input.scheduleDiffPlan.rescheduled.forEach((entry, index) => {
+    const activity: ScheduleChangeActivity = {
+      eventType: 'class.session.rescheduled',
+      dedupeKey: `schedule.base-rescheduled:${input.learningSpaceId}:${entry.previous.id}:${index}:${input.occurredAt}`,
+      payload: {
+        learningSpaceId: input.learningSpaceId,
+        channelId: input.channelId,
+        scheduleId: entry.previous.id,
+        title: input.title,
+        activityPhase: 'updated',
+        invitedCount: input.invitedMembers.length,
+        invitedMembers: input.invitedMembers,
+        firstSessionStartAt: input.nextSessionStartAt ?? entry.next.startAt,
+        firstSessionTimezone: entry.next.timezone ?? entry.previous.timezone,
+        rescheduledFromStartAt: entry.previous.startAt,
+        rescheduledToStartAt: entry.next.startAt,
+        timezone: entry.next.timezone ?? entry.previous.timezone,
+      },
+    };
+    if (shouldPublishScheduleChangeActivity(activity, input.occurredAt)) {
+      activities.push(activity);
+    }
+  });
+
+  return activities;
+}
+
+function normalizeScheduleChangeVerbPlurality(
+  activities: ScheduleChangeActivity[],
+): ScheduleChangeActivity[] {
+  const counts = activities.reduce<Record<ScheduleChangeCategory, number>>(
+    (acc, activity) => {
+      const category = getScheduleChangeCategory(activity.eventType);
+      acc[category] += 1;
+      return acc;
+    },
+    { scheduled: 0, canceled: 0, rescheduled: 0 },
+  );
+
+  return activities.map((activity) => {
+    const category = getScheduleChangeCategory(activity.eventType);
+    const normalizedEventType =
+      counts[category] > 1
+        ? getPluralizedScheduleEventType(category)
+        : getSingularScheduleEventType(category);
+
+    if (activity.eventType === normalizedEventType) {
+      return activity;
+    }
+
+    return {
+      ...activity,
+      eventType: normalizedEventType,
+    };
+  });
+}
+
 function resolveNextSessionStartAtFromIncomingSchedules(input: {
   schedules: NormalizedIncomingSchedule[];
   nowIso: string;
@@ -828,41 +1060,86 @@ function normalizeIncomingSchedulesForCompare(
 function pairSchedulesForCompare(
   previous: NormalizedExistingSchedule[],
   next: NormalizedIncomingSchedule[],
-) {
+): SchedulePairingResult {
   const remainingPrevious = [...previous];
-  const pairs: Array<{
-    previous: NormalizedExistingSchedule;
-    next: NormalizedIncomingSchedule;
-  }> = [];
+  const remainingNext = [...next];
+  const pairs: SchedulePairingResult['pairs'] = [];
 
-  const toTimestamp = (value: string) => {
-    const parsed = new Date(value).getTime();
-    return Number.isFinite(parsed) ? parsed : 0;
+  const selectNearest = (
+    candidates: Array<{ item: NormalizedExistingSchedule; index: number }>,
+    nextItem: NormalizedIncomingSchedule,
+  ) => {
+    const nextTime = toTimeOrZero(nextItem.startAt);
+    return candidates.reduce((currentBest, candidate) => {
+      const candidateDiff = Math.abs(toTimeOrZero(candidate.item.startAt) - nextTime);
+      const bestDiff = Math.abs(toTimeOrZero(currentBest.item.startAt) - nextTime);
+      if (candidateDiff !== bestDiff) {
+        return candidateDiff < bestDiff ? candidate : currentBest;
+      }
+      return candidate.index < currentBest.index ? candidate : currentBest;
+    });
   };
 
-  for (const nextItem of next) {
-    const matchingIndexes = remainingPrevious
+  // Pass 1: exact structural signature match.
+  for (let nextIndex = 0; nextIndex < remainingNext.length; ) {
+    const nextItem = remainingNext[nextIndex];
+    const signature = buildStructuralSignature(nextItem);
+    const exactCandidates = remainingPrevious
       .map((item, index) => ({ item, index }))
-      .filter(({ item }) => item.baseHash === nextItem.baseHash);
+      .filter(({ item }) => buildStructuralSignature(item) === signature);
 
-    if (!matchingIndexes.length) {
+    if (!exactCandidates.length) {
+      nextIndex += 1;
       continue;
     }
 
-    const nextTime = toTimestamp(nextItem.startAt);
-    const best = matchingIndexes.reduce((currentBest, candidate) => {
-      const candidateDiff = Math.abs(toTimestamp(candidate.item.startAt) - nextTime);
-      const bestDiff = Math.abs(toTimestamp(currentBest.item.startAt) - nextTime);
-      return candidateDiff < bestDiff ? candidate : currentBest;
-    });
-
+    const best = selectNearest(exactCandidates, nextItem);
     const matched = remainingPrevious.splice(best.index, 1)[0];
     if (matched) {
-      pairs.push({ previous: matched, next: nextItem });
+      pairs.push({
+        previous: matched,
+        next: nextItem,
+        reason: 'exact_structural',
+      });
     }
+    remainingNext.splice(nextIndex, 1);
   }
 
-  return pairs;
+  // Pass 2: fallback nearest match, preferring same timezone.
+  for (let nextIndex = 0; nextIndex < remainingNext.length; ) {
+    const nextItem = remainingNext[nextIndex];
+    const sameTimezoneCandidates = remainingPrevious
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => (item.timezone ?? 'UTC') === (nextItem.timezone ?? 'UTC'));
+    const fallbackCandidates = remainingPrevious.map((item, index) => ({ item, index }));
+    const selectedCandidates = sameTimezoneCandidates.length
+      ? sameTimezoneCandidates
+      : fallbackCandidates;
+
+    if (!selectedCandidates.length) {
+      nextIndex += 1;
+      continue;
+    }
+
+    const best = selectNearest(selectedCandidates, nextItem);
+    const matched = remainingPrevious.splice(best.index, 1)[0];
+    if (matched) {
+      pairs.push({
+        previous: matched,
+        next: nextItem,
+        reason: sameTimezoneCandidates.length
+          ? 'fallback_nearest_same_timezone'
+          : 'fallback_nearest_any_timezone',
+      });
+    }
+    remainingNext.splice(nextIndex, 1);
+  }
+
+  return {
+    pairs,
+    unpairedPrevious: remainingPrevious,
+    unpairedNext: remainingNext,
+  };
 }
 
 function schedulesMatch(
@@ -924,11 +1201,12 @@ export function buildLearningSpaceScheduleDiffPlan(input: {
     removed: [],
     rescheduled: [],
   };
-  const pairCount = Math.min(previous.length, next.length);
 
-  for (let index = 0; index < pairCount; index += 1) {
-    const previousSchedule = previous[index];
-    const nextSchedule = next[index];
+  const pairing = pairSchedulesForCompare(previous, next);
+
+  for (const pair of pairing.pairs) {
+    const previousSchedule = pair.previous;
+    const nextSchedule = pair.next;
     if (!schedulesMatch(previousSchedule, nextSchedule)) {
       plan.rescheduled.push({
         previous: previousSchedule,
@@ -937,13 +1215,8 @@ export function buildLearningSpaceScheduleDiffPlan(input: {
     }
   }
 
-  if (previous.length > pairCount) {
-    plan.removed.push(...previous.slice(pairCount));
-  }
-
-  if (next.length > pairCount) {
-    plan.added.push(...next.slice(pairCount));
-  }
+  plan.removed.push(...pairing.unpairedPrevious);
+  plan.added.push(...pairing.unpairedNext);
 
   return plan;
 }
@@ -1219,7 +1492,7 @@ export async function updateLearningSpaceFromPayload(
     schedules: normalizedIncomingSchedules,
     nowIso: now,
   });
-  const pairedSchedules = pairSchedulesForCompare(
+  const pairing = pairSchedulesForCompare(
     normalizedPreviousSchedules,
     normalizedIncomingSchedules,
   );
@@ -1230,7 +1503,7 @@ export async function updateLearningSpaceFromPayload(
     occurredAt: now,
     invitedMembers: [],
     nextSessionStartAt,
-    pairs: pairedSchedules.map((pair) => ({
+    pairs: pairing.pairs.map((pair) => ({
       scheduleId: pair.previous.id,
       timezone: pair.previous.timezone ?? pair.next.timezone ?? null,
       previousFullHash: pair.previous.fullHash,
@@ -1261,6 +1534,46 @@ export async function updateLearningSpaceFromPayload(
       },
     })),
   });
+  const baseScheduleActivities = buildBaseScheduleChangeActivities({
+    learningSpaceId,
+    channelId,
+    title: payload.basics.title,
+    occurredAt: now,
+    invitedMembers: [],
+    nextSessionStartAt,
+    scheduleDiffPlan,
+  });
+  const scheduleChangeActivities = normalizeScheduleChangeVerbPlurality([
+    ...exceptionOverrideActivities,
+    ...baseScheduleActivities,
+  ]);
+  const scheduleChangeCounts = scheduleChangeActivities.reduce(
+    (acc, activity) => {
+      if (isScheduledEventType(activity.eventType)) {
+        acc.scheduled += 1;
+      } else if (isRescheduledEventType(activity.eventType)) {
+        acc.rescheduled += 1;
+      } else if (isCanceledEventType(activity.eventType)) {
+        acc.canceled += 1;
+      }
+      return acc;
+    },
+    { scheduled: 0, rescheduled: 0, canceled: 0 },
+  );
+  debugScheduleDiff('schedule-change-activities-built', {
+    exceptionOverrideActivityCount: exceptionOverrideActivities.length,
+    baseScheduleActivityCount: baseScheduleActivities.length,
+    totalScheduleChangeActivityCount: scheduleChangeActivities.length,
+    ...scheduleChangeCounts,
+    sampleActivities: scheduleChangeActivities.slice(0, 5).map((activity) => ({
+      eventType: activity.eventType,
+      dedupeKey: activity.dedupeKey,
+      startAt: activity.payload.startAt ?? null,
+      canceledStartAt: activity.payload.canceledStartAt ?? null,
+      rescheduledFromStartAt: activity.payload.rescheduledFromStartAt ?? null,
+      rescheduledToStartAt: activity.payload.rescheduledToStartAt ?? null,
+    })),
+  });
   const previousSchedulesHashKey = buildLearningSpaceSchedulesHashKeyFromExisting(
     previousScheduleCompareInputs,
   );
@@ -1275,9 +1588,12 @@ export async function updateLearningSpaceFromPayload(
     nextScheduleCount: (payload.schedules ?? []).length,
   });
   debugScheduleDiff('paired-compare', {
-    pairedCount: pairedSchedules.length,
-    pairDiffs: pairedSchedules.map((pair) => ({
+    pairedCount: pairing.pairs.length,
+    unpairedPreviousCount: pairing.unpairedPrevious.length,
+    unpairedNextCount: pairing.unpairedNext.length,
+    pairDiffs: pairing.pairs.map((pair) => ({
       scheduleId: pair.previous.id,
+      matchReason: pair.reason,
       baseHashEqual: pair.previous.baseHash === pair.next.baseHash,
       fullHashEqual: pair.previous.fullHash === pair.next.fullHash,
       previousBaseHash: pair.previous.baseHash,
@@ -1291,15 +1607,12 @@ export async function updateLearningSpaceFromPayload(
     })),
   });
   const hasSemanticScheduleChanges =
-    scheduleDiffPlan.added.length > 0 ||
-    scheduleDiffPlan.removed.length > 0 ||
-    scheduleDiffPlan.rescheduled.length > 0 ||
-    exceptionOverrideActivities.length > 0;
+    hasScheduleHashChanges || scheduleChangeActivities.length > 0;
   debugScheduleDiff('change-decision', {
     hasScheduleChanges: hasSemanticScheduleChanges,
     hasSemanticScheduleChanges,
     hasScheduleHashChanges,
-    exceptionOverrideActivityCount: exceptionOverrideActivities.length,
+    scheduleChangeActivityCount: scheduleChangeActivities.length,
     addedCount: scheduleDiffPlan.added.length,
     removedCount: scheduleDiffPlan.removed.length,
     rescheduledCount: scheduleDiffPlan.rescheduled.length,
@@ -1436,15 +1749,8 @@ export async function updateLearningSpaceFromPayload(
   if (hasLinkChanges) {
     infoChangeSummaryParts.push('Updated class resources');
   }
-  if (hasSemanticScheduleChanges) {
-    const hasRescheduledSessionChanges =
-      scheduleDiffPlan.rescheduled.length > 0 ||
-      exceptionOverrideActivities.some(
-        (activity) => activity.eventType === 'class.session.rescheduled',
-      );
-    infoChangeSummaryParts.push(
-      hasRescheduledSessionChanges ? 'Class rescheduled' : 'Updated class schedule',
-    );
+  if (scheduleChangeActivities.length > 0) {
+    infoChangeSummaryParts.push('Class schedule has been updated');
   }
 
   if (hasInfoChanges || hasSemanticScheduleChanges) {
@@ -1470,6 +1776,41 @@ export async function updateLearningSpaceFromPayload(
       },
       dedupeKey: `class.updated:${learningSpaceId}:${now}`,
       createdBy: systemProfileId,
+    });
+  }
+
+  for (const activity of scheduleChangeActivities) {
+    debugScheduleDiff('schedule-change-publish-attempt', {
+      eventType: activity.eventType,
+      dedupeKey: activity.dedupeKey,
+      startAt: activity.payload.startAt ?? null,
+      canceledStartAt: activity.payload.canceledStartAt ?? null,
+      rescheduledFromStartAt: activity.payload.rescheduledFromStartAt ?? null,
+      rescheduledToStartAt: activity.payload.rescheduledToStartAt ?? null,
+    });
+
+    const published = await publishActivityEvent({
+      supabase: serviceClient,
+      orgId,
+      eventType: activity.eventType,
+      occurredAt: now,
+      sourceKind: 'system',
+      actorProfileId: systemProfileId,
+      scope: { kind: 'learning_space', learningSpaceId },
+      targetRef: { kind: 'learning_space', id: learningSpaceId },
+      payload: activity.payload,
+      dedupeKey: activity.dedupeKey,
+      createdBy: systemProfileId,
+    });
+
+    const publishedId =
+      published && typeof published === 'object' && 'id' in published
+        ? (published as { id?: unknown }).id
+        : null;
+    debugScheduleDiff('schedule-change-publish-success', {
+      eventType: activity.eventType,
+      dedupeKey: activity.dedupeKey,
+      activityEventId: typeof publishedId === 'string' ? publishedId : null,
     });
   }
 
