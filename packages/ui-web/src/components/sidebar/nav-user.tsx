@@ -245,6 +245,29 @@ export function NavUser({
   }, [onboardingStatus]);
 
   React.useEffect(() => {
+    const handleOpenSettingsEvent = (event: Event) => {
+      const customEvent = event as CustomEvent<{ tab?: UserSettingsTab }>;
+      const tab = customEvent.detail?.tab;
+      if (!tab) {
+        return;
+      }
+      openSettings(tab);
+    };
+
+    window.addEventListener(
+      'iconicedu:open-user-settings',
+      handleOpenSettingsEvent as EventListener,
+    );
+
+    return () => {
+      window.removeEventListener(
+        'iconicedu:open-user-settings',
+        handleOpenSettingsEvent as EventListener,
+      );
+    };
+  }, [openSettings]);
+
+  React.useEffect(() => {
     if (!statusDialogOpen) {
       return;
     }

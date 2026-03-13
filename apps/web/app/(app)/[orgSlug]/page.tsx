@@ -1,16 +1,34 @@
-import { DashboardHeader } from '@iconicedu/ui-web';
+import { DashboardHeader, DashboardHomeInfographicSection } from '@iconicedu/ui-web';
+import {
+  getDashboardAccountContext,
+  getDashboardProfileContext,
+} from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
+import { buildDashboardHomeInfographicMetrics } from '@iconicedu/web/lib/dashboard/home-infographic-metrics';
 
-export default function Page() {
+export default async function Page({ params }: { params: Promise<{ orgSlug: string }> }) {
+  const { orgSlug } = await params;
+  const { supabase, account } = await getDashboardAccountContext(orgSlug);
+  const { currentUserProfile } = await getDashboardProfileContext(supabase, account.id);
+  const metrics = await buildDashboardHomeInfographicMetrics({
+    supabase,
+    orgId: account.org_id,
+    orgSlug,
+    currentUserProfile,
+  });
+
   return (
     <div className="flex flex-1 flex-col">
       <DashboardHeader title={'Home'} />
-      <div className="flex flex-1 flex-col gap-4 p-4">
-        <div className="grid auto-rows-min gap-4 md:grid-cols-3">
-          <div className="bg-muted/50 aspect-video rounded-xl" />
-          <div className="bg-muted/50 aspect-video rounded-xl" />
-          <div className="bg-muted/50 aspect-video rounded-xl" />
-        </div>
-        <div className="bg-muted/50 min-h-[100vh] flex-1 rounded-xl md:min-h-min" />
+      <div className="flex flex-1 flex-col p-4">
+        <DashboardHomeInfographicSection
+          isStaffView={metrics.isStaffView}
+          isParentView={!metrics.isStaffView && metrics.activeRole === 'parents'}
+          topMetrics={metrics.metricsByRole[metrics.activeRole]}
+          upcomingSessionsPage={metrics.upcomingSessionsPage}
+          calendarHref={metrics.calendarHref}
+          inboxHref={metrics.inboxHref}
+          browseHref={metrics.browseHref}
+        />
       </div>
     </div>
   );

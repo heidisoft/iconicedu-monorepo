@@ -380,3 +380,7 @@ export function useMessagesState() {
   }
   return context;
 }
+
+export function useOptionalMessagesState() {
+  return useContext(MessagesStateContext);
+}

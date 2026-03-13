@@ -1,17 +1,20 @@
 'use client';
 
 import { useState } from 'react';
-import { Clock3, Loader2, Video } from 'lucide-react';
+import { Clock3, Loader2, MessageSquareText, Video } from 'lucide-react';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
-import { useMessagesState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
+import { useOptionalMessagesState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
 import type { ClassSession } from './messages-schedule-tab.utils';
 
 interface SessionCardProps {
   session: ClassSession;
   index: number;
   canJoin?: boolean;
+  joinLiveSession?: () => Promise<void>;
+  classroomChatHref?: string;
+  openClassroomChat?: () => Promise<void> | void;
 }
 
 export function getSessionCardState(session: ClassSession): {
@@ -40,9 +43,16 @@ export function isSessionJoinButtonDisabled(input: {
   return !input.canJoin || !input.hasJoinLiveSession || input.isJoinPending;
 }
 
-export function SessionCard({ session, canJoin = false }: SessionCardProps) {
+export function SessionCard({
+  session,
+  canJoin = false,
+  joinLiveSession: joinLiveSessionOverride,
+  classroomChatHref,
+  openClassroomChat,
+}: SessionCardProps) {
   const { isLive, isPast, isDisabled } = getSessionCardState(session);
-  const { joinLiveSession } = useMessagesState();
+  const messagesState = useOptionalMessagesState();
+  const joinLiveSession = joinLiveSessionOverride ?? messagesState?.joinLiveSession;
   const [isJoinPending, setIsJoinPending] = useState(false);
   const isJoinButtonDisabled = isSessionJoinButtonDisabled({
     session,
@@ -50,6 +60,12 @@ export function SessionCard({ session, canJoin = false }: SessionCardProps) {
     isJoinPending,
     canJoin,
   });
+  const separatorIndex = session.time.indexOf(' · ');
+  const timeLabel =
+    separatorIndex === -1 ? session.time : session.time.slice(0, separatorIndex);
+  const participantLabel =
+    separatorIndex === -1 ? null : session.time.slice(separatorIndex + 3);
+  const canOpenClassroomChat = Boolean(classroomChatHref || openClassroomChat);
 
   const handleJoin = async () => {
     if (!joinLiveSession || isJoinPending) {
@@ -60,6 +76,16 @@ export function SessionCard({ session, canJoin = false }: SessionCardProps) {
       await joinLiveSession();
     } finally {
       setIsJoinPending(false);
+    }
+  };
+
+  const handleOpenClassroomChat = async () => {
+    if (openClassroomChat) {
+      await openClassroomChat();
+      return;
+    }
+    if (classroomChatHref) {
+      window.location.assign(classroomChatHref);
     }
   };
 
@@ -130,7 +156,13 @@ export function SessionCard({ session, canJoin = false }: SessionCardProps) {
         </div>
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Clock3 className="size-3" />
-          <span>{session.time}</span>
+          <span>{timeLabel}</span>
+          {participantLabel ? (
+            <>
+              <span aria-hidden="true">·</span>
+              <span className="font-medium text-primary">{participantLabel}</span>
+            </>
+          ) : null}
         </div>
         {session.variant === 'override' && session.originalTime ? (
           <>
@@ -150,27 +182,40 @@ export function SessionCard({ session, canJoin = false }: SessionCardProps) {
 
       <div className="flex items-center gap-2">
         {!isPast && !isDisabled ? (
-          <Button
-            size="sm"
-            className={cn(
-              'gap-1.5 rounded-full text-xs font-semibold',
-              isLive
-                ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                : 'bg-primary/10 text-primary hover:bg-primary/20',
-            )}
-            variant="default"
-            disabled={isJoinButtonDisabled}
-            onClick={() => void handleJoin()}
-          >
-            <span className="inline-flex items-center gap-1.5">
-              {isJoinPending ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : (
-                <Video className="size-3.5" />
+          <>
+            {canOpenClassroomChat ? (
+              <Button
+                size="sm"
+                variant="outline"
+                aria-label="Message"
+                className="size-8 rounded-full p-0"
+                onClick={() => void handleOpenClassroomChat()}
+              >
+                <MessageSquareText className="size-3.5" />
+              </Button>
+            ) : null}
+            <Button
+              size="sm"
+              className={cn(
+                'gap-1.5 rounded-full text-xs font-semibold',
+                isLive
+                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                  : 'bg-primary/10 text-primary hover:bg-primary/20',
               )}
-              {isLive ? 'Join Now' : 'Join'}
-            </span>
-          </Button>
+              variant="default"
+              disabled={isJoinButtonDisabled}
+              onClick={() => void handleJoin()}
+            >
+              <span className="inline-flex items-center gap-1.5">
+                {isJoinPending ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <Video className="size-3.5" />
+                )}
+                {isLive ? 'Join Now' : 'Join'}
+              </span>
+            </Button>
+          </>
         ) : isDisabled ? (
           <Button
             size="sm"
