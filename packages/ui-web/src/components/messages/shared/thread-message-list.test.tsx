@@ -1,3 +1,4 @@
+/* @vitest-environment jsdom */
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { MessageVM } from '@iconicedu/shared-types';
@@ -36,7 +37,7 @@ describe('ThreadMessageList', () => {
       />,
     );
 
-    expect(screen.getByText('NEW MESSAGES (2)')).toBeInTheDocument();
+    expect(screen.getByText('New messages (2)')).toBeInTheDocument();
   });
 
   it('places separator after last read message when read anchor is available', () => {
@@ -50,6 +51,23 @@ describe('ThreadMessageList', () => {
       />,
     );
 
-    expect(screen.getByText('NEW MESSAGES (2)')).toBeInTheDocument();
+    expect(screen.getByText('New messages (2)')).toBeInTheDocument();
+  });
+
+  it('renders the unread divider with muted smaller label styling', () => {
+    render(
+      <ThreadMessageList
+        messages={messages}
+        onProfileClick={vi.fn()}
+        currentUserId="profile-2"
+        unreadCount={2}
+      />,
+    );
+
+    expect(screen.getByText('New messages (2)')).toHaveClass(
+      'text-[10px]',
+      'text-muted-foreground/85',
+      'bg-muted/50',
+    );
   });
 });

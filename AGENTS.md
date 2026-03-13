@@ -1,6 +1,6 @@
 # AGENTS.md - IconicEdu Monorepo Architecture Guide
 
-**Last Updated:** 2026-02-16
+**Last Updated:** 2026-03-13
 **Purpose:** Comprehensive guide for AI agents and developers to understand the IconicEdu codebase architecture, domain models, and TypeScript interfaces.
 
 ---
@@ -62,6 +62,7 @@ iconicedu-monorepo/
 ### Apps Overview
 
 #### 1. **web** (Next.js 15)
+
 - **Location:** `/apps/web/`
 - **Framework:** Next.js 15 with App Router
 - **Styling:** Tailwind CSS
@@ -73,6 +74,7 @@ iconicedu-monorepo/
   - Route groups: `(app)`, `(auth)`, `(marketing)`
 
 #### 2. **mobile** (Expo/React Native)
+
 - **Location:** `/apps/mobile/`
 - **Framework:** Expo with React Native
 - **Styling:** NativeWind (Tailwind for React Native)
@@ -82,6 +84,7 @@ iconicedu-monorepo/
   - Native navigation
 
 #### 3. **api** (NestJS)
+
 - **Location:** `/apps/api/`
 - **Framework:** NestJS 10
 - **Database:** Prisma ORM with Supabase Postgres
@@ -94,6 +97,7 @@ iconicedu-monorepo/
 ### Packages Overview
 
 #### 1. **shared-types**
+
 - **Location:** `/packages/shared-types/`
 - **Purpose:** Centralized TypeScript type definitions
 - **Structure:**
@@ -103,6 +107,7 @@ iconicedu-monorepo/
   - `shared/` - Shared utility types
 
 #### 2. **ui-web** & **ui-native**
+
 - **Location:** `/packages/ui-web/`, `/packages/ui-native/`
 - **Purpose:** Platform-specific UI component libraries
 - **Key Components:**
@@ -117,35 +122,35 @@ iconicedu-monorepo/
 
 ### Frontend
 
-| Technology | Purpose | Location |
-|------------|---------|----------|
-| **Next.js 15** | Web framework (App Router) | `apps/web/` |
-| **Expo** | Mobile framework | `apps/mobile/` |
-| **React 19** | UI library | All frontend |
-| **Tailwind CSS** | Web styling | `apps/web/`, `packages/ui-web/` |
-| **NativeWind** | Mobile styling | `apps/mobile/`, `packages/ui-native/` |
-| **React Query** | Data fetching & caching | `apps/web/` |
-| **Supabase Client** | Auth, Realtime, Storage | Frontend apps |
+| Technology          | Purpose                    | Location                              |
+| ------------------- | -------------------------- | ------------------------------------- |
+| **Next.js 15**      | Web framework (App Router) | `apps/web/`                           |
+| **Expo**            | Mobile framework           | `apps/mobile/`                        |
+| **React 19**        | UI library                 | All frontend                          |
+| **Tailwind CSS**    | Web styling                | `apps/web/`, `packages/ui-web/`       |
+| **NativeWind**      | Mobile styling             | `apps/mobile/`, `packages/ui-native/` |
+| **React Query**     | Data fetching & caching    | `apps/web/`                           |
+| **Supabase Client** | Auth, Realtime, Storage    | Frontend apps                         |
 
 ### Backend
 
-| Technology | Purpose | Location |
-|------------|---------|----------|
-| **NestJS 10** | API framework | `apps/api/` |
-| **Prisma** | ORM | `apps/api/` |
-| **Supabase Postgres** | Database | Cloud/Local |
-| **Supabase Auth** | Authentication | Cloud/Local |
-| **Supabase Storage** | File storage | Cloud/Local |
+| Technology            | Purpose                 | Location    |
+| --------------------- | ----------------------- | ----------- |
+| **NestJS 10**         | API framework           | `apps/api/` |
+| **Prisma**            | ORM                     | `apps/api/` |
+| **Supabase Postgres** | Database                | Cloud/Local |
+| **Supabase Auth**     | Authentication          | Cloud/Local |
+| **Supabase Storage**  | File storage            | Cloud/Local |
 | **Supabase Realtime** | Real-time subscriptions | Cloud/Local |
 
 ### Package Management
 
-| Technology | Purpose |
-|------------|---------|
-| **pnpm 9.12.0** | Package manager |
-| **Turborepo** | Monorepo build orchestration |
-| **TypeScript 5.9** | Type system |
-| **Node.js 20.18.1** | Runtime |
+| Technology          | Purpose                      |
+| ------------------- | ---------------------------- |
+| **pnpm 9.12.0**     | Package manager              |
+| **Turborepo**       | Monorepo build orchestration |
+| **TypeScript 5.9**  | Type system                  |
+| **Node.js 20.18.1** | Runtime                      |
 
 ---
 
@@ -293,6 +298,7 @@ The type system is organized into **three layers**, creating a clear separation 
 **Usage:** Database queries, ORM results, Supabase responses
 
 **Characteristics:**
+
 - 1:1 mapping with database tables
 - All fields nullable as they come from the database
 - UUID and ISODateTime string types
@@ -300,6 +306,7 @@ The type system is organized into **three layers**, creating a clear separation 
 - Used in Supabase queries and Prisma schemas
 
 **Example:**
+
 ```typescript
 export interface MessageRow {
   id: UUID;
@@ -322,6 +329,7 @@ export interface MessageRow {
 **Usage:** React components, API responses, UI state
 
 **Characteristics:**
+
 - Structured for UI consumption (grouped fields)
 - Denormalized (includes related entities)
 - Type-safe discriminated unions
@@ -330,15 +338,16 @@ export interface MessageRow {
 - Optimized for component props
 
 **Example:**
+
 ```typescript
 export interface MessageVM {
-  ids: IdsBaseVM;                    // { id, orgId }
+  ids: IdsBaseVM; // { id, orgId }
 
-  core: MessageCoreVM;                // type, sender, createdAt, visibility
+  core: MessageCoreVM; // type, sender, createdAt, visibility
 
-  social: MessageSocialVM;            // reactions, thread
+  social: MessageSocialVM; // reactions, thread
 
-  state?: MessageStateVM;             // isEdited, editedAt, isSaved, isHidden
+  state?: MessageStateVM; // isEdited, editedAt, isSaved, isHidden
 
   // Type-specific fields based on message type
   content?: { text?: string };
@@ -349,6 +358,7 @@ export interface MessageVM {
 ```
 
 **Discriminated Union Pattern:**
+
 ```typescript
 export type MessageVM =
   | TextMessageVM
@@ -377,12 +387,14 @@ function renderMessage(message: MessageVM) {
 **Usage:** Form submissions, API mutations, create/update operations
 
 **Characteristics:**
+
 - Optimized for input (creation/updates)
 - Only includes fields that can be set by user
 - Validation-ready
 - Optional fields marked appropriately
 
 **Example:**
+
 ```typescript
 export type EducatorProfileSaveInput = {
   profileId: UUID;
@@ -398,6 +410,7 @@ export type EducatorProfileSaveInput = {
 
 **Purpose:** Common utility types used across all layers
 **Examples:**
+
 - `UUID`, `ISODateTime`, `IANATimezone`
 - `ConnectionVM<T>`: Pagination wrapper
 - `IdsBaseVM`: Common ID fields
@@ -415,14 +428,14 @@ export type EducatorProfileSaveInput = {
 // Base profile (all users have this)
 export interface BaseUserProfileVM {
   ids: Omit<IdsBaseVM, 'accountId'> & { accountId: UUID };
-  profile: UserProfileBlockVM;        // displayName, email, bio, avatar
-  prefs: UserPrefsVM;                 // timezone, locale, languages
-  presence?: PresenceVM | null;       // online status
-  status?: AccountStatus;             // active, invited, suspended, deleted
-  location?: UserLocationVM;          // address info
-  internal?: UserInternalVM;          // internal notes, lead source
-  meta: UserMetaVM;                   // createdAt, updatedAt
-  ui?: UserUiVM;                      // theme preferences
+  profile: UserProfileBlockVM; // displayName, email, bio, avatar
+  prefs: UserPrefsVM; // timezone, locale, languages
+  presence?: PresenceVM | null; // online status
+  status?: AccountStatus; // active, invited, suspended, deleted
+  location?: UserLocationVM; // address info
+  internal?: UserInternalVM; // internal notes, lead source
+  meta: UserMetaVM; // createdAt, updatedAt
+  ui?: UserUiVM; // theme preferences
 }
 
 // Educator-specific
@@ -433,7 +446,7 @@ export interface EducatorProfileVM extends BaseUserProfileVM {
   gradesSupported?: GradeLevel[] | null;
   education?: string | null;
   experienceYears?: number | null;
-  certifications?: Array<{ name: string; issuer?: string; year?: number; }> | null;
+  certifications?: Array<{ name: string; issuer?: string; year?: number }> | null;
   joinedDate: ISODateTime;
   ageGroupsComfortableWith?: string[] | null;
   identityVerificationStatus?: 'unverified' | 'pending' | 'verified' | null;
@@ -460,9 +473,9 @@ export type UserProfileVM =
 // Base structure (all messages)
 interface BaseMessageVM {
   ids: IdsBaseVM;
-  core: MessageCoreVM;      // type, sender, createdAt, visibility
-  social: MessageSocialVM;  // reactions, thread
-  state?: MessageStateVM;   // isEdited, isSaved, isHidden
+  core: MessageCoreVM; // type, sender, createdAt, visibility
+  social: MessageSocialVM; // reactions, thread
+  state?: MessageStateVM; // isEdited, isSaved, isHidden
 }
 
 // Specific message types
@@ -615,8 +628,8 @@ export type EntityRefVM =
   | { kind: 'session'; id: UUID }
   | { kind: 'homework'; id: UUID }
   | { kind: 'message'; id: UUID }
-  | { kind: 'user'; id: UUID }
-  // ... etc
+  | { kind: 'user'; id: UUID };
+// ... etc
 ```
 
 ---
@@ -636,7 +649,7 @@ export function buildMessageVM(
   sender: UserProfileVM,
   payloadRow: MessagePayloadRow,
   reactions: ReactionVM[],
-  thread?: ThreadVM
+  thread?: ThreadVM,
 ): MessageVM {
   const core: MessageCoreVM = {
     type: messageRow.type as MessageTypeVM,
@@ -673,10 +686,7 @@ Mappers convert between row types and view models:
 ```typescript
 // message.mapper.ts
 export class MessageMapper {
-  static toVM(
-    messageRow: MessageRow,
-    options: MessageMapperOptions
-  ): MessageVM {
+  static toVM(messageRow: MessageRow, options: MessageMapperOptions): MessageVM {
     // Fetch related data
     const sender = this.getSenderProfile(messageRow.sender_profile_id);
     const payload = this.getPayload(messageRow.id, messageRow.type);
@@ -702,15 +712,17 @@ Centralized database queries using Supabase:
 export async function getChannelMessages(
   supabase: SupabaseClient,
   channelId: string,
-  options?: PaginationOptions
+  options?: PaginationOptions,
 ) {
   const query = supabase
     .from('messages')
-    .select(`
+    .select(
+      `
       *,
       sender:profiles!sender_profile_id(*),
       reactions:message_reactions(*)
-    `)
+    `,
+    )
     .eq('channel_id', channelId)
     .order('created_at', { ascending: false })
     .limit(options?.limit ?? 50);
@@ -719,7 +731,7 @@ export async function getChannelMessages(
 
   if (error) throw error;
 
-  return data.map(row => MessageMapper.toVM(row));
+  return data.map((row) => MessageMapper.toVM(row));
 }
 ```
 
@@ -737,7 +749,7 @@ export class SupabaseMessagesRealtimeClient {
   constructor(
     private supabase: SupabaseClient,
     private channelId: string,
-    private handlers: MessageRealtimeHandlers
+    private handlers: MessageRealtimeHandlers,
   ) {}
 
   subscribe() {
@@ -751,7 +763,7 @@ export class SupabaseMessagesRealtimeClient {
           table: 'messages',
           filter: `channel_id=eq.${this.channelId}`,
         },
-        (payload) => this.handlers.onMessageInsert(payload.new)
+        (payload) => this.handlers.onMessageInsert(payload.new),
       )
       .on(
         'postgres_changes',
@@ -761,7 +773,7 @@ export class SupabaseMessagesRealtimeClient {
           table: 'messages',
           filter: `channel_id=eq.${this.channelId}`,
         },
-        (payload) => this.handlers.onMessageUpdate(payload.new)
+        (payload) => this.handlers.onMessageUpdate(payload.new),
       )
       .subscribe();
   }
@@ -780,18 +792,20 @@ Next.js server actions for mutations:
 
 ```typescript
 // messages.ts
-'use server'
+'use server';
 
 import { createServerClient } from '@/lib/supabase/server';
 
 export async function sendMessage(
   channelId: string,
   content: string,
-  type: MessageTypeVM = 'text'
+  type: MessageTypeVM = 'text',
 ) {
   const supabase = await createServerClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) throw new Error('Unauthorized');
 
   const { data, error } = await supabase
@@ -808,13 +822,11 @@ export async function sendMessage(
   if (error) throw error;
 
   // Insert type-specific payload
-  await supabase
-    .from('message_text')
-    .insert({
-      message_id: data.id,
-      org_id: data.org_id,
-      payload: { text: content },
-    });
+  await supabase.from('message_text').insert({
+    message_id: data.id,
+    org_id: data.org_id,
+    payload: { text: content },
+  });
 
   return data;
 }
@@ -831,7 +843,7 @@ Pure utility functions for business logic:
 export function groupMessagesByDate(messages: MessageVM[]): GroupedMessages {
   const groups = new Map<string, MessageVM[]>();
 
-  messages.forEach(message => {
+  messages.forEach((message) => {
     const dateKey = format(new Date(message.core.createdAt), 'yyyy-MM-dd');
     const group = groups.get(dateKey) ?? [];
     group.push(message);
@@ -844,10 +856,7 @@ export function groupMessagesByDate(messages: MessageVM[]): GroupedMessages {
   }));
 }
 
-export function shouldShowDateDivider(
-  current: MessageVM,
-  previous?: MessageVM
-): boolean {
+export function shouldShowDateDivider(current: MessageVM, previous?: MessageVM): boolean {
   if (!previous) return true;
 
   const currentDate = new Date(current.core.createdAt);
@@ -1054,27 +1063,28 @@ TextMessageVM | ImageMessageVM | ... (narrowed type)
 ### Working with Types
 
 1. **Always import from `@iconicedu/shared-types`**
+
    ```typescript
    import type { MessageVM, UserProfileVM } from '@iconicedu/shared-types';
    ```
 
 2. **Use Row types for database operations**
+
    ```typescript
-   const { data } = await supabase
-     .from('messages')
-     .select('*')
-     .single();
+   const { data } = await supabase.from('messages').select('*').single();
    // data is MessageRow
    ```
 
 3. **Use VM types for components**
+
    ```typescript
    interface MessageListProps {
-     messages: MessageVM[];  // NOT MessageRow[]
+     messages: MessageVM[]; // NOT MessageRow[]
    }
    ```
 
 4. **Use Payload types for mutations**
+
    ```typescript
    function updateEducatorProfile(input: EducatorProfileSaveInput) {
      // ...
@@ -1153,8 +1163,14 @@ TextMessageVM | ImageMessageVM | ... (narrowed type)
 - Follow existing test patterns in the codebase
 - Ensure tests cover edge cases and error conditions
 - Run tests before committing changes: `pnpm test`
+- Run the same file-scoped quality gates that pre-commit will run for touched files before handing work off:
+  - `pnpm exec eslint --fix --max-warnings=0 <touched-files>`
+  - `pnpm exec prettier --write <touched-files-matching-lint-staged>`
+  - If the change is meant to be committed immediately, run `pnpm lint-staged` after staging to verify the actual hook path
+- Treat ESLint warnings as failures, especially unused imports/variables in tests, because the repo enforces `--max-warnings=0` in `lint-staged`
 
 **Test Coverage Standards:**
+
 - All utility functions must have unit tests
 - All builders and mappers must have unit tests
 - All React components should have basic rendering tests
@@ -1164,6 +1180,7 @@ TextMessageVM | ImageMessageVM | ... (narrowed type)
 ### Testing Patterns
 
 1. **Test builders and mappers**
+
    ```typescript
    describe('buildMessageVM', () => {
      it('should build a text message VM', () => {
@@ -1180,6 +1197,7 @@ TextMessageVM | ImageMessageVM | ... (narrowed type)
    ```
 
 2. **Test utilities**
+
    ```typescript
    describe('groupMessagesByDate', () => {
      it('should group messages by date', () => {
@@ -1215,10 +1233,7 @@ TextMessageVM | ImageMessageVM | ... (narrowed type)
 
 4. **Memoize expensive computations**
    ```typescript
-   const groupedMessages = useMemo(
-     () => groupMessagesByDate(messages),
-     [messages]
-   );
+   const groupedMessages = useMemo(() => groupMessagesByDate(messages), [messages]);
    ```
 
 ---
@@ -1257,6 +1272,7 @@ TextMessageVM | ImageMessageVM | ... (narrowed type)
 #### Adding a New Message Type
 
 1. **Define row type** in `/packages/shared-types/src/rows/message.ts`
+
    ```typescript
    export interface MessageNewTypeRow {
      message_id: UUID;
@@ -1267,6 +1283,7 @@ TextMessageVM | ImageMessageVM | ... (narrowed type)
    ```
 
 2. **Define VM type** in `/packages/shared-types/src/vm/message.ts`
+
    ```typescript
    export interface NewTypeMessageVM extends BaseMessageVM {
      core: MessageCoreVM & { type: 'new-type' };
@@ -1276,6 +1293,7 @@ TextMessageVM | ImageMessageVM | ... (narrowed type)
    ```
 
 3. **Update discriminated union**
+
    ```typescript
    export type MessageVM =
      | TextMessageVM
@@ -1285,6 +1303,7 @@ TextMessageVM | ImageMessageVM | ... (narrowed type)
    ```
 
 4. **Create React component** in `/packages/ui-web/src/components/messages/message-types/`
+
    ```typescript
    export function NewTypeMessage({ message }: { message: NewTypeMessageVM }) {
      // Render implementation
@@ -1292,6 +1311,7 @@ TextMessageVM | ImageMessageVM | ... (narrowed type)
    ```
 
 5. **Update message renderer**
+
    ```typescript
    function renderMessage(message: MessageVM) {
      switch (message.core.type) {
@@ -1323,16 +1343,19 @@ TextMessageVM | ImageMessageVM | ... (narrowed type)
 ### Quick Type Lookups
 
 **Find a type definition:**
+
 ```bash
 grep -r "export interface MessageVM" packages/shared-types/src/
 ```
 
 **Find all message types:**
+
 ```bash
 grep "export interface.*MessageVM" packages/shared-types/src/vm/message.ts
 ```
 
 **Find components using a type:**
+
 ```bash
 grep -r "MessageVM" packages/ui-web/src/components/
 ```
@@ -1390,13 +1413,13 @@ function handleMessage(message: MessageVM) {
 
 When modifying any source file in `apps/mobile/src/` or `apps/mobile/app/`, add or update its test. Current coverage:
 
-| Source file | Test file |
-|---|---|
-| `src/components/messages/message-item.tsx` | `src/__tests__/message-item.test.tsx` |
-| `src/components/messages/message-list.tsx` | `src/__tests__/message-list.test.tsx` |
+| Source file                                 | Test file                              |
+| ------------------------------------------- | -------------------------------------- |
+| `src/components/messages/message-item.tsx`  | `src/__tests__/message-item.test.tsx`  |
+| `src/components/messages/message-list.tsx`  | `src/__tests__/message-list.test.tsx`  |
 | `src/components/messages/message-input.tsx` | `src/__tests__/message-input.test.tsx` |
-| `src/lib/dummy-messages.ts` | `src/__tests__/dummy-messages.test.ts` |
-| `src/providers/auth-provider.tsx` | `src/__tests__/auth-provider.test.tsx` |
+| `src/lib/dummy-messages.ts`                 | `src/__tests__/dummy-messages.test.ts` |
+| `src/providers/auth-provider.tsx`           | `src/__tests__/auth-provider.test.tsx` |
 
 ### Imports
 
@@ -1414,16 +1437,27 @@ import { render, screen, fireEvent } from '@testing-library/react-native';
 ### Mocking Patterns
 
 **Supabase client:**
+
 ```ts
 jest.mock('../lib/supabase/client', () => ({
   supabase: {
-    auth: { getSession: jest.fn(), onAuthStateChange: jest.fn().mockReturnValue({ data: { subscription: { unsubscribe: jest.fn() } } }) },
-    from: jest.fn().mockReturnValue({ select: jest.fn().mockReturnThis(), eq: jest.fn().mockReturnThis(), maybeSingle: jest.fn() }),
+    auth: {
+      getSession: jest.fn(),
+      onAuthStateChange: jest
+        .fn()
+        .mockReturnValue({ data: { subscription: { unsubscribe: jest.fn() } } }),
+    },
+    from: jest.fn().mockReturnValue({
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      maybeSingle: jest.fn(),
+    }),
   },
 }));
 ```
 
 **Theme provider (when component calls `useTheme`):**
+
 ```ts
 jest.mock('../providers/theme-provider', () => ({
   useTheme: () => ({ colors: require('../lib/theme').lightColors }),
@@ -1431,6 +1465,7 @@ jest.mock('../providers/theme-provider', () => ({
 ```
 
 **Expo Router:**
+
 ```ts
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn() }),
@@ -1457,7 +1492,12 @@ function makeSender(id: string, name = 'Sender') {
 function makeMsg(id: string, senderId: string, createdAt: string): MessageVM {
   return {
     ids: { id, orgId: 'org-1' },
-    core: { type: 'text', sender: makeSender(senderId), createdAt, visibility: { type: 'all' } },
+    core: {
+      type: 'text',
+      sender: makeSender(senderId),
+      createdAt,
+      visibility: { type: 'all' },
+    },
     social: { reactions: [] },
     state: {},
     content: { text: `msg-${id}` },
@@ -1481,6 +1521,7 @@ pnpm --filter mobile exec jest src/__tests__/message-list.test.tsx
 ### Key Mobile Architecture Notes
 
 #### Demo mode (messages)
+
 - Channel IDs starting with `demo-` bypass Supabase — no network calls.
 - Demo screens keep local `useState` initialized from `DEMO_MESSAGE_MAP`.
 - New demo messages are built with `DEMO_RILEY_PROFILE` as sender.
@@ -1488,6 +1529,7 @@ pnpm --filter mobile exec jest src/__tests__/message-list.test.tsx
 - Both `dm/[channelId].tsx` and `channel/[channelId].tsx` share the same pattern.
 
 #### Message list ordering
+
 - `buildListData(messages)` produces date separators + messages in **oldest-first** order.
 - `MessageList` reverses the array before passing to the inverted `FlatList` so `data[0]` = newest renders at the bottom (closest to the input bar).
 - `isGroupStart` is computed per message by walking `data[index + 1]` (the older message visually above it).
@@ -1495,6 +1537,7 @@ pnpm --filter mobile exec jest src/__tests__/message-list.test.tsx
 - Own messages participate in grouping the same as others (no special treatment).
 
 #### Login eligibility
+
 - All user kinds (`educator`, `guardian`, `child`, `staff`, `admin`, `system`) are allowed on mobile.
 - The `MOBILE_ALLOWED_ROLES` set in `src/lib/api/queries.ts` controls this.
 - Unknown/null roles pass through so the profile wizard can collect the role.
@@ -1503,4 +1546,4 @@ pnpm --filter mobile exec jest src/__tests__/message-list.test.tsx
 
 **End of AGENTS.md**
 
-*This document should be updated as the architecture evolves. Last updated: 2026-03-01*
+_This document should be updated as the architecture evolves. Last updated: 2026-03-01_

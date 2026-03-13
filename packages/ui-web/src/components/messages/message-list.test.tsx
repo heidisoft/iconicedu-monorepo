@@ -1,5 +1,6 @@
+/* @vitest-environment jsdom */
 import React from 'react';
-import { render, act, waitFor } from '@testing-library/react';
+import { render, act, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { MessageList } from '@iconicedu/ui-web/components/messages/message-list';
@@ -106,7 +107,7 @@ describe('MessageList', () => {
       />,
     );
 
-    expect(getByText('NEW MESSAGES')).toBeInTheDocument();
+    expect(getByText('New messages')).toBeInTheDocument();
   });
 
   it('does not render new messages divider when only sender messages exist after last read', () => {
@@ -140,7 +141,7 @@ describe('MessageList', () => {
       />,
     );
 
-    expect(queryByText('NEW MESSAGES')).not.toBeInTheDocument();
+    expect(queryByText('New messages')).not.toBeInTheDocument();
   });
 
   it('keeps new messages divider visible across in-page rerenders', () => {
@@ -175,12 +176,12 @@ describe('MessageList', () => {
       />,
     );
 
-    expect(queryByText('NEW MESSAGES')).toBeInTheDocument();
+    expect(queryByText('New messages')).toBeInTheDocument();
 
     act(() => {
       vi.advanceTimersByTime(5000);
     });
-    expect(queryByText('NEW MESSAGES')).toBeInTheDocument();
+    expect(queryByText('New messages')).toBeInTheDocument();
 
     rerender(
       <MessageList
@@ -197,12 +198,12 @@ describe('MessageList', () => {
     act(() => {
       vi.advanceTimersByTime(100);
     });
-    expect(queryByText('NEW MESSAGES')).toBeInTheDocument();
+    expect(queryByText('New messages')).toBeInTheDocument();
 
     act(() => {
       vi.advanceTimersByTime(1000);
     });
-    expect(queryByText('NEW MESSAGES')).toBeInTheDocument();
+    expect(queryByText('New messages')).toBeInTheDocument();
     vi.useRealTimers();
   });
 
@@ -236,7 +237,7 @@ describe('MessageList', () => {
         currentUserId="profile-1"
       />,
     );
-    expect(queryByText('NEW MESSAGES')).toBeInTheDocument();
+    expect(queryByText('New messages')).toBeInTheDocument();
     unmount();
 
     const { queryByText: queryAfterRemount } = render(
@@ -250,7 +251,7 @@ describe('MessageList', () => {
         currentUserId="profile-1"
       />,
     );
-    expect(queryAfterRemount('NEW MESSAGES')).not.toBeInTheDocument();
+    expect(queryAfterRemount('New messages')).not.toBeInTheDocument();
     vi.useRealTimers();
   });
 
@@ -287,8 +288,57 @@ describe('MessageList', () => {
       />,
     );
 
-    await waitFor(() => {
-      expect(onUnreadViewed).toHaveBeenCalledWith('message-newer');
+    expect(onUnreadViewed).toHaveBeenCalledWith('message-newer');
+  });
+
+  it('animates unread divider dismissal before removing it', async () => {
+    vi.useFakeTimers();
+    const older = {
+      ...baseMessage,
+      ids: { ...baseMessage.ids, id: 'message-older' },
+      core: { ...baseMessage.core, createdAt: '2026-02-14T10:00:00.000Z' },
+    } as MessageVM;
+    const newer = {
+      ...baseMessage,
+      ids: { ...baseMessage.ids, id: 'message-newer' },
+      core: {
+        ...baseMessage.core,
+        createdAt: '2026-02-15T10:00:00.000Z',
+        sender: {
+          ...baseMessage.core.sender,
+          ids: { ...baseMessage.core.sender.ids, id: 'profile-2' },
+        },
+      },
+    } as MessageVM;
+    const onUnreadViewed = vi.fn();
+
+    render(
+      <MessageList
+        messages={[older, newer]}
+        onOpenThread={
+          vi.fn() as unknown as (thread: ThreadVM, message: MessageVM) => void
+        }
+        onProfileClick={vi.fn()}
+        lastReadMessageId="message-older"
+        currentUserId="profile-1"
+        onUnreadViewed={onUnreadViewed}
+      />,
+    );
+
+    expect(onUnreadViewed).toHaveBeenCalledWith('message-newer');
+
+    const divider = screen.getByTestId('unread-divider');
+    expect(divider).toHaveAttribute('data-dismissing', 'true');
+
+    act(() => {
+      vi.advanceTimersByTime(899);
     });
+    expect(screen.getByTestId('unread-divider')).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(screen.queryByTestId('unread-divider')).not.toBeInTheDocument();
+    vi.useRealTimers();
   });
 });

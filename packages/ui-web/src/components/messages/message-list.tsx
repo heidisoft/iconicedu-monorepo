@@ -45,6 +45,8 @@ import {
 } from '@iconicedu/ui-web/components/messages/message-list.inline-thread.utils';
 import { shouldHideMessageQuickActions } from '@iconicedu/ui-web/components/messages/message-action-visibility.utils';
 import type { MessageActionState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
+import { useUnreadIndicator } from '@iconicedu/ui-web/components/messages/hooks/use-unread-indicator';
+import { UnreadDivider } from '@iconicedu/ui-web/components/messages/shared/unread-divider';
 
 interface MessageListProps {
   messages: MessageVM[];
@@ -56,7 +58,11 @@ interface MessageListProps {
     content: string,
   ) => Promise<void> | void;
   onProfileClick: (userId: string) => void;
-  onToggleReaction?: (messageId: string, emoji: string, source?: 'bar' | 'picker') => void;
+  onToggleReaction?: (
+    messageId: string,
+    emoji: string,
+    source?: 'bar' | 'picker',
+  ) => void;
   onToggleSaved?: (messageId: string) => void;
   onToggleHidden?: (messageId: string) => void;
   onDelete?: (messageId: string) => void;
@@ -189,6 +195,12 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
       () => findLatestIncomingMessageId(sortedMessages, currentUserId),
       [sortedMessages, currentUserId],
     );
+    const { dismissedUnreadAnchorId, isUnreadDividerDismissing, dismissUnreadDivider } =
+      useUnreadIndicator({
+        unreadAnchorMessageId,
+        latestIncomingMessageId,
+        onUnreadViewed,
+      });
 
     const isViewportNearBottom = useCallback((viewport: HTMLDivElement | null) => {
       if (!viewport) {
@@ -201,6 +213,12 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
 
     const maybeMarkUnreadAsViewed = useCallback(() => {
       if (!onUnreadViewed || !unreadAnchorMessageId || !latestIncomingMessageId) {
+        return;
+      }
+      if (
+        dismissedUnreadAnchorId === unreadAnchorMessageId ||
+        isUnreadDividerDismissing
+      ) {
         return;
       }
       if (!isNearBottomRef.current) {
@@ -218,8 +236,15 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
         return;
       }
       lastNotifiedReadIdRef.current = latestIncomingMessageId;
-      onUnreadViewed(latestIncomingMessageId);
-    }, [latestIncomingMessageId, onUnreadViewed, unreadAnchorMessageId]);
+      dismissUnreadDivider();
+    }, [
+      latestIncomingMessageId,
+      onUnreadViewed,
+      unreadAnchorMessageId,
+      dismissedUnreadAnchorId,
+      isUnreadDividerDismissing,
+      dismissUnreadDivider,
+    ]);
 
     useEffect(() => {
       if (!unreadAnchorMessageId) {
@@ -395,6 +420,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
             {group.messages.map((message) => {
               const showUnreadDivider =
                 unreadAnchorMessageId !== null &&
+                dismissedUnreadAnchorId !== unreadAnchorMessageId &&
                 message.ids.id === unreadAnchorMessageId;
               const isParentRightAligned = currentUserId === message.core.sender.ids.id;
               const inlineThread =
@@ -411,13 +437,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                   className="transition-all duration-300"
                 >
                   {showUnreadDivider && (
-                    <div className="relative my-4 flex items-center">
-                      <div className="flex-1 border-t border-yellow-200" />
-                      <span className="mx-4 text-xs font-medium text-yellow-700 bg-background px-2">
-                        NEW MESSAGES
-                      </span>
-                      <div className="flex-1 border-t border-yellow-200" />
-                    </div>
+                    <UnreadDivider isDismissing={isUnreadDividerDismissing} />
                   )}
                   <MessageItem
                     message={message}
@@ -459,12 +479,17 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                               reply.core.sender.profile,
                             );
                             const isOwnReply = currentUserId === reply.core.sender.ids.id;
-                            const shouldHideQuickActions = shouldHideMessageQuickActions(reply);
-                            const replyActionState = getMessageActionState?.(reply.ids.id);
+                            const shouldHideQuickActions =
+                              shouldHideMessageQuickActions(reply);
+                            const replyActionState = getMessageActionState?.(
+                              reply.ids.id,
+                            );
                             const isSavingReply = Boolean(replyActionState?.isSaving);
                             const isHidingReply = Boolean(replyActionState?.isHiding);
                             const isDeletingReply = Boolean(replyActionState?.isDeleting);
-                            const isAddingReactionReply = Boolean(replyActionState?.isAddingReaction);
+                            const isAddingReactionReply = Boolean(
+                              replyActionState?.isAddingReaction,
+                            );
                             const pendingReplyReactionEmojis =
                               replyActionState?.pendingReactionEmojis ?? [];
                             return (
@@ -593,7 +618,11 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                           isReadOnly
                                             ? undefined
                                             : (emoji) =>
-                                                onToggleReaction?.(reply.ids.id, emoji, 'bar')
+                                                onToggleReaction?.(
+                                                  reply.ids.id,
+                                                  emoji,
+                                                  'bar',
+                                                )
                                         }
                                       />
                                     </div>
@@ -611,7 +640,11 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                       ) : (
                                         <EmojiPicker
                                           onEmojiSelect={(emoji) =>
-                                            onToggleReaction?.(reply.ids.id, emoji, 'picker')
+                                            onToggleReaction?.(
+                                              reply.ids.id,
+                                              emoji,
+                                              'picker',
+                                            )
                                           }
                                         >
                                           <Button
@@ -655,9 +688,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                   )
                                 }
                                 placeholder="Reply in thread..."
-                                className={cn(
-                                  'h-9 w-full rounded-full',
-                                )}
+                                className={cn('h-9 w-full rounded-full')}
                                 disabled={sendingReplyByParent[message.ids.id]}
                               />
                               <Button

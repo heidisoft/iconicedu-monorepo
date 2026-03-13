@@ -4,12 +4,17 @@ import { memo } from 'react';
 import type { MessageVM } from '@iconicedu/shared-types';
 import { MessageItem } from '@iconicedu/ui-web/components/messages/message-item';
 import type { MessageActionState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
+import { UnreadDivider } from './unread-divider';
 
 interface ThreadMessageListProps {
   messages: MessageVM[];
   onProfileClick: (userId: string) => void;
   isReadOnly?: boolean;
-  onToggleReaction?: (messageId: string, emoji: string, source?: 'bar' | 'picker') => void;
+  onToggleReaction?: (
+    messageId: string,
+    emoji: string,
+    source?: 'bar' | 'picker',
+  ) => void;
   onToggleSaved?: (messageId: string) => void;
   onToggleHidden?: (messageId: string) => void;
   onDelete?: (messageId: string) => void;
@@ -18,18 +23,6 @@ interface ThreadMessageListProps {
   lastReadMessageId?: string;
   unreadCount?: number;
 }
-
-const UnreadDivider = memo(function UnreadDivider({ count }: { count?: number }) {
-  return (
-    <div className="relative my-3 flex items-center px-2">
-      <div className="flex-1 border-t border-yellow-200" />
-      <span className="mx-3 text-xs font-medium text-yellow-700 bg-background px-2">
-        NEW MESSAGES{count && count > 0 ? ` (${count})` : ''}
-      </span>
-      <div className="flex-1 border-t border-yellow-200" />
-    </div>
-  );
-});
 
 const ReplyDivider = memo(function ReplyDivider({ count }: { count: number }) {
   return (
@@ -62,9 +55,7 @@ export const ThreadMessageList = memo(function ThreadMessageList({
 
   const normalizedUnreadCount = Math.max(0, unreadCount ?? 0);
   const fallbackUnreadStartIndex =
-    normalizedUnreadCount > 0
-      ? Math.max(1, messages.length - normalizedUnreadCount)
-      : -1;
+    normalizedUnreadCount > 0 ? Math.max(1, messages.length - normalizedUnreadCount) : -1;
 
   return (
     <>
@@ -75,7 +66,9 @@ export const ThreadMessageList = memo(function ThreadMessageList({
           previousMessage?.ids.id === lastReadMessageId &&
           message.ids.id !== lastReadMessageId;
         const showUnreadDividerByFallback =
-          !lastReadMessageId && fallbackUnreadStartIndex > 0 && index === fallbackUnreadStartIndex;
+          !lastReadMessageId &&
+          fallbackUnreadStartIndex > 0 &&
+          index === fallbackUnreadStartIndex;
         const showUnreadDivider =
           showUnreadDividerByReadAnchor || showUnreadDividerByFallback;
 
