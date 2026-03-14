@@ -24,6 +24,7 @@ describe('activity event definitions', () => {
         messageId: 'message-1',
         senderName: 'Jane',
         content: 'Hello there',
+        channelTopic: 'Priya + Riley',
         channelRouteKind: 'dm',
       },
       audience_rules: [],
@@ -34,7 +35,7 @@ describe('activity event definitions', () => {
       updated_at: '2026-03-03T12:00:00.000Z',
     });
 
-    expect(rendered.headline.primary).toBe('Jane sent you a direct message');
+    expect(rendered.headline.primary).toBe('Jane sent you a direct message in');
     expect(rendered.headline.secondaryHref).toBe('../dm/channel-dm-1');
     expect(rendered.actionButton).toBeUndefined();
   });
@@ -163,6 +164,7 @@ describe('activity event definitions', () => {
         messageId: 'message-1',
         senderName: 'Jane',
         content: 'Hello there',
+        channelTopic: 'Support',
       },
       audience_rules: [],
       dedupe_key: 'message.posted:message-1',
@@ -172,11 +174,81 @@ describe('activity event definitions', () => {
       updated_at: '2026-03-03T12:00:00.000Z',
     });
 
+    expect(rendered.headline.primary).toBe('Jane sent you a message in');
     expect(rendered.actionButton).toEqual({
       label: 'View messages',
       variant: 'outline',
       href: '../c/channel-1',
     });
+  });
+
+  it('groups posted channel messages by channel and hour', () => {
+    const definition = getActivityEventDefinition('message.posted');
+    if (!definition || !definition.group) {
+      throw new Error('Missing message.posted grouping');
+    }
+
+    const key = definition.group.buildGroupKey({
+      id: 'event-message-2',
+      org_id: 'org-1',
+      event_type: 'message.posted',
+      occurred_at: '2026-03-03T12:45:00.000Z',
+      source_kind: 'profile',
+      actor_profile_id: 'profile-1',
+      scope: { kind: 'channel', channelId: 'channel-1' },
+      object_ref: { kind: 'message', id: 'message-2' },
+      target_ref: null,
+      payload: {
+        channelId: 'channel-1',
+        messageId: 'message-2',
+        senderName: 'Jane',
+        content: 'Second message',
+        channelTopic: 'Support',
+      },
+      audience_rules: [],
+      dedupe_key: 'message.posted:message-2',
+      projection_status: 'pending',
+      projection_attempts: 0,
+      created_at: '2026-03-03T12:45:00.000Z',
+      updated_at: '2026-03-03T12:45:00.000Z',
+    });
+
+    expect(key).toBe('message-posted:channel-1:2026-03-03T12');
+  });
+
+  it('does not group channel mentions into hourly channel message parents', () => {
+    const definition = getActivityEventDefinition('message.posted');
+    if (!definition || !definition.group) {
+      throw new Error('Missing message.posted grouping');
+    }
+
+    const key = definition.group.buildGroupKey({
+      id: 'event-message-mention-1',
+      org_id: 'org-1',
+      event_type: 'message.posted',
+      occurred_at: '2026-03-03T12:45:00.000Z',
+      source_kind: 'profile',
+      actor_profile_id: 'profile-1',
+      scope: { kind: 'user', userId: 'profile-2' },
+      object_ref: { kind: 'message', id: 'message-2' },
+      target_ref: null,
+      payload: {
+        channelId: 'channel-1',
+        messageId: 'message-2',
+        senderName: 'Jane',
+        content: 'Second message',
+        channelTopic: 'Support',
+        mentionedProfileId: 'profile-2',
+      },
+      audience_rules: [],
+      dedupe_key: 'message.mention:message-2:profile-2',
+      projection_status: 'pending',
+      projection_attempts: 0,
+      created_at: '2026-03-03T12:45:00.000Z',
+      updated_at: '2026-03-03T12:45:00.000Z',
+    });
+
+    expect(key).toBeNull();
   });
 
   it('routes class-scoped message activities to the class page', () => {

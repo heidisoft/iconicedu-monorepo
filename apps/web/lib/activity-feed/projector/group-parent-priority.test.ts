@@ -59,4 +59,21 @@ describe('shouldReplaceGroupParent', () => {
       }),
     ).toBe(true);
   });
+
+  it('prefers messages.posted as the parent for grouped channel-message groups', () => {
+    expect(
+      shouldReplaceGroupParent({
+        groupKey: 'message-posted:channel-1:2026-03-08T12',
+        existingVerb: 'message.posted',
+        nextVerb: 'messages.posted',
+      }),
+    ).toBe(true);
+    expect(
+      shouldReplaceGroupParent({
+        groupKey: 'message-posted:channel-1:2026-03-08T12',
+        existingVerb: 'messages.posted',
+        nextVerb: 'message.posted',
+      }),
+    ).toBe(false);
+  });
 });

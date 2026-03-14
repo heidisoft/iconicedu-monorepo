@@ -530,7 +530,7 @@ const DIRECT_DM_SINGLE: ActivityFeedItemVM = {
   content: {
     leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'info' },
     headline: {
-      primary: `${EDUCATOR_ELENA_PROFILE.profile.displayName} sent you a direct message`,
+      primary: `${EDUCATOR_ELENA_PROFILE.profile.displayName} sent you a direct message in`,
       secondary: EDUCATOR_ELENA_PROFILE.profile.displayName,
     },
     summary: 'Can we adjust tomorrow’s assignment difficulty?',
@@ -574,7 +574,7 @@ const DM_MULTIPLE_MESSAGES_GROUP: ActivityFeedItemVM = {
       overflowCount: 0,
     },
     headline: {
-      primary: `${EDUCATOR_PRIYA_PROFILE.profile.displayName} sent you multiple messages`,
+      primary: `${EDUCATOR_PRIYA_PROFILE.profile.displayName} sent you multiple direct messages in`,
       secondary: EDUCATOR_PRIYA_PROFILE.profile.displayName,
     },
     summary: '3 new messages in direct conversation',

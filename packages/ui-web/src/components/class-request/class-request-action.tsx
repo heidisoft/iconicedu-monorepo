@@ -399,8 +399,11 @@ export function ClassRequestAction({
 
             {requestForm.subjects.includes(OTHER_SUBJECT_VALUE) ? (
               <div className="space-y-2">
-                <label className="font-medium">Other subject</label>
+                <label className="font-medium" htmlFor="class-request-other-subject">
+                  Other subject
+                </label>
                 <Input
+                  id="class-request-other-subject"
                   value={requestForm.otherSubject}
                   onChange={(event) =>
                     setRequestForm((current) => ({
@@ -414,11 +417,14 @@ export function ClassRequestAction({
             ) : null}
 
             <div className="space-y-2">
-              <label className="font-medium">Learning goals</label>
+              <label className="font-medium" htmlFor="class-request-learning-goals">
+                Learning goals
+              </label>
               <p className="text-sm text-muted-foreground">
                 What specific topics or skills should the tutor focus on?
               </p>
               <Textarea
+                id="class-request-learning-goals"
                 value={requestForm.learningGoals}
                 onChange={(event) =>
                   setRequestForm((current) => ({
@@ -432,11 +438,14 @@ export function ClassRequestAction({
             </div>
 
             <div className="space-y-2">
-              <label className="font-medium">Special requirements</label>
+              <label className="font-medium" htmlFor="class-request-special-requirements">
+                Special requirements
+              </label>
               <p className="text-sm text-muted-foreground">
                 Any accommodations, learning preferences, or other notes for the tutor.
               </p>
               <Textarea
+                id="class-request-special-requirements"
                 value={requestForm.specialRequirements}
                 onChange={(event) =>
                   setRequestForm((current) => ({

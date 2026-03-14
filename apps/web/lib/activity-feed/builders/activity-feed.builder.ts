@@ -304,7 +304,10 @@ async function attachGroupMembers(
       normalized.parent,
       normalized.members,
     );
-    const nextParent = normalizeDmGroupedParent(normalized.parent, aggregatedMembers);
+    const nextParent = normalizeChannelGroupedParent(
+      normalizeDmGroupedParent(normalized.parent, aggregatedMembers),
+      aggregatedMembers,
+    );
 
     memberIds.forEach((memberId) => groupedMemberIds.add(memberId));
 
@@ -460,11 +463,6 @@ function normalizeDmGroupedParent(
     return parent;
   }
 
-  const dmMessageCount = members.filter((member) => member.verb === 'dm.posted').length;
-  const messageCount =
-    dmMessageCount > 0
-      ? dmMessageCount
-      : Math.max(parent.subActivityCount ?? members.length, members.length);
   const senderName = members[0]?.refs.actor?.profile?.displayName ?? 'Someone';
   const contextTitle = parent.content.headline.secondary;
 
@@ -473,9 +471,89 @@ function normalizeDmGroupedParent(
     content: {
       ...parent.content,
       headline: {
-        primary: `${senderName} sent you ${messageCount} direct messages`,
+        primary: contextTitle
+          ? `${senderName} sent you multiple direct messages in`
+          : `${senderName} sent you multiple direct messages`,
         secondary: contextTitle,
       },
+    },
+  };
+}
+
+function buildGroupedMessageLeading(
+  members: ActivityFeedLeafItemVM[],
+): InboxLeadingVM | undefined {
+  const aggregatedAvatars = collectUniqueAvatars(
+    members.map((member) => {
+      const actor = member.refs.actor;
+      if (!actor) {
+        return member.content.leading;
+      }
+
+      return {
+        kind: 'avatars' as const,
+        avatars: [
+          {
+            name: actor.profile.displayName ?? 'Someone',
+            avatar: actor.profile.avatar ?? {
+              source: 'seed' as const,
+              seed: actor.ids.id,
+            },
+            themeKey: actor.ui?.themeKey ?? null,
+          },
+        ],
+        overflowCount: 0,
+      };
+    }),
+  );
+
+  if (!aggregatedAvatars.length) {
+    return undefined;
+  }
+
+  return {
+    kind: 'avatars',
+    avatars: aggregatedAvatars.slice(0, 3),
+    overflowCount: Math.max(0, aggregatedAvatars.length - 3),
+  };
+}
+
+function normalizeChannelGroupedParent(
+  parent: Extract<ActivityFeedItemVM, { kind: 'group' }>,
+  members: ActivityFeedLeafItemVM[],
+): Extract<ActivityFeedItemVM, { kind: 'group' }> {
+  if (parent.verb !== 'messages.posted' || !members.length) {
+    return parent;
+  }
+
+  const messageCount = members.filter(
+    (member) => member.verb === 'message.posted',
+  ).length;
+  const senderNames = Array.from(
+    new Set(
+      members
+        .map((member) => member.refs.actor?.profile?.displayName)
+        .filter(
+          (value): value is string => typeof value === 'string' && value.length > 0,
+        ),
+    ),
+  );
+  const contextTitle = parent.content.headline.secondary ?? 'Channel';
+  const leading = buildGroupedMessageLeading(members);
+
+  return {
+    ...parent,
+    content: {
+      ...parent.content,
+      leading: leading ?? parent.content.leading,
+      headline: {
+        primary:
+          senderNames.length <= 1
+            ? `${senderNames[0] ?? 'Someone'} sent you multiple messages in`
+            : 'New messages in',
+        secondary: contextTitle,
+      },
+      summary: messageCount > 1 ? `${messageCount} new messages` : parent.content.summary,
     },
   };
 }

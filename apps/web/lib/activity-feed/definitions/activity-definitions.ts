@@ -800,6 +800,27 @@ function buildSystemLeadingAvatar(): InboxLeadingVM {
   };
 }
 
+function buildMessageHeadline(input: {
+  senderName: string;
+  contextTitle?: string;
+  isDirect?: boolean;
+  multiple?: boolean;
+}) {
+  if (input.multiple) {
+    return input.contextTitle
+      ? `${input.senderName} sent you multiple ${
+          input.isDirect ? 'direct ' : ''
+        }messages in`
+      : `${input.senderName} sent you multiple ${
+          input.isDirect ? 'direct ' : ''
+        }messages`;
+  }
+
+  return input.contextTitle
+    ? `${input.senderName} sent you a ${input.isDirect ? 'direct ' : ''}message in`
+    : `${input.senderName} sent you a ${input.isDirect ? 'direct ' : ''}message`;
+}
+
 export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition> = {
   'dm.posted': {
     eventType: 'dm.posted',
@@ -815,12 +836,18 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       renderGroup: (event) => {
         const payload = asRecord(event.payload);
         const senderName = asString(payload.senderName, 'Someone');
+        const contextTitle = getContextTitle(payload);
         return {
           verb: 'dms.posted',
           leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'info' },
           headline: {
-            primary: `${senderName} sent you direct messages`,
-            secondary: getContextTitle(payload),
+            primary: buildMessageHeadline({
+              senderName,
+              contextTitle,
+              isDirect: true,
+              multiple: true,
+            }),
+            secondary: contextTitle,
           },
           summary: undefined,
           metadata: {
@@ -836,12 +863,17 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       const payload = asRecord(event.payload);
       const senderName = asString(payload.senderName, 'Someone');
       const content = asString(payload.content).slice(0, 160);
+      const contextTitle = getContextTitle(payload);
       return {
         verb: 'dm.posted',
         leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'info' },
         headline: {
-          primary: `${senderName} sent you a direct message`,
-          secondary: getContextTitle(payload),
+          primary: buildMessageHeadline({
+            senderName,
+            contextTitle,
+            isDirect: true,
+          }),
+          secondary: contextTitle,
           secondaryHref: buildInboxSourceHref(event, payload),
         },
         summary: undefined,
@@ -962,7 +994,37 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     eventType: 'message.posted',
     tabKey: 'all',
     importance: 'normal',
-    group: null,
+    group: {
+      groupType: 'message',
+      collapseByDefault: true,
+      buildGroupKey: (event) => {
+        const payload = asRecord(event.payload);
+        if (
+          asOptionalString(payload.mentionedProfileId) ||
+          Boolean(payload.threadReply)
+        ) {
+          return null;
+        }
+        return buildHourlyChannelGroupKey('message-posted', event, payload);
+      },
+      renderGroup: (event) => {
+        const payload = asRecord(event.payload);
+        const contextTitle = getContextTitle(payload) ?? 'Channel';
+        return {
+          verb: 'messages.posted',
+          leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'info' },
+          headline: {
+            primary: 'New messages in',
+            secondary: contextTitle,
+          },
+          summary: undefined,
+          metadata: {
+            channelId: payload.channelId,
+            messageId: payload.messageId,
+          },
+        };
+      },
+    },
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => {
       const payload = asRecord(event.payload);
@@ -971,6 +1033,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       const mentionedProfileId = asOptionalString(payload.mentionedProfileId);
       const isThreadReply = Boolean(payload.threadReply);
       const isMention = Boolean(mentionedProfileId);
+      const contextTitle = getContextTitle(payload);
       return {
         verb: 'message.posted',
         leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'info' },
@@ -979,8 +1042,12 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
             ? `${senderName} mentioned you`
             : isThreadReply
               ? `${senderName} replied in a thread`
-              : `${senderName} sent a message`,
-          secondary: getContextTitle(payload),
+              : buildMessageHeadline({
+                  senderName,
+                  contextTitle,
+                  isDirect: payload.channelRouteKind === 'dm',
+                }),
+          secondary: contextTitle,
         },
         summary: undefined,
         expandedContent: content || undefined,

@@ -644,7 +644,9 @@ describe('buildActivityFeedForProfile', () => {
       throw new Error('Expected grouped item');
     }
 
-    expect(group.content.headline.primary).toBe('Educator sent you 2 direct messages');
+    expect(group.content.headline.primary).toBe(
+      'Educator sent you multiple direct messages in',
+    );
     expect(group.content.headline.secondary).toBe('Priya + Riley');
   });
 
@@ -762,7 +764,236 @@ describe('buildActivityFeedForProfile', () => {
       throw new Error('Expected grouped item');
     }
 
-    expect(group.content.headline.primary).toBe('Educator sent you 2 direct messages');
+    expect(group.content.headline.primary).toBe(
+      'Educator sent you multiple direct messages in',
+    );
+  });
+
+  it('normalizes grouped channel-message parents for a single sender', async () => {
+    getActivityFeedItemsByOrg.mockResolvedValue({
+      data: [
+        {
+          id: 'group-channel-1',
+          org_id: 'org-1',
+          recipient_profile_id: 'profile-1',
+          kind: 'group',
+          occurred_at: '2026-03-07T16:00:00.000Z',
+          created_at: '2026-03-07T16:00:00.000Z',
+          tab_key: 'all',
+          audience: {
+            scope: { kind: 'channel', channelId: 'channel-1' },
+            visibility: 'scope_only',
+          },
+          verb: 'messages.posted',
+          actor_profile_id: 'actor-1',
+          refs: {},
+          group_key: 'message-posted:channel-1:2026-03-07T16',
+          group_type: 'message',
+          content: {
+            headline: {
+              primary: 'New messages in',
+              secondary: 'Class Requests',
+            },
+          },
+          sub_activity_count: 2,
+          updated_at: '2026-03-07T16:00:00.000Z',
+        },
+        {
+          id: 'channel-item-1',
+          org_id: 'org-1',
+          recipient_profile_id: 'profile-1',
+          kind: 'leaf',
+          occurred_at: '2026-03-07T15:59:00.000Z',
+          created_at: '2026-03-07T15:59:00.000Z',
+          tab_key: 'all',
+          audience: {
+            scope: { kind: 'channel', channelId: 'channel-1' },
+            visibility: 'scope_only',
+          },
+          verb: 'message.posted',
+          actor_profile_id: 'actor-1',
+          refs: {},
+          content: {
+            headline: {
+              primary: 'Sender sent you a message in',
+              secondary: 'Class Requests',
+            },
+          },
+          updated_at: '2026-03-07T15:59:00.000Z',
+        },
+        {
+          id: 'channel-item-2',
+          org_id: 'org-1',
+          recipient_profile_id: 'profile-1',
+          kind: 'leaf',
+          occurred_at: '2026-03-07T15:58:00.000Z',
+          created_at: '2026-03-07T15:58:00.000Z',
+          tab_key: 'all',
+          audience: {
+            scope: { kind: 'channel', channelId: 'channel-1' },
+            visibility: 'scope_only',
+          },
+          verb: 'message.posted',
+          actor_profile_id: 'actor-1',
+          refs: {},
+          content: {
+            headline: {
+              primary: 'Sender sent you a message in',
+              secondary: 'Class Requests',
+            },
+          },
+          updated_at: '2026-03-07T15:58:00.000Z',
+        },
+      ],
+    });
+    getActivityFeedGroupMembersByGroupIds.mockResolvedValue({
+      data: [
+        { group_id: 'group-channel-1', item_id: 'channel-item-1' },
+        { group_id: 'group-channel-1', item_id: 'channel-item-2' },
+      ],
+    });
+
+    const feed = await buildActivityFeedForProfile({} as never, 'org-1', 'profile-1');
+    const group = feed.sections[0]?.items.find((item) => item.kind === 'group');
+    if (!group || group.kind !== 'group') {
+      throw new Error('Expected grouped item');
+    }
+
+    expect(group.content.headline.primary).toBe('Educator sent you multiple messages in');
+    expect(group.content.leading).toEqual({
+      kind: 'avatars',
+      avatars: [
+        {
+          name: 'Educator',
+          avatar: { source: 'generated', seed: 'actor-1' },
+          themeKey: null,
+        },
+      ],
+      overflowCount: 0,
+    });
+  });
+
+  it('normalizes grouped channel-message parents for multiple senders with grouped avatars', async () => {
+    getProfilesByIds.mockResolvedValue({
+      data: [
+        { id: 'actor-1', kind: 'educator', account_id: 'account-1' },
+        { id: 'actor-2', kind: 'staff', account_id: 'account-2' },
+      ],
+    });
+    buildUserProfileFromRow.mockImplementation(async (_supabase, row) => ({
+      ids: { id: row.id, orgId: 'org-1', accountId: row.account_id },
+      kind: row.kind,
+      profile: {
+        displayName: row.id === 'actor-1' ? 'Educator' : 'Support',
+        avatar: { source: 'generated', seed: row.id },
+      },
+    }));
+    getActivityFeedItemsByOrg.mockResolvedValue({
+      data: [
+        {
+          id: 'group-channel-2',
+          org_id: 'org-1',
+          recipient_profile_id: 'profile-1',
+          kind: 'group',
+          occurred_at: '2026-03-07T16:00:00.000Z',
+          created_at: '2026-03-07T16:00:00.000Z',
+          tab_key: 'all',
+          audience: {
+            scope: { kind: 'channel', channelId: 'channel-2' },
+            visibility: 'scope_only',
+          },
+          verb: 'messages.posted',
+          actor_profile_id: 'actor-2',
+          refs: {},
+          group_key: 'message-posted:channel-2:2026-03-07T16',
+          group_type: 'message',
+          content: {
+            headline: {
+              primary: 'New messages in',
+              secondary: 'Support',
+            },
+          },
+          sub_activity_count: 2,
+          updated_at: '2026-03-07T16:00:00.000Z',
+        },
+        {
+          id: 'channel-item-3',
+          org_id: 'org-1',
+          recipient_profile_id: 'profile-1',
+          kind: 'leaf',
+          occurred_at: '2026-03-07T15:59:00.000Z',
+          created_at: '2026-03-07T15:59:00.000Z',
+          tab_key: 'all',
+          audience: {
+            scope: { kind: 'channel', channelId: 'channel-2' },
+            visibility: 'scope_only',
+          },
+          verb: 'message.posted',
+          actor_profile_id: 'actor-1',
+          refs: {},
+          content: {
+            headline: {
+              primary: 'Sender sent you a message in',
+              secondary: 'Support',
+            },
+          },
+          updated_at: '2026-03-07T15:59:00.000Z',
+        },
+        {
+          id: 'channel-item-4',
+          org_id: 'org-1',
+          recipient_profile_id: 'profile-1',
+          kind: 'leaf',
+          occurred_at: '2026-03-07T15:58:00.000Z',
+          created_at: '2026-03-07T15:58:00.000Z',
+          tab_key: 'all',
+          audience: {
+            scope: { kind: 'channel', channelId: 'channel-2' },
+            visibility: 'scope_only',
+          },
+          verb: 'message.posted',
+          actor_profile_id: 'actor-2',
+          refs: {},
+          content: {
+            headline: {
+              primary: 'Sender sent you a message in',
+              secondary: 'Support',
+            },
+          },
+          updated_at: '2026-03-07T15:58:00.000Z',
+        },
+      ],
+    });
+    getActivityFeedGroupMembersByGroupIds.mockResolvedValue({
+      data: [
+        { group_id: 'group-channel-2', item_id: 'channel-item-3' },
+        { group_id: 'group-channel-2', item_id: 'channel-item-4' },
+      ],
+    });
+
+    const feed = await buildActivityFeedForProfile({} as never, 'org-1', 'profile-1');
+    const group = feed.sections[0]?.items.find((item) => item.kind === 'group');
+    if (!group || group.kind !== 'group') {
+      throw new Error('Expected grouped item');
+    }
+
+    expect(group.content.headline.primary).toBe('New messages in');
+    expect(group.content.leading).toEqual({
+      kind: 'avatars',
+      avatars: [
+        {
+          name: 'Educator',
+          avatar: { source: 'generated', seed: 'actor-1' },
+          themeKey: null,
+        },
+        {
+          name: 'Support',
+          avatar: { source: 'generated', seed: 'actor-2' },
+          themeKey: null,
+        },
+      ],
+      overflowCount: 0,
+    });
   });
 
   it('attaches persisted recipient feedback metadata to feedback request activities', async () => {
