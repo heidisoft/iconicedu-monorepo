@@ -33,15 +33,32 @@ describe('publishActivityEvent', () => {
       },
       error: null,
     }));
+    const insert = vi.fn(() => ({
+      select: vi.fn(() => ({
+        single: insertSingle,
+      })),
+    }));
 
     const supabase = {
-      from: vi.fn(() => ({
-        insert: vi.fn(() => ({
-          select: vi.fn(() => ({
-            single: insertSingle,
-          })),
-        })),
-      })),
+      from: vi.fn((table: string) => {
+        if (table === 'orgs') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                is: vi.fn(() => ({
+                  maybeSingle: vi.fn(async () => ({
+                    data: { id: 'org-1', slug: 'iconic-academy' },
+                    error: null,
+                  })),
+                })),
+              })),
+            })),
+          };
+        }
+        return {
+          insert,
+        };
+      }),
     };
 
     projectActivityEvents.mockResolvedValue({ processed: 1 });
@@ -58,6 +75,14 @@ describe('publishActivityEvent', () => {
     });
 
     expect(result?.id).toBe('event-1');
+    expect(insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          messageId: 'message-1',
+          orgSlug: 'iconic-academy',
+        }),
+      }),
+    );
     expect(projectActivityEvents).toHaveBeenCalledWith(supabase, {
       eventIds: ['event-1'],
       limit: 1,
@@ -73,15 +98,32 @@ describe('publishActivityEvent', () => {
       },
       error: null,
     }));
+    const insert = vi.fn(() => ({
+      select: vi.fn(() => ({
+        single: insertSingle,
+      })),
+    }));
 
     const supabase = {
-      from: vi.fn(() => ({
-        insert: vi.fn(() => ({
-          select: vi.fn(() => ({
-            single: insertSingle,
-          })),
-        })),
-      })),
+      from: vi.fn((table: string) => {
+        if (table === 'orgs') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                is: vi.fn(() => ({
+                  maybeSingle: vi.fn(async () => ({
+                    data: { id: 'org-1', slug: 'iconic-academy' },
+                    error: null,
+                  })),
+                })),
+              })),
+            })),
+          };
+        }
+        return {
+          insert,
+        };
+      }),
     };
 
     projectActivityEvents.mockRejectedValue(new Error('projection failed'));
@@ -103,6 +145,21 @@ describe('publishActivityEvent', () => {
   it('returns existing event on dedupe conflict', async () => {
     const supabase = {
       from: vi.fn((table: string) => {
+        if (table === 'orgs') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                is: vi.fn(() => ({
+                  maybeSingle: vi.fn(async () => ({
+                    data: { id: 'org-1', slug: 'iconic-academy' },
+                    error: null,
+                  })),
+                })),
+              })),
+            })),
+          };
+        }
+
         if (table !== 'activity_events') {
           throw new Error(`Unexpected table ${table}`);
         }
@@ -159,13 +216,7 @@ describe('publishActivityEvent', () => {
     });
 
     const supabase = {
-      from: vi.fn(() => ({
-        insert: vi.fn(() => ({
-          select: vi.fn(() => ({
-            single: vi.fn(),
-          })),
-        })),
-      })),
+      from: vi.fn(),
     };
 
     const result = await publishActivityEvent({

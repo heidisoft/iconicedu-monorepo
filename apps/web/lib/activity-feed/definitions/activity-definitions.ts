@@ -148,22 +148,26 @@ function buildInboxSourceHref(event: ActivityEventRow, payload: Record<string, u
     return undefined;
   }
 
+  const orgSlug = asOptionalString(payload.orgSlug);
+  const basePath = orgSlug ? `/${orgSlug}` : '..';
   const routeKind = asOptionalRouteKind(payload.channelRouteKind);
   if (routeKind === 'space') {
-    return `../spaces/${channelId}`;
+    return `${basePath}/spaces/${channelId}`;
   }
   if (routeKind === 'dm') {
-    return `../dm/${channelId}`;
+    return `${basePath}/dm/${channelId}`;
   }
   if (routeKind === 'channel') {
-    return `../c/${channelId}`;
+    return `${basePath}/c/${channelId}`;
   }
 
   const scopeKind = getScopeKind(event);
   const isLearningSpace =
     scopeKind === 'learning_space' || typeof payload.learningSpaceId === 'string';
 
-  return isLearningSpace ? `../spaces/${channelId}` : `../c/${channelId}`;
+  return isLearningSpace
+    ? `${basePath}/spaces/${channelId}`
+    : `${basePath}/c/${channelId}`;
 }
 
 function sourceAction(
@@ -360,20 +364,6 @@ function buildCanceledSessionSummary(payload: Record<string, unknown>) {
   return `Session: ${title} weekly session (${dateTimeLabel}) canceled${
     reason ? ` due to ${reason}` : ''
   }`;
-}
-
-function buildHourlyLearningSpaceGroupKey(
-  prefix: string,
-  event: ActivityEventRow,
-  payload: Record<string, unknown>,
-) {
-  const learningSpaceId = getLearningSpaceId(event, payload);
-  if (!learningSpaceId) {
-    return null;
-  }
-
-  const hourBucket = event.occurred_at.slice(0, 13);
-  return `${prefix}:${learningSpaceId}:${hourBucket}`;
 }
 
 function buildHourlyChannelGroupKey(
@@ -990,6 +980,110 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       };
     },
   },
+  'reaction.added': {
+    eventType: 'reaction.added',
+    tabKey: 'all',
+    importance: 'normal',
+    group: {
+      groupType: 'message',
+      collapseByDefault: true,
+      buildGroupKey: (event) => {
+        const payload = asRecord(event.payload);
+        return buildHourlyChannelGroupKey('message-posted', event, payload);
+      },
+      renderGroup: (event) => {
+        const payload = asRecord(event.payload);
+        const senderName = asString(payload.senderName, 'Someone');
+        return {
+          verb: 'reactions.added',
+          leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'info' },
+          headline: {
+            primary: `${senderName} reacted to your messages`,
+            secondary: getContextTitle(payload),
+          },
+          summary: undefined,
+          metadata: {
+            channelId: payload.channelId,
+            messageId: payload.messageId,
+            reactionGroup: 'added',
+          },
+        };
+      },
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => {
+      const payload = asRecord(event.payload);
+      const senderName = asString(payload.senderName, 'Someone');
+      const emoji = asString(payload.emoji, '😀');
+      return {
+        verb: 'reaction.added',
+        leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'info' },
+        headline: {
+          primary: `${senderName} reacted ${emoji} to your message in`,
+          secondary: getContextTitle(payload),
+        },
+        summary: undefined,
+        actionButton: sourceAction(event, payload),
+        metadata: {
+          channelId: payload.channelId,
+          messageId: payload.messageId,
+          emoji,
+        },
+      };
+    },
+  },
+  'reaction.removed': {
+    eventType: 'reaction.removed',
+    tabKey: 'all',
+    importance: 'normal',
+    group: {
+      groupType: 'message',
+      collapseByDefault: true,
+      buildGroupKey: (event) => {
+        const payload = asRecord(event.payload);
+        return buildHourlyChannelGroupKey('message-posted', event, payload);
+      },
+      renderGroup: (event) => {
+        const payload = asRecord(event.payload);
+        const senderName = asString(payload.senderName, 'Someone');
+        return {
+          verb: 'reactions.removed',
+          leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'neutral' },
+          headline: {
+            primary: `${senderName} removed reactions from your messages`,
+            secondary: getContextTitle(payload),
+          },
+          summary: undefined,
+          metadata: {
+            channelId: payload.channelId,
+            messageId: payload.messageId,
+            reactionGroup: 'removed',
+          },
+        };
+      },
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => {
+      const payload = asRecord(event.payload);
+      const senderName = asString(payload.senderName, 'Someone');
+      const emoji = asString(payload.emoji, '😀');
+      return {
+        verb: 'reaction.removed',
+        leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'neutral' },
+        headline: {
+          primary: `${senderName} removed ${emoji} from your message in`,
+          secondary: getContextTitle(payload),
+        },
+        summary: undefined,
+        actionButton: sourceAction(event, payload),
+        metadata: {
+          channelId: payload.channelId,
+          messageId: payload.messageId,
+          emoji,
+        },
+      };
+    },
+  },
   'message.posted': {
     eventType: 'message.posted',
     tabKey: 'all',
@@ -999,10 +1093,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       collapseByDefault: true,
       buildGroupKey: (event) => {
         const payload = asRecord(event.payload);
-        if (
-          asOptionalString(payload.mentionedProfileId) ||
-          Boolean(payload.threadReply)
-        ) {
+        if (asOptionalString(payload.mentionedProfileId)) {
           return null;
         }
         return buildHourlyChannelGroupKey('message-posted', event, payload);
@@ -1031,7 +1122,6 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       const senderName = asString(payload.senderName, 'Someone');
       const content = asString(payload.content).slice(0, 160);
       const mentionedProfileId = asOptionalString(payload.mentionedProfileId);
-      const isThreadReply = Boolean(payload.threadReply);
       const isMention = Boolean(mentionedProfileId);
       const contextTitle = getContextTitle(payload);
       return {
@@ -1039,14 +1129,12 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
         leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'info' },
         headline: {
           primary: isMention
-            ? `${senderName} mentioned you`
-            : isThreadReply
-              ? `${senderName} replied in a thread`
-              : buildMessageHeadline({
-                  senderName,
-                  contextTitle,
-                  isDirect: payload.channelRouteKind === 'dm',
-                }),
+            ? `${senderName} mentioned you in`
+            : buildMessageHeadline({
+                senderName,
+                contextTitle,
+                isDirect: payload.channelRouteKind === 'dm',
+              }),
           secondary: contextTitle,
         },
         summary: undefined,
@@ -1066,11 +1154,11 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     tabKey: 'classes',
     importance: 'normal',
     group: {
-      groupType: 'class',
+      groupType: 'message',
       collapseByDefault: true,
       buildGroupKey: (event) => {
         const payload = asRecord(event.payload);
-        return buildHourlyLearningSpaceGroupKey('files', event, payload);
+        return buildHourlyChannelGroupKey('message-posted', event, payload);
       },
       renderGroup: (event) =>
         renderGroupedClassActivity(event, {

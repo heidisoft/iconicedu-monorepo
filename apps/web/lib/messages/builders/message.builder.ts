@@ -11,6 +11,7 @@ import {
   getMessagesByChannelId,
   getMessagesPageByChannelId,
   getMessageById,
+  getMessageReactionsByMessageIds,
   getMessageTextByMessageIds,
   getMessagesByThreadId,
   getMessageImagesByMessageIds,
@@ -35,6 +36,7 @@ import {
 import { buildUserProfileById } from '@iconicedu/web/lib/profile/builders/user-profile.builder';
 import { mapMessageRowToVM } from '@iconicedu/web/lib/messages/mappers/message.mapper';
 import { buildThreadById } from '@iconicedu/web/lib/messages/builders/thread.builder';
+import { getProfilesByAccountIds } from '@iconicedu/web/lib/profile/queries/profiles.query';
 
 type MessageBuildOptions = {
   threadsById?: Map<string, ThreadVM>;
@@ -73,6 +75,7 @@ export async function buildMessagesPageByChannelId(
     limit: number;
     beforeCreatedAt?: string | null;
     threadsById?: Map<string, ThreadVM>;
+    profileId?: string;
   },
 ): Promise<{
   messages: MessageVM[];
@@ -114,7 +117,9 @@ export async function buildMessageById(
   const [payloadsById, reactionsByMessageId, sender, thread, savedMessageIds] =
     await Promise.all([
       loadPayloadsByMessageIds(supabase, orgId, [row]),
-      loadReactionsByMessageIds(supabase, orgId, [row.id]),
+      loadReactionsByMessageIds(supabase, orgId, [row.id], {
+        accountId: options.accountId,
+      }),
       buildUserProfileById(supabase, row.sender_profile_id),
       row.thread_id
         ? buildThreadById(supabase, orgId, row.thread_id, {
@@ -304,22 +309,49 @@ async function loadReactionsByMessageIds(
   supabase: SupabaseClient,
   orgId: string,
   messageIds: string[],
+  options: Pick<MessageBuildOptions, 'accountId'> = {},
 ): Promise<Map<string, ReactionVM[]>> {
-  const response = await getMessageReactionCountsByMessageIds(
-    supabase,
-    orgId,
-    messageIds,
+  const [countResponse, reactionResponse] = await Promise.all([
+    getMessageReactionCountsByMessageIds(supabase, orgId, messageIds),
+    getMessageReactionsByMessageIds(supabase, orgId, messageIds),
+  ]);
+  const countRows = countResponse.data ?? [];
+  const reactionRows = reactionResponse.data ?? [];
+  const accountIds = Array.from(new Set(reactionRows.map((row) => row.account_id)));
+  const profilesResponse = accountIds.length
+    ? await getProfilesByAccountIds(supabase, orgId, accountIds)
+    : { data: [] };
+  const profileIdByAccountId = new Map(
+    (profilesResponse.data ?? []).map((profile) => [profile.account_id, profile.id]),
   );
-  const rows = response.data ?? [];
-  const grouped = groupBy(rows, (row) => row.message_id);
+  const groupedCounts = groupBy(countRows, (row) => row.message_id);
+  const groupedReactions = groupBy(reactionRows, (row) => row.message_id);
   const result = new Map<string, ReactionVM[]>();
-  grouped.forEach((items, messageId) => {
+  groupedCounts.forEach((items, messageId) => {
+    const reactionsForMessage = groupedReactions.get(messageId) ?? [];
     result.set(
       messageId,
-      items.map((item) => ({
-        emoji: item.emoji,
-        count: item.count,
-      })),
+      items
+        .map((item) => {
+          const reactionsForEmoji = reactionsForMessage
+            .filter((reaction) => reaction.emoji === item.emoji)
+            .sort((left, right) => left.account_id.localeCompare(right.account_id));
+
+          return {
+            emoji: item.emoji,
+            count: item.count,
+            reactedByMe: options.accountId
+              ? reactionsForEmoji.some(
+                  (reaction) => reaction.account_id === options.accountId,
+                )
+              : undefined,
+            sampleUserIds: reactionsForEmoji
+              .slice(0, 3)
+              .map((reaction) => profileIdByAccountId.get(reaction.account_id))
+              .filter((profileId): profileId is string => Boolean(profileId)),
+          } satisfies ReactionVM;
+        })
+        .sort((left, right) => left.emoji.localeCompare(right.emoji)),
     );
   });
   return result;
@@ -351,7 +383,9 @@ async function mapRowsToMessages(
   const [payloadsById, reactionsByMessageId, profilesById, savedMessageIds] =
     await Promise.all([
       loadPayloadsByMessageIds(supabase, orgId, rows),
-      loadReactionsByMessageIds(supabase, orgId, messageIds),
+      loadReactionsByMessageIds(supabase, orgId, messageIds, {
+        accountId: options.accountId,
+      }),
       resolveProfilesById(
         supabase,
         Array.from(new Set(rows.map((row) => row.sender_profile_id))),

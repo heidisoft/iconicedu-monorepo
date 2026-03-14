@@ -26,6 +26,7 @@ describe('activity event definitions', () => {
         content: 'Hello there',
         channelTopic: 'Priya + Riley',
         channelRouteKind: 'dm',
+        orgSlug: 'iconic-academy',
       },
       audience_rules: [],
       dedupe_key: 'dm.posted:message-1',
@@ -36,7 +37,7 @@ describe('activity event definitions', () => {
     });
 
     expect(rendered.headline.primary).toBe('Jane sent you a direct message in');
-    expect(rendered.headline.secondaryHref).toBe('../dm/channel-dm-1');
+    expect(rendered.headline.secondaryHref).toBe('/iconic-academy/dm/channel-dm-1');
     expect(rendered.actionButton).toBeUndefined();
   });
 
@@ -143,6 +144,80 @@ describe('activity event definitions', () => {
     expect(key).toBe('dm-posted:channel-dm-1:2026-03-03T12');
   });
 
+  it('renders channel reaction added activity', () => {
+    const definition = getActivityEventDefinition('reaction.added');
+    if (!definition) {
+      throw new Error('Missing reaction.added definition');
+    }
+
+    const rendered = definition.render({
+      id: 'event-channel-reaction-1',
+      org_id: 'org-1',
+      event_type: 'reaction.added',
+      occurred_at: '2026-03-03T12:00:00.000Z',
+      source_kind: 'profile',
+      actor_profile_id: 'profile-1',
+      scope: { kind: 'user', userId: 'profile-2' },
+      object_ref: { kind: 'message', id: 'message-1' },
+      target_ref: null,
+      payload: {
+        channelId: 'channel-1',
+        messageId: 'message-1',
+        senderName: 'Jane',
+        emoji: '👍',
+        channelTopic: 'Support',
+        orgSlug: 'iconic-academy',
+      },
+      audience_rules: [],
+      dedupe_key: null,
+      projection_status: 'pending',
+      projection_attempts: 0,
+      created_at: '2026-03-03T12:00:00.000Z',
+      updated_at: '2026-03-03T12:00:00.000Z',
+    });
+
+    expect(rendered.headline.primary).toBe('Jane reacted 👍 to your message in');
+    expect(rendered.actionButton).toEqual({
+      label: 'View messages',
+      variant: 'outline',
+      href: '/iconic-academy/c/channel-1',
+    });
+  });
+
+  it('groups channel reactions into the channel message hourly group key', () => {
+    const definition = getActivityEventDefinition('reaction.added');
+    if (!definition || !definition.group) {
+      throw new Error('Missing reaction.added grouping');
+    }
+
+    const key = definition.group.buildGroupKey({
+      id: 'event-channel-reaction-2',
+      org_id: 'org-1',
+      event_type: 'reaction.added',
+      occurred_at: '2026-03-03T12:25:00.000Z',
+      source_kind: 'profile',
+      actor_profile_id: 'profile-1',
+      scope: { kind: 'user', userId: 'profile-2' },
+      object_ref: { kind: 'message', id: 'message-2' },
+      target_ref: null,
+      payload: {
+        channelId: 'channel-1',
+        messageId: 'message-2',
+        senderName: 'Jane',
+        emoji: '👍',
+        channelTopic: 'Support',
+      },
+      audience_rules: [],
+      dedupe_key: null,
+      projection_status: 'pending',
+      projection_attempts: 0,
+      created_at: '2026-03-03T12:25:00.000Z',
+      updated_at: '2026-03-03T12:25:00.000Z',
+    });
+
+    expect(key).toBe('message-posted:channel-1:2026-03-03T12');
+  });
+
   it('adds a channel link for posted messages', () => {
     const definition = getActivityEventDefinition('message.posted');
     if (!definition) {
@@ -165,6 +240,7 @@ describe('activity event definitions', () => {
         senderName: 'Jane',
         content: 'Hello there',
         channelTopic: 'Support',
+        orgSlug: 'iconic-academy',
       },
       audience_rules: [],
       dedupe_key: 'message.posted:message-1',
@@ -178,7 +254,7 @@ describe('activity event definitions', () => {
     expect(rendered.actionButton).toEqual({
       label: 'View messages',
       variant: 'outline',
-      href: '../c/channel-1',
+      href: '/iconic-academy/c/channel-1',
     });
   });
 
@@ -249,6 +325,154 @@ describe('activity event definitions', () => {
     });
 
     expect(key).toBeNull();
+  });
+
+  it('renders mentions with the updated headline copy', () => {
+    const definition = getActivityEventDefinition('message.posted');
+    if (!definition) {
+      throw new Error('Missing message.posted definition');
+    }
+
+    const rendered = definition.render({
+      id: 'event-message-mention-render-1',
+      org_id: 'org-1',
+      event_type: 'message.posted',
+      occurred_at: '2026-03-03T12:45:00.000Z',
+      source_kind: 'profile',
+      actor_profile_id: 'profile-1',
+      scope: { kind: 'channel', channelId: 'channel-1' },
+      object_ref: { kind: 'message', id: 'message-2' },
+      target_ref: null,
+      payload: {
+        channelId: 'channel-1',
+        messageId: 'message-2',
+        senderName: 'Jane',
+        content: '@you hello',
+        channelTopic: 'Support',
+        mentionedProfileId: 'profile-2',
+      },
+      audience_rules: [],
+      dedupe_key: 'message.mention:message-2:profile-2',
+      projection_status: 'pending',
+      projection_attempts: 0,
+      created_at: '2026-03-03T12:45:00.000Z',
+      updated_at: '2026-03-03T12:45:00.000Z',
+    });
+
+    expect(rendered.headline.primary).toBe('Jane mentioned you in');
+    expect(rendered.headline.secondary).toBe('Support');
+  });
+
+  it('groups channel thread replies into hourly channel message parents', () => {
+    const definition = getActivityEventDefinition('message.posted');
+    if (!definition || !definition.group) {
+      throw new Error('Missing message.posted grouping');
+    }
+
+    const key = definition.group.buildGroupKey({
+      id: 'event-message-thread-1',
+      org_id: 'org-1',
+      event_type: 'message.posted',
+      occurred_at: '2026-03-03T12:45:00.000Z',
+      source_kind: 'profile',
+      actor_profile_id: 'profile-1',
+      scope: { kind: 'channel', channelId: 'channel-1' },
+      object_ref: { kind: 'message', id: 'message-3' },
+      target_ref: null,
+      payload: {
+        channelId: 'channel-1',
+        messageId: 'message-3',
+        senderName: 'Jane',
+        content: 'Thread reply',
+        channelTopic: 'Support',
+        threadReply: true,
+      },
+      audience_rules: [],
+      dedupe_key: 'message.posted:message-3',
+      projection_status: 'pending',
+      projection_attempts: 0,
+      created_at: '2026-03-03T12:45:00.000Z',
+      updated_at: '2026-03-03T12:45:00.000Z',
+    });
+
+    expect(key).toBe('message-posted:channel-1:2026-03-03T12');
+  });
+
+  it('renders channel thread replies with the standard message headline', () => {
+    const definition = getActivityEventDefinition('message.posted');
+    if (!definition) {
+      throw new Error('Missing message.posted definition');
+    }
+
+    const rendered = definition.render({
+      id: 'event-thread-reply-1',
+      org_id: 'org-1',
+      event_type: 'message.posted',
+      occurred_at: '2026-03-03T12:00:00.000Z',
+      source_kind: 'profile',
+      actor_profile_id: 'profile-1',
+      scope: { kind: 'channel', channelId: 'channel-1' },
+      object_ref: { kind: 'message', id: 'message-1' },
+      target_ref: null,
+      payload: {
+        channelId: 'channel-1',
+        messageId: 'message-1',
+        senderName: 'Jane',
+        content: 'Replying in thread',
+        channelTopic: 'Support',
+        threadReply: true,
+        orgSlug: 'iconic-academy',
+      },
+      audience_rules: [],
+      dedupe_key: 'message.posted:message-1',
+      projection_status: 'pending',
+      projection_attempts: 0,
+      created_at: '2026-03-03T12:00:00.000Z',
+      updated_at: '2026-03-03T12:00:00.000Z',
+    });
+
+    expect(rendered.headline.primary).toBe('Jane sent you a message in');
+    expect(rendered.actionButton).toEqual({
+      label: 'View messages',
+      variant: 'outline',
+      href: '/iconic-academy/c/channel-1',
+    });
+  });
+
+  it('renders dm-routed thread replies with the standard direct-message headline', () => {
+    const definition = getActivityEventDefinition('message.posted');
+    if (!definition) {
+      throw new Error('Missing message.posted definition');
+    }
+
+    const rendered = definition.render({
+      id: 'event-thread-reply-dm-1',
+      org_id: 'org-1',
+      event_type: 'message.posted',
+      occurred_at: '2026-03-03T12:00:00.000Z',
+      source_kind: 'profile',
+      actor_profile_id: 'profile-1',
+      scope: { kind: 'channel', channelId: 'channel-dm-1' },
+      object_ref: { kind: 'message', id: 'message-1' },
+      target_ref: null,
+      payload: {
+        channelId: 'channel-dm-1',
+        messageId: 'message-1',
+        senderName: 'Jane',
+        content: 'Replying in dm thread',
+        channelTopic: 'Priya + Riley',
+        channelRouteKind: 'dm',
+        threadReply: true,
+      },
+      audience_rules: [],
+      dedupe_key: 'message.posted:message-1',
+      projection_status: 'pending',
+      projection_attempts: 0,
+      created_at: '2026-03-03T12:00:00.000Z',
+      updated_at: '2026-03-03T12:00:00.000Z',
+    });
+
+    expect(rendered.headline.primary).toBe('Jane sent you a direct message in');
   });
 
   it('routes class-scoped message activities to the class page', () => {
@@ -822,7 +1046,7 @@ describe('activity event definitions', () => {
     expect(nextDayKey).not.toBe(classUpdatedKey);
   });
 
-  it('groups class file uploads into hourly class buckets', () => {
+  it('groups class file uploads into the hourly channel conversation bucket', () => {
     const definition = getActivityEventDefinition('file.uploaded');
     if (!definition?.group) {
       throw new Error('Missing file.uploaded group definition');
@@ -852,7 +1076,9 @@ describe('activity event definitions', () => {
       updated_at: '2026-03-03T12:34:00.000Z',
     };
 
-    expect(definition.group.buildGroupKey(event)).toBe('files:space-1:2026-03-03T12');
+    expect(definition.group.buildGroupKey(event)).toBe(
+      'message-posted:channel-1:2026-03-03T12',
+    );
     expect(definition.group.renderGroup?.(event)).toMatchObject({
       headline: {
         primary: 'New class files',

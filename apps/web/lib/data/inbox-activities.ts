@@ -671,7 +671,7 @@ const MENTIONED_YOU: ActivityFeedItemVM = {
   content: {
     leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'info' },
     headline: {
-      primary: 'Someone mentioned you',
+      primary: 'Someone mentioned you in',
       secondary: STAFF_SUPPORT_PROFILE.profile.displayName,
     },
     summary: '@Riley We can update session reminders to 30 mins.',

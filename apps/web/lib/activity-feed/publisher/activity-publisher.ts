@@ -9,6 +9,7 @@ import type { ActivityEventRow } from '@iconicedu/shared-types';
 import type { SupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 
 import { projectActivityEvents } from '@iconicedu/web/lib/activity-feed/projector/project-activity-events';
+import { getOrgById } from '@iconicedu/web/lib/org/queries/org.query';
 import {
   isActivityVerbSuppressionDebugEnabled,
   resolveActivityVerbSuppressionDecision,
@@ -30,6 +31,26 @@ type PublishActivityEventInput<TPayload extends object = Record<string, unknown>
   dedupeKey?: string | null;
   createdBy?: string | null;
 };
+
+const orgSlugCache = new Map<string, string | null>();
+
+async function resolveActivityOrgSlug(
+  supabase: SupabaseServiceClient,
+  orgId: string,
+): Promise<string | null> {
+  if (orgSlugCache.has(orgId)) {
+    return orgSlugCache.get(orgId) ?? null;
+  }
+
+  const response = await getOrgById(supabase, orgId);
+  if (response.error) {
+    throw new Error(response.error.message);
+  }
+
+  const slug = response.data?.slug ?? null;
+  orgSlugCache.set(orgId, slug);
+  return slug;
+}
 
 export async function publishActivityEvent<TPayload extends object>(
   input: PublishActivityEventInput<TPayload>,
@@ -59,6 +80,11 @@ export async function publishActivityEvent<TPayload extends object>(
   }
 
   const now = new Date().toISOString();
+  const orgSlug = await resolveActivityOrgSlug(input.supabase, input.orgId);
+  const payload = {
+    ...(input.payload as Record<string, unknown>),
+    ...(orgSlug ? { orgSlug } : {}),
+  } as TPayload;
   const insertResponse = await input.supabase
     .from('activity_events')
     .insert({
@@ -70,7 +96,7 @@ export async function publishActivityEvent<TPayload extends object>(
       scope: input.scope,
       object_ref: input.objectRef ?? null,
       target_ref: input.targetRef ?? null,
-      payload: input.payload,
+      payload,
       audience_rules: input.audienceRules ?? [],
       dedupe_key: input.dedupeKey ?? null,
       projection_status: 'pending',
@@ -135,7 +161,7 @@ export async function publishSystemNoticeActivity(input: {
     actorProfileId: input.actorProfileId ?? null,
     scope: { kind: 'global' },
     audienceRules: input.audienceRules,
-    payload: input.payload as unknown as SystemNoticeActivityEventPayload,
+    payload: input.payload,
     dedupeKey: input.dedupeKey,
   });
 }

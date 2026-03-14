@@ -43,7 +43,10 @@ import {
 import { markLearningSpaceChannelRead } from '@iconicedu/web/lib/sidebar/learning-space-unread';
 import { upsertDirectMessageChannel } from '@iconicedu/web/lib/sidebar/direct-message-realtime';
 import { applyInboxUnreadCount } from '@iconicedu/web/lib/sidebar/inbox-count';
-import { syncClassRequestUnreadCount } from '@iconicedu/web/lib/sidebar/class-request-unread';
+import {
+  markClassRequestChannelRead,
+  syncClassRequestUnreadCount,
+} from '@iconicedu/web/lib/sidebar/class-request-unread';
 import { shouldRetryDirectMessageBootstrap } from '@iconicedu/web/lib/sidebar/direct-message-bootstrap';
 import {
   bindDirectMessageRecoveryTriggers,
@@ -315,7 +318,11 @@ export function SidebarShell({
           lastReadMessageId,
           lastReadAt,
         });
-        return markLearningSpaceChannelRead(next, channelId, {
+        const nextWithLearningSpaces = markLearningSpaceChannelRead(next, channelId, {
+          lastReadMessageId,
+          lastReadAt,
+        });
+        return markClassRequestChannelRead(nextWithLearningSpaces, channelId, {
           lastReadMessageId,
           lastReadAt,
         });

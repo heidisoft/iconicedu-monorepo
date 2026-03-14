@@ -15,7 +15,13 @@ vi.mock('@iconicedu/web/lib/auth/requireAuthedUser', () => ({
 }));
 
 vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
-  getAccountByAuthUserId: vi.fn(async () => ({ data: { id: 'account-1', org_id: 'org-1' } })),
+  getAccountByAuthUserId: vi.fn(async () => ({
+    data: { id: 'account-1', org_id: 'org-1' },
+  })),
+}));
+
+vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
+  getProfileByAccountId: vi.fn(async () => ({ data: { id: 'profile-1' } })),
 }));
 
 vi.mock('@iconicedu/web/lib/messages/builders/message.builder', () => ({
@@ -40,6 +46,7 @@ describe('GET /api/messages/detail', () => {
 
     expect(buildMessageById).toHaveBeenCalledWith({}, 'org-1', 'message-1', {
       accountId: 'account-1',
+      profileId: 'profile-1',
     });
     expect(response.status).toBe(200);
     const payload = await response.json();

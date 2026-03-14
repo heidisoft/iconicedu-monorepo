@@ -1,7 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { buildMessageById } from '@iconicedu/web/lib/messages/builders/message.builder';
+import {
+  buildMessageById,
+  buildMessagesByChannelId,
+} from '@iconicedu/web/lib/messages/builders/message.builder';
 
 const getMessageById = vi.fn();
 const buildUserProfileById = vi.fn();
@@ -11,11 +14,15 @@ const getMessageFilesByMessageIds = vi.fn(async () => ({ data: [] }));
 const getMessageImagesByMessageIds = vi.fn(async () => ({ data: [] }));
 const getMessageAudioRecordingsByMessageIds = vi.fn(async () => ({ data: [] }));
 const getMessageLiveSessionStartedByMessageIds = vi.fn(async () => ({ data: [] }));
+const getMessageReactionsByMessageIds = vi.fn(async () => ({ data: [] }));
+const getMessageReactionCountsByMessageIds = vi.fn(async () => ({ data: [] }));
 const getMessageSavesByMessageIds = vi.fn(async () => ({ data: [] }));
+const getMessagesByChannelId = vi.fn(async () => ({ data: [] }));
+const getProfilesByAccountIds = vi.fn(async () => ({ data: [] }));
 
 vi.mock('@iconicedu/web/lib/messages/queries/messages.query', () => ({
   getMessageById: (...args: unknown[]) => getMessageById(...args),
-  getMessagesByChannelId: vi.fn(async () => ({ data: [] })),
+  getMessagesByChannelId: (...args: unknown[]) => getMessagesByChannelId(...args),
   getMessageTextByMessageIds: vi.fn(async () => ({ data: [] })),
   getMessageImagesByMessageIds: (...args: unknown[]) =>
     getMessageImagesByMessageIds(...args),
@@ -25,6 +32,7 @@ vi.mock('@iconicedu/web/lib/messages/queries/messages.query', () => ({
   getMessagePaymentRemindersByMessageIds: vi.fn(async () => ({ data: [] })),
   getMessageEventRemindersByMessageIds: vi.fn(async () => ({ data: [] })),
   getMessageFeedbackRequestsByMessageIds: vi.fn(async () => ({ data: [] })),
+  getMessageSessionFeedbackByMessageIds: vi.fn(async () => ({ data: [] })),
   getMessageLessonAssignmentsByMessageIds: vi.fn(async () => ({ data: [] })),
   getMessageProgressUpdatesByMessageIds: vi.fn(async () => ({ data: [] })),
   getMessageSessionBookingsByMessageIds: vi.fn(async () => ({ data: [] })),
@@ -36,7 +44,10 @@ vi.mock('@iconicedu/web/lib/messages/queries/messages.query', () => ({
     getMessageAudioRecordingsByMessageIds(...args),
   getMessageLiveSessionStartedByMessageIds: (...args: unknown[]) =>
     getMessageLiveSessionStartedByMessageIds(...args),
-  getMessageReactionCountsByMessageIds: vi.fn(async () => ({ data: [] })),
+  getMessageReactionsByMessageIds: (...args: unknown[]) =>
+    getMessageReactionsByMessageIds(...args),
+  getMessageReactionCountsByMessageIds: (...args: unknown[]) =>
+    getMessageReactionCountsByMessageIds(...args),
   getMessageSavesByMessageIds: (...args: unknown[]) =>
     getMessageSavesByMessageIds(...args),
 }));
@@ -53,6 +64,10 @@ vi.mock('@iconicedu/web/lib/messages/builders/thread.builder', () => ({
   buildThreadById: (...args: unknown[]) => buildThreadById(...args),
 }));
 
+vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
+  getProfilesByAccountIds: (...args: unknown[]) => getProfilesByAccountIds(...args),
+}));
+
 describe('buildMessageById', () => {
   beforeEach(() => {
     getMessageById.mockReset();
@@ -63,7 +78,11 @@ describe('buildMessageById', () => {
     getMessageImagesByMessageIds.mockResolvedValue({ data: [] });
     getMessageAudioRecordingsByMessageIds.mockResolvedValue({ data: [] });
     getMessageLiveSessionStartedByMessageIds.mockResolvedValue({ data: [] });
+    getMessageReactionsByMessageIds.mockResolvedValue({ data: [] });
+    getMessageReactionCountsByMessageIds.mockResolvedValue({ data: [] });
     getMessageSavesByMessageIds.mockResolvedValue({ data: [] });
+    getMessagesByChannelId.mockResolvedValue({ data: [] });
+    getProfilesByAccountIds.mockResolvedValue({ data: [] });
   });
 
   it('returns null when message does not exist', async () => {
@@ -132,6 +151,116 @@ describe('buildMessageById', () => {
         is_saved: true,
       }),
       expect.anything(),
+    );
+  });
+
+  it('includes reactedByMe and sampleUserIds when building a single message', async () => {
+    const row = {
+      id: 'message-reacted',
+      org_id: 'org-1',
+      sender_profile_id: 'profile-2',
+      type: 'text',
+      created_at: new Date().toISOString(),
+    };
+    getMessageById.mockResolvedValueOnce({ data: row });
+    getMessageReactionCountsByMessageIds.mockResolvedValueOnce({
+      data: [{ message_id: 'message-reacted', emoji: '👍', count: 2 }],
+    });
+    getProfilesByAccountIds.mockResolvedValueOnce({
+      data: [
+        { account_id: 'account-1', id: 'profile-1' },
+        { account_id: 'account-2', id: 'profile-2' },
+      ],
+    });
+    getMessageReactionsByMessageIds.mockResolvedValueOnce({
+      data: [
+        {
+          message_id: 'message-reacted',
+          emoji: '👍',
+          account_id: 'account-1',
+        },
+        {
+          message_id: 'message-reacted',
+          emoji: '👍',
+          account_id: 'account-2',
+        },
+      ],
+    });
+    buildUserProfileById.mockResolvedValueOnce({
+      ids: { id: 'profile-2', orgId: 'org-1' },
+    });
+    mapMessageRowToVM.mockReturnValueOnce({
+      ids: { id: 'message-reacted', orgId: 'org-1' },
+    });
+
+    await buildMessageById({} as any, 'org-1', 'message-reacted', {
+      accountId: 'account-1',
+      profileId: 'profile-1',
+    });
+
+    expect(mapMessageRowToVM).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        reactions: [
+          {
+            emoji: '👍',
+            count: 2,
+            reactedByMe: true,
+            sampleUserIds: ['profile-1', 'profile-2'],
+          },
+        ],
+      }),
+    );
+  });
+
+  it('builds channel messages with viewer-specific reaction state', async () => {
+    const row = {
+      id: 'message-channel-1',
+      org_id: 'org-1',
+      sender_profile_id: 'profile-2',
+      type: 'text',
+      created_at: new Date().toISOString(),
+    };
+    getMessagesByChannelId.mockResolvedValueOnce({ data: [row] });
+    getMessageReactionCountsByMessageIds.mockResolvedValueOnce({
+      data: [{ message_id: 'message-channel-1', emoji: '🔥', count: 1 }],
+    });
+    getProfilesByAccountIds.mockResolvedValueOnce({
+      data: [{ account_id: 'account-2', id: 'profile-2' }],
+    });
+    getMessageReactionsByMessageIds.mockResolvedValueOnce({
+      data: [
+        {
+          message_id: 'message-channel-1',
+          emoji: '🔥',
+          account_id: 'account-2',
+        },
+      ],
+    });
+    buildUserProfileById.mockResolvedValueOnce({
+      ids: { id: 'profile-2', orgId: 'org-1' },
+    });
+    mapMessageRowToVM.mockReturnValueOnce({
+      ids: { id: 'message-channel-1', orgId: 'org-1' },
+    });
+
+    await buildMessagesByChannelId({} as any, 'org-1', 'channel-1', {
+      accountId: 'account-1',
+      profileId: 'profile-1',
+    });
+
+    expect(mapMessageRowToVM).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        reactions: [
+          {
+            emoji: '🔥',
+            count: 1,
+            reactedByMe: false,
+            sampleUserIds: ['profile-2'],
+          },
+        ],
+      }),
     );
   });
 

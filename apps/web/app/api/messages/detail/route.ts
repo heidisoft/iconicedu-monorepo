@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
 import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { buildMessageById } from '@iconicedu/web/lib/messages/builders/message.builder';
+import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -26,11 +27,16 @@ export async function GET(request: Request) {
     );
   }
 
+  const profileResponse = await getProfileByAccountId(supabase, accountResponse.data.id);
+
   const message = await buildMessageById(
     supabase,
     accountResponse.data.org_id,
     messageId,
-    { accountId: accountResponse.data.id },
+    {
+      accountId: accountResponse.data.id,
+      profileId: profileResponse.data?.id ?? undefined,
+    },
   );
 
   if (!message) {

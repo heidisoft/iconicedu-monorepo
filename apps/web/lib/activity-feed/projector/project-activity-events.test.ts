@@ -451,8 +451,8 @@ describe('projectActivityEvents', () => {
     expect(
       feedItemUpserts.find((entry) => entry.payload.kind === 'group')?.payload,
     ).toMatchObject({
-      group_key: 'files:space-1:2026-03-03T12',
-      group_type: 'class',
+      group_key: 'message-posted:channel-1:2026-03-03T12',
+      group_type: 'message',
       content: expect.objectContaining({
         headline: expect.objectContaining({
           primary: 'New class files',

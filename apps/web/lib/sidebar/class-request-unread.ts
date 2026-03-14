@@ -1,4 +1,4 @@
-import type { SidebarLeftDataVM } from '@iconicedu/shared-types';
+import type { ISODateTime, SidebarLeftDataVM, UUID } from '@iconicedu/shared-types';
 
 type SidebarWithClassRequestNav = Pick<SidebarLeftDataVM, 'navigation' | 'collections'>;
 
@@ -39,4 +39,58 @@ export function syncClassRequestUnreadCount<T extends SidebarWithClassRequestNav
     sidebarData,
     getClassRequestUnreadCount(sidebarData),
   );
+}
+
+export function markClassRequestChannelRead<T extends SidebarWithClassRequestNav>(
+  sidebarData: T,
+  channelId?: UUID | null,
+  input?: { lastReadMessageId?: UUID | null; lastReadAt?: ISODateTime | null },
+) {
+  if (!channelId) {
+    return sidebarData;
+  }
+
+  let changed = false;
+  const nextChannels = (sidebarData.collections.classRequestChannels ?? []).map(
+    (channel) => {
+      const currentUnread = Math.max(0, channel.collections.readState?.unreadCount ?? 0);
+      if (
+        channel.ids.id !== channelId ||
+        (currentUnread === 0 &&
+          input?.lastReadMessageId === undefined &&
+          input?.lastReadAt === undefined)
+      ) {
+        return channel;
+      }
+
+      changed = true;
+      return {
+        ...channel,
+        collections: {
+          ...channel.collections,
+          readState: {
+            ...channel.collections.readState,
+            channelId: channel.collections.readState?.channelId ?? channel.ids.id,
+            lastReadMessageId:
+              input?.lastReadMessageId ??
+              channel.collections.readState?.lastReadMessageId,
+            lastReadAt: input?.lastReadAt ?? channel.collections.readState?.lastReadAt,
+            unreadCount: 0,
+          },
+        },
+      };
+    },
+  );
+
+  if (!changed) {
+    return sidebarData;
+  }
+
+  return syncClassRequestUnreadCount({
+    ...sidebarData,
+    collections: {
+      ...sidebarData.collections,
+      classRequestChannels: nextChannels,
+    },
+  });
 }

@@ -15,7 +15,13 @@ vi.mock('@iconicedu/web/lib/auth/requireAuthedUser', () => ({
 }));
 
 vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
-  getAccountByAuthUserId: vi.fn(async () => ({ data: { id: 'account-1', org_id: 'org-1' } })),
+  getAccountByAuthUserId: vi.fn(async () => ({
+    data: { id: 'account-1', org_id: 'org-1' },
+  })),
+}));
+
+vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
+  getProfileByAccountId: vi.fn(async () => ({ data: { id: 'profile-1' } })),
 }));
 
 vi.mock('@iconicedu/web/lib/messages/builders/message.builder', () => ({
@@ -25,9 +31,7 @@ vi.mock('@iconicedu/web/lib/messages/builders/message.builder', () => ({
 
 describe('GET /api/messages/channel-page', () => {
   it('returns 400 when channelId is missing', async () => {
-    const response = await GET(
-      new Request(`${APP_URL}/api/messages/channel-page`),
-    );
+    const response = await GET(new Request(`${APP_URL}/api/messages/channel-page`));
     expect(response.status).toBe(400);
     const payload = await response.json();
     expect(payload).toEqual({ success: false, message: 'channelId is required' });
@@ -49,6 +53,7 @@ describe('GET /api/messages/channel-page', () => {
     expect(buildMessagesPageByChannelId).toHaveBeenCalledWith({}, 'org-1', 'channel-1', {
       beforeCreatedAt: '2026-02-15T11:00:00.000Z',
       limit: 40,
+      profileId: 'profile-1',
     });
     expect(response.status).toBe(200);
     const payload = await response.json();

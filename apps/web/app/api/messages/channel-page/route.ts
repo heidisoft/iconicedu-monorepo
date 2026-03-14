@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
 import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { buildMessagesPageByChannelId } from '@iconicedu/web/lib/messages/builders/message.builder';
+import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
 
 const DEFAULT_PAGE_SIZE = 40;
 const MAX_PAGE_SIZE = 100;
@@ -35,6 +36,8 @@ export async function GET(request: Request) {
     );
   }
 
+  const profileResponse = await getProfileByAccountId(supabase, accountResponse.data.id);
+
   const page = await buildMessagesPageByChannelId(
     supabase,
     accountResponse.data.org_id,
@@ -42,6 +45,7 @@ export async function GET(request: Request) {
     {
       limit,
       beforeCreatedAt: before,
+      profileId: profileResponse.data?.id ?? undefined,
     },
   );
 

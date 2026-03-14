@@ -863,15 +863,20 @@ async function recallMessageActivities(input: {
   }
 }
 
-async function emitDmReactionActivity(input: {
+async function emitReactionActivity(input: {
   supabase: SupabaseServerClient;
   serviceSupabase: SupabaseServiceClient;
   orgId: string;
   messageId: string;
   channelId?: string | null;
   senderProfileId: string;
+  messageSenderProfileId: string;
   emoji: string;
-  eventType: 'dm.reaction.added' | 'dm.reaction.removed';
+  eventType:
+    | 'dm.reaction.added'
+    | 'dm.reaction.removed'
+    | 'reaction.added'
+    | 'reaction.removed';
   now: string;
 }) {
   if (!input.channelId) {
@@ -884,17 +889,22 @@ async function emitDmReactionActivity(input: {
     channelId: input.channelId,
   });
 
-  if (activityContext.channelRouteKind !== 'dm') {
-    return;
-  }
-  const recipientIds = await resolveDmActivityRecipientProfileIds({
-    supabase: input.supabase,
-    orgId: input.orgId,
-    channelId: input.channelId,
-    senderProfileId: input.senderProfileId,
-    now: input.now,
-    eventType: input.eventType,
-  });
+  const isDmRoute = activityContext.channelRouteKind === 'dm';
+  const recipientIds = isDmRoute
+    ? await resolveDmActivityRecipientProfileIds({
+        supabase: input.supabase,
+        orgId: input.orgId,
+        channelId: input.channelId,
+        senderProfileId: input.senderProfileId,
+        now: input.now,
+        eventType:
+          input.eventType === 'dm.reaction.removed'
+            ? 'dm.reaction.removed'
+            : 'dm.reaction.added',
+      })
+    : input.messageSenderProfileId !== input.senderProfileId
+      ? [input.messageSenderProfileId]
+      : [];
 
   if (!recipientIds.length) {
     return;
@@ -917,7 +927,9 @@ async function emitDmReactionActivity(input: {
     occurredAt: input.now,
     sourceKind: 'profile',
     actorProfileId: input.senderProfileId,
-    scope: activityContext.scope,
+    scope: isDmRoute
+      ? activityContext.scope
+      : { kind: 'user', userId: input.messageSenderProfileId },
     objectRef: { kind: 'message', id: input.messageId },
     targetRef: activityContext.targetRef,
     audienceRules: [{ kind: 'users_only', userIds: recipientIds }],
@@ -1537,23 +1549,21 @@ export async function sendFileMessageAction(
     ? await buildThreadById(supabase, accountResponse.data.org_id, threadId)
     : null;
 
-  if (!isAudioUpload || activityContext.channelRouteKind === 'dm') {
-    await createFileUploadActivity({
-      supabase,
-      serviceSupabase,
-      orgId: input.orgId,
-      channelId: input.channelId,
-      senderProfileId: currentProfileId,
-      senderName: senderDisplayName,
-      messageId: messageInsert.data.id,
-      name: input.name,
-      content: input.content?.trim() ?? null,
-      mimeType: input.mimeType ?? null,
-      storagePath: input.storagePath,
-      activityContext,
-      now,
-    });
-  }
+  await createFileUploadActivity({
+    supabase,
+    serviceSupabase,
+    orgId: input.orgId,
+    channelId: input.channelId,
+    senderProfileId: currentProfileId,
+    senderName: senderDisplayName,
+    messageId: messageInsert.data.id,
+    name: input.name,
+    content: input.content?.trim() ?? null,
+    mimeType: input.mimeType ?? null,
+    storagePath: input.storagePath,
+    activityContext,
+    now,
+  });
 
   return mapMessageRowToVM(messageInsert.data, {
     sender,
@@ -1837,9 +1847,14 @@ export async function toggleMessageReactionAction(
 
   const messageResponse = await supabase
     .from('messages')
-    .select('id, org_id, channel_id')
+    .select('id, org_id, channel_id, sender_profile_id')
     .eq('id', input.messageId)
-    .maybeSingle<{ id: string; org_id: string; channel_id?: string | null }>();
+    .maybeSingle<{
+      id: string;
+      org_id: string;
+      channel_id?: string | null;
+      sender_profile_id?: string | null;
+    }>();
 
   if (!messageResponse.data || messageResponse.data.org_id !== input.orgId) {
     throw new Error('Message not found');
@@ -1899,15 +1914,25 @@ export async function toggleMessageReactionAction(
       }
     }
 
-    await emitDmReactionActivity({
+    const isDmRoute =
+      (
+        await resolveActivityChannelContext({
+          supabase,
+          orgId: input.orgId,
+          channelId: messageResponse.data.channel_id ?? '',
+        })
+      ).channelRouteKind === 'dm';
+
+    await emitReactionActivity({
       supabase,
       serviceSupabase,
       orgId: input.orgId,
       messageId: input.messageId,
       channelId: messageResponse.data.channel_id ?? null,
       senderProfileId: profileResponse.data.id,
+      messageSenderProfileId: messageResponse.data.sender_profile_id ?? '',
       emoji: input.emoji,
-      eventType: 'dm.reaction.removed',
+      eventType: isDmRoute ? 'dm.reaction.removed' : 'reaction.removed',
       now: new Date().toISOString(),
     });
 
@@ -1937,15 +1962,25 @@ export async function toggleMessageReactionAction(
       throw new Error(updateCount.error.message);
     }
 
-    await emitDmReactionActivity({
+    const isDmRoute =
+      (
+        await resolveActivityChannelContext({
+          supabase,
+          orgId: input.orgId,
+          channelId: messageResponse.data.channel_id ?? '',
+        })
+      ).channelRouteKind === 'dm';
+
+    await emitReactionActivity({
       supabase,
       serviceSupabase,
       orgId: input.orgId,
       messageId: input.messageId,
       channelId: messageResponse.data.channel_id ?? null,
       senderProfileId: profileResponse.data.id,
+      messageSenderProfileId: messageResponse.data.sender_profile_id ?? '',
       emoji: input.emoji,
-      eventType: 'dm.reaction.added',
+      eventType: isDmRoute ? 'dm.reaction.added' : 'reaction.added',
       now,
     });
     return;
@@ -1964,15 +1999,25 @@ export async function toggleMessageReactionAction(
     throw new Error(insertCount.error.message);
   }
 
-  await emitDmReactionActivity({
+  const isDmRoute =
+    (
+      await resolveActivityChannelContext({
+        supabase,
+        orgId: input.orgId,
+        channelId: messageResponse.data.channel_id ?? '',
+      })
+    ).channelRouteKind === 'dm';
+
+  await emitReactionActivity({
     supabase,
     serviceSupabase,
     orgId: input.orgId,
     messageId: input.messageId,
     channelId: messageResponse.data.channel_id ?? null,
     senderProfileId: profileResponse.data.id,
+    messageSenderProfileId: messageResponse.data.sender_profile_id ?? '',
     emoji: input.emoji,
-    eventType: 'dm.reaction.added',
+    eventType: isDmRoute ? 'dm.reaction.added' : 'reaction.added',
     now,
   });
 }
