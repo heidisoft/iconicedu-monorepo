@@ -27,7 +27,7 @@ vi.mock('@iconicedu/web/lib/telemetry/auth-events', () => ({
   trackAuthTelemetry: vi.fn(),
 }));
 
-import { shouldShowRoleOnboardingDialog } from './page';
+import { shouldShowRoleOnboardingDialog } from './page.utils';
 
 describe('shouldShowRoleOnboardingDialog', () => {
   it('shows the dialog for self sign-up onboarding only', () => {

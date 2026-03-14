@@ -4,6 +4,7 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 
 import { shouldSkipCallbackRun } from '@iconicedu/web/app/(auth)/auth/callback/callback-run-guard';
+import { shouldShowRoleOnboardingDialog } from '@iconicedu/web/app/(auth)/auth/callback/page.utils';
 import { RoleOnboardingModal } from '@iconicedu/web/app/(auth)/auth/callback/role-onboarding-modal';
 import { createSupabaseBrowserClient } from '@iconicedu/web/lib/supabase/client';
 import { trackAuthTelemetry } from '@iconicedu/web/lib/telemetry/auth-events';
@@ -23,18 +24,6 @@ function resolveOtpType(value?: string | null): SupportedOtpType {
 
 function resolveCallbackSource(value?: string | null): AuthCallbackSource {
   return value === 'self-signup' ? 'self-signup' : null;
-}
-
-export function shouldShowRoleOnboardingDialog(input: {
-  authIntent: 'login' | 'get-started' | null;
-  callbackSource: AuthCallbackSource;
-  requiresRoleSelection: boolean;
-}): boolean {
-  return (
-    input.requiresRoleSelection &&
-    input.authIntent === 'get-started' &&
-    input.callbackSource === 'self-signup'
-  );
 }
 
 export default function CallbackPage() {
