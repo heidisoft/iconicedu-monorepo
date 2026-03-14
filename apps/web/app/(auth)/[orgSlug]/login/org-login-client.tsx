@@ -1,7 +1,6 @@
 'use client';
 
 import * as React from 'react';
-import { useRouter } from 'next/navigation';
 
 import { AuthEntryForm } from '../../shared/auth-entry-form';
 import { createSupabaseBrowserClient } from '../../../../lib/supabase/client';
@@ -22,14 +21,13 @@ export function resolveOrgLoginCallbackUrl(orgSlug: string): string {
   return callbackUrl.toString();
 }
 
-export function shouldRedirectToOrgGetStarted(
+export function shouldPromptOrgSignUp(
   eligibility: { eligible?: boolean; reason?: string } | null,
 ): boolean {
   return !eligibility?.eligible && eligibility?.reason === 'missing_account';
 }
 
 export default function OrgLoginClient({ orgSlug, orgName }: OrgLoginClientProps) {
-  const router = useRouter();
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
   const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
@@ -55,8 +53,10 @@ export default function OrgLoginClient({ orgSlug, orgName }: OrgLoginClientProps
     } | null;
 
     if (!eligibilityResponse.ok || !eligibilityBody?.eligible) {
-      if (shouldRedirectToOrgGetStarted(eligibilityBody)) {
-        router.replace(`/${orgSlug}/get-started`);
+      if (shouldPromptOrgSignUp(eligibilityBody)) {
+        setErrorMessage(
+          'No account was found for this organization. Please sign up to continue.',
+        );
         return;
       }
       setErrorMessage(

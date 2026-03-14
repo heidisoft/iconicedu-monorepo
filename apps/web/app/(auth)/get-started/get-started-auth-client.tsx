@@ -38,7 +38,9 @@ export default function GetStartedAuthClient() {
     }
 
     await trackAuthTelemetry('auth_magiclink_sent', { intent: 'global-get-started' });
-    setStatusMessage('Admin check: use this same browser session to continue organization setup.');
+    setStatusMessage(
+      'Admin check: use this same browser session to continue organization setup.',
+    );
   };
 
   const handleOAuthLogin = async (provider: 'apple' | 'google') => {
@@ -72,6 +74,7 @@ export default function GetStartedAuthClient() {
       trustLine="Admin-safe flow. No password required. Organization creation is guarded."
       submitLabel="Send secure admin link"
       submitLoadingLabel="Sending secure admin link..."
+      oauthActionVerb="sign-up"
     />
   );
 }

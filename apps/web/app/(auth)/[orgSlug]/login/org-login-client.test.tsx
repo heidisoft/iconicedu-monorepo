@@ -5,16 +5,10 @@ import { render, screen } from '@testing-library/react';
 import {
   default as OrgLoginClient,
   resolveOrgLoginCallbackUrl,
-  shouldRedirectToOrgGetStarted,
+  shouldPromptOrgSignUp,
 } from './org-login-client';
 
 const authEntryFormPropsMock = vi.fn();
-
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({
-    replace: vi.fn(),
-  }),
-}));
 
 vi.mock('../../shared/auth-entry-form', () => ({
   AuthEntryForm: (props: Record<string, unknown>) => {
@@ -46,10 +40,10 @@ describe('resolveOrgLoginCallbackUrl', () => {
   });
 });
 
-describe('shouldRedirectToOrgGetStarted', () => {
+describe('shouldPromptOrgSignUp', () => {
   it('returns true for missing account reason', () => {
     expect(
-      shouldRedirectToOrgGetStarted({
+      shouldPromptOrgSignUp({
         eligible: false,
         reason: 'missing_account',
       }),
@@ -58,7 +52,7 @@ describe('shouldRedirectToOrgGetStarted', () => {
 
   it('returns false for suspended reason', () => {
     expect(
-      shouldRedirectToOrgGetStarted({
+      shouldPromptOrgSignUp({
         eligible: false,
         reason: 'suspended',
       }),
@@ -78,7 +72,7 @@ describe('OrgLoginClient', () => {
     expect(authEntryFormPropsMock).toHaveBeenCalledWith(
       expect.objectContaining({
         footerLinkIntro: 'New to ICONIC Academy?',
-        footerLinkLabel: 'Sign up',
+        footerLinkLabel: 'Get started here',
         footerLinkHref: '/iconic-academy/get-started',
       }),
     );

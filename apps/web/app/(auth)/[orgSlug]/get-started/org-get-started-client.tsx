@@ -21,7 +21,10 @@ export function resolveOrgGetStartedCallbackUrl(orgSlug: string): string {
   return callbackUrl.toString();
 }
 
-export default function OrgGetStartedClient({ orgSlug, orgName }: OrgGetStartedClientProps) {
+export default function OrgGetStartedClient({
+  orgSlug,
+  orgName,
+}: OrgGetStartedClientProps) {
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
   const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
@@ -43,7 +46,10 @@ export default function OrgGetStartedClient({ orgSlug, orgName }: OrgGetStartedC
       return;
     }
 
-    await trackAuthTelemetry('auth_magiclink_sent', { orgSlug, intent: 'org-get-started' });
+    await trackAuthTelemetry('auth_magiclink_sent', {
+      orgSlug,
+      intent: 'org-get-started',
+    });
     setStatusMessage('Check your email for a secure link to continue setup.');
   };
 
@@ -51,7 +57,10 @@ export default function OrgGetStartedClient({ orgSlug, orgName }: OrgGetStartedC
     setErrorMessage(null);
     setStatusMessage(null);
     if (provider === 'google') {
-      await trackAuthTelemetry('auth_start_google', { orgSlug, intent: 'org-get-started' });
+      await trackAuthTelemetry('auth_start_google', {
+        orgSlug,
+        intent: 'org-get-started',
+      });
     }
 
     const { error } = await supabase.auth.signInWithOAuth({
@@ -73,9 +82,13 @@ export default function OrgGetStartedClient({ orgSlug, orgName }: OrgGetStartedC
       statusMessage={statusMessage}
       errorMessage={errorMessage}
       title={`Get started with ${orgName}`}
-      subtitle="Create your secure account and complete onboarding in a few guided steps."
-      introText="New to this organization? Continue with your email or Google to create your account."
-      trustLine="Secure login. No password required. Guided onboarding."
+      subtitle="Create your secure account with your email or Google and complete onboarding in a few guided steps."
+      introText=""
+      trustLine="Create your account to get started with guided onboarding for your organization."
+      oauthActionVerb="sign-up"
+      footerLinkIntro="Already have an account?"
+      footerLinkLabel="Log in here"
+      footerLinkHref={`/${orgSlug}/login`}
     />
   );
 }

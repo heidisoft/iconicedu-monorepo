@@ -16,6 +16,7 @@ import { SiteLogoFull } from '@iconicedu/ui-web/components/branding/site-logo-fu
 import { Loader2 } from 'lucide-react';
 
 type OAuthProvider = 'apple' | 'google';
+type OAuthActionVerb = 'login' | 'sign-up';
 
 type AuthEntryFormProps = React.ComponentProps<'div'> & {
   title: string;
@@ -28,14 +29,27 @@ type AuthEntryFormProps = React.ComponentProps<'div'> & {
   errorMessage?: string | null;
   submitLabel?: string;
   submitLoadingLabel?: string;
+  oauthActionVerb?: OAuthActionVerb;
   footerLinkLabel?: string;
   footerLinkHref?: string;
   footerLinkIntro?: string;
 };
 
-export function getOAuthButtonLabel(provider: OAuthProvider, isLoading: boolean): string {
+export function getOAuthButtonLabel(
+  provider: OAuthProvider,
+  isLoading: boolean,
+  actionVerb: OAuthActionVerb = 'login',
+): string {
   if (!isLoading) {
+    if (actionVerb === 'sign-up') {
+      return provider === 'google' ? 'Sign up with Google' : 'Sign up with Apple';
+    }
     return provider === 'google' ? 'Login with Google' : 'Login with Apple';
+  }
+  if (actionVerb === 'sign-up') {
+    return provider === 'google'
+      ? 'Signing you up with Google...'
+      : 'Signing you up with Apple...';
   }
   return provider === 'google'
     ? 'Logging you in with Google...'
@@ -54,6 +68,7 @@ export function AuthEntryForm({
   errorMessage,
   submitLabel = 'Send secure link',
   submitLoadingLabel = 'Sending secure link...',
+  oauthActionVerb = 'login',
   footerLinkLabel,
   footerLinkHref,
   footerLinkIntro,
@@ -95,28 +110,30 @@ export function AuthEntryForm({
     <div className={cn('flex flex-col gap-6', className)} {...props}>
       <form onSubmit={handleSubmit}>
         <FieldGroup>
-          <div className="flex flex-col items-center gap-4 text-center">
-            <a href="#" className="flex flex-col items-center font-medium">
-              <SiteLogoFull className="h-12 w-auto sm:h-14" />
-              <span className="sr-only">ICONIC Academy LLC.</span>
-            </a>
-            <h1 className="text-xl font-bold">{title}</h1>
-            <FieldDescription className="text-center">
-              {subtitle}
-              {footerLinkLabel && footerLinkHref ? (
-                <>
-                  {' '}
-                  {footerLinkIntro ? <span>{footerLinkIntro} </span> : null}
-                  <Link
-                    href={footerLinkHref}
-                    className="font-medium text-foreground underline underline-offset-4"
-                  >
-                    {footerLinkLabel}
-                  </Link>
-                </>
-              ) : null}
-            </FieldDescription>
-          </div>
+          <Field>
+            <div className="flex flex-col items-center gap-2 text-center">
+              <a href="#" className="flex flex-col items-center mb-8">
+                <SiteLogoFull className="h-16 w-auto sm:h-18" />
+                <span className="sr-only">ICONIC Academy LLC.</span>
+              </a>
+              <h1 className="text-xl font-bold">{title}</h1>
+              <FieldDescription className="text-center">
+                {subtitle}
+                {footerLinkLabel && footerLinkHref ? (
+                  <>
+                    {' '}
+                    {footerLinkIntro ? <span>{footerLinkIntro} </span> : null}
+                    <Link
+                      href={footerLinkHref}
+                      className="font-medium text-foreground underline underline-offset-4"
+                    >
+                      {footerLinkLabel}
+                    </Link>
+                  </>
+                ) : null}
+              </FieldDescription>
+            </div>
+          </Field>
           <Field>
             <div className="text-center text-sm text-muted-foreground">
               <p>{introText}</p>
@@ -180,7 +197,11 @@ export function AuthEntryForm({
                   />
                 </svg>
               )}
-              {getOAuthButtonLabel('google', oauthSubmittingProvider === 'google')}
+              {getOAuthButtonLabel(
+                'google',
+                oauthSubmittingProvider === 'google',
+                oauthActionVerb,
+              )}
             </Button>
           </Field>
           <div className="space-y-1 text-center text-xs text-muted-foreground">
