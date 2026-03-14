@@ -9,14 +9,18 @@ type RowInviteRequest = {
   mode?: 'invite' | 'link';
   linkType?: 'invite' | 'magiclink';
   redirectTo?: string;
+  intent?: 'login' | 'get-started';
 };
 
 export async function POST(request: Request) {
-  const { accountId, profileKind, mode, linkType, redirectTo } =
+  const { accountId, profileKind, mode, linkType, redirectTo, intent } =
     (await request.json()) as RowInviteRequest;
 
   if (!accountId) {
-    return NextResponse.json({ success: false, message: 'accountId is required' }, { status: 400 });
+    return NextResponse.json(
+      { success: false, message: 'accountId is required' },
+      { status: 400 },
+    );
   }
 
   const adminClient = getFamilyInviteAdminClient();
@@ -30,11 +34,17 @@ export async function POST(request: Request) {
     .maybeSingle<{ email?: string | null }>();
 
   if (accountError) {
-    return NextResponse.json({ success: false, message: accountError.message }, { status: 500 });
+    return NextResponse.json(
+      { success: false, message: accountError.message },
+      { status: 500 },
+    );
   }
 
   if (!account?.email) {
-    return NextResponse.json({ success: false, message: 'Account or email not found' }, { status: 404 });
+    return NextResponse.json(
+      { success: false, message: 'Account or email not found' },
+      { status: 404 },
+    );
   }
 
   const formData = new FormData();
@@ -45,13 +55,19 @@ export async function POST(request: Request) {
   if (redirectTo) {
     formData.set('redirectTo', redirectTo);
   }
+  if (intent) {
+    formData.set('intent', intent);
+  }
 
   try {
     const payload = await inviteAdminUserAction(formData);
     return NextResponse.json({ success: true, payload });
   } catch (error) {
     return NextResponse.json(
-      { success: false, message: error instanceof Error ? error.message : 'Unknown error' },
+      {
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error',
+      },
       { status: 500 },
     );
   }

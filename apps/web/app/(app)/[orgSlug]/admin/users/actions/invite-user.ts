@@ -9,12 +9,14 @@ import {
   getAccountByAuthUserId,
   getAccountByEmail,
   insertInvitedAccount,
+  updateAccountRoleState,
   updateAccountStatus,
 } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import {
   insertProfileForAccount,
   upsertProfileForAccount,
 } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import { upsertUserRole } from '@iconicedu/web/lib/profile/queries/roles.query';
 import { getFamilyInviteAdminClient } from '@iconicedu/web/lib/family/queries/invite.query';
 import { pickRandomThemeKey } from '@iconicedu/web/lib/profile/constants/theme';
 import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
@@ -31,6 +33,18 @@ type InviteUserResult = {
   inviteUrl: string;
   actionLink?: string | null;
 };
+
+function resolveInviteRoleState(
+  profileKind: 'guardian' | 'staff' | 'educator' | 'child',
+): {
+  primaryRole: 'guardian' | 'staff' | 'educator' | 'child';
+  roleStatus: 'active';
+} {
+  return {
+    primaryRole: profileKind,
+    roleStatus: 'active',
+  };
+}
 
 async function resolveBaseUrl() {
   const headerStore = await headers();
@@ -60,6 +74,8 @@ export async function inviteAdminUserAction(
   };
   const mode = (formData.get('mode') as 'invite' | 'link') ?? 'link';
   const linkType = (formData.get('linkType') as 'invite' | 'magiclink') ?? 'invite';
+  const intent =
+    (formData.get('intent') as 'login' | 'get-started' | null) ?? 'get-started';
 
   const supabase = await createSupabaseServerClient();
   const { data: userData } = await supabase.auth.getUser();
@@ -120,7 +136,7 @@ export async function inviteAdminUserAction(
 
   if (mode === 'invite') {
     if (targetAccount.status === 'active') {
-      throw new Error('Account already active; no invite sent.');
+      throw new Error('Account already active; use Generate a login link instead.');
     }
 
     const { error: statusError } = await updateAccountStatus(
@@ -171,6 +187,32 @@ export async function inviteAdminUserAction(
     throw upsertError;
   }
 
+  const inviteRoleState = resolveInviteRoleState(parsed.profileKind);
+  const roleResponse = await upsertUserRole(adminClient, {
+    orgId,
+    accountId: targetAccount.id,
+    roleKey: inviteRoleState.primaryRole,
+    assignedBy: accountResponse.data.id,
+  });
+  if (roleResponse.error) {
+    throw roleResponse.error;
+  }
+
+  const accountRoleStateResponse = await updateAccountRoleState(adminClient, {
+    accountId: targetAccount.id,
+    orgId,
+    primaryRole: inviteRoleState.primaryRole,
+    roleStatus: inviteRoleState.roleStatus,
+    onboardingCompletedAt: new Date().toISOString(),
+    updatedBy: accountResponse.data.id,
+  });
+  if (accountRoleStateResponse.error || !accountRoleStateResponse.data) {
+    throw (
+      accountRoleStateResponse.error ??
+      new Error('Unable to persist invited account role state.')
+    );
+  }
+
   const redirectOverride = formData.get('redirectTo') as string | null;
   const baseUrl = await resolveBaseUrl();
   const defaultRedirectTo = buildOrgInviteRedirectUrl({
@@ -181,10 +223,20 @@ export async function inviteAdminUserAction(
   });
   const redirectTo =
     redirectOverride && redirectOverride.trim()
-      ? ensureOrgCallbackRedirect(redirectOverride, orgSlug, 'get-started')
+      ? ensureOrgCallbackRedirect(redirectOverride, orgSlug, intent)
       : defaultRedirectTo;
 
   if (mode === 'invite') {
+    const { error: inviteEmailError } = await adminClient.auth.admin.inviteUserByEmail(
+      normalizedEmail,
+      {
+        redirectTo,
+      },
+    );
+    if (inviteEmailError) {
+      throw inviteEmailError;
+    }
+
     const { data: inviteData, error: inviteError } =
       await adminClient.auth.admin.generateLink({
         type: linkType,
@@ -233,8 +285,7 @@ export async function inviteAdminUserAction(
     throw linkError;
   }
 
-  const actionLink =
-    generatedLink?.properties?.action_link ?? redirectTo;
+  const actionLink = generatedLink?.properties?.action_link ?? redirectTo;
   if (!actionLink) {
     throw new Error('Supabase did not return an invite action link.');
   }

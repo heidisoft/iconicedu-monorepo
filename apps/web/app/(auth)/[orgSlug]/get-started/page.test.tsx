@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import Page from '@iconicedu/web/app/(auth)/[orgSlug]/get-started/page';
+import Page from './page';
 
 const redirectMock = vi.fn();
 const notFoundMock = vi.fn();
@@ -25,7 +25,8 @@ vi.mock('@iconicedu/web/lib/org/builders/org.builder', () => ({
 }));
 
 vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
-  getAccountByAuthUserIdInOrg: (...args: unknown[]) => getAccountByAuthUserIdInOrgMock(...args),
+  getAccountByAuthUserIdInOrg: (...args: unknown[]) =>
+    getAccountByAuthUserIdInOrgMock(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/org/resolve-dashboard-path', () => ({
@@ -48,7 +49,11 @@ vi.mock('@iconicedu/web/app/(auth)/[orgSlug]/get-started/org-get-started-client'
 
 describe('org get-started page', () => {
   it('redirects authenticated users without org account to global get-started', async () => {
-    buildOrgBySlugMock.mockResolvedValueOnce({ id: 'org-1', slug: 'iconic-academy', name: 'ICONIC' });
+    buildOrgBySlugMock.mockResolvedValueOnce({
+      id: 'org-1',
+      slug: 'iconic-academy',
+      name: 'ICONIC',
+    });
     getUserMock.mockResolvedValueOnce({ data: { user: { id: 'user-1' } } });
     getAccountByAuthUserIdInOrgMock.mockResolvedValueOnce({ data: null });
 
@@ -57,7 +62,7 @@ describe('org get-started page', () => {
     ).rejects.toThrow('NEXT_REDIRECT');
 
     expect(redirectMock).toHaveBeenCalledWith(
-      '/auth/callback?resume=1&org=iconic-academy&intent=get-started',
+      '/auth/callback?resume=1&org=iconic-academy&intent=get-started&source=self-signup',
     );
   });
 });

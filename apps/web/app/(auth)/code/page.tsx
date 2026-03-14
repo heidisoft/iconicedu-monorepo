@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import { OTPForm } from '@iconicedu/ui-web';
+
+import CodeEntryClient from './code-entry-client';
 
 export const metadata: Metadata = {
   title: 'Enter Code | ICONIC Academy',
@@ -14,7 +15,7 @@ export default function OTPPage() {
   return (
     <div className="bg-background flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
       <div className="w-full max-w-sm">
-        <OTPForm />
+        <CodeEntryClient />
       </div>
     </div>
   );

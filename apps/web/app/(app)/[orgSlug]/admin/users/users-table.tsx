@@ -334,6 +334,7 @@ export function UsersTable({ rows }: UsersTableProps) {
           profileKind: row.profileKind ?? 'guardian',
           mode,
           linkType: mode === 'invite' ? 'invite' : 'magiclink',
+          intent: mode === 'link' ? 'login' : 'get-started',
           redirectTo,
         }),
       });

@@ -1,10 +1,15 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
 
 import { AuthEntryForm } from '@iconicedu/web/app/(auth)/shared/auth-entry-form';
 import { createSupabaseBrowserClient } from '@iconicedu/web/lib/supabase/client';
 import { trackAuthTelemetry } from '@iconicedu/web/lib/telemetry/auth-events';
+import {
+  buildCodeEntryPath,
+  shouldCreateUserForIntent,
+} from '@iconicedu/web/app/(auth)/shared/code-entry-utils';
 
 type OrgGetStartedClientProps = {
   orgSlug: string;
@@ -13,11 +18,12 @@ type OrgGetStartedClientProps = {
 
 export function resolveOrgGetStartedCallbackUrl(orgSlug: string): string {
   if (typeof window === 'undefined') {
-    return '/auth/callback?intent=get-started';
+    return '/auth/callback?intent=get-started&source=self-signup';
   }
   const callbackUrl = new URL('/auth/callback', window.location.origin);
   callbackUrl.searchParams.set('org', orgSlug);
   callbackUrl.searchParams.set('intent', 'get-started');
+  callbackUrl.searchParams.set('source', 'self-signup');
   return callbackUrl.toString();
 }
 
@@ -25,6 +31,7 @@ export default function OrgGetStartedClient({
   orgSlug,
   orgName,
 }: OrgGetStartedClientProps) {
+  const router = useRouter();
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
   const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
@@ -37,7 +44,7 @@ export default function OrgGetStartedClient({
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: resolveOrgGetStartedCallbackUrl(orgSlug),
+        shouldCreateUser: shouldCreateUserForIntent('get-started'),
       },
     });
 
@@ -50,7 +57,13 @@ export default function OrgGetStartedClient({
       orgSlug,
       intent: 'org-get-started',
     });
-    setStatusMessage('Check your email for a secure link to continue setup.');
+    router.replace(
+      buildCodeEntryPath({
+        email,
+        intent: 'get-started',
+        orgSlug,
+      }),
+    );
   };
 
   const handleOAuthLogin = async (provider: 'apple' | 'google') => {
@@ -86,6 +99,8 @@ export default function OrgGetStartedClient({
       introText=""
       trustLine="Create your account to get started with guided onboarding for your organization."
       oauthActionVerb="sign-up"
+      submitLabel="Send verification code"
+      submitLoadingLabel="Sending verification code..."
       footerLinkIntro="Already have an account?"
       footerLinkLabel="Log in here"
       footerLinkHref={`/${orgSlug}/login`}

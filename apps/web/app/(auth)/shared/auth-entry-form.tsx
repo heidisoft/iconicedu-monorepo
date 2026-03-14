@@ -26,7 +26,7 @@ type AuthEntryFormProps = React.ComponentProps<'div'> & {
   onEmailLogin?: (email: string) => Promise<void> | void;
   onOAuthLogin?: (provider: OAuthProvider) => Promise<void> | void;
   statusMessage?: string | null;
-  errorMessage?: string | null;
+  errorMessage?: React.ReactNode | null;
   submitLabel?: string;
   submitLoadingLabel?: string;
   oauthActionVerb?: OAuthActionVerb;

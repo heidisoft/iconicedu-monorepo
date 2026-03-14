@@ -59,11 +59,13 @@ export function InviteUserDialog({ className }: { className?: string }) {
       if (inviteLink) {
         setGeneratedInviteUrl(inviteLink);
       }
-      toast.success('Magic link sent');
+      toast.success('Invite email sent');
       router.refresh();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : 'Unable to send magic link at this time.',
+        error instanceof Error
+          ? error.message
+          : 'Unable to send magic link at this time.',
       );
     } finally {
       setIsSubmitting(false);
@@ -105,7 +107,7 @@ export function InviteUserDialog({ className }: { className?: string }) {
         <DialogHeader>
           <DialogTitle>Invite guardians, educators, or staff</DialogTitle>
           <DialogDescription>
-            Send a magic link or copy the invite URL to share it manually.
+            Send a Supabase invite email or copy the invite URL to share it manually.
           </DialogDescription>
         </DialogHeader>
         <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
@@ -170,7 +172,7 @@ export function InviteUserDialog({ className }: { className?: string }) {
           )}
           <DialogFooter className="space-x-2">
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Sending…' : 'Send invite to register'}
+              {isSubmitting ? 'Sending…' : 'Send invite email'}
             </Button>
           </DialogFooter>
         </form>

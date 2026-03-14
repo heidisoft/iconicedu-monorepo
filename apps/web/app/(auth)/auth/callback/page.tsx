@@ -9,6 +9,7 @@ import { createSupabaseBrowserClient } from '@iconicedu/web/lib/supabase/client'
 import { trackAuthTelemetry } from '@iconicedu/web/lib/telemetry/auth-events';
 
 type SupportedOtpType = 'magiclink' | 'invite' | 'signup';
+type AuthCallbackSource = 'self-signup' | null;
 
 function resolveOtpType(value?: string | null): SupportedOtpType {
   if (value === 'magiclink' || value === 'invite' || value === 'signup') {
@@ -18,6 +19,22 @@ function resolveOtpType(value?: string | null): SupportedOtpType {
     return 'invite';
   }
   return 'invite';
+}
+
+function resolveCallbackSource(value?: string | null): AuthCallbackSource {
+  return value === 'self-signup' ? 'self-signup' : null;
+}
+
+export function shouldShowRoleOnboardingDialog(input: {
+  authIntent: 'login' | 'get-started' | null;
+  callbackSource: AuthCallbackSource;
+  requiresRoleSelection: boolean;
+}): boolean {
+  return (
+    input.requiresRoleSelection &&
+    input.authIntent === 'get-started' &&
+    input.callbackSource === 'self-signup'
+  );
 }
 
 export default function CallbackPage() {
@@ -40,13 +57,16 @@ export default function CallbackPage() {
     const requestedOrgSlug = searchParams.get('org')?.trim().toLowerCase() ?? '';
     const authIntentRaw = searchParams.get('intent');
     const authIntent =
-      authIntentRaw === 'login' || authIntentRaw === 'get-started'
-        ? authIntentRaw
-        : null;
-    const fallbackAuthPath = requestedOrgSlug ? `/${requestedOrgSlug}/login` : '/get-started';
+      authIntentRaw === 'login' || authIntentRaw === 'get-started' ? authIntentRaw : null;
+    const callbackSource = resolveCallbackSource(searchParams.get('source'));
+    const fallbackAuthPath = requestedOrgSlug
+      ? `/${requestedOrgSlug}/login`
+      : '/get-started';
 
     const hashParams = new URLSearchParams(
-      window.location.hash.startsWith('#') ? window.location.hash.slice(1) : window.location.hash,
+      window.location.hash.startsWith('#')
+        ? window.location.hash.slice(1)
+        : window.location.hash,
     );
     const accessToken = hashParams.get('access_token');
     const refreshToken = hashParams.get('refresh_token');
@@ -68,15 +88,13 @@ export default function CallbackPage() {
           credentials: 'same-origin',
         });
         if (!response.ok) return null;
-        const body = (await response.json().catch(() => null)) as
-          | {
-              onboarding?: {
-                requiresOrgSetup?: boolean;
-                requiresRoleSelection: boolean;
-                destination: string | null;
-              };
-            }
-          | null;
+        const body = (await response.json().catch(() => null)) as {
+          onboarding?: {
+            requiresOrgSetup?: boolean;
+            requiresRoleSelection: boolean;
+            destination: string | null;
+          };
+        } | null;
         return body?.onboarding ?? null;
       } catch (error) {
         console.error('Failed to activate account after auth callback', error);
@@ -84,11 +102,13 @@ export default function CallbackPage() {
       }
     };
 
-    const applyOnboardingState = async (onboarding: {
-      requiresOrgSetup?: boolean;
-      requiresRoleSelection: boolean;
-      destination: string | null;
-    } | null) => {
+    const applyOnboardingState = async (
+      onboarding: {
+        requiresOrgSetup?: boolean;
+        requiresRoleSelection: boolean;
+        destination: string | null;
+      } | null,
+    ) => {
       if (onboarding?.requiresOrgSetup) {
         router.replace(
           onboarding.destination ??
@@ -97,7 +117,13 @@ export default function CallbackPage() {
         return;
       }
       if (onboarding?.requiresRoleSelection) {
-        if (authIntent === 'get-started') {
+        if (
+          shouldShowRoleOnboardingDialog({
+            authIntent,
+            callbackSource,
+            requiresRoleSelection: onboarding.requiresRoleSelection,
+          })
+        ) {
           setLoadingMessage('Complete setup to continue…');
           setRoleOnboardingState({
             orgSlug: requestedOrgSlug || null,
@@ -157,9 +183,9 @@ export default function CallbackPage() {
               authIntent === 'get-started'
                 ? `/${requestedOrgSlug}/get-started`
                 : `/${requestedOrgSlug}/login`;
-          router.replace(fallbackPath);
-          return;
-        }
+            router.replace(fallbackPath);
+            return;
+          }
           router.replace(fallbackAuthPath);
           return;
         }
@@ -212,9 +238,11 @@ export default function CallbackPage() {
                 credentials: 'same-origin',
                 body: JSON.stringify(body),
               });
-              const payload = (await response.json().catch(() => null)) as
-                | { success?: boolean; message?: string; onboarding?: { destination?: string | null } }
-                | null;
+              const payload = (await response.json().catch(() => null)) as {
+                success?: boolean;
+                message?: string;
+                onboarding?: { destination?: string | null };
+              } | null;
 
               if (!response.ok || !payload?.success) {
                 if (role === 'student') {

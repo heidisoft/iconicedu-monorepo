@@ -1,10 +1,16 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 import { AuthEntryForm } from '../../shared/auth-entry-form';
 import { createSupabaseBrowserClient } from '../../../../lib/supabase/client';
 import { trackAuthTelemetry } from '../../../../lib/telemetry/auth-events';
+import {
+  buildCodeEntryPath,
+  shouldCreateUserForIntent,
+} from '../../shared/code-entry-utils';
 
 type OrgLoginClientProps = {
   orgSlug: string;
@@ -28,9 +34,10 @@ export function shouldPromptOrgSignUp(
 }
 
 export default function OrgLoginClient({ orgSlug, orgName }: OrgLoginClientProps) {
+  const router = useRouter();
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
   const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = React.useState<React.ReactNode | null>(null);
 
   const handleEmailLogin = async (email: string) => {
     setErrorMessage(null);
@@ -55,7 +62,16 @@ export default function OrgLoginClient({ orgSlug, orgName }: OrgLoginClientProps
     if (!eligibilityResponse.ok || !eligibilityBody?.eligible) {
       if (shouldPromptOrgSignUp(eligibilityBody)) {
         setErrorMessage(
-          'No account was found for this organization. Please sign up to continue.',
+          <>
+            No account was found for this organization. Please{' '}
+            <Link
+              href={`/${orgSlug}/get-started`}
+              className="underline underline-offset-4"
+            >
+              sign up
+            </Link>{' '}
+            to continue.
+          </>,
         );
         return;
       }
@@ -70,7 +86,7 @@ export default function OrgLoginClient({ orgSlug, orgName }: OrgLoginClientProps
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: resolveOrgLoginCallbackUrl(orgSlug),
+        shouldCreateUser: shouldCreateUserForIntent('login'),
       },
     });
 
@@ -80,7 +96,13 @@ export default function OrgLoginClient({ orgSlug, orgName }: OrgLoginClientProps
     }
 
     await trackAuthTelemetry('auth_magiclink_sent', { orgSlug, intent: 'org-login' });
-    setStatusMessage('Check your email for your secure sign-in link.');
+    router.replace(
+      buildCodeEntryPath({
+        email,
+        intent: 'login',
+        orgSlug,
+      }),
+    );
   };
 
   const handleOAuthLogin = async (provider: 'apple' | 'google') => {
@@ -112,6 +134,8 @@ export default function OrgLoginClient({ orgSlug, orgName }: OrgLoginClientProps
       subtitle="Use your existing organization account to access your dashboard."
       introText=""
       trustLine="Secure login. No password required. Organization access only."
+      submitLabel="Send verification code"
+      submitLoadingLabel="Sending verification code..."
       footerLinkIntro="New to ICONIC Academy?"
       footerLinkLabel="Get started here"
       footerLinkHref={`/${orgSlug}/get-started`}

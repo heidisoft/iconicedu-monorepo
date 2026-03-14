@@ -1,9 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { POST } from '@iconicedu/web/app/api/accounts/activate/route';
-import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
-
-const APP_URL = resolveAppUrl();
+import { POST } from './route';
+const APP_URL = 'http://localhost:3000';
 const {
   mockSessionGetUser,
   mockGetAccountByAuthUserId,
@@ -17,6 +15,7 @@ const {
   mockGetUserRoles,
   mockGetOrgBySlug,
   mockResolveOrgDashboardPath,
+  mockResolveOrgLoginPath,
 } = vi.hoisted(() => ({
   mockSessionGetUser: vi.fn(),
   mockGetAccountByAuthUserId: vi.fn(),
@@ -30,6 +29,7 @@ const {
   mockGetUserRoles: vi.fn(),
   mockGetOrgBySlug: vi.fn(),
   mockResolveOrgDashboardPath: vi.fn(),
+  mockResolveOrgLoginPath: vi.fn(),
 }));
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
@@ -64,12 +64,53 @@ vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
   insertProfileForAccount: mockInsertProfileForAccount,
 }));
 
+vi.mock('@iconicedu/web/lib/onboarding/auth-state', () => ({
+  buildAuthOnboardingState: vi.fn(
+    (
+      account: {
+        primary_role?: string | null;
+        role_status?: string | null;
+        onboarding_completed_at?: string | null;
+      },
+      roleRows: Array<{ role_key: string }>,
+    ) => {
+      const hasAnyRole =
+        roleRows.length > 0 ||
+        account.primary_role === 'guardian' ||
+        account.primary_role === 'educator' ||
+        account.primary_role === 'child' ||
+        account.primary_role === 'staff' ||
+        account.primary_role === 'admin' ||
+        account.primary_role === 'owner';
+      const requiresRoleSelection =
+        !hasAnyRole ||
+        !account.primary_role ||
+        !account.onboarding_completed_at ||
+        account.role_status === 'unassigned' ||
+        !account.role_status;
+
+      if (requiresRoleSelection) {
+        return { requiresRoleSelection: true, destination: null };
+      }
+      if (account.role_status === 'pending' || account.role_status === 'blocked') {
+        return { requiresRoleSelection: false, destination: '/login/pending-access' };
+      }
+      return { requiresRoleSelection: false, destination: '/dashboard' };
+    },
+  ),
+}));
+
 vi.mock('@iconicedu/web/lib/org/queries/org.query', () => ({
   getOrgBySlug: mockGetOrgBySlug,
 }));
 
 vi.mock('@iconicedu/web/lib/org/resolve-dashboard-path', () => ({
   resolveOrgDashboardPath: mockResolveOrgDashboardPath,
+}));
+
+vi.mock('@iconicedu/web/lib/org/resolve-auth-path', () => ({
+  resolveDefaultOrgLoginPath: vi.fn(),
+  resolveOrgLoginPath: mockResolveOrgLoginPath,
 }));
 
 describe('POST /api/accounts/activate', () => {
@@ -86,12 +127,15 @@ describe('POST /api/accounts/activate', () => {
     mockGetUserRoles.mockReset();
     mockGetOrgBySlug.mockReset();
     mockResolveOrgDashboardPath.mockReset();
+    mockResolveOrgLoginPath.mockReset();
   });
 
   it('returns unauthorized without auth user', async () => {
     mockSessionGetUser.mockResolvedValueOnce({ data: { user: null } });
 
-    const response = await POST(new Request(`${APP_URL}/api/accounts/activate`, { method: 'POST' }));
+    const response = await POST(
+      new Request(`${APP_URL}/api/accounts/activate`, { method: 'POST' }),
+    );
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ error: 'Unauthorized' });
   });
@@ -129,7 +173,9 @@ describe('POST /api/accounts/activate', () => {
       ],
     });
 
-    const response = await POST(new Request(`${APP_URL}/api/accounts/activate`, { method: 'POST' }));
+    const response = await POST(
+      new Request(`${APP_URL}/api/accounts/activate`, { method: 'POST' }),
+    );
     const body = await response.json();
     expect(response.status).toBe(200);
     expect(body.status).toBe('active');
@@ -208,9 +254,12 @@ describe('POST /api/accounts/activate', () => {
     });
 
     const response = await POST(
-      new Request(`${APP_URL}/api/accounts/activate?org=iconic-academy&intent=get-started`, {
-        method: 'POST',
-      }),
+      new Request(
+        `${APP_URL}/api/accounts/activate?org=iconic-academy&intent=get-started`,
+        {
+          method: 'POST',
+        },
+      ),
     );
     const body = await response.json();
     expect(response.status).toBe(200);
@@ -231,6 +280,82 @@ describe('POST /api/accounts/activate', () => {
         orgId: 'org-1',
         accountId: 'account-new',
       }),
+    );
+  });
+
+  it('links invited account with preassigned role and skips role selection', async () => {
+    const now = new Date().toISOString();
+    mockSessionGetUser.mockResolvedValueOnce({
+      data: { user: { id: 'auth-1', email: 'invited@example.com' } },
+    });
+    mockGetOrgBySlug.mockResolvedValueOnce({
+      data: { id: 'org-1', slug: 'iconic-academy' },
+      error: null,
+    });
+    mockGetAccountByAuthUserIdInOrg.mockResolvedValueOnce({ data: null });
+    mockGetAccountByEmail.mockResolvedValueOnce({
+      error: null,
+      data: {
+        id: 'account-invited-1',
+        org_id: 'org-1',
+        status: 'invited',
+      },
+    });
+    mockUpdateAccountAuthUserId.mockResolvedValueOnce({
+      error: null,
+      data: {
+        id: 'account-invited-1',
+        org_id: 'org-1',
+        status: 'active',
+      },
+    });
+    mockGetProfileByAccountId.mockResolvedValueOnce({
+      data: { id: 'profile-1', account_id: 'account-invited-1' },
+      error: null,
+    });
+    mockUpdateAccountStatus.mockResolvedValueOnce({
+      data: {
+        id: 'account-invited-1',
+        org_id: 'org-1',
+        primary_role: 'educator',
+        role_status: 'active',
+        onboarding_completed_at: now,
+      },
+    });
+    mockGetUserRoles.mockResolvedValueOnce({
+      error: null,
+      data: [
+        {
+          id: 'role-1',
+          org_id: 'org-1',
+          account_id: 'account-invited-1',
+          role_key: 'educator',
+          assigned_at: now,
+          created_at: now,
+          updated_at: now,
+        },
+      ],
+    });
+    mockResolveOrgDashboardPath.mockResolvedValueOnce('/iconic-academy');
+
+    const response = await POST(
+      new Request(
+        `${APP_URL}/api/accounts/activate?org=iconic-academy&intent=get-started`,
+        {
+          method: 'POST',
+        },
+      ),
+    );
+
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body.status).toBe('active');
+    expect(body.onboarding.requiresRoleSelection).toBe(false);
+    expect(body.onboarding.destination).toBe('/iconic-academy');
+    expect(mockUpdateAccountAuthUserId).toHaveBeenCalledWith(
+      expect.anything(),
+      'account-invited-1',
+      'auth-1',
     );
   });
 });

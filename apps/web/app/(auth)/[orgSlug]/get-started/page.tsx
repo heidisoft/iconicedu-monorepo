@@ -10,7 +10,8 @@ import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
 
 export const metadata: Metadata = {
   title: 'Get Started | ICONIC Academy',
-  description: 'Create your ICONIC Academy account for your organization and complete onboarding.',
+  description:
+    'Create your ICONIC Academy account for your organization and complete onboarding.',
   robots: {
     index: false,
     follow: false,
@@ -42,9 +43,13 @@ export default async function OrgGetStartedPage({
       org.id,
     );
     if (accountResponse.data?.org_id) {
-      redirect(await resolveOrgDashboardPath(serviceSupabase, accountResponse.data.org_id));
+      redirect(
+        await resolveOrgDashboardPath(serviceSupabase, accountResponse.data.org_id),
+      );
     }
-    redirect(`/auth/callback?resume=1&org=${org.slug}&intent=get-started`);
+    redirect(
+      `/auth/callback?resume=1&org=${org.slug}&intent=get-started&source=self-signup`,
+    );
   }
 
   return (

@@ -10,6 +10,12 @@ import {
 
 const authEntryFormPropsMock = vi.fn();
 
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    replace: vi.fn(),
+  }),
+}));
+
 vi.mock('../../shared/auth-entry-form', () => ({
   AuthEntryForm: (props: Record<string, unknown>) => {
     authEntryFormPropsMock(props);

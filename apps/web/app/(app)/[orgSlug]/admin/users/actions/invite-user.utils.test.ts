@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildOrgInviteRedirectUrl,
   ensureOrgCallbackRedirect,
-} from '@iconicedu/web/app/(app)/[orgSlug]/admin/users/actions/invite-user.utils';
+} from './invite-user.utils';
 
 describe('invite-user redirect helpers', () => {
   it('builds callback url with org slug and get-started intent', () => {
@@ -31,9 +31,25 @@ describe('invite-user redirect helpers', () => {
     expect(url).toContain('intent=get-started');
   });
 
+  it('supports login intent for existing-account magic links', () => {
+    const url = ensureOrgCallbackRedirect(
+      'https://app.example.com/auth/callback?profileKind=staff',
+      'acme-org',
+      'login',
+    );
+
+    expect(url).toContain('/auth/callback?');
+    expect(url).toContain('org=acme-org');
+    expect(url).toContain('intent=login');
+  });
+
   it('leaves non-callback redirects unchanged', () => {
     expect(
-      ensureOrgCallbackRedirect('https://app.example.com/welcome', 'acme-org', 'get-started'),
+      ensureOrgCallbackRedirect(
+        'https://app.example.com/welcome',
+        'acme-org',
+        'get-started',
+      ),
     ).toBe('https://app.example.com/welcome');
   });
 });
