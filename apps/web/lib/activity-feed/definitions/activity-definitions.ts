@@ -183,7 +183,7 @@ function sourceAction(
       ? 'Open class'
       : routeKind === 'dm' || href.includes('/dm/')
         ? 'Open conversation'
-        : 'Open channel';
+        : 'View messages';
 
   return {
     label: customLabel ?? resolvedLabel,

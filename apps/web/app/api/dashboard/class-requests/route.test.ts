@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-import { POST } from '@iconicedu/web/app/api/dashboard/class-requests/route';
+import { POST } from './route';
 import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
 
 const APP_URL = resolveAppUrl();
@@ -15,12 +15,16 @@ const getProfilesByIdsMock = vi.fn();
 const getProfilesByKindMock = vi.fn();
 const createPrivateClassRequestChannelMock = vi.fn();
 const createSupabaseServiceClientMock = vi.fn();
+const sendTextMessageActionMock = vi.fn();
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
   createSupabaseServerClient: () => createSupabaseServerClientMock(),
 }));
 vi.mock('@iconicedu/web/lib/supabase/service', () => ({
   createSupabaseServiceClient: () => createSupabaseServiceClientMock(),
+}));
+vi.mock('@iconicedu/web/app/actions/messages', () => ({
+  sendTextMessageAction: (...args: unknown[]) => sendTextMessageActionMock(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/auth/requireAuthedUser', () => ({
@@ -93,9 +97,13 @@ describe('POST /api/dashboard/class-requests', () => {
     getProfilesByKindMock.mockReset();
     createPrivateClassRequestChannelMock.mockReset();
     createSupabaseServiceClientMock.mockReset();
+    sendTextMessageActionMock.mockReset();
 
     createSupabaseServerClientMock.mockResolvedValue(createMockSupabase());
     createSupabaseServiceClientMock.mockReturnValue(createMockSupabase());
+    sendTextMessageActionMock.mockResolvedValue({
+      ids: { id: 'message-1', orgId: 'org-1' },
+    });
     requireAuthedUserMock.mockResolvedValue({ id: 'auth-1' });
     buildOrgBySlugMock.mockResolvedValue({ id: 'org-1' });
     getAccountByAuthUserIdMock.mockResolvedValue({
@@ -194,6 +202,14 @@ describe('POST /api/dashboard/class-requests', () => {
         orgId: 'org-1',
         topic: expect.stringContaining('Class Request'),
         requesterProfile: expect.objectContaining({ id: 'guardian-1' }),
+      }),
+    );
+    expect(sendTextMessageActionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orgId: 'org-1',
+        channelId: 'channel-1',
+        senderProfileId: 'guardian-1',
+        content: expect.stringContaining('Class Request'),
       }),
     );
 

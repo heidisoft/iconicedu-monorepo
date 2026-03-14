@@ -273,16 +273,19 @@ export function SidebarLeft({
     () => resolveDashboardBasePath(activePath),
     [activePath],
   );
-  const navMain: SidebarNavItem[] = data.navigation.navMain.map((item) => ({
-    ...item,
-    url: normalizeDashboardUrl(item.url, dashboardBasePath),
-    icon: ICONS[item.icon],
-    isActive:
-      normalizeDashboardUrl(item.url, dashboardBasePath) === dashboardBasePath
-        ? activePath === dashboardBasePath
-        : (activePath?.startsWith(normalizeDashboardUrl(item.url, dashboardBasePath)) ??
-          false),
-  }));
+  const userProfile = data.user.profile;
+  const navMain: SidebarNavItem[] = data.navigation.navMain
+    .filter((item) => item.title !== 'Class Requests' || userProfile.kind === 'guardian')
+    .map((item) => ({
+      ...item,
+      url: normalizeDashboardUrl(item.url, dashboardBasePath),
+      icon: ICONS[item.icon],
+      isActive:
+        normalizeDashboardUrl(item.url, dashboardBasePath) === dashboardBasePath
+          ? activePath === dashboardBasePath
+          : (activePath?.startsWith(normalizeDashboardUrl(item.url, dashboardBasePath)) ??
+            false),
+    }));
   const navSecondary: SidebarSecondaryItem[] = data.navigation.navSecondary.map(
     (item) => ({
       ...item,
@@ -304,7 +307,6 @@ export function SidebarLeft({
       })),
     [adminSections, dashboardBasePath],
   );
-  const userProfile = data.user.profile;
   const children = React.useMemo<ChildProfileVM[]>(
     () => (userProfile.kind === 'guardian' ? (userProfile.children?.items ?? []) : []),
     [userProfile],

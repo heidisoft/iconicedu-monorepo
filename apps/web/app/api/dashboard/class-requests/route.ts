@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { sendTextMessageAction } from '@iconicedu/web/app/actions/messages';
 
 import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
@@ -208,45 +209,12 @@ export async function POST(request: Request) {
       specialRequirements: payload.specialRequirements,
     });
 
-    const messageInsert = await serviceSupabase
-      .from('messages')
-      .insert({
-        org_id: org.id,
-        channel_id: channelId,
-        sender_profile_id: requesterProfile.id,
-        type: 'text',
-        visibility_type: 'all',
-        thread_id: null,
-        thread_parent_id: null,
-        created_at: nowIso,
-        created_by: requesterProfile.id,
-        updated_at: nowIso,
-        updated_by: requesterProfile.id,
-      })
-      .select('id')
-      .single<{ id: string }>();
-
-    if (messageInsert.error || !messageInsert.data?.id) {
-      throw new Error(
-        messageInsert.error?.message ?? 'Unable to create request message.',
-      );
-    }
-
-    const messagePayloadInsert = await serviceSupabase.from('message_text').insert({
-      message_id: messageInsert.data.id,
-      org_id: org.id,
-      payload: {
-        text: messageText,
-      },
-      created_at: nowIso,
-      created_by: requesterProfile.id,
-      updated_at: nowIso,
-      updated_by: requesterProfile.id,
+    await sendTextMessageAction({
+      orgId: org.id,
+      channelId,
+      senderProfileId: requesterProfile.id,
+      content: messageText,
     });
-
-    if (messagePayloadInsert.error) {
-      throw new Error(messagePayloadInsert.error.message);
-    }
 
     return NextResponse.json({
       success: true,

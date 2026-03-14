@@ -8,7 +8,7 @@ import {
   sendTextMessageAction,
   toggleHiddenMessageAction,
   toggleSavedMessageAction,
-} from '@iconicedu/web/app/actions/messages';
+} from './messages';
 
 const mapMessageRowToVM = vi.fn();
 const buildUserProfileById = vi.fn();
@@ -93,7 +93,7 @@ describe('sendTextMessageAction', () => {
     });
   });
 
-  it('creates a text message and does not publish inbox activity for a normal channel post', async () => {
+  it('publishes inbox activity for a top-level normal channel post', async () => {
     const supabase = {
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
       from: vi.fn(),
@@ -105,6 +105,13 @@ describe('sendTextMessageAction', () => {
     ).mockReturnValue(supabase);
     const insertMessage = vi.fn();
     const insertMessageText = vi.fn();
+    const channelLookup = createChannelLookupChain({
+      id: 'channel-1',
+      kind: 'channel',
+      topic: 'Class Requests · Riley Morgan',
+      primary_entity_kind: null,
+      primary_entity_id: null,
+    });
     const messageRow = {
       id: 'message-1',
       org_id: 'org-1',
@@ -115,6 +122,9 @@ describe('sendTextMessageAction', () => {
     };
 
     supabase.from.mockImplementation((table: string) => {
+      if (table === 'channels') {
+        return { select: () => channelLookup };
+      }
       if (table === 'messages') {
         insertMessage.mockReturnValue({
           select: () => ({
@@ -157,7 +167,18 @@ describe('sendTextMessageAction', () => {
         payload: { text: 'Hello world' },
       }),
     );
-    expect(publishActivityEvent).not.toHaveBeenCalled();
+    expect(publishActivityEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'message.posted',
+        dedupeKey: 'message.posted:message-1',
+        payload: expect.objectContaining({
+          channelId: 'channel-1',
+          channelRouteKind: 'channel',
+          channelTopic: 'Class Requests · Riley Morgan',
+          content: 'Hello world',
+        }),
+      }),
+    );
     expect(result).toEqual({ ids: { id: 'message-1', orgId: 'org-1' } });
   });
 
@@ -1727,7 +1748,21 @@ describe('sendTextMessageAction', () => {
         }),
       }),
     );
-    expect(publishActivityEvent).toHaveBeenCalledTimes(1);
+    expect(publishActivityEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orgId: 'org-1',
+        eventType: 'message.posted',
+        actorProfileId: 'profile-1',
+        dedupeKey: 'message.posted:message-mention-1',
+        payload: expect.objectContaining({
+          channelId: 'channel-1',
+          senderName: 'Sender Name',
+          content: 'Hello @Taylor Reed',
+          channelRouteKind: 'channel',
+        }),
+      }),
+    );
+    expect(publishActivityEvent).toHaveBeenCalledTimes(2);
   });
 
   it('creates a thread for a reply when needed', async () => {

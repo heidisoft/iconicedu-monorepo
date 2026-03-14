@@ -1,12 +1,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ChannelVM, SidebarLeftDataVM } from '@iconicedu/shared-types';
 
-import { buildLearningSpacesByOrg } from '@iconicedu/web/lib/spaces/builders/learning-space.builder';
+import { buildLearningSpacesByOrg } from '../spaces/builders/learning-space.builder';
 import {
   buildAllChannels,
   buildDirectMessageChannelsWithMessages,
-} from '@iconicedu/web/lib/channels/builders/channel.builder';
-import { getChannelsByOrg } from '@iconicedu/web/lib/channels/queries/channels.query';
+} from '../channels/builders/channel.builder';
+import { getChannelsByOrg } from '../channels/queries/channels.query';
+import { syncClassRequestUnreadCount } from './class-request-unread';
 
 type SidebarBaseData = Omit<SidebarLeftDataVM, 'user'>;
 
@@ -26,6 +27,16 @@ export async function buildSidebarBaseData(
   const alertChannels = allChannels.filter((channel) =>
     isNonLearningSpaceAlertChannel(channel, accountId),
   );
+  const classRequestChannels = allChannels.filter((channel) =>
+    isClassRequestChannel(channel, accountId),
+  );
+  const primaryClassRequestChannel = classRequestChannels
+    .slice()
+    .sort(
+      (left, right) =>
+        new Date(right.lifecycle.createdAt).getTime() -
+        new Date(left.lifecycle.createdAt).getTime(),
+    )[0];
 
   const navSecondary = supportChannelId
     ? [
@@ -37,7 +48,7 @@ export async function buildSidebarBaseData(
       ]
     : [];
 
-  return {
+  return syncClassRequestUnreadCount({
     navigation: {
       navMain: [
         {
@@ -55,15 +66,25 @@ export async function buildSidebarBaseData(
           url: `${dashboardBasePath}/inbox`,
           icon: 'inbox',
         },
+        ...(classRequestChannels.length
+          ? [
+              {
+                title: 'Class Requests',
+                url: `${dashboardBasePath}/c/${primaryClassRequestChannel?.ids.id}`,
+                icon: 'send' as const,
+              },
+            ]
+          : []),
       ],
       navSecondary,
     },
     collections: {
       learningSpaces,
       directMessages,
+      classRequestChannels,
       alertChannels,
     },
-  };
+  });
 }
 
 function isNonLearningSpaceAlertChannel(channel: ChannelVM, accountId: string): boolean {
@@ -75,6 +96,19 @@ function isNonLearningSpaceAlertChannel(channel: ChannelVM, accountId: string): 
   }
   return channel.collections.participants.some(
     (participant) => participant.ids.accountId === accountId,
+  );
+}
+
+function isClassRequestChannel(channel: ChannelVM, accountId: string): boolean {
+  if (channel.basics.purpose !== 'chass-requests') {
+    return false;
+  }
+
+  return (
+    channel.basics.visibility === 'public' ||
+    channel.collections.participants.some(
+      (participant) => participant.ids.accountId === accountId,
+    )
   );
 }
 

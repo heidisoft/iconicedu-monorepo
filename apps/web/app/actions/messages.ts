@@ -1281,6 +1281,21 @@ export async function sendTextMessageAction(
       excludeProfileIds: sanitizedMentions.map((mention) => mention.profileId),
       now,
     });
+  } else {
+    await createChannelMessageActivity({
+      supabase,
+      serviceSupabase,
+      orgId: accountResponse.data.org_id,
+      channelId: input.channelId,
+      senderProfileId: currentProfileId,
+      senderName: senderDisplayName,
+      messageId: messageInsert.data.id,
+      content: homeworkIntent?.cleanedContent ?? input.content,
+      threadId,
+      threadReply: false,
+      activityContext,
+      now,
+    });
   }
 
   const thread = threadId

@@ -173,7 +173,7 @@ describe('activity event definitions', () => {
     });
 
     expect(rendered.actionButton).toEqual({
-      label: 'Open channel',
+      label: 'View messages',
       variant: 'outline',
       href: '../c/channel-1',
     });
