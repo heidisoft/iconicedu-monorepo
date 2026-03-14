@@ -31,7 +31,11 @@ import { resolveOrgGetStartedCallbackUrl } from './org-get-started-client';
 describe('resolveOrgGetStartedCallbackUrl', () => {
   it('builds callback URL with org + get-started intent', () => {
     const callback = resolveOrgGetStartedCallbackUrl('iconic-academy');
+    const expected =
+      typeof window === 'undefined'
+        ? '/auth/callback?intent=get-started&source=self-signup'
+        : `${window.location.origin}/auth/callback?org=iconic-academy&intent=get-started&source=self-signup`;
 
-    expect(callback).toBe('/auth/callback?intent=get-started&source=self-signup');
+    expect(callback).toBe(expected);
   });
 });

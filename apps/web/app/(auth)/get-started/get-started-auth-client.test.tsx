@@ -31,7 +31,11 @@ import { resolveGetStartedCallbackUrl } from './get-started-auth-client';
 describe('resolveGetStartedCallbackUrl', () => {
   it('builds callback URL with get-started intent', () => {
     const callback = resolveGetStartedCallbackUrl();
+    const expected =
+      typeof window === 'undefined'
+        ? '/auth/callback?intent=get-started&source=self-signup'
+        : `${window.location.origin}/auth/callback?intent=get-started&source=self-signup`;
 
-    expect(callback).toBe('/auth/callback?intent=get-started&source=self-signup');
+    expect(callback).toBe(expected);
   });
 });

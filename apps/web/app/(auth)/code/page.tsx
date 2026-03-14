@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 
 import CodeEntryClient from './code-entry-client';
 
@@ -15,7 +16,9 @@ export default function OTPPage() {
   return (
     <div className="bg-background flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
       <div className="w-full max-w-sm">
-        <CodeEntryClient />
+        <Suspense fallback={null}>
+          <CodeEntryClient />
+        </Suspense>
       </div>
     </div>
   );
