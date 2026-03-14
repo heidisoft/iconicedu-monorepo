@@ -53,6 +53,7 @@ export function DashboardHomeInfographicSection({
   browseHref,
   onJoinSession,
 }: DashboardHomeInfographicSectionProps) {
+  const quickActionIconClassName = 'size-5 shrink-0';
   const [currentPage, setCurrentPage] = useState(1);
   const totalPages = Math.max(1, upcomingSessionsPage.totalPages);
 
@@ -158,9 +159,9 @@ export function DashboardHomeInfographicSection({
         </article>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[7fr_3fr]">
+      <div className="grid gap-4 lg:grid-cols-[13fr_7fr]">
         <article className="rounded-3xl border border-border bg-card/80 p-6">
-          <h2 className="font-semibold tracking-tight">Upcoming Sessions this week</h2>
+          <h2 className="font-semibold tracking-tight">Upcoming Sessions</h2>
 
           <div className="mt-5 space-y-3">
             {visibleSessions.length ? (
@@ -225,8 +226,8 @@ export function DashboardHomeInfographicSection({
               className="rounded-2xl bg-primary p-5 text-primary-foreground transition hover:opacity-90"
             >
               <div className="flex items-center gap-2">
-                <Inbox className="size-5" aria-hidden="true" />
-                <p className="font-semibold leading-tight">Inbox</p>
+                <Inbox className={quickActionIconClassName} aria-hidden="true" />
+                <p className="text-sm font-semibold leading-tight">Inbox</p>
               </div>
               <p className="mt-1 text-sm text-primary-foreground/80">
                 View recent updates
@@ -238,8 +239,8 @@ export function DashboardHomeInfographicSection({
               className="rounded-2xl border border-border bg-background/70 p-5 transition hover:bg-muted/40"
             >
               <div className="flex items-center gap-2">
-                <CalendarDays className="size-5" aria-hidden="true" />
-                <p className="font-semibold leading-tight">Calendar</p>
+                <CalendarDays className={quickActionIconClassName} aria-hidden="true" />
+                <p className="text-sm font-semibold leading-tight">Calendar</p>
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
                 Review session schedule

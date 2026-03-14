@@ -303,13 +303,18 @@ async function buildActiveRoleMetrics(input: {
   }
 
   const timelineBuckets = splitSchedulesByTimeline(scopedSchedules, input.now);
+  const nowMs = input.now.getTime();
+  const nextSevenDaysMs = nowMs + 7 * 24 * 60 * 60 * 1000;
+  const upcomingSchedulesNext7Days = timelineBuckets.upcoming.filter((schedule) => {
+    const startAtMs = new Date(schedule.startAt).getTime();
+    return startAtMs >= nowMs && startAtMs < nextSevenDaysMs;
+  });
   const weekStartMs = startOfWeekMonday(input.now).getTime();
   const weekEndMs = endOfWeekSunday(input.now).getTime();
-  const upcomingSchedulesThisWeek = timelineBuckets.upcoming.filter((schedule) => {
+  const upcomingSessionsThisWeek = timelineBuckets.upcoming.filter((schedule) => {
     const scheduleDayMs = startOfDay(new Date(schedule.startAt)).getTime();
     return scheduleDayMs >= weekStartMs && scheduleDayMs <= weekEndMs;
-  });
-  const upcomingSessionsThisWeek = upcomingSchedulesThisWeek.length;
+  }).length;
 
   const monthProgressStatsByKey = getMonthProgressStatsByKey(
     [...timelineBuckets.past, ...timelineBuckets.upcoming],
@@ -362,7 +367,7 @@ async function buildActiveRoleMetrics(input: {
         : toActiveSubjectsLabel(activeSubjects),
     },
     upcomingSessionsPage: buildUpcomingSessionPage({
-      upcomingSchedules: upcomingSchedulesThisWeek,
+      upcomingSchedules: upcomingSchedulesNext7Days,
       orgSlug: input.orgSlug,
       pageSize: input.pageSize,
       now: input.now,

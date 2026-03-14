@@ -123,14 +123,14 @@ describe('buildDashboardHomeInfographicMetrics', () => {
       activeSubjectsCount: 2,
       activeSubjectsLabel: 'Math, Science',
     });
-    expect(result.upcomingSessionsPage.items).toHaveLength(3);
+    expect(result.upcomingSessionsPage.items).toHaveLength(7);
     expect(result.upcomingSessionsPage.items[0]).toMatchObject({
       session: { label: 'Algebra Daily' },
       joinHref: '/iconic-academy/spaces/channel-1',
     });
     expect(result.upcomingSessionsPage.items[0]?.session.time).toContain('Student One');
     expect(result.upcomingSessionsPage.items[0]?.session.time).toContain('Tutor Jane');
-    expect(result.upcomingSessionsPage.total).toBe(3);
+    expect(result.upcomingSessionsPage.total).toBe(7);
     expect(result.metricsByRole.students).toEqual({
       upcomingSessionsThisWeek: 0,
       completedClassesThisMonth: 0,
@@ -175,7 +175,7 @@ describe('buildDashboardHomeInfographicMetrics', () => {
     expect(result.metricsByRole.students.upcomingSessionsThisWeek).toBe(3);
     expect(result.metricsByRole.students.completedClassesThisMonth).toBe(3);
     expect(result.metricsByRole.students.activeSubjectsCount).toBe(1);
-    expect(result.upcomingSessionsPage.items).toHaveLength(3);
+    expect(result.upcomingSessionsPage.items).toHaveLength(7);
     expect(result.upcomingSessionsPage.items[0]?.session.time).toContain('Tutor Jane');
     expect(result.upcomingSessionsPage.items[0]?.session.time).not.toContain(
       'Student One',
@@ -234,7 +234,7 @@ describe('buildDashboardHomeInfographicMetrics', () => {
       activeSubjectsCount: 1,
       activeSubjectsLabel: 'English',
     });
-    expect(result.upcomingSessionsPage.items).toHaveLength(3);
+    expect(result.upcomingSessionsPage.items).toHaveLength(7);
     expect(result.upcomingSessionsPage.items[0]?.session.time).toContain('Student Nine');
     expect(result.upcomingSessionsPage.items[0]?.session.time).not.toContain(
       'Tutor Jane',
@@ -337,9 +337,9 @@ describe('buildDashboardHomeInfographicMetrics', () => {
       } as never,
     });
 
-    expect(result.upcomingSessionsPage.total).toBe(3);
-    expect(result.upcomingSessionsPage.totalPages).toBe(2);
+    expect(result.upcomingSessionsPage.total).toBe(7);
+    expect(result.upcomingSessionsPage.totalPages).toBe(4);
     expect(result.upcomingSessionsPage.pageSize).toBe(2);
-    expect(result.upcomingSessionsPage.items).toHaveLength(3);
+    expect(result.upcomingSessionsPage.items).toHaveLength(7);
   });
 });
