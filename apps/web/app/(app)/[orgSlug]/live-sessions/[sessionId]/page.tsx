@@ -1,5 +1,9 @@
+import type { Metadata } from 'next';
 import { DashboardHeader } from '@iconicedu/ui-web';
-import { getDashboardAccountContext, getDashboardProfileContext } from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
+import {
+  getDashboardAccountContext,
+  getDashboardProfileContext,
+} from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
 import { LiveSessionHost } from '@iconicedu/web/components/live-sessions/live-session-host';
 import { getLiveSessionReturnPath } from '@iconicedu/web/components/live-sessions/live-session-host.utils';
 import { resolveLiveSessionJoinAccess } from '@iconicedu/web/lib/live-sessions/service';
@@ -11,10 +15,14 @@ function parseLiveSessionMode(value: unknown): 'video' | 'audio' | null {
   }
 
   const candidate = value as Record<string, unknown>;
-  return candidate.mode === 'audio' || candidate.mode === 'video'
-    ? candidate.mode
-    : null;
+  return candidate.mode === 'audio' || candidate.mode === 'video' ? candidate.mode : null;
 }
+
+export const metadata: Metadata = {
+  title: 'Live Session',
+  description:
+    'Join your live tutoring session and return to the related conversation when finished.',
+};
 
 export default async function Page({
   params,

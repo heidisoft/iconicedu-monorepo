@@ -1,9 +1,15 @@
+import type { Metadata } from 'next';
 import { buildActivityFeedForProfile } from '@iconicedu/web/lib/activity-feed/builders/activity-feed.builder';
 import {
   getDashboardAccountContext,
   getDashboardProfileContext,
 } from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
 import { InboxPageClient } from '@iconicedu/web/app/(app)/[orgSlug]/inbox/inbox-page-client';
+
+export const metadata: Metadata = {
+  title: 'Inbox',
+  description: 'Review messages, mentions, reactions, and recent activity in one place.',
+};
 
 export default async function Page({ params }: { params: Promise<{ orgSlug: string }> }) {
   const { orgSlug } = await params;

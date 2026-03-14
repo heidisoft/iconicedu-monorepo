@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { DashboardHeader } from '@iconicedu/ui-web';
 import {
@@ -19,6 +20,12 @@ import {
 import { enableMessageTypeComposer } from '@iconicedu/web/flags';
 
 const INITIAL_MESSAGES_PAGE_SIZE = 40;
+
+export const metadata: Metadata = {
+  title: 'Messages',
+  description:
+    'Read channel conversations, post updates, and stay aligned with your team.',
+};
 
 export default async function Page({
   params,

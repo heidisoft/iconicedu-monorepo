@@ -1,7 +1,13 @@
+import type { Metadata } from 'next';
 import React, { Suspense } from 'react';
 import { DashboardHeader, DashboardHomeSkeleton } from '@iconicedu/ui-web';
 
 import { HomePageContent } from './home-page-content';
+
+export const metadata: Metadata = {
+  title: 'Home',
+  description: 'View your dashboard summary, upcoming sessions, and quick actions.',
+};
 
 export default async function Page({ params }: { params: Promise<{ orgSlug: string }> }) {
   const { orgSlug } = await params;

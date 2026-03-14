@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 
 import {
@@ -15,6 +16,11 @@ import { getDashboardAccountContext } from '@iconicedu/web/app/(app)/[orgSlug]/_
 type DmPageProps = {
   params: Promise<{ orgSlug: string }>;
   searchParams?: Promise<{ id?: string; channelId?: string; userId?: string }>;
+};
+
+export const metadata: Metadata = {
+  title: 'Direct Messages',
+  description: 'Open your direct messages and continue private conversations.',
 };
 
 export default async function Page({ params, searchParams }: DmPageProps) {

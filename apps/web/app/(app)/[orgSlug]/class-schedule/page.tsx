@@ -1,6 +1,12 @@
+import type { Metadata } from 'next';
 import { buildClassSchedulesByOrg } from '@iconicedu/web/lib/schedules/builders/class-schedule.builder';
 import { ClassScheduleClient } from '@iconicedu/web/app/(app)/[orgSlug]/class-schedule/class-schedule-client';
 import { getDashboardAccountContext } from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
+
+export const metadata: Metadata = {
+  title: 'Class Schedule',
+  description: 'Review upcoming classes, schedules, and daily learning sessions.',
+};
 
 export default async function ClassSchedulePage({
   params,

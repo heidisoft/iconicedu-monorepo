@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { DashboardHeader } from '@iconicedu/ui-web';
 import { LearningSpaceShell } from '@iconicedu/web/app/(app)/[orgSlug]/spaces/[channelId]/learning-space-shell';
@@ -21,6 +22,12 @@ import {
 import { enableMessageTypeComposer } from '@iconicedu/web/flags';
 
 const INITIAL_MESSAGES_PAGE_SIZE = 40;
+
+export const metadata: Metadata = {
+  title: 'Classroom',
+  description:
+    'Follow classroom updates, resources, and messages for this learning space.',
+};
 
 export default async function Page({
   params,
