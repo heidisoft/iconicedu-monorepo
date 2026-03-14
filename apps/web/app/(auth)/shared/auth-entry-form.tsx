@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import {
@@ -11,7 +12,7 @@ import {
   FieldSeparator,
 } from '@iconicedu/ui-web/ui/field';
 import { Input } from '@iconicedu/ui-web/ui/input';
-import { SiteLogo } from '@iconicedu/ui-web/components/branding/site-logo';
+import { SiteLogoFull } from '@iconicedu/ui-web/components/branding/site-logo-full';
 import { Loader2 } from 'lucide-react';
 
 type OAuthProvider = 'apple' | 'google';
@@ -27,16 +28,18 @@ type AuthEntryFormProps = React.ComponentProps<'div'> & {
   errorMessage?: string | null;
   submitLabel?: string;
   submitLoadingLabel?: string;
+  footerLinkLabel?: string;
+  footerLinkHref?: string;
+  footerLinkIntro?: string;
 };
 
-export function getOAuthButtonLabel(
-  provider: OAuthProvider,
-  isLoading: boolean,
-): string {
+export function getOAuthButtonLabel(provider: OAuthProvider, isLoading: boolean): string {
   if (!isLoading) {
-    return provider === 'google' ? 'Continue with Google' : 'Continue with Apple';
+    return provider === 'google' ? 'Login with Google' : 'Login with Apple';
   }
-  return provider === 'google' ? 'Continuing with Google...' : 'Continuing with Apple...';
+  return provider === 'google'
+    ? 'Logging you in with Google...'
+    : 'Logging you in with Apple...';
 }
 
 export function AuthEntryForm({
@@ -51,6 +54,9 @@ export function AuthEntryForm({
   errorMessage,
   submitLabel = 'Send secure link',
   submitLoadingLabel = 'Sending secure link...',
+  footerLinkLabel,
+  footerLinkHref,
+  footerLinkIntro,
   ...props
 }: AuthEntryFormProps) {
   const [email, setEmail] = React.useState('');
@@ -89,37 +95,30 @@ export function AuthEntryForm({
     <div className={cn('flex flex-col gap-6', className)} {...props}>
       <form onSubmit={handleSubmit}>
         <FieldGroup>
-          <div className="flex flex-col items-center gap-2 text-center">
-            <a href="#" className="flex flex-col items-center gap-2 font-medium">
-              <SiteLogo className="size-18 border-0" />
+          <div className="flex flex-col items-center gap-4 text-center">
+            <a href="#" className="flex flex-col items-center font-medium">
+              <SiteLogoFull className="h-12 w-auto sm:h-14" />
               <span className="sr-only">ICONIC Academy LLC.</span>
             </a>
-            <h1 className="text-2xl font-bold">{title}</h1>
-            <FieldDescription className="text-center text-xs">{subtitle}</FieldDescription>
+            <h1 className="text-xl font-bold">{title}</h1>
+            <FieldDescription className="text-center">
+              {subtitle}
+              {footerLinkLabel && footerLinkHref ? (
+                <>
+                  {' '}
+                  {footerLinkIntro ? <span>{footerLinkIntro} </span> : null}
+                  <Link
+                    href={footerLinkHref}
+                    className="font-medium text-foreground underline underline-offset-4"
+                  >
+                    {footerLinkLabel}
+                  </Link>
+                </>
+              ) : null}
+            </FieldDescription>
           </div>
           <Field>
-            <Button
-              type="button"
-              onClick={handleOAuthLogin('google')}
-              variant="default"
-              disabled={isSubmitting}
-            >
-              {oauthSubmittingProvider === 'google' ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                  <path
-                    d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"
-                    fill="currentColor"
-                  />
-                </svg>
-              )}
-              {getOAuthButtonLabel('google', oauthSubmittingProvider === 'google')}
-            </Button>
-          </Field>
-          <FieldSeparator>Or</FieldSeparator>
-          <Field>
-            <div className="space-y-1 text-center text-xs text-muted-foreground">
+            <div className="text-center text-sm text-muted-foreground">
               <p>{introText}</p>
             </div>
             <FieldLabel htmlFor="email">Email</FieldLabel>
@@ -163,12 +162,33 @@ export function AuthEntryForm({
               )}
             </Button>
           </Field>
+          <FieldSeparator className="my-0">OR</FieldSeparator>
+          <Field>
+            <Button
+              type="button"
+              onClick={handleOAuthLogin('google')}
+              variant="default"
+              disabled={isSubmitting}
+            >
+              {oauthSubmittingProvider === 'google' ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                  <path
+                    d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"
+                    fill="currentColor"
+                  />
+                </svg>
+              )}
+              {getOAuthButtonLabel('google', oauthSubmittingProvider === 'google')}
+            </Button>
+          </Field>
           <div className="space-y-1 text-center text-xs text-muted-foreground">
             <p>{trustLine}</p>
           </div>
         </FieldGroup>
       </form>
-      <FieldDescription className="px-6 text-center text-xs">
+      <FieldDescription className="px-6 text-center">
         By clicking continue, you agree to our <a href="#">Terms of Service</a> and{' '}
         <a href="#">Privacy Policy</a>.
       </FieldDescription>

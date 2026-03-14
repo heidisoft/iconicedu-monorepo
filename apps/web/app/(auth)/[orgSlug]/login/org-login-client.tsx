@@ -3,9 +3,9 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 
-import { AuthEntryForm } from '@iconicedu/web/app/(auth)/shared/auth-entry-form';
-import { createSupabaseBrowserClient } from '@iconicedu/web/lib/supabase/client';
-import { trackAuthTelemetry } from '@iconicedu/web/lib/telemetry/auth-events';
+import { AuthEntryForm } from '../../shared/auth-entry-form';
+import { createSupabaseBrowserClient } from '../../../../lib/supabase/client';
+import { trackAuthTelemetry } from '../../../../lib/telemetry/auth-events';
 
 type OrgLoginClientProps = {
   orgSlug: string;
@@ -48,9 +48,11 @@ export default function OrgLoginClient({ orgSlug, orgName }: OrgLoginClientProps
       }),
     });
 
-    const eligibilityBody = (await eligibilityResponse.json().catch(() => null)) as
-      | { eligible?: boolean; reason?: string; message?: string }
-      | null;
+    const eligibilityBody = (await eligibilityResponse.json().catch(() => null)) as {
+      eligible?: boolean;
+      reason?: string;
+      message?: string;
+    } | null;
 
     if (!eligibilityResponse.ok || !eligibilityBody?.eligible) {
       if (shouldRedirectToOrgGetStarted(eligibilityBody)) {
@@ -108,8 +110,11 @@ export default function OrgLoginClient({ orgSlug, orgName }: OrgLoginClientProps
       errorMessage={errorMessage}
       title={`Sign in to ${orgName}`}
       subtitle="Use your existing organization account to access your dashboard."
-      introText="This page is for existing users. If you are new, use the Get started page for your organization."
+      introText=""
       trustLine="Secure login. No password required. Organization access only."
+      footerLinkIntro="New to ICONIC Academy?"
+      footerLinkLabel="Get started here"
+      footerLinkHref={`/${orgSlug}/get-started`}
     />
   );
 }
