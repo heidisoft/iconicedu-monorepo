@@ -7,7 +7,7 @@ import {
   CalendarClock,
   CalendarDays,
   Inbox,
-  Sparkles,
+  Sparkle,
 } from 'lucide-react';
 
 // eslint-disable-next-line no-restricted-imports
@@ -319,7 +319,7 @@ export function DashboardHomeInfographicSection({
           <div className="mt-5 rounded-2xl border border-primary/30 bg-primary/10 p-5">
             <div className="flex items-center gap-3">
               <div className="rounded-full bg-primary/20 p-2.5 text-primary">
-                <Sparkles className="size-5" aria-hidden="true" />
+                <Sparkle className="size-5" aria-hidden="true" />
               </div>
               <div>
                 <p className="font-semibold">Boost Your Learning!</p>
@@ -348,6 +348,7 @@ export function DashboardHomeInfographicSection({
                     onClick={openDialog}
                     className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
                   >
+                    <Sparkle className="mr-2 size-4" aria-hidden="true" />
                     Explore More Classes
                   </button>
                 ) : (
@@ -355,6 +356,7 @@ export function DashboardHomeInfographicSection({
                     href={fallbackHref}
                     className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
                   >
+                    <Sparkle className="mr-2 size-4" aria-hidden="true" />
                     Explore More Classes
                   </a>
                 )

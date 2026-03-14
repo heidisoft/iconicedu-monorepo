@@ -254,10 +254,10 @@ export function ClassRequestAction({
       <Dialog open={isRequestDialogOpen} onOpenChange={handleRequestDialogOpenChange}>
         <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Explore More Classes</DialogTitle>
+            <DialogTitle>Explore Classes</DialogTitle>
             <DialogDescription>
-              Tell us what you need and we will create a class request channel for
-              follow-up.
+              Tell us what you need, and we will match your family with the best tutors in
+              the world to help your kids learn, grow, and thrive.
             </DialogDescription>
           </DialogHeader>
 

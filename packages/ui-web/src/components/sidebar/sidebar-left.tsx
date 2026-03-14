@@ -12,9 +12,9 @@ import {
   Inbox,
   Languages,
   LifeBuoy,
-  MessageSquarePlus,
   MoreHorizontal,
   Send,
+  Sparkle,
   SquarePi,
   UserPlus,
 } from 'lucide-react';
@@ -646,7 +646,7 @@ export function SidebarLeft({
                               openDialog();
                             }}
                           >
-                            <MessageSquarePlus className="text-muted-foreground" />
+                            <Sparkle className="text-muted-foreground" />
                             <span>Explore Classes</span>
                           </DropdownMenuItem>
                         ) : (
@@ -657,7 +657,7 @@ export function SidebarLeft({
                               }
                             }}
                           >
-                            <MessageSquarePlus className="text-muted-foreground" />
+                            <Sparkle className="text-muted-foreground" />
                             <span>Explore Classes</span>
                           </DropdownMenuItem>
                         )

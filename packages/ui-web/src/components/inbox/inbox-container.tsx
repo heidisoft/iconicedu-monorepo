@@ -2,9 +2,18 @@
 
 import type React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { BellOff } from 'lucide-react';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
 import { ScrollArea } from '@iconicedu/ui-web/ui/scroll-area';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@iconicedu/ui-web/ui/tabs';
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@iconicedu/ui-web/ui/empty';
 import { ActivityBasic } from '@iconicedu/ui-web/components/notification/activity-basic';
 import { ActivityBasicWithExpandedContent } from '@iconicedu/ui-web/components/notification/activity-basic-with-expanded-content';
 import { ActivityFeedbackRequest } from '@iconicedu/ui-web/components/notification/activity-feedback-request';
@@ -662,20 +671,36 @@ export function InboxContainer({
       <TabsContent value={activeTab} className="mt-0">
         <ScrollArea className="h-[calc(100vh-180px)]">
           <div className="p-4 space-y-8">
-            {visibleSections.map((section) => (
-              <div key={section.label} className="space-y-1">
-                <h2 className="sticky top-0 z-30 -mx-4 mb-4 bg-background/95 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground shadow-sm backdrop-blur">
-                  {section.label}
-                </h2>
-                <div className="space-y-1">
-                  {section.items.map((activity) => (
-                    <div key={activity.ids.id} className="relative">
-                      {renderActivity(activity)}
-                    </div>
-                  ))}
+            {visibleSections.length === 0 ? (
+              <Empty className="rounded-2xl border border-dashed border-border bg-background/60 px-6 py-12">
+                <EmptyHeader className="max-w-none items-center text-center">
+                  <EmptyMedia variant="icon">
+                    <BellOff className="size-5" aria-hidden="true" />
+                  </EmptyMedia>
+                  <EmptyTitle>No alerts to display</EmptyTitle>
+                  <EmptyDescription>
+                    Your inbox is clear right now. New messages, mentions, and updates
+                    will show up here.
+                  </EmptyDescription>
+                </EmptyHeader>
+                <EmptyContent />
+              </Empty>
+            ) : (
+              visibleSections.map((section) => (
+                <div key={section.label} className="space-y-1">
+                  <h2 className="sticky top-0 z-30 -mx-4 mb-4 bg-background/95 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground shadow-sm backdrop-blur">
+                    {section.label}
+                  </h2>
+                  <div className="space-y-1">
+                    {section.items.map((activity) => (
+                      <div key={activity.ids.id} className="relative">
+                        {renderActivity(activity)}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
             {hasMore ? (
               <div ref={loadMoreRef} aria-hidden className="h-6 w-full" />
             ) : null}

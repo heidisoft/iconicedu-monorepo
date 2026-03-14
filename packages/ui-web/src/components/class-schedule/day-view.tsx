@@ -13,7 +13,14 @@ import { EventCard } from '@iconicedu/ui-web/components/class-schedule/event-car
 import { MiniClassSchedule } from '@iconicedu/ui-web/components/class-schedule/mini-class-schedule';
 import { ScrollArea } from '@iconicedu/ui-web/ui/scroll-area';
 import { Button } from '@iconicedu/ui-web/ui/button';
-import { ArrowRight, MessageSquarePlus, UserPlus } from 'lucide-react';
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@iconicedu/ui-web/ui/empty';
+import { ArrowRight, CalendarX, UserPlus } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@iconicedu/ui-web/ui/popover';
 import { useEffect, useRef } from 'react';
 
@@ -210,10 +217,7 @@ export function DayView({
                         </div>
                         <div className="max-h-48 overflow-auto">
                           {info.hiddenEvents.map((hidden) => (
-                            <div
-                              key={hidden.ids.id}
-                              className="pointer-events-auto"
-                            >
+                            <div key={hidden.ids.id} className="pointer-events-auto">
                               <EventCard event={hidden} />
                             </div>
                           ))}
@@ -238,15 +242,18 @@ export function DayView({
 
           {dayEvents.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center px-6">
-              <div className="flex flex-col items-center gap-3 rounded-xl border bg-background/90 px-6 py-4 text-center shadow-sm">
+              <Empty className="w-full max-w-sm rounded-xl border bg-background/90 px-6 py-6 shadow-sm">
                 {!hasChildren ? (
                   <>
-                    <div className="text-sm font-medium text-foreground">
-                      Add your child to get started
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      You need at least one child profile to see classes.
-                    </div>
+                    <EmptyHeader className="items-center text-center">
+                      <EmptyMedia variant="icon">
+                        <UserPlus className="size-5" aria-hidden="true" />
+                      </EmptyMedia>
+                      <EmptyTitle>Add your child to get started</EmptyTitle>
+                      <EmptyDescription>
+                        You need at least one child profile to see classes.
+                      </EmptyDescription>
+                    </EmptyHeader>
                     <Button size="sm">
                       <UserPlus className="mr-2 size-4" />
                       Add a child
@@ -254,27 +261,27 @@ export function DayView({
                   </>
                 ) : !hasClasses ? (
                   <>
-                    <div className="text-sm font-medium text-foreground">
-                      No classes enrolled yet
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      Request tutoring to start scheduling.
-                    </div>
-                    <Button size="sm">
-                      <MessageSquarePlus className="mr-2 size-4" />
-                      Request tutoring
-                    </Button>
+                    <EmptyHeader className="items-center text-center">
+                      <EmptyMedia variant="icon">
+                        <CalendarX className="size-5" aria-hidden="true" />
+                      </EmptyMedia>
+                      <EmptyTitle>No classes enrolled yet</EmptyTitle>
+                      <EmptyDescription>
+                        Explore classes to start scheduling and find the right support for
+                        your child.
+                      </EmptyDescription>
+                    </EmptyHeader>
                   </>
                 ) : (
                   <>
-                    <div className="text-sm font-medium text-foreground">
-                      No events today
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {nextEvent
-                        ? `Next up: ${nextEvent.title} at ${formatEventTime(nextEvent.startAt)}`
-                        : 'No upcoming events scheduled'}
-                    </div>
+                    <EmptyHeader className="items-center text-center">
+                      <EmptyTitle>No events today</EmptyTitle>
+                      <EmptyDescription>
+                        {nextEvent
+                          ? `Next up: ${nextEvent.title} at ${formatEventTime(nextEvent.startAt)}`
+                          : 'No upcoming events scheduled'}
+                      </EmptyDescription>
+                    </EmptyHeader>
                     {nextEvent && (
                       <Button
                         size="sm"
@@ -291,7 +298,7 @@ export function DayView({
                     )}
                   </>
                 )}
-              </div>
+              </Empty>
             </div>
           )}
         </div>

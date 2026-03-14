@@ -4,8 +4,8 @@ import {
   ChevronUp,
   Languages,
   ListXIcon,
-  MessageSquarePlus,
   MoreHorizontal,
+  Sparkle,
   StarOff,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -110,12 +110,12 @@ export function NavLearningSpaces({
                       renderTrigger={({ canRequestClasses, fallbackHref, openDialog }) =>
                         canRequestClasses ? (
                           <Button size="lg" type="button" onClick={openDialog}>
-                            <MessageSquarePlus /> Explore Classes
+                            <Sparkle /> Explore Classes
                           </Button>
                         ) : (
                           <Button size="lg" asChild>
                             <a href={fallbackHref}>
-                              <MessageSquarePlus /> Explore Classes
+                              <Sparkle /> Explore Classes
                             </a>
                           </Button>
                         )
@@ -124,7 +124,7 @@ export function NavLearningSpaces({
                   ) : (
                     <Button size="lg" asChild>
                       <a href={`${dashboardBasePath}/spaces`}>
-                        <MessageSquarePlus /> Explore Classes
+                        <Sparkle /> Explore Classes
                       </a>
                     </Button>
                   )}
