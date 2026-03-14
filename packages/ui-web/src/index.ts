@@ -10,6 +10,7 @@ export * from '@iconicedu/ui-web/ui/breadcrumb';
 export * from '@iconicedu/ui-web/ui/button';
 export * from '@iconicedu/ui-web/ui/button-group';
 export * from '@iconicedu/ui-web/ui/dropdown-menu';
+export * from '@iconicedu/ui-web/ui/dot-pattern';
 export * from '@iconicedu/ui-web/ui/command';
 export * from '@iconicedu/ui-web/ui/accordion';
 export * from '@iconicedu/ui-web/ui/field';

@@ -19,6 +19,7 @@ import {
 import { DashboardSessionsEmptyState } from '@iconicedu/ui-web/components/empty';
 import { SessionCard } from '@iconicedu/ui-web/components/messages/tabs/messages-session-card';
 import type { ClassSession } from '@iconicedu/ui-web/components/messages/tabs/messages-schedule-tab.utils';
+import { DotPattern } from '@iconicedu/ui-web/ui/dot-pattern';
 
 export interface DashboardUpcomingSessionListItem {
   session: ClassSession;
@@ -116,78 +117,113 @@ export function DashboardHomeInfographicSection({
     );
   };
 
+  const infographicCardClassName =
+    'relative overflow-hidden rounded-2xl border border-border bg-card p-5';
+  const infographicContentClassName = 'relative z-10';
+  const infographicPatternClassName =
+    'text-primary/20 [mask-image:radial-gradient(250px_circle_at_center,black,transparent_78%)]';
+
   return (
     <section aria-label="Dashboard classroom sessions" className="space-y-4">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <article className="rounded-2xl border border-border bg-card p-5">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <p className="text-base font-semibold text-foreground">Upcoming Sessions</p>
-            <div className="inline-flex rounded-xl bg-primary/15 p-2.5 text-primary/80">
-              <CalendarClock className="size-5" aria-hidden="true" />
+        <article className={infographicCardClassName}>
+          <DotPattern
+            width={20}
+            height={20}
+            cr={3.5}
+            glow={true}
+            className={infographicPatternClassName}
+          />
+          <div className={infographicContentClassName}>
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <p className="text-base font-semibold text-foreground">Upcoming Sessions</p>
+              <div className="inline-flex rounded-xl bg-primary/15 p-2.5 text-primary/80">
+                <CalendarClock className="size-5" aria-hidden="true" />
+              </div>
             </div>
-          </div>
-          <p className="mt-2 text-4xl font-semibold tracking-tight">
-            {topMetrics.upcomingSessionsThisWeek}
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">This week</p>
-        </article>
-
-        <article className="rounded-2xl border border-border bg-card p-5">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <p className="text-base font-semibold text-foreground">Completed Classes</p>
-            <div className="inline-flex rounded-xl bg-primary/15 p-2.5 text-primary/80">
-              <CalendarCheck className="size-5" aria-hidden="true" />
-            </div>
-          </div>
-          <p className="mt-2 text-4xl font-semibold tracking-tight">
-            {topMetrics.completedClassesThisMonth}
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">This month</p>
-        </article>
-
-        <article className="rounded-2xl border border-border bg-card p-5">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <p className="text-base font-semibold text-foreground">
-              {isStaffView ? 'Manage Classrooms' : 'Active Subjects'}
+            <p className="mt-2 text-4xl font-semibold tracking-tight">
+              {topMetrics.upcomingSessionsThisWeek}
             </p>
-            <div className="inline-flex rounded-xl bg-primary/15 p-2.5 text-primary/80">
-              <BookOpenCheck className="size-5" aria-hidden="true" />
-            </div>
+            <p className="mt-1 text-sm text-muted-foreground">This week</p>
           </div>
-          <p className="mt-2 text-4xl font-semibold tracking-tight">
-            {topMetrics.activeSubjectsCount}
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {topMetrics.activeSubjectsLabel}
-          </p>
         </article>
 
-        <article className="rounded-2xl border border-border bg-primary/10 p-5">
-          <p className="text-base font-semibold text-foreground">
-            {isParentView ? 'Manage my family' : 'Manage my account'}
-          </p>
-          <p className="mt-3 text-sm text-muted-foreground">
-            {isParentView
-              ? 'Update your children profiles and household links'
-              : 'Update profile details, preferences, and account settings'}
-          </p>
-          {isParentView ? (
-            <button
-              type="button"
-              onClick={openFamilySettings}
-              className="mt-6 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
-            >
-              Manage my family
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={openAccountSettings}
-              className="mt-6 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
-            >
-              Manage my account
-            </button>
-          )}
+        <article className={infographicCardClassName}>
+          <DotPattern
+            width={20}
+            height={20}
+            cr={3.5}
+            glow={true}
+            className={`${infographicPatternClassName} text-emerald-500/20`}
+          />
+          <div className={infographicContentClassName}>
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <p className="text-base font-semibold text-foreground">Completed Classes</p>
+              <div className="inline-flex rounded-xl bg-primary/15 p-2.5 text-primary/80">
+                <CalendarCheck className="size-5" aria-hidden="true" />
+              </div>
+            </div>
+            <p className="mt-2 text-4xl font-semibold tracking-tight">
+              {topMetrics.completedClassesThisMonth}
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">This month</p>
+          </div>
+        </article>
+
+        <article className={infographicCardClassName}>
+          <DotPattern
+            width={20}
+            height={20}
+            cr={3.5}
+            glow={true}
+            className={`${infographicPatternClassName} text-sky-500/20`}
+          />
+          <div className={infographicContentClassName}>
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <p className="text-base font-semibold text-foreground">
+                {isStaffView ? 'Manage Classrooms' : 'Active Subjects'}
+              </p>
+              <div className="inline-flex rounded-xl bg-primary/15 p-2.5 text-primary/80">
+                <BookOpenCheck className="size-5" aria-hidden="true" />
+              </div>
+            </div>
+            <p className="mt-2 text-4xl font-semibold tracking-tight">
+              {topMetrics.activeSubjectsCount}
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {topMetrics.activeSubjectsLabel}
+            </p>
+          </div>
+        </article>
+
+        <article className="relative overflow-hidden rounded-2xl border border-border bg-primary/10 p-5">
+          <div className={infographicContentClassName}>
+            <p className="text-base font-semibold text-foreground">
+              {isParentView ? 'Manage my family' : 'Manage my account'}
+            </p>
+            <p className="mt-3 text-sm text-muted-foreground">
+              {isParentView
+                ? 'Update your children profiles and household links'
+                : 'Update profile details, preferences, and account settings'}
+            </p>
+            {isParentView ? (
+              <button
+                type="button"
+                onClick={openFamilySettings}
+                className="mt-6 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+              >
+                Manage my family
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={openAccountSettings}
+                className="mt-6 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+              >
+                Manage my account
+              </button>
+            )}
+          </div>
         </article>
       </div>
 

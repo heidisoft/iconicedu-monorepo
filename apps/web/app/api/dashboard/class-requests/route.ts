@@ -19,6 +19,7 @@ import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 
 const OTHER_SUBJECT = 'Other';
+type AllowedDashboardSubject = (typeof DASHBOARD_CLASS_REQUEST_SUBJECT_OPTIONS)[number];
 
 function parsePayload(body: unknown): DashboardClassRequestPayload | null {
   if (!body || typeof body !== 'object') {
@@ -66,8 +67,13 @@ export async function POST(request: Request) {
     );
   }
 
-  const allowedSubjects = new Set(DASHBOARD_CLASS_REQUEST_SUBJECT_OPTIONS);
-  if (payload.subjects.some((subject) => !allowedSubjects.has(subject))) {
+  const allowedSubjects = new Set<AllowedDashboardSubject>(
+    DASHBOARD_CLASS_REQUEST_SUBJECT_OPTIONS,
+  );
+  const isAllowedSubject = (subject: string): subject is AllowedDashboardSubject =>
+    allowedSubjects.has(subject as AllowedDashboardSubject);
+
+  if (payload.subjects.some((subject) => !isAllowedSubject(subject))) {
     return NextResponse.json(
       {
         success: false,
@@ -139,7 +145,9 @@ export async function POST(request: Request) {
     const allowedStudentIds =
       requesterVM.kind === 'child'
         ? new Set([requesterVM.ids.id])
-        : new Set((requesterVM.children?.items ?? []).map((child) => child.ids.id));
+        : requesterVM.kind === 'guardian'
+          ? new Set((requesterVM.children?.items ?? []).map((child) => child.ids.id))
+          : new Set<string>();
 
     const selectedStudentIds = Array.from(
       new Set(payload.studentProfileIds.filter((id) => allowedStudentIds.has(id))),

@@ -1,19 +1,22 @@
+// @vitest-environment jsdom
+
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { render, waitFor } from '@testing-library/react';
 
-import Page from '@iconicedu/web/app/(app)/[orgSlug]/page';
+import { HomePageContent } from './home-page-content';
 
 const dashboardHomeInfographicSectionMock = vi.fn(() => null);
 const buildDashboardHomeInfographicMetricsMock = vi.fn();
 
 vi.mock('@iconicedu/ui-web', () => ({
   DashboardHeader: () => null,
+  DashboardHomeSkeleton: () => null,
   DashboardHomeInfographicSection: (props: unknown) =>
     dashboardHomeInfographicSectionMock(props),
 }));
 
-vi.mock('@iconicedu/web/lib/dashboard/class-request', () => ({
+vi.mock('../../../lib/dashboard/class-request', () => ({
   DASHBOARD_CLASS_REQUEST_SUBJECT_OPTIONS: [
     'Math',
     'English Language Arts',
@@ -28,7 +31,7 @@ vi.mock('@iconicedu/web/lib/dashboard/class-request', () => ({
   ],
 }));
 
-vi.mock('@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth', () => ({
+vi.mock('./_shared/dashboard-auth', () => ({
   getDashboardAccountContext: vi.fn(async () => ({
     supabase: { key: 'supabase-client' },
     account: { id: 'account-1', org_id: 'org-1' },
@@ -50,7 +53,7 @@ vi.mock('@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth', () => ({
   })),
 }));
 
-vi.mock('@iconicedu/web/lib/dashboard/home-infographic-metrics', () => ({
+vi.mock('../../../lib/dashboard/home-infographic-metrics', () => ({
   buildDashboardHomeInfographicMetrics: (...args: unknown[]) =>
     buildDashboardHomeInfographicMetricsMock(...args),
 }));
@@ -86,9 +89,7 @@ describe('d home page', () => {
       },
     });
 
-    const element = await Page({
-      params: Promise.resolve({ orgSlug: 'iconic-academy' }),
-    });
+    const element = await HomePageContent({ orgSlug: 'iconic-academy' });
     render(element as React.ReactElement);
 
     await waitFor(() => {
