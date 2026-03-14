@@ -11,7 +11,12 @@ import type { ChannelReadStateVM, MessageVM } from '@iconicedu/shared-types/vm/m
 import type { MessagesRightPanelIntentKey } from '@iconicedu/shared-types/vm/message';
 
 export type ChannelKind = 'channel' | 'dm' | 'group_dm';
-export type ChannelPurpose = 'learning-space' | 'general' | 'support' | 'announcements';
+export type ChannelPurpose =
+  | 'learning-space'
+  | 'general'
+  | 'support'
+  | 'announcements'
+  | 'chass-requests';
 export type ChannelVisibility = 'private' | 'public';
 export type ChannelStatus = 'active' | 'archived';
 
@@ -26,6 +31,7 @@ export type ChannelHeaderIconKey =
   | 'session-summary';
 
 export type ChannelHeaderActionKey = 'info' | 'saved' | 'custom';
+export type ChannelUiTabKeyVM = 'messages' | 'files' | 'schedule' | 'saved' | 'members';
 
 export interface ChannelHeaderActionVM {
   key: ChannelHeaderActionKey;
@@ -164,6 +170,7 @@ export interface ChannelUiDefaultsVM {
   defaultRightPanelOpen?: boolean;
   defaultRightPanelKey?: MessagesRightPanelIntentKey;
   themeKey?: ThemeKey | null;
+  disabledTabs?: ChannelUiTabKeyVM[] | null;
   infoPanel?: {
     showHeader?: boolean;
     showDetails?: boolean;

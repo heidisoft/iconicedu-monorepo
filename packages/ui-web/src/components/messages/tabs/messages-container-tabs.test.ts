@@ -17,4 +17,9 @@ describe('messages-container-tabs', () => {
       'members',
     ]);
   });
+
+  it('filters disabled tabs from the rendered tab list', () => {
+    const tabs = getMessagesContainerTabs(true, ['members', 'saved']);
+    expect(tabs.map((tab) => tab.key)).toEqual(['messages', 'schedule', 'files']);
+  });
 });

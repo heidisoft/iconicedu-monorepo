@@ -12,6 +12,7 @@ export * from './learning-space';
 export * from './message';
 export * from './message-session-feedback';
 export * from './notification-dispatch-job';
+export * from './push-token';
 export * from './org';
 export * from './profile';
 export * from './reminder-job';

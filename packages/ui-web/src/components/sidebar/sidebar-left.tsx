@@ -16,10 +16,11 @@ import {
   MoreHorizontal,
   Send,
   SquarePi,
-  Settings,
   UserPlus,
 } from 'lucide-react';
 
+// eslint-disable-next-line no-restricted-imports
+import { ClassRequestAction } from '../class-request/class-request-action';
 import { NavLearningSpaces } from '@iconicedu/ui-web/components/sidebar/nav-learning-spaces';
 import { NavSecondary } from '@iconicedu/ui-web/components/sidebar/nav-secondary';
 import { NavUser } from '@iconicedu/ui-web/components/sidebar/nav-user';
@@ -48,7 +49,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@iconicedu/ui-web/ui/dropdown-menu';
 import { NavMain } from '@iconicedu/ui-web/components/sidebar/nav-main';
@@ -360,6 +360,36 @@ export function SidebarLeft({
     accountId: data.user.profile.ids.accountId,
     profileId: data.user.profile.ids.id,
   };
+  const orgSlug = dashboardBasePath.replace(/^\//, '') || '';
+  const canRequestClasses =
+    userProfile.kind === 'guardian' || userProfile.kind === 'child';
+  const requestRole =
+    userProfile.kind === 'guardian'
+      ? 'parents'
+      : userProfile.kind === 'child'
+        ? 'students'
+        : 'other';
+  const requestableStudents =
+    userProfile.kind === 'guardian'
+      ? children.map((child) => ({
+          profileId: child.ids.id,
+          displayName: getProfileDisplayName(child.profile),
+        }))
+      : userProfile.kind === 'child'
+        ? [
+            {
+              profileId: userProfile.ids.id,
+              displayName: getProfileDisplayName(userProfile.profile),
+            },
+          ]
+        : [];
+  const openFamilySettings = React.useCallback(() => {
+    window.dispatchEvent(
+      new CustomEvent('iconicedu:open-user-settings', {
+        detail: { tab: 'family' },
+      }),
+    );
+  }, []);
   const ownDirectMessages =
     userProfile.kind === 'guardian'
       ? data.collections.directMessages.filter((dm) =>
@@ -591,19 +621,46 @@ export function SidebarLeft({
                     side={isMobile ? 'bottom' : 'right'}
                     align={isMobile ? 'end' : 'start'}
                   >
-                    <DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault();
+                        openFamilySettings();
+                      }}
+                    >
                       <UserPlus className="text-muted-foreground" />
                       <span>Add child</span>
                     </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      <MessageSquarePlus className="text-muted-foreground" />
-                      <span>Request tutoring</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem>
-                      <Settings className="text-muted-foreground" />
-                      <span>Manage classrooms</span>
-                    </DropdownMenuItem>
+                    <ClassRequestAction
+                      orgSlug={orgSlug}
+                      fallbackHref={`${dashboardBasePath}/spaces`}
+                      canRequestClasses={canRequestClasses}
+                      requestRole={requestRole}
+                      requestableStudents={requestableStudents}
+                      renderTrigger={({ canRequestClasses, fallbackHref, openDialog }) =>
+                        canRequestClasses ? (
+                          <DropdownMenuItem
+                            onSelect={(event) => {
+                              event.preventDefault();
+                              openDialog();
+                            }}
+                          >
+                            <MessageSquarePlus className="text-muted-foreground" />
+                            <span>Explore Classes</span>
+                          </DropdownMenuItem>
+                        ) : (
+                          <DropdownMenuItem
+                            onSelect={() => {
+                              if (typeof window !== 'undefined') {
+                                window.location.assign(fallbackHref);
+                              }
+                            }}
+                          >
+                            <MessageSquarePlus className="text-muted-foreground" />
+                            <span>Explore Classes</span>
+                          </DropdownMenuItem>
+                        )
+                      }
+                    />
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : null}
@@ -643,6 +700,13 @@ export function SidebarLeft({
                       isMobile={isMobile}
                       currentUser={currentUserRef}
                       dashboardBasePath={dashboardBasePath}
+                      classRequestAction={{
+                        orgSlug,
+                        fallbackHref: `${dashboardBasePath}/spaces`,
+                        canRequestClasses,
+                        requestRole,
+                        requestableStudents,
+                      }}
                     />
                   );
                 })

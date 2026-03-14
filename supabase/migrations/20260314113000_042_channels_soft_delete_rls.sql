@@ -1,0 +1,3 @@
+-- Intentionally left as a no-op.
+-- A previous attempt to alter the channel manager policy failed during
+-- application. The replacement policy change lives in a follow-up migration.

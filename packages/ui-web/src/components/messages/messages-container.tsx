@@ -317,8 +317,8 @@ export function MessagesContainer({
   );
   const enableScheduleTab = hasScheduleCapability || (loadedSchedules?.length ?? 0) > 0;
   const containerTabs = useMemo(
-    () => getMessagesContainerTabs(enableScheduleTab),
-    [enableScheduleTab],
+    () => getMessagesContainerTabs(enableScheduleTab, channel.ui?.disabledTabs ?? []),
+    [enableScheduleTab, channel.ui?.disabledTabs],
   );
   const defaultTab = useMemo(
     () => getDefaultMessagesTab(channel, enableScheduleTab),

@@ -412,6 +412,7 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
                         <SelectContent>
                           <SelectItem value="general">General</SelectItem>
                           <SelectItem value="learning-space">Class</SelectItem>
+                          <SelectItem value="chass-requests">Class requests</SelectItem>
                           <SelectItem value="support">Support</SelectItem>
                           <SelectItem value="announcements">Announcements</SelectItem>
                         </SelectContent>

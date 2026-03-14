@@ -55,6 +55,8 @@ export * from '@iconicedu/ui-web/components/class-schedule/class-schedule-contai
 export * from '@iconicedu/ui-web/components/class-schedule/week-view';
 export * from '@iconicedu/ui-web/components/class-schedule/day-view';
 export * from '@iconicedu/ui-web/components/dashboard/dashboard-home-infographic-section';
+export * from '@iconicedu/ui-web/components/dashboard/dashboard-home-skeleton';
+export * from '@iconicedu/ui-web/components/class-request/class-request-action';
 export * from '@iconicedu/ui-web/components/empty';
 export * from '@iconicedu/ui-web/components/marketing/marketing-header';
 export * from '@iconicedu/ui-web/components/marketing/marketing-home-page';

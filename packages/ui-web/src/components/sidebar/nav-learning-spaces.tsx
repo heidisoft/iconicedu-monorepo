@@ -11,6 +11,8 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import type { LearningSpaceVM, UserProfileVM } from '@iconicedu/shared-types';
 
+// eslint-disable-next-line no-restricted-imports
+import { ClassRequestAction } from '../class-request/class-request-action';
 import {
   Collapsible,
   CollapsibleContent,
@@ -51,6 +53,7 @@ export function NavLearningSpaces({
   isMobile,
   currentUser,
   dashboardBasePath = '/',
+  classRequestAction,
 }: {
   learningSpaces: LearningSpaceVM[];
   title: string;
@@ -61,6 +64,14 @@ export function NavLearningSpaces({
   isMobile: boolean;
   currentUser?: { accountId?: string; profileId?: string };
   dashboardBasePath?: string;
+  classRequestAction?: {
+    orgSlug: string;
+    fallbackHref: string;
+    canRequestClasses: boolean;
+    requestRole: 'parents' | 'students' | 'other';
+    requestableStudents: Array<{ profileId: string; displayName: string }>;
+    subjectOptions?: string[];
+  };
 }) {
   return (
     <SidebarGroup className="py-0 group-data-[collapsible=icon]:hidden">
@@ -88,9 +99,35 @@ export function NavLearningSpaces({
             <Empty>
               <EmptyContent>
                 <div className="flex">
-                  <Button size={'lg'}>
-                    <MessageSquarePlus /> Request tutoring
-                  </Button>
+                  {classRequestAction ? (
+                    <ClassRequestAction
+                      orgSlug={classRequestAction.orgSlug}
+                      fallbackHref={classRequestAction.fallbackHref}
+                      canRequestClasses={classRequestAction.canRequestClasses}
+                      requestRole={classRequestAction.requestRole}
+                      requestableStudents={classRequestAction.requestableStudents}
+                      subjectOptions={classRequestAction.subjectOptions}
+                      renderTrigger={({ canRequestClasses, fallbackHref, openDialog }) =>
+                        canRequestClasses ? (
+                          <Button size="lg" type="button" onClick={openDialog}>
+                            <MessageSquarePlus /> Explore Classes
+                          </Button>
+                        ) : (
+                          <Button size="lg" asChild>
+                            <a href={fallbackHref}>
+                              <MessageSquarePlus /> Explore Classes
+                            </a>
+                          </Button>
+                        )
+                      }
+                    />
+                  ) : (
+                    <Button size="lg" asChild>
+                      <a href={`${dashboardBasePath}/spaces`}>
+                        <MessageSquarePlus /> Explore Classes
+                      </a>
+                    </Button>
+                  )}
                 </div>
               </EmptyContent>
             </Empty>

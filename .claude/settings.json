@@ -28,7 +28,12 @@
       "Bash(pnpm test:mobile)",
       "Bash(pnpm test:web)",
       "Bash(grep -n \"^export\" /Users/hwanigasooriya/Workspace/hobby/iconicedu-monorepo/apps/mobile/app/\\\\\\(app\\\\\\)/channel/[channelId].tsx /Users/hwanigasooriya/Workspace/hobby/iconicedu-monorepo/apps/mobile/app/\\\\\\(app\\\\\\)/dm/[channelId].tsx /Users/hwanigasooriya/Workspace/hobby/iconicedu-monorepo/apps/mobile/app/\\\\\\(app\\\\\\)/spaces/[channelId].tsx)",
-      "Bash(npx expo install expo-audio)"
+      "Bash(npx expo install expo-audio)",
+      "Bash(find /Users/hwanigasooriya/Workspace/hobby/iconicedu-monorepo/apps/web -type f \\\\\\(-name *notif* -o -name *push* \\\\\\))",
+      "Bash(npx expo:*)",
+      "Bash(pnpm --filter mobile test -- src/lib/notifications/push-token.test.ts src/hooks/use-push-registration.test.ts)",
+      "Bash(pnpm --filter web test -- apps/web/lib/notifications/providers/push-provider.test.ts)",
+      "Bash(pnpm --filter web test -- lib/notifications/providers/push-provider.test.ts)"
     ],
     "additionalDirectories": [
       "/Users/hwanigasooriya/Workspace/hobby/iconicedu-monorepo/supabase/migrations"

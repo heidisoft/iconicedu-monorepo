@@ -4,12 +4,17 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/providers/auth-provider';
 import { useTheme } from '@/providers/theme-provider';
 import { fetchOnboardingStatus } from '@/lib/api/queries';
+import { useNotificationHandler } from '@/hooks/use-notification-handler';
+import { usePushRegistration } from '@/hooks/use-push-registration';
 
 export default function AppLayout() {
-  const { session, loading, signOut } = useAuth();
+  const { session, loading } = useAuth();
   const { colors } = useTheme();
   const router = useRouter();
   const queryClient = useQueryClient();
+
+  usePushRegistration();
+  useNotificationHandler();
 
   // Auth guard: redirect to login if not authenticated.
   useEffect(() => {
@@ -41,8 +46,8 @@ export default function AppLayout() {
         // Network error or timeout — let the user access the app.
         // They can complete their profile later from account settings.
       });
-  // Re-run only when the authenticated user changes (login/logout).
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Re-run only when the authenticated user changes (login/logout).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.user.id]);
 
   if (loading || !session) return null;

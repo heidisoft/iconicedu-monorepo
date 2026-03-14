@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { requireAdminAuthContext } from '@iconicedu/web/lib/admin/_auth-context';
+import { requireAdminAuthContext } from './_auth-context';
 
 const getUser = vi.fn();
 const getAccountByAuthUserId = vi.fn();
@@ -40,6 +40,7 @@ describe('requireAdminAuthContext', () => {
 
     const result = await requireAdminAuthContext();
 
+    expect(result.accountId).toBe('account-1');
     expect(result.orgId).toBe('org-1');
     expect(result.profileId).toBe('profile-1');
     expect(result.now).toMatch(/^\d{4}-\d{2}-\d{2}T/);

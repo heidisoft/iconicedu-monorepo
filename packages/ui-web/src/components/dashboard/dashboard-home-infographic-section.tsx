@@ -10,6 +10,12 @@ import {
   Sparkles,
 } from 'lucide-react';
 
+// eslint-disable-next-line no-restricted-imports
+import {
+  ClassRequestAction,
+  type ClassRequestRole as DashboardRequestRole,
+  type ClassRequestableStudent as DashboardRequestableStudent,
+} from '../class-request/class-request-action';
 import { DashboardSessionsEmptyState } from '@iconicedu/ui-web/components/empty';
 import { SessionCard } from '@iconicedu/ui-web/components/messages/tabs/messages-session-card';
 import type { ClassSession } from '@iconicedu/ui-web/components/messages/tabs/messages-schedule-tab.utils';
@@ -28,6 +34,7 @@ export interface DashboardUpcomingSessionsPage {
 }
 
 export interface DashboardHomeInfographicSectionProps {
+  orgSlug: string;
   isStaffView?: boolean;
   isParentView?: boolean;
   topMetrics: {
@@ -40,10 +47,29 @@ export interface DashboardHomeInfographicSectionProps {
   calendarHref: string;
   inboxHref: string;
   browseHref: string;
+  canRequestClasses?: boolean;
+  requestRole?: DashboardRequestRole;
+  requestableStudents?: DashboardRequestableStudent[];
+  subjectOptions?: string[];
+  onClassRequestCreated?: (channelId: string) => void;
   onJoinSession?: (joinHref: string) => void | Promise<void>;
 }
 
+const DEFAULT_SUBJECT_OPTIONS = [
+  'Math',
+  'English Language Arts',
+  'Science',
+  'Social Studies',
+  'Computer Science',
+  'Test Prep',
+  'Study Skills',
+  'Languages',
+  'Arts',
+  'Other',
+];
+
 export function DashboardHomeInfographicSection({
+  orgSlug,
   isStaffView = false,
   isParentView = false,
   topMetrics,
@@ -51,10 +77,16 @@ export function DashboardHomeInfographicSection({
   calendarHref,
   inboxHref,
   browseHref,
+  canRequestClasses = false,
+  requestRole = 'other',
+  requestableStudents = [],
+  subjectOptions = DEFAULT_SUBJECT_OPTIONS,
+  onClassRequestCreated,
   onJoinSession,
 }: DashboardHomeInfographicSectionProps) {
   const quickActionIconClassName = 'size-5 shrink-0';
   const [currentPage, setCurrentPage] = useState(1);
+
   const totalPages = Math.max(1, upcomingSessionsPage.totalPages);
 
   useEffect(() => {
@@ -261,12 +293,37 @@ export function DashboardHomeInfographicSection({
               </div>
             </div>
 
-            <a
-              href={browseHref}
-              className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
-            >
-              Explore More Classes
-            </a>
+            <ClassRequestAction
+              orgSlug={orgSlug}
+              fallbackHref={browseHref}
+              canRequestClasses={canRequestClasses}
+              requestRole={requestRole}
+              requestableStudents={requestableStudents}
+              subjectOptions={subjectOptions}
+              onClassRequestCreated={onClassRequestCreated}
+              renderTrigger={({
+                canRequestClasses: canRequest,
+                fallbackHref,
+                openDialog,
+              }) =>
+                canRequest ? (
+                  <button
+                    type="button"
+                    onClick={openDialog}
+                    className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+                  >
+                    Explore More Classes
+                  </button>
+                ) : (
+                  <a
+                    href={fallbackHref}
+                    className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+                  >
+                    Explore More Classes
+                  </a>
+                )
+              }
+            />
           </div>
         </aside>
       </div>

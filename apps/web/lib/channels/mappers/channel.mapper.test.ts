@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { mapChannelRowToVM } from '@iconicedu/web/lib/channels/mappers/channel.mapper';
+import { mapChannelRowToVM } from './channel.mapper';
 import type { ChannelRow } from '@iconicedu/shared-types';
 
 describe('mapChannelRowToVM', () => {
@@ -93,6 +93,48 @@ describe('mapChannelRowToVM', () => {
 
     expect(channel.ui?.defaultRightPanelOpen).toBeUndefined();
     expect(channel.ui?.defaultRightPanelKey).toBe('channel_info');
+  });
+
+  it('maps disabled tabs from ui defaults', () => {
+    const row: ChannelRow = {
+      id: 'channel-4',
+      org_id: 'org-1',
+      kind: 'channel',
+      topic: 'Class Request: Family',
+      icon_key: null,
+      description: null,
+      visibility: 'private',
+      purpose: 'chass-requests',
+      status: 'active',
+      dm_key: null,
+      posting_policy_kind: 'members-only',
+      allow_threads: true,
+      allow_reactions: true,
+      primary_entity_kind: null,
+      primary_entity_id: null,
+      ui_theme_key: null,
+      ui_defaults: {
+        disabledTabs: ['members', 'saved'],
+      },
+      created_by_profile_id: 'profile-1',
+      created_at: '2026-01-01T00:00:00.000Z',
+      archived_at: null,
+      created_by: 'profile-1',
+      updated_at: '2026-01-01T00:00:00.000Z',
+      updated_by: 'profile-1',
+      deleted_at: null,
+      deleted_by: null,
+    };
+
+    const channel = mapChannelRowToVM(row, {
+      participants: [],
+      messages: [],
+      media: [],
+      files: [],
+      capabilities: [],
+    });
+
+    expect(channel.ui?.disabledTabs).toEqual(['members', 'saved']);
   });
 
   it('maps provider-neutral live session config from live_session_config', () => {

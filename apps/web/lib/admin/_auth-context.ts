@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 
 export type AdminAuthContext = {
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
+  accountId: string;
   orgId: string;
   profileId: string;
   now: string;
@@ -31,6 +32,7 @@ export async function requireAdminAuthContext(): Promise<AdminAuthContext> {
 
   return {
     supabase,
+    accountId: accountResponse.data.id,
     orgId: accountResponse.data.org_id,
     profileId: profileResponse.data.id,
     now: new Date().toISOString(),

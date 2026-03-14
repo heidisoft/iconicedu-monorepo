@@ -2,6 +2,7 @@ import type {
   ChannelCapabilityRow,
   ChannelReadStateRow,
   ChannelRow,
+  ChannelUiTabKeyVM,
   ChannelVM,
   ChannelMediaItemVM,
   ChannelFileItemVM,
@@ -23,9 +24,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function parseUiDefaults(
-  uiDefaultsValue: unknown,
-): Partial<ChannelUiDefaultsVM> | null {
+function parseUiDefaults(uiDefaultsValue: unknown): Partial<ChannelUiDefaultsVM> | null {
   if (!isRecord(uiDefaultsValue)) {
     return null;
   }
@@ -47,6 +46,20 @@ function parseUiDefaults(
       uiDefaultsValue.defaultRightPanelKey === 'saved')
   ) {
     parsed.defaultRightPanelKey = uiDefaultsValue.defaultRightPanelKey;
+  }
+
+  if (Array.isArray(uiDefaultsValue.disabledTabs)) {
+    const disabledTabs = uiDefaultsValue.disabledTabs.filter(
+      (value): value is ChannelUiTabKeyVM =>
+        value === 'messages' ||
+        value === 'files' ||
+        value === 'schedule' ||
+        value === 'saved' ||
+        value === 'members',
+    );
+    if (disabledTabs.length > 0) {
+      parsed.disabledTabs = Array.from(new Set(disabledTabs));
+    }
   }
 
   if (isRecord(uiDefaultsValue.infoPanel)) {
@@ -108,7 +121,9 @@ function parseLiveSessionConfig(value: unknown): ChannelLiveSessionConfigVM | nu
     provider: value.provider,
     mode: value.mode === 'video' || value.mode === 'audio' ? value.mode : null,
     joinUrl:
-      value.provider === 'custom' && typeof value.joinUrl === 'string' && value.joinUrl.trim().length > 0
+      value.provider === 'custom' &&
+      typeof value.joinUrl === 'string' &&
+      value.joinUrl.trim().length > 0
         ? value.joinUrl.trim()
         : null,
   };
@@ -182,10 +197,11 @@ export function mapChannelRowToVM(
             resolveThemeKey(row.ui_theme_key ?? null) ??
             parsedUiDefaults?.themeKey ??
             null,
-          defaultRightPanelOpen:
-            parsedUiDefaults?.defaultRightPanelOpen,
+          disabledTabs: parsedUiDefaults?.disabledTabs ?? null,
+          defaultRightPanelOpen: parsedUiDefaults?.defaultRightPanelOpen,
           defaultRightPanelKey:
-            parsedUiDefaults?.defaultRightPanelKey ?? (isLearningSpace ? 'channel_info' : undefined),
+            parsedUiDefaults?.defaultRightPanelKey ??
+            (isLearningSpace ? 'channel_info' : undefined),
         }
       : undefined;
 
@@ -206,7 +222,8 @@ export function mapChannelRowToVM(
       archivedAt: row.archived_at ?? null,
     },
     postingPolicy: {
-      kind: (row.posting_policy_kind ?? 'members-only') as ChannelVM['postingPolicy']['kind'],
+      kind: (row.posting_policy_kind ??
+        'members-only') as ChannelVM['postingPolicy']['kind'],
       allowThreads: row.allow_threads ?? undefined,
       allowReactions: row.allow_reactions ?? undefined,
     },
@@ -232,9 +249,7 @@ export function mapChannelRowToVM(
   };
 }
 
-export function mapChannelCapabilityRow(
-  row: ChannelCapabilityRow,
-): ChannelCapabilityVM {
+export function mapChannelCapabilityRow(row: ChannelCapabilityRow): ChannelCapabilityVM {
   return row.capability as ChannelCapabilityVM;
 }
 
@@ -253,9 +268,7 @@ export function mapChannelCapabilityRowToRecordVM(
   };
 }
 
-export function mapChannelReadStateRow(
-  row: ChannelReadStateRow,
-): ChannelReadStateVM {
+export function mapChannelReadStateRow(row: ChannelReadStateRow): ChannelReadStateVM {
   return {
     channelId: row.channel_id,
     lastReadMessageId: row.last_read_message_id ?? undefined,

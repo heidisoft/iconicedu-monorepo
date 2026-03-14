@@ -2,7 +2,11 @@
 
 import * as React from 'react';
 
-import type { ChannelUiDefaultsVM, ThemeKey } from '@iconicedu/shared-types';
+import type {
+  ChannelUiDefaultsVM,
+  ChannelUiTabKeyVM,
+  ThemeKey,
+} from '@iconicedu/shared-types';
 import { PROFILE_THEME_OPTIONS } from '@iconicedu/ui-web/components/sidebar/user-settings/constants';
 import {
   Field,
@@ -31,6 +35,14 @@ type ChannelUiDefaultsSettingsSectionProps = {
   children?: React.ReactNode;
 };
 
+const TAB_OPTIONS: Array<{ key: ChannelUiTabKeyVM; label: string }> = [
+  { key: 'messages', label: 'Messages' },
+  { key: 'schedule', label: 'Sessions' },
+  { key: 'files', label: 'Files' },
+  { key: 'saved', label: 'Saved' },
+  { key: 'members', label: 'Members' },
+];
+
 export function ChannelUiDefaultsSettingsSection({
   uiDefaults,
   onUiDefaultsChange,
@@ -44,15 +56,24 @@ export function ChannelUiDefaultsSettingsSection({
   const defaultRightPanelKey: 'channel_info' | 'saved' =
     uiDefaults?.defaultRightPanelKey === 'saved' ? 'saved' : 'channel_info';
   const infoPanel = uiDefaults?.infoPanel ?? {};
+  const disabledTabs = uiDefaults?.disabledTabs ?? [];
 
-  const updateInfoPanel = (
-    patch: NonNullable<ChannelUiDefaultsVM['infoPanel']>,
-  ) => {
+  const updateInfoPanel = (patch: NonNullable<ChannelUiDefaultsVM['infoPanel']>) => {
     onUiDefaultsChange({
       infoPanel: {
         ...(infoPanel ?? {}),
         ...patch,
       },
+    });
+  };
+
+  const toggleDisabledTab = (tabKey: ChannelUiTabKeyVM, shouldDisable: boolean) => {
+    const nextDisabledTabs = shouldDisable
+      ? Array.from(new Set([...disabledTabs, tabKey]))
+      : disabledTabs.filter((item) => item !== tabKey);
+
+    onUiDefaultsChange({
+      disabledTabs: nextDisabledTabs,
     });
   };
 
@@ -64,9 +85,7 @@ export function ChannelUiDefaultsSettingsSection({
           <FieldLabel htmlFor={themeSelectId}>Color theme</FieldLabel>
           <Select
             value={themeKey}
-            onValueChange={(value) =>
-              onUiDefaultsChange({ themeKey: value as ThemeKey })
-            }
+            onValueChange={(value) => onUiDefaultsChange({ themeKey: value as ThemeKey })}
           >
             <SelectTrigger id={themeSelectId}>
               <SelectValue placeholder="Select color" />
@@ -105,8 +124,8 @@ export function ChannelUiDefaultsSettingsSection({
           </FieldLabel>
           <Select
             value={defaultRightPanelKey}
-                onValueChange={(value) =>
-                  onUiDefaultsChange({
+            onValueChange={(value) =>
+              onUiDefaultsChange({
                 defaultRightPanelKey: value as 'channel_info' | 'saved',
               })
             }
@@ -119,6 +138,25 @@ export function ChannelUiDefaultsSettingsSection({
               <SelectItem value="saved">Saved</SelectItem>
             </SelectContent>
           </Select>
+        </Field>
+        <Field>
+          <FieldLabel>Disabled tabs</FieldLabel>
+          <FieldDescription>
+            Hide tabs in the channel view for this channel only.
+          </FieldDescription>
+          <div className="grid gap-2 pt-1 md:grid-cols-2">
+            {TAB_OPTIONS.map((option) => (
+              <Label key={option.key} className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={disabledTabs.includes(option.key)}
+                  onCheckedChange={(checked) =>
+                    toggleDisabledTab(option.key, checked === true)
+                  }
+                />
+                {option.label}
+              </Label>
+            ))}
+          </div>
         </Field>
         <Field>
           <FieldLabel>Info panel sections</FieldLabel>

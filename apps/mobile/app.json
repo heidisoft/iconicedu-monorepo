@@ -35,7 +35,14 @@
       "expo-splash-screen",
       "expo-sharing",
       "expo-web-browser",
-      "expo-audio"
+      "expo-audio",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#0f172a"
+        }
+      ]
     ]
   }
 }
