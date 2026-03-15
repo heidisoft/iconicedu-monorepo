@@ -31,11 +31,16 @@ export interface DashboardUpcomingSessionListItem {
   weekBucket: 'this-week' | 'next-week';
 }
 
-export interface DashboardUpcomingSessionsPage {
+export interface DashboardUpcomingSessionsSectionPage {
   items: DashboardUpcomingSessionListItem[];
   total: number;
   pageSize: number;
   totalPages: number;
+}
+
+export interface DashboardUpcomingSessionsPage {
+  thisWeek: DashboardUpcomingSessionsSectionPage;
+  nextWeek: DashboardUpcomingSessionsSectionPage;
 }
 
 export interface DashboardHomeInfographicMetrics {
@@ -227,8 +232,6 @@ function buildUpcomingSessionPage(input: {
     (group) => group.sessions,
   );
 
-  const total = flatSessions.length;
-  const totalPages = Math.max(1, Math.ceil(total / input.pageSize));
   const displayNow = input.timezone
     ? (toScheduleDisplayDate(input.now, input.timezone) ?? input.now)
     : input.now;
@@ -272,11 +275,18 @@ function buildUpcomingSessionPage(input: {
     } satisfies DashboardUpcomingSessionListItem;
   });
 
-  return {
-    items,
-    total,
+  const buildSectionPage = (
+    sectionItems: DashboardUpcomingSessionListItem[],
+  ): DashboardUpcomingSessionsSectionPage => ({
+    items: sectionItems,
+    total: sectionItems.length,
     pageSize: input.pageSize,
-    totalPages,
+    totalPages: Math.max(1, Math.ceil(sectionItems.length / input.pageSize)),
+  });
+
+  return {
+    thisWeek: buildSectionPage(items.filter((item) => item.weekBucket === 'this-week')),
+    nextWeek: buildSectionPage(items.filter((item) => item.weekBucket === 'next-week')),
   };
 }
 
@@ -298,10 +308,18 @@ async function buildActiveRoleMetrics(input: {
     return {
       metrics: cloneZeroMetrics(),
       upcomingSessionsPage: {
-        items: [],
-        total: 0,
-        pageSize: input.pageSize,
-        totalPages: 1,
+        thisWeek: {
+          items: [],
+          total: 0,
+          pageSize: input.pageSize,
+          totalPages: 1,
+        },
+        nextWeek: {
+          items: [],
+          total: 0,
+          pageSize: input.pageSize,
+          totalPages: 1,
+        },
       },
     };
   }
@@ -323,10 +341,18 @@ async function buildActiveRoleMetrics(input: {
     return {
       metrics: cloneZeroMetrics(),
       upcomingSessionsPage: {
-        items: [],
-        total: 0,
-        pageSize: input.pageSize,
-        totalPages: 1,
+        thisWeek: {
+          items: [],
+          total: 0,
+          pageSize: input.pageSize,
+          totalPages: 1,
+        },
+        nextWeek: {
+          items: [],
+          total: 0,
+          pageSize: input.pageSize,
+          totalPages: 1,
+        },
       },
     };
   }

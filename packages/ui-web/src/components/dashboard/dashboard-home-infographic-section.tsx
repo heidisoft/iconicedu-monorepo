@@ -29,11 +29,16 @@ export interface DashboardUpcomingSessionListItem {
   weekBucket: 'this-week' | 'next-week';
 }
 
-export interface DashboardUpcomingSessionsPage {
+export interface DashboardUpcomingSessionsSectionPage {
   items: DashboardUpcomingSessionListItem[];
   total: number;
   pageSize: number;
   totalPages: number;
+}
+
+export interface DashboardUpcomingSessionsPage {
+  thisWeek: DashboardUpcomingSessionsSectionPage;
+  nextWeek: DashboardUpcomingSessionsSectionPage;
 }
 
 export interface DashboardHomeInfographicSectionProps {
@@ -77,37 +82,78 @@ export function DashboardHomeInfographicSection({
   onJoinSession,
 }: DashboardHomeInfographicSectionProps) {
   const quickActionIconClassName = 'size-5 shrink-0';
-  const [currentPage, setCurrentPage] = useState(1);
+  const [thisWeekPage, setThisWeekPage] = useState(1);
+  const [nextWeekPage, setNextWeekPage] = useState(1);
 
-  const totalPages = Math.max(1, upcomingSessionsPage.totalPages);
+  const thisWeekTotalPages = Math.max(1, upcomingSessionsPage.thisWeek.totalPages);
+  const nextWeekTotalPages = Math.max(1, upcomingSessionsPage.nextWeek.totalPages);
 
   useEffect(() => {
-    setCurrentPage(1);
-  }, [upcomingSessionsPage.items, upcomingSessionsPage.pageSize, totalPages]);
+    setThisWeekPage(1);
+  }, [
+    upcomingSessionsPage.thisWeek.items,
+    upcomingSessionsPage.thisWeek.pageSize,
+    thisWeekTotalPages,
+  ]);
 
-  const visibleSessions = useMemo(() => {
-    const startIndex = (currentPage - 1) * upcomingSessionsPage.pageSize;
-    return upcomingSessionsPage.items.slice(
+  useEffect(() => {
+    setNextWeekPage(1);
+  }, [
+    upcomingSessionsPage.nextWeek.items,
+    upcomingSessionsPage.nextWeek.pageSize,
+    nextWeekTotalPages,
+  ]);
+
+  const visibleThisWeekItems = useMemo(() => {
+    const startIndex = (thisWeekPage - 1) * upcomingSessionsPage.thisWeek.pageSize;
+    return upcomingSessionsPage.thisWeek.items.slice(
       startIndex,
-      startIndex + upcomingSessionsPage.pageSize,
+      startIndex + upcomingSessionsPage.thisWeek.pageSize,
     );
-  }, [currentPage, upcomingSessionsPage.items, upcomingSessionsPage.pageSize]);
-  const visibleSessionSections = useMemo(() => {
-    const thisWeekItems = visibleSessions.filter(
-      (item) => item.weekBucket === 'this-week',
-    );
-    const nextWeekItems = visibleSessions.filter(
-      (item) => item.weekBucket === 'next-week',
-    );
-    const shouldSplit = thisWeekItems.length > 0 && nextWeekItems.length > 0;
+  }, [
+    thisWeekPage,
+    upcomingSessionsPage.thisWeek.items,
+    upcomingSessionsPage.thisWeek.pageSize,
+  ]);
 
-    return shouldSplit
-      ? [
-          { key: 'this-week' as const, label: 'This week', items: thisWeekItems },
-          { key: 'next-week' as const, label: 'Next week', items: nextWeekItems },
-        ]
-      : [{ key: 'all' as const, label: null, items: visibleSessions }];
-  }, [visibleSessions]);
+  const visibleNextWeekItems = useMemo(() => {
+    const startIndex = (nextWeekPage - 1) * upcomingSessionsPage.nextWeek.pageSize;
+    return upcomingSessionsPage.nextWeek.items.slice(
+      startIndex,
+      startIndex + upcomingSessionsPage.nextWeek.pageSize,
+    );
+  }, [
+    nextWeekPage,
+    upcomingSessionsPage.nextWeek.items,
+    upcomingSessionsPage.nextWeek.pageSize,
+  ]);
+
+  const totalUpcomingSessions =
+    upcomingSessionsPage.thisWeek.total + upcomingSessionsPage.nextWeek.total;
+  const visibleSessionSections = [
+    {
+      key: 'this-week' as const,
+      label: 'This week',
+      items: visibleThisWeekItems,
+      total: upcomingSessionsPage.thisWeek.total,
+      currentPage: thisWeekPage,
+      totalPages: thisWeekTotalPages,
+      pageSize: upcomingSessionsPage.thisWeek.pageSize,
+      onPrevious: () => setThisWeekPage((page) => Math.max(1, page - 1)),
+      onNext: () => setThisWeekPage((page) => Math.min(thisWeekTotalPages, page + 1)),
+    },
+    {
+      key: 'next-week' as const,
+      label: 'Next week',
+      items: visibleNextWeekItems,
+      total: upcomingSessionsPage.nextWeek.total,
+      currentPage: nextWeekPage,
+      totalPages: nextWeekTotalPages,
+      pageSize: upcomingSessionsPage.nextWeek.pageSize,
+      onPrevious: () => setNextWeekPage((page) => Math.max(1, page - 1)),
+      onNext: () => setNextWeekPage((page) => Math.min(nextWeekTotalPages, page + 1)),
+    },
+  ].filter((section) => section.total > 0);
 
   const openFamilySettings = () => {
     window.dispatchEvent(
@@ -239,14 +285,37 @@ export function DashboardHomeInfographicSection({
           <h2 className="font-semibold tracking-tight">Upcoming Sessions</h2>
 
           <div className="mt-5 space-y-3">
-            {visibleSessions.length ? (
+            {totalUpcomingSessions > 0 ? (
               visibleSessionSections.map((section) => (
                 <div key={section.key} className="space-y-3">
-                  {section.label ? (
+                  <div className="flex items-center justify-between gap-3">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                       {section.label}
                     </p>
-                  ) : null}
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      {section.total > section.pageSize ? (
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            className="inline-flex min-h-8 items-center justify-center rounded-md border border-border px-2 text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:text-muted-foreground/50 disabled:hover:bg-transparent"
+                            onClick={section.onPrevious}
+                            disabled={section.currentPage <= 1}
+                          >
+                            Previous
+                          </button>
+                          <span>{`Page ${section.currentPage} of ${section.totalPages}`}</span>
+                          <button
+                            type="button"
+                            className="inline-flex min-h-8 items-center justify-center rounded-md border border-border px-2 text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:text-muted-foreground/50 disabled:hover:bg-transparent"
+                            onClick={section.onNext}
+                            disabled={section.currentPage >= section.totalPages}
+                          >
+                            Next
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
                   {section.items.map(
                     ({ session, joinHref, chatHref, weekBucket }, index) => (
                       <SessionCard
@@ -277,33 +346,6 @@ export function DashboardHomeInfographicSection({
               <DashboardSessionsEmptyState />
             )}
           </div>
-
-          {totalPages > 1 ? (
-            <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-              <span>
-                Page {currentPage} of {totalPages}
-                <span className="ml-2">({upcomingSessionsPage.total} total)</span>
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  className="inline-flex min-h-9 items-center justify-center rounded-md border border-border px-3 text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:text-muted-foreground/50 disabled:hover:bg-transparent"
-                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-                  disabled={currentPage <= 1}
-                >
-                  Previous
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex min-h-9 items-center justify-center rounded-md border border-border px-3 text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:text-muted-foreground/50 disabled:hover:bg-transparent"
-                  onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-                  disabled={currentPage >= totalPages}
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          ) : null}
         </article>
 
         <aside className="rounded-3xl border border-border bg-card/80 p-6">

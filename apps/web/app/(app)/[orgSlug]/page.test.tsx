@@ -62,7 +62,10 @@ describe('d home page', () => {
       browseHref: '/iconic-academy/spaces',
       calendarHref: '/iconic-academy/class-schedule',
       notificationsHref: '/iconic-academy/notifications',
-      upcomingSessionsPage: { items: [], total: 0, pageSize: 6, totalPages: 1 },
+      upcomingSessionsPage: {
+        thisWeek: { items: [], total: 0, pageSize: 6, totalPages: 1 },
+        nextWeek: { items: [], total: 0, pageSize: 6, totalPages: 1 },
+      },
       metricsByRole: {
         parents: {
           upcomingSessionsThisWeek: 4,
@@ -106,7 +109,10 @@ describe('d home page', () => {
         topMetrics: expect.objectContaining({
           upcomingSessionsThisWeek: 4,
         }),
-        upcomingSessionsPage: expect.objectContaining({ pageSize: 6 }),
+        upcomingSessionsPage: expect.objectContaining({
+          thisWeek: expect.objectContaining({ pageSize: 6 }),
+          nextWeek: expect.objectContaining({ pageSize: 6 }),
+        }),
         calendarHref: '/iconic-academy/class-schedule',
         notificationsHref: '/iconic-academy/notifications',
         browseHref: '/iconic-academy/spaces',

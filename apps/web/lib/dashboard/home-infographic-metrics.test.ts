@@ -123,15 +123,21 @@ describe('buildDashboardHomeInfographicMetrics', () => {
       activeSubjectsCount: 2,
       activeSubjectsLabel: 'Math, Science',
     });
-    expect(result.upcomingSessionsPage.items).toHaveLength(8);
-    expect(result.upcomingSessionsPage.items[0]).toMatchObject({
+    expect(result.upcomingSessionsPage.thisWeek.items).toHaveLength(3);
+    expect(result.upcomingSessionsPage.nextWeek.items).toHaveLength(5);
+    expect(result.upcomingSessionsPage.thisWeek.items[0]).toMatchObject({
       session: { label: 'Algebra Daily' },
       joinHref: '/iconic-academy/spaces/channel-1',
       weekBucket: 'this-week',
     });
-    expect(result.upcomingSessionsPage.items[0]?.session.time).toContain('Student One');
-    expect(result.upcomingSessionsPage.items[0]?.session.time).toContain('Tutor Jane');
-    expect(result.upcomingSessionsPage.total).toBe(8);
+    expect(result.upcomingSessionsPage.thisWeek.items[0]?.session.time).toContain(
+      'Student One',
+    );
+    expect(result.upcomingSessionsPage.thisWeek.items[0]?.session.time).toContain(
+      'Tutor Jane',
+    );
+    expect(result.upcomingSessionsPage.thisWeek.total).toBe(3);
+    expect(result.upcomingSessionsPage.nextWeek.total).toBe(5);
     expect(result.metricsByRole.students).toEqual({
       upcomingSessionsThisWeek: 0,
       completedClassesThisMonth: 0,
@@ -176,9 +182,12 @@ describe('buildDashboardHomeInfographicMetrics', () => {
     expect(result.metricsByRole.students.upcomingSessionsThisWeek).toBe(3);
     expect(result.metricsByRole.students.completedClassesThisMonth).toBe(3);
     expect(result.metricsByRole.students.activeSubjectsCount).toBe(1);
-    expect(result.upcomingSessionsPage.items).toHaveLength(8);
-    expect(result.upcomingSessionsPage.items[0]?.session.time).toContain('Tutor Jane');
-    expect(result.upcomingSessionsPage.items[0]?.session.time).not.toContain(
+    expect(result.upcomingSessionsPage.thisWeek.items).toHaveLength(3);
+    expect(result.upcomingSessionsPage.nextWeek.items).toHaveLength(5);
+    expect(result.upcomingSessionsPage.thisWeek.items[0]?.session.time).toContain(
+      'Tutor Jane',
+    );
+    expect(result.upcomingSessionsPage.thisWeek.items[0]?.session.time).not.toContain(
       'Student One',
     );
     expect(result.metricsByRole.parents.upcomingSessionsThisWeek).toBe(0);
@@ -235,9 +244,12 @@ describe('buildDashboardHomeInfographicMetrics', () => {
       activeSubjectsCount: 1,
       activeSubjectsLabel: 'English',
     });
-    expect(result.upcomingSessionsPage.items).toHaveLength(8);
-    expect(result.upcomingSessionsPage.items[0]?.session.time).toContain('Student Nine');
-    expect(result.upcomingSessionsPage.items[0]?.session.time).not.toContain(
+    expect(result.upcomingSessionsPage.thisWeek.items).toHaveLength(3);
+    expect(result.upcomingSessionsPage.nextWeek.items).toHaveLength(5);
+    expect(result.upcomingSessionsPage.thisWeek.items[0]?.session.time).toContain(
+      'Student Nine',
+    );
+    expect(result.upcomingSessionsPage.thisWeek.items[0]?.session.time).not.toContain(
       'Tutor Jane',
     );
     expect(result.metricsByRole.parents.activeSubjectsCount).toBe(0);
@@ -309,10 +321,10 @@ describe('buildDashboardHomeInfographicMetrics', () => {
     expect(result.calendarHref).toBe('/iconic-academy/admin/attendance/sessions');
     expect(result.notificationsHref).toBe('/iconic-academy/notifications');
     expect(result.browseHref).toBe('/iconic-academy/admin/channels');
-    expect(result.upcomingSessionsPage.items[0]?.session.time).toContain(
+    expect(result.upcomingSessionsPage.thisWeek.items[0]?.session.time).toContain(
       'Staff Student One',
     );
-    expect(result.upcomingSessionsPage.items[0]?.session.time).toContain(
+    expect(result.upcomingSessionsPage.thisWeek.items[0]?.session.time).toContain(
       'Staff Tutor One',
     );
   });
@@ -338,10 +350,14 @@ describe('buildDashboardHomeInfographicMetrics', () => {
       } as never,
     });
 
-    expect(result.upcomingSessionsPage.total).toBe(8);
-    expect(result.upcomingSessionsPage.totalPages).toBe(4);
-    expect(result.upcomingSessionsPage.pageSize).toBe(2);
-    expect(result.upcomingSessionsPage.items).toHaveLength(8);
+    expect(result.upcomingSessionsPage.thisWeek.total).toBe(3);
+    expect(result.upcomingSessionsPage.thisWeek.totalPages).toBe(2);
+    expect(result.upcomingSessionsPage.thisWeek.pageSize).toBe(2);
+    expect(result.upcomingSessionsPage.thisWeek.items).toHaveLength(3);
+    expect(result.upcomingSessionsPage.nextWeek.total).toBe(5);
+    expect(result.upcomingSessionsPage.nextWeek.totalPages).toBe(3);
+    expect(result.upcomingSessionsPage.nextWeek.pageSize).toBe(2);
+    expect(result.upcomingSessionsPage.nextWeek.items).toHaveLength(5);
   });
 
   it('builds homepage upcoming-session labels in the viewer timezone without double conversion', async () => {
@@ -379,10 +395,10 @@ describe('buildDashboardHomeInfographicMetrics', () => {
       } as never,
     });
 
-    expect(result.upcomingSessionsPage.items[0]?.session.time).toContain(
+    expect(result.upcomingSessionsPage.thisWeek.items[0]?.session.time).toContain(
       'Fri 11:00am EDT',
     );
-    expect(result.upcomingSessionsPage.items[0]?.session.time).not.toContain(
+    expect(result.upcomingSessionsPage.thisWeek.items[0]?.session.time).not.toContain(
       '3:00pm UTC',
     );
   });
@@ -431,10 +447,10 @@ describe('buildDashboardHomeInfographicMetrics', () => {
       } as never,
     });
 
-    expect(result.upcomingSessionsPage.items[0]?.session.time).toContain(
+    expect(result.upcomingSessionsPage.thisWeek.items[0]?.session.time).toContain(
       'Sat 1:30am GMT+5:30',
     );
-    expect(result.upcomingSessionsPage.items[0]?.session.time).not.toContain(
+    expect(result.upcomingSessionsPage.thisWeek.items[0]?.session.time).not.toContain(
       '4:00pm EDT',
     );
   });
@@ -459,7 +475,9 @@ describe('buildDashboardHomeInfographicMetrics', () => {
       } as never,
     });
 
-    expect(result.upcomingSessionsPage.items[0]?.weekBucket).toBe('this-week');
-    expect(result.upcomingSessionsPage.items.at(-1)?.weekBucket).toBe('next-week');
+    expect(result.upcomingSessionsPage.thisWeek.items[0]?.weekBucket).toBe('this-week');
+    expect(result.upcomingSessionsPage.nextWeek.items.at(-1)?.weekBucket).toBe(
+      'next-week',
+    );
   });
 });

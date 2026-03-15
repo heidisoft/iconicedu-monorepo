@@ -5,63 +5,88 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
 import { DashboardHomeInfographicSection } from './dashboard-home-infographic-section';
 
+const sessionItems = [
+  {
+    session: {
+      id: 'schedule-1__2026-03-13T16:00:00.000Z',
+      label: 'Math 101',
+      time: 'Fri 4:00pm',
+      dayName: 'Fri',
+      dayNum: '13',
+      isToday: true,
+      isLive: false,
+      isPast: false,
+      endAt: '2026-03-13T17:00:00.000Z',
+      status: 'scheduled',
+    },
+    joinHref: '/iconic-academy/spaces/channel-1',
+    chatHref: '/iconic-academy/spaces/channel-1',
+    weekBucket: 'this-week',
+  },
+  {
+    session: {
+      id: 'schedule-2__2026-03-14T16:00:00.000Z',
+      label: 'ELA 201',
+      time: 'Sat 4:00pm',
+      dayName: 'Sat',
+      dayNum: '14',
+      isToday: false,
+      isLive: false,
+      isPast: false,
+      endAt: '2026-03-14T17:00:00.000Z',
+      status: 'scheduled',
+    },
+    joinHref: '/iconic-academy/spaces/channel-2',
+    chatHref: '/iconic-academy/spaces/channel-2',
+    weekBucket: 'this-week',
+  },
+  {
+    session: {
+      id: 'schedule-3__2026-03-15T16:00:00.000Z',
+      label: 'Science 301',
+      time: 'Sun 4:00pm',
+      dayName: 'Sun',
+      dayNum: '15',
+      isToday: false,
+      isLive: false,
+      isPast: false,
+      endAt: '2026-03-15T17:00:00.000Z',
+      status: 'scheduled',
+    },
+    joinHref: '/iconic-academy/spaces/channel-3',
+    chatHref: '/iconic-academy/spaces/channel-3',
+    weekBucket: 'next-week',
+  },
+];
+
 const sessionPage = {
-  items: [
-    {
-      session: {
-        id: 'schedule-1__2026-03-13T16:00:00.000Z',
-        label: 'Math 101',
-        time: 'Fri 4:00pm',
-        dayName: 'Fri',
-        dayNum: '13',
-        isToday: true,
-        isLive: false,
-        isPast: false,
-        endAt: '2026-03-13T17:00:00.000Z',
-        status: 'scheduled',
-      },
-      joinHref: '/iconic-academy/spaces/channel-1',
-      chatHref: '/iconic-academy/spaces/channel-1',
-      weekBucket: 'this-week',
-    },
-    {
-      session: {
-        id: 'schedule-2__2026-03-14T16:00:00.000Z',
-        label: 'ELA 201',
-        time: 'Sat 4:00pm',
-        dayName: 'Sat',
-        dayNum: '14',
-        isToday: false,
-        isLive: false,
-        isPast: false,
-        endAt: '2026-03-14T17:00:00.000Z',
-        status: 'scheduled',
-      },
-      joinHref: '/iconic-academy/spaces/channel-2',
-      chatHref: '/iconic-academy/spaces/channel-2',
-      weekBucket: 'this-week',
-    },
-    {
-      session: {
-        id: 'schedule-3__2026-03-15T16:00:00.000Z',
-        label: 'Science 301',
-        time: 'Sun 4:00pm',
-        dayName: 'Sun',
-        dayNum: '15',
-        isToday: false,
-        isLive: false,
-        isPast: false,
-        endAt: '2026-03-15T17:00:00.000Z',
-        status: 'scheduled',
-      },
-      joinHref: '/iconic-academy/spaces/channel-3',
-      chatHref: '/iconic-academy/spaces/channel-3',
-      weekBucket: 'next-week',
-    },
-  ],
-  total: 3,
-  pageSize: 2,
-  totalPages: 2,
+  thisWeek: {
+    items: sessionItems.filter((item) => item.weekBucket === 'this-week'),
+    total: 2,
+    pageSize: 1,
+    totalPages: 2,
+  },
+  nextWeek: {
+    items: sessionItems.filter((item) => item.weekBucket === 'next-week'),
+    total: 1,
+    pageSize: 1,
+    totalPages: 1,
+  },
+} as const;
+
+const singlePageSessionPage = {
+  thisWeek: {
+    items: sessionItems.filter((item) => item.weekBucket === 'this-week'),
+    total: 2,
+    pageSize: 3,
+    totalPages: 1,
+  },
+  nextWeek: {
+    items: sessionItems.filter((item) => item.weekBucket === 'next-week'),
+    total: 1,
+    pageSize: 3,
+    totalPages: 1,
+  },
 } as const;
 
 describe('DashboardHomeInfographicSection', () => {
@@ -101,15 +126,15 @@ describe('DashboardHomeInfographicSection', () => {
       screen.getByRole('region', { name: 'Dashboard classroom sessions' }),
     ).toBeInTheDocument();
     expect(screen.getByText('Math 101')).toBeInTheDocument();
-    expect(screen.getByText('ELA 201')).toBeInTheDocument();
+    expect(screen.queryByText('ELA 201')).not.toBeInTheDocument();
+    expect(screen.getByText('Science 301')).toBeInTheDocument();
     expect(screen.getByText('Notifications')).toBeInTheDocument();
     expect(screen.getByText('Calendar')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Message' })).toHaveLength(2);
-    expect(screen.queryByText('Science 301')).not.toBeInTheDocument();
     expect(screen.getByText('Page 1 of 2')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Next' }));
-    expect(screen.getByText('Science 301')).toBeInTheDocument();
+    expect(screen.getByText('ELA 201')).toBeInTheDocument();
     expect(screen.queryByText('Math 101')).not.toBeInTheDocument();
     expect(screen.getByText('Page 2 of 2')).toBeInTheDocument();
   });
@@ -124,18 +149,14 @@ describe('DashboardHomeInfographicSection', () => {
           activeSubjectsCount: 3,
           activeSubjectsLabel: 'Math, ELA, Science',
         }}
-        upcomingSessionsPage={{
-          ...sessionPage,
-          pageSize: 3,
-          totalPages: 1,
-        }}
+        upcomingSessionsPage={singlePageSessionPage}
         calendarHref="/iconic-academy/class-schedule"
         notificationsHref="/iconic-academy/notifications"
         browseHref="/iconic-academy/spaces"
       />,
     );
 
-    expect(screen.getAllByText('This week')).toHaveLength(2);
+    expect(screen.getAllByText('This week').length).toBeGreaterThan(1);
     expect(screen.getByText('Next week')).toBeInTheDocument();
     expect(screen.getByText('Math 101')).toBeInTheDocument();
     expect(screen.getByText('Science 301')).toBeInTheDocument();
@@ -177,11 +198,7 @@ describe('DashboardHomeInfographicSection', () => {
           activeSubjectsCount: 3,
           activeSubjectsLabel: 'Math, ELA, Science',
         }}
-        upcomingSessionsPage={{
-          ...sessionPage,
-          pageSize: 3,
-          totalPages: 1,
-        }}
+        upcomingSessionsPage={singlePageSessionPage}
         calendarHref="/iconic-academy/class-schedule"
         notificationsHref="/iconic-academy/notifications"
         browseHref="/iconic-academy/spaces"
@@ -238,7 +255,10 @@ describe('DashboardHomeInfographicSection', () => {
           activeSubjectsCount: 0,
           activeSubjectsLabel: 'No active subjects yet',
         }}
-        upcomingSessionsPage={{ items: [], total: 0, pageSize: 3, totalPages: 1 }}
+        upcomingSessionsPage={{
+          thisWeek: { items: [], total: 0, pageSize: 3, totalPages: 1 },
+          nextWeek: { items: [], total: 0, pageSize: 3, totalPages: 1 },
+        }}
         calendarHref="/iconic-academy/class-schedule"
         notificationsHref="/iconic-academy/notifications"
         browseHref="/iconic-academy/spaces"
@@ -261,7 +281,10 @@ describe('DashboardHomeInfographicSection', () => {
           activeSubjectsCount: 2,
           activeSubjectsLabel: 'Math, Science',
         }}
-        upcomingSessionsPage={{ items: [], total: 0, pageSize: 3, totalPages: 1 }}
+        upcomingSessionsPage={{
+          thisWeek: { items: [], total: 0, pageSize: 3, totalPages: 1 },
+          nextWeek: { items: [], total: 0, pageSize: 3, totalPages: 1 },
+        }}
         calendarHref="/iconic-academy/class-schedule"
         notificationsHref="/iconic-academy/notifications"
         browseHref="/iconic-academy/spaces"
@@ -299,7 +322,10 @@ describe('DashboardHomeInfographicSection', () => {
           activeSubjectsCount: 2,
           activeSubjectsLabel: 'Math, Science',
         }}
-        upcomingSessionsPage={{ items: [], total: 0, pageSize: 3, totalPages: 1 }}
+        upcomingSessionsPage={{
+          thisWeek: { items: [], total: 0, pageSize: 3, totalPages: 1 },
+          nextWeek: { items: [], total: 0, pageSize: 3, totalPages: 1 },
+        }}
         calendarHref="/iconic-academy/class-schedule"
         notificationsHref="/iconic-academy/notifications"
         browseHref="/iconic-academy/spaces"
@@ -347,7 +373,10 @@ describe('DashboardHomeInfographicSection', () => {
           activeSubjectsCount: 2,
           activeSubjectsLabel: 'Math, Science',
         }}
-        upcomingSessionsPage={{ items: [], total: 0, pageSize: 3, totalPages: 1 }}
+        upcomingSessionsPage={{
+          thisWeek: { items: [], total: 0, pageSize: 3, totalPages: 1 },
+          nextWeek: { items: [], total: 0, pageSize: 3, totalPages: 1 },
+        }}
         calendarHref="/iconic-academy/class-schedule"
         notificationsHref="/iconic-academy/notifications"
         browseHref="/iconic-academy/spaces"
