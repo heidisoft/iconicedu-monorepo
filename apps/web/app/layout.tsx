@@ -5,10 +5,7 @@ import { ThemeProvider, Toaster } from '@iconicedu/ui-web';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { PostHogPageView } from '@iconicedu/web/components/analytics-provider';
 
-export const metadata = {
-  title: 'ICONIC EDU',
-  description: 'Welcome to ICONIC Academy',
-};
+export { metadata } from './layout.metadata';
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (

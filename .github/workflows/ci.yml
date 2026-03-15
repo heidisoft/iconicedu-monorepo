@@ -17,7 +17,8 @@ env:
 jobs:
   # ──────────────────────────────────────────────────────────────
   # Job 1: Code quality — format · lint · typecheck
-  # Runs in parallel with tests for fast feedback on quality issues
+  # PRs: affected packages only (fast feedback)
+  # Push to main: all packages (full confidence)
   # ──────────────────────────────────────────────────────────────
   quality:
     name: Quality (format · lint · typecheck)
@@ -27,6 +28,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Fetch enough history for turbo --affected to compare against the base
+          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -59,17 +63,20 @@ jobs:
       - name: Build shared packages
         run: pnpm build:packages
 
+      # Always check all files — prettier is fast enough to run unconditionally.
       - name: Format check
-        run: pnpm format:check:changed
+        run: pnpm format:check
 
-      - name: Lint
-        run: pnpm lint
-
-      - name: Typecheck
-        run: pnpm typecheck
+      # PRs: only affected packages. Push to main: all packages.
+      - name: Lint + Typecheck
+        run: pnpm exec turbo run lint typecheck ${{ github.event_name == 'pull_request' && '--affected' || '' }}
+        env:
+          TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha }}
+          TURBO_SCM_HEAD: ${{ github.sha }}
 
   # ──────────────────────────────────────────────────────────────
-  # Job 2: Tests + coverage — runs in parallel with quality
+  # Job 2: Tests + coverage
+  # PRs: affected packages only. Push to main: all packages.
   # ──────────────────────────────────────────────────────────────
   test:
     name: Test
@@ -79,6 +86,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -105,10 +114,18 @@ jobs:
       - name: Build shared packages
         run: pnpm build:packages
 
+      # Generate Prisma client — required for API test suite.
+      - name: Generate Prisma client
+        run: pnpm --filter api db:generate
+
+      # PRs: only affected packages. Push to main: all packages.
       - name: Test
-        run: pnpm test
+        run: pnpm exec turbo run test ${{ github.event_name == 'pull_request' && '--affected' || '' }}
         env:
           CI: true
+          VITEST_COVERAGE: true
+          TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha }}
+          TURBO_SCM_HEAD: ${{ github.sha }}
 
       - name: Upload coverage reports
         if: always()
@@ -117,9 +134,12 @@ jobs:
           name: coverage
           path: |
             apps/web/coverage/
+            apps/api/coverage/
             apps/mobile/coverage/
             packages/ui-web/coverage/
             packages/ui-native/coverage/
+            packages/shared-types/coverage/
+            packages/utils/coverage/
           if-no-files-found: ignore
           retention-days: 14
 
@@ -161,11 +181,17 @@ jobs:
       - name: Generate Prisma client
         run: pnpm --filter api db:generate
 
+      # Set build env vars — use repo secrets when available, fall back to
+      # placeholder values so the Next.js build succeeds in forks / fresh repos.
+      - name: Set build env vars
+        run: |
+          echo "NEXT_PUBLIC_SUPABASE_URL=${_URL:-https://placeholder.supabase.co}" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=${_ANON:-placeholder-anon-key}" >> "$GITHUB_ENV"
+          echo "SUPABASE_SERVICE_ROLE_KEY=${_SRK:-placeholder-service-role-key}" >> "$GITHUB_ENV"
+        env:
+          _URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          _ANON: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          _SRK: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
       - name: Build all
         run: pnpm build
-        env:
-          # Required for Next.js build — use placeholder values in CI since
-          # this is a build check, not a deployment.
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-service-role-key' }}

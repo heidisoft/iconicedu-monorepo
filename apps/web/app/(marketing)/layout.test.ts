@@ -1,4 +1,5 @@
-import { metadata } from '@iconicedu/web/app/(marketing)/layout';
+import { describe, expect, it } from 'vitest';
+import { metadata } from './layout.metadata';
 
 describe('marketing layout metadata', () => {
   it('defines SEO metadata for the marketing page', () => {
