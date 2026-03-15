@@ -1,9 +1,19 @@
+const INVALID_SUBJECT_KEY_CHARS = /[^a-z0-9-]+/g;
+const MULTI_HYPHENS = /-{2,}/g;
+const EDGE_HYPHENS = /^-+|-+$/g;
+
+export const SUBJECT_KEY_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
 export function normalizeSubjectLabel(subject: string) {
   return subject.trim().replace(/\s+/g, ' ');
 }
 
 export function normalizeSubjectKey(subject: string) {
-  return normalizeSubjectLabel(subject).toLowerCase();
+  return normalizeSubjectLabel(subject)
+    .toLowerCase()
+    .replace(INVALID_SUBJECT_KEY_CHARS, '-')
+    .replace(MULTI_HYPHENS, '-')
+    .replace(EDGE_HYPHENS, '');
 }
 
 export function mergeSubjectOptions(

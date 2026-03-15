@@ -14,6 +14,7 @@ import {
   Loader2,
   toast,
 } from '@iconicedu/ui-web';
+import { normalizeSubjectKey } from '@iconicedu/web/lib/subjects/utils';
 
 type SubjectCatalogSettingsDashboardProps = {
   orgId: string;
@@ -47,6 +48,10 @@ export function SubjectCatalogSettingsDashboard({
   const [isSaving, setIsSaving] = React.useState(false);
   const [search, setSearch] = React.useState('');
   const [newSubject, setNewSubject] = React.useState('');
+  const [editingSubjectId, setEditingSubjectId] = React.useState<string | null>(null);
+  const [editingSubjectValue, setEditingSubjectValue] = React.useState('');
+  const [editingSubjectKeyValue, setEditingSubjectKeyValue] = React.useState('');
+  const [isEditingKeyDirty, setIsEditingKeyDirty] = React.useState(false);
 
   const loadSnapshot = React.useCallback(async () => {
     setIsLoading(true);
@@ -81,8 +86,10 @@ export function SubjectCatalogSettingsDashboard({
     if (!normalized) {
       return snapshot.items;
     }
-    return snapshot.items.filter((item) =>
-      item.subject.toLowerCase().includes(normalized),
+    return snapshot.items.filter(
+      (item) =>
+        item.subject.toLowerCase().includes(normalized) ||
+        item.subjectKey.toLowerCase().includes(normalized),
     );
   }, [search, snapshot.items]);
 
@@ -140,6 +147,45 @@ export function SubjectCatalogSettingsDashboard({
     [loadSnapshot, orgId],
   );
 
+  const handleRenameSubject = React.useCallback(
+    async (subjectId: string) => {
+      if (!editingSubjectValue.trim()) {
+        return;
+      }
+      setIsSaving(true);
+      try {
+        const response = await fetch('/api/admin/settings/subjects', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orgId,
+            subjectId,
+            subject: editingSubjectValue,
+            subjectKey: editingSubjectKeyValue,
+          }),
+        });
+        const payload = (await response.json()) as {
+          success?: boolean;
+          message?: string;
+        };
+        if (!response.ok || !payload.success) {
+          throw new Error(payload.message ?? 'Failed to rename subject.');
+        }
+        setEditingSubjectId(null);
+        setEditingSubjectValue('');
+        setEditingSubjectKeyValue('');
+        setIsEditingKeyDirty(false);
+        await loadSnapshot();
+        toast.success('Subject updated');
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Failed to update subject.');
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [editingSubjectKeyValue, editingSubjectValue, loadSnapshot, orgId],
+  );
+
   if (isLoading) {
     return (
       <Card>
@@ -192,7 +238,40 @@ export function SubjectCatalogSettingsDashboard({
             >
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-sm font-medium">{item.subject}</p>
+                  {editingSubjectId === item.id ? (
+                    <div className="grid gap-2 md:grid-cols-[minmax(0,18rem)_minmax(0,14rem)]">
+                      <Input
+                        value={editingSubjectValue}
+                        onChange={(event) => {
+                          const nextValue = event.target.value;
+                          setEditingSubjectValue(nextValue);
+                          if (!isEditingKeyDirty) {
+                            setEditingSubjectKeyValue(normalizeSubjectKey(nextValue));
+                          }
+                        }}
+                        className="h-8 w-full"
+                        disabled={isSaving}
+                        placeholder="Subject name"
+                      />
+                      <Input
+                        value={editingSubjectKeyValue}
+                        onChange={(event) => {
+                          setEditingSubjectKeyValue(event.target.value);
+                          setIsEditingKeyDirty(true);
+                        }}
+                        className="h-8 w-full font-mono"
+                        disabled={isSaving}
+                        placeholder="machine-name"
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-sm font-medium">{item.subject}</p>
+                      <code className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                        {item.subjectKey}
+                      </code>
+                    </>
+                  )}
                   <Badge variant={item.isActive ? 'secondary' : 'outline'}>
                     {item.isActive ? 'Active' : 'Hidden'}
                   </Badge>
@@ -201,15 +280,64 @@ export function SubjectCatalogSettingsDashboard({
                   {formatUsageLabel(item)}
                 </p>
               </div>
-              <Button
-                type="button"
-                variant={item.isActive ? 'outline' : 'secondary'}
-                size="sm"
-                disabled={isSaving}
-                onClick={() => void toggleSubject(item.id, !item.isActive)}
-              >
-                {item.isActive ? 'Hide' : 'Restore'}
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                {editingSubjectId === item.id ? (
+                  <>
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={
+                        isSaving ||
+                        !editingSubjectValue.trim() ||
+                        !normalizeSubjectKey(editingSubjectKeyValue)
+                      }
+                      onClick={() => void handleRenameSubject(item.id)}
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={isSaving}
+                      onClick={() => {
+                        setEditingSubjectId(null);
+                        setEditingSubjectValue('');
+                        setEditingSubjectKeyValue('');
+                        setIsEditingKeyDirty(false);
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={isSaving}
+                      onClick={() => {
+                        setEditingSubjectId(item.id);
+                        setEditingSubjectValue(item.subject);
+                        setEditingSubjectKeyValue(item.subjectKey);
+                        setIsEditingKeyDirty(false);
+                      }}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={item.isActive ? 'outline' : 'secondary'}
+                      size="sm"
+                      disabled={isSaving}
+                      onClick={() => void toggleSubject(item.id, !item.isActive)}
+                    >
+                      {item.isActive ? 'Hide' : 'Restore'}
+                    </Button>
+                  </>
+                )}
+              </div>
             </div>
           ))}
           {!filteredItems.length ? (

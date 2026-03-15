@@ -34,6 +34,13 @@ function createServiceSupabaseMock() {
               })),
             })),
           })),
+          update: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                is: vi.fn(async () => ({ error: null })),
+              })),
+            })),
+          })),
         };
       }
 
@@ -46,6 +53,13 @@ function createServiceSupabaseMock() {
                   data: [{ subject: 'Science' }],
                   error: null,
                 })),
+              })),
+            })),
+          })),
+          update: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                is: vi.fn(async () => ({ error: null })),
               })),
             })),
           })),
@@ -63,6 +77,43 @@ function createServiceSupabaseMock() {
                       maybeSingle: vi.fn(async () => ({
                         data: null,
                         error: null,
+                      })),
+                    })),
+                  })),
+                })),
+              };
+            }
+
+            if (columns === 'id, subject, subject_key, is_active') {
+              return {
+                eq: vi.fn(() => ({
+                  eq: vi.fn(() => ({
+                    is: vi.fn(() => ({
+                      maybeSingle: vi.fn(async () => ({
+                        data: {
+                          id: 'subject-1',
+                          subject: 'Math',
+                          subject_key: 'math',
+                          is_active: true,
+                        },
+                        error: null,
+                      })),
+                    })),
+                  })),
+                })),
+              };
+            }
+
+            if (columns === 'id') {
+              return {
+                eq: vi.fn(() => ({
+                  eq: vi.fn(() => ({
+                    is: vi.fn(() => ({
+                      neq: vi.fn(() => ({
+                        maybeSingle: vi.fn(async () => ({
+                          data: null,
+                          error: null,
+                        })),
                       })),
                     })),
                   })),
@@ -189,6 +240,41 @@ describe('admin subject catalog route', () => {
           orgId: 'org-1',
           subjectId: 'subject-2',
           isActive: true,
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).success).toBe(true);
+  });
+
+  it('PATCH renames a subject', async () => {
+    const response = await PATCH(
+      new Request('http://localhost/api/admin/settings/subjects', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orgId: 'org-1',
+          subjectId: 'subject-1',
+          subject: 'Mathematics',
+          subjectKey: 'core-math',
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).success).toBe(true);
+  });
+
+  it('POST accepts a machine-name key override', async () => {
+    const response = await POST(
+      new Request('http://localhost/api/admin/settings/subjects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orgId: 'org-1',
+          subject: 'English Language Arts',
+          subjectKey: 'ela-core',
         }),
       }),
     );

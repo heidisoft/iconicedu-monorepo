@@ -3,10 +3,13 @@ import type { UUID } from '@iconicedu/shared-types/shared/shared';
 export type CreateOrgSubjectCatalogItemInput = {
   orgId: UUID;
   subject: string;
+  subjectKey?: string;
 };
 
 export type UpdateOrgSubjectCatalogItemInput = {
   orgId: UUID;
   subjectId: UUID;
-  isActive: boolean;
+  isActive?: boolean;
+  subject?: string;
+  subjectKey?: string;
 };

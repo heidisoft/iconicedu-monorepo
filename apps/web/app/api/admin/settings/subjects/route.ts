@@ -137,8 +137,12 @@ export async function POST(request: Request) {
   const orgId = payload.orgId;
   const subject =
     typeof payload.subject === 'string' ? normalizeSubjectLabel(payload.subject) : '';
+  const subjectKey =
+    typeof payload.subjectKey === 'string'
+      ? normalizeSubjectKey(payload.subjectKey)
+      : normalizeSubjectKey(subject);
 
-  if (!orgId || !subject) {
+  if (!orgId || !subject || !subjectKey) {
     return NextResponse.json(
       { success: false, message: 'Missing required fields.' },
       { status: 400 },
@@ -155,7 +159,6 @@ export async function POST(request: Request) {
     }
 
     const serviceSupabase = createSupabaseServiceClient();
-    const subjectKey = normalizeSubjectKey(subject);
     const existingResponse = await serviceSupabase
       .from('org_subject_catalog')
       .select('id, sort_order, is_active')
@@ -241,8 +244,20 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   const payload = (await request.json()) as UpdateOrgSubjectCatalogItemInput;
+  const nextSubject =
+    typeof payload.subject === 'string' ? normalizeSubjectLabel(payload.subject) : null;
+  const nextSubjectKey =
+    typeof payload.subjectKey === 'string'
+      ? normalizeSubjectKey(payload.subjectKey)
+      : nextSubject
+        ? normalizeSubjectKey(nextSubject)
+        : null;
 
-  if (!payload.orgId || !payload.subjectId || typeof payload.isActive !== 'boolean') {
+  if (
+    !payload.orgId ||
+    !payload.subjectId ||
+    (typeof payload.isActive !== 'boolean' && !nextSubject && !nextSubjectKey)
+  ) {
     return NextResponse.json(
       { success: false, message: 'Missing required fields.' },
       { status: 400 },
@@ -259,12 +274,72 @@ export async function PATCH(request: Request) {
     }
 
     const serviceSupabase = createSupabaseServiceClient();
+    const currentSubjectResponse = await serviceSupabase
+      .from('org_subject_catalog')
+      .select('id, subject, subject_key, is_active')
+      .eq('org_id', payload.orgId)
+      .eq('id', payload.subjectId)
+      .is('deleted_at', null)
+      .maybeSingle<{
+        id: string;
+        subject: string;
+        subject_key: string;
+        is_active: boolean;
+      }>();
+
+    if (currentSubjectResponse.error || !currentSubjectResponse.data) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: currentSubjectResponse.error?.message ?? 'Subject not found.',
+        },
+        { status: currentSubjectResponse.error ? 500 : 404 },
+      );
+    }
+
+    const currentSubject = currentSubjectResponse.data;
+    const updatePayload: Record<string, unknown> = {
+      updated_by: authContext.actorProfileId,
+    };
+
+    if (typeof payload.isActive === 'boolean') {
+      updatePayload.is_active = payload.isActive;
+    }
+
+    if (nextSubject) {
+      updatePayload.subject = nextSubject;
+    }
+
+    if (nextSubjectKey) {
+      const duplicateSubjectResponse = await serviceSupabase
+        .from('org_subject_catalog')
+        .select('id')
+        .eq('org_id', payload.orgId)
+        .eq('subject_key', nextSubjectKey)
+        .is('deleted_at', null)
+        .neq('id', payload.subjectId)
+        .maybeSingle<{ id: string }>();
+
+      if (duplicateSubjectResponse.error) {
+        return NextResponse.json(
+          { success: false, message: duplicateSubjectResponse.error.message },
+          { status: 500 },
+        );
+      }
+
+      if (duplicateSubjectResponse.data) {
+        return NextResponse.json(
+          { success: false, message: 'A subject with that key already exists.' },
+          { status: 409 },
+        );
+      }
+
+      updatePayload.subject_key = nextSubjectKey;
+    }
+
     const updateResponse = await serviceSupabase
       .from('org_subject_catalog')
-      .update({
-        is_active: payload.isActive,
-        updated_by: authContext.actorProfileId,
-      })
+      .update(updatePayload)
       .eq('org_id', payload.orgId)
       .eq('id', payload.subjectId)
       .is('deleted_at', null);
@@ -274,6 +349,42 @@ export async function PATCH(request: Request) {
         { success: false, message: updateResponse.error.message },
         { status: 500 },
       );
+    }
+
+    if (nextSubject && nextSubject !== currentSubject.subject) {
+      const learningSpacesUpdateResponse = await serviceSupabase
+        .from('learning_spaces')
+        .update({
+          subject: nextSubject,
+          updated_by: authContext.actorProfileId,
+        })
+        .eq('org_id', payload.orgId)
+        .eq('subject', currentSubject.subject)
+        .is('deleted_at', null);
+
+      if (learningSpacesUpdateResponse.error) {
+        return NextResponse.json(
+          { success: false, message: learningSpacesUpdateResponse.error.message },
+          { status: 500 },
+        );
+      }
+
+      const educatorSubjectsUpdateResponse = await serviceSupabase
+        .from('educator_profile_subjects')
+        .update({
+          subject: nextSubject,
+          updated_by: authContext.actorProfileId,
+        })
+        .eq('org_id', payload.orgId)
+        .eq('subject', currentSubject.subject)
+        .is('deleted_at', null);
+
+      if (educatorSubjectsUpdateResponse.error) {
+        return NextResponse.json(
+          { success: false, message: educatorSubjectsUpdateResponse.error.message },
+          { status: 500 },
+        );
+      }
     }
 
     return NextResponse.json({ success: true });
