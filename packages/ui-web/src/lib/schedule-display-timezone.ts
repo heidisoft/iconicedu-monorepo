@@ -1,8 +1,42 @@
 export const DEFAULT_SCHEDULE_DISPLAY_TIMEZONE = 'UTC';
 
+export interface ScheduleDisplayTimeZoneOptions {
+  viewerTimezone?: string | null;
+  scheduleTimezone?: string | null;
+  allowBrowserFallback?: boolean;
+}
+
+export type ScheduleDisplayTimeZoneInput =
+  | string
+  | null
+  | undefined
+  | ScheduleDisplayTimeZoneOptions;
+
 function normalizeTimeZone(timezone?: string | null) {
   const value = timezone?.trim();
   return value ? value : null;
+}
+
+function isScheduleDisplayTimeZoneOptions(
+  value: ScheduleDisplayTimeZoneInput,
+): value is ScheduleDisplayTimeZoneOptions {
+  return typeof value === 'object' && value !== null;
+}
+
+function normalizeScheduleDisplayTimeZoneInput(input?: ScheduleDisplayTimeZoneInput) {
+  if (isScheduleDisplayTimeZoneOptions(input)) {
+    return {
+      viewerTimezone: normalizeTimeZone(input.viewerTimezone),
+      scheduleTimezone: normalizeTimeZone(input.scheduleTimezone),
+      allowBrowserFallback: input.allowBrowserFallback ?? true,
+    };
+  }
+
+  return {
+    viewerTimezone: normalizeTimeZone(input),
+    scheduleTimezone: null,
+    allowBrowserFallback: true,
+  };
 }
 
 export function isValidScheduleDisplayTimeZone(timezone?: string | null): boolean {
@@ -28,13 +62,23 @@ export function getBrowserScheduleDisplayTimeZone(): string | null {
   }
 }
 
-export function resolveScheduleDisplayTimeZone(timezone?: string | null): string {
-  if (isValidScheduleDisplayTimeZone(timezone)) {
-    return normalizeTimeZone(timezone)!;
+export function resolveScheduleDisplayTimeZone(
+  input?: ScheduleDisplayTimeZoneInput,
+): string {
+  const normalized = normalizeScheduleDisplayTimeZoneInput(input);
+
+  if (isValidScheduleDisplayTimeZone(normalized.viewerTimezone)) {
+    return normalized.viewerTimezone!;
+  }
+
+  if (isValidScheduleDisplayTimeZone(normalized.scheduleTimezone)) {
+    return normalized.scheduleTimezone!;
   }
 
   const browserTimeZone =
-    typeof window !== 'undefined' ? getBrowserScheduleDisplayTimeZone() : null;
+    normalized.allowBrowserFallback && typeof window !== 'undefined'
+      ? getBrowserScheduleDisplayTimeZone()
+      : null;
   if (browserTimeZone) {
     return browserTimeZone;
   }
@@ -48,7 +92,7 @@ function toDate(input: Date | string) {
 }
 
 function buildFormatter(
-  timezone: string | null | undefined,
+  timezone: ScheduleDisplayTimeZoneInput,
   options: Intl.DateTimeFormatOptions,
 ) {
   return new Intl.DateTimeFormat('en-US', {
@@ -59,7 +103,7 @@ function buildFormatter(
 
 export function formatScheduleDisplayValue(
   input: Date | string,
-  timezone: string | null | undefined,
+  timezone: ScheduleDisplayTimeZoneInput,
   options: Intl.DateTimeFormatOptions,
 ) {
   const date = toDate(input);
@@ -72,7 +116,7 @@ export function formatScheduleDisplayValue(
 
 export function getScheduleDisplayDateParts(
   input: Date | string,
-  timezone: string | null | undefined,
+  timezone: ScheduleDisplayTimeZoneInput,
 ) {
   const date = toDate(input);
   if (!date) {
@@ -122,7 +166,7 @@ export function getScheduleDisplayDateParts(
 
 export function toScheduleDisplayDate(
   input: Date | string,
-  timezone: string | null | undefined,
+  timezone: ScheduleDisplayTimeZoneInput,
 ) {
   const parts = getScheduleDisplayDateParts(input, timezone);
   if (!parts) {
@@ -134,7 +178,7 @@ export function toScheduleDisplayDate(
 
 export function getScheduleDisplayDayKey(
   input: Date | string,
-  timezone: string | null | undefined,
+  timezone: ScheduleDisplayTimeZoneInput,
 ) {
   const parts = getScheduleDisplayDateParts(input, timezone);
   if (!parts) {
@@ -146,7 +190,7 @@ export function getScheduleDisplayDayKey(
 
 export function getScheduleDisplayMonthKey(
   input: Date | string,
-  timezone: string | null | undefined,
+  timezone: ScheduleDisplayTimeZoneInput,
 ) {
   const parts = getScheduleDisplayDateParts(input, timezone);
   if (!parts) {
@@ -158,7 +202,7 @@ export function getScheduleDisplayMonthKey(
 
 export function getScheduleDisplayMinutes(
   input: Date | string,
-  timezone: string | null | undefined,
+  timezone: ScheduleDisplayTimeZoneInput,
 ) {
   const parts = getScheduleDisplayDateParts(input, timezone);
   if (!parts) {
@@ -171,9 +215,45 @@ export function getScheduleDisplayMinutes(
 export function isSameScheduleDisplayDay(
   left: Date | string,
   right: Date | string,
-  timezone: string | null | undefined,
+  timezone: ScheduleDisplayTimeZoneInput,
 ) {
   const leftKey = getScheduleDisplayDayKey(left, timezone);
   const rightKey = getScheduleDisplayDayKey(right, timezone);
   return Boolean(leftKey && rightKey && leftKey === rightKey);
+}
+
+export function getScheduleDisplayTimeZoneAbbreviation(
+  input: Date | string,
+  timezone: ScheduleDisplayTimeZoneInput,
+) {
+  const date = toDate(input);
+  if (!date) {
+    return null;
+  }
+
+  const formatter = buildFormatter(timezone, {
+    timeZoneName: 'short',
+  });
+  const part = formatter
+    .formatToParts(date)
+    .find((entry) => entry.type === 'timeZoneName')?.value;
+  return part ?? null;
+}
+
+export function formatScheduleDisplayTimeWithZone(
+  input: Date | string,
+  timezone: ScheduleDisplayTimeZoneInput,
+  options: Intl.DateTimeFormatOptions,
+) {
+  const formatted = formatScheduleDisplayValue(input, timezone, options);
+  if (!formatted) {
+    return null;
+  }
+
+  const abbreviation = getScheduleDisplayTimeZoneAbbreviation(input, timezone);
+  if (!abbreviation) {
+    return formatted;
+  }
+
+  return `${formatted} ${abbreviation}`;
 }

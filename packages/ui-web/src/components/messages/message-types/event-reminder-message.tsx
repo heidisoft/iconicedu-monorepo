@@ -10,6 +10,7 @@ import {
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
 import { useScheduleDisplayTimeZone } from '@iconicedu/ui-web/components/shared/schedule-display-timezone-context';
 import {
+  formatScheduleDisplayTimeWithZone,
   formatScheduleDisplayValue,
   isSameScheduleDisplayDay,
   toScheduleDisplayDate,
@@ -27,12 +28,18 @@ export const EventReminderMessage = memo(function EventReminderMessage(
 ) {
   const { message, ...baseProps } = props;
   const { event } = message;
-  const timezone = useScheduleDisplayTimeZone();
+  const viewerTimezone = useScheduleDisplayTimeZone();
+  const scheduleTimezone =
+    'timezone' in event && typeof event.timezone === 'string' ? event.timezone : null;
+  const displayTimezone = {
+    viewerTimezone,
+    scheduleTimezone,
+  };
 
   const formatEventTime = (start: Date, end?: Date, isAllDay?: boolean) => {
     if (isAllDay) return 'All day';
 
-    const startStr = formatScheduleDisplayValue(start, timezone, {
+    const startStr = formatScheduleDisplayTimeWithZone(start, displayTimezone, {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true,
@@ -40,7 +47,7 @@ export const EventReminderMessage = memo(function EventReminderMessage(
 
     if (!end) return startStr;
 
-    const endStr = formatScheduleDisplayValue(end, timezone, {
+    const endStr = formatScheduleDisplayValue(end, displayTimezone, {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true,
@@ -54,10 +61,10 @@ export const EventReminderMessage = memo(function EventReminderMessage(
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    if (isSameScheduleDisplayDay(date, today, timezone)) return 'Today';
-    if (isSameScheduleDisplayDay(date, tomorrow, timezone)) return 'Tomorrow';
+    if (isSameScheduleDisplayDay(date, today, displayTimezone)) return 'Today';
+    if (isSameScheduleDisplayDay(date, tomorrow, displayTimezone)) return 'Tomorrow';
 
-    return formatScheduleDisplayValue(date, timezone, {
+    return formatScheduleDisplayValue(date, displayTimezone, {
       weekday: 'short',
       month: 'short',
       day: 'numeric',
@@ -65,9 +72,9 @@ export const EventReminderMessage = memo(function EventReminderMessage(
   };
 
   const startTime =
-    toScheduleDisplayDate(event.startAt, timezone) ?? new Date(event.startAt);
+    toScheduleDisplayDate(event.startAt, displayTimezone) ?? new Date(event.startAt);
   const endTime = event.endAt
-    ? (toScheduleDisplayDate(event.endAt, timezone) ?? new Date(event.endAt))
+    ? (toScheduleDisplayDate(event.endAt, displayTimezone) ?? new Date(event.endAt))
     : undefined;
 
   return (
@@ -78,7 +85,9 @@ export const EventReminderMessage = memo(function EventReminderMessage(
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 flex-col items-center justify-center rounded-xl bg-primary/10 text-primary">
                 <span className="text-[10px] font-medium uppercase leading-none">
-                  {formatScheduleDisplayValue(startTime, timezone, { month: 'short' })}
+                  {formatScheduleDisplayValue(event.startAt, displayTimezone, {
+                    month: 'short',
+                  })}
                 </span>
                 <span className="text-lg font-bold leading-tight">
                   {startTime.getDate()}

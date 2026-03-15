@@ -18,7 +18,7 @@ import {
   type MessageBaseProps,
 } from '@iconicedu/ui-web/components/messages/message-base';
 import { useScheduleDisplayTimeZone } from '@iconicedu/ui-web/components/shared/schedule-display-timezone-context';
-import { formatScheduleDisplayValue } from '@iconicedu/ui-web/lib/schedule-display-timezone';
+import { formatScheduleDisplayTimeWithZone } from '@iconicedu/ui-web/lib/schedule-display-timezone';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 
 interface SessionBookingMessageProps extends Omit<
@@ -56,12 +56,20 @@ export const SessionBookingMessage = memo(function SessionBookingMessage(
 ) {
   const { message, ...baseProps } = props;
   const { session } = message;
-  const timezone = useScheduleDisplayTimeZone();
+  const viewerTimezone = useScheduleDisplayTimeZone();
+  const scheduleTimezone =
+    'timezone' in session && typeof session.timezone === 'string'
+      ? session.timezone
+      : null;
   const statusInfo = sessionStatusConfig[session.status];
   const StatusIcon = statusInfo.icon;
+  const displayTimezone = {
+    viewerTimezone,
+    scheduleTimezone,
+  };
 
   const formatSessionTime = (date: string) => {
-    return formatScheduleDisplayValue(date, timezone, {
+    return formatScheduleDisplayTimeWithZone(date, displayTimezone, {
       weekday: 'short',
       month: 'short',
       day: 'numeric',

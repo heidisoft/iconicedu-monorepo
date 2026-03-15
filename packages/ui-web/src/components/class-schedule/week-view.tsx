@@ -2,12 +2,12 @@
 
 import type { ClassScheduleVM } from '@iconicedu/shared-types';
 import {
+  eventTimeToMinutes,
   getWeekDays,
   formatDayName,
   isSameDay,
   getEventDate,
   getTimeSlots,
-  timeToMinutes,
   getEventLayout,
 } from '@iconicedu/ui-web/lib/class-schedule-utils';
 import { EventCard } from '@iconicedu/ui-web/components/class-schedule/event-card';
@@ -54,12 +54,12 @@ export function WeekView({
     let scrollTop: number;
     if (todayEvents.length > 0) {
       const earliestEvent = todayEvents.reduce((earliest, event) => {
-        const eventMinutes = timeToMinutes(event.startAt, timezone);
-        const earliestMinutes = timeToMinutes(earliest.startAt, timezone);
+        const eventMinutes = eventTimeToMinutes(event, 'startAt', timezone);
+        const earliestMinutes = eventTimeToMinutes(earliest, 'startAt', timezone);
         return eventMinutes < earliestMinutes ? event : earliest;
       });
 
-      const eventMinutes = timeToMinutes(earliestEvent.startAt, timezone);
+      const eventMinutes = eventTimeToMinutes(earliestEvent, 'startAt', timezone);
       const scrollToMinutes = Math.max(0, eventMinutes - 60);
       scrollTop = (scrollToMinutes / 30) * 32;
     } else {
@@ -162,7 +162,7 @@ export function WeekView({
               dayEvents.forEach((event) => {
                 const layout = dayLayout.get(event.ids.id);
                 if (!layout) return;
-                const startMinutes = timeToMinutes(event.startAt, timezone);
+                const startMinutes = eventTimeToMinutes(event, 'startAt', timezone);
                 const info = clusterInfo.get(layout.clusterId);
                 const nextInfo = {
                   startMinutes: info
@@ -197,8 +197,8 @@ export function WeekView({
 
                   {/* Events */}
                   {dayEvents.map((event) => {
-                    const startMinutes = timeToMinutes(event.startAt, timezone);
-                    const endMinutes = timeToMinutes(event.endAt, timezone);
+                    const startMinutes = eventTimeToMinutes(event, 'startAt', timezone);
+                    const endMinutes = eventTimeToMinutes(event, 'endAt', timezone);
                     const top = (startMinutes / 30) * 32;
                     const height = ((endMinutes - startMinutes) / 30) * 32;
                     const layout = dayLayout.get(event.ids.id);

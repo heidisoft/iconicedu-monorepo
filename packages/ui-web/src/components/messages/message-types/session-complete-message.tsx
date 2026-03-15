@@ -7,7 +7,7 @@ import {
   type MessageBaseProps,
 } from '@iconicedu/ui-web/components/messages/message-base';
 import { useScheduleDisplayTimeZone } from '@iconicedu/ui-web/components/shared/schedule-display-timezone-context';
-import { formatScheduleDisplayValue } from '@iconicedu/ui-web/lib/schedule-display-timezone';
+import { formatScheduleDisplayTimeWithZone } from '@iconicedu/ui-web/lib/schedule-display-timezone';
 
 interface SessionCompleteMessageProps extends Omit<
   MessageBaseProps,
@@ -21,16 +21,31 @@ export const SessionCompleteMessage = memo(function SessionCompleteMessage(
 ) {
   const { message, ...baseProps } = props;
   const { session } = message;
-  const timezone = useScheduleDisplayTimeZone();
+  const viewerTimezone = useScheduleDisplayTimeZone();
+  const scheduleTimezone =
+    'timezone' in session && typeof session.timezone === 'string'
+      ? session.timezone
+      : null;
+  const displayTimezone = {
+    viewerTimezone,
+    scheduleTimezone,
+  };
 
   const [isCompleted, setIsCompleted] = useState(Boolean(session.completedAt));
   const [isReported, setIsReported] = useState(false);
 
-  const sessionDate = formatScheduleDisplayValue(session.startAt, timezone, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  const sessionDate = formatScheduleDisplayTimeWithZone(
+    session.startAt,
+    displayTimezone,
+    {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    },
+  );
 
   const handleComplete = () => {
     if (isCompleted) return;

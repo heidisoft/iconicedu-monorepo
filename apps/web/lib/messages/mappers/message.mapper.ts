@@ -241,6 +241,7 @@ export function mapMessageRowToVM(row: MessageRow, input: MessageMapperInput): M
           title: String(payload?.title ?? ''),
           startAt: String(payload?.startAt ?? row.created_at),
           endAt: payload?.endAt ? String(payload.endAt) : undefined,
+          timezone: typeof payload?.timezone === 'string' ? payload.timezone : undefined,
           location: typeof payload?.location === 'string' ? payload.location : undefined,
           meetingLink:
             typeof payload?.meetingLink === 'string' ? payload.meetingLink : undefined,
@@ -315,6 +316,7 @@ export function mapMessageRowToVM(row: MessageRow, input: MessageMapperInput): M
           subject: String(payload?.subject ?? ''),
           startAt: String(payload?.startAt ?? row.created_at),
           endAt: payload?.endAt ? String(payload.endAt) : undefined,
+          timezone: typeof payload?.timezone === 'string' ? payload.timezone : undefined,
           durationMinutes: Number(payload?.durationMinutes ?? 0),
           meetingLink:
             typeof payload?.meetingLink === 'string' ? payload.meetingLink : undefined,
@@ -336,6 +338,7 @@ export function mapMessageRowToVM(row: MessageRow, input: MessageMapperInput): M
           title: String(payload?.title ?? ''),
           startAt: String(payload?.startAt ?? row.created_at),
           endAt: payload?.endAt ? String(payload.endAt) : undefined,
+          timezone: typeof payload?.timezone === 'string' ? payload.timezone : undefined,
           completedAt: (payload?.completedAt as string | null) ?? null,
         },
       } as MessageVM;
@@ -347,6 +350,7 @@ export function mapMessageRowToVM(row: MessageRow, input: MessageMapperInput): M
         session: {
           title: String(payload?.title ?? ''),
           startAt: String(payload?.startAt ?? row.created_at),
+          timezone: typeof payload?.timezone === 'string' ? payload.timezone : undefined,
           durationMinutes:
             typeof payload?.durationMinutes === 'number'
               ? payload.durationMinutes

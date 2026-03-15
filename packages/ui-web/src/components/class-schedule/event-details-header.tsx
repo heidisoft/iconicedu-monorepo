@@ -4,7 +4,7 @@ import { cn } from '@iconicedu/ui-web/lib/utils';
 import { AvatarGroup, AvatarGroupCount } from '@iconicedu/ui-web/ui/avatar';
 import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import {
-  formatEventTime,
+  formatEventTimeForSchedule,
   getDisplayEventState,
 } from '@iconicedu/ui-web/lib/class-schedule-utils';
 import { ThemedIconBadge } from '@iconicedu/ui-web/components/shared/themed-icon';
@@ -17,6 +17,10 @@ interface EventDetailsHeaderProps {
 
 export function EventDetailsHeader({ event }: EventDetailsHeaderProps) {
   const timezone = useScheduleDisplayTimeZone();
+  const displayTimezone = {
+    viewerTimezone: timezone,
+    scheduleTimezone: event.timezone ?? event.recurrence?.rule.timezone ?? null,
+  };
   const displayState = getDisplayEventState(event);
   const maxVisibleGuests = 2;
   const visibleGuests = event.participants.slice(0, maxVisibleGuests);
@@ -32,13 +36,13 @@ export function EventDetailsHeader({ event }: EventDetailsHeaderProps) {
           size="sm"
         />
         <p className="text-sm font-medium">
-          {formatScheduleDisplayValue(startDate, timezone, {
+          {formatScheduleDisplayValue(startDate, displayTimezone, {
             weekday: 'long',
             month: 'long',
             day: 'numeric',
             year: 'numeric',
           })}{' '}
-          at {formatEventTime(event.startAt, timezone)}
+          at {formatEventTimeForSchedule(event, 'startAt', timezone)}
         </p>
       </div>
 

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import type { ClassScheduleVM } from '@iconicedu/shared-types';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import {
-  formatEventTime,
+  formatEventTimeForSchedule,
   getDisplayEventState,
   isEventLive,
 } from '@iconicedu/ui-web/lib/class-schedule-utils';
@@ -21,7 +21,7 @@ export function EventCard({ event, compact = false }: EventCardProps) {
   const timezone = useScheduleDisplayTimeZone();
   const isLive = isEventLive(event);
   const [open, setOpen] = useState(false);
-  const startTime = formatEventTime(event.startAt, timezone);
+  const startTime = formatEventTimeForSchedule(event, 'startAt', timezone);
   const displayState = getDisplayEventState(event);
   const themeClassName = event.themeKey ? `theme-${event.themeKey}` : '';
   const themeStyle =

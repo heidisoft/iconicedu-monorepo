@@ -4,9 +4,11 @@ import type {
   WeekdayVM,
 } from '@iconicedu/shared-types';
 import {
+  formatScheduleDisplayTimeWithZone,
   formatScheduleDisplayValue,
   toScheduleDisplayDate,
   getScheduleDisplayMinutes,
+  type ScheduleDisplayTimeZoneInput,
 } from '@iconicedu/ui-web/lib/schedule-display-timezone';
 
 export interface DisplayClassScheduleVM extends ClassScheduleVM {
@@ -16,6 +18,16 @@ export interface DisplayClassScheduleVM extends ClassScheduleVM {
     reason?: string | null;
     originalStartAt?: string;
     originalEndAt?: string;
+  };
+}
+
+function getScheduleDisplayTimezoneInput(
+  event: Pick<ClassScheduleVM, 'timezone' | 'recurrence'>,
+  viewerTimezone?: string | null,
+): ScheduleDisplayTimeZoneInput {
+  return {
+    viewerTimezone,
+    scheduleTimezone: event.timezone ?? event.recurrence?.rule.timezone ?? null,
   };
 }
 
@@ -58,15 +70,37 @@ export function formatMonthYear(date: Date, timezone?: string | null): string {
 
 export function formatEventTime(isoTime: string, timezone?: string | null): string {
   return (
-    formatScheduleDisplayValue(isoTime, timezone, {
+    formatScheduleDisplayTimeWithZone(isoTime, timezone, {
       hour: 'numeric',
       minute: '2-digit',
     }) ?? ''
   );
 }
 
+export function formatEventTimeForSchedule(
+  event: Pick<ClassScheduleVM, 'startAt' | 'endAt' | 'timezone' | 'recurrence'>,
+  key: 'startAt' | 'endAt',
+  timezone?: string | null,
+): string {
+  return (
+    formatScheduleDisplayTimeWithZone(
+      event[key],
+      getScheduleDisplayTimezoneInput(event, timezone),
+      {
+        hour: 'numeric',
+        minute: '2-digit',
+      },
+    ) ?? ''
+  );
+}
+
 export function getEventDate(event: ClassScheduleVM, timezone?: string | null): Date {
-  return toScheduleDisplayDate(event.startAt, timezone) ?? new Date(event.startAt);
+  return (
+    toScheduleDisplayDate(
+      event.startAt,
+      getScheduleDisplayTimezoneInput(event, timezone),
+    ) ?? new Date(event.startAt)
+  );
 }
 
 export function isSameDay(date1: Date, date2: Date): boolean {
@@ -77,8 +111,29 @@ export function isSameDay(date1: Date, date2: Date): boolean {
   );
 }
 
-export function timeToMinutes(isoTime: string, timezone?: string | null): number {
-  return getScheduleDisplayMinutes(isoTime, timezone);
+export function timeToMinutes(
+  input: string | Pick<ClassScheduleVM, 'startAt' | 'timezone' | 'recurrence'>,
+  timezone?: string | null,
+): number {
+  if (typeof input === 'string') {
+    return getScheduleDisplayMinutes(input, timezone);
+  }
+
+  return getScheduleDisplayMinutes(
+    input.startAt,
+    getScheduleDisplayTimezoneInput(input, timezone),
+  );
+}
+
+export function eventTimeToMinutes(
+  event: Pick<ClassScheduleVM, 'startAt' | 'endAt' | 'timezone' | 'recurrence'>,
+  key: 'startAt' | 'endAt',
+  timezone?: string | null,
+): number {
+  return getScheduleDisplayMinutes(
+    event[key],
+    getScheduleDisplayTimezoneInput(event, timezone),
+  );
 }
 
 export function getDisplayEventState(event: ClassScheduleVM | DisplayClassScheduleVM) {
@@ -132,10 +187,12 @@ export function getDaysInMonth(year: number, month: number): Date[] {
 
 export function getEventLayout(events: ClassScheduleVM[], timezone?: string | null) {
   const sorted = [...events].sort((a, b) => {
-    const aStart = timeToMinutes(a.startAt, timezone);
-    const bStart = timeToMinutes(b.startAt, timezone);
+    const aStart = eventTimeToMinutes(a, 'startAt', timezone);
+    const bStart = eventTimeToMinutes(b, 'startAt', timezone);
     if (aStart !== bStart) return aStart - bStart;
-    return timeToMinutes(a.endAt, timezone) - timeToMinutes(b.endAt, timezone);
+    return (
+      eventTimeToMinutes(a, 'endAt', timezone) - eventTimeToMinutes(b, 'endAt', timezone)
+    );
   });
 
   const clusters: ClassScheduleVM[][] = [];
@@ -143,8 +200,8 @@ export function getEventLayout(events: ClassScheduleVM[], timezone?: string | nu
   let currentEnd = -1;
 
   sorted.forEach((event) => {
-    const start = timeToMinutes(event.startAt, timezone);
-    const end = timeToMinutes(event.endAt, timezone);
+    const start = eventTimeToMinutes(event, 'startAt', timezone);
+    const end = eventTimeToMinutes(event, 'endAt', timezone);
 
     if (currentCluster.length === 0 || start < currentEnd) {
       currentCluster.push(event);
@@ -171,8 +228,8 @@ export function getEventLayout(events: ClassScheduleVM[], timezone?: string | nu
     const assignments: Array<{ id: string; column: number }> = [];
 
     cluster.forEach((event) => {
-      const start = timeToMinutes(event.startAt, timezone);
-      const end = timeToMinutes(event.endAt, timezone);
+      const start = eventTimeToMinutes(event, 'startAt', timezone);
+      const end = eventTimeToMinutes(event, 'endAt', timezone);
       let columnIndex = columnEndTimes.findIndex((time) => time <= start);
 
       if (columnIndex === -1) {

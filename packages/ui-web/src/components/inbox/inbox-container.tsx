@@ -27,9 +27,11 @@ import type {
   InboxTabKeyVM,
 } from '@iconicedu/shared-types';
 import {
+  formatScheduleDisplayTimeWithZone,
   formatScheduleDisplayValue,
   isSameScheduleDisplayDay,
   resolveScheduleDisplayTimeZone,
+  type ScheduleDisplayTimeZoneInput,
 } from '@iconicedu/ui-web/lib/schedule-display-timezone';
 
 const INBOX_PAGE_SIZE = 20;
@@ -225,7 +227,13 @@ export function applySessionParentLocalHeadline(
     return activity;
   }
 
-  const localLabel = formatScheduleDisplayValue(date, timezone, {
+  const metadataTimezone =
+    typeof metadata.timezone === 'string' ? metadata.timezone : undefined;
+  const displayTimezone: ScheduleDisplayTimeZoneInput = {
+    viewerTimezone: timezone,
+    scheduleTimezone: metadataTimezone,
+  };
+  const localLabel = formatScheduleDisplayTimeWithZone(date, displayTimezone, {
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
@@ -249,33 +257,55 @@ export function applySessionParentLocalHeadline(
   };
 }
 
-function formatLocalDateTimeLabel(value: string, timezone?: string | null) {
-  return formatScheduleDisplayValue(value, timezone, {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  })?.replace(',', ' at');
+function formatLocalDateTimeLabel(
+  value: string,
+  timezone?: string | null,
+  scheduleTimezone?: string | null,
+) {
+  return formatScheduleDisplayTimeWithZone(
+    value,
+    {
+      viewerTimezone: timezone,
+      scheduleTimezone,
+    },
+    {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    },
+  )?.replace(',', ' at');
 }
 
-function formatLocalTimeLabel(value: string, timezone?: string | null) {
-  return formatScheduleDisplayValue(value, timezone, {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
+function formatLocalTimeLabel(
+  value: string,
+  timezone?: string | null,
+  scheduleTimezone?: string | null,
+) {
+  return formatScheduleDisplayTimeWithZone(
+    value,
+    {
+      viewerTimezone: timezone,
+      scheduleTimezone,
+    },
+    {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    },
+  );
 }
 
 function formatSchedulePart(
   value: string,
-  timezone?: string | null,
+  timezone?: ScheduleDisplayTimeZoneInput,
   options?: Intl.DateTimeFormatOptions,
 ) {
   return formatScheduleDisplayValue(value, timezone, options ?? {});
 }
 
-function formatScheduleDayLabel(value: string, timezone?: string | null) {
+function formatScheduleDayLabel(value: string, timezone?: ScheduleDisplayTimeZoneInput) {
   return formatSchedulePart(value, timezone, {
     weekday: 'short',
     month: 'short',
@@ -285,20 +315,27 @@ function formatScheduleDayLabel(value: string, timezone?: string | null) {
 
 function formatScheduleTimeLabel(
   value: string,
-  timezone?: string | null,
+  timezone?: ScheduleDisplayTimeZoneInput,
   includeZone = false,
 ) {
+  if (includeZone) {
+    return formatScheduleDisplayTimeWithZone(value, timezone, {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+  }
+
   return formatSchedulePart(value, timezone, {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
-    ...(includeZone ? { timeZoneName: 'shortGeneric' } : {}),
   });
 }
 
 function formatScheduleDateTimeLabel(
   value: string,
-  timezone?: string | null,
+  timezone?: ScheduleDisplayTimeZoneInput,
   includeComma = true,
 ) {
   const dayLabel = formatScheduleDayLabel(value, timezone);
@@ -309,7 +346,11 @@ function formatScheduleDateTimeLabel(
   return includeComma ? `${dayLabel}, ${timeLabel}` : `${dayLabel} ${timeLabel}`;
 }
 
-function isSameScheduleDay(a: string, b: string, timezone?: string | null) {
+function isSameScheduleDay(
+  a: string,
+  b: string,
+  timezone?: ScheduleDisplayTimeZoneInput,
+) {
   return isSameScheduleDisplayDay(a, b, timezone);
 }
 
@@ -324,16 +365,23 @@ export function applyScheduleActivityLocalTime(
 
   if (activity.verb === 'class.session.scheduled') {
     const startAt = typeof metadata.startAt === 'string' ? metadata.startAt : undefined;
+    const scheduleTimezone =
+      typeof metadata.timezone === 'string' ? metadata.timezone : undefined;
     const firstSessionStartAt =
       typeof metadata.firstSessionStartAt === 'string'
         ? metadata.firstSessionStartAt
         : undefined;
-    const localStart = startAt ? formatLocalDateTimeLabel(startAt, timezone) : null;
+    const localStart = startAt
+      ? formatLocalDateTimeLabel(startAt, timezone, scheduleTimezone)
+      : null;
     const localFirst = formatLocalDateTimeLabel(
       firstSessionStartAt ?? startAt ?? '',
       timezone,
+      scheduleTimezone,
     );
-    const weeklyLocalTime = startAt ? formatLocalTimeLabel(startAt, timezone) : null;
+    const weeklyLocalTime = startAt
+      ? formatLocalTimeLabel(startAt, timezone, scheduleTimezone)
+      : null;
     const isUpdated = metadata.activityPhase === 'updated';
     return {
       ...activity,
@@ -355,12 +403,16 @@ export function applyScheduleActivityLocalTime(
       typeof metadata.title === 'string'
         ? metadata.title
         : (activity.content.headline.secondary ?? 'Class');
-    const timezone =
+    const scheduleTimezone =
       typeof metadata.firstSessionTimezone === 'string'
         ? metadata.firstSessionTimezone
         : typeof metadata.timezone === 'string'
           ? metadata.timezone
           : undefined;
+    const displayTimezone = {
+      viewerTimezone: timezone,
+      scheduleTimezone,
+    };
     const fromValue =
       typeof metadata.rescheduledFromStartAt === 'string'
         ? metadata.rescheduledFromStartAt
@@ -377,18 +429,18 @@ export function applyScheduleActivityLocalTime(
         : undefined;
     let summary = activity.content.summary;
     if (fromValue && toValue) {
-      if (isSameScheduleDay(fromValue, toValue, timezone)) {
-        const dayLabel = formatScheduleDayLabel(fromValue, timezone);
-        const fromTime = formatScheduleTimeLabel(fromValue, timezone);
-        const toTime = formatScheduleTimeLabel(toValue, timezone, true);
+      if (isSameScheduleDay(fromValue, toValue, displayTimezone)) {
+        const dayLabel = formatScheduleDayLabel(fromValue, displayTimezone);
+        const fromTime = formatScheduleTimeLabel(fromValue, displayTimezone);
+        const toTime = formatScheduleTimeLabel(toValue, displayTimezone, true);
         if (dayLabel && fromTime && toTime) {
           summary = `Session: ${title} weekly session (${dayLabel}) moved from ${fromTime} to ${toTime}${
             reason ? ` due to ${reason}` : ''
           }`;
         }
       } else {
-        const fromDateTime = formatScheduleDateTimeLabel(fromValue, timezone);
-        const toDateTime = formatScheduleDateTimeLabel(toValue, timezone);
+        const fromDateTime = formatScheduleDateTimeLabel(fromValue, displayTimezone);
+        const toDateTime = formatScheduleDateTimeLabel(toValue, displayTimezone);
         if (fromDateTime && toDateTime) {
           summary = `Session: ${title} weekly session moved from ${fromDateTime} to ${toDateTime}${
             reason ? ` due to ${reason}` : ''
@@ -414,12 +466,16 @@ export function applyScheduleActivityLocalTime(
       typeof metadata.title === 'string'
         ? metadata.title
         : (activity.content.headline.secondary ?? 'Class');
-    const timezone =
+    const scheduleTimezone =
       typeof metadata.firstSessionTimezone === 'string'
         ? metadata.firstSessionTimezone
         : typeof metadata.timezone === 'string'
           ? metadata.timezone
           : undefined;
+    const displayTimezone = {
+      viewerTimezone: timezone,
+      scheduleTimezone,
+    };
     const canceledValue =
       typeof metadata.canceledStartAt === 'string'
         ? metadata.canceledStartAt
@@ -432,7 +488,7 @@ export function applyScheduleActivityLocalTime(
     if (canceledValue) {
       const canceledDateTime = formatScheduleDateTimeLabel(
         canceledValue,
-        timezone,
+        displayTimezone,
         false,
       );
       if (canceledDateTime) {

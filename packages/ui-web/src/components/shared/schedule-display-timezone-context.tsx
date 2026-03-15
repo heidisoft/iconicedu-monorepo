@@ -1,7 +1,10 @@
 'use client';
 
 import * as React from 'react';
-import { resolveScheduleDisplayTimeZone } from '@iconicedu/ui-web/lib/schedule-display-timezone';
+import {
+  resolveScheduleDisplayTimeZone,
+  type ScheduleDisplayTimeZoneInput,
+} from '@iconicedu/ui-web/lib/schedule-display-timezone';
 
 const ScheduleDisplayTimeZoneContext = React.createContext<string | null>(null);
 
@@ -24,11 +27,21 @@ export function ScheduleDisplayTimeZoneProvider({
   );
 }
 
-export function useScheduleDisplayTimeZone(timezone?: string | null) {
+export function useScheduleDisplayTimeZone(timezone?: ScheduleDisplayTimeZoneInput) {
   const inheritedTimezone = React.useContext(ScheduleDisplayTimeZoneContext);
 
   return React.useMemo(
-    () => resolveScheduleDisplayTimeZone(timezone ?? inheritedTimezone),
+    () =>
+      resolveScheduleDisplayTimeZone(
+        timezone === undefined
+          ? inheritedTimezone
+          : typeof timezone === 'object' && timezone !== null
+            ? {
+                ...timezone,
+                viewerTimezone: timezone.viewerTimezone ?? inheritedTimezone,
+              }
+            : timezone,
+      ),
     [inheritedTimezone, timezone],
   );
 }

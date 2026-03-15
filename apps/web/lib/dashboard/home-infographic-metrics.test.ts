@@ -378,7 +378,9 @@ describe('buildDashboardHomeInfographicMetrics', () => {
       } as never,
     });
 
-    expect(result.upcomingSessionsPage.items[0]?.session.time).toContain('Fri 11:00am');
+    expect(result.upcomingSessionsPage.items[0]?.session.time).toContain(
+      'Fri 11:00am EDT',
+    );
     expect(result.upcomingSessionsPage.items[0]?.session.time).not.toContain('7:00am');
   });
 });

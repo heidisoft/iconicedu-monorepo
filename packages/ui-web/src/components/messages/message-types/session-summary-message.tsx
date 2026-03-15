@@ -9,7 +9,7 @@ import {
   type MessageBaseProps,
 } from '@iconicedu/ui-web/components/messages/message-base';
 import { useScheduleDisplayTimeZone } from '@iconicedu/ui-web/components/shared/schedule-display-timezone-context';
-import { formatScheduleDisplayValue } from '@iconicedu/ui-web/lib/schedule-display-timezone';
+import { formatScheduleDisplayTimeWithZone } from '@iconicedu/ui-web/lib/schedule-display-timezone';
 
 interface SessionSummaryMessageProps extends Omit<
   MessageBaseProps,
@@ -23,7 +23,15 @@ export const SessionSummaryMessage = memo(function SessionSummaryMessage(
 ) {
   const { message, ...baseProps } = props;
   const { session } = message;
-  const timezone = useScheduleDisplayTimeZone();
+  const viewerTimezone = useScheduleDisplayTimeZone();
+  const scheduleTimezone =
+    'timezone' in session && typeof session.timezone === 'string'
+      ? session.timezone
+      : null;
+  const displayTimezone = {
+    viewerTimezone,
+    scheduleTimezone,
+  };
 
   return (
     <MessageBase message={message} {...baseProps} className="bg-indigo-500/5">
@@ -50,7 +58,7 @@ export const SessionSummaryMessage = memo(function SessionSummaryMessage(
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Calendar className="h-3 w-3" />
               <span>
-                {formatScheduleDisplayValue(session.startAt, timezone, {
+                {formatScheduleDisplayTimeWithZone(session.startAt, displayTimezone, {
                   weekday: 'short',
                   month: 'short',
                   day: 'numeric',

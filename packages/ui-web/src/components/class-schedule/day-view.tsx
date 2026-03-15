@@ -2,11 +2,11 @@
 
 import type { ClassScheduleVM } from '@iconicedu/shared-types';
 import {
+  eventTimeToMinutes,
   isSameDay,
   getEventDate,
-  formatEventTime,
+  formatEventTimeForSchedule,
   getTimeSlots,
-  timeToMinutes,
   getEventLayout,
 } from '@iconicedu/ui-web/lib/class-schedule-utils';
 import { EventCard } from '@iconicedu/ui-web/components/class-schedule/event-card';
@@ -54,7 +54,7 @@ export function DayView({
   );
   const miniScheduleEvents = classScheduleEvents ?? events;
   const hasChildren = childrenCount === undefined ? true : childrenCount > 0;
-  const dayLayout = getEventLayout(dayEvents);
+  const dayLayout = getEventLayout(dayEvents, timezone);
   const maxVisibleColumns = 3;
   const clusterInfo = new Map<
     number,
@@ -64,7 +64,7 @@ export function DayView({
   dayEvents.forEach((event) => {
     const layout = dayLayout.get(event.ids.id);
     if (!layout) return;
-    const startMinutes = timeToMinutes(event.startAt, timezone);
+    const startMinutes = eventTimeToMinutes(event, 'startAt', timezone);
     const info = clusterInfo.get(layout.clusterId);
     const nextInfo = {
       startMinutes: info ? Math.min(info.startMinutes, startMinutes) : startMinutes,
@@ -101,12 +101,12 @@ export function DayView({
 
     if (dayEvents.length > 0) {
       const earliestEvent = dayEvents.reduce((earliest, event) => {
-        const eventMinutes = timeToMinutes(event.startAt, timezone);
-        const earliestMinutes = timeToMinutes(earliest.startAt, timezone);
+        const eventMinutes = eventTimeToMinutes(event, 'startAt', timezone);
+        const earliestMinutes = eventTimeToMinutes(earliest, 'startAt', timezone);
         return eventMinutes < earliestMinutes ? event : earliest;
       });
 
-      const eventMinutes = timeToMinutes(earliestEvent.startAt, timezone);
+      const eventMinutes = eventTimeToMinutes(earliestEvent, 'startAt', timezone);
       const scrollToMinutes = Math.max(0, eventMinutes - 60);
       scrollTop = (scrollToMinutes / 30) * 32;
     }
@@ -150,8 +150,8 @@ export function DayView({
 
               {/* Events */}
               {dayEvents.map((event) => {
-                const startMinutes = timeToMinutes(event.startAt, timezone);
-                const endMinutes = timeToMinutes(event.endAt, timezone);
+                const startMinutes = eventTimeToMinutes(event, 'startAt', timezone);
+                const endMinutes = eventTimeToMinutes(event, 'endAt', timezone);
                 const top = (startMinutes / 30) * 32;
                 const height = ((endMinutes - startMinutes) / 30) * 32;
                 const layout = dayLayout.get(event.ids.id);
@@ -283,7 +283,7 @@ export function DayView({
                       <EmptyTitle>No events today</EmptyTitle>
                       <EmptyDescription>
                         {nextEvent
-                          ? `Next up: ${nextEvent.title} at ${formatEventTime(nextEvent.startAt, timezone)}`
+                          ? `Next up: ${nextEvent.title} at ${formatEventTimeForSchedule(nextEvent, 'startAt', timezone)}`
                           : 'No upcoming events scheduled'}
                       </EmptyDescription>
                     </EmptyHeader>
@@ -295,8 +295,14 @@ export function DayView({
                         <ArrowRight className="mr-2 size-4" />
                         Next up:{' '}
                         {formatScheduleDisplayValue(
-                          getEventDate(nextEvent, timezone),
-                          timezone,
+                          nextEvent.startAt,
+                          {
+                            viewerTimezone: timezone,
+                            scheduleTimezone:
+                              nextEvent.timezone ??
+                              nextEvent.recurrence?.rule.timezone ??
+                              null,
+                          },
                           {
                             month: 'short',
                             day: 'numeric',

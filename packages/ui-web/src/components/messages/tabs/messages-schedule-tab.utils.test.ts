@@ -95,7 +95,7 @@ describe('messages-schedule-tab.utils', () => {
       'America/New_York',
     );
 
-    expect(groups[0]?.sessions[0]?.time).toBe('Fri 11:00am');
+    expect(groups[0]?.sessions[0]?.time).toBe('Fri 11:00am EDT');
     expect(groups[0]?.sessions[0]?.dayNum).toBe('13');
   });
 
@@ -349,7 +349,7 @@ describe('messages-schedule-tab.utils', () => {
       new Date('2026-03-01T00:00:00.000Z'),
     );
 
-    expect(mapped[0]?.sessions[0]?.time).toMatch(/^Tue \d{1,2}:\d{2}(am|pm)$/);
+    expect(mapped[0]?.sessions[0]?.time).toMatch(/^Tue \d{1,2}:\d{2}(am|pm) [A-Z]{2,4}$/);
   });
 
   it('marks sessions live only while current time is within session window', () => {

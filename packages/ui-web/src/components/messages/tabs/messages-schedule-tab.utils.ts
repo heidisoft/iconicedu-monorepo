@@ -1,9 +1,12 @@
 import type { ClassScheduleVM } from '@iconicedu/shared-types';
 import { expandRecurringEvents } from '@iconicedu/ui-web/lib/class-schedule-utils';
 import {
+  formatScheduleDisplayTimeWithZone,
   formatScheduleDisplayValue,
+  getScheduleDisplayTimeZoneAbbreviation,
   getScheduleDisplayMonthKey,
   resolveScheduleDisplayTimeZone,
+  type ScheduleDisplayTimeZoneInput,
   toScheduleDisplayDate,
 } from '@iconicedu/ui-web/lib/schedule-display-timezone';
 
@@ -27,6 +30,16 @@ export interface DisplaySchedule extends ClassScheduleVM {
     reason?: string | null;
     originalStartAt?: string;
     originalEndAt?: string;
+  };
+}
+
+function getScheduleDisplayTimezoneInput(
+  schedule: Pick<DisplaySchedule, 'timezone' | 'recurrence'>,
+  viewerTimezone?: string | null,
+): ScheduleDisplayTimeZoneInput {
+  return {
+    viewerTimezone,
+    scheduleTimezone: schedule.timezone ?? schedule.recurrence?.rule.timezone ?? null,
   };
 }
 
@@ -240,19 +253,24 @@ export function formatScheduleDateTime(
   schedule: ClassScheduleVM,
   timezone?: string | null,
 ): string {
+  const displayTimezone = getScheduleDisplayTimezoneInput(schedule, timezone);
   const start =
-    formatScheduleDisplayValue(schedule.startAt, timezone, {
+    formatScheduleDisplayValue(schedule.startAt, displayTimezone, {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true,
     }) ?? '';
   const end =
-    formatScheduleDisplayValue(schedule.endAt, timezone, {
+    formatScheduleDisplayValue(schedule.endAt, displayTimezone, {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true,
     }) ?? '';
-  return `${start} - ${end}`;
+  const abbreviation = getScheduleDisplayTimeZoneAbbreviation(
+    schedule.endAt,
+    displayTimezone,
+  );
+  return abbreviation ? `${start} - ${end} ${abbreviation}` : `${start} - ${end}`;
 }
 
 export function formatScheduleTimeBadge(
@@ -260,11 +278,15 @@ export function formatScheduleTimeBadge(
   timezone?: string | null,
 ): string {
   return (
-    formatScheduleDisplayValue(schedule.startAt, timezone, {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    }) ?? ''
+    formatScheduleDisplayTimeWithZone(
+      schedule.startAt,
+      getScheduleDisplayTimezoneInput(schedule, timezone),
+      {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      },
+    ) ?? ''
   );
 }
 
@@ -273,9 +295,11 @@ export function formatScheduleDayBadge(
   now = new Date(),
   timezone?: string | null,
 ): string {
+  const displayTimezone = getScheduleDisplayTimezoneInput(schedule, timezone);
   const start =
-    toScheduleDisplayDate(schedule.startAt, timezone) ?? new Date(schedule.startAt);
-  const nowDisplayDate = toScheduleDisplayDate(now, timezone) ?? now;
+    toScheduleDisplayDate(schedule.startAt, displayTimezone) ??
+    new Date(schedule.startAt);
+  const nowDisplayDate = toScheduleDisplayDate(now, displayTimezone) ?? now;
   const startDay = new Date(
     start.getFullYear(),
     start.getMonth(),
@@ -287,7 +311,11 @@ export function formatScheduleDayBadge(
     nowDisplayDate.getDate(),
   ).getTime();
   if (startDay === nowDay) return 'Today';
-  return formatScheduleDisplayValue(start, timezone, { weekday: 'short' }) ?? '';
+  return (
+    formatScheduleDisplayValue(schedule.startAt, displayTimezone, {
+      weekday: 'short',
+    }) ?? ''
+  );
 }
 
 export function formatScheduleDateBadge(
@@ -295,10 +323,14 @@ export function formatScheduleDateBadge(
   timezone?: string | null,
 ): string {
   return (
-    formatScheduleDisplayValue(schedule.startAt, timezone, {
-      month: 'short',
-      day: 'numeric',
-    }) ?? ''
+    formatScheduleDisplayValue(
+      schedule.startAt,
+      getScheduleDisplayTimezoneInput(schedule, timezone),
+      {
+        month: 'short',
+        day: 'numeric',
+      },
+    ) ?? ''
   );
 }
 
@@ -306,8 +338,11 @@ export function formatScheduleDayTimeMeta(
   schedule: ClassScheduleVM,
   timezone?: string | null,
 ): string {
+  const displayTimezone = getScheduleDisplayTimezoneInput(schedule, timezone);
   const dayLabel =
-    formatScheduleDisplayValue(schedule.startAt, timezone, { weekday: 'long' }) ?? '';
+    formatScheduleDisplayValue(schedule.startAt, displayTimezone, {
+      weekday: 'long',
+    }) ?? '';
   return `${dayLabel} • ${formatScheduleDateTime(schedule, timezone)}`;
 }
 
@@ -315,11 +350,15 @@ export function formatScheduleWeekTitle(
   schedule: ClassScheduleVM,
   timezone?: string | null,
 ): string {
+  const displayTimezone = getScheduleDisplayTimezoneInput(schedule, timezone);
   const start =
-    toScheduleDisplayDate(schedule.startAt, timezone) ?? new Date(schedule.startAt);
+    toScheduleDisplayDate(schedule.startAt, displayTimezone) ??
+    new Date(schedule.startAt);
   const weekNumber = Math.min(5, Math.floor((start.getDate() - 1) / 7) + 1);
   const monthLabel =
-    formatScheduleDisplayValue(start, timezone, { month: 'short' }) ?? '';
+    formatScheduleDisplayValue(schedule.startAt, displayTimezone, {
+      month: 'short',
+    }) ?? '';
   return `${monthLabel} · Week ${weekNumber}`;
 }
 
@@ -329,23 +368,40 @@ function getCalendarWeekOfMonth(date: Date): number {
   return Math.floor((date.getDate() + firstWeekdayOffset - 1) / 7) + 1;
 }
 
-function formatCompactMeridiemTime(date: Date, timezone?: string | null): string {
-  return (
-    formatScheduleDisplayValue(date, timezone, {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    }) ?? ''
+function formatCompactMeridiemTime(
+  input: Date | string,
+  timezone: ScheduleDisplayTimeZoneInput,
+  includeZone = false,
+): string {
+  const formatted = (
+    (includeZone
+      ? formatScheduleDisplayTimeWithZone(input, timezone, {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+        })
+      : formatScheduleDisplayValue(input, timezone, {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+        })) ?? ''
   )
     .replace(' AM', 'am')
     .replace(' PM', 'pm');
+
+  return formatted;
 }
 
 export function getScheduleMonthKey(
   schedule: ClassScheduleVM,
   timezone?: string | null,
 ): string {
-  return getScheduleDisplayMonthKey(schedule.startAt, timezone) ?? '1970-01';
+  return (
+    getScheduleDisplayMonthKey(
+      schedule.startAt,
+      getScheduleDisplayTimezoneInput(schedule, timezone),
+    ) ?? '1970-01'
+  );
 }
 
 export function formatScheduleMonthTitleFromKey(monthKey: string): string {
@@ -395,8 +451,8 @@ export function toMonthGroups(
   timezone?: string | null,
 ): MonthGroup[] {
   const nowMs = now.getTime();
-  const resolvedTimezone = resolveScheduleDisplayTimeZone(timezone);
-  const nowDisplayDate = toScheduleDisplayDate(now, resolvedTimezone) ?? now;
+  const resolvedViewerTimezone = resolveScheduleDisplayTimeZone(timezone);
+  const nowDisplayDate = toScheduleDisplayDate(now, resolvedViewerTimezone) ?? now;
   const nowDay = new Date(
     nowDisplayDate.getFullYear(),
     nowDisplayDate.getMonth(),
@@ -407,8 +463,12 @@ export function toMonthGroups(
     const monthDate = new Date(Number(year), Number(month) - 1, 1);
     const sessionCountByWeekNumber = new Map<number, number>();
     const sessions: ClassSession[] = group.schedules.map((schedule) => {
+      const displayTimezone = getScheduleDisplayTimezoneInput(
+        schedule,
+        resolvedViewerTimezone,
+      );
       const startDisplayDate =
-        toScheduleDisplayDate(schedule.startAt, resolvedTimezone) ??
+        toScheduleDisplayDate(schedule.startAt, displayTimezone) ??
         new Date(schedule.startAt);
       const startDay = new Date(
         startDisplayDate.getFullYear(),
@@ -419,19 +479,20 @@ export function toMonthGroups(
       const nextSessionNumber = (sessionCountByWeekNumber.get(weekNumber) ?? 0) + 1;
       sessionCountByWeekNumber.set(weekNumber, nextSessionNumber);
       const monthLabel =
-        formatScheduleDisplayValue(schedule.startAt, resolvedTimezone, {
+        formatScheduleDisplayValue(schedule.startAt, displayTimezone, {
           month: 'short',
         }) ?? '';
       const dayLabel =
-        formatScheduleDisplayValue(schedule.startAt, resolvedTimezone, {
+        formatScheduleDisplayValue(schedule.startAt, displayTimezone, {
           weekday: 'short',
         }) ?? '';
       return {
         id: schedule.ids.id,
         label: `${monthLabel} · Week ${weekNumber} · Session ${nextSessionNumber}`,
         time: `${dayLabel} ${formatCompactMeridiemTime(
-          new Date(schedule.startAt),
-          resolvedTimezone,
+          schedule.startAt,
+          displayTimezone,
+          true,
         )}`,
         dayName: dayLabel,
         dayNum: String(startDisplayDate.getDate()),
@@ -453,7 +514,7 @@ export function toMonthGroups(
                 startAt: schedule.uiState.originalStartAt,
                 endAt: schedule.uiState.originalEndAt ?? schedule.uiState.originalStartAt,
               },
-              resolvedTimezone,
+              resolvedViewerTimezone,
             )
           : null,
         originalDate: schedule.uiState?.originalStartAt
@@ -462,7 +523,7 @@ export function toMonthGroups(
                 ...schedule,
                 startAt: schedule.uiState.originalStartAt,
               },
-              resolvedTimezone,
+              resolvedViewerTimezone,
             )
           : null,
       };
@@ -471,7 +532,9 @@ export function toMonthGroups(
     return {
       monthKey: group.monthKey,
       month:
-        formatScheduleDisplayValue(monthDate, resolvedTimezone, { month: 'long' }) ?? '',
+        formatScheduleDisplayValue(monthDate, resolvedViewerTimezone, {
+          month: 'long',
+        }) ?? '',
       year,
       totalCount: sessions.length,
       completedCount: sessions.filter((session) => session.status === 'completed').length,

@@ -7,10 +7,10 @@ import { WeekView } from '@iconicedu/ui-web/components/class-schedule/week-view'
 import { DayView } from '@iconicedu/ui-web/components/class-schedule/day-view';
 import { useScheduleDisplayTimeZone } from '@iconicedu/ui-web/components/shared/schedule-display-timezone-context';
 import {
+  eventTimeToMinutes,
   getClassScheduleEventsForMonthRange,
   getClassScheduleEventsForView,
   getEventDate,
-  timeToMinutes,
 } from '@iconicedu/ui-web/lib/class-schedule-utils';
 
 interface ClassScheduleContainerProps {
@@ -52,7 +52,10 @@ export function ClassScheduleContainer({
         const dateDiff =
           getEventDate(a, timezone).getTime() - getEventDate(b, timezone).getTime();
         if (dateDiff !== 0) return dateDiff;
-        return timeToMinutes(a.startAt, timezone) - timeToMinutes(b.startAt, timezone);
+        return (
+          eventTimeToMinutes(a, 'startAt', timezone) -
+          eventTimeToMinutes(b, 'startAt', timezone)
+        );
       })[0];
   }, [events, currentDate, timezone]);
 

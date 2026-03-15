@@ -2,7 +2,7 @@ import type { ClassScheduleVM } from '@iconicedu/shared-types';
 import { Separator } from '@iconicedu/ui-web/ui/separator';
 import { User, MapPin, Globe } from 'lucide-react';
 import {
-  formatEventTime,
+  formatEventTimeForSchedule,
   getDisplayEventState,
 } from '@iconicedu/ui-web/lib/class-schedule-utils';
 import { useScheduleDisplayTimeZone } from '@iconicedu/ui-web/components/shared/schedule-display-timezone-context';
@@ -14,6 +14,10 @@ interface EventDetailsInfoProps {
 
 export function EventDetailsInfo({ event }: EventDetailsInfoProps) {
   const timezone = useScheduleDisplayTimeZone();
+  const displayTimezone = {
+    viewerTimezone: timezone,
+    scheduleTimezone: event.timezone ?? event.recurrence?.rule.timezone ?? null,
+  };
   const displayState = getDisplayEventState(event);
   const organizer =
     event.participants.find(
@@ -56,13 +60,22 @@ export function EventDetailsInfo({ event }: EventDetailsInfoProps) {
           </div>
           <span className="text-sm text-muted-foreground">
             Originally{' '}
-            {formatScheduleDisplayValue(originalStart, timezone, {
+            {formatScheduleDisplayValue(originalStart, displayTimezone, {
               weekday: 'long',
               month: 'long',
               day: 'numeric',
               year: 'numeric',
             })}{' '}
-            at {formatEventTime(displayState.originalStartAt!, timezone)}
+            at{' '}
+            {formatEventTimeForSchedule(
+              {
+                ...event,
+                startAt: displayState.originalStartAt!,
+                endAt: displayState.originalEndAt ?? displayState.originalStartAt!,
+              },
+              'startAt',
+              timezone,
+            )}
           </span>
         </div>
       )}

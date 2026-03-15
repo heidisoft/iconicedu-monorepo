@@ -1,4 +1,9 @@
-import type { IdsBaseVM, ISODateTime, UUID } from '@iconicedu/shared-types/shared/shared';
+import type {
+  IANATimezone,
+  IdsBaseVM,
+  ISODateTime,
+  UUID,
+} from '@iconicedu/shared-types/shared/shared';
 import type { UserProfileVM } from '@iconicedu/shared-types/vm/profile';
 import type { LiveSessionProviderVM } from '@iconicedu/shared-types/vm/channel';
 
@@ -201,6 +206,7 @@ export interface EventReminderMessageVM extends BaseMessageVM {
     title: string;
     startAt: ISODateTime;
     endAt?: ISODateTime;
+    timezone?: IANATimezone;
     location?: string;
     meetingLink?: string;
     attendees?: UserProfileVM[];
@@ -262,6 +268,7 @@ export interface SessionBookingMessageVM extends BaseMessageVM {
     subject: string;
     startAt: ISODateTime;
     endAt?: ISODateTime;
+    timezone?: IANATimezone;
     durationMinutes: number;
     meetingLink?: string;
     location?: string;
@@ -277,6 +284,7 @@ export interface SessionCompleteMessageVM extends BaseMessageVM {
     title: string;
     startAt: ISODateTime;
     endAt?: ISODateTime;
+    timezone?: IANATimezone;
     completedAt?: ISODateTime | null;
   };
 }
@@ -287,6 +295,7 @@ export interface SessionSummaryMessageVM extends BaseMessageVM {
   session: {
     title: string;
     startAt: ISODateTime;
+    timezone?: IANATimezone;
     durationMinutes?: number;
     summary: string;
     highlights?: string[];
