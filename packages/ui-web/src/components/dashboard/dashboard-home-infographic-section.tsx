@@ -25,6 +25,7 @@ export interface DashboardUpcomingSessionListItem {
   session: ClassSession;
   joinHref: string;
   chatHref: string;
+  weekBucket: 'this-week' | 'next-week';
 }
 
 export interface DashboardUpcomingSessionsPage {
@@ -101,6 +102,22 @@ export function DashboardHomeInfographicSection({
       startIndex + upcomingSessionsPage.pageSize,
     );
   }, [currentPage, upcomingSessionsPage.items, upcomingSessionsPage.pageSize]);
+  const visibleSessionSections = useMemo(() => {
+    const thisWeekItems = visibleSessions.filter(
+      (item) => item.weekBucket === 'this-week',
+    );
+    const nextWeekItems = visibleSessions.filter(
+      (item) => item.weekBucket === 'next-week',
+    );
+    const shouldSplit = thisWeekItems.length > 0 && nextWeekItems.length > 0;
+
+    return shouldSplit
+      ? [
+          { key: 'this-week' as const, label: 'This week', items: thisWeekItems },
+          { key: 'next-week' as const, label: 'Next week', items: nextWeekItems },
+        ]
+      : [{ key: 'all' as const, label: null, items: visibleSessions }];
+  }, [visibleSessions]);
 
   const openFamilySettings = () => {
     window.dispatchEvent(
@@ -233,21 +250,30 @@ export function DashboardHomeInfographicSection({
 
           <div className="mt-5 space-y-3">
             {visibleSessions.length ? (
-              visibleSessions.map(({ session, joinHref, chatHref }, index) => (
-                <SessionCard
-                  key={session.id}
-                  session={session}
-                  index={index}
-                  canJoin
-                  classroomChatHref={chatHref}
-                  joinLiveSession={async () => {
-                    if (onJoinSession) {
-                      await onJoinSession(joinHref);
-                      return;
-                    }
-                    window.location.assign(joinHref);
-                  }}
-                />
+              visibleSessionSections.map((section) => (
+                <div key={section.key} className="space-y-3">
+                  {section.label ? (
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      {section.label}
+                    </p>
+                  ) : null}
+                  {section.items.map(({ session, joinHref, chatHref }, index) => (
+                    <SessionCard
+                      key={session.id}
+                      session={session}
+                      index={index}
+                      canJoin
+                      classroomChatHref={chatHref}
+                      joinLiveSession={async () => {
+                        if (onJoinSession) {
+                          await onJoinSession(joinHref);
+                          return;
+                        }
+                        window.location.assign(joinHref);
+                      }}
+                    />
+                  ))}
+                </div>
               ))
             ) : (
               <DashboardSessionsEmptyState />

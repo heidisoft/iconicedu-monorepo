@@ -42,12 +42,14 @@ interface RecurrenceSchedulerProps {
   schedules?: RecurrenceFormData[];
   onSchedulesChange?: (schedules: RecurrenceFormData[]) => void;
   className?: string;
+  defaultTimezone?: string | null;
 }
 
 export function RecurrenceScheduler({
   schedules: controlledSchedules,
   onSchedulesChange,
   className,
+  defaultTimezone,
 }: RecurrenceSchedulerProps) {
   const [internalSchedules, setInternalSchedules] = React.useState<RecurrenceFormData[]>(
     [],
@@ -131,6 +133,7 @@ export function RecurrenceScheduler({
           <RecurrenceForm
             key={editingSchedule?.id || 'new'}
             defaultValues={editingSchedule || undefined}
+            defaultTimezone={defaultTimezone}
             onSubmit={handleSubmit}
             onCancel={handleCloseDialog}
             isEditing={Boolean(editingSchedule)}

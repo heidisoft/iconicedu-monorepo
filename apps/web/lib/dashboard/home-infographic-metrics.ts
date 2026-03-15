@@ -6,7 +6,10 @@ import {
   toMonthGroups,
   type ClassSession,
 } from '@iconicedu/ui-web/components/messages/tabs/messages-schedule-tab.utils';
-import { getScheduleDisplayMonthKey } from '@iconicedu/ui-web/lib/schedule-display-timezone';
+import {
+  getScheduleDisplayMonthKey,
+  toScheduleDisplayDate,
+} from '@iconicedu/ui-web/lib/schedule-display-timezone';
 import { buildClassSchedulesByOrg } from '@iconicedu/web/lib/schedules/builders/class-schedule.builder';
 import { getLearningSpacesByOrg } from '@iconicedu/web/lib/spaces/queries/learning-spaces.query';
 import { getLearningSpaceParticipantsByLearningSpaceIds } from '@iconicedu/web/lib/spaces/queries/learning-space-relations.query';
@@ -25,6 +28,7 @@ export interface DashboardUpcomingSessionListItem {
   session: ClassSession;
   joinHref: string;
   chatHref: string;
+  weekBucket: 'this-week' | 'next-week';
 }
 
 export interface DashboardUpcomingSessionsPage {
@@ -71,6 +75,11 @@ const endOfWeekSunday = (date: Date) => {
 };
 
 const cloneZeroMetrics = (): DashboardInfographicRoleMetrics => ({ ...ZERO_METRICS });
+
+function getDisplayDayStart(date: Date | string, timezone?: string | null) {
+  const displayDate = timezone ? toScheduleDisplayDate(date, timezone) : null;
+  return startOfDay(displayDate ?? new Date(date));
+}
 
 function resolveActiveRole(
   currentUserProfile: UserProfileVM | null,
@@ -220,8 +229,16 @@ function buildUpcomingSessionPage(input: {
 
   const total = flatSessions.length;
   const totalPages = Math.max(1, Math.ceil(total / input.pageSize));
+  const displayNow = input.timezone
+    ? (toScheduleDisplayDate(input.now, input.timezone) ?? input.now)
+    : input.now;
+  const currentWeekStart = startOfWeekMonday(displayNow).getTime();
+
   const items = flatSessions.map((session) => {
     const baseScheduleId = getBaseScheduleId(session.id);
+    const sessionSchedule =
+      input.upcomingSchedules.find((schedule) => schedule.ids.id === session.id) ??
+      input.upcomingSchedules.find((schedule) => schedule.ids.id === baseScheduleId);
     const className =
       titleByScheduleId.get(session.id) ??
       titleByScheduleId.get(baseScheduleId) ??
@@ -233,6 +250,14 @@ function buildUpcomingSessionPage(input: {
     const timeLabel = participantNames.length
       ? `${session.time} · ${participantNames.join(', ')}`
       : session.time;
+    const sessionDisplayDate =
+      sessionSchedule?.startAt && input.timezone
+        ? (toScheduleDisplayDate(sessionSchedule.startAt, input.timezone) ??
+          new Date(sessionSchedule.startAt))
+        : sessionSchedule?.startAt
+          ? new Date(sessionSchedule.startAt)
+          : input.now;
+    const sessionWeekStart = startOfWeekMonday(sessionDisplayDate).getTime();
 
     return {
       session: {
@@ -243,7 +268,8 @@ function buildUpcomingSessionPage(input: {
       joinHref:
         joinHrefByScheduleId.get(session.id) ?? `/${input.orgSlug}/class-schedule`,
       chatHref: chatHrefByScheduleId.get(session.id) ?? `/${input.orgSlug}/spaces`,
-    };
+      weekBucket: sessionWeekStart === currentWeekStart ? 'this-week' : 'next-week',
+    } satisfies DashboardUpcomingSessionListItem;
   });
 
   return {
@@ -306,16 +332,20 @@ async function buildActiveRoleMetrics(input: {
   }
 
   const timelineBuckets = splitSchedulesByTimeline(scopedSchedules, input.now);
-  const nowMs = input.now.getTime();
-  const nextSevenDaysMs = nowMs + 7 * 24 * 60 * 60 * 1000;
-  const upcomingSchedulesNext7Days = timelineBuckets.upcoming.filter((schedule) => {
-    const startAtMs = new Date(schedule.startAt).getTime();
-    return startAtMs >= nowMs && startAtMs < nextSevenDaysMs;
+  const displayNow = getDisplayDayStart(input.now, input.timezone);
+  const weekStartMs = startOfWeekMonday(displayNow).getTime();
+  const weekEndMs = endOfWeekSunday(displayNow).getTime();
+  const nextWeekEndMs = (() => {
+    const nextWeekEnd = endOfWeekSunday(displayNow);
+    nextWeekEnd.setDate(nextWeekEnd.getDate() + 7);
+    return nextWeekEnd.getTime();
+  })();
+  const upcomingSchedulesThisAndNextWeek = timelineBuckets.upcoming.filter((schedule) => {
+    const scheduleDayMs = getDisplayDayStart(schedule.startAt, input.timezone).getTime();
+    return scheduleDayMs >= weekStartMs && scheduleDayMs <= nextWeekEndMs;
   });
-  const weekStartMs = startOfWeekMonday(input.now).getTime();
-  const weekEndMs = endOfWeekSunday(input.now).getTime();
   const upcomingSessionsThisWeek = timelineBuckets.upcoming.filter((schedule) => {
-    const scheduleDayMs = startOfDay(new Date(schedule.startAt)).getTime();
+    const scheduleDayMs = getDisplayDayStart(schedule.startAt, input.timezone).getTime();
     return scheduleDayMs >= weekStartMs && scheduleDayMs <= weekEndMs;
   }).length;
 
@@ -373,7 +403,7 @@ async function buildActiveRoleMetrics(input: {
         : toActiveSubjectsLabel(activeSubjects),
     },
     upcomingSessionsPage: buildUpcomingSessionPage({
-      upcomingSchedules: upcomingSchedulesNext7Days,
+      upcomingSchedules: upcomingSchedulesThisAndNextWeek,
       orgSlug: input.orgSlug,
       pageSize: input.pageSize,
       now: input.now,

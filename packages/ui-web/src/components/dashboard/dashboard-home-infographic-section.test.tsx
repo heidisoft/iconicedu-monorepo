@@ -22,6 +22,7 @@ const sessionPage = {
       },
       joinHref: '/iconic-academy/spaces/channel-1',
       chatHref: '/iconic-academy/spaces/channel-1',
+      weekBucket: 'this-week',
     },
     {
       session: {
@@ -38,6 +39,7 @@ const sessionPage = {
       },
       joinHref: '/iconic-academy/spaces/channel-2',
       chatHref: '/iconic-academy/spaces/channel-2',
+      weekBucket: 'this-week',
     },
     {
       session: {
@@ -54,6 +56,7 @@ const sessionPage = {
       },
       joinHref: '/iconic-academy/spaces/channel-3',
       chatHref: '/iconic-academy/spaces/channel-3',
+      weekBucket: 'next-week',
     },
   ],
   total: 3,
@@ -109,6 +112,33 @@ describe('DashboardHomeInfographicSection', () => {
     expect(screen.getByText('Science 301')).toBeInTheDocument();
     expect(screen.queryByText('Math 101')).not.toBeInTheDocument();
     expect(screen.getByText('Page 2 of 2')).toBeInTheDocument();
+  });
+
+  it('separates visible upcoming sessions into this week and next week sections', () => {
+    render(
+      <DashboardHomeInfographicSection
+        orgSlug="iconic-academy"
+        topMetrics={{
+          upcomingSessionsThisWeek: 2,
+          completedClassesThisMonth: 10,
+          activeSubjectsCount: 3,
+          activeSubjectsLabel: 'Math, ELA, Science',
+        }}
+        upcomingSessionsPage={{
+          ...sessionPage,
+          pageSize: 3,
+          totalPages: 1,
+        }}
+        calendarHref="/iconic-academy/class-schedule"
+        notificationsHref="/iconic-academy/notifications"
+        browseHref="/iconic-academy/spaces"
+      />,
+    );
+
+    expect(screen.getAllByText('This week')).toHaveLength(2);
+    expect(screen.getByText('Next week')).toBeInTheDocument();
+    expect(screen.getByText('Math 101')).toBeInTheDocument();
+    expect(screen.getByText('Science 301')).toBeInTheDocument();
   });
 
   it('uses session item join action handler path', async () => {

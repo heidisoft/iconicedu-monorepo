@@ -52,6 +52,7 @@ interface RecurrenceFormProps {
   onCancel?: () => void;
   className?: string;
   isEditing?: boolean;
+  defaultTimezone?: string | null;
 }
 
 type EndType = 'never' | 'count' | 'until';
@@ -86,6 +87,19 @@ export function buildSingleDayWeekdayTime(date: Date, time: string): WeekdayTime
 export function isNoRepeatDefault(values?: Partial<RecurrenceFormData>) {
   const rule = values?.rule;
   return !rule;
+}
+
+export function resolveRecurrenceFormTimezone(input?: {
+  defaultValuesTimezone?: string | null;
+  defaultTimezone?: string | null;
+}) {
+  const candidate =
+    input?.defaultValuesTimezone?.trim() ||
+    input?.defaultTimezone?.trim() ||
+    getBrowserTimezone() ||
+    'UTC';
+
+  return candidate;
 }
 
 export function shouldShowExceptionsAndOverrides(
@@ -143,6 +157,7 @@ export function RecurrenceForm({
   onCancel,
   className,
   isEditing = false,
+  defaultTimezone,
 }: RecurrenceFormProps) {
   const timezoneOptions = React.useMemo(() => getTimezoneOptions(), []);
   const [isSubmitted, setIsSubmitted] = React.useState(false);
@@ -150,7 +165,10 @@ export function RecurrenceForm({
     defaultValues?.startDate ?? new Date(),
   );
   const [timezone, setTimezone] = React.useState<string>(
-    defaultValues?.timezone || getBrowserTimezone() || 'UTC',
+    resolveRecurrenceFormTimezone({
+      defaultValuesTimezone: defaultValues?.timezone,
+      defaultTimezone,
+    }),
   );
   const [startTime, setStartTime] = React.useState<string>(
     defaultValues?.startTime || getPrimaryWeekdayTime(defaultValues?.rule?.weekdayTimes),

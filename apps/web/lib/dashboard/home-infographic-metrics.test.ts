@@ -123,14 +123,15 @@ describe('buildDashboardHomeInfographicMetrics', () => {
       activeSubjectsCount: 2,
       activeSubjectsLabel: 'Math, Science',
     });
-    expect(result.upcomingSessionsPage.items).toHaveLength(7);
+    expect(result.upcomingSessionsPage.items).toHaveLength(8);
     expect(result.upcomingSessionsPage.items[0]).toMatchObject({
       session: { label: 'Algebra Daily' },
       joinHref: '/iconic-academy/spaces/channel-1',
+      weekBucket: 'this-week',
     });
     expect(result.upcomingSessionsPage.items[0]?.session.time).toContain('Student One');
     expect(result.upcomingSessionsPage.items[0]?.session.time).toContain('Tutor Jane');
-    expect(result.upcomingSessionsPage.total).toBe(7);
+    expect(result.upcomingSessionsPage.total).toBe(8);
     expect(result.metricsByRole.students).toEqual({
       upcomingSessionsThisWeek: 0,
       completedClassesThisMonth: 0,
@@ -175,7 +176,7 @@ describe('buildDashboardHomeInfographicMetrics', () => {
     expect(result.metricsByRole.students.upcomingSessionsThisWeek).toBe(3);
     expect(result.metricsByRole.students.completedClassesThisMonth).toBe(3);
     expect(result.metricsByRole.students.activeSubjectsCount).toBe(1);
-    expect(result.upcomingSessionsPage.items).toHaveLength(7);
+    expect(result.upcomingSessionsPage.items).toHaveLength(8);
     expect(result.upcomingSessionsPage.items[0]?.session.time).toContain('Tutor Jane');
     expect(result.upcomingSessionsPage.items[0]?.session.time).not.toContain(
       'Student One',
@@ -234,7 +235,7 @@ describe('buildDashboardHomeInfographicMetrics', () => {
       activeSubjectsCount: 1,
       activeSubjectsLabel: 'English',
     });
-    expect(result.upcomingSessionsPage.items).toHaveLength(7);
+    expect(result.upcomingSessionsPage.items).toHaveLength(8);
     expect(result.upcomingSessionsPage.items[0]?.session.time).toContain('Student Nine');
     expect(result.upcomingSessionsPage.items[0]?.session.time).not.toContain(
       'Tutor Jane',
@@ -337,10 +338,10 @@ describe('buildDashboardHomeInfographicMetrics', () => {
       } as never,
     });
 
-    expect(result.upcomingSessionsPage.total).toBe(7);
+    expect(result.upcomingSessionsPage.total).toBe(8);
     expect(result.upcomingSessionsPage.totalPages).toBe(4);
     expect(result.upcomingSessionsPage.pageSize).toBe(2);
-    expect(result.upcomingSessionsPage.items).toHaveLength(7);
+    expect(result.upcomingSessionsPage.items).toHaveLength(8);
   });
 
   it('builds homepage upcoming-session labels in the profile timezone without double conversion', async () => {
@@ -382,5 +383,29 @@ describe('buildDashboardHomeInfographicMetrics', () => {
       'Fri 11:00am EDT',
     );
     expect(result.upcomingSessionsPage.items[0]?.session.time).not.toContain('7:00am');
+  });
+
+  it('marks homepage upcoming sessions for this week and next week separately', async () => {
+    buildClassSchedulesByOrgMock.mockResolvedValue([buildSchedule()]);
+    getLearningSpacesByOrgMock.mockResolvedValue({
+      data: [{ id: 'space-1', status: 'active', subject: 'Math' }],
+    });
+    getLearningSpaceParticipantsByLearningSpaceIdsMock.mockResolvedValue({
+      data: [{ learning_space_id: 'space-1', profile_id: 'child-1' }],
+    });
+
+    const result = await buildDashboardHomeInfographicMetrics({
+      supabase: {} as never,
+      orgId: 'org-1',
+      orgSlug: 'iconic-academy',
+      now: NOW,
+      currentUserProfile: {
+        kind: 'child',
+        ids: { id: 'child-1', orgId: 'org-1', accountId: 'account-c1' },
+      } as never,
+    });
+
+    expect(result.upcomingSessionsPage.items[0]?.weekBucket).toBe('this-week');
+    expect(result.upcomingSessionsPage.items.at(-1)?.weekBucket).toBe('next-week');
   });
 });

@@ -41,6 +41,7 @@ vi.mock('./_shared/dashboard-auth', () => ({
       kind: 'guardian',
       ids: { id: 'guardian-1', orgId: 'org-1', accountId: 'account-1' },
       profile: { displayName: 'Riley Morgan' },
+      prefs: { timezone: 'America/New_York' },
       children: {
         items: [
           {

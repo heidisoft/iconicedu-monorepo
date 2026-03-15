@@ -24,9 +24,13 @@ const PAGE_SIZES = [10, 25, 50];
 
 type LearningSpacesDashboardProps = {
   rows: AdminLearningSpaceRow[];
+  currentUserTimezone?: string | null;
 };
 
-export function LearningSpacesDashboard({ rows }: LearningSpacesDashboardProps) {
+export function LearningSpacesDashboard({
+  rows,
+  currentUserTimezone,
+}: LearningSpacesDashboardProps) {
   const router = useRouter();
   const [search, setSearch] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState<'all' | string>('all');
@@ -150,7 +154,10 @@ export function LearningSpacesDashboard({ rows }: LearningSpacesDashboardProps) 
   return (
     <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <LearningSpaceFormDialog participantOptions={participantOptions} />
+        <LearningSpaceFormDialog
+          participantOptions={participantOptions}
+          defaultScheduleTimezone={currentUserTimezone}
+        />
         <LearningSpaceFormDialog
           mode="edit"
           open={editOpen}
@@ -161,6 +168,7 @@ export function LearningSpacesDashboard({ rows }: LearningSpacesDashboardProps) 
             }
           }}
           participantOptions={participantOptions}
+          defaultScheduleTimezone={currentUserTimezone}
           initialData={editData}
           onSuccess={() => {
             handleRefresh();

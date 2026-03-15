@@ -87,6 +87,7 @@ const mapParticipantsToPayload = (selected: UserProfileVM[]) =>
 
 type LearningSpaceFormDialogProps = {
   participantOptions?: UserProfileVM[];
+  defaultScheduleTimezone?: string | null;
   mode?: 'create' | 'edit';
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -142,6 +143,7 @@ function createDefaultChannelUiDefaults(): ChannelUiDefaultsVM {
 
 export function LearningSpaceFormDialog({
   participantOptions = [],
+  defaultScheduleTimezone,
   mode = 'create',
   open: openProp,
   onOpenChange,
@@ -538,6 +540,7 @@ export function LearningSpaceFormDialog({
                   <FieldLegend>Schedule</FieldLegend>
                   <RecurrenceScheduler
                     className="max-w-none"
+                    defaultTimezone={defaultScheduleTimezone}
                     schedules={formState.schedules}
                     onSchedulesChange={(nextSchedules) =>
                       updateFormState({ schedules: nextSchedules })

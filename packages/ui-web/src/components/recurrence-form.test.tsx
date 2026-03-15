@@ -8,6 +8,7 @@ import {
   getWeekdayFromDate,
   isEndTimeAfterStartTime,
   isNoRepeatDefault,
+  resolveRecurrenceFormTimezone,
   shouldShowExceptionsAndOverrides,
 } from './recurrence-form';
 
@@ -98,5 +99,24 @@ describe('isEndTimeAfterStartTime', () => {
     expect(isEndTimeAfterStartTime('09:00', '10:00')).toBe(true);
     expect(isEndTimeAfterStartTime('09:00', '09:00')).toBe(false);
     expect(isEndTimeAfterStartTime('09:00', '08:59')).toBe(false);
+  });
+});
+
+describe('resolveRecurrenceFormTimezone', () => {
+  it('prefers the saved schedule timezone when editing', () => {
+    expect(
+      resolveRecurrenceFormTimezone({
+        defaultValuesTimezone: 'America/Chicago',
+        defaultTimezone: 'America/New_York',
+      }),
+    ).toBe('America/Chicago');
+  });
+
+  it('falls back to the signed-in user timezone before browser defaults', () => {
+    expect(
+      resolveRecurrenceFormTimezone({
+        defaultTimezone: 'America/New_York',
+      }),
+    ).toBe('America/New_York');
   });
 });
