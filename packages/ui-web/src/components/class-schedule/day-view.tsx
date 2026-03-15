@@ -265,7 +265,7 @@ export function DayView({
                       <EmptyMedia variant="icon">
                         <CalendarX className="size-5" aria-hidden="true" />
                       </EmptyMedia>
-                      <EmptyTitle>No classes enrolled yet</EmptyTitle>
+                      <EmptyTitle>No upcoming sessions yet</EmptyTitle>
                       <EmptyDescription>
                         Explore classes to start scheduling and find the right support for
                         your child.
