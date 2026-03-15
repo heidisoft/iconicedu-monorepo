@@ -13,7 +13,8 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as LoginEligibilityBody | null;
-  const orgSlugRaw = typeof body?.orgSlug === 'string' ? body.orgSlug.trim().toLowerCase() : '';
+  const orgSlugRaw =
+    typeof body?.orgSlug === 'string' ? body.orgSlug.trim().toLowerCase() : '';
   const emailRaw = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
 
   if (!orgSlugRaw) {
@@ -47,7 +48,11 @@ export async function POST(request: Request) {
     );
   }
 
-  const accountResponse = await getAccountByEmail(serviceSupabase, orgResponse.data.id, emailRaw);
+  const accountResponse = await getAccountByEmail(
+    serviceSupabase,
+    orgResponse.data.id,
+    emailRaw,
+  );
 
   if (accountResponse.error) {
     return NextResponse.json(
@@ -60,7 +65,16 @@ export async function POST(request: Request) {
     return NextResponse.json({
       eligible: false,
       reason: 'missing_account',
-      message: 'No existing account found for this organization. Use Get started instead.',
+      message:
+        'No existing account found for this organization. Use Get started instead.',
+    });
+  }
+
+  if (accountResponse.data.status === 'invited') {
+    return NextResponse.json({
+      eligible: false,
+      reason: 'signup_required',
+      message: 'This account has not completed sign-up yet. Use Get started instead.',
     });
   }
 

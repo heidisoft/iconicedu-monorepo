@@ -31,8 +31,8 @@ export function buildAuthEntryPath(intent: AuthIntent, orgSlug?: string | null):
   return '/get-started';
 }
 
-export function getEmailOtpType(intent: AuthIntent): 'email' | 'signup' {
-  return intent === 'login' ? 'email' : 'signup';
+export function getEmailOtpType(_intent: AuthIntent): 'email' {
+  return 'email';
 }
 
 export function shouldCreateUserForIntent(intent: AuthIntent): boolean {

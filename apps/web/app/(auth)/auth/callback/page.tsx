@@ -9,17 +9,17 @@ import { RoleOnboardingModal } from '@iconicedu/web/app/(auth)/auth/callback/rol
 import { createSupabaseBrowserClient } from '@iconicedu/web/lib/supabase/client';
 import { trackAuthTelemetry } from '@iconicedu/web/lib/telemetry/auth-events';
 
-type SupportedOtpType = 'magiclink' | 'invite' | 'signup';
+type SupportedOtpType = 'email' | 'invite';
 type AuthCallbackSource = 'self-signup' | null;
 
 function resolveOtpType(value?: string | null): SupportedOtpType {
-  if (value === 'magiclink' || value === 'invite' || value === 'signup') {
-    return value;
-  }
-  if (value === 'invitation') {
+  if (value === 'invite' || value === 'invitation') {
     return 'invite';
   }
-  return 'invite';
+  if (value === 'email' || value === 'magiclink' || value === 'signup') {
+    return 'email';
+  }
+  return 'email';
 }
 
 function resolveCallbackSource(value?: string | null): AuthCallbackSource {

@@ -50,8 +50,8 @@ describe('auth intent helpers', () => {
     expect(shouldCreateUserForIntent('login')).toBe(false);
   });
 
-  it('maps get started to signup OTP with user creation', () => {
-    expect(getEmailOtpType('get-started')).toBe('signup');
+  it('maps get started to email OTP with user creation', () => {
+    expect(getEmailOtpType('get-started')).toBe('email');
     expect(shouldCreateUserForIntent('get-started')).toBe(true);
   });
 });

@@ -64,6 +64,15 @@ describe('shouldPromptOrgSignUp', () => {
       }),
     ).toBe(false);
   });
+
+  it('returns true when sign-up is required first', () => {
+    expect(
+      shouldPromptOrgSignUp({
+        eligible: false,
+        reason: 'signup_required',
+      }),
+    ).toBe(true);
+  });
 });
 
 describe('OrgLoginClient', () => {

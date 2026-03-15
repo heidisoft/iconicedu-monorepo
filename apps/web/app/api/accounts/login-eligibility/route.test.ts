@@ -1,9 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { POST } from '@iconicedu/web/app/api/accounts/login-eligibility/route';
-import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
+import { POST } from './route';
 
-const APP_URL = resolveAppUrl();
+const APP_URL = 'http://localhost:3000';
 const { mockGetOrgBySlug, mockGetAccountByEmail } = vi.hoisted(() => ({
   mockGetOrgBySlug: vi.fn(),
   mockGetAccountByEmail: vi.fn(),
@@ -60,7 +59,8 @@ describe('POST /api/accounts/login-eligibility', () => {
     expect(await response.json()).toEqual({
       eligible: false,
       reason: 'missing_account',
-      message: 'No existing account found for this organization. Use Get started instead.',
+      message:
+        'No existing account found for this organization. Use Get started instead.',
     });
   });
 
@@ -83,5 +83,30 @@ describe('POST /api/accounts/login-eligibility', () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ eligible: true });
+  });
+
+  it('returns not eligible when account is invited but not registered', async () => {
+    mockGetOrgBySlug.mockResolvedValueOnce({
+      data: { id: 'org-1', slug: 'iconic-academy' },
+      error: null,
+    });
+    mockGetAccountByEmail.mockResolvedValueOnce({
+      data: { id: 'account-1', status: 'invited' },
+      error: null,
+    });
+
+    const response = await POST(
+      new Request(`${APP_URL}/api/accounts/login-eligibility`, {
+        method: 'POST',
+        body: JSON.stringify({ orgSlug: 'iconic-academy', email: 'parent@example.com' }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      eligible: false,
+      reason: 'signup_required',
+      message: 'This account has not completed sign-up yet. Use Get started instead.',
+    });
   });
 });

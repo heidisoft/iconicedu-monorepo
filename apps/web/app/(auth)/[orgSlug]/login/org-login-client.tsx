@@ -30,7 +30,11 @@ export function resolveOrgLoginCallbackUrl(orgSlug: string): string {
 export function shouldPromptOrgSignUp(
   eligibility: { eligible?: boolean; reason?: string } | null,
 ): boolean {
-  return !eligibility?.eligible && eligibility?.reason === 'missing_account';
+  return (
+    !eligibility?.eligible &&
+    (eligibility?.reason === 'missing_account' ||
+      eligibility?.reason === 'signup_required')
+  );
 }
 
 export default function OrgLoginClient({ orgSlug, orgName }: OrgLoginClientProps) {
