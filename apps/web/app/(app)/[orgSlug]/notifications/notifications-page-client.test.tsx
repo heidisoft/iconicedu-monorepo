@@ -3,7 +3,7 @@ import React from 'react';
 import { act, render } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { InboxPageClient } from './inbox-page-client';
+import { NotificationsPageClient } from './notifications-page-client';
 
 const refresh = vi.fn();
 const channelOn = vi.fn();
@@ -18,7 +18,7 @@ const supabaseChannel = vi.fn(() => channelMock);
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh }),
-  usePathname: () => '/iconic-academy/inbox',
+  usePathname: () => '/iconic-academy/notifications',
 }));
 
 vi.mock('@iconicedu/web/lib/supabase/client', () => ({
@@ -30,19 +30,19 @@ vi.mock('@iconicedu/web/lib/supabase/client', () => ({
 vi.mock('@iconicedu/ui-web', () => ({
   DashboardHeader: ({ title }: { title: string }) => <div>{title}</div>,
   InboxContainer: ({ feed }: { feed: unknown }) => (
-    <div data-testid="inbox-container">{JSON.stringify(feed)}</div>
+    <div data-testid="notifications-container">{JSON.stringify(feed)}</div>
   ),
 }));
 
-describe('InboxPageClient', () => {
+describe('NotificationsPageClient', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
   });
 
-  it('subscribes to inbox-related realtime tables and cleans up on unmount', () => {
+  it('subscribes to notification-related realtime tables and cleans up on unmount', () => {
     const { unmount } = render(
-      <InboxPageClient
+      <NotificationsPageClient
         orgId="org-1"
         orgSlug="iconic-academy"
         profileId="profile-1"
@@ -67,7 +67,7 @@ describe('InboxPageClient', () => {
 
   it('debounces realtime-triggered router refreshes', () => {
     render(
-      <InboxPageClient
+      <NotificationsPageClient
         orgId="org-1"
         orgSlug="iconic-academy"
         profileId="profile-1"
@@ -98,7 +98,7 @@ describe('InboxPageClient', () => {
 
   it('refreshes on focus and visible tab resume', () => {
     render(
-      <InboxPageClient
+      <NotificationsPageClient
         orgId="org-1"
         orgSlug="iconic-academy"
         profileId="profile-1"

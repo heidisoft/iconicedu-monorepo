@@ -306,7 +306,7 @@ describe('buildDashboardHomeInfographicMetrics', () => {
     expect(result.metricsByRole.parents.activeSubjectsCount).toBe(2);
     expect(result.metricsByRole.parents.activeSubjectsLabel).toBe('Manage classrooms');
     expect(result.calendarHref).toBe('/iconic-academy/admin/attendance/sessions');
-    expect(result.inboxHref).toBe('/iconic-academy/inbox');
+    expect(result.notificationsHref).toBe('/iconic-academy/notifications');
     expect(result.browseHref).toBe('/iconic-academy/admin/channels');
     expect(result.upcomingSessionsPage.items[0]?.session.time).toContain(
       'Staff Student One',

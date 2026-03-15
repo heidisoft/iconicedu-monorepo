@@ -7,12 +7,16 @@ import {
 } from '@iconicedu/web/lib/sidebar/inbox-count';
 
 describe('applyInboxUnreadCount', () => {
-  it('sets the inbox nav count without changing other nav items', () => {
+  it('sets the notifications nav count without changing other nav items', () => {
     const sidebarData = {
       navigation: {
         navMain: [
           { title: 'Home', url: '/iconic-academy', icon: 'home' },
-          { title: 'Inbox', url: '/iconic-academy/inbox', icon: 'inbox' },
+          {
+            title: 'Notifications',
+            url: '/iconic-academy/notifications',
+            icon: 'notifications',
+          },
         ],
         navSecondary: [],
       },
@@ -25,7 +29,12 @@ describe('applyInboxUnreadCount', () => {
 
     expect(applyInboxUnreadCount(sidebarData as never, 4).navigation.navMain).toEqual([
       { title: 'Home', url: '/iconic-academy', icon: 'home' },
-      { title: 'Inbox', url: '/iconic-academy/inbox', icon: 'inbox', count: 4 },
+      {
+        title: 'Notifications',
+        url: '/iconic-academy/notifications',
+        icon: 'notifications',
+        count: 4,
+      },
     ]);
   });
 
@@ -34,9 +43,9 @@ describe('applyInboxUnreadCount', () => {
       navigation: {
         navMain: [
           {
-            title: 'Inbox',
-            url: '/iconic-academy/inbox',
-            icon: 'inbox',
+            title: 'Notifications',
+            url: '/iconic-academy/notifications',
+            icon: 'notifications',
             count: 3,
           },
         ],
@@ -50,23 +59,23 @@ describe('applyInboxUnreadCount', () => {
     } as const;
 
     expect(applyInboxUnreadCount(sidebarData as never, 0).navigation.navMain[0]).toEqual({
-      title: 'Inbox',
-      url: '/iconic-academy/inbox',
-      icon: 'inbox',
+      title: 'Notifications',
+      url: '/iconic-academy/notifications',
+      icon: 'notifications',
       count: undefined,
     });
   });
 });
 
 describe('applyInboxUnreadDelta', () => {
-  it('adds delta onto current inbox badge count', () => {
+  it('adds delta onto current notifications badge count', () => {
     const sidebarData = {
       navigation: {
         navMain: [
           {
-            title: 'Inbox',
-            url: '/iconic-academy/inbox',
-            icon: 'inbox',
+            title: 'Notifications',
+            url: '/iconic-academy/notifications',
+            icon: 'notifications',
             count: 3,
           },
         ],

@@ -544,7 +544,7 @@ export function SidebarShell({
 
       refreshTimer = window.setTimeout(() => {
         void refreshInboxUnreadCount();
-        if (pathname?.startsWith(`${dashboardBasePath}/inbox`)) {
+        if (pathname?.startsWith(`${dashboardBasePath}/notifications`)) {
           React.startTransition(() => {
             router.refresh();
           });

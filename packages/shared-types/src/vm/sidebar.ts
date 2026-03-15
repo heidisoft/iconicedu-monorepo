@@ -9,7 +9,7 @@ import type { UUID } from '@iconicedu/shared-types/shared/shared';
 export type SidebarIconKey =
   | 'home'
   | 'class-schedule'
-  | 'inbox'
+  | 'notifications'
   | 'languages'
   | 'chef-hat'
   | 'earth'

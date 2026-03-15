@@ -6,21 +6,21 @@ import { DashboardHeader, InboxContainer } from '@iconicedu/ui-web';
 import type { ActivityFeedVM } from '@iconicedu/shared-types';
 import { createSupabaseBrowserClient } from '@iconicedu/web/lib/supabase/client';
 
-const INBOX_REFRESH_DEBOUNCE_MS = 120;
+const NOTIFICATIONS_REFRESH_DEBOUNCE_MS = 120;
 
-type InboxPageClientProps = {
+type NotificationsPageClientProps = {
   orgId: string;
   orgSlug: string;
   profileId: string;
   feed: ActivityFeedVM;
 };
 
-export function InboxPageClient({
+export function NotificationsPageClient({
   orgId,
   orgSlug,
   profileId,
   feed,
-}: InboxPageClientProps) {
+}: NotificationsPageClientProps) {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
@@ -31,10 +31,10 @@ export function InboxPageClient({
     }
 
     let refreshTimer: number | null = null;
-    const inboxPath = `/${orgSlug}/inbox`;
+    const notificationsPath = `/${orgSlug}/notifications`;
 
     const scheduleRefresh = () => {
-      if (pathname !== inboxPath) {
+      if (pathname !== notificationsPath) {
         return;
       }
       if (refreshTimer) {
@@ -44,7 +44,7 @@ export function InboxPageClient({
         React.startTransition(() => {
           router.refresh();
         });
-      }, INBOX_REFRESH_DEBOUNCE_MS);
+      }, NOTIFICATIONS_REFRESH_DEBOUNCE_MS);
     };
 
     const channel = supabase.channel(`inbox:${orgId}:${profileId}`);
@@ -94,7 +94,7 @@ export function InboxPageClient({
 
   return (
     <div className="flex min-h-0 h-screen flex-1 flex-col">
-      <DashboardHeader title="Inbox" />
+      <DashboardHeader title="Notifications" />
       <div className="p-4 pt-0">
         <InboxContainer feed={feed} />
       </div>

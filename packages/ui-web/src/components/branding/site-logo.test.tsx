@@ -34,8 +34,8 @@ describe('SiteLogoFull', () => {
     expect(gradientIds.every(Boolean)).toBe(true);
     expect(new Set(gradientIds).size).toBe(gradientIds.length);
 
-    const fills = Array.from(container.querySelectorAll('path[fill^="url(#"]')).map((path) =>
-      path.getAttribute('fill'),
+    const fills = Array.from(container.querySelectorAll('path[fill^="url(#"]')).map(
+      (path) => path.getAttribute('fill'),
     );
     expect(fills).toHaveLength(16);
     for (const fill of fills) {
@@ -63,5 +63,16 @@ describe('SiteLogoWithName', () => {
 
     expect(screen.getByText('ICONIC Academy')).toBeInTheDocument();
     expect(screen.getByText('Turn effort into outcomes')).toBeInTheDocument();
+  });
+
+  it('includes collapsed-state classes to keep only the icon visible', () => {
+    const { container } = render(<SiteLogoWithName />);
+
+    expect(container.firstElementChild?.className).toContain(
+      'group-data-[collapsible=icon]:mx-auto',
+    );
+    expect(screen.getByText('ICONIC Academy').parentElement?.className).toContain(
+      'group-data-[collapsible=icon]:hidden',
+    );
   });
 });

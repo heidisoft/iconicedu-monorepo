@@ -89,7 +89,7 @@ describe('DashboardHomeInfographicSection', () => {
         }}
         upcomingSessionsPage={{ ...sessionPage }}
         calendarHref="/iconic-academy/class-schedule"
-        inboxHref="/iconic-academy/inbox"
+        notificationsHref="/iconic-academy/notifications"
         browseHref="/iconic-academy/spaces"
       />,
     );
@@ -99,7 +99,7 @@ describe('DashboardHomeInfographicSection', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Math 101')).toBeInTheDocument();
     expect(screen.getByText('ELA 201')).toBeInTheDocument();
-    expect(screen.getByText('Inbox')).toBeInTheDocument();
+    expect(screen.getByText('Notifications')).toBeInTheDocument();
     expect(screen.getByText('Calendar')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Message' })).toHaveLength(2);
     expect(screen.queryByText('Science 301')).not.toBeInTheDocument();
@@ -126,7 +126,7 @@ describe('DashboardHomeInfographicSection', () => {
         }}
         upcomingSessionsPage={{ ...sessionPage }}
         calendarHref="/iconic-academy/class-schedule"
-        inboxHref="/iconic-academy/inbox"
+        notificationsHref="/iconic-academy/notifications"
         browseHref="/iconic-academy/spaces"
         onJoinSession={onJoinSession}
       />,
@@ -152,7 +152,7 @@ describe('DashboardHomeInfographicSection', () => {
         }}
         upcomingSessionsPage={{ ...sessionPage }}
         calendarHref="/iconic-academy/class-schedule"
-        inboxHref="/iconic-academy/inbox"
+        notificationsHref="/iconic-academy/notifications"
         browseHref="/iconic-academy/spaces"
       />,
     );
@@ -184,7 +184,7 @@ describe('DashboardHomeInfographicSection', () => {
         }}
         upcomingSessionsPage={{ items: [], total: 0, pageSize: 3, totalPages: 1 }}
         calendarHref="/iconic-academy/class-schedule"
-        inboxHref="/iconic-academy/inbox"
+        notificationsHref="/iconic-academy/notifications"
         browseHref="/iconic-academy/spaces"
       />,
     );
@@ -207,7 +207,7 @@ describe('DashboardHomeInfographicSection', () => {
         }}
         upcomingSessionsPage={{ items: [], total: 0, pageSize: 3, totalPages: 1 }}
         calendarHref="/iconic-academy/class-schedule"
-        inboxHref="/iconic-academy/inbox"
+        notificationsHref="/iconic-academy/notifications"
         browseHref="/iconic-academy/spaces"
       />,
     );
@@ -245,7 +245,7 @@ describe('DashboardHomeInfographicSection', () => {
         }}
         upcomingSessionsPage={{ items: [], total: 0, pageSize: 3, totalPages: 1 }}
         calendarHref="/iconic-academy/class-schedule"
-        inboxHref="/iconic-academy/inbox"
+        notificationsHref="/iconic-academy/notifications"
         browseHref="/iconic-academy/spaces"
         onClassRequestCreated={onClassRequestCreated}
       />,
@@ -293,7 +293,7 @@ describe('DashboardHomeInfographicSection', () => {
         }}
         upcomingSessionsPage={{ items: [], total: 0, pageSize: 3, totalPages: 1 }}
         calendarHref="/iconic-academy/class-schedule"
-        inboxHref="/iconic-academy/inbox"
+        notificationsHref="/iconic-academy/notifications"
         browseHref="/iconic-academy/spaces"
       />,
     );

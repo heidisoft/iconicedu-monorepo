@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import {
+  Bell,
   Building2,
   Calendar,
   Check,
@@ -9,7 +10,6 @@ import {
   ChevronDown,
   Earth,
   Home,
-  Inbox,
   Languages,
   LifeBuoy,
   MoreHorizontal,
@@ -88,7 +88,7 @@ import {
 const ICONS = {
   home: Home,
   'class-schedule': Calendar,
-  inbox: Inbox,
+  notifications: Bell,
   languages: Languages,
   'chef-hat': ChefHat,
   earth: Earth,
@@ -530,7 +530,10 @@ export function SidebarLeft({
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton className="bg-transparent" size="lg">
+            <SidebarMenuButton
+              className="bg-transparent group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+              size="lg"
+            >
               <SiteLogoWithName />
             </SidebarMenuButton>
           </SidebarMenuItem>

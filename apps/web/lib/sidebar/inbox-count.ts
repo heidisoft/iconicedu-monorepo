@@ -11,7 +11,7 @@ export function applyInboxUnreadCount(
     navigation: {
       ...sidebarData.navigation,
       navMain: sidebarData.navigation.navMain.map((item) =>
-        item.icon === 'inbox'
+        item.icon === 'notifications'
           ? {
               ...item,
               count: normalizedUnreadCount || undefined,
@@ -27,7 +27,8 @@ export function applyInboxUnreadDelta(
   delta: number,
 ): SidebarLeftDataVM {
   const currentInboxCount =
-    sidebarData.navigation.navMain.find((item) => item.icon === 'inbox')?.count ?? 0;
+    sidebarData.navigation.navMain.find((item) => item.icon === 'notifications')?.count ??
+    0;
   return applyInboxUnreadCount(sidebarData, Math.max(0, currentInboxCount + delta));
 }
 

@@ -54,7 +54,7 @@ export async function HomePageContent({ orgSlug }: { orgSlug: string }) {
       topMetrics={metrics.metricsByRole[metrics.activeRole]}
       upcomingSessionsPage={metrics.upcomingSessionsPage}
       calendarHref={metrics.calendarHref}
-      inboxHref={metrics.inboxHref}
+      notificationsHref={metrics.notificationsHref}
       browseHref={metrics.browseHref}
       canRequestClasses={canRequestClasses}
       requestRole={requestRole}

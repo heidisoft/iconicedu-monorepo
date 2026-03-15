@@ -62,9 +62,9 @@ export async function buildSidebarBaseData(
           icon: 'class-schedule',
         },
         {
-          title: 'Inbox',
-          url: `${dashboardBasePath}/inbox`,
-          icon: 'inbox',
+          title: 'Notifications',
+          url: `${dashboardBasePath}/notifications`,
+          icon: 'notifications',
         },
         ...(classRequestChannels.length
           ? [

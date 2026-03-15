@@ -65,7 +65,7 @@ describe('d home page', () => {
       isStaffView: false,
       browseHref: '/iconic-academy/spaces',
       calendarHref: '/iconic-academy/class-schedule',
-      inboxHref: '/iconic-academy/inbox',
+      notificationsHref: '/iconic-academy/notifications',
       upcomingSessionsPage: { items: [], total: 0, pageSize: 6, totalPages: 1 },
       metricsByRole: {
         parents: {
@@ -112,7 +112,7 @@ describe('d home page', () => {
         }),
         upcomingSessionsPage: expect.objectContaining({ pageSize: 6 }),
         calendarHref: '/iconic-academy/class-schedule',
-        inboxHref: '/iconic-academy/inbox',
+        notificationsHref: '/iconic-academy/notifications',
         browseHref: '/iconic-academy/spaces',
         canRequestClasses: true,
         requestRole: 'parents',

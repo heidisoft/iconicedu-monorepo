@@ -1,6 +1,5 @@
 import type { SidebarLeftDataVM } from '@iconicedu/shared-types';
 import { GUARDIAN_ACCOUNT } from '@iconicedu/web/lib/data/accounts';
-import { FAMILIES, FAMILY_LINKS } from '@iconicedu/web/lib/data/families';
 import { LEARNING_SPACES } from '@iconicedu/web/lib/data/learning-spaces';
 import { DIRECT_MESSAGE_CHANNELS_WITH_MESSAGES } from '@iconicedu/web/lib/data/channel-message-data';
 import { CHANNEL_IDS } from '@iconicedu/web/lib/data/ids';
@@ -24,9 +23,9 @@ export const SIDEBAR_LEFT_DATA: SidebarLeftDataVM = {
         icon: 'class-schedule',
       },
       {
-        title: 'Inbox',
-        url: '/iconic-academy/inbox',
-        icon: 'inbox',
+        title: 'Notifications',
+        url: '/iconic-academy/notifications',
+        icon: 'notifications',
         count: 3,
       },
     ],

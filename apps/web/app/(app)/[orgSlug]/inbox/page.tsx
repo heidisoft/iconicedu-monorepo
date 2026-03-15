@@ -1,29 +1,6 @@
-import type { Metadata } from 'next';
-import { buildActivityFeedForProfile } from '@iconicedu/web/lib/activity-feed/builders/activity-feed.builder';
-import {
-  getDashboardAccountContext,
-  getDashboardProfileContext,
-} from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
-import { InboxPageClient } from '@iconicedu/web/app/(app)/[orgSlug]/inbox/inbox-page-client';
-
-export const metadata: Metadata = {
-  title: 'Inbox',
-  description: 'Review messages, mentions, reactions, and recent activity in one place.',
-};
+import { redirect } from 'next/navigation';
 
 export default async function Page({ params }: { params: Promise<{ orgSlug: string }> }) {
   const { orgSlug } = await params;
-  const { supabase, account } = await getDashboardAccountContext(orgSlug);
-  const { profileResponse } = await getDashboardProfileContext(supabase, account.id);
-  const profileId = profileResponse.data?.id ?? '';
-  const feed = await buildActivityFeedForProfile(supabase, account.org_id, profileId);
-
-  return (
-    <InboxPageClient
-      orgId={account.org_id}
-      orgSlug={orgSlug}
-      profileId={profileId}
-      feed={feed}
-    />
-  );
+  redirect(`/${orgSlug}/notifications`);
 }

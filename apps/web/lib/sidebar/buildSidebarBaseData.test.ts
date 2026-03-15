@@ -90,6 +90,11 @@ describe('buildSidebarBaseData', () => {
     expect(result.navigation.navMain).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
+          title: 'Notifications',
+          url: '/iconic-academy/notifications',
+          icon: 'notifications',
+        }),
+        expect.objectContaining({
           title: 'Class Requests',
           url: '/iconic-academy/c/class-request-2',
           icon: 'send',

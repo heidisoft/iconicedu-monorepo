@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import {
+  Bell,
   BookOpenCheck,
   CalendarCheck,
   CalendarClock,
   CalendarDays,
-  Inbox,
   Sparkle,
 } from 'lucide-react';
 
@@ -46,7 +46,7 @@ export interface DashboardHomeInfographicSectionProps {
   };
   upcomingSessionsPage: DashboardUpcomingSessionsPage;
   calendarHref: string;
-  inboxHref: string;
+  notificationsHref: string;
   browseHref: string;
   canRequestClasses?: boolean;
   requestRole?: DashboardRequestRole;
@@ -76,7 +76,7 @@ export function DashboardHomeInfographicSection({
   topMetrics,
   upcomingSessionsPage,
   calendarHref,
-  inboxHref,
+  notificationsHref,
   browseHref,
   canRequestClasses = false,
   requestRole = 'other',
@@ -290,12 +290,12 @@ export function DashboardHomeInfographicSection({
 
           <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <a
-              href={inboxHref}
+              href={notificationsHref}
               className="rounded-2xl bg-primary p-5 text-primary-foreground transition hover:opacity-90"
             >
               <div className="flex items-center gap-2">
-                <Inbox className={quickActionIconClassName} aria-hidden="true" />
-                <p className="text-sm font-semibold leading-tight">Inbox</p>
+                <Bell className={quickActionIconClassName} aria-hidden="true" />
+                <p className="text-sm font-semibold leading-tight">Notifications</p>
               </div>
               <p className="mt-1 text-sm text-primary-foreground/80">
                 View recent updates

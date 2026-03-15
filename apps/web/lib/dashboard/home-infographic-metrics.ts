@@ -40,7 +40,7 @@ export interface DashboardHomeInfographicMetrics {
   upcomingSessionsPage: DashboardUpcomingSessionsPage;
   browseHref: string;
   calendarHref: string;
-  inboxHref: string;
+  notificationsHref: string;
 }
 
 const DEFAULT_PAGE_SIZE = 6;
@@ -419,6 +419,6 @@ export async function buildDashboardHomeInfographicMetrics(input: {
     calendarHref: isStaffView
       ? `/${input.orgSlug}/admin/attendance/sessions`
       : `/${input.orgSlug}/class-schedule`,
-    inboxHref: `/${input.orgSlug}/inbox`,
+    notificationsHref: `/${input.orgSlug}/notifications`,
   };
 }
