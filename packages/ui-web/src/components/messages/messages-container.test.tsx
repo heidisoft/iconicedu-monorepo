@@ -226,6 +226,24 @@ describe('MessagesContainer', () => {
     });
   });
 
+  it('does not spam read-state persistence for the same viewed message', async () => {
+    vi.useFakeTimers();
+    render(<MessagesContainer channel={channel} currentUserId="profile-2" />);
+
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: 'mark-read' }));
+      fireEvent.click(screen.getByRole('button', { name: 'mark-read' }));
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+
+    vi.useRealTimers();
+  });
+
   it('updates parent thread preview when a reply event is received', async () => {
     const onEventHandlers: Array<(event: any) => void> = [];
     const realtimeClient = {

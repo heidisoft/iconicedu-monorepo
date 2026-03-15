@@ -291,6 +291,67 @@ describe('MessageList', () => {
     expect(onUnreadViewed).toHaveBeenCalledWith('message-newer');
   });
 
+  it('calls unread viewed callback without an unread divider when channel opens on unread messages', () => {
+    const incoming = {
+      ...baseMessage,
+      ids: { ...baseMessage.ids, id: 'message-incoming' },
+      core: {
+        ...baseMessage.core,
+        createdAt: '2026-02-15T10:00:00.000Z',
+        sender: {
+          ...baseMessage.core.sender,
+          ids: { ...baseMessage.core.sender.ids, id: 'profile-2' },
+        },
+      },
+    } as MessageVM;
+    const onUnreadViewed = vi.fn();
+
+    render(
+      <MessageList
+        messages={[incoming]}
+        onOpenThread={
+          vi.fn() as unknown as (thread: ThreadVM, message: MessageVM) => void
+        }
+        onProfileClick={vi.fn()}
+        currentUserId="profile-1"
+        onUnreadViewed={onUnreadViewed}
+      />,
+    );
+
+    expect(onUnreadViewed).toHaveBeenCalledWith('message-incoming');
+    expect(screen.queryByText('New messages')).not.toBeInTheDocument();
+  });
+
+  it('does not call unread viewed callback when only current user messages are visible', () => {
+    const mine = {
+      ...baseMessage,
+      ids: { ...baseMessage.ids, id: 'message-mine' },
+      core: {
+        ...baseMessage.core,
+        createdAt: '2026-02-15T10:00:00.000Z',
+        sender: {
+          ...baseMessage.core.sender,
+          ids: { ...baseMessage.core.sender.ids, id: 'profile-1' },
+        },
+      },
+    } as MessageVM;
+    const onUnreadViewed = vi.fn();
+
+    render(
+      <MessageList
+        messages={[mine]}
+        onOpenThread={
+          vi.fn() as unknown as (thread: ThreadVM, message: MessageVM) => void
+        }
+        onProfileClick={vi.fn()}
+        currentUserId="profile-1"
+        onUnreadViewed={onUnreadViewed}
+      />,
+    );
+
+    expect(onUnreadViewed).not.toHaveBeenCalled();
+  });
+
   it('animates unread divider dismissal before removing it', async () => {
     vi.useFakeTimers();
     const older = {

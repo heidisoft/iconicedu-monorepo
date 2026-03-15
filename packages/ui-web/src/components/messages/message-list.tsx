@@ -13,8 +13,10 @@ import { ReactionBar } from '@iconicedu/ui-web/components/messages/shared/reacti
 import type { ISODateTime, MessageVM, ThreadVM, UUID } from '@iconicedu/shared-types';
 import { ScrollArea } from '@iconicedu/ui-web/ui/scroll-area';
 import { formatDateHeader, formatTime } from '@iconicedu/ui-web/lib/message-utils';
-import { findUnreadAnchorMessageId } from '@iconicedu/ui-web/components/messages/unread-indicator.utils';
-import { findLatestIncomingMessageId } from '@iconicedu/ui-web/components/messages/read-state.utils';
+import {
+  findLatestUnreadIncomingMessageId,
+  findUnreadAnchorMessageId,
+} from '@iconicedu/ui-web/components/messages/unread-indicator.utils';
 import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
 import { cn } from '@iconicedu/ui-web/lib/utils';
@@ -191,16 +193,18 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
         }),
       [sortedMessages, lastReadMessageId, lastReadAt, currentUserId],
     );
-    const latestIncomingMessageId = useMemo(
-      () => findLatestIncomingMessageId(sortedMessages, currentUserId),
-      [sortedMessages, currentUserId],
+    const latestUnreadIncomingMessageId = useMemo(
+      () =>
+        findLatestUnreadIncomingMessageId({
+          sortedMessages,
+          lastReadMessageId,
+          lastReadAt,
+          currentUserId,
+        }),
+      [sortedMessages, lastReadMessageId, lastReadAt, currentUserId],
     );
     const { dismissedUnreadAnchorId, isUnreadDividerDismissing, dismissUnreadDivider } =
-      useUnreadIndicator({
-        unreadAnchorMessageId,
-        latestIncomingMessageId,
-        onUnreadViewed,
-      });
+      useUnreadIndicator({ unreadAnchorMessageId });
 
     const isViewportNearBottom = useCallback((viewport: HTMLDivElement | null) => {
       if (!viewport) {
@@ -211,14 +215,8 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
       return remaining <= 40;
     }, []);
 
-    const maybeMarkUnreadAsViewed = useCallback(() => {
-      if (!onUnreadViewed || !unreadAnchorMessageId || !latestIncomingMessageId) {
-        return;
-      }
-      if (
-        dismissedUnreadAnchorId === unreadAnchorMessageId ||
-        isUnreadDividerDismissing
-      ) {
+    const maybeMarkVisibleIncomingAsViewed = useCallback(() => {
+      if (!onUnreadViewed || !latestUnreadIncomingMessageId) {
         return;
       }
       if (!isNearBottomRef.current) {
@@ -232,13 +230,21 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
           return;
         }
       }
-      if (lastNotifiedReadIdRef.current === latestIncomingMessageId) {
+      if (lastNotifiedReadIdRef.current === latestUnreadIncomingMessageId) {
         return;
       }
-      lastNotifiedReadIdRef.current = latestIncomingMessageId;
-      dismissUnreadDivider();
+      lastNotifiedReadIdRef.current = latestUnreadIncomingMessageId;
+      onUnreadViewed(latestUnreadIncomingMessageId);
+
+      if (
+        unreadAnchorMessageId &&
+        dismissedUnreadAnchorId !== unreadAnchorMessageId &&
+        !isUnreadDividerDismissing
+      ) {
+        dismissUnreadDivider();
+      }
     }, [
-      latestIncomingMessageId,
+      latestUnreadIncomingMessageId,
       onUnreadViewed,
       unreadAnchorMessageId,
       dismissedUnreadAnchorId,
@@ -247,10 +253,10 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
     ]);
 
     useEffect(() => {
-      if (!unreadAnchorMessageId) {
+      if (!latestUnreadIncomingMessageId) {
         lastNotifiedReadIdRef.current = null;
       }
-    }, [unreadAnchorMessageId]);
+    }, [latestUnreadIncomingMessageId]);
 
     useEffect(() => {
       const viewport = scrollAreaRootRef.current?.querySelector(
@@ -260,8 +266,8 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
         return;
       }
       isNearBottomRef.current = isViewportNearBottom(viewport);
-      maybeMarkUnreadAsViewed();
-    }, [messages.length, isViewportNearBottom, maybeMarkUnreadAsViewed]);
+      maybeMarkVisibleIncomingAsViewed();
+    }, [messages.length, isViewportNearBottom, maybeMarkVisibleIncomingAsViewed]);
 
     useEffect(() => {
       const root = scrollAreaRootRef.current;
@@ -277,7 +283,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
 
       const maybeLoadMore = async () => {
         isNearBottomRef.current = isViewportNearBottom(viewport);
-        maybeMarkUnreadAsViewed();
+        maybeMarkVisibleIncomingAsViewed();
         if (viewport.scrollTop > 40 || isLoadingMoreRef.current) {
           return;
         }
@@ -303,7 +309,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
       return () => {
         viewport.removeEventListener('scroll', onScroll);
       };
-    }, [hasMore, onLoadMore, isViewportNearBottom, maybeMarkUnreadAsViewed]);
+    }, [hasMore, onLoadMore, isViewportNearBottom, maybeMarkVisibleIncomingAsViewed]);
 
     useEffect(() => {
       const viewport = scrollAreaRootRef.current?.querySelector(
@@ -314,7 +320,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
       }
       const handleWindowStateChange = () => {
         isNearBottomRef.current = isViewportNearBottom(viewport);
-        maybeMarkUnreadAsViewed();
+        maybeMarkVisibleIncomingAsViewed();
       };
       window.addEventListener('focus', handleWindowStateChange);
       document.addEventListener('visibilitychange', handleWindowStateChange);
@@ -322,7 +328,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
         window.removeEventListener('focus', handleWindowStateChange);
         document.removeEventListener('visibilitychange', handleWindowStateChange);
       };
-    }, [isViewportNearBottom, maybeMarkUnreadAsViewed]);
+    }, [isViewportNearBottom, maybeMarkVisibleIncomingAsViewed]);
 
     const groupedMessages = useMemo(() => {
       const groups: { date: string; messages: MessageVM[] }[] = [];

@@ -1,21 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { UUID } from '@iconicedu/shared-types';
 
 const UNREAD_DIVIDER_DISMISS_MS = 900;
 
 type UseUnreadIndicatorInput = {
-  unreadAnchorMessageId: UUID | null;
-  latestIncomingMessageId: UUID | null;
-  onUnreadViewed?: (lastReadMessageId: UUID) => void;
+  unreadAnchorMessageId: string | null;
 };
 
-export function useUnreadIndicator({
-  unreadAnchorMessageId,
-  latestIncomingMessageId,
-  onUnreadViewed,
-}: UseUnreadIndicatorInput) {
+export function useUnreadIndicator({ unreadAnchorMessageId }: UseUnreadIndicatorInput) {
   const dismissTimeoutRef = useRef<number | null>(null);
-  const unreadViewNotifiedForAnchorRef = useRef<string | null>(null);
   const [dismissedUnreadAnchorId, setDismissedUnreadAnchorId] = useState<string | null>(
     null,
   );
@@ -29,27 +21,12 @@ export function useUnreadIndicator({
       return;
     }
 
-    if (
-      onUnreadViewed &&
-      latestIncomingMessageId &&
-      unreadViewNotifiedForAnchorRef.current !== unreadAnchorMessageId
-    ) {
-      unreadViewNotifiedForAnchorRef.current = unreadAnchorMessageId;
-      onUnreadViewed(latestIncomingMessageId);
-    }
-
     setIsUnreadDividerDismissing(true);
     dismissTimeoutRef.current = window.setTimeout(() => {
       setDismissedUnreadAnchorId(unreadAnchorMessageId);
       setIsUnreadDividerDismissing(false);
     }, UNREAD_DIVIDER_DISMISS_MS);
-  }, [
-    unreadAnchorMessageId,
-    dismissedUnreadAnchorId,
-    isUnreadDividerDismissing,
-    onUnreadViewed,
-    latestIncomingMessageId,
-  ]);
+  }, [unreadAnchorMessageId, dismissedUnreadAnchorId, isUnreadDividerDismissing]);
 
   useEffect(() => {
     return () => {
@@ -63,7 +40,6 @@ export function useUnreadIndicator({
     if (!unreadAnchorMessageId || dismissedUnreadAnchorId === unreadAnchorMessageId) {
       return;
     }
-    unreadViewNotifiedForAnchorRef.current = null;
     setIsUnreadDividerDismissing(false);
   }, [unreadAnchorMessageId, dismissedUnreadAnchorId]);
 

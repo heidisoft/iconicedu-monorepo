@@ -1,5 +1,7 @@
 import type { ISODateTime, MessageVM, UUID } from '@iconicedu/shared-types';
 
+import { findLatestIncomingMessageId } from '@iconicedu/ui-web/components/messages/read-state.utils';
+
 export function findUnreadAnchorMessageId(input: {
   sortedMessages: MessageVM[];
   lastReadMessageId?: UUID;
@@ -13,7 +15,9 @@ export function findUnreadAnchorMessageId(input: {
 
   let lastReadIndex = -1;
   if (lastReadMessageId) {
-    lastReadIndex = sortedMessages.findIndex((message) => message.ids.id === lastReadMessageId);
+    lastReadIndex = sortedMessages.findIndex(
+      (message) => message.ids.id === lastReadMessageId,
+    );
   } else if (lastReadAt) {
     const lastReadAtTime = new Date(lastReadAt).getTime();
     for (let index = sortedMessages.length - 1; index >= 0; index -= 1) {
@@ -47,4 +51,38 @@ export function findUnreadAnchorMessageId(input: {
     );
 
   return unreadStart?.ids.id ?? null;
+}
+
+export function findLatestUnreadIncomingMessageId(input: {
+  sortedMessages: MessageVM[];
+  lastReadMessageId?: UUID;
+  lastReadAt?: ISODateTime;
+  currentUserId?: UUID;
+}): UUID | null {
+  const { sortedMessages, lastReadMessageId, lastReadAt, currentUserId } = input;
+
+  if (!lastReadMessageId && !lastReadAt) {
+    return findLatestIncomingMessageId(sortedMessages, currentUserId);
+  }
+
+  const unreadAnchorMessageId = findUnreadAnchorMessageId(input);
+  if (!unreadAnchorMessageId) {
+    return null;
+  }
+
+  const unreadStartIndex = sortedMessages.findIndex(
+    (message) => message.ids.id === unreadAnchorMessageId,
+  );
+  if (unreadStartIndex < 0) {
+    return null;
+  }
+
+  for (let index = sortedMessages.length - 1; index >= unreadStartIndex; index -= 1) {
+    const message = sortedMessages[index];
+    if (!currentUserId || message.core.sender.ids.id !== currentUserId) {
+      return message.ids.id;
+    }
+  }
+
+  return null;
 }
