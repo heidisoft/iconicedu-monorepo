@@ -6,7 +6,6 @@ import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
 import {
   buildDashboardClassRequestMessage,
   createPrivateClassRequestChannel,
-  DASHBOARD_CLASS_REQUEST_SUBJECT_OPTIONS,
   type DashboardClassRequestPayload,
 } from '@iconicedu/web/lib/dashboard/class-request';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
@@ -18,9 +17,10 @@ import {
 } from '@iconicedu/web/lib/profile/queries/profiles.query';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
+import { listActiveOrgSubjectCatalog } from '@iconicedu/web/lib/subjects/queries/org-subject-catalog.query';
+import { OTHER_SUBJECT_OPTION } from '@iconicedu/shared-types';
 
-const OTHER_SUBJECT = 'Other';
-type AllowedDashboardSubject = (typeof DASHBOARD_CLASS_REQUEST_SUBJECT_OPTIONS)[number];
+const OTHER_SUBJECT = OTHER_SUBJECT_OPTION;
 
 function parsePayload(body: unknown): DashboardClassRequestPayload | null {
   if (!body || typeof body !== 'object') {
@@ -68,32 +68,6 @@ export async function POST(request: Request) {
     );
   }
 
-  const allowedSubjects = new Set<AllowedDashboardSubject>(
-    DASHBOARD_CLASS_REQUEST_SUBJECT_OPTIONS,
-  );
-  const isAllowedSubject = (subject: string): subject is AllowedDashboardSubject =>
-    allowedSubjects.has(subject as AllowedDashboardSubject);
-
-  if (payload.subjects.some((subject) => !isAllowedSubject(subject))) {
-    return NextResponse.json(
-      {
-        success: false,
-        message: 'Invalid subject selection.',
-      },
-      { status: 400 },
-    );
-  }
-
-  if (payload.subjects.includes(OTHER_SUBJECT) && !payload.otherSubject?.length) {
-    return NextResponse.json(
-      {
-        success: false,
-        message: 'Other subject is required when selecting Other.',
-      },
-      { status: 400 },
-    );
-  }
-
   try {
     const supabase = await createSupabaseServerClient();
     const serviceSupabase = createSupabaseServiceClient();
@@ -104,6 +78,40 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { success: false, message: 'Organization not found.' },
         { status: 404 },
+      );
+    }
+
+    const subjectCatalogResponse = await listActiveOrgSubjectCatalog(
+      serviceSupabase,
+      org.id,
+    );
+    if (subjectCatalogResponse.error) {
+      return NextResponse.json(
+        { success: false, message: subjectCatalogResponse.error.message },
+        { status: 500 },
+      );
+    }
+
+    const allowedSubjects = new Set(
+      (subjectCatalogResponse.data ?? []).map((row) => row.subject).concat(OTHER_SUBJECT),
+    );
+    if (payload.subjects.some((subject) => !allowedSubjects.has(subject))) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Invalid subject selection.',
+        },
+        { status: 400 },
+      );
+    }
+
+    if (payload.subjects.includes(OTHER_SUBJECT) && !payload.otherSubject?.length) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Other subject is required when selecting Other.',
+        },
+        { status: 400 },
       );
     }
 

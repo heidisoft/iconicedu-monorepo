@@ -10,7 +10,6 @@ import type {
   GradeLevel,
 } from '@iconicedu/shared-types';
 import { Button } from '@iconicedu/ui-web/ui/button';
-import { Checkbox } from '@iconicedu/ui-web/ui/checkbox';
 import { Input } from '@iconicedu/ui-web/ui/input';
 import { Textarea } from '@iconicedu/ui-web/ui/textarea';
 import { Label } from '@iconicedu/ui-web/ui/label';
@@ -22,6 +21,7 @@ import {
   gradeLabel,
   normalizeCountryCode,
   optionsForCountry,
+  STANDARD_SUBJECT_OPTIONS,
 } from '@iconicedu/shared-types';
 
 const listToString = (items?: string[] | null) => (items ?? []).join(', ');
@@ -31,19 +31,6 @@ const stringToList = (value: string) =>
     .split(',')
     .map((segment) => segment.trim())
     .filter(Boolean);
-
-const SUBJECT_OPTIONS = [
-  'Math',
-  'Science',
-  'English Language Arts',
-  'Social Studies',
-  'STEM & coding',
-  'Creative arts',
-  'Music & performance',
-  'Mindfulness & SEL',
-  'Language studies',
-  'Career readiness',
-];
 
 const AGE_GROUP_OPTIONS = [
   'Toddlers',
@@ -75,6 +62,7 @@ const sanitizeGrades = (grades?: GradeLevel[] | null): GradeLevel[] =>
 
 type EducatorProfileTabProps = {
   educatorProfile: EducatorProfileVM;
+  subjectOptions?: string[];
   fallbackCountryCode?: string | null;
   onSave?: (input: EducatorProfileSaveInput) => Promise<void> | void;
   isEducatorOnboarding?: boolean;
@@ -82,6 +70,7 @@ type EducatorProfileTabProps = {
 
 export function EducatorProfileTab({
   educatorProfile,
+  subjectOptions = [...STANDARD_SUBJECT_OPTIONS],
   fallbackCountryCode,
   onSave,
   isEducatorOnboarding = false,
@@ -145,7 +134,6 @@ export function EducatorProfileTab({
     },
     enabled: isEducatorOnboarding,
   });
-  const showHeadlineBeam = sequentialEducatorHighlight.isActive('headline');
   const showSubjectsBeam = sequentialEducatorHighlight.isActive('subjects');
   const showGradesBeam = sequentialEducatorHighlight.isActive('grades');
   const showEducatorActionBeam =
@@ -190,6 +178,22 @@ export function EducatorProfileTab({
     () => selectedGrades.map((grade) => gradeLabel(grade, educatorCountryCode)),
     [selectedGrades, educatorCountryCode],
   );
+  const subjectPickerOptions = React.useMemo(() => {
+    const merged = new Map<string, string>();
+    [...subjectOptions, ...(educatorProfile.subjects ?? []), ...selectedSubjects].forEach(
+      (subject) => {
+        const normalized = subject.trim();
+        if (!normalized) {
+          return;
+        }
+        const key = normalized.toLowerCase();
+        if (!merged.has(key)) {
+          merged.set(key, normalized);
+        }
+      },
+    );
+    return Array.from(merged.values());
+  }, [educatorProfile.subjects, selectedSubjects, subjectOptions]);
 
   const handleSave = React.useCallback(async () => {
     if (!onSave) {
@@ -241,6 +245,7 @@ export function EducatorProfileTab({
       setIsSaving(false);
     }
   }, [
+    educatorCountryCode,
     educatorProfile.ids.id,
     educatorProfile.ids.orgId,
     headlineValue,
@@ -283,29 +288,32 @@ export function EducatorProfileTab({
         open={basicInfoOpen}
         onOpenChange={handleBasicInfoOpenChange}
         footer={
-            <div className="flex justify-end">
-              <div className="relative inline-flex rounded-full">
-                {showEducatorActionBeam ? (
-                  <BorderBeam
-                    size={26}
-                    initialOffset={8}
-                    borderWidth={2}
-                    className="from-transparent via-amber-700 to-transparent"
-                    transition={{ type: 'spring', stiffness: 60, damping: 20 }}
-                  />
-                ) : null}
-                <Button
-                  size="sm"
-                  className="relative z-10"
-                  onClick={handleSave}
-                  disabled={
-                    isSaving || !onSave || !selectedSubjects.length || !selectedGrades.length
-                  }
-                >
-                  {isSaving ? 'Saving...' : 'Save'}
-                </Button>
-              </div>
+          <div className="flex justify-end">
+            <div className="relative inline-flex rounded-full">
+              {showEducatorActionBeam ? (
+                <BorderBeam
+                  size={26}
+                  initialOffset={8}
+                  borderWidth={2}
+                  className="from-transparent via-amber-700 to-transparent"
+                  transition={{ type: 'spring', stiffness: 60, damping: 20 }}
+                />
+              ) : null}
+              <Button
+                size="sm"
+                className="relative z-10"
+                onClick={handleSave}
+                disabled={
+                  isSaving ||
+                  !onSave ||
+                  !selectedSubjects.length ||
+                  !selectedGrades.length
+                }
+              >
+                {isSaving ? 'Saving...' : 'Save'}
+              </Button>
             </div>
+          </div>
         }
       >
         <div className="grid gap-4 sm:grid-cols-2">
@@ -359,7 +367,7 @@ export function EducatorProfileTab({
                 />
               ) : null}
               <div className="grid gap-2 sm:grid-cols-2">
-                {SUBJECT_OPTIONS.map((option) => {
+                {subjectPickerOptions.map((option) => {
                   const isSelected = selectedSubjects.includes(option);
                   return (
                     <button
@@ -622,9 +630,7 @@ export function EducatorProfileTab({
                         ? 'border-primary bg-primary/5 text-primary'
                         : 'border-border hover:border-foreground/60'
                     }`}
-                    onClick={() =>
-                      toggleSelection(option, setSelectedCurriculumTags)
-                    }
+                    onClick={() => toggleSelection(option, setSelectedCurriculumTags)}
                   >
                     <span>{option}</span>
                     {isSelected ? <Check className="h-4 w-4" /> : null}

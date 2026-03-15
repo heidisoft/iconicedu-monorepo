@@ -155,6 +155,7 @@ function resolveAlertChannelLabel(
 
 export function SidebarLeft({
   data,
+  subjectOptions,
   activePath,
   onLogout,
   onboardingStatus,
@@ -181,6 +182,7 @@ export function SidebarLeft({
   ...props
 }: React.ComponentProps<typeof Sidebar> & {
   data: SidebarLeftDataVM;
+  subjectOptions?: string[];
   activePath?: string | null;
   onLogout?: () => Promise<void> | void;
   onboardingStatus?: UserOnboardingStatusVM | null;
@@ -641,6 +643,7 @@ export function SidebarLeft({
                       canRequestClasses={canRequestClasses}
                       requestRole={requestRole}
                       requestableStudents={requestableStudents}
+                      subjectOptions={subjectOptions}
                       renderTrigger={({ canRequestClasses, fallbackHref, openDialog }) =>
                         canRequestClasses ? (
                           <DropdownMenuItem
@@ -711,6 +714,7 @@ export function SidebarLeft({
                         canRequestClasses,
                         requestRole,
                         requestableStudents,
+                        subjectOptions,
                       }}
                     />
                   );
@@ -846,6 +850,7 @@ export function SidebarLeft({
           onEducatorAvailabilitySave={onEducatorAvailabilitySave}
           onStaffProfileSave={onStaffProfileSave}
           onStatusOverrideSave={onStatusOverrideSave}
+          subjectOptions={subjectOptions}
         />
       </SidebarFooter>
     </Sidebar>

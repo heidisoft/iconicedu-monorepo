@@ -6,8 +6,11 @@ import {
   getDashboardAccountContext,
   getDashboardProfileContext,
 } from './_shared/dashboard-auth';
-import { DASHBOARD_CLASS_REQUEST_SUBJECT_OPTIONS } from '../../../lib/dashboard/class-request';
 import { buildDashboardHomeInfographicMetrics } from '../../../lib/dashboard/home-infographic-metrics';
+import {
+  listActiveOrgSubjectCatalog,
+  mapOrgSubjectRowsToOptions,
+} from '@iconicedu/web/lib/subjects/queries/org-subject-catalog.query';
 
 function resolveRequestRole(kind: string | undefined): ClassRequestRole {
   if (kind === 'guardian') {
@@ -32,6 +35,11 @@ export async function HomePageContent({ orgSlug }: { orgSlug: string }) {
 
   const requestRole = resolveRequestRole(currentUserProfile?.kind);
   const canRequestClasses = requestRole === 'parents' || requestRole === 'students';
+  const subjectCatalogResponse = await listActiveOrgSubjectCatalog(
+    supabase,
+    account.org_id,
+  );
+  const subjectOptions = mapOrgSubjectRowsToOptions(subjectCatalogResponse.data);
   const requestableStudents =
     currentUserProfile?.kind === 'guardian'
       ? (currentUserProfile.children?.items ?? []).map((child) => ({
@@ -60,7 +68,7 @@ export async function HomePageContent({ orgSlug }: { orgSlug: string }) {
       canRequestClasses={canRequestClasses}
       requestRole={requestRole}
       requestableStudents={requestableStudents}
-      subjectOptions={[...DASHBOARD_CLASS_REQUEST_SUBJECT_OPTIONS]}
+      subjectOptions={subjectOptions}
     />
   );
 }

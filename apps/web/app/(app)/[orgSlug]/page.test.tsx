@@ -16,19 +16,14 @@ vi.mock('@iconicedu/ui-web', () => ({
     dashboardHomeInfographicSectionMock(props),
 }));
 
-vi.mock('../../../lib/dashboard/class-request', () => ({
-  DASHBOARD_CLASS_REQUEST_SUBJECT_OPTIONS: [
-    'Math',
-    'English Language Arts',
-    'Science',
-    'Social Studies',
-    'Computer Science',
-    'Test Prep',
-    'Study Skills',
-    'Languages',
-    'Arts',
-    'Other',
-  ],
+vi.mock('../../../lib/subjects/queries/org-subject-catalog.query', () => ({
+  listActiveOrgSubjectCatalog: vi.fn(async () => ({
+    data: [{ subject: 'Math' }, { subject: 'Science' }],
+    error: null,
+  })),
+  mapOrgSubjectRowsToOptions: vi.fn((rows?: Array<{ subject: string }>) =>
+    (rows ?? []).map((row) => row.subject),
+  ),
 }));
 
 vi.mock('./_shared/dashboard-auth', () => ({
@@ -123,6 +118,7 @@ describe('d home page', () => {
             displayName: 'Maya Morgan',
           },
         ],
+        subjectOptions: ['Math', 'Science'],
       }),
     );
   });

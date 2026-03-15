@@ -29,6 +29,7 @@ import {
 import { Input } from '@iconicedu/ui-web/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@iconicedu/ui-web/ui/popover';
 import { Textarea } from '@iconicedu/ui-web/ui/textarea';
+import { OTHER_SUBJECT_OPTION, STANDARD_SUBJECT_OPTIONS } from '@iconicedu/shared-types';
 
 export interface ClassRequestableStudent {
   profileId: string;
@@ -62,20 +63,9 @@ export interface ClassRequestActionProps {
   renderTrigger: (props: ClassRequestActionRenderProps) => ReactNode;
 }
 
-const OTHER_SUBJECT_VALUE = 'Other';
+const OTHER_SUBJECT_VALUE = OTHER_SUBJECT_OPTION;
 
-const DEFAULT_SUBJECT_OPTIONS = [
-  'Math',
-  'English Language Arts',
-  'Science',
-  'Social Studies',
-  'Computer Science',
-  'Test Prep',
-  'Study Skills',
-  'Languages',
-  'Arts',
-  OTHER_SUBJECT_VALUE,
-];
+const DEFAULT_SUBJECT_OPTIONS = [...STANDARD_SUBJECT_OPTIONS, OTHER_SUBJECT_VALUE];
 
 const createInitialFormState = (): ClassRequestFormState => ({
   studentProfileIds: [],
@@ -138,10 +128,17 @@ export function ClassRequestAction({
     value: student.profileId,
     label: student.displayName,
   }));
-  const subjectSelectOptions = subjectOptions.map((subject) => ({
-    value: subject,
-    label: subject,
-  }));
+  const subjectSelectOptions = useMemo(() => {
+    const merged = Array.from(
+      new Map(
+        [...subjectOptions, OTHER_SUBJECT_VALUE].map((subject) => [subject, subject]),
+      ).values(),
+    );
+    return merged.map((subject) => ({
+      value: subject,
+      label: subject,
+    }));
+  }, [subjectOptions]);
 
   useEffect(() => {
     if (!isRequestDialogOpen || !canRequestClasses) {

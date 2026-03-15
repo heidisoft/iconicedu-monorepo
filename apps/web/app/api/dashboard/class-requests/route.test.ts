@@ -16,6 +16,7 @@ const getProfilesByKindMock = vi.fn();
 const createPrivateClassRequestChannelMock = vi.fn();
 const createSupabaseServiceClientMock = vi.fn();
 const sendTextMessageActionMock = vi.fn();
+const listActiveOrgSubjectCatalogMock = vi.fn();
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
   createSupabaseServerClient: () => createSupabaseServerClientMock(),
@@ -47,6 +48,11 @@ vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
 
 vi.mock('@iconicedu/web/lib/profile/builders/user-profile.builder', () => ({
   buildUserProfileById: (...args: unknown[]) => buildUserProfileByIdMock(...args),
+}));
+
+vi.mock('@iconicedu/web/lib/subjects/queries/org-subject-catalog.query', () => ({
+  listActiveOrgSubjectCatalog: (...args: unknown[]) =>
+    listActiveOrgSubjectCatalogMock(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/dashboard/class-request', async () => {
@@ -98,6 +104,7 @@ describe('POST /api/dashboard/class-requests', () => {
     createPrivateClassRequestChannelMock.mockReset();
     createSupabaseServiceClientMock.mockReset();
     sendTextMessageActionMock.mockReset();
+    listActiveOrgSubjectCatalogMock.mockReset();
 
     createSupabaseServerClientMock.mockResolvedValue(createMockSupabase());
     createSupabaseServiceClientMock.mockReturnValue(createMockSupabase());
@@ -106,6 +113,14 @@ describe('POST /api/dashboard/class-requests', () => {
     });
     requireAuthedUserMock.mockResolvedValue({ id: 'auth-1' });
     buildOrgBySlugMock.mockResolvedValue({ id: 'org-1' });
+    listActiveOrgSubjectCatalogMock.mockResolvedValue({
+      data: [
+        { subject: 'Math' },
+        { subject: 'English Language Arts' },
+        { subject: 'Science' },
+      ],
+      error: null,
+    });
     getAccountByAuthUserIdMock.mockResolvedValue({
       data: { id: 'account-1', org_id: 'org-1' },
     });

@@ -17,6 +17,7 @@ const {
   mockResolveOrgDashboardPath,
   mockGetProfileByAccountId,
   mockSeedSignupDefaultNotificationPreferences,
+  mockSeedDefaultOrgSubjectCatalog,
 } = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
   mockFrom: vi.fn(),
@@ -30,6 +31,7 @@ const {
   mockResolveOrgDashboardPath: vi.fn(),
   mockGetProfileByAccountId: vi.fn(),
   mockSeedSignupDefaultNotificationPreferences: vi.fn(),
+  mockSeedDefaultOrgSubjectCatalog: vi.fn(),
 }));
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
@@ -70,6 +72,11 @@ vi.mock('@iconicedu/web/lib/org/resolve-dashboard-path', () => ({
   resolveOrgDashboardPath: mockResolveOrgDashboardPath,
 }));
 
+vi.mock('@iconicedu/web/lib/subjects/queries/org-subject-catalog.query', () => ({
+  seedDefaultOrgSubjectCatalog: (...args: unknown[]) =>
+    mockSeedDefaultOrgSubjectCatalog(...args),
+}));
+
 describe('POST /api/orgs/bootstrap', () => {
   beforeEach(() => {
     mockGetUser.mockReset();
@@ -84,6 +91,8 @@ describe('POST /api/orgs/bootstrap', () => {
     mockResolveOrgDashboardPath.mockReset();
     mockGetProfileByAccountId.mockReset();
     mockSeedSignupDefaultNotificationPreferences.mockReset();
+    mockSeedDefaultOrgSubjectCatalog.mockReset();
+    mockSeedDefaultOrgSubjectCatalog.mockResolvedValue({ error: null });
   });
 
   it('returns 400 for invalid slug', async () => {

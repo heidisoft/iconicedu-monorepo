@@ -14,6 +14,7 @@ export * from './message-session-feedback';
 export * from './notification-dispatch-job';
 export * from './push-token';
 export * from './org';
+export * from './org-subject-catalog';
 export * from './profile';
 export * from './reminder-job';
 export * from './roles';

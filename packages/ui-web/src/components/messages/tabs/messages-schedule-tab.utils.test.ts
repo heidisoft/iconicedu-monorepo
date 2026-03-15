@@ -99,7 +99,7 @@ describe('messages-schedule-tab.utils', () => {
     expect(groups[0]?.sessions[0]?.dayNum).toBe('13');
   });
 
-  it('prefers the schedule timezone over the viewer timezone for schedule labels', () => {
+  it('prefers the viewer timezone over the schedule timezone for schedule labels', () => {
     const schedule = {
       ...buildSchedule('tz-2', '2026-03-13T20:00:00.000Z'),
       timezone: 'America/New_York',
@@ -119,7 +119,7 @@ describe('messages-schedule-tab.utils', () => {
       'Asia/Colombo',
     );
 
-    expect(groups[0]?.sessions[0]?.time).toBe('Fri 4:00pm EDT');
+    expect(groups[0]?.sessions[0]?.time).toBe('Sat 1:30am GMT+5:30');
   });
 
   it('expands recurring schedules when splitting timeline', () => {

@@ -2,19 +2,12 @@ import { randomUUID } from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { ProfileRow } from '@iconicedu/shared-types';
+import { OTHER_SUBJECT_OPTION, STANDARD_SUBJECT_OPTIONS } from '@iconicedu/shared-types';
 
 export const DASHBOARD_CLASS_REQUEST_SUBJECT_OPTIONS = [
-  'Math',
-  'English Language Arts',
-  'Science',
-  'Social Studies',
-  'Computer Science',
-  'Test Prep',
-  'Study Skills',
-  'Languages',
-  'Arts',
-  'Other',
-] as const;
+  ...STANDARD_SUBJECT_OPTIONS,
+  OTHER_SUBJECT_OPTION,
+];
 
 const CLASS_REQUEST_CHANNEL_PURPOSE = 'chass-requests';
 

@@ -52,6 +52,7 @@ import type {
   ThemeKey,
   UserProfileVM,
 } from '@iconicedu/shared-types';
+import { STANDARD_SUBJECT_OPTIONS } from '@iconicedu/shared-types';
 import {
   buildSchedulesHashKeyFromFormSchedules,
   mapSchedulesToPayload,
@@ -59,6 +60,7 @@ import {
 } from '@iconicedu/web/app/(app)/[orgSlug]/admin/spaces/learning-space-form-dialog.utils';
 import { LiveSessionSettingsSection } from '@iconicedu/web/components/admin/live-session-settings-section';
 import { DEFAULT_ADMIN_LIVE_SESSION_CONFIG } from '@iconicedu/web/lib/admin/live-session-config';
+import { mergeSubjectOptions } from '@iconicedu/web/lib/subjects/utils';
 
 const KIND_OPTIONS = [
   { value: 'one_on_one', label: 'One on one' },
@@ -66,7 +68,6 @@ const KIND_OPTIONS = [
   { value: 'large_class', label: 'Large class' },
 ];
 
-const SUBJECT_OPTIONS = ['MATH', 'SCIENCE', 'ELA', 'CHESS'];
 const mapLinksToPayload = (links: LearningSpaceLinkVM[]) =>
   links.map((resource) => ({
     label: resource.label,
@@ -87,6 +88,7 @@ const mapParticipantsToPayload = (selected: UserProfileVM[]) =>
 
 type LearningSpaceFormDialogProps = {
   participantOptions?: UserProfileVM[];
+  subjectOptions?: string[];
   defaultScheduleTimezone?: string | null;
   mode?: 'create' | 'edit';
   open?: boolean;
@@ -143,6 +145,7 @@ function createDefaultChannelUiDefaults(): ChannelUiDefaultsVM {
 
 export function LearningSpaceFormDialog({
   participantOptions = [],
+  subjectOptions = [...STANDARD_SUBJECT_OPTIONS],
   defaultScheduleTimezone,
   mode = 'create',
   open: openProp,
@@ -190,6 +193,14 @@ export function LearningSpaceFormDialog({
   const currentScheduleHashKey = React.useMemo(
     () => buildSchedulesHashKeyFromFormSchedules(formState.schedules),
     [formState.schedules],
+  );
+  const subjectSelectOptions = React.useMemo(
+    () =>
+      mergeSubjectOptions(subjectOptions, [
+        initialData?.basics.subject,
+        formState.subject,
+      ]),
+    [formState.subject, initialData?.basics.subject, subjectOptions],
   );
   const iconInvalid = isSubmitted && !formState.iconKey;
   const titleInvalid = isSubmitted && !formState.title.trim();
@@ -426,7 +437,7 @@ export function LearningSpaceFormDialog({
                         <SelectContent>
                           <SelectGroup>
                             <SelectLabel>Subjects</SelectLabel>
-                            {SUBJECT_OPTIONS.map((option) => (
+                            {subjectSelectOptions.map((option) => (
                               <SelectItem key={option} value={option}>
                                 {option}
                               </SelectItem>

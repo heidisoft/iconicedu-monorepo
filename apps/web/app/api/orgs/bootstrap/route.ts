@@ -14,6 +14,7 @@ import { buildAuthOnboardingState } from '@iconicedu/web/lib/onboarding/auth-sta
 import { getOrgBySlug } from '@iconicedu/web/lib/org/queries/org.query';
 import { resolveOrgDashboardPath } from '@iconicedu/web/lib/org/resolve-dashboard-path';
 import { ORG_SLUG_REGEX } from '@iconicedu/web/lib/org/slug';
+import { seedDefaultOrgSubjectCatalog } from '@iconicedu/web/lib/subjects/queries/org-subject-catalog.query';
 
 type BootstrapRequestBody = {
   name?: unknown;
@@ -130,6 +131,18 @@ export async function POST(request: Request) {
         { status: 500 },
       );
     }
+  }
+
+  const subjectSeedResponse = await seedDefaultOrgSubjectCatalog({
+    supabase: serviceSupabase,
+    orgId: org.id,
+    actorId: profileResponse.data?.id ?? user.id,
+  });
+  if (subjectSeedResponse.error) {
+    return NextResponse.json(
+      { success: false, message: subjectSeedResponse.error.message },
+      { status: 500 },
+    );
   }
 
   const now = new Date().toISOString();

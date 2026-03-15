@@ -143,11 +143,13 @@ export function SidebarShell({
   data,
   initialOnboardingStatus,
   adminSections,
+  subjectOptions,
 }: {
   children: ReactNode;
   data: SidebarLeftDataVM;
   initialOnboardingStatus?: UserOnboardingStatusVM | null;
   adminSections?: AdminMenuSectionVM[] | null;
+  subjectOptions?: string[];
 }) {
   const pathname = usePathname();
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
@@ -2284,6 +2286,7 @@ export function SidebarShell({
     <>
       <SidebarLeft
         data={sidebarData}
+        subjectOptions={subjectOptions}
         activePath={pathname}
         onLogout={handleLogout}
         onboardingStatus={onboardingStatus}

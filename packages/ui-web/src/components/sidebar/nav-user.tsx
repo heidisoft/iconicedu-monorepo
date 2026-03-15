@@ -81,6 +81,7 @@ import {
 export function NavUser({
   profile,
   account,
+  subjectOptions,
   onLogout,
   onOnboardingComplete,
   onboardingStatus,
@@ -107,6 +108,7 @@ export function NavUser({
 }: {
   profile: UserProfileVM;
   account?: UserAccountVM | null;
+  subjectOptions?: string[];
   onLogout?: () => Promise<void> | void;
   onboardingStatus?: UserOnboardingStatusVM | null;
   onProfileSave?: (input: ProfileSaveInput) => Promise<void> | void;
@@ -456,6 +458,7 @@ export function NavUser({
           onTabChange={setSettingsTab}
           profile={profile}
           account={account}
+          subjectOptions={subjectOptions}
           onLogout={onLogout}
           onProfileSave={onProfileSave}
           onChildProfileSave={onChildProfileSave}

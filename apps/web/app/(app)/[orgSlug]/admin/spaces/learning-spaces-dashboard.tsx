@@ -25,11 +25,13 @@ const PAGE_SIZES = [10, 25, 50];
 type LearningSpacesDashboardProps = {
   rows: AdminLearningSpaceRow[];
   currentUserTimezone?: string | null;
+  subjectOptions?: string[];
 };
 
 export function LearningSpacesDashboard({
   rows,
   currentUserTimezone,
+  subjectOptions,
 }: LearningSpacesDashboardProps) {
   const router = useRouter();
   const [search, setSearch] = React.useState('');
@@ -157,6 +159,7 @@ export function LearningSpacesDashboard({
         <LearningSpaceFormDialog
           participantOptions={participantOptions}
           defaultScheduleTimezone={currentUserTimezone}
+          subjectOptions={subjectOptions}
         />
         <LearningSpaceFormDialog
           mode="edit"
@@ -169,6 +172,7 @@ export function LearningSpacesDashboard({
           }}
           participantOptions={participantOptions}
           defaultScheduleTimezone={currentUserTimezone}
+          subjectOptions={subjectOptions}
           initialData={editData}
           onSuccess={() => {
             handleRefresh();

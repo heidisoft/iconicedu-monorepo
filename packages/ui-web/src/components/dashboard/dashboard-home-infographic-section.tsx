@@ -20,6 +20,7 @@ import { DashboardSessionsEmptyState } from '@iconicedu/ui-web/components/empty'
 import { SessionCard } from '@iconicedu/ui-web/components/messages/tabs/messages-session-card';
 import type { ClassSession } from '@iconicedu/ui-web/components/messages/tabs/messages-schedule-tab.utils';
 import { DotPattern } from '@iconicedu/ui-web/ui/dot-pattern';
+import { OTHER_SUBJECT_OPTION, STANDARD_SUBJECT_OPTIONS } from '@iconicedu/shared-types';
 
 export interface DashboardUpcomingSessionListItem {
   session: ClassSession;
@@ -57,18 +58,7 @@ export interface DashboardHomeInfographicSectionProps {
   onJoinSession?: (joinHref: string) => void | Promise<void>;
 }
 
-const DEFAULT_SUBJECT_OPTIONS = [
-  'Math',
-  'English Language Arts',
-  'Science',
-  'Social Studies',
-  'Computer Science',
-  'Test Prep',
-  'Study Skills',
-  'Languages',
-  'Arts',
-  'Other',
-];
+const DEFAULT_SUBJECT_OPTIONS = [...STANDARD_SUBJECT_OPTIONS, OTHER_SUBJECT_OPTION];
 
 export function DashboardHomeInfographicSection({
   orgSlug,

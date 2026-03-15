@@ -10,6 +10,10 @@ import {
 import { getAdminLearningSpaceRows } from '@iconicedu/web/lib/admin/learning-spaces';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
 import { LearningSpacesDashboard } from '@iconicedu/web/app/(app)/[orgSlug]/admin/spaces/learning-spaces-dashboard';
+import {
+  listActiveOrgSubjectCatalog,
+  mapOrgSubjectRowsToOptions,
+} from '@iconicedu/web/lib/subjects/queries/org-subject-catalog.query';
 
 export const metadata: Metadata = {
   title: 'Admin · Classrooms',
@@ -31,6 +35,8 @@ export default async function AdminLearningSpacesPage({
 
   const { currentUserProfile } = await getDashboardProfileContext(supabase, account.id);
   const rows = await getAdminLearningSpaceRows(org.id);
+  const subjectCatalogResponse = await listActiveOrgSubjectCatalog(supabase, org.id);
+  const subjectOptions = mapOrgSubjectRowsToOptions(subjectCatalogResponse.data);
 
   return (
     <div className="flex flex-1 flex-col">
@@ -39,6 +45,7 @@ export default async function AdminLearningSpacesPage({
         <LearningSpacesDashboard
           rows={rows}
           currentUserTimezone={currentUserProfile?.prefs.timezone ?? null}
+          subjectOptions={subjectOptions}
         />
       </div>
     </div>

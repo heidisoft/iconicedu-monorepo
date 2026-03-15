@@ -33,7 +33,12 @@
       "Bash(npx expo:*)",
       "Bash(pnpm --filter mobile test -- src/lib/notifications/push-token.test.ts src/hooks/use-push-registration.test.ts)",
       "Bash(pnpm --filter web test -- apps/web/lib/notifications/providers/push-provider.test.ts)",
-      "Bash(pnpm --filter web test -- lib/notifications/providers/push-provider.test.ts)"
+      "Bash(pnpm --filter web test -- lib/notifications/providers/push-provider.test.ts)",
+      "Bash(pnpm --filter ui-web lint)",
+      "Bash(pnpm --filter web lint)",
+      "Bash(pnpm --filter ui-web typecheck)",
+      "Bash(pnpm --filter ui-web test -- packages/ui-web/src/lib/schedule-display-timezone.test.ts)",
+      "Bash(pnpm --filter web test -- apps/web/lib/dashboard/home-infographic-metrics.test.ts)"
     ],
     "additionalDirectories": [
       "/Users/hwanigasooriya/Workspace/hobby/iconicedu-monorepo/supabase/migrations"

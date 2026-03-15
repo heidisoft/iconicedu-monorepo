@@ -51,6 +51,7 @@ type UserSettingsDialogProps = {
   onTabChange: (tab: UserSettingsTab) => void;
   profile: UserProfileVM;
   account?: UserAccountVM | null;
+  subjectOptions?: string[];
   onLogout?: () => Promise<void> | void;
   onProfileSave?: (input: ProfileSaveInput) => Promise<void> | void;
   onChildProfileSave?: (input: ChildProfileSaveInput) => Promise<void> | void;
@@ -145,6 +146,7 @@ export function UserSettingsDialog({
   onTabChange,
   profile,
   account,
+  subjectOptions,
   onLogout,
   onProfileSave,
   onChildProfileSave,
@@ -252,6 +254,7 @@ export function UserSettingsDialog({
       onValueChange={onTabChange}
       profile={profile}
       account={account}
+      subjectOptions={subjectOptions}
       onLogout={onLogout}
       onProfileSave={onProfileSave}
       onChildProfileSave={onChildProfileSave}

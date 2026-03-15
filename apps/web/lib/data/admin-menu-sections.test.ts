@@ -19,4 +19,10 @@ describe('buildAdminMenuSections', () => {
       'Activity controls',
     );
   });
+
+  it('includes subjects under settings', () => {
+    const sections = buildAdminMenuSections('/iconic-academy');
+    const settingsSection = sections.find((section) => section.title === 'Settings');
+    expect(settingsSection?.links.map((link) => link.title)).toContain('Subjects');
+  });
 });

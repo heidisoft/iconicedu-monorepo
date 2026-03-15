@@ -67,12 +67,12 @@ export function resolveScheduleDisplayTimeZone(
 ): string {
   const normalized = normalizeScheduleDisplayTimeZoneInput(input);
 
-  if (isValidScheduleDisplayTimeZone(normalized.scheduleTimezone)) {
-    return normalized.scheduleTimezone!;
-  }
-
   if (isValidScheduleDisplayTimeZone(normalized.viewerTimezone)) {
     return normalized.viewerTimezone!;
+  }
+
+  if (isValidScheduleDisplayTimeZone(normalized.scheduleTimezone)) {
+    return normalized.scheduleTimezone!;
   }
 
   const browserTimeZone =

@@ -61,6 +61,7 @@ export type UserSettingsTabsProps = {
   onValueChange: (tab: UserSettingsTab) => void;
   profile: UserProfileVM;
   account?: UserAccountVM | null;
+  subjectOptions?: string[];
   onLogout?: () => Promise<void> | void;
   onProfileSave?: (input: ProfileSaveInput) => Promise<void> | void;
   onChildProfileSave?: (input: ChildProfileSaveInput) => Promise<void> | void;
@@ -164,6 +165,7 @@ export function UserSettingsTabs({
   onValueChange,
   profile,
   account,
+  subjectOptions,
   onLogout,
   onProfileSave,
   onChildProfileSave,
@@ -473,6 +475,7 @@ export function UserSettingsTabs({
             <TabsContent value="educator-profile" className="mt-0 space-y-8 w-full px-1">
               <EducatorProfileTab
                 educatorProfile={educatorProfile}
+                subjectOptions={subjectOptions}
                 fallbackCountryCode={profile.location?.countryCode}
                 onSave={onEducatorProfileSave}
                 isEducatorOnboarding={isEducatorProfileOnboarding}

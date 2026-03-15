@@ -14,6 +14,10 @@ import { buildSidebarBaseData } from '@iconicedu/web/lib/sidebar/buildSidebarBas
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
 import { resolveOrgDashboardPath } from '@iconicedu/web/lib/org/resolve-dashboard-path';
 import { shouldRedirectToAuthResume } from '@iconicedu/web/app/(app)/[orgSlug]/layout-auth-gate';
+import {
+  listActiveOrgSubjectCatalog,
+  mapOrgSubjectRowsToOptions,
+} from '@iconicedu/web/lib/subjects/queries/org-subject-catalog.query';
 
 export const metadata: Metadata = {
   title: {
@@ -82,6 +86,11 @@ export default async function Layout({
     baseSidebarData,
     profileKindOverride,
   });
+  const subjectCatalogResponse = await listActiveOrgSubjectCatalog(
+    supabase,
+    account.org_id,
+  );
+  const subjectOptions = mapOrgSubjectRowsToOptions(subjectCatalogResponse.data);
 
   return (
     <SidebarProvider>
@@ -89,6 +98,7 @@ export default async function Layout({
         data={sidebarData}
         initialOnboardingStatus={onboardingStatus}
         adminSections={buildAdminMenuSections(`/${orgSlug}`)}
+        subjectOptions={subjectOptions}
       >
         {children}
       </SidebarShell>

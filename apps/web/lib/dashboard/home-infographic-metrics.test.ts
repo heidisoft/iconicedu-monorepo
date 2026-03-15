@@ -344,7 +344,7 @@ describe('buildDashboardHomeInfographicMetrics', () => {
     expect(result.upcomingSessionsPage.items).toHaveLength(8);
   });
 
-  it('builds homepage upcoming-session labels in the canonical schedule timezone without double conversion', async () => {
+  it('builds homepage upcoming-session labels in the viewer timezone without double conversion', async () => {
     buildClassSchedulesByOrgMock.mockResolvedValue([
       buildSchedule({
         startAt: '2026-03-13T15:00:00.000Z',
@@ -380,12 +380,14 @@ describe('buildDashboardHomeInfographicMetrics', () => {
     });
 
     expect(result.upcomingSessionsPage.items[0]?.session.time).toContain(
-      'Fri 3:00pm UTC',
+      'Fri 11:00am EDT',
     );
-    expect(result.upcomingSessionsPage.items[0]?.session.time).not.toContain('11:00am');
+    expect(result.upcomingSessionsPage.items[0]?.session.time).not.toContain(
+      '3:00pm UTC',
+    );
   });
 
-  it('keeps homepage upcoming-session labels in the canonical class timezone', async () => {
+  it('renders homepage upcoming-session labels in the viewer timezone even for canonical class schedules', async () => {
     buildClassSchedulesByOrgMock.mockResolvedValue([
       buildSchedule({
         startAt: '2026-03-13T20:00:00.000Z',
@@ -430,9 +432,11 @@ describe('buildDashboardHomeInfographicMetrics', () => {
     });
 
     expect(result.upcomingSessionsPage.items[0]?.session.time).toContain(
-      'Fri 4:00pm EDT',
+      'Sat 1:30am GMT+5:30',
     );
-    expect(result.upcomingSessionsPage.items[0]?.session.time).not.toContain('1:30am');
+    expect(result.upcomingSessionsPage.items[0]?.session.time).not.toContain(
+      '4:00pm EDT',
+    );
   });
 
   it('marks homepage upcoming sessions for this week and next week separately', async () => {

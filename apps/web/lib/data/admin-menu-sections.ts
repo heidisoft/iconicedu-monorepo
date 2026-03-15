@@ -51,6 +51,7 @@ export function buildAdminMenuSections(basePath: string): AdminMenuSectionVM[] {
       title: 'Settings',
       iconKey: 'system',
       links: [
+        { title: 'Subjects', url: `${basePath}/admin/settings/subjects` },
         { title: 'Activity controls', url: `${basePath}/admin/settings/activity` },
         { title: 'Account settings', url: `${basePath}/admin/settings/accounts` },
         { title: 'Roles & policies', url: `${basePath}/admin/settings/roles` },
