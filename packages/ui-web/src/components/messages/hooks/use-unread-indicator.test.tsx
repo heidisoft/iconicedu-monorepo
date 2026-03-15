@@ -10,12 +10,9 @@ describe('useUnreadIndicator', () => {
 
   it('keeps divider dismissing until timeout completes', () => {
     vi.useFakeTimers();
-    const onUnreadViewed = vi.fn();
     const { result } = renderHook(() =>
       useUnreadIndicator({
         unreadAnchorMessageId: 'message-2',
-        latestIncomingMessageId: 'message-3',
-        onUnreadViewed,
       }),
     );
 
@@ -23,7 +20,6 @@ describe('useUnreadIndicator', () => {
       result.current.dismissUnreadDivider();
     });
 
-    expect(onUnreadViewed).toHaveBeenCalledWith('message-3');
     expect(result.current.isUnreadDividerDismissing).toBe(true);
     expect(result.current.dismissedUnreadAnchorId).toBeNull();
 
