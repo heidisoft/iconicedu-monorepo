@@ -5,6 +5,7 @@ import {
   buildScheduleStart,
   getDateFromISOInTimezone,
   getTimeFromISOInTimezone,
+  normalizeScheduleFormDate,
   buildLearningSpaceScheduleHashBundleFromExisting,
   buildLearningSpaceScheduleHashBundleFromPayload,
   buildLearningSpaceSchedulesHashKeyFromPayload,
@@ -56,6 +57,21 @@ describe('class schedule hash', () => {
       '2026-03-11',
     );
     expect(getTimeFromISOInTimezone(expanded.endAt, 'America/New_York')).toBe('00:30');
+  });
+
+  it('handles DST-aware conversion using the selected schedule timezone', () => {
+    const expanded = buildScheduleStart({
+      startDate: '2026-03-08T12:00:00.000Z',
+      startTime: '09:00',
+      endTime: '10:00',
+      timezone: 'America/New_York',
+      exceptions: [],
+      overrides: [],
+    });
+
+    expect(expanded.startAt).toBe('2026-03-08T13:00:00.000Z');
+    expect(expanded.endAt).toBe('2026-03-08T14:00:00.000Z');
+    expect(getTimeFromISOInTimezone(expanded.startAt, 'America/New_York')).toBe('09:00');
   });
 
   it('builds recurrence time fields using schedule timezone for non-weekly rules', () => {
@@ -172,6 +188,15 @@ describe('class schedule hash', () => {
     ]);
 
     expect(changed).not.toBe(baseline);
+  });
+
+  it('normalizes form dates from ISO strings using the schedule timezone date', () => {
+    expect(
+      normalizeScheduleFormDate(
+        '2026-03-10T01:30:00.000Z',
+        'America/Los_Angeles',
+      )?.toISOString(),
+    ).toBe('2026-03-09T12:00:00.000Z');
   });
 
   it('treats reordered exception and override lists as the same schedule', () => {

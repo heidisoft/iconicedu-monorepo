@@ -3,6 +3,7 @@ import type {
   ClassScheduleViewVM,
   WeekdayVM,
 } from '@iconicedu/shared-types';
+import { getLocalDate, getLocalTime, toUtcFromLocal } from '@iconicedu/utils';
 import {
   formatScheduleDisplayTimeWithZone,
   formatScheduleDisplayValue,
@@ -19,6 +20,10 @@ export interface DisplayClassScheduleVM extends ClassScheduleVM {
     originalStartAt?: string;
     originalEndAt?: string;
   };
+}
+
+function getScheduleTimezone(event: Pick<ClassScheduleVM, 'timezone' | 'recurrence'>) {
+  return event.timezone ?? event.recurrence?.rule.timezone ?? 'UTC';
 }
 
 function getScheduleDisplayTimezoneInput(
@@ -260,9 +265,40 @@ const addDays = (date: Date, days: number) => {
   return next;
 };
 
-const weekdayTokens: WeekdayVM[] = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+function toDateKey(value: Date) {
+  return value.toISOString().slice(0, 10);
+}
 
-const getOccurrenceDayKey = (isoDateTime: string) => isoDateTime.slice(0, 10);
+function parseDateKey(value: string) {
+  const [yearText, monthText, dayText] = value.split('-');
+  const year = Number.parseInt(yearText ?? '1970', 10);
+  const month = Number.parseInt(monthText ?? '1', 10);
+  const day = Number.parseInt(dayText ?? '1', 10);
+  return new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0));
+}
+
+function getDateDiffInDays(left: string, right: string) {
+  return Math.round(
+    (parseDateKey(left).getTime() - parseDateKey(right).getTime()) /
+      (24 * 60 * 60 * 1000),
+  );
+}
+
+function getWeekdayTokenFromDateKey(value: string): WeekdayVM {
+  const weekday = parseDateKey(value).getUTCDay();
+  return weekdayTokens[weekday] ?? 'MO';
+}
+
+function getScheduleLocalDayKey(
+  isoDateTime: string,
+  event: Pick<ClassScheduleVM, 'timezone' | 'recurrence'>,
+) {
+  return (
+    getLocalDate(isoDateTime, getScheduleTimezone(event)) ?? isoDateTime.slice(0, 10)
+  );
+}
+
+const weekdayTokens: WeekdayVM[] = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
 
 const getDisplaySchedulePriority = (schedule: DisplayClassScheduleVM) => {
   if (schedule.uiState?.kind === 'exception') return 3;
@@ -281,7 +317,10 @@ const dedupeExpandedEvents = (schedules: DisplayClassScheduleVM[]) => {
   const deduped = new Map<string, DisplayClassScheduleVM>();
 
   schedules.forEach((schedule) => {
-    const key = `${getDisplayScheduleBaseId(schedule)}|${schedule.startAt.slice(0, 10)}`;
+    const key = `${getDisplayScheduleBaseId(schedule)}|${getScheduleLocalDayKey(
+      schedule.startAt,
+      schedule,
+    )}`;
     const existing = deduped.get(key);
 
     if (
@@ -344,15 +383,18 @@ export const expandRecurringEvents = (
     const recurrence = event.recurrence;
     const rule = recurrence.rule;
     const interval = rule.interval ?? 1;
+    const scheduleTimezone = getScheduleTimezone(event);
     const baseStart = new Date(event.startAt);
-    const baseDate = startOfDay(baseStart);
+    const baseLocalDate =
+      getLocalDate(event.startAt, scheduleTimezone) ?? event.startAt.slice(0, 10);
+    const baseLocalTime = getLocalTime(event.startAt, scheduleTimezone) ?? '00:00';
     const durationMs = new Date(event.endAt).getTime() - baseStart.getTime();
     const exceptions = new Set(
       recurrence.exceptions?.map((exception) => exception.occurrenceKey) ?? [],
     );
     const exceptionsByDay = new Set(
       recurrence.exceptions?.map((exception) =>
-        getOccurrenceDayKey(exception.occurrenceKey),
+        getScheduleLocalDayKey(exception.occurrenceKey, event),
       ) ?? [],
     );
     const overrides = new Map(
@@ -361,44 +403,55 @@ export const expandRecurringEvents = (
     );
     const overridesByDay = new Map(
       recurrence.overrides?.map((override) => [
-        getOccurrenceDayKey(override.occurrenceKey),
+        getScheduleLocalDayKey(override.occurrenceKey, event),
         override.patch,
       ]) ?? [],
     );
     const byWeekday = rule.byWeekday?.length
       ? rule.byWeekday
-      : [weekdayTokens[baseDate.getDay()]];
+      : [getWeekdayTokenFromDateKey(baseLocalDate)];
     const overrideOriginalDates =
       recurrence.overrides?.map((override) =>
-        startOfDay(new Date(override.occurrenceKey)),
+        getScheduleLocalDayKey(override.occurrenceKey, event),
       ) ?? [];
     const overridePatchedDates =
       recurrence.overrides
         ?.map((override) =>
-          override.patch.startAt ? startOfDay(new Date(override.patch.startAt)) : null,
+          override.patch.startAt
+            ? getScheduleLocalDayKey(override.patch.startAt, event)
+            : null,
         )
-        .filter((date): date is Date => Boolean(date)) ?? [];
+        .filter((date): date is string => Boolean(date)) ?? [];
     const exceptionDates =
       recurrence.exceptions?.map((exception) =>
-        startOfDay(new Date(exception.occurrenceKey)),
+        getScheduleLocalDayKey(exception.occurrenceKey, event),
       ) ?? [];
-    const iterationStart = getMinDate([
-      baseDate,
-      rangeStartDay,
-      ...overrideOriginalDates,
-      ...exceptionDates,
-    ]);
-    const iterationEnd = getMaxDate([
-      rangeEndDay,
-      ...overrideOriginalDates,
-      ...overridePatchedDates,
-      ...exceptionDates,
-    ]);
+    const rangeStartLocalDate =
+      getLocalDate(rangeStart.toISOString(), scheduleTimezone) ??
+      toDateKey(rangeStartDay);
+    const rangeEndLocalDate =
+      getLocalDate(rangeEnd.toISOString(), scheduleTimezone) ?? toDateKey(rangeEndDay);
+    const iterationStart = getMinDate(
+      [
+        parseDateKey(baseLocalDate),
+        parseDateKey(rangeStartLocalDate),
+        ...overrideOriginalDates,
+        ...exceptionDates,
+      ].map((value) => (typeof value === 'string' ? parseDateKey(value) : value)),
+    );
+    const iterationEnd = getMaxDate(
+      [
+        parseDateKey(rangeEndLocalDate),
+        ...overrideOriginalDates,
+        ...overridePatchedDates,
+        ...exceptionDates,
+      ].map((value) => (typeof value === 'string' ? parseDateKey(value) : value)),
+    );
 
     recurrence.exceptions?.forEach((exception) => {
       const originalStart = new Date(exception.occurrenceKey);
 
-      const occurrenceDayKey = getOccurrenceDayKey(exception.occurrenceKey);
+      const occurrenceDayKey = getScheduleLocalDayKey(exception.occurrenceKey, event);
       if (overrides.has(exception.occurrenceKey) || overridesByDay.has(occurrenceDayKey))
         return;
 
@@ -427,18 +480,20 @@ export const expandRecurringEvents = (
     });
 
     let occurrenceCount = 0;
-    const until = rule.until ? startOfDay(new Date(rule.until)) : null;
+    const until = rule.until
+      ? (getLocalDate(rule.until, scheduleTimezone) ?? rule.until.slice(0, 10))
+      : null;
 
     for (
       let current = iterationStart;
       current <= iterationEnd;
       current = addDays(current, 1)
     ) {
-      if (current < baseDate) continue;
-      if (until && current > until) break;
+      const currentLocalDate = toDateKey(current);
+      if (currentLocalDate < baseLocalDate) continue;
+      if (until && currentLocalDate > until) break;
 
-      const diffDays =
-        (startOfDay(current).getTime() - baseDate.getTime()) / (24 * 60 * 60 * 1000);
+      const diffDays = getDateDiffInDays(currentLocalDate, baseLocalDate);
 
       let matches = false;
       if (rule.frequency === 'daily') {
@@ -447,18 +502,23 @@ export const expandRecurringEvents = (
         const weeksDiff = Math.floor(diffDays / 7);
         matches =
           weeksDiff % interval === 0 &&
-          byWeekday.includes(weekdayTokens[current.getDay()]);
+          byWeekday.includes(getWeekdayTokenFromDateKey(currentLocalDate));
       }
 
-      const occurrenceStart = new Date(current);
-      occurrenceStart.setHours(
-        baseStart.getHours(),
-        baseStart.getMinutes(),
-        baseStart.getSeconds(),
-        baseStart.getMilliseconds(),
-      );
-      const occurrenceKey = occurrenceStart.toISOString();
-      const occurrenceDayKey = getOccurrenceDayKey(occurrenceKey);
+      const occurrenceKey =
+        toUtcFromLocal(currentLocalDate, baseLocalTime, scheduleTimezone) ??
+        (() => {
+          const occurrenceStart = new Date(current);
+          occurrenceStart.setHours(
+            baseStart.getHours(),
+            baseStart.getMinutes(),
+            baseStart.getSeconds(),
+            baseStart.getMilliseconds(),
+          );
+          return occurrenceStart.toISOString();
+        })();
+      const occurrenceStart = new Date(occurrenceKey);
+      const occurrenceDayKey = currentLocalDate;
       const override =
         overrides.get(occurrenceKey) ?? overridesByDay.get(occurrenceDayKey);
       const hasOverride = Boolean(override);

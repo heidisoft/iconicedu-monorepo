@@ -1,8 +1,11 @@
+import React from 'react';
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { ClassSession } from './messages-schedule-tab.utils';
 import {
   getSessionCardState,
   isSessionJoinButtonDisabled,
+  SessionCard,
 } from './messages-session-card';
 
 const baseSession: ClassSession = {
@@ -99,5 +102,26 @@ describe('messages-session-card', () => {
         canJoin: true,
       }),
     ).toBe(true);
+  });
+
+  it('renders join before message when actionOrder is join-first', () => {
+    render(
+      React.createElement(SessionCard, {
+        session: baseSession,
+        index: 0,
+        canJoin: true,
+        actionOrder: 'join-first',
+        joinLiveSession: async () => {},
+        classroomChatHref: '/iconic-academy/spaces/channel-1',
+      }),
+    );
+
+    const joinButton = screen.getByRole('button', { name: /Join/i });
+    const messageButton = screen.getByRole('button', { name: 'Message' });
+
+    expect(
+      joinButton.compareDocumentPosition(messageButton) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 });

@@ -344,7 +344,7 @@ describe('buildDashboardHomeInfographicMetrics', () => {
     expect(result.upcomingSessionsPage.items).toHaveLength(8);
   });
 
-  it('builds homepage upcoming-session labels in the profile timezone without double conversion', async () => {
+  it('builds homepage upcoming-session labels in the canonical schedule timezone without double conversion', async () => {
     buildClassSchedulesByOrgMock.mockResolvedValue([
       buildSchedule({
         startAt: '2026-03-13T15:00:00.000Z',
@@ -380,9 +380,59 @@ describe('buildDashboardHomeInfographicMetrics', () => {
     });
 
     expect(result.upcomingSessionsPage.items[0]?.session.time).toContain(
-      'Fri 11:00am EDT',
+      'Fri 3:00pm UTC',
     );
-    expect(result.upcomingSessionsPage.items[0]?.session.time).not.toContain('7:00am');
+    expect(result.upcomingSessionsPage.items[0]?.session.time).not.toContain('11:00am');
+  });
+
+  it('keeps homepage upcoming-session labels in the canonical class timezone', async () => {
+    buildClassSchedulesByOrgMock.mockResolvedValue([
+      buildSchedule({
+        startAt: '2026-03-13T20:00:00.000Z',
+        endAt: '2026-03-13T21:00:00.000Z',
+        timezone: 'America/New_York',
+        recurrence: {
+          ids: { id: 'rec-ny-1', orgId: 'org-1' },
+          rule: {
+            frequency: 'weekly',
+            interval: 1,
+            timezone: 'America/New_York',
+          },
+        },
+      }),
+    ]);
+    getLearningSpacesByOrgMock.mockResolvedValue({
+      data: [{ id: 'space-1', status: 'active', subject: 'Math' }],
+    });
+    getLearningSpaceParticipantsByLearningSpaceIdsMock.mockResolvedValue({
+      data: [{ learning_space_id: 'space-1', profile_id: 'child-1' }],
+    });
+
+    const result = await buildDashboardHomeInfographicMetrics({
+      supabase: {} as never,
+      orgId: 'org-1',
+      orgSlug: 'iconic-academy',
+      now: new Date('2026-03-13T12:00:00.000Z'),
+      timezone: 'Asia/Colombo',
+      currentUserProfile: {
+        kind: 'guardian',
+        ids: { id: 'guardian-1', orgId: 'org-1', accountId: 'account-1' },
+        prefs: { timezone: 'Asia/Colombo' },
+        children: {
+          items: [
+            {
+              kind: 'child',
+              ids: { id: 'child-1', orgId: 'org-1', accountId: 'account-c1' },
+            },
+          ],
+        },
+      } as never,
+    });
+
+    expect(result.upcomingSessionsPage.items[0]?.session.time).toContain(
+      'Fri 4:00pm EDT',
+    );
+    expect(result.upcomingSessionsPage.items[0]?.session.time).not.toContain('1:30am');
   });
 
   it('marks homepage upcoming sessions for this week and next week separately', async () => {

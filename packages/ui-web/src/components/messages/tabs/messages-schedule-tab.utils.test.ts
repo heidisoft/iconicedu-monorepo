@@ -99,6 +99,29 @@ describe('messages-schedule-tab.utils', () => {
     expect(groups[0]?.sessions[0]?.dayNum).toBe('13');
   });
 
+  it('prefers the schedule timezone over the viewer timezone for schedule labels', () => {
+    const schedule = {
+      ...buildSchedule('tz-2', '2026-03-13T20:00:00.000Z'),
+      timezone: 'America/New_York',
+      recurrence: {
+        ids: { id: 'tz-2-rec', orgId: 'org-1' },
+        rule: {
+          frequency: 'weekly' as const,
+          interval: 1,
+          timezone: 'America/New_York',
+        },
+      },
+    };
+
+    const groups = toMonthGroups(
+      groupSchedulesByMonth([schedule], 'Asia/Colombo'),
+      new Date('2026-03-13T12:00:00.000Z'),
+      'Asia/Colombo',
+    );
+
+    expect(groups[0]?.sessions[0]?.time).toBe('Fri 4:00pm EDT');
+  });
+
   it('expands recurring schedules when splitting timeline', () => {
     const schedule = {
       ...buildSchedule('rec-1', '2026-03-01T10:00:00.000Z'),

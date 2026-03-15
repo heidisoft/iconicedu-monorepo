@@ -24,6 +24,7 @@ import {
   createFormDateFromIsoInTimezone,
   getDateFromISOInTimezone,
   getTimeFromISOInTimezone,
+  normalizeScheduleFormDate,
 } from '@iconicedu/web/lib/admin/learning-space-schedule-hash';
 import { buildUserProfileById } from '@iconicedu/web/lib/profile/builders/user-profile.builder';
 import { mapLearningSpaceLinkRow } from '@iconicedu/web/lib/spaces/mappers/learning-space.mapper';
@@ -92,6 +93,30 @@ export function resolveStoredOccurrenceDateForForm(
   return isUtcNaiveStoredTimestamp(value, timezone, expectedLocalTime)
     ? (utcDate ?? localDate)
     : (localDate ?? utcDate);
+}
+
+export function resolveStoredScheduleDateTimeForForm(
+  value: string,
+  timezone: string,
+  expectedLocalTime?: string | null,
+) {
+  const normalizedExpectedLocalTime =
+    typeof expectedLocalTime === 'string' && expectedLocalTime.trim().length > 0
+      ? expectedLocalTime
+      : null;
+  const useUtcNaiveInterpretation = normalizedExpectedLocalTime
+    ? isUtcNaiveStoredTimestamp(value, timezone, normalizedExpectedLocalTime)
+    : false;
+
+  return {
+    date: useUtcNaiveInterpretation
+      ? (getUtcDateFromISO(value) ?? getDateFromISOInTimezone(value, timezone))
+      : (getDateFromISOInTimezone(value, timezone) ?? getUtcDateFromISO(value)),
+    time: useUtcNaiveInterpretation
+      ? (getUtcTimeFromISO(value) ?? getTimeFromISOInTimezone(value, timezone))
+      : (getTimeFromISOInTimezone(value, timezone) ?? getUtcTimeFromISO(value)),
+    useUtcNaiveInterpretation,
+  };
 }
 
 function parseOverridePatchForDetail(patch: Record<string, unknown> | null | undefined) {
@@ -367,6 +392,17 @@ async function buildSchedulesForForm(
       })),
     });
     const timezone = canonical.timezone;
+    const expectedLocalStartTime =
+      canonical.recurrence.weekdayTimes[0]?.time ?? canonical.displayTime;
+    const resolvedCanonicalStart = resolveStoredScheduleDateTimeForForm(
+      canonical.startAt,
+      timezone,
+      expectedLocalStartTime,
+    );
+    const resolvedCanonicalEnd = resolveStoredScheduleDateTimeForForm(
+      canonical.endAt,
+      timezone,
+    );
     const byWeekday = canonical.recurrence.byday.filter(isWeekday) as WeekdayVM[];
     const rawExceptions = (exceptionsByRecurrence.get(recurrence.id) ?? []).map(
       (exception) => ({
@@ -383,11 +419,11 @@ async function buildSchedulesForForm(
 
     return {
       id: schedule.id,
-      startDate: createFormDateFromIsoInTimezone(canonical.startAt, timezone),
-      startTime:
-        getTimeFromISOInTimezone(canonical.startAt, timezone) ?? canonical.displayTime,
-      endTime:
-        getTimeFromISOInTimezone(canonical.endAt, timezone) ?? canonical.displayTime,
+      startDate:
+        normalizeScheduleFormDate(resolvedCanonicalStart.date, timezone) ??
+        createFormDateFromIsoInTimezone(canonical.startAt, timezone),
+      startTime: resolvedCanonicalStart.time ?? canonical.displayTime,
+      endTime: resolvedCanonicalEnd.time ?? canonical.displayTime,
       timezone,
       rule: {
         frequency: canonical.recurrence.frequency as NonNullable<
@@ -437,47 +473,34 @@ async function buildSchedulesForForm(
         reason: exception.reason ?? undefined,
       })),
       overrides: rawOverrides.map((override, index) => {
-        const useUtcNaiveInterpretation = isUtcNaiveStoredTimestamp(
+        const resolvedOccurrence = resolveStoredScheduleDateTimeForForm(
           override.occurrenceKey,
           timezone,
           canonical.displayTime,
         );
         const originalDate =
-          resolveStoredOccurrenceDateForForm(
-            override.occurrenceKey,
-            timezone,
-            canonical.displayTime,
-          ) ?? override.occurrenceKey.slice(0, 10);
+          resolvedOccurrence.date ?? override.occurrenceKey.slice(0, 10);
         const newDate = (() => {
           if (!override.startAt) {
             return originalDate;
           }
-          if (useUtcNaiveInterpretation) {
-            return (
-              getUtcDateFromISO(override.startAt) ??
-              getDateFromISOInTimezone(override.startAt, timezone) ??
-              override.occurrenceKey.slice(0, 10)
-            );
-          }
-          return (
-            getDateFromISOInTimezone(override.startAt, timezone) ??
-            override.occurrenceKey.slice(0, 10)
+          const resolvedStart = resolveStoredScheduleDateTimeForForm(
+            override.startAt,
+            timezone,
+            canonical.displayTime,
           );
+          return resolvedStart.date ?? override.occurrenceKey.slice(0, 10);
         })();
         const newTime = (() => {
           if (!override.startAt) {
             return canonical.displayTime;
           }
-          if (useUtcNaiveInterpretation) {
-            return (
-              getUtcTimeFromISO(override.startAt) ??
-              getTimeFromISOInTimezone(override.startAt, timezone) ??
-              canonical.displayTime
-            );
-          }
-          return (
-            getTimeFromISOInTimezone(override.startAt, timezone) ?? canonical.displayTime
+          const resolvedStart = resolveStoredScheduleDateTimeForForm(
+            override.startAt,
+            timezone,
+            canonical.displayTime,
           );
+          return resolvedStart.time ?? canonical.displayTime;
         })();
 
         return {

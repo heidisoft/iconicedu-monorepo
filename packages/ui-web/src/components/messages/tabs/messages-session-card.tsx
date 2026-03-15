@@ -12,6 +12,8 @@ interface SessionCardProps {
   session: ClassSession;
   index: number;
   canJoin?: boolean;
+  showJoinButton?: boolean;
+  actionOrder?: 'message-first' | 'join-first';
   joinLiveSession?: () => Promise<void>;
   classroomChatHref?: string;
   openClassroomChat?: () => Promise<void> | void;
@@ -46,6 +48,8 @@ export function isSessionJoinButtonDisabled(input: {
 export function SessionCard({
   session,
   canJoin = false,
+  showJoinButton = true,
+  actionOrder = 'message-first',
   joinLiveSession: joinLiveSessionOverride,
   classroomChatHref,
   openClassroomChat,
@@ -66,7 +70,40 @@ export function SessionCard({
   const participantLabel =
     separatorIndex === -1 ? null : session.time.slice(separatorIndex + 3);
   const canOpenClassroomChat = Boolean(classroomChatHref || openClassroomChat);
-
+  const joinButton = showJoinButton ? (
+    <Button
+      size="sm"
+      className={cn(
+        'gap-1.5 rounded-full text-xs font-semibold',
+        isLive
+          ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+          : 'bg-primary/10 text-primary hover:bg-primary/20',
+      )}
+      variant="default"
+      disabled={isJoinButtonDisabled}
+      onClick={() => void handleJoin()}
+    >
+      <span className="inline-flex items-center gap-1.5">
+        {isJoinPending ? (
+          <Loader2 className="size-3.5 animate-spin" />
+        ) : (
+          <Video className="size-3.5" />
+        )}
+        {isLive ? 'Join Now' : 'Join'}
+      </span>
+    </Button>
+  ) : null;
+  const messageButton = canOpenClassroomChat ? (
+    <Button
+      size="sm"
+      variant="outline"
+      aria-label="Message"
+      className="size-8 rounded-full p-0"
+      onClick={() => void handleOpenClassroomChat()}
+    >
+      <MessageSquareText className="size-3.5" />
+    </Button>
+  ) : null;
   const handleJoin = async () => {
     if (!joinLiveSession || isJoinPending) {
       return;
@@ -183,38 +220,17 @@ export function SessionCard({
       <div className="flex items-center gap-2">
         {!isPast && !isDisabled ? (
           <>
-            {canOpenClassroomChat ? (
-              <Button
-                size="sm"
-                variant="outline"
-                aria-label="Message"
-                className="size-8 rounded-full p-0"
-                onClick={() => void handleOpenClassroomChat()}
-              >
-                <MessageSquareText className="size-3.5" />
-              </Button>
-            ) : null}
-            <Button
-              size="sm"
-              className={cn(
-                'gap-1.5 rounded-full text-xs font-semibold',
-                isLive
-                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                  : 'bg-primary/10 text-primary hover:bg-primary/20',
-              )}
-              variant="default"
-              disabled={isJoinButtonDisabled}
-              onClick={() => void handleJoin()}
-            >
-              <span className="inline-flex items-center gap-1.5">
-                {isJoinPending ? (
-                  <Loader2 className="size-3.5 animate-spin" />
-                ) : (
-                  <Video className="size-3.5" />
-                )}
-                {isLive ? 'Join Now' : 'Join'}
-              </span>
-            </Button>
+            {actionOrder === 'join-first' ? (
+              <>
+                {joinButton}
+                {messageButton}
+              </>
+            ) : (
+              <>
+                {messageButton}
+                {joinButton}
+              </>
+            )}
           </>
         ) : isDisabled ? (
           <Button

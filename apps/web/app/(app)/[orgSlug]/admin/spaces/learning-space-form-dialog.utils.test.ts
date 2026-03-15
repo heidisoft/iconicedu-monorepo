@@ -75,6 +75,24 @@ describe('learning-space-form-dialog schedule utils', () => {
     );
   });
 
+  it('serializes string anchors using the schedule timezone instead of the viewer timezone', () => {
+    const schedules: RecurrenceFormData[] = [
+      {
+        id: 'schedule-1',
+        startDate: '2026-03-10T01:30:00.000Z' as unknown as Date,
+        timezone: 'America/Los_Angeles',
+        startTime: '17:30',
+        endTime: '18:30',
+        exceptions: [],
+        overrides: [],
+      },
+    ];
+
+    expect(mapSchedulesToPayload(schedules)[0]?.startDate).toBe(
+      '2026-03-09T12:00:00.000Z',
+    );
+  });
+
   it('normalizes schedules without sharing nested references', () => {
     const source: RecurrenceFormData[] = [
       {
@@ -107,6 +125,24 @@ describe('learning-space-form-dialog schedule utils', () => {
     expect(normalized[0]?.exceptions).not.toBe(source[0]?.exceptions);
     expect(normalized[0]?.overrides).not.toBe(source[0]?.overrides);
     expect(normalized[0]?.rule.weekdayTimes).not.toBe(source[0]?.rule.weekdayTimes);
+  });
+
+  it('normalizes string schedule anchors using the schedule timezone date', () => {
+    const source: RecurrenceFormData[] = [
+      {
+        id: 'schedule-1',
+        startDate: '2026-03-10T01:30:00.000Z' as unknown as Date,
+        timezone: 'America/Los_Angeles',
+        startTime: '17:30',
+        endTime: '18:30',
+        exceptions: [],
+        overrides: [],
+      },
+    ];
+
+    const normalized = normalizeSchedules(source);
+
+    expect(normalized[0]?.startDate?.toISOString()).toBe('2026-03-09T12:00:00.000Z');
   });
 
   it('builds the same hash for reordered exception and override entries', () => {

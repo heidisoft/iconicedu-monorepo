@@ -1,4 +1,5 @@
 import type { ClassScheduleVM } from '@iconicedu/shared-types';
+import { getLocalDate } from '@iconicedu/utils';
 import { expandRecurringEvents } from '@iconicedu/ui-web/lib/class-schedule-utils';
 import {
   formatScheduleDisplayTimeWithZone,
@@ -56,11 +57,16 @@ function getDisplayScheduleBaseId(schedule: DisplaySchedule) {
     : schedule.ids.id.slice(0, separatorIndex);
 }
 
+function getDisplayScheduleDayKey(schedule: DisplaySchedule) {
+  const timezone = schedule.timezone ?? schedule.recurrence?.rule.timezone ?? 'UTC';
+  return getLocalDate(schedule.startAt, timezone) ?? schedule.startAt.slice(0, 10);
+}
+
 function dedupeDisplaySchedules(schedules: DisplaySchedule[]) {
   const deduped = new Map<string, DisplaySchedule>();
 
   schedules.forEach((schedule) => {
-    const key = `${getDisplayScheduleBaseId(schedule)}|${schedule.startAt.slice(0, 10)}`;
+    const key = `${getDisplayScheduleBaseId(schedule)}|${getDisplayScheduleDayKey(schedule)}`;
     const existing = deduped.get(key);
 
     if (
@@ -119,7 +125,13 @@ function isScheduleCompletedForProgress(schedule: DisplaySchedule, now: Date): b
   return new Date(schedule.endAt).getTime() < now.getTime();
 }
 
-const getOccurrenceDayKey = (isoDateTime: string) => isoDateTime.slice(0, 10);
+const getOccurrenceDayKey = (
+  isoDateTime: string,
+  schedule: Pick<DisplaySchedule, 'timezone' | 'recurrence'>,
+) => {
+  const timezone = schedule.timezone ?? schedule.recurrence?.rule.timezone ?? 'UTC';
+  return getLocalDate(isoDateTime, timezone) ?? isoDateTime.slice(0, 10);
+};
 
 function getRecurringDisplayRange(schedules: ClassScheduleVM[], now: Date) {
   const recurringSchedules = schedules.filter((schedule) => Boolean(schedule.recurrence));
@@ -192,7 +204,8 @@ export function expandSchedulesForDisplay(
     const override = baseSchedule?.recurrence?.overrides?.find(
       (item) =>
         item.occurrenceKey === occurrenceKey ||
-        getOccurrenceDayKey(item.occurrenceKey) === getOccurrenceDayKey(occurrenceKey),
+        getOccurrenceDayKey(item.occurrenceKey, baseSchedule ?? schedule) ===
+          getOccurrenceDayKey(occurrenceKey, baseSchedule ?? schedule),
     );
     const originalStartAt = occurrenceKey;
     const durationMs = baseSchedule

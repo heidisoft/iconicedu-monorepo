@@ -142,6 +142,8 @@ export type ExpandedSchedule = {
   time: string;
 };
 
+const ISO_DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
+
 function normalizeNullableText(value: string | null | undefined) {
   if (typeof value !== 'string') {
     return null;
@@ -255,15 +257,72 @@ export function getTimeFromISOInTimezone(value: string, timezone: string) {
   return getLocalTime(value, resolveViewerTimezone(timezone));
 }
 
+function createUtcNoonDate(year: number, month: number, day: number) {
+  return new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0));
+}
+
+export function normalizeScheduleFormDate(
+  value: Date | string | null | undefined,
+  timezone?: string | null,
+) {
+  if (!value) {
+    return undefined;
+  }
+
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) {
+      return undefined;
+    }
+    return createUtcNoonDate(
+      value.getUTCFullYear(),
+      value.getUTCMonth() + 1,
+      value.getUTCDate(),
+    );
+  }
+
+  const dateOnlyMatch = value.match(ISO_DATE_ONLY_PATTERN);
+  if (dateOnlyMatch) {
+    const [, yearText, monthText, dayText] = dateOnlyMatch;
+    return createUtcNoonDate(
+      Number.parseInt(yearText ?? '1970', 10),
+      Number.parseInt(monthText ?? '1', 10),
+      Number.parseInt(dayText ?? '1', 10),
+    );
+  }
+
+  if (timezone) {
+    const normalizedFromTimezone = createFormDateFromIsoInTimezone(value, timezone);
+    if (normalizedFromTimezone) {
+      return normalizedFromTimezone;
+    }
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return undefined;
+  }
+
+  return createUtcNoonDate(
+    parsed.getUTCFullYear(),
+    parsed.getUTCMonth() + 1,
+    parsed.getUTCDate(),
+  );
+}
+
+export function toScheduleDateOnlyIso(
+  value: Date | string | null | undefined,
+  timezone?: string | null,
+) {
+  return normalizeScheduleFormDate(value, timezone)?.toISOString();
+}
+
 export function createFormDateFromIsoInTimezone(value: string, timezone: string) {
   const parts = getDatePartsInTimezone(value, timezone);
   if (!parts) {
     return undefined;
   }
 
-  return new Date(
-    Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), 12, 0, 0, 0),
-  );
+  return createUtcNoonDate(Number(parts.year), Number(parts.month), Number(parts.day));
 }
 
 function getUtcWeekdayCode(isoDateTime: string) {

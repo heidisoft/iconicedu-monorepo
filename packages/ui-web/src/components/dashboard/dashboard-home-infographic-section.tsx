@@ -257,22 +257,30 @@ export function DashboardHomeInfographicSection({
                       {section.label}
                     </p>
                   ) : null}
-                  {section.items.map(({ session, joinHref, chatHref }, index) => (
-                    <SessionCard
-                      key={session.id}
-                      session={session}
-                      index={index}
-                      canJoin
-                      classroomChatHref={chatHref}
-                      joinLiveSession={async () => {
-                        if (onJoinSession) {
-                          await onJoinSession(joinHref);
-                          return;
+                  {section.items.map(
+                    ({ session, joinHref, chatHref, weekBucket }, index) => (
+                      <SessionCard
+                        key={session.id}
+                        session={session}
+                        index={index}
+                        canJoin={weekBucket === 'this-week'}
+                        showJoinButton={weekBucket === 'this-week'}
+                        actionOrder="join-first"
+                        classroomChatHref={chatHref}
+                        joinLiveSession={
+                          weekBucket === 'this-week'
+                            ? async () => {
+                                if (onJoinSession) {
+                                  await onJoinSession(joinHref);
+                                  return;
+                                }
+                                window.location.assign(joinHref);
+                              }
+                            : undefined
                         }
-                        window.location.assign(joinHref);
-                      }}
-                    />
-                  ))}
+                      />
+                    ),
+                  )}
                 </div>
               ))
             ) : (

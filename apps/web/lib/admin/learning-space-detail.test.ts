@@ -5,6 +5,7 @@ import {
   getDateFromISOInTimezone,
   getTimeFromISOInTimezone,
   isUtcNaiveStoredTimestamp,
+  resolveStoredScheduleDateTimeForForm,
   resolveStoredOccurrenceDateForForm,
 } from '@iconicedu/web/lib/admin/learning-space-detail';
 
@@ -60,5 +61,33 @@ describe('class detail schedule timezone helpers', () => {
         '16:00',
       ),
     ).toBe('2026-03-09');
+  });
+
+  it('resolves schedule date and time for legacy UTC-naive rows using the expected local time', () => {
+    expect(
+      resolveStoredScheduleDateTimeForForm(
+        '2026-03-09T16:00:00.000Z',
+        'America/New_York',
+        '16:00',
+      ),
+    ).toEqual({
+      date: '2026-03-09',
+      time: '16:00',
+      useUtcNaiveInterpretation: true,
+    });
+  });
+
+  it('resolves schedule date and time for canonical rows in the schedule timezone', () => {
+    expect(
+      resolveStoredScheduleDateTimeForForm(
+        '2026-03-09T20:00:00.000Z',
+        'America/New_York',
+        '16:00',
+      ),
+    ).toEqual({
+      date: '2026-03-09',
+      time: '16:00',
+      useUtcNaiveInterpretation: false,
+    });
   });
 });

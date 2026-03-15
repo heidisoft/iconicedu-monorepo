@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ClassScheduleVM } from '@iconicedu/shared-types';
+import { getLocalTime } from '@iconicedu/utils';
 
 import { expandRecurringEvents, getDisplayEventState } from './class-schedule-utils';
 
@@ -156,5 +157,69 @@ describe('class-schedule-utils', () => {
     expect(expanded).toHaveLength(1);
     expect(expanded[0]?.startAt).toBe('2026-03-05T17:00:00.000Z');
     expect(expanded[0]?.uiState?.kind).toBe('override');
+  });
+
+  it('keeps weekly recurring sessions anchored to the class timezone across DST', () => {
+    const schedule: ClassScheduleVM = {
+      ...buildRecurringSchedule(),
+      startAt: '2026-03-01T21:00:00.000Z',
+      endAt: '2026-03-01T22:00:00.000Z',
+      timezone: 'America/New_York',
+      recurrence: {
+        ids: { id: 'recurrence-weekly-1', orgId: 'org-1' },
+        rule: {
+          frequency: 'weekly',
+          interval: 1,
+          count: 3,
+          timezone: 'America/New_York',
+          byWeekday: ['SU'],
+        },
+      },
+    };
+
+    const expanded = expandRecurringEvents(
+      [schedule],
+      new Date('2026-03-01T00:00:00.000Z'),
+      new Date('2026-03-16T00:00:00.000Z'),
+    );
+
+    expect(expanded.map((item) => item.startAt)).toEqual([
+      '2026-03-01T21:00:00.000Z',
+      '2026-03-08T20:00:00.000Z',
+      '2026-03-15T20:00:00.000Z',
+    ]);
+    expect(
+      expanded.map((item) => getLocalTime(item.startAt, 'America/New_York')),
+    ).toEqual(['16:00', '16:00', '16:00']);
+  });
+
+  it('shifts tutor-local time in non-DST regions when the class timezone stays fixed', () => {
+    const schedule: ClassScheduleVM = {
+      ...buildRecurringSchedule(),
+      startAt: '2026-03-01T21:00:00.000Z',
+      endAt: '2026-03-01T22:00:00.000Z',
+      timezone: 'America/New_York',
+      recurrence: {
+        ids: { id: 'recurrence-weekly-2', orgId: 'org-1' },
+        rule: {
+          frequency: 'weekly',
+          interval: 1,
+          count: 2,
+          timezone: 'America/New_York',
+          byWeekday: ['SU'],
+        },
+      },
+    };
+
+    const expanded = expandRecurringEvents(
+      [schedule],
+      new Date('2026-03-01T00:00:00.000Z'),
+      new Date('2026-03-09T23:59:59.000Z'),
+    );
+
+    expect(expanded.map((item) => getLocalTime(item.startAt, 'Asia/Colombo'))).toEqual([
+      '02:30',
+      '01:30',
+    ]);
   });
 });

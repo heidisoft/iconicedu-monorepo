@@ -139,6 +139,7 @@ describe('DashboardHomeInfographicSection', () => {
     expect(screen.getByText('Next week')).toBeInTheDocument();
     expect(screen.getByText('Math 101')).toBeInTheDocument();
     expect(screen.getByText('Science 301')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /Join/i })).toHaveLength(2);
   });
 
   it('uses session item join action handler path', async () => {
@@ -164,6 +165,31 @@ describe('DashboardHomeInfographicSection', () => {
 
     await user.click(screen.getAllByRole('button', { name: /Join/i })[0]!);
     expect(onJoinSession).toHaveBeenCalledWith('/iconic-academy/spaces/channel-1');
+  });
+
+  it('hides join button for next week sessions while keeping message actions', () => {
+    render(
+      <DashboardHomeInfographicSection
+        orgSlug="iconic-academy"
+        topMetrics={{
+          upcomingSessionsThisWeek: 2,
+          completedClassesThisMonth: 10,
+          activeSubjectsCount: 3,
+          activeSubjectsLabel: 'Math, ELA, Science',
+        }}
+        upcomingSessionsPage={{
+          ...sessionPage,
+          pageSize: 3,
+          totalPages: 1,
+        }}
+        calendarHref="/iconic-academy/class-schedule"
+        notificationsHref="/iconic-academy/notifications"
+        browseHref="/iconic-academy/spaces"
+      />,
+    );
+
+    expect(screen.getAllByRole('button', { name: /Join/i })).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: 'Message' })).toHaveLength(3);
   });
 
   it('renders parent CTA and opens family settings tab', async () => {
