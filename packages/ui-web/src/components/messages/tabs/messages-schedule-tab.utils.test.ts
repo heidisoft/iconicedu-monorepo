@@ -86,6 +86,19 @@ describe('messages-schedule-tab.utils', () => {
     expect(formatScheduleDateBadge(schedule)).toBe('Sep 14');
   });
 
+  it('formats month-group session labels from raw timestamps without double-applying timezone', () => {
+    const schedule = buildSchedule('tz-1', '2026-03-13T15:00:00.000Z');
+
+    const groups = toMonthGroups(
+      groupSchedulesByMonth([schedule], 'America/New_York'),
+      new Date('2026-03-13T12:00:00.000Z'),
+      'America/New_York',
+    );
+
+    expect(groups[0]?.sessions[0]?.time).toBe('Fri 11:00am');
+    expect(groups[0]?.sessions[0]?.dayNum).toBe('13');
+  });
+
   it('expands recurring schedules when splitting timeline', () => {
     const schedule = {
       ...buildSchedule('rec-1', '2026-03-01T10:00:00.000Z'),

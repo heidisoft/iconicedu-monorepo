@@ -407,33 +407,39 @@ export function toMonthGroups(
     const monthDate = new Date(Number(year), Number(month) - 1, 1);
     const sessionCountByWeekNumber = new Map<number, number>();
     const sessions: ClassSession[] = group.schedules.map((schedule) => {
-      const start =
+      const startDisplayDate =
         toScheduleDisplayDate(schedule.startAt, resolvedTimezone) ??
         new Date(schedule.startAt);
-      const end =
-        toScheduleDisplayDate(schedule.endAt, resolvedTimezone) ??
-        new Date(schedule.endAt);
       const startDay = new Date(
-        start.getFullYear(),
-        start.getMonth(),
-        start.getDate(),
+        startDisplayDate.getFullYear(),
+        startDisplayDate.getMonth(),
+        startDisplayDate.getDate(),
       ).getTime();
-      const weekNumber = getCalendarWeekOfMonth(start);
+      const weekNumber = getCalendarWeekOfMonth(startDisplayDate);
       const nextSessionNumber = (sessionCountByWeekNumber.get(weekNumber) ?? 0) + 1;
       sessionCountByWeekNumber.set(weekNumber, nextSessionNumber);
       const monthLabel =
-        formatScheduleDisplayValue(start, resolvedTimezone, { month: 'short' }) ?? '';
+        formatScheduleDisplayValue(schedule.startAt, resolvedTimezone, {
+          month: 'short',
+        }) ?? '';
       const dayLabel =
-        formatScheduleDisplayValue(start, resolvedTimezone, { weekday: 'short' }) ?? '';
+        formatScheduleDisplayValue(schedule.startAt, resolvedTimezone, {
+          weekday: 'short',
+        }) ?? '';
       return {
         id: schedule.ids.id,
         label: `${monthLabel} · Week ${weekNumber} · Session ${nextSessionNumber}`,
-        time: `${dayLabel} ${formatCompactMeridiemTime(start, resolvedTimezone)}`,
+        time: `${dayLabel} ${formatCompactMeridiemTime(
+          new Date(schedule.startAt),
+          resolvedTimezone,
+        )}`,
         dayName: dayLabel,
-        dayNum: String(start.getDate()),
+        dayNum: String(startDisplayDate.getDate()),
         isToday: startDay === nowDay,
-        isLive: start.getTime() <= nowMs && nowMs < end.getTime(),
-        isPast: end.getTime() < nowMs,
+        isLive:
+          new Date(schedule.startAt).getTime() <= nowMs &&
+          nowMs < new Date(schedule.endAt).getTime(),
+        isPast: new Date(schedule.endAt).getTime() < nowMs,
         endAt: schedule.endAt,
         status: schedule.status,
         meetingLink: schedule.meetingLink ?? null,
