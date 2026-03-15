@@ -463,9 +463,7 @@ describe('reminder-jobs', () => {
     expect(publishActivityEventMock).toHaveBeenCalledTimes(1);
     expect(publishActivityEventMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        objectRef: undefined,
         payload: expect.objectContaining({
-          messageId: null,
           members: [
             expect.objectContaining({
               profileId: 'profile-1',
@@ -555,99 +553,11 @@ describe('reminder-jobs', () => {
     expect(publishActivityEventMock).toHaveBeenCalledWith(
       expect.objectContaining({
         eventType: 'session.feedback_request.sent',
-        objectRef: undefined,
-        payload: expect.objectContaining({
-          messageId: null,
-        }),
       }),
     );
     expect(dispatchLogsTable.insert).toHaveBeenCalledWith(
       expect.objectContaining({
-        message_id: null,
-      }),
-    );
-  });
-
-  it('marks suppressed session feedback jobs as succeeded without publishing activity', async () => {
-    const claimedJob = {
-      id: 'job-feedback-2',
-      org_id: 'org-1',
-      job_type: 'session.feedback_request',
-      target_kind: 'channel',
-      target_id: 'channel-1',
-      payload: {
-        title: 'Algebra',
-        channelId: 'channel-1',
-        learningSpaceId: 'space-1',
-        scheduleId: 'schedule-1',
-        occurrenceStart: '2026-03-06T10:00:00.000Z',
-        suppressSessionActivity: true,
-      },
-      dedupe_key:
-        'session.feedback_request:org-1:space-1:channel-1:2026-03-06T10:00:00.000Z',
-      attempt_count: 0,
-      max_attempts: 8,
-    };
-
-    const profilesSelectChain = {
-      eq: vi.fn(() => profilesSelectChain),
-      is: vi.fn(() => profilesSelectChain),
-      order: vi.fn(() => profilesSelectChain),
-      limit: vi.fn(() => profilesSelectChain),
-      maybeSingle: vi.fn(async () => ({ data: { id: 'system-profile-1' }, error: null })),
-    };
-
-    const reminderJobsUpdateChain = {
-      eq: vi.fn(() => reminderJobsUpdateChain),
-    };
-
-    const reminderJobsTable = {
-      update: vi.fn(() => reminderJobsUpdateChain),
-    };
-
-    const dispatchLogsTable = {
-      insert: vi.fn(async () => ({ error: null })),
-    };
-
-    const supabase = {
-      rpc: vi.fn(async () => ({ data: [claimedJob], error: null })),
-      from: vi.fn((table: string) => {
-        switch (table) {
-          case 'profiles':
-            return {
-              select: vi.fn(() => profilesSelectChain),
-            };
-          case 'reminder_jobs':
-            return reminderJobsTable;
-          case 'reminder_dispatch_logs':
-            return dispatchLogsTable;
-          default:
-            throw new Error(`Unexpected table ${table}`);
-        }
-      }),
-    } as never;
-
-    const result = await dispatchDueReminderJobs({
-      supabase,
-      leaseOwner: 'test-worker',
-      limit: 10,
-      leaseSeconds: 90,
-    });
-
-    expect(result).toEqual({
-      claimed: 1,
-      succeeded: 1,
-      failed: 0,
-      deadLettered: 0,
-    });
-    expect(publishActivityEventMock).not.toHaveBeenCalled();
-    expect(dispatchLogsTable.insert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        result: 'succeeded',
-        activity_event_id: null,
-        details: expect.objectContaining({
-          suppressSessionActivity: true,
-        }),
+        activity_event_id: 'activity-event-1',
       }),
     );
   });

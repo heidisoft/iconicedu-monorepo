@@ -39,7 +39,6 @@ type ReminderJobPayload = {
     avatarUrl?: string | null;
     themeKey?: string | null;
   }> | null;
-  suppressSessionActivity?: boolean | null;
 };
 
 function normalizeBaseScheduleId(scheduleId: string) {
@@ -105,7 +104,6 @@ export async function compileLearningSpaceReminderJobs(input: {
   supabase: SupabaseServiceClient;
   orgId: string;
   learningSpaceId: string;
-  compileMode?: 'default' | 'suppress_session_activity';
 }) {
   const schedules = await buildClassSchedulesByOrg(input.supabase, input.orgId);
   const relevant = schedules.filter(
@@ -124,8 +122,6 @@ export async function compileLearningSpaceReminderJobs(input: {
   const dedupeKeys = new Set<string>();
   const rows: Array<Record<string, unknown>> = [];
   const createdAt = new Date().toISOString();
-  const suppressSessionActivity = input.compileMode === 'suppress_session_activity';
-
   for (const occurrence of occurrences) {
     if (occurrence.source.kind !== 'class_session' || !occurrence.source.channelId) {
       continue;
@@ -192,7 +188,6 @@ export async function compileLearningSpaceReminderJobs(input: {
           ...payload,
           summary: formatStartsInSummary(offsetMinutes),
           reminderOffsetMinutes: offsetMinutes,
-          suppressSessionActivity,
         },
         dedupe_key: reminderDedupe,
         status: 'pending',
@@ -228,7 +223,6 @@ export async function compileLearningSpaceReminderJobs(input: {
       timezone: occurrence.timezone ?? 'UTC',
       payload: {
         ...payload,
-        suppressSessionActivity,
       },
       dedupe_key: feedbackDedupe,
       status: 'pending',
@@ -390,7 +384,6 @@ async function logDispatch(input: {
   supabase: SupabaseServiceClient;
   orgId: string;
   jobId: string;
-  messageId?: string | null;
   activityEventId?: string | null;
   result: 'succeeded' | 'idempotent_hit' | 'retryable_failure' | 'fatal_failure';
   details?: Record<string, unknown>;
@@ -399,7 +392,6 @@ async function logDispatch(input: {
   const response = await input.supabase.from('reminder_dispatch_logs').insert({
     org_id: input.orgId,
     reminder_job_id: input.jobId,
-    message_id: input.messageId ?? null,
     activity_event_id: input.activityEventId ?? null,
     result: input.result,
     details: input.details ?? {},
@@ -417,7 +409,6 @@ async function processReminderJob(supabase: SupabaseServiceClient, job: Reminder
   const now = new Date().toISOString();
 
   const systemProfileId = await ensureSystemProfileId(supabase, job.org_id);
-  const messageId: string | null = null;
 
   const eventType =
     job.job_type === 'payment.reminder'
@@ -425,45 +416,37 @@ async function processReminderJob(supabase: SupabaseServiceClient, job: Reminder
       : job.job_type === 'session.feedback_request'
         ? 'session.feedback_request.sent'
         : 'session.reminder.sent';
-  const shouldSuppressSessionActivity =
-    payload.suppressSessionActivity === true &&
-    (job.job_type === 'session.reminder' || job.job_type === 'session.feedback_request');
-
-  const activityEvent = shouldSuppressSessionActivity
-    ? null
-    : await publishActivityEvent({
-        supabase,
-        orgId: job.org_id,
-        eventType,
-        occurredAt: now,
-        sourceKind: 'system',
-        actorProfileId: systemProfileId,
-        scope: payload.learningSpaceId
-          ? { kind: 'learning_space', learningSpaceId: payload.learningSpaceId as string }
-          : ({ kind: 'channel', channelId: payload.channelId } as FeedScopeVM),
-        objectRef: messageId ? { kind: 'message', id: messageId } : undefined,
-        targetRef: payload.learningSpaceId
-          ? { kind: 'learning_space', id: payload.learningSpaceId as string }
-          : undefined,
-        payload: {
-          channelId: payload.channelId,
-          messageId: messageId ?? null,
-          learningSpaceId: payload.learningSpaceId ?? null,
-          scheduleId: payload.scheduleId ?? null,
-          occurrenceStart: payload.occurrenceStart ?? payload.startAt ?? now,
-          reminderOffsetMinutes: payload.reminderOffsetMinutes ?? null,
-          timezone: payload.timezone ?? job.timezone ?? 'UTC',
-          invoiceId: payload.invoiceId ?? null,
-          dueAt: payload.dueAt ?? null,
-          title: payload.title,
-          summary: payload.summary ?? null,
-          channelRouteKind:
-            payload.channelRouteKind ?? (payload.learningSpaceId ? 'space' : 'channel'),
-          members: payload.members ?? null,
-        },
-        dedupeKey: `${job.dedupe_key}:activity`,
-        createdBy: systemProfileId,
-      });
+  const activityEvent = await publishActivityEvent({
+    supabase,
+    orgId: job.org_id,
+    eventType,
+    occurredAt: now,
+    sourceKind: 'system',
+    actorProfileId: systemProfileId,
+    scope: payload.learningSpaceId
+      ? { kind: 'learning_space', learningSpaceId: payload.learningSpaceId as string }
+      : ({ kind: 'channel', channelId: payload.channelId } as FeedScopeVM),
+    targetRef: payload.learningSpaceId
+      ? { kind: 'learning_space', id: payload.learningSpaceId as string }
+      : undefined,
+    payload: {
+      channelId: payload.channelId,
+      learningSpaceId: payload.learningSpaceId ?? null,
+      scheduleId: payload.scheduleId ?? null,
+      occurrenceStart: payload.occurrenceStart ?? payload.startAt ?? now,
+      reminderOffsetMinutes: payload.reminderOffsetMinutes ?? null,
+      timezone: payload.timezone ?? job.timezone ?? 'UTC',
+      invoiceId: payload.invoiceId ?? null,
+      dueAt: payload.dueAt ?? null,
+      title: payload.title,
+      summary: payload.summary ?? null,
+      channelRouteKind:
+        payload.channelRouteKind ?? (payload.learningSpaceId ? 'space' : 'channel'),
+      members: payload.members ?? null,
+    },
+    dedupeKey: `${job.dedupe_key}:activity`,
+    createdBy: systemProfileId,
+  });
 
   await supabase
     .from('reminder_jobs')
@@ -483,12 +466,10 @@ async function processReminderJob(supabase: SupabaseServiceClient, job: Reminder
     supabase,
     orgId: job.org_id,
     jobId: job.id,
-    messageId,
     activityEventId: activityEvent?.id ?? null,
     result: 'succeeded',
     details: {
       eventType,
-      suppressSessionActivity: shouldSuppressSessionActivity,
     },
   });
 }

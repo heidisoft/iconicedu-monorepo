@@ -1699,7 +1699,6 @@ export async function updateLearningSpaceFromPayload(
       supabase: serviceClient,
       orgId,
       learningSpaceId,
-      compileMode: 'suppress_session_activity',
     });
   }
 

@@ -736,7 +736,6 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
       expect.objectContaining({
         orgId: 'org-1',
         learningSpaceId: 'space-1',
-        compileMode: 'suppress_session_activity',
       }),
     );
     expect(publishActivityEventMock).toHaveBeenCalledTimes(2);
