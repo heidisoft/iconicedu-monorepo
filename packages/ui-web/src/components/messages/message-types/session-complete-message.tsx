@@ -2,30 +2,35 @@ import { memo, useState } from 'react';
 import { CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import type { SessionCompleteMessageVM as SessionCompleteMessageType } from '@iconicedu/shared-types';
-import { MessageBase, type MessageBaseProps } from '@iconicedu/ui-web/components/messages/message-base';
+import {
+  MessageBase,
+  type MessageBaseProps,
+} from '@iconicedu/ui-web/components/messages/message-base';
+import { useScheduleDisplayTimeZone } from '@iconicedu/ui-web/components/shared/schedule-display-timezone-context';
+import { formatScheduleDisplayValue } from '@iconicedu/ui-web/lib/schedule-display-timezone';
 
-interface SessionCompleteMessageProps
-  extends Omit<MessageBaseProps, 'message' | 'children'> {
+interface SessionCompleteMessageProps extends Omit<
+  MessageBaseProps,
+  'message' | 'children'
+> {
   message: SessionCompleteMessageType;
 }
-
-const formatSessionDate = (value: string) =>
-  new Date(value).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
 
 export const SessionCompleteMessage = memo(function SessionCompleteMessage(
   props: SessionCompleteMessageProps,
 ) {
   const { message, ...baseProps } = props;
   const { session } = message;
+  const timezone = useScheduleDisplayTimeZone();
 
   const [isCompleted, setIsCompleted] = useState(Boolean(session.completedAt));
   const [isReported, setIsReported] = useState(false);
 
-  const sessionDate = formatSessionDate(session.startAt);
+  const sessionDate = formatScheduleDisplayValue(session.startAt, timezone, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
 
   const handleComplete = () => {
     if (isCompleted) return;
@@ -48,9 +53,7 @@ export const SessionCompleteMessage = memo(function SessionCompleteMessage(
           <CheckCircle2 className="h-4 w-4 text-primary" />
           <span>Complete session</span>
         </div>
-        <p className="mt-2 text-sm text-muted-foreground">
-          {session.title}
-        </p>
+        <p className="mt-2 text-sm text-muted-foreground">{session.title}</p>
 
         {isCompleted ? (
           <div className="mt-3 space-y-2">

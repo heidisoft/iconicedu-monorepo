@@ -13,6 +13,7 @@ type NotificationsPageClientProps = {
   orgSlug: string;
   profileId: string;
   feed: ActivityFeedVM;
+  timezone?: string | null;
 };
 
 export function NotificationsPageClient({
@@ -20,6 +21,7 @@ export function NotificationsPageClient({
   orgSlug,
   profileId,
   feed,
+  timezone,
 }: NotificationsPageClientProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -96,7 +98,7 @@ export function NotificationsPageClient({
     <div className="flex min-h-0 h-screen flex-1 flex-col">
       <DashboardHeader title="Notifications" />
       <div className="p-4 pt-0">
-        <InboxContainer feed={feed} />
+        <InboxContainer feed={feed} timezone={timezone} />
       </div>
     </div>
   );

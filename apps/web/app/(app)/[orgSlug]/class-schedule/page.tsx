@@ -1,7 +1,10 @@
 import type { Metadata } from 'next';
 import { buildClassSchedulesByOrg } from '@iconicedu/web/lib/schedules/builders/class-schedule.builder';
 import { ClassScheduleClient } from '@iconicedu/web/app/(app)/[orgSlug]/class-schedule/class-schedule-client';
-import { getDashboardAccountContext } from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
+import {
+  getDashboardAccountContext,
+  getDashboardProfileContext,
+} from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
 
 export const metadata: Metadata = {
   title: 'Class Schedule',
@@ -15,7 +18,13 @@ export default async function ClassSchedulePage({
 }) {
   const { orgSlug } = await params;
   const { supabase, account } = await getDashboardAccountContext(orgSlug);
+  const { currentUserProfile } = await getDashboardProfileContext(supabase, account.id);
   const events = await buildClassSchedulesByOrg(supabase, account.org_id);
 
-  return <ClassScheduleClient events={events} />;
+  return (
+    <ClassScheduleClient
+      events={events}
+      timezone={currentUserProfile?.prefs.timezone ?? null}
+    />
+  );
 }

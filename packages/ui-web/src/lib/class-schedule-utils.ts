@@ -3,6 +3,11 @@ import type {
   ClassScheduleViewVM,
   WeekdayVM,
 } from '@iconicedu/shared-types';
+import {
+  formatScheduleDisplayValue,
+  toScheduleDisplayDate,
+  getScheduleDisplayMinutes,
+} from '@iconicedu/ui-web/lib/schedule-display-timezone';
 
 export interface DisplayClassScheduleVM extends ClassScheduleVM {
   uiState?: {
@@ -29,29 +34,51 @@ export function getWeekDays(date: Date): Date[] {
   return days;
 }
 
-export function formatDate(date: Date): string {
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-  });
+export function formatDate(date: Date, timezone?: string | null): string {
+  return (
+    formatScheduleDisplayValue(date, timezone, {
+      month: 'short',
+      day: 'numeric',
+    }) ?? ''
+  );
 }
 
-export function formatDayName(date: Date): string {
-  return date.toLocaleDateString('en-US', { weekday: 'short' });
+export function formatDayName(date: Date, timezone?: string | null): string {
+  return formatScheduleDisplayValue(date, timezone, { weekday: 'short' }) ?? '';
 }
 
-export function formatMonthYear(date: Date): string {
-  return date.toLocaleDateString('en-US', {
-    month: 'long',
-    year: 'numeric',
-  });
+export function formatMonthYear(date: Date, timezone?: string | null): string {
+  return (
+    formatScheduleDisplayValue(date, timezone, {
+      month: 'long',
+      year: 'numeric',
+    }) ?? ''
+  );
 }
 
-export function formatEventTime(isoTime: string): string {
-  return new Date(isoTime).toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-  });
+export function formatEventTime(isoTime: string, timezone?: string | null): string {
+  return (
+    formatScheduleDisplayValue(isoTime, timezone, {
+      hour: 'numeric',
+      minute: '2-digit',
+    }) ?? ''
+  );
+}
+
+export function getEventDate(event: ClassScheduleVM, timezone?: string | null): Date {
+  return toScheduleDisplayDate(event.startAt, timezone) ?? new Date(event.startAt);
+}
+
+export function isSameDay(date1: Date, date2: Date): boolean {
+  return (
+    date1.getDate() === date2.getDate() &&
+    date1.getMonth() === date2.getMonth() &&
+    date1.getFullYear() === date2.getFullYear()
+  );
+}
+
+export function timeToMinutes(isoTime: string, timezone?: string | null): number {
+  return getScheduleDisplayMinutes(isoTime, timezone);
 }
 
 export function getDisplayEventState(event: ClassScheduleVM | DisplayClassScheduleVM) {
@@ -63,23 +90,6 @@ export function getDisplayEventState(event: ClassScheduleVM | DisplayClassSchedu
     originalStartAt: uiState?.originalStartAt ?? null,
     originalEndAt: uiState?.originalEndAt ?? null,
   };
-}
-
-export function getEventDate(event: ClassScheduleVM): Date {
-  return new Date(event.startAt);
-}
-
-export function isSameDay(date1: Date, date2: Date): boolean {
-  return (
-    date1.getDate() === date2.getDate() &&
-    date1.getMonth() === date2.getMonth() &&
-    date1.getFullYear() === date2.getFullYear()
-  );
-}
-
-export function timeToMinutes(isoTime: string): number {
-  const date = new Date(isoTime);
-  return date.getHours() * 60 + date.getMinutes();
 }
 
 export function getTimeSlots(): string[] {
@@ -120,12 +130,12 @@ export function getDaysInMonth(year: number, month: number): Date[] {
   return days;
 }
 
-export function getEventLayout(events: ClassScheduleVM[]) {
+export function getEventLayout(events: ClassScheduleVM[], timezone?: string | null) {
   const sorted = [...events].sort((a, b) => {
-    const aStart = timeToMinutes(a.startAt);
-    const bStart = timeToMinutes(b.startAt);
+    const aStart = timeToMinutes(a.startAt, timezone);
+    const bStart = timeToMinutes(b.startAt, timezone);
     if (aStart !== bStart) return aStart - bStart;
-    return timeToMinutes(a.endAt) - timeToMinutes(b.endAt);
+    return timeToMinutes(a.endAt, timezone) - timeToMinutes(b.endAt, timezone);
   });
 
   const clusters: ClassScheduleVM[][] = [];
@@ -133,8 +143,8 @@ export function getEventLayout(events: ClassScheduleVM[]) {
   let currentEnd = -1;
 
   sorted.forEach((event) => {
-    const start = timeToMinutes(event.startAt);
-    const end = timeToMinutes(event.endAt);
+    const start = timeToMinutes(event.startAt, timezone);
+    const end = timeToMinutes(event.endAt, timezone);
 
     if (currentCluster.length === 0 || start < currentEnd) {
       currentCluster.push(event);
@@ -161,8 +171,8 @@ export function getEventLayout(events: ClassScheduleVM[]) {
     const assignments: Array<{ id: string; column: number }> = [];
 
     cluster.forEach((event) => {
-      const start = timeToMinutes(event.startAt);
-      const end = timeToMinutes(event.endAt);
+      const start = timeToMinutes(event.startAt, timezone);
+      const end = timeToMinutes(event.endAt, timezone);
       let columnIndex = columnEndTimes.findIndex((time) => time <= start);
 
       if (columnIndex === -1) {
@@ -205,7 +215,9 @@ const getDisplaySchedulePriority = (schedule: DisplayClassScheduleVM) => {
 
 const getDisplayScheduleBaseId = (schedule: DisplayClassScheduleVM) => {
   const separatorIndex = schedule.ids.id.indexOf('__');
-  return separatorIndex === -1 ? schedule.ids.id : schedule.ids.id.slice(0, separatorIndex);
+  return separatorIndex === -1
+    ? schedule.ids.id
+    : schedule.ids.id.slice(0, separatorIndex);
 };
 
 const dedupeExpandedEvents = (schedules: DisplayClassScheduleVM[]) => {
@@ -215,7 +227,10 @@ const dedupeExpandedEvents = (schedules: DisplayClassScheduleVM[]) => {
     const key = `${getDisplayScheduleBaseId(schedule)}|${schedule.startAt.slice(0, 10)}`;
     const existing = deduped.get(key);
 
-    if (!existing || getDisplaySchedulePriority(schedule) > getDisplaySchedulePriority(existing)) {
+    if (
+      !existing ||
+      getDisplaySchedulePriority(schedule) > getDisplaySchedulePriority(existing)
+    ) {
       deduped.set(key, schedule);
     }
   });
@@ -279,8 +294,9 @@ export const expandRecurringEvents = (
       recurrence.exceptions?.map((exception) => exception.occurrenceKey) ?? [],
     );
     const exceptionsByDay = new Set(
-      recurrence.exceptions?.map((exception) => getOccurrenceDayKey(exception.occurrenceKey)) ??
-        [],
+      recurrence.exceptions?.map((exception) =>
+        getOccurrenceDayKey(exception.occurrenceKey),
+      ) ?? [],
     );
     const overrides = new Map(
       recurrence.overrides?.map((override) => [override.occurrenceKey, override.patch]) ??
@@ -295,17 +311,20 @@ export const expandRecurringEvents = (
     const byWeekday = rule.byWeekday?.length
       ? rule.byWeekday
       : [weekdayTokens[baseDate.getDay()]];
-    const overrideOriginalDates = recurrence.overrides?.map((override) =>
-      startOfDay(new Date(override.occurrenceKey)),
-    ) ?? [];
-    const overridePatchedDates = recurrence.overrides
-      ?.map((override) =>
-        override.patch.startAt ? startOfDay(new Date(override.patch.startAt)) : null,
-      )
-      .filter((date): date is Date => Boolean(date)) ?? [];
-    const exceptionDates = recurrence.exceptions?.map((exception) =>
-      startOfDay(new Date(exception.occurrenceKey)),
-    ) ?? [];
+    const overrideOriginalDates =
+      recurrence.overrides?.map((override) =>
+        startOfDay(new Date(override.occurrenceKey)),
+      ) ?? [];
+    const overridePatchedDates =
+      recurrence.overrides
+        ?.map((override) =>
+          override.patch.startAt ? startOfDay(new Date(override.patch.startAt)) : null,
+        )
+        .filter((date): date is Date => Boolean(date)) ?? [];
+    const exceptionDates =
+      recurrence.exceptions?.map((exception) =>
+        startOfDay(new Date(exception.occurrenceKey)),
+      ) ?? [];
     const iterationStart = getMinDate([
       baseDate,
       rangeStartDay,
@@ -323,7 +342,8 @@ export const expandRecurringEvents = (
       const originalStart = new Date(exception.occurrenceKey);
 
       const occurrenceDayKey = getOccurrenceDayKey(exception.occurrenceKey);
-      if (overrides.has(exception.occurrenceKey) || overridesByDay.has(occurrenceDayKey)) return;
+      if (overrides.has(exception.occurrenceKey) || overridesByDay.has(occurrenceDayKey))
+        return;
 
       const originalEnd = new Date(originalStart.getTime() + durationMs);
 
@@ -382,11 +402,15 @@ export const expandRecurringEvents = (
       );
       const occurrenceKey = occurrenceStart.toISOString();
       const occurrenceDayKey = getOccurrenceDayKey(occurrenceKey);
-      const override = overrides.get(occurrenceKey) ?? overridesByDay.get(occurrenceDayKey);
+      const override =
+        overrides.get(occurrenceKey) ?? overridesByDay.get(occurrenceDayKey);
       const hasOverride = Boolean(override);
 
       if (!matches && !hasOverride) continue;
-      if ((exceptions.has(occurrenceKey) || exceptionsByDay.has(occurrenceDayKey)) && !hasOverride)
+      if (
+        (exceptions.has(occurrenceKey) || exceptionsByDay.has(occurrenceDayKey)) &&
+        !hasOverride
+      )
         continue;
 
       if (rule.count && occurrenceCount >= rule.count) break;
@@ -409,7 +433,8 @@ export const expandRecurringEvents = (
               reason:
                 typeof override?.description === 'string'
                   ? override.description
-                  : typeof (override as { reason?: unknown } | undefined)?.reason === 'string'
+                  : typeof (override as { reason?: unknown } | undefined)?.reason ===
+                      'string'
                     ? ((override as { reason?: string }).reason ?? null)
                     : null,
               originalStartAt: occurrenceStart.toISOString(),

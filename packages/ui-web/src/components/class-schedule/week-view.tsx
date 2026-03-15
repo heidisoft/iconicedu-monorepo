@@ -14,6 +14,7 @@ import { EventCard } from '@iconicedu/ui-web/components/class-schedule/event-car
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import { useEffect, useRef } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@iconicedu/ui-web/ui/popover';
+import { useScheduleDisplayTimeZone } from '@iconicedu/ui-web/components/shared/schedule-display-timezone-context';
 
 interface WeekViewProps {
   currentDate: Date;
@@ -28,6 +29,7 @@ export function WeekView({
   onDateSelect,
   onSwitchToDay,
 }: WeekViewProps) {
+  const timezone = useScheduleDisplayTimeZone();
   const weekDays = getWeekDays(currentDate);
   const timeSlots = getTimeSlots();
   const today = new Date();
@@ -46,18 +48,18 @@ export function WeekView({
     if (!scrollContainerRef.current) return;
 
     const todayEvents = events.filter((event) => {
-      return weekDays.some((day) => isSameDay(getEventDate(event), day));
+      return weekDays.some((day) => isSameDay(getEventDate(event, timezone), day));
     });
 
     let scrollTop: number;
     if (todayEvents.length > 0) {
       const earliestEvent = todayEvents.reduce((earliest, event) => {
-        const eventMinutes = timeToMinutes(event.startAt);
-        const earliestMinutes = timeToMinutes(earliest.startAt);
+        const eventMinutes = timeToMinutes(event.startAt, timezone);
+        const earliestMinutes = timeToMinutes(earliest.startAt, timezone);
         return eventMinutes < earliestMinutes ? event : earliest;
       });
 
-      const eventMinutes = timeToMinutes(earliestEvent.startAt);
+      const eventMinutes = timeToMinutes(earliestEvent.startAt, timezone);
       const scrollToMinutes = Math.max(0, eventMinutes - 60);
       scrollTop = (scrollToMinutes / 30) * 32;
     } else {
@@ -73,7 +75,7 @@ export function WeekView({
     } else {
       scrollContainerRef.current.scrollTo({ top: scrollTop, behavior: 'smooth' });
     }
-  }, [currentDate, events, weekDays]);
+  }, [currentDate, events, weekDays, timezone]);
 
   const handleCellClick = (day: Date) => {
     if (onDateSelect) {
@@ -112,7 +114,7 @@ export function WeekView({
                   )}
                 >
                   <div className="text-sm text-muted-foreground">
-                    {formatDayName(day)}
+                    {formatDayName(day, timezone)}
                   </div>
                   <div
                     className={cn(
@@ -147,9 +149,9 @@ export function WeekView({
             {/* Day columns */}
             {weekDays.map((day, dayIndex) => {
               const dayEvents = events.filter((event) =>
-                isSameDay(getEventDate(event), day),
+                isSameDay(getEventDate(event, timezone), day),
               );
-              const dayLayout = getEventLayout(dayEvents);
+              const dayLayout = getEventLayout(dayEvents, timezone);
               const clusterInfo = new Map<
                 number,
                 { startMinutes: number; hiddenEvents: ClassScheduleVM[]; columns: number }
@@ -160,10 +162,12 @@ export function WeekView({
               dayEvents.forEach((event) => {
                 const layout = dayLayout.get(event.ids.id);
                 if (!layout) return;
-                const startMinutes = timeToMinutes(event.startAt);
+                const startMinutes = timeToMinutes(event.startAt, timezone);
                 const info = clusterInfo.get(layout.clusterId);
                 const nextInfo = {
-                  startMinutes: info ? Math.min(info.startMinutes, startMinutes) : startMinutes,
+                  startMinutes: info
+                    ? Math.min(info.startMinutes, startMinutes)
+                    : startMinutes,
                   hiddenEvents: info?.hiddenEvents ?? [],
                   columns: layout.columns,
                 };
@@ -193,8 +197,8 @@ export function WeekView({
 
                   {/* Events */}
                   {dayEvents.map((event) => {
-                    const startMinutes = timeToMinutes(event.startAt);
-                    const endMinutes = timeToMinutes(event.endAt);
+                    const startMinutes = timeToMinutes(event.startAt, timezone);
+                    const endMinutes = timeToMinutes(event.endAt, timezone);
                     const top = (startMinutes / 30) * 32;
                     const height = ((endMinutes - startMinutes) / 30) * 32;
                     const layout = dayLayout.get(event.ids.id);
@@ -266,10 +270,7 @@ export function WeekView({
                             </div>
                             <div className="max-h-48 overflow-auto">
                               {info.hiddenEvents.map((hidden) => (
-                                <div
-                                  key={hidden.ids.id}
-                                  className="pointer-events-auto"
-                                >
+                                <div key={hidden.ids.id} className="pointer-events-auto">
                                   <EventCard event={hidden} />
                                 </div>
                               ))}

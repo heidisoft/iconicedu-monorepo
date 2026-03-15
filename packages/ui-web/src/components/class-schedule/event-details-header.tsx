@@ -3,14 +3,20 @@ import { CalendarDays } from 'lucide-react';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import { AvatarGroup, AvatarGroupCount } from '@iconicedu/ui-web/ui/avatar';
 import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
-import { formatEventTime, getDisplayEventState } from '@iconicedu/ui-web/lib/class-schedule-utils';
+import {
+  formatEventTime,
+  getDisplayEventState,
+} from '@iconicedu/ui-web/lib/class-schedule-utils';
 import { ThemedIconBadge } from '@iconicedu/ui-web/components/shared/themed-icon';
+import { useScheduleDisplayTimeZone } from '@iconicedu/ui-web/components/shared/schedule-display-timezone-context';
+import { formatScheduleDisplayValue } from '@iconicedu/ui-web/lib/schedule-display-timezone';
 
 interface EventDetailsHeaderProps {
   event: ClassScheduleVM;
 }
 
 export function EventDetailsHeader({ event }: EventDetailsHeaderProps) {
+  const timezone = useScheduleDisplayTimeZone();
   const displayState = getDisplayEventState(event);
   const maxVisibleGuests = 2;
   const visibleGuests = event.participants.slice(0, maxVisibleGuests);
@@ -26,13 +32,13 @@ export function EventDetailsHeader({ event }: EventDetailsHeaderProps) {
           size="sm"
         />
         <p className="text-sm font-medium">
-          {startDate.toLocaleDateString('en-US', {
+          {formatScheduleDisplayValue(startDate, timezone, {
             weekday: 'long',
             month: 'long',
             day: 'numeric',
             year: 'numeric',
           })}{' '}
-          at {formatEventTime(event.startAt)}
+          at {formatEventTime(event.startAt, timezone)}
         </p>
       </div>
 

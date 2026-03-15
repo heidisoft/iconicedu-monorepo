@@ -14,7 +14,10 @@ export const metadata: Metadata = {
 export default async function Page({ params }: { params: Promise<{ orgSlug: string }> }) {
   const { orgSlug } = await params;
   const { supabase, account } = await getDashboardAccountContext(orgSlug);
-  const { profileResponse } = await getDashboardProfileContext(supabase, account.id);
+  const { profileResponse, currentUserProfile } = await getDashboardProfileContext(
+    supabase,
+    account.id,
+  );
   const profileId = profileResponse.data?.id ?? '';
   const feed = await buildActivityFeedForProfile(supabase, account.org_id, profileId);
 
@@ -24,6 +27,7 @@ export default async function Page({ params }: { params: Promise<{ orgSlug: stri
       orgSlug={orgSlug}
       profileId={profileId}
       feed={feed}
+      timezone={currentUserProfile?.prefs.timezone ?? null}
     />
   );
 }

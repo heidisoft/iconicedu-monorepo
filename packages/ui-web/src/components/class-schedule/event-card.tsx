@@ -8,6 +8,7 @@ import {
   getDisplayEventState,
   isEventLive,
 } from '@iconicedu/ui-web/lib/class-schedule-utils';
+import { useScheduleDisplayTimeZone } from '@iconicedu/ui-web/components/shared/schedule-display-timezone-context';
 import { EventDialog } from '@iconicedu/ui-web/components/class-schedule/event-dialog';
 import { EventLiveIndicator } from '@iconicedu/ui-web/components/class-schedule/event-live-indicator';
 
@@ -17,17 +18,19 @@ interface EventCardProps {
 }
 
 export function EventCard({ event, compact = false }: EventCardProps) {
+  const timezone = useScheduleDisplayTimeZone();
   const isLive = isEventLive(event);
   const [open, setOpen] = useState(false);
-  const startTime = formatEventTime(event.startAt);
+  const startTime = formatEventTime(event.startAt, timezone);
   const displayState = getDisplayEventState(event);
   const themeClassName = event.themeKey ? `theme-${event.themeKey}` : '';
-  const themeStyle = event.themeKey && displayState.kind !== 'exception'
-    ? {
-        backgroundColor: 'color-mix(in oklab, var(--theme-bg) 12%, transparent)',
-        borderColor: 'color-mix(in oklab, var(--theme-bg) 30%, transparent)',
-      }
-    : undefined;
+  const themeStyle =
+    event.themeKey && displayState.kind !== 'exception'
+      ? {
+          backgroundColor: 'color-mix(in oklab, var(--theme-bg) 12%, transparent)',
+          borderColor: 'color-mix(in oklab, var(--theme-bg) 30%, transparent)',
+        }
+      : undefined;
 
   const eventButton = (
     <button

@@ -1,13 +1,11 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import type {
-  ClassScheduleVM,
-  ClassScheduleViewVM,
-} from '@iconicedu/shared-types';
+import type { ClassScheduleVM, ClassScheduleViewVM } from '@iconicedu/shared-types';
 import { ClassScheduleHeader } from '@iconicedu/ui-web/components/class-schedule/class-schedule-header';
 import { WeekView } from '@iconicedu/ui-web/components/class-schedule/week-view';
 import { DayView } from '@iconicedu/ui-web/components/class-schedule/day-view';
+import { useScheduleDisplayTimeZone } from '@iconicedu/ui-web/components/shared/schedule-display-timezone-context';
 import {
   getClassScheduleEventsForMonthRange,
   getClassScheduleEventsForView,
@@ -32,13 +30,13 @@ export function ClassScheduleContainer({
   events,
   childrenCount,
 }: ClassScheduleContainerProps) {
+  const timezone = useScheduleDisplayTimeZone();
   const [classScheduleMonthAnchor, setClassScheduleMonthAnchor] = useState(
     new Date(currentDate.getFullYear(), currentDate.getMonth(), 1),
   );
 
   const classScheduleEventsForDots = useMemo(
-    () =>
-      getClassScheduleEventsForMonthRange(events, classScheduleMonthAnchor, 1, 1),
+    () => getClassScheduleEventsForMonthRange(events, classScheduleMonthAnchor, 1, 1),
     [events, classScheduleMonthAnchor],
   );
   const classScheduleEventsForView = useMemo(
@@ -49,13 +47,14 @@ export function ClassScheduleContainer({
   const hasClasses = events.length > 0;
   const nextEvent = useMemo(() => {
     return [...events]
-      .filter((event) => getEventDate(event) > currentDate)
+      .filter((event) => getEventDate(event, timezone) > currentDate)
       .sort((a, b) => {
-        const dateDiff = getEventDate(a).getTime() - getEventDate(b).getTime();
+        const dateDiff =
+          getEventDate(a, timezone).getTime() - getEventDate(b, timezone).getTime();
         if (dateDiff !== 0) return dateDiff;
-        return timeToMinutes(a.startAt) - timeToMinutes(b.startAt);
+        return timeToMinutes(a.startAt, timezone) - timeToMinutes(b.startAt, timezone);
       })[0];
-  }, [events, currentDate]);
+  }, [events, currentDate, timezone]);
 
   const handleNavigate = (direction: 'prev' | 'next' | 'today') => {
     if (direction === 'today') {

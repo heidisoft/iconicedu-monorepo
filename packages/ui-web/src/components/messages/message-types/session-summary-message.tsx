@@ -4,7 +4,12 @@ import { memo } from 'react';
 import { ClipboardList, Clock, Calendar } from 'lucide-react';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
 import type { SessionSummaryMessageVM as SessionSummaryMessageType } from '@iconicedu/shared-types';
-import { MessageBase, type MessageBaseProps } from '@iconicedu/ui-web/components/messages/message-base';
+import {
+  MessageBase,
+  type MessageBaseProps,
+} from '@iconicedu/ui-web/components/messages/message-base';
+import { useScheduleDisplayTimeZone } from '@iconicedu/ui-web/components/shared/schedule-display-timezone-context';
+import { formatScheduleDisplayValue } from '@iconicedu/ui-web/lib/schedule-display-timezone';
 
 interface SessionSummaryMessageProps extends Omit<
   MessageBaseProps,
@@ -13,21 +18,12 @@ interface SessionSummaryMessageProps extends Omit<
   message: SessionSummaryMessageType;
 }
 
-const formatSessionTime = (date: string) =>
-  new Date(date).toLocaleString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
-
 export const SessionSummaryMessage = memo(function SessionSummaryMessage(
   props: SessionSummaryMessageProps,
 ) {
   const { message, ...baseProps } = props;
   const { session } = message;
+  const timezone = useScheduleDisplayTimeZone();
 
   return (
     <MessageBase message={message} {...baseProps} className="bg-indigo-500/5">
@@ -53,7 +49,16 @@ export const SessionSummaryMessage = memo(function SessionSummaryMessage(
           <div className="space-y-2 mb-3">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Calendar className="h-3 w-3" />
-              <span>{formatSessionTime(session.startAt)}</span>
+              <span>
+                {formatScheduleDisplayValue(session.startAt, timezone, {
+                  weekday: 'short',
+                  month: 'short',
+                  day: 'numeric',
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  hour12: true,
+                })}
+              </span>
             </div>
             {session.durationMinutes ? (
               <div className="flex items-center gap-2 text-xs text-muted-foreground">

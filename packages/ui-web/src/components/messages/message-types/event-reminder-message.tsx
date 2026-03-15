@@ -3,8 +3,17 @@ import { Calendar, Clock, MapPin, Video, Users } from 'lucide-react';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import type { EventReminderMessageVM as EventReminderMessageType } from '@iconicedu/shared-types';
-import { MessageBase, type MessageBaseProps } from '@iconicedu/ui-web/components/messages/message-base';
+import {
+  MessageBase,
+  type MessageBaseProps,
+} from '@iconicedu/ui-web/components/messages/message-base';
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
+import { useScheduleDisplayTimeZone } from '@iconicedu/ui-web/components/shared/schedule-display-timezone-context';
+import {
+  formatScheduleDisplayValue,
+  isSameScheduleDisplayDay,
+  toScheduleDisplayDate,
+} from '@iconicedu/ui-web/lib/schedule-display-timezone';
 
 interface EventReminderMessageProps extends Omit<
   MessageBaseProps,
@@ -18,11 +27,12 @@ export const EventReminderMessage = memo(function EventReminderMessage(
 ) {
   const { message, ...baseProps } = props;
   const { event } = message;
+  const timezone = useScheduleDisplayTimeZone();
 
   const formatEventTime = (start: Date, end?: Date, isAllDay?: boolean) => {
     if (isAllDay) return 'All day';
 
-    const startStr = start.toLocaleTimeString('en-US', {
+    const startStr = formatScheduleDisplayValue(start, timezone, {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true,
@@ -30,7 +40,7 @@ export const EventReminderMessage = memo(function EventReminderMessage(
 
     if (!end) return startStr;
 
-    const endStr = end.toLocaleTimeString('en-US', {
+    const endStr = formatScheduleDisplayValue(end, timezone, {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true,
@@ -44,18 +54,21 @@ export const EventReminderMessage = memo(function EventReminderMessage(
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    if (date.toDateString() === today.toDateString()) return 'Today';
-    if (date.toDateString() === tomorrow.toDateString()) return 'Tomorrow';
+    if (isSameScheduleDisplayDay(date, today, timezone)) return 'Today';
+    if (isSameScheduleDisplayDay(date, tomorrow, timezone)) return 'Tomorrow';
 
-    return date.toLocaleDateString('en-US', {
+    return formatScheduleDisplayValue(date, timezone, {
       weekday: 'short',
       month: 'short',
       day: 'numeric',
     });
   };
 
-  const startTime = new Date(event.startAt);
-  const endTime = event.endAt ? new Date(event.endAt) : undefined;
+  const startTime =
+    toScheduleDisplayDate(event.startAt, timezone) ?? new Date(event.startAt);
+  const endTime = event.endAt
+    ? (toScheduleDisplayDate(event.endAt, timezone) ?? new Date(event.endAt))
+    : undefined;
 
   return (
     <MessageBase message={message} {...baseProps} className="bg-primary/5">
@@ -65,7 +78,7 @@ export const EventReminderMessage = memo(function EventReminderMessage(
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 flex-col items-center justify-center rounded-xl bg-primary/10 text-primary">
                 <span className="text-[10px] font-medium uppercase leading-none">
-                  {startTime.toLocaleDateString('en-US', { month: 'short' })}
+                  {formatScheduleDisplayValue(startTime, timezone, { month: 'short' })}
                 </span>
                 <span className="text-lg font-bold leading-tight">
                   {startTime.getDate()}
@@ -78,9 +91,7 @@ export const EventReminderMessage = memo(function EventReminderMessage(
                   <span>{formatEventDate(startTime)}</span>
                   <span>•</span>
                   <Clock className="h-3 w-3" />
-                  <span>
-                    {formatEventTime(startTime, endTime, event.isAllDay)}
-                  </span>
+                  <span>{formatEventTime(startTime, endTime, event.isAllDay)}</span>
                 </div>
               </div>
             </div>

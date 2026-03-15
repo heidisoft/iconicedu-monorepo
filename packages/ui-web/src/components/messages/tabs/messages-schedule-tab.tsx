@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import type { ClassScheduleVM } from '@iconicedu/shared-types';
+import { useScheduleDisplayTimeZone } from '@iconicedu/ui-web/components/shared/schedule-display-timezone-context';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { ScrollArea } from '@iconicedu/ui-web/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@iconicedu/ui-web/ui/tabs';
@@ -21,6 +22,7 @@ interface MessagesScheduleTabProps {
   schedules: ClassScheduleVM[];
   isLoading: boolean;
   error: string | null;
+  timezone?: string | null;
 }
 
 const MONTH_PAGE_SIZE = 4;
@@ -29,15 +31,17 @@ export function MessagesScheduleTab({
   schedules,
   isLoading,
   error,
+  timezone,
 }: MessagesScheduleTabProps) {
+  const displayTimezone = useScheduleDisplayTimeZone(timezone);
   const [activeTab, setActiveTab] = useState<ScheduleSubTabKey>('upcoming');
   const [upcomingMonthLimit, setUpcomingMonthLimit] = useState(MONTH_PAGE_SIZE);
   const [pastMonthLimit, setPastMonthLimit] = useState(MONTH_PAGE_SIZE);
-  const { upcoming, past } = useMemo(() => splitSchedulesByTimeline(schedules), [schedules]);
-  const allDisplaySchedules = useMemo(
-    () => [...past, ...upcoming],
-    [past, upcoming],
+  const { upcoming, past } = useMemo(
+    () => splitSchedulesByTimeline(schedules),
+    [schedules],
   );
+  const allDisplaySchedules = useMemo(() => [...past, ...upcoming], [past, upcoming]);
 
   const now = useMemo(() => new Date(), []);
   const currentMonthKey = useMemo(
@@ -45,31 +49,50 @@ export function MessagesScheduleTab({
     [now],
   );
 
-  const upcomingMonthGroups = useMemo(() => groupSchedulesByMonth(upcoming), [upcoming]);
-  const pastMonthGroups = useMemo(() => groupSchedulesByMonth(past), [past]);
+  const upcomingMonthGroups = useMemo(
+    () => groupSchedulesByMonth(upcoming, displayTimezone),
+    [displayTimezone, upcoming],
+  );
+  const pastMonthGroups = useMemo(
+    () => groupSchedulesByMonth(past, displayTimezone),
+    [displayTimezone, past],
+  );
   const monthProgressStatsByKey = useMemo(
-    () => getMonthProgressStatsByKey(allDisplaySchedules, now),
-    [allDisplaySchedules, now],
+    () => getMonthProgressStatsByKey(allDisplaySchedules, now, displayTimezone),
+    [allDisplaySchedules, displayTimezone, now],
   );
 
   const upcomingGroups = useMemo(
-    () => toMonthGroups(takeMonthGroups(upcomingMonthGroups, upcomingMonthLimit), now),
-    [upcomingMonthGroups, upcomingMonthLimit, now],
+    () =>
+      toMonthGroups(
+        takeMonthGroups(upcomingMonthGroups, upcomingMonthLimit),
+        now,
+        displayTimezone,
+      ),
+    [displayTimezone, upcomingMonthGroups, upcomingMonthLimit, now],
   );
   const joinableSessionId = useMemo(() => getJoinableSessionId(upcoming), [upcoming]);
 
   const pastGroups = useMemo(
-    () => toMonthGroups(takeMonthGroups(pastMonthGroups, pastMonthLimit), now),
-    [pastMonthGroups, pastMonthLimit, now],
+    () =>
+      toMonthGroups(
+        takeMonthGroups(pastMonthGroups, pastMonthLimit),
+        now,
+        displayTimezone,
+      ),
+    [displayTimezone, pastMonthGroups, pastMonthLimit, now],
   );
 
   const canLoadMoreUpcoming = useMemo(
-    () => takeMonthGroups(upcomingMonthGroups, upcomingMonthLimit).length < upcomingMonthGroups.length,
+    () =>
+      takeMonthGroups(upcomingMonthGroups, upcomingMonthLimit).length <
+      upcomingMonthGroups.length,
     [upcomingMonthGroups, upcomingMonthLimit],
   );
 
   const canLoadMorePast = useMemo(
-    () => takeMonthGroups(pastMonthGroups, pastMonthLimit).length < pastMonthGroups.length,
+    () =>
+      takeMonthGroups(pastMonthGroups, pastMonthLimit).length < pastMonthGroups.length,
     [pastMonthGroups, pastMonthLimit],
   );
 
@@ -177,7 +200,9 @@ export function MessagesScheduleTab({
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => setPastMonthLimit((current) => current + MONTH_PAGE_SIZE)}
+                    onClick={() =>
+                      setPastMonthLimit((current) => current + MONTH_PAGE_SIZE)
+                    }
                   >
                     Load more
                   </Button>

@@ -1,5 +1,11 @@
 import type { ClassScheduleVM } from '@iconicedu/shared-types';
 import { expandRecurringEvents } from '@iconicedu/ui-web/lib/class-schedule-utils';
+import {
+  formatScheduleDisplayValue,
+  getScheduleDisplayMonthKey,
+  resolveScheduleDisplayTimeZone,
+  toScheduleDisplayDate,
+} from '@iconicedu/ui-web/lib/schedule-display-timezone';
 
 export type ScheduleSubTabKey = 'upcoming' | 'past';
 
@@ -100,22 +106,6 @@ function isScheduleCompletedForProgress(schedule: DisplaySchedule, now: Date): b
   return new Date(schedule.endAt).getTime() < now.getTime();
 }
 
-const weekdayFormatter = new Intl.DateTimeFormat('en-US', { weekday: 'long' });
-const shortWeekdayFormatter = new Intl.DateTimeFormat('en-US', { weekday: 'short' });
-const timeFormatter = new Intl.DateTimeFormat('en-US', {
-  hour: 'numeric',
-  minute: '2-digit',
-  hour12: true,
-});
-const monthFormatter = new Intl.DateTimeFormat('en-US', { month: 'short' });
-const monthYearFormatter = new Intl.DateTimeFormat('en-US', {
-  month: 'long',
-  year: 'numeric',
-});
-const monthDayFormatter = new Intl.DateTimeFormat('en-US', {
-  month: 'short',
-  day: 'numeric',
-});
 const getOccurrenceDayKey = (isoDateTime: string) => isoDateTime.slice(0, 10);
 
 function getRecurringDisplayRange(schedules: ClassScheduleVM[], now: Date) {
@@ -246,44 +236,91 @@ export function formatScheduleStatus(status: ClassScheduleVM['status']): string 
   return 'Scheduled';
 }
 
-export function formatScheduleDateTime(schedule: ClassScheduleVM): string {
-  const start = new Date(schedule.startAt);
-  const end = new Date(schedule.endAt);
-  return `${timeFormatter.format(start)} - ${timeFormatter.format(end)}`;
+export function formatScheduleDateTime(
+  schedule: ClassScheduleVM,
+  timezone?: string | null,
+): string {
+  const start =
+    formatScheduleDisplayValue(schedule.startAt, timezone, {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    }) ?? '';
+  const end =
+    formatScheduleDisplayValue(schedule.endAt, timezone, {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    }) ?? '';
+  return `${start} - ${end}`;
 }
 
-export function formatScheduleTimeBadge(schedule: ClassScheduleVM): string {
-  return timeFormatter.format(new Date(schedule.startAt));
+export function formatScheduleTimeBadge(
+  schedule: ClassScheduleVM,
+  timezone?: string | null,
+): string {
+  return (
+    formatScheduleDisplayValue(schedule.startAt, timezone, {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    }) ?? ''
+  );
 }
 
 export function formatScheduleDayBadge(
   schedule: ClassScheduleVM,
   now = new Date(),
+  timezone?: string | null,
 ): string {
-  const start = new Date(schedule.startAt);
+  const start =
+    toScheduleDisplayDate(schedule.startAt, timezone) ?? new Date(schedule.startAt);
+  const nowDisplayDate = toScheduleDisplayDate(now, timezone) ?? now;
   const startDay = new Date(
     start.getFullYear(),
     start.getMonth(),
     start.getDate(),
   ).getTime();
-  const nowDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const nowDay = new Date(
+    nowDisplayDate.getFullYear(),
+    nowDisplayDate.getMonth(),
+    nowDisplayDate.getDate(),
+  ).getTime();
   if (startDay === nowDay) return 'Today';
-  return shortWeekdayFormatter.format(start);
+  return formatScheduleDisplayValue(start, timezone, { weekday: 'short' }) ?? '';
 }
 
-export function formatScheduleDateBadge(schedule: ClassScheduleVM): string {
-  return monthDayFormatter.format(new Date(schedule.startAt));
+export function formatScheduleDateBadge(
+  schedule: ClassScheduleVM,
+  timezone?: string | null,
+): string {
+  return (
+    formatScheduleDisplayValue(schedule.startAt, timezone, {
+      month: 'short',
+      day: 'numeric',
+    }) ?? ''
+  );
 }
 
-export function formatScheduleDayTimeMeta(schedule: ClassScheduleVM): string {
-  const start = new Date(schedule.startAt);
-  return `${weekdayFormatter.format(start)} • ${formatScheduleDateTime(schedule)}`;
+export function formatScheduleDayTimeMeta(
+  schedule: ClassScheduleVM,
+  timezone?: string | null,
+): string {
+  const dayLabel =
+    formatScheduleDisplayValue(schedule.startAt, timezone, { weekday: 'long' }) ?? '';
+  return `${dayLabel} • ${formatScheduleDateTime(schedule, timezone)}`;
 }
 
-export function formatScheduleWeekTitle(schedule: ClassScheduleVM): string {
-  const start = new Date(schedule.startAt);
+export function formatScheduleWeekTitle(
+  schedule: ClassScheduleVM,
+  timezone?: string | null,
+): string {
+  const start =
+    toScheduleDisplayDate(schedule.startAt, timezone) ?? new Date(schedule.startAt);
   const weekNumber = Math.min(5, Math.floor((start.getDate() - 1) / 7) + 1);
-  return `${monthFormatter.format(start)} · Week ${weekNumber}`;
+  const monthLabel =
+    formatScheduleDisplayValue(start, timezone, { month: 'short' }) ?? '';
+  return `${monthLabel} · Week ${weekNumber}`;
 }
 
 function getCalendarWeekOfMonth(date: Date): number {
@@ -292,13 +329,23 @@ function getCalendarWeekOfMonth(date: Date): number {
   return Math.floor((date.getDate() + firstWeekdayOffset - 1) / 7) + 1;
 }
 
-function formatCompactMeridiemTime(date: Date): string {
-  return timeFormatter.format(date).replace(' AM', 'am').replace(' PM', 'pm');
+function formatCompactMeridiemTime(date: Date, timezone?: string | null): string {
+  return (
+    formatScheduleDisplayValue(date, timezone, {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    }) ?? ''
+  )
+    .replace(' AM', 'am')
+    .replace(' PM', 'pm');
 }
 
-export function getScheduleMonthKey(schedule: ClassScheduleVM): string {
-  const start = new Date(schedule.startAt);
-  return `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`;
+export function getScheduleMonthKey(
+  schedule: ClassScheduleVM,
+  timezone?: string | null,
+): string {
+  return getScheduleDisplayMonthKey(schedule.startAt, timezone) ?? '1970-01';
 }
 
 export function formatScheduleMonthTitleFromKey(monthKey: string): string {
@@ -306,16 +353,22 @@ export function formatScheduleMonthTitleFromKey(monthKey: string): string {
   const year = Number(yearRaw);
   const month = Number(monthRaw);
   const monthDate = new Date(year, month - 1, 1);
-  return monthYearFormatter.format(monthDate);
+  return (
+    formatScheduleDisplayValue(monthDate, null, {
+      month: 'long',
+      year: 'numeric',
+    }) ?? monthKey
+  );
 }
 
 export function groupSchedulesByMonth(
   schedules: DisplaySchedule[],
+  timezone?: string | null,
 ): MonthScheduleGroup[] {
   const map = new Map<string, DisplaySchedule[]>();
 
   schedules.forEach((schedule) => {
-    const monthKey = getScheduleMonthKey(schedule);
+    const monthKey = getScheduleMonthKey(schedule, timezone);
     const current = map.get(monthKey) ?? [];
     current.push(schedule);
     map.set(monthKey, current);
@@ -339,16 +392,27 @@ export function takeMonthGroups(
 export function toMonthGroups(
   groups: MonthScheduleGroup[],
   now = new Date(),
+  timezone?: string | null,
 ): MonthGroup[] {
   const nowMs = now.getTime();
-  const nowDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const resolvedTimezone = resolveScheduleDisplayTimeZone(timezone);
+  const nowDisplayDate = toScheduleDisplayDate(now, resolvedTimezone) ?? now;
+  const nowDay = new Date(
+    nowDisplayDate.getFullYear(),
+    nowDisplayDate.getMonth(),
+    nowDisplayDate.getDate(),
+  ).getTime();
   return groups.map((group) => {
     const [year, month] = group.monthKey.split('-');
     const monthDate = new Date(Number(year), Number(month) - 1, 1);
     const sessionCountByWeekNumber = new Map<number, number>();
     const sessions: ClassSession[] = group.schedules.map((schedule) => {
-      const start = new Date(schedule.startAt);
-      const end = new Date(schedule.endAt);
+      const start =
+        toScheduleDisplayDate(schedule.startAt, resolvedTimezone) ??
+        new Date(schedule.startAt);
+      const end =
+        toScheduleDisplayDate(schedule.endAt, resolvedTimezone) ??
+        new Date(schedule.endAt);
       const startDay = new Date(
         start.getFullYear(),
         start.getMonth(),
@@ -357,11 +421,15 @@ export function toMonthGroups(
       const weekNumber = getCalendarWeekOfMonth(start);
       const nextSessionNumber = (sessionCountByWeekNumber.get(weekNumber) ?? 0) + 1;
       sessionCountByWeekNumber.set(weekNumber, nextSessionNumber);
+      const monthLabel =
+        formatScheduleDisplayValue(start, resolvedTimezone, { month: 'short' }) ?? '';
+      const dayLabel =
+        formatScheduleDisplayValue(start, resolvedTimezone, { weekday: 'short' }) ?? '';
       return {
         id: schedule.ids.id,
-        label: `${monthFormatter.format(start)} · Week ${weekNumber} · Session ${nextSessionNumber}`,
-        time: `${shortWeekdayFormatter.format(start)} ${formatCompactMeridiemTime(start)}`,
-        dayName: shortWeekdayFormatter.format(start),
+        label: `${monthLabel} · Week ${weekNumber} · Session ${nextSessionNumber}`,
+        time: `${dayLabel} ${formatCompactMeridiemTime(start, resolvedTimezone)}`,
+        dayName: dayLabel,
         dayNum: String(start.getDate()),
         isToday: startDay === nowDay,
         isLive: start.getTime() <= nowMs && nowMs < end.getTime(),
@@ -373,24 +441,31 @@ export function toMonthGroups(
         disabled: schedule.uiState?.disabled ?? false,
         reason: schedule.uiState?.reason ?? null,
         originalTime: schedule.uiState?.originalStartAt
-          ? formatScheduleDateTime({
-              ...schedule,
-              startAt: schedule.uiState.originalStartAt,
-              endAt: schedule.uiState.originalEndAt ?? schedule.uiState.originalStartAt,
-            })
+          ? formatScheduleDateTime(
+              {
+                ...schedule,
+                startAt: schedule.uiState.originalStartAt,
+                endAt: schedule.uiState.originalEndAt ?? schedule.uiState.originalStartAt,
+              },
+              resolvedTimezone,
+            )
           : null,
         originalDate: schedule.uiState?.originalStartAt
-          ? formatScheduleDateBadge({
-              ...schedule,
-              startAt: schedule.uiState.originalStartAt,
-            })
+          ? formatScheduleDateBadge(
+              {
+                ...schedule,
+                startAt: schedule.uiState.originalStartAt,
+              },
+              resolvedTimezone,
+            )
           : null,
       };
     });
 
     return {
       monthKey: group.monthKey,
-      month: monthDate.toLocaleDateString('en-US', { month: 'long' }),
+      month:
+        formatScheduleDisplayValue(monthDate, resolvedTimezone, { month: 'long' }) ?? '',
       year,
       totalCount: sessions.length,
       completedCount: sessions.filter((session) => session.status === 'completed').length,
@@ -409,11 +484,12 @@ export function getJoinableSessionId(schedules: DisplaySchedule[]): string | nul
 export function getMonthProgressStatsByKey(
   schedules: DisplaySchedule[],
   now = new Date(),
+  timezone?: string | null,
 ): Map<string, MonthProgressStats> {
   const statsByMonthKey = new Map<string, MonthProgressStats>();
 
   schedules.forEach((schedule) => {
-    const monthKey = getScheduleMonthKey(schedule);
+    const monthKey = getScheduleMonthKey(schedule, timezone);
     const current = statsByMonthKey.get(monthKey) ?? {
       scheduledCount: 0,
       completedCount: 0,

@@ -23,6 +23,8 @@ import {
 import { ArrowRight, CalendarX, UserPlus } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@iconicedu/ui-web/ui/popover';
 import { useEffect, useRef } from 'react';
+import { useScheduleDisplayTimeZone } from '@iconicedu/ui-web/components/shared/schedule-display-timezone-context';
+import { formatScheduleDisplayValue } from '@iconicedu/ui-web/lib/schedule-display-timezone';
 
 interface DayViewProps {
   currentDate: Date;
@@ -45,8 +47,11 @@ export function DayView({
   onDateSelect,
   onMonthChange,
 }: DayViewProps) {
+  const timezone = useScheduleDisplayTimeZone();
   const timeSlots = getTimeSlots();
-  const dayEvents = events.filter((event) => isSameDay(getEventDate(event), currentDate));
+  const dayEvents = events.filter((event) =>
+    isSameDay(getEventDate(event, timezone), currentDate),
+  );
   const miniScheduleEvents = classScheduleEvents ?? events;
   const hasChildren = childrenCount === undefined ? true : childrenCount > 0;
   const dayLayout = getEventLayout(dayEvents);
@@ -59,7 +64,7 @@ export function DayView({
   dayEvents.forEach((event) => {
     const layout = dayLayout.get(event.ids.id);
     if (!layout) return;
-    const startMinutes = timeToMinutes(event.startAt);
+    const startMinutes = timeToMinutes(event.startAt, timezone);
     const info = clusterInfo.get(layout.clusterId);
     const nextInfo = {
       startMinutes: info ? Math.min(info.startMinutes, startMinutes) : startMinutes,
@@ -96,12 +101,12 @@ export function DayView({
 
     if (dayEvents.length > 0) {
       const earliestEvent = dayEvents.reduce((earliest, event) => {
-        const eventMinutes = timeToMinutes(event.startAt);
-        const earliestMinutes = timeToMinutes(earliest.startAt);
+        const eventMinutes = timeToMinutes(event.startAt, timezone);
+        const earliestMinutes = timeToMinutes(earliest.startAt, timezone);
         return eventMinutes < earliestMinutes ? event : earliest;
       });
 
-      const eventMinutes = timeToMinutes(earliestEvent.startAt);
+      const eventMinutes = timeToMinutes(earliestEvent.startAt, timezone);
       const scrollToMinutes = Math.max(0, eventMinutes - 60);
       scrollTop = (scrollToMinutes / 30) * 32;
     }
@@ -114,7 +119,7 @@ export function DayView({
     } else {
       container.scrollTo({ top: scrollTop, behavior: 'smooth' });
     }
-  }, [currentDate, dayEvents]);
+  }, [currentDate, dayEvents, timezone]);
 
   return (
     <div className="flex flex-1 overflow-hidden">
@@ -145,8 +150,8 @@ export function DayView({
 
               {/* Events */}
               {dayEvents.map((event) => {
-                const startMinutes = timeToMinutes(event.startAt);
-                const endMinutes = timeToMinutes(event.endAt);
+                const startMinutes = timeToMinutes(event.startAt, timezone);
+                const endMinutes = timeToMinutes(event.endAt, timezone);
                 const top = (startMinutes / 30) * 32;
                 const height = ((endMinutes - startMinutes) / 30) * 32;
                 const layout = dayLayout.get(event.ids.id);
@@ -278,22 +283,26 @@ export function DayView({
                       <EmptyTitle>No events today</EmptyTitle>
                       <EmptyDescription>
                         {nextEvent
-                          ? `Next up: ${nextEvent.title} at ${formatEventTime(nextEvent.startAt)}`
+                          ? `Next up: ${nextEvent.title} at ${formatEventTime(nextEvent.startAt, timezone)}`
                           : 'No upcoming events scheduled'}
                       </EmptyDescription>
                     </EmptyHeader>
                     {nextEvent && (
                       <Button
                         size="sm"
-                        onClick={() => onDateSelect(getEventDate(nextEvent))}
+                        onClick={() => onDateSelect(getEventDate(nextEvent, timezone))}
                       >
                         <ArrowRight className="mr-2 size-4" />
                         Next up:{' '}
-                        {getEventDate(nextEvent).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                        })}
+                        {formatScheduleDisplayValue(
+                          getEventDate(nextEvent, timezone),
+                          timezone,
+                          {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                          },
+                        )}
                       </Button>
                     )}
                   </>

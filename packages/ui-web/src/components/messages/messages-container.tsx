@@ -65,6 +65,7 @@ import {
   Loader2,
   Presentation,
 } from 'lucide-react';
+import { ScheduleDisplayTimeZoneProvider } from '@iconicedu/ui-web/components/shared/schedule-display-timezone-context';
 
 function getMessageInputPlaceholder(
   channel: ChannelVM,
@@ -1683,6 +1684,7 @@ export function MessagesContainer({
           schedules={loadedSchedules ?? []}
           isLoading={isLoadingSchedules}
           error={schedulesLoadError}
+          timezone={currentUserProfile?.prefs.timezone ?? null}
         />
       );
     }
@@ -1697,41 +1699,45 @@ export function MessagesContainer({
   };
 
   return (
-    <div className="relative flex h-full min-h-0 flex-1 min-w-0 flex-col">
-      <div className="border-b border-border bg-muted/40 px-4">
-        <Tabs
-          value={activeTab}
-          onValueChange={(value) => {
-            if (containerTabs.some((tab) => tab.key === value)) {
-              setActiveTab(value as MessagesContainerTabKey);
-            }
-          }}
-          className="gap-0"
+    <ScheduleDisplayTimeZoneProvider
+      timezone={currentUserProfile?.prefs.timezone ?? null}
+    >
+      <div className="relative flex h-full min-h-0 flex-1 min-w-0 flex-col">
+        <div className="border-b border-border bg-muted/40 px-4">
+          <Tabs
+            value={activeTab}
+            onValueChange={(value) => {
+              if (containerTabs.some((tab) => tab.key === value)) {
+                setActiveTab(value as MessagesContainerTabKey);
+              }
+            }}
+            className="gap-0"
+          >
+            <TabsList variant="line" className="h-12 p-0">
+              {containerTabs.map((tab) => {
+                const Icon = tab.icon;
+                return (
+                  <TabsTrigger
+                    key={tab.key}
+                    value={tab.key}
+                    className="w-auto flex-none px-1.5"
+                  >
+                    <Icon className="h-4 w-4 text-muted-foreground/70" />
+                    {tab.label}
+                  </TabsTrigger>
+                );
+              })}
+            </TabsList>
+          </Tabs>
+        </div>
+        <div
+          key={activeTab}
+          data-testid="messages-tab-content"
+          className="min-h-0 flex-1 flex flex-col motion-reduce:animate-none animate-in fade-in-0 slide-in-from-right-1 duration-200"
         >
-          <TabsList variant="line" className="h-12 p-0">
-            {containerTabs.map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <TabsTrigger
-                  key={tab.key}
-                  value={tab.key}
-                  className="w-auto flex-none px-1.5"
-                >
-                  <Icon className="h-4 w-4 text-muted-foreground/70" />
-                  {tab.label}
-                </TabsTrigger>
-              );
-            })}
-          </TabsList>
-        </Tabs>
+          {renderActiveTabContent()}
+        </div>
       </div>
-      <div
-        key={activeTab}
-        data-testid="messages-tab-content"
-        className="min-h-0 flex-1 flex flex-col motion-reduce:animate-none animate-in fade-in-0 slide-in-from-right-1 duration-200"
-      >
-        {renderActiveTabContent()}
-      </div>
-    </div>
+    </ScheduleDisplayTimeZoneProvider>
   );
 }

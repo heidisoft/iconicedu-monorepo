@@ -13,7 +13,12 @@ import {
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
 import type { SessionBookingMessageVM as SessionBookingMessageType } from '@iconicedu/shared-types';
-import { MessageBase, type MessageBaseProps } from '@iconicedu/ui-web/components/messages/message-base';
+import {
+  MessageBase,
+  type MessageBaseProps,
+} from '@iconicedu/ui-web/components/messages/message-base';
+import { useScheduleDisplayTimeZone } from '@iconicedu/ui-web/components/shared/schedule-display-timezone-context';
+import { formatScheduleDisplayValue } from '@iconicedu/ui-web/lib/schedule-display-timezone';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 
 interface SessionBookingMessageProps extends Omit<
@@ -51,11 +56,12 @@ export const SessionBookingMessage = memo(function SessionBookingMessage(
 ) {
   const { message, ...baseProps } = props;
   const { session } = message;
+  const timezone = useScheduleDisplayTimeZone();
   const statusInfo = sessionStatusConfig[session.status];
   const StatusIcon = statusInfo.icon;
 
   const formatSessionTime = (date: string) => {
-    return new Date(date).toLocaleString('en-US', {
+    return formatScheduleDisplayValue(date, timezone, {
       weekday: 'short',
       month: 'short',
       day: 'numeric',

@@ -26,6 +26,11 @@ import type {
   ActivityFeedTabVM,
   InboxTabKeyVM,
 } from '@iconicedu/shared-types';
+import {
+  formatScheduleDisplayValue,
+  isSameScheduleDisplayDay,
+  resolveScheduleDisplayTimeZone,
+} from '@iconicedu/ui-web/lib/schedule-display-timezone';
 
 const INBOX_PAGE_SIZE = 20;
 
@@ -203,6 +208,7 @@ export function buildUnreadTabCounts(
 
 export function applySessionParentLocalHeadline(
   activity: ActivityFeedItemVM,
+  timezone?: string | null,
 ): ActivityFeedItemVM {
   const metadata = activity.metadata as Record<string, unknown> | undefined;
   if (!metadata?.sessionGroupLocalTime) {
@@ -219,15 +225,17 @@ export function applySessionParentLocalHeadline(
     return activity;
   }
 
-  const localLabel = date
-    .toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    })
-    .replace(',', ' at');
+  const localLabel = formatScheduleDisplayValue(date, timezone, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })?.replace(',', ' at');
+
+  if (!localLabel) {
+    return activity;
+  }
 
   return {
     ...activity,
@@ -241,30 +249,18 @@ export function applySessionParentLocalHeadline(
   };
 }
 
-function formatLocalDateTimeLabel(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  return date
-    .toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    })
-    .replace(',', ' at');
+function formatLocalDateTimeLabel(value: string, timezone?: string | null) {
+  return formatScheduleDisplayValue(value, timezone, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })?.replace(',', ' at');
 }
 
-function formatLocalTimeLabel(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  return date.toLocaleTimeString('en-US', {
+function formatLocalTimeLabel(value: string, timezone?: string | null) {
+  return formatScheduleDisplayValue(value, timezone, {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
@@ -273,21 +269,13 @@ function formatLocalTimeLabel(value: string) {
 
 function formatSchedulePart(
   value: string,
-  timezone?: string,
+  timezone?: string | null,
   options?: Intl.DateTimeFormatOptions,
 ) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  return new Intl.DateTimeFormat('en-US', {
-    ...(timezone ? { timeZone: timezone } : {}),
-    ...options,
-  }).format(date);
+  return formatScheduleDisplayValue(value, timezone, options ?? {});
 }
 
-function formatScheduleDayLabel(value: string, timezone?: string) {
+function formatScheduleDayLabel(value: string, timezone?: string | null) {
   return formatSchedulePart(value, timezone, {
     weekday: 'short',
     month: 'short',
@@ -295,7 +283,11 @@ function formatScheduleDayLabel(value: string, timezone?: string) {
   });
 }
 
-function formatScheduleTimeLabel(value: string, timezone?: string, includeZone = false) {
+function formatScheduleTimeLabel(
+  value: string,
+  timezone?: string | null,
+  includeZone = false,
+) {
   return formatSchedulePart(value, timezone, {
     hour: 'numeric',
     minute: '2-digit',
@@ -306,7 +298,7 @@ function formatScheduleTimeLabel(value: string, timezone?: string, includeZone =
 
 function formatScheduleDateTimeLabel(
   value: string,
-  timezone?: string,
+  timezone?: string | null,
   includeComma = true,
 ) {
   const dayLabel = formatScheduleDayLabel(value, timezone);
@@ -317,19 +309,13 @@ function formatScheduleDateTimeLabel(
   return includeComma ? `${dayLabel}, ${timeLabel}` : `${dayLabel} ${timeLabel}`;
 }
 
-function isSameScheduleDay(a: string, b: string, timezone?: string) {
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    ...(timezone ? { timeZone: timezone } : {}),
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-
-  return formatter.format(new Date(a)) === formatter.format(new Date(b));
+function isSameScheduleDay(a: string, b: string, timezone?: string | null) {
+  return isSameScheduleDisplayDay(a, b, timezone);
 }
 
 export function applyScheduleActivityLocalTime(
   activity: ActivityFeedItemVM,
+  timezone?: string | null,
 ): ActivityFeedItemVM {
   const metadata = activity.metadata as Record<string, unknown> | undefined;
   if (!metadata?.sessionLocalTime) {
@@ -342,9 +328,12 @@ export function applyScheduleActivityLocalTime(
       typeof metadata.firstSessionStartAt === 'string'
         ? metadata.firstSessionStartAt
         : undefined;
-    const localStart = startAt ? formatLocalDateTimeLabel(startAt) : null;
-    const localFirst = formatLocalDateTimeLabel(firstSessionStartAt ?? startAt ?? '');
-    const weeklyLocalTime = startAt ? formatLocalTimeLabel(startAt) : null;
+    const localStart = startAt ? formatLocalDateTimeLabel(startAt, timezone) : null;
+    const localFirst = formatLocalDateTimeLabel(
+      firstSessionStartAt ?? startAt ?? '',
+      timezone,
+    );
+    const weeklyLocalTime = startAt ? formatLocalTimeLabel(startAt, timezone) : null;
     const isUpdated = metadata.activityPhase === 'updated';
     return {
       ...activity,
@@ -471,10 +460,13 @@ export function applyScheduleActivityLocalTime(
 export function InboxContainer({
   feed,
   markReadEndpoint = '/api/activity-feed/read',
+  timezone,
 }: {
   feed: ActivityFeedVM;
   markReadEndpoint?: string;
+  timezone?: string | null;
 }) {
+  const displayTimezone = resolveScheduleDisplayTimeZone(timezone);
   const [sections, setSections] = useState(feed.sections);
   const [activeTab, setActiveTab] = useState<InboxTabKeyVM>(feed.activeTab);
   const [visibleItemCount, setVisibleItemCount] = useState(INBOX_PAGE_SIZE);
@@ -599,7 +591,8 @@ export function InboxContainer({
 
   const renderActivity = (activity: ActivityFeedItemVM) => {
     const displayActivity = applyScheduleActivityLocalTime(
-      applySessionParentLocalHeadline(activity),
+      applySessionParentLocalHeadline(activity, displayTimezone),
+      displayTimezone,
     );
 
     if (displayActivity.kind === 'group') {

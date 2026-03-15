@@ -6,6 +6,7 @@ import {
   toMonthGroups,
   type ClassSession,
 } from '@iconicedu/ui-web/components/messages/tabs/messages-schedule-tab.utils';
+import { getScheduleDisplayMonthKey } from '@iconicedu/ui-web/lib/schedule-display-timezone';
 import { buildClassSchedulesByOrg } from '@iconicedu/web/lib/schedules/builders/class-schedule.builder';
 import { getLearningSpacesByOrg } from '@iconicedu/web/lib/spaces/queries/learning-spaces.query';
 import { getLearningSpaceParticipantsByLearningSpaceIds } from '@iconicedu/web/lib/spaces/queries/learning-space-relations.query';
@@ -178,6 +179,7 @@ function buildUpcomingSessionPage(input: {
   now: Date;
   activeRole: DashboardInfographicRole;
   isStaffView: boolean;
+  timezone?: string | null;
 }): DashboardUpcomingSessionsPage {
   const getBaseScheduleId = (sessionId: string) => {
     const separatorIndex = sessionId.indexOf('__');
@@ -211,8 +213,8 @@ function buildUpcomingSessionPage(input: {
     );
   });
 
-  const grouped = groupSchedulesByMonth(input.upcomingSchedules);
-  const flatSessions = toMonthGroups(grouped, input.now).flatMap(
+  const grouped = groupSchedulesByMonth(input.upcomingSchedules, input.timezone);
+  const flatSessions = toMonthGroups(grouped, input.now, input.timezone).flatMap(
     (group) => group.sessions,
   );
 
@@ -261,6 +263,7 @@ async function buildActiveRoleMetrics(input: {
   now: Date;
   orgSlug: string;
   pageSize: number;
+  timezone?: string | null;
 }): Promise<{
   metrics: DashboardInfographicRoleMetrics;
   upcomingSessionsPage: DashboardUpcomingSessionsPage;
@@ -319,8 +322,11 @@ async function buildActiveRoleMetrics(input: {
   const monthProgressStatsByKey = getMonthProgressStatsByKey(
     [...timelineBuckets.past, ...timelineBuckets.upcoming],
     input.now,
+    input.timezone,
   );
-  const currentMonthKey = `${input.now.getFullYear()}-${String(input.now.getMonth() + 1).padStart(2, '0')}`;
+  const currentMonthKey =
+    getScheduleDisplayMonthKey(input.now, input.timezone) ??
+    `${input.now.getFullYear()}-${String(input.now.getMonth() + 1).padStart(2, '0')}`;
   const completedClassesThisMonth =
     monthProgressStatsByKey.get(currentMonthKey)?.completedCount ?? 0;
 
@@ -373,6 +379,7 @@ async function buildActiveRoleMetrics(input: {
       now: input.now,
       activeRole: input.activeRole,
       isStaffView: input.isStaffView,
+      timezone: input.timezone,
     }),
   };
 }
@@ -384,6 +391,7 @@ export async function buildDashboardHomeInfographicMetrics(input: {
   currentUserProfile: UserProfileVM | null;
   now?: Date;
   pageSize?: number;
+  timezone?: string | null;
 }): Promise<DashboardHomeInfographicMetrics> {
   const now = input.now ?? new Date();
   const pageSize = Math.max(1, Math.floor(input.pageSize ?? DEFAULT_PAGE_SIZE));
@@ -402,6 +410,7 @@ export async function buildDashboardHomeInfographicMetrics(input: {
     now,
     orgSlug: input.orgSlug,
     pageSize,
+    timezone: input.timezone ?? input.currentUserProfile?.prefs?.timezone ?? null,
   });
 
   return {

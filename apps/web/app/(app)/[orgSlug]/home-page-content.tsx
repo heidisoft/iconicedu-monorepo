@@ -27,6 +27,7 @@ export async function HomePageContent({ orgSlug }: { orgSlug: string }) {
     orgId: account.org_id,
     orgSlug,
     currentUserProfile,
+    timezone: currentUserProfile?.prefs.timezone ?? null,
   });
 
   const requestRole = resolveRequestRole(currentUserProfile?.kind);
