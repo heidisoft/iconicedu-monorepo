@@ -98,7 +98,9 @@ describe('mapMessageRowToVM', () => {
     if (imageMessage.core.type !== 'image') {
       throw new Error('Expected image message');
     }
-    expect(imageMessage.attachment.storagePath).toBe('org-1/channel-1/profile-1/image.png');
+    expect(imageMessage.attachment.storagePath).toBe(
+      'org-1/channel-1/profile-1/image.png',
+    );
 
     expect(audioMessage.core.type).toBe('audio-recording');
     if (audioMessage.core.type !== 'audio-recording') {

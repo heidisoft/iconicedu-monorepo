@@ -2,12 +2,12 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { FamilyLinkRow, GuardianProfileRow } from '@iconicedu/shared-types';
 
-import { FAMILY_LINKS_SELECT, GUARDIAN_PROFILE_SELECT } from '@iconicedu/web/lib/profile/constants/selects';
+import {
+  FAMILY_LINKS_SELECT,
+  GUARDIAN_PROFILE_SELECT,
+} from '@iconicedu/web/lib/profile/constants/selects';
 
-export async function getGuardianProfile(
-  supabase: SupabaseClient,
-  profileId: string,
-) {
+export async function getGuardianProfile(supabase: SupabaseClient, profileId: string) {
   return supabase
     .from('guardian_profiles')
     .select(GUARDIAN_PROFILE_SELECT)

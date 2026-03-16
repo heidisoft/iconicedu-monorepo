@@ -19,8 +19,7 @@ const normalizeNullableField = (value?: string) => {
   return trimmed ? trimmed : null;
 };
 
-const isValidEmail = (value: string) =>
-  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
 const ALLOWED_PRIMARY_ROLES: RoleKey[] = [
   'owner',

@@ -30,7 +30,10 @@ export default async function AdminFamiliesPage({
 
   return (
     <div className="flex flex-1 flex-col">
-      <DashboardHeader title="Manage families" description="View families, guardians, and invites." />
+      <DashboardHeader
+        title="Manage families"
+        description="View families, guardians, and invites."
+      />
       <div className="flex flex-1 flex-col gap-4 p-4">
         <FamiliesDashboard rows={rows} />
       </div>

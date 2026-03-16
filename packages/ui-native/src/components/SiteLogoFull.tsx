@@ -28,36 +28,92 @@ export const SiteLogoFull: React.FC<SiteLogoFullProps> = ({
     <Svg viewBox="0 0 215.11 77.39" width={w} height={h} accessibilityLabel="IconicEdu">
       <Defs>
         {/* Main gradient used by the chevron mark */}
-        <LinearGradient id="ie-g1" x1="107.24" y1="52.88" x2="110.36" y2="25.36" gradientUnits="userSpaceOnUse">
+        <LinearGradient
+          id="ie-g1"
+          x1="107.24"
+          y1="52.88"
+          x2="110.36"
+          y2="25.36"
+          gradientUnits="userSpaceOnUse"
+        >
           <Stop offset="0.04" stopColor={S1} />
           <Stop offset="1" stopColor={S2} />
         </LinearGradient>
         {/* Sub-heading letter gradients — same stops, different coordinates */}
-        <LinearGradient id="ie-g2" x1="0" y1="68.66" x2="15.97" y2="68.66" gradientUnits="userSpaceOnUse">
+        <LinearGradient
+          id="ie-g2"
+          x1="0"
+          y1="68.66"
+          x2="15.97"
+          y2="68.66"
+          gradientUnits="userSpaceOnUse"
+        >
           <Stop offset="0.04" stopColor={S1} />
           <Stop offset="1" stopColor={S2} />
         </LinearGradient>
-        <LinearGradient id="ie-g3" x1="33.13" y1="68.69" x2="48.16" y2="68.69" gradientUnits="userSpaceOnUse">
+        <LinearGradient
+          id="ie-g3"
+          x1="33.13"
+          y1="68.69"
+          x2="48.16"
+          y2="68.69"
+          gradientUnits="userSpaceOnUse"
+        >
           <Stop offset="0.04" stopColor={S1} />
           <Stop offset="1" stopColor={S2} />
         </LinearGradient>
-        <LinearGradient id="ie-g4" x1="65.21" y1="68.66" x2="81.18" y2="68.66" gradientUnits="userSpaceOnUse">
+        <LinearGradient
+          id="ie-g4"
+          x1="65.21"
+          y1="68.66"
+          x2="81.18"
+          y2="68.66"
+          gradientUnits="userSpaceOnUse"
+        >
           <Stop offset="0.04" stopColor={S1} />
           <Stop offset="1" stopColor={S2} />
         </LinearGradient>
-        <LinearGradient id="ie-g5" x1="99.11" y1="68.68" x2="113.35" y2="68.68" gradientUnits="userSpaceOnUse">
+        <LinearGradient
+          id="ie-g5"
+          x1="99.11"
+          y1="68.68"
+          x2="113.35"
+          y2="68.68"
+          gradientUnits="userSpaceOnUse"
+        >
           <Stop offset="0.04" stopColor={S1} />
           <Stop offset="1" stopColor={S2} />
         </LinearGradient>
-        <LinearGradient id="ie-g6" x1="132.34" y1="68.68" x2="144.47" y2="68.68" gradientUnits="userSpaceOnUse">
+        <LinearGradient
+          id="ie-g6"
+          x1="132.34"
+          y1="68.68"
+          x2="144.47"
+          y2="68.68"
+          gradientUnits="userSpaceOnUse"
+        >
           <Stop offset="0.04" stopColor={S1} />
           <Stop offset="1" stopColor={S2} />
         </LinearGradient>
-        <LinearGradient id="ie-g7" x1="163.46" y1="68.68" x2="180.76" y2="68.68" gradientUnits="userSpaceOnUse">
+        <LinearGradient
+          id="ie-g7"
+          x1="163.46"
+          y1="68.68"
+          x2="180.76"
+          y2="68.68"
+          gradientUnits="userSpaceOnUse"
+        >
           <Stop offset="0.04" stopColor={S1} />
           <Stop offset="1" stopColor={S2} />
         </LinearGradient>
-        <LinearGradient id="ie-g8" x1="198.74" y1="68.68" x2="214.17" y2="68.68" gradientUnits="userSpaceOnUse">
+        <LinearGradient
+          id="ie-g8"
+          x1="198.74"
+          y1="68.68"
+          x2="214.17"
+          y2="68.68"
+          gradientUnits="userSpaceOnUse"
+        >
           <Stop offset="0.04" stopColor={S1} />
           <Stop offset="1" stopColor={S2} />
         </LinearGradient>
@@ -79,13 +135,34 @@ export const SiteLogoFull: React.FC<SiteLogoFullProps> = ({
           />
 
           {/* Sub-heading letters "academy" — gradient overrides */}
-          <Path fill="url(#ie-g2)" d="M16,77H12.83l-1.59-4.42H4.65L3,77H0L6.43,60.33H9.54ZM8,63.37l-2.59,7h5.07Z" />
-          <Path fill="url(#ie-g3)" d="M46,75.56a7.1,7.1,0,0,1-5.06,1.83A7.2,7.2,0,0,1,35.26,75a9.15,9.15,0,0,1-2.13-6.33A10.25,10.25,0,0,1,34,64.34a7.5,7.5,0,0,1,7-4.36,7.52,7.52,0,0,1,4.6,1.46A6.05,6.05,0,0,1,48,65.66h-2.9a3.82,3.82,0,0,0-1.4-2.35A4.28,4.28,0,0,0,41,62.46a4.35,4.35,0,0,0-2.82.93,5.11,5.11,0,0,0-1.63,2.3,9.53,9.53,0,0,0-.2,5.28,7.06,7.06,0,0,0,.84,2,4.08,4.08,0,0,0,1.53,1.44,4.58,4.58,0,0,0,2.26.54q3.7,0,4.25-4.26h2.92A7.18,7.18,0,0,1,46,75.56Z" />
-          <Path fill="url(#ie-g4)" d="M81.18,77H78l-1.58-4.42h-6.6L68.23,77h-3l6.43-16.67h3.11Zm-8-13.63-2.6,7h5.07Z" />
-          <Path fill="url(#ie-g5)" d="M105.45,60.35a11.1,11.1,0,0,1,3,.37,6.09,6.09,0,0,1,2.41,1.34,8.07,8.07,0,0,1,2.45,6.33q0,4.42-2.34,6.76a5.69,5.69,0,0,1-2.23,1.44,10.16,10.16,0,0,1-3.17.41h-6.5V60.35ZM102,74.54h3.44A4.41,4.41,0,0,0,109.31,73a7.55,7.55,0,0,0,1.12-4.42,6.33,6.33,0,0,0-1.26-4.19,4.8,4.8,0,0,0-3.91-1.51H102Z" />
-          <Path fill="url(#ie-g6)" d="M144.33,62.81h-9.09v4.42h8.44v2.36h-8.44V74.5h9.23V77H132.34V60.35h12Z" />
-          <Path fill="url(#ie-g7)" d="M180.76,77H178V64.16L173.35,77H171l-4.74-12.84V77h-2.76V60.35h4.09l4.65,13,4.49-13h4.07Z" />
-          <Path fill="url(#ie-g8)" d="M207.91,70.38V77H205V70.38l-6.29-10h3.37l4.42,7.37,4.37-7.37h3.27Z" />
+          <Path
+            fill="url(#ie-g2)"
+            d="M16,77H12.83l-1.59-4.42H4.65L3,77H0L6.43,60.33H9.54ZM8,63.37l-2.59,7h5.07Z"
+          />
+          <Path
+            fill="url(#ie-g3)"
+            d="M46,75.56a7.1,7.1,0,0,1-5.06,1.83A7.2,7.2,0,0,1,35.26,75a9.15,9.15,0,0,1-2.13-6.33A10.25,10.25,0,0,1,34,64.34a7.5,7.5,0,0,1,7-4.36,7.52,7.52,0,0,1,4.6,1.46A6.05,6.05,0,0,1,48,65.66h-2.9a3.82,3.82,0,0,0-1.4-2.35A4.28,4.28,0,0,0,41,62.46a4.35,4.35,0,0,0-2.82.93,5.11,5.11,0,0,0-1.63,2.3,9.53,9.53,0,0,0-.2,5.28,7.06,7.06,0,0,0,.84,2,4.08,4.08,0,0,0,1.53,1.44,4.58,4.58,0,0,0,2.26.54q3.7,0,4.25-4.26h2.92A7.18,7.18,0,0,1,46,75.56Z"
+          />
+          <Path
+            fill="url(#ie-g4)"
+            d="M81.18,77H78l-1.58-4.42h-6.6L68.23,77h-3l6.43-16.67h3.11Zm-8-13.63-2.6,7h5.07Z"
+          />
+          <Path
+            fill="url(#ie-g5)"
+            d="M105.45,60.35a11.1,11.1,0,0,1,3,.37,6.09,6.09,0,0,1,2.41,1.34,8.07,8.07,0,0,1,2.45,6.33q0,4.42-2.34,6.76a5.69,5.69,0,0,1-2.23,1.44,10.16,10.16,0,0,1-3.17.41h-6.5V60.35ZM102,74.54h3.44A4.41,4.41,0,0,0,109.31,73a7.55,7.55,0,0,0,1.12-4.42,6.33,6.33,0,0,0-1.26-4.19,4.8,4.8,0,0,0-3.91-1.51H102Z"
+          />
+          <Path
+            fill="url(#ie-g6)"
+            d="M144.33,62.81h-9.09v4.42h8.44v2.36h-8.44V74.5h9.23V77H132.34V60.35h12Z"
+          />
+          <Path
+            fill="url(#ie-g7)"
+            d="M180.76,77H178V64.16L173.35,77H171l-4.74-12.84V77h-2.76V60.35h4.09l4.65,13,4.49-13h4.07Z"
+          />
+          <Path
+            fill="url(#ie-g8)"
+            d="M207.91,70.38V77H205V70.38l-6.29-10h3.37l4.42,7.37,4.37-7.37h3.27Z"
+          />
         </G>
       </G>
     </Svg>

@@ -65,4 +65,3 @@ describe('resolveThreadAfterReply', () => {
     expect(result.wasRekeyed).toBe(false);
   });
 });
-

@@ -131,7 +131,12 @@ export const MessageActions = memo(function MessageActions({
   const shouldHideQuickActions = shouldHideMessageQuickActions(message);
 
   return (
-    <div className={cn("absolute right-2 top-0 z-10 flex items-center gap-1 rounded-xl border bg-card px-1 py-1 shadow-md", className)}>
+    <div
+      className={cn(
+        'absolute right-2 top-0 z-10 flex items-center gap-1 rounded-xl border bg-card px-1 py-1 shadow-md',
+        className,
+      )}
+    >
       {!shouldHideQuickActions ? (
         <>
           {!isThreadReply && (
@@ -143,7 +148,9 @@ export const MessageActions = memo(function MessageActions({
                     size="icon"
                     className="h-7 w-7"
                     onClick={handleThreadClick}
-                    aria-label={message.social.thread ? 'Reply in thread' : 'Start a thread'}
+                    aria-label={
+                      message.social.thread ? 'Reply in thread' : 'Start a thread'
+                    }
                   >
                     <MessageCircle className="h-4 w-4" />
                   </Button>
@@ -259,7 +266,10 @@ export const MessageActions = memo(function MessageActions({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={handleCancelDelete}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

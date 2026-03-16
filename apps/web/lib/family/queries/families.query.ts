@@ -1,5 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { FamilyLinkInviteRow, FamilyLinkRow, FamilyRow } from '@iconicedu/shared-types';
+import type {
+  FamilyLinkInviteRow,
+  FamilyLinkRow,
+  FamilyRow,
+} from '@iconicedu/shared-types';
 
 import {
   FAMILY_INVITE_SELECT,
@@ -7,10 +11,7 @@ import {
   FAMILY_SELECT,
 } from '@iconicedu/web/lib/family/constants/selects';
 
-export async function getFamiliesByOrg(
-  supabase: SupabaseClient,
-  orgId: string,
-) {
+export async function getFamiliesByOrg(supabase: SupabaseClient, orgId: string) {
   return supabase
     .from('families')
     .select(FAMILY_SELECT)
@@ -51,10 +52,7 @@ export async function getFamilyLinksByFamilyIds(
     .returns<FamilyLinkRow[]>();
 }
 
-export async function getFamilyLinksByOrg(
-  supabase: SupabaseClient,
-  orgId: string,
-) {
+export async function getFamilyLinksByOrg(supabase: SupabaseClient, orgId: string) {
   return supabase
     .from('family_links')
     .select(FAMILY_LINK_SELECT)

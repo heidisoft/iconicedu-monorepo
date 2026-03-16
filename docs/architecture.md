@@ -165,13 +165,13 @@ INSERT into message_text (message_id, payload={text})
 
 Users belong to exactly one organisation. Within that org, an account has a `role`:
 
-| Role | Abbr | Can see |
-|---|---|---|
-| `guardian` | G | Own data + their children's data (via `family_links`) |
-| `educator` | E | Own data + enrolled students' data |
-| `student` | S | Own data |
-| `advisor` | A | Assigned families' data |
-| `staff` | ST | Broad read for admin operations |
+| Role       | Abbr | Can see                                               |
+| ---------- | ---- | ----------------------------------------------------- |
+| `guardian` | G    | Own data + their children's data (via `family_links`) |
+| `educator` | E    | Own data + enrolled students' data                    |
+| `student`  | S    | Own data                                              |
+| `advisor`  | A    | Assigned families' data                               |
+| `staff`    | ST   | Broad read for admin operations                       |
 
 RLS policies enforce these boundaries at the database level — not just in application code.
 

@@ -6,7 +6,9 @@ import {
   extractMentionsFromMessageText,
 } from './message-mentions.utils';
 
-function createParticipant(overrides: Partial<UserProfileVM> & { ids?: Partial<UserProfileVM['ids']> } = {}) {
+function createParticipant(
+  overrides: Partial<UserProfileVM> & { ids?: Partial<UserProfileVM['ids']> } = {},
+) {
   return {
     kind: 'guardian',
     ids: {
@@ -33,11 +35,21 @@ function createParticipant(overrides: Partial<UserProfileVM> & { ids?: Partial<U
 
 describe('message mention utils', () => {
   it('extracts exact participant mentions and excludes the current user', () => {
-    const self = createParticipant({ ids: { id: 'self' }, profile: { displayName: 'Alex Johnson' } });
-    const other = createParticipant({ ids: { id: 'other' }, profile: { displayName: 'Taylor Reed' } });
+    const self = createParticipant({
+      ids: { id: 'self' },
+      profile: { displayName: 'Alex Johnson' },
+    });
+    const other = createParticipant({
+      ids: { id: 'other' },
+      profile: { displayName: 'Taylor Reed' },
+    });
 
     expect(
-      extractMentionsFromMessageText('Hello @Taylor Reed and @Alex Johnson', [self, other], 'self'),
+      extractMentionsFromMessageText(
+        'Hello @Taylor Reed and @Alex Johnson',
+        [self, other],
+        'self',
+      ),
     ).toEqual([
       {
         profileId: 'other',

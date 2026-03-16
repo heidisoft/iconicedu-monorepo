@@ -54,8 +54,10 @@ All message and payload types use discriminated unions on a `type` field. Always
 ```ts
 // Good — exhaustive, type-safe
 switch (message.core.type) {
-  case 'text': return message.content.text;
-  case 'file': return message.attachment.name;
+  case 'text':
+    return message.content.text;
+  case 'file':
+    return message.attachment.name;
   // ...
 }
 
@@ -118,6 +120,7 @@ The pipeline is: `^build` (dependencies) → `build` → `lint | typecheck | tes
 ### Server vs Client Components
 
 Default to **Server Components**. Only add `'use client'` when the component needs:
+
 - `useState`, `useEffect`, or other hooks
 - Browser APIs (window, document, localStorage)
 - Event listeners
@@ -130,7 +133,7 @@ export default async function ChannelPage({ params }: Props) {
 }
 
 // Client Component — add directive at top of file
-'use client';
+('use client');
 export function MessageInput({ onSend }: Props) {
   const [text, setText] = useState('');
   // ...
@@ -223,6 +226,7 @@ const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL; // undefined at runtim
 ### React Query
 
 All data fetching in mobile uses React Query. Follow existing patterns:
+
 - Queries use `useQuery` with stable query keys
 - Mutations use `useMutation` and invalidate related queries on success
 - Real-time Supabase subscriptions are set up in `useEffect` and torn down on unmount
@@ -230,6 +234,7 @@ All data fetching in mobile uses React Query. Follow existing patterns:
 ### Expo Router
 
 The route structure is:
+
 ```
 app/
 ├── _layout.tsx           # Root layout (auth check, providers)
@@ -256,6 +261,7 @@ Pass data between screens via search params for simple values. For complex objec
 ### `@iconicedu/shared-types`
 
 Contains three layers:
+
 - **Rows** — raw database shapes (what Supabase returns)
 - **VMs (View Models)** — richly typed objects consumed by UI
 - **Payloads** — data sent in mutations and API calls
@@ -265,6 +271,7 @@ Always import VMs in UI code, not Rows. Rows are for the query/builder layer onl
 ### `@iconicedu/ui-web`
 
 Components in `ui-web` must:
+
 - Be server-component-safe by default (no `'use client'` unless needed)
 - Accept `className` for Tailwind customization
 - Not depend on app-specific context or routing
@@ -272,6 +279,7 @@ Components in `ui-web` must:
 ### `@iconicedu/ui-native`
 
 Components in `ui-native` must:
+
 - Be fully compatible with React Native (no web-only APIs)
 - Use NativeWind for styling with the `className` cast pattern
 - Export typed props interfaces
@@ -297,13 +305,13 @@ Never disable RLS for convenience. If you need to bypass RLS for a service opera
 
 ### Supabase client usage
 
-| Context | Client to use |
-|---|---|
-| Web Server Components / Route handlers (read) | `createServerClient()` |
-| Web Route handlers (admin/service operations) | `createAdminClient()` (service role) |
-| Web Client Components | `createBrowserClient()` |
-| Mobile | `supabase` singleton from `@/lib/supabase` |
-| NestJS API | Prisma client (`PrismaService`) |
+| Context                                       | Client to use                              |
+| --------------------------------------------- | ------------------------------------------ |
+| Web Server Components / Route handlers (read) | `createServerClient()`                     |
+| Web Route handlers (admin/service operations) | `createAdminClient()` (service role)       |
+| Web Client Components                         | `createBrowserClient()`                    |
+| Mobile                                        | `supabase` singleton from `@/lib/supabase` |
+| NestJS API                                    | Prisma client (`PrismaService`)            |
 
 ### Real-time subscriptions
 
@@ -313,10 +321,16 @@ Real-time is used in mobile (via Supabase Realtime channels) and will eventually
 useEffect(() => {
   const channel = supabase
     .channel(`messages:${channelId}`)
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, handler)
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'messages' },
+      handler,
+    )
     .subscribe();
 
-  return () => { supabase.removeChannel(channel); };
+  return () => {
+    supabase.removeChannel(channel);
+  };
 }, [channelId]);
 ```
 
@@ -355,6 +369,7 @@ pnpm test:mobile
 ```
 
 Key setup details:
+
 - `jest.setup.js` patches `NativeModules.UIManager` for test compatibility
 - `jest.resolver.js` strips the `exports` field from `expo-modules-core` (pnpm hoisting fix)
 - NativeWind babel preset is excluded in test environment (no native worklets in jest)
@@ -391,7 +406,12 @@ Follow the existing Tailwind class ordering (layout → spacing → typography �
 ```tsx
 import { cn } from '@iconicedu/ui-web/lib/utils';
 
-<div className={cn('flex items-center gap-2', isActive && 'bg-primary text-primary-foreground')} />
+<div
+  className={cn(
+    'flex items-center gap-2',
+    isActive && 'bg-primary text-primary-foreground',
+  )}
+/>;
 ```
 
 ### Mobile — NativeWind + StyleSheet

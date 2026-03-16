@@ -40,8 +40,14 @@ describe('message-loading-state.utils', () => {
   });
 
   it('returns context-appropriate composer submit labels', () => {
-    expect(getComposerSubmitLabel({ isSendingText: false, isAttachingFile: false })).toBe('Send');
-    expect(getComposerSubmitLabel({ isSendingText: true, isAttachingFile: false })).toBe('Sending...');
-    expect(getComposerSubmitLabel({ isSendingText: false, isAttachingFile: true })).toBe('Uploading...');
+    expect(getComposerSubmitLabel({ isSendingText: false, isAttachingFile: false })).toBe(
+      'Send',
+    );
+    expect(getComposerSubmitLabel({ isSendingText: true, isAttachingFile: false })).toBe(
+      'Sending...',
+    );
+    expect(getComposerSubmitLabel({ isSendingText: false, isAttachingFile: true })).toBe(
+      'Uploading...',
+    );
   });
 });

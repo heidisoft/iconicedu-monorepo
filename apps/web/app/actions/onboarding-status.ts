@@ -3,10 +3,7 @@
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { upsertUserOnboardingStatus } from '@iconicedu/web/lib/onboarding/queries/status.query';
 import { mapUserOnboardingStatusRowToVM } from '@iconicedu/web/lib/onboarding/mappers';
-import type {
-  OnboardingStep,
-  UserOnboardingStatusVM,
-} from '@iconicedu/shared-types';
+import type { OnboardingStep, UserOnboardingStatusVM } from '@iconicedu/shared-types';
 
 export type OnboardingStatusUpdateInput = {
   profileId: string;

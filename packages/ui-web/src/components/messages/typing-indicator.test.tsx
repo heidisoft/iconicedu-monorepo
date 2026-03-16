@@ -16,7 +16,7 @@ const makeProfile = (id: string, name: string): UserProfileVM =>
     meta: {},
     ui: { themeKey: null },
     joinedDate: new Date().toISOString(),
-  } as unknown as UserProfileVM);
+  }) as unknown as UserProfileVM;
 
 describe('TypingIndicator', () => {
   it('renders nothing when no profiles', () => {

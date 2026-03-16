@@ -82,8 +82,8 @@ export async function getChannelDetail(channelId: string): Promise<ChannelDetail
       buildUserProfileById(supabase, row.profile_id),
     ),
   );
-  const participants = participantProfiles.filter(
-    (profile): profile is UserProfileVM => Boolean(profile),
+  const participants = participantProfiles.filter((profile): profile is UserProfileVM =>
+    Boolean(profile),
   );
 
   const capabilities = (capabilitiesResponse.data ?? [])

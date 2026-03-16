@@ -23,9 +23,7 @@ describe('messages-month-section', () => {
       scheduledCount: 4,
       completedCount: 3,
     });
-    expect(
-      getMonthSectionStats({ ...monthGroup, completedCount: 4 }),
-    ).toEqual({
+    expect(getMonthSectionStats({ ...monthGroup, completedCount: 4 })).toEqual({
       progressPercent: 100,
       allComplete: true,
       scheduledCount: 4,

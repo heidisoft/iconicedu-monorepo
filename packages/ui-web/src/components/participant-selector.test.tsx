@@ -49,7 +49,9 @@ describe('ParticipantSelector', () => {
     render(
       <ParticipantSelector
         users={[]}
-        selectedUsers={[makeUser({ displayName: null, firstName: 'Maya', lastName: 'Johnson' })]}
+        selectedUsers={[
+          makeUser({ displayName: null, firstName: 'Maya', lastName: 'Johnson' }),
+        ]}
         onUserAdd={onUserAdd}
         onUserRemove={onUserRemove}
       />,

@@ -1,4 +1,9 @@
-import type { AvatarSource, ThemeKey, UserProfileVM, UserRoleVM } from '@iconicedu/shared-types';
+import type {
+  AvatarSource,
+  ThemeKey,
+  UserProfileVM,
+  UserRoleVM,
+} from '@iconicedu/shared-types';
 import type { RoleKey } from '@iconicedu/shared-types';
 
 import { THEME_KEY_SET } from '@iconicedu/web/lib/profile/constants/theme';
@@ -33,9 +38,7 @@ export function resolveExternalAvatarUrl(user: {
     (typeof user.user_metadata?.avatar_url === 'string'
       ? user.user_metadata.avatar_url
       : null) ??
-    (typeof user.user_metadata?.picture === 'string'
-      ? user.user_metadata.picture
-      : null);
+    (typeof user.user_metadata?.picture === 'string' ? user.user_metadata.picture : null);
 
   return avatarUrl && avatarUrl.trim() ? avatarUrl.trim() : null;
 }

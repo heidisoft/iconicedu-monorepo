@@ -11,7 +11,9 @@ export function isLiveSessionJoinDisabled(
   }
 
   const startedAt = Date.parse(message.liveSession.startedAt);
-  const endsAt = message.liveSession.endsAt ? Date.parse(message.liveSession.endsAt) : Number.NaN;
+  const endsAt = message.liveSession.endsAt
+    ? Date.parse(message.liveSession.endsAt)
+    : Number.NaN;
   const effectiveEndsAt = Number.isFinite(endsAt)
     ? endsAt
     : Number.isFinite(startedAt)
@@ -21,7 +23,10 @@ export function isLiveSessionJoinDisabled(
   return Number.isFinite(effectiveEndsAt) && effectiveEndsAt <= now;
 }
 
-export function getLiveSessionStartedMessageState(message: LiveSessionStartedMessageVM, now = Date.now()) {
+export function getLiveSessionStartedMessageState(
+  message: LiveSessionStartedMessageVM,
+  now = Date.now(),
+) {
   const ended = isLiveSessionJoinDisabled(message, now);
   return {
     ended,

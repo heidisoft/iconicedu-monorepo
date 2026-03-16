@@ -1,10 +1,4 @@
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  useMemo,
-} from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { useColorScheme, Appearance } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { lightColors, darkColors, type AppColors, type ThemeMode } from '@/lib/theme';
@@ -32,8 +26,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // OS versions — fall back to Appearance.getColorScheme() which reads the
   // Android UiMode directly and is always non-null.
   const rnScheme = useColorScheme();
-  const systemScheme: 'light' | 'dark' =
-    (rnScheme ?? Appearance.getColorScheme() ?? 'light') as 'light' | 'dark';
+  const systemScheme: 'light' | 'dark' = (rnScheme ??
+    Appearance.getColorScheme() ??
+    'light') as 'light' | 'dark';
   const [mode, setModeState] = useState<ThemeMode>('system');
 
   // Load persisted preference on mount. We render immediately with 'system'
@@ -49,8 +44,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       .catch(() => {});
   }, []);
 
-  const colorScheme: 'light' | 'dark' =
-    mode === 'system' ? systemScheme : mode;
+  const colorScheme: 'light' | 'dark' = mode === 'system' ? systemScheme : mode;
   const isDark = colorScheme === 'dark';
   const colors = isDark ? darkColors : lightColors;
 
@@ -65,9 +59,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     [mode, colorScheme, isDark],
   );
 
-  return (
-    <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
-  );
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
 export function useTheme() {

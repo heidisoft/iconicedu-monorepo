@@ -1,9 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type {
-  FamilyLinkInviteVM,
-  FamilyLinkVM,
-  FamilyVM,
-} from '@iconicedu/shared-types';
+import type { FamilyLinkInviteVM, FamilyLinkVM, FamilyVM } from '@iconicedu/shared-types';
 
 import {
   getFamiliesByOrg,

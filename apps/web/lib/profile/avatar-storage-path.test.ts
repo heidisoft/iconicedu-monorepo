@@ -5,9 +5,9 @@ import { buildAvatarStoragePath } from '@iconicedu/web/lib/profile/avatar-storag
 describe('buildAvatarStoragePath', () => {
   it('builds tenant-first avatar paths with a typed segment', () => {
     const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(1700000000000);
-    const randomUuidSpy = vi.spyOn(crypto, 'randomUUID').mockReturnValue(
-      'abcd1234-ffff-eeee-dddd-ccccbbbb0000',
-    );
+    const randomUuidSpy = vi
+      .spyOn(crypto, 'randomUUID')
+      .mockReturnValue('abcd1234-ffff-eeee-dddd-ccccbbbb0000');
 
     const file = new File(['avatar'], 'Profile Photo.PNG', { type: 'image/png' });
 

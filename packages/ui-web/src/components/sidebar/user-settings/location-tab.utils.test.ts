@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  isLocationComplete,
-  normalizeReverseGeocodeAddress,
-} from './location-tab.utils';
+import { isLocationComplete, normalizeReverseGeocodeAddress } from './location-tab.utils';
 
 describe('location-tab utils', () => {
   it('normalizes reverse geocode fields into location values', () => {

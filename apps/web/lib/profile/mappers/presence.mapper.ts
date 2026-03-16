@@ -40,9 +40,7 @@ export function mapProfilePresenceRowToVM(
   const liveStatusRaw = row.live_status?.trim();
   const displayStatusRaw = row.display_status?.trim();
   const rawDisplayStatus =
-    displayStatusRaw && isDisplayStatus(displayStatusRaw)
-      ? displayStatusRaw
-      : undefined;
+    displayStatusRaw && isDisplayStatus(displayStatusRaw) ? displayStatusRaw : undefined;
   const displayStatus = deriveDisplayStatusFromPresenceRow({
     reportedStatus: rawDisplayStatus ?? null,
     lastSeenAt: row.last_seen_at ?? null,
@@ -59,10 +57,7 @@ export function mapProfilePresenceRowToVM(
   const now = Date.now();
   const expiresAt = row.state_expires_at ?? null;
   const expiresAtMs = expiresAt ? new Date(expiresAt).getTime() : NaN;
-  const isStateExpired =
-    !!expiresAt &&
-    !Number.isNaN(expiresAtMs) &&
-    expiresAtMs <= now;
+  const isStateExpired = !!expiresAt && !Number.isNaN(expiresAtMs) && expiresAtMs <= now;
 
   return {
     state: {

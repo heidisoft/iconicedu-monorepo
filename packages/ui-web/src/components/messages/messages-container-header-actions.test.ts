@@ -40,7 +40,12 @@ describe('messages-container-header-actions helpers', () => {
 
   it('returns the first visible join quick action', () => {
     const join = getHeaderJoinQuickAction([
-      { key: 'join', label: 'Hidden join', hidden: true, url: 'https://example.com/hidden' },
+      {
+        key: 'join',
+        label: 'Hidden join',
+        hidden: true,
+        url: 'https://example.com/hidden',
+      },
       { key: 'join', label: 'Visible join', url: 'https://example.com/live' },
     ]);
 
@@ -52,7 +57,9 @@ describe('messages-container-header-actions helpers', () => {
   });
 
   it('falls back to default join action when missing for non-dm headers', () => {
-    expect(resolveHeaderJoinQuickAction([{ key: 'saved', label: 'Saved' }], true)).toEqual({
+    expect(
+      resolveHeaderJoinQuickAction([{ key: 'saved', label: 'Saved' }], true),
+    ).toEqual({
       key: 'join',
       label: 'Join',
       isPrimary: true,
@@ -60,13 +67,19 @@ describe('messages-container-header-actions helpers', () => {
   });
 
   it('does not fallback join action for dm headers', () => {
-    expect(resolveHeaderJoinQuickAction([{ key: 'saved', label: 'Saved' }], false)).toBeNull();
+    expect(
+      resolveHeaderJoinQuickAction([{ key: 'saved', label: 'Saved' }], false),
+    ).toBeNull();
   });
 
   it('prefers the explicit join quick action url', () => {
     expect(
       resolveHeaderJoinHref({
-        joinQuickAction: { key: 'join', label: 'Join', url: ' https://example.com/live ' },
+        joinQuickAction: {
+          key: 'join',
+          label: 'Join',
+          url: ' https://example.com/live ',
+        },
         fallbackUrl: 'https://example.com/fallback',
       }),
     ).toBe('https://example.com/live');

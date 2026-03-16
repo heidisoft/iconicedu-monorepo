@@ -29,9 +29,7 @@ export const StyledTextInput = TextInput as React.ComponentType<
 export const StyledScrollView = ScrollView as React.ComponentType<
   WithClassName<ScrollViewProps>
 >;
-export const StyledImage = Image as React.ComponentType<
-  WithClassName<ImageProps>
->;
+export const StyledImage = Image as React.ComponentType<WithClassName<ImageProps>>;
 export const StyledFlatList = FlatList as React.ComponentType<
   WithClassName<FlatListProps<unknown>>
 >;

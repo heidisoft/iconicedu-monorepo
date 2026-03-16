@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
-import {
-  getAccountByAuthUserIdInOrg,
-} from '@iconicedu/web/lib/accounts/queries/accounts.query';
+import { getAccountByAuthUserIdInOrg } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { getUserRoles } from '@iconicedu/web/lib/profile/queries/roles.query';
 import { projectActivityEvents } from '@iconicedu/web/lib/activity-feed/projector/project-activity-events';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
@@ -19,9 +17,9 @@ function isAllowedAdminRole(roleKey: string | null | undefined) {
 }
 
 export async function POST(request: Request) {
-  const body = (await request.json().catch(() => null)) as
-    | RetryActivityEventRequest
-    | null;
+  const body = (await request
+    .json()
+    .catch(() => null)) as RetryActivityEventRequest | null;
   const eventId = body?.eventId;
   const orgId = body?.orgId;
 
@@ -42,7 +40,11 @@ export async function POST(request: Request) {
   try {
     const supabase = await createSupabaseServerClient();
     const authUser = await requireAuthedUser(supabase);
-    const accountResponse = await getAccountByAuthUserIdInOrg(supabase, authUser.id, orgId);
+    const accountResponse = await getAccountByAuthUserIdInOrg(
+      supabase,
+      authUser.id,
+      orgId,
+    );
 
     if (!accountResponse.data) {
       return NextResponse.json(
@@ -67,10 +69,7 @@ export async function POST(request: Request) {
       isAllowedAdminRole(role.role_key),
     );
     if (!hasAdminRole) {
-      return NextResponse.json(
-        { success: false, message: 'Forbidden' },
-        { status: 403 },
-      );
+      return NextResponse.json({ success: false, message: 'Forbidden' }, { status: 403 });
     }
 
     const eventResponse = await supabase

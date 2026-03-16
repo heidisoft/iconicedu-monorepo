@@ -303,7 +303,9 @@ export function upsertPendingOverride({
     );
   }
 
-  const duplicate = overrides.some((override) => override.originalDate === nextOriginalDate);
+  const duplicate = overrides.some(
+    (override) => override.originalDate === nextOriginalDate,
+  );
   if (duplicate) {
     return overrides;
   }

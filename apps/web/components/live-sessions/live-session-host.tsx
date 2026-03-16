@@ -87,10 +87,16 @@ export function LiveSessionHost({
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">{heading}</h1>
-          <p className="text-sm text-muted-foreground">{channelPurpose ?? 'Live session'}</p>
+          <p className="text-sm text-muted-foreground">
+            {channelPurpose ?? 'Live session'}
+          </p>
         </div>
         <Button asChild variant="outline" size="sm">
-          <a href={(externalJoinUrl ?? joinUrl) ?? undefined} target="_blank" rel="noreferrer">
+          <a
+            href={externalJoinUrl ?? joinUrl ?? undefined}
+            target="_blank"
+            rel="noreferrer"
+          >
             <MonitorUp className="h-4 w-4" />
             Open in new tab
           </a>

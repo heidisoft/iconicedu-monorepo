@@ -27,14 +27,10 @@ export async function GET(request: Request) {
     );
   }
 
-  const schedules = await buildClassSchedulesByOrg(
-    supabase,
-    accountResponse.data.org_id,
-  );
+  const schedules = await buildClassSchedulesByOrg(supabase, accountResponse.data.org_id);
   const channelSchedules = schedules.filter(
     (schedule) =>
-      schedule.source.kind === 'class_session' &&
-      schedule.source.channelId === channelId,
+      schedule.source.kind === 'class_session' && schedule.source.channelId === channelId,
   );
 
   return NextResponse.json({
@@ -42,4 +38,3 @@ export async function GET(request: Request) {
     schedules: channelSchedules,
   });
 }
-

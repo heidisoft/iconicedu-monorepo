@@ -15,8 +15,7 @@ function applyRealtimeOnlineStatus(
   if (isOnline) {
     const nextDisplayStatus =
       currentPresence?.displayStatus === 'busy' ? 'busy' : 'online';
-    const nextLiveStatus =
-      currentPresence?.displayStatus === 'busy' ? 'busy' : 'online';
+    const nextLiveStatus = currentPresence?.displayStatus === 'busy' ? 'busy' : 'online';
     const nextPresence: PresenceVM = {
       state: currentPresence?.state ?? {},
       liveStatus: nextLiveStatus,
@@ -124,7 +123,11 @@ export function applyPresenceToSidebarData(
   profileId: string,
   presence: PresenceVM | null,
 ): SidebarLeftDataVM {
-  const nextProfile = applyPresenceToProfile(sidebarData.user.profile, profileId, presence);
+  const nextProfile = applyPresenceToProfile(
+    sidebarData.user.profile,
+    profileId,
+    presence,
+  );
   const nextDirectMessages = sidebarData.collections.directMessages.map((channel) =>
     applyPresenceToChannelParticipants(channel, profileId, presence),
   );
@@ -179,7 +182,10 @@ export function applyRealtimeOnlineProfilesToSidebarData(
   sidebarData: SidebarLeftDataVM,
   onlineProfileIds: Set<string>,
 ): SidebarLeftDataVM {
-  const nextProfile = applyRealtimeOnlineStatus(sidebarData.user.profile, onlineProfileIds);
+  const nextProfile = applyRealtimeOnlineStatus(
+    sidebarData.user.profile,
+    onlineProfileIds,
+  );
   const nextDirectMessages = sidebarData.collections.directMessages.map((channel) =>
     applyRealtimeOnlineProfilesToChannelParticipants(channel, onlineProfileIds),
   );

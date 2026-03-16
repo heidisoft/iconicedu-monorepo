@@ -56,10 +56,8 @@ export function MonthSection({
   const [isOpen, setIsOpen] = useState(
     shouldMonthSectionStartOpen(defaultOpen, isCurrentMonth),
   );
-  const { progressPercent, allComplete, scheduledCount, completedCount } = getMonthSectionStats(
-    group,
-    progressStats,
-  );
+  const { progressPercent, allComplete, scheduledCount, completedCount } =
+    getMonthSectionStats(group, progressStats);
   return (
     <section className="space-y-0">
       <button

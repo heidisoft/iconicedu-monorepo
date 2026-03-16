@@ -1,7 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { UserAccountVM } from '@iconicedu/shared-types';
 
-import { mapAccountRowToVM, mapUserRoles } from '@iconicedu/web/lib/accounts/mappers/account.mapper';
+import {
+  mapAccountRowToVM,
+  mapUserRoles,
+} from '@iconicedu/web/lib/accounts/mappers/account.mapper';
 import {
   getAccountByAuthUserId,
   getAccountById,

@@ -1,4 +1,9 @@
-import type { EducatorAvailabilityVM, EducatorProfileVM, GradeLevel, UserProfileVM } from '@iconicedu/shared-types';
+import type {
+  EducatorAvailabilityVM,
+  EducatorProfileVM,
+  GradeLevel,
+  UserProfileVM,
+} from '@iconicedu/shared-types';
 import type { ProfileRow } from '@iconicedu/shared-types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 

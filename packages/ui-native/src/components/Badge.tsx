@@ -52,11 +52,7 @@ export const Badge: React.FC<BadgeProps> = ({
   if (dot) {
     return (
       <View
-        className={cn(
-          'h-2 w-2 rounded-full',
-          badgeVariants({ variant }),
-          className,
-        )}
+        className={cn('h-2 w-2 rounded-full', badgeVariants({ variant }), className)}
         accessibilityLabel="New notification"
       />
     );
@@ -74,16 +70,10 @@ export const Badge: React.FC<BadgeProps> = ({
 
   return (
     <View
-      className={cn(
-        badgeVariants({ variant }),
-        'px-2 py-0.5',
-        className,
-      )}
+      className={cn(badgeVariants({ variant }), 'px-2 py-0.5', className)}
       accessibilityLabel={`${displayText} notifications`}
     >
-      <Text className={cn(badgeTextVariants({ variant }))}>
-        {displayText}
-      </Text>
+      <Text className={cn(badgeTextVariants({ variant }))}>{displayText}</Text>
     </View>
   );
 };

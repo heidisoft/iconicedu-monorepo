@@ -70,7 +70,6 @@ export async function getOrCreateAccount(
         });
         return { account: refreshed.data, invite };
       }
-
     }
   }
 

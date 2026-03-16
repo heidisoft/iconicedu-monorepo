@@ -24,12 +24,12 @@ Step-by-step guide to get the IconicEdu monorepo running on your machine.
 
 ### Required tools
 
-| Tool | Version | How to install |
-|---|---|---|
-| Node.js | 20.19.0 | nvm or asdf |
-| pnpm | 9.12.0 | `corepack enable && corepack prepare pnpm@9.12.0 --activate` |
-| Git | any | system |
-| Supabase CLI | latest | `brew install supabase/tap/supabase` |
+| Tool         | Version | How to install                                               |
+| ------------ | ------- | ------------------------------------------------------------ |
+| Node.js      | 20.19.0 | nvm or asdf                                                  |
+| pnpm         | 9.12.0  | `corepack enable && corepack prepare pnpm@9.12.0 --activate` |
+| Git          | any     | system                                                       |
+| Supabase CLI | latest  | `brew install supabase/tap/supabase`                         |
 
 ### macOS only (for iOS development)
 
@@ -299,6 +299,7 @@ pnpm dev:mobile
 ```
 
 Then in the Expo terminal:
+
 - Press `i` — open iOS Simulator (macOS only)
 - Press `a` — open Android Emulator
 - Scan QR code — open on physical device with Expo Go
@@ -392,6 +393,7 @@ pnpm --filter api db:studio
 ### `pnpm install` fails with peer dependency errors
 
 Ensure you are using the exact pnpm version:
+
 ```bash
 corepack prepare pnpm@9.12.0 --activate
 pnpm install
@@ -404,6 +406,7 @@ Migrations are applied in filename order. If a migration references a table from
 ### Expo throws "Unable to resolve module"
 
 Shared packages haven't been built yet:
+
 ```bash
 pnpm build:packages
 ```
@@ -413,6 +416,7 @@ Then restart the Metro bundler with `pnpm dev:mobile`.
 ### Metro starts but the app crashes on device
 
 Clear the Expo cache:
+
 ```bash
 pnpm --filter mobile start -- --clear
 ```
@@ -442,6 +446,7 @@ Run everything inside WSL2. Do not use Windows native Node.js with Expo.
 ### TypeScript errors after pulling new code
 
 Rebuild packages to pick up new type definitions:
+
 ```bash
 pnpm build:packages
 ```

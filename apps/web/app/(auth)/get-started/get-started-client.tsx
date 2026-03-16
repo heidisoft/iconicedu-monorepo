@@ -6,7 +6,10 @@ import { Button, Input, Label } from '@iconicedu/ui-web';
 
 import { normalizeOrgSlug } from '@iconicedu/web/lib/org/slug';
 
-export function shouldSyncSlugFromName(isSlugManuallyEdited: boolean, currentSlug: string): boolean {
+export function shouldSyncSlugFromName(
+  isSlugManuallyEdited: boolean,
+  currentSlug: string,
+): boolean {
   return !isSlugManuallyEdited || !currentSlug.trim();
 }
 
@@ -60,13 +63,11 @@ export default function GetStartedClient() {
         }),
       });
 
-      const body = (await response.json().catch(() => null)) as
-        | {
-            success?: boolean;
-            message?: string;
-            onboarding?: { destination?: string | null };
-          }
-        | null;
+      const body = (await response.json().catch(() => null)) as {
+        success?: boolean;
+        message?: string;
+        onboarding?: { destination?: string | null };
+      } | null;
 
       if (!response.ok || !body?.success) {
         setErrorMessage(body?.message ?? 'Unable to create organization.');
@@ -86,14 +87,14 @@ export default function GetStartedClient() {
       <div className="space-y-1">
         <h1 className="text-xl font-semibold">Create organization (Admin only)</h1>
         <p className="text-sm text-muted-foreground">
-          No organization is currently assigned to your account. Create one only if you are the
-          responsible administrator for this workspace.
+          No organization is currently assigned to your account. Create one only if you
+          are the responsible administrator for this workspace.
         </p>
       </div>
 
       <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200">
-        This action creates a new organization owner context. Do not continue if your team already
-        has an existing organization.
+        This action creates a new organization owner context. Do not continue if your team
+        already has an existing organization.
       </div>
 
       <div className="grid gap-2">

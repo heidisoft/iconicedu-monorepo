@@ -14,9 +14,7 @@
 
 let mockNativeModules;
 try {
-  mockNativeModules = jest.requireActual(
-    'react-native/jest/mocks/NativeModules'
-  ).default;
+  mockNativeModules = jest.requireActual('react-native/jest/mocks/NativeModules').default;
 } catch {
   mockNativeModules = {};
 }
@@ -24,10 +22,7 @@ try {
 if (!mockNativeModules || typeof mockNativeModules !== 'object') {
   mockNativeModules = {};
 }
-if (
-  !mockNativeModules.UIManager ||
-  typeof mockNativeModules.UIManager !== 'object'
-) {
+if (!mockNativeModules.UIManager || typeof mockNativeModules.UIManager !== 'object') {
   mockNativeModules.UIManager = {};
 }
 
@@ -74,7 +69,10 @@ jest.mock('expo-audio', () => {
     },
     useAudioRecorderPermissions: jest
       .fn()
-      .mockReturnValue([{ granted: true }, jest.fn().mockResolvedValue({ granted: true })]),
+      .mockReturnValue([
+        { granted: true },
+        jest.fn().mockResolvedValue({ granted: true }),
+      ]),
   };
 });
 

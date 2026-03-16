@@ -8,7 +8,10 @@ import type {
   FamilyLinkInviteVM,
   FamilyRelation,
 } from '@iconicedu/shared-types';
-import { getProfileByAccountId, upsertProfileForAccount } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import {
+  getProfileByAccountId,
+  upsertProfileForAccount,
+} from '@iconicedu/web/lib/profile/queries/profiles.query';
 import { pickRandomThemeKey } from '@iconicedu/web/lib/profile/constants/theme';
 import {
   getAccountByEmail,
@@ -78,8 +81,7 @@ async function ensureInvitedAccountForRole(options: {
   if (existingAccountError) {
     throw existingAccountError;
   }
-  const displayName =
-    options.kind === 'child' ? 'Invited child' : 'Invited guardian';
+  const displayName = options.kind === 'child' ? 'Invited child' : 'Invited guardian';
   const uiThemeKey = options.kind === 'guardian' ? pickRandomThemeKey() : 'teal';
   if (existingAccount) {
     await upsertProfileForAccount(options.adminClient, {
@@ -425,21 +427,19 @@ export async function acceptFamilyInvite(options: AcceptFamilyInviteOptions) {
   }
 
   if (inviteRow.invited_role === 'child') {
-    const { error: linkError } = await adminClient
-      .from('family_links')
-      .upsert(
-        {
-          org_id: inviteRow.org_id,
-          family_id: inviteRow.family_id,
-          guardian_account_id: inviteRow.created_by_account_id,
-          child_account_id: options.account.id,
-          relation: options.relation ?? 'guardian',
-          permissions_scope: options.permissionsScope ?? null,
-          created_by: options.account.id,
-          updated_by: options.account.id,
-        },
-        { onConflict: 'org_id,family_id,guardian_account_id,child_account_id' },
-      );
+    const { error: linkError } = await adminClient.from('family_links').upsert(
+      {
+        org_id: inviteRow.org_id,
+        family_id: inviteRow.family_id,
+        guardian_account_id: inviteRow.created_by_account_id,
+        child_account_id: options.account.id,
+        relation: options.relation ?? 'guardian',
+        permissions_scope: options.permissionsScope ?? null,
+        created_by: options.account.id,
+        updated_by: options.account.id,
+      },
+      { onConflict: 'org_id,family_id,guardian_account_id,child_account_id' },
+    );
 
     if (linkError) {
       throw linkError;

@@ -13,7 +13,9 @@ import type {
   ProfileRow,
 } from '@iconicedu/shared-types';
 
-function toDisplayName(profile: Pick<ProfileRow, 'display_name' | 'first_name' | 'last_name'>) {
+function toDisplayName(
+  profile: Pick<ProfileRow, 'display_name' | 'first_name' | 'last_name'>,
+) {
   const display = profile.display_name?.trim() ?? '';
   if (display) {
     return display;
@@ -97,7 +99,9 @@ function buildMetrics(
     participants.filter((row) => row.attendance_status === 'no_show').length;
   const durations = attendeeRows
     .map((row) => row.credited_seconds ?? row.total_seconds ?? null)
-    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+    .filter(
+      (value): value is number => typeof value === 'number' && Number.isFinite(value),
+    );
   const denominator = expectedParticipantCount || participantCount || 0;
 
   return {
@@ -140,8 +144,7 @@ function resolveAttendancePolicy(
       typeof value.countLateJoinAsAttended === 'boolean'
         ? value.countLateJoinAsAttended
         : true,
-    countRejoins:
-      typeof value.countRejoins === 'boolean' ? value.countRejoins : true,
+    countRejoins: typeof value.countRejoins === 'boolean' ? value.countRejoins : true,
     source: 'hybrid',
   };
 }
@@ -220,12 +223,14 @@ export function buildLiveSessionAttendanceParticipantVM(input: {
     lastLeftAt: input.participantRow.last_left_at ?? null,
     joinCount: input.participantRow.join_count ?? 0,
     totalSeconds: input.participantRow.total_seconds ?? null,
-    lastKnownStatus: (input.participantRow.last_known_status ?? 'requested') as LiveSessionAttendanceParticipantVM['lastKnownStatus'],
+    lastKnownStatus: (input.participantRow.last_known_status ??
+      'requested') as LiveSessionAttendanceParticipantVM['lastKnownStatus'],
     attended: Boolean(input.participantRow.first_joined_at),
     noShow: input.participantRow.attendance_status === 'no_show',
     expectedToAttend: input.participantRow.expected_to_attend === true,
     attendanceStatus:
-      (input.participantRow.attendance_status as LiveSessionAttendanceParticipantVM['attendanceStatus']) ??
+      (input.participantRow
+        .attendance_status as LiveSessionAttendanceParticipantVM['attendanceStatus']) ??
       (input.participantRow.first_joined_at ? 'partial' : 'expected'),
     attendanceRatio: input.participantRow.attendance_ratio ?? null,
     qualifiedFullAttendance: input.participantRow.qualified_full_attendance === true,

@@ -2,7 +2,10 @@ import { memo } from 'react';
 import { TrendingUp } from 'lucide-react';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
 import type { ProgressUpdateMessageVM as ProgressUpdateMessageType } from '@iconicedu/shared-types';
-import { MessageBase, type MessageBaseProps } from '@iconicedu/ui-web/components/messages/message-base';
+import {
+  MessageBase,
+  type MessageBaseProps,
+} from '@iconicedu/ui-web/components/messages/message-base';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 
 interface ProgressUpdateMessageProps extends Omit<

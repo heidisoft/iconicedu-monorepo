@@ -41,7 +41,9 @@ type ResponsiveDialogProps = {
   containerClassName?: string;
   bodyClassName?: string;
   dialogProps?: React.ComponentProps<typeof Dialog>;
-  drawerProps?: (React.ComponentProps<typeof Drawer> & Record<string, unknown>) | undefined;
+  drawerProps?:
+    | (React.ComponentProps<typeof Drawer> & Record<string, unknown>)
+    | undefined;
 };
 
 export function ResponsiveDialog({
@@ -96,10 +98,7 @@ export function ResponsiveDialog({
     <DialogTitle className={dialogTitleClasses}>{title}</DialogTitle>
   );
 
-  const renderContent = (
-    headerNode: React.ReactNode,
-    bodyNode: React.ReactNode,
-  ) =>
+  const renderContent = (headerNode: React.ReactNode, bodyNode: React.ReactNode) =>
     containerClassName ? (
       <div className={cn('flex flex-col min-h-0', containerClassName)}>
         {headerNode}

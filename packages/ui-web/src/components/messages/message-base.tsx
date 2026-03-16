@@ -175,7 +175,11 @@ export const MessageBase = memo(function MessageBase({
         {isOwnMessage ? (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onToggleHidden} disabled={isHiding} className="py-2">
+            <DropdownMenuItem
+              onClick={onToggleHidden}
+              disabled={isHiding}
+              className="py-2"
+            >
               {isHiding ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
@@ -425,10 +429,14 @@ export const MessageBase = memo(function MessageBase({
               isOwnMessage ? 'justify-end' : 'justify-start',
             )}
           >
-            <div className={cn(isInteractionDisabled && 'pointer-events-none opacity-60')}>
+            <div
+              className={cn(isInteractionDisabled && 'pointer-events-none opacity-60')}
+            >
               <ReactionBar
                 reactions={message.social.reactions}
-                onToggleReaction={isInteractionDisabled ? undefined : handleToggleReaction}
+                onToggleReaction={
+                  isInteractionDisabled ? undefined : handleToggleReaction
+                }
                 pendingEmojis={pendingReactionEmojis}
               />
             </div>
@@ -446,7 +454,9 @@ export const MessageBase = memo(function MessageBase({
                     <SmilePlus className="h-4 w-4" />
                   </Button>
                 ) : (
-                  <EmojiPicker onEmojiSelect={(emoji) => handleToggleReaction(emoji, 'picker')}>
+                  <EmojiPicker
+                    onEmojiSelect={(emoji) => handleToggleReaction(emoji, 'picker')}
+                  >
                     <Button
                       variant="ghost"
                       size="icon"

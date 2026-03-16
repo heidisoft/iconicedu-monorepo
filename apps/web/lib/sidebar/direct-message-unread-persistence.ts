@@ -40,10 +40,7 @@ export async function persistDirectMessageUnreadCount(
     payload.last_read_at = input.lastReadAt;
   }
 
-  return supabase.from('channel_read_state').upsert(
-    payload,
-    {
-      onConflict: 'org_id,channel_id,account_id',
-    },
-  );
+  return supabase.from('channel_read_state').upsert(payload, {
+    onConflict: 'org_id,channel_id,account_id',
+  });
 }

@@ -1,4 +1,8 @@
-import type { ClassScheduleVM, LiveSessionModeVM, LiveSessionProviderVM } from '@iconicedu/shared-types';
+import type {
+  ClassScheduleVM,
+  LiveSessionModeVM,
+  LiveSessionProviderVM,
+} from '@iconicedu/shared-types';
 
 export type LiveSessionStatus = 'starting' | 'live' | 'ended' | 'failed';
 
@@ -39,7 +43,11 @@ export type NormalizedLiveSessionParticipantEvent = {
   participantDisplayName?: string | null;
   participantEmail?: string | null;
   correlationKey?: string | null;
-  eventType: 'session_started' | 'session_ended' | 'participant_joined' | 'participant_left';
+  eventType:
+    | 'session_started'
+    | 'session_ended'
+    | 'participant_joined'
+    | 'participant_left';
   occurredAt: string;
   payload: Record<string, unknown>;
   raw?: Record<string, unknown>;
@@ -47,7 +55,9 @@ export type NormalizedLiveSessionParticipantEvent = {
 
 export interface LiveSessionProviderAdapter {
   readonly key: LiveSessionProviderVM;
-  createSession(input: LiveSessionProviderCreateInput): Promise<LiveSessionProviderCreateResult>;
+  createSession(
+    input: LiveSessionProviderCreateInput,
+  ): Promise<LiveSessionProviderCreateResult>;
   getJoinAccess(input: LiveSessionJoinAccessInput): Promise<LiveSessionJoinAccessResult>;
   normalizeWebhook(input: {
     headers: Headers;

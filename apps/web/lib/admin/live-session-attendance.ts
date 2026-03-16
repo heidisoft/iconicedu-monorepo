@@ -46,7 +46,9 @@ export async function getAdminLiveSessionAttendanceList(
       session,
       channel: channelById.get(session.channel_id) ?? null,
       learningSpaceLink: link,
-      learningSpace: link ? (learningSpaceById.get(link.learning_space_id) ?? null) : null,
+      learningSpace: link
+        ? (learningSpaceById.get(link.learning_space_id) ?? null)
+        : null,
       participants: participantsBySessionId.get(session.id) ?? [],
       starterProfile: profileById.get(session.started_by_profile_id) ?? null,
     });

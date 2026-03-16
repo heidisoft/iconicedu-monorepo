@@ -34,7 +34,8 @@ export async function POST(
 
     return NextResponse.json({ success: true, ...result });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to join live session';
+    const message =
+      error instanceof Error ? error.message : 'Failed to join live session';
     const status = message === 'Unauthorized' ? 403 : 500;
     return NextResponse.json({ success: false, error: message }, { status });
   }

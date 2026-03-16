@@ -2,7 +2,11 @@
 
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { getDaysInMonth, getEventDate, isSameDay } from '@iconicedu/ui-web/lib/class-schedule-utils';
+import {
+  getDaysInMonth,
+  getEventDate,
+  isSameDay,
+} from '@iconicedu/ui-web/lib/class-schedule-utils';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import type { ClassScheduleVM } from '@iconicedu/shared-types';
 import { useState, useEffect } from 'react';
@@ -30,7 +34,7 @@ export function MiniClassSchedule({
     setDisplayMonth(currentDate.getMonth());
     setDisplayYear(currentDate.getFullYear());
     onMonthChange?.(new Date(currentDate.getFullYear(), currentDate.getMonth(), 1));
-  }, [currentDate]);
+  }, [currentDate, onMonthChange]);
 
   const days = getDaysInMonth(displayYear, displayMonth);
   const monthName = new Date(displayYear, displayMonth).toLocaleDateString('en-US', {

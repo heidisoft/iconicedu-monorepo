@@ -11,7 +11,10 @@ export const STATUS_EMOJI_OPTIONS = [
   '🧑‍💼',
 ] as const;
 
-export const STATUS_CLEAR_AFTER_OPTIONS: Array<{ value: StatusClearAfterOption; label: string }> = [
+export const STATUS_CLEAR_AFTER_OPTIONS: Array<{
+  value: StatusClearAfterOption;
+  label: string;
+}> = [
   { value: 'never', label: "Don't clear" },
   { value: '30m', label: '30 minutes' },
   { value: '1h', label: '1 hour' },

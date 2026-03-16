@@ -1,11 +1,5 @@
 import React, { useMemo } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-} from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, MapPin } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
@@ -16,26 +10,59 @@ import type { AppColors } from '@/lib/theme';
 
 function makeStyles(C: AppColors) {
   return StyleSheet.create({
-    safe:         { flex: 1, backgroundColor: C.pageBg },
-    nav:          { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border },
-    navBack:      { padding: 8, borderRadius: 8 },
-    navTitle:     { flex: 1, fontSize: 17, fontWeight: '700', color: C.text, textAlign: 'center', marginRight: 40 },
-    scroll:       { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 48, gap: 6 },
-    sectionLabel: { fontSize: 12, fontWeight: '700', color: C.textFaint, textTransform: 'uppercase', letterSpacing: 0.8, paddingHorizontal: 4, paddingTop: 14, paddingBottom: 6 },
-    card:         { borderRadius: 14, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, overflow: 'hidden' },
-    divider:      { height: 1, backgroundColor: C.border, marginLeft: 60 },
-    valueText:    { fontSize: 13, color: C.textMuted, maxWidth: 160, textAlign: 'right' },
-    emptyValue:   { fontSize: 13, color: C.textFaint, fontStyle: 'italic' },
-    emptyCard:    { padding: 24, alignItems: 'center', gap: 8 },
-    emptyIcon:    { fontSize: 32 },
-    emptyTitle:   { fontSize: 15, fontWeight: '600', color: C.text },
-    emptyDesc:    { fontSize: 13, color: C.textMuted, textAlign: 'center' },
+    safe: { flex: 1, backgroundColor: C.pageBg },
+    nav: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 8,
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: C.border,
+    },
+    navBack: { padding: 8, borderRadius: 8 },
+    navTitle: {
+      flex: 1,
+      fontSize: 17,
+      fontWeight: '700',
+      color: C.text,
+      textAlign: 'center',
+      marginRight: 40,
+    },
+    scroll: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 48, gap: 6 },
+    sectionLabel: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: C.textFaint,
+      textTransform: 'uppercase',
+      letterSpacing: 0.8,
+      paddingHorizontal: 4,
+      paddingTop: 14,
+      paddingBottom: 6,
+    },
+    card: {
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.card,
+      overflow: 'hidden',
+    },
+    divider: { height: 1, backgroundColor: C.border, marginLeft: 60 },
+    valueText: { fontSize: 13, color: C.textMuted, maxWidth: 160, textAlign: 'right' },
+    emptyValue: { fontSize: 13, color: C.textFaint, fontStyle: 'italic' },
+    emptyCard: { padding: 24, alignItems: 'center', gap: 8 },
+    emptyIcon: { fontSize: 32 },
+    emptyTitle: { fontSize: 15, fontWeight: '600', color: C.text },
+    emptyDesc: { fontSize: 13, color: C.textMuted, textAlign: 'center' },
   });
 }
 
 function Val({ value, s }: { value?: string | null; s: ReturnType<typeof makeStyles> }) {
   if (!value) return <Text style={s.emptyValue}>Not set</Text>;
-  return <Text style={s.valueText} numberOfLines={1}>{value}</Text>;
+  return (
+    <Text style={s.valueText} numberOfLines={1}>
+      {value}
+    </Text>
+  );
 }
 
 export default function LocationScreen() {
@@ -46,7 +73,11 @@ export default function LocationScreen() {
 
   const prof = profile as Record<string, unknown> | undefined;
   const hasAnyLocation =
-    prof?.country_name || prof?.country_code || prof?.region || prof?.city || prof?.postal_code;
+    prof?.country_name ||
+    prof?.country_code ||
+    prof?.region ||
+    prof?.city ||
+    prof?.postal_code;
 
   return (
     <SafeAreaView style={s.safe}>
@@ -64,7 +95,9 @@ export default function LocationScreen() {
           <View style={[s.card, s.emptyCard]}>
             <Text style={s.emptyIcon}>📍</Text>
             <Text style={s.emptyTitle}>No location set</Text>
-            <Text style={s.emptyDesc}>Location details appear here once your profile is updated.</Text>
+            <Text style={s.emptyDesc}>
+              Location details appear here once your profile is updated.
+            </Text>
           </View>
         ) : (
           <View style={s.card}>
@@ -74,7 +107,10 @@ export default function LocationScreen() {
               labelColor={colors.text}
               hideChevron
               trailing={
-                <Val value={(prof?.country_name as string) ?? (prof?.country_code as string)} s={s} />
+                <Val
+                  value={(prof?.country_name as string) ?? (prof?.country_code as string)}
+                  s={s}
+                />
               }
             />
             <View style={s.divider} />

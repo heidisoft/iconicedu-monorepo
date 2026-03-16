@@ -1,4 +1,8 @@
-import type { ISODateTime, OnboardingStep, UUID } from '@iconicedu/shared-types/shared/shared';
+import type {
+  ISODateTime,
+  OnboardingStep,
+  UUID,
+} from '@iconicedu/shared-types/shared/shared';
 
 export interface UserOnboardingStatusRow {
   id: UUID;

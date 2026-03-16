@@ -103,9 +103,9 @@ describe('createChannelFileItem', () => {
   });
 
   it('derives a visual kind from mime type and file extension', () => {
-    expect(getChannelFileVisualKind({ name: 'brief.pdf', mimeType: 'application/pdf' })).toBe(
-      'pdf',
-    );
+    expect(
+      getChannelFileVisualKind({ name: 'brief.pdf', mimeType: 'application/pdf' }),
+    ).toBe('pdf');
     expect(
       getChannelFileVisualKind({
         name: 'worksheet.xlsx',
@@ -115,12 +115,15 @@ describe('createChannelFileItem', () => {
     expect(getChannelFileVisualKind({ name: 'voice.webm', mimeType: 'audio/webm' })).toBe(
       'audio',
     );
-    expect(getChannelFileVisualKind({ name: 'archive.zip', mimeType: 'application/zip' })).toBe(
-      'archive',
-    );
-    expect(getChannelFileVisualKind({ name: 'unknown.bin', mimeType: 'application/octet-stream' })).toBe(
-      'generic',
-    );
+    expect(
+      getChannelFileVisualKind({ name: 'archive.zip', mimeType: 'application/zip' }),
+    ).toBe('archive');
+    expect(
+      getChannelFileVisualKind({
+        name: 'unknown.bin',
+        mimeType: 'application/octet-stream',
+      }),
+    ).toBe('generic');
   });
 
   it('returns a stable visual tone for file kinds', () => {
@@ -131,6 +134,8 @@ describe('createChannelFileItem', () => {
   });
 
   it('formats the uploaded date for files-tab metadata', () => {
-    expect(formatChannelFileUploadedDate('2026-02-24T10:00:00.000Z')).toBe('Feb 24, 2026');
+    expect(formatChannelFileUploadedDate('2026-02-24T10:00:00.000Z')).toBe(
+      'Feb 24, 2026',
+    );
   });
 });

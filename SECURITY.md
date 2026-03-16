@@ -2,10 +2,10 @@
 
 ## Supported Versions
 
-| Version | Supported |
-|---|---|
-| `main` branch | Yes |
-| Older branches | No |
+| Version        | Supported |
+| -------------- | --------- |
+| `main` branch  | Yes       |
+| Older branches | No        |
 
 ## Reporting a Vulnerability
 
@@ -15,7 +15,7 @@ If you discover a security vulnerability — especially one involving user data,
 
 ### How to report
 
-Email: **security@iconicedu.com** *(replace with your actual contact)*
+Email: **security@iconicedu.com** _(replace with your actual contact)_
 
 Include as much of the following as possible:
 
@@ -32,6 +32,7 @@ Include as much of the following as possible:
 - We will work with you to understand the scope, patch it, and disclose responsibly
 
 We ask that you:
+
 - Give us reasonable time to fix the issue before public disclosure
 - Not access, modify, or delete data belonging to other users during testing
 - Not perform denial-of-service testing
@@ -41,6 +42,7 @@ We ask that you:
 This platform handles data for minors (children in an education context). Any vulnerability affecting child data, guardian access controls, or role-based visibility is treated as **critical priority**.
 
 Key areas of concern:
+
 - **Row Level Security (RLS)** — Supabase RLS policies restrict data access per user role. Bypasses are critical.
 - **Authentication** — Supabase Auth handles session tokens. Token leakage or auth bypass is critical.
 - **Role boundaries** — Guardians, educators, advisors, and staff have different data access scopes. Cross-role data leakage is critical.

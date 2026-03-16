@@ -1,11 +1,13 @@
 # AI Project Instructions
 
 ## 1. Project Overview
+
 - This monorepo powers a multi-platform education platform (web, mobile, API).
 - Web is the canonical UI for admin/parent workflows; mobile targets student/teacher use cases.
 - Shared ViewModels (VMs) define UI-facing data contracts across apps.
 
 ## 2. Tech Stack & Versions
+
 - Next.js (App Router) for web.
 - NestJS for API and business logic.
 - Supabase for Auth, DB, RLS, and Realtime.
@@ -15,6 +17,7 @@
 - Turborepo + pnpm for monorepo tooling.
 
 ## 3. Monorepo Structure & Ownership Rules
+
 - `apps/web` owns web routes, server/client components, and data wiring.
 - `apps/api` (NestJS) owns all business logic, validation, and writes.
 - `apps/mobile` owns native UI and mobile-only UX logic.
@@ -23,6 +26,7 @@
 - Do not bypass ownership by importing across boundaries (e.g., UI into API).
 
 ## 4. Data Access & Security Rules
+
 - All writes and business logic must go through NestJS API.
 - Supabase RLS must remain enabled for all tables.
 - Never use service role keys in client apps.
@@ -34,6 +38,7 @@
 - When adding DB queries for any entity, follow the `apps/web/lib/user` structure: `queries/` for raw DB access, `mappers/` for row-to-VM translation, `builders/` for composition/aggregation, `constants/` for shared select lists, and `derive.ts` for computed fields. Create a matching `apps/web/lib/<entity>` folder with the same layout and place admin-only helpers in `apps/web/lib/admin/<entity>.ts` (or `apps/web/lib/admin/<entity>/` if it grows).
 
 ## 5. TypeScript & API Design Rules
+
 - Use strict typing and prefer explicit interfaces/types.
 - VMs live in `packages/shared-types` and are the only shared UI contract.
 - Avoid circular references in VM types.
@@ -41,6 +46,7 @@
 - Use discriminated unions for message/attachment variants.
 
 ## 6. UI & Design System Rules
+
 - Use Tailwind CSS and shadcn/ui components consistently.
 - Prefer composition of shadcn primitives over custom components.
 - Reference the official shadcn component docs (https://ui.shadcn.com/docs/components) before recreating a UI pattern; strive to reuse those building blocks rather than invent new ones.
@@ -50,23 +56,27 @@
 - Keep mobile responsiveness in mind for all layouts.
 
 ## 7. Naming & File Conventions
+
 - Use `kebab-case` for files and folders.
 - Components are `PascalCase`.
 - VMs are suffixed with `VM`.
 - Keep related code colocated; avoid duplicate utilities.
 
 ## 8. Error Handling & Validation
+
 - Validate all inputs on the API layer (NestJS).
 - Use typed errors and surface user-safe messages in UI.
 - Never suppress errors silently; log with context.
 
 ## 9. Performance & Scalability Principles
+
 - Avoid unnecessary data mapping or heavy client transforms.
 - Use pagination/cursors for message and thread lists.
 - Prefer server-side aggregation over client-side computation.
 - Keep UI lists virtualizable and avoid deep nesting in render loops.
 
 ## 10. Testing Expectations
+
 - For every new file and any updated file, add unit tests that cover basic usage and edge cases.
 - Co-locate tests with the owning package/app conventions and keep them deterministic.
 - Run relevant test suites for the changes and ensure they pass; if failures occur, fix them before finishing.

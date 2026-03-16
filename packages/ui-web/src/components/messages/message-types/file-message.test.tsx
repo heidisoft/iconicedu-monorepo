@@ -13,7 +13,11 @@ describe('formatFileSize', () => {
   it('returns grouped file attachments when present', () => {
     expect(
       getFileAttachments({
-        attachment: { type: 'file', name: 'first.pdf', url: 'https://example.com/first.pdf' },
+        attachment: {
+          type: 'file',
+          name: 'first.pdf',
+          url: 'https://example.com/first.pdf',
+        },
         attachments: [
           { type: 'file', name: 'first.pdf', url: 'https://example.com/first.pdf' },
           { type: 'file', name: 'second.pdf', url: 'https://example.com/second.pdf' },

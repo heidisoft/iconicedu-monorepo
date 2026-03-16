@@ -39,11 +39,7 @@ export function ThemeToggle({ ...props }) {
   const handleToggle = () => {
     // Cycle: system → light → dark → system
     const nextTheme =
-      currentTheme === 'system'
-        ? 'light'
-        : currentTheme === 'light'
-          ? 'dark'
-          : 'system';
+      currentTheme === 'system' ? 'light' : currentTheme === 'light' ? 'dark' : 'system';
     setTheme(nextTheme);
   };
 

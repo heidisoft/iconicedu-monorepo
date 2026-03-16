@@ -7,8 +7,10 @@ const getChannelMediaByChannelIds = vi.fn();
 const createSignedChannelFileUrl = vi.fn();
 
 vi.mock('@iconicedu/web/lib/messages/queries/messages.query', () => ({
-  getChannelFilesByChannelIds: (...args: unknown[]) => getChannelFilesByChannelIds(...args),
-  getChannelMediaByChannelIds: (...args: unknown[]) => getChannelMediaByChannelIds(...args),
+  getChannelFilesByChannelIds: (...args: unknown[]) =>
+    getChannelFilesByChannelIds(...args),
+  getChannelMediaByChannelIds: (...args: unknown[]) =>
+    getChannelMediaByChannelIds(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/messages/queries/file-url.query', () => ({

@@ -1,18 +1,22 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useMemo, useState } from 'react';
-import { queryKeys, fetchChannelMessages, toggleReaction as apiToggleReaction } from '@/lib/api/queries';
+import {
+  queryKeys,
+  fetchChannelMessages,
+  toggleReaction as apiToggleReaction,
+} from '@/lib/api/queries';
 import { supabase } from '@/lib/supabase/client';
 import type { MessageVM, ReactionVM } from '@iconicedu/shared-types';
 
 // ─── Typing constants ─────────────────────────────────────────────────────────
 
-const TYPING_REMOTE_TIMEOUT_MS = 4000;  // remove user from list after this long without an event
-const TYPING_THROTTLE_MS = 1500;        // min interval between start broadcasts
-const TYPING_STOP_DELAY_MS = 2500;      // auto-send stop after this much inactivity
+const TYPING_REMOTE_TIMEOUT_MS = 4000; // remove user from list after this long without an event
+const TYPING_THROTTLE_MS = 1500; // min interval between start broadcasts
+const TYPING_STOP_DELAY_MS = 2500; // auto-send stop after this much inactivity
 
 type TypingPayload = {
   profileId?: string;
-  name?: string;      // included by mobile; absent in web payloads
+  name?: string; // included by mobile; absent in web payloads
   isTyping?: boolean; // true = start, false = stop; absent in legacy mobile payloads
 };
 
@@ -43,8 +47,12 @@ export function useMessages(
   // Stable refs so typing callbacks don't need to be recreated on every render
   const myTypingNameRef = useRef(myTypingName);
   const currentProfileIdRef = useRef(currentProfileId);
-  useEffect(() => { myTypingNameRef.current = myTypingName; }, [myTypingName]);
-  useEffect(() => { currentProfileIdRef.current = currentProfileId; }, [currentProfileId]);
+  useEffect(() => {
+    myTypingNameRef.current = myTypingName;
+  }, [myTypingName]);
+  useEffect(() => {
+    currentProfileIdRef.current = currentProfileId;
+  }, [currentProfileId]);
 
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const remoteTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
@@ -62,29 +70,54 @@ export function useMessages(
       // ── Postgres changes: messages table ──
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages', filter: `channel_id=eq.${channelId}` },
-        () => { queryClient.invalidateQueries({ queryKey: queryKeys.messages(channelId) }); },
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `channel_id=eq.${channelId}`,
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: queryKeys.messages(channelId) });
+        },
       )
       .on(
         'postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'messages', filter: `channel_id=eq.${channelId}` },
-        () => { queryClient.invalidateQueries({ queryKey: queryKeys.messages(channelId) }); },
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'messages',
+          filter: `channel_id=eq.${channelId}`,
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: queryKeys.messages(channelId) });
+        },
       )
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'messages', filter: `channel_id=eq.${channelId}` },
-        () => { queryClient.invalidateQueries({ queryKey: queryKeys.messages(channelId) }); },
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+          filter: `channel_id=eq.${channelId}`,
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: queryKeys.messages(channelId) });
+        },
       )
       // ── Postgres changes: message payload tables ──
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'message_text' },
-        () => { queryClient.invalidateQueries({ queryKey: queryKeys.messages(channelId) }); },
+        () => {
+          queryClient.invalidateQueries({ queryKey: queryKeys.messages(channelId) });
+        },
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'message_reactions' },
-        () => { queryClient.invalidateQueries({ queryKey: queryKeys.messages(channelId) }); },
+        () => {
+          queryClient.invalidateQueries({ queryKey: queryKeys.messages(channelId) });
+        },
       )
       // ── Postgres changes: threads table (reply count updates) ──
       .on(
@@ -95,7 +128,9 @@ export function useMessages(
           table: 'threads',
           ...(orgId ? { filter: `org_id=eq.${orgId}` } : {}),
         },
-        () => { queryClient.invalidateQueries({ queryKey: queryKeys.messages(channelId) }); },
+        () => {
+          queryClient.invalidateQueries({ queryKey: queryKeys.messages(channelId) });
+        },
       )
       // ── Broadcast: typing events (shared channel with web) ──
       .on('broadcast', { event: 'typing' }, ({ payload }: { payload: TypingPayload }) => {
@@ -106,7 +141,9 @@ export function useMessages(
         // otherwise look up from cached messages (web omits name).
         const resolveDisplayName = () => {
           if (name) return name;
-          const msgs = queryClient.getQueryData<MessageVM[]>(queryKeys.messages(channelId));
+          const msgs = queryClient.getQueryData<MessageVM[]>(
+            queryKeys.messages(channelId),
+          );
           const found = msgs?.find((m) => m.core.sender.ids.id === profileId);
           return found?.core.sender.profile.displayName ?? 'Someone';
         };
@@ -149,12 +186,13 @@ export function useMessages(
 
     ch.subscribe();
     channelRef.current = ch;
+    const remoteTimeouts = remoteTimeoutsRef.current;
 
     return () => {
       supabase.removeChannel(ch);
       channelRef.current = null;
-      remoteTimeoutsRef.current.forEach((t) => clearTimeout(t));
-      remoteTimeoutsRef.current.clear();
+      remoteTimeouts.forEach((t) => clearTimeout(t));
+      remoteTimeouts.clear();
       if (stopTimerRef.current) clearTimeout(stopTimerRef.current);
       setTypingMap(new Map());
     };
@@ -209,10 +247,11 @@ export function useMessages(
   const typingUsers = useMemo(() => Array.from(typingMap.values()), [typingMap]);
 
   // ── Load more ─────────────────────────────────────────────────────────────
+  const messages = useMemo(() => query.data ?? [], [query.data]);
 
   const loadMore = useCallback(async () => {
-    if (!query.data?.length) return;
-    const oldest = query.data[0];
+    if (!messages.length) return;
+    const oldest = messages[0];
     if (!oldest) return;
 
     const olderMessages = await fetchChannelMessages(
@@ -223,11 +262,11 @@ export function useMessages(
       oldest.core.createdAt,
     );
 
-    queryClient.setQueryData(
-      queryKeys.messages(channelId),
-      (prev: typeof query.data) => [...olderMessages, ...(prev ?? [])],
-    );
-  }, [channelId, currentProfileId, currentAccountId, query.data, queryClient]);
+    queryClient.setQueryData(queryKeys.messages(channelId), (prev: typeof messages) => [
+      ...olderMessages,
+      ...(prev ?? []),
+    ]);
+  }, [channelId, currentProfileId, currentAccountId, messages, queryClient]);
 
   // ── Reaction toggle ───────────────────────────────────────────────────────
 
@@ -254,19 +293,18 @@ export function useMessages(
           let nextReactions: ReactionVM[];
           if (existing?.reactedByMe) {
             // Remove my reaction
-            nextReactions = existing.count <= 1
-              ? reactions.filter((r) => r.emoji !== emoji)
-              : reactions.map((r) =>
-                  r.emoji === emoji
-                    ? { ...r, count: r.count - 1, reactedByMe: false }
-                    : r,
-                );
+            nextReactions =
+              existing.count <= 1
+                ? reactions.filter((r) => r.emoji !== emoji)
+                : reactions.map((r) =>
+                    r.emoji === emoji
+                      ? { ...r, count: r.count - 1, reactedByMe: false }
+                      : r,
+                  );
           } else if (existing) {
             // Add my reaction to an existing emoji group (others reacted, I haven't yet)
             nextReactions = reactions.map((r) =>
-              r.emoji === emoji
-                ? { ...r, count: r.count + 1, reactedByMe: true }
-                : r,
+              r.emoji === emoji ? { ...r, count: r.count + 1, reactedByMe: true } : r,
             );
           } else {
             // New emoji — toggle on

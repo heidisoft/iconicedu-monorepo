@@ -46,10 +46,7 @@ export async function GET(request: Request) {
   }
 
   if (accountResponse.data.org_id !== orgId) {
-    return NextResponse.json(
-      { success: false, message: 'Forbidden' },
-      { status: 403 },
-    );
+    return NextResponse.json({ success: false, message: 'Forbidden' }, { status: 403 });
   }
 
   const membershipResponse = await supabase
@@ -63,10 +60,7 @@ export async function GET(request: Request) {
     .maybeSingle();
 
   if (!membershipResponse.data) {
-    return NextResponse.json(
-      { success: false, message: 'Forbidden' },
-      { status: 403 },
-    );
+    return NextResponse.json({ success: false, message: 'Forbidden' }, { status: 403 });
   }
 
   const signedUrl = await createSignedChannelFileUrl(supabase, path);

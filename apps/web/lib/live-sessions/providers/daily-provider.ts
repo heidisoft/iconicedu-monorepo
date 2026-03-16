@@ -32,7 +32,11 @@ function getDailyConfig() {
 
 function buildDailyRoomName(input: LiveSessionProviderCreateInput) {
   const normalizedScope = input.scopeKey.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-  const scopeHash = crypto.createHash('sha1').update(normalizedScope).digest('hex').slice(0, 10);
+  const scopeHash = crypto
+    .createHash('sha1')
+    .update(normalizedScope)
+    .digest('hex')
+    .slice(0, 10);
   return [
     'ls',
     input.orgId.replace(/-/g, '').slice(0, 8),
@@ -42,7 +46,9 @@ function buildDailyRoomName(input: LiveSessionProviderCreateInput) {
   ].join('-');
 }
 
-async function createDailyRoom(input: LiveSessionProviderCreateInput): Promise<DailyRoomResponse> {
+async function createDailyRoom(
+  input: LiveSessionProviderCreateInput,
+): Promise<DailyRoomResponse> {
   const config = getDailyConfig();
   if (!config.apiKey) {
     throw new Error('Daily is not configured');
@@ -130,7 +136,9 @@ function verifyDailyWebhookSignature(headers: Headers, body: string) {
   return signature.includes(expected);
 }
 
-function normalizeDailyEvent(body: Record<string, unknown>): NormalizedLiveSessionParticipantEvent[] {
+function normalizeDailyEvent(
+  body: Record<string, unknown>,
+): NormalizedLiveSessionParticipantEvent[] {
   const eventName =
     typeof body.event === 'string'
       ? body.event
@@ -169,10 +177,8 @@ function normalizeDailyEvent(body: Record<string, unknown>): NormalizedLiveSessi
         : typeof payload.id === 'string'
           ? payload.id
           : null,
-    providerParticipantId:
-      typeof participant.id === 'string' ? participant.id : null,
-    profileId:
-      typeof participant.user_id === 'string' ? participant.user_id : null,
+    providerParticipantId: typeof participant.id === 'string' ? participant.id : null,
+    profileId: typeof participant.user_id === 'string' ? participant.user_id : null,
     participantDisplayName:
       typeof participant.user_name === 'string'
         ? participant.user_name
@@ -217,7 +223,9 @@ function normalizeDailyEvent(body: Record<string, unknown>): NormalizedLiveSessi
 
 export const dailyLiveSessionProvider: LiveSessionProviderAdapter = {
   key: 'daily',
-  async createSession(input: LiveSessionProviderCreateInput): Promise<LiveSessionProviderCreateResult> {
+  async createSession(
+    input: LiveSessionProviderCreateInput,
+  ): Promise<LiveSessionProviderCreateResult> {
     const room = await createDailyRoom(input);
     const providerSessionId = room.name ?? room.id;
     if (!providerSessionId) {
@@ -234,7 +242,9 @@ export const dailyLiveSessionProvider: LiveSessionProviderAdapter = {
       },
     };
   },
-  async getJoinAccess(input: LiveSessionJoinAccessInput): Promise<LiveSessionJoinAccessResult> {
+  async getJoinAccess(
+    input: LiveSessionJoinAccessInput,
+  ): Promise<LiveSessionJoinAccessResult> {
     const roomName =
       typeof input.providerMetadata?.roomName === 'string'
         ? input.providerMetadata.roomName
@@ -253,7 +263,8 @@ export const dailyLiveSessionProvider: LiveSessionProviderAdapter = {
       profileId: input.profileId,
       displayName: input.displayName,
       mode:
-        input.providerMetadata?.mode === 'audio' || input.providerMetadata?.mode === 'video'
+        input.providerMetadata?.mode === 'audio' ||
+        input.providerMetadata?.mode === 'video'
           ? input.providerMetadata.mode
           : 'video',
     });

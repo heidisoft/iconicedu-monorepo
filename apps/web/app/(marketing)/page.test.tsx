@@ -21,7 +21,13 @@ describe('marketing home page', () => {
 
     expect(screen.getByText('Math')).toBeInTheDocument();
     expect(screen.getByText('Competition Prep')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Programs' })).toHaveAttribute('href', '#subjects');
-    expect(screen.getByRole('link', { name: 'Privacy' })).toHaveAttribute('href', '/privacy');
+    expect(screen.getByRole('link', { name: 'Programs' })).toHaveAttribute(
+      'href',
+      '#subjects',
+    );
+    expect(screen.getByRole('link', { name: 'Privacy' })).toHaveAttribute(
+      'href',
+      '/privacy',
+    );
   });
 });

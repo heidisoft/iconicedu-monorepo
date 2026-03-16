@@ -2,11 +2,23 @@
 
 import { memo, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { Bookmark, Flag, Info, LifeBuoy, Loader2, LogOut, MoreHorizontal, Video } from 'lucide-react';
+import {
+  Bookmark,
+  Flag,
+  Info,
+  LifeBuoy,
+  Loader2,
+  LogOut,
+  MoreHorizontal,
+  Video,
+} from 'lucide-react';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import { useMessagesState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
-import type { ChannelHeaderActionVM, ChannelQuickActionVM } from '@iconicedu/shared-types';
+import type {
+  ChannelHeaderActionVM,
+  ChannelQuickActionVM,
+} from '@iconicedu/shared-types';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,10 +55,7 @@ const ActionButton = memo(function ActionButton({
     <Button
       variant="ghost"
       size="icon"
-      className={cn(
-        'group h-9 w-9 text-muted-foreground',
-        active && 'text-primary',
-      )}
+      className={cn('group h-9 w-9 text-muted-foreground', active && 'text-primary')}
       onClick={onClick}
       aria-label={label}
       disabled={disabled}
@@ -76,9 +85,7 @@ export function getVisibleHeaderActions(
 export function getHeaderJoinQuickAction(
   quickActions?: ChannelQuickActionVM[] | null,
 ): ChannelQuickActionVM | null {
-  return (
-    quickActions?.find((action) => action.key === 'join' && !action.hidden) ?? null
-  );
+  return quickActions?.find((action) => action.key === 'join' && !action.hidden) ?? null;
 }
 
 export function resolveHeaderJoinQuickAction(
@@ -104,7 +111,8 @@ export function resolveHeaderJoinHref(input: {
   fallbackUrl?: string | null;
 }): string | null {
   const joinQuickActionUrl =
-    typeof input.joinQuickAction?.url === 'string' && input.joinQuickAction.url.trim().length > 0
+    typeof input.joinQuickAction?.url === 'string' &&
+    input.joinQuickAction.url.trim().length > 0
       ? input.joinQuickAction.url.trim()
       : null;
 
@@ -126,15 +134,14 @@ export function shouldUseExternalHeaderJoin(input: {
   }
 
   return (
-    input.provider === 'custom' ||
-    input.provider === 'zoom' ||
-    input.provider === 'jitsi'
+    input.provider === 'custom' || input.provider === 'zoom' || input.provider === 'jitsi'
   );
 }
 
 export const MessagesContainerHeaderActions = memo(
   function MessagesContainerHeaderActions() {
-    const { toggle, isActive, channel, currentUserId, joinLiveSession } = useMessagesState();
+    const { toggle, isActive, channel, currentUserId, joinLiveSession } =
+      useMessagesState();
     const [isJoinPending, setIsJoinPending] = useState(false);
     const otherParticipant =
       channel.basics.kind === 'dm'
@@ -155,7 +162,9 @@ export const MessagesContainerHeaderActions = memo(
       provider: channel.context?.liveSession?.provider ?? null,
       joinHref,
     });
-    const canJoin = useExternalJoin ? Boolean(joinHref) : Boolean(joinLiveSession || joinHref);
+    const canJoin = useExternalJoin
+      ? Boolean(joinHref)
+      : Boolean(joinLiveSession || joinHref);
 
     const handleJoin = async () => {
       if (isJoinPending) {
@@ -199,7 +208,7 @@ export const MessagesContainerHeaderActions = memo(
               ? channel.basics.kind === 'dm'
                 ? 'profile'
                 : 'channel_info'
-              : action.intentKey ?? (action.key === 'saved' ? 'saved' : 'channel_info');
+              : (action.intentKey ?? (action.key === 'saved' ? 'saved' : 'channel_info'));
           const intent =
             resolvedIntentKey === 'profile' && otherParticipant
               ? ({ key: 'profile', userId: otherParticipant.ids.id } as const)

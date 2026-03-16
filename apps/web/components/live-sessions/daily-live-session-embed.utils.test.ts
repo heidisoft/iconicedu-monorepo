@@ -72,24 +72,24 @@ describe('daily-live-session-embed.utils', () => {
 
   it('treats DMs and audio sessions as direct-call layouts', () => {
     expect(isDirectLiveSessionLayout({ channelKind: 'dm', mode: 'video' })).toBe(true);
-    expect(
-      isDirectLiveSessionLayout({ channelKind: 'channel', mode: 'audio' }),
-    ).toBe(true);
-    expect(
-      isDirectLiveSessionLayout({ channelKind: 'channel', mode: 'video' }),
-    ).toBe(false);
+    expect(isDirectLiveSessionLayout({ channelKind: 'channel', mode: 'audio' })).toBe(
+      true,
+    );
+    expect(isDirectLiveSessionLayout({ channelKind: 'channel', mode: 'video' })).toBe(
+      false,
+    );
   });
 
   it('only shows full meeting controls for non-direct video sessions', () => {
-    expect(
-      shouldShowFullMeetingControls({ channelKind: 'channel', mode: 'video' }),
-    ).toBe(true);
-    expect(
-      shouldShowFullMeetingControls({ channelKind: 'dm', mode: 'video' }),
-    ).toBe(false);
-    expect(
-      shouldShowFullMeetingControls({ channelKind: 'channel', mode: 'audio' }),
-    ).toBe(false);
+    expect(shouldShowFullMeetingControls({ channelKind: 'channel', mode: 'video' })).toBe(
+      true,
+    );
+    expect(shouldShowFullMeetingControls({ channelKind: 'dm', mode: 'video' })).toBe(
+      false,
+    );
+    expect(shouldShowFullMeetingControls({ channelKind: 'channel', mode: 'audio' })).toBe(
+      false,
+    );
   });
 
   it('maps background processors to stable preset values', () => {
@@ -127,15 +127,15 @@ describe('daily-live-session-embed.utils', () => {
   });
 
   it('returns stable device labels when browser labels are empty', () => {
-    expect(
-      getDailyDeviceLabel({ label: '', kind: 'videoinput', index: 0 }),
-    ).toBe('Camera 1');
-    expect(
-      getDailyDeviceLabel({ label: '', kind: 'audioinput', index: 1 }),
-    ).toBe('Microphone 2');
-    expect(
-      getDailyDeviceLabel({ label: '', kind: 'audiooutput', index: 2 }),
-    ).toBe('Speaker 3');
+    expect(getDailyDeviceLabel({ label: '', kind: 'videoinput', index: 0 })).toBe(
+      'Camera 1',
+    );
+    expect(getDailyDeviceLabel({ label: '', kind: 'audioinput', index: 1 })).toBe(
+      'Microphone 2',
+    );
+    expect(getDailyDeviceLabel({ label: '', kind: 'audiooutput', index: 2 })).toBe(
+      'Speaker 3',
+    );
   });
 
   it('keeps the supported background presets list stable', () => {

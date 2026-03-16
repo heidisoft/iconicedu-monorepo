@@ -48,7 +48,11 @@ interface MessageItemProps {
   isReadOnly?: boolean;
   currentUserId?: UUID;
   onProfileClick: (userId: UUID) => void;
-  onToggleReaction?: (messageId: string, emoji: string, source?: 'bar' | 'picker') => void;
+  onToggleReaction?: (
+    messageId: string,
+    emoji: string,
+    source?: 'bar' | 'picker',
+  ) => void;
   onToggleSaved?: (messageId: string) => void;
   onToggleHidden?: (messageId: string) => void;
   onToggleImportant?: (messageId: string) => void;

@@ -1,7 +1,10 @@
 'use server';
 
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
-import { getAccountByAuthUserId, getAccountById } from '@iconicedu/web/lib/accounts/queries/accounts.query';
+import {
+  getAccountByAuthUserId,
+  getAccountById,
+} from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { getFamilyInviteAdminClient } from '@iconicedu/web/lib/family/queries/invite.query';
 
 type RemoveFamilyMemberInput = {

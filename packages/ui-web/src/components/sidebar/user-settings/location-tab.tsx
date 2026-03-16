@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { ArrowRight, MapPin } from 'lucide-react';
+import { MapPin } from 'lucide-react';
 
 import { Country, State } from 'country-state-city';
 import type { UserProfileVM } from '@iconicedu/shared-types';
@@ -56,9 +56,9 @@ export function LocationTab({
   const [regionValue, setRegionValue] = React.useState(location?.region ?? '');
   const [postalValue, setPostalValue] = React.useState(location?.postalCode ?? '');
   const [streetValue, setStreetValue] = React.useState(location?.streetAddress ?? '');
-  const [isCityFocused, setIsCityFocused] = React.useState(false);
-  const [isRegionFocused, setIsRegionFocused] = React.useState(false);
-  const [isPostalFocused, setIsPostalFocused] = React.useState(false);
+  const [, setIsCityFocused] = React.useState(false);
+  const [, setIsRegionFocused] = React.useState(false);
+  const [, setIsPostalFocused] = React.useState(false);
   const [isCountryFocused, setIsCountryFocused] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
   const [isPickingLocation, setIsPickingLocation] = React.useState(false);
@@ -182,10 +182,15 @@ export function LocationTab({
             throw new Error('Unable to determine your location.');
           }
           const data = (await response.json()) as { address?: Record<string, string> };
-          const normalized = normalizeReverseGeocodeAddress(data.address ?? {}, countries);
+          const normalized = normalizeReverseGeocodeAddress(
+            data.address ?? {},
+            countries,
+          );
 
           if (normalized.countryCode) {
-            const match = countries.find((entry) => entry.isoCode === normalized.countryCode);
+            const match = countries.find(
+              (entry) => entry.isoCode === normalized.countryCode,
+            );
             setCountryValue(match?.isoCode ?? normalized.countryCode);
           }
           setCityValue(normalized.city);

@@ -11,9 +11,7 @@ type ThreadMapperInput = {
   readState?: ThreadReadStateRow | null;
 };
 
-export function mapThreadReadStateRow(
-  row: ThreadReadStateRow,
-): ThreadReadStateVM {
+export function mapThreadReadStateRow(row: ThreadReadStateRow): ThreadReadStateVM {
   return {
     threadId: row.thread_id,
     channelId: row.channel_id ?? undefined,
@@ -23,10 +21,7 @@ export function mapThreadReadStateRow(
   };
 }
 
-export function mapThreadRowToVM(
-  row: ThreadRow,
-  input: ThreadMapperInput,
-): ThreadVM {
+export function mapThreadRowToVM(row: ThreadRow, input: ThreadMapperInput): ThreadVM {
   return {
     ids: {
       id: row.id,

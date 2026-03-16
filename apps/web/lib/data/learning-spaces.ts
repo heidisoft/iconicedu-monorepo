@@ -1,5 +1,9 @@
 import type { LearningSpaceVM } from '@iconicedu/shared-types';
-import { CHANNEL_IDS, LEARNING_SPACE_IDS, DEMO_ORG_ID } from '@iconicedu/web/lib/data/ids';
+import {
+  CHANNEL_IDS,
+  LEARNING_SPACE_IDS,
+  DEMO_ORG_ID,
+} from '@iconicedu/web/lib/data/ids';
 import {
   CHILD_MAYA_PROFILE,
   CHILD_TEHARA_PROFILE,
@@ -62,11 +66,7 @@ export const LEARNING_SPACES: LearningSpaceVM[] = [
       createdBy: EDUCATOR_PRIYA_PROFILE.ids.id,
       archivedAt: null,
     },
-    participants: [
-      EDUCATOR_PRIYA_PROFILE,
-      GUARDIAN_RILEY_PROFILE,
-      CHILD_TEVIN_PROFILE,
-    ],
+    participants: [EDUCATOR_PRIYA_PROFILE, GUARDIAN_RILEY_PROFILE, CHILD_TEVIN_PROFILE],
   },
   {
     ids: { id: LEARNING_SPACE_IDS.science, orgId: DEMO_ORG_ID },
@@ -111,11 +111,7 @@ export const LEARNING_SPACES: LearningSpaceVM[] = [
       createdBy: EDUCATOR_LUCAS_PROFILE.ids.id,
       archivedAt: null,
     },
-    participants: [
-      EDUCATOR_LUCAS_PROFILE,
-      GUARDIAN_RILEY_PROFILE,
-      CHILD_TEHARA_PROFILE,
-    ],
+    participants: [EDUCATOR_LUCAS_PROFILE, GUARDIAN_RILEY_PROFILE, CHILD_TEHARA_PROFILE],
   },
   {
     ids: { id: LEARNING_SPACE_IDS.ela, orgId: DEMO_ORG_ID },
@@ -160,11 +156,7 @@ export const LEARNING_SPACES: LearningSpaceVM[] = [
       createdBy: EDUCATOR_ELENA_PROFILE.ids.id,
       archivedAt: null,
     },
-    participants: [
-      EDUCATOR_ELENA_PROFILE,
-      GUARDIAN_RILEY_PROFILE,
-      CHILD_MAYA_PROFILE,
-    ],
+    participants: [EDUCATOR_ELENA_PROFILE, GUARDIAN_RILEY_PROFILE, CHILD_MAYA_PROFILE],
   },
   {
     ids: { id: LEARNING_SPACE_IDS.chess, orgId: DEMO_ORG_ID },
@@ -209,11 +201,7 @@ export const LEARNING_SPACES: LearningSpaceVM[] = [
       createdBy: EDUCATOR_MISHAN_PROFILE.ids.id,
       archivedAt: null,
     },
-    participants: [
-      EDUCATOR_MISHAN_PROFILE,
-      GUARDIAN_RILEY_PROFILE,
-      CHILD_TEVIN_PROFILE,
-    ],
+    participants: [EDUCATOR_MISHAN_PROFILE, GUARDIAN_RILEY_PROFILE, CHILD_TEVIN_PROFILE],
   },
 ];
 

@@ -75,7 +75,9 @@ export function LiveSessionSettingsSection({
             <Select
               value={value.provider}
               onValueChange={(nextValue) =>
-                onChange(withNextLiveSessionProvider(value, nextValue as LiveSessionProviderVM))
+                onChange(
+                  withNextLiveSessionProvider(value, nextValue as LiveSessionProviderVM),
+                )
               }
               disabled={!value.enabled}
             >
@@ -136,7 +138,8 @@ export function LiveSessionSettingsSection({
               }
             />
             <FieldDescription>
-              Used when the external provider is selected. Channel join actions will open this URL directly.
+              Used when the external provider is selected. Channel join actions will open
+              this URL directly.
             </FieldDescription>
           </Field>
         )}

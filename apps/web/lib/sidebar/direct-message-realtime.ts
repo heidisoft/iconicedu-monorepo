@@ -48,13 +48,23 @@ export function upsertDirectMessageChannel(
 
   const existing = current[existingIndex];
   const existingUnread = Math.max(0, existing.collections.readState?.unreadCount ?? 0);
-  const mergedUnread = Math.max(existingUnread, nextChannel.collections.readState?.unreadCount ?? 0);
+  const mergedUnread = Math.max(
+    existingUnread,
+    nextChannel.collections.readState?.unreadCount ?? 0,
+  );
   const merged = withMinimumUnread(nextChannel, mergedUnread);
 
-  const withoutExisting = [...current.slice(0, existingIndex), ...current.slice(existingIndex + 1)];
+  const withoutExisting = [
+    ...current.slice(0, existingIndex),
+    ...current.slice(existingIndex + 1),
+  ];
   const nextDirectMessages = moveToTop
     ? [merged, ...withoutExisting]
-    : [...withoutExisting.slice(0, existingIndex), merged, ...withoutExisting.slice(existingIndex)];
+    : [
+        ...withoutExisting.slice(0, existingIndex),
+        merged,
+        ...withoutExisting.slice(existingIndex),
+      ];
 
   return {
     ...sidebarData,

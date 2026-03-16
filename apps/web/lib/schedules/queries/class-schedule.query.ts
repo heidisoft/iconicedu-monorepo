@@ -15,10 +15,7 @@ import {
   CLASS_SCHEDULE_RECURRENCE_OVERRIDE_SELECT,
 } from '@iconicedu/web/lib/schedules/constants/selects';
 
-export async function getClassSchedulesByOrg(
-  supabase: SupabaseClient,
-  orgId: string,
-) {
+export async function getClassSchedulesByOrg(supabase: SupabaseClient, orgId: string) {
   return supabase
     .from('class_schedules')
     .select(CLASS_SCHEDULE_SELECT)

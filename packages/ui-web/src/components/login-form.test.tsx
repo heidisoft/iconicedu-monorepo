@@ -8,13 +8,17 @@ describe('LoginForm', () => {
   it('renders updated onboarding-focused copy', () => {
     render(<LoginForm />);
 
-    expect(screen.getByRole('heading', { name: 'Welcome to ICONIC Academy' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Welcome to ICONIC Academy' }),
+    ).toBeInTheDocument();
     expect(
       screen.getByText(
         /Sign in or get started in seconds. We'll create your secure account automatically if you're new\./i,
       ),
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Continue with Google' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Continue with Google' }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Send secure link' })).toBeInTheDocument();
   });
 

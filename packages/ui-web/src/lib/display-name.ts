@@ -34,7 +34,10 @@ export function formatFirstAndLastInitial(
   return `${first} ${firstChar(last)}.`;
 }
 
-export function getProfileDisplayName(info?: ProfileNameInfo | null, fallback = 'User'): string {
+export function getProfileDisplayName(
+  info?: ProfileNameInfo | null,
+  fallback = 'User',
+): string {
   if (!info) {
     return fallback;
   }
@@ -49,7 +52,10 @@ export function getProfileDisplayName(info?: ProfileNameInfo | null, fallback = 
   return fallback;
 }
 
-export function getProfileFullName(info?: ProfileNameInfo | null, fallback = 'User'): string {
+export function getProfileFullName(
+  info?: ProfileNameInfo | null,
+  fallback = 'User',
+): string {
   if (!info) {
     return fallback;
   }

@@ -24,7 +24,9 @@ export function applyIncomingLearningSpaceUnread(
         ? buildUnreadIncrementedChannel(primaryChannel)
         : primaryChannel;
     const nextRelatedChannels = relatedChannels.map((channel) =>
-      channel.ids.id === input.channelId ? buildUnreadIncrementedChannel(channel) : channel,
+      channel.ids.id === input.channelId
+        ? buildUnreadIncrementedChannel(channel)
+        : channel,
     );
 
     const matched =
@@ -114,7 +116,9 @@ export function markLearningSpaceChannelRead(
   };
 }
 
-function buildUnreadIncrementedChannel(channel: SidebarLeftDataVM['collections']['learningSpaces'][number]['channels']['primaryChannel']) {
+function buildUnreadIncrementedChannel(
+  channel: SidebarLeftDataVM['collections']['learningSpaces'][number]['channels']['primaryChannel'],
+) {
   const currentUnread = Math.max(0, channel.collections.readState?.unreadCount ?? 0);
   return {
     ...channel,

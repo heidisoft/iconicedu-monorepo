@@ -37,7 +37,10 @@ import {
   Trash2,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import type { LearningSpaceLinkVM, LearningSpaceLinkStatusVM } from '@iconicedu/shared-types';
+import type {
+  LearningSpaceLinkVM,
+  LearningSpaceLinkStatusVM,
+} from '@iconicedu/shared-types';
 
 const ICON_OPTIONS: { key: string; label: string; icon: LucideIcon }[] = [
   { key: 'video', label: 'Video', icon: Video },
@@ -61,7 +64,11 @@ function getIconComponent(iconKey: string | null) {
   return ICON_OPTIONS.find((option) => option.key === iconKey)?.icon ?? LinkIcon;
 }
 
-export function ResourceLinksEditor({ links, onLinksChange, className }: ResourceLinksEditorProps) {
+export function ResourceLinksEditor({
+  links,
+  onLinksChange,
+  className,
+}: ResourceLinksEditorProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [editingIndex, setEditingIndex] = React.useState<number | null>(null);
   const [isSubmitted, setIsSubmitted] = React.useState(false);
@@ -167,105 +174,109 @@ export function ResourceLinksEditor({ links, onLinksChange, className }: Resourc
           </DialogTrigger>
           <DialogContent onKeyDownCapture={handleDialogKeyDown}>
             <div ref={contentRef}>
-            <DialogHeader>
-              <DialogTitle>
-                {editingIndex !== null ? 'Edit Resource Link' : 'Add Resource Link'}
-              </DialogTitle>
-              <DialogDescription>
-                {editingIndex !== null
-                  ? 'Update the details of your resource link.'
-                  : 'Add a new resource link with a label, icon, and URL.'}
-              </DialogDescription>
-            </DialogHeader>
+              <DialogHeader>
+                <DialogTitle>
+                  {editingIndex !== null ? 'Edit Resource Link' : 'Add Resource Link'}
+                </DialogTitle>
+                <DialogDescription>
+                  {editingIndex !== null
+                    ? 'Update the details of your resource link.'
+                    : 'Add a new resource link with a label, icon, and URL.'}
+                </DialogDescription>
+              </DialogHeader>
               <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="resource-label">
-                  Label <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="resource-label"
-                  placeholder="e.g., Join Zoom"
-                  value={formData.label}
-                  onChange={(event) =>
-                    setFormData((prev) => ({ ...prev, label: event.target.value }))
-                  }
-                  onKeyDown={handleDialogKeyDown}
-                  required
-                />
-                {labelInvalid && (
-                  <p className="text-xs text-destructive">Label is required.</p>
-                )}
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="resource-url">
-                  URL <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="resource-url"
-                  type="url"
-                  placeholder="https://..."
-                  value={formData.url}
-                  onChange={(event) =>
-                    setFormData((prev) => ({ ...prev, url: event.target.value }))
-                  }
-                  onKeyDown={handleDialogKeyDown}
-                  required
-                />
-                {urlInvalid && (
-                  <p className="text-xs text-destructive">URL is required.</p>
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label>Icon</Label>
-                  <Select
-                    value={formData.iconKey}
-                    onValueChange={(value) =>
-                      setFormData((prev) => ({ ...prev, iconKey: value }))
+                  <Label htmlFor="resource-label">
+                    Label <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="resource-label"
+                    placeholder="e.g., Join Zoom"
+                    value={formData.label}
+                    onChange={(event) =>
+                      setFormData((prev) => ({ ...prev, label: event.target.value }))
                     }
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ICON_OPTIONS.map((option) => {
-                        const Icon = option.icon;
-                        return (
-                          <SelectItem key={option.key} value={option.key}>
-                            <Icon className="size-4" />
-                            {option.label}
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
+                    onKeyDown={handleDialogKeyDown}
+                    required
+                  />
+                  {labelInvalid && (
+                    <p className="text-xs text-destructive">Label is required.</p>
+                  )}
                 </div>
                 <div className="grid gap-2">
-                  <Label>Status</Label>
-                  <div className="flex items-center gap-2 rounded-2xl border border-border px-3 py-2">
-                    <Switch
-                      checked={formData.status === 'active'}
-                      onCheckedChange={(checked) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          status: checked ? 'active' : 'inactive',
-                        }))
+                  <Label htmlFor="resource-url">
+                    URL <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="resource-url"
+                    type="url"
+                    placeholder="https://..."
+                    value={formData.url}
+                    onChange={(event) =>
+                      setFormData((prev) => ({ ...prev, url: event.target.value }))
+                    }
+                    onKeyDown={handleDialogKeyDown}
+                    required
+                  />
+                  {urlInvalid && (
+                    <p className="text-xs text-destructive">URL is required.</p>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label>Icon</Label>
+                    <Select
+                      value={formData.iconKey}
+                      onValueChange={(value) =>
+                        setFormData((prev) => ({ ...prev, iconKey: value }))
                       }
-                    />
-                    <span className="text-sm text-muted-foreground">
-                      {formData.status === 'active' ? 'Active' : 'Inactive'}
-                    </span>
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ICON_OPTIONS.map((option) => {
+                          const Icon = option.icon;
+                          return (
+                            <SelectItem key={option.key} value={option.key}>
+                              <Icon className="size-4" />
+                              {option.label}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Status</Label>
+                    <div className="flex items-center gap-2 rounded-2xl border border-border px-3 py-2">
+                      <Switch
+                        checked={formData.status === 'active'}
+                        onCheckedChange={(checked) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            status: checked ? 'active' : 'inactive',
+                          }))
+                        }
+                      />
+                      <span className="text-sm text-muted-foreground">
+                        {formData.status === 'active' ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <DialogFooter className="mt-2">
-                <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
-                  Cancel
-                </Button>
-                <Button type="button" onClick={handleSave} disabled={!canSave}>
-                  {editingIndex !== null ? 'Save changes' : 'Add link'}
-                </Button>
-              </DialogFooter>
+                <DialogFooter className="mt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => handleOpenChange(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="button" onClick={handleSave} disabled={!canSave}>
+                    {editingIndex !== null ? 'Save changes' : 'Add link'}
+                  </Button>
+                </DialogFooter>
               </div>
             </div>
           </DialogContent>
@@ -292,9 +303,7 @@ export function ResourceLinksEditor({ links, onLinksChange, className }: Resourc
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm font-medium truncate">{link.label}</p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {link.url}
-                    </p>
+                    <p className="text-xs text-muted-foreground truncate">{link.url}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">

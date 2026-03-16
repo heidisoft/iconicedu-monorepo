@@ -21,7 +21,8 @@ export const MATH_SCHEDULE_EVENT: ClassScheduleVM = {
   title: 'Math: Foundations & Fluency',
   description: 'Weekly math session focused on number sense and fluency.',
   location: 'Zoom',
-  meetingLink: 'https://us06web.zoom.us/j/82163287655?pwd=MujGqqespu4eUIe6zE3CpLqasOp6Nu.1',
+  meetingLink:
+    'https://us06web.zoom.us/j/82163287655?pwd=MujGqqespu4eUIe6zE3CpLqasOp6Nu.1',
   startAt: '2026-01-06T23:00:00.000Z',
   endAt: '2026-01-06T23:45:00.000Z',
   timezone: 'America/Los_Angeles',
@@ -89,7 +90,8 @@ export const SCIENCE_SCHEDULE_EVENT: ClassScheduleVM = {
   title: 'Science Lab Explorers',
   description: 'Hands-on experiments and guided inquiry.',
   location: 'Zoom',
-  meetingLink: 'https://us06web.zoom.us/j/88676118659?pwd=gsLCQZrCkU60T91Dc37DaaNiWdsgTq.1',
+  meetingLink:
+    'https://us06web.zoom.us/j/88676118659?pwd=gsLCQZrCkU60T91Dc37DaaNiWdsgTq.1',
   startAt: '2026-01-07T23:30:00.000Z',
   endAt: '2026-01-08T00:15:00.000Z',
   timezone: 'America/Los_Angeles',
@@ -149,7 +151,8 @@ export const ELA_SCHEDULE_EVENT: ClassScheduleVM = {
   title: 'ELA: Writing Workshop',
   description: 'Crafting narratives and improving clarity.',
   location: 'Zoom',
-  meetingLink: 'https://us06web.zoom.us/j/82163287655?pwd=MujGqqespu4eUIe6zE3CpLqasOp6Nu.1',
+  meetingLink:
+    'https://us06web.zoom.us/j/82163287655?pwd=MujGqqespu4eUIe6zE3CpLqasOp6Nu.1',
   startAt: '2026-01-08T00:00:00.000Z',
   endAt: '2026-01-08T00:45:00.000Z',
   timezone: 'America/Los_Angeles',
@@ -210,7 +213,8 @@ export const CHESS_SCHEDULE_EVENT: ClassScheduleVM = {
   title: 'Chess Strategy Lab',
   description: 'Build opening strategies and tactical awareness.',
   location: 'Zoom',
-  meetingLink: 'https://us06web.zoom.us/j/88676118659?pwd=gsLCQZrCkU60T91Dc37DaaNiWdsgTq.1',
+  meetingLink:
+    'https://us06web.zoom.us/j/88676118659?pwd=gsLCQZrCkU60T91Dc37DaaNiWdsgTq.1',
   startAt: '2026-01-02T23:30:00.000Z',
   endAt: '2026-01-03T00:15:00.000Z',
   timezone: 'America/Los_Angeles',

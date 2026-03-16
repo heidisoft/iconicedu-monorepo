@@ -47,8 +47,14 @@ export function NavSupervisedDirectMessages({
               fallbackClassName="text-[10px] font-semibold leading-none uppercase"
               initialsLength={1}
             />
-            <span className="flex-1">{getProfileDisplayName(child.profile).split(' ')[0]}</span>
-            {isOpen ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+            <span className="flex-1">
+              {getProfileDisplayName(child.profile).split(' ')[0]}
+            </span>
+            {isOpen ? (
+              <ChevronUp className="size-4" />
+            ) : (
+              <ChevronDown className="size-4" />
+            )}
           </SidebarGroupLabel>
         </CollapsibleTrigger>
         <CollapsibleContent className="rounded-md rounded-t-none">

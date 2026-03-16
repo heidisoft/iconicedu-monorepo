@@ -63,7 +63,11 @@ function getProfileName(profile?: ProfileRow | null) {
   return null;
 }
 
-function formatChildLabel(accountId: string, account?: AccountRow, profile?: ProfileRow | null) {
+function formatChildLabel(
+  accountId: string,
+  account?: AccountRow,
+  profile?: ProfileRow | null,
+) {
   const profileName = getProfileName(profile);
   if (profileName) {
     return profileName;
@@ -111,11 +115,7 @@ export async function getAdminFamilyRows(orgId: string): Promise<AdminFamilyRow[
 
   const familyIds = families.map((family) => family.id);
 
-  const { data: links } = await getFamilyLinksByFamilyIds(
-    supabase,
-    orgId,
-    familyIds,
-  );
+  const { data: links } = await getFamilyLinksByFamilyIds(supabase, orgId, familyIds);
 
   const accountIds = new Set<string>();
   links?.forEach((link) => {
@@ -138,7 +138,10 @@ export async function getAdminFamilyRows(orgId: string): Promise<AdminFamilyRow[
   const guardianProfileByAccountId = new Map<string, ProfileRow>();
   const childProfileByAccountId = new Map<string, ProfileRow>();
   profiles?.forEach((profile) => {
-    if (profile.kind === 'guardian' && !guardianProfileByAccountId.has(profile.account_id)) {
+    if (
+      profile.kind === 'guardian' &&
+      !guardianProfileByAccountId.has(profile.account_id)
+    ) {
       guardianProfileByAccountId.set(profile.account_id, profile);
       return;
     }
@@ -148,11 +151,7 @@ export async function getAdminFamilyRows(orgId: string): Promise<AdminFamilyRow[
     childProfileByAccountId.set(profile.account_id, profile);
   });
 
-  const { data: invites } = await getFamilyInvitesByFamilyIds(
-    supabase,
-    orgId,
-    familyIds,
-  );
+  const { data: invites } = await getFamilyInvitesByFamilyIds(supabase, orgId, familyIds);
 
   const invitesByFamily = new Map<string, FamilyLinkInviteRow[]>();
   invites?.forEach((invite) => {
@@ -193,7 +192,8 @@ export async function getAdminFamilyRows(orgId: string): Promise<AdminFamilyRow[
         avatarUrl: childProfileByAccountId.get(link.child_account_id)?.avatar_url ?? null,
         avatarSource:
           childProfileByAccountId.get(link.child_account_id)?.avatar_source ?? null,
-        themeKey: childProfileByAccountId.get(link.child_account_id)?.ui_theme_key ?? null,
+        themeKey:
+          childProfileByAccountId.get(link.child_account_id)?.ui_theme_key ?? null,
       });
     });
 

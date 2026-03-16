@@ -108,7 +108,11 @@ export function ControlBar({
                     <DropdownMenuItem
                       key={option.id}
                       onClick={() => onSelectMicrophone(option.id)}
-                      className={currentMicrophoneId === option.id ? 'bg-primary/10 text-primary' : ''}
+                      className={
+                        currentMicrophoneId === option.id
+                          ? 'bg-primary/10 text-primary'
+                          : ''
+                      }
                     >
                       <Mic className="mr-2 h-4 w-4" />
                       <span className="truncate">{option.label}</span>
@@ -124,7 +128,9 @@ export function ControlBar({
               onClick={onToggleMute}
               className={[
                 'h-10 w-10 rounded-none',
-                onSelectMicrophone && microphoneOptions.length > 0 ? 'rounded-r-full' : 'rounded-full',
+                onSelectMicrophone && microphoneOptions.length > 0
+                  ? 'rounded-r-full'
+                  : 'rounded-full',
               ].join(' ')}
               title={isMuted ? 'Unmute' : 'Mute'}
             >
@@ -151,7 +157,11 @@ export function ControlBar({
                       <DropdownMenuItem
                         key={option.id}
                         onClick={() => onSelectCamera(option.id)}
-                        className={currentCameraId === option.id ? 'bg-primary/10 text-primary' : ''}
+                        className={
+                          currentCameraId === option.id
+                            ? 'bg-primary/10 text-primary'
+                            : ''
+                        }
                       >
                         <Video className="mr-2 h-4 w-4" />
                         <span className="truncate">{option.label}</span>
@@ -167,11 +177,17 @@ export function ControlBar({
                 onClick={onToggleVideo}
                 className={[
                   'h-10 w-10 rounded-none',
-                  onSelectCamera && cameraOptions.length > 0 ? 'rounded-r-full' : 'rounded-full',
+                  onSelectCamera && cameraOptions.length > 0
+                    ? 'rounded-r-full'
+                    : 'rounded-full',
                 ].join(' ')}
                 title={isVideoOn ? 'Stop video' : 'Start video'}
               >
-                {isVideoOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
+                {isVideoOn ? (
+                  <Video className="h-5 w-5" />
+                ) : (
+                  <VideoOff className="h-5 w-5" />
+                )}
               </Button>
             </div>
           ) : null}

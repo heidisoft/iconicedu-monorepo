@@ -1,5 +1,10 @@
 import type { FamilyLinkVM, FamilyVM } from '@iconicedu/shared-types';
-import { ACCOUNT_IDS, FAMILY_IDS, FAMILY_LINK_IDS, DEMO_ORG_ID } from '@iconicedu/web/lib/data/ids';
+import {
+  ACCOUNT_IDS,
+  FAMILY_IDS,
+  FAMILY_LINK_IDS,
+  DEMO_ORG_ID,
+} from '@iconicedu/web/lib/data/ids';
 
 export const MORGAN_FAMILY: FamilyVM = {
   ids: { id: FAMILY_IDS.morganFamily, orgId: DEMO_ORG_ID },

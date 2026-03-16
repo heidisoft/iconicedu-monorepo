@@ -36,8 +36,11 @@ export async function buildLearningSpaceChannelsWithMessages(
   orgId: string,
   options: BuildChannelOptions = {},
 ): Promise<ChannelVM[]> {
-  return buildChannelsByFilter(supabase, orgId, options, (row) =>
-    row.purpose === 'learning-space',
+  return buildChannelsByFilter(
+    supabase,
+    orgId,
+    options,
+    (row) => row.purpose === 'learning-space',
   );
 }
 
@@ -46,8 +49,11 @@ export async function buildDirectMessageChannelsWithMessages(
   orgId: string,
   options: BuildChannelOptions = {},
 ): Promise<ChannelVM[]> {
-  const channels = await buildChannelsByFilter(supabase, orgId, options, (row) =>
-    row.kind === 'dm' || row.kind === 'group_dm',
+  const channels = await buildChannelsByFilter(
+    supabase,
+    orgId,
+    options,
+    (row) => row.kind === 'dm' || row.kind === 'group_dm',
   );
 
   if (!options.accountId) {
@@ -130,19 +136,15 @@ async function buildChannelsFromRows(
   options: BuildChannelOptions,
 ): Promise<ChannelVM[]> {
   const channelIds = rows.map((row) => row.id);
-  const [membersResponse, capabilitiesResponse, readStatesResponse] =
-    await Promise.all([
-      getChannelParticipantsByChannelIds(supabase, orgId, channelIds),
-      getChannelCapabilitiesByChannelIds(supabase, orgId, channelIds),
-      options.accountId
-        ? getChannelReadStatesByAccountId(supabase, orgId, options.accountId)
-        : Promise.resolve({ data: [] }),
-    ]);
+  const [membersResponse, capabilitiesResponse, readStatesResponse] = await Promise.all([
+    getChannelParticipantsByChannelIds(supabase, orgId, channelIds),
+    getChannelCapabilitiesByChannelIds(supabase, orgId, channelIds),
+    options.accountId
+      ? getChannelReadStatesByAccountId(supabase, orgId, options.accountId)
+      : Promise.resolve({ data: [] }),
+  ]);
 
-  const membersByChannel = groupBy(
-    membersResponse.data ?? [],
-    (row) => row.channel_id,
-  );
+  const membersByChannel = groupBy(membersResponse.data ?? [], (row) => row.channel_id);
   const capabilitiesByChannel = groupBy(
     capabilitiesResponse.data ?? [],
     (row) => row.channel_id,
@@ -200,14 +202,13 @@ async function buildChannelFromRow(
   row: ChannelRow,
   options: BuildChannelOptions,
 ): Promise<ChannelVM> {
-  const [membersResponse, capabilitiesResponse, readStatesResponse] =
-    await Promise.all([
-      getChannelParticipantsByChannelIds(supabase, orgId, [row.id]),
-      getChannelCapabilitiesByChannelIds(supabase, orgId, [row.id]),
-      options.accountId
-        ? getChannelReadStatesByAccountId(supabase, orgId, options.accountId)
-        : Promise.resolve({ data: [] }),
-    ]);
+  const [membersResponse, capabilitiesResponse, readStatesResponse] = await Promise.all([
+    getChannelParticipantsByChannelIds(supabase, orgId, [row.id]),
+    getChannelCapabilitiesByChannelIds(supabase, orgId, [row.id]),
+    options.accountId
+      ? getChannelReadStatesByAccountId(supabase, orgId, options.accountId)
+      : Promise.resolve({ data: [] }),
+  ]);
 
   const participants = await loadParticipants(
     supabase,
@@ -261,10 +262,10 @@ async function loadParticipantsByChannel(
   const profileRows = profilesResponse.data ?? [];
 
   const profileVMs: Array<[string, UserProfileVM]> = await Promise.all(
-    profileRows.map(async (row) => [
-      row.id,
-      await buildUserProfileFromRow(supabase, row),
-    ] as [string, UserProfileVM]),
+    profileRows.map(
+      async (row) =>
+        [row.id, await buildUserProfileFromRow(supabase, row)] as [string, UserProfileVM],
+    ),
   );
   const profileVMMap = new Map(profileVMs);
 
@@ -304,10 +305,7 @@ async function loadParticipants(
     .filter((profile): profile is UserProfileVM => Boolean(profile));
 }
 
-function groupBy<T, K extends string>(
-  rows: T[],
-  getKey: (row: T) => K,
-): Map<K, T[]> {
+function groupBy<T, K extends string>(rows: T[], getKey: (row: T) => K): Map<K, T[]> {
   const map = new Map<K, T[]>();
   rows.forEach((row) => {
     const key = getKey(row);

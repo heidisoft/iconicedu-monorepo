@@ -16,13 +16,7 @@ describe('recurrence-form utils', () => {
         fromDate: new Date('2026-03-08T00:00:00.000Z'),
         maxResults: 5,
       }),
-    ).toEqual([
-      '2026-03-09',
-      '2026-03-11',
-      '2026-03-16',
-      '2026-03-18',
-      '2026-03-23',
-    ]);
+    ).toEqual(['2026-03-09', '2026-03-11', '2026-03-16', '2026-03-18', '2026-03-23']);
   });
 
   it('respects recurrence interval and count limits', () => {

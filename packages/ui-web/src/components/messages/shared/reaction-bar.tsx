@@ -63,7 +63,9 @@ export const ReactionBar = memo(function ReactionBar({
                       }}
                       aria-label={`${reaction.emoji} reaction, ${reaction.count} ${reaction.count === 1 ? 'person' : 'people'}`}
                     >
-                      <span className="mr-1 text-[13px] leading-none">{reaction.emoji}</span>
+                      <span className="mr-1 text-[13px] leading-none">
+                        {reaction.emoji}
+                      </span>
                       {isPending ? (
                         <Loader2 className="h-3 w-3 animate-spin" />
                       ) : (

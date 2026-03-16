@@ -3,7 +3,10 @@ import { FileText, Clock, Download, Award, Send, AlertCircle } from 'lucide-reac
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
 import type { HomeworkSubmissionMessageVM as HomeworkSubmissionMessageType } from '@iconicedu/shared-types';
-import { MessageBase, type MessageBaseProps } from '@iconicedu/ui-web/components/messages/message-base';
+import {
+  MessageBase,
+  type MessageBaseProps,
+} from '@iconicedu/ui-web/components/messages/message-base';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 
 interface HomeworkSubmissionMessageProps extends Omit<

@@ -17,7 +17,11 @@ function mergeMessage(current: MessageVM, updates: Partial<MessageVM>): MessageV
       }
     : current.social;
 
-  if (updates.social && 'thread' in updates.social && updates.social.thread === undefined) {
+  if (
+    updates.social &&
+    'thread' in updates.social &&
+    updates.social.thread === undefined
+  ) {
     mergedSocial.thread = current.social.thread;
   }
 
@@ -40,7 +44,10 @@ function hydrateParentThreads(messages: MessageVM[]): MessageVM[] {
     return messages;
   }
 
-  const parentThreadByMessageId = new Map<string, NonNullable<MessageVM['social']['thread']>>();
+  const parentThreadByMessageId = new Map<
+    string,
+    NonNullable<MessageVM['social']['thread']>
+  >();
 
   messages.forEach((message) => {
     const thread = message.social.thread;
@@ -83,7 +90,9 @@ function hydrateParentThreads(messages: MessageVM[]): MessageVM[] {
 }
 
 export function upsertMessage(messages: MessageVM[], incoming: MessageVM): MessageVM[] {
-  const existingIndex = messages.findIndex((message) => message.ids.id === incoming.ids.id);
+  const existingIndex = messages.findIndex(
+    (message) => message.ids.id === incoming.ids.id,
+  );
   if (existingIndex < 0) {
     return hydrateParentThreads([...messages, incoming].sort(compareMessagesByCreatedAt));
   }

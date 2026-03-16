@@ -3,7 +3,10 @@ import { Figma, PenTool, Layers, ExternalLink } from 'lucide-react';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
 import type { DesignFileUpdateMessageVM } from '@iconicedu/shared-types';
-import { MessageBase, type MessageBaseProps } from '@iconicedu/ui-web/components/messages/message-base';
+import {
+  MessageBase,
+  type MessageBaseProps,
+} from '@iconicedu/ui-web/components/messages/message-base';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 
 interface DesignFileMessageProps extends Omit<MessageBaseProps, 'message' | 'children'> {

@@ -30,14 +30,14 @@ Guidelines for contributing to the IconicEdu monorepo.
 
 Use a prefix that describes the type of change, followed by a short kebab-case description.
 
-| Prefix | Use for |
-|---|---|
-| `feature/` | New functionality |
-| `fix/` | Bug fixes |
-| `chore/` | Tooling, config, dependency updates |
-| `docs/` | Documentation only |
+| Prefix      | Use for                              |
+| ----------- | ------------------------------------ |
+| `feature/`  | New functionality                    |
+| `fix/`      | Bug fixes                            |
+| `chore/`    | Tooling, config, dependency updates  |
+| `docs/`     | Documentation only                   |
 | `refactor/` | Code changes with no behavior change |
-| `test/` | Adding or fixing tests |
+| `test/`     | Adding or fixing tests               |
 
 **Examples:**
 
@@ -69,17 +69,17 @@ Follow the [Conventional Commits](https://www.conventionalcommits.org/) specific
 
 ### Types
 
-| Type | Use for |
-|---|---|
-| `feat` | A new feature |
-| `fix` | A bug fix |
-| `chore` | Build process, tooling, dependencies |
-| `docs` | Documentation only |
+| Type       | Use for                                  |
+| ---------- | ---------------------------------------- |
+| `feat`     | A new feature                            |
+| `fix`      | A bug fix                                |
+| `chore`    | Build process, tooling, dependencies     |
+| `docs`     | Documentation only                       |
 | `refactor` | Code restructure with no behavior change |
-| `test` | Adding or updating tests |
-| `style` | Formatting, whitespace (no logic change) |
-| `perf` | Performance improvement |
-| `ci` | CI configuration changes |
+| `test`     | Adding or updating tests                 |
+| `style`    | Formatting, whitespace (no logic change) |
+| `perf`     | Performance improvement                  |
+| `ci`       | CI configuration changes                 |
 
 ### Scope (optional but recommended)
 
@@ -307,12 +307,12 @@ git commit --no-verify -m "..."
 
 All PRs must pass the following checks before merging:
 
-| Check | Command | Scope |
-|---|---|---|
-| Lint | `pnpm lint` | All packages |
+| Check      | Command          | Scope        |
+| ---------- | ---------------- | ------------ |
+| Lint       | `pnpm lint`      | All packages |
 | Type-check | `pnpm typecheck` | All packages |
-| Unit tests | `pnpm test` | All packages |
-| Build | `pnpm build` | All packages |
+| Unit tests | `pnpm test`      | All packages |
+| Build      | `pnpm build`     | All packages |
 
 These are enforced via the `pnpm ci` command and run in the CI pipeline on every PR.
 

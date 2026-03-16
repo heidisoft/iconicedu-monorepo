@@ -14,8 +14,8 @@ Running both MCP and the Next.js dev server gives you the rapid component previe
 
 ## VS Code tips
 
-- Use the Next.js DevTools extension in VS Code (search `Next.js` or open https://marketplace.visualstudio.com/items?itemName=stevencl.add-control) to get quick links into the DevTools panel while the server runs.  
-- Launch `pnpm dev:web` inside the built-in terminal and use the Output/Terminal panel to monitor the server. The Next.js App Router MCP guide covers how to attach VS Code’s debugger once the server is live.  
+- Use the Next.js DevTools extension in VS Code (search `Next.js` or open https://marketplace.visualstudio.com/items?itemName=stevencl.add-control) to get quick links into the DevTools panel while the server runs.
+- Launch `pnpm dev:web` inside the built-in terminal and use the Output/Terminal panel to monitor the server. The Next.js App Router MCP guide covers how to attach VS Code’s debugger once the server is live.
 - When editing shadcn components you can hit the MCP server via the browser, but keep VS Code’s integrated browser preview (Command+Shift+P → “Webview: Open Preview”) open if you want inline changes without switching apps.
 
 ## Running the server

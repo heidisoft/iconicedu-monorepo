@@ -1,11 +1,6 @@
 'use server';
 
-import type {
-  DayAvailability,
-  EducatorAvailabilityInput,
-  EducatorAvailabilityVM,
-} from '@iconicedu/shared-types';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { DayAvailability, EducatorAvailabilityVM } from '@iconicedu/shared-types';
 
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
@@ -40,18 +35,15 @@ export async function saveEducatorAvailabilityAction(
     throw new Error('Organization mismatch');
   }
 
-  const { data: availabilityRow, error } = await upsertEducatorAvailability(
-    supabase,
-    {
-      profileId: input.profileId,
-      orgId: input.orgId,
-      classTypes: input.classTypes ?? null,
-      weeklyCommitment: input.weeklyCommitment ?? null,
-      availability: input.availability ?? null,
-      createdBy: accountResponse.data.id,
-      updatedBy: accountResponse.data.id,
-    },
-  );
+  const { data: availabilityRow, error } = await upsertEducatorAvailability(supabase, {
+    profileId: input.profileId,
+    orgId: input.orgId,
+    classTypes: input.classTypes ?? null,
+    weeklyCommitment: input.weeklyCommitment ?? null,
+    availability: input.availability ?? null,
+    createdBy: accountResponse.data.id,
+    updatedBy: accountResponse.data.id,
+  });
 
   if (error) {
     throw error;

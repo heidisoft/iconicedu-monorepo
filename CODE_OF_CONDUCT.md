@@ -34,7 +34,7 @@ This Code of Conduct applies within all project spaces (GitHub issues, PRs, disc
 
 ## Enforcement
 
-Instances of abusive, harassing, or otherwise unacceptable behaviour may be reported to the project maintainers at **conduct@iconicedu.com** *(replace with your actual contact)*. All complaints will be reviewed and investigated promptly and fairly.
+Instances of abusive, harassing, or otherwise unacceptable behaviour may be reported to the project maintainers at **conduct@iconicedu.com** _(replace with your actual contact)_. All complaints will be reviewed and investigated promptly and fairly.
 
 ## Attribution
 

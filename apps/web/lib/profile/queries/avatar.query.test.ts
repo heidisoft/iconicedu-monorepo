@@ -21,11 +21,20 @@ describe('avatar.query', () => {
       },
     } as unknown as Parameters<typeof createSignedAvatarUrl>[0];
 
-    const signed = await createSignedAvatarUrl(supabase, 'org-1/avatars/profile-1/avatar.jpg');
-    const publicUrl = createPublicAvatarUrl(supabase, 'org-1/avatars/profile-1/avatar.jpg');
+    const signed = await createSignedAvatarUrl(
+      supabase,
+      'org-1/avatars/profile-1/avatar.jpg',
+    );
+    const publicUrl = createPublicAvatarUrl(
+      supabase,
+      'org-1/avatars/profile-1/avatar.jpg',
+    );
 
     expect(from).toHaveBeenCalledWith('public-avatars');
-    expect(createSignedUrl).toHaveBeenCalledWith('org-1/avatars/profile-1/avatar.jpg', 3600);
+    expect(createSignedUrl).toHaveBeenCalledWith(
+      'org-1/avatars/profile-1/avatar.jpg',
+      3600,
+    );
     expect(getPublicUrl).toHaveBeenCalledWith('org-1/avatars/profile-1/avatar.jpg');
     expect(signed.data?.signedUrl).toBe('https://example.com/signed/avatar.jpg');
     expect(publicUrl.data.publicUrl).toBe('https://example.com/public/avatar.jpg');

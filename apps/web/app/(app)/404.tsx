@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import type { ReactNode } from 'react';
 
 import {
   Empty,
@@ -34,7 +33,8 @@ export default function NotFoundPage() {
         <EmptyHeader>
           <EmptyTitle>404 · Not Found</EmptyTitle>
           <EmptyDescription>
-            The page you&apos;re looking for doesn&apos;t exist. Try searching for what you need below.
+            The page you&apos;re looking for doesn&apos;t exist. Try searching for what
+            you need below.
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
@@ -48,7 +48,13 @@ export default function NotFoundPage() {
             </InputGroupAddon>
           </InputGroup>
           <EmptyDescription>
-            Need help? <a className="text-primary hover:underline" href="mailto:support@iconicedu.org">Contact support</a>
+            Need help?{' '}
+            <a
+              className="text-primary hover:underline"
+              href="mailto:support@iconicedu.org"
+            >
+              Contact support
+            </a>
           </EmptyDescription>
         </EmptyContent>
       </Empty>

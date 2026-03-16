@@ -45,15 +45,6 @@ const ChannelInfoPanelContent = memo(function ChannelInfoPanelContent() {
   const iconKey = channel.basics.iconKey ?? 'sparkles';
   const TopicIcon =
     CHANNEL_ICON_MAP[iconKey as keyof typeof CHANNEL_ICON_MAP] ?? Sparkles;
-  const createdAt = channel.lifecycle?.createdAt
-    ? new Date(channel.lifecycle.createdAt).toLocaleString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-      })
-    : 'Unknown';
   const metadata = getChannelMetadata(channel);
   return (
     <div className="flex-1 min-w-0">
@@ -116,7 +107,9 @@ const ChannelInfoPanelContent = memo(function ChannelInfoPanelContent() {
   );
 });
 
-export function getChannelMetadata(channel: ReturnType<typeof useMessagesState>['channel']) {
+export function getChannelMetadata(
+  channel: ReturnType<typeof useMessagesState>['channel'],
+) {
   const createdAt = channel.lifecycle?.createdAt
     ? new Date(channel.lifecycle.createdAt).toLocaleString('en-US', {
         month: 'short',

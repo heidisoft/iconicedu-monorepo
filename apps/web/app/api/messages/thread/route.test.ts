@@ -15,7 +15,9 @@ vi.mock('@iconicedu/web/lib/auth/requireAuthedUser', () => ({
 }));
 
 vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
-  getAccountByAuthUserId: vi.fn(async () => ({ data: { id: 'account-1', org_id: 'org-1' } })),
+  getAccountByAuthUserId: vi.fn(async () => ({
+    data: { id: 'account-1', org_id: 'org-1' },
+  })),
 }));
 
 vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({

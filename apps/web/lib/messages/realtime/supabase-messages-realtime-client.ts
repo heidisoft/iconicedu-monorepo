@@ -26,8 +26,6 @@ const MESSAGE_PAYLOAD_TABLES = [
 
 const THREAD_TABLES = ['threads'] as const;
 
-type MessagePayloadTable = (typeof MESSAGE_PAYLOAD_TABLES)[number];
-
 export function createSupabaseMessagesRealtimeClient(): MessagesRealtimeClient {
   const supabase = createSupabaseBrowserClient();
   const channelsById = new Map<string, ReturnType<typeof supabase.channel>>();
@@ -37,7 +35,9 @@ export function createSupabaseMessagesRealtimeClient(): MessagesRealtimeClient {
       // Clean up existing subscription if any
       const existing = channelsById.get(channelId);
       if (existing) {
-        console.log(`[Realtime] Cleaning up existing subscription for messages:${channelId}`);
+        console.log(
+          `[Realtime] Cleaning up existing subscription for messages:${channelId}`,
+        );
         void existing.unsubscribe();
         channelsById.delete(channelId);
       }
@@ -79,10 +79,15 @@ export function createSupabaseMessagesRealtimeClient(): MessagesRealtimeClient {
                   message: payload.message,
                 });
               } else {
-                console.warn(`[Realtime] Invalid message payload for ${messageId}`, payload);
+                console.warn(
+                  `[Realtime] Invalid message payload for ${messageId}`,
+                  payload,
+                );
               }
             } else {
-              console.error(`[Realtime] Failed to fetch message ${messageId}: ${response.status}`);
+              console.error(
+                `[Realtime] Failed to fetch message ${messageId}: ${response.status}`,
+              );
             }
 
             const queuedType = queued.get(messageId);
@@ -109,7 +114,9 @@ export function createSupabaseMessagesRealtimeClient(): MessagesRealtimeClient {
           filter: `channel_id=eq.${channelId}`,
         },
         (payload) => {
-          console.log(`[Realtime] Received ${payload.eventType} event for messages table`);
+          console.log(
+            `[Realtime] Received ${payload.eventType} event for messages table`,
+          );
           if (payload.eventType === 'DELETE') {
             const messageId = (payload.old as { id?: string } | null)?.id;
             if (messageId) {
@@ -118,7 +125,10 @@ export function createSupabaseMessagesRealtimeClient(): MessagesRealtimeClient {
             return;
           }
           if (payload.eventType === 'UPDATE') {
-            const updated = payload.new as { id?: string; deleted_at?: string | null } | null;
+            const updated = payload.new as {
+              id?: string;
+              deleted_at?: string | null;
+            } | null;
             if (updated?.id && updated.deleted_at) {
               onEvent({ type: 'message-deleted', messageId: updated.id });
               return;
@@ -127,7 +137,10 @@ export function createSupabaseMessagesRealtimeClient(): MessagesRealtimeClient {
           const messageId =
             (payload.new as { id?: string } | null)?.id ??
             (payload.old as { id?: string } | null)?.id;
-          void fetchMessage(messageId ?? '', payload.eventType === 'INSERT' ? 'added' : 'updated');
+          void fetchMessage(
+            messageId ?? '',
+            payload.eventType === 'INSERT' ? 'added' : 'updated',
+          );
         },
       );
 
@@ -172,7 +185,9 @@ export function createSupabaseMessagesRealtimeClient(): MessagesRealtimeClient {
       });
 
       channel.on('broadcast', { event: 'typing' }, (payload) => {
-        const data = payload.payload as { profileId?: string; isTyping?: boolean } | undefined;
+        const data = payload.payload as
+          | { profileId?: string; isTyping?: boolean }
+          | undefined;
         if (!data?.profileId) {
           return;
         }
@@ -210,10 +225,15 @@ export function createSupabaseMessagesRealtimeClient(): MessagesRealtimeClient {
             console.log(`[Realtime] Successfully subscribed to messages:${channelId}`);
             retryCount = 0; // Reset on success
           } else if (status === 'CHANNEL_ERROR') {
-            console.error(`[Realtime] Failed to subscribe to messages:${channelId}`, status);
+            console.error(
+              `[Realtime] Failed to subscribe to messages:${channelId}`,
+              status,
+            );
             if (retryCount < maxRetries) {
               retryCount++;
-              console.log(`[Realtime] Retry attempt ${retryCount}/${maxRetries} for messages:${channelId}`);
+              console.log(
+                `[Realtime] Retry attempt ${retryCount}/${maxRetries} for messages:${channelId}`,
+              );
               setTimeout(() => {
                 void channel.unsubscribe();
                 attemptSubscribe();
@@ -225,7 +245,9 @@ export function createSupabaseMessagesRealtimeClient(): MessagesRealtimeClient {
             console.error(`[Realtime] Subscription timed out for messages:${channelId}`);
             if (retryCount < maxRetries) {
               retryCount++;
-              console.log(`[Realtime] Retry after timeout ${retryCount}/${maxRetries} for messages:${channelId}`);
+              console.log(
+                `[Realtime] Retry after timeout ${retryCount}/${maxRetries} for messages:${channelId}`,
+              );
               setTimeout(() => {
                 void channel.unsubscribe();
                 attemptSubscribe();

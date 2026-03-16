@@ -46,19 +46,13 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           {...rest}
         />
         {value.length > 0 && (
-          <Pressable
-            onPress={() => onChangeText('')}
-            accessibilityLabel="Clear search"
-          >
+          <Pressable onPress={() => onChangeText('')} accessibilityLabel="Clear search">
             <X size={16} color="#a1a1aa" />
           </Pressable>
         )}
       </View>
       {(showCancel || focused) && onCancel && (
-        <Pressable
-          onPress={handleCancel}
-          accessibilityLabel="Cancel search"
-        >
+        <Pressable onPress={handleCancel} accessibilityLabel="Cancel search">
           <Text className="text-sm text-primary">Cancel</Text>
         </Pressable>
       )}

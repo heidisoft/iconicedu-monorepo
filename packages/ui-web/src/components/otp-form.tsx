@@ -1,6 +1,11 @@
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import { Button } from '@iconicedu/ui-web/ui/button';
-import { Field, FieldDescription, FieldGroup, FieldLabel } from '@iconicedu/ui-web/ui/field';
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from '@iconicedu/ui-web/ui/field';
 import {
   InputOTP,
   InputOTPGroup,

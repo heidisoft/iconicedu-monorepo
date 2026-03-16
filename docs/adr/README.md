@@ -6,11 +6,11 @@ ADRs are written when a decision is made and are **never deleted** — if a deci
 
 ## Index
 
-| ADR | Title | Status |
-|---|---|---|
-| [001](001-monorepo-turborepo-pnpm.md) | Monorepo with Turborepo and pnpm | Accepted |
-| [002](002-supabase.md) | Supabase as database and auth platform | Accepted |
-| [003](003-expo-react-native.md) | Expo for cross-platform mobile | Accepted |
+| ADR                                   | Title                                  | Status   |
+| ------------------------------------- | -------------------------------------- | -------- |
+| [001](001-monorepo-turborepo-pnpm.md) | Monorepo with Turborepo and pnpm       | Accepted |
+| [002](002-supabase.md)                | Supabase as database and auth platform | Accepted |
+| [003](003-expo-react-native.md)       | Expo for cross-platform mobile         | Accepted |
 
 ## Creating a new ADR
 

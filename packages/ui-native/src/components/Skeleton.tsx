@@ -4,7 +4,8 @@ import { Animated, type ViewProps } from 'react-native';
 type AnimatedViewWithClassName = Animated.AnimatedProps<ViewProps> & {
   className?: string;
 };
-const StyledAnimatedView = Animated.View as React.ComponentType<AnimatedViewWithClassName>;
+const StyledAnimatedView =
+  Animated.View as React.ComponentType<AnimatedViewWithClassName>;
 
 export type SkeletonProps = {
   width?: number;

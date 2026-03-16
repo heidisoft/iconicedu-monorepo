@@ -40,7 +40,14 @@ export const SiteLogoFull = forwardRef<SVGSVGElement, SiteLogoFullProps>(
             <stop offset="1" stopColor="#85c53e" />
           </linearGradient>
 
-          <linearGradient id={g2} x1="0" y1="68.66" x2="15.97" y2="68.66" xlinkHref={`#${g1}`} />
+          <linearGradient
+            id={g2}
+            x1="0"
+            y1="68.66"
+            x2="15.97"
+            y2="68.66"
+            xlinkHref={`#${g1}`}
+          />
           <linearGradient
             id={g3}
             x1="33.13"

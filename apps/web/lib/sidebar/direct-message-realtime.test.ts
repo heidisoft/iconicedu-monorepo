@@ -35,7 +35,10 @@ describe('upsertDirectMessageChannel', () => {
     const sidebarData = makeSidebarData([makeChannel('dm-1')]);
     const updated = upsertDirectMessageChannel(sidebarData, makeChannel('dm-2'));
 
-    expect(updated.collections.directMessages.map((item) => item.ids.id)).toEqual(['dm-2', 'dm-1']);
+    expect(updated.collections.directMessages.map((item) => item.ids.id)).toEqual([
+      'dm-2',
+      'dm-1',
+    ]);
   });
 
   it('keeps higher unread count when refreshing an existing channel', () => {
@@ -43,7 +46,9 @@ describe('upsertDirectMessageChannel', () => {
     const updated = upsertDirectMessageChannel(sidebarData, makeChannel('dm-1', 0));
 
     expect(updated.collections.directMessages[0].ids.id).toBe('dm-1');
-    expect(updated.collections.directMessages[0].collections.readState?.unreadCount).toBe(3);
+    expect(updated.collections.directMessages[0].collections.readState?.unreadCount).toBe(
+      3,
+    );
   });
 
   it('applies minimum unread when channel read state has not persisted yet', () => {

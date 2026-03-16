@@ -65,8 +65,9 @@ describe('resolveProfileAvatarUrl', () => {
 
   it('returns raw value for non-upload sources', async () => {
     const { supabase, createSignedUrl } = makeSupabase({});
-    expect(await resolveProfileAvatarUrl(supabase, 'seed', 'seed-value')).toBe('seed-value');
+    expect(await resolveProfileAvatarUrl(supabase, 'seed', 'seed-value')).toBe(
+      'seed-value',
+    );
     expect(createSignedUrl).not.toHaveBeenCalled();
   });
 });
-

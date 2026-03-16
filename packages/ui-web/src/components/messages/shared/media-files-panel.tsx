@@ -80,11 +80,11 @@ export const MediaFilesPanel = memo(function MediaFilesPanel({
                     <FileText className="h-4 w-4" />
                   </div>
                   <div className="min-w-0">
-                    <p className="truncate text-sm text-foreground">
-                      {item.name}
-                    </p>
+                    <p className="truncate text-sm text-foreground">{item.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {item.kind === 'design-file' ? item.tool ?? 'Design file' : item.mimeType ?? 'File'}
+                      {item.kind === 'design-file'
+                        ? (item.tool ?? 'Design file')
+                        : (item.mimeType ?? 'File')}
                     </p>
                   </div>
                 </div>

@@ -34,9 +34,7 @@ export function VideoParticipant({
       className={[
         'relative h-full w-full overflow-hidden rounded-lg border bg-card shadow-[0_12px_40px_rgba(15,23,42,0.18)] transition-all duration-300 dark:shadow-[0_12px_40px_rgba(0,0,0,0.35)]',
         aspectClassName,
-        isActive
-          ? 'border-primary/80 ring-2 ring-primary/70'
-          : 'border-border ring-0',
+        isActive ? 'border-primary/80 ring-2 ring-primary/70' : 'border-border ring-0',
       ].join(' ')}
     >
       <div

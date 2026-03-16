@@ -1,6 +1,8 @@
 import type { MessageVM, UUID } from '@iconicedu/shared-types';
 
-export function buildThreadRepliesByParent(messages: MessageVM[]): Map<UUID, MessageVM[]> {
+export function buildThreadRepliesByParent(
+  messages: MessageVM[],
+): Map<UUID, MessageVM[]> {
   const replies = new Map<UUID, MessageVM[]>();
   messages.forEach((candidate) => {
     const thread = candidate.social.thread;

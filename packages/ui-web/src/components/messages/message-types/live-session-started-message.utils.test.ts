@@ -21,7 +21,10 @@ const baseMessage: LiveSessionStartedMessageVM = {
         avatar: { url: null, seed: null },
       },
       prefs: {},
-      meta: { createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' },
+      meta: {
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
     },
     createdAt: '2026-01-01T10:00:00.000Z',
     visibility: { type: 'all' },
@@ -58,8 +61,12 @@ describe('live-session-started-message.utils', () => {
       },
     };
 
-    expect(isLiveSessionJoinDisabled(message, Date.parse('2026-01-01T10:45:00.000Z'))).toBe(false);
-    expect(isLiveSessionJoinDisabled(message, Date.parse('2026-01-01T11:01:00.000Z'))).toBe(true);
+    expect(
+      isLiveSessionJoinDisabled(message, Date.parse('2026-01-01T10:45:00.000Z')),
+    ).toBe(false);
+    expect(
+      isLiveSessionJoinDisabled(message, Date.parse('2026-01-01T11:01:00.000Z')),
+    ).toBe(true);
   });
 
   it('marks the message as class ended when joining is disabled', () => {

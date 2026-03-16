@@ -56,11 +56,15 @@ describe('POST /api/admin/users/update-user', () => {
     const accountsUpdateEqOrgId = vi.fn(async () => ({ error: null }));
     const accountsUpdateEqId = vi.fn(() => ({ eq: accountsUpdateEqOrgId }));
     const accountsUpdate = vi.fn(() => ({ eq: accountsUpdateEqId }));
-    const profilesUpdateEqOrgId = vi.fn(() => ({ is: vi.fn(async () => ({ error: null })) }));
+    const profilesUpdateEqOrgId = vi.fn(() => ({
+      is: vi.fn(async () => ({ error: null })),
+    }));
     const profilesUpdateEqAccountId = vi.fn(() => ({ eq: profilesUpdateEqOrgId }));
     const profilesUpdate = vi.fn(() => ({ eq: profilesUpdateEqAccountId }));
     const accountsConflictMaybeSingle = vi.fn(async () => ({ data: null, error: null }));
-    const accountsConflictLimit = vi.fn(() => ({ maybeSingle: accountsConflictMaybeSingle }));
+    const accountsConflictLimit = vi.fn(() => ({
+      maybeSingle: accountsConflictMaybeSingle,
+    }));
     const accountsConflictIs = vi.fn(() => ({ limit: accountsConflictLimit }));
     const accountsConflictNeq = vi.fn(() => ({ is: accountsConflictIs }));
     const accountsConflictIlike = vi.fn(() => ({ neq: accountsConflictNeq }));
@@ -138,11 +142,15 @@ describe('POST /api/admin/users/update-user', () => {
     const accountsUpdateEqOrgId = vi.fn(async () => ({ error: null }));
     const accountsUpdateEqId = vi.fn(() => ({ eq: accountsUpdateEqOrgId }));
     const accountsUpdate = vi.fn(() => ({ eq: accountsUpdateEqId }));
-    const profilesUpdateEqOrgId = vi.fn(() => ({ is: vi.fn(async () => ({ error: null })) }));
+    const profilesUpdateEqOrgId = vi.fn(() => ({
+      is: vi.fn(async () => ({ error: null })),
+    }));
     const profilesUpdateEqAccountId = vi.fn(() => ({ eq: profilesUpdateEqOrgId }));
     const profilesUpdate = vi.fn(() => ({ eq: profilesUpdateEqAccountId }));
     const accountsConflictMaybeSingle = vi.fn(async () => ({ data: null, error: null }));
-    const accountsConflictLimit = vi.fn(() => ({ maybeSingle: accountsConflictMaybeSingle }));
+    const accountsConflictLimit = vi.fn(() => ({
+      maybeSingle: accountsConflictMaybeSingle,
+    }));
     const accountsConflictIs = vi.fn(() => ({ limit: accountsConflictLimit }));
     const accountsConflictNeq = vi.fn(() => ({ is: accountsConflictIs }));
     const accountsConflictIlike = vi.fn(() => ({ neq: accountsConflictNeq }));
@@ -207,15 +215,12 @@ describe('POST /api/admin/users/update-user', () => {
       primary_role: 'educator',
       role_status: 'active',
     });
-    expect(upsertUserRole).toHaveBeenCalledWith(
-      expect.anything(),
-      {
-        orgId: 'org-1',
-        accountId: 'account-1',
-        roleKey: 'educator',
-        assignedBy: 'auth-1',
-      },
-    );
+    expect(upsertUserRole).toHaveBeenCalledWith(expect.anything(), {
+      orgId: 'org-1',
+      accountId: 'account-1',
+      roleKey: 'educator',
+      assignedBy: 'auth-1',
+    });
   });
 
   it('returns 409 when email already exists in org', async () => {
@@ -236,7 +241,9 @@ describe('POST /api/admin/users/update-user', () => {
       data: { id: 'account-2' },
       error: null,
     }));
-    const accountsConflictLimit = vi.fn(() => ({ maybeSingle: accountsConflictMaybeSingle }));
+    const accountsConflictLimit = vi.fn(() => ({
+      maybeSingle: accountsConflictMaybeSingle,
+    }));
     const accountsConflictIs = vi.fn(() => ({ limit: accountsConflictLimit }));
     const accountsConflictNeq = vi.fn(() => ({ is: accountsConflictIs }));
     const accountsConflictIlike = vi.fn(() => ({ neq: accountsConflictNeq }));

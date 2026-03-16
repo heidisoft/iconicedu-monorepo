@@ -1,6 +1,5 @@
 import * as React from 'react';
 
-import { Input } from '@iconicedu/ui-web/ui/input';
 import {
   InputGroup,
   InputGroupAddon,
@@ -69,17 +68,13 @@ export const ContactField = React.forwardRef<HTMLInputElement, ContactFieldProps
                 onChange(event.target.value)
               }
             />
-            {addon ? (
-              <InputGroupAddon align="inline-end">{addon}</InputGroupAddon>
-            ) : null}
+            {addon ? <InputGroupAddon align="inline-end">{addon}</InputGroupAddon> : null}
           </InputGroup>
         </div>
         {helperText ? (
           <p className="text-xs text-muted-foreground">{helperText}</p>
         ) : null}
-        {error ? (
-          <p className="text-xs text-destructive">{error}</p>
-        ) : null}
+        {error ? <p className="text-xs text-destructive">{error}</p> : null}
       </div>
     );
   },

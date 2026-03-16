@@ -5,9 +5,9 @@ import { buildMessageFileStoragePath } from '@iconicedu/web/app/(app)/[orgSlug]/
 describe('buildMessageFileStoragePath', () => {
   it('builds tenant and asset-typed storage paths', () => {
     const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(1700000000000);
-    const randomUuidSpy = vi.spyOn(crypto, 'randomUUID').mockReturnValue(
-      'abcd1234-ffff-eeee-dddd-ccccbbbb0000',
-    );
+    const randomUuidSpy = vi
+      .spyOn(crypto, 'randomUUID')
+      .mockReturnValue('abcd1234-ffff-eeee-dddd-ccccbbbb0000');
 
     const imageFile = new File(['image'], 'Class Photo.png', { type: 'image/png' });
     const audioFile = new File(['audio'], 'Voice Note.m4a', { type: 'audio/mp4' });

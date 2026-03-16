@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildAudioWaveformBars, formatAudioTime, resolveAudioDuration } from './audio-message';
+import {
+  buildAudioWaveformBars,
+  formatAudioTime,
+  resolveAudioDuration,
+} from './audio-message';
 
 describe('audio-message helpers', () => {
   it('formats audio time for the player labels', () => {
@@ -10,12 +14,7 @@ describe('audio-message helpers', () => {
   });
 
   it('builds bounded waveform bars from message waveform data', () => {
-    expect(buildAudioWaveformBars([0.1, 0.5, 1.4, -2], 4)).toEqual([
-      0.2,
-      0.5,
-      1,
-      0.2,
-    ]);
+    expect(buildAudioWaveformBars([0.1, 0.5, 1.4, -2], 4)).toEqual([0.2, 0.5, 1, 0.2]);
   });
 
   it('keeps fallback waveform bars above the minimum visible threshold', () => {

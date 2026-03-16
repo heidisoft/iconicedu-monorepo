@@ -2,7 +2,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { ProfileRow } from '@iconicedu/shared-types';
 
-import { PROFILE_SELECT, PROFILE_SUMMARY_SELECT } from '@iconicedu/web/lib/profile/constants/selects';
+import {
+  PROFILE_SELECT,
+  PROFILE_SUMMARY_SELECT,
+} from '@iconicedu/web/lib/profile/constants/selects';
 
 type ProfileInsertPayload = {
   orgId: string;
@@ -18,10 +21,7 @@ type ProfileInsertPayload = {
   uiThemeKey: string;
 };
 
-export async function getProfileByAccountId(
-  supabase: SupabaseClient,
-  accountId: string,
-) {
+export async function getProfileByAccountId(supabase: SupabaseClient, accountId: string) {
   return supabase
     .from('profiles')
     .select(PROFILE_SELECT)
@@ -32,10 +32,7 @@ export async function getProfileByAccountId(
     .maybeSingle<ProfileRow>();
 }
 
-export async function getProfileById(
-  supabase: SupabaseClient,
-  profileId: string,
-) {
+export async function getProfileById(supabase: SupabaseClient, profileId: string) {
   return supabase
     .from('profiles')
     .select(PROFILE_SELECT)

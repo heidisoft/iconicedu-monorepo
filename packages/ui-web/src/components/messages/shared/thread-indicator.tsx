@@ -33,7 +33,10 @@ export const ThreadIndicator = memo(function ThreadIndicator({
         {thread.stats.messageCount === 1 ? 'reply' : 'replies'}
       </span>
       {unreadCount > 0 && (
-        <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-semibold uppercase">
+        <Badge
+          variant="secondary"
+          className="h-5 px-1.5 text-[10px] font-semibold uppercase"
+        >
           New
         </Badge>
       )}

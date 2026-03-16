@@ -38,11 +38,7 @@ export async function buildClassSchedulesByIds(
   orgId: string,
   scheduleIds: string[],
 ): Promise<ClassScheduleVM[]> {
-  const schedulesResponse = await getClassSchedulesByIds(
-    supabase,
-    orgId,
-    scheduleIds,
-  );
+  const schedulesResponse = await getClassSchedulesByIds(supabase, orgId, scheduleIds);
   const scheduleRows = schedulesResponse.data ?? [];
 
   return buildClassSchedulesFromRows(supabase, orgId, scheduleRows);
@@ -53,11 +49,7 @@ export async function buildClassScheduleById(
   orgId: string,
   scheduleId: string,
 ): Promise<ClassScheduleVM | null> {
-  const schedules = await buildClassSchedulesByIds(
-    supabase,
-    orgId,
-    [scheduleId],
-  );
+  const schedules = await buildClassSchedulesByIds(supabase, orgId, [scheduleId]);
 
   return schedules[0] ?? null;
 }
@@ -123,24 +115,12 @@ async function loadRecurrencesBySchedule(
 
   const recurrenceIds = recurrenceRows.map((row) => row.id);
   const [exceptionsResponse, overridesResponse] = await Promise.all([
-    getClassScheduleRecurrenceExceptionsByRecurrenceIds(
-      supabase,
-      orgId,
-      recurrenceIds,
-    ),
-    getClassScheduleRecurrenceOverridesByRecurrenceIds(
-      supabase,
-      orgId,
-      recurrenceIds,
-    ),
+    getClassScheduleRecurrenceExceptionsByRecurrenceIds(supabase, orgId, recurrenceIds),
+    getClassScheduleRecurrenceOverridesByRecurrenceIds(supabase, orgId, recurrenceIds),
   ]);
 
-  const exceptionsByRecurrence = groupRecurrenceExceptions(
-    exceptionsResponse.data ?? [],
-  );
-  const overridesByRecurrence = groupRecurrenceOverrides(
-    overridesResponse.data ?? [],
-  );
+  const exceptionsByRecurrence = groupRecurrenceExceptions(exceptionsResponse.data ?? []);
+  const overridesByRecurrence = groupRecurrenceOverrides(overridesResponse.data ?? []);
 
   const recurrencesBySchedule = new Map<string, RecurrenceVM>();
   recurrenceRows.forEach((row) => {

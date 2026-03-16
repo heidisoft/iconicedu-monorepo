@@ -3,10 +3,7 @@ import type { LearningSpaceRow } from '@iconicedu/shared-types';
 
 import { LEARNING_SPACE_SELECT } from '@iconicedu/web/lib/spaces/constants/selects';
 
-export async function getLearningSpacesByOrg(
-  supabase: SupabaseClient,
-  orgId: string,
-) {
+export async function getLearningSpacesByOrg(supabase: SupabaseClient, orgId: string) {
   return supabase
     .from('learning_spaces')
     .select(LEARNING_SPACE_SELECT)

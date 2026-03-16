@@ -10,7 +10,6 @@ import {
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/providers/auth-provider';
-import { useAccount } from '@/hooks/use-account';
 
 const C = {
   bg: '#ffffff',
@@ -35,7 +34,6 @@ const settingsItems = [
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
-  const { data: account } = useAccount();
   const router = useRouter();
 
   const displayName = user?.email?.split('@')[0] ?? 'User';
@@ -95,30 +93,73 @@ export default function ProfileScreen() {
 }
 
 const s = StyleSheet.create({
-  safe:         { flex: 1, backgroundColor: C.bg },
+  safe: { flex: 1, backgroundColor: C.bg },
 
-  nav:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.border },
-  navBack:      { paddingHorizontal: 4 },
-  navBackTxt:   { fontSize: 15, color: C.teal, fontWeight: '600' },
-  navTitle:     { fontSize: 17, fontWeight: '700', color: C.dark },
+  nav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+  },
+  navBack: { paddingHorizontal: 4 },
+  navBackTxt: { fontSize: 15, color: C.teal, fontWeight: '600' },
+  navTitle: { fontSize: 17, fontWeight: '700', color: C.dark },
 
-  content:      { paddingHorizontal: 16, paddingTop: 24, paddingBottom: 40, gap: 20 },
+  content: { paddingHorizontal: 16, paddingTop: 24, paddingBottom: 40, gap: 20 },
 
-  avatarSection:{ alignItems: 'center', gap: 8, paddingBottom: 8 },
-  avatar:       { width: 80, height: 80, borderRadius: 40, backgroundColor: C.teal, alignItems: 'center', justifyContent: 'center' },
-  avatarTxt:    { color: C.tealFg, fontWeight: '800', fontSize: 32 },
-  displayName:  { fontSize: 22, fontWeight: '800', color: C.dark, letterSpacing: -0.3 },
-  email:        { fontSize: 14, color: C.gray },
+  avatarSection: { alignItems: 'center', gap: 8, paddingBottom: 8 },
+  avatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: C.teal,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarTxt: { color: C.tealFg, fontWeight: '800', fontSize: 32 },
+  displayName: { fontSize: 22, fontWeight: '800', color: C.dark, letterSpacing: -0.3 },
+  email: { fontSize: 14, color: C.gray },
 
-  card:         { backgroundColor: C.bg2, borderRadius: 16, borderWidth: 1, borderColor: C.border, overflow: 'hidden' },
-  cardHeader:   { fontSize: 12, fontWeight: '600', color: C.grayLight, textTransform: 'uppercase', letterSpacing: 0.8, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 6 },
-  row:          { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
-  rowIcon:      { fontSize: 18, width: 28, textAlign: 'center' },
-  rowLabel:     { flex: 1, fontSize: 15, color: C.dark, fontWeight: '500' },
-  rowChevron:   { fontSize: 20, color: C.grayLight },
-  divider:      { height: 1, backgroundColor: C.border, marginLeft: 56 },
+  card: {
+    backgroundColor: C.bg2,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: C.border,
+    overflow: 'hidden',
+  },
+  cardHeader: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: C.grayLight,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 6,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  rowIcon: { fontSize: 18, width: 28, textAlign: 'center' },
+  rowLabel: { flex: 1, fontSize: 15, color: C.dark, fontWeight: '500' },
+  rowChevron: { fontSize: 20, color: C.grayLight },
+  divider: { height: 1, backgroundColor: C.border, marginLeft: 56 },
 
-  signOut:      { backgroundColor: C.redLight, borderRadius: 14, paddingVertical: 16, alignItems: 'center', borderWidth: 1, borderColor: '#fecdd3' },
-  signOutTxt:   { color: C.red, fontWeight: '700', fontSize: 16 },
-  version:      { textAlign: 'center', fontSize: 12, color: C.grayLight },
+  signOut: {
+    backgroundColor: C.redLight,
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#fecdd3',
+  },
+  signOutTxt: { color: C.red, fontWeight: '700', fontSize: 16 },
+  version: { textAlign: 'center', fontSize: 12, color: C.grayLight },
 });

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { filterDirectMessageChannels, type AdminChannelRow } from '@iconicedu/web/lib/admin/channels';
+import {
+  filterDirectMessageChannels,
+  type AdminChannelRow,
+} from '@iconicedu/web/lib/admin/channels';
 
 const baseRow: AdminChannelRow = {
   id: 'channel-1',

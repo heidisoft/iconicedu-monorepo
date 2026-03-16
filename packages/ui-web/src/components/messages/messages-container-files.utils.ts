@@ -64,23 +64,28 @@ function isAudioRecordingMessage(
   return message.core.type === 'audio-recording';
 }
 
-export function getChannelFileVisualKind(item: Pick<ChannelFileItemVM, 'name' | 'mimeType'>) {
+export function getChannelFileVisualKind(
+  item: Pick<ChannelFileItemVM, 'name' | 'mimeType'>,
+) {
   const mimeType = (item.mimeType ?? '').toLowerCase();
   const extension = item.name.toLowerCase().split('.').pop() ?? '';
 
-  if (mimeType.startsWith('image/') || extension.match(/^(png|jpe?g|gif|webp|svg|heic)$/)) {
+  if (
+    mimeType.startsWith('image/') ||
+    extension.match(/^(png|jpe?g|gif|webp|svg|heic)$/)
+  ) {
     return 'image' satisfies ChannelFileVisualKind;
   }
-  if (mimeType.startsWith('audio/') || extension.match(/^(mp3|wav|m4a|ogg|webm|aac|flac)$/)) {
+  if (
+    mimeType.startsWith('audio/') ||
+    extension.match(/^(mp3|wav|m4a|ogg|webm|aac|flac)$/)
+  ) {
     return 'audio' satisfies ChannelFileVisualKind;
   }
   if (mimeType === 'application/pdf' || extension === 'pdf') {
     return 'pdf' satisfies ChannelFileVisualKind;
   }
-  if (
-    mimeType.includes('word') ||
-    extension.match(/^(doc|docx|odt|pages|rtf)$/)
-  ) {
+  if (mimeType.includes('word') || extension.match(/^(doc|docx|odt|pages|rtf)$/)) {
     return 'document' satisfies ChannelFileVisualKind;
   }
   if (
@@ -175,7 +180,9 @@ export function createChannelFileItems(
   message: FileMessageVM | ImageMessageVM | AudioRecordingMessageVM,
 ): ChannelFileItemVM[] {
   if (isImageMessage(message)) {
-    const attachments = message.attachments?.length ? message.attachments : [message.attachment];
+    const attachments = message.attachments?.length
+      ? message.attachments
+      : [message.attachment];
     return attachments.map((attachment, index) => ({
       ids: {
         id: `file-${message.ids.id}-${index}`,
@@ -197,7 +204,9 @@ export function createChannelFileItems(
     return [createChannelFileItem(channelId, message)];
   }
 
-  const attachments = message.attachments?.length ? message.attachments : [message.attachment];
+  const attachments = message.attachments?.length
+    ? message.attachments
+    : [message.attachment];
   return attachments.map((attachment, index) => ({
     ids: {
       id: `file-${message.ids.id}-${index}`,

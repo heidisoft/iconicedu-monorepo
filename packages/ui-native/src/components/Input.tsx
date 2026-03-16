@@ -41,9 +41,7 @@ export const Input: React.FC<InputProps> = ({
   return (
     <View className={cn('gap-1.5', containerClassName)}>
       {label && (
-        <Text className="text-sm font-medium text-muted-foreground">
-          {label}
-        </Text>
+        <Text className="text-sm font-medium text-muted-foreground">{label}</Text>
       )}
       <TextInput
         className={cn(
@@ -59,9 +57,7 @@ export const Input: React.FC<InputProps> = ({
         accessibilityState={{ disabled: rest.editable === false }}
         {...rest}
       />
-      {error && (
-        <Text className="text-xs text-destructive">{error}</Text>
-      )}
+      {error && <Text className="text-xs text-destructive">{error}</Text>}
       {helperText && !error && (
         <Text className="text-xs text-muted-foreground">{helperText}</Text>
       )}

@@ -29,7 +29,9 @@ export function formatAttendanceDuration(seconds: number | null | undefined) {
   return `${minutes}m`;
 }
 
-export function getAttendanceStatusTone(status: LiveSessionAttendanceListItemVM['status']) {
+export function getAttendanceStatusTone(
+  status: LiveSessionAttendanceListItemVM['status'],
+) {
   switch (status) {
     case 'live':
       return 'default';

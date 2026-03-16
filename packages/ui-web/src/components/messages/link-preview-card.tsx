@@ -30,11 +30,7 @@ export function LinkPreviewCard({
     >
       {imageUrl ? (
         <div className="aspect-video w-full overflow-hidden bg-muted">
-          <img
-            src={imageUrl}
-            alt={title}
-            className="h-full w-full object-cover"
-          />
+          <img src={imageUrl} alt={title} className="h-full w-full object-cover" />
         </div>
       ) : null}
       <div className="p-3">
@@ -50,12 +46,7 @@ export function LinkPreviewCard({
             ) : null}
             <div className="mt-2 flex items-center gap-1.5">
               {favicon ? (
-                <img
-                  src={favicon}
-                  alt=""
-                  className="h-3 w-3"
-                  aria-hidden="true"
-                />
+                <img src={favicon} alt="" className="h-3 w-3" aria-hidden="true" />
               ) : null}
               <span className="truncate text-xs text-muted-foreground">
                 {siteName || url}

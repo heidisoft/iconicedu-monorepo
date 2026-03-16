@@ -57,14 +57,16 @@ describe('message-list.inline-thread.utils', () => {
   });
 
   it('returns text content for inline preview when present', () => {
-    expect(getInlineReplyPreview(createTextMessage('message-1', 'message-parent', 'Reply body'))).toBe(
-      'Reply body',
-    );
+    expect(
+      getInlineReplyPreview(
+        createTextMessage('message-1', 'message-parent', 'Reply body'),
+      ),
+    ).toBe('Reply body');
   });
 
   it('returns fallback preview when text content is empty', () => {
-    expect(getInlineReplyPreview(createTextMessage('message-1', 'message-parent', '   '))).toBe(
-      'Shared an update',
-    );
+    expect(
+      getInlineReplyPreview(createTextMessage('message-1', 'message-parent', '   ')),
+    ).toBe('Shared an update');
   });
 });

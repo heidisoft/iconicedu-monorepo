@@ -1,5 +1,12 @@
 import React from 'react';
-import { View, Text, Image, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
+import {
+  View,
+  Text,
+  Image,
+  TouchableOpacity,
+  ActivityIndicator,
+  StyleSheet,
+} from 'react-native';
 import { FileText, Mic, AlertCircle } from 'lucide-react-native';
 import type { AppColors } from '@/lib/theme';
 
@@ -34,9 +41,11 @@ type PendingMessageRowProps = {
 export function PendingMessageRow({ pending, colors, onRetry }: PendingMessageRowProps) {
   const { type, attachments, failed } = pending;
 
-  const StatusIndicator = failed
-    ? <AlertCircle size={18} color="#ef4444" />
-    : <ActivityIndicator size="small" color="#fff" />;
+  const StatusIndicator = failed ? (
+    <AlertCircle size={18} color="#ef4444" />
+  ) : (
+    <ActivityIndicator size="small" color="#fff" />
+  );
 
   const overlayBg = failed ? 'rgba(239,68,68,0.4)' : 'rgba(0,0,0,0.38)';
 
@@ -88,31 +97,40 @@ export function PendingMessageRow({ pending, colors, onRetry }: PendingMessageRo
           )
         ) : (
           /* ── File / audio bubble ──────────────────────────────────── */
-          <View style={[styles.fileBubble, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            {type === 'audio'
-              ? <Mic size={18} color={colors.teal} />
-              : <FileText size={18} color={colors.teal} />
-            }
+          <View
+            style={[
+              styles.fileBubble,
+              { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
+          >
+            {type === 'audio' ? (
+              <Mic size={18} color={colors.teal} />
+            ) : (
+              <FileText size={18} color={colors.teal} />
+            )}
             <Text style={[styles.fileName, { color: colors.text }]} numberOfLines={1}>
               {attachments[0]?.name ?? (type === 'audio' ? 'Voice message' : 'File')}
             </Text>
-            {failed
-              ? <AlertCircle size={16} color="#ef4444" />
-              : <ActivityIndicator size="small" color={colors.teal} />
-            }
+            {failed ? (
+              <AlertCircle size={16} color="#ef4444" />
+            ) : (
+              <ActivityIndicator size="small" color={colors.teal} />
+            )}
           </View>
         )}
 
         {failed ? (
-          <TouchableOpacity onPress={onRetry} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <TouchableOpacity
+            onPress={onRetry}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
             <Text style={[styles.statusText, { color: '#ef4444' }]}>
               Failed to send · tap to retry
             </Text>
           </TouchableOpacity>
         ) : (
-          <Text style={[styles.statusText, { color: colors.textMuted }]}>
-            Sending…
-          </Text>
+          <Text style={[styles.statusText, { color: colors.textMuted }]}>Sending…</Text>
         )}
       </View>
     </View>

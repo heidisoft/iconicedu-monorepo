@@ -65,7 +65,11 @@ export function touchDirectMessageChannelOrder(
   }
 
   const [target] = current.slice(index, index + 1);
-  const nextDirectMessages = [target, ...current.slice(0, index), ...current.slice(index + 1)];
+  const nextDirectMessages = [
+    target,
+    ...current.slice(0, index),
+    ...current.slice(index + 1),
+  ];
 
   return {
     ...sidebarData,
@@ -104,8 +108,7 @@ export function markDirectMessageChannelRead(
           ...channel.collections.readState,
           channelId: channel.ids.id,
           lastReadMessageId:
-            input?.lastReadMessageId ??
-            channel.collections.readState?.lastReadMessageId,
+            input?.lastReadMessageId ?? channel.collections.readState?.lastReadMessageId,
           lastReadAt: input?.lastReadAt ?? channel.collections.readState?.lastReadAt,
           unreadCount: 0,
         },

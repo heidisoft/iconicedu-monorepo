@@ -10,9 +10,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const body = (await request.json().catch(() => null)) as
-    | { eventIds?: string[]; limit?: number }
-    | null;
+  const body = (await request.json().catch(() => null)) as {
+    eventIds?: string[];
+    limit?: number;
+  } | null;
 
   const supabase = createSupabaseServiceClient();
   const result = await projectActivityEvents(supabase, {

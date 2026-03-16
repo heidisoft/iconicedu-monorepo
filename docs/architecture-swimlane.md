@@ -102,13 +102,15 @@ sequenceDiagram
 ## Flow Descriptions
 
 ### 1. Web Auth Flow
+
 Browser triggers OAuth or Magic Link → Supabase issues tokens and redirects to `/auth/callback` → Next.js exchanges the auth code for a session via `exchangeCodeForSession` → sets a server-side cookie (Supabase SSR pattern) → calls `/api/accounts/activate` to create or activate the account row in Postgres → redirects the user to `/{orgSlug}/dashboard`.
 
-Key files: [apps/web/app/(auth)/auth/callback/page.tsx](../apps/web/app/(auth)/auth/callback/page.tsx) · [apps/web/app/api/accounts/activate/route.ts](../apps/web/app/api/accounts/activate/route.ts) · [apps/web/lib/supabase/server.ts](../apps/web/lib/supabase/server.ts)
+Key files: [apps/web/app/(auth)/auth/callback/page.tsx](<../apps/web/app/(auth)/auth/callback/page.tsx>) · [apps/web/app/api/accounts/activate/route.ts](../apps/web/app/api/accounts/activate/route.ts) · [apps/web/lib/supabase/server.ts](../apps/web/lib/supabase/server.ts)
 
 ---
 
 ### 2. Mobile Auth Flow
+
 `AuthProvider` in Expo calls `signInWithOtp` (email code) or `signInWithGoogle` (implicit OAuth flow — no PKCE to avoid React Native race conditions) → Supabase returns a session JWT via URL hash → session is stored in `expo-secure-store` → `checkOrgAssignment` validates the user has an assigned org → `activateAccount` marks the account active → Expo Router redirects to `/(app)/(tabs)`.
 
 Key files: [apps/mobile/src/providers/auth-provider.tsx](../apps/mobile/src/providers/auth-provider.tsx) · [apps/mobile/src/lib/supabase/client.ts](../apps/mobile/src/lib/supabase/client.ts)
@@ -116,7 +118,9 @@ Key files: [apps/mobile/src/providers/auth-provider.tsx](../apps/mobile/src/prov
 ---
 
 ### 3. Web Protected Route (SSR Read)
+
 Every request to `/{orgSlug}/*` passes through `[orgSlug]/layout.tsx`:
+
 1. `createSupabaseServerClient()` reads the session cookie
 2. `requireAuthedUser()` calls `auth.getUser()` — redirects to `/login` if unauthenticated
 3. Validates org slug, fetches account, checks `role_status` (pending/blocked → redirect)
@@ -125,12 +129,14 @@ Every request to `/{orgSlug}/*` passes through `[orgSlug]/layout.tsx`:
 6. Page Server Component runs its own `buildX()` queries and maps rows → VMs
 7. Typed VMs are passed as props to `packages/ui-web` components for rendering
 
-Key files: [apps/web/app/(app)/[orgSlug]/layout.tsx](../apps/web/app/(app)/[orgSlug]/layout.tsx) · [apps/web/lib/sidebar/buildSidebarBaseData.ts](../apps/web/lib/sidebar/buildSidebarBaseData.ts) · [apps/web/lib/auth/requireAuthedUser.ts](../apps/web/lib/auth/requireAuthedUser.ts)
+Key files: [apps/web/app/(app)/[orgSlug]/layout.tsx](<../apps/web/app/(app)/[orgSlug]/layout.tsx>) · [apps/web/lib/sidebar/buildSidebarBaseData.ts](../apps/web/lib/sidebar/buildSidebarBaseData.ts) · [apps/web/lib/auth/requireAuthedUser.ts](../apps/web/lib/auth/requireAuthedUser.ts)
 
 ---
 
 ### 4. Web Mutation (Server Action)
+
 Client components invoke `'use server'` functions in `app/actions/`. Each action:
+
 1. Re-creates the server Supabase client (reads fresh session cookie)
 2. Calls `requireAuthedUser()` to validate auth
 3. Checks ownership (orgId, profileId) before writing
@@ -142,7 +148,9 @@ Key files: [apps/web/app/actions/messages.ts](../apps/web/app/actions/messages.t
 ---
 
 ### 5. NestJS API Request
+
 The NestJS API (`apps/api`) handles HTTP requests from Mobile (and optionally Web clients) carrying `Authorization: Bearer <JWT>`:
+
 1. **Global `ValidationPipe`** — whitelists DTO fields, strips unknowns, coerces types; throws `400` on violation
 2. **`AuthGuard`** — `jwt.decode(token)` extracts `sub` (user UUID) and `user_metadata.app_role`; attaches `req.user`; throws `401` if missing or malformed
 3. **Controller** delegates to **Service** which calls **`PrismaService`** for DB access
@@ -155,7 +163,9 @@ Key files: [apps/api/src/main.ts](../apps/api/src/main.ts) · [apps/api/src/modu
 ---
 
 ### 6. Mobile Data Fetch + Realtime
+
 Screens consume custom React Query hooks (`useMessages`, `useChannels`, `useAccount`):
+
 - Queries are **`enabled: !!user`** to prevent execution before auth loads
 - Default `staleTime: 1 min`, `gcTime: 5 min`, `retry: 2`
 - Supabase client fetches rows directly (no NestJS hop for reads)

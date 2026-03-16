@@ -23,7 +23,8 @@ export function normalizeReverseGeocodeAddress(
   const city = address.city ?? address.town ?? address.village ?? address.county ?? '';
   const region = address.state ?? address.region ?? '';
   const postalCode = address.postcode ?? '';
-  const streetAddress = [address.house_number, address.road].filter(Boolean).join(' ') || null;
+  const streetAddress =
+    [address.house_number, address.road].filter(Boolean).join(' ') || null;
 
   return {
     countryCode,
@@ -43,8 +44,8 @@ export function isLocationComplete(input: {
 }): boolean {
   return Boolean(
     input.countryCode.trim() &&
-      input.city.trim() &&
-      input.region.trim() &&
-      input.postalCode.trim(),
+    input.city.trim() &&
+    input.region.trim() &&
+    input.postalCode.trim(),
   );
 }

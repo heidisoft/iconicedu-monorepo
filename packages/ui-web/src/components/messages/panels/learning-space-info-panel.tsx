@@ -1,14 +1,7 @@
 'use client';
 
 import { memo } from 'react';
-import {
-  CalendarDays,
-  CircleDot,
-  Eye,
-  School,
-  Tag,
-  Users,
-} from 'lucide-react';
+import { CalendarDays, CircleDot, Eye, School, Tag, Users } from 'lucide-react';
 import type { LearningSpaceVM, MessagesRightPanelIntent } from '@iconicedu/shared-types';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
 import { Separator } from '@iconicedu/ui-web/ui/separator';
@@ -117,13 +110,15 @@ export function getLearningSpaceMetadata(
     { label: 'Kind', value: learningSpace.basics.kind.replace(/_/g, ' '), icon: School },
     { label: 'Visibility', value: channel.basics.visibility, icon: Eye },
     { label: 'Purpose', value: channel.basics.purpose, icon: Tag },
-    { label: 'Participants', value: String(learningSpace.participants.length), icon: Users },
+    {
+      label: 'Participants',
+      value: String(learningSpace.participants.length),
+      icon: Users,
+    },
   ];
 }
 
-export function LearningSpaceInfoPanel({
-  learningSpace,
-}: LearningSpaceInfoPanelProps) {
+export function LearningSpaceInfoPanel({ learningSpace }: LearningSpaceInfoPanelProps) {
   if (!learningSpace) {
     return null;
   }

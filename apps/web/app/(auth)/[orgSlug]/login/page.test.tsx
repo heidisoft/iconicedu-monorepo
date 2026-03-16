@@ -25,7 +25,8 @@ vi.mock('@iconicedu/web/lib/org/builders/org.builder', () => ({
 }));
 
 vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
-  getAccountByAuthUserIdInOrg: (...args: unknown[]) => getAccountByAuthUserIdInOrgMock(...args),
+  getAccountByAuthUserIdInOrg: (...args: unknown[]) =>
+    getAccountByAuthUserIdInOrgMock(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/org/resolve-dashboard-path', () => ({

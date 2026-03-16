@@ -23,9 +23,9 @@ describe('storage-paths', () => {
 
   it('builds randomized file keys with optional extension fallback', () => {
     const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(1700000000000);
-    const randomUuidSpy = vi.spyOn(crypto, 'randomUUID').mockReturnValue(
-      'abcd1234-ffff-eeee-dddd-ccccbbbb0000',
-    );
+    const randomUuidSpy = vi
+      .spyOn(crypto, 'randomUUID')
+      .mockReturnValue('abcd1234-ffff-eeee-dddd-ccccbbbb0000');
 
     expect(
       buildStorageFileKey({

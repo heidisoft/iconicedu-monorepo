@@ -66,16 +66,19 @@ export function FamiliesTable({ rows }: FamiliesTableProps) {
                               avatar={{
                                 source: resolveAvatarSource(guardian.avatarSource),
                                 url: guardian.avatarUrl ?? null,
-                                seed: resolveAvatarSource(guardian.avatarSource) === 'seed'
-                                  ? guardian.id
-                                  : undefined,
+                                seed:
+                                  resolveAvatarSource(guardian.avatarSource) === 'seed'
+                                    ? guardian.id
+                                    : undefined,
                               }}
                               themeKey={resolveThemeKey(guardian.themeKey)}
                               showStatus={false}
                               sizeClassName="size-7"
                               initialsLength={1}
                             />
-                            <span className="truncate">{guardian.name ?? guardian.label}</span>
+                            <span className="truncate">
+                              {guardian.name ?? guardian.label}
+                            </span>
                           </div>
                           <p className="pl-9 text-xs text-muted-foreground">
                             {guardian.email ?? '—'}
@@ -97,9 +100,10 @@ export function FamiliesTable({ rows }: FamiliesTableProps) {
                             avatar={{
                               source: resolveAvatarSource(child.avatarSource),
                               url: child.avatarUrl ?? null,
-                              seed: resolveAvatarSource(child.avatarSource) === 'seed'
-                                ? child.id
-                                : undefined,
+                              seed:
+                                resolveAvatarSource(child.avatarSource) === 'seed'
+                                  ? child.id
+                                  : undefined,
                             }}
                             themeKey={resolveThemeKey(child.themeKey)}
                             showStatus={false}
@@ -126,7 +130,9 @@ export function FamiliesTable({ rows }: FamiliesTableProps) {
                             {invite.invitedEmail ?? invite.invitedPhone ?? 'Invite'}
                           </span>
                           <Badge
-                            variant={invite.status === 'pending' ? 'secondary' : 'outline'}
+                            variant={
+                              invite.status === 'pending' ? 'secondary' : 'outline'
+                            }
                             className="text-[11px] px-2"
                           >
                             {invite.status}

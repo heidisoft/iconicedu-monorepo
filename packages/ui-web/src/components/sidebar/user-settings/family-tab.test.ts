@@ -60,7 +60,9 @@ describe('resolveFamilyInviteErrorMessage', () => {
   });
 
   it('returns raw error message when available', () => {
-    expect(resolveFamilyInviteErrorMessage(new Error('Custom error'))).toBe('Custom error');
+    expect(resolveFamilyInviteErrorMessage(new Error('Custom error'))).toBe(
+      'Custom error',
+    );
   });
 
   it('returns fallback for unknown errors', () => {

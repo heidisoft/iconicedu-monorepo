@@ -44,31 +44,52 @@ function makeStyles(C: AppColors) {
       overflow: 'hidden',
     },
     handle: {
-      width: 40, height: 4, borderRadius: 2,
-      backgroundColor: C.border, alignSelf: 'center', marginTop: 10,
+      width: 40,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: C.border,
+      alignSelf: 'center',
+      marginTop: 10,
     },
     header: {
-      flexDirection: 'row', alignItems: 'center',
-      paddingHorizontal: 16, paddingVertical: 14,
-      borderBottomWidth: 1, borderBottomColor: C.border,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: C.border,
     },
     headerTitle: { flex: 1, fontSize: 16, fontWeight: '700', color: C.text },
     closeBtn: {
-      width: 32, height: 32, borderRadius: 16,
-      backgroundColor: C.inputBg, alignItems: 'center', justifyContent: 'center',
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: C.inputBg,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     closeTxt: { fontSize: 16, color: C.textMuted },
     parentSection: {
-      borderBottomWidth: 1, borderBottomColor: C.border,
+      borderBottomWidth: 1,
+      borderBottomColor: C.border,
       backgroundColor: C.inputBg,
       paddingVertical: 4,
     },
     repliesHeader: {
-      fontSize: 13, fontWeight: '600', color: C.textMuted,
-      paddingHorizontal: 16, paddingVertical: 10,
-      borderBottomWidth: 1, borderBottomColor: C.border,
+      fontSize: 13,
+      fontWeight: '600',
+      color: C.textMuted,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: C.border,
     },
-    center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 32 },
+    center: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 32,
+    },
     emptyTxt: { fontSize: 13, color: C.textFaint },
   });
 }
@@ -96,8 +117,8 @@ export const ThreadSheet: React.FC<ThreadSheetProps> = ({
     try {
       // Pass both threadId (preferred, threads table FK) and parentMessageId (fallback)
       const data = await fetchThreadMessages(
-        threadId ?? parentMessage.ids.id,  // threadId when available
-        parentMessage.ids.id,              // always the parent message id
+        threadId ?? parentMessage.ids.id, // threadId when available
+        parentMessage.ids.id, // always the parent message id
         currentProfileId,
         currentAccountId,
       );
@@ -148,7 +169,11 @@ export const ThreadSheet: React.FC<ThreadSheetProps> = ({
             {/* Header */}
             <View style={s.header}>
               <Text style={s.headerTitle}>Thread</Text>
-              <TouchableOpacity style={s.closeBtn} onPress={onClose} accessibilityLabel="Close thread">
+              <TouchableOpacity
+                style={s.closeBtn}
+                onPress={onClose}
+                accessibilityLabel="Close thread"
+              >
                 <Text style={s.closeTxt}>✕</Text>
               </TouchableOpacity>
             </View>

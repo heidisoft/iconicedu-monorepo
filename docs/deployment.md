@@ -29,11 +29,11 @@ The Next.js web app is designed to deploy on [Vercel](https://vercel.com). It us
 
 ### Environment variables (Vercel dashboard)
 
-| Variable | Where to find it |
-|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase dashboard → Settings → API |
+| Variable                        | Where to find it                    |
+| ------------------------------- | ----------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`      | Supabase dashboard → Settings → API |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase dashboard → Settings → API |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase dashboard → Settings → API |
+| `SUPABASE_SERVICE_ROLE_KEY`     | Supabase dashboard → Settings → API |
 
 ### Deploying
 
@@ -69,11 +69,11 @@ eas login
 
 Three profiles are configured in `apps/mobile/eas.json`:
 
-| Profile | Use for | Distribution |
-|---|---|---|
-| `development` | Local testing with dev client | Internal |
-| `preview` | Stakeholder testing | Internal (TestFlight / internal track) |
-| `production` | App Store / Play Store release | Store |
+| Profile       | Use for                        | Distribution                           |
+| ------------- | ------------------------------ | -------------------------------------- |
+| `development` | Local testing with dev client  | Internal                               |
+| `preview`     | Stakeholder testing            | Internal (TestFlight / internal track) |
+| `production`  | App Store / Play Store release | Store                                  |
 
 ### Development build
 
@@ -171,12 +171,12 @@ node apps/api/dist/main.js
 
 ### Recommended platforms
 
-| Platform | Notes |
-|---|---|
-| [Railway](https://railway.app) | Simple, good for early-stage; auto-detects Node |
-| [Render](https://render.com) | Free tier available; deploy from GitHub |
-| [Fly.io](https://fly.io) | More control; good if you need edge regions |
-| [AWS ECS / App Runner](https://aws.amazon.com) | For scale |
+| Platform                                       | Notes                                           |
+| ---------------------------------------------- | ----------------------------------------------- |
+| [Railway](https://railway.app)                 | Simple, good for early-stage; auto-detects Node |
+| [Render](https://render.com)                   | Free tier available; deploy from GitHub         |
+| [Fly.io](https://fly.io)                       | More control; good if you need edge regions     |
+| [AWS ECS / App Runner](https://aws.amazon.com) | For scale                                       |
 
 ### Docker (recommended for consistency)
 
@@ -201,14 +201,14 @@ CMD ["node", "dist/main.js"]
 
 ### Environment variables
 
-| Variable | Description |
-|---|---|
-| `DATABASE_URL` | Supabase Postgres connection string (pooled) |
-| `DIRECT_URL` | Non-pooled URL for Prisma migrations |
-| `SUPABASE_URL` | Supabase project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | Service role key (bypasses RLS) |
-| `JWT_SECRET` | From Supabase → Settings → API → JWT Settings |
-| `PORT` | HTTP port (default `3001`) |
+| Variable                    | Description                                   |
+| --------------------------- | --------------------------------------------- |
+| `DATABASE_URL`              | Supabase Postgres connection string (pooled)  |
+| `DIRECT_URL`                | Non-pooled URL for Prisma migrations          |
+| `SUPABASE_URL`              | Supabase project URL                          |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key (bypasses RLS)               |
+| `JWT_SECRET`                | From Supabase → Settings → API → JWT Settings |
+| `PORT`                      | HTTP port (default `3001`)                    |
 
 ### Prisma in production
 
@@ -253,14 +253,14 @@ Supabase automatically takes daily backups on paid plans. For additional safety,
 
 ## Environment Variables Reference
 
-| Variable | Web | Mobile | API | Notes |
-|---|---|---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | ✅ | — | — | Public, browser-safe |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | — | — | Public, browser-safe |
-| `SUPABASE_SERVICE_ROLE_KEY` | ✅ (server) | — | ✅ | Never expose client-side |
-| `EXPO_PUBLIC_SUPABASE_URL` | — | ✅ | — | Inlined at build time |
-| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | — | ✅ | — | Inlined at build time |
-| `DATABASE_URL` | — | — | ✅ | Pooled Postgres URL |
-| `DIRECT_URL` | — | — | ✅ | Non-pooled, for migrations |
-| `SUPABASE_URL` | — | — | ✅ | |
-| `JWT_SECRET` | — | — | ✅ | From Supabase JWT settings |
+| Variable                        | Web         | Mobile | API | Notes                      |
+| ------------------------------- | ----------- | ------ | --- | -------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`      | ✅          | —      | —   | Public, browser-safe       |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅          | —      | —   | Public, browser-safe       |
+| `SUPABASE_SERVICE_ROLE_KEY`     | ✅ (server) | —      | ✅  | Never expose client-side   |
+| `EXPO_PUBLIC_SUPABASE_URL`      | —           | ✅     | —   | Inlined at build time      |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | —           | ✅     | —   | Inlined at build time      |
+| `DATABASE_URL`                  | —           | —      | ✅  | Pooled Postgres URL        |
+| `DIRECT_URL`                    | —           | —      | ✅  | Non-pooled, for migrations |
+| `SUPABASE_URL`                  | —           | —      | ✅  |                            |
+| `JWT_SECRET`                    | —           | —      | ✅  | From Supabase JWT settings |

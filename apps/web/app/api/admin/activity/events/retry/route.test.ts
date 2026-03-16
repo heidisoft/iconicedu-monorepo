@@ -18,11 +18,13 @@ vi.mock('@iconicedu/web/lib/supabase/server', () => ({
 }));
 
 vi.mock('@iconicedu/web/lib/supabase/service', () => ({
-  createSupabaseServiceClient: (...args: unknown[]) => createSupabaseServiceClient(...args),
+  createSupabaseServiceClient: (...args: unknown[]) =>
+    createSupabaseServiceClient(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
-  getAccountByAuthUserIdInOrg: (...args: unknown[]) => getAccountByAuthUserIdInOrg(...args),
+  getAccountByAuthUserIdInOrg: (...args: unknown[]) =>
+    getAccountByAuthUserIdInOrg(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/profile/queries/roles.query', () => ({

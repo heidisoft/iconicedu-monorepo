@@ -58,7 +58,9 @@ export async function ensureDirectMessageChannel(
     updated_by: currentProfileId,
   }));
 
-  const { error: memberError } = await supabase.from('channel_members').insert(memberRows);
+  const { error: memberError } = await supabase
+    .from('channel_members')
+    .insert(memberRows);
   if (memberError) {
     throw new Error(memberError.message);
   }

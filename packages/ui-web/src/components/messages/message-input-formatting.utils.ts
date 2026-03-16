@@ -14,11 +14,7 @@ export function applyInlineFormat(
   const safeEnd = Math.max(safeStart, Math.min(selectionEnd, value.length));
   const selectedText = value.slice(safeStart, safeEnd);
   const nextValue =
-    value.slice(0, safeStart) +
-    wrapper +
-    selectedText +
-    wrapper +
-    value.slice(safeEnd);
+    value.slice(0, safeStart) + wrapper + selectedText + wrapper + value.slice(safeEnd);
 
   if (safeStart === safeEnd) {
     const caret = safeStart + wrapper.length;

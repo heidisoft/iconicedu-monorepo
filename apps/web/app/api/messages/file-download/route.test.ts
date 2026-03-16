@@ -27,11 +27,15 @@ vi.mock('@iconicedu/web/lib/auth/requireAuthedUser', () => ({
 }));
 
 vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
-  getAccountByAuthUserId: vi.fn(async () => ({ data: { id: 'account-1', org_id: 'org-1' } })),
+  getAccountByAuthUserId: vi.fn(async () => ({
+    data: { id: 'account-1', org_id: 'org-1' },
+  })),
 }));
 
 vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
-  getProfileByAccountId: vi.fn(async () => ({ data: { id: 'profile-1', org_id: 'org-1' } })),
+  getProfileByAccountId: vi.fn(async () => ({
+    data: { id: 'profile-1', org_id: 'org-1' },
+  })),
 }));
 
 vi.mock('@iconicedu/web/lib/messages/queries/file-url.query', () => ({
@@ -51,7 +55,9 @@ describe('GET /api/messages/file-download', () => {
 
   it('returns 403 when the path org does not match the signed-in account org', async () => {
     const response = await GET(
-      new Request(`${APP_URL}/api/messages/file-download?path=org-2/channel-1/profile-1/file.pdf`),
+      new Request(
+        `${APP_URL}/api/messages/file-download?path=org-2/channel-1/profile-1/file.pdf`,
+      ),
     );
 
     expect(response.status).toBe(403);
@@ -59,7 +65,9 @@ describe('GET /api/messages/file-download', () => {
 
   it('redirects to a fresh signed url when the user belongs to the file org', async () => {
     const response = await GET(
-      new Request(`${APP_URL}/api/messages/file-download?path=org-1/channel-1/profile-1/file.pdf`),
+      new Request(
+        `${APP_URL}/api/messages/file-download?path=org-1/channel-1/profile-1/file.pdf`,
+      ),
     );
 
     expect(response.status).toBe(307);
@@ -70,7 +78,9 @@ describe('GET /api/messages/file-download', () => {
     maybeSingle.mockResolvedValueOnce({ data: null });
 
     const response = await GET(
-      new Request(`${APP_URL}/api/messages/file-download?path=org-1/channel-1/profile-1/file.pdf`),
+      new Request(
+        `${APP_URL}/api/messages/file-download?path=org-1/channel-1/profile-1/file.pdf`,
+      ),
     );
 
     expect(response.status).toBe(403);

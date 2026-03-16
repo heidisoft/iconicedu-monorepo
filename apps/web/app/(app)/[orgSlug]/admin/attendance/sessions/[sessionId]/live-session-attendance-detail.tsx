@@ -23,19 +23,27 @@ type LiveSessionAttendanceDetailProps = {
   detail: LiveSessionAttendanceDetailVM;
 };
 
-export function LiveSessionAttendanceDetail({ detail }: LiveSessionAttendanceDetailProps) {
+export function LiveSessionAttendanceDetail({
+  detail,
+}: LiveSessionAttendanceDetailProps) {
   return (
     <div className="grid gap-4">
       <Card>
         <CardHeader>
-          <CardTitle>{detail.session.learningSpaceTitle ?? detail.session.channelTopic}</CardTitle>
+          <CardTitle>
+            {detail.session.learningSpaceTitle ?? detail.session.channelTopic}
+          </CardTitle>
         </CardHeader>
         <CardContent className="grid gap-2 text-sm text-muted-foreground md:grid-cols-2">
           <div>Channel: {detail.session.channelTopic}</div>
-          <div>Provider: <span className="capitalize">{detail.session.provider}</span></div>
+          <div>
+            Provider: <span className="capitalize">{detail.session.provider}</span>
+          </div>
           <div>Started: {formatAttendanceDateTime(detail.session.startedAt)}</div>
           <div>Ended: {formatAttendanceDateTime(detail.session.endedAt)}</div>
-          <div>Duration: {formatAttendanceDuration(detail.session.metrics.durationSeconds)}</div>
+          <div>
+            Duration: {formatAttendanceDuration(detail.session.metrics.durationSeconds)}
+          </div>
           <div>Expected: {detail.session.metrics.expectedParticipantCount}</div>
           <div>Attendees: {detail.session.metrics.attendeeCount}</div>
           <div>Full attendance: {detail.session.metrics.fullAttendanceCount}</div>
@@ -45,7 +53,10 @@ export function LiveSessionAttendanceDetail({ detail }: LiveSessionAttendanceDet
           <div>Starter: {detail.session.startedBy?.profile.displayName ?? 'System'}</div>
           <div>
             Status:{' '}
-            <Badge variant={detail.session.status === 'failed' ? 'destructive' : 'secondary'} className="capitalize">
+            <Badge
+              variant={detail.session.status === 'failed' ? 'destructive' : 'secondary'}
+              className="capitalize"
+            >
               {detail.session.status}
             </Badge>
           </div>
@@ -72,17 +83,26 @@ export function LiveSessionAttendanceDetail({ detail }: LiveSessionAttendanceDet
           <TableBody>
             {detail.participants.map((row) => (
               <TableRow key={row.ids.id}>
-                <TableCell>{row.participant?.profile.displayName ?? 'Unknown user'}</TableCell>
-                <TableCell className="capitalize">{row.participant?.kind ?? 'unknown'}</TableCell>
+                <TableCell>
+                  {row.participant?.profile.displayName ?? 'Unknown user'}
+                </TableCell>
+                <TableCell className="capitalize">
+                  {row.participant?.kind ?? 'unknown'}
+                </TableCell>
                 <TableCell>{row.expectedToAttend ? 'Yes' : 'No'}</TableCell>
                 <TableCell>{formatAttendanceDateTime(row.firstJoinedAt)}</TableCell>
                 <TableCell>{formatAttendanceDateTime(row.lastLeftAt)}</TableCell>
-                <TableCell>{formatAttendanceDuration(row.creditedSeconds ?? row.totalSeconds)}</TableCell>
+                <TableCell>
+                  {formatAttendanceDuration(row.creditedSeconds ?? row.totalSeconds)}
+                </TableCell>
                 <TableCell>{formatAttendanceDuration(row.requiredSeconds)}</TableCell>
                 <TableCell>{formatAttendancePercent(row.attendanceRatio)}</TableCell>
                 <TableCell>{row.joinCount}</TableCell>
                 <TableCell>
-                  <Badge variant={getParticipantAttendanceTone(row.attendanceStatus)} className="capitalize">
+                  <Badge
+                    variant={getParticipantAttendanceTone(row.attendanceStatus)}
+                    className="capitalize"
+                  >
                     {row.attendanceStatus.replace('_', ' ')}
                   </Badge>
                 </TableCell>
@@ -99,13 +119,18 @@ export function LiveSessionAttendanceDetail({ detail }: LiveSessionAttendanceDet
           </CardHeader>
           <CardContent className="space-y-3">
             {detail.timeline.map((event) => (
-              <div key={event.id} className="flex items-center justify-between gap-4 text-sm">
+              <div
+                key={event.id}
+                className="flex items-center justify-between gap-4 text-sm"
+              >
                 <div className="flex flex-col gap-1">
                   <span className="font-medium capitalize text-foreground">
                     {event.eventType.replace(/_/g, ' ')}
                   </span>
                   <span className="text-muted-foreground">
-                    {event.participantDisplayName ?? event.providerParticipantId ?? 'System'}
+                    {event.participantDisplayName ??
+                      event.providerParticipantId ??
+                      'System'}
                   </span>
                 </div>
                 <div className="text-right text-muted-foreground">

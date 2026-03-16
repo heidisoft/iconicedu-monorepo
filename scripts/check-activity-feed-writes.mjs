@@ -55,13 +55,7 @@ function collectSourceFiles(rootDir) {
 }
 
 function collectPatternViolations(input) {
-  const {
-    pattern,
-    sources,
-    allowlistedRelativePaths,
-    code,
-    description,
-  } = input;
+  const { pattern, sources, allowlistedRelativePaths, code, description } = input;
 
   const violations = [];
   for (const [filePath, source] of Object.entries(sources)) {
@@ -88,14 +82,15 @@ export function findUnauthorizedActivityFeedWritesInSources(sources) {
       allowlistedRelativePaths: ALLOWED_ACTIVITY_FEED_INSERT_UPSERT_FILES,
       code: 'activity_feed_items.insert_or_upsert',
       description:
-        "Direct insert/upsert on activity_feed_items is only allowed in the projector.",
+        'Direct insert/upsert on activity_feed_items is only allowed in the projector.',
     }),
     ...collectPatternViolations({
       pattern: ACTIVITY_EVENTS_INSERT_PATTERN,
       sources,
       allowlistedRelativePaths: ALLOWED_ACTIVITY_EVENTS_INSERT_FILES,
       code: 'activity_events.insert',
-      description: "Direct insert on activity_events is only allowed in publishActivityEvent.",
+      description:
+        'Direct insert on activity_events is only allowed in publishActivityEvent.',
     }),
   ];
 }

@@ -18,10 +18,7 @@ export async function getChildProfile(supabase: SupabaseClient, profileId: strin
     .maybeSingle<ChildProfileRow>();
 }
 
-export async function getChildGradeLevel(
-  supabase: SupabaseClient,
-  profileId: string,
-) {
+export async function getChildGradeLevel(supabase: SupabaseClient, profileId: string) {
   return supabase
     .from('child_profile_grade_level')
     .select(CHILD_GRADE_LEVEL_SELECT)

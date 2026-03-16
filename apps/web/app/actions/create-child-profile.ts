@@ -2,14 +2,15 @@
 
 import type {
   AccountRow,
-  ChildProfileGradeLevelRow,
-  ChildProfileRow,
   ChildProfileVM,
   ProfileRow,
   ThemeKey,
 } from '@iconicedu/shared-types';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { getFamilyInviteAdminClient, ensureFamilyForGuardian } from '@iconicedu/web/lib/family/queries/invite.query';
+import {
+  getFamilyInviteAdminClient,
+  ensureFamilyForGuardian,
+} from '@iconicedu/web/lib/family/queries/invite.query';
 import { loadChildProfiles } from '@iconicedu/web/lib/profile/builders/load-child-profiles';
 import { buildChildDisplayName } from '@iconicedu/web/lib/profile/display-name';
 import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
@@ -74,15 +75,12 @@ async function cleanupCreatedRecords(context: CreationCleanupContext) {
 
   if (familyLinkCreated && familyId) {
     await run('family link', () =>
-      serviceClient
-        .from('family_links')
-        .delete()
-        .match({
-          org_id: orgId,
-          family_id: familyId,
-          guardian_account_id: guardianAccountId,
-          child_account_id: childAccountId,
-        }),
+      serviceClient.from('family_links').delete().match({
+        org_id: orgId,
+        family_id: familyId,
+        guardian_account_id: guardianAccountId,
+        child_account_id: childAccountId,
+      }),
     );
   }
 
@@ -231,10 +229,7 @@ export async function createChildProfileAction(
       updated_by: guardianAccount.id,
     };
 
-    const {
-      data: existingProfile,
-      error: existingProfileError,
-    } = await serviceClient
+    const { data: existingProfile, error: existingProfileError } = await serviceClient
       .from('profiles')
       .select('id')
       .eq('org_id', guardianAccount.org_id)
@@ -289,14 +284,15 @@ export async function createChildProfileAction(
 
     cleanupContext.familyId = familyId;
 
-    const { data: existingFamilyLink, error: existingFamilyLinkError } = await serviceClient
-      .from('family_links')
-      .select('id')
-      .eq('org_id', guardianAccount.org_id)
-      .eq('family_id', familyId)
-      .eq('guardian_account_id', guardianAccount.id)
-      .eq('child_account_id', childAccount.id)
-      .maybeSingle();
+    const { data: existingFamilyLink, error: existingFamilyLinkError } =
+      await serviceClient
+        .from('family_links')
+        .select('id')
+        .eq('org_id', guardianAccount.org_id)
+        .eq('family_id', familyId)
+        .eq('guardian_account_id', guardianAccount.id)
+        .eq('child_account_id', childAccount.id)
+        .maybeSingle();
 
     if (existingFamilyLinkError) {
       throw existingFamilyLinkError;
@@ -304,20 +300,18 @@ export async function createChildProfileAction(
 
     cleanupContext.familyLinkCreated = !existingFamilyLink;
 
-    const { error: linkError } = await serviceClient
-      .from('family_links')
-      .upsert(
-        {
-          org_id: guardianAccount.org_id,
-          family_id: familyId,
-          guardian_account_id: guardianAccount.id,
-          child_account_id: childAccount.id,
-          relation: 'guardian',
-          created_by: guardianAccount.id,
-          updated_by: guardianAccount.id,
-        },
-        { onConflict: 'org_id,family_id,guardian_account_id,child_account_id' },
-      );
+    const { error: linkError } = await serviceClient.from('family_links').upsert(
+      {
+        org_id: guardianAccount.org_id,
+        family_id: familyId,
+        guardian_account_id: guardianAccount.id,
+        child_account_id: childAccount.id,
+        relation: 'guardian',
+        created_by: guardianAccount.id,
+        updated_by: guardianAccount.id,
+      },
+      { onConflict: 'org_id,family_id,guardian_account_id,child_account_id' },
+    );
 
     if (linkError) {
       throw linkError;
@@ -331,15 +325,13 @@ export async function createChildProfileAction(
       updated_by: guardianAccount.id,
     };
 
-    const {
-      data: existingChildProfile,
-      error: existingChildProfileError,
-    } = await serviceClient
-      .from('child_profiles')
-      .select('profile_id')
-      .eq('org_id', guardianAccount.org_id)
-      .eq('profile_id', profileRow.id)
-      .maybeSingle();
+    const { data: existingChildProfile, error: existingChildProfileError } =
+      await serviceClient
+        .from('child_profiles')
+        .select('profile_id')
+        .eq('org_id', guardianAccount.org_id)
+        .eq('profile_id', profileRow.id)
+        .maybeSingle();
 
     if (existingChildProfileError) {
       throw existingChildProfileError;
@@ -360,7 +352,9 @@ export async function createChildProfileAction(
         throw error;
       }
     } else {
-      const { error } = await serviceClient.from('child_profiles').insert(childProfilePayload);
+      const { error } = await serviceClient
+        .from('child_profiles')
+        .insert(childProfilePayload);
 
       if (error) {
         throw error;
@@ -376,10 +370,7 @@ export async function createChildProfileAction(
       updated_by: guardianAccount.id,
     };
 
-    const {
-      data: existingGrade,
-      error: existingGradeError,
-    } = await serviceClient
+    const { data: existingGrade, error: existingGradeError } = await serviceClient
       .from('child_profile_grade_level')
       .select('id')
       .eq('org_id', guardianAccount.org_id)
@@ -411,11 +402,9 @@ export async function createChildProfileAction(
       }
     }
 
-    const children = await loadChildProfiles(
-      serviceClient,
-      guardianAccount.org_id,
-      [childAccount.id],
-    );
+    const children = await loadChildProfiles(serviceClient, guardianAccount.org_id, [
+      childAccount.id,
+    ]);
 
     if (!children.length) {
       throw new Error('Unable to load child profile');

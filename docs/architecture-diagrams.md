@@ -1587,4 +1587,4 @@ graph LR
 
 ---
 
-*Generated from codebase exploration — `iconicedu-monorepo`. Last updated: 2026-02-27.*
+_Generated from codebase exploration — `iconicedu-monorepo`. Last updated: 2026-02-27._

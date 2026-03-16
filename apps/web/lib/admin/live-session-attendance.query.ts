@@ -171,7 +171,10 @@ export async function listLiveSessionAttendanceRows(
     new Set(
       learningSpaceLinks
         .map((row) => row.learning_space_id)
-        .filter((learningSpaceId) => !filters.learningSpaceId || learningSpaceId === filters.learningSpaceId),
+        .filter(
+          (learningSpaceId) =>
+            !filters.learningSpaceId || learningSpaceId === filters.learningSpaceId,
+        ),
     ),
   );
 
@@ -188,7 +191,9 @@ export async function listLiveSessionAttendanceRows(
     : sessions;
 
   const filteredParticipants = new Set(filteredSessions.map((row) => row.id));
-  const scopedParticipants = participants.filter((row) => filteredParticipants.has(row.live_session_id));
+  const scopedParticipants = participants.filter((row) =>
+    filteredParticipants.has(row.live_session_id),
+  );
 
   const [learningSpacesResponse, profilesResponse] = await Promise.all([
     getLearningSpacesByIds(supabase, orgId, learningSpaceIds),
@@ -252,37 +257,38 @@ export async function getLiveSessionAttendanceDetailRows(
     };
   }
 
-  const [channelResponse, linkResponse, participantsResponse, eventsResponse] = await Promise.all([
-    supabase
-      .from('channels')
-      .select('*')
-      .eq('org_id', orgId)
-      .eq('id', session.channel_id)
-      .is('deleted_at', null)
-      .maybeSingle<ChannelRow>(),
-    supabase
-      .from('learning_space_channels')
-      .select('*')
-      .eq('org_id', orgId)
-      .eq('channel_id', session.channel_id)
-      .is('deleted_at', null)
-      .maybeSingle<LearningSpaceChannelRow>(),
-    supabase
-      .from('channel_live_session_participants')
-      .select('*')
-      .eq('org_id', orgId)
-      .eq('live_session_id', liveSessionId)
-      .is('deleted_at', null)
-      .returns<ChannelLiveSessionParticipantRow[]>(),
-    supabase
-      .from('channel_live_session_participant_events')
-      .select('*')
-      .eq('org_id', orgId)
-      .eq('live_session_id', liveSessionId)
-      .is('deleted_at', null)
-      .order('occurred_at', { ascending: true })
-      .returns<ChannelLiveSessionParticipantEventRow[]>(),
-  ]);
+  const [channelResponse, linkResponse, participantsResponse, eventsResponse] =
+    await Promise.all([
+      supabase
+        .from('channels')
+        .select('*')
+        .eq('org_id', orgId)
+        .eq('id', session.channel_id)
+        .is('deleted_at', null)
+        .maybeSingle<ChannelRow>(),
+      supabase
+        .from('learning_space_channels')
+        .select('*')
+        .eq('org_id', orgId)
+        .eq('channel_id', session.channel_id)
+        .is('deleted_at', null)
+        .maybeSingle<LearningSpaceChannelRow>(),
+      supabase
+        .from('channel_live_session_participants')
+        .select('*')
+        .eq('org_id', orgId)
+        .eq('live_session_id', liveSessionId)
+        .is('deleted_at', null)
+        .returns<ChannelLiveSessionParticipantRow[]>(),
+      supabase
+        .from('channel_live_session_participant_events')
+        .select('*')
+        .eq('org_id', orgId)
+        .eq('live_session_id', liveSessionId)
+        .is('deleted_at', null)
+        .order('occurred_at', { ascending: true })
+        .returns<ChannelLiveSessionParticipantEventRow[]>(),
+    ]);
 
   if (channelResponse.error) {
     throw new Error(channelResponse.error.message);
@@ -342,7 +348,8 @@ export async function getLiveSessionAttendanceDetailRows(
     participants,
     events,
     profiles,
-    starterProfile: profiles.find((profile) => profile.id === session.started_by_profile_id) ?? null,
+    starterProfile:
+      profiles.find((profile) => profile.id === session.started_by_profile_id) ?? null,
   };
 }
 

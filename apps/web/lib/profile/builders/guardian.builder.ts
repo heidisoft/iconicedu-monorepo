@@ -7,7 +7,10 @@ import type {
 import type { ProfileRow } from '@iconicedu/shared-types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import { getGuardianFamilyLinks, getGuardianProfile } from '@iconicedu/web/lib/profile/queries/guardian.query';
+import {
+  getGuardianFamilyLinks,
+  getGuardianProfile,
+} from '@iconicedu/web/lib/profile/queries/guardian.query';
 import { loadChildProfiles } from '@iconicedu/web/lib/profile/builders/load-child-profiles';
 
 function normalizeSessionNotesVisibility(
@@ -31,13 +34,8 @@ export async function buildGuardianProfile(
     profileRow.account_id,
   );
 
-  const childAccountIds =
-    familyLinks.data?.map((link) => link.child_account_id) ?? [];
-  const children = await loadChildProfiles(
-    supabase,
-    profileRow.org_id,
-    childAccountIds,
-  );
+  const childAccountIds = familyLinks.data?.map((link) => link.child_account_id) ?? [];
+  const children = await loadChildProfiles(supabase, profileRow.org_id, childAccountIds);
 
   const childrenConnection: ConnectionVM<ChildProfileVM> = {
     items: children,

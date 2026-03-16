@@ -42,7 +42,8 @@ export function mapAccountRowToVM(
         accountRow?.phone_verified ?? (accountRow?.phone_verified_at ? true : undefined),
       phoneVerifiedAt: accountRow?.phone_verified_at ?? null,
       whatsappVerified:
-        accountRow?.whatsapp_verified ?? (accountRow?.whatsapp_verified_at ? true : undefined),
+        accountRow?.whatsapp_verified ??
+        (accountRow?.whatsapp_verified_at ? true : undefined),
       whatsappVerifiedAt: accountRow?.whatsapp_verified_at ?? null,
       preferredContactChannels: (accountRow?.preferred_contact_channels as Array<
         'email' | 'sms' | 'whatsapp'

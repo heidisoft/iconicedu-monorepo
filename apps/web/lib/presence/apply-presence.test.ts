@@ -104,11 +104,7 @@ describe('apply presence helpers', () => {
 
   it('updates sidebar user profile and direct message participants', () => {
     const sidebarData = makeSidebarData();
-    const updated = applyPresenceToSidebarData(
-      sidebarData,
-      'profile-1',
-      busyPresence,
-    );
+    const updated = applyPresenceToSidebarData(sidebarData, 'profile-1', busyPresence);
 
     expect(updated.user.profile.presence?.displayStatus).toBe('busy');
     expect(

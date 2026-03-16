@@ -104,6 +104,8 @@ describe('getAdminActivityEventRows', () => {
       actorDisplayName: 'System',
       scopeLabel: 'org',
     });
-    expect(getProfilesByIds).toHaveBeenCalledWith(expect.anything(), 'org-1', ['profile-1']);
+    expect(getProfilesByIds).toHaveBeenCalledWith(expect.anything(), 'org-1', [
+      'profile-1',
+    ]);
   });
 });

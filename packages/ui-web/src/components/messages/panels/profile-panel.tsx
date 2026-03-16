@@ -1,7 +1,10 @@
 'use client';
 
-import type { MessagesRightPanelIntent, UserProfileVM } from '@iconicedu/shared-types';
-import { ProfileContent, ProfileSheet } from '@iconicedu/ui-web/components/messages/profile-sheet';
+import type { MessagesRightPanelIntent } from '@iconicedu/shared-types';
+import {
+  ProfileContent,
+  ProfileSheet,
+} from '@iconicedu/ui-web/components/messages/profile-sheet';
 import { useMessagesState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
 import { useIsMobile } from '@iconicedu/ui-web/hooks/use-mobile';
 import { resolveDashboardBasePathFromWindow } from '@iconicedu/ui-web/lib/dashboard-base-path';
@@ -28,17 +31,7 @@ export function ProfilePanel({ intent }: ProfilePanelProps) {
         }
       : undefined;
   if (isMobile) {
-    return (
-      <ProfileSheet
-        user={user}
-        onDmClick={handleDmClick}
-      />
-    );
+    return <ProfileSheet user={user} onDmClick={handleDmClick} />;
   }
-  return (
-    <ProfileContent
-      user={user}
-      onDmClick={handleDmClick}
-    />
-  );
+  return <ProfileContent user={user} onDmClick={handleDmClick} />;
 }

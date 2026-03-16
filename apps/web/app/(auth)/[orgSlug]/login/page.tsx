@@ -42,7 +42,9 @@ export default async function OrgLoginPage({
       org.id,
     );
     if (accountResponse.data?.org_id) {
-      redirect(await resolveOrgDashboardPath(serviceSupabase, accountResponse.data.org_id));
+      redirect(
+        await resolveOrgDashboardPath(serviceSupabase, accountResponse.data.org_id),
+      );
     }
     redirect(`/${org.slug}/get-started`);
   }

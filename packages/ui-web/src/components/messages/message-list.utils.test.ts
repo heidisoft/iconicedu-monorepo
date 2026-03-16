@@ -41,9 +41,9 @@ describe('message-list utils', () => {
 
     expect(withUpdatedSecond).toHaveLength(2);
     expect(withUpdatedSecond.map((message) => message.ids.id)).toEqual(['a', 'b']);
-    expect((withUpdatedSecond[1] as MessageVM & { content?: { text?: string } }).content?.text).toBe(
-      'updated',
-    );
+    expect(
+      (withUpdatedSecond[1] as MessageVM & { content?: { text?: string } }).content?.text,
+    ).toBe('updated');
   });
 
   it('prepends older messages without duplicates', () => {
@@ -104,9 +104,9 @@ describe('message-list utils', () => {
 
     const result = prependUniqueMessages([parent], [reply]);
 
-    expect(result.find((message) => message.ids.id === 'parent-1')?.social.thread?.ids.id).toBe(
-      'thread-1',
-    );
+    expect(
+      result.find((message) => message.ids.id === 'parent-1')?.social.thread?.ids.id,
+    ).toBe('thread-1');
   });
 
   it('removes a message by id', () => {

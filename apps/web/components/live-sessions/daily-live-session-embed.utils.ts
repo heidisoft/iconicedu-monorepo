@@ -31,12 +31,11 @@ export function buildDailyDirectCallComposition(input: {
   const primaryParticipantId =
     input.remoteParticipantIds[0] ?? input.localSessionId ?? null;
   const floatingParticipantId =
-    input.remoteParticipantIds.length > 0 ? input.localSessionId ?? null : null;
+    input.remoteParticipantIds.length > 0 ? (input.localSessionId ?? null) : null;
 
   return {
     useOneToOneLayout:
-      input.remoteParticipantIds.length <= 1 &&
-      Boolean(primaryParticipantId),
+      input.remoteParticipantIds.length <= 1 && Boolean(primaryParticipantId),
     primaryParticipantId,
     floatingParticipantId,
   };
@@ -158,12 +157,7 @@ export function getDailyParticipantLabel(input: {
 }
 
 export function getDailyParticipantInitials(name?: string | null) {
-  const parts =
-    name
-      ?.trim()
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2) ?? [];
+  const parts = name?.trim().split(/\s+/).filter(Boolean).slice(0, 2) ?? [];
 
   if (parts.length === 0) {
     return 'P';
@@ -180,8 +174,6 @@ export function buildDailySpeakingWaveformBars(isSpeaking: boolean) {
   return isSpeaking ? [10, 20, 14, 24, 16] : [4, 8, 6, 10, 7];
 }
 
-export function isDailyParticipantMicMuted(input: {
-  audioState?: string | null;
-}) {
+export function isDailyParticipantMicMuted(input: { audioState?: string | null }) {
   return input.audioState !== 'playable';
 }

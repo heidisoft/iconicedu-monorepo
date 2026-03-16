@@ -1,9 +1,9 @@
 ---
 name: Bug report
 about: Something is broken or behaving unexpectedly
-title: "fix: "
+title: 'fix: '
 labels: bug
-assignees: ""
+assignees: ''
 ---
 
 ## Describe the bug
@@ -30,14 +30,14 @@ assignees: ""
 
 ## Environment
 
-| Field | Value |
-|---|---|
-| App | web / mobile / api |
-| OS | macOS / Linux / Windows (WSL2) |
-| Node version | |
-| pnpm version | |
-| Browser (web) | |
-| Device / OS version (mobile) | |
+| Field                        | Value                          |
+| ---------------------------- | ------------------------------ |
+| App                          | web / mobile / api             |
+| OS                           | macOS / Linux / Windows (WSL2) |
+| Node version                 |                                |
+| pnpm version                 |                                |
+| Browser (web)                |                                |
+| Device / OS version (mobile) |                                |
 
 ## Additional context
 

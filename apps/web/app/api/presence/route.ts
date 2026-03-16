@@ -121,16 +121,12 @@ export async function POST(request: Request) {
     }
   }
 
-  const { error } = await serviceClient.from('profile_presence').upsert(
-    upsertPayload,
-    { onConflict: 'org_id,profile_id' },
-  );
+  const { error } = await serviceClient
+    .from('profile_presence')
+    .upsert(upsertPayload, { onConflict: 'org_id,profile_id' });
 
   if (error) {
-    return NextResponse.json(
-      { success: false, message: error.message },
-      { status: 500 },
-    );
+    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
 
   return NextResponse.json({ success: true });

@@ -2,7 +2,9 @@
   "name": "@iconicedu/config-eslint",
   "version": "0.1.0",
   "main": "index.cjs",
-  "files": ["index.cjs"],
+  "files": [
+    "index.cjs"
+  ],
   "license": "MIT",
   "peerDependencies": {
     "eslint": "^9.39.1",

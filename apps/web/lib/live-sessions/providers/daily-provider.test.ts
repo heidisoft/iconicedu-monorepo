@@ -27,12 +27,10 @@ describe('daily live session provider', () => {
   it('returns sdk join access separately from the external tokenized url', async () => {
     process.env.DAILY_API_KEY = 'test-key';
 
-    const fetchMock = vi
-      .spyOn(global, 'fetch')
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ token: 'meeting-token' }),
-      } as Response);
+    const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ token: 'meeting-token' }),
+    } as Response);
 
     const result = await dailyLiveSessionProvider.getJoinAccess({
       sessionId: 'session-1',

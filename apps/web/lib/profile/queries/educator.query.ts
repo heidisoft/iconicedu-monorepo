@@ -19,10 +19,7 @@ import {
   EDUCATOR_SUBJECTS_SELECT,
 } from '@iconicedu/web/lib/profile/constants/selects';
 
-export async function getEducatorProfile(
-  supabase: SupabaseClient,
-  profileId: string,
-) {
+export async function getEducatorProfile(supabase: SupabaseClient, profileId: string) {
   return supabase
     .from('educator_profiles')
     .select(EDUCATOR_PROFILE_SELECT)
@@ -31,10 +28,7 @@ export async function getEducatorProfile(
     .maybeSingle<EducatorProfileRow>();
 }
 
-export async function getEducatorSubjects(
-  supabase: SupabaseClient,
-  profileId: string,
-) {
+export async function getEducatorSubjects(supabase: SupabaseClient, profileId: string) {
   return supabase
     .from('educator_profile_subjects')
     .select(EDUCATOR_SUBJECTS_SELECT)
@@ -67,10 +61,7 @@ export async function getEducatorCurriculumTags(
     .returns<EducatorProfileCurriculumTagRow[]>();
 }
 
-export async function getEducatorBadges(
-  supabase: SupabaseClient,
-  profileId: string,
-) {
+export async function getEducatorBadges(supabase: SupabaseClient, profileId: string) {
   return supabase
     .from('educator_profile_badges')
     .select(EDUCATOR_BADGES_SELECT)

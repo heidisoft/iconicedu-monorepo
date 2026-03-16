@@ -405,7 +405,8 @@ export function EducatorAvailabilityTab({
         <div className="space-y-4">
           <div className="space-y-2">
             <p className="text-xs text-muted-foreground">
-              Click a day to select when you’re available to teach. You can update this anytime.
+              Click a day to select when you’re available to teach. You can update this
+              anytime.
             </p>
             <AvailabilityScheduler value={availability} onChange={setAvailability} />
           </div>

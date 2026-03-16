@@ -1,9 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const {
-  createSupabaseServiceClientMock,
-  insertClassSchedulesMock,
-} = vi.hoisted(() => ({
+const { createSupabaseServiceClientMock, insertClassSchedulesMock } = vi.hoisted(() => ({
   createSupabaseServiceClientMock: vi.fn(),
   insertClassSchedulesMock: vi.fn(),
 }));
@@ -13,9 +10,9 @@ vi.mock('@iconicedu/web/lib/supabase/service', () => ({
 }));
 
 vi.mock('@iconicedu/web/lib/admin/learning-space-create', async () => {
-  const actual = await vi.importActual<typeof import('@iconicedu/web/lib/admin/learning-space-create')>(
-    '@iconicedu/web/lib/admin/learning-space-create',
-  );
+  const actual = await vi.importActual<
+    typeof import('@iconicedu/web/lib/admin/learning-space-create')
+  >('@iconicedu/web/lib/admin/learning-space-create');
 
   return {
     ...actual,
@@ -123,12 +120,15 @@ describe('replaceLearningSpaceSchedules', () => {
     });
 
     expect(createSupabaseServiceClientMock).toHaveBeenCalledTimes(1);
-    expect(insertClassSchedulesMock).toHaveBeenCalledWith(serviceClient, expect.objectContaining({
-      orgId: 'org-1',
-      learningSpaceId: 'space-1',
-      channelId: 'channel-1',
-      title: 'Algebra',
-    }));
+    expect(insertClassSchedulesMock).toHaveBeenCalledWith(
+      serviceClient,
+      expect.objectContaining({
+        orgId: 'org-1',
+        learningSpaceId: 'space-1',
+        channelId: 'channel-1',
+        title: 'Algebra',
+      }),
+    );
     expect(classSchedulesTable.delete).toHaveBeenCalledTimes(1);
     expect(recurrenceTable.delete).toHaveBeenCalledTimes(1);
   });

@@ -140,7 +140,11 @@ export async function getAdminActivityEventRows(
 
   const rows = response.data ?? [];
   const actorIds = Array.from(
-    new Set(rows.map((row) => row.actor_profile_id).filter((value): value is string => Boolean(value))),
+    new Set(
+      rows
+        .map((row) => row.actor_profile_id)
+        .filter((value): value is string => Boolean(value)),
+    ),
   );
   const profilesResponse = await getProfilesByIds(supabase, orgId, actorIds);
   const profilesById = new Map(

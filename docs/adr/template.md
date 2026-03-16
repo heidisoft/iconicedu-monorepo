@@ -15,10 +15,10 @@ What was decided? State it clearly and directly.
 
 ## Alternatives considered
 
-| Option | Why rejected |
-|---|---|
-| Option A | |
-| Option B | |
+| Option   | Why rejected |
+| -------- | ------------ |
+| Option A |              |
+| Option B |              |
 
 ## Consequences
 

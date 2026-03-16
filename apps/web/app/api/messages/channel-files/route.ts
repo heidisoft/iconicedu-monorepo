@@ -27,11 +27,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const files = await buildChannelFiles(
-    supabase,
-    accountResponse.data.org_id,
-    channelId,
-  );
+  const files = await buildChannelFiles(supabase, accountResponse.data.org_id, channelId);
 
   return NextResponse.json({
     success: true,

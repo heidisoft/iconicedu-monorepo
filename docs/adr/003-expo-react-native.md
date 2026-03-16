@@ -10,6 +10,7 @@
 The platform requires a mobile app for iOS and Android. The web app is already React-based (Next.js), so a React-adjacent mobile solution was preferred to maximise code and knowledge sharing.
 
 Key requirements:
+
 - iOS and Android from a single codebase
 - OTA (over-the-air) updates for JS-only changes
 - Push notifications
@@ -31,13 +32,13 @@ Use **Expo** (managed workflow with EAS) built on **React Native**.
 
 ## Alternatives considered
 
-| Option | Why rejected |
-|---|---|
-| Bare React Native (no Expo) | More native configuration overhead; Expo managed workflow eliminates most of it. EAS Build provides CI/CD. |
-| Flutter | Different language (Dart); no code/knowledge sharing with the existing React web codebase. |
+| Option                      | Why rejected                                                                                                |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Bare React Native (no Expo) | More native configuration overhead; Expo managed workflow eliminates most of it. EAS Build provides CI/CD.  |
+| Flutter                     | Different language (Dart); no code/knowledge sharing with the existing React web codebase.                  |
 | React Native + Expo Go only | Expo Go doesn't support all native modules (e.g. `expo-secure-store`). EAS Development builds are required. |
-| Capacitor / Ionic | Web-based rendering; worse performance for a real-time messaging app. |
-| PWA (Progressive Web App) | Poor native feel; no access to native APIs (secure storage, push notifications); App Store presence harder. |
+| Capacitor / Ionic           | Web-based rendering; worse performance for a real-time messaging app.                                       |
+| PWA (Progressive Web App)   | Poor native feel; no access to native APIs (secure storage, push notifications); App Store presence harder. |
 
 ## Consequences
 

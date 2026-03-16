@@ -22,12 +22,7 @@ function loadChokidar() {
 
 const chokidar = loadChokidar();
 
-const tailwindArgs = [
-  '-i',
-  './src/styles/global.css',
-  '-o',
-  './dist/ui-web.css',
-];
+const tailwindArgs = ['-i', './src/styles/global.css', '-o', './dist/ui-web.css'];
 
 const tailwindCliPath = path.resolve(
   __dirname,
@@ -76,14 +71,11 @@ async function rebuildTailwind(trigger) {
   }
 }
 
-const watcher = chokidar.watch(
-  ['tailwind.config.ts', 'src/**/*.{ts,tsx,css}'],
-  {
-    ignoreInitial: true,
-    usePolling: true,
-    interval: 1000,
-  },
-);
+const watcher = chokidar.watch(['tailwind.config.ts', 'src/**/*.{ts,tsx,css}'], {
+  ignoreInitial: true,
+  usePolling: true,
+  interval: 1000,
+});
 
 watcher.on('all', (event, path) => {
   rebuildTailwind(`${event} ${path}`);

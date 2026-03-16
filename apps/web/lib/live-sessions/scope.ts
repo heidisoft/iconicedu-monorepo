@@ -52,7 +52,8 @@ export async function resolveChannelLiveSessionScope(input: {
   const schedules = await buildClassSchedulesByOrg(input.supabase, input.orgId);
   const channelSchedules = schedules.filter(
     (schedule) =>
-      schedule.source.kind === 'class_session' && schedule.source.channelId === input.channelId,
+      schedule.source.kind === 'class_session' &&
+      schedule.source.channelId === input.channelId,
   );
 
   for (const schedule of channelSchedules) {

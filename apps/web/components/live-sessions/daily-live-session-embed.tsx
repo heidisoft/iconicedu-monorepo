@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   DailyAudio,
   DailyProvider,
@@ -15,7 +15,6 @@ import {
   useParticipant,
   useParticipantIds,
   useParticipantCounts,
-  useRecording,
 } from '@daily-co/daily-react';
 import type { DailyInputSettings } from '@daily-co/daily-js';
 import {
@@ -54,11 +53,9 @@ import {
   getDailyLiveSessionErrorMessage,
   getDailyParticipantInitials,
   getDailyParticipantLabel,
-  buildDailySpeakingWaveformBars,
   isDirectLiveSessionLayout,
   isDailyParticipantMicMuted,
   isDailyParticipantSpeaking,
-  shouldShowFullMeetingControls,
 } from '@iconicedu/web/components/live-sessions/daily-live-session-embed.utils';
 import { type LiveSessionViewType } from '@iconicedu/web/components/live-sessions/view-switcher';
 import { VideoParticipant } from '@iconicedu/web/components/live-sessions/video-participant';
@@ -84,7 +81,6 @@ function DailyParticipantTile({
   const isMicMuted = isDailyParticipantMicMuted({
     audioState: participant?.tracks.audio.state,
   });
-  const waveformBars = buildDailySpeakingWaveformBars(isSpeaking);
   const isFloating = variant === 'floating';
 
   useAudioLevel(participant?.tracks.audio.persistentTrack, setAudioLevel);
@@ -116,11 +112,7 @@ function DailyParticipantTile({
   );
 }
 
-function DailyScreenShareTile({
-  sessionId,
-}: {
-  sessionId: string;
-}) {
+function DailyScreenShareTile({ sessionId }: { sessionId: string }) {
   const participant = useParticipant(sessionId);
   const participantLabel = getDailyParticipantLabel({
     isLocal: participant?.local,
@@ -172,8 +164,12 @@ function DailyParticipantListItem({
           <AvatarFallback>{participantInitials}</AvatarFallback>
         </Avatar>
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-foreground">{participantLabel}</p>
-          <p className="text-xs text-muted-foreground">{isLocal ? 'You' : 'Participant'}</p>
+          <p className="truncate text-sm font-medium text-foreground">
+            {participantLabel}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {isLocal ? 'You' : 'Participant'}
+          </p>
         </div>
       </div>
       <div className="flex items-center gap-2 text-muted-foreground">
@@ -190,7 +186,9 @@ function DailyPreJoinPreview({
   isMicEnabled,
   meetingName,
 }: {
-  participant: ReturnType<NonNullable<ReturnType<typeof useCallObject>>['participants']>['local'] | undefined;
+  participant:
+    | ReturnType<NonNullable<ReturnType<typeof useCallObject>>['participants']>['local']
+    | undefined;
   isCameraEnabled: boolean;
   isMicEnabled: boolean;
   meetingName?: string | null;
@@ -257,7 +255,11 @@ function DailyPreJoinPreview({
           {isMicEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
         </div>
         <div className="rounded-full border border-white/20 bg-black/45 p-3 text-white backdrop-blur">
-          {isCameraEnabled ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
+          {isCameraEnabled ? (
+            <Video className="h-4 w-4" />
+          ) : (
+            <VideoOff className="h-4 w-4" />
+          )}
         </div>
         <div className="rounded-full border border-white/20 bg-black/45 p-3 text-white backdrop-blur">
           <WandSparkles className="h-4 w-4" />
@@ -291,7 +293,6 @@ function DailyLiveSessionSurface({
   const remoteParticipantIds = useParticipantIds({ filter: 'remote' });
   const participantCounts = useParticipantCounts();
   const meetingState = useMeetingState();
-  const recording = useRecording();
   const {
     cameras,
     microphones,
@@ -304,7 +305,11 @@ function DailyLiveSessionSurface({
     setSpeaker,
     refreshDevices,
   } = useDevices();
-  const { inputSettings, updateInputSettings, errorMsg: inputSettingsError } = useInputSettings();
+  const {
+    inputSettings,
+    updateInputSettings,
+    errorMsg: inputSettingsError,
+  } = useInputSettings();
   const [error, setError] = useState<string | null>(null);
   const [isPreparingPreview, setIsPreparingPreview] = useState(true);
   const [hasStartedJoin, setHasStartedJoin] = useState(false);
@@ -318,14 +323,14 @@ function DailyLiveSessionSurface({
   const [isApplyingDevice, setIsApplyingDevice] = useState<string | null>(null);
   const [isApplyingInputSettings, setIsApplyingInputSettings] = useState(false);
   const [currentView, setCurrentView] = useState<LiveSessionViewType>('gallery');
-  const [participantTrackVersion, setParticipantTrackVersion] = useState(0);
+  const [, forceParticipantTrackRefresh] = useReducer((value: number) => value + 1, 0);
   const shouldRouteOnLeaveRef = useRef(true);
   const isDirectCall = isDirectLiveSessionLayout({ channelKind, mode });
-  const showFullMeetingControls = shouldShowFullMeetingControls({ channelKind, mode });
   const backgroundPreset = getDailyBackgroundPresetValue({
     processor: inputSettings?.video?.processor ?? null,
   });
-  const isNoiseCancellationEnabled = inputSettings?.audio?.processor?.type === 'noise-cancellation';
+  const isNoiseCancellationEnabled =
+    inputSettings?.audio?.processor?.type === 'noise-cancellation';
 
   const handleLeftMeeting = useCallback(() => {
     if (!shouldRouteOnLeaveRef.current) {
@@ -344,32 +349,32 @@ function DailyLiveSessionSurface({
   useDailyEvent(
     'participant-updated',
     useCallback(() => {
-      setParticipantTrackVersion((value) => value + 1);
+      forceParticipantTrackRefresh();
     }, []),
   );
   useDailyEvent(
     'participant-joined',
     useCallback(() => {
-      setParticipantTrackVersion((value) => value + 1);
+      forceParticipantTrackRefresh();
     }, []),
   );
   useDailyEvent(
     'participant-left',
     useCallback(() => {
-      setParticipantTrackVersion((value) => value + 1);
+      forceParticipantTrackRefresh();
     }, []),
   );
   useDailyEvent(
     'local-screen-share-started',
     useCallback(() => {
-      setParticipantTrackVersion((value) => value + 1);
+      forceParticipantTrackRefresh();
       setCurrentView('shared-content');
     }, []),
   );
   useDailyEvent(
     'local-screen-share-stopped',
     useCallback(() => {
-      setParticipantTrackVersion((value) => value + 1);
+      forceParticipantTrackRefresh();
       setCurrentView((view) => (view === 'shared-content' ? 'gallery' : view));
     }, []),
   );
@@ -380,7 +385,7 @@ function DailyLiveSessionSurface({
       setIsPreparingPreview(false);
       setHasStartedJoin(true);
       setError(null);
-      setParticipantTrackVersion((value) => value + 1);
+      forceParticipantTrackRefresh();
     }, []),
   );
 
@@ -397,7 +402,7 @@ function DailyLiveSessionSurface({
           return;
         }
         setIsPreparingPreview(false);
-        setParticipantTrackVersion((value) => value + 1);
+        forceParticipantTrackRefresh();
       })
       .catch((previewError: unknown) => {
         if (!isActive) {
@@ -466,7 +471,7 @@ function DailyLiveSessionSurface({
       }),
     [localSessionId, remoteParticipantIds],
   );
-  const activeScreenShareSessionId = useMemo(() => {
+  const activeScreenShareSessionId = (() => {
     const participants = callObject.participants();
     for (const sessionId of participantIds) {
       if (participants[sessionId]?.tracks.screenVideo.state === 'playable') {
@@ -474,27 +479,27 @@ function DailyLiveSessionSurface({
       }
     }
     return null;
-  }, [callObject, participantIds, participantTrackVersion]);
-  const isScreenSharing = useMemo(() => {
+  })();
+  const isScreenSharing = (() => {
     if (!localSessionId) {
       return false;
     }
 
     const participants = callObject.participants();
     return participants[localSessionId]?.tracks.screenVideo.state === 'playable';
-  }, [callObject, localSessionId, participantTrackVersion]);
+  })();
   const stageParticipantIds = useMemo(
     () => participantIds.filter((sessionId) => sessionId !== activeScreenShareSessionId),
     [activeScreenShareSessionId, participantIds],
   );
   const localParticipant = useParticipant(localSessionId ?? undefined);
-  const previewParticipant = useMemo(() => callObject.participants().local, [callObject, participantTrackVersion]);
+  const previewParticipant = callObject.participants().local;
   const isHandRaised = Boolean(
     localParticipant &&
-      typeof localParticipant.userData === 'object' &&
-      localParticipant.userData !== null &&
-      'raisedHand' in localParticipant.userData &&
-      localParticipant.userData.raisedHand,
+    typeof localParticipant.userData === 'object' &&
+    localParticipant.userData !== null &&
+    'raisedHand' in localParticipant.userData &&
+    localParticipant.userData.raisedHand,
   );
 
   const applyInputSettings = useCallback(
@@ -539,7 +544,9 @@ function DailyLiveSessionSurface({
 
   const handleToggleRaiseHand = async () => {
     const currentUserData =
-      localParticipant && typeof localParticipant.userData === 'object' && localParticipant.userData !== null
+      localParticipant &&
+      typeof localParticipant.userData === 'object' &&
+      localParticipant.userData !== null
         ? localParticipant.userData
         : {};
 
@@ -548,7 +555,7 @@ function DailyLiveSessionSurface({
         ...currentUserData,
         raisedHand: !isHandRaised,
       });
-      setParticipantTrackVersion((value) => value + 1);
+      forceParticipantTrackRefresh();
     } catch (raiseHandError: unknown) {
       setError(getDailyLiveSessionErrorMessage(raiseHandError));
     }
@@ -623,7 +630,9 @@ function DailyLiveSessionSurface({
         {error ? (
           <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/90 px-6 text-center">
             <div className="space-y-2">
-              <p className="text-sm font-medium text-foreground">Live session unavailable</p>
+              <p className="text-sm font-medium text-foreground">
+                Live session unavailable
+              </p>
               <p className="text-sm text-muted-foreground">{error}</p>
             </div>
           </div>
@@ -654,16 +663,34 @@ function DailyLiveSessionSurface({
                 <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                   <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5">
                     <Mic className="h-3.5 w-3.5" />
-                    <span>{getDailyDeviceLabel({ label: currentMic?.device.label, kind: currentMic?.device.kind, index: 0 })}</span>
+                    <span>
+                      {getDailyDeviceLabel({
+                        label: currentMic?.device.label,
+                        kind: currentMic?.device.kind,
+                        index: 0,
+                      })}
+                    </span>
                   </div>
                   <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5">
                     <Volume2 className="h-3.5 w-3.5" />
-                    <span>{getDailyDeviceLabel({ label: currentSpeaker?.device.label, kind: currentSpeaker?.device.kind, index: 0 })}</span>
+                    <span>
+                      {getDailyDeviceLabel({
+                        label: currentSpeaker?.device.label,
+                        kind: currentSpeaker?.device.kind,
+                        index: 0,
+                      })}
+                    </span>
                   </div>
                   {mode !== 'audio' ? (
                     <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5">
                       <Camera className="h-3.5 w-3.5" />
-                      <span>{getDailyDeviceLabel({ label: currentCam?.device.label, kind: currentCam?.device.kind, index: 0 })}</span>
+                      <span>
+                        {getDailyDeviceLabel({
+                          label: currentCam?.device.label,
+                          kind: currentCam?.device.kind,
+                          index: 0,
+                        })}
+                      </span>
                     </div>
                   ) : null}
                 </div>
@@ -672,10 +699,12 @@ function DailyLiveSessionSurface({
               <div className="space-y-5">
                 <div className="space-y-2">
                   <h2 className="text-2xl font-semibold tracking-tight text-foreground">
-                    {meetingName?.trim() || (isDirectCall ? 'Direct session' : 'Live session')}
+                    {meetingName?.trim() ||
+                      (isDirectCall ? 'Direct session' : 'Live session')}
                   </h2>
                   <p className="text-sm text-muted-foreground">
-                    Check your camera, microphone, background, and devices before you join.
+                    Check your camera, microphone, background, and devices before you
+                    join.
                   </p>
                 </div>
 
@@ -798,7 +827,10 @@ function DailyLiveSessionSurface({
                       </SelectTrigger>
                       <SelectContent>
                         {cameras.map((camera, index) => (
-                          <SelectItem key={camera.device.deviceId} value={camera.device.deviceId}>
+                          <SelectItem
+                            key={camera.device.deviceId}
+                            value={camera.device.deviceId}
+                          >
                             {getDailyDeviceLabel({
                               label: camera.device.label,
                               kind: camera.device.kind,
@@ -818,7 +850,9 @@ function DailyLiveSessionSurface({
                   </span>
                   <Select
                     value={currentMic?.device.deviceId ?? ''}
-                    onValueChange={(value) => void handleSelectDevice('microphone', value)}
+                    onValueChange={(value) =>
+                      void handleSelectDevice('microphone', value)
+                    }
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select microphone" />
@@ -854,7 +888,10 @@ function DailyLiveSessionSurface({
                     </SelectTrigger>
                     <SelectContent>
                       {speakers.map((speaker, index) => (
-                        <SelectItem key={speaker.device.deviceId} value={speaker.device.deviceId}>
+                        <SelectItem
+                          key={speaker.device.deviceId}
+                          value={speaker.device.deviceId}
+                        >
                           {getDailyDeviceLabel({
                             label: speaker.device.label,
                             kind: speaker.device.kind,
@@ -895,11 +932,15 @@ function DailyLiveSessionSurface({
                 <div className="flex items-center gap-3">
                   <Switch
                     checked={isNoiseCancellationEnabled}
-                    onCheckedChange={(checked) => void handleToggleNoiseCancellation(checked)}
+                    onCheckedChange={(checked) =>
+                      void handleToggleNoiseCancellation(checked)
+                    }
                     disabled={isApplyingInputSettings}
                   />
                   <div className="space-y-0.5">
-                    <p className="text-sm font-medium text-foreground">Noise cancellation</p>
+                    <p className="text-sm font-medium text-foreground">
+                      Noise cancellation
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       Reduce room noise on your microphone input.
                     </p>
@@ -933,14 +974,14 @@ function DailyLiveSessionSurface({
                 activeScreenShareSessionId && !isDirectCall
                   ? 'flex flex-col gap-3'
                   : isDirectCall && directCallComposition.useOneToOneLayout
-                  ? 'relative'
-                  : isDirectCall
-                    ? 'grid grid-cols-1 gap-3 md:grid-cols-2'
-                    : currentView === 'speaker'
-                      ? 'grid grid-cols-1 gap-3'
-                      : currentView === 'gallery'
-                        ? 'grid grid-cols-1 gap-3 md:grid-cols-2'
-                        : 'grid grid-cols-1 gap-3',
+                    ? 'relative'
+                    : isDirectCall
+                      ? 'grid grid-cols-1 gap-3 md:grid-cols-2'
+                      : currentView === 'speaker'
+                        ? 'grid grid-cols-1 gap-3'
+                        : currentView === 'gallery'
+                          ? 'grid grid-cols-1 gap-3 md:grid-cols-2'
+                          : 'grid grid-cols-1 gap-3',
               ].join(' ')}
             >
               {activeScreenShareSessionId && !isDirectCall ? (
@@ -964,7 +1005,9 @@ function DailyLiveSessionSurface({
                     <DailyParticipantTile
                       key={directCallComposition.primaryParticipantId}
                       sessionId={directCallComposition.primaryParticipantId}
-                      isLocal={directCallComposition.primaryParticipantId === localSessionId}
+                      isLocal={
+                        directCallComposition.primaryParticipantId === localSessionId
+                      }
                     />
                   ) : null}
                   {directCallComposition.floatingParticipantId ? (
@@ -972,7 +1015,9 @@ function DailyLiveSessionSurface({
                       <DailyParticipantTile
                         key={directCallComposition.floatingParticipantId}
                         sessionId={directCallComposition.floatingParticipantId}
-                        isLocal={directCallComposition.floatingParticipantId === localSessionId}
+                        isLocal={
+                          directCallComposition.floatingParticipantId === localSessionId
+                        }
                         variant="floating"
                       />
                     </div>
@@ -995,8 +1040,12 @@ function DailyLiveSessionSurface({
                   <Users className="h-5 w-5" />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-sm font-medium text-foreground">Waiting for participants</p>
-                  <p className="text-sm">Share the live session message or join link to bring others in.</p>
+                  <p className="text-sm font-medium text-foreground">
+                    Waiting for participants
+                  </p>
+                  <p className="text-sm">
+                    Share the live session message or join link to bring others in.
+                  </p>
                 </div>
               </div>
             </div>
@@ -1030,7 +1079,9 @@ function DailyLiveSessionSurface({
         }))}
         currentMicrophoneId={currentMic?.device.deviceId ?? null}
         currentCameraId={currentCam?.device.deviceId ?? null}
-        meetingName={meetingName?.trim() || (isDirectCall ? 'Direct session' : 'Live session')}
+        meetingName={
+          meetingName?.trim() || (isDirectCall ? 'Direct session' : 'Live session')
+        }
         isMuted={!isMicEnabled}
         isVideoOn={isCameraEnabled}
         isSharing={isScreenSharing}

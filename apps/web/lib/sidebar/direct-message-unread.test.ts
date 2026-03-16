@@ -61,7 +61,9 @@ describe('direct message unread helpers', () => {
       currentProfileId: 'profile-self',
     });
 
-    expect(updated.collections.directMessages[0].collections.readState.unreadCount).toBe(2);
+    expect(updated.collections.directMessages[0].collections.readState.unreadCount).toBe(
+      2,
+    );
   });
 
   it('does not increment unread count for messages sent by current profile', () => {
@@ -82,7 +84,9 @@ describe('direct message unread helpers', () => {
       currentProfileId: 'profile-self',
     });
 
-    expect(updated.collections.directMessages[0].collections.readState.unreadCount).toBe(1);
+    expect(updated.collections.directMessages[0].collections.readState.unreadCount).toBe(
+      1,
+    );
   });
 
   it('marks active dm as read', () => {
@@ -91,17 +95,22 @@ describe('direct message unread helpers', () => {
       lastReadAt: '2026-02-15T00:00:00.000Z',
     });
 
-    expect(updated.collections.directMessages[0].collections.readState.unreadCount).toBe(0);
-    expect(updated.collections.directMessages[0].collections.readState.lastReadMessageId).toBe(
-      'message-4',
+    expect(updated.collections.directMessages[0].collections.readState.unreadCount).toBe(
+      0,
     );
+    expect(
+      updated.collections.directMessages[0].collections.readState.lastReadMessageId,
+    ).toBe('message-4');
     expect(updated.collections.directMessages[0].collections.readState.lastReadAt).toBe(
       '2026-02-15T00:00:00.000Z',
     );
   });
 
   it('moves active channel to top on message activity', () => {
-    const updated = touchDirectMessageChannelOrder(makeSidebarDataWithTwoChannels(), 'dm-2');
+    const updated = touchDirectMessageChannelOrder(
+      makeSidebarDataWithTwoChannels(),
+      'dm-2',
+    );
     expect(updated.collections.directMessages.map((channel) => channel.ids.id)).toEqual([
       'dm-2',
       'dm-1',

@@ -37,10 +37,7 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
     )}
     {leading}
     <View className="min-w-0 flex-1">
-      <Text
-        className="text-base font-semibold text-foreground"
-        numberOfLines={1}
-      >
+      <Text className="text-base font-semibold text-foreground" numberOfLines={1}>
         {title}
       </Text>
       {subtitle && (

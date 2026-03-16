@@ -23,13 +23,21 @@ function isMode(value: unknown): value is LiveSessionModeVM {
   return value === 'video' || value === 'audio';
 }
 
-export function parseAdminLiveSessionConfig(value: unknown): ChannelLiveSessionConfigVM | null {
-  if (!isRecord(value) || typeof value.enabled !== 'boolean' || !isProvider(value.provider)) {
+export function parseAdminLiveSessionConfig(
+  value: unknown,
+): ChannelLiveSessionConfigVM | null {
+  if (
+    !isRecord(value) ||
+    typeof value.enabled !== 'boolean' ||
+    !isProvider(value.provider)
+  ) {
     return null;
   }
 
   const joinUrl =
-    value.provider === 'custom' && typeof value.joinUrl === 'string' && value.joinUrl.trim().length > 0
+    value.provider === 'custom' &&
+    typeof value.joinUrl === 'string' &&
+    value.joinUrl.trim().length > 0
       ? value.joinUrl.trim()
       : null;
 
@@ -41,9 +49,7 @@ export function parseAdminLiveSessionConfig(value: unknown): ChannelLiveSessionC
   };
 }
 
-export function getAdminLiveSessionConfig(
-  value: unknown,
-): ChannelLiveSessionConfigVM {
+export function getAdminLiveSessionConfig(value: unknown): ChannelLiveSessionConfigVM {
   return parseAdminLiveSessionConfig(value) ?? DEFAULT_ADMIN_LIVE_SESSION_CONFIG;
 }
 
@@ -59,7 +65,9 @@ export function toStoredLiveSessionConfig(
     provider: value.provider,
     mode: value.mode ?? 'video',
     joinUrl:
-      value.provider === 'custom' && typeof value.joinUrl === 'string' && value.joinUrl.trim().length > 0
+      value.provider === 'custom' &&
+      typeof value.joinUrl === 'string' &&
+      value.joinUrl.trim().length > 0
         ? value.joinUrl.trim()
         : null,
   };

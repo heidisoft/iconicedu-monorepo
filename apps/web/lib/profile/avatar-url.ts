@@ -31,4 +31,3 @@ export async function resolveProfileAvatarUrl(
   const { data: publicData } = createPublicAvatarUrl(supabase, avatarUrl);
   return publicData?.publicUrl ?? null;
 }
-

@@ -8,6 +8,7 @@
 ## Context
 
 The platform requires:
+
 - A relational database with complex joins (users, classes, messages, threads, reactions)
 - Row-level security to enforce multi-role data visibility (guardian, educator, student, advisor, staff)
 - Authentication with email OTP and Google OAuth
@@ -16,6 +17,7 @@ The platform requires:
 - Fast iteration speed — the platform is early-stage
 
 Key constraints:
+
 - The data model involves children's data — access control must be enforced at the database level, not just application code
 - Multi-role visibility rules are complex (guardians see their children's data via `family_links`; advisors see assigned families)
 - The team is small; a managed service reduces operational burden
@@ -23,6 +25,7 @@ Key constraints:
 ## Decision
 
 Use **Supabase** as the all-in-one backend platform:
+
 - **PostgreSQL** for the relational database
 - **Row Level Security (RLS)** for enforcing access control at the database level
 - **Supabase Auth** for authentication (email OTP + OAuth providers)
@@ -33,13 +36,13 @@ All database schema changes are managed via migration files in `supabase/migrati
 
 ## Alternatives considered
 
-| Option | Why rejected |
-|---|---|
-| Firebase (Firestore) | NoSQL — poor fit for the relational data model (classes, enrolments, threads, reactions). No SQL joins. |
-| PlanetScale + Auth0 | Two separate managed services; more complexity and cost. No built-in RLS equivalent. |
+| Option                             | Why rejected                                                                                                           |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Firebase (Firestore)               | NoSQL — poor fit for the relational data model (classes, enrolments, threads, reactions). No SQL joins.                |
+| PlanetScale + Auth0                | Two separate managed services; more complexity and cost. No built-in RLS equivalent.                                   |
 | Self-hosted Postgres + custom auth | High operational overhead for a small team. Auth is hard to get right, especially for a platform with children's data. |
-| Prisma + custom Postgres | Prisma doesn't support RLS natively; would require application-level access control that could be bypassed. |
-| Hasura | GraphQL is a mismatch with the current team's patterns; more complex to reason about permissions. |
+| Prisma + custom Postgres           | Prisma doesn't support RLS natively; would require application-level access control that could be bypassed.            |
+| Hasura                             | GraphQL is a mismatch with the current team's patterns; more complex to reason about permissions.                      |
 
 ## Consequences
 

@@ -1,8 +1,12 @@
 import type { MessageVM, ThreadVM } from '@iconicedu/shared-types';
-import { CHANNEL_IDS, MESSAGE_IDS, DEMO_ORG_ID, THREAD_IDS } from '@iconicedu/web/lib/data/ids';
+import {
+  CHANNEL_IDS,
+  MESSAGE_IDS,
+  DEMO_ORG_ID,
+  THREAD_IDS,
+} from '@iconicedu/web/lib/data/ids';
 import {
   CHILD_MAYA_PROFILE,
-  CHILD_TEHARA_PROFILE,
   CHILD_TEVIN_PROFILE,
   EDUCATOR_AVA_PROFILE,
   EDUCATOR_ELENA_PROFILE,

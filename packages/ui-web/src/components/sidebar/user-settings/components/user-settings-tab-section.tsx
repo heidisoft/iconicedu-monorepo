@@ -66,9 +66,7 @@ export function UserSettingsTabSection({
             disabled && 'cursor-not-allowed opacity-70',
           )}
         >
-          <span className={USER_SETTINGS_SECTION_ICON_CLASS}>
-            {icon}
-          </span>
+          <span className={USER_SETTINGS_SECTION_ICON_CLASS}>{icon}</span>
           <div className="flex-1">
             <div className="text-sm font-medium">{title}</div>
             {subtitle ? (

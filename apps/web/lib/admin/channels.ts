@@ -1,5 +1,9 @@
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
-import type { ChannelRow, ChannelMemberRow, UserProfileVM } from '@iconicedu/shared-types';
+import type {
+  ChannelRow,
+  ChannelMemberRow,
+  UserProfileVM,
+} from '@iconicedu/shared-types';
 import {
   getChannelsByOrg,
   getChannelParticipantsByChannelIds,
@@ -106,7 +110,9 @@ export async function getAdminChannelRows(orgId: string): Promise<AdminChannelRo
   });
 }
 
-export async function getAdminDirectMessageRows(orgId: string): Promise<AdminChannelRow[]> {
+export async function getAdminDirectMessageRows(
+  orgId: string,
+): Promise<AdminChannelRow[]> {
   const rows = await getAdminChannelRows(orgId);
   return filterDirectMessageChannels(rows);
 }

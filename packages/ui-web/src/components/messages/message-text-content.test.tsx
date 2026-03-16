@@ -8,7 +8,9 @@ describe('MessageTextContent', () => {
     const { container } = render(
       <MessageTextContent
         text="Hello @Taylor Reed there"
-        mentions={[{ profileId: 'profile-1', displayName: 'Taylor Reed', start: 6, end: 18 }]}
+        mentions={[
+          { profileId: 'profile-1', displayName: 'Taylor Reed', start: 6, end: 18 },
+        ]}
       />,
     );
 
@@ -25,9 +27,7 @@ describe('MessageTextContent', () => {
   });
 
   it('renders bold and italic text markers as formatted content', async () => {
-    render(
-      <MessageTextContent text="This is **bold** and *italic* text" />,
-    );
+    render(<MessageTextContent text="This is **bold** and *italic* text" />);
 
     await waitFor(() => {
       expect(screen.getByText('bold').tagName).toBe('STRONG');

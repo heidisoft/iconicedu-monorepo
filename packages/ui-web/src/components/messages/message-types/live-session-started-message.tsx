@@ -3,12 +3,17 @@
 import { memo } from 'react';
 import { Video } from 'lucide-react';
 import type { LiveSessionStartedMessageVM as LiveSessionStartedMessageType } from '@iconicedu/shared-types';
-import { MessageBase, type MessageBaseProps } from '@iconicedu/ui-web/components/messages/message-base';
+import {
+  MessageBase,
+  type MessageBaseProps,
+} from '@iconicedu/ui-web/components/messages/message-base';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { getLiveSessionStartedMessageState } from '@iconicedu/ui-web/components/messages/message-types/live-session-started-message.utils';
 
-interface LiveSessionStartedMessageProps
-  extends Omit<MessageBaseProps, 'message' | 'children'> {
+interface LiveSessionStartedMessageProps extends Omit<
+  MessageBaseProps,
+  'message' | 'children'
+> {
   message: LiveSessionStartedMessageType;
 }
 
@@ -28,7 +33,9 @@ export const LiveSessionStartedMessage = memo(function LiveSessionStartedMessage
         }`}
       >
         <div className="space-y-1">
-          <p className={`text-sm font-semibold ${viewState.ended ? 'text-muted-foreground' : 'text-foreground'}`}>
+          <p
+            className={`text-sm font-semibold ${viewState.ended ? 'text-muted-foreground' : 'text-foreground'}`}
+          >
             {viewState.title}
           </p>
           <p className="text-sm text-muted-foreground">

@@ -97,7 +97,8 @@ export function getLearningSpaceItemUnreadCountForUser(
 
     const senderIds = latestMessage.core.sender?.ids;
     const isOwnMessage =
-      (Boolean(currentUser?.accountId) && senderIds?.accountId === currentUser.accountId) ||
+      (Boolean(currentUser?.accountId) &&
+        senderIds?.accountId === currentUser.accountId) ||
       (Boolean(currentUser?.profileId) && senderIds?.id === currentUser.profileId);
     if (isOwnMessage) {
       return total;

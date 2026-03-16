@@ -79,8 +79,9 @@ export function ChannelsTable({ rows, onEdit }: ChannelsTableProps) {
     () => resolveDashboardBasePath(pathname),
     [pathname],
   );
-  const [confirmDeleteRow, setConfirmDeleteRow] =
-    React.useState<AdminChannelRow | null>(null);
+  const [confirmDeleteRow, setConfirmDeleteRow] = React.useState<AdminChannelRow | null>(
+    null,
+  );
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
   const [archivingId, setArchivingId] = React.useState<string | null>(null);
   const [unarchivingId, setUnarchivingId] = React.useState<string | null>(null);
@@ -146,7 +147,9 @@ export function ChannelsTable({ rows, onEdit }: ChannelsTableProps) {
       toast.success('Channel restored.');
       router.refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Unable to unarchive channel.');
+      toast.error(
+        error instanceof Error ? error.message : 'Unable to unarchive channel.',
+      );
     } finally {
       setUnarchivingId(null);
     }
@@ -192,9 +195,7 @@ export function ChannelsTable({ rows, onEdit }: ChannelsTableProps) {
                         {row.topic}
                       </Link>
                       {row.description ? (
-                        <p className="text-xs text-muted-foreground">
-                          {row.description}
-                        </p>
+                        <p className="text-xs text-muted-foreground">{row.description}</p>
                       ) : null}
                     </div>
                   </div>
@@ -221,7 +222,9 @@ export function ChannelsTable({ rows, onEdit }: ChannelsTableProps) {
                                     source: participant.avatarUrl ? 'upload' : 'seed',
                                     url: participant.avatarUrl ?? null,
                                   }}
-                                  themeKey={(participant.themeKey as ThemeKey | null) ?? null}
+                                  themeKey={
+                                    (participant.themeKey as ThemeKey | null) ?? null
+                                  }
                                   showStatus={false}
                                   sizeClassName="size-8"
                                   initialsLength={1}

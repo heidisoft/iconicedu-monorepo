@@ -19,11 +19,7 @@ import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-wit
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
 import { Separator } from '@iconicedu/ui-web/ui/separator';
-import type {
-  ChildProfileVM,
-  GradeLevel,
-  UserProfileVM,
-} from '@iconicedu/shared-types';
+import type { ChildProfileVM, GradeLevel, UserProfileVM } from '@iconicedu/shared-types';
 import { gradeLabel, normalizeCountryCode } from '@iconicedu/shared-types';
 
 export type ProfileDetailsUser = UserProfileVM & {
@@ -127,7 +123,12 @@ export function buildAboutFields(user: ProfileDetailsUser): AboutField[] {
   pushField('email', 'Email', user.profile.email ?? user.accountEmail ?? null, Mail);
   pushField('location', 'Location', buildLocationLabel(user), MapPin);
   pushField('timezone', 'Timezone', user.prefs.timezone, Globe);
-  pushField('languagesSpoken', 'Languages', user.prefs.languagesSpoken?.join(', '), Globe);
+  pushField(
+    'languagesSpoken',
+    'Languages',
+    user.prefs.languagesSpoken?.join(', '),
+    Globe,
+  );
 
   if (user.kind === 'educator') {
     pushField('headline', 'Headline', user.headline, Megaphone);
@@ -208,11 +209,11 @@ export function buildAboutFields(user: ProfileDetailsUser): AboutField[] {
 
 export function ProfileContent({
   user,
-  onCallClick,
-  onDmClick,
-  onScheduleClick,
-  onShareClick,
-  onReportClick,
+  onDmClick: _onDmClick,
+  onCallClick: _onCallClick,
+  onScheduleClick: _onScheduleClick,
+  onShareClick: _onShareClick,
+  onReportClick: _onReportClick,
 }: {
   user: ProfileDetailsUser;
   onCallClick?: () => void;

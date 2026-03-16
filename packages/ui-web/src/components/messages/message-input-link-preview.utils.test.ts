@@ -18,14 +18,20 @@ describe('extractComposerLinkPreviewUrl', () => {
 
   it('hides the preview when the same url was dismissed', () => {
     expect(
-      shouldShowComposerLinkPreview('https://example.com/post', 'https://example.com/post'),
+      shouldShowComposerLinkPreview(
+        'https://example.com/post',
+        'https://example.com/post',
+      ),
     ).toBe(false);
   });
 
   it('shows the preview when there is no dismissal or the url changed', () => {
     expect(shouldShowComposerLinkPreview('https://example.com/post', null)).toBe(true);
     expect(
-      shouldShowComposerLinkPreview('https://example.com/next', 'https://example.com/post'),
+      shouldShowComposerLinkPreview(
+        'https://example.com/next',
+        'https://example.com/post',
+      ),
     ).toBe(true);
   });
 });

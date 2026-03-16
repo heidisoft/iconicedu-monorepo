@@ -46,10 +46,7 @@ export function ViewSwitcher({ currentView, onViewChange }: ViewSwitcherProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          variant="outline"
-          className="gap-2"
-        >
+        <Button variant="outline" className="gap-2">
           <CurrentIcon className="h-4 w-4" />
           <span className="hidden sm:inline">{currentViewOption.label}</span>
           <ChevronDown className="h-4 w-4" />
@@ -67,7 +64,9 @@ export function ViewSwitcher({ currentView, onViewChange }: ViewSwitcherProps) {
               <Icon className="mr-3 h-4 w-4" />
               <div className="flex flex-col gap-1">
                 <span className="font-medium">{option.label}</span>
-                <span className="text-xs text-muted-foreground">{option.description}</span>
+                <span className="text-xs text-muted-foreground">
+                  {option.description}
+                </span>
               </div>
               {currentView === option.id ? (
                 <span className="ml-auto text-primary">✓</span>

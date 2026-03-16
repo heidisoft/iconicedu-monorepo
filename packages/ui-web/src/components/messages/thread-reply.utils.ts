@@ -17,7 +17,10 @@ export function resolveThreadAfterReply(input: {
         ...persistedThread,
         stats: {
           ...persistedThread.stats,
-          messageCount: Math.max(persistedThread.stats.messageCount, input.replyCount + 1),
+          messageCount: Math.max(
+            persistedThread.stats.messageCount,
+            input.replyCount + 1,
+          ),
           lastReplyAt: input.now,
         },
       }
@@ -25,7 +28,10 @@ export function resolveThreadAfterReply(input: {
         ...input.currentThread,
         stats: {
           ...input.currentThread.stats,
-          messageCount: Math.max(input.currentThread.stats.messageCount + 1, input.replyCount + 1),
+          messageCount: Math.max(
+            input.currentThread.stats.messageCount + 1,
+            input.replyCount + 1,
+          ),
           lastReplyAt: input.now,
         },
       };
@@ -46,4 +52,3 @@ export function resolveThreadAfterReply(input: {
     wasRekeyed: thread.ids.id !== input.currentThread.ids.id,
   };
 }
-

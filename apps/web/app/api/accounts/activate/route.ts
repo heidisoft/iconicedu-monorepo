@@ -117,7 +117,10 @@ export async function POST(request: Request) {
             email: data.user.email?.trim().toLowerCase() ?? null,
           });
           if (insertResponse.error || !insertResponse.data) {
-            throw insertResponse.error ?? new Error('Unable to create account for organization');
+            throw (
+              insertResponse.error ??
+              new Error('Unable to create account for organization')
+            );
           }
           account = insertResponse.data;
         }
@@ -182,11 +185,7 @@ export async function POST(request: Request) {
       data.user.id,
     );
     const activeAccount = statusResponse.data ?? account;
-    const rolesResponse = await getUserRoles(
-      serviceSupabase,
-      account.id,
-      account.org_id,
-    );
+    const rolesResponse = await getUserRoles(serviceSupabase, account.id, account.org_id);
     if (rolesResponse.error) {
       throw rolesResponse.error;
     }
@@ -204,13 +203,13 @@ export async function POST(request: Request) {
         );
       }
     } else if (onboarding.destination === '/login/pending-access') {
-      const loginPath = await resolveOrgLoginPath(
+      const loginPath = await resolveOrgLoginPath(serviceSupabase, activeAccount.org_id);
+      onboarding.destination = `${loginPath}/pending-access`;
+    } else if (onboarding.destination === '/dashboard') {
+      onboarding.destination = await resolveOrgDashboardPath(
         serviceSupabase,
         activeAccount.org_id,
       );
-      onboarding.destination = `${loginPath}/pending-access`;
-    } else if (onboarding.destination === '/dashboard') {
-      onboarding.destination = await resolveOrgDashboardPath(serviceSupabase, activeAccount.org_id);
     }
 
     return NextResponse.json({
@@ -219,9 +218,6 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error('activate-account', error);
-    return NextResponse.json(
-      { error: 'Unable to activate account' },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: 'Unable to activate account' }, { status: 500 });
   }
 }

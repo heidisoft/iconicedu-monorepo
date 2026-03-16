@@ -1,5 +1,10 @@
 import type { ChannelFileItemVM } from '@iconicedu/shared-types';
-import { CHANNEL_IDS, FILE_IDS, MESSAGE_IDS, DEMO_ORG_ID } from '@iconicedu/web/lib/data/ids';
+import {
+  CHANNEL_IDS,
+  FILE_IDS,
+  MESSAGE_IDS,
+  DEMO_ORG_ID,
+} from '@iconicedu/web/lib/data/ids';
 import {
   EDUCATOR_ELENA_PROFILE,
   EDUCATOR_LUCAS_PROFILE,

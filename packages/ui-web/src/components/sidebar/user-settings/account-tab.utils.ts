@@ -1,6 +1,7 @@
 import { parsePhoneNumberFromString } from 'libphonenumber-js';
 
-const INVALID_PHONE_MESSAGE = 'Enter a valid international number (e.g. +1 415 555 0100).';
+const INVALID_PHONE_MESSAGE =
+  'Enter a valid international number (e.g. +1 415 555 0100).';
 
 export function getPhoneValidationError(
   value: string,

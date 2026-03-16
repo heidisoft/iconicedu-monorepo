@@ -1,13 +1,14 @@
 import React, { useMemo } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-} from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, CheckCircle, Mail, Phone, Shield, CreditCard } from 'lucide-react-native';
+import {
+  ChevronLeft,
+  CheckCircle,
+  Mail,
+  Phone,
+  Shield,
+  CreditCard,
+} from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { SettingsRow } from '@iconicedu/ui-native';
 import { useAccount } from '@/hooks/use-account';
@@ -18,31 +19,66 @@ import type { AppColors } from '@/lib/theme';
 const ROLE_LABELS: Record<string, string> = {
   educator: 'Educator',
   guardian: 'Parent / Guardian',
-  child:    'Student',
-  staff:    'Staff',
-  admin:    'Admin',
-  owner:    'Owner',
+  child: 'Student',
+  staff: 'Staff',
+  admin: 'Admin',
+  owner: 'Owner',
 };
 
 function makeStyles(C: AppColors) {
   return StyleSheet.create({
-    safe:         { flex: 1, backgroundColor: C.pageBg },
-    nav:          { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border },
-    navBack:      { padding: 8, borderRadius: 8 },
-    navTitle:     { flex: 1, fontSize: 17, fontWeight: '700', color: C.text, textAlign: 'center', marginRight: 40 },
-    scroll:       { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 48, gap: 6 },
-    sectionLabel: { fontSize: 12, fontWeight: '700', color: C.textFaint, textTransform: 'uppercase', letterSpacing: 0.8, paddingHorizontal: 4, paddingTop: 14, paddingBottom: 6 },
-    card:         { borderRadius: 14, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, overflow: 'hidden' },
-    divider:      { height: 1, backgroundColor: C.border, marginLeft: 60 },
-    valueText:    { fontSize: 13, color: C.textMuted, maxWidth: 160, textAlign: 'right' },
-    verifiedRow:  { alignItems: 'flex-end', gap: 3 },
-    verifiedBadge:{ flexDirection: 'row', alignItems: 'center', gap: 3 },
-    verifiedTxt:  { fontSize: 11, fontWeight: '600', color: '#16a34a' },
-    unverifiedTxt:{ fontSize: 11, color: C.textFaint },
+    safe: { flex: 1, backgroundColor: C.pageBg },
+    nav: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 8,
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: C.border,
+    },
+    navBack: { padding: 8, borderRadius: 8 },
+    navTitle: {
+      flex: 1,
+      fontSize: 17,
+      fontWeight: '700',
+      color: C.text,
+      textAlign: 'center',
+      marginRight: 40,
+    },
+    scroll: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 48, gap: 6 },
+    sectionLabel: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: C.textFaint,
+      textTransform: 'uppercase',
+      letterSpacing: 0.8,
+      paddingHorizontal: 4,
+      paddingTop: 14,
+      paddingBottom: 6,
+    },
+    card: {
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.card,
+      overflow: 'hidden',
+    },
+    divider: { height: 1, backgroundColor: C.border, marginLeft: 60 },
+    valueText: { fontSize: 13, color: C.textMuted, maxWidth: 160, textAlign: 'right' },
+    verifiedRow: { alignItems: 'flex-end', gap: 3 },
+    verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+    verifiedTxt: { fontSize: 11, fontWeight: '600', color: '#16a34a' },
+    unverifiedTxt: { fontSize: 11, color: C.textFaint },
   });
 }
 
-function VerifiedBadge({ verified, s }: { verified?: boolean | null; s: ReturnType<typeof makeStyles> }) {
+function VerifiedBadge({
+  verified,
+  s,
+}: {
+  verified?: boolean | null;
+  s: ReturnType<typeof makeStyles>;
+}) {
   if (verified) {
     return (
       <View style={s.verifiedBadge}>
@@ -85,12 +121,14 @@ export default function AccountInfoScreen() {
             hideChevron
             trailing={
               <View style={s.verifiedRow}>
-                <Text style={s.valueText} numberOfLines={1}>{acc?.email as string ?? '—'}</Text>
+                <Text style={s.valueText} numberOfLines={1}>
+                  {(acc?.email as string) ?? '—'}
+                </Text>
                 <VerifiedBadge verified={acc?.email_verified as boolean} s={s} />
               </View>
             }
           />
-          {!!(acc?.phone_e164) && (
+          {!!acc?.phone_e164 && (
             <>
               <View style={s.divider} />
               <SettingsRow
@@ -100,14 +138,16 @@ export default function AccountInfoScreen() {
                 hideChevron
                 trailing={
                   <View style={s.verifiedRow}>
-                    <Text style={s.valueText} numberOfLines={1}>{acc.phone_e164 as string}</Text>
+                    <Text style={s.valueText} numberOfLines={1}>
+                      {acc.phone_e164 as string}
+                    </Text>
                     <VerifiedBadge verified={acc?.phone_verified as boolean} s={s} />
                   </View>
                 }
               />
             </>
           )}
-          {!!(acc?.whatsapp_e164) && (
+          {!!acc?.whatsapp_e164 && (
             <>
               <View style={s.divider} />
               <SettingsRow
@@ -117,7 +157,9 @@ export default function AccountInfoScreen() {
                 hideChevron
                 trailing={
                   <View style={s.verifiedRow}>
-                    <Text style={s.valueText} numberOfLines={1}>{acc.whatsapp_e164 as string}</Text>
+                    <Text style={s.valueText} numberOfLines={1}>
+                      {acc.whatsapp_e164 as string}
+                    </Text>
                     <VerifiedBadge verified={acc?.whatsapp_verified as boolean} s={s} />
                   </View>
                 }
@@ -135,7 +177,9 @@ export default function AccountInfoScreen() {
             labelColor={colors.text}
             hideChevron
             trailing={
-              <Text style={s.valueText}>{ROLE_LABELS[profileKind ?? ''] ?? profileKind ?? '—'}</Text>
+              <Text style={s.valueText}>
+                {ROLE_LABELS[profileKind ?? ''] ?? profileKind ?? '—'}
+              </Text>
             }
           />
           <View style={s.divider} />

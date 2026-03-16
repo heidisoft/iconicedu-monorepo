@@ -5,7 +5,12 @@ import { X } from 'lucide-react';
 import { useIsMobile } from '@iconicedu/ui-web/hooks/use-mobile';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { Card, CardContent, CardHeader } from '@iconicedu/ui-web/ui/card';
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@iconicedu/ui-web/ui/drawer';
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+} from '@iconicedu/ui-web/ui/drawer';
 import { ScrollArea } from '@iconicedu/ui-web/ui/scroll-area';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 

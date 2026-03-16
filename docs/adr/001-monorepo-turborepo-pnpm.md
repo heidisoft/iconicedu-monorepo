@@ -10,6 +10,7 @@
 IconicEdu consists of three apps (web, mobile, API) that share types, UI components, and utilities. We needed to decide whether to use separate repositories or a monorepo, and if a monorepo, which tooling to use.
 
 Key requirements:
+
 - Shared TypeScript types between all apps, with a single source of truth
 - Shared UI components (separate libraries for web and native)
 - Incremental builds — don't rebuild everything on every change
@@ -27,12 +28,12 @@ Use a **pnpm monorepo** with **Turborepo** for task orchestration.
 
 ## Alternatives considered
 
-| Option | Why rejected |
-|---|---|
-| Separate repos | No shared types without npm publishing; version drift between apps; slow to make cross-cutting changes |
-| Nx | More opinionated and complex; Turborepo is simpler for this scale |
-| Yarn workspaces + Lerna | pnpm is faster, has better disk efficiency, and has first-class workspace support |
-| npm workspaces | No Turborepo-equivalent caching; slower install times |
+| Option                  | Why rejected                                                                                           |
+| ----------------------- | ------------------------------------------------------------------------------------------------------ |
+| Separate repos          | No shared types without npm publishing; version drift between apps; slow to make cross-cutting changes |
+| Nx                      | More opinionated and complex; Turborepo is simpler for this scale                                      |
+| Yarn workspaces + Lerna | pnpm is faster, has better disk efficiency, and has first-class workspace support                      |
+| npm workspaces          | No Turborepo-equivalent caching; slower install times                                                  |
 
 ## Consequences
 

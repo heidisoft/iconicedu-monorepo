@@ -93,10 +93,7 @@ export function filterActivityEventRows(
   });
 }
 
-export function ActivityEventsDashboard({
-  orgId,
-  rows,
-}: ActivityEventsDashboardProps) {
+export function ActivityEventsDashboard({ orgId, rows }: ActivityEventsDashboardProps) {
   const router = useRouter();
   const [isPending, startTransition] = React.useTransition();
   const [search, setSearch] = React.useState('');
@@ -204,7 +201,11 @@ export function ActivityEventsDashboard({
           disabled={isPending}
           className="gap-2"
         >
-          {isPending ? <Loader2 className="size-4 animate-spin" /> : <RotateCw className="size-4" />}
+          {isPending ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <RotateCw className="size-4" />
+          )}
           Refresh
         </Button>
       </div>
@@ -214,7 +215,9 @@ export function ActivityEventsDashboard({
           <span>
             Showing {visibleRows.length} of {totalRows} activity events
           </span>
-          <span>{rows.filter((row) => row.projection_status === 'failed').length} failed</span>
+          <span>
+            {rows.filter((row) => row.projection_status === 'failed').length} failed
+          </span>
         </div>
         <Table className="min-w-full">
           <TableHeader>
@@ -236,7 +239,10 @@ export function ActivityEventsDashboard({
                 const isRetrying = retryingId === row.id;
 
                 return (
-                  <TableRow key={row.id} className="border-b border-border/60 last:border-b-0">
+                  <TableRow
+                    key={row.id}
+                    className="border-b border-border/60 last:border-b-0"
+                  >
                     <TableCell>
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold">{row.event_type}</p>
@@ -255,7 +261,9 @@ export function ActivityEventsDashboard({
                     </TableCell>
                     <TableCell>
                       <div className="min-w-0">
-                        <p className="truncate text-sm">{row.actorDisplayName ?? 'Unknown actor'}</p>
+                        <p className="truncate text-sm">
+                          {row.actorDisplayName ?? 'Unknown actor'}
+                        </p>
                         <p className="text-xs capitalize text-muted-foreground">
                           {row.source_kind.replace(/_/g, ' ')}
                         </p>
@@ -270,7 +278,9 @@ export function ActivityEventsDashboard({
                       </Badge>
                     </TableCell>
                     <TableCell className="text-sm">{row.projection_attempts}</TableCell>
-                    <TableCell className="text-sm">{formatDateTime(row.occurred_at)}</TableCell>
+                    <TableCell className="text-sm">
+                      {formatDateTime(row.occurred_at)}
+                    </TableCell>
                     <TableCell>
                       <span className="block max-w-xs truncate text-sm text-muted-foreground">
                         {toErrorPreview(row.last_projection_error)}
@@ -307,7 +317,10 @@ export function ActivityEventsDashboard({
               })
             ) : (
               <TableRow>
-                <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
+                <TableCell
+                  colSpan={8}
+                  className="py-10 text-center text-sm text-muted-foreground"
+                >
                   No activity events match the current filters.
                 </TableCell>
               </TableRow>

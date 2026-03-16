@@ -46,14 +46,22 @@ function calculateSessionDurationSeconds(session: ChannelLiveSessionRow): number
   return Math.round((endedAt - startedAt) / 1000);
 }
 
-function calculateScheduledDurationSeconds(session: ChannelLiveSessionRow): number | null {
-  const occurrenceStart = session.occurrence_key ? new Date(session.occurrence_key).getTime() : NaN;
+function calculateScheduledDurationSeconds(
+  session: ChannelLiveSessionRow,
+): number | null {
+  const occurrenceStart = session.occurrence_key
+    ? new Date(session.occurrence_key).getTime()
+    : NaN;
   const occurrenceEndRaw =
     session.app_metadata && typeof session.app_metadata.occurrenceEndAt === 'string'
       ? session.app_metadata.occurrenceEndAt
       : null;
   const occurrenceEnd = occurrenceEndRaw ? new Date(occurrenceEndRaw).getTime() : NaN;
-  if (!Number.isFinite(occurrenceStart) || !Number.isFinite(occurrenceEnd) || occurrenceEnd < occurrenceStart) {
+  if (
+    !Number.isFinite(occurrenceStart) ||
+    !Number.isFinite(occurrenceEnd) ||
+    occurrenceEnd < occurrenceStart
+  ) {
     return null;
   }
 
@@ -280,7 +288,10 @@ export async function evaluateLiveSessionAttendance(input: {
       })
       .eq('org_id', session.org_id)
       .eq('live_session_id', session.id)
-      .eq('profile_id', participantRows.find((row) => row.id === entry.participantId)?.profile_id ?? '');
+      .eq(
+        'profile_id',
+        participantRows.find((row) => row.id === entry.participantId)?.profile_id ?? '',
+      );
 
     if (updateResponse.error) {
       throw new Error(updateResponse.error.message);
@@ -289,9 +300,15 @@ export async function evaluateLiveSessionAttendance(input: {
 
   const attendeeCount = evaluated.filter((entry) => entry.attended).length;
   const expectedParticipantCount = expectedProfileIds.size;
-  const fullAttendanceCount = evaluated.filter((entry) => entry.attendanceStatus === 'full').length;
-  const partialAttendanceCount = evaluated.filter((entry) => entry.attendanceStatus === 'partial').length;
-  const noShowCount = evaluated.filter((entry) => entry.attendanceStatus === 'no_show').length;
+  const fullAttendanceCount = evaluated.filter(
+    (entry) => entry.attendanceStatus === 'full',
+  ).length;
+  const partialAttendanceCount = evaluated.filter(
+    (entry) => entry.attendanceStatus === 'partial',
+  ).length;
+  const noShowCount = evaluated.filter(
+    (entry) => entry.attendanceStatus === 'no_show',
+  ).length;
 
   const sessionUpdateResponse = await input.supabase
     .from('channel_live_sessions')
@@ -340,5 +357,6 @@ export const __test__ = {
   calculateRequiredSeconds,
   calculateCreditedSeconds,
   evaluateParticipant,
-  defaultAttendancePolicy: expectedParticipantsTest.DEFAULT_LIVE_SESSION_ATTENDANCE_POLICY,
+  defaultAttendancePolicy:
+    expectedParticipantsTest.DEFAULT_LIVE_SESSION_ATTENDANCE_POLICY,
 };

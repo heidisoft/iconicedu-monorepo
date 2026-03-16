@@ -15,7 +15,9 @@ vi.mock('@iconicedu/web/lib/auth/requireAuthedUser', () => ({
 }));
 
 vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
-  getAccountByAuthUserId: vi.fn(async () => ({ data: { id: 'account-1', org_id: 'org-1' } })),
+  getAccountByAuthUserId: vi.fn(async () => ({
+    data: { id: 'account-1', org_id: 'org-1' },
+  })),
 }));
 
 vi.mock('@iconicedu/web/lib/messages/builders/channel-messages.builder', () => ({
@@ -24,9 +26,7 @@ vi.mock('@iconicedu/web/lib/messages/builders/channel-messages.builder', () => (
 
 describe('GET /api/messages/channel-files', () => {
   it('returns 400 when channelId is missing', async () => {
-    const response = await GET(
-      new Request(`${APP_URL}/api/messages/channel-files`),
-    );
+    const response = await GET(new Request(`${APP_URL}/api/messages/channel-files`));
     expect(response.status).toBe(400);
     const payload = await response.json();
     expect(payload).toEqual({ success: false, message: 'channelId is required' });

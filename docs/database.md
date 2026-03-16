@@ -22,40 +22,40 @@ The source of truth for the live schema is `supabase/migrations/`. The Prisma sc
 
 ### Identity and access
 
-| Table | Purpose |
-|---|---|
-| `organisations` | Top-level tenant. Every user belongs to one org. |
-| `accounts` | Platform account per user. Has `status` (active/invited/suspended/deleted), `role`, and links to `auth.users`. |
-| `profiles` | Display identity. An account can have multiple profiles (e.g. a guardian acting as both parent and advisor). |
+| Table           | Purpose                                                                                                        |
+| --------------- | -------------------------------------------------------------------------------------------------------------- |
+| `organisations` | Top-level tenant. Every user belongs to one org.                                                               |
+| `accounts`      | Platform account per user. Has `status` (active/invited/suspended/deleted), `role`, and links to `auth.users`. |
+| `profiles`      | Display identity. An account can have multiple profiles (e.g. a guardian acting as both parent and advisor).   |
 
 ### Messaging
 
-| Table | Purpose |
-|---|---|
-| `channels` | A conversation container. `type` discriminates DM, group channel, or learning space. |
-| `channel_members` | Who belongs to which channel. |
-| `messages` | Message records. `type` discriminates the payload type (text, file, audio, etc.). No `content` column — payloads live in type-specific tables. |
-| `message_text` | Payload for `type = 'text'`. Stores the `payload` JSONB field. |
-| `message_file` | Payload for `type = 'file'`. |
-| `message_audio` | Payload for `type = 'audio-recording'`. |
-| `threads` | Thread container tied to a parent message. |
-| `reactions` | Per-message emoji reactions with profile ownership. |
+| Table             | Purpose                                                                                                                                        |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `channels`        | A conversation container. `type` discriminates DM, group channel, or learning space.                                                           |
+| `channel_members` | Who belongs to which channel.                                                                                                                  |
+| `messages`        | Message records. `type` discriminates the payload type (text, file, audio, etc.). No `content` column — payloads live in type-specific tables. |
+| `message_text`    | Payload for `type = 'text'`. Stores the `payload` JSONB field.                                                                                 |
+| `message_file`    | Payload for `type = 'file'`.                                                                                                                   |
+| `message_audio`   | Payload for `type = 'audio-recording'`.                                                                                                        |
+| `threads`         | Thread container tied to a parent message.                                                                                                     |
+| `reactions`       | Per-message emoji reactions with profile ownership.                                                                                            |
 
 ### Education
 
-| Table | Purpose |
-|---|---|
-| `classes` | A class or course. |
-| `class_enrolments` | Student and educator membership in a class. |
-| `sessions` | Scheduled class sessions. |
-| `assignments` | Homework assignments for a class. |
-| `homework_submissions` | Student submissions against an assignment. |
+| Table                  | Purpose                                     |
+| ---------------------- | ------------------------------------------- |
+| `classes`              | A class or course.                          |
+| `class_enrolments`     | Student and educator membership in a class. |
+| `sessions`             | Scheduled class sessions.                   |
+| `assignments`          | Homework assignments for a class.           |
+| `homework_submissions` | Student submissions against an assignment.  |
 
 ### Family and social
 
-| Table | Purpose |
-|---|---|
-| `family_links` | Guardian → child relationship. |
+| Table                 | Purpose                                                  |
+| --------------------- | -------------------------------------------------------- |
+| `family_links`        | Guardian → child relationship.                           |
 | `family_link_invites` | Invite flow for linking a guardian to a child's account. |
 
 ---
@@ -115,13 +115,13 @@ CREATE POLICY "channel_members_can_read_messages"
 
 The `accounts.role` field drives additional visibility:
 
-| Role | Typical access |
-|---|---|
+| Role       | Typical access                              |
+| ---------- | ------------------------------------------- |
 | `guardian` | Own data + children's data via family links |
-| `educator` | Own data + enrolled students' data |
-| `student` | Own data |
-| `advisor` | Assigned families' data |
-| `staff` | Broad read access for admin operations |
+| `educator` | Own data + enrolled students' data          |
+| `student`  | Own data                                    |
+| `advisor`  | Assigned families' data                     |
+| `staff`    | Broad read access for admin operations      |
 
 ### Service role bypass
 
@@ -158,6 +158,7 @@ supabase migration new <descriptive-name>
 ```
 
 Use a short, descriptive name in snake_case. Examples:
+
 - `add_avatar_url_to_profiles`
 - `add_rls_policy_for_advisor_channels`
 - `drop_deprecated_content_column`
@@ -261,10 +262,10 @@ Mobile subscription pattern — see `apps/mobile/src/hooks/use-messages.ts`.
 
 Supabase Storage is used for:
 
-| Bucket | Contents | Access |
-|---|---|---|
-| `avatars` | Profile pictures | Public read, authenticated write |
-| `homework` | Student homework file uploads | Private, owner + educator |
+| Bucket     | Contents                      | Access                           |
+| ---------- | ----------------------------- | -------------------------------- |
+| `avatars`  | Profile pictures              | Public read, authenticated write |
+| `homework` | Student homework file uploads | Private, owner + educator        |
 
 Storage policies mirror the RLS logic but apply to file paths. See `supabase/migrations/*_storage_avatar_policies*.sql` for examples.
 

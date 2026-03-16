@@ -1,19 +1,21 @@
 import * as React from 'react';
 import { AsYouType, parsePhoneNumberFromString } from 'libphonenumber-js';
-import { BadgeCheck, Info, Mail, MessageCircle, Phone, X } from 'lucide-react';
+import { BadgeCheck, Info, Mail, MessageCircle, Phone } from 'lucide-react';
 
 import type { UserAccountVM } from '@iconicedu/shared-types';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
 import { Button } from '@iconicedu/ui-web/ui/button';
-import { Input } from '@iconicedu/ui-web/ui/input';
-import { InputGroup, InputGroupAddon, InputGroupInput } from '@iconicedu/ui-web/ui/input-group';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from '@iconicedu/ui-web/ui/input-group';
 import { Label } from '@iconicedu/ui-web/ui/label';
 import { Switch } from '@iconicedu/ui-web/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@iconicedu/ui-web/ui/tooltip';
 import { UserSettingsTabSection } from '@iconicedu/ui-web/components/sidebar/user-settings/components/user-settings-tab-section';
 import { Checkbox } from '@iconicedu/ui-web/ui/checkbox';
 import { BorderBeam } from '@iconicedu/ui-web/ui/border-beam';
-import { useSequentialHighlight } from '@iconicedu/ui-web/components/sidebar/user-settings/hooks/use-sequential-highlight';
 import { getPhoneValidationError } from '@iconicedu/ui-web/components/sidebar/user-settings/account-tab.utils';
 
 export type AccountSectionKey = 'email' | 'phone' | 'whatsapp';
@@ -54,7 +56,7 @@ export function AccountTab({
   isChildAccount = false,
 }: AccountTabProps) {
   const [phoneValue, setPhoneValue] = React.useState('');
-  const [isPhoneFocused, setIsPhoneFocused] = React.useState(false);
+  const [, setIsPhoneFocused] = React.useState(false);
   const [phoneError, setPhoneError] = React.useState<string | null>(null);
   const [whatsappValue, setWhatsappValue] = React.useState('');
   const [isWhatsappFocused, setIsWhatsappFocused] = React.useState(false);
@@ -112,7 +114,7 @@ export function AccountTab({
   }, [phoneInputValue, usePhoneForWhatsapp]);
   const [whatsappOpen, setWhatsappOpen] = React.useState(false);
   const [emailInputValue, setEmailInputValue] = React.useState(email);
-  const [isEmailFocused, setIsEmailFocused] = React.useState(false);
+  const [, setIsEmailFocused] = React.useState(false);
   React.useEffect(() => {
     setEmailInputValue(email);
   }, [email]);
@@ -124,15 +126,6 @@ export function AccountTab({
   const emailDisabled = shouldLockSections && !isEmailSectionActive;
   const phoneDisabled = shouldLockSections && !isPhoneSectionActive;
   const whatsappDisabled = shouldLockSections && !isWhatsappSectionActive;
-  const sequentialPhoneHighlight = useSequentialHighlight<'phone'>({
-    order: ['phone'],
-    satisfied: {
-      phone: Boolean(phoneInputValue.trim()),
-    },
-    enabled: Boolean(onboardingRequiredSection === 'phone'),
-  });
-  const showPhoneFieldBeam = sequentialPhoneHighlight.isActive('phone');
-
   React.useEffect(() => {
     setPhoneValue(formatPhoneInput(contacts?.phoneE164 ?? ''));
   }, [contacts?.phoneE164, formatPhoneInput]);
@@ -163,7 +156,7 @@ export function AccountTab({
 
     const nextValue = shouldUsePhone ? contactPhone : contactWhatsapp;
     setWhatsappValue(formatPhoneInput(nextValue));
-  }, [contacts?.phoneE164, contacts?.whatsappE164, formatPhoneInput]);
+  }, [contacts?.phoneE164, contacts?.whatsappE164, formatPhoneInput, isWhatsappFocused]);
 
   React.useEffect(() => {
     setShowPhoneActionBeam(

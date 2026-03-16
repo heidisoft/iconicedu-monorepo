@@ -21,33 +21,47 @@ function createQuerySupabaseStub() {
 
       if (table === 'channel_live_sessions') {
         return {
-          select() { return this; },
-          eq() { return this; },
-          is() { return this; },
-          order() { return this; },
-          gte() { return this; },
-          lte() { return this; },
+          select() {
+            return this;
+          },
+          eq() {
+            return this;
+          },
+          is() {
+            return this;
+          },
+          order() {
+            return this;
+          },
+          gte() {
+            return this;
+          },
+          lte() {
+            return this;
+          },
           returns: async () => ({
-            data: [{
-              id: 'session-1',
-              org_id: 'org-1',
-              channel_id: 'channel-1',
-              provider: 'daily',
-              session_scope_key: 'channel:channel-1',
-              status: 'ended',
-              started_by_profile_id: 'profile-1',
-              join_path: '/iconic-academy/live-sessions/session-1',
-              started_at: '2026-03-02T10:00:00.000Z',
-              ended_at: '2026-03-02T11:00:00.000Z',
-              expected_participant_count: 1,
-              attendee_count: 1,
-              full_attendance_count: 1,
-              partial_attendance_count: 0,
-              no_show_count: 0,
-              session_duration_seconds: 3600,
-              created_at: '2026-03-02T10:00:00.000Z',
-              updated_at: '2026-03-02T11:00:00.000Z',
-            }],
+            data: [
+              {
+                id: 'session-1',
+                org_id: 'org-1',
+                channel_id: 'channel-1',
+                provider: 'daily',
+                session_scope_key: 'channel:channel-1',
+                status: 'ended',
+                started_by_profile_id: 'profile-1',
+                join_path: '/iconic-academy/live-sessions/session-1',
+                started_at: '2026-03-02T10:00:00.000Z',
+                ended_at: '2026-03-02T11:00:00.000Z',
+                expected_participant_count: 1,
+                attendee_count: 1,
+                full_attendance_count: 1,
+                partial_attendance_count: 0,
+                no_show_count: 0,
+                session_duration_seconds: 3600,
+                created_at: '2026-03-02T10:00:00.000Z',
+                updated_at: '2026-03-02T11:00:00.000Z',
+              },
+            ],
             error: null,
           }),
           maybeSingle: async () => ({
@@ -78,22 +92,32 @@ function createQuerySupabaseStub() {
 
       if (table === 'channels') {
         return {
-          select() { return this; },
-          eq() { return this; },
-          in() { return this; },
-          is() { return this; },
+          select() {
+            return this;
+          },
+          eq() {
+            return this;
+          },
+          in() {
+            return this;
+          },
+          is() {
+            return this;
+          },
           returns: async () => ({
-            data: [{
-              id: 'channel-1',
-              org_id: 'org-1',
-              kind: 'channel',
-              topic: 'Algebra 1',
-              visibility: 'private',
-              purpose: 'learning-space',
-              status: 'active',
-              created_at: '2026-03-01T10:00:00.000Z',
-              updated_at: '2026-03-01T10:00:00.000Z',
-            }],
+            data: [
+              {
+                id: 'channel-1',
+                org_id: 'org-1',
+                kind: 'channel',
+                topic: 'Algebra 1',
+                visibility: 'private',
+                purpose: 'learning-space',
+                status: 'active',
+                created_at: '2026-03-01T10:00:00.000Z',
+                updated_at: '2026-03-01T10:00:00.000Z',
+              },
+            ],
             error: null,
           }),
           maybeSingle: async () => ({
@@ -115,20 +139,30 @@ function createQuerySupabaseStub() {
 
       if (table === 'learning_space_channels') {
         return {
-          select() { return this; },
-          eq() { return this; },
-          in() { return this; },
-          is() { return this; },
+          select() {
+            return this;
+          },
+          eq() {
+            return this;
+          },
+          in() {
+            return this;
+          },
+          is() {
+            return this;
+          },
           returns: async () => ({
-            data: [{
-              id: 'link-1',
-              org_id: 'org-1',
-              learning_space_id: 'space-1',
-              channel_id: 'channel-1',
-              is_primary: true,
-              created_at: '2026-03-01T10:00:00.000Z',
-              updated_at: '2026-03-01T10:00:00.000Z',
-            }],
+            data: [
+              {
+                id: 'link-1',
+                org_id: 'org-1',
+                learning_space_id: 'space-1',
+                channel_id: 'channel-1',
+                is_primary: true,
+                created_at: '2026-03-01T10:00:00.000Z',
+                updated_at: '2026-03-01T10:00:00.000Z',
+              },
+            ],
             error: null,
           }),
           maybeSingle: async () => ({
@@ -148,20 +182,30 @@ function createQuerySupabaseStub() {
 
       if (table === 'learning_spaces') {
         return {
-          select() { return this; },
-          eq() { return this; },
-          in() { return this; },
-          is() { return this; },
+          select() {
+            return this;
+          },
+          eq() {
+            return this;
+          },
+          in() {
+            return this;
+          },
+          is() {
+            return this;
+          },
           returns: async () => ({
-            data: [{
-              id: 'space-1',
-              org_id: 'org-1',
-              kind: 'one_on_one',
-              status: 'active',
-              title: 'Algebra tutoring',
-              created_at: '2026-03-01T10:00:00.000Z',
-              updated_at: '2026-03-01T10:00:00.000Z',
-            }],
+            data: [
+              {
+                id: 'space-1',
+                org_id: 'org-1',
+                kind: 'one_on_one',
+                status: 'active',
+                title: 'Algebra tutoring',
+                created_at: '2026-03-01T10:00:00.000Z',
+                updated_at: '2026-03-01T10:00:00.000Z',
+              },
+            ],
             error: null,
           }),
           maybeSingle: async () => ({
@@ -181,30 +225,40 @@ function createQuerySupabaseStub() {
 
       if (table === 'channel_live_session_participants') {
         return {
-          select() { return this; },
-          eq() { return this; },
-          in() { return this; },
-          is() { return this; },
+          select() {
+            return this;
+          },
+          eq() {
+            return this;
+          },
+          in() {
+            return this;
+          },
+          is() {
+            return this;
+          },
           returns: async () => ({
-            data: [{
-              id: 'participant-1',
-              org_id: 'org-1',
-              live_session_id: 'session-1',
-              channel_id: 'channel-1',
-              profile_id: 'profile-1',
-              join_requested_at: '2026-03-02T09:59:00.000Z',
-              first_joined_at: '2026-03-02T10:00:10.000Z',
-              expected_to_attend: true,
-              attendance_status: 'full',
-              attendance_ratio: 0.98,
-              qualified_full_attendance: true,
-              required_seconds: 3600,
-              credited_seconds: 3530,
-              join_count: 1,
-              last_known_status: 'joined',
-              created_at: '2026-03-02T10:00:00.000Z',
-              updated_at: '2026-03-02T10:10:00.000Z',
-            }],
+            data: [
+              {
+                id: 'participant-1',
+                org_id: 'org-1',
+                live_session_id: 'session-1',
+                channel_id: 'channel-1',
+                profile_id: 'profile-1',
+                join_requested_at: '2026-03-02T09:59:00.000Z',
+                first_joined_at: '2026-03-02T10:00:10.000Z',
+                expected_to_attend: true,
+                attendance_status: 'full',
+                attendance_ratio: 0.98,
+                qualified_full_attendance: true,
+                required_seconds: 3600,
+                credited_seconds: 3530,
+                join_count: 1,
+                last_known_status: 'joined',
+                created_at: '2026-03-02T10:00:00.000Z',
+                updated_at: '2026-03-02T10:10:00.000Z',
+              },
+            ],
             error: null,
           }),
         };
@@ -212,24 +266,34 @@ function createQuerySupabaseStub() {
 
       if (table === 'channel_live_session_participant_events') {
         return {
-          select() { return this; },
-          eq() { return this; },
-          is() { return this; },
-          order() { return this; },
+          select() {
+            return this;
+          },
+          eq() {
+            return this;
+          },
+          is() {
+            return this;
+          },
+          order() {
+            return this;
+          },
           returns: async () => ({
-            data: [{
-              id: 'event-1',
-              org_id: 'org-1',
-              live_session_id: 'session-1',
-              channel_id: 'channel-1',
-              profile_id: 'profile-1',
-              provider: 'daily',
-              event_type: 'participant_joined',
-              occurred_at: '2026-03-02T10:00:10.000Z',
-              source: 'provider_webhook',
-              created_at: '2026-03-02T10:00:10.000Z',
-              updated_at: '2026-03-02T10:00:10.000Z',
-            }],
+            data: [
+              {
+                id: 'event-1',
+                org_id: 'org-1',
+                live_session_id: 'session-1',
+                channel_id: 'channel-1',
+                profile_id: 'profile-1',
+                provider: 'daily',
+                event_type: 'participant_joined',
+                occurred_at: '2026-03-02T10:00:10.000Z',
+                source: 'provider_webhook',
+                created_at: '2026-03-02T10:00:10.000Z',
+                updated_at: '2026-03-02T10:00:10.000Z',
+              },
+            ],
             error: null,
           }),
         };
@@ -243,23 +307,25 @@ function createQuerySupabaseStub() {
 describe('live-session-attendance.query', () => {
   it('loads list rows and fans out to related tables', async () => {
     vi.mocked(getProfilesByIds).mockResolvedValue({
-      data: [{
-        id: 'profile-1',
-        org_id: 'org-1',
-        account_id: 'account-1',
-        kind: 'educator',
-        display_name: 'Taylor Reed',
-        first_name: 'Taylor',
-        last_name: 'Reed',
-        avatar_source: 'uploaded',
-        avatar_url: null,
-        avatar_seed: 'seed',
-        timezone: 'UTC',
-        locale: 'en',
-        status: 'active',
-        created_at: '2026-03-01T10:00:00.000Z',
-        updated_at: '2026-03-01T10:00:00.000Z',
-      }],
+      data: [
+        {
+          id: 'profile-1',
+          org_id: 'org-1',
+          account_id: 'account-1',
+          kind: 'educator',
+          display_name: 'Taylor Reed',
+          first_name: 'Taylor',
+          last_name: 'Reed',
+          avatar_source: 'uploaded',
+          avatar_url: null,
+          avatar_seed: 'seed',
+          timezone: 'UTC',
+          locale: 'en',
+          status: 'active',
+          created_at: '2026-03-01T10:00:00.000Z',
+          updated_at: '2026-03-01T10:00:00.000Z',
+        },
+      ],
       error: null,
     } as never);
 
@@ -269,28 +335,32 @@ describe('live-session-attendance.query', () => {
     expect(result.sessions).toHaveLength(1);
     expect(result.channels[0]?.topic).toBe('Algebra 1');
     expect(result.learningSpaces[0]?.title).toBe('Algebra tutoring');
-    expect(getProfilesByIds).toHaveBeenCalledWith(expect.anything(), 'org-1', ['profile-1']);
+    expect(getProfilesByIds).toHaveBeenCalledWith(expect.anything(), 'org-1', [
+      'profile-1',
+    ]);
   });
 
   it('loads detail rows for a specific live session', async () => {
     vi.mocked(getProfilesByIds).mockResolvedValue({
-      data: [{
-        id: 'profile-1',
-        org_id: 'org-1',
-        account_id: 'account-1',
-        kind: 'educator',
-        display_name: 'Taylor Reed',
-        first_name: 'Taylor',
-        last_name: 'Reed',
-        avatar_source: 'uploaded',
-        avatar_url: null,
-        avatar_seed: 'seed',
-        timezone: 'UTC',
-        locale: 'en',
-        status: 'active',
-        created_at: '2026-03-01T10:00:00.000Z',
-        updated_at: '2026-03-01T10:00:00.000Z',
-      }],
+      data: [
+        {
+          id: 'profile-1',
+          org_id: 'org-1',
+          account_id: 'account-1',
+          kind: 'educator',
+          display_name: 'Taylor Reed',
+          first_name: 'Taylor',
+          last_name: 'Reed',
+          avatar_source: 'uploaded',
+          avatar_url: null,
+          avatar_seed: 'seed',
+          timezone: 'UTC',
+          locale: 'en',
+          status: 'active',
+          created_at: '2026-03-01T10:00:00.000Z',
+          updated_at: '2026-03-01T10:00:00.000Z',
+        },
+      ],
       error: null,
     } as never);
 

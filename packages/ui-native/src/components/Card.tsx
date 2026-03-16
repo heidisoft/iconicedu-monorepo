@@ -34,10 +34,7 @@ export type CardFooterProps = ViewProps & {
 
 export const Card: React.FC<CardProps> = ({ className, children, ...rest }) => (
   <View
-    className={cn(
-      'rounded-2xl border border-border bg-card p-4',
-      className,
-    )}
+    className={cn('rounded-2xl border border-border bg-card p-4', className)}
     {...rest}
   >
     {children}
@@ -54,10 +51,7 @@ export const CardHeader: React.FC<CardHeaderProps> = ({
   </View>
 );
 
-export const CardTitle: React.FC<CardTitleProps> = ({
-  className,
-  children,
-}) => (
+export const CardTitle: React.FC<CardTitleProps> = ({ className, children }) => (
   <Text className={cn('text-lg font-semibold text-card-foreground', className)}>
     {children}
   </Text>
@@ -66,11 +60,7 @@ export const CardTitle: React.FC<CardTitleProps> = ({
 export const CardDescription: React.FC<CardDescriptionProps> = ({
   className,
   children,
-}) => (
-  <Text className={cn('text-sm text-muted-foreground', className)}>
-    {children}
-  </Text>
-);
+}) => <Text className={cn('text-sm text-muted-foreground', className)}>{children}</Text>;
 
 export const CardContent: React.FC<CardContentProps> = ({
   className,
@@ -87,10 +77,7 @@ export const CardFooter: React.FC<CardFooterProps> = ({
   children,
   ...rest
 }) => (
-  <View
-    className={cn('flex-row items-center pt-3', className)}
-    {...rest}
-  >
+  <View className={cn('flex-row items-center pt-3', className)} {...rest}>
     {children}
   </View>
 );

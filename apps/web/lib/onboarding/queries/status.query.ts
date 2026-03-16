@@ -1,8 +1,5 @@
 import type { SupabaseClient, PostgrestSingleResponse } from '@supabase/supabase-js';
-import type {
-  OnboardingStep,
-  UserOnboardingStatusRow,
-} from '@iconicedu/shared-types';
+import type { OnboardingStep, UserOnboardingStatusRow } from '@iconicedu/shared-types';
 
 export interface UpsertUserOnboardingStatusInput {
   profileId: string;

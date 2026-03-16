@@ -89,9 +89,7 @@ export const Avatar: React.FC<AvatarProps> = ({
           className={cn(avatarVariants({ size }))}
           accessibilityLabel={name ?? 'Avatar'}
         >
-          <Text className={cn(avatarTextVariants({ size }))}>
-            {initials}
-          </Text>
+          <Text className={cn(avatarTextVariants({ size }))}>{initials}</Text>
         </View>
       )}
       {status && status !== 'offline' && (

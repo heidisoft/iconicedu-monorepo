@@ -37,10 +37,8 @@ function mapAccountToRow(account: AccountRow, profile?: ProfileRow | null): Admi
   const first = profile?.first_name?.trim() ?? '';
   const last = profile?.last_name?.trim() ?? '';
   const profileName =
-    (displayName ||
-      (first && last
-      ? `${first} ${last.charAt(0).toUpperCase()}.`
-      : first || null));
+    displayName ||
+    (first && last ? `${first} ${last.charAt(0).toUpperCase()}.` : first || null);
   return {
     id: account.id,
     orgId: account.org_id,

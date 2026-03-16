@@ -33,8 +33,7 @@ export function ThemedIconBadge({
 
   const softStyle = themeKey
     ? {
-        backgroundColor:
-          'color-mix(in oklab, var(--theme-bg) 16%, transparent)',
+        backgroundColor: 'color-mix(in oklab, var(--theme-bg) 16%, transparent)',
         color: 'var(--theme-bg)',
         borderColor: 'color-mix(in oklab, var(--theme-bg) 30%, transparent)',
       }

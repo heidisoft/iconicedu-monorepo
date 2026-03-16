@@ -4,7 +4,11 @@ const EMOJI_ONLY_PATTERN =
   /(?:\p{Regional_Indicator}{2}|[#*0-9]\uFE0F?\u20E3|(?:\p{Extended_Pictographic}|\p{Emoji_Presentation})(?:\uFE0F|\uFE0E)?(?:\p{Emoji_Modifier})?(?:\u200D(?:\p{Extended_Pictographic}|\p{Emoji_Presentation})(?:\uFE0F|\uFE0E)?(?:\p{Emoji_Modifier})?)*)/gu;
 
 function getMessageTextContent(message: MessageVM): string | null {
-  if (!('content' in message) || !message.content || typeof message.content !== 'object') {
+  if (
+    !('content' in message) ||
+    !message.content ||
+    typeof message.content !== 'object'
+  ) {
     return null;
   }
 

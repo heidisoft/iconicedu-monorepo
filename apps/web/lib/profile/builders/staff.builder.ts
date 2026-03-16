@@ -2,7 +2,10 @@ import type { StaffProfileVM, UserProfileVM } from '@iconicedu/shared-types';
 import type { ProfileRow } from '@iconicedu/shared-types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import { getStaffProfile, getStaffSpecialties } from '@iconicedu/web/lib/profile/queries/staff.query';
+import {
+  getStaffProfile,
+  getStaffSpecialties,
+} from '@iconicedu/web/lib/profile/queries/staff.query';
 
 function normalizePermissionsScope(
   raw: string | null | undefined,

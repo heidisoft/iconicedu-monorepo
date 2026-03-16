@@ -23,7 +23,9 @@ test('supervised conversation keeps message actions disabled but thread viewing 
     await expect(addEmojiButton).toBeDisabled();
   }
 
-  const threadIndicator = page.getByRole('button', { name: /\d+\s+repl(y|ies)/i }).first();
+  const threadIndicator = page
+    .getByRole('button', { name: /\d+\s+repl(y|ies)/i })
+    .first();
   if ((await threadIndicator.count()) > 0) {
     await expect(threadIndicator).toBeEnabled();
     await threadIndicator.click();

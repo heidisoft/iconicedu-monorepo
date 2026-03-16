@@ -13,14 +13,14 @@ export type SectionCardProps = {
 
 const BG: Record<SectionCardVariant, string> = {
   white: '#ffffff',
-  tint:  '#f0fdf7',
-  dark:  '#0f172a',
+  tint: '#f0fdf7',
+  dark: '#0f172a',
 };
 
 const BORDER: Record<SectionCardVariant, string | undefined> = {
   white: '#e2e8f0',
-  tint:  '#bbf7d0',
-  dark:  undefined,
+  tint: '#bbf7d0',
+  dark: undefined,
 };
 
 export const SectionCard: React.FC<SectionCardProps> = ({

@@ -5,10 +5,7 @@ import type {
   UserProfileVM,
   ChannelVM,
 } from '@iconicedu/shared-types';
-import type {
-  LearningSpaceRow,
-  LearningSpaceLinkRow,
-} from '@iconicedu/shared-types';
+import type { LearningSpaceRow, LearningSpaceLinkRow } from '@iconicedu/shared-types';
 
 type LearningSpaceMapperInput = {
   channels: {

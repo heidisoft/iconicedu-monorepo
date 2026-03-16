@@ -21,7 +21,9 @@ describe('message-input attachment helpers', () => {
       getComposerAttachmentKind(new File(['image'], 'photo.png', { type: 'image/png' })),
     ).toBe('image');
     expect(
-      getComposerAttachmentKind(new File(['audio'], 'voice.webm', { type: 'audio/webm' })),
+      getComposerAttachmentKind(
+        new File(['audio'], 'voice.webm', { type: 'audio/webm' }),
+      ),
     ).toBe('audio');
     expect(
       getComposerAttachmentKind(
@@ -159,7 +161,9 @@ describe('message-input attachment helpers', () => {
 
   it('returns null when image thumbnail generation is unavailable', async () => {
     await expect(
-      createImageThumbnailFile(new File(['doc'], 'brief.pdf', { type: 'application/pdf' })),
+      createImageThumbnailFile(
+        new File(['doc'], 'brief.pdf', { type: 'application/pdf' }),
+      ),
     ).resolves.toBeNull();
   });
 });

@@ -24,33 +24,32 @@ export function useTyping(channelId: string, myName: string, myProfileId: string
 
     const ch = supabase.channel(`typing:${channelId}`);
     channelRef.current = ch;
+    const timeouts = timeoutsRef.current;
 
-    ch
-      .on('broadcast', { event: 'typing' }, ({ payload }: { payload: TypingPayload }) => {
-        const { profileId, name } = payload;
-        // Ignore our own events
-        if (profileId === myProfileId) return;
+    ch.on('broadcast', { event: 'typing' }, ({ payload }: { payload: TypingPayload }) => {
+      const { profileId, name } = payload;
+      // Ignore our own events
+      if (profileId === myProfileId) return;
 
-        setTypingUsers((prev) => (prev.includes(name) ? prev : [...prev, name]));
+      setTypingUsers((prev) => (prev.includes(name) ? prev : [...prev, name]));
 
-        // Reset the auto-remove timer for this user
-        const existing = timeoutsRef.current.get(profileId);
-        if (existing) clearTimeout(existing);
+      // Reset the auto-remove timer for this user
+      const existing = timeoutsRef.current.get(profileId);
+      if (existing) clearTimeout(existing);
 
-        const timeout = setTimeout(() => {
-          setTypingUsers((prev) => prev.filter((n) => n !== name));
-          timeoutsRef.current.delete(profileId);
-        }, TYPING_TIMEOUT_MS);
+      const timeout = setTimeout(() => {
+        setTypingUsers((prev) => prev.filter((n) => n !== name));
+        timeoutsRef.current.delete(profileId);
+      }, TYPING_TIMEOUT_MS);
 
-        timeoutsRef.current.set(profileId, timeout);
-      })
-      .subscribe();
+      timeoutsRef.current.set(profileId, timeout);
+    }).subscribe();
 
     return () => {
       supabase.removeChannel(ch);
       channelRef.current = null;
-      timeoutsRef.current.forEach((t) => clearTimeout(t));
-      timeoutsRef.current.clear();
+      timeouts.forEach((t) => clearTimeout(t));
+      timeouts.clear();
       setTypingUsers([]);
     };
   }, [channelId, myProfileId]);

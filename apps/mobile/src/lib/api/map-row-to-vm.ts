@@ -1,4 +1,9 @@
-import type { MessageVM, UserProfileVM, ReactionVM, ThreadVM } from '@iconicedu/shared-types';
+import type {
+  MessageVM,
+  UserProfileVM,
+  ReactionVM,
+  ThreadVM,
+} from '@iconicedu/shared-types';
 
 // Raw shape returned by Supabase when selecting from messages + sender join.
 // The messages table has NO `content` column — payloads live in separate
@@ -144,9 +149,10 @@ export function mapRowToMessageVM(
     case 'image': {
       // Mirror web's mapFileAttachments: if payload has an `attachments` array use it,
       // otherwise wrap the top-level payload as a single-element array.
-      const imgAtts = (Array.isArray(c.attachments) && (c.attachments as unknown[]).length > 0)
-        ? c.attachments as Record<string, unknown>[]
-        : [c];
+      const imgAtts =
+        Array.isArray(c.attachments) && (c.attachments as unknown[]).length > 0
+          ? (c.attachments as Record<string, unknown>[])
+          : [c];
       return {
         ...base,
         content: previewText ? { text: previewText } : undefined,
@@ -157,9 +163,10 @@ export function mapRowToMessageVM(
 
     case 'file': {
       // Mirror web's mapFileAttachments: extract the `attachments` array so all files render.
-      const fileAtts = (Array.isArray(c.attachments) && (c.attachments as unknown[]).length > 0)
-        ? c.attachments as Record<string, unknown>[]
-        : [c];
+      const fileAtts =
+        Array.isArray(c.attachments) && (c.attachments as unknown[]).length > 0
+          ? (c.attachments as Record<string, unknown>[])
+          : [c];
       return {
         ...base,
         content: previewText ? { text: previewText } : undefined,
@@ -197,19 +204,19 @@ export function getMessagePreview(msg: {
 }): string {
   if (msg.content?.text) return msg.content.text;
   const labels: Record<string, string> = {
-    'lesson-assignment':   '📚 Assignment',
+    'lesson-assignment': '📚 Assignment',
     'homework-submission': '📝 Homework submitted',
-    'progress-update':     '📈 Progress update',
-    'event-reminder':      '📅 Event reminder',
-    'session-summary':     '📋 Session summary',
-    'session-complete':    '✓ Session complete',
-    'session-booking':     '🗓 Session booked',
-    'payment-reminder':    '💳 Payment reminder',
-    'feedback-request':    '💬 Feedback request',
-    image:                 '🖼 Image',
-    file:                  '📎 File',
-    'audio-recording':     '🎙 Voice message',
-    'link-preview':        '🔗 Link',
+    'progress-update': '📈 Progress update',
+    'event-reminder': '📅 Event reminder',
+    'session-summary': '📋 Session summary',
+    'session-complete': '✓ Session complete',
+    'session-booking': '🗓 Session booked',
+    'payment-reminder': '💳 Payment reminder',
+    'feedback-request': '💬 Feedback request',
+    image: '🖼 Image',
+    file: '📎 File',
+    'audio-recording': '🎙 Voice message',
+    'link-preview': '🔗 Link',
   };
   return labels[msg.type] ?? 'Message';
 }

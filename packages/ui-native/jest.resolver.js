@@ -6,11 +6,7 @@
  */
 'use strict';
 
-const STRIP_EXPORTS_PACKAGES = new Set([
-  'react-native',
-  'expo-modules-core',
-  'expo',
-]);
+const STRIP_EXPORTS_PACKAGES = new Set(['react-native', 'expo-modules-core', 'expo']);
 
 module.exports = (path, options) => {
   const originalPackageFilter = options.packageFilter;
@@ -18,9 +14,7 @@ module.exports = (path, options) => {
   return options.defaultResolver(path, {
     ...options,
     packageFilter: (pkg) => {
-      const filteredPkg = originalPackageFilter
-        ? originalPackageFilter(pkg)
-        : pkg;
+      const filteredPkg = originalPackageFilter ? originalPackageFilter(pkg) : pkg;
 
       if (STRIP_EXPORTS_PACKAGES.has(filteredPkg.name)) {
         delete filteredPkg.exports;

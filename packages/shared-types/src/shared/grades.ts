@@ -1,11 +1,4 @@
-export type CountryCode =
-  | 'us'
-  | 'gb'
-  | 'in'
-  | 'lk'
-  | 'au'
-  | 'ib'
-  | 'global';
+export type CountryCode = 'us' | 'gb' | 'in' | 'lk' | 'au' | 'ib' | 'global';
 
 export enum GradeBand {
   EarlyChildhood = 'early_childhood',
@@ -275,7 +268,11 @@ export const GRADE_META: Readonly<Record<GradeLevel, GradeMeta>> = {
       au: 'Year 10',
       global: 'Grade 10',
     },
-    milestones: [GradeMilestone.SriLanka_OL_Prep, GradeMilestone.UK_GCSE, GradeMilestone.NYS_Regents],
+    milestones: [
+      GradeMilestone.SriLanka_OL_Prep,
+      GradeMilestone.UK_GCSE,
+      GradeMilestone.NYS_Regents,
+    ],
     sortOrder: 120,
   },
   [GradeLevel.Grade11]: {
@@ -312,7 +309,11 @@ export const GRADE_META: Readonly<Record<GradeLevel, GradeMeta>> = {
       au: 'Year 12',
       global: 'Grade 12',
     },
-    milestones: [GradeMilestone.SriLanka_AL_Year1, GradeMilestone.UK_ALevels, GradeMilestone.NYS_Regents],
+    milestones: [
+      GradeMilestone.SriLanka_AL_Year1,
+      GradeMilestone.UK_ALevels,
+      GradeMilestone.NYS_Regents,
+    ],
     sortOrder: 140,
   },
   [GradeLevel.Grade13]: {
@@ -362,7 +363,7 @@ const COUNTRY_CODE_ALIASES: Record<string, CountryCode> = {
   in: 'in',
   india: 'in',
   lk: 'lk',
-  'sri_lanka': 'lk',
+  sri_lanka: 'lk',
   au: 'au',
   australia: 'au',
   ib: 'ib',
