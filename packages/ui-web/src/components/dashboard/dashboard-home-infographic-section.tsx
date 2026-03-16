@@ -82,78 +82,51 @@ export function DashboardHomeInfographicSection({
   onJoinSession,
 }: DashboardHomeInfographicSectionProps) {
   const quickActionIconClassName = 'size-5 shrink-0';
-  const [thisWeekPage, setThisWeekPage] = useState(1);
-  const [nextWeekPage, setNextWeekPage] = useState(1);
-
-  const thisWeekTotalPages = Math.max(1, upcomingSessionsPage.thisWeek.totalPages);
-  const nextWeekTotalPages = Math.max(1, upcomingSessionsPage.nextWeek.totalPages);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = Math.max(
+    1,
+    upcomingSessionsPage.thisWeek.pageSize,
+    upcomingSessionsPage.nextWeek.pageSize,
+  );
 
   useEffect(() => {
-    setThisWeekPage(1);
+    setCurrentPage(1);
   }, [
     upcomingSessionsPage.thisWeek.items,
-    upcomingSessionsPage.thisWeek.pageSize,
-    thisWeekTotalPages,
-  ]);
-
-  useEffect(() => {
-    setNextWeekPage(1);
-  }, [
     upcomingSessionsPage.nextWeek.items,
-    upcomingSessionsPage.nextWeek.pageSize,
-    nextWeekTotalPages,
-  ]);
-
-  const visibleThisWeekItems = useMemo(() => {
-    const startIndex = (thisWeekPage - 1) * upcomingSessionsPage.thisWeek.pageSize;
-    return upcomingSessionsPage.thisWeek.items.slice(
-      startIndex,
-      startIndex + upcomingSessionsPage.thisWeek.pageSize,
-    );
-  }, [
-    thisWeekPage,
-    upcomingSessionsPage.thisWeek.items,
-    upcomingSessionsPage.thisWeek.pageSize,
-  ]);
-
-  const visibleNextWeekItems = useMemo(() => {
-    const startIndex = (nextWeekPage - 1) * upcomingSessionsPage.nextWeek.pageSize;
-    return upcomingSessionsPage.nextWeek.items.slice(
-      startIndex,
-      startIndex + upcomingSessionsPage.nextWeek.pageSize,
-    );
-  }, [
-    nextWeekPage,
-    upcomingSessionsPage.nextWeek.items,
-    upcomingSessionsPage.nextWeek.pageSize,
+    pageSize,
   ]);
 
   const totalUpcomingSessions =
     upcomingSessionsPage.thisWeek.total + upcomingSessionsPage.nextWeek.total;
+  const totalPages = Math.max(1, Math.ceil(totalUpcomingSessions / pageSize));
+  const visibleItems = useMemo(() => {
+    const allItems = [
+      ...upcomingSessionsPage.thisWeek.items,
+      ...upcomingSessionsPage.nextWeek.items,
+    ];
+    const startIndex = (currentPage - 1) * pageSize;
+    return allItems.slice(startIndex, startIndex + pageSize);
+  }, [
+    upcomingSessionsPage.thisWeek.items,
+    upcomingSessionsPage.nextWeek.items,
+    currentPage,
+    pageSize,
+  ]);
   const visibleSessionSections = [
     {
       key: 'this-week' as const,
       label: 'This week',
-      items: visibleThisWeekItems,
+      items: visibleItems.filter((item) => item.weekBucket === 'this-week'),
       total: upcomingSessionsPage.thisWeek.total,
-      currentPage: thisWeekPage,
-      totalPages: thisWeekTotalPages,
-      pageSize: upcomingSessionsPage.thisWeek.pageSize,
-      onPrevious: () => setThisWeekPage((page) => Math.max(1, page - 1)),
-      onNext: () => setThisWeekPage((page) => Math.min(thisWeekTotalPages, page + 1)),
     },
     {
       key: 'next-week' as const,
       label: 'Next week',
-      items: visibleNextWeekItems,
+      items: visibleItems.filter((item) => item.weekBucket === 'next-week'),
       total: upcomingSessionsPage.nextWeek.total,
-      currentPage: nextWeekPage,
-      totalPages: nextWeekTotalPages,
-      pageSize: upcomingSessionsPage.nextWeek.pageSize,
-      onPrevious: () => setNextWeekPage((page) => Math.max(1, page - 1)),
-      onNext: () => setNextWeekPage((page) => Math.min(nextWeekTotalPages, page + 1)),
     },
-  ].filter((section) => section.total > 0);
+  ].filter((section) => section.items.length > 0);
 
   const openFamilySettings = () => {
     window.dispatchEvent(
@@ -292,29 +265,6 @@ export function DashboardHomeInfographicSection({
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                       {section.label}
                     </p>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      {section.total > section.pageSize ? (
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            className="inline-flex min-h-8 items-center justify-center rounded-md border border-border px-2 text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:text-muted-foreground/50 disabled:hover:bg-transparent"
-                            onClick={section.onPrevious}
-                            disabled={section.currentPage <= 1}
-                          >
-                            Previous
-                          </button>
-                          <span>{`Page ${section.currentPage} of ${section.totalPages}`}</span>
-                          <button
-                            type="button"
-                            className="inline-flex min-h-8 items-center justify-center rounded-md border border-border px-2 text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:text-muted-foreground/50 disabled:hover:bg-transparent"
-                            onClick={section.onNext}
-                            disabled={section.currentPage >= section.totalPages}
-                          >
-                            Next
-                          </button>
-                        </div>
-                      ) : null}
-                    </div>
                   </div>
                   {section.items.map(
                     ({ session, joinHref, chatHref, weekBucket }, index) => (
@@ -345,6 +295,27 @@ export function DashboardHomeInfographicSection({
             ) : (
               <DashboardSessionsEmptyState />
             )}
+            {totalUpcomingSessions > pageSize ? (
+              <div className="flex items-center justify-end gap-2 pt-2 text-xs text-muted-foreground">
+                <button
+                  type="button"
+                  className="inline-flex min-h-8 items-center justify-center rounded-md border border-border px-2 text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:text-muted-foreground/50 disabled:hover:bg-transparent"
+                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                  disabled={currentPage <= 1}
+                >
+                  Previous
+                </button>
+                <span>{`Page ${currentPage} of ${totalPages}`}</span>
+                <button
+                  type="button"
+                  className="inline-flex min-h-8 items-center justify-center rounded-md border border-border px-2 text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:text-muted-foreground/50 disabled:hover:bg-transparent"
+                  onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                  disabled={currentPage >= totalPages}
+                >
+                  Next
+                </button>
+              </div>
+            ) : null}
           </div>
         </article>
 

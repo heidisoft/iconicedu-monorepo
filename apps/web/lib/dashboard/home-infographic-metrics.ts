@@ -53,7 +53,7 @@ export interface DashboardHomeInfographicMetrics {
   notificationsHref: string;
 }
 
-const DEFAULT_PAGE_SIZE = 6;
+const DEFAULT_PAGE_SIZE = 5;
 
 const ZERO_METRICS: DashboardInfographicRoleMetrics = {
   upcomingSessionsThisWeek: 0,

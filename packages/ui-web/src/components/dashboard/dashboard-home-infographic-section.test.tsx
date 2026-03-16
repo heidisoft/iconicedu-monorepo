@@ -74,6 +74,21 @@ const sessionPage = {
   },
 } as const;
 
+const combinedPaginationSessionPage = {
+  thisWeek: {
+    items: sessionItems.filter((item) => item.weekBucket === 'this-week'),
+    total: 2,
+    pageSize: 2,
+    totalPages: 1,
+  },
+  nextWeek: {
+    items: sessionItems.filter((item) => item.weekBucket === 'next-week'),
+    total: 1,
+    pageSize: 2,
+    totalPages: 1,
+  },
+} as const;
+
 const singlePageSessionPage = {
   thisWeek: {
     items: sessionItems.filter((item) => item.weekBucket === 'this-week'),
@@ -103,7 +118,7 @@ describe('DashboardHomeInfographicSection', () => {
     Element.prototype.scrollIntoView = originalScrollIntoView;
   });
 
-  it('renders the same session item component content and paginates client-side', async () => {
+  it('renders the same session item component content and paginates across the combined upcoming list', async () => {
     const user = userEvent.setup();
 
     render(
@@ -126,17 +141,17 @@ describe('DashboardHomeInfographicSection', () => {
       screen.getByRole('region', { name: 'Dashboard classroom sessions' }),
     ).toBeInTheDocument();
     expect(screen.getByText('Math 101')).toBeInTheDocument();
+    expect(screen.queryByText('Science 301')).not.toBeInTheDocument();
     expect(screen.queryByText('ELA 201')).not.toBeInTheDocument();
-    expect(screen.getByText('Science 301')).toBeInTheDocument();
     expect(screen.getByText('Notifications')).toBeInTheDocument();
     expect(screen.getByText('Calendar')).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: 'Message' })).toHaveLength(2);
-    expect(screen.getByText('Page 1 of 2')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Message' })).toHaveLength(1);
+    expect(screen.getByText('Page 1 of 3')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Next' }));
     expect(screen.getByText('ELA 201')).toBeInTheDocument();
     expect(screen.queryByText('Math 101')).not.toBeInTheDocument();
-    expect(screen.getByText('Page 2 of 2')).toBeInTheDocument();
+    expect(screen.getByText('Page 2 of 3')).toBeInTheDocument();
   });
 
   it('separates visible upcoming sessions into this week and next week sections', () => {
@@ -149,7 +164,7 @@ describe('DashboardHomeInfographicSection', () => {
           activeSubjectsCount: 3,
           activeSubjectsLabel: 'Math, ELA, Science',
         }}
-        upcomingSessionsPage={singlePageSessionPage}
+        upcomingSessionsPage={combinedPaginationSessionPage}
         calendarHref="/iconic-academy/class-schedule"
         notificationsHref="/iconic-academy/notifications"
         browseHref="/iconic-academy/spaces"
@@ -157,9 +172,9 @@ describe('DashboardHomeInfographicSection', () => {
     );
 
     expect(screen.getAllByText('This week').length).toBeGreaterThan(1);
-    expect(screen.getByText('Next week')).toBeInTheDocument();
+    expect(screen.queryByText('Next week')).not.toBeInTheDocument();
     expect(screen.getByText('Math 101')).toBeInTheDocument();
-    expect(screen.getByText('Science 301')).toBeInTheDocument();
+    expect(screen.queryByText('Science 301')).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /Join/i })).toHaveLength(2);
   });
 
