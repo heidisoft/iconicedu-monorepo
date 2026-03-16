@@ -379,6 +379,19 @@ describe('InboxContainer rendering behavior', () => {
     );
   });
 
+  it('does not render section-level timeline connectors in the inbox container', () => {
+    const filename = fileURLToPath(import.meta.url);
+    const source = readFileSync(
+      resolve(dirname(filename), 'inbox-container.tsx'),
+      'utf8',
+    );
+
+    expect(source).not.toContain('showTimelineConnector');
+    expect(source).not.toContain(
+      'absolute left-14 top-10 hidden h-[calc(100%-0.5rem)] w-px rounded-full bg-border/80 md:block',
+    );
+  });
+
   it('formats session parent headline using viewer local time metadata', () => {
     const activity = {
       kind: 'group' as const,

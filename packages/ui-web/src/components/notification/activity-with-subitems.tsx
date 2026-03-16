@@ -102,7 +102,7 @@ export function ActivityWithSubitems({
 
       {hasSubActivities && !isCollapsed && (
         <div className="relative ml-6 md:ml-[42px] animate-in slide-in-from-top-2 fade-in duration-300">
-          {subActivities.map((sub: ActivityFeedLeafItemVM) => (
+          {subActivities.map((sub: ActivityFeedLeafItemVM, index: number) => (
             <div key={sub.ids.id} className="relative">
               {sub.content.expandedContent ? (
                 <ActivityBasicWithExpandedContent
@@ -112,6 +112,7 @@ export function ActivityWithSubitems({
                   showActionButton={showActionButton && Boolean(sub.content.actionButton)}
                   isSubActivity
                   parentExpanded={!isCollapsed}
+                  showTimelineConnector={index < subActivities.length - 1}
                 />
               ) : showActionButton && sub.content.actionButton ? (
                 <ActivityBasicWithActionButton
@@ -120,6 +121,7 @@ export function ActivityWithSubitems({
                   onAutoRead={onAutoRead}
                   isSubActivity
                   parentExpanded={!isCollapsed}
+                  showTimelineConnector={index < subActivities.length - 1}
                 />
               ) : (
                 <ActivityItemBase
@@ -128,6 +130,7 @@ export function ActivityWithSubitems({
                   onAutoRead={onAutoRead}
                   isSubActivity
                   parentExpanded={!isCollapsed}
+                  showTimelineConnector={index < subActivities.length - 1}
                 />
               )}
             </div>

@@ -12,6 +12,7 @@ type ActivityBasicWithExpandedContentProps = {
   showActionButton?: boolean;
   isSubActivity?: boolean;
   parentExpanded?: boolean;
+  showTimelineConnector?: boolean;
   className?: string;
   children?: React.ReactNode;
 };
@@ -23,6 +24,7 @@ export function ActivityBasicWithExpandedContent({
   showActionButton = false,
   isSubActivity,
   parentExpanded,
+  showTimelineConnector,
   className,
   children,
 }: ActivityBasicWithExpandedContentProps) {
@@ -42,6 +44,7 @@ export function ActivityBasicWithExpandedContent({
       onToggle={handleToggle}
       isSubActivity={isSubActivity}
       parentExpanded={parentExpanded}
+      showTimelineConnector={showTimelineConnector}
       showActionButton={showActionButton}
       className={className}
       footer={

@@ -10,6 +10,7 @@ type ActivityBasicWithActionButtonProps = {
   onAutoRead?: (id: string) => void;
   isSubActivity?: boolean;
   parentExpanded?: boolean;
+  showTimelineConnector?: boolean;
   className?: string;
 };
 
@@ -19,6 +20,7 @@ export function ActivityBasicWithActionButton({
   onAutoRead,
   isSubActivity,
   parentExpanded,
+  showTimelineConnector,
   className,
 }: ActivityBasicWithActionButtonProps) {
   return (
@@ -28,6 +30,7 @@ export function ActivityBasicWithActionButton({
       onAutoRead={onAutoRead}
       isSubActivity={isSubActivity}
       parentExpanded={parentExpanded}
+      showTimelineConnector={showTimelineConnector}
       showActionButton
       className={className}
     />

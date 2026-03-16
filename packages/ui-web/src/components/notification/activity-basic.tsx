@@ -10,6 +10,7 @@ type ActivityBasicProps = {
   onAutoRead?: (id: string) => void;
   isSubActivity?: boolean;
   parentExpanded?: boolean;
+  showTimelineConnector?: boolean;
   className?: string;
 };
 
@@ -19,6 +20,7 @@ export function ActivityBasic({
   onAutoRead,
   isSubActivity,
   parentExpanded,
+  showTimelineConnector,
   className,
 }: ActivityBasicProps) {
   return (
@@ -28,6 +30,7 @@ export function ActivityBasic({
       onAutoRead={onAutoRead}
       isSubActivity={isSubActivity}
       parentExpanded={parentExpanded}
+      showTimelineConnector={showTimelineConnector}
       className={className}
     />
   );

@@ -42,6 +42,7 @@ type ActivityItemBaseProps = {
   subActivityCount?: number;
   unreadSubActivityCount?: number;
   hasUnreadSubActivities?: boolean;
+  showTimelineConnector?: boolean;
   footer?: React.ReactNode;
   className?: string;
 };
@@ -179,6 +180,7 @@ export function ActivityItemBase({
   subActivityCount,
   unreadSubActivityCount,
   hasUnreadSubActivities = false,
+  showTimelineConnector = false,
   footer,
   className,
 }: ActivityItemBaseProps) {
@@ -278,6 +280,12 @@ export function ActivityItemBase({
     >
       <div className="flex items-center gap-2 md:flex-row md:items-start">
         <div className="relative flex shrink-0 flex-col items-center">
+          {showTimelineConnector ? (
+            <div
+              aria-hidden
+              className="absolute left-1/2 top-7 hidden h-[calc(100%+1rem)] w-px -translate-x-1/2 rounded-full bg-border/80 md:block"
+            />
+          ) : null}
           <div
             className={cn(
               'z-10 flex size-6 items-center justify-center rounded-full transition-colors duration-300 ease-out',

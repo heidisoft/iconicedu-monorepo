@@ -64,4 +64,20 @@ describe('ActivityItemBase', () => {
 
     expect(screen.getByText('Direct message').tagName).toBe('SPAN');
   });
+
+  it('renders a vertical connector when timeline connector is enabled', () => {
+    const { container } = render(
+      <ActivityItemBase
+        activity={createActivity()}
+        onMarkRead={vi.fn()}
+        showTimelineConnector
+      />,
+    );
+
+    expect(
+      container.querySelector(
+        '.absolute.left-1\\/2.top-7.hidden.h-\\[calc\\(100\\%-1rem\\)\\].w-px',
+      ),
+    ).not.toBeNull();
+  });
 });
