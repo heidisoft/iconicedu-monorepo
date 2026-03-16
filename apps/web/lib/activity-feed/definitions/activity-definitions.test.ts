@@ -1394,6 +1394,47 @@ describe('activity event definitions', () => {
     });
   });
 
+  it('renders session reminders in the viewer timezone when provided', () => {
+    const definition = getActivityEventDefinition('session.reminder.sent');
+    if (!definition) {
+      throw new Error('Missing session.reminder.sent definition');
+    }
+
+    const rendered = definition.render({
+      id: 'event-6-viewer-timezone',
+      org_id: 'org-1',
+      event_type: 'session.reminder.sent',
+      occurred_at: '2026-03-03T12:34:00.000Z',
+      source_kind: 'system',
+      actor_profile_id: 'profile-system',
+      scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+      object_ref: { kind: 'message', id: 'message-6' },
+      target_ref: { kind: 'learning_space', id: 'space-1' },
+      payload: {
+        channelId: 'channel-1',
+        messageId: 'message-6',
+        learningSpaceId: 'space-1',
+        title: 'Algebra',
+        occurrenceStart: '2026-03-03T12:40:00.000Z',
+        reminderOffsetMinutes: 5,
+        timezone: 'UTC',
+        viewerTimezone: 'America/New_York',
+        summary: 'Class starts in 10 minutes',
+        channelRouteKind: 'space',
+      },
+      audience_rules: [],
+      dedupe_key: 'session.reminder:org-1:schedule-1:2026-03-03T12:40:00.000Z:activity',
+      projection_status: 'pending',
+      projection_attempts: 0,
+      created_at: '2026-03-03T12:34:00.000Z',
+      updated_at: '2026-03-03T12:34:00.000Z',
+    });
+
+    expect(rendered.summary).toBe(
+      'Your session for Algebra will start on Mar 3 at 7:40 AM',
+    );
+  });
+
   it('renders session feedback request with class feedback headline', () => {
     const definition = getActivityEventDefinition('session.feedback_request.sent');
     if (!definition) {

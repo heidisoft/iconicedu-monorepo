@@ -5,6 +5,7 @@ import { getActivityEventDefinition } from '@iconicedu/web/lib/activity-feed/def
 import { shouldReplaceGroupParent } from '@iconicedu/web/lib/activity-feed/projector/group-parent-priority';
 import { resolveActiveConversationSuppressedRecipients } from '@iconicedu/web/lib/activity-feed/suppression/active-conversation-suppression';
 import { enqueueNotificationDispatchJobs } from '@iconicedu/web/lib/notifications/dispatch-jobs';
+import { getProfilesByIds } from '@iconicedu/web/lib/profile/queries/profiles.query';
 
 const MAX_ATTEMPTS = 10;
 
@@ -223,8 +224,6 @@ async function projectEvent(supabase: SupabaseServiceClient, event: ActivityEven
   if (!definition) {
     throw new Error(`Unsupported activity event type: ${event.event_type}`);
   }
-
-  const rendered = definition.render(event);
   const resolvedRecipientProfileIds = await definition.resolveRecipients(supabase, event);
   const suppressionResult = await resolveActiveConversationSuppressedRecipients({
     supabase,
@@ -249,6 +248,22 @@ async function projectEvent(supabase: SupabaseServiceClient, event: ActivityEven
     return;
   }
 
+  const recipientProfilesResponse = await getProfilesByIds(
+    supabase,
+    event.org_id,
+    recipientProfileIds,
+  );
+  if (recipientProfilesResponse.error) {
+    throw new Error(recipientProfilesResponse.error.message);
+  }
+
+  const recipientTimezoneByProfileId = new Map(
+    (recipientProfilesResponse.data ?? []).map((profile) => [
+      profile.id,
+      profile.timezone ?? null,
+    ]),
+  );
+
   await enqueueNotificationDispatchJobs({
     supabase,
     event,
@@ -259,16 +274,28 @@ async function projectEvent(supabase: SupabaseServiceClient, event: ActivityEven
     object: event.object_ref ?? undefined,
     target: event.target_ref ?? undefined,
   };
-  const content = {
-    headline: rendered.headline,
-    summary: rendered.summary,
-    preview: rendered.preview,
-    actionButton: rendered.actionButton,
-    expandedContent: rendered.expandedContent,
-    leading: rendered.leading,
-  };
-
   for (const recipientProfileId of recipientProfileIds) {
+    const recipientTimezone =
+      recipientTimezoneByProfileId.get(recipientProfileId) ?? null;
+    const recipientEvent =
+      event.payload && typeof event.payload === 'object' && !Array.isArray(event.payload)
+        ? {
+            ...event,
+            payload: {
+              ...event.payload,
+              viewerTimezone: recipientTimezone,
+            },
+          }
+        : event;
+    const rendered = definition.render(recipientEvent);
+    const content = {
+      headline: rendered.headline,
+      summary: rendered.summary,
+      preview: rendered.preview,
+      actionButton: rendered.actionButton,
+      expandedContent: rendered.expandedContent,
+      leading: rendered.leading,
+    };
     const itemId = await upsertProjectionRow(supabase, {
       org_id: event.org_id,
       recipient_profile_id: recipientProfileId,
@@ -304,7 +331,7 @@ async function projectEvent(supabase: SupabaseServiceClient, event: ActivityEven
       const groupKey = definition.group.buildGroupKey(event);
       if (groupKey) {
         const groupRendered = definition.group.renderGroup
-          ? definition.group.renderGroup(event)
+          ? definition.group.renderGroup(recipientEvent)
           : rendered;
         const groupId = await ensureGroupParent({
           supabase,

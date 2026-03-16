@@ -861,4 +861,224 @@ describe('projectActivityEvents', () => {
     );
     expect(leafUpserts).toHaveLength(2);
   });
+
+  it('renders session reminder activity summaries in each recipient timezone', async () => {
+    getProfilesByIds.mockResolvedValue({
+      data: [
+        {
+          id: 'child-profile-1',
+          account_id: 'child-account-1',
+          kind: 'child',
+          timezone: 'America/New_York',
+        },
+        {
+          id: 'guardian-profile-1',
+          account_id: 'guardian-account-1',
+          kind: 'guardian',
+          timezone: 'Asia/Colombo',
+        },
+      ],
+    });
+
+    const reminderEvent = {
+      id: 'event-reminder-1',
+      org_id: 'org-1',
+      event_type: 'session.reminder.sent',
+      occurred_at: '2026-03-03T12:34:00.000Z',
+      source_kind: 'system',
+      actor_profile_id: 'profile-system',
+      scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+      object_ref: { kind: 'message', id: 'message-6' },
+      target_ref: { kind: 'learning_space', id: 'space-1' },
+      payload: {
+        channelId: 'channel-1',
+        messageId: 'message-6',
+        learningSpaceId: 'space-1',
+        title: 'Algebra',
+        occurrenceStart: '2026-03-03T12:40:00.000Z',
+        reminderOffsetMinutes: 5,
+        timezone: 'UTC',
+        channelRouteKind: 'space',
+      },
+      audience_rules: [],
+      dedupe_key: 'session.reminder:org-1:schedule-1:2026-03-03T12:40:00.000Z:activity',
+      projection_status: 'pending',
+      projection_attempts: 0,
+      created_at: '2026-03-03T12:34:00.000Z',
+      updated_at: '2026-03-03T12:34:00.000Z',
+    };
+
+    const upserts: Array<{ table: string; payload: Record<string, unknown> }> = [];
+    const supabase = {
+      from: vi.fn((table: string) => {
+        if (
+          table === 'notification_preferences' ||
+          table === 'notification_preference_scopes'
+        ) {
+          const chain = {
+            eq: vi.fn(() => chain),
+            in: vi.fn(() => chain),
+            is: vi.fn(() => chain),
+            returns: vi.fn(async () => ({ data: [], error: null })),
+          };
+          return { select: vi.fn(() => chain) };
+        }
+
+        if (table === 'activity_events') {
+          return {
+            select: vi.fn(() => ({
+              is: vi.fn(() => ({
+                lt: vi.fn(() => ({
+                  order: vi.fn(() => ({
+                    limit: vi.fn(() => ({
+                      in: vi.fn(() => ({
+                        returns: vi.fn(async () => ({
+                          data: [reminderEvent],
+                          error: null,
+                        })),
+                      })),
+                    })),
+                  })),
+                })),
+              })),
+            })),
+            update: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                is: vi.fn(async () => ({ error: null })),
+              })),
+            })),
+          };
+        }
+
+        if (table === 'learning_space_participants') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                eq: vi.fn(() => ({
+                  is: vi.fn(() => ({
+                    returns: vi.fn(async () => ({
+                      data: [
+                        { profile_id: 'child-profile-1' },
+                        { profile_id: 'educator-profile-1' },
+                      ],
+                      error: null,
+                    })),
+                  })),
+                })),
+              })),
+            })),
+          };
+        }
+
+        if (table === 'profiles') {
+          const chain = {
+            eq: vi.fn(() => chain),
+            in: vi.fn(() => chain),
+            is: vi.fn(() => chain),
+            returns: vi.fn(async () => ({
+              data: [
+                { id: 'child-profile-1', account_id: 'child-account-1' },
+                { id: 'guardian-profile-1', account_id: 'guardian-account-1' },
+              ],
+              error: null,
+            })),
+          };
+          return { select: vi.fn(() => chain) };
+        }
+
+        if (table === 'profile_presence') {
+          const chain = {
+            eq: vi.fn(() => chain),
+            in: vi.fn(() => chain),
+            is: vi.fn(() => chain),
+            returns: vi.fn(async () => ({
+              data: [
+                { profile_id: 'child-profile-1', live_status: 'away' },
+                { profile_id: 'guardian-profile-1', live_status: 'away' },
+              ],
+              error: null,
+            })),
+          };
+          return { select: vi.fn(() => chain) };
+        }
+
+        if (table === 'channel_read_state') {
+          const chain = {
+            eq: vi.fn(() => chain),
+            in: vi.fn(() => chain),
+            is: vi.fn(() => chain),
+            returns: vi.fn(async () => ({
+              data: [
+                {
+                  account_id: 'child-account-1',
+                  last_read_at: '2026-03-03T11:00:00.000Z',
+                },
+                {
+                  account_id: 'guardian-account-1',
+                  last_read_at: '2026-03-03T11:00:00.000Z',
+                },
+              ],
+              error: null,
+            })),
+          };
+          return { select: vi.fn(() => chain) };
+        }
+
+        if (table === 'activity_feed_items') {
+          const selectChain = {
+            eq: vi.fn(() => selectChain),
+            is: vi.fn(() => selectChain),
+            maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+          };
+
+          return {
+            select: vi.fn(() => selectChain),
+            upsert: vi.fn((payload: Record<string, unknown>) => ({
+              select: vi.fn(() => ({
+                single: vi.fn(async () => {
+                  upserts.push({ table, payload });
+                  return { data: { id: 'feed-item-1' }, error: null };
+                }),
+              })),
+            })),
+            update: vi.fn(() => ({
+              eq: vi.fn(async () => ({ error: null })),
+            })),
+          };
+        }
+
+        if (table === 'activity_feed_group_members') {
+          return {
+            upsert: vi.fn(async () => ({ error: null })),
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                is: vi.fn(async () => ({ count: 1, error: null })),
+              })),
+            })),
+          };
+        }
+
+        throw new Error(`Unexpected table ${table}`);
+      }),
+    };
+
+    await projectActivityEvents(supabase as never);
+
+    const leafUpserts = upserts.filter(
+      (entry) => entry.table === 'activity_feed_items' && entry.payload.kind === 'leaf',
+    );
+    const childItem = leafUpserts.find(
+      (entry) => entry.payload.recipient_profile_id === 'child-profile-1',
+    );
+    const guardianItem = leafUpserts.find(
+      (entry) => entry.payload.recipient_profile_id === 'guardian-profile-1',
+    );
+
+    expect(childItem?.payload.summary).toBe(
+      'Your session for Algebra will start on Mar 3 at 7:40 AM',
+    );
+    expect(guardianItem?.payload.summary).toBe(
+      'Your session for Algebra will start on Mar 3 at 6:10 PM',
+    );
+  });
 });

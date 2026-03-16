@@ -71,10 +71,25 @@ function asOptionalThemeKey(value: unknown) {
   return typeof value === 'string' && value.length > 0 ? (value as ThemeKey) : null;
 }
 
+function extractDisplayTimezone(value: unknown) {
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  const record = asRecord(value);
+  return (
+    asOptionalString(record.viewerTimezone) ??
+    asOptionalString(record.recipientTimezone) ??
+    asOptionalString(record.timezone) ??
+    asOptionalString(record.firstSessionTimezone) ??
+    null
+  );
+}
+
 function resolveDisplayTimezone(preferred: unknown, fallback?: unknown) {
   return resolveViewerTimezone(
-    typeof preferred === 'string' ? preferred : null,
-    typeof fallback === 'string' ? fallback : null,
+    extractDisplayTimezone(preferred),
+    extractDisplayTimezone(fallback),
   );
 }
 
@@ -306,7 +321,7 @@ function isSameScheduleDay(a: string, b: string, timezone: unknown) {
 }
 
 function buildRescheduledSessionSummary(payload: Record<string, unknown>) {
-  const timezone = payload.firstSessionTimezone ?? payload.timezone;
+  const timezone = payload;
   const title = sessionName(payload);
   const fromValue =
     asOptionalString(payload.rescheduledFromStartAt) ?? asOptionalString(payload.startAt);
@@ -345,7 +360,7 @@ function buildRescheduledSessionSummary(payload: Record<string, unknown>) {
 }
 
 function buildCanceledSessionSummary(payload: Record<string, unknown>) {
-  const timezone = payload.firstSessionTimezone ?? payload.timezone;
+  const timezone = payload;
   const title = sessionName(payload);
   const canceledValue =
     asOptionalString(payload.canceledStartAt) ?? asOptionalString(payload.startAt);
@@ -465,7 +480,7 @@ function renderClassCreatedGroup(event: ActivityEventRow) {
   const payload = asRecord(event.payload);
   const invitedMembers = buildParticipantAvatars(payload);
   const firstSessionLabel =
-    formatNaturalDateTime(payload.firstSessionStartAt, payload.firstSessionTimezone) ??
+    formatNaturalDateTime(payload.firstSessionStartAt, payload) ??
     asOptionalString(payload.firstSessionLabel);
   const participantsSummary = buildParticipantNamesSummary(payload, 'Participants');
   const summaryParts = [
@@ -498,7 +513,7 @@ function renderClassCreatedGroup(event: ActivityEventRow) {
 function renderClassCreatedLeaf(event: ActivityEventRow) {
   const payload = asRecord(event.payload);
   const firstSessionLabel =
-    formatNaturalDateTime(payload.firstSessionStartAt, payload.firstSessionTimezone) ??
+    formatNaturalDateTime(payload.firstSessionStartAt, payload) ??
     asOptionalString(payload.firstSessionLabel);
 
   return {
@@ -515,10 +530,7 @@ function renderClassCreatedLeaf(event: ActivityEventRow) {
 function renderLearningSpaceUpdatedGroup(event: ActivityEventRow) {
   const payload = asRecord(event.payload);
   const invitedMembers = buildParticipantAvatars(payload);
-  const firstSessionLabel = formatNaturalDateTime(
-    payload.firstSessionStartAt,
-    payload.firstSessionTimezone ?? payload.timezone,
-  );
+  const firstSessionLabel = formatNaturalDateTime(payload.firstSessionStartAt, payload);
   return {
     verb: event.event_type as ActivityVerbVM,
     leading:
@@ -723,7 +735,7 @@ function buildSessionTimelineLabel(payload: Record<string, unknown>) {
   return (
     formatNaturalDateTime(
       payload.occurrenceStart ?? payload.scheduledStartAt ?? payload.startedAt,
-      payload.timezone,
+      payload,
     ) ?? asOptionalString(payload.occurrenceLabel)
   );
 }
@@ -1380,10 +1392,8 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       const payload = asRecord(event.payload);
       if (isSessionRosterEvent(payload)) {
         const joinedAt =
-          formatNaturalDateTime(
-            payload.joinedAt ?? event.occurred_at,
-            payload.timezone,
-          ) ?? formatNaturalDateTime(event.occurred_at, payload.timezone);
+          formatNaturalDateTime(payload.joinedAt ?? event.occurred_at, payload) ??
+          formatNaturalDateTime(event.occurred_at, payload);
         return {
           verb: 'member.joined',
           leading: buildMembersLeading(payload),
@@ -1424,8 +1434,8 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       const payload = asRecord(event.payload);
       if (isSessionRosterEvent(payload)) {
         const leftAt =
-          formatNaturalDateTime(payload.leftAt ?? event.occurred_at, payload.timezone) ??
-          formatNaturalDateTime(event.occurred_at, payload.timezone);
+          formatNaturalDateTime(payload.leftAt ?? event.occurred_at, payload) ??
+          formatNaturalDateTime(event.occurred_at, payload);
         return {
           verb: 'members.removed',
           leading: buildMembersLeading(payload),
@@ -1478,8 +1488,8 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       const payload = asRecord(event.payload);
       if (isSessionRosterEvent(payload)) {
         const leftAt =
-          formatNaturalDateTime(payload.leftAt ?? event.occurred_at, payload.timezone) ??
-          formatNaturalDateTime(event.occurred_at, payload.timezone);
+          formatNaturalDateTime(payload.leftAt ?? event.occurred_at, payload) ??
+          formatNaturalDateTime(event.occurred_at, payload);
         return {
           verb: 'member.removed',
           leading: buildMembersLeading(payload),
@@ -1550,11 +1560,11 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => {
       const payload = asRecord(event.payload);
-      const firstSessionLabel = formatSessionLabel(payload.startAt, payload.timezone);
-      const weeklyTime = formatWeeklyTimeLabel(payload.startAt, payload.timezone);
+      const firstSessionLabel = formatSessionLabel(payload.startAt, payload);
+      const weeklyTime = formatWeeklyTimeLabel(payload.startAt, payload);
       const scheduledLabel = formatNaturalDateTime(
         payload.startAt ?? payload.firstSessionStartAt,
-        payload.timezone ?? payload.firstSessionTimezone,
+        payload,
       );
       const isUpdated = asOptionalString(payload.activityPhase) === 'updated';
       return {
@@ -1600,11 +1610,11 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => {
       const payload = asRecord(event.payload);
-      const firstSessionLabel = formatSessionLabel(payload.startAt, payload.timezone);
-      const weeklyTime = formatWeeklyTimeLabel(payload.startAt, payload.timezone);
+      const firstSessionLabel = formatSessionLabel(payload.startAt, payload);
+      const weeklyTime = formatWeeklyTimeLabel(payload.startAt, payload);
       const scheduledLabel = formatNaturalDateTime(
         payload.startAt ?? payload.firstSessionStartAt,
-        payload.timezone ?? payload.firstSessionTimezone,
+        payload,
       );
       const isUpdated = asOptionalString(payload.activityPhase) === 'updated';
       return {
@@ -1838,7 +1848,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       const payload = asRecord(event.payload);
       const endedAt = formatNaturalDateTime(
         payload.endedAt ?? event.occurred_at,
-        payload.timezone,
+        payload,
       );
       return {
         verb: 'session.ended',
