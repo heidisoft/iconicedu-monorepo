@@ -16,7 +16,10 @@ import {
 } from '@iconicedu/ui-web/ui/empty';
 import { ActivityBasic } from '@iconicedu/ui-web/components/notification/activity-basic';
 import { ActivityBasicWithExpandedContent } from '@iconicedu/ui-web/components/notification/activity-basic-with-expanded-content';
-import { ActivityFeedbackRequest } from '@iconicedu/ui-web/components/notification/activity-feedback-request';
+import {
+  ActivityFeedbackRequest,
+  canRenderActivityFeedbackRequest,
+} from '@iconicedu/ui-web/components/notification/activity-feedback-request';
 import { ActivityWithSubitems } from '@iconicedu/ui-web/components/notification/activity-with-subitems';
 import type {
   ActivityFeedItemVM,
@@ -663,6 +666,16 @@ export function InboxContainer({
     }
 
     if (displayActivity.verb === 'session.feedback_request.sent') {
+      if (!canRenderActivityFeedbackRequest(displayActivity as ActivityFeedLeafItemVM)) {
+        return (
+          <ActivityBasic
+            activity={displayActivity}
+            onMarkRead={markAsRead}
+            onAutoRead={autoMarkAsRead}
+          />
+        );
+      }
+
       return (
         <ActivityBasicWithExpandedContent
           activity={displayActivity}

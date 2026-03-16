@@ -1,6 +1,6 @@
 import type { ISODateTime, UUID } from '../shared/shared';
 
-export interface MessageSessionFeedbackRow {
+export interface ClassSessionFeedbackRow {
   id: UUID;
   org_id: UUID;
   recipient_profile_id: UUID;

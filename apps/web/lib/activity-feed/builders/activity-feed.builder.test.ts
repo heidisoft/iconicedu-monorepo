@@ -1045,7 +1045,7 @@ describe('buildActivityFeedForProfile', () => {
 
     const supabase = {
       from: vi.fn((table: string) => {
-        if (table !== 'message_session_feedback') {
+        if (table !== 'class_session_feedback') {
           throw new Error(`Unexpected table ${table}`);
         }
         return {

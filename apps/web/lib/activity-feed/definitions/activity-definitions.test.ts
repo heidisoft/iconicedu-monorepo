@@ -1435,7 +1435,7 @@ describe('activity event definitions', () => {
     );
   });
 
-  it('renders session feedback request with class feedback headline', () => {
+  it('renders child feedback request copy with the class name', () => {
     const definition = getActivityEventDefinition('session.feedback_request.sent');
     if (!definition) {
       throw new Error('Missing session.feedback_request.sent definition');
@@ -1456,6 +1456,7 @@ describe('activity event definitions', () => {
         messageId: 'message-feedback-1',
         learningSpaceId: 'space-1',
         title: 'Algebra',
+        viewerRole: 'child',
         occurrenceStart: '2026-03-03T12:40:00.000Z',
         channelRouteKind: 'space',
       },
@@ -1470,12 +1471,137 @@ describe('activity event definitions', () => {
 
     expect(rendered.headline).toEqual({
       primary: 'Class feedback requested',
-      secondary: "How was today's session?",
+      secondary: 'How was your Algebra session today?',
     });
     expect(rendered.metadata).toMatchObject({
       messageId: 'message-feedback-1',
       occurrenceStart: '2026-03-03T12:40:00.000Z',
+      viewerRole: 'child',
+      feedbackUiEnabled: true,
     });
+  });
+
+  it('renders guardian feedback request copy for one student', () => {
+    const definition = getActivityEventDefinition('session.feedback_request.sent');
+    if (!definition) {
+      throw new Error('Missing session.feedback_request.sent definition');
+    }
+
+    const rendered = definition.render({
+      id: 'event-feedback-guardian-1',
+      org_id: 'org-1',
+      event_type: 'session.feedback_request.sent',
+      occurred_at: '2026-03-03T14:40:00.000Z',
+      source_kind: 'system',
+      actor_profile_id: 'profile-system',
+      scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+      object_ref: { kind: 'message', id: 'message-feedback-guardian-1' },
+      target_ref: { kind: 'learning_space', id: 'space-1' },
+      payload: {
+        channelId: 'channel-1',
+        messageId: 'message-feedback-guardian-1',
+        learningSpaceId: 'space-1',
+        title: 'Algebra',
+        viewerRole: 'guardian',
+        members: [{ profileId: 'child-1', role: 'child', displayName: 'Ava' }],
+        occurrenceStart: '2026-03-03T12:40:00.000Z',
+        channelRouteKind: 'space',
+      },
+      audience_rules: [],
+      dedupe_key:
+        'session.feedback_request:org-1:schedule-1:2026-03-03T12:40:00.000Z:activity',
+      projection_status: 'pending',
+      projection_attempts: 0,
+      created_at: '2026-03-03T14:40:00.000Z',
+      updated_at: '2026-03-03T14:40:00.000Z',
+    });
+
+    expect(rendered.headline.secondary).toBe("How was Ava's Algebra session today?");
+    expect(rendered.metadata).toMatchObject({
+      viewerRole: 'guardian',
+      feedbackUiEnabled: true,
+    });
+  });
+
+  it('renders educator feedback request copy for one student', () => {
+    const definition = getActivityEventDefinition('session.feedback_request.sent');
+    if (!definition) {
+      throw new Error('Missing session.feedback_request.sent definition');
+    }
+
+    const rendered = definition.render({
+      id: 'event-feedback-educator-1',
+      org_id: 'org-1',
+      event_type: 'session.feedback_request.sent',
+      occurred_at: '2026-03-03T14:40:00.000Z',
+      source_kind: 'system',
+      actor_profile_id: 'profile-system',
+      scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+      object_ref: { kind: 'message', id: 'message-feedback-educator-1' },
+      target_ref: { kind: 'learning_space', id: 'space-1' },
+      payload: {
+        channelId: 'channel-1',
+        messageId: 'message-feedback-educator-1',
+        learningSpaceId: 'space-1',
+        title: 'Algebra',
+        viewerRole: 'educator',
+        members: [{ profileId: 'child-1', role: 'child', displayName: 'Ava' }],
+        occurrenceStart: '2026-03-03T12:40:00.000Z',
+        channelRouteKind: 'space',
+      },
+      audience_rules: [],
+      dedupe_key:
+        'session.feedback_request:org-1:schedule-1:2026-03-03T12:40:00.000Z:activity',
+      projection_status: 'pending',
+      projection_attempts: 0,
+      created_at: '2026-03-03T14:40:00.000Z',
+      updated_at: '2026-03-03T14:40:00.000Z',
+    });
+
+    expect(rendered.headline.secondary).toBe(
+      "How did Ava do in today's Algebra session?",
+    );
+  });
+
+  it('falls back to generic feedback request copy for multi-student guardian sessions', () => {
+    const definition = getActivityEventDefinition('session.feedback_request.sent');
+    if (!definition) {
+      throw new Error('Missing session.feedback_request.sent definition');
+    }
+
+    const rendered = definition.render({
+      id: 'event-feedback-guardian-many',
+      org_id: 'org-1',
+      event_type: 'session.feedback_request.sent',
+      occurred_at: '2026-03-03T14:40:00.000Z',
+      source_kind: 'system',
+      actor_profile_id: 'profile-system',
+      scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+      object_ref: { kind: 'message', id: 'message-feedback-many' },
+      target_ref: { kind: 'learning_space', id: 'space-1' },
+      payload: {
+        channelId: 'channel-1',
+        messageId: 'message-feedback-many',
+        learningSpaceId: 'space-1',
+        title: 'Algebra',
+        viewerRole: 'guardian',
+        members: [
+          { profileId: 'child-1', role: 'child', displayName: 'Ava' },
+          { profileId: 'child-2', role: 'child', displayName: 'Luca' },
+        ],
+        occurrenceStart: '2026-03-03T12:40:00.000Z',
+        channelRouteKind: 'space',
+      },
+      audience_rules: [],
+      dedupe_key:
+        'session.feedback_request:org-1:schedule-1:2026-03-03T12:40:00.000Z:activity',
+      projection_status: 'pending',
+      projection_attempts: 0,
+      created_at: '2026-03-03T14:40:00.000Z',
+      updated_at: '2026-03-03T14:40:00.000Z',
+    });
+
+    expect(rendered.headline.secondary).toBe("How was today's session?");
   });
 
   it('renders session participant join and leave activities with participant avatars', () => {

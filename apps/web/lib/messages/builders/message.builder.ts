@@ -20,7 +20,7 @@ import {
   getMessagePaymentRemindersByMessageIds,
   getMessageEventRemindersByMessageIds,
   getMessageFeedbackRequestsByMessageIds,
-  getMessageSessionFeedbackByMessageIds,
+  getClassSessionFeedbackByMessageIds,
   getMessageLessonAssignmentsByMessageIds,
   getMessageProgressUpdatesByMessageIds,
   getMessageSessionBookingsByMessageIds,
@@ -433,7 +433,7 @@ async function applySessionFeedbackResponsesToPayloads(
     return;
   }
 
-  const response = await getMessageSessionFeedbackByMessageIds(
+  const response = await getClassSessionFeedbackByMessageIds(
     supabase,
     orgId,
     profileId,

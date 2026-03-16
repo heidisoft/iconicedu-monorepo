@@ -32,6 +32,7 @@ type ReminderJobPayload = {
   channelRouteKind?: 'space' | 'dm' | 'channel' | null;
   members?: Array<{
     profileId: string;
+    role?: 'educator' | 'child' | 'guardian' | 'staff' | 'observer' | null;
     displayName?: string | null;
     avatarUrl?: string | null;
     themeKey?: string | null;

@@ -138,7 +138,7 @@ export async function POST(request: Request) {
 
   const now = new Date().toISOString();
   const upsertResponse = await supabase
-    .from('message_session_feedback')
+    .from('class_session_feedback')
     .upsert(
       {
         org_id: accountResponse.data.org_id,

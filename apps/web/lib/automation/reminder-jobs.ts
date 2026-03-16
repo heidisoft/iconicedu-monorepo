@@ -1,4 +1,8 @@
-import type { FeedScopeVM, ReminderJobRow } from '@iconicedu/shared-types';
+import type {
+  FeedScopeVM,
+  ParticipantRoleVM,
+  ReminderJobRow,
+} from '@iconicedu/shared-types';
 import { expandRecurringEvents } from '@iconicedu/ui-web/lib/class-schedule-utils';
 import { buildClassSchedulesByOrg } from '@iconicedu/web/lib/schedules/builders/class-schedule.builder';
 import { publishActivityEvent } from '@iconicedu/web/lib/activity-feed/publisher/activity-publisher';
@@ -35,6 +39,7 @@ type ReminderJobPayload = {
   channelRouteKind?: 'space' | 'dm' | 'channel' | null;
   members?: Array<{
     profileId: string;
+    role?: ParticipantRoleVM | null;
     displayName?: string | null;
     avatarUrl?: string | null;
     themeKey?: string | null;
@@ -153,6 +158,7 @@ export async function compileLearningSpaceReminderJobs(input: {
       channelRouteKind: 'space',
       members: occurrence.participants.map((participant) => ({
         profileId: participant.ids.id,
+        role: participant.role,
         displayName: participant.displayName ?? null,
         avatarUrl: participant.avatarUrl ?? null,
         themeKey: participant.themeKey ?? null,

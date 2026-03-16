@@ -71,6 +71,10 @@ function asOptionalThemeKey(value: unknown) {
   return typeof value === 'string' && value.length > 0 ? (value as ThemeKey) : null;
 }
 
+function asArray(value: unknown) {
+  return Array.isArray(value) ? value : [];
+}
+
 function extractDisplayTimezone(value: unknown) {
   if (typeof value === 'string') {
     return value;
@@ -247,6 +251,50 @@ function className(payload: Record<string, unknown>) {
 
 function sessionName(payload: Record<string, unknown>) {
   return asString(payload.title, 'Session');
+}
+
+function getFeedbackViewerRole(payload: Record<string, unknown>) {
+  const role = asOptionalString(payload.viewerRole);
+  return role === 'child' || role === 'guardian' || role === 'educator' ? role : null;
+}
+
+function getFeedbackChildParticipants(payload: Record<string, unknown>) {
+  return asArray(payload.members)
+    .map((member) => asRecord(member))
+    .filter((member) => member.role === 'child');
+}
+
+function getSingleFeedbackChildName(payload: Record<string, unknown>) {
+  const childParticipants = getFeedbackChildParticipants(payload);
+  if (childParticipants.length !== 1) {
+    return null;
+  }
+
+  return asOptionalString(childParticipants[0]?.displayName) ?? null;
+}
+
+function buildFeedbackHeadlineSecondary(payload: Record<string, unknown>) {
+  const sessionTitle = sessionName(payload);
+  const viewerRole = getFeedbackViewerRole(payload);
+  const childName = getSingleFeedbackChildName(payload);
+
+  if (viewerRole === 'child') {
+    return `How was your ${sessionTitle} session today?`;
+  }
+
+  if (viewerRole === 'guardian' && childName) {
+    return `How was ${childName}'s ${sessionTitle} session today?`;
+  }
+
+  if (viewerRole === 'educator' && childName) {
+    return `How did ${childName} do in today's ${sessionTitle} session?`;
+  }
+
+  return "How was today's session?";
+}
+
+function isFeedbackUiEnabled(payload: Record<string, unknown>) {
+  return getFeedbackViewerRole(payload) !== null;
 }
 
 function formatSessionLabel(startAt: unknown, timezone: unknown) {
@@ -1912,7 +1960,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
         leading: buildSessionParticipantsLeading(payload),
         headline: {
           primary: 'Class feedback requested',
-          secondary: "How was today's session?",
+          secondary: buildFeedbackHeadlineSecondary(payload),
         },
         summary: asOptionalString(payload.summary) ?? 'Rate this class in one minute.',
         metadata: {
@@ -1924,6 +1972,8 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
           occurrenceStart:
             asOptionalString(payload.occurrenceStart) ??
             asOptionalString(payload.startAt),
+          viewerRole: getFeedbackViewerRole(payload),
+          feedbackUiEnabled: isFeedbackUiEnabled(payload),
         },
       };
     },

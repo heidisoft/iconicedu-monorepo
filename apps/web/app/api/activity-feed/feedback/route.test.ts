@@ -87,7 +87,7 @@ describe('POST /api/activity-feed/feedback', () => {
         if (table === 'channel_members') {
           return { select: vi.fn(() => channelMemberQuery) };
         }
-        if (table === 'message_session_feedback') {
+        if (table === 'class_session_feedback') {
           return { upsert: vi.fn(() => upsertQuery) };
         }
         throw new Error(`Unexpected table ${table}`);

@@ -263,6 +263,12 @@ async function projectEvent(supabase: SupabaseServiceClient, event: ActivityEven
       profile.timezone ?? null,
     ]),
   );
+  const recipientRoleByProfileId = new Map(
+    (recipientProfilesResponse.data ?? []).map((profile) => [
+      profile.id,
+      profile.kind ?? null,
+    ]),
+  );
 
   await enqueueNotificationDispatchJobs({
     supabase,
@@ -277,6 +283,7 @@ async function projectEvent(supabase: SupabaseServiceClient, event: ActivityEven
   for (const recipientProfileId of recipientProfileIds) {
     const recipientTimezone =
       recipientTimezoneByProfileId.get(recipientProfileId) ?? null;
+    const recipientRole = recipientRoleByProfileId.get(recipientProfileId) ?? null;
     const recipientEvent =
       event.payload && typeof event.payload === 'object' && !Array.isArray(event.payload)
         ? {
@@ -284,6 +291,7 @@ async function projectEvent(supabase: SupabaseServiceClient, event: ActivityEven
             payload: {
               ...event.payload,
               viewerTimezone: recipientTimezone,
+              viewerRole: recipientRole,
             },
           }
         : event;

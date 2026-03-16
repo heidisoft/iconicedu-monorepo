@@ -69,6 +69,7 @@ describe('reminder-jobs', () => {
         participants: [
           {
             ids: { id: 'profile-1', orgId: 'org-1' },
+            role: 'child',
             displayName: 'Alex Student',
             avatarUrl: 'https://cdn.test/alex.png',
             themeKey: 'blue',
@@ -130,6 +131,7 @@ describe('reminder-jobs', () => {
     expect(feedbackRow?.run_at).toBe('2030-03-06T11:15:00.000Z');
     expect(feedbackRow?.payload.members?.[0]).toMatchObject({
       profileId: 'profile-1',
+      role: 'child',
     });
   });
 
@@ -393,6 +395,7 @@ describe('reminder-jobs', () => {
         members: [
           {
             profileId: 'profile-1',
+            role: 'child',
             displayName: 'Alex Student',
             avatarUrl: 'https://cdn.test/alex.png',
             themeKey: 'blue',
@@ -467,6 +470,7 @@ describe('reminder-jobs', () => {
           members: [
             expect.objectContaining({
               profileId: 'profile-1',
+              role: 'child',
             }),
           ],
         }),

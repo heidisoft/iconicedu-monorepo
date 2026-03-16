@@ -5,7 +5,7 @@ import type {
   ActivityFeedTabVM,
   InboxLeadingVM,
   InboxTabKeyVM,
-  MessageSessionFeedbackRow,
+  ClassSessionFeedbackRow,
 } from '@iconicedu/shared-types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -108,7 +108,7 @@ async function attachFeedbackResponses(
   const [sessionResponse, eventResponse] = await Promise.all([
     uniqueSessionIds.length
       ? supabase
-          .from('message_session_feedback')
+          .from('class_session_feedback')
           .select(
             'class_session_id, source_event_id, message_id, rating, comment, submitted_at',
           )
@@ -118,7 +118,7 @@ async function attachFeedbackResponses(
           .is('deleted_at', null)
           .returns<
             Pick<
-              MessageSessionFeedbackRow,
+              ClassSessionFeedbackRow,
               | 'class_session_id'
               | 'source_event_id'
               | 'message_id'
@@ -130,7 +130,7 @@ async function attachFeedbackResponses(
       : Promise.resolve({ data: [], error: null }),
     uniqueSourceEventIds.length
       ? supabase
-          .from('message_session_feedback')
+          .from('class_session_feedback')
           .select(
             'class_session_id, source_event_id, message_id, rating, comment, submitted_at',
           )
@@ -140,7 +140,7 @@ async function attachFeedbackResponses(
           .is('deleted_at', null)
           .returns<
             Pick<
-              MessageSessionFeedbackRow,
+              ClassSessionFeedbackRow,
               | 'class_session_id'
               | 'source_event_id'
               | 'message_id'
