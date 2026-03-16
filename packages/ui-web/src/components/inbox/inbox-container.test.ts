@@ -9,6 +9,7 @@ import {
   applySessionParentLocalHeadline,
   buildUnreadTabCounts,
   limitSectionsByItemCount,
+  resolveUnreadIdsForTab,
   resolveReadIdsForActivity,
 } from './inbox-container';
 import type { ActivityFeedSectionVM, ActivityFeedTabVM } from '@iconicedu/shared-types';
@@ -323,6 +324,113 @@ describe('buildUnreadTabCounts', () => {
   });
 });
 
+describe('resolveUnreadIdsForTab', () => {
+  it('returns unread ids for the active tab only', () => {
+    const sections: ActivityFeedSectionVM[] = [
+      {
+        label: 'Today',
+        items: [
+          {
+            kind: 'leaf',
+            ids: { id: 'leaf-classes', orgId: 'org-1' },
+            timestamps: {
+              occurredAt: '2026-03-04T12:00:00.000Z',
+              createdAt: '2026-03-04T12:00:00.000Z',
+            },
+            tabKey: 'classes',
+            audience: { scope: { kind: 'global' }, visibility: 'public' },
+            verb: 'class.created',
+            refs: { actor: {} as never },
+            content: { headline: { primary: 'Leaf item' } },
+            state: { isRead: false },
+          },
+          {
+            kind: 'leaf',
+            ids: { id: 'leaf-payment', orgId: 'org-1' },
+            timestamps: {
+              occurredAt: '2026-03-04T12:00:00.000Z',
+              createdAt: '2026-03-04T12:00:00.000Z',
+            },
+            tabKey: 'payment',
+            audience: { scope: { kind: 'global' }, visibility: 'public' },
+            verb: 'payment.reminder.sent',
+            refs: { actor: {} as never },
+            content: { headline: { primary: 'Payment item' } },
+            state: { isRead: false },
+          },
+          {
+            kind: 'group',
+            ids: { id: 'group-classes', orgId: 'org-1' },
+            timestamps: {
+              occurredAt: '2026-03-04T12:00:00.000Z',
+              createdAt: '2026-03-04T12:00:00.000Z',
+            },
+            tabKey: 'classes',
+            audience: { scope: { kind: 'global' }, visibility: 'public' },
+            verb: 'homework.assigned',
+            refs: { actor: {} as never },
+            grouping: { groupKey: 'group-classes', groupType: 'homework' },
+            content: { headline: { primary: 'Grouped item' } },
+            subActivityCount: 2,
+            subActivities: {
+              items: [
+                {
+                  kind: 'leaf',
+                  ids: { id: 'sub-read', orgId: 'org-1' },
+                  timestamps: {
+                    occurredAt: '2026-03-04T12:00:00.000Z',
+                    createdAt: '2026-03-04T12:00:00.000Z',
+                  },
+                  tabKey: 'classes',
+                  audience: { scope: { kind: 'global' }, visibility: 'public' },
+                  verb: 'homework.assigned',
+                  refs: { actor: {} as never },
+                  content: { headline: { primary: 'Read sub item' } },
+                  state: { isRead: true },
+                },
+                {
+                  kind: 'leaf',
+                  ids: { id: 'sub-unread', orgId: 'org-1' },
+                  timestamps: {
+                    occurredAt: '2026-03-04T12:00:00.000Z',
+                    createdAt: '2026-03-04T12:00:00.000Z',
+                  },
+                  tabKey: 'classes',
+                  audience: { scope: { kind: 'global' }, visibility: 'public' },
+                  verb: 'homework.assigned',
+                  refs: { actor: {} as never },
+                  content: { headline: { primary: 'Unread sub item' } },
+                  metadata: {
+                    readItemIds: ['backing-id-1', 'backing-id-2'],
+                  },
+                  state: { isRead: false },
+                },
+              ],
+              total: 2,
+            },
+            state: { isRead: false },
+          },
+        ],
+      },
+    ];
+
+    expect(resolveUnreadIdsForTab(sections, 'classes')).toEqual([
+      'leaf-classes',
+      'sub-unread',
+      'backing-id-1',
+      'backing-id-2',
+    ]);
+    expect(resolveUnreadIdsForTab(sections, 'payment')).toEqual(['leaf-payment']);
+    expect(resolveUnreadIdsForTab(sections, 'all')).toEqual([
+      'leaf-classes',
+      'leaf-payment',
+      'sub-unread',
+      'backing-id-1',
+      'backing-id-2',
+    ]);
+  });
+});
+
 describe('limitSectionsByItemCount', () => {
   it('limits items across sections while preserving section order', () => {
     const sections: ActivityFeedSectionVM[] = [
@@ -377,6 +485,7 @@ describe('InboxContainer rendering behavior', () => {
     expect(source).toContain(
       "if (displayActivity.verb === 'session.feedback_request.sent')",
     );
+    expect(source).toContain('Mark all as read');
   });
 
   it('does not render section-level timeline connectors in the inbox container', () => {

@@ -5,6 +5,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { NotificationsPageClient } from './notifications-page-client';
 
+const { inboxContainerMock } = vi.hoisted(() => ({
+  inboxContainerMock: vi.fn(
+    ({ feed, showMarkAllAsRead }: { feed: unknown; showMarkAllAsRead?: boolean }) => (
+      <div
+        data-testid="notifications-container"
+        data-mark-all={String(showMarkAllAsRead)}
+      >
+        {JSON.stringify(feed)}
+      </div>
+    ),
+  ),
+}));
+
 const refresh = vi.fn();
 const channelOn = vi.fn();
 const channelSubscribe = vi.fn();
@@ -29,9 +42,7 @@ vi.mock('@iconicedu/web/lib/supabase/client', () => ({
 
 vi.mock('@iconicedu/ui-web', () => ({
   DashboardHeader: ({ title }: { title: string }) => <div>{title}</div>,
-  InboxContainer: ({ feed }: { feed: unknown }) => (
-    <div data-testid="notifications-container">{JSON.stringify(feed)}</div>
-  ),
+  InboxContainer: inboxContainerMock,
 }));
 
 describe('NotificationsPageClient', () => {
@@ -127,5 +138,28 @@ describe('NotificationsPageClient', () => {
       vi.advanceTimersByTime(120);
     });
     expect(refresh).toHaveBeenCalledTimes(2);
+  });
+
+  it('enables mark all as read on the notifications inbox', () => {
+    const { getByTestId } = render(
+      <NotificationsPageClient
+        orgId="org-1"
+        orgSlug="iconic-academy"
+        profileId="profile-1"
+        feed={{
+          activeTab: 'all',
+          tabs: [],
+          sections: [],
+          unreadCount: 0,
+          nextCursor: null,
+        }}
+      />,
+    );
+
+    expect(inboxContainerMock).toHaveBeenCalled();
+    expect(getByTestId('notifications-container')).toHaveAttribute(
+      'data-mark-all',
+      'true',
+    );
   });
 });

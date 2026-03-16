@@ -98,7 +98,7 @@ export function NotificationsPageClient({
     <div className="flex min-h-0 h-screen flex-1 flex-col">
       <DashboardHeader title="Notifications" />
       <div className="p-4 pt-0">
-        <InboxContainer feed={feed} timezone={timezone} />
+        <InboxContainer feed={feed} timezone={timezone} showMarkAllAsRead />
       </div>
     </div>
   );

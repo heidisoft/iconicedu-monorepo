@@ -4,6 +4,7 @@ import type React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { BellOff } from 'lucide-react';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
+import { Button } from '@iconicedu/ui-web/ui/button';
 import { ScrollArea } from '@iconicedu/ui-web/ui/scroll-area';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@iconicedu/ui-web/ui/tabs';
 import {
@@ -209,6 +210,36 @@ export function buildUnreadTabCounts(
   });
 
   return counts;
+}
+
+export function resolveUnreadIdsForTab(
+  sections: ActivityFeedSectionVM[],
+  activeTab: InboxTabKeyVM,
+): string[] {
+  const unreadIds = new Set<string>();
+
+  sections.forEach((section) => {
+    section.items.forEach((item) => {
+      if (activeTab !== 'all' && item.tabKey !== activeTab) {
+        return;
+      }
+
+      if (item.kind === 'group') {
+        item.subActivities?.items.forEach((sub: ActivityFeedLeafItemVM) => {
+          if (!sub.state?.isRead) {
+            getItemReadIds(sub).forEach((id) => unreadIds.add(id));
+          }
+        });
+        return;
+      }
+
+      if (!item.state?.isRead) {
+        getItemReadIds(item).forEach((id) => unreadIds.add(id));
+      }
+    });
+  });
+
+  return Array.from(unreadIds);
 }
 
 export function applySessionParentLocalHeadline(
@@ -520,10 +551,12 @@ export function InboxContainer({
   feed,
   markReadEndpoint = '/api/activity-feed/read',
   timezone,
+  showMarkAllAsRead = false,
 }: {
   feed: ActivityFeedVM;
   markReadEndpoint?: string;
   timezone?: string | null;
+  showMarkAllAsRead?: boolean;
 }) {
   const displayTimezone = resolveScheduleDisplayTimeZone(timezone);
   const [sections, setSections] = useState(feed.sections);
@@ -574,6 +607,8 @@ export function InboxContainer({
   );
 
   const tabCounts = buildUnreadTabCounts(feed.tabs, sections);
+  const unreadIdsForActiveTab = resolveUnreadIdsForTab(sections, activeTab);
+  const isMarkAllDisabled = unreadIdsForActiveTab.length === 0;
 
   const filteredSections = sections
     .map((section) => ({
@@ -632,6 +667,18 @@ export function InboxContainer({
     applyReadState(resolvedIds);
     persistReadState(resolvedIds);
   };
+
+  const markAllAsRead = useCallback(() => {
+    if (unreadIdsForActiveTab.length === 0) {
+      return;
+    }
+
+    unreadIdsForActiveTab.forEach((resolvedId) => {
+      pendingAutoReadIdsRef.current.delete(resolvedId);
+    });
+    applyReadState(unreadIdsForActiveTab);
+    persistReadState(unreadIdsForActiveTab);
+  }, [applyReadState, persistReadState, unreadIdsForActiveTab]);
 
   const autoMarkAsRead = useCallback(
     (id: string) => {
@@ -716,19 +763,31 @@ export function InboxContainer({
       onValueChange={handleTabChange}
       className="flex size-full flex-col"
     >
-      <div className="px-4 py-2">
+      <div className="flex items-center justify-between gap-3 px-4 py-2">
         <TabsList>
           {feed.tabs.map((tab) => (
             <TabsTrigger key={tab.key} value={tab.key} className="gap-2">
               <span>{tab.label}</span>
               {tabCounts[tab.key] > 0 && (
-                <Badge className="h-4 px-1.5 text-[10px] bg-rose-500 text-white">
+                <Badge className="h-4 bg-rose-500 px-1.5 text-[10px] text-white">
                   {tabCounts[tab.key]}
                 </Badge>
               )}
             </TabsTrigger>
           ))}
         </TabsList>
+        {showMarkAllAsRead ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="shrink-0"
+            disabled={isMarkAllDisabled}
+            onClick={markAllAsRead}
+          >
+            Mark all as read
+          </Button>
+        ) : null}
       </div>
       <TabsContent value={activeTab} className="mt-0">
         <ScrollArea className="h-[calc(100vh-180px)]">
