@@ -76,7 +76,7 @@ describe('ActivityItemBase', () => {
 
     expect(
       container.querySelector(
-        '.absolute.left-1\\/2.top-7.hidden.h-\\[calc\\(100\\%-1rem\\)\\].w-px',
+        '.absolute.left-1\\/2.top-7.hidden.h-\\[calc\\(100\\%\\+1rem\\)\\].w-px',
       ),
     ).not.toBeNull();
   });

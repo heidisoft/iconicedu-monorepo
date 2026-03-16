@@ -253,8 +253,10 @@ async function projectEvent(supabase: SupabaseServiceClient, event: ActivityEven
     event.org_id,
     recipientProfileIds,
   );
-  if (recipientProfilesResponse.error) {
-    throw new Error(recipientProfilesResponse.error.message);
+  const recipientProfilesError =
+    'error' in recipientProfilesResponse ? recipientProfilesResponse.error : null;
+  if (recipientProfilesError) {
+    throw new Error(recipientProfilesError.message);
   }
 
   const recipientTimezoneByProfileId = new Map(
