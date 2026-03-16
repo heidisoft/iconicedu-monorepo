@@ -28,6 +28,14 @@ import { Tabs, TabsList, TabsTrigger } from '@iconicedu/ui-web/ui/tabs';
 import { ScrollArea } from '@iconicedu/ui-web/ui/scroll-area';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@iconicedu/ui-web/ui/empty';
+import {
   createChannelFileItems,
   formatChannelFileUploadedDate,
   getChannelFileVisualKind,
@@ -1609,7 +1617,18 @@ export function MessagesContainer({
               <p className="text-sm text-muted-foreground">{filesLoadError}</p>
             ) : null}
             {!isLoadingFiles && !filesLoadError && filesForDisplay.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No files yet.</p>
+              <Empty className="min-h-[280px] border-none p-0">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <FileText className="size-5" />
+                  </EmptyMedia>
+                  <EmptyTitle className="text-sm">No shared files</EmptyTitle>
+                  <EmptyDescription>
+                    Files shared in this channel will appear here.
+                  </EmptyDescription>
+                </EmptyHeader>
+                <EmptyContent />
+              </Empty>
             ) : null}
             {!isLoadingFiles && !filesLoadError
               ? filesForDisplay.map((item) =>

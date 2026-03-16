@@ -4,6 +4,13 @@ import { memo, useMemo } from 'react';
 import { FileText } from 'lucide-react';
 import type { ChannelFileItemVM, ChannelMediaItemVM } from '@iconicedu/shared-types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@iconicedu/ui-web/ui/tabs';
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@iconicedu/ui-web/ui/empty';
 import { buildFileAccessHref } from '@iconicedu/ui-web/components/messages/file-download.utils';
 
 type MediaFilesPanelProps = {
@@ -44,7 +51,17 @@ export const MediaFilesPanel = memo(function MediaFilesPanel({
         </TabsList>
         <TabsContent value="media" className="min-w-0">
           {scopedMedia.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No media yet.</p>
+            <Empty className="min-h-[180px] border-none p-0">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <FileText className="size-5" />
+                </EmptyMedia>
+                <EmptyTitle className="text-sm">No media yet</EmptyTitle>
+                <EmptyDescription>
+                  Images and videos shared here will appear here.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           ) : (
             <div className="grid grid-cols-2 gap-3">
               {scopedMedia.slice(0, 6).map((item) => (
@@ -68,7 +85,15 @@ export const MediaFilesPanel = memo(function MediaFilesPanel({
         </TabsContent>
         <TabsContent value="files" className="min-w-0">
           {scopedFiles.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No files yet.</p>
+            <Empty className="min-h-[180px] border-none p-0">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <FileText className="size-5" />
+                </EmptyMedia>
+                <EmptyTitle className="text-sm">No shared files</EmptyTitle>
+                <EmptyDescription>Files shared here will appear here.</EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           ) : (
             <div className="space-y-2">
               {scopedFiles.slice(0, 6).map((item) => (

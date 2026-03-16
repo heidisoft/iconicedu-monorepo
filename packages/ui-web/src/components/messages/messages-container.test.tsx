@@ -352,4 +352,40 @@ describe('MessagesContainer', () => {
       expect(screen.getByText('Worksheet.pdf')).toBeInTheDocument();
     });
   });
+
+  it('renders a shadcn-style empty message when the files tab has no files', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes('/api/messages/channel-files')) {
+          return {
+            ok: true,
+            json: async () => ({
+              success: true,
+              files: [],
+            }),
+          } as Response;
+        }
+        return {
+          ok: true,
+          json: async () => ({ success: true }),
+        } as Response;
+      }),
+    );
+
+    render(<MessagesContainer channel={channel} currentUserId="profile-2" />);
+
+    const filesTab = screen.getByRole('tab', { name: /files/i });
+    fireEvent.mouseDown(filesTab);
+    fireEvent.click(filesTab);
+
+    await waitFor(() => {
+      expect(screen.getByText('No shared files')).toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByText('Files shared in this channel will appear here.'),
+    ).toBeInTheDocument();
+  });
 });

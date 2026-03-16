@@ -1036,7 +1036,7 @@ export function MessageInput({
         <div
           ref={wrapperRef}
           className={cn(
-            'relative rounded-xl border border-input bg-background focus-within:ring-1 focus-within:ring-ring',
+            'relative rounded-xl border border-border/80 bg-muted/30 transition-colors focus-within:border-ring/70 focus-within:bg-background focus-within:ring-1 focus-within:ring-ring',
             isDragOver && 'border-primary bg-primary/5 ring-1 ring-primary/30',
           )}
           onDragEnter={(event) => {
@@ -1369,7 +1369,7 @@ export function MessageInput({
             onKeyDown={handleKeyDown}
             onFocus={onFocus}
             placeholder={placeholder}
-            className="min-h-[80px] max-h-[120px] resize-none border-0 bg-transparent px-3 py-2 text-base sm:text-sm focus-visible:ring-0 focus-visible:ring-offset-0 overflow-x-hidden placeholder:whitespace-nowrap placeholder:text-ellipsis"
+            className="min-h-[80px] max-h-[120px] resize-none border-0 bg-transparent px-3 py-2 text-base sm:text-sm focus-visible:ring-0 focus-visible:ring-offset-0 overflow-x-hidden placeholder:whitespace-nowrap placeholder:text-ellipsis placeholder:text-muted-foreground/90"
           />
           {isMentionListOpen ? (
             <div
