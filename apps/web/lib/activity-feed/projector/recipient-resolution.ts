@@ -22,21 +22,32 @@ function unique(values: string[]) {
   return Array.from(new Set(values.filter(Boolean)));
 }
 
+type UsersOnlyAudienceRule = {
+  kind: 'users_only';
+  userIds: unknown[];
+};
+
+function isUsersOnlyAudienceRule(
+  rule: Record<string, unknown>,
+): rule is UsersOnlyAudienceRule {
+  return rule.kind === 'users_only' && Array.isArray(rule.userIds);
+}
+
+function toStringUserIds(values: unknown[]): string[] {
+  return values.filter((value): value is string => typeof value === 'string');
+}
+
 function applyUsersOnlyRule(
   recipients: string[],
   audienceRules: Record<string, unknown>[],
 ) {
-  const usersOnlyRule = audienceRules.find(
-    (rule) => rule.kind === 'users_only' && Array.isArray(rule.userIds),
-  );
+  const usersOnlyRule = audienceRules.find(isUsersOnlyAudienceRule);
 
-  if (!usersOnlyRule || !Array.isArray(usersOnlyRule.userIds)) {
+  if (!usersOnlyRule) {
     return unique(recipients);
   }
 
-  const allowedIds = new Set(
-    usersOnlyRule.userIds.filter((value): value is string => typeof value === 'string'),
-  );
+  const allowedIds = new Set(toStringUserIds(usersOnlyRule.userIds));
 
   if (!allowedIds.size) {
     return [];
@@ -210,14 +221,8 @@ export async function resolveRecipientsForActivityEvent(
       scope.channelId,
     );
   } else {
-    const usersOnlyRule = audienceRules.find(
-      (rule) => rule.kind === 'users_only' && Array.isArray(rule.userIds),
-    );
-    scopedRecipients = usersOnlyRule
-      ? usersOnlyRule.userIds.filter(
-          (value): value is string => typeof value === 'string',
-        )
-      : [];
+    const usersOnlyRule = audienceRules.find(isUsersOnlyAudienceRule);
+    scopedRecipients = usersOnlyRule ? toStringUserIds(usersOnlyRule.userIds) : [];
   }
 
   const usersOnlyScoped = applyUsersOnlyRule(scopedRecipients, audienceRules);

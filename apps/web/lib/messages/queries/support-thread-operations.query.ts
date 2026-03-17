@@ -108,7 +108,10 @@ export async function listSupportThreadReplyCoverage(
           .in('id', parentMessageIds)
           .is('deleted_at', null)
           .returns<Array<{ id: string; sender_profile_id: string }>>()
-      : Promise.resolve({ data: [] as Array<{ id: string; sender_profile_id: string }> }),
+      : Promise.resolve({
+          data: [] as Array<{ id: string; sender_profile_id: string }>,
+          error: null,
+        }),
   ]);
 
   if (threadMessagesResponse.error) {
@@ -141,9 +144,9 @@ export async function listSupportThreadReplyCoverage(
         .in('account_id', Array.from(roleAccountIds))
         .is('deleted_at', null)
         .returns<Array<{ id: string; account_id: string }>>()
-    : { data: [] as Array<{ id: string; account_id: string }> };
+    : { data: [] as Array<{ id: string; account_id: string }>, error: null };
 
-  if ('error' in allProfilesResponse && allProfilesResponse.error) {
+  if (allProfilesResponse.error) {
     throw new Error(allProfilesResponse.error.message);
   }
 
