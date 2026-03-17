@@ -7,7 +7,10 @@ import {
   getUserRoles,
   upsertUserRole,
 } from '@iconicedu/web/lib/profile/queries/roles.query';
-import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import {
+  getProfileByAccountId,
+  insertProfileForAccount,
+} from '@iconicedu/web/lib/profile/queries/profiles.query';
 import { seedSignupDefaultNotificationPreferences } from '@iconicedu/web/lib/profile/queries/notification-defaults-seed.query';
 import { updateAccountRoleState } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { buildAuthOnboardingState } from '@iconicedu/web/lib/onboarding/auth-state';
@@ -15,6 +18,7 @@ import { getOrgBySlug } from '@iconicedu/web/lib/org/queries/org.query';
 import { resolveOrgDashboardPath } from '@iconicedu/web/lib/org/resolve-dashboard-path';
 import { ORG_SLUG_REGEX } from '@iconicedu/web/lib/org/slug';
 import { seedDefaultOrgSubjectCatalog } from '@iconicedu/web/lib/subjects/queries/org-subject-catalog.query';
+import { ensureSupportChannel } from '@iconicedu/web/lib/channels/actions/ensure-support-channel';
 
 type BootstrapRequestBody = {
   name?: unknown;
@@ -119,28 +123,72 @@ export async function POST(request: Request) {
     );
   }
 
-  if (profileResponse.data?.id) {
-    const seedResponse = await seedSignupDefaultNotificationPreferences(
-      serviceSupabase,
-      org.id,
-      profileResponse.data.id,
-    );
-    if (seedResponse.error) {
+  let creatorProfile = profileResponse.data;
+  if (!creatorProfile) {
+    const insertProfileResponse = await insertProfileForAccount(serviceSupabase, {
+      orgId: org.id,
+      accountId: account.id,
+      kind: 'guardian',
+      displayName: null,
+      avatarSource: 'seed',
+      avatarUrl: null,
+      avatarSeed: account.id,
+      timezone: 'UTC',
+      locale: 'en-US',
+      status: 'active',
+      uiThemeKey: 'teal',
+    });
+
+    if (insertProfileResponse.error || !insertProfileResponse.data) {
       return NextResponse.json(
-        { success: false, message: seedResponse.error.message },
+        {
+          success: false,
+          message: insertProfileResponse.error?.message ?? 'Unable to create profile.',
+        },
         { status: 500 },
       );
     }
+
+    creatorProfile = insertProfileResponse.data;
+  }
+
+  const seedResponse = await seedSignupDefaultNotificationPreferences(
+    serviceSupabase,
+    org.id,
+    creatorProfile.id,
+  );
+  if (seedResponse.error) {
+    return NextResponse.json(
+      { success: false, message: seedResponse.error.message },
+      { status: 500 },
+    );
   }
 
   const subjectSeedResponse = await seedDefaultOrgSubjectCatalog({
     supabase: serviceSupabase,
     orgId: org.id,
-    actorId: profileResponse.data?.id ?? user.id,
+    actorId: creatorProfile.id,
   });
   if (subjectSeedResponse.error) {
     return NextResponse.json(
       { success: false, message: subjectSeedResponse.error.message },
+      { status: 500 },
+    );
+  }
+
+  try {
+    await ensureSupportChannel({
+      supabase: serviceSupabase,
+      orgId: org.id,
+      creatorProfileId: creatorProfile.id,
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          error instanceof Error ? error.message : 'Unable to create support channel.',
+      },
       { status: 500 },
     );
   }

@@ -22,6 +22,29 @@ function unique(values: string[]) {
   return Array.from(new Set(values.filter(Boolean)));
 }
 
+function applyUsersOnlyRule(
+  recipients: string[],
+  audienceRules: Record<string, unknown>[],
+) {
+  const usersOnlyRule = audienceRules.find(
+    (rule) => rule.kind === 'users_only' && Array.isArray(rule.userIds),
+  );
+
+  if (!usersOnlyRule || !Array.isArray(usersOnlyRule.userIds)) {
+    return unique(recipients);
+  }
+
+  const allowedIds = new Set(
+    usersOnlyRule.userIds.filter((value): value is string => typeof value === 'string'),
+  );
+
+  if (!allowedIds.size) {
+    return [];
+  }
+
+  return unique(recipients.filter((recipientId) => allowedIds.has(recipientId)));
+}
+
 function applyRecipientExclusions(
   recipients: string[],
   event: ActivityEventRow,
@@ -167,47 +190,36 @@ export async function resolveRecipientsForActivityEvent(
       Boolean(rule) && typeof rule === 'object' && !Array.isArray(rule),
   );
   const scopeKind = typeof scope.kind === 'string' ? scope.kind : 'global';
+  let scopedRecipients: string[] = [];
 
   if (scopeKind === 'user' && typeof scope.userId === 'string') {
-    return applyRecipientExclusions([scope.userId], event, audienceRules);
-  }
-
-  if (scopeKind === 'learning_space' && typeof scope.learningSpaceId === 'string') {
-    const resolved = await resolveLearningSpaceRecipients(
+    scopedRecipients = [scope.userId];
+  } else if (
+    scopeKind === 'learning_space' &&
+    typeof scope.learningSpaceId === 'string'
+  ) {
+    scopedRecipients = await resolveLearningSpaceRecipients(
       supabase,
       event.org_id,
       scope.learningSpaceId,
     );
-    const recipients = applyRecipientExclusions(resolved, event, audienceRules);
-    return recipients;
-  }
-
-  if (scopeKind === 'channel' && typeof scope.channelId === 'string') {
-    const resolved = await resolveChannelRecipients(
+  } else if (scopeKind === 'channel' && typeof scope.channelId === 'string') {
+    scopedRecipients = await resolveChannelRecipients(
       supabase,
       event.org_id,
       scope.channelId,
     );
-    const recipients = applyRecipientExclusions(resolved, event, audienceRules);
-    return recipients;
-  }
-
-  const usersOnlyRule = audienceRules.find(
-    (rule) =>
-      rule &&
-      typeof rule === 'object' &&
-      !Array.isArray(rule) &&
-      (rule as Record<string, unknown>).kind === 'users_only',
-  ) as Record<string, unknown> | undefined;
-
-  if (usersOnlyRule && Array.isArray(usersOnlyRule.userIds)) {
-    const recipients = applyRecipientExclusions(
-      usersOnlyRule.userIds.filter((value): value is string => typeof value === 'string'),
-      event,
-      audienceRules,
+  } else {
+    const usersOnlyRule = audienceRules.find(
+      (rule) => rule.kind === 'users_only' && Array.isArray(rule.userIds),
     );
-    return recipients;
+    scopedRecipients = usersOnlyRule
+      ? usersOnlyRule.userIds.filter(
+          (value): value is string => typeof value === 'string',
+        )
+      : [];
   }
 
-  return applyRecipientExclusions([], event, audienceRules);
+  const usersOnlyScoped = applyUsersOnlyRule(scopedRecipients, audienceRules);
+  return applyRecipientExclusions(usersOnlyScoped, event, audienceRules);
 }

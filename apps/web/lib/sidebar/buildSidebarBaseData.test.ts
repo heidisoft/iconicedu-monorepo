@@ -102,6 +102,7 @@ describe('buildSidebarBaseData', () => {
         }),
       ]),
     );
+    expect(result.navigation.navSecondary[0]?.title).toBe('24/7 Live Support');
     expect(result.navigation.navSecondary[0]?.url).toBe('/iconic-academy/c/support-1');
   });
 });

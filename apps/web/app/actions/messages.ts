@@ -33,6 +33,16 @@ import {
   filterDmRecipientsByLastReadRecency,
   isDmActivitySuppressionDebugEnabled,
 } from '@iconicedu/web/lib/activity-feed/dm-activity-suppression';
+import {
+  buildSupportVisibilityFields,
+  isStaffActorInOrg,
+  listSupportPrivilegedProfileIds,
+  resolveSupportQuestionOwnerProfileId,
+} from '@iconicedu/web/lib/messages/support-visibility';
+import {
+  markSupportStaffVolunteerAssignment,
+  seedRequiredSupportThreadAssignments,
+} from '@iconicedu/web/lib/messages/support-thread-staffing';
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
 type SupabaseServiceClient = ReturnType<typeof createSupabaseServiceClient>;
@@ -54,6 +64,8 @@ type ActivityChannelContext = {
   learningSpaceId?: string | null;
   learningSpaceTitle?: string | null;
   channelRouteKind: 'space' | 'dm' | 'channel';
+  channelPurpose?: string | null;
+  channelVisibility?: string | null;
 };
 
 type HomeworkMessageIntent = {
@@ -64,6 +76,90 @@ type HomeworkMessageIntent = {
   dueAt: string;
   subject: string;
 };
+
+type VisibilityAudienceResolution = {
+  suppressActivity: boolean;
+  audienceRules?: AudienceRuleVM[];
+  allowedProfileIds: Set<string> | null;
+};
+
+function resolveVisibilityAudienceFromMessageRow(input: {
+  visibilityType?: string | null;
+  visibilityUserId?: string | null;
+  visibilityUserIds?: string[] | null;
+}): VisibilityAudienceResolution {
+  const visibilityType = input.visibilityType ?? 'all';
+  if (visibilityType === 'sender-only') {
+    return {
+      suppressActivity: true,
+      allowedProfileIds: new Set(),
+    };
+  }
+
+  if (visibilityType === 'recipient-only') {
+    const userIds = input.visibilityUserId ? [input.visibilityUserId] : [];
+    return {
+      suppressActivity: userIds.length === 0,
+      audienceRules: userIds.length ? [{ kind: 'users_only', userIds }] : undefined,
+      allowedProfileIds: new Set(userIds),
+    };
+  }
+
+  if (visibilityType === 'specific-users') {
+    const userIds = Array.from(new Set(input.visibilityUserIds ?? []));
+    return {
+      suppressActivity: userIds.length === 0,
+      audienceRules: userIds.length ? [{ kind: 'users_only', userIds }] : undefined,
+      allowedProfileIds: new Set(userIds),
+    };
+  }
+
+  return {
+    suppressActivity: false,
+    allowedProfileIds: null,
+  };
+}
+
+function isRlsPolicyViolation(error: unknown): boolean {
+  const code =
+    (error as { code?: string } | null | undefined)?.code?.toString().trim() ?? '';
+  const message =
+    (error as { message?: string } | null | undefined)?.message?.toString() ?? '';
+  return code === '42501' && message.toLowerCase().includes('row-level security policy');
+}
+
+async function insertMessageRowWithRlsFallback(input: {
+  supabase: SupabaseServerClient;
+  serviceSupabase: SupabaseServiceClient;
+  values: Record<string, unknown>;
+  debugContext: Record<string, unknown>;
+}) {
+  const regularInsert = await input.supabase
+    .from('messages')
+    .insert(input.values)
+    .select('*')
+    .single();
+
+  if (!regularInsert.error && regularInsert.data) {
+    return regularInsert;
+  }
+
+  if (!isRlsPolicyViolation(regularInsert.error)) {
+    return regularInsert;
+  }
+
+  const serviceInsert = await input.serviceSupabase
+    .from('messages')
+    .insert(input.values)
+    .select('*')
+    .single();
+
+  if (!serviceInsert.error && serviceInsert.data) {
+    return serviceInsert;
+  }
+
+  return serviceInsert;
+}
 
 function sanitizeMentions(
   content: string,
@@ -153,9 +249,14 @@ async function createMentionNotifications(input: {
   content: string;
   mentions: MessageMentionVM[];
   now: string;
+  visibilityAllowedProfileIds?: Set<string> | null;
 }) {
   const recipientIds = Array.from(
     new Set(input.mentions.map((mention) => mention.profileId)),
+  ).filter((profileId) =>
+    input.visibilityAllowedProfileIds
+      ? input.visibilityAllowedProfileIds.has(profileId)
+      : true,
   );
   if (!recipientIds.length) {
     return;
@@ -270,6 +371,8 @@ async function createChannelMessageActivity(input: {
   threadReply?: boolean;
   activityContext: ActivityChannelContext;
   now: string;
+  visibilityAudienceRules?: AudienceRuleVM[];
+  visibilityAllowedProfileIds?: Set<string> | null;
 }) {
   const isDmRoute = input.activityContext.channelRouteKind === 'dm';
   const eventType = isDmRoute ? 'dm.posted' : 'message.posted';
@@ -285,7 +388,15 @@ async function createChannelMessageActivity(input: {
       })
     : null;
 
-  if (isDmRoute && (!dmRecipients || dmRecipients.length === 0)) {
+  const scopedDmRecipients = isDmRoute
+    ? (dmRecipients ?? []).filter((profileId) =>
+        input.visibilityAllowedProfileIds
+          ? input.visibilityAllowedProfileIds.has(profileId)
+          : true,
+      )
+    : null;
+
+  if (isDmRoute && (!scopedDmRecipients || scopedDmRecipients.length === 0)) {
     return;
   }
 
@@ -300,9 +411,9 @@ async function createChannelMessageActivity(input: {
     objectRef: { kind: 'message', id: input.messageId },
     targetRef: input.activityContext.targetRef,
     audienceRules:
-      isDmRoute && dmRecipients
-        ? [{ kind: 'users_only', userIds: dmRecipients }]
-        : undefined,
+      isDmRoute && scopedDmRecipients
+        ? [{ kind: 'users_only', userIds: scopedDmRecipients }]
+        : input.visibilityAudienceRules,
     payload: {
       channelId: input.channelId,
       messageId: input.messageId,
@@ -333,6 +444,7 @@ async function createThreadReplyNotifications(input: {
   activityContext: ActivityChannelContext;
   excludeProfileIds?: string[];
   now: string;
+  visibilityAllowedProfileIds?: Set<string> | null;
 }) {
   const participantsResponse = await input.supabase
     .from('thread_participants')
@@ -353,6 +465,10 @@ async function createThreadReplyNotifications(input: {
         .map((row) => row.profile_id)
         .filter((profileId) => profileId && !exclude.has(profileId)),
     ),
+  ).filter((profileId) =>
+    input.visibilityAllowedProfileIds
+      ? input.visibilityAllowedProfileIds.has(profileId)
+      : true,
   );
 
   for (const recipientId of recipientIds) {
@@ -400,6 +516,8 @@ async function createFileUploadActivity(input: {
   fileCount?: number;
   activityContext: ActivityChannelContext;
   now: string;
+  visibilityAudienceRules?: AudienceRuleVM[];
+  visibilityAllowedProfileIds?: Set<string> | null;
 }) {
   const isDmRoute = input.activityContext.channelRouteKind === 'dm';
   const eventType = isDmRoute ? 'dm.posted' : 'file.uploaded';
@@ -422,7 +540,15 @@ async function createFileUploadActivity(input: {
       })
     : null;
 
-  if (isDmRoute && (!dmRecipients || dmRecipients.length === 0)) {
+  const scopedDmRecipients = isDmRoute
+    ? (dmRecipients ?? []).filter((profileId) =>
+        input.visibilityAllowedProfileIds
+          ? input.visibilityAllowedProfileIds.has(profileId)
+          : true,
+      )
+    : null;
+
+  if (isDmRoute && (!scopedDmRecipients || scopedDmRecipients.length === 0)) {
     return;
   }
 
@@ -437,9 +563,9 @@ async function createFileUploadActivity(input: {
     objectRef: { kind: 'message', id: input.messageId },
     targetRef: input.activityContext.targetRef,
     audienceRules:
-      isDmRoute && dmRecipients
-        ? [{ kind: 'users_only', userIds: dmRecipients }]
-        : undefined,
+      isDmRoute && scopedDmRecipients
+        ? [{ kind: 'users_only', userIds: scopedDmRecipients }]
+        : input.visibilityAudienceRules,
     payload: {
       channelId: input.channelId,
       messageId: input.messageId,
@@ -489,6 +615,8 @@ async function resolveActivityChannelContext(input: {
                 id: string;
                 kind: string;
                 topic?: string | null;
+                purpose?: string | null;
+                visibility?: string | null;
                 primary_entity_kind?: string | null;
                 primary_entity_id?: string | null;
               } | null;
@@ -505,7 +633,9 @@ async function resolveActivityChannelContext(input: {
   }
 
   const channelResponse = await channelsTable
-    .select('id, kind, topic, primary_entity_kind, primary_entity_id')
+    .select(
+      'id, kind, topic, purpose, visibility, primary_entity_kind, primary_entity_id',
+    )
     .eq('org_id', input.orgId)
     .eq('id', input.channelId)
     .is('deleted_at', null)
@@ -528,6 +658,8 @@ async function resolveActivityChannelContext(input: {
       learningSpaceId: channel.primary_entity_id,
       learningSpaceTitle: channel.topic ?? null,
       channelRouteKind: 'space',
+      channelPurpose: channel.purpose ?? null,
+      channelVisibility: channel.visibility ?? null,
     };
   }
 
@@ -537,7 +669,42 @@ async function resolveActivityChannelContext(input: {
     scope: { kind: 'channel', channelId: input.channelId },
     channelTopic: channel.topic ?? null,
     channelRouteKind: routeKind,
+    channelPurpose: channel.purpose ?? null,
+    channelVisibility: channel.visibility ?? null,
   };
+}
+
+async function ensureChannelMembershipForMessageWrite(input: {
+  serviceSupabase: SupabaseServiceClient;
+  shouldEnsureMembership: boolean;
+  orgId: string;
+  channelId: string;
+  profileId: string;
+  now: string;
+}) {
+  if (!input.shouldEnsureMembership) {
+    return;
+  }
+
+  const upsertResponse = await input.serviceSupabase.from('channel_members').upsert(
+    {
+      org_id: input.orgId,
+      channel_id: input.channelId,
+      profile_id: input.profileId,
+      joined_at: input.now,
+      created_at: input.now,
+      created_by: input.profileId,
+      updated_at: input.now,
+      updated_by: input.profileId,
+      deleted_at: null,
+      deleted_by: null,
+    },
+    { onConflict: 'org_id,channel_id,profile_id', ignoreDuplicates: false },
+  );
+
+  if (upsertResponse.error) {
+    throw new Error(upsertResponse.error.message);
+  }
 }
 
 async function resolveThreadContext(input: {
@@ -1083,7 +1250,6 @@ export async function sendTextMessageAction(
   if (input.senderProfileId !== profileResponse.data.id) {
     throw new Error('Invalid sender');
   }
-
   let sanitizedMentions: MessageMentionVM[] = [];
   if (input.mentions?.length) {
     const channelMembersResponse = await supabase
@@ -1128,32 +1294,82 @@ export async function sendTextMessageAction(
     threadParentId: input.threadParentId,
     now,
   });
-
-  const messageInsert = await supabase
-    .from('messages')
-    .insert({
-      org_id: accountResponse.data.org_id,
-      channel_id: input.channelId,
-      sender_profile_id: profileResponse.data.id,
-      type: homeworkIntent
-        ? 'lesson-assignment'
-        : previewMetadata
-          ? 'link-preview'
-          : 'text',
-      visibility_type: 'all',
-      thread_id: threadId,
-      thread_parent_id: input.threadParentId ?? null,
-      created_at: now,
-      created_by: profileResponse.data.id,
-      updated_at: now,
-      updated_by: profileResponse.data.id,
-    })
-    .select('*')
-    .single();
+  const isSupportChannel = activityContext.channelPurpose === 'support';
+  const isSupportThreadReply = Boolean(input.threadParentId);
+  const staffSender = await isStaffActorInOrg(supabase, {
+    orgId: accountOrgId,
+    accountId: accountResponse.data.id,
+    profileKind: profileResponse.data.kind,
+  });
+  const supportQuestionOwnerProfileId =
+    isSupportChannel && isSupportThreadReply
+      ? await resolveSupportQuestionOwnerProfileId({
+          supabase,
+          orgId: accountOrgId,
+          channelId: input.channelId,
+          threadParentId: input.threadParentId ?? null,
+          threadId: threadId ?? input.threadId ?? null,
+          parentSenderProfileId: null,
+        })
+      : null;
+  const supportPrivilegedProfileIds = isSupportChannel
+    ? await listSupportPrivilegedProfileIds(serviceSupabase, accountOrgId)
+    : [];
+  const supportVisibility = buildSupportVisibilityFields({
+    isSupportChannel,
+    isStaffSender: staffSender,
+    isThreadReply: isSupportThreadReply,
+    currentProfileId,
+    questionOwnerProfileId: supportQuestionOwnerProfileId,
+    privilegedProfileIds: supportPrivilegedProfileIds,
+  });
+  await ensureChannelMembershipForMessageWrite({
+    serviceSupabase,
+    shouldEnsureMembership:
+      isSupportChannel || activityContext.channelVisibility === 'public',
+    orgId: accountOrgId,
+    channelId: input.channelId,
+    profileId: currentProfileId,
+    now,
+  });
+  const messageInsertValues = {
+    org_id: accountResponse.data.org_id,
+    channel_id: input.channelId,
+    sender_profile_id: profileResponse.data.id,
+    type: homeworkIntent
+      ? 'lesson-assignment'
+      : previewMetadata
+        ? 'link-preview'
+        : 'text',
+    visibility_type: supportVisibility.visibility_type,
+    visibility_user_ids: supportVisibility.visibility_user_ids ?? null,
+    thread_id: threadId,
+    thread_parent_id: input.threadParentId ?? null,
+    created_at: now,
+    created_by: profileResponse.data.id,
+    updated_at: now,
+    updated_by: profileResponse.data.id,
+  };
+  const messageInsert = await insertMessageRowWithRlsFallback({
+    supabase,
+    serviceSupabase,
+    values: messageInsertValues,
+    debugContext: {
+      orgId: accountResponse.data.org_id,
+      channelId: input.channelId,
+      senderProfileId: profileResponse.data.id,
+      action: 'sendTextMessageAction',
+    },
+  });
 
   if (messageInsert.error || !messageInsert.data) {
     throw new Error(messageInsert.error?.message ?? 'Unable to create message.');
   }
+  const visibilityAudience = resolveVisibilityAudienceFromMessageRow({
+    visibilityType: messageInsert.data.visibility_type,
+    visibilityUserId: messageInsert.data.visibility_user_id,
+    visibilityUserIds: messageInsert.data.visibility_user_ids,
+  });
 
   const payloadInsert = await supabase
     .from(
@@ -1201,6 +1417,27 @@ export async function sendTextMessageAction(
     throw new Error(payloadInsert.error.message);
   }
 
+  if (isSupportChannel && threadCreated && threadId) {
+    await seedRequiredSupportThreadAssignments({
+      supabase: serviceSupabase,
+      orgId: accountOrgId,
+      threadId,
+      assignedByProfileId: currentProfileId,
+      now,
+    });
+  }
+
+  if (isSupportChannel && isSupportThreadReply && staffSender && threadId) {
+    await markSupportStaffVolunteerAssignment({
+      supabase: serviceSupabase,
+      orgId: accountOrgId,
+      threadId,
+      staffProfileId: currentProfileId,
+      assignedByProfileId: currentProfileId,
+      now,
+    });
+  }
+
   await bumpThreadReplyCount({
     supabase,
     threadId,
@@ -1225,6 +1462,7 @@ export async function sendTextMessageAction(
       content: homeworkIntent?.cleanedContent ?? input.content,
       mentions: sanitizedMentions,
       now,
+      visibilityAllowedProfileIds: visibilityAudience.allowedProfileIds,
     });
   }
 
@@ -1238,76 +1476,90 @@ export async function sendTextMessageAction(
       : undefined) ?? 'Someone';
 
   if (homeworkIntent && activityContext.scope.kind === 'learning_space') {
-    await publishActivityEvent({
-      supabase: serviceSupabase,
-      orgId: accountResponse.data.org_id,
-      eventType: 'homework.assigned',
-      occurredAt: now,
-      sourceKind: 'profile',
-      actorProfileId: currentProfileId,
-      scope: activityContext.scope,
-      objectRef: { kind: 'message', id: messageInsert.data.id },
-      targetRef: activityContext.targetRef,
-      payload: {
-        channelId: input.channelId,
-        messageId: messageInsert.data.id,
-        title: homeworkIntent.title,
-        description: homeworkIntent.description,
-        dueAt: homeworkIntent.dueAt,
-        subject: homeworkIntent.subject,
-        learningSpaceId: activityContext.learningSpaceId ?? null,
-        learningSpaceTitle: activityContext.learningSpaceTitle ?? null,
-        channelTopic: activityContext.channelTopic ?? null,
-        channelRouteKind: activityContext.channelRouteKind,
-      },
-      dedupeKey: `homework.assigned:${messageInsert.data.id}`,
-      createdBy: currentProfileId,
-    });
+    if (!visibilityAudience.suppressActivity) {
+      await publishActivityEvent({
+        supabase: serviceSupabase,
+        orgId: accountResponse.data.org_id,
+        eventType: 'homework.assigned',
+        occurredAt: now,
+        sourceKind: 'profile',
+        actorProfileId: currentProfileId,
+        scope: activityContext.scope,
+        objectRef: { kind: 'message', id: messageInsert.data.id },
+        targetRef: activityContext.targetRef,
+        audienceRules: visibilityAudience.audienceRules,
+        payload: {
+          channelId: input.channelId,
+          messageId: messageInsert.data.id,
+          title: homeworkIntent.title,
+          description: homeworkIntent.description,
+          dueAt: homeworkIntent.dueAt,
+          subject: homeworkIntent.subject,
+          learningSpaceId: activityContext.learningSpaceId ?? null,
+          learningSpaceTitle: activityContext.learningSpaceTitle ?? null,
+          channelTopic: activityContext.channelTopic ?? null,
+          channelRouteKind: activityContext.channelRouteKind,
+        },
+        dedupeKey: `homework.assigned:${messageInsert.data.id}`,
+        createdBy: currentProfileId,
+      });
+    }
   } else if (activityContext.channelRouteKind === 'dm') {
-    await createChannelMessageActivity({
-      supabase,
-      serviceSupabase,
-      orgId: accountResponse.data.org_id,
-      channelId: input.channelId,
-      senderProfileId: currentProfileId,
-      senderName: senderDisplayName,
-      messageId: messageInsert.data.id,
-      content: homeworkIntent?.cleanedContent ?? input.content,
-      threadId,
-      threadReply: Boolean(threadId && input.threadParentId),
-      activityContext,
-      now,
-    });
+    if (!visibilityAudience.suppressActivity) {
+      await createChannelMessageActivity({
+        supabase,
+        serviceSupabase,
+        orgId: accountResponse.data.org_id,
+        channelId: input.channelId,
+        senderProfileId: currentProfileId,
+        senderName: senderDisplayName,
+        messageId: messageInsert.data.id,
+        content: homeworkIntent?.cleanedContent ?? input.content,
+        threadId,
+        threadReply: Boolean(threadId && input.threadParentId),
+        activityContext,
+        now,
+        visibilityAudienceRules: visibilityAudience.audienceRules,
+        visibilityAllowedProfileIds: visibilityAudience.allowedProfileIds,
+      });
+    }
   } else if (threadId && input.threadParentId) {
-    await createThreadReplyNotifications({
-      supabase,
-      serviceSupabase,
-      orgId: accountResponse.data.org_id,
-      threadId,
-      channelId: input.channelId,
-      senderProfileId: currentProfileId,
-      senderName: senderDisplayName,
-      messageId: messageInsert.data.id,
-      content: input.content,
-      activityContext,
-      excludeProfileIds: sanitizedMentions.map((mention) => mention.profileId),
-      now,
-    });
+    if (!visibilityAudience.suppressActivity) {
+      await createThreadReplyNotifications({
+        supabase,
+        serviceSupabase,
+        orgId: accountResponse.data.org_id,
+        threadId,
+        channelId: input.channelId,
+        senderProfileId: currentProfileId,
+        senderName: senderDisplayName,
+        messageId: messageInsert.data.id,
+        content: input.content,
+        activityContext,
+        excludeProfileIds: sanitizedMentions.map((mention) => mention.profileId),
+        now,
+        visibilityAllowedProfileIds: visibilityAudience.allowedProfileIds,
+      });
+    }
   } else {
-    await createChannelMessageActivity({
-      supabase,
-      serviceSupabase,
-      orgId: accountResponse.data.org_id,
-      channelId: input.channelId,
-      senderProfileId: currentProfileId,
-      senderName: senderDisplayName,
-      messageId: messageInsert.data.id,
-      content: homeworkIntent?.cleanedContent ?? input.content,
-      threadId,
-      threadReply: false,
-      activityContext,
-      now,
-    });
+    if (!visibilityAudience.suppressActivity) {
+      await createChannelMessageActivity({
+        supabase,
+        serviceSupabase,
+        orgId: accountResponse.data.org_id,
+        channelId: input.channelId,
+        senderProfileId: currentProfileId,
+        senderName: senderDisplayName,
+        messageId: messageInsert.data.id,
+        content: homeworkIntent?.cleanedContent ?? input.content,
+        threadId,
+        threadReply: false,
+        activityContext,
+        now,
+        visibilityAudienceRules: visibilityAudience.audienceRules,
+        visibilityAllowedProfileIds: visibilityAudience.allowedProfileIds,
+      });
+    }
   }
 
   const thread = threadId
@@ -1401,6 +1653,44 @@ export async function sendFileMessageAction(
     threadParentId: input.threadParentId,
     now,
   });
+  const isSupportChannel = activityContext.channelPurpose === 'support';
+  const isSupportThreadReply = Boolean(input.threadParentId);
+  const staffSender = await isStaffActorInOrg(supabase, {
+    orgId: input.orgId,
+    accountId: accountResponse.data.id,
+    profileKind: profileResponse.data.kind,
+  });
+  const supportQuestionOwnerProfileId =
+    isSupportChannel && isSupportThreadReply
+      ? await resolveSupportQuestionOwnerProfileId({
+          supabase,
+          orgId: input.orgId,
+          channelId: input.channelId,
+          threadParentId: input.threadParentId ?? null,
+          threadId: threadId ?? input.threadId ?? null,
+          parentSenderProfileId: null,
+        })
+      : null;
+  const supportPrivilegedProfileIds = isSupportChannel
+    ? await listSupportPrivilegedProfileIds(serviceSupabase, input.orgId)
+    : [];
+  const supportVisibility = buildSupportVisibilityFields({
+    isSupportChannel,
+    isStaffSender: staffSender,
+    isThreadReply: isSupportThreadReply,
+    currentProfileId,
+    questionOwnerProfileId: supportQuestionOwnerProfileId,
+    privilegedProfileIds: supportPrivilegedProfileIds,
+  });
+  await ensureChannelMembershipForMessageWrite({
+    serviceSupabase,
+    shouldEnsureMembership:
+      isSupportChannel || activityContext.channelVisibility === 'public',
+    orgId: input.orgId,
+    channelId: input.channelId,
+    profileId: currentProfileId,
+    now,
+  });
   const signedUrl = await createSignedChannelFileUrl(supabase, input.storagePath);
   const isImageUpload = input.mimeType?.startsWith('image/') ?? false;
   const isAudioUpload = input.mimeType?.startsWith('audio/') ?? false;
@@ -1410,27 +1700,39 @@ export async function sendFileMessageAction(
       ? 'audio-recording'
       : 'file';
 
-  const messageInsert = await supabase
-    .from('messages')
-    .insert({
+  const messageInsert = await insertMessageRowWithRlsFallback({
+    supabase,
+    serviceSupabase,
+    values: {
       org_id: input.orgId,
       channel_id: input.channelId,
       sender_profile_id: currentProfileId,
       type: messageType,
-      visibility_type: 'all',
+      visibility_type: supportVisibility.visibility_type,
+      visibility_user_ids: supportVisibility.visibility_user_ids ?? null,
       thread_id: threadId,
       thread_parent_id: input.threadParentId ?? null,
       created_at: now,
       created_by: currentProfileId,
       updated_at: now,
       updated_by: currentProfileId,
-    })
-    .select('*')
-    .single();
+    },
+    debugContext: {
+      orgId: input.orgId,
+      channelId: input.channelId,
+      senderProfileId: currentProfileId,
+      action: 'sendFileMessageAction',
+    },
+  });
 
   if (messageInsert.error || !messageInsert.data) {
     throw new Error(messageInsert.error?.message ?? 'Unable to create message.');
   }
+  const visibilityAudience = resolveVisibilityAudienceFromMessageRow({
+    visibilityType: messageInsert.data.visibility_type,
+    visibilityUserId: messageInsert.data.visibility_user_id,
+    visibilityUserIds: messageInsert.data.visibility_user_ids,
+  });
 
   const payload = {
     url: input.storagePath,
@@ -1524,6 +1826,27 @@ export async function sendFileMessageAction(
     throw new Error(channelAssetInsert.error.message);
   }
 
+  if (isSupportChannel && threadCreated && threadId) {
+    await seedRequiredSupportThreadAssignments({
+      supabase: serviceSupabase,
+      orgId: input.orgId,
+      threadId,
+      assignedByProfileId: currentProfileId,
+      now,
+    });
+  }
+
+  if (isSupportChannel && isSupportThreadReply && staffSender && threadId) {
+    await markSupportStaffVolunteerAssignment({
+      supabase: serviceSupabase,
+      orgId: input.orgId,
+      threadId,
+      staffProfileId: currentProfileId,
+      assignedByProfileId: currentProfileId,
+      now,
+    });
+  }
+
   await bumpThreadReplyCount({
     supabase,
     threadId,
@@ -1549,21 +1872,25 @@ export async function sendFileMessageAction(
     ? await buildThreadById(supabase, accountResponse.data.org_id, threadId)
     : null;
 
-  await createFileUploadActivity({
-    supabase,
-    serviceSupabase,
-    orgId: input.orgId,
-    channelId: input.channelId,
-    senderProfileId: currentProfileId,
-    senderName: senderDisplayName,
-    messageId: messageInsert.data.id,
-    name: input.name,
-    content: input.content?.trim() ?? null,
-    mimeType: input.mimeType ?? null,
-    storagePath: input.storagePath,
-    activityContext,
-    now,
-  });
+  if (!visibilityAudience.suppressActivity) {
+    await createFileUploadActivity({
+      supabase,
+      serviceSupabase,
+      orgId: input.orgId,
+      channelId: input.channelId,
+      senderProfileId: currentProfileId,
+      senderName: senderDisplayName,
+      messageId: messageInsert.data.id,
+      name: input.name,
+      content: input.content?.trim() ?? null,
+      mimeType: input.mimeType ?? null,
+      storagePath: input.storagePath,
+      activityContext,
+      now,
+      visibilityAudienceRules: visibilityAudience.audienceRules,
+      visibilityAllowedProfileIds: visibilityAudience.allowedProfileIds,
+    });
+  }
 
   return mapMessageRowToVM(messageInsert.data, {
     sender,
@@ -1649,29 +1976,79 @@ export async function sendFilesMessageAction(
     threadParentId: input.threadParentId,
     now,
   });
+  const isSupportChannel = activityContext.channelPurpose === 'support';
+  const isSupportThreadReply = Boolean(input.threadParentId);
+  const staffSender = await isStaffActorInOrg(supabase, {
+    orgId: input.orgId,
+    accountId: accountResponse.data.id,
+    profileKind: profileResponse.data.kind,
+  });
+  const supportQuestionOwnerProfileId =
+    isSupportChannel && isSupportThreadReply
+      ? await resolveSupportQuestionOwnerProfileId({
+          supabase,
+          orgId: input.orgId,
+          channelId: input.channelId,
+          threadParentId: input.threadParentId ?? null,
+          threadId: threadId ?? input.threadId ?? null,
+          parentSenderProfileId: null,
+        })
+      : null;
+  const supportPrivilegedProfileIds = isSupportChannel
+    ? await listSupportPrivilegedProfileIds(serviceSupabase, input.orgId)
+    : [];
+  const supportVisibility = buildSupportVisibilityFields({
+    isSupportChannel,
+    isStaffSender: staffSender,
+    isThreadReply: isSupportThreadReply,
+    currentProfileId,
+    questionOwnerProfileId: supportQuestionOwnerProfileId,
+    privilegedProfileIds: supportPrivilegedProfileIds,
+  });
+  await ensureChannelMembershipForMessageWrite({
+    serviceSupabase,
+    shouldEnsureMembership:
+      isSupportChannel || activityContext.channelVisibility === 'public',
+    orgId: input.orgId,
+    channelId: input.channelId,
+    profileId: currentProfileId,
+    now,
+  });
 
   const messageType = allImages ? 'image' : 'file';
-  const messageInsert = await supabase
-    .from('messages')
-    .insert({
+  const messageInsert = await insertMessageRowWithRlsFallback({
+    supabase,
+    serviceSupabase,
+    values: {
       org_id: input.orgId,
       channel_id: input.channelId,
       sender_profile_id: currentProfileId,
       type: messageType,
-      visibility_type: 'all',
+      visibility_type: supportVisibility.visibility_type,
+      visibility_user_ids: supportVisibility.visibility_user_ids ?? null,
       thread_id: threadId,
       thread_parent_id: input.threadParentId ?? null,
       created_at: now,
       created_by: currentProfileId,
       updated_at: now,
       updated_by: currentProfileId,
-    })
-    .select('*')
-    .single();
+    },
+    debugContext: {
+      orgId: input.orgId,
+      channelId: input.channelId,
+      senderProfileId: currentProfileId,
+      action: 'sendFilesMessageAction',
+    },
+  });
 
   if (messageInsert.error || !messageInsert.data) {
     throw new Error(messageInsert.error?.message ?? 'Unable to create message.');
   }
+  const visibilityAudience = resolveVisibilityAudienceFromMessageRow({
+    visibilityType: messageInsert.data.visibility_type,
+    visibilityUserId: messageInsert.data.visibility_user_id,
+    visibilityUserIds: messageInsert.data.visibility_user_ids,
+  });
 
   const signedAssets = await Promise.all(
     input.assets.map(async (asset) => ({
@@ -1761,6 +2138,27 @@ export async function sendFilesMessageAction(
     throw new Error(channelAssetInsert.error.message);
   }
 
+  if (isSupportChannel && threadCreated && threadId) {
+    await seedRequiredSupportThreadAssignments({
+      supabase: serviceSupabase,
+      orgId: input.orgId,
+      threadId,
+      assignedByProfileId: currentProfileId,
+      now,
+    });
+  }
+
+  if (isSupportChannel && isSupportThreadReply && staffSender && threadId) {
+    await markSupportStaffVolunteerAssignment({
+      supabase: serviceSupabase,
+      orgId: input.orgId,
+      threadId,
+      staffProfileId: currentProfileId,
+      assignedByProfileId: currentProfileId,
+      now,
+    });
+  }
+
   await bumpThreadReplyCount({
     supabase,
     threadId,
@@ -1786,25 +2184,29 @@ export async function sendFilesMessageAction(
     ? await buildThreadById(supabase, accountResponse.data.org_id, threadId)
     : null;
 
-  await createFileUploadActivity({
-    supabase,
-    serviceSupabase,
-    orgId: input.orgId,
-    channelId: input.channelId,
-    senderProfileId: currentProfileId,
-    senderName: senderDisplayName,
-    messageId: messageInsert.data.id,
-    name:
-      input.assets.length > 1
-        ? `${input.assets[0]?.name ?? 'File'} +${input.assets.length - 1} more`
-        : (input.assets[0]?.name ?? 'File'),
-    content: input.content?.trim() ?? null,
-    mimeType: allImages ? 'image/*' : (input.assets[0]?.mimeType ?? null),
-    storagePath: input.assets[0]?.storagePath ?? null,
-    fileCount: input.assets.length,
-    activityContext,
-    now,
-  });
+  if (!visibilityAudience.suppressActivity) {
+    await createFileUploadActivity({
+      supabase,
+      serviceSupabase,
+      orgId: input.orgId,
+      channelId: input.channelId,
+      senderProfileId: currentProfileId,
+      senderName: senderDisplayName,
+      messageId: messageInsert.data.id,
+      name:
+        input.assets.length > 1
+          ? `${input.assets[0]?.name ?? 'File'} +${input.assets.length - 1} more`
+          : (input.assets[0]?.name ?? 'File'),
+      content: input.content?.trim() ?? null,
+      mimeType: allImages ? 'image/*' : (input.assets[0]?.mimeType ?? null),
+      storagePath: input.assets[0]?.storagePath ?? null,
+      fileCount: input.assets.length,
+      activityContext,
+      now,
+      visibilityAudienceRules: visibilityAudience.audienceRules,
+      visibilityAllowedProfileIds: visibilityAudience.allowedProfileIds,
+    });
+  }
 
   return mapMessageRowToVM(messageInsert.data, {
     sender,

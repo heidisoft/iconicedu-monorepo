@@ -16,8 +16,10 @@ const {
   mockGetUserRoles,
   mockResolveOrgDashboardPath,
   mockGetProfileByAccountId,
+  mockInsertProfileForAccount,
   mockSeedSignupDefaultNotificationPreferences,
   mockSeedDefaultOrgSubjectCatalog,
+  mockEnsureSupportChannel,
 } = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
   mockFrom: vi.fn(),
@@ -30,8 +32,10 @@ const {
   mockGetUserRoles: vi.fn(),
   mockResolveOrgDashboardPath: vi.fn(),
   mockGetProfileByAccountId: vi.fn(),
+  mockInsertProfileForAccount: vi.fn(),
   mockSeedSignupDefaultNotificationPreferences: vi.fn(),
   mockSeedDefaultOrgSubjectCatalog: vi.fn(),
+  mockEnsureSupportChannel: vi.fn(),
 }));
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
@@ -62,6 +66,7 @@ vi.mock('@iconicedu/web/lib/profile/queries/roles.query', () => ({
 
 vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
   getProfileByAccountId: mockGetProfileByAccountId,
+  insertProfileForAccount: mockInsertProfileForAccount,
 }));
 
 vi.mock('@iconicedu/web/lib/profile/queries/notification-defaults-seed.query', () => ({
@@ -77,6 +82,10 @@ vi.mock('@iconicedu/web/lib/subjects/queries/org-subject-catalog.query', () => (
     mockSeedDefaultOrgSubjectCatalog(...args),
 }));
 
+vi.mock('@iconicedu/web/lib/channels/actions/ensure-support-channel', () => ({
+  ensureSupportChannel: (...args: unknown[]) => mockEnsureSupportChannel(...args),
+}));
+
 describe('POST /api/orgs/bootstrap', () => {
   beforeEach(() => {
     mockGetUser.mockReset();
@@ -90,9 +99,12 @@ describe('POST /api/orgs/bootstrap', () => {
     mockGetUserRoles.mockReset();
     mockResolveOrgDashboardPath.mockReset();
     mockGetProfileByAccountId.mockReset();
+    mockInsertProfileForAccount.mockReset();
     mockSeedSignupDefaultNotificationPreferences.mockReset();
     mockSeedDefaultOrgSubjectCatalog.mockReset();
+    mockEnsureSupportChannel.mockReset();
     mockSeedDefaultOrgSubjectCatalog.mockResolvedValue({ error: null });
+    mockEnsureSupportChannel.mockResolvedValue({ channelId: 'support-1' });
   });
 
   it('returns 400 for invalid slug', async () => {
@@ -118,6 +130,11 @@ describe('POST /api/orgs/bootstrap', () => {
       account: { id: 'account-1', org_id: 'org-1' },
     });
     mockGetProfileByAccountId.mockResolvedValueOnce({ data: null, error: null });
+    mockInsertProfileForAccount.mockResolvedValueOnce({
+      data: { id: 'profile-1' },
+      error: null,
+    });
+    mockSeedSignupDefaultNotificationPreferences.mockResolvedValueOnce({ error: null });
     mockUpsertUserRole.mockResolvedValueOnce({ error: null });
     mockUpdateAccountRoleState.mockResolvedValueOnce({
       error: null,
@@ -183,6 +200,12 @@ describe('POST /api/orgs/bootstrap', () => {
     expect(body.success).toBe(true);
     expect(body.org.slug).toBe('iconic-academy');
     expect(body.onboarding.destination).toBe('/iconic-academy');
+    expect(mockEnsureSupportChannel).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orgId: 'org-1',
+        creatorProfileId: 'profile-1',
+      }),
+    );
   });
 
   it('allows an authenticated user to create another organization', async () => {
@@ -195,6 +218,11 @@ describe('POST /api/orgs/bootstrap', () => {
       account: { id: 'account-2', org_id: 'org-2' },
     });
     mockGetProfileByAccountId.mockResolvedValueOnce({ data: null, error: null });
+    mockInsertProfileForAccount.mockResolvedValueOnce({
+      data: { id: 'profile-2' },
+      error: null,
+    });
+    mockSeedSignupDefaultNotificationPreferences.mockResolvedValueOnce({ error: null });
     mockUpsertUserRole.mockResolvedValueOnce({ error: null });
     mockUpdateAccountRoleState.mockResolvedValueOnce({
       error: null,

@@ -98,7 +98,7 @@ describe('resolveRecipientsForActivityEvent', () => {
     expect(recipients).toEqual(['profile-target']);
   });
 
-  it('keeps recipients for channel scope when users_only audience rule exists', async () => {
+  it('filters channel-scope recipients by users_only audience rule', async () => {
     const recipients = await resolveRecipientsForActivityEvent(
       createSupabaseMock() as never,
       {
@@ -121,5 +121,30 @@ describe('resolveRecipientsForActivityEvent', () => {
     );
 
     expect(recipients).toEqual(['profile-target']);
+  });
+
+  it('returns empty recipients when channel-scope users_only excludes members', async () => {
+    const recipients = await resolveRecipientsForActivityEvent(
+      createSupabaseMock() as never,
+      {
+        id: 'event-3',
+        org_id: 'org-1',
+        event_type: 'message.posted',
+        occurred_at: '2026-03-09T10:00:00.000Z',
+        source_kind: 'profile',
+        actor_profile_id: 'profile-actor',
+        scope: { kind: 'channel', channelId: 'channel-1' },
+        object_ref: null,
+        target_ref: null,
+        payload: {},
+        audience_rules: [{ kind: 'users_only', userIds: ['profile-someone-else'] }],
+        projection_status: 'pending',
+        projection_attempts: 0,
+        created_at: '2026-03-09T10:00:00.000Z',
+        updated_at: '2026-03-09T10:00:00.000Z',
+      },
+    );
+
+    expect(recipients).toEqual([]);
   });
 });

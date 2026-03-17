@@ -19,6 +19,7 @@ function createChannelLookupChain(
     id: string;
     kind: string;
     topic?: string | null;
+    purpose?: string | null;
     primary_entity_kind?: string | null;
     primary_entity_id?: string | null;
   } | null,
@@ -80,6 +81,71 @@ vi.mock('@iconicedu/web/lib/messages/link-preview', () => ({
 }));
 
 describe('sendTextMessageAction', () => {
+  const createSupportServiceSupabaseMock = () => {
+    const membershipUpsert = vi.fn(async () => ({ error: null }));
+
+    const staffProfilesChain: any = {};
+    staffProfilesChain.eq = vi.fn((column: string) => {
+      if (column === 'kind') {
+        return {
+          is: vi.fn(() => ({
+            returns: vi.fn(async () => ({
+              data: [{ id: 'staff-profile-1' }],
+              error: null,
+            })),
+          })),
+        };
+      }
+      return staffProfilesChain;
+    });
+    staffProfilesChain.in = vi.fn(() => ({
+      is: vi.fn(() => ({
+        returns: vi.fn(async () => ({ data: [{ id: 'owner-profile-1' }], error: null })),
+      })),
+    }));
+    staffProfilesChain.is = vi.fn(() => staffProfilesChain);
+    staffProfilesChain.returns = vi.fn(async () => ({
+      data: [{ id: 'staff-profile-1' }],
+      error: null,
+    }));
+
+    const roleAccountsChain: any = {};
+    roleAccountsChain.eq = vi.fn(() => roleAccountsChain);
+    roleAccountsChain.in = vi.fn(() => roleAccountsChain);
+    roleAccountsChain.is = vi.fn(() => roleAccountsChain);
+    roleAccountsChain.returns = vi.fn(async () => ({
+      data: [{ account_id: 'account-owner-1' }],
+      error: null,
+    }));
+
+    const primaryRoleAccountsChain: any = {};
+    primaryRoleAccountsChain.eq = vi.fn(() => primaryRoleAccountsChain);
+    primaryRoleAccountsChain.in = vi.fn(() => primaryRoleAccountsChain);
+    primaryRoleAccountsChain.is = vi.fn(() => primaryRoleAccountsChain);
+    primaryRoleAccountsChain.returns = vi.fn(async () => ({
+      data: [{ id: 'account-owner-1' }],
+      error: null,
+    }));
+
+    return {
+      from: vi.fn((table: string) => {
+        if (table === 'channel_members') {
+          return { upsert: membershipUpsert };
+        }
+        if (table === 'profiles') {
+          return { select: () => staffProfilesChain };
+        }
+        if (table === 'user_roles') {
+          return { select: () => roleAccountsChain };
+        }
+        if (table === 'accounts') {
+          return { select: () => primaryRoleAccountsChain };
+        }
+        return {};
+      }),
+    };
+  };
+
   beforeEach(async () => {
     mapMessageRowToVM.mockReset();
     buildUserProfileById.mockReset();
@@ -180,6 +246,75 @@ describe('sendTextMessageAction', () => {
       }),
     );
     expect(result).toEqual({ ids: { id: 'message-1', orgId: 'org-1' } });
+  });
+
+  it('does not publish activity for sender-only visibility messages', async () => {
+    const supabase = {
+      auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
+      from: vi.fn(),
+    };
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
+
+    const insertMessage = vi.fn().mockReturnValue({
+      select: () => ({
+        single: async () => ({
+          data: {
+            id: 'message-sender-only-1',
+            org_id: 'org-1',
+            channel_id: 'channel-1',
+            sender_profile_id: 'profile-1',
+            type: 'text',
+            visibility_type: 'sender-only',
+            visibility_user_id: null,
+            visibility_user_ids: null,
+            created_at: new Date().toISOString(),
+          },
+          error: null,
+        }),
+      }),
+    });
+    const insertMessageText = vi.fn().mockResolvedValue({ error: null });
+    const channelLookup = createChannelLookupChain({
+      id: 'channel-1',
+      kind: 'channel',
+      topic: 'General',
+      primary_entity_kind: null,
+      primary_entity_id: null,
+    });
+
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'channels') {
+        return { select: () => channelLookup };
+      }
+      if (table === 'messages') {
+        return { insert: insertMessage };
+      }
+      if (table === 'message_text') {
+        return { insert: insertMessageText };
+      }
+      return {};
+    });
+
+    buildUserProfileById.mockResolvedValueOnce({
+      ids: { id: 'profile-1', orgId: 'org-1' },
+      profile: { displayName: 'Sender' },
+    });
+    mapMessageRowToVM.mockReturnValueOnce({
+      ids: { id: 'message-sender-only-1', orgId: 'org-1' },
+    });
+
+    await sendTextMessageAction({
+      orgId: 'org-1',
+      channelId: 'channel-1',
+      senderProfileId: 'profile-1',
+      content: 'Private note',
+    });
+
+    expect(publishActivityEvent).not.toHaveBeenCalled();
   });
 
   it('treats @homework text as plain text when explicit assignment metadata is not provided', async () => {
@@ -2179,6 +2314,296 @@ describe('sendTextMessageAction', () => {
       }),
     );
     expect(result).toEqual({ ids: { id: 'message-4', orgId: 'org-1' } });
+  });
+
+  it('stores support top-level questions as specific-users visibility for the asker', async () => {
+    const supabase = {
+      auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
+      from: vi.fn(),
+    };
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    const { createSupabaseServiceClient } =
+      await import('@iconicedu/web/lib/supabase/service');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
+    (
+      createSupabaseServiceClient as unknown as {
+        mockReturnValue: (value: any) => void;
+      }
+    ).mockReturnValue(createSupportServiceSupabaseMock());
+    const { getProfileByAccountId } =
+      await import('@iconicedu/web/lib/profile/queries/profiles.query');
+    (
+      getProfileByAccountId as unknown as { mockResolvedValueOnce: (value: any) => void }
+    ).mockResolvedValueOnce({
+      data: { id: 'profile-1', kind: 'guardian' },
+    });
+
+    const insertMessage = vi.fn().mockReturnValue({
+      select: () => ({
+        single: async () => ({
+          data: {
+            id: 'message-support-1',
+            org_id: 'org-1',
+            channel_id: 'channel-support-1',
+            sender_profile_id: 'profile-1',
+            type: 'text',
+            visibility_type: 'specific-users',
+            visibility_user_id: null,
+            visibility_user_ids: ['profile-1', 'staff-profile-1'],
+            created_at: new Date().toISOString(),
+          },
+          error: null,
+        }),
+      }),
+    });
+    const insertMessageText = vi.fn().mockResolvedValue({ error: null });
+    const channelLookup = createChannelLookupChain({
+      id: 'channel-support-1',
+      kind: 'channel',
+      purpose: 'support',
+      topic: 'Support',
+      primary_entity_kind: null,
+      primary_entity_id: null,
+    });
+
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'channels') {
+        return { select: () => channelLookup };
+      }
+      if (table === 'messages') {
+        return { insert: insertMessage };
+      }
+      if (table === 'message_text') {
+        return { insert: insertMessageText };
+      }
+      return {};
+    });
+
+    buildUserProfileById.mockResolvedValueOnce({
+      ids: { id: 'profile-1', orgId: 'org-1' },
+      profile: { displayName: 'Asker' },
+    });
+    mapMessageRowToVM.mockReturnValueOnce({
+      ids: { id: 'message-support-1', orgId: 'org-1' },
+    });
+
+    await sendTextMessageAction({
+      orgId: 'org-1',
+      channelId: 'channel-support-1',
+      senderProfileId: 'profile-1',
+      content: 'Need help with homework.',
+    });
+
+    expect(insertMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        visibility_type: 'specific-users',
+        visibility_user_ids: expect.arrayContaining(['profile-1', 'staff-profile-1']),
+      }),
+    );
+    expect(publishActivityEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        audienceRules: [
+          {
+            kind: 'users_only',
+            userIds: expect.arrayContaining(['profile-1', 'staff-profile-1']),
+          },
+        ],
+      }),
+    );
+  });
+
+  it('rejects staff top-level support posts', async () => {
+    const supabase = {
+      auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
+      from: vi.fn(),
+    };
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    const { createSupabaseServiceClient } =
+      await import('@iconicedu/web/lib/supabase/service');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
+    (
+      createSupabaseServiceClient as unknown as {
+        mockReturnValue: (value: any) => void;
+      }
+    ).mockReturnValue(createSupportServiceSupabaseMock());
+    const { getProfileByAccountId } =
+      await import('@iconicedu/web/lib/profile/queries/profiles.query');
+    (
+      getProfileByAccountId as unknown as { mockResolvedValueOnce: (value: any) => void }
+    ).mockResolvedValueOnce({
+      data: { id: 'profile-1', kind: 'staff' },
+    });
+
+    const insertMessage = vi.fn();
+    const channelLookup = createChannelLookupChain({
+      id: 'channel-support-1',
+      kind: 'channel',
+      purpose: 'support',
+      topic: 'Support',
+      primary_entity_kind: null,
+      primary_entity_id: null,
+    });
+
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'channels') {
+        return { select: () => channelLookup };
+      }
+      if (table === 'messages') {
+        return { insert: insertMessage };
+      }
+      if (table === 'message_text') {
+        return { insert: vi.fn() };
+      }
+      return {};
+    });
+
+    await expect(
+      sendTextMessageAction({
+        orgId: 'org-1',
+        channelId: 'channel-support-1',
+        senderProfileId: 'profile-1',
+        content: 'Please share logs',
+      }),
+    ).rejects.toThrow('Support staff must reply in a thread');
+    expect(insertMessage).not.toHaveBeenCalled();
+  });
+
+  it('stores support thread replies with visibility scoped to the question owner', async () => {
+    const supabase = {
+      auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
+      from: vi.fn(),
+    };
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    const { createSupabaseServiceClient } =
+      await import('@iconicedu/web/lib/supabase/service');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
+    (
+      createSupabaseServiceClient as unknown as {
+        mockReturnValue: (value: any) => void;
+      }
+    ).mockReturnValue(createSupportServiceSupabaseMock());
+    const { getProfileByAccountId } =
+      await import('@iconicedu/web/lib/profile/queries/profiles.query');
+    (
+      getProfileByAccountId as unknown as { mockResolvedValueOnce: (value: any) => void }
+    ).mockResolvedValueOnce({
+      data: { id: 'owner-profile-1', kind: 'guardian' },
+    });
+
+    const parentSelectChain: any = {};
+    parentSelectChain.eq = vi.fn(() => parentSelectChain);
+    parentSelectChain.maybeSingle = vi.fn(async () => ({
+      data: {
+        id: 'support-parent-1',
+        org_id: 'org-1',
+        channel_id: 'channel-support-1',
+        sender_profile_id: 'owner-profile-1',
+        thread_id: 'thread-support-1',
+        type: 'text',
+      },
+    }));
+    const messageInsert = vi.fn().mockReturnValue({
+      select: () => ({
+        single: async () => ({
+          data: {
+            id: 'support-reply-1',
+            org_id: 'org-1',
+            channel_id: 'channel-support-1',
+            sender_profile_id: 'owner-profile-1',
+            type: 'text',
+            visibility_type: 'specific-users',
+            visibility_user_id: null,
+            visibility_user_ids: ['owner-profile-1', 'staff-profile-1'],
+            created_at: new Date().toISOString(),
+          },
+          error: null,
+        }),
+      }),
+    });
+    const messageTextInsert = vi.fn().mockResolvedValue({ error: null });
+    const threadSelectChain: any = {};
+    threadSelectChain.eq = vi.fn(() => threadSelectChain);
+    threadSelectChain.maybeSingle = vi.fn(async () => ({
+      data: { id: 'thread-support-1', message_count: 1 },
+    }));
+    const updateThread = vi.fn().mockResolvedValue({ error: null });
+    const participantUpsert = vi.fn().mockResolvedValue({ error: null });
+    const participantSelectChain: any = {};
+    participantSelectChain.eq = vi.fn(() => participantSelectChain);
+    participantSelectChain.is = vi.fn(() => participantSelectChain);
+    participantSelectChain.returns = vi.fn(async () => ({
+      data: [{ profile_id: 'owner-profile-1' }],
+      error: null,
+    }));
+    const channelLookup = createChannelLookupChain({
+      id: 'channel-support-1',
+      kind: 'channel',
+      purpose: 'support',
+      topic: 'Support',
+      primary_entity_kind: null,
+      primary_entity_id: null,
+    });
+
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'channels') {
+        return { select: () => channelLookup };
+      }
+      if (table === 'messages') {
+        return {
+          select: () => parentSelectChain,
+          insert: messageInsert,
+        };
+      }
+      if (table === 'message_text') {
+        return { insert: messageTextInsert };
+      }
+      if (table === 'thread_participants') {
+        return { upsert: participantUpsert, select: () => participantSelectChain };
+      }
+      if (table === 'threads') {
+        return {
+          select: () => threadSelectChain,
+          update: () => ({ eq: updateThread }),
+        };
+      }
+      return {};
+    });
+
+    buildUserProfileById.mockResolvedValueOnce({
+      ids: { id: 'owner-profile-1', orgId: 'org-1' },
+      profile: { displayName: 'Owner' },
+    });
+    mapMessageRowToVM.mockReturnValueOnce({
+      ids: { id: 'support-reply-1', orgId: 'org-1' },
+    });
+
+    await sendTextMessageAction({
+      orgId: 'org-1',
+      channelId: 'channel-support-1',
+      senderProfileId: 'owner-profile-1',
+      content: 'Additional details',
+      threadParentId: 'support-parent-1',
+      threadId: 'thread-support-1',
+    });
+
+    expect(messageInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        visibility_type: 'specific-users',
+        visibility_user_ids: expect.arrayContaining([
+          'owner-profile-1',
+          'staff-profile-1',
+        ]),
+      }),
+    );
   });
 });
 

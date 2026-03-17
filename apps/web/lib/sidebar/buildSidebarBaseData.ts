@@ -41,7 +41,7 @@ export async function buildSidebarBaseData(
   const navSecondary = supportChannelId
     ? [
         {
-          title: 'Support',
+          title: '24/7 Live Support',
           url: `${dashboardBasePath}/c/${supportChannelId}`,
           icon: 'life-buoy' as const,
         },

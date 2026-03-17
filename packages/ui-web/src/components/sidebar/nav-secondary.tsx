@@ -8,6 +8,12 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@iconicedu/ui-web/ui/sidebar';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@iconicedu/ui-web/ui/tooltip';
 
 export function NavSecondary({
   items,
@@ -19,16 +25,46 @@ export function NavSecondary({
     <SidebarGroup {...props}>
       <SidebarGroupContent>
         <SidebarMenu>
-          {items.map((item) => (
-            <SidebarMenuItem key={item.title}>
+          {items.map((item) => {
+            const isSupportItem =
+              item.title.toLowerCase().includes('support') ||
+              item.url.toLowerCase().includes('/support');
+
+            const content = (
               <SidebarMenuButton asChild size="sm" isActive={item.isActive}>
                 <a href={item.url}>
-                  <item.icon />
+                  <item.icon
+                    className={
+                      isSupportItem ? 'text-amber-500 dark:text-amber-400' : undefined
+                    }
+                  />
                   <span>{item.title}</span>
                 </a>
               </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
+            );
+
+            return (
+              <SidebarMenuItem key={item.title}>
+                {isSupportItem ? (
+                  <TooltipProvider delayDuration={150}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>{content}</TooltipTrigger>
+                      <TooltipContent
+                        side="right"
+                        align="center"
+                        className="max-w-xs text-xs leading-relaxed"
+                      >
+                        Ask us anything in real time: classes, schedules, reschedules,
+                        cancellations, and payments.
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                ) : (
+                  content
+                )}
+              </SidebarMenuItem>
+            );
+          })}
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>
