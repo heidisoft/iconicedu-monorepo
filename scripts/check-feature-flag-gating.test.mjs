@@ -18,7 +18,8 @@ test('fails when feature-bearing file changes without flag usage', () => {
   const violations = evaluateFeatureFlagGating({
     changedFiles: ['apps/web/app/(app)/[orgSlug]/page.tsx'],
     sources: {
-      'apps/web/app/(app)/[orgSlug]/page.tsx': 'export default function Page() { return null; }',
+      'apps/web/app/(app)/[orgSlug]/page.tsx':
+        'export default function Page() { return null; }',
     },
     prBody: '',
     commitMessage: '',
@@ -46,7 +47,8 @@ test('passes with explicit exemption tag', () => {
   const violations = evaluateFeatureFlagGating({
     changedFiles: ['apps/web/app/(app)/[orgSlug]/page.tsx'],
     sources: {
-      'apps/web/app/(app)/[orgSlug]/page.tsx': 'export default function Page() { return null; }',
+      'apps/web/app/(app)/[orgSlug]/page.tsx':
+        'export default function Page() { return null; }',
     },
     prBody: 'flag-exempt: maintenance-only',
     commitMessage: '',

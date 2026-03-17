@@ -31,7 +31,10 @@ function hasFlagReference(source) {
 }
 
 function hasFlagExemption(input) {
-  return EXEMPTION_PATTERN.test(input.prBody ?? '') || EXEMPTION_PATTERN.test(input.commitMessage ?? '');
+  return (
+    EXEMPTION_PATTERN.test(input.prBody ?? '') ||
+    EXEMPTION_PATTERN.test(input.commitMessage ?? '')
+  );
 }
 
 export function evaluateFeatureFlagGating(input) {
@@ -117,7 +120,9 @@ function readPrBody() {
   }
   try {
     const payload = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
-    return typeof payload?.pull_request?.body === 'string' ? payload.pull_request.body : '';
+    return typeof payload?.pull_request?.body === 'string'
+      ? payload.pull_request.body
+      : '';
   } catch {
     return '';
   }
