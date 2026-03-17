@@ -22,14 +22,17 @@ import {
   resolveAvatarSource,
   resolveExternalAvatarUrl,
 } from '@iconicedu/web/lib/profile/derive';
-import { getAccountById } from '@iconicedu/web/lib/accounts/queries/accounts.query';
+import {
+  getAccountById,
+  updateAccountActiveProfile,
+} from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { getNotificationDefaults } from '@iconicedu/web/lib/profile/queries/notification-defaults.query';
 import { seedSignupDefaultNotificationPreferences } from '@iconicedu/web/lib/profile/queries/notification-defaults-seed.query';
 import { getNotificationScopedDefaults } from '@iconicedu/web/lib/profile/queries/notification-scoped-defaults.query';
 import { getPresence } from '@iconicedu/web/lib/profile/queries/presence.query';
 import { mapProfilePresenceRowToVM } from '@iconicedu/web/lib/profile/mappers/presence.mapper';
 import {
-  getProfileByAccountId,
+  getProfilesByAccountId,
   insertProfileForAccount,
   updateProfileAvatar,
   upsertProfileForAccount,
@@ -56,11 +59,24 @@ export async function buildSidebarUser(
   account: { id: string; org_id: string },
   familyInvite?: FamilyLinkInviteRow | null,
   profileKindOverride?: UserProfileVM['kind'],
-): Promise<{ accountVM: UserAccountVM; profileVM: UserProfileVM }> {
-  const [accountRow, roleRows, profileResponse] = await Promise.all([
+): Promise<{
+  accountVM: UserAccountVM;
+  profileVM: UserProfileVM;
+  availablePersonas: Array<{
+    profileId: string;
+    kind: UserProfileVM['kind'];
+    label: string;
+    isActive: boolean;
+  }>;
+  addablePersonas: Array<{
+    kind: UserProfileVM['kind'];
+    label: string;
+  }>;
+}> {
+  const [accountRow, roleRows, profilesResponse] = await Promise.all([
     getAccountById(supabase, account.id),
     getUserRoles(supabase, account.id, account.org_id),
-    getProfileByAccountId(supabase, account.id),
+    getProfilesByAccountId(supabase, account.id),
   ]);
 
   const userRoles = mapUserRoles(roleRows.data ?? []);
@@ -71,7 +87,8 @@ export async function buildSidebarUser(
     userRoles,
   });
 
-  let profileRow = profileResponse.data as ProfileRow | null;
+  let profileRows = (profilesResponse.data ?? []) as ProfileRow[];
+  let profileRow: ProfileRow | null = null;
   let createdProfile = false;
   const externalAvatarUrl = resolveExternalAvatarUrl(user);
   const inviteRow =
@@ -90,8 +107,19 @@ export async function buildSidebarUser(
     inviteRow?.invited_role ??
     accountPrimaryRoleKind ??
     deriveProfileKind(userRoles);
+  const addablePersonas = buildAddablePersonas({
+    userRoles,
+    primaryRole: accountRow.data?.primary_role ?? null,
+    profileRows,
+  });
 
-  if (!profileRow) {
+  profileRow =
+    profileRows.find((row) => row.id === accountRow.data?.active_profile_id) ??
+    profileRows.find((row) => row.kind === derivedKind) ??
+    profileRows[0] ??
+    null;
+
+  if (!profileRow || !profileRows.some((row) => row.kind === derivedKind)) {
     const upserted = await upsertProfileForAccount(supabase, {
       orgId: account.org_id,
       accountId: account.id,
@@ -125,16 +153,37 @@ export async function buildSidebarUser(
 
       profileRow = fallback.data ?? null;
       createdProfile = Boolean(profileRow);
+      if (profileRow) {
+        profileRows = [
+          profileRow,
+          ...profileRows.filter((row) => row.id !== profileRow?.id),
+        ];
+      }
     } else if (upserted.error) {
       throw upserted.error;
     } else {
       profileRow = upserted.data ?? null;
       createdProfile = Boolean(profileRow);
+      if (profileRow) {
+        profileRows = [
+          profileRow,
+          ...profileRows.filter((row) => row.id !== profileRow?.id),
+        ];
+      }
     }
   }
 
   if (!profileRow) {
     throw new Error('Profile record missing for authenticated user.');
+  }
+
+  if (accountRow.data?.active_profile_id !== profileRow.id) {
+    await updateAccountActiveProfile(supabase, {
+      accountId: account.id,
+      orgId: account.org_id,
+      activeProfileId: profileRow.id,
+      updatedBy: user.id,
+    });
   }
 
   if (createdProfile) {
@@ -185,6 +234,8 @@ export async function buildSidebarUser(
     return {
       accountVM,
       profileVM: await buildEducatorProfile(supabase, baseProfile, profileRow),
+      availablePersonas: buildAvailablePersonas(profileRows, profileRow.id),
+      addablePersonas,
     };
   }
 
@@ -192,6 +243,8 @@ export async function buildSidebarUser(
     return {
       accountVM,
       profileVM: await buildChildProfile(supabase, baseProfile, profileRow),
+      availablePersonas: buildAvailablePersonas(profileRows, profileRow.id),
+      addablePersonas,
     };
   }
 
@@ -199,6 +252,8 @@ export async function buildSidebarUser(
     return {
       accountVM,
       profileVM: await buildStaffProfile(supabase, baseProfile, profileRow),
+      availablePersonas: buildAvailablePersonas(profileRows, profileRow.id),
+      addablePersonas,
     };
   }
 
@@ -217,6 +272,8 @@ export async function buildSidebarUser(
         ...guardianProfile,
         familyInvites: invites,
       },
+      availablePersonas: buildAvailablePersonas(profileRows, profileRow.id),
+      addablePersonas,
     };
   }
 
@@ -226,7 +283,74 @@ export async function buildSidebarUser(
       ...baseProfile,
       kind: 'system',
     },
+    availablePersonas: buildAvailablePersonas(profileRows, profileRow.id),
+    addablePersonas,
   };
+}
+
+function buildAvailablePersonas(profileRows: ProfileRow[], activeProfileId: string) {
+  return Array.from(
+    new Map(
+      profileRows.map((row) => [
+        row.id,
+        {
+          profileId: row.id,
+          kind: row.kind as UserProfileVM['kind'],
+          label: toPersonaLabel(row.kind),
+          isActive: row.id === activeProfileId,
+        },
+      ]),
+    ).values(),
+  );
+}
+
+function toPersonaLabel(kind: string): string {
+  if (kind === 'educator') {
+    return 'Tutor';
+  }
+  if (kind === 'guardian') {
+    return 'Parent';
+  }
+  if (kind === 'child') {
+    return 'Student';
+  }
+  if (kind === 'staff') {
+    return 'Staff';
+  }
+  return 'Profile';
+}
+
+function buildAddablePersonas(input: {
+  userRoles: ReturnType<typeof mapUserRoles>;
+  primaryRole: AccountRow['primary_role'] | null;
+  profileRows: ProfileRow[];
+}) {
+  const existingKinds = new Set(input.profileRows.map((profile) => profile.kind));
+  const roleKeys = new Set(input.userRoles.map((role) => role.roleKey));
+  if (input.primaryRole) {
+    roleKeys.add(input.primaryRole);
+  }
+
+  const addableKinds = new Set<UserProfileVM['kind']>();
+  if (roleKeys.has('educator')) {
+    addableKinds.add('educator');
+  }
+  if (roleKeys.has('guardian')) {
+    addableKinds.add('guardian');
+  }
+  if (roleKeys.has('child')) {
+    addableKinds.add('child');
+  }
+  if (roleKeys.has('staff') || roleKeys.has('owner') || roleKeys.has('admin')) {
+    addableKinds.add('staff');
+  }
+
+  return Array.from(addableKinds)
+    .filter((kind) => !existingKinds.has(kind))
+    .map((kind) => ({
+      kind,
+      label: toPersonaLabel(kind),
+    }));
 }
 
 async function loadNotificationDefaults(

@@ -18,7 +18,7 @@ const basePayload = {
 } as const;
 
 describe('insertProfileForAccount', () => {
-  it('uses upsert with org/account conflict target', async () => {
+  it('uses upsert with org/account/kind conflict target', async () => {
     const expected = {
       data: { id: 'profile-1', org_id: 'org-1', account_id: 'account-1' },
       error: null,
@@ -41,7 +41,7 @@ describe('insertProfileForAccount', () => {
         account_id: 'account-1',
         kind: 'guardian',
       }),
-      { onConflict: 'org_id,account_id' },
+      { onConflict: 'org_id,account_id,kind' },
     );
   });
 

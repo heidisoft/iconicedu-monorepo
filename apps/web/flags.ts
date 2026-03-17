@@ -36,9 +36,38 @@ export const enableMessageTypeComposer = flag<boolean, { profileId?: string | nu
   },
 });
 
+export const enablePersonaSwitch = flag<boolean, { profileId?: string | null }>({
+  key: 'enable-persona-switch',
+  description: 'Enables persona switching from the user menu and active profile updates.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  decide() {
+    return false;
+  },
+});
+
+export const enablePersonaAdd = flag<boolean, { profileId?: string | null }>({
+  key: 'enable-persona-add',
+  description:
+    'Enables adding additional personas to the same org account from the user menu.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  decide() {
+    return false;
+  },
+});
+
 export const webFlags = {
   enableChannelCommunications,
   enableMessageTypeComposer,
+  enablePersonaSwitch,
+  enablePersonaAdd,
 } as const;
 
 export type WebFlagKey = keyof typeof webFlags;

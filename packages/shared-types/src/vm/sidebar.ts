@@ -52,6 +52,16 @@ export type SidebarChildVM = ChildProfileVM;
 
 export interface SidebarUserVM {
   profile: UserProfileVM;
+  availablePersonas?: Array<{
+    profileId: UUID;
+    kind: UserProfileVM['kind'];
+    label: string;
+    isActive: boolean;
+  }> | null;
+  addablePersonas?: Array<{
+    kind: UserProfileVM['kind'];
+    label: string;
+  }> | null;
   account?: UserAccountVM | null;
   families?: FamilyVM[] | null;
   familyLinks?: FamilyLinkVM[] | null;

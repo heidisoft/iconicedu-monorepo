@@ -47,13 +47,14 @@ export async function loadSidebarContext(
 }> {
   await autoAcceptPendingInvites(supabase, input.account.id);
 
-  const { accountVM, profileVM } = await buildSidebarUser(
-    supabase,
-    input.authUser,
-    input.account,
-    input.familyInvite ?? null,
-    input.profileKindOverride,
-  );
+  const { accountVM, profileVM, availablePersonas, addablePersonas } =
+    await buildSidebarUser(
+      supabase,
+      input.authUser,
+      input.account,
+      input.familyInvite ?? null,
+      input.profileKindOverride,
+    );
 
   const directMessages =
     profileVM.kind === 'guardian'
@@ -121,6 +122,8 @@ export async function loadSidebarContext(
       user: {
         profile: profileVM,
         account: accountVM,
+        availablePersonas,
+        addablePersonas,
       },
       collections: {
         ...input.baseSidebarData.collections,

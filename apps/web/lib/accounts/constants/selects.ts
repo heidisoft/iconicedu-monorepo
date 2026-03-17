@@ -16,6 +16,7 @@ export const ACCOUNT_SELECT = [
   'primary_role',
   'role_status',
   'onboarding_completed_at',
+  'active_profile_id',
   'created_at',
   'updated_at',
   'archived_at',
