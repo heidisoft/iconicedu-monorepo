@@ -128,7 +128,7 @@ export async function POST(request: Request) {
     const insertProfileResponse = await insertProfileForAccount(serviceSupabase, {
       orgId: org.id,
       accountId: account.id,
-      kind: 'guardian',
+      kind: 'staff',
       displayName: null,
       avatarSource: 'seed',
       avatarUrl: null,

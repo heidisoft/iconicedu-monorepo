@@ -200,6 +200,19 @@ describe('POST /api/orgs/bootstrap', () => {
     expect(body.success).toBe(true);
     expect(body.org.slug).toBe('iconic-academy');
     expect(body.onboarding.destination).toBe('/iconic-academy');
+    expect(mockInsertProfileForAccount).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        orgId: 'org-1',
+        accountId: 'account-1',
+        kind: 'staff',
+        avatarSource: 'seed',
+        timezone: 'UTC',
+        locale: 'en-US',
+        status: 'active',
+        uiThemeKey: 'teal',
+      }),
+    );
     expect(mockEnsureSupportChannel).toHaveBeenCalledWith(
       expect.objectContaining({
         orgId: 'org-1',
