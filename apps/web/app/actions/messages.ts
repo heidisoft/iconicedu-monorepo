@@ -16,6 +16,7 @@ import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service
 import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
 import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import { resolveActiveProfileForAccountInOrg } from '@iconicedu/web/lib/profile/queries/active-profile.query';
 import { buildUserProfileById } from '@iconicedu/web/lib/profile/builders/user-profile.builder';
 import { mapMessageRowToVM } from '@iconicedu/web/lib/messages/mappers/message.mapper';
 import { buildThreadById } from '@iconicedu/web/lib/messages/builders/thread.builder';
@@ -1236,18 +1237,31 @@ export async function sendTextMessageAction(
     throw new Error('Account not found');
   }
 
-  const profileResponse = await getProfileByAccountId(supabase, accountResponse.data.id);
-  if (!profileResponse.data) {
-    throw new Error('Profile not found');
-  }
-  const accountOrgId = accountResponse.data.org_id;
-  const currentProfileId = profileResponse.data.id;
-  const serviceSupabase = createSupabaseServiceClient();
-
   if (input.orgId !== accountResponse.data.org_id) {
     throw new Error('Invalid org');
   }
-  if (input.senderProfileId !== profileResponse.data.id) {
+
+  const activeProfile = await resolveActiveProfileForAccountInOrg(supabase, {
+    accountId: accountResponse.data.id,
+    orgId: accountResponse.data.org_id,
+    activeProfileId: accountResponse.data.active_profile_id ?? null,
+    updatedByAuthUserId: authUser.id,
+  });
+  if (activeProfile.source !== 'active_profile_id') {
+    console.info('[active-profile-resolver]', {
+      action: 'sendTextMessageAction',
+      orgId: accountResponse.data.org_id,
+      accountId: accountResponse.data.id,
+      previousActiveProfileId: accountResponse.data.active_profile_id ?? null,
+      resolvedProfileId: activeProfile.profile.id,
+      source: activeProfile.source,
+    });
+  }
+  const accountOrgId = accountResponse.data.org_id;
+  const currentProfileId = activeProfile.profile.id;
+  const serviceSupabase = createSupabaseServiceClient();
+
+  if (input.senderProfileId !== activeProfile.profile.id) {
     throw new Error('Invalid sender');
   }
   let sanitizedMentions: MessageMentionVM[] = [];
@@ -1299,7 +1313,7 @@ export async function sendTextMessageAction(
   const staffSender = await isStaffActorInOrg(supabase, {
     orgId: accountOrgId,
     accountId: accountResponse.data.id,
-    profileKind: profileResponse.data.kind,
+    profileKind: activeProfile.profile.kind,
   });
   const supportQuestionOwnerProfileId =
     isSupportChannel && isSupportThreadReply
@@ -1335,7 +1349,7 @@ export async function sendTextMessageAction(
   const messageInsertValues = {
     org_id: accountResponse.data.org_id,
     channel_id: input.channelId,
-    sender_profile_id: profileResponse.data.id,
+    sender_profile_id: currentProfileId,
     type: homeworkIntent
       ? 'lesson-assignment'
       : previewMetadata
@@ -1346,9 +1360,9 @@ export async function sendTextMessageAction(
     thread_id: threadId,
     thread_parent_id: input.threadParentId ?? null,
     created_at: now,
-    created_by: profileResponse.data.id,
+    created_by: currentProfileId,
     updated_at: now,
-    updated_by: profileResponse.data.id,
+    updated_by: currentProfileId,
   };
   const messageInsert = await insertMessageRowWithRlsFallback({
     supabase,
@@ -1357,7 +1371,7 @@ export async function sendTextMessageAction(
     debugContext: {
       orgId: accountResponse.data.org_id,
       channelId: input.channelId,
-      senderProfileId: profileResponse.data.id,
+      senderProfileId: currentProfileId,
       action: 'sendTextMessageAction',
     },
   });
@@ -1407,9 +1421,9 @@ export async function sendTextMessageAction(
               ...(sanitizedMentions.length ? { mentions: sanitizedMentions } : {}),
             },
       created_at: now,
-      created_by: profileResponse.data.id,
+      created_by: currentProfileId,
       updated_at: now,
-      updated_by: profileResponse.data.id,
+      updated_by: currentProfileId,
     });
 
   if (payloadInsert.error) {
@@ -1446,7 +1460,7 @@ export async function sendTextMessageAction(
     currentProfileId,
   });
 
-  const sender = await buildUserProfileById(supabase, profileResponse.data.id);
+  const sender = await buildUserProfileById(supabase, currentProfileId);
   if (!sender) {
     throw new Error('Sender not found');
   }
@@ -1608,15 +1622,27 @@ export async function sendFileMessageAction(
     throw new Error('Account not found');
   }
 
-  const profileResponse = await getProfileByAccountId(supabase, accountResponse.data.id);
-  if (!profileResponse.data) {
-    throw new Error('Profile not found');
-  }
-
   if (input.orgId !== accountResponse.data.org_id) {
     throw new Error('Invalid org');
   }
-  if (input.senderProfileId !== profileResponse.data.id) {
+
+  const activeProfile = await resolveActiveProfileForAccountInOrg(supabase, {
+    accountId: accountResponse.data.id,
+    orgId: accountResponse.data.org_id,
+    activeProfileId: accountResponse.data.active_profile_id ?? null,
+    updatedByAuthUserId: authUser.id,
+  });
+  if (activeProfile.source !== 'active_profile_id') {
+    console.info('[active-profile-resolver]', {
+      action: 'sendFileMessageAction',
+      orgId: accountResponse.data.org_id,
+      accountId: accountResponse.data.id,
+      previousActiveProfileId: accountResponse.data.active_profile_id ?? null,
+      resolvedProfileId: activeProfile.profile.id,
+      source: activeProfile.source,
+    });
+  }
+  if (input.senderProfileId !== activeProfile.profile.id) {
     throw new Error('Invalid sender');
   }
   if (!input.name?.trim()) {
@@ -1630,14 +1656,14 @@ export async function sendFileMessageAction(
       storagePath: input.storagePath,
       orgId: input.orgId,
       channelId: input.channelId,
-      profileId: profileResponse.data.id,
+      profileId: activeProfile.profile.id,
     })
   ) {
     throw new Error('Invalid file storage path');
   }
 
   const now = new Date().toISOString();
-  const currentProfileId = profileResponse.data.id;
+  const currentProfileId = activeProfile.profile.id;
   const serviceSupabase = createSupabaseServiceClient();
   const activityContext = await resolveActivityChannelContext({
     supabase,
@@ -1658,7 +1684,7 @@ export async function sendFileMessageAction(
   const staffSender = await isStaffActorInOrg(supabase, {
     orgId: input.orgId,
     accountId: accountResponse.data.id,
-    profileKind: profileResponse.data.kind,
+    profileKind: activeProfile.profile.kind,
   });
   const supportQuestionOwnerProfileId =
     isSupportChannel && isSupportThreadReply
@@ -1914,22 +1940,33 @@ export async function sendFilesMessageAction(
     throw new Error('Account not found');
   }
 
-  const profileResponse = await getProfileByAccountId(supabase, accountResponse.data.id);
-  if (!profileResponse.data) {
-    throw new Error('Profile not found');
-  }
-
   if (input.orgId !== accountResponse.data.org_id) {
     throw new Error('Invalid org');
   }
-  if (input.senderProfileId !== profileResponse.data.id) {
+  const activeProfile = await resolveActiveProfileForAccountInOrg(supabase, {
+    accountId: accountResponse.data.id,
+    orgId: accountResponse.data.org_id,
+    activeProfileId: accountResponse.data.active_profile_id ?? null,
+    updatedByAuthUserId: authUser.id,
+  });
+  if (activeProfile.source !== 'active_profile_id') {
+    console.info('[active-profile-resolver]', {
+      action: 'sendFilesMessageAction',
+      orgId: accountResponse.data.org_id,
+      accountId: accountResponse.data.id,
+      previousActiveProfileId: accountResponse.data.active_profile_id ?? null,
+      resolvedProfileId: activeProfile.profile.id,
+      source: activeProfile.source,
+    });
+  }
+  if (input.senderProfileId !== activeProfile.profile.id) {
     throw new Error('Invalid sender');
   }
   if (!input.assets.length) {
     throw new Error('At least one file is required');
   }
 
-  const currentProfileId = profileResponse.data.id;
+  const currentProfileId = activeProfile.profile.id;
   for (const asset of input.assets) {
     if (!asset.name?.trim()) {
       throw new Error('File name is required');
@@ -1981,7 +2018,7 @@ export async function sendFilesMessageAction(
   const staffSender = await isStaffActorInOrg(supabase, {
     orgId: input.orgId,
     accountId: accountResponse.data.id,
-    profileKind: profileResponse.data.kind,
+    profileKind: activeProfile.profile.kind,
   });
   const supportQuestionOwnerProfileId =
     isSupportChannel && isSupportThreadReply

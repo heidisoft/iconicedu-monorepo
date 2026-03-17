@@ -13,6 +13,7 @@ import {
 const mapMessageRowToVM = vi.fn();
 const buildUserProfileById = vi.fn();
 const publishActivityEvent = vi.fn();
+const resolveActiveProfileForAccountInOrg = vi.fn();
 
 function createChannelLookupChain(
   data: {
@@ -50,6 +51,10 @@ vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
 
 vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
   getProfileByAccountId: vi.fn(async () => ({ data: { id: 'profile-1' } })),
+}));
+vi.mock('@iconicedu/web/lib/profile/queries/active-profile.query', () => ({
+  resolveActiveProfileForAccountInOrg: (...args: unknown[]) =>
+    resolveActiveProfileForAccountInOrg(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/profile/builders/user-profile.builder', () => ({
@@ -150,6 +155,33 @@ describe('sendTextMessageAction', () => {
     mapMessageRowToVM.mockReset();
     buildUserProfileById.mockReset();
     publishActivityEvent.mockReset();
+    resolveActiveProfileForAccountInOrg.mockReset();
+    const { getProfileByAccountId } =
+      await import('@iconicedu/web/lib/profile/queries/profiles.query');
+    const { getAccountByAuthUserId } =
+      await import('@iconicedu/web/lib/accounts/queries/accounts.query');
+    (
+      getAccountByAuthUserId as unknown as { mockResolvedValue: (value: unknown) => void }
+    ).mockResolvedValue({
+      data: { id: 'account-1', org_id: 'org-1' },
+    });
+    resolveActiveProfileForAccountInOrg.mockImplementation(
+      async (supabase: unknown, input: { accountId: string }) => {
+        const profileResponse = await (
+          getProfileByAccountId as unknown as (
+            client: unknown,
+            accountId: string,
+          ) => Promise<{ data?: { id?: string; kind?: string } | null }>
+        )(supabase, input.accountId);
+        return {
+          profile: {
+            id: profileResponse.data?.id ?? 'profile-1',
+            kind: profileResponse.data?.kind ?? 'guardian',
+          },
+          source: 'active_profile_id',
+        };
+      },
+    );
     const { createSupabaseServiceClient } =
       await import('@iconicedu/web/lib/supabase/service');
     (
@@ -315,6 +347,159 @@ describe('sendTextMessageAction', () => {
     });
 
     expect(publishActivityEvent).not.toHaveBeenCalled();
+  });
+
+  it('uses active_profile_id resolver for sender validation', async () => {
+    const supabase = {
+      auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
+      from: vi.fn(),
+    };
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    (
+      createSupabaseServerClient as unknown as {
+        mockReturnValue: (value: unknown) => void;
+      }
+    ).mockReturnValue(supabase);
+    const { getAccountByAuthUserId } =
+      await import('@iconicedu/web/lib/accounts/queries/accounts.query');
+    (
+      getAccountByAuthUserId as unknown as { mockResolvedValue: (value: unknown) => void }
+    ).mockResolvedValue({
+      data: { id: 'account-1', org_id: 'org-1', active_profile_id: 'profile-active' },
+    });
+    resolveActiveProfileForAccountInOrg.mockResolvedValueOnce({
+      profile: { id: 'profile-active', kind: 'staff' },
+      source: 'active_profile_id',
+    });
+
+    const insertMessage = vi.fn(() => ({
+      select: () => ({
+        single: async () => ({
+          data: {
+            id: 'message-active-1',
+            org_id: 'org-1',
+            channel_id: 'channel-1',
+            sender_profile_id: 'profile-active',
+            type: 'text',
+            created_at: new Date().toISOString(),
+          },
+          error: null,
+        }),
+      }),
+    }));
+    const insertMessageText = vi.fn(async () => ({ error: null }));
+    const channelLookup = createChannelLookupChain({
+      id: 'channel-1',
+      kind: 'channel',
+      topic: 'General',
+      primary_entity_kind: null,
+      primary_entity_id: null,
+    });
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'channels') return { select: () => channelLookup };
+      if (table === 'messages') return { insert: insertMessage };
+      if (table === 'message_text') return { insert: insertMessageText };
+      return { insert: vi.fn() };
+    });
+
+    buildUserProfileById.mockResolvedValueOnce({
+      ids: { id: 'profile-active', orgId: 'org-1' },
+      profile: { displayName: 'Priya' },
+    });
+    mapMessageRowToVM.mockReturnValueOnce({
+      ids: { id: 'message-active-1', orgId: 'org-1' },
+    });
+
+    await expect(
+      sendTextMessageAction({
+        orgId: 'org-1',
+        channelId: 'channel-1',
+        senderProfileId: 'profile-active',
+        content: 'active profile send',
+      }),
+    ).resolves.toEqual({ ids: { id: 'message-active-1', orgId: 'org-1' } });
+
+    expect(resolveActiveProfileForAccountInOrg).toHaveBeenCalledWith(
+      supabase,
+      expect.objectContaining({
+        accountId: 'account-1',
+        orgId: 'org-1',
+        activeProfileId: 'profile-active',
+      }),
+    );
+  });
+
+  it('self-heals active profile mismatch and allows sender when fallback profile matches', async () => {
+    const supabase = {
+      auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
+      from: vi.fn(),
+    };
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    (
+      createSupabaseServerClient as unknown as {
+        mockReturnValue: (value: unknown) => void;
+      }
+    ).mockReturnValue(supabase);
+    const { getAccountByAuthUserId } =
+      await import('@iconicedu/web/lib/accounts/queries/accounts.query');
+    (
+      getAccountByAuthUserId as unknown as { mockResolvedValue: (value: unknown) => void }
+    ).mockResolvedValue({
+      data: { id: 'account-1', org_id: 'org-1', active_profile_id: 'stale-profile' },
+    });
+    resolveActiveProfileForAccountInOrg.mockResolvedValueOnce({
+      profile: { id: 'profile-healed', kind: 'guardian' },
+      source: 'fallback-healed',
+    });
+
+    const insertMessage = vi.fn(() => ({
+      select: () => ({
+        single: async () => ({
+          data: {
+            id: 'message-healed-1',
+            org_id: 'org-1',
+            channel_id: 'channel-1',
+            sender_profile_id: 'profile-healed',
+            type: 'text',
+            created_at: new Date().toISOString(),
+          },
+          error: null,
+        }),
+      }),
+    }));
+    const insertMessageText = vi.fn(async () => ({ error: null }));
+    const channelLookup = createChannelLookupChain({
+      id: 'channel-1',
+      kind: 'channel',
+      topic: 'General',
+      primary_entity_kind: null,
+      primary_entity_id: null,
+    });
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'channels') return { select: () => channelLookup };
+      if (table === 'messages') return { insert: insertMessage };
+      if (table === 'message_text') return { insert: insertMessageText };
+      return { insert: vi.fn() };
+    });
+
+    buildUserProfileById.mockResolvedValueOnce({
+      ids: { id: 'profile-healed', orgId: 'org-1' },
+      profile: { displayName: 'Priya' },
+    });
+    mapMessageRowToVM.mockReturnValueOnce({
+      ids: { id: 'message-healed-1', orgId: 'org-1' },
+    });
+
+    await expect(
+      sendTextMessageAction({
+        orgId: 'org-1',
+        channelId: 'channel-1',
+        senderProfileId: 'profile-healed',
+        content: 'healed profile send',
+      }),
+    ).resolves.toEqual({ ids: { id: 'message-healed-1', orgId: 'org-1' } });
   });
 
   it('treats @homework text as plain text when explicit assignment metadata is not provided', async () => {
