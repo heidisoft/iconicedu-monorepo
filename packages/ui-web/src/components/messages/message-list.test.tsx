@@ -1,13 +1,32 @@
 /* @vitest-environment jsdom */
 import React from 'react';
-import { render, act, screen } from '@testing-library/react';
+import { render, act, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { MessageList } from '@iconicedu/ui-web/components/messages/message-list';
 import type { MessageVM, ThreadVM } from '@iconicedu/shared-types';
 
 vi.mock('@iconicedu/ui-web/components/messages/message-item', () => ({
-  MessageItem: () => null,
+  MessageItem: ({
+    message,
+    onOpenThread,
+    isThreadReply,
+  }: {
+    message: MessageVM;
+    onOpenThread?: (thread: ThreadVM, message: MessageVM) => void;
+    isThreadReply?: boolean;
+  }) =>
+    !isThreadReply && message.social.thread ? (
+      <button
+        type="button"
+        data-testid={`open-thread-${message.ids.id}`}
+        onClick={() => onOpenThread?.(message.social.thread as ThreadVM, message)}
+      >
+        Open thread
+      </button>
+    ) : (
+      <div data-testid={`message-item-${message.ids.id}`} />
+    ),
 }));
 
 vi.mock('@iconicedu/ui-web/components/messages/empty-state', () => ({
@@ -36,6 +55,32 @@ const baseMessage: MessageVM = {
   social: { reactions: [] },
   content: { text: 'Hello' },
 };
+
+function createMessage(input: {
+  id: string;
+  senderId?: string;
+  createdAt?: string;
+  thread?: ThreadVM;
+  text?: string;
+}): MessageVM {
+  return {
+    ...baseMessage,
+    ids: { ...baseMessage.ids, id: input.id },
+    core: {
+      ...baseMessage.core,
+      createdAt: input.createdAt ?? baseMessage.core.createdAt,
+      sender: {
+        ...baseMessage.core.sender,
+        ids: { ...baseMessage.core.sender.ids, id: input.senderId ?? 'profile-1' },
+      },
+    },
+    social: {
+      ...baseMessage.social,
+      thread: input.thread,
+    },
+    content: { text: input.text ?? 'Hello' },
+  } as MessageVM;
+}
 
 describe('MessageList', () => {
   beforeEach(() => {
@@ -401,5 +446,186 @@ describe('MessageList', () => {
     });
     expect(screen.queryByTestId('unread-divider')).not.toBeInTheDocument();
     vi.useRealTimers();
+  });
+
+  it('shows inline unread divider at first unread reply when lastReadMessageId is present', async () => {
+    const thread: ThreadVM = {
+      ids: { id: 'thread-1', orgId: 'org-1' },
+      parent: { messageId: 'message-parent' },
+      stats: { messageCount: 3, lastReplyAt: '2026-02-16T10:03:00.000Z' },
+      participants: [],
+      readState: { threadId: 'thread-1', lastReadMessageId: 'reply-1', unreadCount: 2 },
+    };
+    const parent = createMessage({
+      id: 'message-parent',
+      senderId: 'profile-parent',
+      createdAt: '2026-02-16T10:00:00.000Z',
+      thread,
+    });
+    const reply1 = createMessage({
+      id: 'reply-1',
+      senderId: 'profile-2',
+      createdAt: '2026-02-16T10:01:00.000Z',
+      thread,
+      text: 'Reply one',
+    });
+    const reply2 = createMessage({
+      id: 'reply-2',
+      senderId: 'profile-3',
+      createdAt: '2026-02-16T10:02:00.000Z',
+      thread,
+      text: 'Reply two',
+    });
+
+    render(
+      <MessageList
+        messages={[parent, reply1, reply2]}
+        onOpenThread={
+          vi.fn() as unknown as (thread: ThreadVM, message: MessageVM) => void
+        }
+        onProfileClick={vi.fn()}
+        currentUserId="profile-1"
+      />,
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('open-thread-message-parent'));
+    });
+
+    expect(screen.getByText('New messages (2)')).toBeInTheDocument();
+  });
+
+  it('shows inline unread divider using unreadCount fallback when lastReadMessageId is missing', async () => {
+    const thread: ThreadVM = {
+      ids: { id: 'thread-2', orgId: 'org-1' },
+      parent: { messageId: 'message-parent' },
+      stats: { messageCount: 4, lastReplyAt: '2026-02-16T10:04:00.000Z' },
+      participants: [],
+      readState: { threadId: 'thread-2', unreadCount: 1 },
+    };
+    const parent = createMessage({
+      id: 'message-parent',
+      senderId: 'profile-parent',
+      createdAt: '2026-02-16T10:00:00.000Z',
+      thread,
+    });
+    const reply1 = createMessage({
+      id: 'reply-1',
+      senderId: 'profile-2',
+      createdAt: '2026-02-16T10:01:00.000Z',
+      thread,
+      text: 'Reply one',
+    });
+    const reply2 = createMessage({
+      id: 'reply-2',
+      senderId: 'profile-3',
+      createdAt: '2026-02-16T10:02:00.000Z',
+      thread,
+      text: 'Reply two',
+    });
+
+    render(
+      <MessageList
+        messages={[parent, reply1, reply2]}
+        onOpenThread={
+          vi.fn() as unknown as (thread: ThreadVM, message: MessageVM) => void
+        }
+        onProfileClick={vi.fn()}
+        currentUserId="profile-1"
+      />,
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('open-thread-message-parent'));
+    });
+
+    expect(screen.getByText('New messages (1)')).toBeInTheDocument();
+  });
+
+  it('does not show inline unread divider when unreadCount is zero', async () => {
+    const thread: ThreadVM = {
+      ids: { id: 'thread-3', orgId: 'org-1' },
+      parent: { messageId: 'message-parent' },
+      stats: { messageCount: 3, lastReplyAt: '2026-02-16T10:03:00.000Z' },
+      participants: [],
+      readState: { threadId: 'thread-3', unreadCount: 0 },
+    };
+    const parent = createMessage({
+      id: 'message-parent',
+      senderId: 'profile-parent',
+      createdAt: '2026-02-16T10:00:00.000Z',
+      thread,
+    });
+    const reply1 = createMessage({
+      id: 'reply-1',
+      senderId: 'profile-2',
+      createdAt: '2026-02-16T10:01:00.000Z',
+      thread,
+      text: 'Reply one',
+    });
+
+    render(
+      <MessageList
+        messages={[parent, reply1]}
+        onOpenThread={
+          vi.fn() as unknown as (thread: ThreadVM, message: MessageVM) => void
+        }
+        onProfileClick={vi.fn()}
+        currentUserId="profile-1"
+      />,
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('open-thread-message-parent'));
+    });
+
+    expect(screen.queryByText(/New messages/)).not.toBeInTheDocument();
+  });
+
+  it('does not show inline unread divider when replies after anchor are authored by current user', async () => {
+    const thread: ThreadVM = {
+      ids: { id: 'thread-4', orgId: 'org-1' },
+      parent: { messageId: 'message-parent' },
+      stats: { messageCount: 3, lastReplyAt: '2026-02-16T10:03:00.000Z' },
+      participants: [],
+      readState: { threadId: 'thread-4', lastReadMessageId: 'reply-1', unreadCount: 1 },
+    };
+    const parent = createMessage({
+      id: 'message-parent',
+      senderId: 'profile-parent',
+      createdAt: '2026-02-16T10:00:00.000Z',
+      thread,
+    });
+    const reply1 = createMessage({
+      id: 'reply-1',
+      senderId: 'profile-2',
+      createdAt: '2026-02-16T10:01:00.000Z',
+      thread,
+      text: 'Reply one',
+    });
+    const myReply = createMessage({
+      id: 'reply-2',
+      senderId: 'profile-1',
+      createdAt: '2026-02-16T10:02:00.000Z',
+      thread,
+      text: 'My reply',
+    });
+
+    render(
+      <MessageList
+        messages={[parent, reply1, myReply]}
+        onOpenThread={
+          vi.fn() as unknown as (thread: ThreadVM, message: MessageVM) => void
+        }
+        onProfileClick={vi.fn()}
+        currentUserId="profile-1"
+      />,
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('open-thread-message-parent'));
+    });
+
+    expect(screen.queryByText(/New messages/)).not.toBeInTheDocument();
   });
 });

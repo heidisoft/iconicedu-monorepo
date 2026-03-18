@@ -25,6 +25,17 @@ function mergeMessage(current: MessageVM, updates: Partial<MessageVM>): MessageV
     mergedSocial.thread = current.social.thread;
   }
 
+  if (
+    updates.social?.thread &&
+    current.social.thread?.readState &&
+    updates.social.thread.readState?.unreadCount === undefined
+  ) {
+    mergedSocial.thread = {
+      ...updates.social.thread,
+      readState: current.social.thread.readState,
+    };
+  }
+
   return {
     ...current,
     ...updates,

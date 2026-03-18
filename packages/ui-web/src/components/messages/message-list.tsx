@@ -84,6 +84,45 @@ export interface MessageListRef {
   scrollToMessage: (messageId: string) => void;
 }
 
+function findInlineUnreadStartIndex(input: {
+  replies: MessageVM[];
+  lastReadMessageId?: UUID;
+  unreadCount?: number;
+  currentUserId?: UUID;
+}): number {
+  const { replies, lastReadMessageId, unreadCount, currentUserId } = input;
+  const normalizedUnreadCount = Math.max(0, unreadCount ?? 0);
+  if (replies.length === 0) {
+    return -1;
+  }
+
+  const findIncomingIndex = (startIndex: number): number => {
+    for (let index = startIndex; index < replies.length; index += 1) {
+      const reply = replies[index];
+      if (!currentUserId || reply.core.sender.ids.id !== currentUserId) {
+        return index;
+      }
+    }
+    return -1;
+  };
+
+  if (lastReadMessageId) {
+    const lastReadIndex = replies.findIndex(
+      (reply) => reply.ids.id === lastReadMessageId,
+    );
+    if (lastReadIndex >= 0) {
+      return findIncomingIndex(lastReadIndex + 1);
+    }
+  }
+
+  if (normalizedUnreadCount <= 0) {
+    return -1;
+  }
+
+  const fallbackStartIndex = Math.max(0, replies.length - normalizedUnreadCount);
+  return findIncomingIndex(fallbackStartIndex);
+}
+
 export const MessageList = forwardRef<MessageListRef, MessageListProps>(
   (
     {
@@ -433,6 +472,17 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                 openedThreadByParent[message.ids.id] ?? message.social.thread;
               const isInlineThreadExpanded =
                 Boolean(inlineThread) && Boolean(expandedThreadsByParent[message.ids.id]);
+              const inlineReplies = threadRepliesByParent.get(message.ids.id) ?? [];
+              const inlineUnreadCount = Math.max(
+                0,
+                inlineThread?.readState?.unreadCount ?? 0,
+              );
+              const inlineUnreadStartIndex = findInlineUnreadStartIndex({
+                replies: inlineReplies,
+                lastReadMessageId: inlineThread?.readState?.lastReadMessageId,
+                unreadCount: inlineThread?.readState?.unreadCount,
+                currentUserId,
+              });
               return (
                 <div
                   key={message.ids.id}
@@ -479,30 +529,33 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                             Loading replies...
                           </div>
                         )}
-                        {(threadRepliesByParent.get(message.ids.id) ?? []).map(
-                          (reply) => {
-                            const senderName = getProfileDisplayName(
-                              reply.core.sender.profile,
-                            );
-                            const isOwnReply = currentUserId === reply.core.sender.ids.id;
-                            const shouldHideQuickActions =
-                              shouldHideMessageQuickActions(reply);
-                            const replyActionState = getMessageActionState?.(
-                              reply.ids.id,
-                            );
-                            const isSavingReply = Boolean(replyActionState?.isSaving);
-                            const isHidingReply = Boolean(replyActionState?.isHiding);
-                            const isDeletingReply = Boolean(replyActionState?.isDeleting);
-                            const isAddingReactionReply = Boolean(
-                              replyActionState?.isAddingReaction,
-                            );
-                            const pendingReplyReactionEmojis =
-                              replyActionState?.pendingReactionEmojis ?? [];
-                            return (
-                              <div
-                                key={reply.ids.id}
-                                className="flex w-full items-start gap-3"
-                              >
+                        {inlineReplies.map((reply, replyIndex) => {
+                          const senderName = getProfileDisplayName(
+                            reply.core.sender.profile,
+                          );
+                          const isOwnReply = currentUserId === reply.core.sender.ids.id;
+                          const shouldHideQuickActions =
+                            shouldHideMessageQuickActions(reply);
+                          const replyActionState = getMessageActionState?.(reply.ids.id);
+                          const isSavingReply = Boolean(replyActionState?.isSaving);
+                          const isHidingReply = Boolean(replyActionState?.isHiding);
+                          const isDeletingReply = Boolean(replyActionState?.isDeleting);
+                          const isAddingReactionReply = Boolean(
+                            replyActionState?.isAddingReaction,
+                          );
+                          const pendingReplyReactionEmojis =
+                            replyActionState?.pendingReactionEmojis ?? [];
+                          return (
+                            <div key={reply.ids.id}>
+                              {inlineUnreadStartIndex === replyIndex && (
+                                <UnreadDivider
+                                  count={
+                                    inlineUnreadCount > 0 ? inlineUnreadCount : undefined
+                                  }
+                                  className="my-2"
+                                />
+                              )}
+                              <div className="flex w-full items-start gap-3">
                                 <AvatarWithStatus
                                   name={senderName}
                                   avatar={reply.core.sender.profile.avatar}
@@ -672,9 +725,9 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                   </div>
                                 </div>
                               </div>
-                            );
-                          },
-                        )}
+                            </div>
+                          );
+                        })}
                         {!isReadOnly && (
                           <form
                             className="pt-1"

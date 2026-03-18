@@ -88,6 +88,35 @@ describe('message-list utils', () => {
     expect(result[0].social.thread?.ids.id).toBe('thread-1');
   });
 
+  it('preserves existing thread read state when incoming thread omits unread count', () => {
+    const initial = createMessage('a', '2026-01-01T10:00:00.000Z', {
+      social: {
+        reactions: [],
+        thread: {
+          ids: { id: 'thread-1', orgId: 'org-1' },
+          parent: { messageId: 'a' },
+          stats: { messageCount: 3, lastReplyAt: '2026-01-01T10:10:00.000Z' },
+          participants: [],
+          readState: { threadId: 'thread-1', unreadCount: 2 },
+        },
+      },
+    });
+
+    const result = updateMessageById([initial], 'a', {
+      social: {
+        thread: {
+          ids: { id: 'thread-1', orgId: 'org-1' },
+          parent: { messageId: 'a' },
+          stats: { messageCount: 4, lastReplyAt: '2026-01-01T10:12:00.000Z' },
+          participants: [],
+        },
+      },
+    });
+
+    expect(result[0].social.thread?.stats.messageCount).toBe(4);
+    expect(result[0].social.thread?.readState?.unreadCount).toBe(2);
+  });
+
   it('hydrates a parent thread from a loaded reply when the parent is missing thread metadata', () => {
     const parent = createMessage('parent-1', '2026-01-01T10:00:00.000Z');
     const reply = createMessage('reply-1', '2026-01-01T10:05:00.000Z', {

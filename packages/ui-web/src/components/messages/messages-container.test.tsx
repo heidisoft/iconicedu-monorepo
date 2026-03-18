@@ -58,12 +58,28 @@ vi.mock('./context/messages-state-provider', () => ({
 vi.mock('./message-list', () => ({
   MessageList: ({
     onUnreadViewed,
+    onOpenThread,
+    messages,
   }: {
     onUnreadViewed?: (lastReadMessageId: string) => void;
+    onOpenThread?: (thread: any, parentMessage: any) => void | Promise<void>;
+    messages?: any[];
   }) => (
     <div>
       <button type="button" onClick={() => onUnreadViewed?.('message-2')}>
         mark-read
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          const parentMessage = messages?.[0];
+          const thread = parentMessage?.social?.thread;
+          if (thread && parentMessage) {
+            void onOpenThread?.(thread, parentMessage);
+          }
+        }}
+      >
+        open-thread
       </button>
     </div>
   ),
@@ -298,6 +314,124 @@ describe('MessagesContainer', () => {
         }),
       }),
     );
+  });
+
+  it('marks a thread read when opened and persists thread read-state', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes('/api/messages/thread?')) {
+          return {
+            ok: true,
+            json: async () => ({
+              success: true,
+              messages: [
+                {
+                  ids: { id: 'parent-1', orgId: 'org-1' },
+                  core: {
+                    type: 'text',
+                    createdAt: '2026-03-18T09:00:00.000Z',
+                    visibility: { type: 'all' },
+                    sender: makeParticipant('profile-1', 'guardian'),
+                  },
+                  social: { reactions: [] },
+                  content: { text: 'parent' },
+                },
+                {
+                  ids: { id: 'reply-1', orgId: 'org-1' },
+                  core: {
+                    type: 'text',
+                    createdAt: '2026-03-18T09:10:00.000Z',
+                    visibility: { type: 'all' },
+                    sender: makeParticipant('profile-1', 'guardian'),
+                  },
+                  social: {
+                    reactions: [],
+                    thread: {
+                      ids: { id: 'thread-1', orgId: 'org-1' },
+                      parent: { messageId: 'parent-1' },
+                      stats: { messageCount: 2, lastReplyAt: '2026-03-18T09:10:00.000Z' },
+                      participants: [],
+                    },
+                  },
+                  content: { text: 'reply' },
+                },
+              ],
+            }),
+          };
+        }
+        if (url.includes('/api/messages/thread-read-state')) {
+          return {
+            ok: true,
+            json: async () => ({
+              success: true,
+              unreadCount: 0,
+              lastReadAt: '2026-03-18T09:10:00.000Z',
+              lastReadMessageId: 'reply-1',
+            }),
+          };
+        }
+        return {
+          ok: true,
+          json: async () => ({ success: true, files: [] }),
+        };
+      }),
+    );
+
+    const channelWithThread = {
+      ...channel,
+      collections: {
+        ...channel.collections,
+        messages: {
+          items: [
+            {
+              ids: { id: 'parent-1', orgId: 'org-1' },
+              core: {
+                type: 'text',
+                createdAt: '2026-03-18T09:00:00.000Z',
+                visibility: { type: 'all' },
+                sender: makeParticipant('profile-2', 'educator'),
+              },
+              social: {
+                reactions: [],
+                thread: {
+                  ids: { id: 'thread-1', orgId: 'org-1' },
+                  parent: { messageId: 'parent-1' },
+                  stats: { messageCount: 2, lastReplyAt: '2026-03-18T09:10:00.000Z' },
+                  participants: [],
+                  readState: { threadId: 'thread-1', unreadCount: 1 },
+                },
+              },
+              content: { text: 'parent' },
+            },
+          ],
+          total: 1,
+        },
+      },
+    } as unknown as ChannelVM;
+
+    render(<MessagesContainer channel={channelWithThread} currentUserId="profile-2" />);
+
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: 'open-thread' }));
+    });
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/messages/thread?'),
+      );
+    });
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/messages/thread-read-state',
+        expect.objectContaining({
+          method: 'POST',
+          body: expect.stringContaining('"threadId":"thread-1"'),
+        }),
+      );
+    });
   });
 
   it('renders read-only notice for supervised conversations', () => {

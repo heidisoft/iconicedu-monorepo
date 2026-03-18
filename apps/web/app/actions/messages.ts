@@ -1577,7 +1577,9 @@ export async function sendTextMessageAction(
   }
 
   const thread = threadId
-    ? await buildThreadById(supabase, accountResponse.data.org_id, threadId)
+    ? await buildThreadById(supabase, accountResponse.data.org_id, threadId, {
+        accountId: accountResponse.data.id,
+      })
     : null;
 
   return mapMessageRowToVM(messageInsert.data, {
@@ -1895,7 +1897,9 @@ export async function sendFileMessageAction(
       : undefined) ?? 'Someone';
 
   const thread = threadId
-    ? await buildThreadById(supabase, accountResponse.data.org_id, threadId)
+    ? await buildThreadById(supabase, accountResponse.data.org_id, threadId, {
+        accountId: accountResponse.data.id,
+      })
     : null;
 
   if (!visibilityAudience.suppressActivity) {
@@ -2218,7 +2222,9 @@ export async function sendFilesMessageAction(
       : undefined) ?? 'Someone';
 
   const thread = threadId
-    ? await buildThreadById(supabase, accountResponse.data.org_id, threadId)
+    ? await buildThreadById(supabase, accountResponse.data.org_id, threadId, {
+        accountId: accountResponse.data.id,
+      })
     : null;
 
   if (!visibilityAudience.suppressActivity) {

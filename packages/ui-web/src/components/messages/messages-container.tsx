@@ -126,6 +126,14 @@ const isEducatorProfile = (profile: UserProfileVM): profile is EducatorProfileVM
 const MESSAGES_PAGE_SIZE = 40;
 const READ_STATE_PERSIST_DEBOUNCE_MS = 220;
 const TYPING_REMOTE_TIMEOUT_MS = 4000;
+
+function isThreadUnreadDebugEnabled() {
+  return (
+    process.env.NEXT_PUBLIC_DEBUG_THREAD_UNREAD?.trim() === 'true' ||
+    process.env.DEBUG_THREAD_UNREAD?.trim() === 'true'
+  );
+}
+
 type AssignmentSendInput = {
   kind?: 'homework' | 'lesson';
   title: string;
@@ -538,6 +546,119 @@ export function MessagesContainer({
         parentMessage,
       });
 
+      const latestReply = [...resolvedReplies].sort(
+        (a, b) =>
+          new Date(a.core.createdAt).getTime() - new Date(b.core.createdAt).getTime(),
+      )[resolvedReplies.length - 1];
+      if (latestReply?.ids.id) {
+        const optimisticReadAt = new Date().toISOString();
+        const optimisticThread = {
+          ...thread,
+          readState: {
+            threadId: thread.ids.id,
+            channelId: channel.ids.id,
+            lastReadMessageId: latestReply.ids.id,
+            lastReadAt: optimisticReadAt,
+            unreadCount: 0,
+          },
+        } as ThreadVM;
+
+        if (isThreadUnreadDebugEnabled()) {
+          console.info('[thread-unread][ui][open][request]', {
+            channelId: channel.ids.id,
+            threadId: thread.ids.id,
+            lastReadMessageId: latestReply.ids.id,
+            optimisticReadAt,
+          });
+        }
+
+        setThreadData(optimisticThread, {
+          replies: {
+            items: resolvedReplies,
+            total:
+              typeof optimisticThread.stats?.messageCount === 'number'
+                ? Math.max(0, optimisticThread.stats.messageCount - 1)
+                : resolvedReplies.length,
+          },
+          parentMessage,
+        });
+
+        updateMessage(parentMessage.ids.id, {
+          social: {
+            ...(parentMessage.social ?? { reactions: [] }),
+            thread: optimisticThread,
+          } as MessageVM['social'],
+        });
+
+        try {
+          const response = await runWithNetworkActivity(() =>
+            window.fetch('/api/messages/thread-read-state', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                channelId: channel.ids.id,
+                threadId: thread.ids.id,
+                lastReadMessageId: latestReply.ids.id,
+              }),
+            }),
+          );
+
+          if (response.ok) {
+            const payload = (await response.json().catch(() => null)) as {
+              success?: boolean;
+              unreadCount?: number;
+              lastReadAt?: string;
+              lastReadMessageId?: string;
+            } | null;
+
+            if (payload?.success) {
+              const reconciledThread = {
+                ...optimisticThread,
+                readState: {
+                  threadId: thread.ids.id,
+                  channelId: channel.ids.id,
+                  lastReadMessageId:
+                    payload.lastReadMessageId ??
+                    optimisticThread.readState?.lastReadMessageId,
+                  lastReadAt:
+                    payload.lastReadAt ?? optimisticThread.readState?.lastReadAt,
+                  unreadCount: Math.max(0, payload.unreadCount ?? 0),
+                },
+              } as ThreadVM;
+
+              if (isThreadUnreadDebugEnabled()) {
+                console.info('[thread-unread][ui][open][response]', {
+                  channelId: channel.ids.id,
+                  threadId: thread.ids.id,
+                  lastReadMessageId: payload.lastReadMessageId ?? latestReply.ids.id,
+                  unreadCount: payload.unreadCount ?? 0,
+                });
+              }
+
+              setThreadData(reconciledThread, {
+                replies: {
+                  items: resolvedReplies,
+                  total:
+                    typeof reconciledThread.stats?.messageCount === 'number'
+                      ? Math.max(0, reconciledThread.stats.messageCount - 1)
+                      : resolvedReplies.length,
+                },
+                parentMessage,
+              });
+
+              updateMessage(parentMessage.ids.id, {
+                social: {
+                  ...(parentMessage.social ?? { reactions: [] }),
+                  thread: reconciledThread,
+                } as MessageVM['social'],
+              });
+            }
+          }
+        } catch {
+          // Best effort thread read-state sync.
+        }
+      }
+
       const isDraftThreadOnly =
         thread.parent.messageId === parentMessage.ids.id &&
         resolvedReplies.length === 0 &&
@@ -546,14 +667,23 @@ export function MessagesContainer({
         return;
       }
 
-      updateMessage(parentMessage.ids.id, {
-        social: {
-          ...(parentMessage.social ?? { reactions: [] }),
-          thread,
-        } as MessageVM['social'],
-      });
+      if (!latestReply?.ids.id) {
+        updateMessage(parentMessage.ids.id, {
+          social: {
+            ...(parentMessage.social ?? { reactions: [] }),
+            thread,
+          } as MessageVM['social'],
+        });
+      }
     },
-    [addMessage, messages, runWithNetworkActivity, setThreadData, updateMessage],
+    [
+      addMessage,
+      channel.ids.id,
+      messages,
+      runWithNetworkActivity,
+      setThreadData,
+      updateMessage,
+    ],
   );
 
   const syncParentThreadFromReply = useCallback(

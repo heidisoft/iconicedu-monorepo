@@ -14,6 +14,7 @@ const mapMessageRowToVM = vi.fn();
 const buildUserProfileById = vi.fn();
 const publishActivityEvent = vi.fn();
 const resolveActiveProfileForAccountInOrg = vi.fn();
+const buildThreadById = vi.fn(async () => ({ ids: { id: 'thread-1', orgId: 'org-1' } }));
 
 function createChannelLookupChain(
   data: {
@@ -69,7 +70,7 @@ vi.mock('@iconicedu/web/lib/activity-feed/publisher/activity-publisher', () => (
 }));
 
 vi.mock('@iconicedu/web/lib/messages/builders/thread.builder', () => ({
-  buildThreadById: vi.fn(async () => ({ ids: { id: 'thread-1', orgId: 'org-1' } })),
+  buildThreadById: (...args: unknown[]) => buildThreadById(...args),
 }));
 vi.mock('@iconicedu/web/lib/messages/link-preview', () => ({
   extractFirstUrl: vi.fn(
@@ -156,6 +157,8 @@ describe('sendTextMessageAction', () => {
     buildUserProfileById.mockReset();
     publishActivityEvent.mockReset();
     resolveActiveProfileForAccountInOrg.mockReset();
+    buildThreadById.mockReset();
+    buildThreadById.mockResolvedValue({ ids: { id: 'thread-1', orgId: 'org-1' } });
     const { getProfileByAccountId } =
       await import('@iconicedu/web/lib/profile/queries/profiles.query');
     const { getAccountByAuthUserId } =
@@ -1155,6 +1158,14 @@ describe('sendTextMessageAction', () => {
     });
     const insertMessageFile = vi.fn(async () => ({ error: null }));
     const insertChannelFile = vi.fn(async () => ({ error: null }));
+    const threadSelectChain: any = {};
+    threadSelectChain.select = vi.fn(() => threadSelectChain);
+    threadSelectChain.eq = vi.fn(() => threadSelectChain);
+    threadSelectChain.maybeSingle = vi.fn(async () => ({
+      data: { id: 'thread-file-1', message_count: 0 },
+      error: null,
+    }));
+    const threadUpdate = vi.fn().mockResolvedValue({ error: null });
     const channelLookup = createChannelLookupChain({
       id: 'channel-1',
       kind: 'channel',
@@ -1176,6 +1187,12 @@ describe('sendTextMessageAction', () => {
       if (table === 'channel_files') {
         return { insert: insertChannelFile };
       }
+      if (table === 'threads') {
+        return {
+          select: () => threadSelectChain,
+          update: () => ({ eq: threadUpdate }),
+        };
+      }
       return {};
     });
 
@@ -1195,6 +1212,7 @@ describe('sendTextMessageAction', () => {
       size: 11,
       mimeType: 'application/pdf',
       content: 'See attached',
+      threadId: 'thread-file-1',
     });
 
     expect(supabase.storage.from).toHaveBeenCalledWith('channel-files');
@@ -1238,6 +1256,12 @@ describe('sendTextMessageAction', () => {
           learningSpaceId: 'space-1',
         }),
       }),
+    );
+    expect(buildThreadById).toHaveBeenCalledWith(
+      expect.anything(),
+      'org-1',
+      'thread-file-1',
+      { accountId: 'account-1' },
     );
     expect(result).toEqual({ ids: { id: 'file-message-1', orgId: 'org-1' } });
   });
@@ -1752,11 +1776,25 @@ describe('sendTextMessageAction', () => {
     });
     const insertMessageFile = vi.fn(async () => ({ error: null }));
     const insertChannelFiles = vi.fn(async () => ({ error: null }));
+    const threadSelectChain: any = {};
+    threadSelectChain.select = vi.fn(() => threadSelectChain);
+    threadSelectChain.eq = vi.fn(() => threadSelectChain);
+    threadSelectChain.maybeSingle = vi.fn(async () => ({
+      data: { id: 'thread-files-1', message_count: 0 },
+      error: null,
+    }));
+    const threadUpdate = vi.fn().mockResolvedValue({ error: null });
 
     supabase.from.mockImplementation((table: string) => {
       if (table === 'messages') return { insert: insertMessage };
       if (table === 'message_file') return { insert: insertMessageFile };
       if (table === 'channel_files') return { insert: insertChannelFiles };
+      if (table === 'threads') {
+        return {
+          select: () => threadSelectChain,
+          update: () => ({ eq: threadUpdate }),
+        };
+      }
       return {};
     });
 
@@ -1772,6 +1810,7 @@ describe('sendTextMessageAction', () => {
       channelId: 'channel-1',
       senderProfileId: 'profile-1',
       content: 'Three docs',
+      threadId: 'thread-files-1',
       assets: [
         {
           name: 'brief.pdf',
@@ -1835,6 +1874,12 @@ describe('sendTextMessageAction', () => {
           fileCount: 3,
         }),
       }),
+    );
+    expect(buildThreadById).toHaveBeenCalledWith(
+      expect.anything(),
+      'org-1',
+      'thread-files-1',
+      { accountId: 'account-1' },
     );
     expect(result).toEqual({ ids: { id: 'file-message-group-1', orgId: 'org-1' } });
   });
@@ -2233,6 +2278,9 @@ describe('sendTextMessageAction', () => {
         payload: expect.objectContaining({ threadReply: true }),
       }),
     );
+    expect(buildThreadById).toHaveBeenCalledWith(expect.anything(), 'org-1', 'thread-1', {
+      accountId: 'account-1',
+    });
     expect(result).toEqual({ ids: { id: 'message-2', orgId: 'org-1' } });
   });
 
@@ -2377,6 +2425,9 @@ describe('sendTextMessageAction', () => {
         scope: { kind: 'user', userId: 'profile-parent' },
       }),
     );
+    expect(buildThreadById).toHaveBeenCalledWith(expect.anything(), 'org-1', 'thread-2', {
+      accountId: 'account-1',
+    });
     expect(result).toEqual({ ids: { id: 'message-3', orgId: 'org-1' } });
   });
 
