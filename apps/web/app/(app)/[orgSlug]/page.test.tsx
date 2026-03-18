@@ -8,6 +8,26 @@ import { HomePageContent } from './home-page-content';
 
 const dashboardHomeInfographicSectionMock = vi.fn(() => null);
 const buildDashboardHomeInfographicMetricsMock = vi.fn();
+const getDashboardAccountContextMock = vi.fn(async () => ({
+  supabase: { key: 'supabase-client' },
+  account: { id: 'account-1', org_id: 'org-1' },
+}));
+const getDashboardProfileContextMock = vi.fn(async () => ({
+  currentUserProfile: {
+    kind: 'guardian',
+    ids: { id: 'guardian-1', orgId: 'org-1', accountId: 'account-1' },
+    profile: { displayName: 'Riley Morgan' },
+    prefs: { timezone: 'America/New_York' },
+    children: {
+      items: [
+        {
+          ids: { id: 'child-1' },
+          profile: { displayName: 'Maya Morgan' },
+        },
+      ],
+    },
+  },
+}));
 
 vi.mock('@iconicedu/ui-web', () => ({
   DashboardHeader: () => null,
@@ -27,26 +47,10 @@ vi.mock('../../../lib/subjects/queries/org-subject-catalog.query', () => ({
 }));
 
 vi.mock('./_shared/dashboard-auth', () => ({
-  getDashboardAccountContext: vi.fn(async () => ({
-    supabase: { key: 'supabase-client' },
-    account: { id: 'account-1', org_id: 'org-1' },
-  })),
-  getDashboardProfileContext: vi.fn(async () => ({
-    currentUserProfile: {
-      kind: 'guardian',
-      ids: { id: 'guardian-1', orgId: 'org-1', accountId: 'account-1' },
-      profile: { displayName: 'Riley Morgan' },
-      prefs: { timezone: 'America/New_York' },
-      children: {
-        items: [
-          {
-            ids: { id: 'child-1' },
-            profile: { displayName: 'Maya Morgan' },
-          },
-        ],
-      },
-    },
-  })),
+  getDashboardAccountContext: (...args: unknown[]) =>
+    getDashboardAccountContextMock(...args),
+  getDashboardProfileContext: (...args: unknown[]) =>
+    getDashboardProfileContextMock(...args),
 }));
 
 vi.mock('../../../lib/dashboard/home-infographic-metrics', () => ({
@@ -125,6 +129,84 @@ describe('d home page', () => {
           },
         ],
         subjectOptions: ['Math', 'Science'],
+      }),
+    );
+  });
+
+  it('keeps guardian home metrics when account has multiple personas', async () => {
+    getDashboardProfileContextMock.mockResolvedValueOnce({
+      currentUserProfile: {
+        kind: 'guardian',
+        ids: { id: 'guardian-1', orgId: 'org-1', accountId: 'account-1' },
+        profile: { displayName: 'Riley Morgan' },
+        prefs: { timezone: 'America/New_York' },
+        children: {
+          items: [
+            {
+              ids: { id: 'child-1' },
+              profile: { displayName: 'Maya Morgan' },
+            },
+          ],
+        },
+      },
+      availablePersonas: [
+        { profileId: 'guardian-1', kind: 'guardian', isActive: true },
+        { profileId: 'educator-2', kind: 'educator', isActive: false },
+      ],
+    });
+    buildDashboardHomeInfographicMetricsMock.mockResolvedValueOnce({
+      activeRole: 'parents',
+      isStaffView: false,
+      browseHref: '/iconic-academy/spaces',
+      calendarHref: '/iconic-academy/class-schedule',
+      notificationsHref: '/iconic-academy/notifications',
+      upcomingSessionsPage: {
+        thisWeek: { items: [], total: 0, pageSize: 6, totalPages: 1 },
+        nextWeek: { items: [], total: 0, pageSize: 6, totalPages: 1 },
+      },
+      metricsByRole: {
+        parents: {
+          upcomingSessionsThisWeek: 7,
+          completedClassesThisMonth: 12,
+          activeSubjectsCount: 2,
+          activeSubjectsLabel: 'Math, Science',
+        },
+        students: {
+          upcomingSessionsThisWeek: 0,
+          completedClassesThisMonth: 0,
+          activeSubjectsCount: 0,
+          activeSubjectsLabel: 'No active subjects yet',
+        },
+        tutors: {
+          upcomingSessionsThisWeek: 0,
+          completedClassesThisMonth: 0,
+          activeSubjectsCount: 0,
+          activeSubjectsLabel: 'No active subjects yet',
+        },
+      },
+    });
+
+    const element = await HomePageContent({ orgSlug: 'iconic-academy' });
+    render(element as React.ReactElement);
+
+    await waitFor(() => {
+      expect(buildDashboardHomeInfographicMetricsMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          currentUserProfile: expect.objectContaining({
+            kind: 'guardian',
+            ids: expect.objectContaining({ id: 'guardian-1' }),
+          }),
+        }),
+      );
+    });
+
+    expect(dashboardHomeInfographicSectionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        isParentView: true,
+        topMetrics: expect.objectContaining({
+          upcomingSessionsThisWeek: 7,
+          completedClassesThisMonth: 12,
+        }),
       }),
     );
   });

@@ -51,9 +51,10 @@ export async function evaluatePosthogBooleanFlag(
   const flagKey = input.flagKey.trim();
   const apiKey = getPosthogKey();
   const host = getPosthogHost();
+  const isDebugEnabled = isPosthogFlagDebugEnabled();
 
   if (!distinctId || !flagKey || !apiKey || !host) {
-    if (isPosthogFlagDebugEnabled()) {
+    if (isDebugEnabled) {
       console.info('[posthog-flags]', 'evaluation-skipped', {
         flagKey,
         hasDistinctId: Boolean(distinctId),
@@ -84,7 +85,7 @@ export async function evaluatePosthogBooleanFlag(
     });
 
     if (!response.ok) {
-      if (isPosthogFlagDebugEnabled()) {
+      if (isDebugEnabled) {
         console.info('[posthog-flags]', 'evaluation-failed', {
           flagKey,
           status: response.status,
@@ -95,22 +96,33 @@ export async function evaluatePosthogBooleanFlag(
 
     const payload = (await response.json()) as unknown;
     const value = getFeatureFlagValue(payload, flagKey);
+    const result =
+      typeof value === 'boolean'
+        ? value
+        : typeof value === 'string'
+          ? value.length > 0
+          : typeof value === 'number'
+            ? value !== 0
+            : false;
 
-    if (typeof value === 'boolean') {
-      return value;
+    if (isDebugEnabled) {
+      console.info('[posthog-flags]', 'evaluation-result', {
+        flagKey,
+        distinctId,
+        rawValueType: value === undefined ? 'undefined' : typeof value,
+        rawValue:
+          typeof value === 'string'
+            ? value.slice(0, 64)
+            : typeof value === 'number'
+              ? value
+              : (value ?? null),
+        result,
+      });
     }
 
-    if (typeof value === 'string') {
-      return value.length > 0;
-    }
-
-    if (typeof value === 'number') {
-      return value !== 0;
-    }
-
-    return false;
+    return result;
   } catch {
-    if (isPosthogFlagDebugEnabled()) {
+    if (isDebugEnabled) {
       console.info('[posthog-flags]', 'evaluation-exception', {
         flagKey,
       });

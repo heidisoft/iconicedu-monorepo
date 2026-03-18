@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import type { ProfileRow } from '@iconicedu/shared-types';
+import type { AccountRow, ProfileRow } from '@iconicedu/shared-types';
 
 import {
   PROFILE_SELECT,
@@ -22,11 +22,40 @@ type ProfileInsertPayload = {
 };
 
 export async function getProfileByAccountId(supabase: SupabaseClient, accountId: string) {
-  return supabase
+  const accountResponse = await supabase
+    .from('accounts')
+    .select('id, org_id, active_profile_id')
+    .eq('id', accountId)
+    .is('deleted_at', null)
+    .maybeSingle<Pick<AccountRow, 'id' | 'org_id' | 'active_profile_id'>>();
+
+  const account = accountResponse.data ?? null;
+  if (account?.active_profile_id) {
+    const activeProfileResponse = await supabase
+      .from('profiles')
+      .select(PROFILE_SELECT)
+      .eq('id', account.active_profile_id)
+      .eq('account_id', accountId)
+      .eq('org_id', account.org_id)
+      .is('deleted_at', null)
+      .maybeSingle<ProfileRow>();
+
+    if (activeProfileResponse.data) {
+      return activeProfileResponse;
+    }
+  }
+
+  const fallbackQuery = supabase
     .from('profiles')
     .select(PROFILE_SELECT)
     .eq('account_id', accountId)
-    .is('deleted_at', null)
+    .is('deleted_at', null);
+
+  if (account?.org_id) {
+    fallbackQuery.eq('org_id', account.org_id);
+  }
+
+  return fallbackQuery
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle<ProfileRow>();

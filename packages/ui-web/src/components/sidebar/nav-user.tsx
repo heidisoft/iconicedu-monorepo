@@ -2,16 +2,19 @@
 
 import * as React from 'react';
 import {
+  ArrowRightLeft,
   BadgeCheck,
   Bell,
   CalendarDays,
   ChevronsUpDown,
   Clock3,
   Lightbulb,
+  Loader2,
   LogOut,
   Smile,
   SlidersHorizontal,
   User,
+  UserPlus,
   Users,
 } from 'lucide-react';
 
@@ -38,6 +41,9 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@iconicedu/ui-web/ui/dropdown-menu';
 import { Button } from '@iconicedu/ui-web/ui/button';
@@ -230,6 +236,9 @@ export function NavUser({
   const [statusSaveError, setStatusSaveError] = React.useState<string | null>(null);
   const [isSavingStatus, setIsSavingStatus] = React.useState(false);
   const [isSwitchingPersona, setIsSwitchingPersona] = React.useState(false);
+  const [switchingPersonaProfileId, setSwitchingPersonaProfileId] = React.useState<
+    string | null
+  >(null);
   const [isAddingPersona, setIsAddingPersona] = React.useState(false);
 
   const openSettings = React.useCallback((tab: UserSettingsTab) => {
@@ -436,26 +445,47 @@ export function NavUser({
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
-                  {personaChoices.map((persona) => (
-                    <DropdownMenuItem
-                      key={persona.profileId}
-                      disabled={persona.isActive || isSwitchingPersona}
-                      onSelect={async () => {
-                        if (!onPersonaSwitch || persona.isActive) {
-                          return;
-                        }
-                        setIsSwitchingPersona(true);
-                        try {
-                          await onPersonaSwitch({ profileId: persona.profileId });
-                        } finally {
-                          setIsSwitchingPersona(false);
-                        }
-                      }}
-                    >
-                      <Users />
-                      {persona.label}
-                    </DropdownMenuItem>
-                  ))}
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>
+                      <ArrowRightLeft />
+                      Switch profile
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent>
+                      {personaChoices.map((persona) => (
+                        <DropdownMenuItem
+                          key={persona.profileId}
+                          disabled={persona.isActive || isSwitchingPersona}
+                          onSelect={async (event) => {
+                            if (!onPersonaSwitch || persona.isActive) {
+                              return;
+                            }
+                            event.preventDefault();
+                            setIsSwitchingPersona(true);
+                            setSwitchingPersonaProfileId(persona.profileId);
+                            try {
+                              await onPersonaSwitch({ profileId: persona.profileId });
+                            } finally {
+                              setIsSwitchingPersona(false);
+                              setSwitchingPersonaProfileId(null);
+                            }
+                          }}
+                        >
+                          {isSwitchingPersona &&
+                          switchingPersonaProfileId === persona.profileId ? (
+                            <>
+                              <Loader2 className="animate-spin" />
+                              Switching profile...
+                            </>
+                          ) : (
+                            <>
+                              <Users />
+                              {persona.label}
+                            </>
+                          )}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
                 </DropdownMenuGroup>
               </>
             ) : null}
@@ -479,8 +509,8 @@ export function NavUser({
                         }
                       }}
                     >
-                      <Users />
-                      Add {persona.label} persona
+                      <UserPlus />
+                      Add {persona.label} profile
                     </DropdownMenuItem>
                   ))}
                 </DropdownMenuGroup>

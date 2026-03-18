@@ -34,10 +34,7 @@ export default async function AdminLiveSessionAttendanceDetailPage({
 
   return (
     <div className="flex flex-1 flex-col">
-      <DashboardHeader
-        title="Session attendance detail"
-        description="Review participant attendance for this live session."
-      />
+      <DashboardHeader title="Session attendance detail" />
       <div className="flex flex-1 flex-col gap-4 p-4">
         <div>
           <Link

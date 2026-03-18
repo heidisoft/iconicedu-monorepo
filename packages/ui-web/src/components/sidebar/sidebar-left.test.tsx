@@ -77,7 +77,12 @@ function makeData() {
               ui: {},
               collections: {
                 readState: { unreadCount: 2 },
-                participants: [{ ids: { accountId: 'account-educator' } }],
+                participants: [
+                  {
+                    kind: 'educator',
+                    ids: { id: 'profile-educator', accountId: 'account-educator' },
+                  },
+                ],
               },
             },
           },
@@ -300,7 +305,12 @@ function makeStudentData() {
               ui: {},
               collections: {
                 readState: { unreadCount: 2 },
-                participants: [{ ids: { accountId: 'account-student' } }],
+                participants: [
+                  {
+                    kind: 'child',
+                    ids: { id: 'profile-student', accountId: 'account-student' },
+                  },
+                ],
               },
             },
           },
@@ -426,6 +436,67 @@ describe('SidebarLeft', () => {
     expect(screen.queryByText('Direct Messages')).not.toBeInTheDocument();
   });
 
+  it('shows only educator classrooms for tutor persona on shared account', () => {
+    const data = makeData();
+    data.user.profile.kind = 'educator';
+    data.user.profile.ids = {
+      id: 'profile-educator',
+      orgId: 'org-1',
+      accountId: 'account-shared',
+    };
+    data.collections.learningSpaces = [
+      {
+        ids: { id: 'space-parent', orgId: 'org-1' },
+        basics: { title: 'Parent Room', subject: 'Reading', iconKey: null },
+        channels: {
+          primaryChannel: {
+            ids: { id: 'channel-parent', orgId: 'org-1' },
+            basics: { iconKey: null },
+            ui: {},
+            collections: {
+              readState: { unreadCount: 1 },
+              participants: [
+                {
+                  kind: 'guardian',
+                  ids: { id: 'profile-guardian', accountId: 'account-shared' },
+                },
+              ],
+            },
+          },
+        },
+      },
+      {
+        ids: { id: 'space-tutor', orgId: 'org-1' },
+        basics: { title: 'Tutor Room', subject: 'Math', iconKey: null },
+        channels: {
+          primaryChannel: {
+            ids: { id: 'channel-tutor', orgId: 'org-1' },
+            basics: { iconKey: null },
+            ui: {},
+            collections: {
+              readState: { unreadCount: 2 },
+              participants: [
+                {
+                  kind: 'educator',
+                  ids: { id: 'profile-educator', accountId: 'account-shared' },
+                },
+              ],
+            },
+          },
+        },
+      },
+    ];
+
+    render(
+      <SidebarProvider>
+        <SidebarLeft data={data} />
+      </SidebarProvider>,
+    );
+
+    expect(screen.getByText('Tutor Room')).toBeInTheDocument();
+    expect(screen.queryByText('Parent Room')).not.toBeInTheDocument();
+  });
+
   it('renders slug-based links when active path is org scoped', () => {
     render(
       <SidebarProvider>
@@ -511,6 +582,69 @@ describe('SidebarLeft', () => {
     );
     expect(screen.queryByText('Other Space')).not.toBeInTheDocument();
     expect(screen.getAllByText('2').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('shows only child classrooms for student persona on shared account', () => {
+    const data = makeStudentData();
+    data.user.profile.ids = {
+      id: 'profile-student',
+      orgId: 'org-1',
+      accountId: 'account-shared-student',
+    };
+    data.collections.learningSpaces = [
+      {
+        ids: { id: 'space-guardian-view', orgId: 'org-1' },
+        basics: { title: 'Guardian View Space', subject: 'Reading', iconKey: null },
+        channels: {
+          primaryChannel: {
+            ids: { id: 'channel-guardian-view', orgId: 'org-1' },
+            basics: { iconKey: null },
+            ui: {},
+            collections: {
+              readState: { unreadCount: 1 },
+              participants: [
+                {
+                  kind: 'guardian',
+                  ids: { id: 'profile-parent', accountId: 'account-shared-student' },
+                },
+              ],
+            },
+          },
+        },
+      },
+      {
+        ids: { id: 'space-student-view', orgId: 'org-1' },
+        basics: { title: 'Student View Space', subject: 'Math', iconKey: null },
+        channels: {
+          primaryChannel: {
+            ids: { id: 'channel-student-view', orgId: 'org-1' },
+            basics: { iconKey: null },
+            ui: {},
+            collections: {
+              readState: { unreadCount: 2 },
+              participants: [
+                {
+                  kind: 'child',
+                  ids: {
+                    id: 'profile-student',
+                    accountId: 'account-shared-student',
+                  },
+                },
+              ],
+            },
+          },
+        },
+      },
+    ];
+
+    render(
+      <SidebarProvider>
+        <SidebarLeft data={data} />
+      </SidebarProvider>,
+    );
+
+    expect(screen.getByText('Student View Space')).toBeInTheDocument();
+    expect(screen.queryByText('Guardian View Space')).not.toBeInTheDocument();
   });
 
   it('hides classes for educators without assigned spaces', () => {

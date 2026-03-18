@@ -1,7 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, expect, it, vi } from 'vitest';
 
-import { insertProfileForAccount } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import {
+  getProfileByAccountId,
+  insertProfileForAccount,
+} from '@iconicedu/web/lib/profile/queries/profiles.query';
 
 const basePayload = {
   orgId: 'org-1',
@@ -68,5 +71,125 @@ describe('insertProfileForAccount', () => {
     expect(result).toEqual(fallback);
     expect(upsert).toHaveBeenCalledTimes(1);
     expect(insert).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('getProfileByAccountId', () => {
+  function createQueryBuilder(result: unknown) {
+    const builder = {
+      select: vi.fn(),
+      eq: vi.fn(),
+      is: vi.fn(),
+      order: vi.fn(),
+      limit: vi.fn(),
+      maybeSingle: vi.fn(),
+    };
+
+    builder.select.mockReturnValue(builder);
+    builder.eq.mockReturnValue(builder);
+    builder.is.mockReturnValue(builder);
+    builder.order.mockReturnValue(builder);
+    builder.limit.mockReturnValue(builder);
+    builder.maybeSingle.mockResolvedValue(result);
+
+    return builder;
+  }
+
+  it('returns active profile when accounts.active_profile_id is valid', async () => {
+    const accountBuilder = createQueryBuilder({
+      data: { id: 'account-1', org_id: 'org-1', active_profile_id: 'profile-active' },
+      error: null,
+    });
+    const activeProfileBuilder = createQueryBuilder({
+      data: { id: 'profile-active', org_id: 'org-1', account_id: 'account-1' },
+      error: null,
+    });
+    const from = vi.fn((table: string) => {
+      if (table === 'accounts') {
+        return accountBuilder;
+      }
+      return activeProfileBuilder;
+    });
+    const supabase = { from } as any;
+
+    const response = await getProfileByAccountId(supabase, 'account-1');
+
+    expect(response.data).toEqual({
+      id: 'profile-active',
+      org_id: 'org-1',
+      account_id: 'account-1',
+    });
+    expect(activeProfileBuilder.eq).toHaveBeenCalledWith('id', 'profile-active');
+    expect(activeProfileBuilder.eq).toHaveBeenCalledWith('account_id', 'account-1');
+    expect(activeProfileBuilder.eq).toHaveBeenCalledWith('org_id', 'org-1');
+    expect(activeProfileBuilder.order).not.toHaveBeenCalled();
+  });
+
+  it('falls back to latest profile when active_profile_id is null', async () => {
+    const accountBuilder = createQueryBuilder({
+      data: { id: 'account-1', org_id: 'org-1', active_profile_id: null },
+      error: null,
+    });
+    const fallbackProfileBuilder = createQueryBuilder({
+      data: { id: 'profile-newest', org_id: 'org-1', account_id: 'account-1' },
+      error: null,
+    });
+    const from = vi.fn((table: string) => {
+      if (table === 'accounts') {
+        return accountBuilder;
+      }
+      return fallbackProfileBuilder;
+    });
+    const supabase = { from } as any;
+
+    const response = await getProfileByAccountId(supabase, 'account-1');
+
+    expect(response.data).toEqual({
+      id: 'profile-newest',
+      org_id: 'org-1',
+      account_id: 'account-1',
+    });
+    expect(fallbackProfileBuilder.eq).toHaveBeenCalledWith('account_id', 'account-1');
+    expect(fallbackProfileBuilder.eq).toHaveBeenCalledWith('org_id', 'org-1');
+    expect(fallbackProfileBuilder.order).toHaveBeenCalledWith('created_at', {
+      ascending: false,
+    });
+    expect(fallbackProfileBuilder.limit).toHaveBeenCalledWith(1);
+  });
+
+  it('falls back to latest profile when active profile is missing or soft-deleted', async () => {
+    const accountBuilder = createQueryBuilder({
+      data: { id: 'account-1', org_id: 'org-1', active_profile_id: 'profile-stale' },
+      error: null,
+    });
+    const activeProfileBuilder = createQueryBuilder({
+      data: null,
+      error: null,
+    });
+    const fallbackProfileBuilder = createQueryBuilder({
+      data: { id: 'profile-newest', org_id: 'org-1', account_id: 'account-1' },
+      error: null,
+    });
+    const profileBuilders = [activeProfileBuilder, fallbackProfileBuilder];
+    const from = vi.fn((table: string) => {
+      if (table === 'accounts') {
+        return accountBuilder;
+      }
+      return profileBuilders.shift();
+    });
+    const supabase = { from } as any;
+
+    const response = await getProfileByAccountId(supabase, 'account-1');
+
+    expect(response.data).toEqual({
+      id: 'profile-newest',
+      org_id: 'org-1',
+      account_id: 'account-1',
+    });
+    expect(activeProfileBuilder.eq).toHaveBeenCalledWith('id', 'profile-stale');
+    expect(activeProfileBuilder.eq).toHaveBeenCalledWith('account_id', 'account-1');
+    expect(activeProfileBuilder.eq).toHaveBeenCalledWith('org_id', 'org-1');
+    expect(fallbackProfileBuilder.eq).toHaveBeenCalledWith('account_id', 'account-1');
+    expect(fallbackProfileBuilder.eq).toHaveBeenCalledWith('org_id', 'org-1');
   });
 });

@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { UserAccountVM, UserProfileVM } from '@iconicedu/shared-types';
 
 import { NavUser } from './nav-user';
@@ -18,10 +18,32 @@ vi.mock('@iconicedu/ui-web/ui/dropdown-menu', () => {
     DropdownMenuTrigger: ({ children }: { children?: React.ReactNode }) => children,
     DropdownMenuContent: passthrough,
     DropdownMenuGroup: passthrough,
-    DropdownMenuItem: ({ children, ...props }: { children?: React.ReactNode }) =>
-      React.createElement('button', props, children),
+    DropdownMenuItem: ({
+      children,
+      onSelect,
+      ...props
+    }: {
+      children?: React.ReactNode;
+      onSelect?: (event: Event) => void;
+    }) =>
+      React.createElement(
+        'button',
+        {
+          ...props,
+          onClick: () => {
+            if (onSelect) {
+              onSelect({ preventDefault: () => undefined } as unknown as Event);
+            }
+          },
+        },
+        children,
+      ),
     DropdownMenuLabel: passthrough,
     DropdownMenuSeparator: passthrough,
+    DropdownMenuSub: passthrough,
+    DropdownMenuSubTrigger: ({ children, ...props }: { children?: React.ReactNode }) =>
+      React.createElement('button', props, children),
+    DropdownMenuSubContent: passthrough,
   };
 });
 
@@ -144,5 +166,39 @@ describe('NavUser', () => {
     expect(chevron?.getAttribute('class')).toContain(
       'group-data-[collapsible=icon]:hidden',
     );
+  });
+
+  it('shows switching profile loading text while persona switch is pending', async () => {
+    let resolveSwitch: (() => void) | null = null;
+    const onPersonaSwitch = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSwitch = resolve;
+        }),
+    );
+
+    render(
+      <NavUser
+        profile={profile}
+        account={account}
+        isPersonaSwitchEnabled
+        availablePersonas={[
+          { profileId: 'profile-1', kind: 'educator', label: 'Tutor', isActive: true },
+          { profileId: 'profile-2', kind: 'guardian', label: 'Parent', isActive: false },
+        ]}
+        onPersonaSwitch={onPersonaSwitch}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /switch profile/i }));
+    fireEvent.click(screen.getByRole('button', { name: /parent/i }));
+
+    expect(onPersonaSwitch).toHaveBeenCalledWith({ profileId: 'profile-2' });
+    expect(screen.getByText('Switching profile...')).toBeInTheDocument();
+
+    resolveSwitch?.();
+    await waitFor(() => {
+      expect(screen.queryByText('Switching profile...')).not.toBeInTheDocument();
+    });
   });
 });

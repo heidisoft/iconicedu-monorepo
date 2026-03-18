@@ -12,6 +12,7 @@ describe('evaluatePosthogBooleanFlag', () => {
     delete process.env.POSTHOG_HOST;
     delete process.env.NEXT_PUBLIC_POSTHOG_KEY;
     delete process.env.NEXT_PUBLIC_POSTHOG_HOST;
+    delete process.env.DEBUG_POSTHOG_FLAGS;
   });
 
   it('returns the provider value when available', async () => {
@@ -128,5 +129,64 @@ describe('evaluatePosthogBooleanFlag', () => {
         distinctId: 'profile-1',
       }),
     ).resolves.toBe(false);
+  });
+
+  it('does not emit debug logs when debug mode is disabled', async () => {
+    process.env.POSTHOG_KEY = 'phc_test';
+    process.env.POSTHOG_HOST = 'https://posthog.example.com';
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          featureFlags: {
+            'enable-persona-add': true,
+          },
+        }),
+      })),
+    );
+
+    await expect(
+      evaluatePosthogBooleanFlag({
+        flagKey: 'enable-persona-add',
+        distinctId: 'profile-1',
+      }),
+    ).resolves.toBe(true);
+
+    expect(infoSpy).not.toHaveBeenCalled();
+  });
+
+  it('emits evaluation-result debug logs when debug mode is enabled', async () => {
+    process.env.POSTHOG_KEY = 'phc_test';
+    process.env.POSTHOG_HOST = 'https://posthog.example.com';
+    process.env.DEBUG_POSTHOG_FLAGS = 'true';
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          featureFlags: {
+            'enable-persona-add': 'variant-a',
+          },
+        }),
+      })),
+    );
+
+    await expect(
+      evaluatePosthogBooleanFlag({
+        flagKey: 'enable-persona-add',
+        distinctId: 'profile-1',
+      }),
+    ).resolves.toBe(true);
+
+    expect(infoSpy).toHaveBeenCalledWith('[posthog-flags]', 'evaluation-result', {
+      flagKey: 'enable-persona-add',
+      distinctId: 'profile-1',
+      rawValueType: 'string',
+      rawValue: 'variant-a',
+      result: true,
+    });
   });
 });

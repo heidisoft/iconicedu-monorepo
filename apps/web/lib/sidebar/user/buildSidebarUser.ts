@@ -48,6 +48,54 @@ import {
   mapFamilyLinkInviteRowToVM,
 } from '@iconicedu/web/lib/family/queries/invite.query';
 
+type PersonaDecisionReason = 'missing-role' | 'already-exists' | 'addable';
+type AddablePersonaKind = 'educator' | 'guardian' | 'child' | 'staff';
+
+type PersonaAddableEvaluation = {
+  addablePersonas: Array<{
+    kind: AddablePersonaKind;
+    label: string;
+  }>;
+  roleKeys: Set<string>;
+  existingKinds: Set<string>;
+  reasons: Record<AddablePersonaKind, PersonaDecisionReason>;
+};
+
+function isPersonaFlagDebugEnabled() {
+  return process.env.DEBUG_POSTHOG_FLAGS?.trim() === 'true';
+}
+
+function logPersonaAddableEvaluation(input: {
+  accountId: string;
+  orgId: string;
+  activeProfileId: string | null;
+  derivedKind: UserProfileVM['kind'];
+  primaryRole: AccountRow['primary_role'] | null;
+  evaluation: PersonaAddableEvaluation;
+}) {
+  if (!isPersonaFlagDebugEnabled()) {
+    return;
+  }
+
+  const debugPayload = {
+    accountId: input.accountId,
+    orgId: input.orgId,
+    activeProfileId: input.activeProfileId,
+    derivedKind: input.derivedKind,
+    primaryRole: input.primaryRole,
+    userRoleKeys: Array.from(input.evaluation.roleKeys).sort(),
+    existingProfileKinds: Array.from(input.evaluation.existingKinds).sort(),
+    addablePersonas: input.evaluation.addablePersonas,
+  };
+  console.info('[persona-flags]', 'sidebar-user-addable-evaluation', debugPayload);
+  if (input.evaluation.addablePersonas.length === 0) {
+    console.info('[persona-flags]', 'sidebar-user-addable-empty', {
+      ...debugPayload,
+      reasons: input.evaluation.reasons,
+    });
+  }
+}
+
 export async function buildSidebarUser(
   supabase: SupabaseClient,
   user: {
@@ -107,10 +155,20 @@ export async function buildSidebarUser(
     inviteRow?.invited_role ??
     accountPrimaryRoleKind ??
     deriveProfileKind(userRoles);
-  const addablePersonas = buildAddablePersonas({
+  const addableEvaluation = buildAddablePersonaEvaluation({
     userRoles,
     primaryRole: accountRow.data?.primary_role ?? null,
     profileRows,
+  });
+  const addablePersonas = addableEvaluation.addablePersonas;
+
+  logPersonaAddableEvaluation({
+    accountId: account.id,
+    orgId: account.org_id,
+    activeProfileId: accountRow.data?.active_profile_id ?? null,
+    derivedKind,
+    primaryRole: accountRow.data?.primary_role ?? null,
+    evaluation: addableEvaluation,
   });
 
   profileRow =
@@ -320,37 +378,56 @@ function toPersonaLabel(kind: string): string {
   return 'Profile';
 }
 
-function buildAddablePersonas(input: {
+function buildAddablePersonaEvaluation(input: {
   userRoles: ReturnType<typeof mapUserRoles>;
   primaryRole: AccountRow['primary_role'] | null;
   profileRows: ProfileRow[];
-}) {
+}): PersonaAddableEvaluation {
   const existingKinds = new Set(input.profileRows.map((profile) => profile.kind));
   const roleKeys = new Set(input.userRoles.map((role) => role.roleKey));
   if (input.primaryRole) {
     roleKeys.add(input.primaryRole);
   }
 
-  const addableKinds = new Set<UserProfileVM['kind']>();
-  if (roleKeys.has('educator')) {
-    addableKinds.add('educator');
-  }
-  if (roleKeys.has('guardian')) {
-    addableKinds.add('guardian');
-  }
-  if (roleKeys.has('child')) {
-    addableKinds.add('child');
-  }
-  if (roleKeys.has('staff') || roleKeys.has('owner') || roleKeys.has('admin')) {
-    addableKinds.add('staff');
-  }
+  const staffHasRole =
+    roleKeys.has('staff') || roleKeys.has('owner') || roleKeys.has('admin');
+  const reasons: Record<AddablePersonaKind, PersonaDecisionReason> = {
+    educator: !roleKeys.has('educator')
+      ? 'missing-role'
+      : existingKinds.has('educator')
+        ? 'already-exists'
+        : 'addable',
+    guardian: !roleKeys.has('guardian')
+      ? 'missing-role'
+      : existingKinds.has('guardian')
+        ? 'already-exists'
+        : 'addable',
+    child: !roleKeys.has('child')
+      ? 'missing-role'
+      : existingKinds.has('child')
+        ? 'already-exists'
+        : 'addable',
+    staff: !staffHasRole
+      ? 'missing-role'
+      : existingKinds.has('staff')
+        ? 'already-exists'
+        : 'addable',
+  };
 
-  return Array.from(addableKinds)
-    .filter((kind) => !existingKinds.has(kind))
+  const orderedKinds: AddablePersonaKind[] = ['educator', 'guardian', 'child', 'staff'];
+  const addablePersonas = orderedKinds
+    .filter((kind) => reasons[kind] === 'addable')
     .map((kind) => ({
       kind,
       label: toPersonaLabel(kind),
     }));
+
+  return {
+    addablePersonas,
+    roleKeys,
+    existingKinds,
+    reasons,
+  };
 }
 
 async function loadNotificationDefaults(
@@ -378,6 +455,11 @@ async function loadNotificationDefaults(
 
   return defaults;
 }
+
+export const __test__ = {
+  buildAddablePersonaEvaluation,
+  logPersonaAddableEvaluation,
+};
 
 async function loadNotificationScopedDefaults(
   supabase: SupabaseClient,

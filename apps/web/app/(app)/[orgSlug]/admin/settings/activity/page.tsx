@@ -27,10 +27,7 @@ export default async function AdminActivityControlsPage({
 
   return (
     <div className="flex flex-1 flex-col">
-      <DashboardHeader
-        title="Activity controls"
-        description="Temporarily suppress specific activity verbs globally or for specific actors."
-      />
+      <DashboardHeader title="Activity controls" />
       <div className="flex flex-1 flex-col gap-4 p-4">
         <ActivityVerbSuppressionDashboard orgId={org.id} />
       </div>

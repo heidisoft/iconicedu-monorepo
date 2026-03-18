@@ -31,7 +31,7 @@ export const SIDEBAR_LEFT_DATA: SidebarLeftDataVM = {
     ],
     navSecondary: [
       {
-        title: '24/7 Live Support',
+        title: 'Live Support',
         url: `/iconic-academy/c/${CHANNEL_IDS.support}`,
         icon: 'life-buoy',
       },

@@ -25,7 +25,7 @@ describe('ensureSupportChannel', () => {
     const selectChain = createSelectChain({
       data: {
         id: 'support-existing',
-        topic: '24/7 Live Support',
+        topic: 'Live Support',
         icon_key: 'life-buoy',
         ui_theme_key: 'amber',
         ui_defaults: {
@@ -91,7 +91,7 @@ describe('ensureSupportChannel', () => {
     expect(insert).toHaveBeenCalledWith(
       expect.objectContaining({
         org_id: 'org-1',
-        topic: '24/7 Live Support',
+        topic: 'Live Support',
         purpose: 'support',
         icon_key: 'life-buoy',
         ui_theme_key: 'amber',
@@ -177,7 +177,7 @@ describe('ensureSupportChannel', () => {
     expect(update).toHaveBeenCalled();
     expect(update).toHaveBeenCalledWith(
       expect.objectContaining({
-        topic: '24/7 Live Support',
+        topic: 'Live Support',
         icon_key: 'life-buoy',
         ui_theme_key: 'amber',
         ui_defaults: expect.objectContaining({

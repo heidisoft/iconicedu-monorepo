@@ -30,10 +30,7 @@ export default async function AdminLiveSessionAttendancePage({
 
   return (
     <div className="flex flex-1 flex-col">
-      <DashboardHeader
-        title="Session attendance"
-        description="Review live sessions, attendance counts, and session duration."
-      />
+      <DashboardHeader title="Session attendance" />
       <div className="flex flex-1 flex-col gap-4 p-4">
         <LiveSessionAttendanceTable orgSlug={orgSlug} rows={rows} />
       </div>

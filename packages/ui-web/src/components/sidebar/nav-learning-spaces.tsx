@@ -73,6 +73,13 @@ export function NavLearningSpaces({
     subjectOptions?: string[];
   };
 }) {
+  const participantFirstName =
+    participant.profile.firstName?.trim() ||
+    getProfileDisplayName(participant.profile).split(' ')[0] ||
+    title.split(' ')[0] ||
+    'Student';
+  const exploreClassesLabel = `Explore Classes for ${participantFirstName}`;
+
   return (
     <SidebarGroup className="py-0 group-data-[collapsible=icon]:hidden">
       <Collapsible open={isOpen} onOpenChange={onOpenChange}>
@@ -110,12 +117,12 @@ export function NavLearningSpaces({
                       renderTrigger={({ canRequestClasses, fallbackHref, openDialog }) =>
                         canRequestClasses ? (
                           <Button size="lg" type="button" onClick={openDialog}>
-                            <Sparkle /> Explore Classes
+                            <Sparkle /> {exploreClassesLabel}
                           </Button>
                         ) : (
                           <Button size="lg" asChild>
                             <a href={fallbackHref}>
-                              <Sparkle /> Explore Classes
+                              <Sparkle /> {exploreClassesLabel}
                             </a>
                           </Button>
                         )
@@ -124,7 +131,7 @@ export function NavLearningSpaces({
                   ) : (
                     <Button size="lg" asChild>
                       <a href={`${dashboardBasePath}/spaces`}>
-                        <Sparkle /> Explore Classes
+                        <Sparkle /> {exploreClassesLabel}
                       </a>
                     </Button>
                   )}

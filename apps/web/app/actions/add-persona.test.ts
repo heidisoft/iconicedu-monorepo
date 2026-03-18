@@ -49,6 +49,10 @@ import { addPersonaAction } from './add-persona';
 
 describe('addPersonaAction', () => {
   beforeEach(() => {
+    delete process.env.DEBUG_POSTHOG_FLAGS;
+  });
+
+  beforeEach(() => {
     createSupabaseServerClient.mockReset();
     requireAuthedUser.mockReset();
     getAccountByAuthUserIdInOrg.mockReset();
@@ -75,6 +79,27 @@ describe('addPersonaAction', () => {
         kind: 'educator',
       }),
     ).rejects.toThrow('Persona add is disabled.');
+  });
+
+  it('logs debug context when persona add is blocked and debug mode is enabled', async () => {
+    process.env.DEBUG_POSTHOG_FLAGS = 'true';
+    enablePersonaAddRun.mockResolvedValue(false);
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+
+    await expect(
+      addPersonaAction({
+        orgId: 'org-1',
+        orgSlug: 'iconic-academy',
+        kind: 'educator',
+      }),
+    ).rejects.toThrow('Persona add is disabled.');
+
+    expect(infoSpy).toHaveBeenCalledWith('[persona-flags]', 'operation-blocked', {
+      operation: 'add',
+      accountId: 'account-1',
+      activeProfileId: 'profile-1',
+      evaluatedFlag: false,
+    });
   });
 
   it('creates persona profile when flag and role checks pass', async () => {

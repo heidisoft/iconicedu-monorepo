@@ -30,10 +30,7 @@ export default async function AdminActivityLogsPage({
 
   return (
     <div className="flex flex-1 flex-col">
-      <DashboardHeader
-        title="Activity logs"
-        description="Review canonical activity events, projection state, and retry failures."
-      />
+      <DashboardHeader title="Activity logs" />
       <div className="flex flex-1 flex-col gap-4 p-4">
         <ActivityEventsDashboard orgId={org.id} rows={rows} />
       </div>

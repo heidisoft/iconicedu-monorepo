@@ -26,10 +26,7 @@ export default async function AdminSubjectCatalogSettingsPage({
 
   return (
     <div className="flex flex-1 flex-col">
-      <DashboardHeader
-        title="Subjects"
-        description="Manage the subject catalog used in classrooms, educator settings, and class requests."
-      />
+      <DashboardHeader title="Subjects" />
       <div className="flex flex-1 flex-col gap-4 p-4">
         <SubjectCatalogSettingsDashboard orgId={org.id} />
       </div>

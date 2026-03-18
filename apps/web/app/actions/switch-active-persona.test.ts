@@ -52,6 +52,10 @@ import { switchActivePersonaAction } from './switch-active-persona';
 
 describe('switchActivePersonaAction', () => {
   beforeEach(() => {
+    delete process.env.DEBUG_POSTHOG_FLAGS;
+  });
+
+  beforeEach(() => {
     createSupabaseServerClient.mockReset();
     requireAuthedUser.mockReset();
     getAccountByAuthUserIdInOrg.mockReset();
@@ -79,6 +83,27 @@ describe('switchActivePersonaAction', () => {
         profileId: 'profile-2',
       }),
     ).rejects.toThrow('Persona switch is disabled.');
+  });
+
+  it('logs debug context when persona switch is blocked and debug mode is enabled', async () => {
+    process.env.DEBUG_POSTHOG_FLAGS = 'true';
+    enablePersonaSwitchRun.mockResolvedValue(false);
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+
+    await expect(
+      switchActivePersonaAction({
+        orgId: 'org-1',
+        orgSlug: 'iconic-academy',
+        profileId: 'profile-2',
+      }),
+    ).rejects.toThrow('Persona switch is disabled.');
+
+    expect(infoSpy).toHaveBeenCalledWith('[persona-flags]', 'operation-blocked', {
+      operation: 'switch',
+      accountId: 'account-1',
+      activeProfileId: 'profile-1',
+      evaluatedFlag: false,
+    });
   });
 
   it('switches active persona when feature flag and role checks pass', async () => {

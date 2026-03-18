@@ -7,7 +7,7 @@ type EnsureSupportChannelInput = {
   creatorProfileId: string;
 };
 
-const SUPPORT_TOPIC = '24/7 Live Support';
+const SUPPORT_TOPIC = 'Live Support';
 const SUPPORT_ICON_KEY = 'life-buoy';
 const SUPPORT_THEME_KEY = 'amber';
 const SUPPORT_UI_DEFAULTS = {

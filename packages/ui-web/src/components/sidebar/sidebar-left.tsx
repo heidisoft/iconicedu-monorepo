@@ -153,6 +153,20 @@ function resolveAlertChannelLabel(
   } others`;
 }
 
+function matchesActivePersonaParticipant(
+  participant: UserProfileVM,
+  activeProfile: Pick<UserProfileVM, 'ids' | 'kind'>,
+): boolean {
+  if (participant.ids.id === activeProfile.ids.id) {
+    return true;
+  }
+
+  return (
+    participant.ids.accountId === activeProfile.ids.accountId &&
+    participant.kind === activeProfile.kind
+  );
+}
+
 export function SidebarLeft({
   data,
   subjectOptions,
@@ -341,8 +355,10 @@ export function SidebarLeft({
       ? data.collections.learningSpaces.filter((space) =>
           space.channels.primaryChannel.collections.participants.some(
             (participant: UserProfileVM) =>
-              participant.ids.accountId === userProfile.ids.accountId ||
-              participant.ids.id === userProfile.ids.id,
+              matchesActivePersonaParticipant(participant, {
+                ids: userProfile.ids,
+                kind: 'educator',
+              }),
           ),
         )
       : [];
@@ -351,8 +367,10 @@ export function SidebarLeft({
       ? data.collections.learningSpaces.filter((space) =>
           space.channels.primaryChannel.collections.participants.some(
             (participant: UserProfileVM) =>
-              participant.ids.accountId === userProfile.ids.accountId ||
-              participant.ids.id === userProfile.ids.id,
+              matchesActivePersonaParticipant(participant, {
+                ids: userProfile.ids,
+                kind: 'child',
+              }),
           ),
         )
       : [];

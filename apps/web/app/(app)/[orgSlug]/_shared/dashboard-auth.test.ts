@@ -16,8 +16,8 @@ const getOrCreateAccountMock = vi.fn(async () => ({
 }));
 const resolveOrgDashboardPathMock = vi.fn(async () => '/iconic-academy');
 const buildOrgBySlugMock = vi.fn(async () => ({ id: 'org-1' }));
-const getProfileByAccountIdMock = vi.fn(async () => ({ data: { id: 'profile-1' } }));
-const buildUserProfileByIdMock = vi.fn(async () => ({ ids: { id: 'profile-1' } }));
+const getProfileByAccountIdMock = vi.fn(async () => ({ data: { id: 'profile-active' } }));
+const buildUserProfileByIdMock = vi.fn(async () => ({ ids: { id: 'profile-active' } }));
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
   createSupabaseServerClient: (...args: unknown[]) =>
@@ -71,15 +71,15 @@ describe('dashboard-auth helpers', () => {
     });
   });
 
-  it('builds profile context from account id', async () => {
+  it('builds profile context from the resolved active account profile', async () => {
     const supabase = { client: 'supabase' } as any;
     const result = await getDashboardProfileContext(supabase, 'account-1');
 
     expect(getProfileByAccountIdMock).toHaveBeenCalledWith(supabase, 'account-1');
-    expect(buildUserProfileByIdMock).toHaveBeenCalledWith(supabase, 'profile-1');
+    expect(buildUserProfileByIdMock).toHaveBeenCalledWith(supabase, 'profile-active');
     expect(result).toEqual({
-      profileResponse: { data: { id: 'profile-1' } },
-      currentUserProfile: { ids: { id: 'profile-1' } },
+      profileResponse: { data: { id: 'profile-active' } },
+      currentUserProfile: { ids: { id: 'profile-active' } },
     });
   });
 });

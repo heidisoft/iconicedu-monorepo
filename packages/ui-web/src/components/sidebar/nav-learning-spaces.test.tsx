@@ -113,4 +113,35 @@ describe('NavLearningSpaces', () => {
       '/iconic-academy/spaces/channel-1',
     );
   });
+
+  it('renders child-first-name explore classes label for empty state', () => {
+    render(
+      <SidebarProvider>
+        <NavLearningSpaces
+          title="Ariana Smith"
+          participant={
+            {
+              ids: { id: 'profile-child', orgId: 'org-1', accountId: 'account-child' },
+              profile: {
+                displayName: 'Ariana Smith',
+                firstName: 'Ariana',
+                lastName: 'Smith',
+                avatar: { source: 'seed', seed: 'child-1' },
+              },
+              ui: {},
+            } as unknown as Pick<UserProfileVM, 'ids' | 'profile' | 'ui'>
+          }
+          isOpen={true}
+          onOpenChange={() => undefined}
+          activeChannelId={null}
+          isMobile={false}
+          learningSpaces={[]}
+        />
+      </SidebarProvider>,
+    );
+
+    expect(
+      screen.getByRole('link', { name: /Explore Classes for Ariana/i }),
+    ).toBeInTheDocument();
+  });
 });
