@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 import { buildAboutFields, ProfileContent } from './profile-sheet';
 
@@ -32,6 +32,16 @@ describe('ProfileContent', () => {
     render(<ProfileContent user={makeUser()} />);
     expect(screen.queryByText('Quick actions')).not.toBeInTheDocument();
     expect(screen.queryByText('Media & files')).not.toBeInTheDocument();
+  });
+
+  it('renders a Message quick action when a DM handler is provided', () => {
+    const onDmClick = vi.fn();
+    render(<ProfileContent user={makeUser()} onDmClick={onDmClick} />);
+
+    const messageButton = screen.getByRole('button', { name: 'Message' });
+    fireEvent.click(messageButton);
+
+    expect(onDmClick).toHaveBeenCalledTimes(1);
   });
 
   it('builds public profile metadata fields when available', () => {

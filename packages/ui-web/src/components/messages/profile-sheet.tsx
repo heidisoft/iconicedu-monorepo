@@ -2,6 +2,7 @@ import {
   Calendar,
   BookOpen,
   GraduationCap,
+  Phone,
   Award,
   Clock,
   Users,
@@ -13,12 +14,15 @@ import {
   School,
   Heart,
   Sparkles,
+  MessageCircle,
   type LucideIcon,
 } from 'lucide-react';
 import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
+import { Button } from '@iconicedu/ui-web/ui/button';
 import { Separator } from '@iconicedu/ui-web/ui/separator';
+import { cn } from '@iconicedu/ui-web/lib/utils';
 import type { ChildProfileVM, GradeLevel, UserProfileVM } from '@iconicedu/shared-types';
 import { gradeLabel, normalizeCountryCode } from '@iconicedu/shared-types';
 
@@ -209,7 +213,7 @@ export function buildAboutFields(user: ProfileDetailsUser): AboutField[] {
 
 export function ProfileContent({
   user,
-  onDmClick: _onDmClick,
+  onDmClick,
   onCallClick: _onCallClick,
   onScheduleClick: _onScheduleClick,
   onShareClick: _onShareClick,
@@ -259,6 +263,36 @@ export function ProfileContent({
         <Badge variant="secondary" className="text-xs">
           {roleLabel}
         </Badge>
+        {onDmClick ? (
+          <div className="mt-1 flex items-start gap-3">
+            <Button
+              type="button"
+              variant="ghost"
+              disabled
+              className={cn(
+                'h-auto w-16 shrink-0 basis-16 flex-col items-center gap-2 px-1 py-2 text-[11px] font-medium text-muted-foreground hover:bg-transparent',
+              )}
+            >
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                <Phone className="h-4 w-4" />
+              </span>
+              <span className="w-full truncate text-center">Call</span>
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className={cn(
+                'group h-auto w-16 shrink-0 basis-16 flex-col items-center gap-2 px-1 py-2 text-[11px] font-medium text-foreground hover:bg-transparent',
+              )}
+              onClick={onDmClick}
+            >
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors group-hover:bg-primary/15 group-hover:text-primary">
+                <MessageCircle className="h-4 w-4" />
+              </span>
+              <span className="w-full truncate text-center">Message</span>
+            </Button>
+          </div>
+        ) : null}
       </div>
 
       <Separator />

@@ -15,21 +15,26 @@ interface ProfilePanelProps {
 
 export function ProfilePanel({ intent }: ProfilePanelProps) {
   const isMobile = useIsMobile();
-  const { channel } = useMessagesState();
+  const { channel, currentUserId } = useMessagesState();
   if (intent.key !== 'profile') return null;
   const user = channel.collections.participants.find(
     (participant) => participant.ids.id === intent.userId,
   );
   if (!user) return null;
-  const handleDmClick =
-    channel.basics.kind === 'dm'
-      ? () => {
-          if (typeof window !== 'undefined') {
-            const dashboardBasePath = resolveDashboardBasePathFromWindow();
-            window.location.href = `${dashboardBasePath}/dm/${channel.ids.id}`;
-          }
+  const dmTargetId =
+    user.ids.id === currentUserId
+      ? null
+      : channel.basics.kind === 'dm'
+        ? channel.ids.id
+        : user.ids.id;
+  const handleDmClick = dmTargetId
+    ? () => {
+        if (typeof window !== 'undefined') {
+          const dashboardBasePath = resolveDashboardBasePathFromWindow();
+          window.location.href = `${dashboardBasePath}/dm/${dmTargetId}`;
         }
-      : undefined;
+      }
+    : undefined;
   if (isMobile) {
     return <ProfileSheet user={user} onDmClick={handleDmClick} />;
   }

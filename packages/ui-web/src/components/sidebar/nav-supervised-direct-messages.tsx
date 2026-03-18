@@ -73,7 +73,7 @@ export function NavSupervisedDirectMessages({
                   <SidebarMenuButton
                     asChild
                     isActive={isActive}
-                    className="px-2.5 group-data-[collapsible=icon]:px-0"
+                    className="px-2.5 group-data-[collapsible=icon]:justify-center"
                   >
                     <a href={`${dashboardBasePath}/dm/${item.ids.id}`}>
                       <AvatarWithStatus
@@ -86,7 +86,7 @@ export function NavSupervisedDirectMessages({
                         fallbackClassName="text-xs font-medium"
                         initialsLength={1}
                       />
-                      <div className="min-w-0 flex-1">
+                      <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
                         <div className="truncate text-sm font-medium">{name}</div>
                       </div>
                     </a>

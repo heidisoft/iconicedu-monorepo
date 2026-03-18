@@ -1,7 +1,26 @@
 'use client';
 
 import type { LucideIcon } from 'lucide-react';
-import { ChefHat, Earth, Languages, Sparkles, SquarePi } from 'lucide-react';
+import {
+  Calculator,
+  ChefHat,
+  ChessKnight,
+  ClipboardCheck,
+  Earth,
+  GraduationCap,
+  Languages,
+  Landmark,
+  Map,
+  NotebookPen,
+  NotebookText,
+  Paintbrush,
+  Palette,
+  PenTool,
+  Ruler,
+  Scissors,
+  Sparkles,
+  SquarePi,
+} from 'lucide-react';
 
 export const LEARNING_SPACE_ICON_MAP = {
   sparkles: Sparkles,
@@ -9,6 +28,19 @@ export const LEARNING_SPACE_ICON_MAP = {
   languages: Languages,
   'chef-hat': ChefHat,
   earth: Earth,
+  'chess-knight': ChessKnight,
+  palette: Palette,
+  paintbrush: Paintbrush,
+  scissors: Scissors,
+  calculator: Calculator,
+  ruler: Ruler,
+  'pen-tool': PenTool,
+  'notebook-pen': NotebookPen,
+  'notebook-text': NotebookText,
+  'clipboard-check': ClipboardCheck,
+  'graduation-cap': GraduationCap,
+  landmark: Landmark,
+  map: Map,
 } as const;
 
 export type LearningSpaceIconKey = keyof typeof LEARNING_SPACE_ICON_MAP;
@@ -24,6 +56,19 @@ export const LEARNING_SPACE_ICON_OPTIONS: {
   { value: 'languages', label: 'Languages' },
   { value: 'chef-hat', label: 'Creative' },
   { value: 'earth', label: 'World' },
+  { value: 'chess-knight', label: 'Chess' },
+  { value: 'palette', label: 'Arts Palette' },
+  { value: 'paintbrush', label: 'Arts Brush' },
+  { value: 'scissors', label: 'Arts Scissors' },
+  { value: 'calculator', label: 'Math Calculator' },
+  { value: 'ruler', label: 'Math Ruler' },
+  { value: 'pen-tool', label: 'ELA Pen' },
+  { value: 'notebook-pen', label: 'ELA Notebook' },
+  { value: 'notebook-text', label: 'Homework Notebook' },
+  { value: 'clipboard-check', label: 'Homework Checklist' },
+  { value: 'graduation-cap', label: 'SHSAT / SAT' },
+  { value: 'landmark', label: 'Social Studies Landmark' },
+  { value: 'map', label: 'Social Studies Map' },
 ];
 
 export function getLearningSpaceIcon(

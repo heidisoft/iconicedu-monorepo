@@ -173,10 +173,10 @@ All six sub-tables (`educator_profile_subjects`, `educator_profile_grade_levels`
 
 #### `channels`
 
-| Operation   | Who                                                    |
-| ----------- | ------------------------------------------------------ |
-| SELECT      | Org member AND (channel is public OR user is a member) |
-| ALL (write) | `can_manage_channel`                                   |
+| Operation   | Who                                                                                   |
+| ----------- | ------------------------------------------------------------------------------------- |
+| SELECT      | Org member AND (channel is public OR user is a member) OR supervised guardian DM read |
+| ALL (write) | `can_manage_channel`                                                                  |
 
 #### `channel_members`
 
