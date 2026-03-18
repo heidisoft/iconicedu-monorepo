@@ -31,6 +31,8 @@ import { removeFamilyMemberAction } from '@iconicedu/web/app/actions/remove-fami
 import { createChildProfileAction } from '@iconicedu/web/app/actions/create-child-profile';
 import { saveEducatorAvailabilityAction } from '@iconicedu/web/app/actions/educator-availability';
 import { upsertUserOnboardingStatusAction } from '@iconicedu/web/app/actions/onboarding-status';
+import { addPersonaAction } from '@iconicedu/web/app/actions/add-persona';
+import { switchActivePersonaAction } from '@iconicedu/web/app/actions/switch-active-persona';
 import { determineOnboardingStep } from '@iconicedu/web/lib/onboarding/determineOnboardingStep';
 import {
   markDirectMessageChannelRead,
@@ -142,12 +144,16 @@ export function SidebarShell({
   children,
   data,
   initialOnboardingStatus,
+  isPersonaSwitchEnabled,
+  isPersonaAddEnabled,
   adminSections,
   subjectOptions,
 }: {
   children: ReactNode;
   data: SidebarLeftDataVM;
   initialOnboardingStatus?: UserOnboardingStatusVM | null;
+  isPersonaSwitchEnabled?: boolean;
+  isPersonaAddEnabled?: boolean;
   adminSections?: AdminMenuSectionVM[] | null;
   subjectOptions?: string[];
 }) {
@@ -204,6 +210,32 @@ export function SidebarShell({
   const handleOnboardingComplete = React.useCallback(() => {
     void router.push(dashboardBasePath);
   }, [dashboardBasePath, router]);
+
+  const handlePersonaSwitch = React.useCallback(
+    async (input: { profileId: string }) => {
+      const orgSlug = dashboardBasePath.replace(/^\//, '');
+      await switchActivePersonaAction({
+        orgId: sidebarData.user.profile.ids.orgId,
+        orgSlug,
+        profileId: input.profileId,
+      });
+      router.refresh();
+    },
+    [dashboardBasePath, router, sidebarData.user.profile.ids.orgId],
+  );
+
+  const handlePersonaAdd = React.useCallback(
+    async (input: { kind: 'educator' | 'guardian' | 'child' | 'staff' }) => {
+      const orgSlug = dashboardBasePath.replace(/^\//, '');
+      await addPersonaAction({
+        orgId: sidebarData.user.profile.ids.orgId,
+        orgSlug,
+        kind: input.kind,
+      });
+      router.refresh();
+    },
+    [dashboardBasePath, router, sidebarData.user.profile.ids.orgId],
+  );
 
   const handleStatusOverrideSave = React.useCallback(
     async (input: {
@@ -2309,6 +2341,10 @@ export function SidebarShell({
         onEducatorAvailabilitySave={handleEducatorAvailabilitySave}
         onStaffProfileSave={handleStaffProfileSave}
         onStatusOverrideSave={handleStatusOverrideSave}
+        onPersonaSwitch={handlePersonaSwitch}
+        onPersonaAdd={handlePersonaAdd}
+        isPersonaSwitchEnabled={Boolean(isPersonaSwitchEnabled)}
+        isPersonaAddEnabled={Boolean(isPersonaAddEnabled)}
         adminSections={adminSections ?? undefined}
       />
       <SidebarInset>{children}</SidebarInset>

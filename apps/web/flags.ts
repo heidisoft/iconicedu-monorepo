@@ -1,6 +1,26 @@
 import { flag, getProviderData as getCodeProviderData } from 'flags/next';
 
-export const enableChannelCommunications = flag<boolean>({
+function resolveDistinctId(profileId?: string | null) {
+  const resolved = profileId?.trim();
+  if (resolved) {
+    return resolved;
+  }
+  return 'anonymous';
+}
+
+async function evaluateWebBooleanFlag(input: {
+  flagKey: string;
+  profileId?: string | null;
+}) {
+  const { evaluatePosthogBooleanFlag } =
+    await import('@iconicedu/web/lib/flags/posthog-flags');
+  return evaluatePosthogBooleanFlag({
+    flagKey: input.flagKey,
+    distinctId: resolveDistinctId(input.profileId),
+  });
+}
+
+export const enableChannelCommunications = flag<boolean, { profileId?: string | null }>({
   key: 'enable-channel-communications',
   description:
     'Enables channel-level communication features that are still behind rollout control.',
@@ -9,8 +29,11 @@ export const enableChannelCommunications = flag<boolean>({
     { label: 'On', value: true },
   ],
   defaultValue: false,
-  decide() {
-    return false;
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: 'enable-channel-communications',
+      profileId: entities?.profileId,
+    });
   },
 });
 
@@ -23,15 +46,42 @@ export const enableMessageTypeComposer = flag<boolean, { profileId?: string | nu
   ],
   defaultValue: false,
   async decide({ entities }) {
-    const profileId = entities?.profileId?.trim();
-    if (!profileId) {
-      return false;
-    }
-    const { evaluatePosthogBooleanFlag } =
-      await import('@iconicedu/web/lib/flags/posthog-flags');
-    return evaluatePosthogBooleanFlag({
+    return evaluateWebBooleanFlag({
       flagKey: 'enable-message-type-composer',
-      distinctId: profileId,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
+export const enablePersonaSwitch = flag<boolean, { profileId?: string | null }>({
+  key: 'enable-persona-switch',
+  description: 'Enables persona switching from the user menu and active profile updates.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: 'enable-persona-switch',
+      profileId: entities?.profileId,
+    });
+  },
+});
+
+export const enablePersonaAdd = flag<boolean, { profileId?: string | null }>({
+  key: 'enable-persona-add',
+  description:
+    'Enables adding additional personas to the same org account from the user menu.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: 'enable-persona-add',
+      profileId: entities?.profileId,
     });
   },
 });
@@ -39,12 +89,20 @@ export const enableMessageTypeComposer = flag<boolean, { profileId?: string | nu
 export const webFlags = {
   enableChannelCommunications,
   enableMessageTypeComposer,
+  enablePersonaSwitch,
+  enablePersonaAdd,
 } as const;
 
 export type WebFlagKey = keyof typeof webFlags;
 
 export function isVercelFlagsSdkConfigured() {
-  return false;
+  const posthogKey =
+    process.env.POSTHOG_KEY?.trim() ?? process.env.NEXT_PUBLIC_POSTHOG_KEY?.trim() ?? '';
+  const posthogHost =
+    process.env.POSTHOG_HOST?.trim() ??
+    process.env.NEXT_PUBLIC_POSTHOG_HOST?.trim() ??
+    '';
+  return posthogKey.length > 0 && posthogHost.length > 0;
 }
 
 export async function getFlagsProviderData() {

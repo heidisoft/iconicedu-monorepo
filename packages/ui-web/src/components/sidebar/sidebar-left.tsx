@@ -178,6 +178,10 @@ export function SidebarLeft({
   onEducatorAvailabilitySave,
   onStaffProfileSave,
   onStatusOverrideSave,
+  onPersonaSwitch,
+  onPersonaAdd,
+  isPersonaSwitchEnabled,
+  isPersonaAddEnabled,
   adminSections,
   ...props
 }: React.ComponentProps<typeof Sidebar> & {
@@ -269,6 +273,12 @@ export function SidebarLeft({
     stateExpiresAt?: string | null;
     clearState?: boolean;
   }) => Promise<void> | void;
+  onPersonaSwitch?: (input: { profileId: string }) => Promise<void> | void;
+  onPersonaAdd?: (input: {
+    kind: 'educator' | 'guardian' | 'child' | 'staff';
+  }) => Promise<void> | void;
+  isPersonaSwitchEnabled?: boolean;
+  isPersonaAddEnabled?: boolean;
   onOnboardingComplete?: () => void;
 }) {
   const dashboardBasePath = React.useMemo(
@@ -850,6 +860,12 @@ export function SidebarLeft({
           onEducatorAvailabilitySave={onEducatorAvailabilitySave}
           onStaffProfileSave={onStaffProfileSave}
           onStatusOverrideSave={onStatusOverrideSave}
+          availablePersonas={data.user.availablePersonas ?? null}
+          addablePersonas={data.user.addablePersonas ?? null}
+          onPersonaSwitch={onPersonaSwitch}
+          onPersonaAdd={onPersonaAdd}
+          isPersonaSwitchEnabled={isPersonaSwitchEnabled}
+          isPersonaAddEnabled={isPersonaAddEnabled}
           subjectOptions={subjectOptions}
         />
       </SidebarFooter>

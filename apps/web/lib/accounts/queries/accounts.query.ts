@@ -207,6 +207,28 @@ export async function updateAccountRoleState(
     .maybeSingle<AccountRow>();
 }
 
+export async function updateAccountActiveProfile(
+  supabase: SupabaseClient,
+  input: {
+    accountId: string;
+    orgId: string;
+    activeProfileId: string | null;
+    updatedBy?: string | null;
+  },
+) {
+  return supabase
+    .from('accounts')
+    .update({
+      active_profile_id: input.activeProfileId,
+      updated_by: input.updatedBy ?? null,
+    })
+    .eq('id', input.accountId)
+    .eq('org_id', input.orgId)
+    .is('deleted_at', null)
+    .select(ACCOUNT_SELECT)
+    .maybeSingle<AccountRow>();
+}
+
 export async function deleteAccountById(
   supabase: SupabaseClient,
   accountId: string,

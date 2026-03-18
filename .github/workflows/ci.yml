@@ -67,6 +67,9 @@ jobs:
       - name: Format check
         run: pnpm format:check
 
+      - name: Guard feature flags
+        run: pnpm guard:feature-flags
+
       # PRs: only affected packages. Push to main: all packages.
       - name: Lint + Typecheck
         run: pnpm exec turbo run lint typecheck ${{ github.event_name == 'pull_request' && '--affected' || '' }}

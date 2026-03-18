@@ -32,6 +32,19 @@ export async function getProfileByAccountId(supabase: SupabaseClient, accountId:
     .maybeSingle<ProfileRow>();
 }
 
+export async function getProfilesByAccountId(
+  supabase: SupabaseClient,
+  accountId: string,
+) {
+  return supabase
+    .from('profiles')
+    .select(PROFILE_SELECT)
+    .eq('account_id', accountId)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false })
+    .returns<ProfileRow[]>();
+}
+
 export async function getProfileById(supabase: SupabaseClient, profileId: string) {
   return supabase
     .from('profiles')
@@ -63,7 +76,7 @@ export async function upsertProfileForAccount(
         status: payload.status,
         ui_theme_key: payload.uiThemeKey,
       },
-      { onConflict: 'org_id,account_id' },
+      { onConflict: 'org_id,account_id,kind' },
     )
     .select(PROFILE_SELECT)
     .single<ProfileRow>();
@@ -91,7 +104,7 @@ export async function insertProfileForAccount(
         status: payload.status,
         ui_theme_key: payload.uiThemeKey,
       },
-      { onConflict: 'org_id,account_id' },
+      { onConflict: 'org_id,account_id,kind' },
     )
     .select(PROFILE_SELECT)
     .single<ProfileRow>();

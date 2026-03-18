@@ -24,6 +24,7 @@ export interface AccountRow {
   primary_role?: RoleKey | null;
   role_status?: AccountRoleStatus | null;
   onboarding_completed_at?: ISODateTime | null;
+  active_profile_id?: UUID | null;
   created_at: ISODateTime;
   created_by?: UUID | null;
   updated_at: ISODateTime;

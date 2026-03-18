@@ -81,3 +81,19 @@
 - Co-locate tests with the owning package/app conventions and keep them deterministic.
 - Run relevant test suites for the changes and ensure they pass; if failures occur, fix them before finishing.
 - After every code change, run `pnpm turbo run test` and fix any failures before finishing.
+
+## 11. Feature Toggle Policy (Web)
+
+- All new user-facing features in `apps/web` must ship behind a feature toggle and default to OFF.
+- Use the Vercel Flags SDK catalog in `apps/web/flags.ts` as the source of truth.
+- Do not add ad-hoc rollout checks when a feature flag is required.
+- Rollout lifecycle per feature: `introduce (off)` -> `enable gradually` -> `remove stale flag`.
+- Exemptions are maintenance-only and require `flag-exempt: <reason>` in PR body or commit message.
+
+### Feature Flag Checklist
+
+1. Add a stable key in `apps/web/flags.ts` (`feature-area-action` naming).
+2. Keep `defaultValue: false` and explicit `decide()` behavior.
+3. Gate server behavior and UI behavior with the flag.
+4. Add/update tests for flag metadata and OFF/ON behavior.
+5. Remove stale flags after full rollout.

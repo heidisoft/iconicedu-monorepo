@@ -27,6 +27,7 @@ import type {
   ThemeKey,
   UserOnboardingStatusVM,
   UserAccountVM,
+  SidebarUserVM,
   UserProfileVM,
 } from '@iconicedu/shared-types';
 import { getProfileFullName } from '@iconicedu/ui-web/lib/display-name';
@@ -105,6 +106,12 @@ export function NavUser({
   onEducatorAvailabilitySave,
   onStaffProfileSave,
   onStatusOverrideSave,
+  availablePersonas,
+  addablePersonas,
+  onPersonaSwitch,
+  onPersonaAdd,
+  isPersonaSwitchEnabled,
+  isPersonaAddEnabled,
 }: {
   profile: UserProfileVM;
   account?: UserAccountVM | null;
@@ -199,6 +206,14 @@ export function NavUser({
     stateExpiresAt?: string | null;
     clearState?: boolean;
   }) => Promise<void> | void;
+  availablePersonas?: SidebarUserVM['availablePersonas'];
+  addablePersonas?: SidebarUserVM['addablePersonas'];
+  onPersonaSwitch?: (input: { profileId: string }) => Promise<void> | void;
+  onPersonaAdd?: (input: {
+    kind: 'educator' | 'guardian' | 'child' | 'staff';
+  }) => Promise<void> | void;
+  isPersonaSwitchEnabled?: boolean;
+  isPersonaAddEnabled?: boolean;
   onOnboardingComplete?: () => void;
 }) {
   const profileDisplayName = getProfileFullName(profile.profile);
@@ -214,6 +229,8 @@ export function NavUser({
     React.useState<StatusClearAfterOption>('never');
   const [statusSaveError, setStatusSaveError] = React.useState<string | null>(null);
   const [isSavingStatus, setIsSavingStatus] = React.useState(false);
+  const [isSwitchingPersona, setIsSwitchingPersona] = React.useState(false);
+  const [isAddingPersona, setIsAddingPersona] = React.useState(false);
 
   const openSettings = React.useCallback((tab: UserSettingsTab) => {
     setSettingsTab(tab);
@@ -344,6 +361,17 @@ export function NavUser({
     .filter(Boolean)
     .join(' ')
     .trim();
+  const personaChoices = (availablePersonas ?? []).filter(
+    (persona) => persona.kind !== 'system',
+  );
+  const personaAdds = (addablePersonas ?? []).filter(
+    (
+      persona,
+    ): persona is {
+      kind: 'educator' | 'guardian' | 'child' | 'staff';
+      label: string;
+    } => persona.kind !== 'system',
+  );
 
   return (
     <SidebarMenu>
@@ -404,6 +432,60 @@ export function NavUser({
                 {currentStatusSummary || 'Set a status'}
               </DropdownMenuItem>
             </DropdownMenuGroup>
+            {isPersonaSwitchEnabled && personaChoices.length > 1 ? (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  {personaChoices.map((persona) => (
+                    <DropdownMenuItem
+                      key={persona.profileId}
+                      disabled={persona.isActive || isSwitchingPersona}
+                      onSelect={async () => {
+                        if (!onPersonaSwitch || persona.isActive) {
+                          return;
+                        }
+                        setIsSwitchingPersona(true);
+                        try {
+                          await onPersonaSwitch({ profileId: persona.profileId });
+                        } finally {
+                          setIsSwitchingPersona(false);
+                        }
+                      }}
+                    >
+                      <Users />
+                      {persona.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuGroup>
+              </>
+            ) : null}
+            {isPersonaAddEnabled && personaAdds.length > 0 ? (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  {personaAdds.map((persona) => (
+                    <DropdownMenuItem
+                      key={persona.kind}
+                      disabled={isAddingPersona}
+                      onSelect={async () => {
+                        if (!onPersonaAdd) {
+                          return;
+                        }
+                        setIsAddingPersona(true);
+                        try {
+                          await onPersonaAdd({ kind: persona.kind });
+                        } finally {
+                          setIsAddingPersona(false);
+                        }
+                      }}
+                    >
+                      <Users />
+                      Add {persona.label} persona
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuGroup>
+              </>
+            ) : null}
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem onSelect={() => openSettings('account')}>

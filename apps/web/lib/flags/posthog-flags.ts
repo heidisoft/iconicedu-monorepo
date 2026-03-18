@@ -10,6 +10,10 @@ type EvaluatePosthogBooleanFlagInput = {
 const DEFAULT_POSTHOG_HOST = 'https://t.iconicedu.lk';
 const DEFAULT_TIMEOUT_MS = 2500;
 
+function isPosthogFlagDebugEnabled() {
+  return process.env.DEBUG_POSTHOG_FLAGS?.trim() === 'true';
+}
+
 function getPosthogHost() {
   return (
     process.env.POSTHOG_HOST ??
@@ -49,6 +53,14 @@ export async function evaluatePosthogBooleanFlag(
   const host = getPosthogHost();
 
   if (!distinctId || !flagKey || !apiKey || !host) {
+    if (isPosthogFlagDebugEnabled()) {
+      console.info('[posthog-flags]', 'evaluation-skipped', {
+        flagKey,
+        hasDistinctId: Boolean(distinctId),
+        hasApiKey: Boolean(apiKey),
+        hasHost: Boolean(host),
+      });
+    }
     return false;
   }
 
@@ -72,6 +84,12 @@ export async function evaluatePosthogBooleanFlag(
     });
 
     if (!response.ok) {
+      if (isPosthogFlagDebugEnabled()) {
+        console.info('[posthog-flags]', 'evaluation-failed', {
+          flagKey,
+          status: response.status,
+        });
+      }
       return false;
     }
 
@@ -92,6 +110,11 @@ export async function evaluatePosthogBooleanFlag(
 
     return false;
   } catch {
+    if (isPosthogFlagDebugEnabled()) {
+      console.info('[posthog-flags]', 'evaluation-exception', {
+        flagKey,
+      });
+    }
     return false;
   } finally {
     clearTimeout(timeout);

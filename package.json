@@ -19,7 +19,7 @@
     "build:api": "turbo run build --filter=api...",
     "build:packages": "turbo run build --filter='./packages/*'",
     "----------- QUALITY -----------": "",
-    "lint": "pnpm guard:activity-feed-writes && turbo run lint",
+    "lint": "pnpm guard:activity-feed-writes && pnpm guard:feature-flags && turbo run lint",
     "lint:fix": "turbo run lint:fix",
     "lint:web": "turbo run lint --filter=web...",
     "lint:mobile": "turbo run lint --filter=mobile...",
@@ -29,7 +29,7 @@
     "typecheck:mobile": "turbo run typecheck --filter=mobile...",
     "prepush:check": "pnpm exec turbo run lint typecheck test --affected",
     "----------- TESTING -----------": "",
-    "test": "pnpm test:guard:activity-feed-writes && turbo run test",
+    "test": "pnpm test:guard:activity-feed-writes && pnpm test:guard:feature-flags && turbo run test",
     "test:web": "turbo run test --filter=web --filter=@iconicedu/ui-web",
     "test:mobile": "turbo run test --filter=mobile --filter=@iconicedu/ui-native",
     "test:api": "turbo run test --filter=api",
@@ -57,7 +57,9 @@
     "format:check": "prettier --check .",
     "format:check:changed": "node scripts/prettier-check-changed.mjs",
     "guard:activity-feed-writes": "node scripts/check-activity-feed-writes.mjs",
+    "guard:feature-flags": "node scripts/check-feature-flag-gating.mjs",
     "test:guard:activity-feed-writes": "node --test scripts/check-activity-feed-writes.test.mjs",
+    "test:guard:feature-flags": "node --test scripts/check-feature-flag-gating.test.mjs",
     "prepare": "husky"
   },
   "devDependencies": {

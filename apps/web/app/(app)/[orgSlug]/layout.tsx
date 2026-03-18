@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { SidebarProvider } from '@iconicedu/ui-web';
-import { cookies } from 'next/headers';
 
 import { SidebarShell } from '@iconicedu/web/app/(app)/[orgSlug]/sidebar-shell';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
@@ -18,6 +17,7 @@ import {
   listActiveOrgSubjectCatalog,
   mapOrgSubjectRowsToOptions,
 } from '@iconicedu/web/lib/subjects/queries/org-subject-catalog.query';
+import { enablePersonaAdd, enablePersonaSwitch } from '@iconicedu/web/flags';
 
 export const metadata: Metadata = {
   title: {
@@ -67,12 +67,6 @@ export default async function Layout({
     redirect(`/${orgSlug}/login/pending-access`);
   }
 
-  const cookieStore = await cookies();
-  const overrideCookie = cookieStore.get('profile_kind_override');
-  const profileKindOverrideFromCookie =
-    overrideCookie?.value === 'educator' ? 'educator' : undefined;
-  const profileKindOverride = profileKindOverrideFromCookie;
-
   const baseSidebarData = await buildSidebarBaseData(
     supabase,
     account.org_id,
@@ -84,8 +78,19 @@ export default async function Layout({
     account,
     familyInvite: invite,
     baseSidebarData,
-    profileKindOverride,
   });
+  const [isPersonaSwitchEnabled, isPersonaAddEnabled] = await Promise.all([
+    enablePersonaSwitch.run({
+      identify: {
+        profileId: sidebarData.user.profile.ids.id,
+      },
+    }),
+    enablePersonaAdd.run({
+      identify: {
+        profileId: sidebarData.user.profile.ids.id,
+      },
+    }),
+  ]);
   const subjectCatalogResponse = await listActiveOrgSubjectCatalog(
     supabase,
     account.org_id,
@@ -97,6 +102,8 @@ export default async function Layout({
       <SidebarShell
         data={sidebarData}
         initialOnboardingStatus={onboardingStatus}
+        isPersonaSwitchEnabled={isPersonaSwitchEnabled}
+        isPersonaAddEnabled={isPersonaAddEnabled}
         adminSections={buildAdminMenuSections(`/${orgSlug}`)}
         subjectOptions={subjectOptions}
       >

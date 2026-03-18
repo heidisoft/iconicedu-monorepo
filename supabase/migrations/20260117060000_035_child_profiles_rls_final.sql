@@ -1,4 +1,6 @@
 -- Recreate child profile RLS rules, combining owner, guardian, child, and admin paths.
+-- NOTE: drop read policy first so mixed branch history / replayed migrations stay idempotent.
+drop policy if exists "child profiles read by org" on public.child_profiles;
 drop policy if exists "child profiles manage by admin" on public.child_profiles;
 drop policy if exists "child profiles insert guardian" on public.child_profiles;
 drop policy if exists "child profiles insert by owner or guardian" on public.child_profiles;

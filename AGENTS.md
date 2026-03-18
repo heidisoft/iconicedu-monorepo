@@ -1547,3 +1547,22 @@ pnpm --filter mobile exec jest src/__tests__/message-list.test.tsx
 **End of AGENTS.md**
 
 _This document should be updated as the architecture evolves. Last updated: 2026-03-01_
+
+## Feature Toggle Policy (Web)
+
+- All new user-facing features in `apps/web` must ship behind a feature toggle and default to OFF.
+- Use the Vercel Flags SDK catalog in `apps/web/flags.ts` as the source of truth.
+- Do not introduce ad-hoc rollout checks when a feature flag is required.
+- Rollout lifecycle must be documented per feature:
+  - `introduce` (flag OFF)
+  - `enable gradually`
+  - `remove stale flag + dead code`
+- Exemptions are allowed only for maintenance/refactor changes and must include `flag-exempt: <reason>` in PR body or commit message.
+
+### Feature Flag Checklist
+
+1. Add a stable key in `apps/web/flags.ts` (`feature-area-action`).
+2. Keep `defaultValue: false` and provide explicit `decide()` behavior.
+3. Gate both server behavior and UI behavior with the flag.
+4. Add/update tests for catalog metadata and OFF/ON behavior.
+5. Define removal criteria and remove the flag after full rollout.
