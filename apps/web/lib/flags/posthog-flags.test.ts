@@ -83,4 +83,50 @@ describe('evaluatePosthogBooleanFlag', () => {
     ).resolves.toBe(false);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
+
+  it('coerces non-boolean provider values', async () => {
+    process.env.POSTHOG_KEY = 'phc_test';
+    process.env.POSTHOG_HOST = 'https://posthog.example.com';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          featureFlags: {
+            'enable-persona-add': 'variant-a',
+          },
+        }),
+      })),
+    );
+
+    await expect(
+      evaluatePosthogBooleanFlag({
+        flagKey: 'enable-persona-add',
+        distinctId: 'profile-1',
+      }),
+    ).resolves.toBe(true);
+  });
+
+  it('returns false for zero numeric provider values', async () => {
+    process.env.POSTHOG_KEY = 'phc_test';
+    process.env.POSTHOG_HOST = 'https://posthog.example.com';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          featureFlags: {
+            'enable-persona-add': 0,
+          },
+        }),
+      })),
+    );
+
+    await expect(
+      evaluatePosthogBooleanFlag({
+        flagKey: 'enable-persona-add',
+        distinctId: 'profile-1',
+      }),
+    ).resolves.toBe(false);
+  });
 });
