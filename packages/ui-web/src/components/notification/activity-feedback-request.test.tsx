@@ -174,6 +174,42 @@ describe('ActivityFeedbackRequest', () => {
     expect(screen.getByText('Thank you for your feedback.')).toBeInTheDocument();
   });
 
+  it('shows a submitted-time tooltip using timezone-adjusted formatting', () => {
+    render(
+      <ActivityFeedbackRequest
+        activity={createActivity({
+          feedbackResponse: {
+            rating: 5,
+            comment: null,
+            submittedAt: '2026-03-16T10:01:00.000Z',
+          },
+        })}
+      />,
+    );
+
+    const submittedCard = screen.getByText('Thank you for your feedback.').closest('div');
+    expect(submittedCard).not.toBeNull();
+    expect(submittedCard?.getAttribute('title')).toMatch(/^Submitted /);
+  });
+
+  it('does not set submitted-time tooltip when submittedAt is invalid', () => {
+    render(
+      <ActivityFeedbackRequest
+        activity={createActivity({
+          feedbackResponse: {
+            rating: 5,
+            comment: null,
+            submittedAt: 'not-a-date',
+          },
+        })}
+      />,
+    );
+
+    const submittedCard = screen.getByText('Thank you for your feedback.').closest('div');
+    expect(submittedCard).not.toBeNull();
+    expect(submittedCard?.getAttribute('title')).toBeNull();
+  });
+
   it('removes edit access after one minute from the submitted timestamp', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-16T10:02:31.000Z'));

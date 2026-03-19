@@ -5,6 +5,10 @@ import { Star } from 'lucide-react';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { Textarea } from '@iconicedu/ui-web/ui/textarea';
 import { cn } from '@iconicedu/ui-web/lib/utils';
+import {
+  formatScheduleDisplayValue,
+  resolveScheduleDisplayTimeZone,
+} from '@iconicedu/ui-web/lib/schedule-display-timezone';
 import type { ActivityFeedLeafItemVM } from '@iconicedu/shared-types';
 
 const EDIT_WINDOW_MS = 60_000;
@@ -87,7 +91,20 @@ function formatSubmittedAtTooltip(submittedAt: string | null) {
     return null;
   }
 
-  return `Submitted ${submittedDate.toLocaleString()}`;
+  const userTimeZone = resolveScheduleDisplayTimeZone();
+  const formatted = formatScheduleDisplayValue(submittedDate, userTimeZone, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZoneName: 'short',
+  });
+  if (!formatted) {
+    return null;
+  }
+
+  return `Submitted ${formatted}`;
 }
 
 export function canRenderActivityFeedbackRequest(activity: ActivityFeedLeafItemVM) {
@@ -351,9 +368,6 @@ export function ActivityFeedbackRequest({ activity }: ActivityFeedbackRequestPro
           title={submittedTooltip ?? undefined}
         >
           <p className="font-semibold text-foreground">Thank you for your feedback.</p>
-          <p className="mt-1">
-            You rated this session {rating} star{rating === 1 ? '' : 's'}.
-          </p>
         </div>
       ) : null}
 

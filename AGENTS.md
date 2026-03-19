@@ -1133,6 +1133,12 @@ TextMessageVM | ImageMessageVM | ... (narrowed type)
    - Each package should have an `index.ts` that re-exports public API
    - Consumers import from package root: `import { MessageVM } from '@iconicedu/shared-types'`
 
+### Time & Timezone Formatting
+
+- For user-visible dates/times, do not use direct `toLocaleString` or ad-hoc `Intl.DateTimeFormat` formatting in feature code.
+- Use shared timezone-aware helpers so output is consistently viewer-timezone adjusted.
+- Prefer `@iconicedu/utils` (`formatDateTime`, `formatDate`, `formatTime`, `resolveViewerTimezone`) or `packages/ui-web/src/lib/schedule-display-timezone.ts` helpers (`resolveScheduleDisplayTimeZone`, `formatScheduleDisplayValue`, `formatScheduleDisplayTimeWithZone`).
+
 ### Animation Guidelines
 
 1. **Use smooth animations for user interactions (Web + Mobile)**
