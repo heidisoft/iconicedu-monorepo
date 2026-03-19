@@ -328,26 +328,30 @@ export function DashboardHomeInfographicSection({
           <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <a
               href={notificationsHref}
-              className="rounded-2xl bg-primary p-5 text-primary-foreground transition hover:opacity-90"
+              className="flex min-h-36 flex-col rounded-2xl bg-primary p-5 text-primary-foreground transition hover:opacity-90"
             >
-              <div className="flex items-center gap-2">
+              <div className="flex items-start gap-2">
                 <Bell className={quickActionIconClassName} aria-hidden="true" />
-                <p className="text-sm font-semibold leading-tight">Notifications</p>
+                <p className="min-w-0 flex-1 text-sm font-semibold leading-tight break-words">
+                  Notifications
+                </p>
               </div>
-              <p className="mt-1 text-sm text-primary-foreground/80">
+              <p className="mt-2 min-w-0 text-sm leading-snug text-primary-foreground/80 break-words">
                 View recent updates
               </p>
             </a>
 
             <a
               href={calendarHref}
-              className="rounded-2xl border border-border bg-background/70 p-5 transition hover:bg-muted/40"
+              className="flex min-h-36 flex-col rounded-2xl border border-border bg-background/70 p-5 transition hover:bg-muted/40"
             >
-              <div className="flex items-center gap-2">
+              <div className="flex items-start gap-2">
                 <CalendarDays className={quickActionIconClassName} aria-hidden="true" />
-                <p className="text-sm font-semibold leading-tight">Calendar</p>
+                <p className="min-w-0 flex-1 text-sm font-semibold leading-tight break-words">
+                  Calendar
+                </p>
               </div>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <p className="mt-2 min-w-0 text-sm leading-snug text-muted-foreground break-words">
                 Review session schedule
               </p>
             </a>
