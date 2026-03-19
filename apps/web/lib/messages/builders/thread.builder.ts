@@ -15,10 +15,6 @@ type ThreadBuildOptions = {
   accountId?: string;
 };
 
-function isThreadUnreadDebugEnabled() {
-  return process.env.DEBUG_THREAD_UNREAD?.trim() === 'true';
-}
-
 export async function buildThreadsByChannelId(
   supabase: SupabaseClient,
   orgId: string,
@@ -54,16 +50,6 @@ export async function buildThreadsByChannelId(
 
   return threadRows.map((row) => {
     const readState = readStateByThread.get(row.id);
-    if (isThreadUnreadDebugEnabled()) {
-      console.info('[thread-unread][builder][channel-thread]', {
-        threadId: row.id,
-        channelId: row.channel_id,
-        accountId: options.accountId ?? null,
-        unreadCount: readState?.unread_count ?? null,
-        lastReadAt: readState?.last_read_at ?? null,
-        lastReadMessageId: readState?.last_read_message_id ?? null,
-      });
-    }
     const participants = (participantsByThread.get(row.id) ?? [])
       .map((participant) => profilesById.get(participant.profile_id))
       .filter((profile): profile is UserProfileVM => Boolean(profile));
@@ -103,17 +89,6 @@ export async function buildThreadById(
 
   const readStateRow =
     (readStateResponse.data ?? []).find((row) => row.thread_id === threadId) ?? null;
-
-  if (isThreadUnreadDebugEnabled()) {
-    console.info('[thread-unread][builder][thread-by-id]', {
-      threadId,
-      channelId: threadRow.channel_id,
-      accountId: options.accountId ?? null,
-      unreadCount: readStateRow?.unread_count ?? null,
-      lastReadAt: readStateRow?.last_read_at ?? null,
-      lastReadMessageId: readStateRow?.last_read_message_id ?? null,
-    });
-  }
 
   return mapThreadRowToVM(threadRow, {
     participants: participantVMs,
