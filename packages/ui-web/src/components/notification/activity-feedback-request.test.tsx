@@ -94,8 +94,13 @@ describe('ActivityFeedbackRequest', () => {
     );
   });
 
-  it('requires a comment before submitting ratings below five stars', async () => {
-    const fetchMock = vi.fn();
+  it('allows submitting ratings below five stars without a comment', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        data: { submittedAt: '2026-03-16T10:01:00.000Z', rating: 3, comment: null },
+      }),
+    }));
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
 
@@ -107,14 +112,11 @@ describe('ActivityFeedbackRequest', () => {
     ).toBeInTheDocument();
 
     const submitButton = screen.getByRole('button', { name: 'Submit feedback' });
-    expect(submitButton).toBeDisabled();
-
-    await user.type(
-      screen.getByPlaceholderText('Tell us what could be better...'),
-      'Need a little more structure.',
-    );
-
     expect(submitButton).toBeEnabled();
+    await user.click(submitButton);
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('allows temporary re-rating after submit', async () => {

@@ -5,6 +5,10 @@ import { useState } from 'react';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import { ActivityBasicWithActionButton } from '@iconicedu/ui-web/components/notification/activity-basic-with-action-button';
 import { ActivityBasicWithExpandedContent } from '@iconicedu/ui-web/components/notification/activity-basic-with-expanded-content';
+import {
+  ActivityFeedbackRequest,
+  canRenderActivityFeedbackRequest,
+} from '@iconicedu/ui-web/components/notification/activity-feedback-request';
 import { ActivityItemBase } from '@iconicedu/ui-web/components/notification/activity-item-base';
 import type {
   ActivityFeedGroupItemVM,
@@ -104,7 +108,21 @@ export function ActivityWithSubitems({
         <div className="relative ml-6 md:ml-[42px] animate-in slide-in-from-top-2 fade-in duration-300">
           {subActivities.map((sub: ActivityFeedLeafItemVM, index: number) => (
             <div key={sub.ids.id} className="relative">
-              {sub.content.expandedContent ? (
+              {sub.verb === 'session.feedback_request.sent' &&
+              canRenderActivityFeedbackRequest(sub) ? (
+                <ActivityBasicWithExpandedContent
+                  activity={sub}
+                  onMarkRead={onMarkRead}
+                  onAutoRead={onAutoRead}
+                  showActionButton={false}
+                  isSubActivity
+                  parentExpanded={!isCollapsed}
+                  showTimelineConnector={index < subActivities.length - 1}
+                  className="pb-0"
+                >
+                  <ActivityFeedbackRequest activity={sub} />
+                </ActivityBasicWithExpandedContent>
+              ) : sub.content.expandedContent ? (
                 <ActivityBasicWithExpandedContent
                   activity={sub}
                   onMarkRead={onMarkRead}

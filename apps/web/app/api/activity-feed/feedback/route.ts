@@ -71,12 +71,6 @@ export async function POST(request: Request) {
   }
 
   const comment = normalizeComment(body.comment);
-  if (body.rating < 5 && !comment) {
-    return NextResponse.json(
-      { error: 'Comment is required for ratings below 5' },
-      { status: 400 },
-    );
-  }
   if (comment && comment.length > 1000) {
     return NextResponse.json({ error: 'Comment is too long' }, { status: 400 });
   }

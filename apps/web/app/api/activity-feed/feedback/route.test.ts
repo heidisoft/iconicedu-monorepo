@@ -121,9 +121,40 @@ describe('POST /api/activity-feed/feedback', () => {
     });
   });
 
-  it('rejects ratings below 5 when comment is missing', async () => {
+  it('accepts ratings below 5 when comment is missing', async () => {
+    const entitlementQuery = {
+      eq: vi.fn(() => entitlementQuery),
+      is: vi.fn(() => entitlementQuery),
+      limit: vi.fn(() => entitlementQuery),
+      maybeSingle: vi.fn(async () => ({ data: { id: 'item-1' }, error: null })),
+    };
+    const upsertQuery = {
+      select: vi.fn(() => upsertQuery),
+      single: vi.fn(async () => ({
+        data: {
+          source_event_id: '11111111-1111-4111-8111-111111111111',
+          message_id: null,
+          class_session_id: '33333333-3333-4333-8333-333333333333',
+          classroom_id: '44444444-4444-4444-8444-444444444444',
+          channel_id: '55555555-5555-4555-8555-555555555555',
+          occurrence_start_at: null,
+          rating: 3,
+          comment: null,
+          submitted_at: '2026-03-09T16:00:00.000Z',
+        },
+        error: null,
+      })),
+    };
     createSupabaseServerClient.mockResolvedValue({
-      from: vi.fn(),
+      from: vi.fn((table: string) => {
+        if (table === 'activity_feed_items') {
+          return { select: vi.fn(() => entitlementQuery) };
+        }
+        if (table === 'class_session_feedback') {
+          return { upsert: vi.fn(() => upsertQuery) };
+        }
+        throw new Error(`Unexpected table ${table}`);
+      }),
     });
 
     const response = await POST(
@@ -141,8 +172,12 @@ describe('POST /api/activity-feed/feedback', () => {
       }),
     );
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.error).toContain('Comment is required');
+    expect(body.success).toBe(true);
+    expect(body.data).toMatchObject({
+      rating: 3,
+      comment: null,
+    });
   });
 });

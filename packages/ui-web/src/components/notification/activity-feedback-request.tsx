@@ -77,6 +77,19 @@ function resolveEditWindowOpen(submittedAt: string | null) {
   return submittedTimestamp + EDIT_WINDOW_MS > Date.now();
 }
 
+function formatSubmittedAtTooltip(submittedAt: string | null) {
+  if (!submittedAt) {
+    return null;
+  }
+
+  const submittedDate = new Date(submittedAt);
+  if (Number.isNaN(submittedDate.getTime())) {
+    return null;
+  }
+
+  return `Submitted ${submittedDate.toLocaleString()}`;
+}
+
 export function canRenderActivityFeedbackRequest(activity: ActivityFeedLeafItemVM) {
   return getFeedbackMetadata(activity).feedbackUiEnabled;
 }
@@ -154,9 +167,8 @@ export function ActivityFeedbackRequest({ activity }: ActivityFeedbackRequestPro
     Boolean(metadata.channelId);
   const isSubmitted = Boolean(submittedAt) && !isEditing;
   const displayRating = hoveredRating || rating;
-  const requiresComment = rating > 0 && rating < 5;
   const trimmedComment = comment.trim();
-  const canSubmitComment = !requiresComment || trimmedComment.length > 0;
+  const submittedTooltip = formatSubmittedAtTooltip(submittedAt);
 
   const submitFeedback = async (nextRating: number, nextComment?: string) => {
     if (!canSubmit || nextRating < 1 || nextRating > 5) {
@@ -233,11 +245,6 @@ export function ActivityFeedbackRequest({ activity }: ActivityFeedbackRequestPro
       return;
     }
 
-    if (!canSubmitComment) {
-      setError('Add a comment for ratings below 5 stars.');
-      return;
-    }
-
     await submitFeedback(rating, trimmedComment);
   };
 
@@ -253,19 +260,11 @@ export function ActivityFeedbackRequest({ activity }: ActivityFeedbackRequestPro
   }
 
   return (
-    <div className="rounded-xl border border-border/80 bg-background/95 p-4 shadow-sm">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            Rate this session
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {isSubmitted
-              ? 'Your feedback was saved.'
-              : 'Choose a rating to share how the class went.'}
-          </p>
-        </div>
-
+    <div className="w-full rounded-xl border border-border/80 bg-background/95 p-4 text-xs md:max-w-[420px]">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          Rate your session
+        </p>
         {isSubmitted && isEditWindowOpen ? (
           <Button
             type="button"
@@ -273,6 +272,7 @@ export function ActivityFeedbackRequest({ activity }: ActivityFeedbackRequestPro
             variant="ghost"
             onClick={handleResetRating}
             data-action-button="true"
+            className="text-xs"
           >
             Edit rating
           </Button>
@@ -280,7 +280,7 @@ export function ActivityFeedbackRequest({ activity }: ActivityFeedbackRequestPro
       </div>
 
       <div
-        className="mt-4 flex items-center gap-2"
+        className="mt-2 flex items-center gap-2"
         role="group"
         aria-label="Session feedback rating"
       >
@@ -297,7 +297,7 @@ export function ActivityFeedbackRequest({ activity }: ActivityFeedbackRequestPro
               onFocus={() => setHoveredRating(value)}
               onBlur={() => setHoveredRating(0)}
               className={cn(
-                'flex h-10 w-10 items-center justify-center rounded-full border border-border bg-background transition-colors duration-150',
+                'flex h-8 w-8 items-center justify-center rounded-full border border-border bg-background transition-colors duration-150',
                 canSubmit && !isSubmitting && !isSubmitted
                   ? 'cursor-pointer hover:border-amber-300 hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2'
                   : 'cursor-default',
@@ -308,7 +308,7 @@ export function ActivityFeedbackRequest({ activity }: ActivityFeedbackRequestPro
             >
               <Star
                 className={cn(
-                  'h-5 w-5 transition-colors duration-150',
+                  'h-4 w-4 transition-colors duration-150',
                   isActive ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground',
                 )}
               />
@@ -318,7 +318,7 @@ export function ActivityFeedbackRequest({ activity }: ActivityFeedbackRequestPro
       </div>
 
       {!isSubmitted && showComment ? (
-        <div className="mt-4 space-y-3">
+        <div className="mt-2 space-y-2">
           <Textarea
             value={comment}
             onChange={(event) => {
@@ -328,18 +328,16 @@ export function ActivityFeedbackRequest({ activity }: ActivityFeedbackRequestPro
               }
             }}
             placeholder="Tell us what could be better..."
-            className="min-h-[112px]"
+            className="min-h-[112px] text-xs placeholder:text-xs"
           />
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-xs text-muted-foreground">
-              Ratings below 5 stars require a comment.
-            </p>
+          <div className="flex items-center justify-end gap-3">
             <Button
               type="button"
               size="sm"
               onClick={() => void handleSubmit()}
-              disabled={isSubmitting || !canSubmitComment}
+              disabled={isSubmitting}
               data-action-button="true"
+              className="text-xs"
             >
               Submit feedback
             </Button>
@@ -348,28 +346,30 @@ export function ActivityFeedbackRequest({ activity }: ActivityFeedbackRequestPro
       ) : null}
 
       {isSubmitted ? (
-        <div className="mt-4 rounded-lg bg-muted/50 px-3 py-3 text-sm text-muted-foreground">
+        <div
+          className="mt-2 rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground"
+          title={submittedTooltip ?? undefined}
+        >
           <p className="font-semibold text-foreground">Thank you for your feedback.</p>
           <p className="mt-1">
             You rated this session {rating} star{rating === 1 ? '' : 's'}.
           </p>
-          {comment ? <p className="mt-2 text-xs">&ldquo;{comment}&rdquo;</p> : null}
         </div>
       ) : null}
 
       {!isSubmitted && !showComment && rating > 0 && rating < 5 ? (
-        <p className="mt-3 text-xs text-muted-foreground">
+        <p className="mt-2 text-xs text-muted-foreground">
           Add a comment to submit a rating below 5 stars.
         </p>
       ) : null}
 
       {!isSubmitted && !canSubmit ? (
-        <p className="mt-3 text-xs text-muted-foreground">
+        <p className="mt-2 text-xs text-muted-foreground">
           Feedback is unavailable for this session.
         </p>
       ) : null}
 
-      {error ? <p className="mt-3 text-xs text-rose-600">{error}</p> : null}
+      {error ? <p className="mt-2 text-xs text-rose-600">{error}</p> : null}
     </div>
   );
 }
