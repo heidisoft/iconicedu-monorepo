@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { inviteAdminUserAction } from '@iconicedu/web/app/(app)/[orgSlug]/admin/users/actions/invite-user';
 import { getFamilyInviteAdminClient } from '@iconicedu/web/lib/family/queries/invite.query';
+import { requireAdminOrgContext } from '@iconicedu/web/lib/admin/require-admin-org-context';
 
 type RowInviteRequest = {
   accountId?: string;
@@ -27,11 +28,11 @@ export async function POST(request: Request) {
 
   const { data: account, error: accountError } = await adminClient
     .from('accounts')
-    .select('email')
+    .select('email, org_id')
     .eq('id', accountId)
     .is('deleted_at', null)
     .limit(1)
-    .maybeSingle<{ email?: string | null }>();
+    .maybeSingle<{ email?: string | null; org_id: string }>();
 
   if (accountError) {
     return NextResponse.json(
@@ -44,6 +45,14 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { success: false, message: 'Account or email not found' },
       { status: 404 },
+    );
+  }
+
+  const authContext = await requireAdminOrgContext(account.org_id, { allowStaff: true });
+  if (!authContext.ok) {
+    return NextResponse.json(
+      { success: false, message: authContext.message },
+      { status: authContext.status },
     );
   }
 

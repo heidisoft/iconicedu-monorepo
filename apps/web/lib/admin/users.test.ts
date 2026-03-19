@@ -1,17 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
-  createSupabaseServerClientMock,
+  createSupabaseServiceClientMock,
+  requireAdminOrgContextMock,
   getAccountsByOrgIdMock,
   getProfileSummariesByAccountIdsMock,
 } = vi.hoisted(() => ({
-  createSupabaseServerClientMock: vi.fn(),
+  createSupabaseServiceClientMock: vi.fn(),
+  requireAdminOrgContextMock: vi.fn(),
   getAccountsByOrgIdMock: vi.fn(),
   getProfileSummariesByAccountIdsMock: vi.fn(),
 }));
 
-vi.mock('@iconicedu/web/lib/supabase/server', () => ({
-  createSupabaseServerClient: createSupabaseServerClientMock,
+vi.mock('@iconicedu/web/lib/supabase/service', () => ({
+  createSupabaseServiceClient: createSupabaseServiceClientMock,
+}));
+
+vi.mock('@iconicedu/web/lib/admin/require-admin-org-context', () => ({
+  requireAdminOrgContext: (...args: unknown[]) => requireAdminOrgContextMock(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
@@ -33,12 +39,28 @@ describe('getAdminUserRows', () => {
     const rows = await getAdminUserRows('');
 
     expect(rows).toEqual([]);
-    expect(createSupabaseServerClientMock).not.toHaveBeenCalled();
+    expect(createSupabaseServiceClientMock).not.toHaveBeenCalled();
+  });
+
+  it('throws when requester is not authorized for admin users', async () => {
+    requireAdminOrgContextMock.mockResolvedValue({
+      ok: false,
+      status: 403,
+      message: 'Forbidden',
+    });
+
+    await expect(getAdminUserRows('org-1')).rejects.toThrow('Forbidden');
+    expect(createSupabaseServiceClientMock).not.toHaveBeenCalled();
   });
 
   it('loads users for the provided org id', async () => {
     const supabase = {};
-    createSupabaseServerClientMock.mockResolvedValue(supabase);
+    requireAdminOrgContextMock.mockResolvedValue({
+      ok: true,
+      orgId: 'org-1',
+      actorProfileId: 'profile-actor-1',
+    });
+    createSupabaseServiceClientMock.mockReturnValue(supabase);
     getAccountsByOrgIdMock.mockResolvedValue({
       data: [
         {
@@ -71,6 +93,9 @@ describe('getAdminUserRows', () => {
 
     const rows = await getAdminUserRows('org-1');
 
+    expect(requireAdminOrgContextMock).toHaveBeenCalledWith('org-1', {
+      allowStaff: true,
+    });
     expect(getAccountsByOrgIdMock).toHaveBeenCalledWith(supabase, 'org-1');
     expect(getProfileSummariesByAccountIdsMock).toHaveBeenCalledWith(supabase, 'org-1', [
       'account-1',

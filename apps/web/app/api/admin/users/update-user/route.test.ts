@@ -6,6 +6,7 @@ import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
 const updateUserById = vi.fn();
 const getFamilyInviteAdminClient = vi.fn();
 const upsertUserRole = vi.fn();
+const requireAdminOrgContext = vi.fn();
 const APP_URL = resolveAppUrl();
 
 vi.mock('@iconicedu/web/lib/family/queries/invite.query', () => ({
@@ -16,10 +17,19 @@ vi.mock('@iconicedu/web/lib/profile/queries/roles.query', () => ({
   upsertUserRole: (...args: unknown[]) => upsertUserRole(...args),
 }));
 
+vi.mock('@iconicedu/web/lib/admin/require-admin-org-context', () => ({
+  requireAdminOrgContext: (...args: unknown[]) => requireAdminOrgContext(...args),
+}));
+
 describe('POST /api/admin/users/update-user', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     upsertUserRole.mockResolvedValue({ error: null });
+    requireAdminOrgContext.mockResolvedValue({
+      ok: true,
+      orgId: 'org-1',
+      actorProfileId: 'profile-staff-1',
+    });
   });
 
   it('returns 400 when accountId is missing', async () => {
@@ -288,6 +298,63 @@ describe('POST /api/admin/users/update-user', () => {
     expect(await response.json()).toEqual({
       success: false,
       message: 'Email is already used by another account',
+    });
+  });
+
+  it('returns auth error when actor cannot manage org users', async () => {
+    requireAdminOrgContext.mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      message: 'Forbidden',
+    });
+
+    const accountsLookupMaybeSingle = vi.fn(async () => ({
+      data: {
+        id: 'account-1',
+        org_id: 'org-1',
+        auth_user_id: null,
+        email: 'old@example.com',
+      },
+      error: null,
+    }));
+    const accountsLookupLimit = vi.fn(() => ({ maybeSingle: accountsLookupMaybeSingle }));
+    const accountsLookupIs = vi.fn(() => ({ limit: accountsLookupLimit }));
+    const accountsLookupEqId = vi.fn(() => ({ is: accountsLookupIs }));
+
+    getFamilyInviteAdminClient.mockReturnValue({
+      from: (table: string) => {
+        if (table === 'accounts') {
+          return {
+            select: vi.fn(() => ({ eq: accountsLookupEqId })),
+            update: vi.fn(),
+          };
+        }
+        if (table === 'profiles') {
+          return { update: vi.fn() };
+        }
+        throw new Error(`unexpected table ${table}`);
+      },
+      auth: {
+        admin: {
+          updateUserById,
+        },
+      },
+    });
+
+    const response = await POST(
+      new Request(`${APP_URL}/api/admin/users/update-user`, {
+        method: 'POST',
+        body: JSON.stringify({
+          accountId: 'account-1',
+          email: 'user@example.com',
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({
+      success: false,
+      message: 'Forbidden',
     });
   });
 });

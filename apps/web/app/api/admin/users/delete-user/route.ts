@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { deleteUserAction } from '@iconicedu/web/lib/auth/admin-actions';
 import { getFamilyInviteAdminClient } from '@iconicedu/web/lib/family/queries/invite.query';
+import { requireAdminOrgContext } from '@iconicedu/web/lib/admin/require-admin-org-context';
 
 type DeleteRequestBody = {
   accountId?: string;
@@ -37,6 +38,14 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { success: false, message: 'Account not found' },
       { status: 404 },
+    );
+  }
+
+  const authContext = await requireAdminOrgContext(account.org_id, { allowStaff: true });
+  if (!authContext.ok) {
+    return NextResponse.json(
+      { success: false, message: authContext.message },
+      { status: authContext.status },
     );
   }
 

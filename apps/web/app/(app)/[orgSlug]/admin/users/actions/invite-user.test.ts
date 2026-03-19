@@ -17,6 +17,7 @@ const {
   mockGetOrgById,
   mockInviteUserByEmail,
   mockGenerateLink,
+  mockRequireAdminOrgContext,
 } = vi.hoisted(() => ({
   mockHeaders: vi.fn(),
   mockCreateSupabaseServerClient: vi.fn(),
@@ -32,6 +33,7 @@ const {
   mockGetOrgById: vi.fn(),
   mockInviteUserByEmail: vi.fn(),
   mockGenerateLink: vi.fn(),
+  mockRequireAdminOrgContext: vi.fn(),
 }));
 
 vi.mock('next/headers', () => ({
@@ -103,6 +105,10 @@ vi.mock('@iconicedu/web/lib/org/queries/org.query', () => ({
   getOrgById: mockGetOrgById,
 }));
 
+vi.mock('@iconicedu/web/lib/admin/require-admin-org-context', () => ({
+  requireAdminOrgContext: (...args: unknown[]) => mockRequireAdminOrgContext(...args),
+}));
+
 describe('inviteAdminUserAction', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -122,6 +128,11 @@ describe('inviteAdminUserAction', () => {
     });
     mockGetAccountByAuthUserId.mockResolvedValue({
       data: { id: 'account-admin-1', org_id: 'org-1' },
+    });
+    mockRequireAdminOrgContext.mockResolvedValue({
+      ok: true,
+      orgId: 'org-1',
+      actorProfileId: 'profile-staff-1',
     });
     mockGetOrgById.mockResolvedValue({
       error: null,

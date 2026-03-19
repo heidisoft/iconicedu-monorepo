@@ -8,7 +8,10 @@ function isAllowedAdminRole(roleKey: string | null | undefined) {
   return roleKey === 'owner' || roleKey === 'admin';
 }
 
-export async function requireAdminOrgContext(orgId: string) {
+export async function requireAdminOrgContext(
+  orgId: string,
+  options?: { allowStaff?: boolean },
+) {
   const supabase = await createSupabaseServerClient();
   const authUser = await requireAuthedUser(supabase);
   const accountResponse = await getAccountByAuthUserIdInOrg(supabase, authUser.id, orgId);
@@ -27,7 +30,9 @@ export async function requireAdminOrgContext(orgId: string) {
   }
 
   const hasAdminRole = (rolesResponse.data ?? []).some((role) =>
-    isAllowedAdminRole(role.role_key),
+    options?.allowStaff && role.role_key === 'staff'
+      ? true
+      : isAllowedAdminRole(role.role_key),
   );
   if (!hasAdminRole) {
     return { ok: false as const, status: 403, message: 'Forbidden' };

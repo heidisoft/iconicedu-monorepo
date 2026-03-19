@@ -3,6 +3,7 @@ import type { AccountRoleStatus, RoleKey } from '@iconicedu/shared-types';
 
 import { getFamilyInviteAdminClient } from '@iconicedu/web/lib/family/queries/invite.query';
 import { upsertUserRole } from '@iconicedu/web/lib/profile/queries/roles.query';
+import { requireAdminOrgContext } from '@iconicedu/web/lib/admin/require-admin-org-context';
 
 type UpdateUserRequestBody = {
   accountId?: string;
@@ -102,6 +103,14 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { success: false, message: 'Account not found' },
       { status: 404 },
+    );
+  }
+
+  const authContext = await requireAdminOrgContext(account.org_id, { allowStaff: true });
+  if (!authContext.ok) {
+    return NextResponse.json(
+      { success: false, message: authContext.message },
+      { status: authContext.status },
     );
   }
 

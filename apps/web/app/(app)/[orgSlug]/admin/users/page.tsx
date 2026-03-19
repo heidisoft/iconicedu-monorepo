@@ -26,7 +26,12 @@ export default async function AdminUsersPage({
     notFound();
   }
 
-  const rows = await getAdminUserRows(org.id);
+  let rows: Awaited<ReturnType<typeof getAdminUserRows>> = [];
+  try {
+    rows = await getAdminUserRows(org.id);
+  } catch {
+    notFound();
+  }
 
   return (
     <div className="flex flex-1 flex-col">

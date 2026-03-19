@@ -25,6 +25,7 @@ import {
   buildOrgInviteRedirectUrl,
   ensureOrgCallbackRedirect,
 } from '@iconicedu/web/app/(app)/[orgSlug]/admin/users/actions/invite-user.utils';
+import { requireAdminOrgContext } from '@iconicedu/web/lib/admin/require-admin-org-context';
 
 const VALID_PROFILE_KINDS = new Set(['guardian', 'staff', 'educator', 'child']);
 
@@ -89,6 +90,10 @@ export async function inviteAdminUserAction(
     throw new Error('Account record not found');
   }
   const orgId = accountResponse.data.org_id;
+  const authContext = await requireAdminOrgContext(orgId, { allowStaff: true });
+  if (!authContext.ok) {
+    throw new Error(authContext.message);
+  }
 
   const adminClient = getFamilyInviteAdminClient();
   const normalizedEmail = parsed.email.toLowerCase();

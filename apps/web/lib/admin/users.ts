@@ -1,8 +1,9 @@
 import type { AccountRow, ProfileRow } from '@iconicedu/shared-types';
 
-import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
+import { requireAdminOrgContext } from '@iconicedu/web/lib/admin/require-admin-org-context';
 import { getAccountsByOrgId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { getProfileSummariesByAccountIds } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 
 export type AdminUserRow = {
   id: string;
@@ -65,7 +66,12 @@ export async function getAdminUserRows(orgId: string): Promise<AdminUserRow[]> {
     return [];
   }
 
-  const supabase = await createSupabaseServerClient();
+  const authContext = await requireAdminOrgContext(orgId, { allowStaff: true });
+  if (!authContext.ok) {
+    throw new Error(authContext.message);
+  }
+
+  const supabase = createSupabaseServiceClient();
   const { data: accounts } = await getAccountsByOrgId(supabase, orgId);
 
   if (!accounts?.length) {
