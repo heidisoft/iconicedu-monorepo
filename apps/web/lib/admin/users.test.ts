@@ -86,6 +86,8 @@ describe('getAdminUserRows', () => {
           last_name: 'M',
           avatar_url: null,
           avatar_source: 'seed',
+          country_name: 'United States',
+          timezone: 'America/New_York',
           ui_theme_key: 'teal',
         },
       ],
@@ -107,6 +109,8 @@ describe('getAdminUserRows', () => {
       email: 'person@example.com',
       profileKind: 'guardian',
       displayName: 'Jamie M',
+      countryName: 'United States',
+      timezone: 'America/New_York',
     });
   });
 });

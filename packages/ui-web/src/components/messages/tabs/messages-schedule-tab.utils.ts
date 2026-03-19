@@ -44,6 +44,40 @@ function getScheduleDisplayTimezoneInput(
   };
 }
 
+function startOfDisplayDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function startOfDisplayWeekMonday(date: Date) {
+  const result = startOfDisplayDay(date);
+  const day = result.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  result.setDate(result.getDate() + diff);
+  return result;
+}
+
+export function getScheduleDisplayStartOfDay(
+  input: Date | string,
+  timezone: ScheduleDisplayTimeZoneInput,
+) {
+  const displayDate = toScheduleDisplayDate(input, timezone) ?? new Date(input);
+  return startOfDisplayDay(displayDate);
+}
+
+export function getScheduleDisplayStartOfWeek(
+  input: Date | string,
+  timezone: ScheduleDisplayTimeZoneInput,
+) {
+  return startOfDisplayWeekMonday(getScheduleDisplayStartOfDay(input, timezone));
+}
+
+export function getResolvedScheduleDisplayMonthKey(
+  input: Date | string,
+  timezone: ScheduleDisplayTimeZoneInput,
+) {
+  return getScheduleDisplayMonthKey(input, timezone) ?? '1970-01';
+}
+
 function getDisplaySchedulePriority(schedule: DisplaySchedule) {
   if (schedule.uiState?.kind === 'exception') return 3;
   if (schedule.uiState?.kind === 'override') return 2;
@@ -309,20 +343,11 @@ export function formatScheduleDayBadge(
   timezone?: string | null,
 ): string {
   const displayTimezone = getScheduleDisplayTimezoneInput(schedule, timezone);
-  const start =
-    toScheduleDisplayDate(schedule.startAt, displayTimezone) ??
-    new Date(schedule.startAt);
-  const nowDisplayDate = toScheduleDisplayDate(now, displayTimezone) ?? now;
-  const startDay = new Date(
-    start.getFullYear(),
-    start.getMonth(),
-    start.getDate(),
+  const startDay = getScheduleDisplayStartOfDay(
+    schedule.startAt,
+    displayTimezone,
   ).getTime();
-  const nowDay = new Date(
-    nowDisplayDate.getFullYear(),
-    nowDisplayDate.getMonth(),
-    nowDisplayDate.getDate(),
-  ).getTime();
+  const nowDay = getScheduleDisplayStartOfDay(now, displayTimezone).getTime();
   if (startDay === nowDay) return 'Today';
   return (
     formatScheduleDisplayValue(schedule.startAt, displayTimezone, {
@@ -364,9 +389,7 @@ export function formatScheduleWeekTitle(
   timezone?: string | null,
 ): string {
   const displayTimezone = getScheduleDisplayTimezoneInput(schedule, timezone);
-  const start =
-    toScheduleDisplayDate(schedule.startAt, displayTimezone) ??
-    new Date(schedule.startAt);
+  const start = getScheduleDisplayStartOfDay(schedule.startAt, displayTimezone);
   const weekNumber = Math.min(5, Math.floor((start.getDate() - 1) / 7) + 1);
   const monthLabel =
     formatScheduleDisplayValue(schedule.startAt, displayTimezone, {
@@ -409,11 +432,9 @@ export function getScheduleMonthKey(
   schedule: ClassScheduleVM,
   timezone?: string | null,
 ): string {
-  return (
-    getScheduleDisplayMonthKey(
-      schedule.startAt,
-      getScheduleDisplayTimezoneInput(schedule, timezone),
-    ) ?? '1970-01'
+  return getResolvedScheduleDisplayMonthKey(
+    schedule.startAt,
+    getScheduleDisplayTimezoneInput(schedule, timezone),
   );
 }
 
@@ -465,29 +486,21 @@ export function toMonthGroups(
 ): MonthGroup[] {
   const nowMs = now.getTime();
   const resolvedViewerTimezone = resolveScheduleDisplayTimeZone(timezone);
-  const nowDisplayDate = toScheduleDisplayDate(now, resolvedViewerTimezone) ?? now;
-  const nowDay = new Date(
-    nowDisplayDate.getFullYear(),
-    nowDisplayDate.getMonth(),
-    nowDisplayDate.getDate(),
-  ).getTime();
+  const nowDay = getScheduleDisplayStartOfDay(now, resolvedViewerTimezone).getTime();
   return groups.map((group) => {
     const [year, month] = group.monthKey.split('-');
-    const monthDate = new Date(Number(year), Number(month) - 1, 1);
+    const monthDate = new Date(Number(year), Number(month) - 1, 1, 12);
     const sessionCountByWeekNumber = new Map<number, number>();
     const sessions: ClassSession[] = group.schedules.map((schedule) => {
       const displayTimezone = getScheduleDisplayTimezoneInput(
         schedule,
         resolvedViewerTimezone,
       );
-      const startDisplayDate =
-        toScheduleDisplayDate(schedule.startAt, displayTimezone) ??
-        new Date(schedule.startAt);
-      const startDay = new Date(
-        startDisplayDate.getFullYear(),
-        startDisplayDate.getMonth(),
-        startDisplayDate.getDate(),
-      ).getTime();
+      const startDisplayDate = getScheduleDisplayStartOfDay(
+        schedule.startAt,
+        displayTimezone,
+      );
+      const startDay = startDisplayDate.getTime();
       const weekNumber = getCalendarWeekOfMonth(startDisplayDate);
       const nextSessionNumber = (sessionCountByWeekNumber.get(weekNumber) ?? 0) + 1;
       sessionCountByWeekNumber.set(weekNumber, nextSessionNumber);
@@ -545,7 +558,7 @@ export function toMonthGroups(
     return {
       monthKey: group.monthKey,
       month:
-        formatScheduleDisplayValue(monthDate, resolvedViewerTimezone, {
+        formatScheduleDisplayValue(monthDate, null, {
           month: 'long',
         }) ?? '',
       year,

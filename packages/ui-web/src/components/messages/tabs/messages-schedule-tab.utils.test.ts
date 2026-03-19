@@ -5,6 +5,7 @@ import {
   createGoogleCalendarUrl,
   formatScheduleDateBadge,
   formatScheduleDateTime,
+  formatScheduleDayBadge,
   formatScheduleDayTimeMeta,
   getMonthProgressStatsByKey,
   getJoinableSessionId,
@@ -120,6 +121,33 @@ describe('messages-schedule-tab.utils', () => {
     );
 
     expect(groups[0]?.sessions[0]?.time).toBe('Sat 1:30am GMT+5:30');
+  });
+
+  it('groups a session into the viewer-local month when it crosses a UTC month boundary', () => {
+    const schedule = buildSchedule('month-boundary', '2026-03-01T00:30:00.000Z');
+
+    const groups = toMonthGroups(
+      groupSchedulesByMonth([schedule], 'America/Los_Angeles'),
+      new Date('2026-02-28T20:00:00.000Z'),
+      'America/Los_Angeles',
+    );
+
+    expect(groups[0]?.monthKey).toBe('2026-02');
+    expect(groups[0]?.month).toBe('February');
+    expect(groups[0]?.sessions[0]?.dayNum).toBe('28');
+    expect(groups[0]?.sessions[0]?.time).toContain('Sat 4:30pm PST');
+  });
+
+  it('marks today using the viewer timezone when UTC falls on a different local day', () => {
+    const schedule = buildSchedule('today-boundary', '2026-03-01T00:30:00.000Z');
+
+    expect(
+      formatScheduleDayBadge(
+        schedule,
+        new Date('2026-02-28T23:00:00.000Z'),
+        'America/Los_Angeles',
+      ),
+    ).toBe('Today');
   });
 
   it('expands recurring schedules when splitting timeline', () => {

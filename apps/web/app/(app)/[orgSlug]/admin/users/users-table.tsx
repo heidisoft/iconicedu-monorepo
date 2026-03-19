@@ -442,6 +442,7 @@ export function UsersTable({ rows }: UsersTableProps) {
                 </button>
               </TableHead>
               <TableHead>Type</TableHead>
+              <TableHead>Country / timezone</TableHead>
               <TableHead>
                 <button
                   type="button"
@@ -509,6 +510,10 @@ export function UsersTable({ rows }: UsersTableProps) {
                       <Icon className="size-4 text-muted-foreground" aria-hidden />
                       {row.profileKind ?? 'account'}
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    <p className="text-sm">{row.countryName ?? '—'}</p>
+                    <p className="text-xs text-muted-foreground">{row.timezone ?? '—'}</p>
                   </TableCell>
                   <TableCell>
                     <Badge

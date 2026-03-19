@@ -1,15 +1,14 @@
 import type { ClassScheduleVM, UserProfileVM } from '@iconicedu/shared-types';
 import {
+  getResolvedScheduleDisplayMonthKey,
+  getScheduleDisplayStartOfDay,
+  getScheduleDisplayStartOfWeek,
   getMonthProgressStatsByKey,
   groupSchedulesByMonth,
   splitSchedulesByTimeline,
   toMonthGroups,
   type ClassSession,
 } from '@iconicedu/ui-web/components/messages/tabs/messages-schedule-tab.utils';
-import {
-  getScheduleDisplayMonthKey,
-  toScheduleDisplayDate,
-} from '@iconicedu/ui-web/lib/schedule-display-timezone';
 import { buildClassSchedulesByOrg } from '@iconicedu/web/lib/schedules/builders/class-schedule.builder';
 import { getLearningSpacesByOrg } from '@iconicedu/web/lib/spaces/queries/learning-spaces.query';
 import { getLearningSpaceParticipantsByLearningSpaceIds } from '@iconicedu/web/lib/spaces/queries/learning-space-relations.query';
@@ -62,29 +61,13 @@ const ZERO_METRICS: DashboardInfographicRoleMetrics = {
   activeSubjectsLabel: 'No active subjects yet',
 };
 
-const startOfDay = (date: Date) =>
-  new Date(date.getFullYear(), date.getMonth(), date.getDate());
-
-const startOfWeekMonday = (date: Date) => {
-  const result = startOfDay(date);
-  const day = result.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  result.setDate(result.getDate() + diff);
-  return result;
-};
-
 const endOfWeekSunday = (date: Date) => {
-  const result = startOfWeekMonday(date);
+  const result = new Date(date);
   result.setDate(result.getDate() + 6);
   return result;
 };
 
 const cloneZeroMetrics = (): DashboardInfographicRoleMetrics => ({ ...ZERO_METRICS });
-
-function getDisplayDayStart(date: Date | string, timezone?: string | null) {
-  const displayDate = timezone ? toScheduleDisplayDate(date, timezone) : null;
-  return startOfDay(displayDate ?? new Date(date));
-}
 
 function resolveActiveRole(
   currentUserProfile: UserProfileVM | null,
@@ -232,10 +215,10 @@ function buildUpcomingSessionPage(input: {
     (group) => group.sessions,
   );
 
-  const displayNow = input.timezone
-    ? (toScheduleDisplayDate(input.now, input.timezone) ?? input.now)
-    : input.now;
-  const currentWeekStart = startOfWeekMonday(displayNow).getTime();
+  const currentWeekStart = getScheduleDisplayStartOfWeek(
+    input.now,
+    input.timezone ?? null,
+  ).getTime();
 
   const items = flatSessions.map((session) => {
     const baseScheduleId = getBaseScheduleId(session.id);
@@ -253,14 +236,10 @@ function buildUpcomingSessionPage(input: {
     const timeLabel = participantNames.length
       ? `${session.time} · ${participantNames.join(', ')}`
       : session.time;
-    const sessionDisplayDate =
-      sessionSchedule?.startAt && input.timezone
-        ? (toScheduleDisplayDate(sessionSchedule.startAt, input.timezone) ??
-          new Date(sessionSchedule.startAt))
-        : sessionSchedule?.startAt
-          ? new Date(sessionSchedule.startAt)
-          : input.now;
-    const sessionWeekStart = startOfWeekMonday(sessionDisplayDate).getTime();
+    const sessionWeekStart = getScheduleDisplayStartOfWeek(
+      sessionSchedule?.startAt ?? input.now,
+      input.timezone ?? null,
+    ).getTime();
 
     return {
       session: {
@@ -358,20 +337,27 @@ async function buildActiveRoleMetrics(input: {
   }
 
   const timelineBuckets = splitSchedulesByTimeline(scopedSchedules, input.now);
-  const displayNow = getDisplayDayStart(input.now, input.timezone);
-  const weekStartMs = startOfWeekMonday(displayNow).getTime();
-  const weekEndMs = endOfWeekSunday(displayNow).getTime();
+  const displayNow = getScheduleDisplayStartOfDay(input.now, input.timezone ?? null);
+  const weekStartDate = getScheduleDisplayStartOfWeek(displayNow, input.timezone ?? null);
+  const weekStartMs = weekStartDate.getTime();
+  const weekEndMs = endOfWeekSunday(weekStartDate).getTime();
   const nextWeekEndMs = (() => {
-    const nextWeekEnd = endOfWeekSunday(displayNow);
+    const nextWeekEnd = endOfWeekSunday(weekStartDate);
     nextWeekEnd.setDate(nextWeekEnd.getDate() + 7);
     return nextWeekEnd.getTime();
   })();
   const upcomingSchedulesThisAndNextWeek = timelineBuckets.upcoming.filter((schedule) => {
-    const scheduleDayMs = getDisplayDayStart(schedule.startAt, input.timezone).getTime();
+    const scheduleDayMs = getScheduleDisplayStartOfDay(
+      schedule.startAt,
+      input.timezone ?? null,
+    ).getTime();
     return scheduleDayMs >= weekStartMs && scheduleDayMs <= nextWeekEndMs;
   });
   const upcomingSessionsThisWeek = timelineBuckets.upcoming.filter((schedule) => {
-    const scheduleDayMs = getDisplayDayStart(schedule.startAt, input.timezone).getTime();
+    const scheduleDayMs = getScheduleDisplayStartOfDay(
+      schedule.startAt,
+      input.timezone ?? null,
+    ).getTime();
     return scheduleDayMs >= weekStartMs && scheduleDayMs <= weekEndMs;
   }).length;
 
@@ -380,9 +366,10 @@ async function buildActiveRoleMetrics(input: {
     input.now,
     input.timezone,
   );
-  const currentMonthKey =
-    getScheduleDisplayMonthKey(input.now, input.timezone) ??
-    `${input.now.getFullYear()}-${String(input.now.getMonth() + 1).padStart(2, '0')}`;
+  const currentMonthKey = getResolvedScheduleDisplayMonthKey(
+    input.now,
+    input.timezone ?? null,
+  );
   const completedClassesThisMonth =
     monthProgressStatsByKey.get(currentMonthKey)?.completedCount ?? 0;
 

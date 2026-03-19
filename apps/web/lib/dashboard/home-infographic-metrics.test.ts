@@ -480,4 +480,42 @@ describe('buildDashboardHomeInfographicMetrics', () => {
       'next-week',
     );
   });
+
+  it('uses the viewer timezone for dashboard week buckets near UTC week boundaries', async () => {
+    buildClassSchedulesByOrgMock.mockResolvedValue([
+      buildSchedule({
+        ids: { id: 'week-boundary', orgId: 'org-1' },
+        startAt: '2026-03-09T00:30:00.000Z',
+        endAt: '2026-03-09T01:30:00.000Z',
+        recurrence: undefined,
+      }),
+    ]);
+    getLearningSpacesByOrgMock.mockResolvedValue({
+      data: [{ id: 'space-1', status: 'active', subject: 'Math' }],
+    });
+    getLearningSpaceParticipantsByLearningSpaceIdsMock.mockResolvedValue({
+      data: [{ learning_space_id: 'space-1', profile_id: 'child-1' }],
+    });
+
+    const result = await buildDashboardHomeInfographicMetrics({
+      supabase: {} as never,
+      orgId: 'org-1',
+      orgSlug: 'iconic-academy',
+      now: new Date('2026-03-08T23:30:00.000Z'),
+      timezone: 'America/Los_Angeles',
+      currentUserProfile: {
+        kind: 'child',
+        ids: { id: 'child-1', orgId: 'org-1', accountId: 'account-c1' },
+        prefs: { timezone: 'America/Los_Angeles' },
+      } as never,
+    });
+
+    expect(result.metricsByRole.students.upcomingSessionsThisWeek).toBe(1);
+    expect(result.upcomingSessionsPage.thisWeek.items).toHaveLength(1);
+    expect(result.upcomingSessionsPage.thisWeek.items[0]?.weekBucket).toBe('this-week');
+    expect(result.upcomingSessionsPage.nextWeek.items).toHaveLength(0);
+    expect(result.upcomingSessionsPage.thisWeek.items[0]?.session.time).toContain(
+      'Sun 5:30pm PDT',
+    );
+  });
 });

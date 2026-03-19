@@ -21,6 +21,8 @@ export type AdminUserRow = {
   avatarUrl?: string | null;
   avatarSource?: string | null;
   themeKey?: string | null;
+  countryName?: string | null;
+  timezone?: string | null;
   primaryRole?: AccountRow['primary_role'] | null;
   roleStatus?: AccountRow['role_status'] | null;
 };
@@ -56,6 +58,8 @@ function mapAccountToRow(account: AccountRow, profile?: ProfileRow | null): Admi
     avatarUrl: profile?.avatar_url ?? null,
     avatarSource: profile?.avatar_source ?? null,
     themeKey: profile?.ui_theme_key ?? null,
+    countryName: profile?.country_name ?? null,
+    timezone: profile?.timezone ?? null,
     primaryRole: account.primary_role ?? null,
     roleStatus: account.role_status ?? null,
   };

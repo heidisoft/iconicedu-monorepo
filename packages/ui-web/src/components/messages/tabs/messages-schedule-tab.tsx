@@ -8,6 +8,7 @@ import { ScrollArea } from '@iconicedu/ui-web/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@iconicedu/ui-web/ui/tabs';
 import { CalendarDays, Loader2 } from 'lucide-react';
 import {
+  getResolvedScheduleDisplayMonthKey,
   getJoinableSessionId,
   getMonthProgressStatsByKey,
   groupSchedulesByMonth,
@@ -45,8 +46,8 @@ export function MessagesScheduleTab({
 
   const now = useMemo(() => new Date(), []);
   const currentMonthKey = useMemo(
-    () => `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`,
-    [now],
+    () => getResolvedScheduleDisplayMonthKey(now, displayTimezone),
+    [displayTimezone, now],
   );
 
   const upcomingMonthGroups = useMemo(
@@ -114,11 +115,11 @@ export function MessagesScheduleTab({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-muted/30 p-4">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-muted/30 p-4">
       <Tabs
         value={activeTab}
         onValueChange={(v) => setActiveTab(v as ScheduleSubTabKey)}
-        className="min-h-0 flex-1"
+        className="min-h-0 flex-1 overflow-hidden"
       >
         <TabsList className="bg-secondary transition-colors duration-200">
           <TabsTrigger value="upcoming" className="gap-1.5">
@@ -131,9 +132,9 @@ export function MessagesScheduleTab({
 
         <TabsContent
           value="upcoming"
-          className="mt-4 min-h-0 flex-1 space-y-2 motion-reduce:animate-none animate-in fade-in-0 slide-in-from-right-1 duration-200"
+          className="mt-4 flex min-h-0 flex-1 flex-col overflow-hidden space-y-2 motion-reduce:animate-none animate-in fade-in-0 slide-in-from-right-1 duration-200"
         >
-          <ScrollArea className="min-h-0 flex-1 pr-1">
+          <ScrollArea className="h-full min-h-0 flex-1 pr-1">
             <div className="space-y-2">
               {upcomingGroups.length === 0 ? (
                 <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-12 text-center">
@@ -173,9 +174,9 @@ export function MessagesScheduleTab({
 
         <TabsContent
           value="past"
-          className="mt-4 min-h-0 flex-1 space-y-2 motion-reduce:animate-none animate-in fade-in-0 slide-in-from-right-1 duration-200"
+          className="mt-4 flex min-h-0 flex-1 flex-col overflow-hidden space-y-2 motion-reduce:animate-none animate-in fade-in-0 slide-in-from-right-1 duration-200"
         >
-          <ScrollArea className="min-h-0 flex-1 pr-1">
+          <ScrollArea className="h-full min-h-0 flex-1 pr-1">
             <div className="space-y-2">
               {pastGroups.length === 0 ? (
                 <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-12 text-center">

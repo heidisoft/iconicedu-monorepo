@@ -32,6 +32,8 @@ export const PROFILE_SUMMARY_SELECT = [
   ...PROFILE_IDENTITY_FIELDS,
   ...PROFILE_DISPLAY_FIELDS,
   ...PROFILE_AVATAR_FIELDS,
+  'timezone',
+  'country_name',
   'ui_theme_key',
 ].join(',');
 
