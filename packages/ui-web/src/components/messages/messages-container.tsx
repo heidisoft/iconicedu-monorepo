@@ -1000,7 +1000,7 @@ export function MessagesContainer({
 
   const handleDeleteMessage = useCallback(
     async (messageId: string) => {
-      if (readOnly) return;
+      if (readOnly && currentUserProfile?.kind !== 'staff') return;
       if (messageWriteClient) {
         setPendingMessageAction(setDeletingMessageIds, messageId, true);
         try {
@@ -1036,6 +1036,7 @@ export function MessagesContainer({
       realtimeClient,
       deleteMessage,
       readOnly,
+      currentUserProfile?.kind,
       runWithNetworkActivity,
       setPendingMessageAction,
     ],
@@ -1608,6 +1609,7 @@ export function MessagesContainer({
       onDelete: handleDeleteMessage,
       getMessageActionState,
       currentUserId,
+      currentUserCanDeleteAnyMessages: currentUserProfile?.kind === 'staff',
       isReadOnly: readOnly,
       onSendThreadReply: handleSendThreadReply,
       lastReadMessageId,
@@ -1629,6 +1631,7 @@ export function MessagesContainer({
       handleDeleteMessage,
       getMessageActionState,
       currentUserId,
+      currentUserProfile?.kind,
       readOnly,
       handleSendThreadReply,
       lastReadMessageId,

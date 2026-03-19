@@ -47,6 +47,7 @@ interface MessageItemProps {
   isThreadReply?: boolean;
   isReadOnly?: boolean;
   currentUserId?: UUID;
+  currentUserCanDeleteAnyMessages?: boolean;
   onProfileClick: (userId: UUID) => void;
   onToggleReaction?: (
     messageId: string,
@@ -66,6 +67,7 @@ export const MessageItem = memo(function MessageItem({
   isThreadReply = false,
   isReadOnly = false,
   currentUserId = 'user-1',
+  currentUserCanDeleteAnyMessages = false,
   onProfileClick,
   onToggleReaction,
   onToggleSaved,
@@ -109,6 +111,7 @@ export const MessageItem = memo(function MessageItem({
     onToggleImportant: handleToggleImportant,
     onDelete: handleDelete,
     currentUserId,
+    canDeleteAnyMessages: currentUserCanDeleteAnyMessages,
     actionState,
   };
 

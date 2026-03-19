@@ -63,6 +63,7 @@ export interface MessageBaseProps {
   onToggleHidden?: () => void;
   onDelete?: () => void;
   currentUserId?: UUID;
+  canDeleteAnyMessages?: boolean;
   actionState?: MessageActionState;
 }
 
@@ -79,6 +80,7 @@ export const MessageBase = memo(function MessageBase({
   onToggleHidden,
   onDelete,
   currentUserId,
+  canDeleteAnyMessages = false,
   actionState,
 }: MessageBaseProps) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -172,21 +174,23 @@ export const MessageBase = memo(function MessageBase({
           <Copy className="mr-2 h-4 w-4" />
           <span>Copy text</span>
         </DropdownMenuItem>
-        {isOwnMessage ? (
+        {isOwnMessage || canDeleteAnyMessages ? (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={onToggleHidden}
-              disabled={isHiding}
-              className="py-2"
-            >
-              {isHiding ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <EyeOff className="mr-2 h-4 w-4" />
-              )}
-              <span>Hide message</span>
-            </DropdownMenuItem>
+            {isOwnMessage ? (
+              <DropdownMenuItem
+                onClick={onToggleHidden}
+                disabled={isHiding}
+                className="py-2"
+              >
+                {isHiding ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <EyeOff className="mr-2 h-4 w-4" />
+                )}
+                <span>Hide message</span>
+              </DropdownMenuItem>
+            ) : null}
             <DropdownMenuItem
               onClick={handleDeleteClick}
               disabled={isDeleting}

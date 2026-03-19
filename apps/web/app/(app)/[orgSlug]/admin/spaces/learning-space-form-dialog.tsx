@@ -130,14 +130,14 @@ type LearningSpaceFormState = {
 function createDefaultChannelUiDefaults(): ChannelUiDefaultsVM {
   return {
     themeKey: 'teal',
-    defaultRightPanelOpen: true,
+    defaultRightPanelOpen: false,
     defaultRightPanelKey: 'channel_info',
     infoPanel: {
-      showHeader: true,
-      showDetails: true,
-      showMedia: true,
-      showMembers: true,
-      showQuickActions: true,
+      showHeader: false,
+      showDetails: false,
+      showMedia: false,
+      showMembers: false,
+      showQuickActions: false,
       showHiddenQuickActions: false,
     },
   };

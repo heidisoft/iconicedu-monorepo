@@ -3560,6 +3560,122 @@ describe('deleteMessageAction', () => {
       }),
     );
   });
+
+  it('rejects deleting another user message when actor is not staff', async () => {
+    const supabase = {
+      auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
+      from: vi.fn(),
+    };
+    const serviceSupabase = { from: vi.fn() };
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    const { createSupabaseServiceClient } =
+      await import('@iconicedu/web/lib/supabase/service');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
+    (
+      createSupabaseServiceClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(serviceSupabase);
+
+    const messageSelectChain: any = {};
+    messageSelectChain.eq = vi.fn(() => messageSelectChain);
+    messageSelectChain.maybeSingle = vi.fn(async () => ({
+      data: { id: 'message-1', org_id: 'org-1', sender_profile_id: 'profile-2' },
+    }));
+
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'messages') {
+        return { select: () => messageSelectChain };
+      }
+      return {};
+    });
+
+    await expect(
+      deleteMessageAction({ orgId: 'org-1', messageId: 'message-1' }),
+    ).rejects.toThrow('Unauthorized: You can only delete your own messages');
+  });
+
+  it('allows staff to delete any org message', async () => {
+    const supabase = {
+      auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
+      from: vi.fn(),
+    };
+    const serviceSupabase = { from: vi.fn() };
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    const { createSupabaseServiceClient } =
+      await import('@iconicedu/web/lib/supabase/service');
+    const { getProfileByAccountId } =
+      await import('@iconicedu/web/lib/profile/queries/profiles.query');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
+    (
+      createSupabaseServiceClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(serviceSupabase);
+    (
+      getProfileByAccountId as unknown as { mockResolvedValueOnce: (value: any) => void }
+    ).mockResolvedValueOnce({ data: { id: 'profile-1', kind: 'staff' } });
+
+    const messageSelectChain: any = {};
+    messageSelectChain.eq = vi.fn(() => messageSelectChain);
+    messageSelectChain.maybeSingle = vi.fn(async () => ({
+      data: { id: 'message-1', org_id: 'org-1', sender_profile_id: 'profile-2' },
+    }));
+
+    const staffRoleChain: any = {};
+    staffRoleChain.eq = vi.fn(() => staffRoleChain);
+    staffRoleChain.is = vi.fn(() => staffRoleChain);
+    staffRoleChain.limit = vi.fn(() => staffRoleChain);
+    staffRoleChain.maybeSingle = vi.fn(async () => ({ data: { id: 'role-1' } }));
+
+    const deleteUpdateChain: any = {};
+    deleteUpdateChain.eq = vi.fn(() => deleteUpdateChain);
+    deleteUpdateChain.is = vi.fn(async () => ({ error: null }));
+    const updateMessage = vi.fn(() => deleteUpdateChain);
+
+    const activityEventSelectChain: any = {};
+    activityEventSelectChain.eq = vi.fn(() => activityEventSelectChain);
+    activityEventSelectChain.contains = vi.fn(() => activityEventSelectChain);
+    activityEventSelectChain.is = vi.fn(() => activityEventSelectChain);
+    activityEventSelectChain.returns = vi.fn(async () => ({ data: [], error: null }));
+
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'messages') {
+        return { select: () => messageSelectChain };
+      }
+      if (table === 'user_roles') {
+        return { select: () => staffRoleChain };
+      }
+      return {};
+    });
+
+    serviceSupabase.from.mockImplementation((table: string) => {
+      if (table === 'messages') {
+        return { update: updateMessage };
+      }
+      if (table === 'activity_events') {
+        return { select: () => activityEventSelectChain };
+      }
+      return {};
+    });
+
+    await deleteMessageAction({ orgId: 'org-1', messageId: 'message-1' });
+
+    expect(updateMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        deleted_at: expect.any(String),
+        deleted_by: 'profile-1',
+      }),
+    );
+    expect(deleteUpdateChain.eq).toHaveBeenCalledWith('id', 'message-1');
+    expect(deleteUpdateChain.eq).toHaveBeenCalledWith('org_id', 'org-1');
+    expect(deleteUpdateChain.eq).not.toHaveBeenCalledWith(
+      'sender_profile_id',
+      'profile-1',
+    );
+  });
 });
 
 describe('toggleHiddenMessageAction', () => {

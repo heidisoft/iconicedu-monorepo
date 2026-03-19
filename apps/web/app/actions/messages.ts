@@ -2499,22 +2499,35 @@ export async function deleteMessageAction(input: {
     throw new Error('Profile not found');
   }
 
-  if (messageResponse.data.sender_profile_id !== profileResponse.data.id) {
+  const isStaffActor = await isStaffActorInOrg(supabase, {
+    orgId: input.orgId,
+    accountId: accountResponse.data.id,
+    profileKind: profileResponse.data.kind,
+  });
+
+  if (
+    !isStaffActor &&
+    messageResponse.data.sender_profile_id !== profileResponse.data.id
+  ) {
     throw new Error('Unauthorized: You can only delete your own messages');
   }
 
   const now = new Date().toISOString();
 
-  const deleteResult = await serviceSupabase
+  const deleteQuery = serviceSupabase
     .from('messages')
     .update({
       deleted_at: now,
       deleted_by: profileResponse.data.id,
     })
     .eq('id', input.messageId)
-    .eq('org_id', input.orgId)
-    .eq('sender_profile_id', profileResponse.data.id)
-    .is('deleted_at', null);
+    .eq('org_id', input.orgId);
+
+  if (!isStaffActor) {
+    deleteQuery.eq('sender_profile_id', profileResponse.data.id);
+  }
+
+  const deleteResult = await deleteQuery.is('deleted_at', null);
 
   if (deleteResult.error) {
     throw new Error(deleteResult.error.message);

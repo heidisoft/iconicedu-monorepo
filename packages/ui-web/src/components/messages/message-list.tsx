@@ -70,6 +70,7 @@ interface MessageListProps {
   onDelete?: (messageId: string) => void;
   getMessageActionState?: (messageId: string) => MessageActionState | undefined;
   currentUserId?: string;
+  currentUserCanDeleteAnyMessages?: boolean;
   isReadOnly?: boolean;
   lastReadMessageId?: UUID;
   lastReadAt?: ISODateTime;
@@ -137,6 +138,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
       onDelete,
       getMessageActionState,
       currentUserId,
+      currentUserCanDeleteAnyMessages = false,
       isReadOnly = false,
       lastReadMessageId,
       lastReadAt,
@@ -510,6 +512,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                     onDelete={onDelete}
                     actionState={getMessageActionState?.(message.ids.id)}
                     currentUserId={currentUserId}
+                    currentUserCanDeleteAnyMessages={currentUserCanDeleteAnyMessages}
                   />
                   {isInlineThreadExpanded && (
                     <div
@@ -627,23 +630,25 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                           <Copy className="mr-2 h-4 w-4" />
                                           <span>Copy text</span>
                                         </DropdownMenuItem>
-                                        {isOwnReply ? (
+                                        {isOwnReply || currentUserCanDeleteAnyMessages ? (
                                           <>
                                             <DropdownMenuSeparator />
-                                            <DropdownMenuItem
-                                              onClick={() =>
-                                                onToggleHidden?.(reply.ids.id)
-                                              }
-                                              disabled={isHidingReply}
-                                              className="py-2"
-                                            >
-                                              {isHidingReply ? (
-                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                              ) : (
-                                                <EyeOff className="mr-2 h-4 w-4" />
-                                              )}
-                                              <span>Hide message</span>
-                                            </DropdownMenuItem>
+                                            {isOwnReply ? (
+                                              <DropdownMenuItem
+                                                onClick={() =>
+                                                  onToggleHidden?.(reply.ids.id)
+                                                }
+                                                disabled={isHidingReply}
+                                                className="py-2"
+                                              >
+                                                {isHidingReply ? (
+                                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                ) : (
+                                                  <EyeOff className="mr-2 h-4 w-4" />
+                                                )}
+                                                <span>Hide message</span>
+                                              </DropdownMenuItem>
+                                            ) : null}
                                             <DropdownMenuItem
                                               onClick={() => onDelete?.(reply.ids.id)}
                                               disabled={isDeletingReply}
