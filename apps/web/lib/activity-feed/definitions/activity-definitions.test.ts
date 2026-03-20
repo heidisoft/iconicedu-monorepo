@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import { getActivityEventDefinition } from '@iconicedu/web/lib/activity-feed/definitions/activity-definitions';
 
+function isoFromNow(offsetMinutes: number) {
+  return new Date(Date.now() + offsetMinutes * 60 * 1000).toISOString();
+}
+
 describe('activity event definitions', () => {
   it('renders direct message activity headline with a linked conversation context and no action button', () => {
     const definition = getActivityEventDefinition('dm.posted');
@@ -1404,11 +1408,12 @@ describe('activity event definitions', () => {
       throw new Error('Missing session.started group definition');
     }
 
+    const startedAt = isoFromNow(-2);
     const event = {
       id: 'event-live-unscheduled-1',
       org_id: 'org-1',
       event_type: 'session.started',
-      occurred_at: '2026-03-03T12:34:00.000Z',
+      occurred_at: startedAt,
       source_kind: 'profile',
       actor_profile_id: 'profile-1',
       scope: { kind: 'channel', channelId: 'channel-1' },
@@ -1426,12 +1431,12 @@ describe('activity event definitions', () => {
       dedupe_key: 'session.started:live-session-1',
       projection_status: 'pending',
       projection_attempts: 0,
-      created_at: '2026-03-03T12:34:00.000Z',
-      updated_at: '2026-03-03T12:34:00.000Z',
+      created_at: startedAt,
+      updated_at: startedAt,
     };
 
     expect(definition.group.buildGroupKey(event)).toBe(
-      'live-session:channel:channel-1:huddle-window:2026-03-03T12:34',
+      `live-session:channel:channel-1:huddle-window:${startedAt.slice(0, 16)}`,
     );
     expect(definition.group.renderGroup?.(event)).toMatchObject({
       headline: {
@@ -1451,11 +1456,12 @@ describe('activity event definitions', () => {
       throw new Error('Missing session.started group definition');
     }
 
+    const startedAt = isoFromNow(-3);
     const event = {
       id: 'event-live-unscheduled-audio-1',
       org_id: 'org-1',
       event_type: 'session.started',
-      occurred_at: '2026-03-03T12:34:00.000Z',
+      occurred_at: startedAt,
       source_kind: 'profile',
       actor_profile_id: 'profile-1',
       scope: { kind: 'channel', channelId: 'channel-1' },
@@ -1473,8 +1479,8 @@ describe('activity event definitions', () => {
       dedupe_key: 'session.started:live-session-2',
       projection_status: 'pending',
       projection_attempts: 0,
-      created_at: '2026-03-03T12:34:00.000Z',
-      updated_at: '2026-03-03T12:34:00.000Z',
+      created_at: startedAt,
+      updated_at: startedAt,
     };
 
     expect(definition.group.renderGroup?.(event)).toMatchObject({
@@ -1496,11 +1502,13 @@ describe('activity event definitions', () => {
       throw new Error('Missing live-session grouping definitions');
     }
 
+    const startedAt = isoFromNow(-2);
+    const joinedAt = isoFromNow(-1);
     const startedEvent = {
       id: 'event-dm-session-started-1',
       org_id: 'org-1',
       event_type: 'session.started',
-      occurred_at: '2026-03-19T19:48:00.000Z',
+      occurred_at: startedAt,
       source_kind: 'profile' as const,
       actor_profile_id: 'profile-1',
       scope: { kind: 'channel' as const, channelId: 'channel-dm-1' },
@@ -1513,14 +1521,14 @@ describe('activity event definitions', () => {
         channelTopic: 'Direct message',
         mode: 'video',
         startedByDisplayName: 'Tiffany T',
-        startedAt: '2026-03-19T19:48:00.000Z',
+        startedAt,
       },
       audience_rules: [],
       dedupe_key: 'session.started:live-session-dm-1',
       projection_status: 'pending' as const,
       projection_attempts: 0,
-      created_at: '2026-03-19T19:48:00.000Z',
-      updated_at: '2026-03-19T19:48:00.000Z',
+      created_at: startedAt,
+      updated_at: startedAt,
     };
 
     const joinedEvent = {
@@ -1535,16 +1543,16 @@ describe('activity event definitions', () => {
         mode: 'video',
         memberProfileId: 'profile-2',
         memberDisplayName: 'Tiffany T',
-        joinedAt: '2026-03-19T19:48:30.000Z',
+        joinedAt,
       },
       dedupe_key: 'member.joined:live-session-dm-1:profile-2',
     };
 
     expect(started.group.buildGroupKey(startedEvent)).toBe(
-      'live-session:channel:channel-dm-1:huddle-window:2026-03-19T19:48',
+      `live-session:channel:channel-dm-1:huddle-window:${startedAt.slice(0, 16)}`,
     );
     expect(joined.group.buildGroupKey(joinedEvent)).toBe(
-      'live-session:channel:channel-dm-1:huddle-window:2026-03-19T19:48',
+      `live-session:channel:channel-dm-1:huddle-window:${startedAt.slice(0, 16)}`,
     );
     expect(started.render(startedEvent)).toMatchObject({
       headline: { primary: 'Tiffany T started a video huddle' },
@@ -1676,11 +1684,13 @@ describe('activity event definitions', () => {
       throw new Error('Missing session.started group definition');
     }
 
+    const occurrenceStart = isoFromNow(-10);
+    const occurrenceEndAt = isoFromNow(50);
     const event = {
       id: 'event-space-session-started-1',
       org_id: 'org-1',
       event_type: 'session.started',
-      occurred_at: '2026-03-19T16:57:00.000Z',
+      occurred_at: occurrenceStart,
       source_kind: 'profile',
       actor_profile_id: 'profile-1',
       scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
@@ -1691,7 +1701,8 @@ describe('activity event definitions', () => {
         learningSpaceId: 'space-1',
         channelId: 'channel-1',
         title: 'ELA with Mr Daniel',
-        occurrenceStart: '2026-03-19T16:57:00.000Z',
+        occurrenceStart,
+        occurrenceEndAt,
         isScheduledSessionWindow: true,
         startedByDisplayName: 'Daniel W',
         mode: 'video',
@@ -1700,13 +1711,13 @@ describe('activity event definitions', () => {
       dedupe_key: 'session.started:live-session-1',
       projection_status: 'pending',
       projection_attempts: 0,
-      created_at: '2026-03-19T16:57:00.000Z',
-      updated_at: '2026-03-19T16:57:00.000Z',
+      created_at: occurrenceStart,
+      updated_at: occurrenceStart,
     };
 
     expect(definition.group.renderGroup?.(event)).toMatchObject({
       headline: {
-        primary: 'Class session 2026-03-19T16:57:00.000Z',
+        primary: `Class session ${occurrenceStart}`,
         secondary: 'ELA with Mr Daniel',
       },
       actionButton: {
@@ -1723,11 +1734,12 @@ describe('activity event definitions', () => {
       throw new Error('Missing session.started group definition');
     }
 
+    const startedAt = isoFromNow(-1);
     const event = {
       id: 'event-space-session-started-outside-1',
       org_id: 'org-1',
       event_type: 'session.started',
-      occurred_at: '2026-03-19T22:10:00.000Z',
+      occurred_at: startedAt,
       source_kind: 'profile',
       actor_profile_id: 'profile-1',
       scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
@@ -1746,8 +1758,8 @@ describe('activity event definitions', () => {
       dedupe_key: 'session.started:live-session-3',
       projection_status: 'pending',
       projection_attempts: 0,
-      created_at: '2026-03-19T22:10:00.000Z',
-      updated_at: '2026-03-19T22:10:00.000Z',
+      created_at: startedAt,
+      updated_at: startedAt,
     };
 
     expect(definition.group.renderGroup?.(event)).toMatchObject({
@@ -1760,6 +1772,69 @@ describe('activity event definitions', () => {
         href: '../spaces/channel-1',
       },
     });
+  });
+
+  it('hides Join now for stale class-started and stale huddle activity', () => {
+    const definition = getActivityEventDefinition('session.started');
+    if (!definition?.group) {
+      throw new Error('Missing session.started group definition');
+    }
+
+    const staleScheduledStart = isoFromNow(-120);
+    const staleHuddleStart = isoFromNow(-30);
+
+    const staleScheduledEvent = {
+      id: 'event-session-started-stale-scheduled',
+      org_id: 'org-1',
+      event_type: 'session.started',
+      occurred_at: staleScheduledStart,
+      source_kind: 'profile',
+      actor_profile_id: 'profile-1',
+      scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+      object_ref: { kind: 'session', id: 'live-session-stale-scheduled' },
+      target_ref: { kind: 'learning_space', id: 'space-1' },
+      payload: {
+        liveSessionId: 'live-session-stale-scheduled',
+        learningSpaceId: 'space-1',
+        channelId: 'channel-1',
+        title: 'ELA with Mr Daniel',
+        occurrenceStart: staleScheduledStart,
+        isScheduledSessionWindow: true,
+      },
+      audience_rules: [],
+      dedupe_key: 'session.started:live-session-stale-scheduled',
+      projection_status: 'pending',
+      projection_attempts: 0,
+      created_at: staleScheduledStart,
+      updated_at: staleScheduledStart,
+    };
+
+    const staleHuddleEvent = {
+      ...staleScheduledEvent,
+      id: 'event-session-started-stale-huddle',
+      scope: { kind: 'channel', channelId: 'channel-1' },
+      object_ref: { kind: 'session', id: 'live-session-stale-huddle' },
+      target_ref: null,
+      payload: {
+        liveSessionId: 'live-session-stale-huddle',
+        channelId: 'channel-1',
+        title: 'Direct message',
+        channelTopic: 'Direct message',
+        mode: 'video',
+        startedByDisplayName: 'Tiffany T',
+        startedAt: staleHuddleStart,
+        isScheduledSessionWindow: false,
+      },
+      dedupe_key: 'session.started:live-session-stale-huddle',
+      occurred_at: staleHuddleStart,
+      created_at: staleHuddleStart,
+      updated_at: staleHuddleStart,
+    };
+
+    expect(definition.render(staleScheduledEvent).actionButton).toBeUndefined();
+    expect(
+      definition.group.renderGroup?.(staleHuddleEvent)?.actionButton,
+    ).toBeUndefined();
   });
 
   it('renders actor-owned session.started and member.joined with You label', () => {

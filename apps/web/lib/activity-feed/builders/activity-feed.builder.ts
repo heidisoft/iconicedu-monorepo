@@ -308,11 +308,15 @@ async function attachGroupMembers(
       normalizeDmGroupedParent(normalized.parent, aggregatedMembers),
       aggregatedMembers,
     );
+    const normalizedLiveSessionParent = normalizeSessionStartedGroupedParent(
+      nextParent,
+      aggregatedMembers,
+    );
 
     memberIds.forEach((memberId) => groupedMemberIds.add(memberId));
 
     return {
-      ...nextParent,
+      ...normalizedLiveSessionParent,
       subActivities: {
         items: aggregatedMembers,
       },
@@ -556,6 +560,141 @@ function normalizeChannelGroupedParent(
       summary: messageCount > 1 ? `${messageCount} new messages` : parent.content.summary,
     },
   };
+}
+
+function resolveSessionTimelineLabelFromParent(
+  parent: Extract<ActivityFeedItemVM, { kind: 'group' }>,
+) {
+  const primary = parent.content.headline.primary ?? '';
+  if (primary.startsWith('Class session ')) {
+    return primary.slice('Class session '.length).trim();
+  }
+
+  if (primary === 'Class session') {
+    return undefined;
+  }
+
+  return undefined;
+}
+
+function parseReminderMinutesFromSummaryLeaf(leaf: ActivityFeedLeafItemVM) {
+  const reminderText = `${leaf.content.headline.primary ?? ''} ${leaf.content.summary ?? ''}`;
+  const match = reminderText.match(/(\d+)\s*(mins?|minutes?)\b/i);
+  if (!match) {
+    return undefined;
+  }
+
+  const parsed = Number.parseInt(match[1] ?? '', 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function resolveJoinedParticipantName(leaf: ActivityFeedLeafItemVM) {
+  const lead = leaf.content.leading;
+  if (lead?.kind === 'avatars' && lead.avatars[0]?.name) {
+    return lead.avatars[0].name;
+  }
+
+  const actorName = leaf.refs.actor?.profile?.displayName;
+  if (actorName) {
+    return actorName;
+  }
+
+  const headline = leaf.content.headline.primary ?? '';
+  const match = headline.match(/^(.+?)\s+joined/i);
+  return match?.[1]?.trim() || undefined;
+}
+
+function normalizeSessionStartedGroupedParent(
+  parent: Extract<ActivityFeedItemVM, { kind: 'group' }>,
+  members: ActivityFeedLeafItemVM[],
+): Extract<ActivityFeedItemVM, { kind: 'group' }> {
+  if (
+    parent.verb !== 'session.started' ||
+    parent.grouping?.groupKey?.startsWith('live-session:') !== true ||
+    !members.length
+  ) {
+    return parent;
+  }
+
+  const joinedLeaves = members.filter((member) => member.verb === 'member.joined');
+  const joinedAvatars = collectUniqueAvatars(
+    joinedLeaves.map((leaf) => leaf.content.leading),
+  );
+  const leading =
+    joinedAvatars.length > 0
+      ? ({
+          kind: 'avatars',
+          avatars: joinedAvatars.slice(0, 3),
+          overflowCount: Math.max(0, joinedAvatars.length - 3),
+        } satisfies InboxLeadingVM)
+      : parent.content.leading;
+
+  const feedbackLeaf = members.find(
+    (member) => member.verb === 'session.feedback_request.sent',
+  );
+  if (feedbackLeaf) {
+    return {
+      ...parent,
+      content: {
+        ...parent.content,
+        leading,
+        summary: "How was today's class, class session feedback is requested",
+      },
+    };
+  }
+
+  if (joinedLeaves.length > 0) {
+    const joinedNames = Array.from(
+      new Set(
+        joinedLeaves
+          .map((leaf) => resolveJoinedParticipantName(leaf))
+          .filter((name): name is string => Boolean(name)),
+      ),
+    );
+
+    const latestJoinedName = joinedNames[0] ?? 'Participant';
+    const summary =
+      joinedNames.length > 1
+        ? `Class session is live ${latestJoinedName} and ${joinedNames.length - 1} of people joined`
+        : `Class session is live ${latestJoinedName} joined`;
+
+    return {
+      ...parent,
+      content: {
+        ...parent.content,
+        leading,
+        summary,
+      },
+    };
+  }
+
+  const reminderLeaf = members.find((member) => member.verb === 'session.reminder.sent');
+  if (reminderLeaf) {
+    const minutes = parseReminderMinutesFromSummaryLeaf(reminderLeaf);
+    const timelineLabel = resolveSessionTimelineLabelFromParent(parent);
+    if (minutes && timelineLabel) {
+      return {
+        ...parent,
+        content: {
+          ...parent.content,
+          leading,
+          summary: `Class session ${timelineLabel} will start in ${minutes} mins`,
+        },
+      };
+    }
+  }
+
+  if (leading !== parent.content.leading) {
+    return {
+      ...parent,
+      content: {
+        ...parent.content,
+        leading,
+      },
+    };
+  }
+
+  return parent;
 }
 
 function collectActivityReadItemIds(items: ActivityFeedLeafItemVM[], fallbackId: string) {

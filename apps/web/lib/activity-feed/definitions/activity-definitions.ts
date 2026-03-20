@@ -264,7 +264,14 @@ function sourceScheduleAction(event: ActivityEventRow, payload: Record<string, u
 function sessionStartedAction(
   event: ActivityEventRow,
   payload: Record<string, unknown>,
+  options?: {
+    requireLiveNow?: boolean;
+  },
 ): InboxActionButtonVM | undefined {
+  if (options?.requireLiveNow && !shouldShowJoinNowForStartedSession(event, payload)) {
+    return undefined;
+  }
+
   const joinHref =
     asOptionalString(payload.joinPath) ?? buildInboxSourceHref(event, payload);
   const chatHref = buildInboxSourceHref(event, payload);
@@ -291,6 +298,65 @@ function sessionStartedAction(
         }
       : null,
   };
+}
+
+const DEFAULT_SCHEDULED_SESSION_WINDOW_MS = 60 * 60 * 1000;
+const RECENT_HUDDLE_START_WINDOW_MS = 10 * 60 * 1000;
+
+function parseTimestampMs(value: unknown): number | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function isWithinTimeWindow(currentMs: number, startMs: number, endMs: number): boolean {
+  return currentMs >= startMs && currentMs <= endMs;
+}
+
+function shouldShowJoinNowForStartedSession(
+  event: ActivityEventRow,
+  payload: Record<string, unknown>,
+): boolean {
+  const nowMs = Date.now();
+  const isScheduledWindow = isScheduledLearningSpaceWindowEvent(event, payload);
+
+  if (isScheduledWindow) {
+    const startMs =
+      parseTimestampMs(payload.occurrenceStart) ??
+      parseTimestampMs(payload.scheduledStartAt) ??
+      parseTimestampMs(payload.startedAt) ??
+      parseTimestampMs(event.occurred_at);
+    if (startMs === null) {
+      return false;
+    }
+
+    const explicitEndMs =
+      parseTimestampMs(payload.occurrenceEndAt) ??
+      parseTimestampMs(payload.scheduledEndAt) ??
+      parseTimestampMs(payload.endAt);
+    const endMs =
+      explicitEndMs !== null && explicitEndMs > startMs
+        ? explicitEndMs
+        : startMs + DEFAULT_SCHEDULED_SESSION_WINDOW_MS;
+    return isWithinTimeWindow(nowMs, startMs, endMs);
+  }
+
+  const huddleStartedMs =
+    parseTimestampMs(payload.startedAt) ??
+    parseTimestampMs(payload.joinedAt) ??
+    parseTimestampMs(event.occurred_at);
+  if (huddleStartedMs === null) {
+    return false;
+  }
+
+  return isWithinTimeWindow(
+    nowMs,
+    huddleStartedMs,
+    huddleStartedMs + RECENT_HUDDLE_START_WINDOW_MS,
+  );
 }
 
 function paymentAction(
@@ -939,6 +1005,8 @@ function renderSessionTimelineGroup(event: ActivityEventRow) {
     payload,
   );
   const contextTitle = getContextTitle(payload) ?? sessionName(payload);
+  const shouldRequireLiveNowForJoinAction =
+    event.event_type === 'session.started' || event.event_type === 'member.joined';
   return {
     verb: event.event_type as ActivityVerbVM,
     leading: buildSessionStartedLeading(),
@@ -956,7 +1024,9 @@ function renderSessionTimelineGroup(event: ActivityEventRow) {
       secondaryHref: buildInboxSourceHref(event, payload),
     },
     summary: startedByDisplayName ? undefined : 'Session activity and follow-up updates.',
-    actionButton: sessionStartedAction(event, payload),
+    actionButton: sessionStartedAction(event, payload, {
+      requireLiveNow: shouldRequireLiveNowForJoinAction,
+    }),
     metadata: {
       sessionGroupLocalTime: true,
       occurrenceStart,
@@ -2022,7 +2092,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
           secondaryHref: buildInboxSourceHref(event, payload),
         },
         summary: undefined,
-        actionButton: sessionStartedAction(event, payload),
+        actionButton: sessionStartedAction(event, payload, { requireLiveNow: true }),
       };
     },
   },
