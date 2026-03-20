@@ -62,7 +62,7 @@ function getChannelHref(row: AdminChannelRow, dashboardBasePath: string) {
   const isLearningSpace =
     row.purpose === 'learning-space' || row.primary_entity_kind === 'learning_space';
   return isLearningSpace
-    ? `${dashboardBasePath}/spaces/${row.id}`
+    ? `${dashboardBasePath}/s/${row.id}`
     : `${dashboardBasePath}/c/${row.id}`;
 }
 

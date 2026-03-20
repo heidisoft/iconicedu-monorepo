@@ -43,7 +43,7 @@ describe('live-session-host.utils', () => {
         channelId: 'channel-1',
         channelPurpose: 'learning-space',
       }),
-    ).toBe('/iconic-academy/spaces/channel-1');
+    ).toBe('/iconic-academy/s/channel-1');
     expect(
       getLiveSessionReturnPath({
         orgSlug: 'iconic-academy',

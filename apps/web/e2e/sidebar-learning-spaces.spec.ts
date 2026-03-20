@@ -9,7 +9,7 @@ test('student sidebar shows classes header when spaces exist', async ({ page }) 
 
   await page.goto(`/${orgSlug}`);
 
-  const learningSpaceLinks = page.locator(`a[href^='/${orgSlug}/spaces/']`);
+  const learningSpaceLinks = page.locator(`a[href^='/${orgSlug}/s/']`);
   await expect(learningSpaceLinks.first()).toBeVisible();
   await expect(page.getByText('Classes')).toBeVisible();
 });

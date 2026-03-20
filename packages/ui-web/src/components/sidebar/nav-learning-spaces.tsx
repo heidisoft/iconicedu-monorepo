@@ -130,7 +130,7 @@ export function NavLearningSpaces({
                     />
                   ) : (
                     <Button size="lg" asChild>
-                      <a href={`${dashboardBasePath}/spaces`}>
+                      <a href={`${dashboardBasePath}/s`}>
                         <Sparkle /> {exploreClassesLabel}
                       </a>
                     </Button>
@@ -158,7 +158,7 @@ export function NavLearningSpaces({
                       isActive={isActive}
                       className="px-2.5"
                     >
-                      <a href={`${dashboardBasePath}/spaces/${channel.ids.id}`}>
+                      <a href={`${dashboardBasePath}/s/${channel.ids.id}`}>
                         <ThemedIconBadge
                           icon={Icon}
                           themeKey={channel.ui?.themeKey ?? null}

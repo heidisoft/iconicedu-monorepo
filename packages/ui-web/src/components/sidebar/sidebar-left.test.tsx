@@ -530,7 +530,7 @@ describe('SidebarLeft', () => {
     expect(screen.getByText('For Tevin Carter and 1 more')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Algebra 1/i })).toHaveAttribute(
       'href',
-      '//spaces/channel-1',
+      '//s/channel-1',
     );
     expect(screen.queryByText('Chemistry')).not.toBeInTheDocument();
     expect(screen.queryByText('Educator')).not.toBeInTheDocument();
@@ -602,13 +602,13 @@ describe('SidebarLeft', () => {
   it('renders slug-based links when active path is org scoped', () => {
     render(
       <SidebarProvider>
-        <SidebarLeft data={makeData()} activePath="/iconic-academy/spaces/channel-1" />
+        <SidebarLeft data={makeData()} activePath="/iconic-academy/s/channel-1" />
       </SidebarProvider>,
     );
 
     expect(screen.getByRole('link', { name: /Algebra 1/i })).toHaveAttribute(
       'href',
-      '/iconic-academy/spaces/channel-1',
+      '/iconic-academy/s/channel-1',
     );
   });
 
@@ -728,7 +728,7 @@ describe('SidebarLeft', () => {
     expect(screen.getByText('Physics')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Physics/i })).toHaveAttribute(
       'href',
-      '//spaces/channel-physics',
+      '//s/channel-physics',
     );
     expect(screen.getAllByText('1').length).toBeGreaterThanOrEqual(2);
   });
@@ -744,7 +744,7 @@ describe('SidebarLeft', () => {
     expect(screen.getByText('Student Algebra')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Student Algebra/i })).toHaveAttribute(
       'href',
-      '//spaces/channel-student-1',
+      '//s/channel-student-1',
     );
     expect(screen.queryByText('Other Space')).not.toBeInTheDocument();
     expect(screen.getAllByText('2').length).toBeGreaterThanOrEqual(2);

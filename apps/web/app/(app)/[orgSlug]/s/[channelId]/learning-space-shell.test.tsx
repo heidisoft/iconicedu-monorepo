@@ -2,7 +2,7 @@ import React from 'react';
 import { render, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { LearningSpaceShell } from '@iconicedu/web/app/(app)/[orgSlug]/spaces/[channelId]/learning-space-shell';
+import { LearningSpaceShell } from '@iconicedu/web/app/(app)/[orgSlug]/s/[channelId]/learning-space-shell';
 
 const messagesShellMock = vi.fn(() => null);
 

@@ -202,13 +202,13 @@ function buildUpcomingSessionPage(input: {
   input.upcomingSchedules.forEach((schedule) => {
     const joinHref =
       schedule.source.kind === 'class_session' && schedule.source.channelId
-        ? `/${input.orgSlug}/spaces/${schedule.source.channelId}`
+        ? `/${input.orgSlug}/s/${schedule.source.channelId}`
         : `/${input.orgSlug}/class-schedule`;
     joinHrefByScheduleId.set(schedule.ids.id, joinHref);
     const chatHref =
       schedule.source.kind === 'class_session' && schedule.source.channelId
-        ? `/${input.orgSlug}/spaces/${schedule.source.channelId}`
-        : `/${input.orgSlug}/spaces`;
+        ? `/${input.orgSlug}/s/${schedule.source.channelId}`
+        : `/${input.orgSlug}/s`;
     chatHrefByScheduleId.set(schedule.ids.id, chatHref);
     titleByScheduleId.set(schedule.ids.id, schedule.title);
     participantNamesByScheduleId.set(
@@ -264,7 +264,7 @@ function buildUpcomingSessionPage(input: {
           : null,
       joinHref:
         joinHrefByScheduleId.get(session.id) ?? `/${input.orgSlug}/class-schedule`,
-      chatHref: chatHrefByScheduleId.get(session.id) ?? `/${input.orgSlug}/spaces`,
+      chatHref: chatHrefByScheduleId.get(session.id) ?? `/${input.orgSlug}/s`,
       weekBucket: sessionWeekStart === currentWeekStart ? 'this-week' : 'next-week',
     } satisfies DashboardUpcomingSessionListItem;
   });
@@ -508,9 +508,7 @@ export async function buildDashboardHomeInfographicMetrics(input: {
       tutors: activeRole === 'tutors' ? activeRoleData.metrics : cloneZeroMetrics(),
     },
     upcomingSessionsPage: activeRoleData.upcomingSessionsPage,
-    browseHref: isStaffView
-      ? `/${input.orgSlug}/admin/channels`
-      : `/${input.orgSlug}/spaces`,
+    browseHref: isStaffView ? `/${input.orgSlug}/admin/channels` : `/${input.orgSlug}/s`,
     calendarHref: isStaffView
       ? `/${input.orgSlug}/admin/attendance/sessions`
       : `/${input.orgSlug}/class-schedule`,

@@ -112,7 +112,7 @@ describe('messages-session-card', () => {
         canJoin: true,
         actionOrder: 'join-first',
         joinLiveSession: async () => {},
-        classroomChatHref: '/iconic-academy/spaces/channel-1',
+        classroomChatHref: '/iconic-academy/s/channel-1',
       }),
     );
 

@@ -14,7 +14,7 @@ export function EventActions({ event, onClose }: EventActionsProps) {
   const joinLink = event.meetingLink ?? null;
   const chatLink =
     event.source.kind === 'class_session' && event.source.channelId
-      ? `/spaces/${event.source.channelId}`
+      ? `/s/${event.source.channelId}`
       : null;
   const themeClassName = event.themeKey ? `theme-${event.themeKey}` : '';
   const joinStyle = event.themeKey

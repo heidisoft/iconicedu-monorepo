@@ -47,7 +47,7 @@ describe('HomePageInfographicClient', () => {
         }}
         calendarHref="/iconic-academy/class-schedule"
         notificationsHref="/iconic-academy/notifications"
-        browseHref="/iconic-academy/spaces"
+        browseHref="/iconic-academy/s"
       />,
     );
 
@@ -61,7 +61,7 @@ describe('HomePageInfographicClient', () => {
     await act(async () => {
       await props.onJoinSession?.({
         channelId: 'channel-1',
-        joinHref: '/iconic-academy/spaces/channel-1',
+        joinHref: '/iconic-academy/s/channel-1',
       });
     });
 

@@ -110,7 +110,7 @@ describe('NavLearningSpaces', () => {
 
     expect(screen.getByRole('link', { name: /Reading/i })).toHaveAttribute(
       'href',
-      '/iconic-academy/spaces/channel-1',
+      '/iconic-academy/s/channel-1',
     );
   });
 

@@ -61,6 +61,6 @@ describe('ChannelsTable', () => {
     expect(generalLink).toHaveAttribute('href', '/iconic-academy/c/channel-1');
 
     const learningSpaceLink = screen.getByRole('link', { name: 'Algebra' });
-    expect(learningSpaceLink).toHaveAttribute('href', '/iconic-academy/spaces/channel-2');
+    expect(learningSpaceLink).toHaveAttribute('href', '/iconic-academy/s/channel-2');
   });
 });

@@ -927,7 +927,7 @@ export function SidebarLeft({
                     </DropdownMenuItem>
                     <ClassRequestAction
                       orgSlug={orgSlug}
-                      fallbackHref={`${dashboardBasePath}/spaces`}
+                      fallbackHref={`${dashboardBasePath}/s`}
                       canRequestClasses={canRequestClasses}
                       requestRole={requestRole}
                       requestableStudents={requestableStudents}
@@ -998,7 +998,7 @@ export function SidebarLeft({
                       dashboardBasePath={dashboardBasePath}
                       classRequestAction={{
                         orgSlug,
-                        fallbackHref: `${dashboardBasePath}/spaces`,
+                        fallbackHref: `${dashboardBasePath}/s`,
                         canRequestClasses,
                         requestRole,
                         requestableStudents,
@@ -1034,7 +1034,7 @@ export function SidebarLeft({
                           isActive={isActive}
                           className="px-2.5"
                         >
-                          <a href={`${dashboardBasePath}/spaces/${channel.ids.id}`}>
+                          <a href={`${dashboardBasePath}/s/${channel.ids.id}`}>
                             <ThemedIconBadge
                               icon={Icon}
                               themeKey={channel.ui?.themeKey ?? null}

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { DashboardHeader } from '@iconicedu/ui-web';
-import { LearningSpaceShell } from '@iconicedu/web/app/(app)/[orgSlug]/spaces/[channelId]/learning-space-shell';
+import { LearningSpaceShell } from '@iconicedu/web/app/(app)/[orgSlug]/s/[channelId]/learning-space-shell';
 import {
   sendFileMessageAction,
   sendFilesMessageAction,
@@ -14,7 +14,7 @@ import {
 import { buildChannelById } from '@iconicedu/web/lib/channels/builders/channel.builder';
 import { isStaffObserverReadOnlyChannel } from '@iconicedu/web/lib/channels/read-only';
 import { buildLearningSpaceByChannelId } from '@iconicedu/web/lib/spaces/builders/learning-space.builder';
-import { LEARNING_SPACE_MESSAGES_SECTION_TITLE } from '@iconicedu/web/app/(app)/[orgSlug]/spaces/[channelId]/page.constants';
+import { LEARNING_SPACE_MESSAGES_SECTION_TITLE } from '@iconicedu/web/app/(app)/[orgSlug]/s/[channelId]/page.constants';
 import {
   getDashboardAccountContext,
   getDashboardProfileContext,

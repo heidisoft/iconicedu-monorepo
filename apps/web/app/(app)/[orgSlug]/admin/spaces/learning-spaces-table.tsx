@@ -166,7 +166,7 @@ export function LearningSpacesTable({ rows, onEdit }: LearningSpacesTableProps) 
                       <div className="min-w-0 flex-1">
                         {row.primaryChannelId ? (
                           <Link
-                            href={`${dashboardBasePath}/spaces/${row.primaryChannelId}`}
+                            href={`${dashboardBasePath}/s/${row.primaryChannelId}`}
                             className="text-sm font-medium hover:underline whitespace-normal break-words"
                           >
                             {row.title}

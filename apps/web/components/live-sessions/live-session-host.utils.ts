@@ -31,7 +31,7 @@ export function getLiveSessionReturnPath(input: {
   channelPurpose?: string | null;
 }) {
   if (input.channelPurpose === 'learning-space') {
-    return `/${input.orgSlug}/spaces/${input.channelId}`;
+    return `/${input.orgSlug}/s/${input.channelId}`;
   }
   if (input.channelKind === 'dm' || input.channelKind === 'group_dm') {
     return `/${input.orgSlug}/dm/${input.channelId}`;

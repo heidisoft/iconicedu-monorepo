@@ -2,7 +2,7 @@ import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { render, waitFor } from '@testing-library/react';
 
-import Page from '@iconicedu/web/app/(app)/[orgSlug]/spaces/[channelId]/page';
+import Page from '@iconicedu/web/app/(app)/[orgSlug]/s/[channelId]/page';
 
 const learningSpaceShellMock = vi.fn(() => null);
 const buildChannelByIdMock = vi.fn();
@@ -12,12 +12,9 @@ vi.mock('@iconicedu/ui-web', () => ({
   DashboardHeader: () => null,
 }));
 
-vi.mock(
-  '@iconicedu/web/app/(app)/[orgSlug]/spaces/[channelId]/learning-space-shell',
-  () => ({
-    LearningSpaceShell: (props: unknown) => learningSpaceShellMock(props),
-  }),
-);
+vi.mock('@iconicedu/web/app/(app)/[orgSlug]/s/[channelId]/learning-space-shell', () => ({
+  LearningSpaceShell: (props: unknown) => learningSpaceShellMock(props),
+}));
 
 vi.mock('@iconicedu/web/app/actions/messages', () => ({
   sendFileMessageAction: vi.fn(),
@@ -54,7 +51,7 @@ vi.mock('@iconicedu/web/flags', () => ({
   },
 }));
 
-describe('d/spaces/[channelId] page', () => {
+describe('d/s/[channelId] page', () => {
   it('passes currentUserId to LearningSpaceShell', async () => {
     buildChannelByIdMock.mockResolvedValueOnce({
       ids: { id: 'channel-1', orgId: 'org-1' },

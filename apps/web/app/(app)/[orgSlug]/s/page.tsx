@@ -25,5 +25,5 @@ export default async function Page({ params }: { params: Promise<{ orgSlug: stri
     return null;
   }
 
-  redirect(`${dashboardPath}/spaces/${firstChannel.ids.id}`);
+  redirect(`${dashboardPath}/s/${firstChannel.ids.id}`);
 }

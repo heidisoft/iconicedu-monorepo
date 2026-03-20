@@ -204,7 +204,7 @@ function buildInboxSourceHref(event: ActivityEventRow, payload: Record<string, u
   const basePath = orgSlug ? `/${orgSlug}` : '..';
   const routeKind = asOptionalRouteKind(payload.channelRouteKind);
   if (routeKind === 'space') {
-    return `${basePath}/spaces/${channelId}`;
+    return `${basePath}/s/${channelId}`;
   }
   if (routeKind === 'dm') {
     return `${basePath}/dm/${channelId}`;
@@ -217,9 +217,7 @@ function buildInboxSourceHref(event: ActivityEventRow, payload: Record<string, u
   const isLearningSpace =
     scopeKind === 'learning_space' || typeof payload.learningSpaceId === 'string';
 
-  return isLearningSpace
-    ? `${basePath}/spaces/${channelId}`
-    : `${basePath}/c/${channelId}`;
+  return isLearningSpace ? `${basePath}/s/${channelId}` : `${basePath}/c/${channelId}`;
 }
 
 function sourceAction(
@@ -235,7 +233,7 @@ function sourceAction(
 
   const routeKind = asOptionalRouteKind(payload.channelRouteKind);
   const resolvedLabel =
-    routeKind === 'space' || href.includes('/spaces/')
+    routeKind === 'space' || href.includes('/s/')
       ? 'Open class'
       : routeKind === 'dm' || href.includes('/dm/')
         ? 'Open conversation'

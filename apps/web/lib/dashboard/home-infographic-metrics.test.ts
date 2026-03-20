@@ -116,7 +116,7 @@ describe('buildDashboardHomeInfographicMetrics', () => {
     });
 
     expect(result.activeRole).toBe('parents');
-    expect(result.browseHref).toBe('/iconic-academy/spaces');
+    expect(result.browseHref).toBe('/iconic-academy/s');
     expect(result.metricsByRole.parents).toEqual({
       upcomingSessionsThisWeek: 3,
       completedClassesThisMonth: 3,
@@ -127,7 +127,7 @@ describe('buildDashboardHomeInfographicMetrics', () => {
     expect(result.upcomingSessionsPage.nextWeek.items).toHaveLength(5);
     expect(result.upcomingSessionsPage.thisWeek.items[0]).toMatchObject({
       session: { label: 'Algebra Daily' },
-      joinHref: '/iconic-academy/spaces/channel-1',
+      joinHref: '/iconic-academy/s/channel-1',
       weekBucket: 'this-week',
     });
     expect(result.upcomingSessionsPage.thisWeek.items[0]?.session.time).toContain(

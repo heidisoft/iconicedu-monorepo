@@ -20,8 +20,8 @@ const sessionItems = [
       status: 'scheduled',
     },
     channelId: 'channel-1',
-    joinHref: '/iconic-academy/spaces/channel-1',
-    chatHref: '/iconic-academy/spaces/channel-1',
+    joinHref: '/iconic-academy/s/channel-1',
+    chatHref: '/iconic-academy/s/channel-1',
     weekBucket: 'this-week',
   },
   {
@@ -38,8 +38,8 @@ const sessionItems = [
       status: 'scheduled',
     },
     channelId: 'channel-2',
-    joinHref: '/iconic-academy/spaces/channel-2',
-    chatHref: '/iconic-academy/spaces/channel-2',
+    joinHref: '/iconic-academy/s/channel-2',
+    chatHref: '/iconic-academy/s/channel-2',
     weekBucket: 'this-week',
   },
   {
@@ -56,8 +56,8 @@ const sessionItems = [
       status: 'scheduled',
     },
     channelId: 'channel-3',
-    joinHref: '/iconic-academy/spaces/channel-3',
-    chatHref: '/iconic-academy/spaces/channel-3',
+    joinHref: '/iconic-academy/s/channel-3',
+    chatHref: '/iconic-academy/s/channel-3',
     weekBucket: 'next-week',
   },
 ];
@@ -136,7 +136,7 @@ describe('DashboardHomeInfographicSection', () => {
         upcomingSessionsPage={{ ...sessionPage }}
         calendarHref="/iconic-academy/class-schedule"
         notificationsHref="/iconic-academy/notifications"
-        browseHref="/iconic-academy/spaces"
+        browseHref="/iconic-academy/s"
       />,
     );
 
@@ -170,7 +170,7 @@ describe('DashboardHomeInfographicSection', () => {
         upcomingSessionsPage={combinedPaginationSessionPage}
         calendarHref="/iconic-academy/class-schedule"
         notificationsHref="/iconic-academy/notifications"
-        browseHref="/iconic-academy/spaces"
+        browseHref="/iconic-academy/s"
       />,
     );
 
@@ -197,7 +197,7 @@ describe('DashboardHomeInfographicSection', () => {
         upcomingSessionsPage={{ ...sessionPage }}
         calendarHref="/iconic-academy/class-schedule"
         notificationsHref="/iconic-academy/notifications"
-        browseHref="/iconic-academy/spaces"
+        browseHref="/iconic-academy/s"
         onJoinSession={onJoinSession}
       />,
     );
@@ -206,7 +206,7 @@ describe('DashboardHomeInfographicSection', () => {
     expect(onJoinSession).toHaveBeenCalledWith(
       expect.objectContaining({
         channelId: 'channel-1',
-        joinHref: '/iconic-academy/spaces/channel-1',
+        joinHref: '/iconic-academy/s/channel-1',
       }),
     );
   });
@@ -224,7 +224,7 @@ describe('DashboardHomeInfographicSection', () => {
         upcomingSessionsPage={singlePageSessionPage}
         calendarHref="/iconic-academy/class-schedule"
         notificationsHref="/iconic-academy/notifications"
-        browseHref="/iconic-academy/spaces"
+        browseHref="/iconic-academy/s"
       />,
     );
 
@@ -246,7 +246,7 @@ describe('DashboardHomeInfographicSection', () => {
         upcomingSessionsPage={combinedPaginationSessionPage}
         calendarHref="/iconic-academy/class-schedule"
         notificationsHref="/iconic-academy/notifications"
-        browseHref="/iconic-academy/spaces"
+        browseHref="/iconic-academy/s"
       />,
     );
 
@@ -272,7 +272,7 @@ describe('DashboardHomeInfographicSection', () => {
         upcomingSessionsPage={{ ...sessionPage }}
         calendarHref="/iconic-academy/class-schedule"
         notificationsHref="/iconic-academy/notifications"
-        browseHref="/iconic-academy/spaces"
+        browseHref="/iconic-academy/s"
       />,
     );
 
@@ -307,7 +307,7 @@ describe('DashboardHomeInfographicSection', () => {
         }}
         calendarHref="/iconic-academy/class-schedule"
         notificationsHref="/iconic-academy/notifications"
-        browseHref="/iconic-academy/spaces"
+        browseHref="/iconic-academy/s"
       />,
     );
 
@@ -333,13 +333,13 @@ describe('DashboardHomeInfographicSection', () => {
         }}
         calendarHref="/iconic-academy/class-schedule"
         notificationsHref="/iconic-academy/notifications"
-        browseHref="/iconic-academy/spaces"
+        browseHref="/iconic-academy/s"
       />,
     );
 
     expect(screen.getByRole('link', { name: 'Explore More Classes' })).toHaveAttribute(
       'href',
-      '/iconic-academy/spaces',
+      '/iconic-academy/s',
     );
   });
 
@@ -374,7 +374,7 @@ describe('DashboardHomeInfographicSection', () => {
         }}
         calendarHref="/iconic-academy/class-schedule"
         notificationsHref="/iconic-academy/notifications"
-        browseHref="/iconic-academy/spaces"
+        browseHref="/iconic-academy/s"
         onClassRequestCreated={onClassRequestCreated}
       />,
     );
@@ -425,7 +425,7 @@ describe('DashboardHomeInfographicSection', () => {
         }}
         calendarHref="/iconic-academy/class-schedule"
         notificationsHref="/iconic-academy/notifications"
-        browseHref="/iconic-academy/spaces"
+        browseHref="/iconic-academy/s"
       />,
     );
 

@@ -54,7 +54,7 @@ const CLASS_LIVE_NOW: ActivityFeedItemVM = {
     actionButton: {
       label: 'Join class',
       variant: 'default',
-      href: `/iconic-academy/spaces/${CHANNEL_IDS.mathSpace}`,
+      href: `/iconic-academy/s/${CHANNEL_IDS.mathSpace}`,
     },
   },
   state: unread(false),
@@ -137,7 +137,7 @@ const HOMEWORK_ASSIGNED: ActivityFeedItemVM = {
     actionButton: {
       label: 'View homework',
       variant: 'default',
-      href: `/iconic-academy/spaces/${CHANNEL_IDS.mathSpace}`,
+      href: `/iconic-academy/s/${CHANNEL_IDS.mathSpace}`,
     },
   },
   state: unread(false),
@@ -169,7 +169,7 @@ const LESSON_ASSIGNMENT_ASSIGNED: ActivityFeedItemVM = {
     actionButton: {
       label: 'Open class',
       variant: 'outline',
-      href: `/iconic-academy/spaces/${CHANNEL_IDS.mathSpace}`,
+      href: `/iconic-academy/s/${CHANNEL_IDS.mathSpace}`,
     },
   },
   state: unread(false),
@@ -200,7 +200,7 @@ const HOMEWORK_ATTACHMENT_UPLOADED: ActivityFeedItemVM = {
     actionButton: {
       label: 'Open class',
       variant: 'outline',
-      href: `/iconic-academy/spaces/${CHANNEL_IDS.mathSpace}`,
+      href: `/iconic-academy/s/${CHANNEL_IDS.mathSpace}`,
     },
   },
   state: unread(true),
@@ -231,7 +231,7 @@ const CLASS_FEEDBACK_REQUESTED: ActivityFeedItemVM = {
     actionButton: {
       label: 'Leave feedback',
       variant: 'default',
-      href: `/iconic-academy/spaces/${CHANNEL_IDS.mathSpace}`,
+      href: `/iconic-academy/s/${CHANNEL_IDS.mathSpace}`,
     },
   },
   state: unread(false),
@@ -312,7 +312,7 @@ const CLASS_SESSION_GROUP: ActivityFeedItemVM = {
     actionButton: {
       label: 'Open class',
       variant: 'outline',
-      href: `/iconic-academy/spaces/${CHANNEL_IDS.mathSpace}`,
+      href: `/iconic-academy/s/${CHANNEL_IDS.mathSpace}`,
     },
   },
   state: unread(false),
@@ -405,7 +405,7 @@ const SCHEDULE_UPDATED: ActivityFeedItemVM = {
     actionButton: {
       label: 'Open class',
       variant: 'outline',
-      href: `/iconic-academy/spaces/${CHANNEL_IDS.mathSpace}`,
+      href: `/iconic-academy/s/${CHANNEL_IDS.mathSpace}`,
     },
   },
   state: unread(true),
@@ -785,7 +785,7 @@ const CLASS_SETUP_GROUP: ActivityFeedItemVM = {
     actionButton: {
       label: 'View class',
       variant: 'outline',
-      href: `/iconic-academy/spaces/${CHANNEL_IDS.mathSpace}`,
+      href: `/iconic-academy/s/${CHANNEL_IDS.mathSpace}`,
     },
   },
   state: unread(false),
@@ -940,7 +940,7 @@ const CLASS_UPDATED_GROUP: ActivityFeedItemVM = {
     actionButton: {
       label: 'View class',
       variant: 'outline',
-      href: `/iconic-academy/spaces/${CHANNEL_IDS.mathSpace}`,
+      href: `/iconic-academy/s/${CHANNEL_IDS.mathSpace}`,
     },
   },
   state: unread(false),

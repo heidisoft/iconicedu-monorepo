@@ -516,7 +516,7 @@ describe('activity event definitions', () => {
     expect(rendered.actionButton).toEqual({
       label: 'Open class',
       variant: 'outline',
-      href: '../spaces/channel-1',
+      href: '../s/channel-1',
     });
   });
 
@@ -823,7 +823,7 @@ describe('activity event definitions', () => {
     expect(grouped?.headline.primary).toBe('Class updated');
     expect(grouped?.actionButton).toMatchObject({
       label: 'Open classroom chat',
-      href: '../spaces/channel-1',
+      href: '../s/channel-1',
     });
     expect(grouped?.leading).toEqual({
       kind: 'avatars',
@@ -1133,7 +1133,7 @@ describe('activity event definitions', () => {
     expect(rendered.actionButton).toEqual({
       label: 'View schedule',
       variant: 'outline',
-      href: '../spaces/channel-1?tab=schedule',
+      href: '../s/channel-1?tab=schedule',
     });
   });
 
@@ -1312,7 +1312,7 @@ describe('activity event definitions', () => {
       actionButton: {
         label: 'View homework',
         variant: 'default',
-        href: '../spaces/channel-1',
+        href: '../s/channel-1',
       },
       expandedContent: 'Focus on equivalent fractions and number lines.',
     });
@@ -1376,7 +1376,7 @@ describe('activity event definitions', () => {
       summary: 'Your session for Algebra will start on Mar 3 at 12:40 PM',
       actionButton: {
         label: 'Join class',
-        href: '../spaces/channel-1',
+        href: '../s/channel-1',
       },
       leading: {
         kind: 'icon',
@@ -1394,7 +1394,7 @@ describe('activity event definitions', () => {
       actionButton: {
         label: 'Join now',
         variant: 'default',
-        href: '../spaces/channel-1',
+        href: '../s/channel-1',
       },
       metadata: {
         sessionGroupLocalTime: true,
@@ -1723,7 +1723,7 @@ describe('activity event definitions', () => {
       actionButton: {
         label: 'Join now',
         variant: 'default',
-        href: '../spaces/channel-1',
+        href: '../s/channel-1',
       },
     });
   });
@@ -1769,7 +1769,7 @@ describe('activity event definitions', () => {
       actionButton: {
         label: 'Join now',
         variant: 'default',
-        href: '../spaces/channel-1',
+        href: '../s/channel-1',
       },
     });
   });

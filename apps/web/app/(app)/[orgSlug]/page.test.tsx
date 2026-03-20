@@ -63,7 +63,7 @@ describe('d home page', () => {
     buildDashboardHomeInfographicMetricsMock.mockResolvedValueOnce({
       activeRole: 'parents',
       isStaffView: false,
-      browseHref: '/iconic-academy/spaces',
+      browseHref: '/iconic-academy/s',
       calendarHref: '/iconic-academy/class-schedule',
       notificationsHref: '/iconic-academy/notifications',
       upcomingSessionsPage: {
@@ -119,7 +119,7 @@ describe('d home page', () => {
         }),
         calendarHref: '/iconic-academy/class-schedule',
         notificationsHref: '/iconic-academy/notifications',
-        browseHref: '/iconic-academy/spaces',
+        browseHref: '/iconic-academy/s',
         canRequestClasses: true,
         requestRole: 'parents',
         requestableStudents: [
@@ -157,7 +157,7 @@ describe('d home page', () => {
     buildDashboardHomeInfographicMetricsMock.mockResolvedValueOnce({
       activeRole: 'parents',
       isStaffView: false,
-      browseHref: '/iconic-academy/spaces',
+      browseHref: '/iconic-academy/s',
       calendarHref: '/iconic-academy/class-schedule',
       notificationsHref: '/iconic-academy/notifications',
       upcomingSessionsPage: {
