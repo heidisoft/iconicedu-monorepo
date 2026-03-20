@@ -17,13 +17,16 @@ import {
   type ClassRequestableStudent as DashboardRequestableStudent,
 } from '../class-request/class-request-action';
 import { DashboardSessionsEmptyState } from '@iconicedu/ui-web/components/empty';
+import { ExternalLiveSessionJoinDialog } from '@iconicedu/ui-web/components/messages/external-live-session-join-dialog';
 import { SessionCard } from '@iconicedu/ui-web/components/messages/tabs/messages-session-card';
+import { useExternalLiveSessionJoinDialog } from '@iconicedu/ui-web/components/messages/use-external-live-session-join-dialog';
 import type { ClassSession } from '@iconicedu/ui-web/components/messages/tabs/messages-schedule-tab.utils';
 import { DotPattern } from '@iconicedu/ui-web/ui/dot-pattern';
 import { OTHER_SUBJECT_OPTION, STANDARD_SUBJECT_OPTIONS } from '@iconicedu/shared-types';
 
 export interface DashboardUpcomingSessionListItem {
   session: ClassSession;
+  channelId?: string | null;
   joinHref: string;
   chatHref: string;
   weekBucket: 'this-week' | 'next-week';
@@ -60,7 +63,7 @@ export interface DashboardHomeInfographicSectionProps {
   requestableStudents?: DashboardRequestableStudent[];
   subjectOptions?: string[];
   onClassRequestCreated?: (channelId: string) => void;
-  onJoinSession?: (joinHref: string) => void | Promise<void>;
+  onJoinSession?: (item: DashboardUpcomingSessionListItem) => void | Promise<void>;
 }
 
 const DEFAULT_SUBJECT_OPTIONS = [...STANDARD_SUBJECT_OPTIONS, OTHER_SUBJECT_OPTION];
@@ -83,6 +86,8 @@ export function DashboardHomeInfographicSection({
 }: DashboardHomeInfographicSectionProps) {
   const quickActionIconClassName = 'size-5 shrink-0';
   const [currentPage, setCurrentPage] = useState(1);
+  const { externalJoinTarget, closeExternalJoinDialog, handleResolvedJoinHref } =
+    useExternalLiveSessionJoinDialog();
   const pageSize = Math.max(
     1,
     upcomingSessionsPage.thisWeek.pageSize,
@@ -266,30 +271,28 @@ export function DashboardHomeInfographicSection({
                       {section.label}
                     </p>
                   </div>
-                  {section.items.map(
-                    ({ session, joinHref, chatHref, weekBucket }, index) => (
-                      <SessionCard
-                        key={session.id}
-                        session={session}
-                        index={index}
-                        canJoin={weekBucket === 'this-week'}
-                        showJoinButton={weekBucket === 'this-week'}
-                        actionOrder="join-first"
-                        classroomChatHref={chatHref}
-                        joinLiveSession={
-                          weekBucket === 'this-week'
-                            ? async () => {
-                                if (onJoinSession) {
-                                  await onJoinSession(joinHref);
-                                  return;
-                                }
-                                window.location.assign(joinHref);
+                  {section.items.map((item, index) => (
+                    <SessionCard
+                      key={item.session.id}
+                      session={item.session}
+                      index={index}
+                      canJoin={item.weekBucket === 'this-week'}
+                      showJoinButton={item.weekBucket === 'this-week'}
+                      actionOrder="join-first"
+                      classroomChatHref={item.chatHref}
+                      joinLiveSession={
+                        item.weekBucket === 'this-week'
+                          ? async () => {
+                              if (onJoinSession) {
+                                await onJoinSession(item);
+                                return;
                               }
-                            : undefined
-                        }
-                      />
-                    ),
-                  )}
+                              handleResolvedJoinHref(item.joinHref);
+                            }
+                          : undefined
+                      }
+                    />
+                  ))}
                 </div>
               ))
             ) : (
@@ -406,6 +409,14 @@ export function DashboardHomeInfographicSection({
           </div>
         </aside>
       </div>
+      <ExternalLiveSessionJoinDialog
+        target={externalJoinTarget}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeExternalJoinDialog();
+          }
+        }}
+      />
     </section>
   );
 }

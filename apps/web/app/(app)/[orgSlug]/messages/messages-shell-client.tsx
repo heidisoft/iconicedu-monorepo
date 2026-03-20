@@ -21,6 +21,8 @@ import type {
   UserProfileVM,
 } from '@iconicedu/shared-types';
 import { MessagesShell } from '@iconicedu/ui-web';
+import { ExternalLiveSessionJoinDialog } from '@iconicedu/ui-web/components/messages/external-live-session-join-dialog';
+import { useExternalLiveSessionJoinDialog } from '@iconicedu/ui-web/components/messages/use-external-live-session-join-dialog';
 
 import { createSupabaseMessagesRealtimeClient } from '@iconicedu/web/lib/messages/realtime/supabase-messages-realtime-client';
 import { createSupabaseBrowserClient } from '@iconicedu/web/lib/supabase/client';
@@ -185,6 +187,12 @@ export function MessagesShellClient({
   const onlineProfileIdsRef = useRef(new Set<string>());
   const presenceClient = useMemo(() => createSupabaseBrowserClient(), []);
   const realtimeClient = useMemo(() => createSupabaseMessagesRealtimeClient(), []);
+  const { externalJoinTarget, closeExternalJoinDialog, handleResolvedJoinHref } =
+    useExternalLiveSessionJoinDialog({
+      onInternalJoinHref: (joinHref) => {
+        router.push(joinHref);
+      },
+    });
   const messageWriteClient = useMemo(
     () => ({
       sendTextMessage,
@@ -420,13 +428,8 @@ export function MessagesShellClient({
       throw new Error(payload?.error ?? 'Failed to join live session');
     }
 
-    if (/^https?:\/\//i.test(payload.joinPath)) {
-      window.location.assign(payload.joinPath);
-      return;
-    }
-
-    router.push(payload.joinPath);
-  }, [channelState.ids.id, orgSlug, router]);
+    handleResolvedJoinHref(payload.joinPath);
+  }, [channelState.ids.id, handleResolvedJoinHref, orgSlug]);
 
   useEffect(() => {
     setChannelState(channel);
@@ -507,17 +510,27 @@ export function MessagesShellClient({
   ]);
 
   return (
-    <MessagesShell
-      channel={channelState}
-      currentUserId={currentUserId}
-      currentUserProfile={currentUserProfile}
-      readOnly={readOnly}
-      showCreateMessageTypeButton={showCreateMessageTypeButton}
-      panelRegistry={panelRegistry}
-      realtimeClient={realtimeClient}
-      messageWriteClient={messageWriteClient}
-      uploadFileMessage={uploadFileMessage}
-      joinLiveSession={joinLiveSession}
-    />
+    <>
+      <MessagesShell
+        channel={channelState}
+        currentUserId={currentUserId}
+        currentUserProfile={currentUserProfile}
+        readOnly={readOnly}
+        showCreateMessageTypeButton={showCreateMessageTypeButton}
+        panelRegistry={panelRegistry}
+        realtimeClient={realtimeClient}
+        messageWriteClient={messageWriteClient}
+        uploadFileMessage={uploadFileMessage}
+        joinLiveSession={joinLiveSession}
+      />
+      <ExternalLiveSessionJoinDialog
+        target={externalJoinTarget}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeExternalJoinDialog();
+          }
+        }}
+      />
+    </>
   );
 }

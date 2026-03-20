@@ -17,6 +17,7 @@ import {
   GraduationCap,
   MessageSquare,
   Paperclip,
+  PhoneOutgoing,
   Sparkles,
   UserRoundMinus,
   UserRoundPlus,
@@ -65,6 +66,7 @@ const INBOX_ICON_MAP: Record<
   GraduationCap,
   MessageSquare,
   Paperclip,
+  PhoneOutgoing,
   Sparkles,
   UserRoundMinus,
   UserRoundPlus,
@@ -81,6 +83,12 @@ const TONE_CLASSNAMES = {
 
 const getDefaultIconKey = (activity: ActivityFeedItemVM): InboxIconKeyVM => {
   if (activity.kind === 'group') {
+    if (activity.verb === 'session.started') {
+      return 'Video';
+    }
+    if (activity.verb === 'member.joined') {
+      return 'PhoneOutgoing';
+    }
     switch (activity.grouping?.groupType) {
       case 'payment':
         return 'CreditCard';
@@ -141,7 +149,7 @@ const getDefaultIconKey = (activity: ActivityFeedItemVM): InboxIconKeyVM => {
       return 'UserRoundMinus';
     case 'member.joined':
     case 'role.changed':
-      return 'CheckCircle2';
+      return 'PhoneOutgoing';
     default:
       return 'Bell';
   }

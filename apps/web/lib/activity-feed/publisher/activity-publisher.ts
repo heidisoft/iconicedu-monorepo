@@ -124,6 +124,14 @@ export async function publishActivityEvent<TPayload extends object>(
       }
 
       if (existingResponse.data) {
+        try {
+          await projectActivityEvents(input.supabase, {
+            eventIds: [existingResponse.data.id],
+            limit: 1,
+          });
+        } catch {
+          // Keep the event durable even if immediate projection fails.
+        }
         return existingResponse.data;
       }
     }

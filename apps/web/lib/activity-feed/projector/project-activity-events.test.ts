@@ -21,8 +21,8 @@ vi.mock('@iconicedu/web/lib/notifications/dispatch-jobs', () => ({
     enqueueNotificationDispatchJobs(...args),
 }));
 
-function createSupabaseMock() {
-  const events = [
+function createSupabaseMock(input?: { events?: Array<Record<string, unknown>> }) {
+  const events = input?.events ?? [
     {
       id: 'event-1',
       org_id: 'org-1',
@@ -48,7 +48,11 @@ function createSupabaseMock() {
     },
   ];
   const updates: Array<{ table: string; payload: Record<string, unknown> }> = [];
-  const upserts: Array<{ table: string; payload: Record<string, unknown> }> = [];
+  const upserts: Array<{
+    table: string;
+    payload: Record<string, unknown>;
+    onConflict?: string;
+  }> = [];
 
   const supabase = {
     from: vi.fn((table: string) => {
@@ -68,6 +72,110 @@ function createSupabaseMock() {
       }
 
       if (table === 'activity_events') {
+        const lookupState: {
+          orgId?: string;
+          eventType?: string;
+          scopeContains?: Record<string, unknown>;
+          occurredAtEq?: string;
+          occurredAtGte?: string;
+          occurredAtLt?: string;
+          orderAscending?: boolean;
+          limit?: number;
+        } = {};
+
+        const lookupChain = {
+          eq: vi.fn((column: string, value: unknown) => {
+            if (column === 'org_id' && typeof value === 'string') {
+              lookupState.orgId = value;
+            }
+            if (column === 'event_type' && typeof value === 'string') {
+              lookupState.eventType = value;
+            }
+            if (column === 'occurred_at' && typeof value === 'string') {
+              lookupState.occurredAtEq = value;
+            }
+            return lookupChain;
+          }),
+          contains: vi.fn((column: string, value: Record<string, unknown>) => {
+            if (column === 'scope') {
+              lookupState.scopeContains = value;
+            }
+            return lookupChain;
+          }),
+          gte: vi.fn((column: string, value: string) => {
+            if (column === 'occurred_at') {
+              lookupState.occurredAtGte = value;
+            }
+            return lookupChain;
+          }),
+          lt: vi.fn((column: string, value: string) => {
+            if (column === 'occurred_at') {
+              lookupState.occurredAtLt = value;
+            }
+            return lookupChain;
+          }),
+          is: vi.fn(() => lookupChain),
+          order: vi.fn((column: string, options?: { ascending?: boolean }) => {
+            if (column === 'occurred_at') {
+              lookupState.orderAscending = options?.ascending ?? true;
+            }
+            return lookupChain;
+          }),
+          limit: vi.fn((value: number) => {
+            lookupState.limit = value;
+            return lookupChain;
+          }),
+          returns: vi.fn(async () => {
+            let filtered = events.filter((event) => {
+              if (lookupState.orgId && event.org_id !== lookupState.orgId) {
+                return false;
+              }
+              if (lookupState.eventType && event.event_type !== lookupState.eventType) {
+                return false;
+              }
+              if (lookupState.scopeContains) {
+                const eventScope = event.scope as Record<string, unknown>;
+                for (const [key, value] of Object.entries(lookupState.scopeContains)) {
+                  if (eventScope[key] !== value) {
+                    return false;
+                  }
+                }
+              }
+              if (
+                lookupState.occurredAtEq &&
+                String(event.occurred_at) !== lookupState.occurredAtEq
+              ) {
+                return false;
+              }
+              if (
+                lookupState.occurredAtGte &&
+                String(event.occurred_at) < lookupState.occurredAtGte
+              ) {
+                return false;
+              }
+              if (
+                lookupState.occurredAtLt &&
+                String(event.occurred_at) >= lookupState.occurredAtLt
+              ) {
+                return false;
+              }
+              return true;
+            });
+
+            filtered = filtered.sort((a, b) =>
+              lookupState.orderAscending === false
+                ? String(b.occurred_at).localeCompare(String(a.occurred_at))
+                : String(a.occurred_at).localeCompare(String(b.occurred_at)),
+            );
+
+            if (typeof lookupState.limit === 'number') {
+              filtered = filtered.slice(0, lookupState.limit);
+            }
+
+            return { data: filtered, error: null };
+          }),
+        };
+
         return {
           select: vi.fn(() => ({
             is: vi.fn(() => ({
@@ -81,6 +189,13 @@ function createSupabaseMock() {
                 })),
               })),
             })),
+            eq: lookupChain.eq,
+            contains: lookupChain.contains,
+            gte: lookupChain.gte,
+            lt: lookupChain.lt,
+            order: lookupChain.order,
+            limit: lookupChain.limit,
+            returns: lookupChain.returns,
           })),
           update: vi.fn((payload: Record<string, unknown>) => ({
             eq: vi.fn(() => ({
@@ -94,6 +209,26 @@ function createSupabaseMock() {
       }
 
       if (table === 'learning_space_participants') {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                is: vi.fn(() => ({
+                  returns: vi.fn(async () => ({
+                    data: [
+                      { profile_id: 'child-profile-1' },
+                      { profile_id: 'educator-profile-1' },
+                    ],
+                    error: null,
+                  })),
+                })),
+              })),
+            })),
+          })),
+        };
+      }
+
+      if (table === 'channel_members') {
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
@@ -181,14 +316,16 @@ function createSupabaseMock() {
 
         return {
           select: vi.fn(() => selectChain),
-          upsert: vi.fn((payload: Record<string, unknown>) => ({
-            select: vi.fn(() => ({
-              single: vi.fn(async () => {
-                upserts.push({ table, payload });
-                return { data: { id: 'feed-item-1' }, error: null };
-              }),
-            })),
-          })),
+          upsert: vi.fn(
+            (payload: Record<string, unknown>, options?: { onConflict?: string }) => ({
+              select: vi.fn(() => ({
+                single: vi.fn(async () => {
+                  upserts.push({ table, payload, onConflict: options?.onConflict });
+                  return { data: { id: 'feed-item-1' }, error: null };
+                }),
+              })),
+            }),
+          ),
           update: vi.fn((payload: Record<string, unknown>) => ({
             eq: vi.fn(async () => {
               updates.push({ table, payload });
@@ -657,11 +794,11 @@ describe('projectActivityEvents', () => {
     await projectActivityEvents(supabase as never);
 
     expect(
-      updates.some(
-        (entry) =>
-          entry.table === 'activity_feed_items' &&
-          entry.payload.occurred_at === '2026-03-08T13:00:00.000Z',
-      ),
+      updates.some((entry) => entry.table === 'activity_feed_items') ||
+        upserts.some(
+          (entry) =>
+            entry.table === 'activity_feed_items' && entry.payload.kind === 'group',
+        ),
     ).toBe(true);
   });
 
@@ -1318,5 +1455,336 @@ describe('projectActivityEvents', () => {
     expect(
       (childItem?.payload.metadata as { viewerRole?: string | null }).viewerRole,
     ).toBe('child');
+  });
+
+  it('uses recipient and dedupe key for leaf upserts when an activity event has a dedupe key', async () => {
+    const { supabase, upserts } = createSupabaseMock({
+      events: [
+        {
+          id: 'event-joined-1',
+          org_id: 'org-1',
+          event_type: 'member.joined',
+          occurred_at: '2026-03-03T12:00:00.000Z',
+          source_kind: 'profile',
+          actor_profile_id: 'child-profile-1',
+          scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+          object_ref: { kind: 'session', id: 'session-1' },
+          target_ref: { kind: 'learning_space', id: 'space-1' },
+          payload: {
+            liveSessionId: 'session-1',
+            learningSpaceId: 'space-1',
+            channelId: 'channel-1',
+            title: 'Algebra I',
+            occurrenceStart: '2026-03-03T12:00:00.000Z',
+            memberProfileId: 'child-profile-1',
+            memberDisplayName: 'Taylor Reed',
+          },
+          audience_rules: [],
+          dedupe_key: 'member.joined:session-1:child-profile-1',
+          projection_status: 'pending',
+          projection_attempts: 0,
+          created_at: '2026-03-03T12:00:00.000Z',
+          updated_at: '2026-03-03T12:00:00.000Z',
+        },
+      ],
+    });
+
+    await projectActivityEvents(supabase as never);
+
+    const leafUpsert = upserts.find(
+      (entry) => entry.table === 'activity_feed_items' && entry.payload.kind === 'leaf',
+    );
+    expect(leafUpsert?.onConflict).toBe('recipient_profile_id,dedupe_key');
+  });
+
+  it('marks actor-owned leaf rows as read on projection', async () => {
+    const { supabase, upserts } = createSupabaseMock({
+      events: [
+        {
+          id: 'event-actor-joined-1',
+          org_id: 'org-1',
+          event_type: 'member.joined',
+          occurred_at: '2026-03-03T12:00:00.000Z',
+          source_kind: 'profile',
+          actor_profile_id: 'child-profile-1',
+          scope: { kind: 'channel', channelId: 'channel-1' },
+          object_ref: { kind: 'session', id: 'session-1' },
+          target_ref: null,
+          payload: {
+            liveSessionId: 'session-1',
+            channelId: 'channel-1',
+            title: 'Algebra I',
+            memberProfileId: 'child-profile-1',
+            memberDisplayName: 'Taylor Reed',
+            mode: 'video',
+          },
+          audience_rules: [],
+          dedupe_key: 'member.joined:session-1:child-profile-1',
+          projection_status: 'pending',
+          projection_attempts: 0,
+          created_at: '2026-03-03T12:00:00.000Z',
+          updated_at: '2026-03-03T12:00:00.000Z',
+        },
+      ],
+    });
+
+    await projectActivityEvents(supabase as never);
+
+    const actorLeaf = upserts.find(
+      (entry) =>
+        entry.table === 'activity_feed_items' &&
+        entry.payload.kind === 'leaf' &&
+        entry.payload.recipient_profile_id === 'child-profile-1',
+    );
+
+    expect(actorLeaf?.payload.is_read).toBe(true);
+    expect(actorLeaf?.payload.read_at).toBe('2026-03-03T12:00:00.000Z');
+  });
+
+  it('groups non-learning-space live-session events under the most recent start within one hour', async () => {
+    const { supabase, upserts } = createSupabaseMock({
+      events: [
+        {
+          id: 'event-start-1',
+          org_id: 'org-1',
+          event_type: 'session.started',
+          occurred_at: '2026-03-19T12:00:00.000Z',
+          source_kind: 'profile',
+          actor_profile_id: 'profile-1',
+          scope: { kind: 'channel', channelId: 'channel-dm-1' },
+          object_ref: { kind: 'session', id: 'session-1' },
+          target_ref: null,
+          payload: {
+            liveSessionId: 'session-1',
+            channelId: 'channel-dm-1',
+            title: 'Direct message',
+            channelTopic: 'Direct message',
+            startedByDisplayName: 'Tiffany T',
+            mode: 'video',
+          },
+          audience_rules: [],
+          dedupe_key: 'session.started:session-1',
+          projection_status: 'pending',
+          projection_attempts: 0,
+          created_at: '2026-03-19T12:00:00.000Z',
+          updated_at: '2026-03-19T12:00:00.000Z',
+        },
+        {
+          id: 'event-start-2',
+          org_id: 'org-1',
+          event_type: 'session.started',
+          occurred_at: '2026-03-19T12:40:00.000Z',
+          source_kind: 'profile',
+          actor_profile_id: 'profile-2',
+          scope: { kind: 'channel', channelId: 'channel-dm-1' },
+          object_ref: { kind: 'session', id: 'session-2' },
+          target_ref: null,
+          payload: {
+            liveSessionId: 'session-2',
+            channelId: 'channel-dm-1',
+            title: 'Direct message',
+            channelTopic: 'Direct message',
+            startedByDisplayName: 'Taylor R',
+            mode: 'video',
+          },
+          audience_rules: [],
+          dedupe_key: 'session.started:session-2',
+          projection_status: 'pending',
+          projection_attempts: 0,
+          created_at: '2026-03-19T12:40:00.000Z',
+          updated_at: '2026-03-19T12:40:00.000Z',
+        },
+        {
+          id: 'event-join-1',
+          org_id: 'org-1',
+          event_type: 'member.joined',
+          occurred_at: '2026-03-19T12:50:00.000Z',
+          source_kind: 'profile',
+          actor_profile_id: 'profile-2',
+          scope: { kind: 'channel', channelId: 'channel-dm-1' },
+          object_ref: { kind: 'session', id: 'session-2' },
+          target_ref: null,
+          payload: {
+            liveSessionId: 'session-2',
+            channelId: 'channel-dm-1',
+            title: 'Direct message',
+            channelTopic: 'Direct message',
+            memberProfileId: 'profile-2',
+            memberDisplayName: 'Taylor R',
+            mode: 'video',
+          },
+          audience_rules: [],
+          dedupe_key: 'member.joined:session-2:profile-2',
+          projection_status: 'pending',
+          projection_attempts: 0,
+          created_at: '2026-03-19T12:50:00.000Z',
+          updated_at: '2026-03-19T12:50:00.000Z',
+        },
+      ],
+    });
+
+    await projectActivityEvents(supabase as never);
+
+    const groupUpserts = upserts.filter(
+      (entry) => entry.table === 'activity_feed_items' && entry.payload.kind === 'group',
+    );
+    const uniqueGroupKeys = Array.from(
+      new Set(groupUpserts.map((entry) => String(entry.payload.group_key))),
+    );
+    expect(uniqueGroupKeys).toEqual([
+      'live-session:channel:channel-dm-1:huddle-start:event-start-1',
+    ]);
+
+    const sessionStartedLeafUpserts = upserts.filter(
+      (entry) =>
+        entry.table === 'activity_feed_items' &&
+        entry.payload.kind === 'leaf' &&
+        entry.payload.verb === 'session.started',
+    );
+    expect(sessionStartedLeafUpserts).toHaveLength(0);
+  });
+
+  it('groups member.joined under session.started when both share the same occurred_at timestamp', async () => {
+    const { supabase, upserts } = createSupabaseMock({
+      events: [
+        {
+          id: 'event-join-same-time-1',
+          org_id: 'org-1',
+          event_type: 'member.joined',
+          occurred_at: '2026-03-19T12:00:00.000Z',
+          source_kind: 'profile',
+          actor_profile_id: 'profile-2',
+          scope: { kind: 'channel', channelId: 'channel-dm-1' },
+          object_ref: { kind: 'session', id: 'session-1' },
+          target_ref: null,
+          payload: {
+            liveSessionId: 'session-1',
+            channelId: 'channel-dm-1',
+            title: 'Direct message',
+            channelTopic: 'Direct message',
+            memberProfileId: 'profile-2',
+            memberDisplayName: 'Taylor R',
+            mode: 'video',
+          },
+          audience_rules: [],
+          dedupe_key: 'member.joined:session-1:profile-2',
+          projection_status: 'pending',
+          projection_attempts: 0,
+          created_at: '2026-03-19T12:00:00.000Z',
+          updated_at: '2026-03-19T12:00:00.000Z',
+        },
+        {
+          id: 'event-start-same-time-1',
+          org_id: 'org-1',
+          event_type: 'session.started',
+          occurred_at: '2026-03-19T12:00:00.000Z',
+          source_kind: 'profile',
+          actor_profile_id: 'profile-1',
+          scope: { kind: 'channel', channelId: 'channel-dm-1' },
+          object_ref: { kind: 'session', id: 'session-1' },
+          target_ref: null,
+          payload: {
+            liveSessionId: 'session-1',
+            channelId: 'channel-dm-1',
+            title: 'Direct message',
+            channelTopic: 'Direct message',
+            startedByDisplayName: 'Tiffany T',
+            mode: 'video',
+          },
+          audience_rules: [],
+          dedupe_key: 'session.started:session-1',
+          projection_status: 'pending',
+          projection_attempts: 0,
+          created_at: '2026-03-19T12:00:00.000Z',
+          updated_at: '2026-03-19T12:00:00.000Z',
+        },
+      ],
+    });
+
+    await projectActivityEvents(supabase as never);
+
+    const groupUpserts = upserts.filter(
+      (entry) => entry.table === 'activity_feed_items' && entry.payload.kind === 'group',
+    );
+    const uniqueGroupKeys = Array.from(
+      new Set(groupUpserts.map((entry) => String(entry.payload.group_key))),
+    );
+    expect(uniqueGroupKeys).toEqual([
+      'live-session:channel:channel-dm-1:huddle-start:event-start-same-time-1',
+    ]);
+  });
+
+  it('refreshes session.started parent occurred_at when a newer member.joined is projected', async () => {
+    const { supabase, upserts } = createSupabaseMock({
+      events: [
+        {
+          id: 'event-start-refresh-1',
+          org_id: 'org-1',
+          event_type: 'session.started',
+          occurred_at: '2026-03-19T12:00:00.000Z',
+          source_kind: 'profile',
+          actor_profile_id: 'profile-1',
+          scope: { kind: 'channel', channelId: 'channel-dm-1' },
+          object_ref: { kind: 'session', id: 'session-1' },
+          target_ref: null,
+          payload: {
+            liveSessionId: 'session-1',
+            channelId: 'channel-dm-1',
+            title: 'Direct message',
+            channelTopic: 'Direct message',
+            startedByDisplayName: 'Tiffany T',
+            mode: 'video',
+          },
+          audience_rules: [],
+          dedupe_key: 'session.started:session-1',
+          projection_status: 'pending',
+          projection_attempts: 0,
+          created_at: '2026-03-19T12:00:00.000Z',
+          updated_at: '2026-03-19T12:00:00.000Z',
+        },
+        {
+          id: 'event-join-refresh-1',
+          org_id: 'org-1',
+          event_type: 'member.joined',
+          occurred_at: '2026-03-19T12:15:00.000Z',
+          source_kind: 'profile',
+          actor_profile_id: 'profile-2',
+          scope: { kind: 'channel', channelId: 'channel-dm-1' },
+          object_ref: { kind: 'session', id: 'session-1' },
+          target_ref: null,
+          payload: {
+            liveSessionId: 'session-1',
+            channelId: 'channel-dm-1',
+            title: 'Direct message',
+            channelTopic: 'Direct message',
+            memberProfileId: 'profile-2',
+            memberDisplayName: 'Taylor R',
+            mode: 'video',
+          },
+          audience_rules: [],
+          dedupe_key: 'member.joined:session-1:profile-2',
+          projection_status: 'pending',
+          projection_attempts: 0,
+          created_at: '2026-03-19T12:15:00.000Z',
+          updated_at: '2026-03-19T12:15:00.000Z',
+        },
+      ],
+    });
+
+    await projectActivityEvents(supabase as never);
+
+    const latestGroupUpsert = upserts
+      .filter(
+        (entry) =>
+          entry.table === 'activity_feed_items' &&
+          entry.payload.kind === 'group' &&
+          entry.payload.group_key ===
+            'live-session:channel:channel-dm-1:huddle-start:event-start-refresh-1',
+      )
+      .at(-1);
+
+    const groupTimestampTouch = latestGroupUpsert?.payload;
+    expect(groupTimestampTouch).toBeDefined();
+    expect(groupTimestampTouch?.occurred_at).toBe('2026-03-19T12:15:00.000Z');
   });
 });

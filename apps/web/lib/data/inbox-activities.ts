@@ -75,7 +75,7 @@ const TEACHER_JOINED_CLASS: ActivityFeedItemVM = {
     target: { kind: 'learning_space', id: LEARNING_SPACE_IDS.math },
   },
   content: {
-    leading: { kind: 'icon', iconKey: 'CheckCircle2', tone: 'info' },
+    leading: { kind: 'icon', iconKey: 'PhoneOutgoing', tone: 'info' },
     headline: {
       primary: 'Teacher joined the class',
       secondary: EDUCATOR_PRIYA_PROFILE.profile.displayName,
@@ -100,7 +100,7 @@ const STUDENT_JOINED_CLASS: ActivityFeedItemVM = {
     target: { kind: 'learning_space', id: LEARNING_SPACE_IDS.math },
   },
   content: {
-    leading: { kind: 'icon', iconKey: 'CheckCircle2', tone: 'success' },
+    leading: { kind: 'icon', iconKey: 'PhoneOutgoing', tone: 'success' },
     headline: {
       primary: 'Student joined the class',
       secondary: CHILD_TEVIN_PROFILE.profile.displayName,
@@ -280,7 +280,7 @@ const CLASS_SESSION_GROUP: ActivityFeedItemVM = {
   },
   grouping: {
     groupType: 'class',
-    groupKey: `class-session:${CLASS_SCHEDULE_IDS.math}:2026-03-07T14:00:00.000Z`,
+    groupKey: `live-session:learning_space:${LEARNING_SPACE_IDS.math}:2026-03-07T14:00`,
   },
   content: {
     leading: {

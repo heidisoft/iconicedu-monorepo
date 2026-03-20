@@ -8,6 +8,143 @@ import { enqueueNotificationDispatchJobs } from '@iconicedu/web/lib/notification
 import { getProfilesByIds } from '@iconicedu/web/lib/profile/queries/profiles.query';
 
 const MAX_ATTEMPTS = 10;
+const HOURLY_HUDDLE_WINDOW_MS = 60 * 60 * 1000;
+const SESSION_TIMELINE_EVENTS = new Set([
+  'session.started',
+  'member.joined',
+  'member.removed',
+  'session.ended',
+]);
+
+function asRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+  return value as Record<string, unknown>;
+}
+
+function asOptionalString(value: unknown) {
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function resolveHourlyHuddleChannelId(event: ActivityEventRow) {
+  const payload = asRecord(event.payload);
+  const occurrenceStart =
+    asOptionalString(payload.occurrenceStart) ??
+    asOptionalString(payload.scheduledStartAt);
+  if (occurrenceStart) {
+    return null;
+  }
+
+  const scope = asRecord(event.scope);
+  const channelId =
+    asOptionalString(payload.channelId) ??
+    (scope.kind === 'channel' ? asOptionalString(scope.channelId) : undefined);
+
+  return channelId ?? null;
+}
+
+function buildNonLearningSpaceHuddleGroupKey(channelId: string, anchor: string) {
+  return `live-session:channel:${channelId}:huddle-start:${anchor}`;
+}
+
+async function resolveHourlyHuddleGroupKey(
+  supabase: SupabaseServiceClient,
+  event: ActivityEventRow,
+) {
+  if (!SESSION_TIMELINE_EVENTS.has(event.event_type)) {
+    return null;
+  }
+
+  const channelId = resolveHourlyHuddleChannelId(event);
+  if (!channelId) {
+    return null;
+  }
+
+  const currentOccurredAt = new Date(event.occurred_at);
+  const cutoff = new Date(
+    currentOccurredAt.getTime() - HOURLY_HUDDLE_WINDOW_MS,
+  ).toISOString();
+  const recentStartsResponse = await supabase
+    .from('activity_events')
+    .select('id, occurred_at')
+    .eq('org_id', event.org_id)
+    .eq('event_type', 'session.started')
+    .contains('scope', { kind: 'channel', channelId })
+    .gte('occurred_at', cutoff)
+    .lt('occurred_at', event.occurred_at)
+    .is('deleted_at', null)
+    .order('occurred_at', { ascending: true })
+    .limit(1)
+    .returns<Array<Pick<ActivityEventRow, 'id' | 'occurred_at'>>>();
+
+  if (recentStartsResponse.error) {
+    throw new Error(recentStartsResponse.error.message);
+  }
+
+  const recentStart = recentStartsResponse.data?.[0];
+  if (recentStart) {
+    return buildNonLearningSpaceHuddleGroupKey(channelId, recentStart.id);
+  }
+
+  if (event.event_type === 'session.started') {
+    return buildNonLearningSpaceHuddleGroupKey(channelId, event.id);
+  }
+
+  const sameTimestampStartsResponse = await supabase
+    .from('activity_events')
+    .select('id')
+    .eq('org_id', event.org_id)
+    .eq('event_type', 'session.started')
+    .contains('scope', { kind: 'channel', channelId })
+    .eq('occurred_at', event.occurred_at)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .returns<Array<Pick<ActivityEventRow, 'id'>>>();
+
+  if (sameTimestampStartsResponse.error) {
+    throw new Error(sameTimestampStartsResponse.error.message);
+  }
+
+  const sameTimestampStart = sameTimestampStartsResponse.data?.[0];
+  if (sameTimestampStart) {
+    return buildNonLearningSpaceHuddleGroupKey(channelId, sameTimestampStart.id);
+  }
+
+  return buildNonLearningSpaceHuddleGroupKey(channelId, event.occurred_at.slice(0, 16));
+}
+
+async function resolveProjectedGroupKey(
+  supabase: SupabaseServiceClient,
+  event: ActivityEventRow,
+  definition: NonNullable<ReturnType<typeof getActivityEventDefinition>>,
+) {
+  if (!definition.group) {
+    return null;
+  }
+
+  const hourlyHuddleGroupKey = await resolveHourlyHuddleGroupKey(supabase, event);
+  if (hourlyHuddleGroupKey) {
+    return hourlyHuddleGroupKey;
+  }
+
+  return definition.group.buildGroupKey(event);
+}
+
+function resolveProjectedLeafDedupeKey(input: {
+  event: ActivityEventRow;
+  groupKey: string | null;
+  recipientProfileId: string;
+}) {
+  if (input.event.event_type === 'session.started' && input.groupKey) {
+    return `leaf:session.started:${input.groupKey}`;
+  }
+
+  return input.event.dedupe_key
+    ? `${input.event.dedupe_key}:${input.recipientProfileId}`
+    : null;
+}
 
 async function loadEvents(
   supabase: SupabaseServiceClient,
@@ -57,9 +194,13 @@ async function upsertProjectionRow(
   supabase: SupabaseServiceClient,
   row: Record<string, unknown>,
 ) {
+  const onConflict =
+    typeof row.dedupe_key === 'string' && row.dedupe_key.length > 0
+      ? 'recipient_profile_id,dedupe_key'
+      : 'recipient_profile_id,source_event_id';
   const response = await supabase
     .from('activity_feed_items')
-    .upsert(row, { onConflict: 'recipient_profile_id,source_event_id' })
+    .upsert(row, { onConflict })
     .select('id')
     .single<{ id: string }>();
 
@@ -81,6 +222,9 @@ async function ensureGroupParent(input: {
   importance: string | undefined;
 }) {
   const dedupeKey = `group:${input.groupKey}`;
+  const isActorRecipient =
+    Boolean(input.event.actor_profile_id) &&
+    input.event.actor_profile_id === input.recipientProfileId;
   const row = {
     org_id: input.event.org_id,
     recipient_profile_id: input.recipientProfileId,
@@ -117,7 +261,8 @@ async function ensureGroupParent(input: {
     expanded_content: input.rendered.expandedContent ?? null,
     metadata: input.rendered.metadata ?? {},
     importance: input.importance ?? 'normal',
-    is_read: false,
+    is_read: isActorRecipient,
+    read_at: isActorRecipient ? input.event.occurred_at : null,
     created_at: input.event.occurred_at,
     updated_at: new Date().toISOString(),
   };
@@ -294,6 +439,9 @@ async function projectEvent(supabase: SupabaseServiceClient, event: ActivityEven
               ...event.payload,
               viewerTimezone: recipientTimezone,
               viewerRole: recipientRole,
+              viewerIsActor:
+                Boolean(event.actor_profile_id) &&
+                event.actor_profile_id === recipientProfileId,
             },
           }
         : event;
@@ -306,11 +454,42 @@ async function projectEvent(supabase: SupabaseServiceClient, event: ActivityEven
       expandedContent: rendered.expandedContent,
       leading: rendered.leading,
     };
+    const groupKey = definition.group
+      ? await resolveProjectedGroupKey(supabase, event, definition)
+      : null;
+    const shouldSkipLeafForStartEvent =
+      event.event_type === 'session.started' && Boolean(definition.group);
+
+    if (shouldSkipLeafForStartEvent) {
+      if (definition.group && groupKey) {
+        const groupRendered = definition.group.renderGroup
+          ? definition.group.renderGroup(recipientEvent)
+          : rendered;
+        await ensureGroupParent({
+          supabase,
+          event,
+          recipientProfileId,
+          groupKey,
+          groupType: definition.group.groupType,
+          rendered: groupRendered,
+          tabKey: definition.tabKey,
+          importance: definition.importance,
+        });
+      }
+      continue;
+    }
+
+    const isActorRecipient =
+      Boolean(event.actor_profile_id) && event.actor_profile_id === recipientProfileId;
     const itemId = await upsertProjectionRow(supabase, {
       org_id: event.org_id,
       recipient_profile_id: recipientProfileId,
       source_event_id: event.id,
-      dedupe_key: event.dedupe_key ? `${event.dedupe_key}:${recipientProfileId}` : null,
+      dedupe_key: resolveProjectedLeafDedupeKey({
+        event,
+        groupKey,
+        recipientProfileId,
+      }),
       kind: 'leaf',
       occurred_at: event.occurred_at,
       tab_key: definition.tabKey,
@@ -328,8 +507,8 @@ async function projectEvent(supabase: SupabaseServiceClient, event: ActivityEven
       action_button: rendered.actionButton ?? null,
       expanded_content: rendered.expandedContent ?? null,
       importance: definition.importance ?? 'normal',
-      is_read: false,
-      read_at: null,
+      is_read: isActorRecipient,
+      read_at: isActorRecipient ? event.occurred_at : null,
       metadata: rendered.metadata ?? {},
       created_at: event.occurred_at,
       updated_at: new Date().toISOString(),
@@ -338,7 +517,6 @@ async function projectEvent(supabase: SupabaseServiceClient, event: ActivityEven
     });
 
     if (definition.group) {
-      const groupKey = definition.group.buildGroupKey(event);
       if (groupKey) {
         const groupRendered = definition.group.renderGroup
           ? definition.group.renderGroup(recipientEvent)

@@ -1,5 +1,4 @@
 import React from 'react';
-import { DashboardHomeInfographicSection } from '@iconicedu/ui-web';
 import type { ClassRequestRole } from '@iconicedu/ui-web';
 
 import {
@@ -11,6 +10,7 @@ import {
   listActiveOrgSubjectCatalog,
   mapOrgSubjectRowsToOptions,
 } from '@iconicedu/web/lib/subjects/queries/org-subject-catalog.query';
+import { HomePageInfographicClient } from './home-page-infographic-client';
 
 function resolveRequestRole(kind: string | undefined): ClassRequestRole {
   if (kind === 'guardian') {
@@ -56,7 +56,7 @@ export async function HomePageContent({ orgSlug }: { orgSlug: string }) {
         : [];
 
   return (
-    <DashboardHomeInfographicSection
+    <HomePageInfographicClient
       orgSlug={orgSlug}
       isStaffView={metrics.isStaffView}
       isParentView={!metrics.isStaffView && metrics.activeRole === 'parents'}

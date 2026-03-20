@@ -1355,13 +1355,13 @@ describe('activity event definitions', () => {
     };
 
     expect(definition.group.buildGroupKey(event)).toBe(
-      'class-session:space-1:2026-03-03T12:40',
+      'live-session:learning_space:space-1:2026-03-03T12:40',
     );
     expect(sessionStarted.group.buildGroupKey(event)).toBe(
-      'class-session:space-1:2026-03-03T12:40',
+      'live-session:learning_space:space-1:2026-03-03T12:40',
     );
     expect(sessionEnded.group.buildGroupKey(event)).toBe(
-      'class-session:space-1:2026-03-03T12:40',
+      'live-session:learning_space:space-1:2026-03-03T12:40',
     );
     const renderedReminder = definition.render(event);
     expect(renderedReminder).toMatchObject({
@@ -1386,11 +1386,438 @@ describe('activity event definitions', () => {
         primary: 'Class session 2026-03-03T12:40:00.000Z',
         secondary: 'Algebra',
       },
-      actionButton: undefined,
+      actionButton: {
+        label: 'Join now',
+        variant: 'default',
+        href: '../spaces/channel-1',
+      },
       metadata: {
-        hideActionButton: true,
         sessionGroupLocalTime: true,
       },
+    });
+  });
+
+  it('renders non-scheduled live-session groups with a meaningful parent headline', () => {
+    const definition = getActivityEventDefinition('session.started');
+    if (!definition?.group) {
+      throw new Error('Missing session.started group definition');
+    }
+
+    const event = {
+      id: 'event-live-unscheduled-1',
+      org_id: 'org-1',
+      event_type: 'session.started',
+      occurred_at: '2026-03-03T12:34:00.000Z',
+      source_kind: 'profile',
+      actor_profile_id: 'profile-1',
+      scope: { kind: 'channel', channelId: 'channel-1' },
+      object_ref: { kind: 'session', id: 'live-session-1' },
+      target_ref: null,
+      payload: {
+        liveSessionId: 'live-session-1',
+        channelId: 'channel-1',
+        channelTopic: 'Parent Support Room',
+        title: 'Parent Support Room',
+        startedByDisplayName: 'Taylor Reed',
+        mode: 'video',
+      },
+      audience_rules: [],
+      dedupe_key: 'session.started:live-session-1',
+      projection_status: 'pending',
+      projection_attempts: 0,
+      created_at: '2026-03-03T12:34:00.000Z',
+      updated_at: '2026-03-03T12:34:00.000Z',
+    };
+
+    expect(definition.group.buildGroupKey(event)).toBe(
+      'live-session:channel:channel-1:huddle-window:2026-03-03T12:34',
+    );
+    expect(definition.group.renderGroup?.(event)).toMatchObject({
+      headline: {
+        primary: 'Taylor Reed started a video huddle',
+      },
+      actionButton: {
+        label: 'Join now',
+        variant: 'default',
+        href: '../c/channel-1',
+      },
+    });
+  });
+
+  it('renders generic huddle parents for unscheduled audio sessions', () => {
+    const definition = getActivityEventDefinition('session.started');
+    if (!definition?.group) {
+      throw new Error('Missing session.started group definition');
+    }
+
+    const event = {
+      id: 'event-live-unscheduled-audio-1',
+      org_id: 'org-1',
+      event_type: 'session.started',
+      occurred_at: '2026-03-03T12:34:00.000Z',
+      source_kind: 'profile',
+      actor_profile_id: 'profile-1',
+      scope: { kind: 'channel', channelId: 'channel-1' },
+      object_ref: { kind: 'session', id: 'live-session-2' },
+      target_ref: null,
+      payload: {
+        liveSessionId: 'live-session-2',
+        channelId: 'channel-1',
+        channelTopic: 'Advisor Room',
+        title: 'Advisor Room',
+        startedByDisplayName: 'Taylor Reed',
+        mode: 'audio',
+      },
+      audience_rules: [],
+      dedupe_key: 'session.started:live-session-2',
+      projection_status: 'pending',
+      projection_attempts: 0,
+      created_at: '2026-03-03T12:34:00.000Z',
+      updated_at: '2026-03-03T12:34:00.000Z',
+    };
+
+    expect(definition.group.renderGroup?.(event)).toMatchObject({
+      headline: {
+        primary: 'Taylor Reed started an audio huddle',
+      },
+      actionButton: {
+        label: 'Join now',
+        variant: 'default',
+        href: '../c/channel-1',
+      },
+    });
+  });
+
+  it('does not create a separate dated group from startedAt for unscheduled live sessions', () => {
+    const started = getActivityEventDefinition('session.started');
+    const joined = getActivityEventDefinition('member.joined');
+    if (!started?.group || !joined?.group) {
+      throw new Error('Missing live-session grouping definitions');
+    }
+
+    const startedEvent = {
+      id: 'event-dm-session-started-1',
+      org_id: 'org-1',
+      event_type: 'session.started',
+      occurred_at: '2026-03-19T19:48:00.000Z',
+      source_kind: 'profile' as const,
+      actor_profile_id: 'profile-1',
+      scope: { kind: 'channel' as const, channelId: 'channel-dm-1' },
+      object_ref: { kind: 'session' as const, id: 'live-session-dm-1' },
+      target_ref: null,
+      payload: {
+        liveSessionId: 'live-session-dm-1',
+        channelId: 'channel-dm-1',
+        title: 'Direct message',
+        channelTopic: 'Direct message',
+        mode: 'video',
+        startedByDisplayName: 'Tiffany T',
+        startedAt: '2026-03-19T19:48:00.000Z',
+      },
+      audience_rules: [],
+      dedupe_key: 'session.started:live-session-dm-1',
+      projection_status: 'pending' as const,
+      projection_attempts: 0,
+      created_at: '2026-03-19T19:48:00.000Z',
+      updated_at: '2026-03-19T19:48:00.000Z',
+    };
+
+    const joinedEvent = {
+      ...startedEvent,
+      id: 'event-dm-member-joined-1',
+      event_type: 'member.joined',
+      payload: {
+        liveSessionId: 'live-session-dm-1',
+        channelId: 'channel-dm-1',
+        title: 'Direct message',
+        channelTopic: 'Direct message',
+        mode: 'video',
+        memberProfileId: 'profile-2',
+        memberDisplayName: 'Tiffany T',
+        joinedAt: '2026-03-19T19:48:30.000Z',
+      },
+      dedupe_key: 'member.joined:live-session-dm-1:profile-2',
+    };
+
+    expect(started.group.buildGroupKey(startedEvent)).toBe(
+      'live-session:channel:channel-dm-1:huddle-window:2026-03-19T19:48',
+    );
+    expect(joined.group.buildGroupKey(joinedEvent)).toBe(
+      'live-session:channel:channel-dm-1:huddle-window:2026-03-19T19:48',
+    );
+    expect(started.render(startedEvent)).toMatchObject({
+      headline: { primary: 'Tiffany T started a video huddle' },
+      actionButton: {
+        label: 'Join now',
+        variant: 'default',
+        href: '../c/channel-dm-1',
+      },
+    });
+  });
+
+  it('creates a new non-learning-space huddle key when a later start is more than one hour away', () => {
+    const started = getActivityEventDefinition('session.started');
+    if (!started?.group) {
+      throw new Error('Missing session.started group definition');
+    }
+
+    const earlyEvent = {
+      id: 'event-dm-session-started-early',
+      org_id: 'org-1',
+      event_type: 'session.started',
+      occurred_at: '2026-03-19T19:00:00.000Z',
+      source_kind: 'profile' as const,
+      actor_profile_id: 'profile-1',
+      scope: { kind: 'channel' as const, channelId: 'channel-dm-1' },
+      object_ref: { kind: 'session' as const, id: 'live-session-dm-early' },
+      target_ref: null,
+      payload: {
+        liveSessionId: 'live-session-dm-early',
+        channelId: 'channel-dm-1',
+        title: 'Direct message',
+        channelTopic: 'Direct message',
+        mode: 'video',
+      },
+      audience_rules: [],
+      dedupe_key: 'session.started:live-session-dm-early',
+      projection_status: 'pending' as const,
+      projection_attempts: 0,
+      created_at: '2026-03-19T19:00:00.000Z',
+      updated_at: '2026-03-19T19:00:00.000Z',
+    };
+
+    const laterEvent = {
+      ...earlyEvent,
+      id: 'event-dm-session-started-late',
+      occurred_at: '2026-03-19T20:05:00.000Z',
+      payload: {
+        ...earlyEvent.payload,
+        liveSessionId: 'live-session-dm-late',
+      },
+      dedupe_key: 'session.started:live-session-dm-late',
+      created_at: '2026-03-19T20:05:00.000Z',
+      updated_at: '2026-03-19T20:05:00.000Z',
+    };
+
+    expect(started.group.buildGroupKey(earlyEvent)).toBe(
+      'live-session:channel:channel-dm-1:huddle-window:2026-03-19T19:00',
+    );
+    expect(started.group.buildGroupKey(laterEvent)).toBe(
+      'live-session:channel:channel-dm-1:huddle-window:2026-03-19T20:05',
+    );
+  });
+
+  it('keeps session.started and member.joined in the same scheduled session group', () => {
+    const started = getActivityEventDefinition('session.started');
+    const joined = getActivityEventDefinition('member.joined');
+    if (!started?.group || !joined?.group) {
+      throw new Error('Missing live-session grouping definitions');
+    }
+
+    const basePayload = {
+      liveSessionId: 'live-session-1',
+      learningSpaceId: 'space-1',
+      channelId: 'channel-1',
+      title: 'ELA with Mr Daniel',
+      occurrenceStart: '2026-03-19T16:57:00.000Z',
+      occurrenceLabel: 'Mar 19 at 12:57 PM EDT',
+      isScheduledSessionWindow: true,
+      mode: 'video',
+    };
+
+    const startedEvent = {
+      id: 'event-session-started-1',
+      org_id: 'org-1',
+      event_type: 'session.started',
+      occurred_at: '2026-03-19T16:57:00.000Z',
+      source_kind: 'profile' as const,
+      actor_profile_id: 'profile-1',
+      scope: { kind: 'learning_space' as const, learningSpaceId: 'space-1' },
+      object_ref: { kind: 'session' as const, id: 'live-session-1' },
+      target_ref: { kind: 'learning_space' as const, id: 'space-1' },
+      payload: {
+        ...basePayload,
+        startedByDisplayName: 'Daniel W',
+      },
+      audience_rules: [],
+      dedupe_key: 'session.started:live-session-1',
+      projection_status: 'pending' as const,
+      projection_attempts: 0,
+      created_at: '2026-03-19T16:57:00.000Z',
+      updated_at: '2026-03-19T16:57:00.000Z',
+    };
+
+    const joinedEvent = {
+      ...startedEvent,
+      id: 'event-member-joined-1',
+      event_type: 'member.joined',
+      payload: {
+        ...basePayload,
+        memberProfileId: 'profile-2',
+        memberDisplayName: 'Daniel W',
+        joinedAt: '2026-03-19T16:57:30.000Z',
+      },
+      dedupe_key: 'member.joined:live-session-1:profile-2',
+    };
+
+    expect(started.group.buildGroupKey(startedEvent)).toBe(
+      'live-session:learning_space:space-1:2026-03-19T16:57',
+    );
+    expect(joined.group.buildGroupKey(joinedEvent)).toBe(
+      'live-session:learning_space:space-1:2026-03-19T16:57',
+    );
+  });
+
+  it('renders scheduled session.started groups with class-session parent semantics', () => {
+    const definition = getActivityEventDefinition('session.started');
+    if (!definition?.group) {
+      throw new Error('Missing session.started group definition');
+    }
+
+    const event = {
+      id: 'event-space-session-started-1',
+      org_id: 'org-1',
+      event_type: 'session.started',
+      occurred_at: '2026-03-19T16:57:00.000Z',
+      source_kind: 'profile',
+      actor_profile_id: 'profile-1',
+      scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+      object_ref: { kind: 'session', id: 'live-session-1' },
+      target_ref: { kind: 'learning_space', id: 'space-1' },
+      payload: {
+        liveSessionId: 'live-session-1',
+        learningSpaceId: 'space-1',
+        channelId: 'channel-1',
+        title: 'ELA with Mr Daniel',
+        occurrenceStart: '2026-03-19T16:57:00.000Z',
+        isScheduledSessionWindow: true,
+        startedByDisplayName: 'Daniel W',
+        mode: 'video',
+      },
+      audience_rules: [],
+      dedupe_key: 'session.started:live-session-1',
+      projection_status: 'pending',
+      projection_attempts: 0,
+      created_at: '2026-03-19T16:57:00.000Z',
+      updated_at: '2026-03-19T16:57:00.000Z',
+    };
+
+    expect(definition.group.renderGroup?.(event)).toMatchObject({
+      headline: {
+        primary: 'Class session 2026-03-19T16:57:00.000Z',
+        secondary: 'ELA with Mr Daniel',
+      },
+      actionButton: {
+        label: 'Join now',
+        variant: 'default',
+        href: '../spaces/channel-1',
+      },
+    });
+  });
+
+  it('renders learning-space outside-schedule parents as huddles', () => {
+    const definition = getActivityEventDefinition('session.started');
+    if (!definition?.group) {
+      throw new Error('Missing session.started group definition');
+    }
+
+    const event = {
+      id: 'event-space-session-started-outside-1',
+      org_id: 'org-1',
+      event_type: 'session.started',
+      occurred_at: '2026-03-19T22:10:00.000Z',
+      source_kind: 'profile',
+      actor_profile_id: 'profile-1',
+      scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+      object_ref: { kind: 'session', id: 'live-session-3' },
+      target_ref: { kind: 'learning_space', id: 'space-1' },
+      payload: {
+        liveSessionId: 'live-session-3',
+        learningSpaceId: 'space-1',
+        channelId: 'channel-1',
+        title: 'ELA with Mr Daniel',
+        startedByDisplayName: 'Daniel W',
+        mode: 'audio',
+        isScheduledSessionWindow: false,
+      },
+      audience_rules: [],
+      dedupe_key: 'session.started:live-session-3',
+      projection_status: 'pending',
+      projection_attempts: 0,
+      created_at: '2026-03-19T22:10:00.000Z',
+      updated_at: '2026-03-19T22:10:00.000Z',
+    };
+
+    expect(definition.group.renderGroup?.(event)).toMatchObject({
+      headline: {
+        primary: 'Daniel W started an audio huddle',
+      },
+      actionButton: {
+        label: 'Join now',
+        variant: 'default',
+        href: '../spaces/channel-1',
+      },
+    });
+  });
+
+  it('renders actor-owned session.started and member.joined with You label', () => {
+    const started = getActivityEventDefinition('session.started');
+    const joined = getActivityEventDefinition('member.joined');
+    if (!started || !joined) {
+      throw new Error('Missing live-session activity definitions');
+    }
+
+    const baseEvent = {
+      id: 'event-live-actor-1',
+      org_id: 'org-1',
+      occurred_at: '2026-03-19T16:57:00.000Z',
+      source_kind: 'profile' as const,
+      actor_profile_id: 'profile-1',
+      scope: { kind: 'channel' as const, channelId: 'channel-1' },
+      object_ref: { kind: 'session' as const, id: 'live-session-1' },
+      target_ref: null,
+      audience_rules: [],
+      projection_status: 'pending' as const,
+      projection_attempts: 0,
+      created_at: '2026-03-19T16:57:00.000Z',
+      updated_at: '2026-03-19T16:57:00.000Z',
+    };
+
+    expect(
+      started.render({
+        ...baseEvent,
+        event_type: 'session.started',
+        dedupe_key: 'session.started:live-session-1',
+        payload: {
+          liveSessionId: 'live-session-1',
+          channelId: 'channel-1',
+          title: 'General',
+          startedByDisplayName: 'Daniel W',
+          mode: 'video',
+          viewerIsActor: true,
+        },
+      }),
+    ).toMatchObject({
+      headline: { primary: 'You started a video huddle' },
+    });
+
+    expect(
+      joined.render({
+        ...baseEvent,
+        event_type: 'member.joined',
+        dedupe_key: 'member.joined:live-session-1:profile-1',
+        payload: {
+          liveSessionId: 'live-session-1',
+          channelId: 'channel-1',
+          memberProfileId: 'profile-1',
+          memberDisplayName: 'Daniel W',
+          mode: 'video',
+          joinedAt: '2026-03-19T16:57:30.000Z',
+          viewerIsActor: true,
+        },
+      }),
+    ).toMatchObject({
+      headline: { primary: 'You joined the huddle' },
     });
   });
 
@@ -1604,7 +2031,7 @@ describe('activity event definitions', () => {
     expect(rendered.headline.secondary).toBe("How was today's session?");
   });
 
-  it('renders session participant join and leave activities with participant avatars', () => {
+  it('renders session participant join and leave activities with session icons', () => {
     const joined = getActivityEventDefinition('member.joined');
     const left = getActivityEventDefinition('member.removed');
     if (!joined || !left) {
@@ -1652,17 +2079,28 @@ describe('activity event definitions', () => {
         payload: { ...baseEvent.payload, joinedAt: '2026-03-07T19:05:00.000Z' },
       }),
     ).toMatchObject({
-      headline: { primary: 'Tehara Morgan joined the session' },
+      headline: { primary: 'Tehara Morgan joined the huddle' },
       leading: {
-        kind: 'avatars',
-        avatars: [
-          {
-            name: 'Tehara Morgan',
-            avatar: { source: 'upload', url: 'https://cdn.test/tehara.png' },
-            themeKey: 'rose',
-          },
-        ],
+        kind: 'icon',
+        iconKey: 'PhoneOutgoing',
+        tone: 'info',
       },
+      summary: 'Joined at Mar 7 at 7:05 PM',
+    });
+
+    expect(
+      joined.render({
+        ...baseEvent,
+        event_type: 'member.joined',
+        dedupe_key: 'participant_joined:scheduled',
+        payload: {
+          ...baseEvent.payload,
+          isScheduledSessionWindow: true,
+          joinedAt: '2026-03-07T19:05:00.000Z',
+        },
+      }),
+    ).toMatchObject({
+      headline: { primary: 'Tehara Morgan joined the class session' },
       summary: 'Joined at Mar 7 at 7:05 PM',
     });
 

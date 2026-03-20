@@ -71,6 +71,10 @@ function asOptionalThemeKey(value: unknown) {
   return typeof value === 'string' && value.length > 0 ? (value as ThemeKey) : null;
 }
 
+function asOptionalBoolean(value: unknown) {
+  return typeof value === 'boolean' ? value : undefined;
+}
+
 function asArray(value: unknown) {
   return Array.isArray(value) ? value : [];
 }
@@ -138,14 +142,35 @@ function getLearningSpaceId(event: ActivityEventRow, payload: Record<string, unk
   return asOptionalString(payload.learningSpaceId) ?? getScopeLearningSpaceId(event);
 }
 
-function resolveSessionAnchor(payload: Record<string, unknown>, fallback: string) {
+function resolveSessionGroupContext(
+  event: ActivityEventRow,
+  payload: Record<string, unknown>,
+) {
+  const learningSpaceId = getLearningSpaceId(event, payload);
+  if (learningSpaceId) {
+    return { kind: 'learning_space' as const, id: learningSpaceId };
+  }
+
+  const scope = asRecord(event.scope);
+  const channelId =
+    asOptionalString(payload.channelId) ??
+    (scope.kind === 'channel' ? asOptionalString(scope.channelId) : null);
+  if (channelId) {
+    return { kind: 'channel' as const, id: channelId };
+  }
+
+  return null;
+}
+
+function resolveSessionGroupAnchor(payload: Record<string, unknown>, fallback: string) {
   const explicit =
     asOptionalString(payload.occurrenceStart) ??
-    asOptionalString(payload.scheduledStartAt) ??
-    asOptionalString(payload.startAt) ??
-    asOptionalString(payload.startedAt);
-  const value = explicit ?? fallback;
-  return value.slice(0, 16);
+    asOptionalString(payload.scheduledStartAt);
+  if (explicit) {
+    return explicit.slice(0, 16);
+  }
+
+  return `huddle-window:${fallback.slice(0, 16)}`;
 }
 
 function getContextTitle(payload: Record<string, unknown>) {
@@ -225,6 +250,38 @@ function sourceScheduleAction(event: ActivityEventRow, payload: Record<string, u
     label: 'View schedule',
     variant: 'outline' as const,
     href: `${href}${href.includes('?') ? '&' : '?'}tab=schedule`,
+  };
+}
+
+function sessionStartedAction(
+  event: ActivityEventRow,
+  payload: Record<string, unknown>,
+): InboxActionButtonVM | undefined {
+  const joinHref =
+    asOptionalString(payload.joinPath) ?? buildInboxSourceHref(event, payload);
+  const chatHref = buildInboxSourceHref(event, payload);
+  const channelId = asOptionalString(payload.channelId);
+  const orgSlug = asOptionalString(payload.orgSlug);
+  if (!joinHref && !chatHref) {
+    return undefined;
+  }
+
+  return {
+    label: 'Join now',
+    variant: 'default',
+    href: joinHref,
+    actionKey: channelId ? 'live-session.join' : null,
+    payload: chatHref
+      ? {
+          channelId,
+          orgSlug,
+          secondaryAction: {
+            kind: 'open-chat',
+            href: chatHref,
+            label: 'Open chat',
+          },
+        }
+      : null,
   };
 }
 
@@ -486,12 +543,12 @@ function buildClassUpdatedGroupKey(event: ActivityEventRow) {
 
 function buildSessionGroupKey(event: ActivityEventRow) {
   const payload = asRecord(event.payload);
-  const learningSpaceId = getLearningSpaceId(event, payload);
-  if (!learningSpaceId) {
+  const context = resolveSessionGroupContext(event, payload);
+  if (!context) {
     return null;
   }
-  const sessionAnchor = resolveSessionAnchor(payload, event.occurred_at);
-  return `class-session:${learningSpaceId}:${sessionAnchor}`;
+  const sessionAnchor = resolveSessionGroupAnchor(payload, event.occurred_at);
+  return `live-session:${context.kind}:${context.id}:${sessionAnchor}`;
 }
 
 function buildClassLifecycleGroupKey(event: ActivityEventRow) {
@@ -779,13 +836,57 @@ function buildSessionParticipantsLeading(payload: Record<string, unknown>) {
   } satisfies InboxLeadingVM;
 }
 
+function buildSessionStartedLeading() {
+  return { kind: 'icon', iconKey: 'Video', tone: 'info' } satisfies InboxLeadingVM;
+}
+
+function buildSessionJoinLeading() {
+  return {
+    kind: 'icon',
+    iconKey: 'PhoneOutgoing',
+    tone: 'info',
+  } satisfies InboxLeadingVM;
+}
+
 function buildSessionTimelineLabel(payload: Record<string, unknown>) {
   return (
-    formatNaturalDateTime(
-      payload.occurrenceStart ?? payload.scheduledStartAt ?? payload.startedAt,
-      payload,
-    ) ?? asOptionalString(payload.occurrenceLabel)
+    formatNaturalDateTime(payload.occurrenceStart ?? payload.scheduledStartAt, payload) ??
+    asOptionalString(payload.occurrenceLabel)
   );
+}
+
+function isLearningSpaceSessionEvent(
+  event: ActivityEventRow,
+  payload: Record<string, unknown>,
+) {
+  return Boolean(getLearningSpaceId(event, payload));
+}
+
+function isScheduledLearningSpaceWindowEvent(
+  event: ActivityEventRow,
+  payload: Record<string, unknown>,
+) {
+  if (!isLearningSpaceSessionEvent(event, payload)) {
+    return false;
+  }
+
+  return payload.isScheduledSessionWindow === true;
+}
+
+function resolveSessionMode(payload: Record<string, unknown>) {
+  const mode = asOptionalString(payload.mode);
+  return mode === 'audio' || mode === 'video' ? mode : 'video';
+}
+
+function formatSessionHuddleLabel(mode: 'audio' | 'video') {
+  return mode === 'audio' ? 'an audio huddle' : 'a video huddle';
+}
+
+function resolveActorLabelForViewer(
+  payload: Record<string, unknown>,
+  fallbackName: string,
+) {
+  return asOptionalBoolean(payload.viewerIsActor) ? 'You' : fallbackName;
 }
 
 function resolveReminderOffsetMinutes(payload: Record<string, unknown>) {
@@ -816,22 +917,37 @@ function renderSessionTimelineGroup(event: ActivityEventRow) {
   const payload = asRecord(event.payload);
   const occurrenceStart =
     asOptionalString(payload.occurrenceStart) ??
-    asOptionalString(payload.scheduledStartAt) ??
-    asOptionalString(payload.startAt) ??
-    asOptionalString(payload.startedAt);
+    asOptionalString(payload.scheduledStartAt);
+  const startedByDisplayName = asOptionalString(payload.startedByDisplayName);
+  const starterLabel = startedByDisplayName
+    ? resolveActorLabelForViewer(payload, startedByDisplayName)
+    : undefined;
+  const isScheduledLearningSpaceWindow = isScheduledLearningSpaceWindowEvent(
+    event,
+    payload,
+  );
+  const contextTitle = getContextTitle(payload) ?? sessionName(payload);
   return {
     verb: event.event_type as ActivityVerbVM,
-    leading: buildSessionParticipantsLeading(payload),
+    leading: buildSessionStartedLeading(),
     headline: {
-      primary: occurrenceStart ? `Class session ${occurrenceStart}` : 'Class session',
-      secondary: sessionName(payload),
+      primary: starterLabel
+        ? isScheduledLearningSpaceWindow
+          ? occurrenceStart
+            ? `Class session ${occurrenceStart}`
+            : 'Class session'
+          : `${starterLabel} started ${formatSessionHuddleLabel(resolveSessionMode(payload))}`
+        : occurrenceStart
+          ? `Class session ${occurrenceStart}`
+          : `Started ${formatSessionHuddleLabel(resolveSessionMode(payload))}`,
+      secondary: contextTitle,
+      secondaryHref: buildInboxSourceHref(event, payload),
     },
-    summary: 'Session activity and follow-up updates.',
-    actionButton: undefined,
+    summary: startedByDisplayName ? undefined : 'Session activity and follow-up updates.',
+    actionButton: sessionStartedAction(event, payload),
     metadata: {
       sessionGroupLocalTime: true,
       occurrenceStart,
-      hideActionButton: true,
     },
   } satisfies ActivityRenderResult;
 }
@@ -1428,12 +1544,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       groupType: 'class',
       collapseByDefault: true,
       buildGroupKey: (event) => buildSessionGroupKey(event),
-      renderGroup: (event) =>
-        renderGroupedClassActivity(event, {
-          iconKey: 'Video',
-          tone: 'info',
-          primary: 'Class session',
-        }),
+      renderGroup: (event) => renderSessionTimelineGroup(event),
     },
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => {
@@ -1442,18 +1553,28 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
         const joinedAt =
           formatNaturalDateTime(payload.joinedAt ?? event.occurred_at, payload) ??
           formatNaturalDateTime(event.occurred_at, payload);
+        const isScheduledLearningSpaceWindow = isScheduledLearningSpaceWindowEvent(
+          event,
+          payload,
+        );
+        const memberLabel = resolveActorLabelForViewer(
+          payload,
+          asString(payload.memberDisplayName, 'Participant'),
+        );
         return {
           verb: 'member.joined',
-          leading: buildMembersLeading(payload),
+          leading: buildSessionJoinLeading(),
           headline: {
-            primary: `${asString(payload.memberDisplayName, 'Participant')} joined the session`,
+            primary: isScheduledLearningSpaceWindow
+              ? `${memberLabel} joined the class session`
+              : `${memberLabel} joined the huddle`,
           },
           summary: joinedAt ? `Joined at ${joinedAt}` : undefined,
         };
       }
       return {
         verb: 'member.joined',
-        leading: buildMembersLeading(payload),
+        leading: buildSessionJoinLeading(),
         headline: {
           primary: `${asString(payload.memberDisplayName, 'Participant')} joined class`,
         },
@@ -1522,13 +1643,17 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     group: {
       groupType: 'class',
       collapseByDefault: true,
-      buildGroupKey: (event) => buildClassLifecycleGroupKey(event),
+      buildGroupKey: (event) => {
+        const payload = asRecord(event.payload);
+        return isSessionRosterEvent(payload)
+          ? buildSessionGroupKey(event)
+          : buildClassLifecycleGroupKey(event);
+      },
       renderGroup: (event) => {
         const payload = asRecord(event.payload);
-        if (asOptionalString(payload.activityPhase) === 'created') {
-          return renderClassCreatedGroup(event);
-        }
-        return renderLearningSpaceUpdatedGroup(event);
+        return isSessionRosterEvent(payload)
+          ? renderSessionTimelineGroup(event)
+          : renderLearningSpaceUpdatedGroup(event);
       },
     },
     resolveRecipients: DEFAULT_RECIPIENTS,
@@ -1861,23 +1986,31 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     render: (event) => {
       const payload = asRecord(event.payload);
       const timelineLabel = buildSessionTimelineLabel(payload);
-      const joinPath = asOptionalString(payload.joinPath);
+      const startedByDisplayName = asOptionalString(payload.startedByDisplayName);
+      const starterLabel = startedByDisplayName
+        ? resolveActorLabelForViewer(payload, startedByDisplayName)
+        : undefined;
+      const isScheduledLearningSpaceWindow = isScheduledLearningSpaceWindowEvent(
+        event,
+        payload,
+      );
       return {
         verb: 'session.started',
-        leading: buildSessionParticipantsLeading(payload),
+        leading: buildSessionStartedLeading(),
         headline: {
-          primary: timelineLabel
-            ? `${sessionName(payload)} session ${timelineLabel}`
-            : `${sessionName(payload)} session started`,
+          primary: starterLabel
+            ? isScheduledLearningSpaceWindow
+              ? timelineLabel
+                ? `${sessionName(payload)} session ${timelineLabel}`
+                : `${sessionName(payload)} session started`
+              : `${starterLabel} started ${formatSessionHuddleLabel(resolveSessionMode(payload))}`
+            : timelineLabel
+              ? `${sessionName(payload)} session ${timelineLabel}`
+              : `${sessionName(payload)} session started`,
+          secondaryHref: buildInboxSourceHref(event, payload),
         },
-        summary: 'Class is live now.',
-        actionButton: joinPath
-          ? {
-              label: 'Join class',
-              variant: 'default',
-              href: joinPath,
-            }
-          : sourceAction(event, payload, 'outline', 'Open class'),
+        summary: undefined,
+        actionButton: sessionStartedAction(event, payload),
       };
     },
   },

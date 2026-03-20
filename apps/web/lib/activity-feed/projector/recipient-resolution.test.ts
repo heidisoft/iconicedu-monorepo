@@ -3,6 +3,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { resolveRecipientsForActivityEvent } from '@iconicedu/web/lib/activity-feed/projector/recipient-resolution';
 
 function createSupabaseMock() {
+  const channelMembers = [
+    { profile_id: 'profile-target' },
+    { profile_id: 'profile-actor' },
+  ];
+  const learningSpaceParticipants = [{ profile_id: 'profile-space' }];
   return {
     from: vi.fn((table: string) => {
       if (table === 'channel_members') {
@@ -10,7 +15,7 @@ function createSupabaseMock() {
           eq: vi.fn(() => channelChain),
           is: vi.fn(() => channelChain),
           returns: vi.fn(async () => ({
-            data: [{ profile_id: 'profile-target' }],
+            data: channelMembers,
             error: null,
           })),
         };
@@ -25,7 +30,7 @@ function createSupabaseMock() {
           eq: vi.fn(() => participantChain),
           is: vi.fn(() => participantChain),
           returns: vi.fn(async () => ({
-            data: [{ profile_id: 'profile-target' }],
+            data: learningSpaceParticipants,
             error: null,
           })),
         };
@@ -146,5 +151,89 @@ describe('resolveRecipientsForActivityEvent', () => {
     );
 
     expect(recipients).toEqual([]);
+  });
+
+  it('uses channel recipients for live-session timeline events even when scope is learning_space', async () => {
+    const recipients = await resolveRecipientsForActivityEvent(
+      createSupabaseMock() as never,
+      {
+        id: 'event-4',
+        org_id: 'org-1',
+        event_type: 'session.started',
+        occurred_at: '2026-03-09T10:00:00.000Z',
+        source_kind: 'profile',
+        actor_profile_id: 'profile-actor',
+        scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+        object_ref: { kind: 'session', id: 'session-1' },
+        target_ref: { kind: 'learning_space', id: 'space-1' },
+        payload: {
+          learningSpaceId: 'space-1',
+          channelId: 'channel-1',
+        },
+        audience_rules: [],
+        projection_status: 'pending',
+        projection_attempts: 0,
+        created_at: '2026-03-09T10:00:00.000Z',
+        updated_at: '2026-03-09T10:00:00.000Z',
+      },
+    );
+
+    expect(recipients).toEqual(['profile-target', 'profile-actor']);
+  });
+
+  it('includes actor for member.joined events', async () => {
+    const recipients = await resolveRecipientsForActivityEvent(
+      createSupabaseMock() as never,
+      {
+        id: 'event-5',
+        org_id: 'org-1',
+        event_type: 'member.joined',
+        occurred_at: '2026-03-09T10:00:00.000Z',
+        source_kind: 'profile',
+        actor_profile_id: 'profile-actor',
+        scope: { kind: 'channel', channelId: 'channel-1' },
+        object_ref: { kind: 'session', id: 'session-1' },
+        target_ref: null,
+        payload: {
+          channelId: 'channel-1',
+          liveSessionId: 'session-1',
+          memberProfileId: 'profile-actor',
+        },
+        audience_rules: [],
+        projection_status: 'pending',
+        projection_attempts: 0,
+        created_at: '2026-03-09T10:00:00.000Z',
+        updated_at: '2026-03-09T10:00:00.000Z',
+      },
+    );
+
+    expect(recipients).toEqual(['profile-target', 'profile-actor']);
+  });
+
+  it('still excludes actor for non-live-session events', async () => {
+    const recipients = await resolveRecipientsForActivityEvent(
+      createSupabaseMock() as never,
+      {
+        id: 'event-6',
+        org_id: 'org-1',
+        event_type: 'message.posted',
+        occurred_at: '2026-03-09T10:00:00.000Z',
+        source_kind: 'profile',
+        actor_profile_id: 'profile-actor',
+        scope: { kind: 'channel', channelId: 'channel-1' },
+        object_ref: null,
+        target_ref: null,
+        payload: {
+          channelId: 'channel-1',
+        },
+        audience_rules: [],
+        projection_status: 'pending',
+        projection_attempts: 0,
+        created_at: '2026-03-09T10:00:00.000Z',
+        updated_at: '2026-03-09T10:00:00.000Z',
+      },
+    );
+
+    expect(recipients).toEqual(['profile-target']);
   });
 });

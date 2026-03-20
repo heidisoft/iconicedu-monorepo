@@ -19,6 +19,7 @@ const sessionItems = [
       endAt: '2026-03-13T17:00:00.000Z',
       status: 'scheduled',
     },
+    channelId: 'channel-1',
     joinHref: '/iconic-academy/spaces/channel-1',
     chatHref: '/iconic-academy/spaces/channel-1',
     weekBucket: 'this-week',
@@ -36,6 +37,7 @@ const sessionItems = [
       endAt: '2026-03-14T17:00:00.000Z',
       status: 'scheduled',
     },
+    channelId: 'channel-2',
     joinHref: '/iconic-academy/spaces/channel-2',
     chatHref: '/iconic-academy/spaces/channel-2',
     weekBucket: 'this-week',
@@ -53,6 +55,7 @@ const sessionItems = [
       endAt: '2026-03-15T17:00:00.000Z',
       status: 'scheduled',
     },
+    channelId: 'channel-3',
     joinHref: '/iconic-academy/spaces/channel-3',
     chatHref: '/iconic-academy/spaces/channel-3',
     weekBucket: 'next-week',
@@ -200,7 +203,12 @@ describe('DashboardHomeInfographicSection', () => {
     );
 
     await user.click(screen.getAllByRole('button', { name: /Join/i })[0]!);
-    expect(onJoinSession).toHaveBeenCalledWith('/iconic-academy/spaces/channel-1');
+    expect(onJoinSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channelId: 'channel-1',
+        joinHref: '/iconic-academy/spaces/channel-1',
+      }),
+    );
   });
 
   it('hides join button for next week sessions while keeping message actions', () => {

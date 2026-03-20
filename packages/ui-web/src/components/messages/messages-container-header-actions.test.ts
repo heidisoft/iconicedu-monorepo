@@ -4,8 +4,11 @@ import {
   resolveHeaderJoinQuickAction,
   resolveHeaderJoinHref,
   getVisibleHeaderActions,
-  shouldUseExternalHeaderJoin,
 } from './messages-container-header-actions';
+import {
+  isExternalJoinHref,
+  resolveLiveSessionJoinAction,
+} from '@iconicedu/ui-web/components/messages/live-session-join.utils';
 
 describe('messages-container-header-actions helpers', () => {
   it('removes info and hidden actions from header actions', () => {
@@ -103,39 +106,45 @@ describe('messages-container-header-actions helpers', () => {
     ).toBeNull();
   });
 
-  it('uses external header join for external providers when a join href exists', () => {
+  it('hides join when live sessions are disabled even if a join quick action exists', () => {
     expect(
-      shouldUseExternalHeaderJoin({
-        provider: 'custom',
-        joinHref: 'https://example.com/live',
+      resolveLiveSessionJoinAction({
+        liveSession: {
+          enabled: false,
+          provider: 'custom',
+          joinUrl: 'https://example.com/live',
+        },
+        quickActions: [{ key: 'join', label: 'Join', url: 'https://example.com/live' }],
+        hasJoinHandler: true,
+        allowDefaultAction: true,
       }),
-    ).toBe(true);
-    expect(
-      shouldUseExternalHeaderJoin({
-        provider: 'zoom',
-        joinHref: 'https://example.com/live',
-      }),
-    ).toBe(true);
-    expect(
-      shouldUseExternalHeaderJoin({
-        provider: 'jitsi',
-        joinHref: 'https://example.com/live',
-      }),
-    ).toBe(true);
+    ).toEqual({
+      visible: false,
+      label: 'Join',
+      joinHref: null,
+    });
   });
 
-  it('keeps the internal join flow for daily or missing href', () => {
+  it('shows join when live sessions are enabled and a handler exists', () => {
     expect(
-      shouldUseExternalHeaderJoin({
-        provider: 'daily',
-        joinHref: 'https://example.com/live',
+      resolveLiveSessionJoinAction({
+        liveSession: {
+          enabled: true,
+          provider: 'daily',
+        },
+        quickActions: null,
+        hasJoinHandler: true,
+        allowDefaultAction: true,
       }),
-    ).toBe(false);
-    expect(
-      shouldUseExternalHeaderJoin({
-        provider: 'custom',
-        joinHref: null,
-      }),
-    ).toBe(false);
+    ).toEqual({
+      visible: true,
+      label: 'Join',
+      joinHref: null,
+    });
+  });
+
+  it('treats absolute join urls as external links', () => {
+    expect(isExternalJoinHref('https://example.com/live')).toBe(true);
+    expect(isExternalJoinHref('/iconic-academy/live-sessions/123')).toBe(false);
   });
 });

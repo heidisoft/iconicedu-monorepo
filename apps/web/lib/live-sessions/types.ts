@@ -71,4 +71,5 @@ export type ResolvedLiveSessionScope = {
   occurrenceEndAt?: string | null;
   occurrenceLabel?: string | null;
   schedule?: ClassScheduleVM | null;
+  isScheduledSessionWindow?: boolean;
 };

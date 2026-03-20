@@ -20,6 +20,13 @@ import type {
   ChannelQuickActionVM,
 } from '@iconicedu/shared-types';
 import {
+  getVisibleJoinQuickAction,
+  resolveLiveSessionJoinAction,
+  resolveLiveSessionJoinHref,
+} from '@iconicedu/ui-web/components/messages/live-session-join.utils';
+import { ExternalLiveSessionJoinDialog } from '@iconicedu/ui-web/components/messages/external-live-session-join-dialog';
+import { useExternalLiveSessionJoinDialog } from '@iconicedu/ui-web/components/messages/use-external-live-session-join-dialog';
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -85,7 +92,7 @@ export function getVisibleHeaderActions(
 export function getHeaderJoinQuickAction(
   quickActions?: ChannelQuickActionVM[] | null,
 ): ChannelQuickActionVM | null {
-  return quickActions?.find((action) => action.key === 'join' && !action.hidden) ?? null;
+  return getVisibleJoinQuickAction(quickActions);
 }
 
 export function resolveHeaderJoinQuickAction(
@@ -110,32 +117,10 @@ export function resolveHeaderJoinHref(input: {
   joinQuickAction?: ChannelQuickActionVM | null;
   fallbackUrl?: string | null;
 }): string | null {
-  const joinQuickActionUrl =
-    typeof input.joinQuickAction?.url === 'string' &&
-    input.joinQuickAction.url.trim().length > 0
-      ? input.joinQuickAction.url.trim()
-      : null;
-
-  if (joinQuickActionUrl) {
-    return joinQuickActionUrl;
-  }
-
-  return typeof input.fallbackUrl === 'string' && input.fallbackUrl.trim().length > 0
-    ? input.fallbackUrl.trim()
-    : null;
-}
-
-export function shouldUseExternalHeaderJoin(input: {
-  provider?: string | null;
-  joinHref?: string | null;
-}): boolean {
-  if (!input.joinHref) {
-    return false;
-  }
-
-  return (
-    input.provider === 'custom' || input.provider === 'zoom' || input.provider === 'jitsi'
-  );
+  return resolveLiveSessionJoinHref({
+    quickActions: input.joinQuickAction ? [input.joinQuickAction] : [],
+    fallbackUrl: input.fallbackUrl,
+  });
 }
 
 export const MessagesContainerHeaderActions = memo(
@@ -150,30 +135,17 @@ export const MessagesContainerHeaderActions = memo(
           )
         : null;
     const actions = getVisibleHeaderActions(channel.ui?.headerActions);
-    const joinQuickAction = resolveHeaderJoinQuickAction(
-      channel.ui?.quickActions,
-      channel.context?.liveSession?.enabled === true,
-    );
-    const joinHref = resolveHeaderJoinHref({
-      joinQuickAction,
-      fallbackUrl: channel.context?.liveSession?.joinUrl ?? null,
+    const { externalJoinTarget, closeExternalJoinDialog, handleResolvedJoinHref } =
+      useExternalLiveSessionJoinDialog();
+    const joinAction = resolveLiveSessionJoinAction({
+      liveSession: channel.context?.liveSession,
+      quickActions: channel.ui?.quickActions,
+      hasJoinHandler: Boolean(joinLiveSession),
+      allowDefaultAction: true,
     });
-    const useExternalJoin = shouldUseExternalHeaderJoin({
-      provider: channel.context?.liveSession?.provider ?? null,
-      joinHref,
-    });
-    const canJoin = useExternalJoin
-      ? Boolean(joinHref)
-      : Boolean(joinLiveSession || joinHref);
 
     const handleJoin = async () => {
       if (isJoinPending) {
-        return;
-      }
-      if (useExternalJoin) {
-        if (joinHref && typeof window !== 'undefined') {
-          window.location.assign(joinHref);
-        }
         return;
       }
       if (joinLiveSession) {
@@ -186,8 +158,8 @@ export const MessagesContainerHeaderActions = memo(
         return;
       }
 
-      if (joinHref && typeof window !== 'undefined') {
-        window.location.assign(joinHref);
+      if (joinAction.joinHref) {
+        handleResolvedJoinHref(joinAction.joinHref);
       }
     };
 
@@ -199,86 +171,93 @@ export const MessagesContainerHeaderActions = memo(
     };
 
     return (
-      <div className="flex items-center gap-2">
-        {actions.map((action, index) => {
-          const key = action.iconKey ?? action.key;
-          const Icon = iconMap[key ?? 'info'] ?? Info;
-          const resolvedIntentKey =
-            action.key === 'info'
-              ? channel.basics.kind === 'dm'
-                ? 'profile'
-                : 'channel_info'
-              : (action.intentKey ?? (action.key === 'saved' ? 'saved' : 'channel_info'));
-          const intent =
-            resolvedIntentKey === 'profile' && otherParticipant
-              ? ({ key: 'profile', userId: otherParticipant.ids.id } as const)
+      <>
+        <div className="flex items-center gap-2">
+          {actions.map((action, index) => {
+            const key = action.iconKey ?? action.key;
+            const Icon = iconMap[key ?? 'info'] ?? Info;
+            const resolvedIntentKey =
+              action.key === 'info'
+                ? channel.basics.kind === 'dm'
+                  ? 'profile'
+                  : 'channel_info'
+                : (action.intentKey ??
+                  (action.key === 'saved' ? 'saved' : 'channel_info'));
+            const intent =
+              resolvedIntentKey === 'profile' && otherParticipant
+                ? ({ key: 'profile', userId: otherParticipant.ids.id } as const)
+                : resolvedIntentKey === 'saved'
+                  ? ({ key: 'saved' } as const)
+                  : ({ key: 'channel_info' } as const);
+            const isProfileIntent =
+              resolvedIntentKey === 'profile' || action.key === 'info';
+            const useThemeHover =
+              action.key === 'info' &&
+              channel.basics.purpose === 'learning-space' &&
+              !!channel.ui?.themeKey;
+            const active = isProfileIntent
+              ? isActive('profile', {
+                  key: 'profile',
+                  userId: otherParticipant?.ids.id ?? '',
+                })
               : resolvedIntentKey === 'saved'
-                ? ({ key: 'saved' } as const)
-                : ({ key: 'channel_info' } as const);
-          const isProfileIntent =
-            resolvedIntentKey === 'profile' || action.key === 'info';
-          const useThemeHover =
-            action.key === 'info' &&
-            channel.basics.purpose === 'learning-space' &&
-            !!channel.ui?.themeKey;
-          const active = isProfileIntent
-            ? isActive('profile', {
-                key: 'profile',
-                userId: otherParticipant?.ids.id ?? '',
-              })
-            : resolvedIntentKey === 'saved'
-              ? isActive('saved')
-              : isActive('channel_info');
-          const disabled = resolvedIntentKey === 'profile' && !otherParticipant;
+                ? isActive('saved')
+                : isActive('channel_info');
+            const disabled = resolvedIntentKey === 'profile' && !otherParticipant;
 
-          return (
-            <ActionButton
-              key={`${action.key}-${index}`}
-              icon={Icon}
-              label={action.label}
-              active={active}
-              onClick={() => toggle(intent)}
-              disabled={disabled}
-              themeKey={channel.ui?.themeKey ?? null}
-              useThemeHover={useThemeHover}
-            />
-          );
-        })}
-        {joinQuickAction ? (
-          <Button
-            size="sm"
-            disabled={!canJoin || isJoinPending}
-            onClick={() => void handleJoin()}
-          >
-            {isJoinPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Video className="h-4 w-4" />
-            )}
-            {joinQuickAction.label}
-          </Button>
-        ) : null}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label="More actions">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                <MoreHorizontal className="h-4 w-4" />
-              </span>
+            return (
+              <ActionButton
+                key={`${action.key}-${index}`}
+                icon={Icon}
+                label={action.label}
+                active={active}
+                onClick={() => toggle(intent)}
+                disabled={disabled}
+                themeKey={channel.ui?.themeKey ?? null}
+                useThemeHover={useThemeHover}
+              />
+            );
+          })}
+          {joinAction.visible ? (
+            <Button size="sm" disabled={isJoinPending} onClick={() => void handleJoin()}>
+              {isJoinPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Video className="h-4 w-4" />
+              )}
+              {joinAction.label}
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem>
-              <LogOut className="h-4 w-4 text-muted-foreground" />
-              <span>Leave</span>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <Flag className="h-4 w-4 text-muted-foreground" />
-              <span>Report</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+          ) : null}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" aria-label="More actions">
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                  <MoreHorizontal className="h-4 w-4" />
+                </span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem>
+                <LogOut className="h-4 w-4 text-muted-foreground" />
+                <span>Leave</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem>
+                <Flag className="h-4 w-4 text-muted-foreground" />
+                <span>Report</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+        <ExternalLiveSessionJoinDialog
+          target={externalJoinTarget}
+          onOpenChange={(open) => {
+            if (!open) {
+              closeExternalJoinDialog();
+            }
+          }}
+        />
+      </>
     );
   },
 );

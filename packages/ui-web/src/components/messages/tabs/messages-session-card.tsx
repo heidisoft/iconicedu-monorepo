@@ -6,6 +6,8 @@ import { cn } from '@iconicedu/ui-web/lib/utils';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
 import { useOptionalMessagesState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
+import { ExternalLiveSessionJoinDialog } from '@iconicedu/ui-web/components/messages/external-live-session-join-dialog';
+import { useExternalLiveSessionJoinDialog } from '@iconicedu/ui-web/components/messages/use-external-live-session-join-dialog';
 import type { ClassSession } from './messages-schedule-tab.utils';
 
 interface SessionCardProps {
@@ -15,6 +17,7 @@ interface SessionCardProps {
   showJoinButton?: boolean;
   actionOrder?: 'message-first' | 'join-first';
   joinLiveSession?: () => Promise<void>;
+  joinHref?: string | null;
   classroomChatHref?: string;
   openClassroomChat?: () => Promise<void> | void;
 }
@@ -34,7 +37,7 @@ export function getSessionCardState(session: ClassSession): {
 
 export function isSessionJoinButtonDisabled(input: {
   session: ClassSession;
-  hasJoinLiveSession: boolean;
+  hasJoinAction: boolean;
   isJoinPending: boolean;
   canJoin: boolean;
 }): boolean {
@@ -42,7 +45,7 @@ export function isSessionJoinButtonDisabled(input: {
   if (isPast || isDisabled) {
     return true;
   }
-  return !input.canJoin || !input.hasJoinLiveSession || input.isJoinPending;
+  return !input.canJoin || !input.hasJoinAction || input.isJoinPending;
 }
 
 export function SessionCard({
@@ -51,6 +54,7 @@ export function SessionCard({
   showJoinButton = true,
   actionOrder = 'message-first',
   joinLiveSession: joinLiveSessionOverride,
+  joinHref,
   classroomChatHref,
   openClassroomChat,
 }: SessionCardProps) {
@@ -58,9 +62,11 @@ export function SessionCard({
   const messagesState = useOptionalMessagesState();
   const joinLiveSession = joinLiveSessionOverride ?? messagesState?.joinLiveSession;
   const [isJoinPending, setIsJoinPending] = useState(false);
+  const { externalJoinTarget, closeExternalJoinDialog, handleResolvedJoinHref } =
+    useExternalLiveSessionJoinDialog();
   const isJoinButtonDisabled = isSessionJoinButtonDisabled({
     session,
-    hasJoinLiveSession: Boolean(joinLiveSession),
+    hasJoinAction: Boolean(joinLiveSession || joinHref),
     isJoinPending,
     canJoin,
   });
@@ -105,14 +111,20 @@ export function SessionCard({
     </Button>
   ) : null;
   const handleJoin = async () => {
-    if (!joinLiveSession || isJoinPending) {
+    if (isJoinPending) {
       return;
     }
-    setIsJoinPending(true);
-    try {
-      await joinLiveSession();
-    } finally {
-      setIsJoinPending(false);
+    if (joinLiveSession) {
+      setIsJoinPending(true);
+      try {
+        await joinLiveSession();
+      } finally {
+        setIsJoinPending(false);
+      }
+      return;
+    }
+    if (joinHref) {
+      handleResolvedJoinHref(joinHref);
     }
   };
 
@@ -127,132 +139,142 @@ export function SessionCard({
   };
 
   return (
-    <div
-      className={cn(
-        'group relative flex items-center gap-4 rounded-xl border px-4 py-3 transition-all',
-        isDisabled
-          ? 'border-border/50 bg-muted/25 opacity-75'
-          : isLive
-            ? 'border-primary/30 bg-primary/5 shadow-sm shadow-primary/10'
-            : isPast
-              ? 'border-border/50 bg-muted/40'
-              : 'border-border bg-card hover:border-primary/20 hover:shadow-sm',
-      )}
-    >
+    <>
       <div
         className={cn(
-          'flex min-w-[4.5rem] flex-col items-center rounded-lg px-3 py-2',
+          'group relative flex items-center gap-4 rounded-xl border px-4 py-3 transition-all',
           isDisabled
-            ? 'bg-muted/70 text-muted-foreground'
+            ? 'border-border/50 bg-muted/25 opacity-75'
             : isLive
-              ? 'bg-primary text-primary-foreground'
+              ? 'border-primary/30 bg-primary/5 shadow-sm shadow-primary/10'
               : isPast
-                ? 'bg-muted text-muted-foreground'
-                : 'bg-secondary text-secondary-foreground',
+                ? 'border-border/50 bg-muted/40'
+                : 'border-border bg-card hover:border-primary/20 hover:shadow-sm',
         )}
       >
-        {isLive ? (
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-primary-foreground">
-            Today
-          </span>
-        ) : null}
-        <span className="text-xs font-medium">{session.dayName}</span>
-        <span className="text-sm font-bold leading-tight">{session.dayNum}</span>
-      </div>
-
-      <div className="flex flex-1 flex-col gap-1">
-        <div className="flex items-center gap-2">
-          <h3
-            className={cn(
-              'text-sm font-semibold',
-              isDisabled || isPast ? 'text-muted-foreground' : 'text-card-foreground',
-            )}
-          >
-            {session.label}
-          </h3>
+        <div
+          className={cn(
+            'flex min-w-[4.5rem] flex-col items-center rounded-lg px-3 py-2',
+            isDisabled
+              ? 'bg-muted/70 text-muted-foreground'
+              : isLive
+                ? 'bg-primary text-primary-foreground'
+                : isPast
+                  ? 'bg-muted text-muted-foreground'
+                  : 'bg-secondary text-secondary-foreground',
+          )}
+        >
           {isLive ? (
-            <Badge className="animate-pulse bg-primary px-1.5 py-0 text-[10px] font-semibold text-primary-foreground">
-              LIVE
-            </Badge>
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-primary-foreground">
+              Today
+            </span>
           ) : null}
-          {session.variant === 'exception' ? (
-            <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
-              Skipped
-            </Badge>
-          ) : null}
-          {session.variant === 'override' ? (
-            <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
-              Changed
-            </Badge>
-          ) : null}
-          {isPast && session.variant !== 'exception' ? (
-            <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
-              Completed
-            </Badge>
-          ) : null}
+          <span className="text-xs font-medium">{session.dayName}</span>
+          <span className="text-sm font-bold leading-tight">{session.dayNum}</span>
         </div>
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Clock3 className="size-3" />
-          <span>{timeLabel}</span>
-          {participantLabel ? (
+
+        <div className="flex flex-1 flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <h3
+              className={cn(
+                'text-sm font-semibold',
+                isDisabled || isPast ? 'text-muted-foreground' : 'text-card-foreground',
+              )}
+            >
+              {session.label}
+            </h3>
+            {isLive ? (
+              <Badge className="animate-pulse bg-primary px-1.5 py-0 text-[10px] font-semibold text-primary-foreground">
+                LIVE
+              </Badge>
+            ) : null}
+            {session.variant === 'exception' ? (
+              <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
+                Skipped
+              </Badge>
+            ) : null}
+            {session.variant === 'override' ? (
+              <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
+                Changed
+              </Badge>
+            ) : null}
+            {isPast && session.variant !== 'exception' ? (
+              <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
+                Completed
+              </Badge>
+            ) : null}
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Clock3 className="size-3" />
+            <span>{timeLabel}</span>
+            {participantLabel ? (
+              <>
+                <span aria-hidden="true">·</span>
+                <span className="font-medium text-primary">{participantLabel}</span>
+              </>
+            ) : null}
+          </div>
+          {session.variant === 'override' && session.originalTime ? (
             <>
-              <span aria-hidden="true">·</span>
-              <span className="font-medium text-primary">{participantLabel}</span>
+              <p className="text-xs text-muted-foreground">
+                Was{' '}
+                <span className="line-through">
+                  {session.originalDate ? `${session.originalDate} ` : ''}
+                  {session.originalTime}
+                </span>
+              </p>
             </>
           ) : null}
+          {session.variant === 'exception' && session.reason ? (
+            <p className="text-xs text-muted-foreground">{session.reason}</p>
+          ) : null}
         </div>
-        {session.variant === 'override' && session.originalTime ? (
-          <>
-            <p className="text-xs text-muted-foreground">
-              Was{' '}
-              <span className="line-through">
-                {session.originalDate ? `${session.originalDate} ` : ''}
-                {session.originalTime}
-              </span>
-            </p>
-          </>
-        ) : null}
-        {session.variant === 'exception' && session.reason ? (
-          <p className="text-xs text-muted-foreground">{session.reason}</p>
-        ) : null}
-      </div>
 
-      <div className="flex items-center gap-2">
-        {!isPast && !isDisabled ? (
-          <>
-            {actionOrder === 'join-first' ? (
-              <>
-                {joinButton}
-                {messageButton}
-              </>
-            ) : (
-              <>
-                {messageButton}
-                {joinButton}
-              </>
-            )}
-          </>
-        ) : isDisabled ? (
-          <Button
-            size="sm"
-            variant="ghost"
-            className="gap-1.5 text-xs text-muted-foreground"
-            disabled
-          >
-            <Video className="size-3.5" />
-            Unavailable
-          </Button>
-        ) : (
-          <Button
-            size="sm"
-            variant="ghost"
-            className="gap-1.5 text-xs text-muted-foreground"
-          >
-            <Video className="size-3.5" />
-            Recording
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {!isPast && !isDisabled ? (
+            <>
+              {actionOrder === 'join-first' ? (
+                <>
+                  {joinButton}
+                  {messageButton}
+                </>
+              ) : (
+                <>
+                  {messageButton}
+                  {joinButton}
+                </>
+              )}
+            </>
+          ) : isDisabled ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="gap-1.5 text-xs text-muted-foreground"
+              disabled
+            >
+              <Video className="size-3.5" />
+              Unavailable
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="gap-1.5 text-xs text-muted-foreground"
+            >
+              <Video className="size-3.5" />
+              Recording
+            </Button>
+          )}
+        </div>
       </div>
-    </div>
+      <ExternalLiveSessionJoinDialog
+        target={externalJoinTarget}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeExternalJoinDialog();
+          }
+        }}
+      />
+    </>
   );
 }

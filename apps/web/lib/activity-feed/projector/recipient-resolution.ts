@@ -22,6 +22,15 @@ function unique(values: string[]) {
   return Array.from(new Set(values.filter(Boolean)));
 }
 
+const CHANNEL_SCOPED_LIVE_SESSION_EVENTS = new Set([
+  'session.started',
+  'member.joined',
+  'member.removed',
+  'session.ended',
+]);
+
+const INCLUDE_ACTOR_LIVE_SESSION_EVENTS = new Set(['session.started', 'member.joined']);
+
 type UsersOnlyAudienceRule = {
   kind: 'users_only';
   userIds: unknown[];
@@ -75,7 +84,10 @@ function applyRecipientExclusions(
     }
   }
 
-  if (event.actor_profile_id) {
+  if (
+    event.actor_profile_id &&
+    !INCLUDE_ACTOR_LIVE_SESSION_EVENTS.has(event.event_type)
+  ) {
     excludedIds.add(event.actor_profile_id);
   }
 
@@ -194,6 +206,7 @@ export async function resolveRecipientsForActivityEvent(
   event: ActivityEventRow,
 ) {
   const scope = asRecord(event.scope);
+  const payload = asRecord(event.payload);
   const audienceRules = (
     Array.isArray(event.audience_rules) ? event.audience_rules : []
   ).filter(
@@ -203,8 +216,21 @@ export async function resolveRecipientsForActivityEvent(
   const scopeKind = typeof scope.kind === 'string' ? scope.kind : 'global';
   let scopedRecipients: string[] = [];
 
+  const payloadChannelId =
+    typeof payload.channelId === 'string' ? payload.channelId : null;
+  const prefersChannelRecipients =
+    scopeKind === 'learning_space' &&
+    CHANNEL_SCOPED_LIVE_SESSION_EVENTS.has(event.event_type) &&
+    Boolean(payloadChannelId);
+
   if (scopeKind === 'user' && typeof scope.userId === 'string') {
     scopedRecipients = [scope.userId];
+  } else if (prefersChannelRecipients && payloadChannelId) {
+    scopedRecipients = await resolveChannelRecipients(
+      supabase,
+      event.org_id,
+      payloadChannelId,
+    );
   } else if (
     scopeKind === 'learning_space' &&
     typeof scope.learningSpaceId === 'string'

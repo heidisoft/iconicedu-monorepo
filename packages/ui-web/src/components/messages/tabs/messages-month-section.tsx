@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { CheckCircle2, ChevronDown } from 'lucide-react';
 import { cn } from '@iconicedu/ui-web/lib/utils';
+import { useOptionalMessagesState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
+import { resolveLiveSessionJoinAction } from '@iconicedu/ui-web/components/messages/live-session-join.utils';
 import type { MonthGroup, MonthProgressStats } from './messages-schedule-tab.utils';
 import { SessionCard } from './messages-session-card';
 
@@ -53,9 +55,15 @@ export function MonthSection({
   joinableSessionId = null,
   progressStats,
 }: MonthSectionProps) {
+  const messagesState = useOptionalMessagesState();
   const [isOpen, setIsOpen] = useState(
     shouldMonthSectionStartOpen(defaultOpen, isCurrentMonth),
   );
+  const joinAction = resolveLiveSessionJoinAction({
+    liveSession: messagesState?.channel.context?.liveSession ?? null,
+    quickActions: messagesState?.channel.ui?.quickActions ?? null,
+    hasJoinHandler: Boolean(messagesState?.joinLiveSession),
+  });
   const { progressPercent, allComplete, scheduledCount, completedCount } =
     getMonthSectionStats(group, progressStats);
   return (
@@ -119,7 +127,9 @@ export function MonthSection({
               key={session.id}
               session={session}
               index={index}
-              canJoin={session.id === joinableSessionId}
+              canJoin={joinAction.visible && session.id === joinableSessionId}
+              showJoinButton={joinAction.visible}
+              joinHref={joinAction.joinHref}
             />
           ))}
         </div>

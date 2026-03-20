@@ -130,6 +130,7 @@ export type InboxIconKeyVM =
   | 'GraduationCap'
   | 'MessageSquare'
   | 'Paperclip'
+  | 'PhoneOutgoing'
   | 'Sparkles'
   | 'UserRoundMinus'
   | 'UserRoundPlus'

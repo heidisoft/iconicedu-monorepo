@@ -52,7 +52,7 @@ describe('messages-session-card', () => {
     expect(
       isSessionJoinButtonDisabled({
         session: baseSession,
-        hasJoinLiveSession: true,
+        hasJoinAction: true,
         isJoinPending: false,
         canJoin: true,
       }),
@@ -61,7 +61,7 @@ describe('messages-session-card', () => {
     expect(
       isSessionJoinButtonDisabled({
         session: baseSession,
-        hasJoinLiveSession: false,
+        hasJoinAction: false,
         isJoinPending: false,
         canJoin: true,
       }),
@@ -70,7 +70,7 @@ describe('messages-session-card', () => {
     expect(
       isSessionJoinButtonDisabled({
         session: baseSession,
-        hasJoinLiveSession: true,
+        hasJoinAction: true,
         isJoinPending: false,
         canJoin: false,
       }),
@@ -79,7 +79,7 @@ describe('messages-session-card', () => {
     expect(
       isSessionJoinButtonDisabled({
         session: { ...baseSession, isPast: true },
-        hasJoinLiveSession: true,
+        hasJoinAction: true,
         isJoinPending: false,
         canJoin: true,
       }),
@@ -88,7 +88,7 @@ describe('messages-session-card', () => {
     expect(
       isSessionJoinButtonDisabled({
         session: { ...baseSession, disabled: true },
-        hasJoinLiveSession: true,
+        hasJoinAction: true,
         isJoinPending: false,
         canJoin: true,
       }),
@@ -97,7 +97,7 @@ describe('messages-session-card', () => {
     expect(
       isSessionJoinButtonDisabled({
         session: baseSession,
-        hasJoinLiveSession: true,
+        hasJoinAction: true,
         isJoinPending: true,
         canJoin: true,
       }),

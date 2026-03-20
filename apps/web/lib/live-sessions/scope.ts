@@ -5,7 +5,9 @@ import type { ResolvedLiveSessionScope } from '@iconicedu/web/lib/live-sessions/
 import { buildClassSchedulesByOrg } from '@iconicedu/web/lib/schedules/builders/class-schedule.builder';
 import type { SupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 
-const UPCOMING_OCCURRENCE_LEAD_MS = 60 * 60 * 1000;
+const UPCOMING_OCCURRENCE_LOOKAHEAD_MS = 30 * 24 * 60 * 60 * 1000;
+const RECENT_OCCURRENCE_GRACE_MS = 30 * 60 * 1000;
+const EARLY_JOIN_ALLOWANCE_MS = 15 * 60 * 1000;
 
 function buildOccurrenceLabel(schedule: ClassScheduleVM, occurrenceKey: string) {
   const date = new Date(occurrenceKey);
@@ -19,27 +21,32 @@ function buildOccurrenceLabel(schedule: ClassScheduleVM, occurrenceKey: string) 
 
 function findRelevantOccurrence(schedule: ClassScheduleVM, now: Date) {
   const rangeStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-  const rangeEnd = new Date(now.getTime() + UPCOMING_OCCURRENCE_LEAD_MS);
+  const rangeEnd = new Date(now.getTime() + UPCOMING_OCCURRENCE_LOOKAHEAD_MS);
   const expanded = expandRecurringEvents([schedule], rangeStart, rangeEnd);
+  const nowTime = now.getTime();
 
-  const liveOccurrence = expanded.find((event) => {
-    const startAt = new Date(event.startAt).getTime();
-    const endAt = new Date(event.endAt).getTime();
-    const nowTime = now.getTime();
-    return startAt <= nowTime && nowTime <= endAt;
-  });
-
-  if (liveOccurrence) {
-    return liveOccurrence;
-  }
-
-  return expanded
+  const scheduledWindowOccurrence = expanded
     .filter((event) => {
       const startAt = new Date(event.startAt).getTime();
-      const diff = startAt - now.getTime();
-      return diff >= 0 && diff <= UPCOMING_OCCURRENCE_LEAD_MS;
+      const endAt = new Date(event.endAt).getTime();
+      return (
+        startAt - EARLY_JOIN_ALLOWANCE_MS <= nowTime &&
+        endAt + RECENT_OCCURRENCE_GRACE_MS > nowTime
+      );
     })
-    .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime())[0];
+    .sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime())[0];
+
+  if (scheduledWindowOccurrence) {
+    return {
+      occurrence: scheduledWindowOccurrence,
+      isScheduledSessionWindow: true,
+    };
+  }
+
+  return {
+    occurrence: null,
+    isScheduledSessionWindow: false,
+  };
 }
 
 export async function resolveChannelLiveSessionScope(input: {
@@ -58,16 +65,20 @@ export async function resolveChannelLiveSessionScope(input: {
 
   for (const schedule of channelSchedules) {
     const relevantOccurrence = findRelevantOccurrence(schedule, now);
-    if (!relevantOccurrence) {
+    if (!relevantOccurrence.occurrence) {
       continue;
     }
 
     return {
-      scopeKey: `occurrence:${relevantOccurrence.startAt}`,
-      occurrenceKey: relevantOccurrence.startAt,
-      occurrenceEndAt: relevantOccurrence.endAt,
-      occurrenceLabel: buildOccurrenceLabel(schedule, relevantOccurrence.startAt),
+      scopeKey: `occurrence:${relevantOccurrence.occurrence.startAt}`,
+      occurrenceKey: relevantOccurrence.occurrence.startAt,
+      occurrenceEndAt: relevantOccurrence.occurrence.endAt,
+      occurrenceLabel: buildOccurrenceLabel(
+        schedule,
+        relevantOccurrence.occurrence.startAt,
+      ),
       schedule,
+      isScheduledSessionWindow: relevantOccurrence.isScheduledSessionWindow,
     };
   }
 
@@ -77,5 +88,6 @@ export async function resolveChannelLiveSessionScope(input: {
     occurrenceEndAt: null,
     occurrenceLabel: null,
     schedule: null,
+    isScheduledSessionWindow: false,
   };
 }

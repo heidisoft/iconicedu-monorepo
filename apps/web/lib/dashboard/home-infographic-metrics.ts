@@ -25,6 +25,7 @@ export interface DashboardInfographicRoleMetrics {
 
 export interface DashboardUpcomingSessionListItem {
   session: ClassSession;
+  channelId?: string | null;
   joinHref: string;
   chatHref: string;
   weekBucket: 'this-week' | 'next-week';
@@ -247,6 +248,10 @@ function buildUpcomingSessionPage(input: {
         label: className,
         time: timeLabel,
       },
+      channelId:
+        sessionSchedule?.source.kind === 'class_session'
+          ? (sessionSchedule.source.channelId ?? null)
+          : null,
       joinHref:
         joinHrefByScheduleId.get(session.id) ?? `/${input.orgSlug}/class-schedule`,
       chatHref: chatHrefByScheduleId.get(session.id) ?? `/${input.orgSlug}/spaces`,

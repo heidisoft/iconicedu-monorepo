@@ -142,7 +142,7 @@ describe('publishActivityEvent', () => {
     expect(result?.id).toBe('event-2');
   });
 
-  it('returns existing event on dedupe conflict', async () => {
+  it('returns existing event on dedupe conflict and reprojects it', async () => {
     const supabase = {
       from: vi.fn((table: string) => {
         if (table === 'orgs') {
@@ -205,7 +205,10 @@ describe('publishActivityEvent', () => {
     });
 
     expect(result?.id).toBe('event-existing');
-    expect(projectActivityEvents).not.toHaveBeenCalled();
+    expect(projectActivityEvents).toHaveBeenCalledWith(supabase, {
+      eventIds: ['event-existing'],
+      limit: 1,
+    });
   });
 
   it('returns null and skips insert when event type is suppressed', async () => {

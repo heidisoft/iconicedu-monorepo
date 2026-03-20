@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 
 import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
 import { createOrJoinLiveSession } from '@iconicedu/web/lib/live-sessions/service';
@@ -30,6 +30,9 @@ export async function POST(
       authUserId: authUser.id,
       channelId,
       orgSlug: body.orgSlug,
+      schedulePostJoinSideEffects: (task) => {
+        after(task);
+      },
     });
 
     return NextResponse.json({ success: true, ...result });

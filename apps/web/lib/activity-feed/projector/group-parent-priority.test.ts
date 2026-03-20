@@ -60,6 +60,23 @@ describe('shouldReplaceGroupParent', () => {
     ).toBe(true);
   });
 
+  it('prefers session.started as the parent for live-session groups', () => {
+    expect(
+      shouldReplaceGroupParent({
+        groupKey: 'live-session:channel:channel-1:session-1',
+        existingVerb: 'member.joined',
+        nextVerb: 'member.removed',
+      }),
+    ).toBe(false);
+    expect(
+      shouldReplaceGroupParent({
+        groupKey: 'live-session:channel:channel-1:session-1',
+        existingVerb: 'member.joined',
+        nextVerb: 'session.started',
+      }),
+    ).toBe(true);
+  });
+
   it('prefers messages.posted as the parent for grouped channel-message groups', () => {
     expect(
       shouldReplaceGroupParent({
