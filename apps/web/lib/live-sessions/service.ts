@@ -179,18 +179,84 @@ async function verifyChannelMembership(
   supabase: SupabaseServiceClient,
   orgId: string,
   channelId: string,
-  profileId: string,
+  profileIds: string[],
 ) {
+  if (!profileIds.length) {
+    return false;
+  }
+
   const response = await supabase
     .from('channel_members')
     .select('id')
     .eq('org_id', orgId)
     .eq('channel_id', channelId)
-    .eq('profile_id', profileId)
+    .in('profile_id', profileIds)
     .is('deleted_at', null)
-    .maybeSingle<{ id: string }>();
+    .limit(1)
+    .returns<Array<{ id: string }>>();
 
-  return Boolean(response.data?.id);
+  if (response.error) {
+    throw new Error(response.error.message);
+  }
+
+  return Boolean(response.data?.[0]?.id);
+}
+
+async function resolveAuthorizedLiveSessionProfileIds(input: {
+  supabase: SupabaseServiceClient;
+  orgId: string;
+  profile: ProfileRow;
+}) {
+  const resolvedProfileIds = new Set<string>([input.profile.id]);
+
+  if (input.profile.kind !== 'guardian' || !input.profile.account_id) {
+    return Array.from(resolvedProfileIds);
+  }
+
+  const familyLinksResponse = await input.supabase
+    .from('family_links')
+    .select('child_account_id')
+    .eq('org_id', input.orgId)
+    .eq('guardian_account_id', input.profile.account_id)
+    .is('deleted_at', null)
+    .returns<Array<{ child_account_id: string | null }>>();
+
+  if (familyLinksResponse.error) {
+    throw new Error(familyLinksResponse.error.message);
+  }
+
+  const childAccountIds = Array.from(
+    new Set(
+      (familyLinksResponse.data ?? [])
+        .map((row) => row.child_account_id)
+        .filter((childAccountId): childAccountId is string => Boolean(childAccountId)),
+    ),
+  );
+
+  if (!childAccountIds.length) {
+    return Array.from(resolvedProfileIds);
+  }
+
+  const childProfilesResponse = await input.supabase
+    .from('profiles')
+    .select('id')
+    .in('account_id', childAccountIds)
+    .eq('org_id', input.orgId)
+    .eq('kind', 'child')
+    .is('deleted_at', null)
+    .returns<Array<{ id: string }>>();
+
+  if (childProfilesResponse.error) {
+    throw new Error(childProfilesResponse.error.message);
+  }
+
+  (childProfilesResponse.data ?? []).forEach((row) => {
+    if (row.id) {
+      resolvedProfileIds.add(row.id);
+    }
+  });
+
+  return Array.from(resolvedProfileIds);
 }
 
 async function loadActivityParticipants(input: {
@@ -906,11 +972,16 @@ export async function createOrJoinLiveSession(input: {
   }
   const channel = channelResponse.data;
 
+  const authorizedProfileIds = await resolveAuthorizedLiveSessionProfileIds({
+    supabase: input.serviceSupabase,
+    orgId: channel.org_id,
+    profile,
+  });
   const hasMembership = await verifyChannelMembership(
     input.serviceSupabase,
     channel.org_id,
     channel.id,
-    profile.id,
+    authorizedProfileIds,
   );
   if (!hasMembership) {
     throw new Error('Unauthorized');
@@ -1550,11 +1621,16 @@ export async function resolveLiveSessionJoinAccess(input: {
     throw new Error('Live session is not active');
   }
 
+  const authorizedProfileIds = await resolveAuthorizedLiveSessionProfileIds({
+    supabase: input.serviceSupabase,
+    orgId: sessionResponse.data.org_id,
+    profile: input.profile,
+  });
   const hasMembership = await verifyChannelMembership(
     input.serviceSupabase,
     sessionResponse.data.org_id,
     sessionResponse.data.channel_id,
-    input.profile.id,
+    authorizedProfileIds,
   );
   if (!hasMembership) {
     throw new Error('Unauthorized');

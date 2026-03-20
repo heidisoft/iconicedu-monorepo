@@ -19,6 +19,11 @@ vi.mock('@iconicedu/web/lib/live-sessions/providers', () => ({
       providerSessionId: `provider-${sessionId}`,
       providerMetadata: {},
     })),
+    getJoinAccess: vi.fn(async ({ sessionId }: { sessionId: string }) => ({
+      joinUrl: `https://meet.example.com/${sessionId}`,
+      token: 'join-token',
+      metadata: {},
+    })),
   })),
 }));
 
@@ -33,19 +38,39 @@ import {
 } from '@iconicedu/web/lib/profile/queries/profiles.query';
 import { publishActivityEvent } from '@iconicedu/web/lib/activity-feed/publisher/activity-publisher';
 import { resolveChannelLiveSessionScope } from '@iconicedu/web/lib/live-sessions/scope';
-import { createOrJoinLiveSession } from '@iconicedu/web/lib/live-sessions/service';
+import {
+  createOrJoinLiveSession,
+  resolveLiveSessionJoinAccess,
+} from '@iconicedu/web/lib/live-sessions/service';
 
 function createServiceSupabaseStub(input?: {
   activeLiveSessionRow?: Record<string, unknown> | null;
   liveSessionConfig?: Record<string, unknown>;
   channel?: Record<string, unknown>;
   existingSessionStartedActivity?: boolean;
+  memberProfileIds?: string[];
+  familyLinks?: Array<{
+    guardianAccountId: string;
+    childAccountId: string;
+  }>;
+  childProfiles?: Array<{
+    id: string;
+    accountId: string;
+    kind?: string;
+  }>;
 }) {
   let liveSessionRow: Record<string, unknown> | null =
     input?.activeLiveSessionRow ?? null;
   let participantUpserted = false;
   let expectedParticipantsInserted = 0;
   const participantEvents: Array<Record<string, unknown>> = [];
+  const memberProfileIds = new Set(input?.memberProfileIds ?? ['profile-1']);
+  const familyLinks = input?.familyLinks ?? [];
+  const childProfiles = input?.childProfiles ?? [];
+  const availableProfiles = [
+    { id: 'profile-1', accountId: 'account-1', kind: 'educator' },
+    ...childProfiles,
+  ];
 
   return {
     state: {
@@ -96,21 +121,113 @@ function createServiceSupabaseStub(input?: {
       }
 
       if (table === 'channel_members') {
+        const filters: { profileIds?: string[] } = {};
         return {
           select() {
             return this;
           },
-          eq() {
+          eq(column: string, value: string) {
+            if (column === 'profile_id') {
+              filters.profileIds = [value];
+            }
             return this;
           },
-          returns: async () => ({
-            data: [{ profile_id: 'profile-1' }],
-            error: null,
-          }),
+          in(column: string, values: string[]) {
+            if (column === 'profile_id') {
+              filters.profileIds = values;
+            }
+            return this;
+          },
+          returns: async () => {
+            const scopedIds = filters.profileIds ?? Array.from(memberProfileIds);
+            const matches = scopedIds.filter((profileId) =>
+              memberProfileIds.has(profileId),
+            );
+            return {
+              data: matches.map((profileId, index) => ({
+                id: `member-${index + 1}`,
+                profile_id: profileId,
+              })),
+              error: null,
+            };
+          },
           is() {
             return this;
           },
-          maybeSingle: async () => ({ data: { id: 'member-1' }, error: null }),
+          limit() {
+            return this;
+          },
+          maybeSingle: async () => {
+            const scopedIds = filters.profileIds ?? Array.from(memberProfileIds);
+            const match = scopedIds.some((profileId) => memberProfileIds.has(profileId));
+            return { data: match ? { id: 'member-1' } : null, error: null };
+          },
+        };
+      }
+
+      if (table === 'family_links') {
+        const filters: { guardianAccountId?: string } = {};
+        return {
+          select() {
+            return this;
+          },
+          eq(column: string, value: string) {
+            if (column === 'guardian_account_id') {
+              filters.guardianAccountId = value;
+            }
+            return this;
+          },
+          is() {
+            return this;
+          },
+          returns: async () => ({
+            data: familyLinks
+              .filter((row) => row.guardianAccountId === filters.guardianAccountId)
+              .map((row) => ({ child_account_id: row.childAccountId })),
+            error: null,
+          }),
+        };
+      }
+
+      if (table === 'profiles') {
+        const filters: { accountIds?: string[]; profileIds?: string[]; kind?: string } =
+          {};
+        return {
+          select() {
+            return this;
+          },
+          in(column: string, values: string[]) {
+            if (column === 'account_id') {
+              filters.accountIds = values;
+            }
+            if (column === 'id') {
+              filters.profileIds = values;
+            }
+            return this;
+          },
+          eq(column: string, value: string) {
+            if (column === 'kind') {
+              filters.kind = value;
+            }
+            return this;
+          },
+          is() {
+            return this;
+          },
+          returns: async () => ({
+            data: availableProfiles
+              .filter(
+                (profile) =>
+                  !filters.accountIds || filters.accountIds.includes(profile.accountId),
+              )
+              .filter(
+                (profile) =>
+                  !filters.profileIds || filters.profileIds.includes(profile.id),
+              )
+              .filter((profile) => !filters.kind || profile.kind === filters.kind)
+              .map((profile) => ({ id: profile.id })),
+            error: null,
+          }),
         };
       }
 
@@ -287,6 +404,8 @@ describe('createOrJoinLiveSession', () => {
     vi.mocked(getProfileByAccountId).mockResolvedValue({
       data: {
         id: 'profile-1',
+        account_id: 'account-1',
+        kind: 'educator',
         display_name: 'Taylor Reed',
         first_name: 'Taylor',
         last_name: 'Reed',
@@ -543,6 +662,88 @@ describe('createOrJoinLiveSession', () => {
     ).toEqual(expect.arrayContaining(['session.started', 'member.joined']));
   });
 
+  it('allows guardians to join when a linked child is a channel member', async () => {
+    vi.mocked(getProfileByAccountId).mockResolvedValueOnce({
+      data: {
+        id: 'profile-guardian-1',
+        account_id: 'account-guardian-1',
+        kind: 'guardian',
+        display_name: 'Riley Guardian',
+        first_name: 'Riley',
+        last_name: 'Guardian',
+      },
+      error: null,
+    } as never);
+    vi.mocked(getProfilesByIds).mockResolvedValueOnce({
+      data: [
+        {
+          id: 'profile-guardian-1',
+          display_name: 'Riley Guardian',
+          avatar_url: null,
+          ui_theme_key: null,
+        },
+      ],
+      error: null,
+    } as never);
+
+    const serviceSupabase = createServiceSupabaseStub({
+      memberProfileIds: ['profile-child-1'],
+      familyLinks: [
+        { guardianAccountId: 'account-guardian-1', childAccountId: 'account-child-1' },
+      ],
+      childProfiles: [
+        { id: 'profile-child-1', accountId: 'account-child-1', kind: 'child' },
+      ],
+    });
+
+    const result = await createOrJoinLiveSession({
+      supabase: {} as never,
+      serviceSupabase: serviceSupabase as never,
+      authUserId: 'auth-user-1',
+      channelId: 'channel-1',
+      orgSlug: 'iconic-academy',
+    });
+
+    expect(result).toMatchObject({
+      sessionId: 'live-session-1',
+      created: true,
+    });
+  });
+
+  it('still denies guardians when linked children are not channel members', async () => {
+    vi.mocked(getProfileByAccountId).mockResolvedValueOnce({
+      data: {
+        id: 'profile-guardian-1',
+        account_id: 'account-guardian-1',
+        kind: 'guardian',
+        display_name: 'Riley Guardian',
+        first_name: 'Riley',
+        last_name: 'Guardian',
+      },
+      error: null,
+    } as never);
+
+    const serviceSupabase = createServiceSupabaseStub({
+      memberProfileIds: ['profile-other-1'],
+      familyLinks: [
+        { guardianAccountId: 'account-guardian-1', childAccountId: 'account-child-1' },
+      ],
+      childProfiles: [
+        { id: 'profile-child-1', accountId: 'account-child-1', kind: 'child' },
+      ],
+    });
+
+    await expect(
+      createOrJoinLiveSession({
+        supabase: {} as never,
+        serviceSupabase: serviceSupabase as never,
+        authUserId: 'auth-user-1',
+        channelId: 'channel-1',
+        orgSlug: 'iconic-academy',
+      }),
+    ).rejects.toThrow('Unauthorized');
+  });
+
   it('uses schedule-derived learningSpaceId and scheduleId when channel metadata is missing', async () => {
     vi.mocked(resolveChannelLiveSessionScope).mockResolvedValueOnce({
       scopeKey: 'occurrence:2026-03-02T10:00:00.000Z',
@@ -675,5 +876,74 @@ describe('createOrJoinLiveSession', () => {
     );
 
     errorSpy.mockRestore();
+  });
+});
+
+describe('resolveLiveSessionJoinAccess', () => {
+  it('allows guardians to access a live session when a linked child is a channel member', async () => {
+    const serviceSupabase = createServiceSupabaseStub({
+      activeLiveSessionRow: {
+        id: 'live-session-1',
+        org_id: 'org-1',
+        channel_id: 'channel-1',
+        provider: 'daily',
+        status: 'live',
+        provider_metadata: {},
+      },
+      memberProfileIds: ['profile-child-1'],
+      familyLinks: [
+        { guardianAccountId: 'account-guardian-1', childAccountId: 'account-child-1' },
+      ],
+      childProfiles: [
+        { id: 'profile-child-1', accountId: 'account-child-1', kind: 'child' },
+      ],
+    });
+
+    const result = await resolveLiveSessionJoinAccess({
+      serviceSupabase: serviceSupabase as never,
+      liveSessionId: 'live-session-1',
+      profile: {
+        id: 'profile-guardian-1',
+        org_id: 'org-1',
+        account_id: 'account-guardian-1',
+        kind: 'guardian',
+        display_name: 'Riley Guardian',
+        first_name: 'Riley',
+        last_name: 'Guardian',
+      } as never,
+    });
+
+    expect(result.session.id).toBe('live-session-1');
+    expect(result.joinAccess.joinUrl).toContain('live-session-1');
+  });
+
+  it('keeps direct-membership checks for non-guardians', async () => {
+    const serviceSupabase = createServiceSupabaseStub({
+      activeLiveSessionRow: {
+        id: 'live-session-1',
+        org_id: 'org-1',
+        channel_id: 'channel-1',
+        provider: 'daily',
+        status: 'live',
+        provider_metadata: {},
+      },
+      memberProfileIds: ['profile-member-1'],
+    });
+
+    await expect(
+      resolveLiveSessionJoinAccess({
+        serviceSupabase: serviceSupabase as never,
+        liveSessionId: 'live-session-1',
+        profile: {
+          id: 'profile-educator-1',
+          org_id: 'org-1',
+          account_id: 'account-educator-1',
+          kind: 'educator',
+          display_name: 'Jamie Educator',
+          first_name: 'Jamie',
+          last_name: 'Educator',
+        } as never,
+      }),
+    ).rejects.toThrow('Unauthorized');
   });
 });
