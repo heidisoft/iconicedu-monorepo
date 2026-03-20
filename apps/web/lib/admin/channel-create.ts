@@ -3,8 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { ChannelCreatePayload, ChannelCapabilityVM } from '@iconicedu/shared-types';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
-import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
-import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import { requireParentActorContext } from '@iconicedu/web/lib/family-view/actor-context';
 import { toStoredLiveSessionConfig } from '@iconicedu/web/lib/admin/live-session-config';
 import { withInfoPanelDisabled } from '@iconicedu/web/lib/channels/ui-defaults';
 
@@ -20,15 +19,7 @@ export async function createAdminChannel(payload: ChannelCreatePayload) {
     throw new Error('Unauthorized');
   }
 
-  const accountResponse = await getAccountByAuthUserId(supabase, user.id);
-  if (!accountResponse.data) {
-    throw new Error('Account not found');
-  }
-
-  const profileResponse = await getProfileByAccountId(supabase, accountResponse.data.id);
-  if (!profileResponse.data) {
-    throw new Error('Profile not found');
-  }
+  const actor = await requireParentActorContext(supabase);
 
   const now = new Date().toISOString();
   const channelId = randomUUID();
@@ -36,7 +27,7 @@ export async function createAdminChannel(payload: ChannelCreatePayload) {
 
   const { error } = await supabase.from('channels').insert({
     id: channelId,
-    org_id: accountResponse.data.org_id,
+    org_id: actor.account.org_id,
     kind: payload.basics.kind,
     topic: payload.basics.topic.trim(),
     description: payload.basics.description ?? null,
@@ -50,11 +41,11 @@ export async function createAdminChannel(payload: ChannelCreatePayload) {
     posting_policy_kind: payload.postingPolicy.kind,
     allow_threads: payload.postingPolicy.allowThreads ?? true,
     allow_reactions: payload.postingPolicy.allowReactions ?? true,
-    created_by_profile_id: profileResponse.data.id,
+    created_by_profile_id: actor.profile.id,
     created_at: now,
-    created_by: profileResponse.data.id,
+    created_by: actor.profile.id,
     updated_at: now,
-    updated_by: profileResponse.data.id,
+    updated_by: actor.profile.id,
   });
 
   if (error) {
@@ -62,17 +53,17 @@ export async function createAdminChannel(payload: ChannelCreatePayload) {
   }
 
   await insertChannelMembers(supabase, {
-    orgId: accountResponse.data.org_id,
+    orgId: actor.account.org_id,
     channelId,
-    createdBy: profileResponse.data.id,
+    createdBy: actor.profile.id,
     createdAt: now,
     participants: payload.participants,
   });
 
   await insertChannelCapabilities(supabase, {
-    orgId: accountResponse.data.org_id,
+    orgId: actor.account.org_id,
     channelId,
-    createdBy: profileResponse.data.id,
+    createdBy: actor.profile.id,
     createdAt: now,
     capabilities: payload.capabilities ?? DEFAULT_CAPABILITIES,
   });

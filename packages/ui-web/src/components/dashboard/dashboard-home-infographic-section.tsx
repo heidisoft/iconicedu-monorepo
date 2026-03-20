@@ -48,6 +48,7 @@ export interface DashboardHomeInfographicSectionProps {
   orgSlug: string;
   isStaffView?: boolean;
   isParentView?: boolean;
+  isTutorView?: boolean;
   topMetrics: {
     upcomingSessionsThisWeek: number;
     completedClassesThisMonth: number;
@@ -72,6 +73,7 @@ export function DashboardHomeInfographicSection({
   orgSlug,
   isStaffView = false,
   isParentView = false,
+  isTutorView = false,
   topMetrics,
   upcomingSessionsPage,
   calendarHref,
@@ -212,7 +214,11 @@ export function DashboardHomeInfographicSection({
           <div className={infographicContentClassName}>
             <div className="mb-3 flex items-center justify-between gap-2">
               <p className="text-base font-semibold text-foreground">
-                {isStaffView ? 'Manage Classrooms' : 'Active Subjects'}
+                {isStaffView
+                  ? 'Manage Classrooms'
+                  : isTutorView
+                    ? 'Active Students'
+                    : 'Active Subjects'}
               </p>
               <div className="inline-flex rounded-xl bg-primary/15 p-2.5 text-primary/80">
                 <BookOpenCheck className="size-5" aria-hidden="true" />

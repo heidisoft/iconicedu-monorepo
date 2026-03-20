@@ -6,12 +6,12 @@ import {
   buildChannelByDmKey,
   buildDirectMessageChannelsWithMessages,
 } from '@iconicedu/web/lib/channels/builders/channel.builder';
-import {
-  getProfileByAccountId,
-  getProfileById,
-} from '@iconicedu/web/lib/profile/queries/profiles.query';
+import { getProfileById } from '@iconicedu/web/lib/profile/queries/profiles.query';
 import { ensureDirectMessageChannel } from '@iconicedu/web/lib/channels/actions/ensure-direct-message-channel';
-import { getDashboardAccountContext } from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
+import {
+  getDashboardAccountContext,
+  getDashboardProfileContext,
+} from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
 
 type DmPageProps = {
   params: Promise<{ orgSlug: string }>;
@@ -27,7 +27,7 @@ export default async function Page({ params, searchParams }: DmPageProps) {
   const { orgSlug } = await params;
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const { supabase, account, dashboardPath } = await getDashboardAccountContext(orgSlug);
-  const profileResponse = await getProfileByAccountId(supabase, account.id);
+  const { profileResponse } = await getDashboardProfileContext(supabase, account.id);
   const currentProfileId = profileResponse.data?.id ?? null;
   const requestedId =
     resolvedSearchParams?.channelId ??

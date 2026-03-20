@@ -16,6 +16,12 @@ const getOrCreateAccountMock = vi.fn(async () => ({
 }));
 const resolveOrgDashboardPathMock = vi.fn(async () => '/iconic-academy');
 const buildOrgBySlugMock = vi.fn(async () => ({ id: 'org-1' }));
+const getAccountByIdMock = vi.fn(async () => ({
+  data: { id: 'account-1', org_id: 'org-1', auth_user_id: 'auth-user-1' },
+}));
+const resolveEffectiveProfileForAccountInOrgMock = vi.fn(async () => ({
+  effectiveProfile: { id: 'profile-active' },
+}));
 const getProfileByAccountIdMock = vi.fn(async () => ({ data: { id: 'profile-active' } }));
 const buildUserProfileByIdMock = vi.fn(async () => ({ ids: { id: 'profile-active' } }));
 
@@ -42,6 +48,15 @@ vi.mock('@iconicedu/web/lib/org/builders/org.builder', () => ({
 
 vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
   getProfileByAccountId: (...args: unknown[]) => getProfileByAccountIdMock(...args),
+}));
+
+vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
+  getAccountById: (...args: unknown[]) => getAccountByIdMock(...args),
+}));
+
+vi.mock('@iconicedu/web/lib/family-view/effective-profile', () => ({
+  resolveEffectiveProfileForAccountInOrg: (...args: unknown[]) =>
+    resolveEffectiveProfileForAccountInOrgMock(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/profile/builders/user-profile.builder', () => ({
@@ -75,10 +90,14 @@ describe('dashboard-auth helpers', () => {
     const supabase = { client: 'supabase' } as any;
     const result = await getDashboardProfileContext(supabase, 'account-1');
 
-    expect(getProfileByAccountIdMock).toHaveBeenCalledWith(supabase, 'account-1');
+    expect(getAccountByIdMock).toHaveBeenCalledWith(supabase, 'account-1');
+    expect(resolveEffectiveProfileForAccountInOrgMock).toHaveBeenCalledWith(supabase, {
+      account: { id: 'account-1', org_id: 'org-1', auth_user_id: 'auth-user-1' },
+      authUserId: 'auth-user-1',
+    });
     expect(buildUserProfileByIdMock).toHaveBeenCalledWith(supabase, 'profile-active');
     expect(result).toEqual({
-      profileResponse: { data: { id: 'profile-active' } },
+      profileResponse: { data: { id: 'profile-active' }, error: null },
       currentUserProfile: { ids: { id: 'profile-active' } },
     });
   });

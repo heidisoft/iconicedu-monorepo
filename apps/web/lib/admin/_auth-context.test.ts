@@ -3,8 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { requireAdminAuthContext } from './_auth-context';
 
 const getUser = vi.fn();
-const getAccountByAuthUserId = vi.fn();
-const getProfileByAccountId = vi.fn();
+const requireEffectiveActorContext = vi.fn();
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(async () => ({
@@ -14,12 +13,10 @@ vi.mock('@iconicedu/web/lib/supabase/server', () => ({
   })),
 }));
 
-vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
-  getAccountByAuthUserId: (...args: unknown[]) => getAccountByAuthUserId(...args),
-}));
-
-vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
-  getProfileByAccountId: (...args: unknown[]) => getProfileByAccountId(...args),
+vi.mock('@iconicedu/web/lib/family-view/actor-context', () => ({
+  requireEffectiveActorContext: (...args: unknown[]) =>
+    requireEffectiveActorContext(...args),
+  ParentModeRequiredError: class ParentModeRequiredError extends Error {},
 }));
 
 describe('requireAdminAuthContext', () => {
@@ -31,11 +28,11 @@ describe('requireAdminAuthContext', () => {
     getUser.mockResolvedValue({
       data: { user: { id: 'auth-user-1' } },
     });
-    getAccountByAuthUserId.mockResolvedValue({
-      data: { id: 'account-1', org_id: 'org-1' },
-    });
-    getProfileByAccountId.mockResolvedValue({
-      data: { id: 'profile-1' },
+    requireEffectiveActorContext.mockResolvedValue({
+      authUserId: 'auth-user-1',
+      account: { id: 'account-1', org_id: 'org-1' },
+      profile: { id: 'profile-1' },
+      isViewingAsChild: false,
     });
 
     const result = await requireAdminAuthContext();

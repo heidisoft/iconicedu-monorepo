@@ -3,8 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { ChannelCreatePayload, ChannelCapabilityVM } from '@iconicedu/shared-types';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
-import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
-import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import { requireParentActorContext } from '@iconicedu/web/lib/family-view/actor-context';
 import { toStoredLiveSessionConfig } from '@iconicedu/web/lib/admin/live-session-config';
 
 export async function updateChannelFromPayload(
@@ -20,17 +19,9 @@ export async function updateChannelFromPayload(
     throw new Error('Unauthorized');
   }
 
-  const accountResponse = await getAccountByAuthUserId(supabase, user.id);
-  if (!accountResponse.data) {
-    throw new Error('Account not found');
-  }
+  const actor = await requireParentActorContext(supabase);
 
-  const profileResponse = await getProfileByAccountId(supabase, accountResponse.data.id);
-  if (!profileResponse.data) {
-    throw new Error('Profile not found');
-  }
-
-  const orgId = accountResponse.data.org_id;
+  const orgId = actor.account.org_id;
   const now = new Date().toISOString();
 
   await updateChannel(supabase, {
@@ -49,14 +40,14 @@ export async function updateChannelFromPayload(
     postingPolicyKind: payload.postingPolicy.kind,
     allowThreads: payload.postingPolicy.allowThreads ?? true,
     allowReactions: payload.postingPolicy.allowReactions ?? true,
-    updatedBy: profileResponse.data.id,
+    updatedBy: actor.profile.id,
     updatedAt: now,
   });
 
   await replaceChannelMembers(supabase, {
     orgId,
     channelId,
-    createdBy: profileResponse.data.id,
+    createdBy: actor.profile.id,
     createdAt: now,
     participants: payload.participants ?? [],
   });
@@ -64,7 +55,7 @@ export async function updateChannelFromPayload(
   await replaceChannelCapabilities(supabase, {
     orgId,
     channelId,
-    createdBy: profileResponse.data.id,
+    createdBy: actor.profile.id,
     createdAt: now,
     capabilities: payload.capabilities ?? [],
   });

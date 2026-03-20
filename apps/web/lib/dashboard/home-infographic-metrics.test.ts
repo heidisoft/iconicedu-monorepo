@@ -242,7 +242,7 @@ describe('buildDashboardHomeInfographicMetrics', () => {
       upcomingSessionsThisWeek: 3,
       completedClassesThisMonth: 3,
       activeSubjectsCount: 1,
-      activeSubjectsLabel: 'English',
+      activeSubjectsLabel: '1 active student',
     });
     expect(result.upcomingSessionsPage.thisWeek.items).toHaveLength(3);
     expect(result.upcomingSessionsPage.nextWeek.items).toHaveLength(5);

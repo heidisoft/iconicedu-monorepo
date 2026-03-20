@@ -107,6 +107,7 @@ export async function buildSidebarUser(
   account: { id: string; org_id: string },
   familyInvite?: FamilyLinkInviteRow | null,
   profileKindOverride?: UserProfileVM['kind'],
+  effectiveProfileRow?: ProfileRow | null,
 ): Promise<{
   accountVM: UserAccountVM;
   profileVM: UserProfileVM;
@@ -114,6 +115,7 @@ export async function buildSidebarUser(
     profileId: string;
     kind: UserProfileVM['kind'];
     label: string;
+    displayName?: string | null;
     isActive: boolean;
   }>;
   addablePersonas: Array<{
@@ -172,12 +174,16 @@ export async function buildSidebarUser(
   });
 
   profileRow =
+    effectiveProfileRow ??
     profileRows.find((row) => row.id === accountRow.data?.active_profile_id) ??
     profileRows.find((row) => row.kind === derivedKind) ??
     profileRows[0] ??
     null;
 
-  if (!profileRow || !profileRows.some((row) => row.kind === derivedKind)) {
+  if (
+    !effectiveProfileRow &&
+    (!profileRow || !profileRows.some((row) => row.kind === derivedKind))
+  ) {
     const upserted = await upsertProfileForAccount(supabase, {
       orgId: account.org_id,
       accountId: account.id,
@@ -235,7 +241,7 @@ export async function buildSidebarUser(
     throw new Error('Profile record missing for authenticated user.');
   }
 
-  if (accountRow.data?.active_profile_id !== profileRow.id) {
+  if (!effectiveProfileRow && accountRow.data?.active_profile_id !== profileRow.id) {
     await updateAccountActiveProfile(supabase, {
       accountId: account.id,
       orgId: account.org_id,
@@ -355,6 +361,7 @@ function buildAvailablePersonas(profileRows: ProfileRow[], activeProfileId: stri
           profileId: row.id,
           kind: row.kind as UserProfileVM['kind'],
           label: toPersonaLabel(row.kind),
+          displayName: row.display_name ?? null,
           isActive: row.id === activeProfileId,
         },
       ]),

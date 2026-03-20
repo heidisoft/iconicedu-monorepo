@@ -8,7 +8,7 @@ import type {
 } from '@iconicedu/shared-types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
-import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
+import { requireParentActorContext } from '@iconicedu/web/lib/family-view/actor-context';
 import {
   acceptFamilyInvite,
   createFamilyInvite,
@@ -31,15 +31,12 @@ async function resolveGuardianContext(): Promise<ResolvedGuardianContext> {
     throw new Error('Unauthorized');
   }
 
-  const accountResponse = await getAccountByAuthUserId(supabase, userData.user.id);
-  if (!accountResponse.data) {
-    throw new Error('Account record not found');
-  }
+  const actor = await requireParentActorContext(supabase);
 
   return {
     supabase,
-    accountId: accountResponse.data.id,
-    orgId: accountResponse.data.org_id,
+    accountId: actor.account.id,
+    orgId: actor.account.org_id,
   };
 }
 
@@ -54,14 +51,11 @@ async function resolveAccountContext(): Promise<{
     throw new Error('Unauthorized');
   }
 
-  const accountResponse = await getAccountByAuthUserId(supabase, userData.user.id);
-  if (!accountResponse.data) {
-    throw new Error('Account record not found');
-  }
+  const actor = await requireParentActorContext(supabase);
 
   return {
     supabase,
-    account: accountResponse.data,
+    account: actor.account,
   };
 }
 

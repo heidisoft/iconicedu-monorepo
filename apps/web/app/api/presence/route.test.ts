@@ -1,19 +1,14 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { POST } from '@iconicedu/web/app/api/presence/route';
 import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
 
 const upsert = vi.fn();
-const getUser = vi.fn(async () => ({ data: { user: { id: 'auth-user' } } }));
+const requireEffectiveActorContext = vi.fn();
 const APP_URL = resolveAppUrl();
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
-  createSupabaseServerClient: vi.fn(() => ({
-    auth: {
-      getUser,
-    },
-  })),
+  createSupabaseServerClient: vi.fn(() => ({})),
 }));
 
 vi.mock('@iconicedu/web/lib/supabase/service', () => ({
@@ -24,17 +19,20 @@ vi.mock('@iconicedu/web/lib/supabase/service', () => ({
   })),
 }));
 
-vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
-  getAccountByAuthUserId: vi.fn(async () => ({
-    data: { id: 'account-1', org_id: 'org-1' },
-  })),
-}));
-
-vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
-  getProfileByAccountId: vi.fn(async () => ({ data: { id: 'profile-1' } })),
+vi.mock('@iconicedu/web/lib/family-view/actor-context', () => ({
+  requireEffectiveActorContext: (...args: unknown[]) =>
+    requireEffectiveActorContext(...args),
 }));
 
 describe('POST /api/presence', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    requireEffectiveActorContext.mockResolvedValue({
+      account: { id: 'account-1', org_id: 'org-1' },
+      profile: { id: 'profile-1' },
+    });
+  });
+
   it('returns 400 for invalid json body', async () => {
     const response = await POST(
       new Request(`${APP_URL}/api/presence`, {
@@ -157,7 +155,7 @@ describe('POST /api/presence', () => {
   });
 
   it('returns 401 when auth user is missing', async () => {
-    getUser.mockResolvedValueOnce({ data: { user: null } } as any);
+    requireEffectiveActorContext.mockRejectedValueOnce(new Error('Unauthorized'));
 
     const response = await POST(
       new Request(`${APP_URL}/api/presence`, {

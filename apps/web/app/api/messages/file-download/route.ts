@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server';
 
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
-import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
-import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { createSignedChannelFileUrl } from '@iconicedu/web/lib/messages/queries/file-url.query';
-import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import { requireEffectiveActorContext } from '@iconicedu/web/lib/family-view/actor-context';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -26,26 +24,27 @@ export async function GET(request: Request) {
   }
 
   const supabase = await createSupabaseServerClient();
-  const authUser = await requireAuthedUser(supabase);
-  const accountResponse = await getAccountByAuthUserId(supabase, authUser.id);
+  let actor;
+  try {
+    actor = await requireEffectiveActorContext(supabase);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Account not found') {
+      return NextResponse.json(
+        { success: false, message: 'Account not found' },
+        { status: 404 },
+      );
+    }
+    throw error;
+  }
 
-  if (!accountResponse.data) {
+  if (!actor) {
     return NextResponse.json(
       { success: false, message: 'Account not found' },
       { status: 404 },
     );
   }
 
-  const profileResponse = await getProfileByAccountId(supabase, accountResponse.data.id);
-
-  if (!profileResponse.data) {
-    return NextResponse.json(
-      { success: false, message: 'Profile not found' },
-      { status: 404 },
-    );
-  }
-
-  if (accountResponse.data.org_id !== orgId) {
+  if (actor.account.org_id !== orgId) {
     return NextResponse.json({ success: false, message: 'Forbidden' }, { status: 403 });
   }
 
@@ -54,7 +53,7 @@ export async function GET(request: Request) {
     .select('id')
     .eq('org_id', orgId)
     .eq('channel_id', channelId)
-    .eq('profile_id', profileResponse.data.id)
+    .eq('profile_id', actor.profile.id)
     .is('deleted_at', null)
     .limit(1)
     .maybeSingle();

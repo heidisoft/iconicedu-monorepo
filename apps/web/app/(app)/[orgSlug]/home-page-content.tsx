@@ -60,6 +60,7 @@ export async function HomePageContent({ orgSlug }: { orgSlug: string }) {
       orgSlug={orgSlug}
       isStaffView={metrics.isStaffView}
       isParentView={!metrics.isStaffView && metrics.activeRole === 'parents'}
+      isTutorView={!metrics.isStaffView && metrics.activeRole === 'tutors'}
       topMetrics={metrics.metricsByRole[metrics.activeRole]}
       upcomingSessionsPage={metrics.upcomingSessionsPage}
       calendarHref={metrics.calendarHref}

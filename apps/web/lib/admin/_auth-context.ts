@@ -1,5 +1,7 @@
-import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
-import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import {
+  ParentModeRequiredError,
+  requireEffectiveActorContext,
+} from '@iconicedu/web/lib/family-view/actor-context';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 
 export type AdminAuthContext = {
@@ -20,21 +22,16 @@ export async function requireAdminAuthContext(): Promise<AdminAuthContext> {
     throw new Error('Unauthorized');
   }
 
-  const accountResponse = await getAccountByAuthUserId(supabase, user.id);
-  if (!accountResponse.data) {
-    throw new Error('Account not found');
-  }
-
-  const profileResponse = await getProfileByAccountId(supabase, accountResponse.data.id);
-  if (!profileResponse.data) {
-    throw new Error('Profile not found');
+  const actor = await requireEffectiveActorContext(supabase);
+  if (actor.isViewingAsChild) {
+    throw new ParentModeRequiredError();
   }
 
   return {
     supabase,
-    accountId: accountResponse.data.id,
-    orgId: accountResponse.data.org_id,
-    profileId: profileResponse.data.id,
+    accountId: actor.account.id,
+    orgId: actor.account.org_id,
+    profileId: actor.profile.id,
     now: new Date().toISOString(),
   };
 }

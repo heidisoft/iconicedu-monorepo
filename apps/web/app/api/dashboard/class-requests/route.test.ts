@@ -8,8 +8,7 @@ const APP_URL = resolveAppUrl();
 const createSupabaseServerClientMock = vi.fn();
 const requireAuthedUserMock = vi.fn();
 const buildOrgBySlugMock = vi.fn();
-const getAccountByAuthUserIdMock = vi.fn();
-const getProfileByAccountIdMock = vi.fn();
+const resolveEffectiveProfileForAuthUserInOrgMock = vi.fn();
 const buildUserProfileByIdMock = vi.fn();
 const getProfilesByIdsMock = vi.fn();
 const getProfilesByKindMock = vi.fn();
@@ -36,12 +35,12 @@ vi.mock('@iconicedu/web/lib/org/builders/org.builder', () => ({
   buildOrgBySlug: (...args: unknown[]) => buildOrgBySlugMock(...args),
 }));
 
-vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
-  getAccountByAuthUserId: (...args: unknown[]) => getAccountByAuthUserIdMock(...args),
+vi.mock('@iconicedu/web/lib/family-view/effective-profile', () => ({
+  resolveEffectiveProfileForAuthUserInOrg: (...args: unknown[]) =>
+    resolveEffectiveProfileForAuthUserInOrgMock(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
-  getProfileByAccountId: (...args: unknown[]) => getProfileByAccountIdMock(...args),
   getProfilesByIds: (...args: unknown[]) => getProfilesByIdsMock(...args),
   getProfilesByKind: (...args: unknown[]) => getProfilesByKindMock(...args),
 }));
@@ -96,8 +95,7 @@ describe('POST /api/dashboard/class-requests', () => {
     createSupabaseServerClientMock.mockReset();
     requireAuthedUserMock.mockReset();
     buildOrgBySlugMock.mockReset();
-    getAccountByAuthUserIdMock.mockReset();
-    getProfileByAccountIdMock.mockReset();
+    resolveEffectiveProfileForAuthUserInOrgMock.mockReset();
     buildUserProfileByIdMock.mockReset();
     getProfilesByIdsMock.mockReset();
     getProfilesByKindMock.mockReset();
@@ -121,11 +119,8 @@ describe('POST /api/dashboard/class-requests', () => {
       ],
       error: null,
     });
-    getAccountByAuthUserIdMock.mockResolvedValue({
-      data: { id: 'account-1', org_id: 'org-1' },
-    });
-    getProfileByAccountIdMock.mockResolvedValue({
-      data: {
+    resolveEffectiveProfileForAuthUserInOrgMock.mockResolvedValue({
+      effectiveProfile: {
         id: 'guardian-1',
         org_id: 'org-1',
         kind: 'guardian',
@@ -169,8 +164,8 @@ describe('POST /api/dashboard/class-requests', () => {
   });
 
   it('returns 403 when caller is not parent or student', async () => {
-    getProfileByAccountIdMock.mockResolvedValueOnce({
-      data: {
+    resolveEffectiveProfileForAuthUserInOrgMock.mockResolvedValueOnce({
+      effectiveProfile: {
         id: 'staff-2',
         org_id: 'org-1',
         kind: 'staff',

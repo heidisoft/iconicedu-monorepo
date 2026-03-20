@@ -1,11 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
-  getAccountByAuthUserId: vi.fn(),
-}));
+import type { ProfileRow } from '@iconicedu/shared-types';
 
 vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
-  getProfileByAccountId: vi.fn(),
   getProfilesByIds: vi.fn(),
 }));
 
@@ -31,17 +27,29 @@ vi.mock('@iconicedu/web/lib/activity-feed/publisher/activity-publisher', () => (
   publishActivityEvent: vi.fn(),
 }));
 
-import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
-import {
-  getProfileByAccountId,
-  getProfilesByIds,
-} from '@iconicedu/web/lib/profile/queries/profiles.query';
+import { getProfilesByIds } from '@iconicedu/web/lib/profile/queries/profiles.query';
 import { publishActivityEvent } from '@iconicedu/web/lib/activity-feed/publisher/activity-publisher';
 import { resolveChannelLiveSessionScope } from '@iconicedu/web/lib/live-sessions/scope';
 import {
   createOrJoinLiveSession,
   resolveLiveSessionJoinAccess,
 } from '@iconicedu/web/lib/live-sessions/service';
+
+const DEFAULT_ACTOR = {
+  authUserId: 'auth-user-1',
+  account: {
+    id: 'account-1',
+    org_id: 'org-1',
+  },
+  profile: {
+    id: 'profile-1',
+    account_id: 'account-1',
+    kind: 'educator',
+    display_name: 'Taylor Reed',
+    first_name: 'Taylor',
+    last_name: 'Reed',
+  } as unknown as ProfileRow,
+} as const;
 
 function createServiceSupabaseStub(input?: {
   activeLiveSessionRow?: Record<string, unknown> | null;
@@ -393,26 +401,6 @@ function createImmediateScheduler() {
 describe('createOrJoinLiveSession', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(getAccountByAuthUserId).mockResolvedValue({
-      data: {
-        id: 'account-1',
-        org_id: 'org-1',
-      },
-      error: null,
-    } as never);
-
-    vi.mocked(getProfileByAccountId).mockResolvedValue({
-      data: {
-        id: 'profile-1',
-        account_id: 'account-1',
-        kind: 'educator',
-        display_name: 'Taylor Reed',
-        first_name: 'Taylor',
-        last_name: 'Reed',
-      },
-      error: null,
-    } as never);
-
     vi.mocked(getProfilesByIds).mockResolvedValue({
       data: [
         {
@@ -439,9 +427,8 @@ describe('createOrJoinLiveSession', () => {
     const scheduler = createImmediateScheduler();
 
     const result = await createOrJoinLiveSession({
-      supabase: {} as never,
       serviceSupabase: serviceSupabase as never,
-      authUserId: 'auth-user-1',
+      actor: DEFAULT_ACTOR,
       channelId: 'channel-1',
       orgSlug: 'iconic-academy',
       schedulePostJoinSideEffects: scheduler.schedule,
@@ -541,9 +528,8 @@ describe('createOrJoinLiveSession', () => {
     const scheduler = createImmediateScheduler();
 
     const result = await createOrJoinLiveSession({
-      supabase: {} as never,
       serviceSupabase: serviceSupabase as never,
-      authUserId: 'auth-user-1',
+      actor: DEFAULT_ACTOR,
       channelId: 'channel-1',
       orgSlug: 'iconic-academy',
       schedulePostJoinSideEffects: scheduler.schedule,
@@ -607,9 +593,8 @@ describe('createOrJoinLiveSession', () => {
     const scheduler = createImmediateScheduler();
 
     await createOrJoinLiveSession({
-      supabase: {} as never,
       serviceSupabase: serviceSupabase as never,
-      authUserId: 'auth-user-1',
+      actor: DEFAULT_ACTOR,
       channelId: 'channel-1',
       orgSlug: 'iconic-academy',
       schedulePostJoinSideEffects: scheduler.schedule,
@@ -639,9 +624,8 @@ describe('createOrJoinLiveSession', () => {
     const scheduler = createImmediateScheduler();
 
     const result = await createOrJoinLiveSession({
-      supabase: {} as never,
       serviceSupabase: serviceSupabase as never,
-      authUserId: 'auth-user-1',
+      actor: DEFAULT_ACTOR,
       channelId: 'channel-1',
       orgSlug: 'iconic-academy',
       schedulePostJoinSideEffects: scheduler.schedule,
@@ -663,17 +647,6 @@ describe('createOrJoinLiveSession', () => {
   });
 
   it('allows guardians to join when a linked child is a channel member', async () => {
-    vi.mocked(getProfileByAccountId).mockResolvedValueOnce({
-      data: {
-        id: 'profile-guardian-1',
-        account_id: 'account-guardian-1',
-        kind: 'guardian',
-        display_name: 'Riley Guardian',
-        first_name: 'Riley',
-        last_name: 'Guardian',
-      },
-      error: null,
-    } as never);
     vi.mocked(getProfilesByIds).mockResolvedValueOnce({
       data: [
         {
@@ -697,9 +670,22 @@ describe('createOrJoinLiveSession', () => {
     });
 
     const result = await createOrJoinLiveSession({
-      supabase: {} as never,
       serviceSupabase: serviceSupabase as never,
-      authUserId: 'auth-user-1',
+      actor: {
+        ...DEFAULT_ACTOR,
+        account: {
+          id: 'account-guardian-1',
+          org_id: 'org-1',
+        },
+        profile: {
+          id: 'profile-guardian-1',
+          account_id: 'account-guardian-1',
+          kind: 'guardian',
+          display_name: 'Riley Guardian',
+          first_name: 'Riley',
+          last_name: 'Guardian',
+        } as unknown as ProfileRow,
+      },
       channelId: 'channel-1',
       orgSlug: 'iconic-academy',
     });
@@ -711,18 +697,6 @@ describe('createOrJoinLiveSession', () => {
   });
 
   it('still denies guardians when linked children are not channel members', async () => {
-    vi.mocked(getProfileByAccountId).mockResolvedValueOnce({
-      data: {
-        id: 'profile-guardian-1',
-        account_id: 'account-guardian-1',
-        kind: 'guardian',
-        display_name: 'Riley Guardian',
-        first_name: 'Riley',
-        last_name: 'Guardian',
-      },
-      error: null,
-    } as never);
-
     const serviceSupabase = createServiceSupabaseStub({
       memberProfileIds: ['profile-other-1'],
       familyLinks: [
@@ -735,9 +709,22 @@ describe('createOrJoinLiveSession', () => {
 
     await expect(
       createOrJoinLiveSession({
-        supabase: {} as never,
         serviceSupabase: serviceSupabase as never,
-        authUserId: 'auth-user-1',
+        actor: {
+          ...DEFAULT_ACTOR,
+          account: {
+            id: 'account-guardian-1',
+            org_id: 'org-1',
+          },
+          profile: {
+            id: 'profile-guardian-1',
+            account_id: 'account-guardian-1',
+            kind: 'guardian',
+            display_name: 'Riley Guardian',
+            first_name: 'Riley',
+            last_name: 'Guardian',
+          } as unknown as ProfileRow,
+        },
         channelId: 'channel-1',
         orgSlug: 'iconic-academy',
       }),
@@ -780,9 +767,8 @@ describe('createOrJoinLiveSession', () => {
     const scheduler = createImmediateScheduler();
 
     await createOrJoinLiveSession({
-      supabase: {} as never,
       serviceSupabase: serviceSupabase as never,
-      authUserId: 'auth-user-1',
+      actor: DEFAULT_ACTOR,
       channelId: 'channel-1',
       orgSlug: 'iconic-academy',
       schedulePostJoinSideEffects: scheduler.schedule,
@@ -823,9 +809,8 @@ describe('createOrJoinLiveSession', () => {
     const scheduler = createImmediateScheduler();
 
     await createOrJoinLiveSession({
-      supabase: {} as never,
       serviceSupabase: serviceSupabase as never,
-      authUserId: 'auth-user-1',
+      actor: DEFAULT_ACTOR,
       channelId: 'channel-1',
       orgSlug: 'iconic-academy',
       schedulePostJoinSideEffects: scheduler.schedule,
@@ -847,9 +832,8 @@ describe('createOrJoinLiveSession', () => {
     vi.mocked(publishActivityEvent).mockRejectedValueOnce(new Error('activity failed'));
 
     const result = await createOrJoinLiveSession({
-      supabase: {} as never,
       serviceSupabase: serviceSupabase as never,
-      authUserId: 'auth-user-1',
+      actor: DEFAULT_ACTOR,
       channelId: 'channel-1',
       orgSlug: 'iconic-academy',
       schedulePostJoinSideEffects: scheduler.schedule,

@@ -1,6 +1,4 @@
-import { getAccountByAuthUserIdInOrg } from '@iconicedu/web/lib/accounts/queries/accounts.query';
-import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
-import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import { requireEffectiveActorContext } from '@iconicedu/web/lib/family-view/actor-context';
 import { getUserRoles } from '@iconicedu/web/lib/profile/queries/roles.query';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 
@@ -13,17 +11,24 @@ export async function requireAdminOrgContext(
   options?: { allowStaff?: boolean },
 ) {
   const supabase = await createSupabaseServerClient();
-  const authUser = await requireAuthedUser(supabase);
-  const accountResponse = await getAccountByAuthUserIdInOrg(supabase, authUser.id, orgId);
-
-  if (!accountResponse.data) {
+  let actor;
+  try {
+    actor = await requireEffectiveActorContext(supabase, { orgId });
+  } catch {
     return { ok: false as const, status: 401, message: 'Unauthorized' };
+  }
+  if (actor.isViewingAsChild) {
+    return {
+      ok: false as const,
+      status: 403,
+      message: 'Switch back to Parent to perform this action.',
+    };
   }
 
   const rolesResponse = await getUserRoles(
     supabase,
-    accountResponse.data.id,
-    accountResponse.data.org_id,
+    actor.account.id,
+    actor.account.org_id,
   );
   if (rolesResponse.error) {
     return { ok: false as const, status: 500, message: rolesResponse.error.message };
@@ -38,14 +43,9 @@ export async function requireAdminOrgContext(
     return { ok: false as const, status: 403, message: 'Forbidden' };
   }
 
-  const profileResponse = await getProfileByAccountId(supabase, accountResponse.data.id);
-  if (profileResponse.error) {
-    return { ok: false as const, status: 500, message: profileResponse.error.message };
-  }
-
   return {
     ok: true as const,
     orgId,
-    actorProfileId: profileResponse.data?.id ?? null,
+    actorProfileId: actor.profile.id,
   };
 }

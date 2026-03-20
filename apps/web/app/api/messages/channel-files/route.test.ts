@@ -4,7 +4,7 @@ import { GET } from '@iconicedu/web/app/api/messages/channel-files/route';
 import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
 
 const buildChannelFiles = vi.fn();
-const getProfileByAccountId = vi.fn();
+const requireEffectiveActorContext = vi.fn();
 const messagesQuery = {
   select: vi.fn(),
   eq: vi.fn(),
@@ -21,27 +21,22 @@ vi.mock('@iconicedu/web/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(() => supabase),
 }));
 
-vi.mock('@iconicedu/web/lib/auth/requireAuthedUser', () => ({
-  requireAuthedUser: vi.fn(async () => ({ id: 'auth-user' })),
-}));
-
-vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
-  getAccountByAuthUserId: vi.fn(async () => ({
-    data: { id: 'account-1', org_id: 'org-1', active_profile_id: 'profile-1' },
-  })),
+vi.mock('@iconicedu/web/lib/family-view/actor-context', () => ({
+  requireEffectiveActorContext: (...args: unknown[]) =>
+    requireEffectiveActorContext(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/messages/builders/channel-messages.builder', () => ({
   buildChannelFiles: (...args: unknown[]) => buildChannelFiles(...args),
 }));
 
-vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
-  getProfileByAccountId: (...args: unknown[]) => getProfileByAccountId(...args),
-}));
-
 describe('GET /api/messages/channel-files', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    requireEffectiveActorContext.mockResolvedValue({
+      account: { id: 'account-1', org_id: 'org-1' },
+      profile: { id: 'profile-1' },
+    });
     supabase.from.mockReturnValue(messagesQuery);
     messagesQuery.select.mockReturnValue(messagesQuery);
     messagesQuery.eq.mockReturnValue(messagesQuery);

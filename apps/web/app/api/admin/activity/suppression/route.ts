@@ -6,17 +6,9 @@ import type {
   DeleteActivityVerbSuppressionRuleInput,
   UpsertActivityVerbSuppressionRuleInput,
 } from '@iconicedu/shared-types';
-import { getAccountByAuthUserIdInOrg } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { listActivityEventDefinitionTypes } from '@iconicedu/web/lib/activity-feed/definitions/activity-definitions';
-import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
-import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
-import { getUserRoles } from '@iconicedu/web/lib/profile/queries/roles.query';
-import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
+import { requireAdminOrgContext } from '@iconicedu/web/lib/admin/require-admin-org-context';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
-
-function isAllowedAdminRole(roleKey: string | null | undefined) {
-  return roleKey === 'owner' || roleKey === 'admin';
-}
 
 function asRuleVm(row: ActivityEventSuppressionRuleRow): ActivityVerbSuppressionRuleVM {
   return {
@@ -28,43 +20,6 @@ function asRuleVm(row: ActivityEventSuppressionRuleRow): ActivityVerbSuppression
     isEnabled: row.is_enabled,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-  };
-}
-
-async function requireAdminOrgContext(orgId: string) {
-  const supabase = await createSupabaseServerClient();
-  const authUser = await requireAuthedUser(supabase);
-  const accountResponse = await getAccountByAuthUserIdInOrg(supabase, authUser.id, orgId);
-
-  if (!accountResponse.data) {
-    return { ok: false as const, status: 401, message: 'Unauthorized' };
-  }
-
-  const rolesResponse = await getUserRoles(
-    supabase,
-    accountResponse.data.id,
-    accountResponse.data.org_id,
-  );
-  if (rolesResponse.error) {
-    return { ok: false as const, status: 500, message: rolesResponse.error.message };
-  }
-
-  const hasAdminRole = (rolesResponse.data ?? []).some((role) =>
-    isAllowedAdminRole(role.role_key),
-  );
-  if (!hasAdminRole) {
-    return { ok: false as const, status: 403, message: 'Forbidden' };
-  }
-
-  const profileResponse = await getProfileByAccountId(supabase, accountResponse.data.id);
-  if (profileResponse.error) {
-    return { ok: false as const, status: 500, message: profileResponse.error.message };
-  }
-
-  return {
-    ok: true as const,
-    orgId,
-    actorProfileId: profileResponse.data?.id ?? null,
   };
 }
 

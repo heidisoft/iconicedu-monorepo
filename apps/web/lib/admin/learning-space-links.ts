@@ -2,8 +2,7 @@ import { randomUUID } from 'crypto';
 
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
-import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
-import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import { requireParentActorContext } from '@iconicedu/web/lib/family-view/actor-context';
 import type { LearningSpaceResourcePayload } from '@iconicedu/shared-types';
 
 export async function replaceLearningSpaceLinks(
@@ -19,18 +18,10 @@ export async function replaceLearningSpaceLinks(
     throw new Error('Unauthorized');
   }
 
-  const accountResponse = await getAccountByAuthUserId(supabase, user.id);
-  if (!accountResponse.data) {
-    throw new Error('Account not found');
-  }
+  const actor = await requireParentActorContext(supabase);
+  const profileId = actor.profile.id;
 
-  const profileResponse = await getProfileByAccountId(supabase, accountResponse.data.id);
-  if (!profileResponse.data) {
-    throw new Error('Profile not found');
-  }
-  const profileId = profileResponse.data.id;
-
-  const orgId = accountResponse.data.org_id;
+  const orgId = actor.account.org_id;
   const now = new Date().toISOString();
 
   const serviceClient = createSupabaseServiceClient();

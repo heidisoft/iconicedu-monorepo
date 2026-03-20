@@ -1,7 +1,8 @@
 import { after, NextResponse } from 'next/server';
 
-import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
+import { requireEffectiveActorContext } from '@iconicedu/web/lib/family-view/actor-context';
 import { createOrJoinLiveSession } from '@iconicedu/web/lib/live-sessions/service';
+import { getOrgBySlug } from '@iconicedu/web/lib/org/queries/org.query';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 
@@ -28,31 +29,48 @@ export async function POST(
     }
 
     const supabase = await createSupabaseServerClient();
-    const authUser = await requireAuthedUser(supabase);
     const serviceSupabase = createSupabaseServiceClient();
-    console.info('[live-session:debug][api-join] resolved auth', {
+    const orgResponse = await getOrgBySlug(serviceSupabase, body.orgSlug);
+    if (orgResponse.error) {
+      throw new Error(orgResponse.error.message);
+    }
+    if (!orgResponse.data) {
+      return NextResponse.json(
+        { success: false, error: 'Organization not found' },
+        { status: 404 },
+      );
+    }
+    const actor = await requireEffectiveActorContext(supabase, {
+      orgId: orgResponse.data.id,
+    });
+    console.info('[live-session:debug][api-join] resolved actor', {
       channelId,
-      authUserId: authUser.id,
+      authUserId: actor.authUserId,
+      accountId: actor.account.id,
+      profileId: actor.profile.id,
       orgSlug: body.orgSlug,
     });
 
     const result = await createOrJoinLiveSession({
-      supabase,
       serviceSupabase,
-      authUserId: authUser.id,
+      actor: {
+        authUserId: actor.authUserId,
+        account: actor.account,
+        profile: actor.profile,
+      },
       channelId,
       orgSlug: body.orgSlug,
       schedulePostJoinSideEffects: (task) => {
         console.info('[live-session:debug][api-join] scheduling post-join side effects', {
           channelId,
-          authUserId: authUser.id,
+          authUserId: actor.authUserId,
         });
         after(task);
       },
     });
     console.info('[live-session:debug][api-join] createOrJoinLiveSession result', {
       channelId,
-      authUserId: authUser.id,
+      authUserId: actor.authUserId,
       sessionId: result.sessionId,
       created: result.created,
       status: result.status,

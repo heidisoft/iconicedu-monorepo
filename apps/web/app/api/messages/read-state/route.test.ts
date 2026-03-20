@@ -1,9 +1,10 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { POST } from '@iconicedu/web/app/api/messages/read-state/route';
 import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
 
 const rpc = vi.fn();
+const requireEffectiveActorContext = vi.fn();
 const channelMaybeSingle = vi.fn();
 const messageMaybeSingle = vi.fn();
 const memberMaybeSingle = vi.fn();
@@ -40,21 +41,20 @@ vi.mock('@iconicedu/web/lib/supabase/server', () => ({
   })),
 }));
 
-vi.mock('@iconicedu/web/lib/auth/requireAuthedUser', () => ({
-  requireAuthedUser: vi.fn(async () => ({ id: 'auth-user' })),
-}));
-
-vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
-  getAccountByAuthUserId: vi.fn(async () => ({
-    data: { id: 'account-1', org_id: 'org-1' },
-  })),
-}));
-
-vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
-  getProfileByAccountId: vi.fn(async () => ({ data: { id: 'profile-1' } })),
+vi.mock('@iconicedu/web/lib/family-view/actor-context', () => ({
+  requireEffectiveActorContext: (...args: unknown[]) =>
+    requireEffectiveActorContext(...args),
 }));
 
 describe('POST /api/messages/read-state', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    requireEffectiveActorContext.mockResolvedValue({
+      account: { id: 'account-1', org_id: 'org-1' },
+      profile: { id: 'profile-1' },
+    });
+  });
+
   it('returns 400 when channelId is missing', async () => {
     const response = await POST(
       new Request(`${APP_URL}/api/messages/read-state`, {

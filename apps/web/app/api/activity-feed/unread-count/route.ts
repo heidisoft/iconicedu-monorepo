@@ -1,34 +1,24 @@
 import { NextResponse } from 'next/server';
 
-import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { buildActivityFeedUnreadCountForProfile } from '@iconicedu/web/lib/activity-feed/builders/activity-feed.builder';
-import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import { requireEffectiveActorContext } from '@iconicedu/web/lib/family-view/actor-context';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 
-export async function GET() {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const orgId = searchParams.get('orgId')?.trim() || undefined;
   const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  let actor;
+  try {
+    actor = await requireEffectiveActorContext(supabase, orgId ? { orgId } : undefined);
+  } catch {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const accountResponse = await getAccountByAuthUserId(supabase, user.id);
-  if (!accountResponse.data) {
-    return NextResponse.json({ error: 'Account not found' }, { status: 404 });
-  }
-
-  const profileResponse = await getProfileByAccountId(supabase, accountResponse.data.id);
-  if (!profileResponse.data) {
-    return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
   }
 
   const unreadCount = await buildActivityFeedUnreadCountForProfile(
     supabase,
-    accountResponse.data.org_id,
-    profileResponse.data.id,
+    actor.account.org_id,
+    actor.profile.id,
   );
 
   return NextResponse.json({ unreadCount });

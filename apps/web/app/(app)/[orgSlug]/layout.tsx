@@ -10,6 +10,7 @@ import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
 import { getOrCreateAccount } from '@iconicedu/web/lib/accounts/getOrCreateAccount';
 import { loadSidebarContext } from '@iconicedu/web/lib/sidebar/loadSidebarContext';
 import { buildSidebarBaseData } from '@iconicedu/web/lib/sidebar/buildSidebarBaseData';
+import { resolveEffectiveProfileForAccountInOrg } from '@iconicedu/web/lib/family-view/effective-profile';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
 import { resolveOrgDashboardPath } from '@iconicedu/web/lib/org/resolve-dashboard-path';
 import { shouldRedirectToAuthResume } from '@iconicedu/web/app/(app)/[orgSlug]/layout-auth-gate';
@@ -71,10 +72,15 @@ export default async function Layout({
     redirect(`/${orgSlug}/login/pending-access`);
   }
 
+  const familyViewResolution = await resolveEffectiveProfileForAccountInOrg(supabase, {
+    account,
+    authUserId: authUser.id,
+  });
+
   const baseSidebarData = await buildSidebarBaseData(
     supabase,
     account.org_id,
-    account.id,
+    familyViewResolution.effectiveProfile.account_id,
     `/${orgSlug}`,
   );
   const { sidebarData, onboardingStatus } = await loadSidebarContext(supabase, {
@@ -82,6 +88,13 @@ export default async function Layout({
     account,
     familyInvite: invite,
     baseSidebarData,
+    effectiveProfileRow: familyViewResolution.effectiveProfile,
+    familySwitchOptions: familyViewResolution.familySwitchOptions.map((option) => ({
+      ...option,
+      isActive: option.profileId === familyViewResolution.effectiveProfile.id,
+    })),
+    isViewingAsChild: familyViewResolution.isViewingAsChild,
+    viewingAsProfileId: familyViewResolution.viewingAsProfileId,
   });
   const [isPersonaSwitchEnabled, isPersonaAddEnabled] = await Promise.all([
     enablePersonaSwitch.run({

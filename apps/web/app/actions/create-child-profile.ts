@@ -13,7 +13,7 @@ import {
 } from '@iconicedu/web/lib/family/queries/invite.query';
 import { loadChildProfiles } from '@iconicedu/web/lib/profile/builders/load-child-profiles';
 import { buildChildDisplayName } from '@iconicedu/web/lib/profile/display-name';
-import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
+import { requireParentActorContext } from '@iconicedu/web/lib/family-view/actor-context';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 
 const normalizeEmail = (value?: string | null) => value?.trim().toLowerCase() ?? null;
@@ -170,12 +170,8 @@ export async function createChildProfileAction(
     throw new Error('Unauthorized');
   }
 
-  const accountResponse = await getAccountByAuthUserId(supabase, user.id);
-  if (!accountResponse.data) {
-    throw new Error('Guardian account not found');
-  }
-
-  const guardianAccount = accountResponse.data;
+  const actor = await requireParentActorContext(supabase);
+  const guardianAccount = actor.account;
   if (input.orgId !== guardianAccount.org_id) {
     throw new Error('Organization mismatch');
   }

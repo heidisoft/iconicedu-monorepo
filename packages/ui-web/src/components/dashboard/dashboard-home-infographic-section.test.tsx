@@ -232,6 +232,29 @@ describe('DashboardHomeInfographicSection', () => {
     expect(screen.getAllByRole('button', { name: 'Message' })).toHaveLength(3);
   });
 
+  it('shows Active Students tile for tutor view', () => {
+    render(
+      <DashboardHomeInfographicSection
+        orgSlug="iconic-academy"
+        isTutorView
+        topMetrics={{
+          upcomingSessionsThisWeek: 2,
+          completedClassesThisMonth: 10,
+          activeSubjectsCount: 4,
+          activeSubjectsLabel: '4 active students',
+        }}
+        upcomingSessionsPage={combinedPaginationSessionPage}
+        calendarHref="/iconic-academy/class-schedule"
+        notificationsHref="/iconic-academy/notifications"
+        browseHref="/iconic-academy/spaces"
+      />,
+    );
+
+    expect(screen.getByText('Active Students')).toBeInTheDocument();
+    expect(screen.queryByText('Active Subjects')).not.toBeInTheDocument();
+    expect(screen.getByText('4 active students')).toBeInTheDocument();
+  });
+
   it('renders parent CTA and opens family settings tab', async () => {
     const user = userEvent.setup();
     const dispatchEventSpy = vi.spyOn(window, 'dispatchEvent');

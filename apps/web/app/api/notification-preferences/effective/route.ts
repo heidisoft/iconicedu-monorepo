@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
-import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
-import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import { requireEffectiveActorContext } from '@iconicedu/web/lib/family-view/actor-context';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { getNotificationPolicyConfig } from '@iconicedu/web/lib/notifications/policy-config';
 import { resolveEffectivePreference } from '@iconicedu/web/lib/notifications/resolve-effective-preference';
@@ -35,28 +33,8 @@ export async function POST(request: Request) {
 
   const supabase = await createSupabaseServerClient();
   try {
-    const authUser = await requireAuthedUser(supabase);
-    const accountResponse = await getAccountByAuthUserId(supabase, authUser.id);
-    if (!accountResponse.data) {
-      return NextResponse.json(
-        { success: false, message: 'Account not found.' },
-        { status: 404 },
-      );
-    }
-    const profileResponse = await getProfileByAccountId(
-      supabase,
-      accountResponse.data.id,
-    );
-    if (!profileResponse.data) {
-      return NextResponse.json(
-        { success: false, message: 'Profile not found.' },
-        { status: 404 },
-      );
-    }
-    if (
-      profileResponse.data.id !== body.profileId ||
-      accountResponse.data.org_id !== body.orgId
-    ) {
+    const actor = await requireEffectiveActorContext(supabase, { orgId: body.orgId });
+    if (actor.profile.id !== body.profileId || actor.account.org_id !== body.orgId) {
       return NextResponse.json({ success: false, message: 'Forbidden' }, { status: 403 });
     }
 

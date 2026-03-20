@@ -116,6 +116,16 @@ function toActiveSubjectsLabel(subjects: string[]): string {
   return `${subjects.slice(0, 3).join(', ')} +${subjects.length - 3} more`;
 }
 
+function toActiveStudentsLabel(activeStudentsCount: number): string {
+  if (!activeStudentsCount) {
+    return 'No active students yet';
+  }
+
+  return activeStudentsCount === 1
+    ? '1 active student'
+    : `${activeStudentsCount} active students`;
+}
+
 function getProfileRoleForScope(activeRole: DashboardInfographicRole) {
   if (activeRole === 'tutors') return 'educator';
   return 'child';
@@ -411,14 +421,42 @@ async function buildActiveRoleMetrics(input: {
         );
       })();
 
+  const activeStudentsCount =
+    input.activeRole === 'tutors'
+      ? (() => {
+          const activeLearningSpaceIdSet = new Set(learningSpaceIds);
+          const activeStudentIds = new Set<string>();
+
+          scopedSchedules.forEach((schedule) => {
+            if (schedule.source.kind !== 'class_session') {
+              return;
+            }
+            if (!activeLearningSpaceIdSet.has(schedule.source.learningSpaceId)) {
+              return;
+            }
+
+            schedule.participants.forEach((participant) => {
+              if (participant.role === 'child') {
+                activeStudentIds.add(participant.ids.id);
+              }
+            });
+          });
+
+          return activeStudentIds.size;
+        })()
+      : 0;
+
   return {
     metrics: {
       upcomingSessionsThisWeek,
       completedClassesThisMonth,
-      activeSubjectsCount: activeSubjects.length,
+      activeSubjectsCount:
+        input.activeRole === 'tutors' ? activeStudentsCount : activeSubjects.length,
       activeSubjectsLabel: input.isStaffView
         ? 'Manage classrooms'
-        : toActiveSubjectsLabel(activeSubjects),
+        : input.activeRole === 'tutors'
+          ? toActiveStudentsLabel(activeStudentsCount)
+          : toActiveSubjectsLabel(activeSubjects),
     },
     upcomingSessionsPage: buildUpcomingSessionPage({
       upcomingSchedules: upcomingSchedulesThisAndNextWeek,

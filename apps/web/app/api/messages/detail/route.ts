@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server';
 
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
-import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
-import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { buildMessageById } from '@iconicedu/web/lib/messages/builders/message.builder';
-import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import { requireEffectiveActorContext } from '@iconicedu/web/lib/family-view/actor-context';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -18,26 +16,29 @@ export async function GET(request: Request) {
   }
 
   const supabase = await createSupabaseServerClient();
-  const authUser = await requireAuthedUser(supabase);
-  const accountResponse = await getAccountByAuthUserId(supabase, authUser.id);
-  if (!accountResponse.data) {
+  let actor;
+  try {
+    actor = await requireEffectiveActorContext(supabase);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Account not found') {
+      return NextResponse.json(
+        { success: false, message: 'Account not found' },
+        { status: 404 },
+      );
+    }
+    throw error;
+  }
+  if (!actor) {
     return NextResponse.json(
       { success: false, message: 'Account not found' },
       { status: 404 },
     );
   }
 
-  const profileResponse = await getProfileByAccountId(supabase, accountResponse.data.id);
-
-  const message = await buildMessageById(
-    supabase,
-    accountResponse.data.org_id,
-    messageId,
-    {
-      accountId: accountResponse.data.id,
-      profileId: profileResponse.data?.id ?? undefined,
-    },
-  );
+  const message = await buildMessageById(supabase, actor.account.org_id, messageId, {
+    accountId: actor.account.id,
+    profileId: actor.profile.id,
+  });
 
   if (!message) {
     return NextResponse.json(

@@ -40,6 +40,47 @@ vi.mock('@iconicedu/ui-web/ui/sidebar', () => {
   };
 });
 
+vi.mock('@iconicedu/ui-web/ui/dropdown-menu', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@iconicedu/ui-web/ui/dropdown-menu')>();
+  const React = require('react');
+  const passthrough = ({ children, ...props }: { children?: React.ReactNode }) =>
+    React.createElement('div', props, children);
+  return {
+    ...actual,
+    DropdownMenu: passthrough,
+    DropdownMenuTrigger: ({ children }: { children?: React.ReactNode }) => children,
+    DropdownMenuContent: passthrough,
+    DropdownMenuGroup: passthrough,
+    DropdownMenuLabel: passthrough,
+    DropdownMenuSeparator: passthrough,
+    DropdownMenuSub: passthrough,
+    DropdownMenuSubTrigger: ({ children, ...props }: { children?: React.ReactNode }) =>
+      React.createElement('button', props, children),
+    DropdownMenuSubContent: passthrough,
+    DropdownMenuItem: ({
+      children,
+      onSelect,
+      ...props
+    }: {
+      children?: React.ReactNode;
+      onSelect?: (event: Event) => void;
+    }) =>
+      React.createElement(
+        'button',
+        {
+          ...props,
+          onClick: () => {
+            if (onSelect) {
+              onSelect({ preventDefault: () => undefined } as unknown as Event);
+            }
+          },
+        },
+        children,
+      ),
+  };
+});
+
 function makeData() {
   return {
     navigation: {
@@ -179,6 +220,29 @@ function makeGuardianData() {
           ],
         },
       },
+      availablePersonas: [
+        {
+          profileId: 'profile-guardian',
+          kind: 'guardian',
+          label: 'Parent',
+          displayName: 'Parent One',
+          isActive: true,
+        },
+        {
+          profileId: 'profile-child-1',
+          kind: 'child',
+          label: 'Student',
+          displayName: 'Aiden One',
+          isActive: false,
+        },
+        {
+          profileId: 'profile-child-2',
+          kind: 'child',
+          label: 'Student',
+          displayName: 'Bella Two',
+          isActive: false,
+        },
+      ],
       account: { id: 'account-guardian', orgId: 'org-1', contacts: {} },
     },
     collections: {
@@ -307,6 +371,29 @@ function makeStudentData() {
         prefs: {},
         meta: {},
       },
+      availablePersonas: [
+        {
+          profileId: 'profile-parent',
+          kind: 'guardian',
+          label: 'Parent',
+          displayName: 'Parent One',
+          isActive: false,
+        },
+        {
+          profileId: 'profile-student',
+          kind: 'child',
+          label: 'Student',
+          displayName: 'Student One',
+          isActive: true,
+        },
+        {
+          profileId: 'profile-student-sibling',
+          kind: 'child',
+          label: 'Student',
+          displayName: 'Student Two',
+          isActive: false,
+        },
+      ],
       account: { id: 'account-student', orgId: 'org-1', contacts: {} },
     },
     collections: {
@@ -427,10 +514,8 @@ describe('SidebarLeft', () => {
     );
 
     expect(screen.getByText('Organization')).toBeInTheDocument();
-    const trigger = screen
-      .getAllByRole('button', { name: /ICONIC Academy/i })
-      .find((button) => button.getAttribute('aria-haspopup') === 'menu');
-    expect(trigger).toBeTruthy();
+    expect(screen.getAllByText('ICONIC Academy').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Second Campus').length).toBeGreaterThan(0);
   });
 
   it('shows educator classes on the sidebar', () => {
@@ -541,6 +626,70 @@ describe('SidebarLeft', () => {
     expect(screen.getByText('3')).toBeInTheDocument();
   });
 
+  it('shows family persona switcher above classrooms for guardian and switches profile', async () => {
+    const onPersonaSwitch = vi.fn(async () => undefined);
+    render(
+      <SidebarProvider>
+        <SidebarLeft
+          data={makeGuardianData()}
+          onPersonaSwitch={onPersonaSwitch}
+          isPersonaSwitchEnabled
+        />
+      </SidebarProvider>,
+    );
+
+    const trigger = screen.getByRole('button', { name: 'Switch classroom profile' });
+    expect(trigger).toBeInTheDocument();
+    expect(screen.getByText('View as')).toBeInTheDocument();
+    expect(screen.getAllByText('Parent One').length).toBeGreaterThan(0);
+
+    fireEvent.pointerDown(trigger);
+    expect(screen.getAllByText(/Aiden One/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Bella Two/i).length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByText(/Aiden One/i));
+    expect(onPersonaSwitch).toHaveBeenCalledWith({ profileId: 'profile-child-1' });
+  });
+
+  it('uses family view switch callback and supports switching back to parent', async () => {
+    const onFamilyViewSwitch = vi.fn(async () => undefined);
+    const data = makeGuardianData();
+    data.user.familySwitchOptions = [
+      {
+        profileId: 'profile-guardian',
+        kind: 'guardian',
+        label: 'Parent',
+        displayName: 'Parent One',
+        isParentOption: true,
+        isActive: false,
+      },
+      {
+        profileId: 'profile-child-1',
+        kind: 'child',
+        label: 'Student',
+        displayName: 'Aiden One',
+        isParentOption: false,
+        isActive: true,
+      },
+    ];
+
+    render(
+      <SidebarProvider>
+        <SidebarLeft
+          data={data}
+          onFamilyViewSwitch={onFamilyViewSwitch}
+          isPersonaSwitchEnabled
+        />
+      </SidebarProvider>,
+    );
+
+    fireEvent.pointerDown(
+      screen.getByRole('button', { name: 'Switch classroom profile' }),
+    );
+    fireEvent.click(screen.getAllByText(/Parent One/i)[0]!);
+    expect(onFamilyViewSwitch).toHaveBeenCalledWith({ childProfileId: null });
+  });
+
   it('shows educator learning-space unread when participant accountId is missing', () => {
     const data = makeData();
     data.collections.learningSpaces = [
@@ -599,6 +748,38 @@ describe('SidebarLeft', () => {
     );
     expect(screen.queryByText('Other Space')).not.toBeInTheDocument();
     expect(screen.getAllByText('2').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('shows family persona switcher for student and includes parent option', () => {
+    render(
+      <SidebarProvider>
+        <SidebarLeft
+          data={makeStudentData()}
+          onPersonaSwitch={vi.fn(async () => undefined)}
+          isPersonaSwitchEnabled
+        />
+      </SidebarProvider>,
+    );
+
+    fireEvent.pointerDown(
+      screen.getByRole('button', { name: 'Switch classroom profile' }),
+    );
+    expect(screen.getAllByText(/Parent One/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Student Two/i).length).toBeGreaterThan(0);
+  });
+
+  it('does not show family persona switcher for non-family personas', () => {
+    render(
+      <SidebarProvider>
+        <SidebarLeft
+          data={makeData()}
+          onPersonaSwitch={vi.fn(async () => undefined)}
+          isPersonaSwitchEnabled
+        />
+      </SidebarProvider>,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Switch classroom profile' })).toBeNull();
   });
 
   it('shows only child classrooms for student persona on shared account', () => {

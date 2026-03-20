@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
-import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
-import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
-import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import { requireEffectiveActorContext } from '@iconicedu/web/lib/family-view/actor-context';
 
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as {
@@ -20,21 +18,22 @@ export async function POST(request: Request) {
   }
 
   const supabase = await createSupabaseServerClient();
-  const authUser = await requireAuthedUser(supabase);
-  const accountResponse = await getAccountByAuthUserId(supabase, authUser.id);
-  const account = accountResponse.data;
+  let actor;
+  try {
+    actor = await requireEffectiveActorContext(supabase);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Account not found') {
+      return NextResponse.json(
+        { success: false, message: 'Account not found' },
+        { status: 404 },
+      );
+    }
+    throw error;
+  }
 
-  if (!account) {
+  if (!actor) {
     return NextResponse.json(
       { success: false, message: 'Account not found' },
-      { status: 404 },
-    );
-  }
-  const profileResponse = await getProfileByAccountId(supabase, account.id);
-  const profile = profileResponse.data;
-  if (!profile) {
-    return NextResponse.json(
-      { success: false, message: 'Profile not found' },
       { status: 404 },
     );
   }
@@ -43,7 +42,7 @@ export async function POST(request: Request) {
   const channelLookup = await supabase
     .from('channels')
     .select('id')
-    .eq('org_id', account.org_id)
+    .eq('org_id', actor.account.org_id)
     .eq('id', channelId)
     .is('deleted_at', null)
     .maybeSingle<{ id: string }>();
@@ -64,9 +63,9 @@ export async function POST(request: Request) {
   const membershipLookup = await supabase
     .from('channel_members')
     .select('id')
-    .eq('org_id', account.org_id)
+    .eq('org_id', actor.account.org_id)
     .eq('channel_id', channelId)
-    .eq('profile_id', profile.id)
+    .eq('profile_id', actor.profile.id)
     .is('deleted_at', null)
     .maybeSingle<{ id: string }>();
 
@@ -89,7 +88,7 @@ export async function POST(request: Request) {
     const messageLookup = await supabase
       .from('messages')
       .select('id')
-      .eq('org_id', account.org_id)
+      .eq('org_id', actor.account.org_id)
       .eq('channel_id', channelId)
       .eq('id', requestedLastReadMessageId)
       .is('deleted_at', null)
@@ -111,12 +110,12 @@ export async function POST(request: Request) {
   }
 
   const recomputeResponse = await supabase.rpc('recompute_unread_for_account_channel', {
-    p_org_id: account.org_id,
+    p_org_id: actor.account.org_id,
     p_channel_id: channelId,
-    p_account_id: account.id,
+    p_account_id: actor.account.id,
     p_last_read_message_id: requestedLastReadMessageId,
     p_last_read_at: now,
-    p_actor_profile_id: profile.id,
+    p_actor_profile_id: actor.profile.id,
   });
 
   const { error } = recomputeResponse;

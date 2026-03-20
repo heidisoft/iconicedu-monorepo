@@ -14,9 +14,7 @@ import type {
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
-import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
-import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
-import { resolveActiveProfileForAccountInOrg } from '@iconicedu/web/lib/profile/queries/active-profile.query';
+import { resolveEffectiveProfileForAuthUserInOrg } from '@iconicedu/web/lib/family-view/effective-profile';
 import { buildUserProfileById } from '@iconicedu/web/lib/profile/builders/user-profile.builder';
 import { mapMessageRowToVM } from '@iconicedu/web/lib/messages/mappers/message.mapper';
 import { buildThreadById } from '@iconicedu/web/lib/messages/builders/thread.builder';
@@ -83,6 +81,22 @@ type VisibilityAudienceResolution = {
   audienceRules?: AudienceRuleVM[];
   allowedProfileIds: Set<string> | null;
 };
+
+async function resolveEffectiveMessageActor(input: {
+  supabase: SupabaseServerClient;
+  authUserId: string;
+  orgId: string;
+}) {
+  const resolution = await resolveEffectiveProfileForAuthUserInOrg(input.supabase, {
+    authUserId: input.authUserId,
+    orgId: input.orgId,
+  });
+
+  return {
+    account: resolution.account,
+    profile: resolution.effectiveProfile,
+  };
+}
 
 function resolveVisibilityAudienceFromMessageRow(input: {
   visibilityType?: string | null;
@@ -1231,37 +1245,16 @@ export async function sendTextMessageAction(
 ): Promise<MessageVM> {
   const supabase = await createSupabaseServerClient();
   const authUser = await requireAuthedUser(supabase);
-  const accountResponse = await getAccountByAuthUserId(supabase, authUser.id);
-
-  if (!accountResponse.data) {
-    throw new Error('Account not found');
-  }
-
-  if (input.orgId !== accountResponse.data.org_id) {
-    throw new Error('Invalid org');
-  }
-
-  const activeProfile = await resolveActiveProfileForAccountInOrg(supabase, {
-    accountId: accountResponse.data.id,
-    orgId: accountResponse.data.org_id,
-    activeProfileId: accountResponse.data.active_profile_id ?? null,
-    updatedByAuthUserId: authUser.id,
+  const actor = await resolveEffectiveMessageActor({
+    supabase,
+    authUserId: authUser.id,
+    orgId: input.orgId,
   });
-  if (activeProfile.source !== 'active_profile_id') {
-    console.info('[active-profile-resolver]', {
-      action: 'sendTextMessageAction',
-      orgId: accountResponse.data.org_id,
-      accountId: accountResponse.data.id,
-      previousActiveProfileId: accountResponse.data.active_profile_id ?? null,
-      resolvedProfileId: activeProfile.profile.id,
-      source: activeProfile.source,
-    });
-  }
-  const accountOrgId = accountResponse.data.org_id;
-  const currentProfileId = activeProfile.profile.id;
+  const accountOrgId = actor.account.org_id;
+  const currentProfileId = actor.profile.id;
   const serviceSupabase = createSupabaseServiceClient();
 
-  if (input.senderProfileId !== activeProfile.profile.id) {
+  if (input.senderProfileId !== currentProfileId) {
     throw new Error('Invalid sender');
   }
   let sanitizedMentions: MessageMentionVM[] = [];
@@ -1269,7 +1262,7 @@ export async function sendTextMessageAction(
     const channelMembersResponse = await supabase
       .from('channel_members')
       .select('profile_id')
-      .eq('org_id', accountResponse.data.org_id)
+      .eq('org_id', accountOrgId)
       .eq('channel_id', input.channelId)
       .is('deleted_at', null)
       .returns<Array<{ profile_id: string }>>();
@@ -1312,8 +1305,8 @@ export async function sendTextMessageAction(
   const isSupportThreadReply = Boolean(input.threadParentId);
   const staffSender = await isStaffActorInOrg(supabase, {
     orgId: accountOrgId,
-    accountId: accountResponse.data.id,
-    profileKind: activeProfile.profile.kind,
+    accountId: actor.account.id,
+    profileKind: actor.profile.kind,
   });
   const supportQuestionOwnerProfileId =
     isSupportChannel && isSupportThreadReply
@@ -1347,7 +1340,7 @@ export async function sendTextMessageAction(
     now,
   });
   const messageInsertValues = {
-    org_id: accountResponse.data.org_id,
+    org_id: accountOrgId,
     channel_id: input.channelId,
     sender_profile_id: currentProfileId,
     type: homeworkIntent
@@ -1369,7 +1362,7 @@ export async function sendTextMessageAction(
     serviceSupabase,
     values: messageInsertValues,
     debugContext: {
-      orgId: accountResponse.data.org_id,
+      orgId: accountOrgId,
       channelId: input.channelId,
       senderProfileId: currentProfileId,
       action: 'sendTextMessageAction',
@@ -1395,7 +1388,7 @@ export async function sendTextMessageAction(
     )
     .insert({
       message_id: messageInsert.data.id,
-      org_id: accountResponse.data.org_id,
+      org_id: accountOrgId,
       payload: homeworkIntent
         ? {
             kind: homeworkIntent.kind,
@@ -1468,7 +1461,7 @@ export async function sendTextMessageAction(
   if (sanitizedMentions.length) {
     await createMentionNotifications({
       serviceSupabase,
-      orgId: accountResponse.data.org_id,
+      orgId: accountOrgId,
       channelId: input.channelId,
       senderProfileId: currentProfileId,
       senderName: sender.profile.displayName ?? 'Someone',
@@ -1493,7 +1486,7 @@ export async function sendTextMessageAction(
     if (!visibilityAudience.suppressActivity) {
       await publishActivityEvent({
         supabase: serviceSupabase,
-        orgId: accountResponse.data.org_id,
+        orgId: accountOrgId,
         eventType: 'homework.assigned',
         occurredAt: now,
         sourceKind: 'profile',
@@ -1523,7 +1516,7 @@ export async function sendTextMessageAction(
       await createChannelMessageActivity({
         supabase,
         serviceSupabase,
-        orgId: accountResponse.data.org_id,
+        orgId: accountOrgId,
         channelId: input.channelId,
         senderProfileId: currentProfileId,
         senderName: senderDisplayName,
@@ -1542,7 +1535,7 @@ export async function sendTextMessageAction(
       await createThreadReplyNotifications({
         supabase,
         serviceSupabase,
-        orgId: accountResponse.data.org_id,
+        orgId: accountOrgId,
         threadId,
         channelId: input.channelId,
         senderProfileId: currentProfileId,
@@ -1560,7 +1553,7 @@ export async function sendTextMessageAction(
       await createChannelMessageActivity({
         supabase,
         serviceSupabase,
-        orgId: accountResponse.data.org_id,
+        orgId: accountOrgId,
         channelId: input.channelId,
         senderProfileId: currentProfileId,
         senderName: senderDisplayName,
@@ -1577,8 +1570,8 @@ export async function sendTextMessageAction(
   }
 
   const thread = threadId
-    ? await buildThreadById(supabase, accountResponse.data.org_id, threadId, {
-        accountId: accountResponse.data.id,
+    ? await buildThreadById(supabase, accountOrgId, threadId, {
+        accountId: actor.account.id,
       })
     : null;
 
@@ -1618,33 +1611,12 @@ export async function sendFileMessageAction(
 ): Promise<MessageVM> {
   const supabase = await createSupabaseServerClient();
   const authUser = await requireAuthedUser(supabase);
-  const accountResponse = await getAccountByAuthUserId(supabase, authUser.id);
-
-  if (!accountResponse.data) {
-    throw new Error('Account not found');
-  }
-
-  if (input.orgId !== accountResponse.data.org_id) {
-    throw new Error('Invalid org');
-  }
-
-  const activeProfile = await resolveActiveProfileForAccountInOrg(supabase, {
-    accountId: accountResponse.data.id,
-    orgId: accountResponse.data.org_id,
-    activeProfileId: accountResponse.data.active_profile_id ?? null,
-    updatedByAuthUserId: authUser.id,
+  const actor = await resolveEffectiveMessageActor({
+    supabase,
+    authUserId: authUser.id,
+    orgId: input.orgId,
   });
-  if (activeProfile.source !== 'active_profile_id') {
-    console.info('[active-profile-resolver]', {
-      action: 'sendFileMessageAction',
-      orgId: accountResponse.data.org_id,
-      accountId: accountResponse.data.id,
-      previousActiveProfileId: accountResponse.data.active_profile_id ?? null,
-      resolvedProfileId: activeProfile.profile.id,
-      source: activeProfile.source,
-    });
-  }
-  if (input.senderProfileId !== activeProfile.profile.id) {
+  if (input.senderProfileId !== actor.profile.id) {
     throw new Error('Invalid sender');
   }
   if (!input.name?.trim()) {
@@ -1658,14 +1630,14 @@ export async function sendFileMessageAction(
       storagePath: input.storagePath,
       orgId: input.orgId,
       channelId: input.channelId,
-      profileId: activeProfile.profile.id,
+      profileId: actor.profile.id,
     })
   ) {
     throw new Error('Invalid file storage path');
   }
 
   const now = new Date().toISOString();
-  const currentProfileId = activeProfile.profile.id;
+  const currentProfileId = actor.profile.id;
   const serviceSupabase = createSupabaseServiceClient();
   const activityContext = await resolveActivityChannelContext({
     supabase,
@@ -1674,7 +1646,7 @@ export async function sendFileMessageAction(
   });
   const { threadId, threadCreated } = await resolveThreadContext({
     supabase,
-    orgId: accountResponse.data.org_id,
+    orgId: actor.account.org_id,
     channelId: input.channelId,
     currentProfileId,
     requestedThreadId: input.threadId,
@@ -1685,8 +1657,8 @@ export async function sendFileMessageAction(
   const isSupportThreadReply = Boolean(input.threadParentId);
   const staffSender = await isStaffActorInOrg(supabase, {
     orgId: input.orgId,
-    accountId: accountResponse.data.id,
-    profileKind: activeProfile.profile.kind,
+    accountId: actor.account.id,
+    profileKind: actor.profile.kind,
   });
   const supportQuestionOwnerProfileId =
     isSupportChannel && isSupportThreadReply
@@ -1897,8 +1869,8 @@ export async function sendFileMessageAction(
       : undefined) ?? 'Someone';
 
   const thread = threadId
-    ? await buildThreadById(supabase, accountResponse.data.org_id, threadId, {
-        accountId: accountResponse.data.id,
+    ? await buildThreadById(supabase, actor.account.org_id, threadId, {
+        accountId: actor.account.id,
       })
     : null;
 
@@ -1938,39 +1910,19 @@ export async function sendFilesMessageAction(
 ): Promise<MessageVM> {
   const supabase = await createSupabaseServerClient();
   const authUser = await requireAuthedUser(supabase);
-  const accountResponse = await getAccountByAuthUserId(supabase, authUser.id);
-
-  if (!accountResponse.data) {
-    throw new Error('Account not found');
-  }
-
-  if (input.orgId !== accountResponse.data.org_id) {
-    throw new Error('Invalid org');
-  }
-  const activeProfile = await resolveActiveProfileForAccountInOrg(supabase, {
-    accountId: accountResponse.data.id,
-    orgId: accountResponse.data.org_id,
-    activeProfileId: accountResponse.data.active_profile_id ?? null,
-    updatedByAuthUserId: authUser.id,
+  const actor = await resolveEffectiveMessageActor({
+    supabase,
+    authUserId: authUser.id,
+    orgId: input.orgId,
   });
-  if (activeProfile.source !== 'active_profile_id') {
-    console.info('[active-profile-resolver]', {
-      action: 'sendFilesMessageAction',
-      orgId: accountResponse.data.org_id,
-      accountId: accountResponse.data.id,
-      previousActiveProfileId: accountResponse.data.active_profile_id ?? null,
-      resolvedProfileId: activeProfile.profile.id,
-      source: activeProfile.source,
-    });
-  }
-  if (input.senderProfileId !== activeProfile.profile.id) {
+  if (input.senderProfileId !== actor.profile.id) {
     throw new Error('Invalid sender');
   }
   if (!input.assets.length) {
     throw new Error('At least one file is required');
   }
 
-  const currentProfileId = activeProfile.profile.id;
+  const currentProfileId = actor.profile.id;
   for (const asset of input.assets) {
     if (!asset.name?.trim()) {
       throw new Error('File name is required');
@@ -2010,7 +1962,7 @@ export async function sendFilesMessageAction(
   });
   const { threadId, threadCreated } = await resolveThreadContext({
     supabase,
-    orgId: accountResponse.data.org_id,
+    orgId: actor.account.org_id,
     channelId: input.channelId,
     currentProfileId,
     requestedThreadId: input.threadId,
@@ -2021,8 +1973,8 @@ export async function sendFilesMessageAction(
   const isSupportThreadReply = Boolean(input.threadParentId);
   const staffSender = await isStaffActorInOrg(supabase, {
     orgId: input.orgId,
-    accountId: accountResponse.data.id,
-    profileKind: activeProfile.profile.kind,
+    accountId: actor.account.id,
+    profileKind: actor.profile.kind,
   });
   const supportQuestionOwnerProfileId =
     isSupportChannel && isSupportThreadReply
@@ -2222,8 +2174,8 @@ export async function sendFilesMessageAction(
       : undefined) ?? 'Someone';
 
   const thread = threadId
-    ? await buildThreadById(supabase, accountResponse.data.org_id, threadId, {
-        accountId: accountResponse.data.id,
+    ? await buildThreadById(supabase, actor.account.org_id, threadId, {
+        accountId: actor.account.id,
       })
     : null;
 
@@ -2276,18 +2228,14 @@ export async function toggleMessageReactionAction(
   const supabase = await createSupabaseServerClient();
   const serviceSupabase = createSupabaseServiceClient();
   const authUser = await requireAuthedUser(supabase);
-  const accountResponse = await getAccountByAuthUserId(supabase, authUser.id);
-
-  if (!accountResponse.data) {
-    throw new Error('Account not found');
-  }
+  const actor = await resolveEffectiveMessageActor({
+    supabase,
+    authUserId: authUser.id,
+    orgId: input.orgId,
+  });
 
   if (!input.emoji?.trim()) {
     throw new Error('Emoji is required');
-  }
-
-  if (input.orgId !== accountResponse.data.org_id) {
-    throw new Error('Invalid org');
   }
 
   const messageResponse = await supabase
@@ -2305,17 +2253,12 @@ export async function toggleMessageReactionAction(
     throw new Error('Message not found');
   }
 
-  const profileResponse = await getProfileByAccountId(supabase, accountResponse.data.id);
-  if (!profileResponse.data) {
-    throw new Error('Profile not found');
-  }
-
   const reactionResponse = await supabase
     .from('message_reactions')
     .select('id')
     .eq('org_id', input.orgId)
     .eq('message_id', input.messageId)
-    .eq('account_id', accountResponse.data.id)
+    .eq('account_id', actor.account.id)
     .eq('emoji', input.emoji)
     .is('deleted_at', null)
     .maybeSingle<{ id: string }>();
@@ -2374,7 +2317,7 @@ export async function toggleMessageReactionAction(
       orgId: input.orgId,
       messageId: input.messageId,
       channelId: messageResponse.data.channel_id ?? null,
-      senderProfileId: profileResponse.data.id,
+      senderProfileId: actor.profile.id,
       messageSenderProfileId: messageResponse.data.sender_profile_id ?? '',
       emoji: input.emoji,
       eventType: isDmRoute ? 'dm.reaction.removed' : 'reaction.removed',
@@ -2388,7 +2331,7 @@ export async function toggleMessageReactionAction(
   const insertReaction = await supabase.from('message_reactions').insert({
     org_id: input.orgId,
     message_id: input.messageId,
-    account_id: accountResponse.data.id,
+    account_id: actor.account.id,
     emoji: input.emoji,
     created_at: now,
     updated_at: now,
@@ -2422,7 +2365,7 @@ export async function toggleMessageReactionAction(
       orgId: input.orgId,
       messageId: input.messageId,
       channelId: messageResponse.data.channel_id ?? null,
-      senderProfileId: profileResponse.data.id,
+      senderProfileId: actor.profile.id,
       messageSenderProfileId: messageResponse.data.sender_profile_id ?? '',
       emoji: input.emoji,
       eventType: isDmRoute ? 'dm.reaction.added' : 'reaction.added',
@@ -2459,7 +2402,7 @@ export async function toggleMessageReactionAction(
     orgId: input.orgId,
     messageId: input.messageId,
     channelId: messageResponse.data.channel_id ?? null,
-    senderProfileId: profileResponse.data.id,
+    senderProfileId: actor.profile.id,
     messageSenderProfileId: messageResponse.data.sender_profile_id ?? '',
     emoji: input.emoji,
     eventType: isDmRoute ? 'dm.reaction.added' : 'reaction.added',
@@ -2474,15 +2417,11 @@ export async function deleteMessageAction(input: {
   const supabase = await createSupabaseServerClient();
   const serviceSupabase = createSupabaseServiceClient();
   const authUser = await requireAuthedUser(supabase);
-  const accountResponse = await getAccountByAuthUserId(supabase, authUser.id);
-
-  if (!accountResponse.data) {
-    throw new Error('Account not found');
-  }
-
-  if (input.orgId !== accountResponse.data.org_id) {
-    throw new Error('Invalid org');
-  }
+  const actor = await resolveEffectiveMessageActor({
+    supabase,
+    authUserId: authUser.id,
+    orgId: input.orgId,
+  });
 
   const messageResponse = await supabase
     .from('messages')
@@ -2494,21 +2433,13 @@ export async function deleteMessageAction(input: {
     throw new Error('Message not found');
   }
 
-  const profileResponse = await getProfileByAccountId(supabase, accountResponse.data.id);
-  if (!profileResponse.data) {
-    throw new Error('Profile not found');
-  }
-
   const isStaffActor = await isStaffActorInOrg(supabase, {
     orgId: input.orgId,
-    accountId: accountResponse.data.id,
-    profileKind: profileResponse.data.kind,
+    accountId: actor.account.id,
+    profileKind: actor.profile.kind,
   });
 
-  if (
-    !isStaffActor &&
-    messageResponse.data.sender_profile_id !== profileResponse.data.id
-  ) {
+  if (!isStaffActor && messageResponse.data.sender_profile_id !== actor.profile.id) {
     throw new Error('Unauthorized: You can only delete your own messages');
   }
 
@@ -2518,13 +2449,13 @@ export async function deleteMessageAction(input: {
     .from('messages')
     .update({
       deleted_at: now,
-      deleted_by: profileResponse.data.id,
+      deleted_by: actor.profile.id,
     })
     .eq('id', input.messageId)
     .eq('org_id', input.orgId);
 
   if (!isStaffActor) {
-    deleteQuery.eq('sender_profile_id', profileResponse.data.id);
+    deleteQuery.eq('sender_profile_id', actor.profile.id);
   }
 
   const deleteResult = await deleteQuery.is('deleted_at', null);
@@ -2537,7 +2468,7 @@ export async function deleteMessageAction(input: {
     serviceSupabase,
     orgId: input.orgId,
     messageId: input.messageId,
-    actorProfileId: profileResponse.data.id,
+    actorProfileId: actor.profile.id,
     now,
   });
 }
@@ -2549,15 +2480,11 @@ export async function toggleHiddenMessageAction(input: {
 }): Promise<void> {
   const supabase = await createSupabaseServerClient();
   const authUser = await requireAuthedUser(supabase);
-  const accountResponse = await getAccountByAuthUserId(supabase, authUser.id);
-
-  if (!accountResponse.data) {
-    throw new Error('Account not found');
-  }
-
-  if (input.orgId !== accountResponse.data.org_id) {
-    throw new Error('Invalid org');
-  }
+  const actor = await resolveEffectiveMessageActor({
+    supabase,
+    authUserId: authUser.id,
+    orgId: input.orgId,
+  });
 
   const messageResponse = await supabase
     .from('messages')
@@ -2569,12 +2496,7 @@ export async function toggleHiddenMessageAction(input: {
     throw new Error('Message not found');
   }
 
-  const profileResponse = await getProfileByAccountId(supabase, accountResponse.data.id);
-  if (!profileResponse.data) {
-    throw new Error('Profile not found');
-  }
-
-  if (messageResponse.data.sender_profile_id !== profileResponse.data.id) {
+  if (messageResponse.data.sender_profile_id !== actor.profile.id) {
     throw new Error('Unauthorized: You can only hide your own messages');
   }
 
@@ -2585,7 +2507,7 @@ export async function toggleHiddenMessageAction(input: {
     })
     .eq('id', input.messageId)
     .eq('org_id', input.orgId)
-    .eq('sender_profile_id', profileResponse.data.id)
+    .eq('sender_profile_id', actor.profile.id)
     .is('deleted_at', null);
 
   if (updateResult.error) {
@@ -2598,20 +2520,11 @@ export async function toggleSavedMessageAction(
 ): Promise<void> {
   const supabase = await createSupabaseServerClient();
   const authUser = await requireAuthedUser(supabase);
-  const accountResponse = await getAccountByAuthUserId(supabase, authUser.id);
-
-  if (!accountResponse.data) {
-    throw new Error('Account not found');
-  }
-
-  if (input.orgId !== accountResponse.data.org_id) {
-    throw new Error('Invalid org');
-  }
-
-  const profileResponse = await getProfileByAccountId(supabase, accountResponse.data.id);
-  if (!profileResponse.data) {
-    throw new Error('Profile not found');
-  }
+  const actor = await resolveEffectiveMessageActor({
+    supabase,
+    authUserId: authUser.id,
+    orgId: input.orgId,
+  });
 
   const messageResponse = await supabase
     .from('messages')
@@ -2629,7 +2542,7 @@ export async function toggleSavedMessageAction(
     .select('id')
     .eq('org_id', input.orgId)
     .eq('channel_id', messageResponse.data.channel_id)
-    .eq('profile_id', profileResponse.data.id)
+    .eq('profile_id', actor.profile.id)
     .is('deleted_at', null)
     .maybeSingle<{ id: string }>();
 
@@ -2645,11 +2558,11 @@ export async function toggleSavedMessageAction(
         org_id: input.orgId,
         message_id: input.messageId,
         channel_id: messageResponse.data.channel_id,
-        profile_id: profileResponse.data.id,
+        profile_id: actor.profile.id,
         created_at: now,
-        created_by: profileResponse.data.id,
+        created_by: actor.profile.id,
         updated_at: now,
-        updated_by: profileResponse.data.id,
+        updated_by: actor.profile.id,
         deleted_at: null,
         deleted_by: null,
       },
@@ -2669,13 +2582,13 @@ export async function toggleSavedMessageAction(
     .from('message_saves')
     .update({
       deleted_at: now,
-      deleted_by: profileResponse.data.id,
+      deleted_by: actor.profile.id,
       updated_at: now,
-      updated_by: profileResponse.data.id,
+      updated_by: actor.profile.id,
     })
     .eq('org_id', input.orgId)
     .eq('message_id', input.messageId)
-    .eq('profile_id', profileResponse.data.id)
+    .eq('profile_id', actor.profile.id)
     .is('deleted_at', null);
 
   if (unsaveResponse.error) {

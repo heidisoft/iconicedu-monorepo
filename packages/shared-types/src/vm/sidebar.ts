@@ -56,8 +56,19 @@ export interface SidebarUserVM {
     profileId: UUID;
     kind: UserProfileVM['kind'];
     label: string;
+    displayName?: string | null;
     isActive: boolean;
   }> | null;
+  familySwitchOptions?: Array<{
+    profileId: UUID;
+    kind: 'guardian' | 'child';
+    label: string;
+    displayName?: string | null;
+    isActive: boolean;
+    isParentOption?: boolean;
+  }> | null;
+  isViewingAsChild?: boolean;
+  viewingAsProfileId?: UUID | null;
   addablePersonas?: Array<{
     kind: UserProfileVM['kind'];
     label: string;

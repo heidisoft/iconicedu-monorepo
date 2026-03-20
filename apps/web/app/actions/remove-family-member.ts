@@ -1,10 +1,8 @@
 'use server';
 
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
-import {
-  getAccountByAuthUserId,
-  getAccountById,
-} from '@iconicedu/web/lib/accounts/queries/accounts.query';
+import { getAccountById } from '@iconicedu/web/lib/accounts/queries/accounts.query';
+import { requireParentActorContext } from '@iconicedu/web/lib/family-view/actor-context';
 import { getFamilyInviteAdminClient } from '@iconicedu/web/lib/family/queries/invite.query';
 
 type RemoveFamilyMemberInput = {
@@ -24,12 +22,8 @@ export async function removeFamilyMemberAction(
     throw new Error('Unauthorized');
   }
 
-  const accountResponse = await getAccountByAuthUserId(supabase, user.id);
-  if (!accountResponse.data) {
-    throw new Error('Guardian account record not found');
-  }
-
-  const guardianAccount = accountResponse.data;
+  const actor = await requireParentActorContext(supabase);
+  const guardianAccount = actor.account;
   const now = new Date().toISOString();
   const serviceClient = getFamilyInviteAdminClient();
 

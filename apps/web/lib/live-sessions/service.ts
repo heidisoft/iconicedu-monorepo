@@ -1,14 +1,11 @@
 import type {
   LiveSessionModeVM,
   LiveSessionProviderVM,
+  AccountRow,
   ProfileRow,
 } from '@iconicedu/shared-types';
 
-import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
-import {
-  getProfileByAccountId,
-  getProfilesByIds,
-} from '@iconicedu/web/lib/profile/queries/profiles.query';
+import { getProfilesByIds } from '@iconicedu/web/lib/profile/queries/profiles.query';
 import { getLiveSessionProvider } from '@iconicedu/web/lib/live-sessions/providers';
 import { snapshotExpectedParticipantsForLiveSession } from '@iconicedu/web/lib/live-sessions/expected-participants';
 import { getLiveSessionAttendancePolicy } from '@iconicedu/web/lib/live-sessions/expected-participants';
@@ -17,11 +14,8 @@ import {
   regenerateLiveSessionAttendanceReport,
 } from '@iconicedu/web/lib/live-sessions/attendance-evaluator';
 import { resolveChannelLiveSessionScope } from '@iconicedu/web/lib/live-sessions/scope';
-import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import type { SupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { publishActivityEvent } from '@iconicedu/web/lib/activity-feed/publisher/activity-publisher';
-
-type SupabaseServerClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
 
 type ChannelLiveSessionConfigRecord = {
   enabled: boolean;
@@ -934,33 +928,26 @@ async function upsertProviderParticipantState(input: {
 }
 
 export async function createOrJoinLiveSession(input: {
-  supabase: SupabaseServerClient;
   serviceSupabase: SupabaseServiceClient;
-  authUserId: string;
+  actor: {
+    authUserId: string;
+    account: Pick<AccountRow, 'id' | 'org_id'>;
+    profile: ProfileRow;
+  };
   channelId: string;
   orgSlug: string;
   schedulePostJoinSideEffects?: PostJoinSideEffectsScheduler;
 }): Promise<CreateOrJoinLiveSessionResult> {
   console.info('[live-session:debug][service] createOrJoinLiveSession started', {
-    authUserId: input.authUserId,
+    authUserId: input.actor.authUserId,
+    accountId: input.actor.account.id,
+    profileId: input.actor.profile.id,
     channelId: input.channelId,
     orgSlug: input.orgSlug,
     hasScheduler: Boolean(input.schedulePostJoinSideEffects),
   });
-  const [accountResponse] = await Promise.all([
-    getAccountByAuthUserId(input.supabase, input.authUserId),
-  ]);
-
-  if (!accountResponse.data) {
-    throw new Error('Account not found');
-  }
-  const account = accountResponse.data;
-
-  const profileResponse = await getProfileByAccountId(input.supabase, account.id);
-  if (!profileResponse.data) {
-    throw new Error('Profile not found');
-  }
-  const profile = profileResponse.data;
+  const account = input.actor.account;
+  const profile = input.actor.profile;
 
   const channelResponse = await getChannelSummary(
     input.serviceSupabase,

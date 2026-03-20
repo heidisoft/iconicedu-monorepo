@@ -5,9 +5,7 @@ import type {
   NotificationPreferenceScopeRow,
   UpsertNotificationPreferenceInput,
 } from '@iconicedu/shared-types';
-import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
-import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
-import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import { requireEffectiveActorContext } from '@iconicedu/web/lib/family-view/actor-context';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 
 type ScopeKind = 'channel' | 'learning_space';
@@ -24,19 +22,11 @@ function normalizeNotificationChannels(channels: string[]) {
 
 async function requireOwnerContext() {
   const supabase = await createSupabaseServerClient();
-  const authUser = await requireAuthedUser(supabase);
-  const accountResponse = await getAccountByAuthUserId(supabase, authUser.id);
-  if (!accountResponse.data) {
-    throw new Error('Account not found');
-  }
-  const profileResponse = await getProfileByAccountId(supabase, accountResponse.data.id);
-  if (!profileResponse.data) {
-    throw new Error('Profile not found');
-  }
+  const actor = await requireEffectiveActorContext(supabase);
   return {
     supabase,
-    orgId: accountResponse.data.org_id,
-    profileId: profileResponse.data.id,
+    orgId: actor.account.org_id,
+    profileId: actor.profile.id,
   };
 }
 

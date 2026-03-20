@@ -1,27 +1,19 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { GET } from '@iconicedu/web/app/api/messages/detail/route';
 import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
 
 const buildMessageById = vi.fn();
+const requireEffectiveActorContext = vi.fn();
 const APP_URL = resolveAppUrl();
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(() => ({})),
 }));
 
-vi.mock('@iconicedu/web/lib/auth/requireAuthedUser', () => ({
-  requireAuthedUser: vi.fn(async () => ({ id: 'auth-user' })),
-}));
-
-vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
-  getAccountByAuthUserId: vi.fn(async () => ({
-    data: { id: 'account-1', org_id: 'org-1' },
-  })),
-}));
-
-vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
-  getProfileByAccountId: vi.fn(async () => ({ data: { id: 'profile-1' } })),
+vi.mock('@iconicedu/web/lib/family-view/actor-context', () => ({
+  requireEffectiveActorContext: (...args: unknown[]) =>
+    requireEffectiveActorContext(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/messages/builders/message.builder', () => ({
@@ -29,6 +21,14 @@ vi.mock('@iconicedu/web/lib/messages/builders/message.builder', () => ({
 }));
 
 describe('GET /api/messages/detail', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    requireEffectiveActorContext.mockResolvedValue({
+      account: { id: 'account-1', org_id: 'org-1' },
+      profile: { id: 'profile-1' },
+    });
+  });
+
   it('returns 400 when messageId is missing', async () => {
     const response = await GET(new Request(`${APP_URL}/api/messages/detail`));
 

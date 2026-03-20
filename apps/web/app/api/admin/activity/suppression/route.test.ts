@@ -2,38 +2,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { GET, POST } from '@iconicedu/web/app/api/admin/activity/suppression/route';
 
-const requireAuthedUser = vi.fn();
-const createSupabaseServerClient = vi.fn();
+const requireAdminOrgContext = vi.fn();
 const createSupabaseServiceClient = vi.fn();
-const getAccountByAuthUserIdInOrg = vi.fn();
-const getUserRoles = vi.fn();
-const getProfileByAccountId = vi.fn();
 const listActivityEventDefinitionTypes = vi.fn();
 
-vi.mock('@iconicedu/web/lib/auth/requireAuthedUser', () => ({
-  requireAuthedUser: (...args: unknown[]) => requireAuthedUser(...args),
-}));
-
-vi.mock('@iconicedu/web/lib/supabase/server', () => ({
-  createSupabaseServerClient: (...args: unknown[]) => createSupabaseServerClient(...args),
+vi.mock('@iconicedu/web/lib/admin/require-admin-org-context', () => ({
+  requireAdminOrgContext: (...args: unknown[]) => requireAdminOrgContext(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/supabase/service', () => ({
   createSupabaseServiceClient: (...args: unknown[]) =>
     createSupabaseServiceClient(...args),
-}));
-
-vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
-  getAccountByAuthUserIdInOrg: (...args: unknown[]) =>
-    getAccountByAuthUserIdInOrg(...args),
-}));
-
-vi.mock('@iconicedu/web/lib/profile/queries/roles.query', () => ({
-  getUserRoles: (...args: unknown[]) => getUserRoles(...args),
-}));
-
-vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
-  getProfileByAccountId: (...args: unknown[]) => getProfileByAccountId(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/activity-feed/definitions/activity-definitions', () => ({
@@ -140,19 +119,11 @@ function createServiceSupabaseMock() {
 describe('admin activity suppression route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    requireAuthedUser.mockResolvedValue({ id: 'auth-user-1' });
-    getAccountByAuthUserIdInOrg.mockResolvedValue({
-      data: { id: 'account-1', org_id: 'org-1' },
+    requireAdminOrgContext.mockResolvedValue({
+      ok: true,
+      orgId: 'org-1',
+      actorProfileId: 'profile-admin-1',
     });
-    getUserRoles.mockResolvedValue({
-      data: [{ role_key: 'admin' }],
-      error: null,
-    });
-    getProfileByAccountId.mockResolvedValue({
-      data: { id: 'profile-admin-1' },
-      error: null,
-    });
-    createSupabaseServerClient.mockResolvedValue({});
     createSupabaseServiceClient.mockReturnValue(createServiceSupabaseMock());
     listActivityEventDefinitionTypes.mockReturnValue(['message.posted', 'dm.posted']);
   });

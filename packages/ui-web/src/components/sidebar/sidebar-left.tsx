@@ -17,6 +17,7 @@ import {
   Sparkle,
   SquarePi,
   UserPlus,
+  Loader2,
 } from 'lucide-react';
 
 // eslint-disable-next-line no-restricted-imports
@@ -45,6 +46,7 @@ import {
   useSidebar,
 } from '@iconicedu/ui-web/ui/sidebar';
 import { Button } from '@iconicedu/ui-web/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@iconicedu/ui-web/ui/avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -209,6 +211,40 @@ function matchesActivePersonaParticipant(
   );
 }
 
+function resolveFamilyPersonaOptionLabel(persona: {
+  kind: UserProfileVM['kind'];
+  label: string;
+  displayName?: string | null;
+}): string {
+  const displayName = persona.displayName?.trim();
+  if (displayName) {
+    return displayName;
+  }
+
+  const roleLabel = persona.kind === 'guardian' ? 'Parent' : 'Student';
+  const label = persona.label?.trim();
+  return label || roleLabel;
+}
+
+function resolveFamilyPersonaOptionSubtitle(persona: {
+  kind: UserProfileVM['kind'];
+  email?: string | null;
+}): string {
+  const email = persona.email?.trim();
+  if (email) {
+    return email;
+  }
+  return persona.kind === 'guardian' ? 'Parent account' : 'Student profile';
+}
+
+function resolveInitials(label: string): string {
+  const words = label.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) {
+    return '?';
+  }
+  return (words[0][0] ?? '?').toUpperCase();
+}
+
 export function SidebarLeft({
   data,
   subjectOptions,
@@ -235,6 +271,7 @@ export function SidebarLeft({
   onStaffProfileSave,
   onStatusOverrideSave,
   onPersonaSwitch,
+  onFamilyViewSwitch,
   onPersonaAdd,
   isPersonaSwitchEnabled,
   isPersonaAddEnabled,
@@ -330,6 +367,7 @@ export function SidebarLeft({
     clearState?: boolean;
   }) => Promise<void> | void;
   onPersonaSwitch?: (input: { profileId: string }) => Promise<void> | void;
+  onFamilyViewSwitch?: (input: { childProfileId: string | null }) => Promise<void> | void;
   onPersonaAdd?: (input: {
     kind: 'educator' | 'guardian' | 'child' | 'staff';
   }) => Promise<void> | void;
@@ -593,6 +631,54 @@ export function SidebarLeft({
     return null;
   }, [activePath]);
   const { isMobile } = useSidebar();
+  type FamilySwitchOptionLike = {
+    profileId: string;
+    kind: UserProfileVM['kind'];
+    label: string;
+    displayName?: string | null;
+    isActive: boolean;
+    isParentOption?: boolean;
+  };
+  const familySwitchOptionsRaw =
+    (
+      data.user as SidebarLeftDataVM['user'] & {
+        familySwitchOptions?: FamilySwitchOptionLike[] | null;
+      }
+    ).familySwitchOptions ?? data.user.availablePersonas;
+  const familySwitchOptions = React.useMemo(
+    () =>
+      (familySwitchOptionsRaw ?? []).filter(
+        (option): option is FamilySwitchOptionLike & { kind: 'guardian' | 'child' } =>
+          option.kind === 'guardian' || option.kind === 'child',
+      ),
+    [familySwitchOptionsRaw],
+  );
+  const normalizedFamilySwitchOptions = React.useMemo(
+    () =>
+      familySwitchOptions.map((option) => ({
+        ...option,
+        isParentOption:
+          'isParentOption' in option ? option.isParentOption : option.kind === 'guardian',
+      })),
+    [familySwitchOptions],
+  );
+  const [isSwitchingClassroomPersona, setIsSwitchingClassroomPersona] =
+    React.useState(false);
+  const [switchingClassroomProfileId, setSwitchingClassroomProfileId] = React.useState<
+    string | null
+  >(null);
+  const shouldShowClassroomPersonaSwitcher =
+    Boolean(isPersonaSwitchEnabled) &&
+    Boolean(onFamilyViewSwitch ?? onPersonaSwitch) &&
+    (userProfile.kind === 'guardian' || userProfile.kind === 'child') &&
+    normalizedFamilySwitchOptions.some((option) => !option.isActive);
+  const activeFamilyPersona =
+    normalizedFamilySwitchOptions.find((option) => option.isActive) ?? null;
+  const activeFamilyPersonaLabel = activeFamilyPersona
+    ? resolveFamilyPersonaOptionLabel(activeFamilyPersona)
+    : userProfile.kind === 'guardian'
+      ? 'Parent'
+      : 'Student';
   const organizations = data.organizations ?? [];
   const currentOrganization =
     organizations.find((org) => org.isCurrent) ?? organizations[0] ?? null;
@@ -672,6 +758,138 @@ export function SidebarLeft({
         {shouldShowLearningSpaces ? (
           <>
             <SidebarSeparator className="mx-2 group-data-[collapsible=icon]:hidden" />
+            {shouldShowClassroomPersonaSwitcher ? (
+              <SidebarGroup className="py-0 group-data-[collapsible=icon]:hidden">
+                <SidebarGroupContent>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="hover:bg-sidebar-accent/60 h-8 w-full justify-between rounded-lg px-2.5 text-xs"
+                        aria-label="Switch classroom profile"
+                        disabled={isSwitchingClassroomPersona}
+                      >
+                        <span className="text-muted-foreground">View as</span>
+                        <span className="ml-2 truncate">{activeFamilyPersonaLabel}</span>
+                        <ChevronDown className="text-muted-foreground ml-auto size-3.5 shrink-0" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      className="w-(--radix-dropdown-menu-trigger-width) min-w-64"
+                      side="bottom"
+                      align="start"
+                    >
+                      {normalizedFamilySwitchOptions.map((option) => {
+                        const matchedGuardianChild =
+                          userProfile.kind === 'guardian'
+                            ? children.find((child) => child.ids.id === option.profileId)
+                            : null;
+                        const matchedProfile =
+                          option.profileId === userProfile.ids.id
+                            ? userProfile
+                            : matchedGuardianChild;
+                        const optionLabel =
+                          resolveFamilyPersonaOptionLabel(option) ||
+                          getProfileDisplayName(matchedProfile?.profile, option.label);
+                        const optionSubtitle = resolveFamilyPersonaOptionSubtitle({
+                          kind: option.kind,
+                          email: matchedProfile?.profile?.email,
+                        });
+                        const optionAvatarUrl = matchedProfile?.profile?.avatar?.url;
+                        const optionThemeKey = matchedProfile?.ui?.themeKey ?? null;
+                        const optionInitials = resolveInitials(optionLabel);
+                        const isPending =
+                          isSwitchingClassroomPersona &&
+                          switchingClassroomProfileId === option.profileId;
+
+                        return (
+                          <DropdownMenuItem
+                            key={option.profileId}
+                            className="px-1 py-1"
+                            disabled={option.isActive || isSwitchingClassroomPersona}
+                            onSelect={async () => {
+                              if (option.isActive) {
+                                return;
+                              }
+                              setIsSwitchingClassroomPersona(true);
+                              setSwitchingClassroomProfileId(option.profileId);
+                              try {
+                                if (onFamilyViewSwitch) {
+                                  await onFamilyViewSwitch({
+                                    childProfileId: option.isParentOption
+                                      ? null
+                                      : option.profileId,
+                                  });
+                                  return;
+                                }
+                                if (onPersonaSwitch) {
+                                  await onPersonaSwitch({ profileId: option.profileId });
+                                }
+                              } finally {
+                                setIsSwitchingClassroomPersona(false);
+                                setSwitchingClassroomProfileId(null);
+                              }
+                            }}
+                          >
+                            {isPending ? (
+                              <>
+                                <Loader2 className="animate-spin text-muted-foreground" />
+                                <span>Switching profile...</span>
+                              </>
+                            ) : (
+                              <span className="flex w-full items-center gap-3 rounded-lg border px-3 py-2.5">
+                                <Avatar
+                                  size="default"
+                                  className={
+                                    optionThemeKey
+                                      ? `theme-${optionThemeKey} border theme-border`
+                                      : undefined
+                                  }
+                                >
+                                  {optionAvatarUrl ? (
+                                    <AvatarImage
+                                      src={optionAvatarUrl}
+                                      alt={optionLabel}
+                                    />
+                                  ) : null}
+                                  <AvatarFallback
+                                    className={
+                                      optionThemeKey ? 'theme-bg theme-fg' : undefined
+                                    }
+                                  >
+                                    {optionInitials}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span className="min-w-0 flex-1">
+                                  <span className="block truncate text-sm font-medium text-foreground">
+                                    {optionLabel}
+                                  </span>
+                                  <span className="text-muted-foreground block truncate text-xs">
+                                    {optionSubtitle}
+                                  </span>
+                                </span>
+                                <span
+                                  className={`flex size-5 shrink-0 items-center justify-center rounded-full border ${
+                                    option.isActive
+                                      ? 'border-primary'
+                                      : 'border-muted-foreground/40'
+                                  }`}
+                                  aria-hidden
+                                >
+                                  {option.isActive ? (
+                                    <span className="bg-primary size-2.5 rounded-full" />
+                                  ) : null}
+                                </span>
+                              </span>
+                            )}
+                          </DropdownMenuItem>
+                        );
+                      })}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            ) : null}
             <SidebarGroup className="pb-0">
               {shouldShowLearningSpacesLabel ? (
                 <SidebarGroupLabel asChild className="uppercase">

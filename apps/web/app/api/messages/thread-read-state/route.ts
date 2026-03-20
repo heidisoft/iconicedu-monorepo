@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
-import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
-import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
-import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import { requireEffectiveActorContext } from '@iconicedu/web/lib/family-view/actor-context';
 
 function isThreadUnreadDebugEnabled() {
   return process.env.DEBUG_THREAD_UNREAD?.trim() === 'true';
@@ -34,23 +32,22 @@ export async function POST(request: Request) {
   }
 
   const supabase = await createSupabaseServerClient();
-  const authUser = await requireAuthedUser(supabase);
-  const accountResponse = await getAccountByAuthUserId(supabase, authUser.id);
-  const account = accountResponse.data;
-
-  if (!account) {
-    return NextResponse.json(
-      { success: false, message: 'Account not found' },
-      { status: 404 },
-    );
+  let actor;
+  try {
+    actor = await requireEffectiveActorContext(supabase);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Account not found') {
+      return NextResponse.json(
+        { success: false, message: 'Account not found' },
+        { status: 404 },
+      );
+    }
+    throw error;
   }
 
-  const profileResponse = await getProfileByAccountId(supabase, account.id);
-  const profile = profileResponse.data;
-
-  if (!profile) {
+  if (!actor) {
     return NextResponse.json(
-      { success: false, message: 'Profile not found' },
+      { success: false, message: 'Account not found' },
       { status: 404 },
     );
   }
@@ -58,7 +55,7 @@ export async function POST(request: Request) {
   const threadLookup = await supabase
     .from('threads')
     .select('id, channel_id')
-    .eq('org_id', account.org_id)
+    .eq('org_id', actor.account.org_id)
     .eq('id', threadId)
     .eq('channel_id', channelId)
     .is('deleted_at', null)
@@ -81,9 +78,9 @@ export async function POST(request: Request) {
   const participantLookup = await supabase
     .from('thread_participants')
     .select('id')
-    .eq('org_id', account.org_id)
+    .eq('org_id', actor.account.org_id)
     .eq('thread_id', threadId)
-    .eq('profile_id', profile.id)
+    .eq('profile_id', actor.profile.id)
     .is('deleted_at', null)
     .maybeSingle<{ id: string }>();
 
@@ -107,7 +104,7 @@ export async function POST(request: Request) {
     const messageLookup = await supabase
       .from('messages')
       .select('id')
-      .eq('org_id', account.org_id)
+      .eq('org_id', actor.account.org_id)
       .eq('channel_id', channelId)
       .eq('thread_id', threadId)
       .eq('id', requestedLastReadMessageId)
@@ -133,24 +130,24 @@ export async function POST(request: Request) {
 
   if (isThreadUnreadDebugEnabled()) {
     console.info('[thread-unread][api][request]', {
-      orgId: account.org_id,
+      orgId: actor.account.org_id,
       channelId,
       threadId,
-      accountId: account.id,
-      profileId: profile.id,
+      accountId: actor.account.id,
+      profileId: actor.profile.id,
       requestedLastReadMessageId,
       now,
     });
   }
 
   const recomputeResponse = await supabase.rpc('recompute_unread_for_account_thread', {
-    p_org_id: account.org_id,
+    p_org_id: actor.account.org_id,
     p_channel_id: channelId,
     p_thread_id: threadId,
-    p_account_id: account.id,
+    p_account_id: actor.account.id,
     p_last_read_message_id: requestedLastReadMessageId,
     p_last_read_at: now,
-    p_actor_profile_id: profile.id,
+    p_actor_profile_id: actor.profile.id,
   });
 
   if (recomputeResponse.error) {

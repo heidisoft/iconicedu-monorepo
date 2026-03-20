@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { GET } from '@iconicedu/web/app/api/messages/file-download/route';
 
 const APP_URL = 'https://app.iconicedu.test';
+const requireEffectiveActorContext = vi.fn();
 const maybeSingle = vi.fn(async () => ({ data: { id: 'member-1' } }));
 const limit = vi.fn(() => ({ maybeSingle }));
 const is = vi.fn(() => ({ limit }));
@@ -22,20 +23,9 @@ vi.mock('@iconicedu/web/lib/supabase/server', () => ({
   })),
 }));
 
-vi.mock('@iconicedu/web/lib/auth/requireAuthedUser', () => ({
-  requireAuthedUser: vi.fn(async () => ({ id: 'auth-user' })),
-}));
-
-vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
-  getAccountByAuthUserId: vi.fn(async () => ({
-    data: { id: 'account-1', org_id: 'org-1' },
-  })),
-}));
-
-vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
-  getProfileByAccountId: vi.fn(async () => ({
-    data: { id: 'profile-1', org_id: 'org-1' },
-  })),
+vi.mock('@iconicedu/web/lib/family-view/actor-context', () => ({
+  requireEffectiveActorContext: (...args: unknown[]) =>
+    requireEffectiveActorContext(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/messages/queries/file-url.query', () => ({
@@ -44,6 +34,11 @@ vi.mock('@iconicedu/web/lib/messages/queries/file-url.query', () => ({
 
 describe('GET /api/messages/file-download', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
+    requireEffectiveActorContext.mockResolvedValue({
+      account: { id: 'account-1', org_id: 'org-1' },
+      profile: { id: 'profile-1', org_id: 'org-1' },
+    });
     maybeSingle.mockResolvedValue({ data: { id: 'member-1' } });
   });
 

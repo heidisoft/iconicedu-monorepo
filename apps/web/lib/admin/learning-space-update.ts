@@ -3,8 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
-import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
-import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import { requireParentActorContext } from '@iconicedu/web/lib/family-view/actor-context';
 import {
   insertClassSchedules,
   publishParticipantInviteActivities,
@@ -1244,22 +1243,9 @@ export async function updateLearningSpaceFromPayload(
     if (!user) {
       throw new Error('Unauthorized');
     }
-
-    const accountResponse = await getAccountByAuthUserId(supabase, user.id);
-    if (!accountResponse.data) {
-      throw new Error('Account not found');
-    }
-
-    const profileResponse = await getProfileByAccountId(
-      supabase,
-      accountResponse.data.id,
-    );
-    if (!profileResponse.data) {
-      throw new Error('Profile not found');
-    }
-
-    orgId = accountResponse.data.org_id;
-    actorProfileId = profileResponse.data.id;
+    const actor = await requireParentActorContext(supabase);
+    orgId = actor.account.org_id;
+    actorProfileId = actor.profile.id;
   }
   const now = new Date().toISOString();
   const nextParticipantsSnapshot = payload.participants ?? [];

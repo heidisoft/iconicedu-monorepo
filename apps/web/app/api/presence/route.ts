@@ -2,8 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
-import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
-import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import { requireEffectiveActorContext } from '@iconicedu/web/lib/family-view/actor-context';
 import {
   mapConnectionStatusToDisplayStatus,
   mapConnectionStatusToLiveStatus,
@@ -66,39 +65,37 @@ export async function POST(request: Request) {
   };
 
   const supabase = await createSupabaseServerClient();
-  const {
-    data: { user: authUser },
-  } = await supabase.auth.getUser();
-  if (!authUser) {
+  let actor;
+  try {
+    actor = await requireEffectiveActorContext(supabase);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { success: false, message: 'Unauthorized' },
+        { status: 401 },
+      );
+    }
+    if (error instanceof Error && error.message === 'Account not found') {
+      return NextResponse.json(
+        { success: false, message: 'Account not found' },
+        { status: 404 },
+      );
+    }
+    throw error;
+  }
+
+  if (!actor) {
     return NextResponse.json(
       { success: false, message: 'Unauthorized' },
       { status: 401 },
-    );
-  }
-  const accountResponse = await getAccountByAuthUserId(supabase, authUser.id);
-  const account = accountResponse.data;
-
-  if (!account) {
-    return NextResponse.json(
-      { success: false, message: 'Account not found' },
-      { status: 404 },
-    );
-  }
-
-  const profileResponse = await getProfileByAccountId(supabase, account.id);
-  const profile = profileResponse.data;
-  if (!profile) {
-    return NextResponse.json(
-      { success: false, message: 'Profile not found' },
-      { status: 404 },
     );
   }
 
   const now = new Date().toISOString();
   const serviceClient = createSupabaseServiceClient();
   const upsertPayload: Record<string, unknown> = {
-    org_id: account.org_id,
-    profile_id: profile.id,
+    org_id: actor.account.org_id,
+    profile_id: actor.profile.id,
     live_status: mapConnectionStatusToLiveStatus(status),
     display_status: mapConnectionStatusToDisplayStatus(status),
     last_seen_at: now,

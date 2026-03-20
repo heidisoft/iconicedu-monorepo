@@ -21,6 +21,22 @@ vi.mock('@iconicedu/web/lib/auth/requireAuthedUser', () => ({
   requireAuthedUser: vi.fn(async () => ({ id: 'auth-user-1' })),
 }));
 
+vi.mock('@iconicedu/web/lib/family-view/actor-context', () => ({
+  requireEffectiveActorContext: vi.fn(async () => ({
+    authUserId: 'auth-user-1',
+    account: { id: 'account-1', org_id: 'org-1' },
+    profile: { id: 'profile-1', kind: 'guardian', account_id: 'account-1' },
+    isViewingAsChild: false,
+  })),
+}));
+
+vi.mock('@iconicedu/web/lib/org/queries/org.query', () => ({
+  getOrgBySlug: vi.fn(async () => ({
+    data: { id: 'org-1', slug: 'iconic-academy' },
+    error: null,
+  })),
+}));
+
 vi.mock('@iconicedu/web/lib/live-sessions/service', () => ({
   createOrJoinLiveSession: (...args: unknown[]) => createOrJoinLiveSession(...args),
 }));

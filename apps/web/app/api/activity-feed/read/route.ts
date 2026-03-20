@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
-import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
-import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
-import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
+import { requireEffectiveActorContext } from '@iconicedu/web/lib/family-view/actor-context';
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -14,15 +12,18 @@ function isUuid(value: string) {
 
 export async function POST(request: Request) {
   const supabase = await createSupabaseServerClient();
-  const authUser = await requireAuthedUser(supabase);
-  const accountResponse = await getAccountByAuthUserId(supabase, authUser.id);
-  if (!accountResponse.data) {
-    return NextResponse.json({ error: 'Account not found' }, { status: 404 });
+  let actor;
+  try {
+    actor = await requireEffectiveActorContext(supabase);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Account not found') {
+      return NextResponse.json({ error: 'Account not found' }, { status: 404 });
+    }
+    throw error;
   }
 
-  const profileResponse = await getProfileByAccountId(supabase, accountResponse.data.id);
-  if (!profileResponse.data) {
-    return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
+  if (!actor) {
+    return NextResponse.json({ error: 'Account not found' }, { status: 404 });
   }
 
   const body = (await request.json().catch(() => null)) as { ids?: unknown } | null;
@@ -39,8 +40,8 @@ export async function POST(request: Request) {
   const baseItemsResponse = await supabase
     .from('activity_feed_items')
     .select('id, kind')
-    .eq('org_id', accountResponse.data.org_id)
-    .eq('recipient_profile_id', profileResponse.data.id)
+    .eq('org_id', actor.account.org_id)
+    .eq('recipient_profile_id', actor.profile.id)
     .in('id', ids)
     .is('deleted_at', null);
 
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
     const groupMembersResponse = await supabase
       .from('activity_feed_group_members')
       .select('item_id')
-      .eq('org_id', accountResponse.data.org_id)
+      .eq('org_id', actor.account.org_id)
       .in('group_id', groupIds);
 
     if (groupMembersResponse.error) {
@@ -86,10 +87,10 @@ export async function POST(request: Request) {
       is_read: true,
       read_at: now,
       updated_at: now,
-      updated_by: profileResponse.data.id,
+      updated_by: actor.profile.id,
     })
-    .eq('org_id', accountResponse.data.org_id)
-    .eq('recipient_profile_id', profileResponse.data.id)
+    .eq('org_id', actor.account.org_id)
+    .eq('recipient_profile_id', actor.profile.id)
     .in('id', idsToUpdate)
     .is('deleted_at', null);
 

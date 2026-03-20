@@ -1,17 +1,16 @@
 import { NextResponse } from 'next/server';
 import { sendTextMessageAction } from '@iconicedu/web/app/actions/messages';
 
-import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
 import {
   buildDashboardClassRequestMessage,
   createPrivateClassRequestChannel,
   type DashboardClassRequestPayload,
 } from '@iconicedu/web/lib/dashboard/class-request';
+import { resolveEffectiveProfileForAuthUserInOrg } from '@iconicedu/web/lib/family-view/effective-profile';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
 import { buildUserProfileById } from '@iconicedu/web/lib/profile/builders/user-profile.builder';
 import {
-  getProfileByAccountId,
   getProfilesByIds,
   getProfilesByKind,
 } from '@iconicedu/web/lib/profile/queries/profiles.query';
@@ -115,27 +114,11 @@ export async function POST(request: Request) {
       );
     }
 
-    const accountResponse = await getAccountByAuthUserId(supabase, authUser.id);
-    if (!accountResponse.data || accountResponse.data.org_id !== org.id) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized.' },
-        { status: 403 },
-      );
-    }
-
-    const requesterProfileResponse = await getProfileByAccountId(
-      supabase,
-      accountResponse.data.id,
-    );
-
-    if (!requesterProfileResponse.data) {
-      return NextResponse.json(
-        { success: false, message: 'Profile not found.' },
-        { status: 404 },
-      );
-    }
-
-    const requesterProfile = requesterProfileResponse.data;
+    const resolution = await resolveEffectiveProfileForAuthUserInOrg(supabase, {
+      authUserId: authUser.id,
+      orgId: org.id,
+    });
+    const requesterProfile = resolution.effectiveProfile;
     if (requesterProfile.kind !== 'guardian' && requesterProfile.kind !== 'child') {
       return NextResponse.json(
         { success: false, message: 'Only parents and students can submit requests.' },

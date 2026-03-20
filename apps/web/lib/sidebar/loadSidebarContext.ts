@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type {
   AccountRow,
+  ProfileRow,
   SidebarLeftDataVM,
   SidebarOrganizationSwitchItemVM,
   UserAccountVM,
@@ -38,6 +39,10 @@ export async function loadSidebarContext(
     baseSidebarData: Omit<SidebarLeftDataVM, 'user'>;
     familyInvite?: FamilyLinkInviteRow | null;
     profileKindOverride?: UserProfileVM['kind'];
+    effectiveProfileRow?: ProfileRow | null;
+    familySwitchOptions?: SidebarLeftDataVM['user']['familySwitchOptions'];
+    isViewingAsChild?: boolean;
+    viewingAsProfileId?: string | null;
   },
 ): Promise<{
   sidebarData: SidebarLeftDataVM;
@@ -54,6 +59,7 @@ export async function loadSidebarContext(
       input.account,
       input.familyInvite ?? null,
       input.profileKindOverride,
+      input.effectiveProfileRow ?? null,
     );
 
   const directMessages =
@@ -123,6 +129,9 @@ export async function loadSidebarContext(
         profile: profileVM,
         account: accountVM,
         availablePersonas,
+        familySwitchOptions: input.familySwitchOptions ?? null,
+        isViewingAsChild: Boolean(input.isViewingAsChild),
+        viewingAsProfileId: input.viewingAsProfileId ?? null,
         addablePersonas,
       },
       collections: {

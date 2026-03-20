@@ -6,8 +6,7 @@ import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service
 import { publishActivityEvent } from '@iconicedu/web/lib/activity-feed/publisher/activity-publisher';
 import { compileLearningSpaceReminderJobs } from '@iconicedu/web/lib/automation/reminder-jobs';
 import { ensureSystemProfileId } from '@iconicedu/web/lib/automation/system-profile';
-import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
-import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import { requireParentActorContext } from '@iconicedu/web/lib/family-view/actor-context';
 import { toStoredLiveSessionConfig } from '@iconicedu/web/lib/admin/live-session-config';
 import { withInfoPanelDisabled } from '@iconicedu/web/lib/channels/ui-defaults';
 import {
@@ -130,18 +129,10 @@ export async function createLearningSpaceFromPayload(
     throw new Error('Unauthorized');
   }
 
-  const accountResponse = await getAccountByAuthUserId(supabase, user.id);
-  if (!accountResponse.data) {
-    throw new Error('Account not found');
-  }
+  const actor = await requireParentActorContext(supabase);
 
-  const profileResponse = await getProfileByAccountId(supabase, accountResponse.data.id);
-  if (!profileResponse.data) {
-    throw new Error('Profile not found');
-  }
-
-  const orgId = accountResponse.data.org_id;
-  const actorProfileId = profileResponse.data.id;
+  const orgId = actor.account.org_id;
+  const actorProfileId = actor.profile.id;
   const now = new Date().toISOString();
 
   const learningSpaceId = randomUUID();

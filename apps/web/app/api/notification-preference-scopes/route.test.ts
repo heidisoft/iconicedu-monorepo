@@ -6,25 +6,16 @@ import {
   POST,
 } from '@iconicedu/web/app/api/notification-preference-scopes/route';
 
-const requireAuthedUser = vi.fn();
+const requireEffectiveActorContext = vi.fn();
 const createSupabaseServerClient = vi.fn();
-const getAccountByAuthUserId = vi.fn();
-const getProfileByAccountId = vi.fn();
 
-vi.mock('@iconicedu/web/lib/auth/requireAuthedUser', () => ({
-  requireAuthedUser: (...args: unknown[]) => requireAuthedUser(...args),
+vi.mock('@iconicedu/web/lib/family-view/actor-context', () => ({
+  requireEffectiveActorContext: (...args: unknown[]) =>
+    requireEffectiveActorContext(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
   createSupabaseServerClient: (...args: unknown[]) => createSupabaseServerClient(...args),
-}));
-
-vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
-  getAccountByAuthUserId: (...args: unknown[]) => getAccountByAuthUserId(...args),
-}));
-
-vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
-  getProfileByAccountId: (...args: unknown[]) => getProfileByAccountId(...args),
 }));
 
 function createSupabaseMock() {
@@ -100,11 +91,10 @@ function createSupabaseMock() {
 describe('notification preference scopes route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    requireAuthedUser.mockResolvedValue({ id: 'auth-user-1' });
-    getAccountByAuthUserId.mockResolvedValue({
-      data: { id: 'account-1', org_id: 'org-1' },
+    requireEffectiveActorContext.mockResolvedValue({
+      account: { id: 'account-1', org_id: 'org-1' },
+      profile: { id: 'profile-1' },
     });
-    getProfileByAccountId.mockResolvedValue({ data: { id: 'profile-1' } });
     createSupabaseServerClient.mockResolvedValue(createSupabaseMock());
   });
 

@@ -2,9 +2,7 @@ import { NextResponse } from 'next/server';
 
 import type { SubmitSessionFeedbackInput } from '@iconicedu/shared-types';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
-import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
-import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
-import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
+import { requireEffectiveActorContext } from '@iconicedu/web/lib/family-view/actor-context';
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -23,15 +21,17 @@ function normalizeComment(value: string | null | undefined) {
 
 export async function POST(request: Request) {
   const supabase = await createSupabaseServerClient();
-  const authUser = await requireAuthedUser(supabase);
-  const accountResponse = await getAccountByAuthUserId(supabase, authUser.id);
-  if (!accountResponse.data) {
-    return NextResponse.json({ error: 'Account not found' }, { status: 404 });
+  let actor;
+  try {
+    actor = await requireEffectiveActorContext(supabase);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Account not found') {
+      return NextResponse.json({ error: 'Account not found' }, { status: 404 });
+    }
+    throw error;
   }
-
-  const profileResponse = await getProfileByAccountId(supabase, accountResponse.data.id);
-  if (!profileResponse.data) {
-    return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
+  if (!actor) {
+    return NextResponse.json({ error: 'Account not found' }, { status: 404 });
   }
 
   const body = (await request
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
   }
 
-  if (body.orgId !== accountResponse.data.org_id) {
+  if (body.orgId !== actor.account.org_id) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
   if (!isUuid(body.classSessionId)) {
@@ -79,8 +79,8 @@ export async function POST(request: Request) {
     const activityAccessResponse = await supabase
       .from('activity_feed_items')
       .select('id')
-      .eq('org_id', accountResponse.data.org_id)
-      .eq('recipient_profile_id', profileResponse.data.id)
+      .eq('org_id', actor.account.org_id)
+      .eq('recipient_profile_id', actor.profile.id)
       .eq('source_event_id', body.sourceEventId)
       .is('deleted_at', null)
       .limit(1)
@@ -101,7 +101,7 @@ export async function POST(request: Request) {
     const messageResponse = await supabase
       .from('messages')
       .select('channel_id')
-      .eq('org_id', accountResponse.data.org_id)
+      .eq('org_id', actor.account.org_id)
       .eq('id', body.messageId)
       .is('deleted_at', null)
       .maybeSingle<{ channel_id: string }>();
@@ -116,9 +116,9 @@ export async function POST(request: Request) {
     const memberResponse = await supabase
       .from('channel_members')
       .select('id')
-      .eq('org_id', accountResponse.data.org_id)
+      .eq('org_id', actor.account.org_id)
       .eq('channel_id', messageResponse.data.channel_id)
-      .eq('profile_id', profileResponse.data.id)
+      .eq('profile_id', actor.profile.id)
       .is('deleted_at', null)
       .maybeSingle<{ id: string }>();
 
@@ -135,8 +135,8 @@ export async function POST(request: Request) {
     .from('class_session_feedback')
     .upsert(
       {
-        org_id: accountResponse.data.org_id,
-        recipient_profile_id: profileResponse.data.id,
+        org_id: actor.account.org_id,
+        recipient_profile_id: actor.profile.id,
         class_session_id: body.classSessionId,
         classroom_id: body.classroomId,
         channel_id: body.channelId,
@@ -147,7 +147,7 @@ export async function POST(request: Request) {
         comment,
         submitted_at: now,
         updated_at: now,
-        updated_by: profileResponse.data.id,
+        updated_by: actor.profile.id,
         deleted_at: null,
         deleted_by: null,
       },

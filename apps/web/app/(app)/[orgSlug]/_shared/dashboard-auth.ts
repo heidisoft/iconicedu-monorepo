@@ -3,6 +3,8 @@ import { getOrCreateAccount } from '@iconicedu/web/lib/accounts/getOrCreateAccou
 import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
 import { buildUserProfileById } from '@iconicedu/web/lib/profile/builders/user-profile.builder';
 import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import { getAccountById } from '@iconicedu/web/lib/accounts/queries/accounts.query';
+import { resolveEffectiveProfileForAccountInOrg } from '@iconicedu/web/lib/family-view/effective-profile';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
@@ -45,7 +47,23 @@ export async function getDashboardProfileContext(
   profileResponse: Awaited<ReturnType<typeof getProfileByAccountId>>;
   currentUserProfile: Awaited<ReturnType<typeof buildUserProfileById>> | null;
 }> {
-  const profileResponse = await getProfileByAccountId(supabase, accountId);
+  const accountResponse = await getAccountById(supabase, accountId);
+  const account = accountResponse.data;
+
+  let profileResponse: Awaited<ReturnType<typeof getProfileByAccountId>>;
+  if (account?.auth_user_id) {
+    const resolved = await resolveEffectiveProfileForAccountInOrg(supabase, {
+      account,
+      authUserId: account.auth_user_id,
+    });
+    profileResponse = {
+      data: resolved.effectiveProfile,
+      error: null,
+    } as Awaited<ReturnType<typeof getProfileByAccountId>>;
+  } else {
+    profileResponse = await getProfileByAccountId(supabase, accountId);
+  }
+
   const currentUserProfile = profileResponse.data
     ? await buildUserProfileById(supabase, profileResponse.data.id)
     : null;

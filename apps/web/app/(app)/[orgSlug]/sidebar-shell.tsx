@@ -33,6 +33,7 @@ import { saveEducatorAvailabilityAction } from '@iconicedu/web/app/actions/educa
 import { upsertUserOnboardingStatusAction } from '@iconicedu/web/app/actions/onboarding-status';
 import { addPersonaAction } from '@iconicedu/web/app/actions/add-persona';
 import { switchActivePersonaAction } from '@iconicedu/web/app/actions/switch-active-persona';
+import { switchFamilyViewAction } from '@iconicedu/web/app/actions/switch-family-view';
 import { determineOnboardingStep } from '@iconicedu/web/lib/onboarding/determineOnboardingStep';
 import {
   markDirectMessageChannelRead,
@@ -224,6 +225,21 @@ export function SidebarShell({
     [dashboardBasePath, router, sidebarData.user.profile.ids.orgId],
   );
 
+  const handleFamilyViewSwitch = React.useCallback(
+    async (input: { childProfileId: string | null }) => {
+      const orgSlug = dashboardBasePath.replace(/^\//, '');
+      await switchFamilyViewAction({
+        orgId: sidebarData.user.profile.ids.orgId,
+        orgSlug,
+        childProfileId: input.childProfileId,
+      });
+      if (typeof window !== 'undefined') {
+        window.location.reload();
+      }
+    },
+    [dashboardBasePath, sidebarData.user.profile.ids.orgId],
+  );
+
   const handlePersonaAdd = React.useCallback(
     async (input: { kind: 'educator' | 'guardian' | 'child' | 'staff' }) => {
       const orgSlug = dashboardBasePath.replace(/^\//, '');
@@ -314,7 +330,10 @@ export function SidebarShell({
     sidebarData.user.account?.ids?.id ?? sidebarProfile.ids?.accountId ?? null;
 
   const refreshInboxUnreadCount = React.useCallback(async () => {
-    const response = await window.fetch('/api/activity-feed/unread-count', {
+    const orgId =
+      sidebarData.user.account?.ids?.orgId ?? sidebarData.user.profile.ids.orgId;
+    const query = orgId ? `?orgId=${encodeURIComponent(orgId)}` : '';
+    const response = await window.fetch(`/api/activity-feed/unread-count${query}`, {
       method: 'GET',
       headers: { 'content-type': 'application/json' },
       cache: 'no-store',
@@ -327,7 +346,7 @@ export function SidebarShell({
     } | null;
 
     setSidebarData((prev) => applyInboxUnreadCount(prev, payload?.unreadCount ?? 0));
-  }, []);
+  }, [sidebarData.user.account?.ids?.orgId, sidebarData.user.profile.ids.orgId]);
 
   const computedOnboardingStep = React.useMemo(
     () => determineOnboardingStep(sidebarProfile, sidebarAccount),
@@ -2342,6 +2361,7 @@ export function SidebarShell({
         onStaffProfileSave={handleStaffProfileSave}
         onStatusOverrideSave={handleStatusOverrideSave}
         onPersonaSwitch={handlePersonaSwitch}
+        onFamilyViewSwitch={handleFamilyViewSwitch}
         onPersonaAdd={handlePersonaAdd}
         isPersonaSwitchEnabled={Boolean(isPersonaSwitchEnabled)}
         isPersonaAddEnabled={Boolean(isPersonaAddEnabled)}
