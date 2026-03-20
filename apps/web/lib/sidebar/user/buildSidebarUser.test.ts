@@ -51,7 +51,7 @@ describe('buildSidebarUser addable persona diagnostics', () => {
     expect(infoSpy).not.toHaveBeenCalled();
   });
 
-  it('emits evaluation and empty-reason logs when debug flag is enabled and none are addable', () => {
+  it('does not emit logs when debug flag is enabled and none are addable', () => {
     process.env.DEBUG_POSTHOG_FLAGS = 'true';
     const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined);
 
@@ -74,41 +74,6 @@ describe('buildSidebarUser addable persona diagnostics', () => {
       },
     });
 
-    expect(infoSpy).toHaveBeenNthCalledWith(
-      1,
-      '[persona-flags]',
-      'sidebar-user-addable-evaluation',
-      {
-        accountId: 'account-1',
-        orgId: 'org-1',
-        activeProfileId: 'profile-1',
-        derivedKind: 'guardian',
-        primaryRole: 'guardian',
-        userRoleKeys: ['guardian'],
-        existingProfileKinds: ['guardian'],
-        addablePersonas: [],
-      },
-    );
-    expect(infoSpy).toHaveBeenNthCalledWith(
-      2,
-      '[persona-flags]',
-      'sidebar-user-addable-empty',
-      {
-        accountId: 'account-1',
-        orgId: 'org-1',
-        activeProfileId: 'profile-1',
-        derivedKind: 'guardian',
-        primaryRole: 'guardian',
-        userRoleKeys: ['guardian'],
-        existingProfileKinds: ['guardian'],
-        addablePersonas: [],
-        reasons: {
-          educator: 'missing-role',
-          guardian: 'already-exists',
-          child: 'missing-role',
-          staff: 'missing-role',
-        },
-      },
-    );
+    expect(infoSpy).not.toHaveBeenCalled();
   });
 });

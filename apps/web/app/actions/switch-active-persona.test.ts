@@ -85,7 +85,7 @@ describe('switchActivePersonaAction', () => {
     ).rejects.toThrow('Persona switch is disabled.');
   });
 
-  it('logs debug context when persona switch is blocked and debug mode is enabled', async () => {
+  it('does not log debug context when persona switch is blocked', async () => {
     process.env.DEBUG_POSTHOG_FLAGS = 'true';
     enablePersonaSwitchRun.mockResolvedValue(false);
     const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined);
@@ -98,12 +98,7 @@ describe('switchActivePersonaAction', () => {
       }),
     ).rejects.toThrow('Persona switch is disabled.');
 
-    expect(infoSpy).toHaveBeenCalledWith('[persona-flags]', 'operation-blocked', {
-      operation: 'switch',
-      accountId: 'account-1',
-      activeProfileId: 'profile-1',
-      evaluatedFlag: false,
-    });
+    expect(infoSpy).not.toHaveBeenCalled();
   });
 
   it('switches active persona when feature flag and role checks pass', async () => {

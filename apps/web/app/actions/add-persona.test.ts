@@ -81,7 +81,7 @@ describe('addPersonaAction', () => {
     ).rejects.toThrow('Persona add is disabled.');
   });
 
-  it('logs debug context when persona add is blocked and debug mode is enabled', async () => {
+  it('does not log debug context when persona add is blocked', async () => {
     process.env.DEBUG_POSTHOG_FLAGS = 'true';
     enablePersonaAddRun.mockResolvedValue(false);
     const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined);
@@ -94,12 +94,7 @@ describe('addPersonaAction', () => {
       }),
     ).rejects.toThrow('Persona add is disabled.');
 
-    expect(infoSpy).toHaveBeenCalledWith('[persona-flags]', 'operation-blocked', {
-      operation: 'add',
-      accountId: 'account-1',
-      activeProfileId: 'profile-1',
-      evaluatedFlag: false,
-    });
+    expect(infoSpy).not.toHaveBeenCalled();
   });
 
   it('creates persona profile when flag and role checks pass', async () => {

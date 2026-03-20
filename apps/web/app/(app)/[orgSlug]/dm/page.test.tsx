@@ -4,6 +4,8 @@ import Page from '@iconicedu/web/app/(app)/[orgSlug]/dm/page';
 
 const redirectMock = vi.fn();
 const ensureDmMock = vi.fn();
+const getDashboardAccountContextMock = vi.fn();
+const getDashboardProfileContextMock = vi.fn();
 
 vi.mock('next/navigation', () => ({
   redirect: (path: string) => redirectMock(path),
@@ -50,6 +52,13 @@ vi.mock('@iconicedu/web/lib/channels/actions/ensure-direct-message-channel', () 
   ensureDirectMessageChannel: (...args: unknown[]) => ensureDmMock(...args),
 }));
 
+vi.mock('@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth', () => ({
+  getDashboardAccountContext: (...args: unknown[]) =>
+    getDashboardAccountContextMock(...args),
+  getDashboardProfileContext: (...args: unknown[]) =>
+    getDashboardProfileContextMock(...args),
+}));
+
 const buildChannelByIdMock = vi.fn();
 const buildChannelByDmKeyMock = vi.fn();
 const buildDirectMessageChannelsWithMessagesMock = vi.fn();
@@ -70,6 +79,17 @@ describe('d/dm page', () => {
   beforeEach(() => {
     resolveOrgDashboardPathMock.mockClear();
     resolveOrgDashboardPathMock.mockResolvedValue('/iconic-academy');
+    getDashboardAccountContextMock.mockReset();
+    getDashboardProfileContextMock.mockReset();
+    getDashboardAccountContextMock.mockResolvedValue({
+      supabase: {},
+      account: { id: 'account-1', org_id: 'org-1' },
+      dashboardPath: '/iconic-academy',
+    });
+    getDashboardProfileContextMock.mockResolvedValue({
+      profileResponse: { data: { id: 'profile-1' } },
+      currentUserProfile: null,
+    });
   });
 
   it('redirects to a provided dm channel id when it exists', async () => {

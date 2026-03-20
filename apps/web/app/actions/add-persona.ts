@@ -27,10 +27,6 @@ function roleKeyFromKind(kind: UserProfileVM['kind']): string | null {
   return null;
 }
 
-function isPersonaFlagDebugEnabled() {
-  return process.env.DEBUG_POSTHOG_FLAGS?.trim() === 'true';
-}
-
 export async function addPersonaAction(input: AddPersonaInput) {
   const supabase = await createSupabaseServerClient();
   const authUser = await requireAuthedUser(supabase);
@@ -50,14 +46,6 @@ export async function addPersonaAction(input: AddPersonaInput) {
     },
   });
   if (!isEnabled) {
-    if (isPersonaFlagDebugEnabled()) {
-      console.info('[persona-flags]', 'operation-blocked', {
-        operation: 'add',
-        accountId: account.id,
-        activeProfileId: account.active_profile_id ?? null,
-        evaluatedFlag: isEnabled,
-      });
-    }
     throw new Error('Persona add is disabled.');
   }
 

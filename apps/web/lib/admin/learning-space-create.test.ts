@@ -6,6 +6,7 @@ const {
   publishActivityEventMock,
   compileLearningSpaceReminderJobsMock,
   ensureSystemProfileIdMock,
+  requireParentActorContextMock,
   getAccountByAuthUserIdMock,
   getProfileByAccountIdMock,
   insertClassSchedulesMock,
@@ -15,6 +16,7 @@ const {
   publishActivityEventMock: vi.fn(),
   compileLearningSpaceReminderJobsMock: vi.fn(),
   ensureSystemProfileIdMock: vi.fn(),
+  requireParentActorContextMock: vi.fn(),
   getAccountByAuthUserIdMock: vi.fn(),
   getProfileByAccountIdMock: vi.fn(),
   insertClassSchedulesMock: vi.fn(),
@@ -38,6 +40,10 @@ vi.mock('@iconicedu/web/lib/automation/reminder-jobs', () => ({
 
 vi.mock('@iconicedu/web/lib/automation/system-profile', () => ({
   ensureSystemProfileId: ensureSystemProfileIdMock,
+}));
+
+vi.mock('@iconicedu/web/lib/family-view/actor-context', () => ({
+  requireParentActorContext: requireParentActorContextMock,
 }));
 
 vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
@@ -87,6 +93,11 @@ describe('createLearningSpaceFromPayload', () => {
     });
     insertClassSchedulesMock.mockResolvedValue(['schedule-1']);
     ensureSystemProfileIdMock.mockResolvedValue('system-profile-1');
+    requireParentActorContextMock.mockResolvedValue({
+      account: { id: 'account-1', org_id: 'org-1' },
+      profile: { id: 'profile-1', account_id: 'account-1', org_id: 'org-1' },
+      source: 'parent',
+    });
   });
 
   it('publishes class creation and one plural participant activity without initial session activity items', async () => {

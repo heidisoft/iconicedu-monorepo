@@ -20,10 +20,6 @@ import {
 } from '@iconicedu/web/lib/subjects/queries/org-subject-catalog.query';
 import { enablePersonaAdd, enablePersonaSwitch } from '@iconicedu/web/flags';
 
-function isPersonaFlagDebugEnabled() {
-  return process.env.DEBUG_POSTHOG_FLAGS?.trim() === 'true';
-}
-
 export const metadata: Metadata = {
   title: {
     default: 'Dashboard | ICONIC Academy',
@@ -108,15 +104,6 @@ export default async function Layout({
       },
     }),
   ]);
-  if (isPersonaFlagDebugEnabled()) {
-    console.info('[persona-flags]', 'layout-evaluation-result', {
-      profileId: sidebarData.user.profile.ids.id,
-      orgSlug,
-      orgId: account.org_id,
-      isPersonaSwitchEnabled,
-      isPersonaAddEnabled,
-    });
-  }
   const subjectCatalogResponse = await listActiveOrgSubjectCatalog(
     supabase,
     account.org_id,

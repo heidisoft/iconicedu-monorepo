@@ -450,7 +450,7 @@ describe('buildLearningSpaceScheduleDiffPlan', () => {
     expect(unscheduledRemovalActivities).toEqual([]);
   });
 
-  it('logs skip decision reason for past schedule-change activities when debug is enabled', () => {
+  it('does not log skip decision reason for past schedule-change activities', () => {
     vi.stubEnv('DEBUG_LEARNING_SPACE_SCHEDULE_DIFF', '1');
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
 
@@ -478,25 +478,10 @@ describe('buildLearningSpaceScheduleDiffPlan', () => {
       ],
     });
 
-    const decisionLogs = logSpy.mock.calls
-      .filter(
-        (call) =>
-          call[0] === '[learning-space:update:schedule-diff]' &&
-          call[1] === 'schedule-change-publish-decision',
-      )
-      .map((call) => call[2] as Record<string, unknown>);
-
-    expect(
-      decisionLogs.some(
-        (entry) =>
-          entry.eventType === 'class.session.canceled' &&
-          entry.decision === 'skip' &&
-          entry.reason === 'past_reference_time',
-      ),
-    ).toBe(true);
+    expect(logSpy).not.toHaveBeenCalled();
   });
 
-  it('logs publish decision reason for future schedule-change activities when debug is enabled', () => {
+  it('does not log publish decision reason for future schedule-change activities', () => {
     vi.stubEnv('DEBUG_LEARNING_SPACE_SCHEDULE_DIFF', '1');
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
 
@@ -529,22 +514,7 @@ describe('buildLearningSpaceScheduleDiffPlan', () => {
       ],
     });
 
-    const decisionLogs = logSpy.mock.calls
-      .filter(
-        (call) =>
-          call[0] === '[learning-space:update:schedule-diff]' &&
-          call[1] === 'schedule-change-publish-decision',
-      )
-      .map((call) => call[2] as Record<string, unknown>);
-
-    expect(
-      decisionLogs.some(
-        (entry) =>
-          entry.eventType === 'class.session.rescheduled' &&
-          entry.decision === 'publish' &&
-          entry.reason === 'future_or_now_reference_time',
-      ),
-    ).toBe(true);
+    expect(logSpy).not.toHaveBeenCalled();
   });
 
   it('does not emit diffs for timezone-shifted keys when full hash is equal', () => {

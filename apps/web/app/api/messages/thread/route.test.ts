@@ -4,6 +4,7 @@ import { GET } from '@iconicedu/web/app/api/messages/thread/route';
 import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
 
 const buildMessagesByThreadId = vi.fn();
+const requireEffectiveActorContextMock = vi.fn();
 const APP_URL = resolveAppUrl();
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
@@ -14,14 +15,9 @@ vi.mock('@iconicedu/web/lib/auth/requireAuthedUser', () => ({
   requireAuthedUser: vi.fn(async () => ({ id: 'auth-user' })),
 }));
 
-vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
-  getAccountByAuthUserId: vi.fn(async () => ({
-    data: { id: 'account-1', org_id: 'org-1' },
-  })),
-}));
-
-vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
-  getProfileByAccountId: vi.fn(async () => ({ data: { id: 'profile-1' } })),
+vi.mock('@iconicedu/web/lib/family-view/actor-context', () => ({
+  requireEffectiveActorContext: (...args: unknown[]) =>
+    requireEffectiveActorContextMock(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/messages/builders/message.builder', () => ({
@@ -38,6 +34,11 @@ describe('GET /api/messages/thread', () => {
   });
 
   it('returns messages for thread payload', async () => {
+    requireEffectiveActorContextMock.mockResolvedValueOnce({
+      account: { id: 'account-1', org_id: 'org-1' },
+      profile: { id: 'profile-1' },
+      source: 'primary',
+    });
     buildMessagesByThreadId.mockResolvedValueOnce([
       { ids: { id: 'message-1', orgId: 'org-1' } },
     ]);

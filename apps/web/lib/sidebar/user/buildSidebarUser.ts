@@ -61,11 +61,7 @@ type PersonaAddableEvaluation = {
   reasons: Record<AddablePersonaKind, PersonaDecisionReason>;
 };
 
-function isPersonaFlagDebugEnabled() {
-  return process.env.DEBUG_POSTHOG_FLAGS?.trim() === 'true';
-}
-
-function logPersonaAddableEvaluation(input: {
+function logPersonaAddableEvaluation(_input: {
   accountId: string;
   orgId: string;
   activeProfileId: string | null;
@@ -73,27 +69,7 @@ function logPersonaAddableEvaluation(input: {
   primaryRole: AccountRow['primary_role'] | null;
   evaluation: PersonaAddableEvaluation;
 }) {
-  if (!isPersonaFlagDebugEnabled()) {
-    return;
-  }
-
-  const debugPayload = {
-    accountId: input.accountId,
-    orgId: input.orgId,
-    activeProfileId: input.activeProfileId,
-    derivedKind: input.derivedKind,
-    primaryRole: input.primaryRole,
-    userRoleKeys: Array.from(input.evaluation.roleKeys).sort(),
-    existingProfileKinds: Array.from(input.evaluation.existingKinds).sort(),
-    addablePersonas: input.evaluation.addablePersonas,
-  };
-  console.info('[persona-flags]', 'sidebar-user-addable-evaluation', debugPayload);
-  if (input.evaluation.addablePersonas.length === 0) {
-    console.info('[persona-flags]', 'sidebar-user-addable-empty', {
-      ...debugPayload,
-      reasons: input.evaluation.reasons,
-    });
-  }
+  return;
 }
 
 export async function buildSidebarUser(

@@ -57,7 +57,6 @@ async function rebuildTailwind(trigger) {
 
   isBuilding = true;
   try {
-    console.log(`Rebuilding Tailwind due to ${trigger}`);
     await runTailwind();
   } catch (error) {
     console.error(error);

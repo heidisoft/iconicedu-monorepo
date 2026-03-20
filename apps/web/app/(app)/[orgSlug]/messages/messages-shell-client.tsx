@@ -145,6 +145,7 @@ type MessagesShellClientProps = {
   panelRegistry?: Partial<
     MessagesRightPanelRegistry<ComponentType<{ intent: MessagesRightPanelIntent }>>
   >;
+
   sendTextMessage: (input: MessageSendTextInput) => Promise<MessageVM>;
   sendFileMessage: (input: MessageSendFileInput) => Promise<MessageVM>;
   sendFilesMessage: (input: MessageSendFilesInput) => Promise<MessageVM>;
@@ -407,10 +408,6 @@ export function MessagesShellClient({
       return;
     }
 
-    console.info('[live-session:debug][messages-join] join requested', {
-      orgSlug,
-      channelId: channelState.ids.id,
-    });
     const response = await window.fetch(
       `/api/channels/${channelState.ids.id}/live-sessions/join`,
       {
@@ -427,24 +424,12 @@ export function MessagesShellClient({
       joinPath?: string;
       error?: string;
     } | null;
-    console.info('[live-session:debug][messages-join] join response received', {
-      channelId: channelState.ids.id,
-      status: response.status,
-      ok: response.ok,
-      success: payload?.success ?? null,
-      joinPath: payload?.joinPath ?? null,
-      error: payload?.error ?? null,
-    });
 
     if (!response.ok || !payload?.success || !payload.joinPath) {
       throw new Error(payload?.error ?? 'Failed to join live session');
     }
 
     handleResolvedJoinHref(payload.joinPath);
-    console.info('[live-session:debug][messages-join] resolved join href', {
-      channelId: channelState.ids.id,
-      joinPath: payload.joinPath,
-    });
   }, [channelState.ids.id, handleResolvedJoinHref, orgSlug]);
 
   useEffect(() => {
@@ -539,6 +524,7 @@ export function MessagesShellClient({
         uploadFileMessage={uploadFileMessage}
         joinLiveSession={joinLiveSession}
       />
+
       <ExternalLiveSessionJoinDialog
         target={externalJoinTarget}
         onOpenChange={(open) => {

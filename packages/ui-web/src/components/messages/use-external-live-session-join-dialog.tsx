@@ -35,17 +35,12 @@ export function useExternalLiveSessionJoinDialog(input?: {
   const handleResolvedJoinHref = useCallback(
     (joinHref: string) => {
       if (isExternalJoinHref(joinHref)) {
-        console.info('[live-session:debug][join-dialog] opening external join dialog', {
-          joinHref,
-        });
         openExternalJoinDialog(joinHref);
         return;
       }
 
       const navigate = input?.onInternalJoinHref ?? defaultInternalNavigate;
-      console.info('[live-session:debug][join-dialog] navigating to internal join href', {
-        joinHref,
-      });
+
       navigate(joinHref);
     },
     [input?.onInternalJoinHref, openExternalJoinDialog],

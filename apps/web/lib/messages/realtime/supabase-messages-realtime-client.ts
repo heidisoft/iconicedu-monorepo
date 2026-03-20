@@ -35,9 +35,6 @@ export function createSupabaseMessagesRealtimeClient(): MessagesRealtimeClient {
       // Clean up existing subscription if any
       const existing = channelsById.get(channelId);
       if (existing) {
-        console.log(
-          `[Realtime] Cleaning up existing subscription for messages:${channelId}`,
-        );
         void existing.unsubscribe();
         channelsById.delete(channelId);
       }
@@ -73,7 +70,6 @@ export function createSupabaseMessagesRealtimeClient(): MessagesRealtimeClient {
                 message?: MessageVM;
               };
               if (payload?.success && payload.message) {
-                console.log(`[Realtime] Message ${currentType}: ${messageId}`);
                 onEvent({
                   type: currentType === 'added' ? 'message-added' : 'message-updated',
                   message: payload.message,
@@ -114,9 +110,6 @@ export function createSupabaseMessagesRealtimeClient(): MessagesRealtimeClient {
           filter: `channel_id=eq.${channelId}`,
         },
         (payload) => {
-          console.log(
-            `[Realtime] Received ${payload.eventType} event for messages table`,
-          );
           if (payload.eventType === 'DELETE') {
             const messageId = (payload.old as { id?: string } | null)?.id;
             if (messageId) {
@@ -222,7 +215,6 @@ export function createSupabaseMessagesRealtimeClient(): MessagesRealtimeClient {
       const attemptSubscribe = () => {
         channel.subscribe((status) => {
           if (status === 'SUBSCRIBED') {
-            console.log(`[Realtime] Successfully subscribed to messages:${channelId}`);
             retryCount = 0; // Reset on success
           } else if (status === 'CHANNEL_ERROR') {
             console.error(
@@ -231,9 +223,7 @@ export function createSupabaseMessagesRealtimeClient(): MessagesRealtimeClient {
             );
             if (retryCount < maxRetries) {
               retryCount++;
-              console.log(
-                `[Realtime] Retry attempt ${retryCount}/${maxRetries} for messages:${channelId}`,
-              );
+
               setTimeout(() => {
                 void channel.unsubscribe();
                 attemptSubscribe();
@@ -245,9 +235,7 @@ export function createSupabaseMessagesRealtimeClient(): MessagesRealtimeClient {
             console.error(`[Realtime] Subscription timed out for messages:${channelId}`);
             if (retryCount < maxRetries) {
               retryCount++;
-              console.log(
-                `[Realtime] Retry after timeout ${retryCount}/${maxRetries} for messages:${channelId}`,
-              );
+
               setTimeout(() => {
                 void channel.unsubscribe();
                 attemptSubscribe();

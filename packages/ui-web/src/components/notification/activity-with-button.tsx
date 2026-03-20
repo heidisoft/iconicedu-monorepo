@@ -78,27 +78,13 @@ export function ActivityWithButton({
 
   const handleJoinAction = async () => {
     if (!joinChannelId || isJoinPending) {
-      console.info('[live-session:debug][inbox-join] join skipped', {
-        joinChannelId,
-        isJoinPending,
-        reason: !joinChannelId ? 'missing-channel-id' : 'pending',
-      });
       return;
     }
     const orgSlug = resolveOrgSlugForJoin();
     if (!orgSlug) {
-      console.error('[live-session:debug][inbox-join] missing orgSlug for join', {
-        joinChannelId,
-      });
       throw new Error('orgSlug is required');
     }
 
-    console.info('[live-session:debug][inbox-join] requesting join', {
-      joinChannelId,
-      orgSlug,
-      actionKey: actionButton.actionKey ?? null,
-      href: actionButton.href ?? null,
-    });
     setIsJoinPending(true);
     try {
       const response = await window.fetch(
@@ -118,29 +104,11 @@ export function ActivityWithButton({
             error?: string;
           }
         | undefined;
-      console.info('[live-session:debug][inbox-join] join response received', {
-        joinChannelId,
-        status: response.status,
-        ok: response.ok,
-        success: payload?.success ?? null,
-        joinPath: payload?.joinPath ?? null,
-        error: payload?.error ?? null,
-      });
+
       if (!response.ok || !payload?.success || !payload.joinPath) {
         throw new Error(payload?.error ?? 'Failed to join live session');
       }
       handleResolvedJoinHref(payload.joinPath);
-      console.info('[live-session:debug][inbox-join] resolved join href', {
-        joinChannelId,
-        joinPath: payload.joinPath,
-      });
-    } catch (error) {
-      console.error('[live-session:debug][inbox-join] join failed', {
-        joinChannelId,
-        orgSlug,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
     } finally {
       setIsJoinPending(false);
     }

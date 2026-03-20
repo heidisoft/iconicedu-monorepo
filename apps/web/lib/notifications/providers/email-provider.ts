@@ -7,13 +7,4 @@ type EmailNotificationPayload = {
   metadata?: Record<string, unknown>;
 };
 
-export async function sendEmailNotification(payload: EmailNotificationPayload) {
-  console.log('notifications.email.send', {
-    orgId: payload.orgId,
-    recipientProfileId: payload.recipientProfileId,
-    prefKey: payload.prefKey,
-    subject: payload.subject,
-    summary: payload.summary ?? null,
-    metadata: payload.metadata ?? {},
-  });
-}
+export async function sendEmailNotification(_payload: EmailNotificationPayload) {}

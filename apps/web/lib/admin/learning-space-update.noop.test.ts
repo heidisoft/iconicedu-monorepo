@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   createSupabaseServerClientMock,
   createSupabaseServiceClientMock,
+  requireParentActorContextMock,
   getAccountByAuthUserIdMock,
   getProfileByAccountIdMock,
   publishActivityEventMock,
@@ -11,6 +12,7 @@ const {
 } = vi.hoisted(() => ({
   createSupabaseServerClientMock: vi.fn(),
   createSupabaseServiceClientMock: vi.fn(),
+  requireParentActorContextMock: vi.fn(),
   getAccountByAuthUserIdMock: vi.fn(),
   getProfileByAccountIdMock: vi.fn(),
   publishActivityEventMock: vi.fn(),
@@ -24,6 +26,10 @@ vi.mock('@iconicedu/web/lib/supabase/server', () => ({
 
 vi.mock('@iconicedu/web/lib/supabase/service', () => ({
   createSupabaseServiceClient: createSupabaseServiceClientMock,
+}));
+
+vi.mock('@iconicedu/web/lib/family-view/actor-context', () => ({
+  requireParentActorContext: requireParentActorContextMock,
 }));
 
 vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
@@ -125,6 +131,11 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-01T12:00:00.000Z'));
+    requireParentActorContextMock.mockResolvedValue({
+      account: { id: 'account-1', org_id: 'org-1' },
+      profile: { id: 'profile-actor-1', account_id: 'account-1', org_id: 'org-1' },
+      source: 'parent',
+    });
   });
 
   afterEach(() => {
@@ -765,35 +776,7 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
       }),
     );
 
-    const publishAttemptLogs = logSpy.mock.calls
-      .filter(
-        (call) =>
-          call[0] === '[learning-space:update:schedule-diff]' &&
-          call[1] === 'schedule-change-publish-attempt',
-      )
-      .map((call) => call[2] as Record<string, unknown>);
-    const publishSuccessLogs = logSpy.mock.calls
-      .filter(
-        (call) =>
-          call[0] === '[learning-space:update:schedule-diff]' &&
-          call[1] === 'schedule-change-publish-success',
-      )
-      .map((call) => call[2] as Record<string, unknown>);
-
-    expect(
-      publishAttemptLogs.some(
-        (entry) =>
-          entry.eventType === 'class.session.rescheduled' &&
-          typeof entry.dedupeKey === 'string',
-      ),
-    ).toBe(true);
-    expect(
-      publishSuccessLogs.some(
-        (entry) =>
-          entry.eventType === 'class.session.rescheduled' &&
-          entry.activityEventId === 'activity-1',
-      ),
-    ).toBe(true);
+    expect(logSpy).not.toHaveBeenCalled();
   });
 
   it('emits class.session.canceled for added exceptions even when base schedule also changes', async () => {

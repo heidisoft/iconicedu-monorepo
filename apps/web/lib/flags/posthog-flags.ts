@@ -10,10 +10,6 @@ type EvaluatePosthogBooleanFlagInput = {
 const DEFAULT_POSTHOG_HOST = 'https://t.iconicedu.lk';
 const DEFAULT_TIMEOUT_MS = 2500;
 
-function isPosthogFlagDebugEnabled() {
-  return process.env.DEBUG_POSTHOG_FLAGS?.trim() === 'true';
-}
-
 function getPosthogHost() {
   return (
     process.env.POSTHOG_HOST ??
@@ -51,17 +47,8 @@ export async function evaluatePosthogBooleanFlag(
   const flagKey = input.flagKey.trim();
   const apiKey = getPosthogKey();
   const host = getPosthogHost();
-  const isDebugEnabled = isPosthogFlagDebugEnabled();
 
   if (!distinctId || !flagKey || !apiKey || !host) {
-    if (isDebugEnabled) {
-      console.info('[posthog-flags]', 'evaluation-skipped', {
-        flagKey,
-        hasDistinctId: Boolean(distinctId),
-        hasApiKey: Boolean(apiKey),
-        hasHost: Boolean(host),
-      });
-    }
     return false;
   }
 
@@ -85,12 +72,6 @@ export async function evaluatePosthogBooleanFlag(
     });
 
     if (!response.ok) {
-      if (isDebugEnabled) {
-        console.info('[posthog-flags]', 'evaluation-failed', {
-          flagKey,
-          status: response.status,
-        });
-      }
       return false;
     }
 
@@ -105,28 +86,8 @@ export async function evaluatePosthogBooleanFlag(
             ? value !== 0
             : false;
 
-    if (isDebugEnabled) {
-      console.info('[posthog-flags]', 'evaluation-result', {
-        flagKey,
-        distinctId,
-        rawValueType: value === undefined ? 'undefined' : typeof value,
-        rawValue:
-          typeof value === 'string'
-            ? value.slice(0, 64)
-            : typeof value === 'number'
-              ? value
-              : (value ?? null),
-        result,
-      });
-    }
-
     return result;
   } catch {
-    if (isDebugEnabled) {
-      console.info('[posthog-flags]', 'evaluation-exception', {
-        flagKey,
-      });
-    }
     return false;
   } finally {
     clearTimeout(timeout);

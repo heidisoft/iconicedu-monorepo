@@ -420,11 +420,10 @@ function isScheduleDiffDebugEnabled() {
   return process.env.DEBUG_LEARNING_SPACE_SCHEDULE_DIFF === '1';
 }
 
-function debugScheduleDiff(stage: string, details: Record<string, unknown>) {
+function debugScheduleDiff(_stage: string, _details: Record<string, unknown>) {
   if (!isScheduleDiffDebugEnabled()) {
     return;
   }
-  console.log('[learning-space:update:schedule-diff]', stage, details);
 }
 
 export function buildRemovedMembersActivity(input: {

@@ -48,10 +48,25 @@ vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
   getAccountByAuthUserId: vi.fn(async () => ({
     data: { id: 'account-1', org_id: 'org-1' },
   })),
+  getAccountByAuthUserIdInOrg: vi.fn(async () => ({
+    data: { id: 'account-1', org_id: 'org-1', auth_user_id: 'auth-user' },
+  })),
 }));
 
 vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
   getProfileByAccountId: vi.fn(async () => ({ data: { id: 'profile-1' } })),
+  getProfilesByAccountId: vi.fn(async () => ({
+    data: [{ id: 'profile-1', account_id: 'account-1', kind: 'guardian' }],
+    error: null,
+  })),
+  getChildProfilesByAccountIds: vi.fn(async () => ({ data: [], error: null })),
+}));
+vi.mock('@iconicedu/web/lib/profile/queries/guardian.query', () => ({
+  getGuardianFamilyLinks: vi.fn(async () => ({ data: [], error: null })),
+}));
+vi.mock('@iconicedu/web/lib/family-view/context', () => ({
+  getFamilyViewCookieSelection: vi.fn(async () => null),
+  clearFamilyViewCookie: vi.fn(async () => undefined),
 }));
 vi.mock('@iconicedu/web/lib/profile/queries/active-profile.query', () => ({
   resolveActiveProfileForAccountInOrg: (...args: unknown[]) =>
@@ -428,7 +443,8 @@ describe('sendTextMessageAction', () => {
       expect.objectContaining({
         accountId: 'account-1',
         orgId: 'org-1',
-        activeProfileId: 'profile-active',
+        activeProfileId: null,
+        updatedByAuthUserId: 'auth-user',
       }),
     );
   });

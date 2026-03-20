@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { Button } from '@iconicedu/ui-web/ui/button';
-import { Check, Moon, Sun } from 'lucide-react';
+import { Moon, Sun } from 'lucide-react';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import {
   DAY_KEYS,
@@ -22,7 +22,6 @@ type AvailabilitySchedulerProps = {
 };
 
 export function AvailabilityScheduler({ value, onChange }: AvailabilitySchedulerProps) {
-  console.log('Rendering AvailabilityScheduler with value:', value);
   const [selectedDay, setSelectedDay] = React.useState<DayKey>('Mon');
   const [availability, setAvailability] = React.useState<DayAvailability>(
     value ?? EMPTY_DAY_AVAILABILITY,
@@ -110,6 +109,7 @@ export function AvailabilityScheduler({ value, onChange }: AvailabilityScheduler
                         : '4px',
                   }}
                 />
+
                 <div
                   className={cn(
                     'w-1.5 sm:w-2 rounded-sm transition-all',

@@ -378,17 +378,6 @@ async function projectEvent(supabase: SupabaseServiceClient, event: ActivityEven
   });
   const recipientProfileIds = suppressionResult.recipientProfileIds;
 
-  if (suppressionResult.suppressedProfileIds.length) {
-    console.log('[activity-feed:active-conversation-suppression]', 'decision', {
-      eventType: event.event_type,
-      eventId: event.id,
-      channelId: suppressionResult.channelId,
-      suppressedRecipientProfileIds: suppressionResult.suppressedProfileIds,
-      emittedRecipientProfileIds: recipientProfileIds,
-      reason: 'active_channel_conversation',
-    });
-  }
-
   if (!recipientProfileIds.length) {
     return;
   }

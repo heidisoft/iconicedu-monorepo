@@ -397,19 +397,6 @@ async function publishSessionStartedActivity(input: {
   const scheduleId = resolveSessionActivityScheduleId(input.context);
   const title = resolveSessionActivityTitle(input.context);
   const mode = resolveSessionActivityMode(input.context);
-  console.info('[live-session:debug][service] publishing session.started', {
-    sessionId: input.context.session.id,
-    channelId: input.context.session.channel_id,
-    actorProfileId: input.actorProfileId,
-    learningSpaceId,
-    scheduleId,
-    occurredAt: input.occurredAt,
-    isScheduledSessionWindow: input.context.scope.isScheduledSessionWindow === true,
-    occurrenceStart:
-      input.context.scope.occurrenceKey ?? input.context.session.occurrence_key ?? null,
-    mode,
-    title,
-  });
 
   await publishActivityEvent({
     supabase: input.supabase,
@@ -461,21 +448,6 @@ async function publishMemberJoinedActivity(input: {
   const title = resolveSessionActivityTitle(input.context);
   const mode = resolveSessionActivityMode(input.context);
   const memberProfileId = input.member?.profileId ?? input.actorProfileId;
-  console.info('[live-session:debug][service] preparing member.joined publish', {
-    sessionId: input.context.session.id,
-    channelId: input.context.session.channel_id,
-    sourceKind: input.sourceKind,
-    actorProfileId: input.actorProfileId,
-    memberProfileId,
-    learningSpaceId,
-    scheduleId,
-    occurredAt: input.occurredAt,
-    isScheduledSessionWindow: input.context.scope.isScheduledSessionWindow === true,
-    occurrenceStart:
-      input.context.scope.occurrenceKey ?? input.context.session.occurrence_key ?? null,
-    mode,
-    title,
-  });
 
   if (input.sourceKind === 'provider_webhook') {
     const recentlyPublishedByApp = await hasRecentAppMemberJoinedActivity({
@@ -487,15 +459,6 @@ async function publishMemberJoinedActivity(input: {
       occurredAt: input.occurredAt,
     });
     if (recentlyPublishedByApp) {
-      console.info(
-        '[live-session:debug][service] skipping provider member.joined publish due to recent app event',
-        {
-          sessionId: input.context.session.id,
-          channelId: input.context.session.channel_id,
-          memberProfileId,
-          occurredAt: input.occurredAt,
-        },
-      );
       return;
     }
   }
@@ -550,13 +513,6 @@ async function publishMemberJoinedActivity(input: {
     ),
     createdBy: input.sourceKind === 'profile' ? input.actorProfileId : null,
   });
-  console.info('[live-session:debug][service] published member.joined', {
-    sessionId: input.context.session.id,
-    channelId: input.context.session.channel_id,
-    memberProfileId,
-    sourceKind: input.sourceKind,
-    occurredAt: input.occurredAt,
-  });
 }
 
 async function hasScheduledSessionStartedActivity(input: {
@@ -597,20 +553,11 @@ async function shouldPublishSessionStartedForJoin(input: {
   occurrenceStart: string | null;
   isScheduledSessionWindow: boolean;
 }) {
-  console.info('[live-session:debug][service] evaluating session.started publish', {
-    channelId: input.channelId,
-    learningSpaceId: input.learningSpaceId,
-    occurrenceStart: input.occurrenceStart,
-    isScheduledSessionWindow: input.isScheduledSessionWindow,
-  });
   if (
     !input.isScheduledSessionWindow ||
     !input.learningSpaceId ||
     !input.occurrenceStart
   ) {
-    console.info(
-      '[live-session:debug][service] session.started publish allowed (non-scheduled context)',
-    );
     return true;
   }
 
@@ -622,12 +569,6 @@ async function shouldPublishSessionStartedForJoin(input: {
     occurrenceStart: input.occurrenceStart,
   });
 
-  console.info('[live-session:debug][service] session.started prior event check', {
-    channelId: input.channelId,
-    learningSpaceId: input.learningSpaceId,
-    occurrenceStart: input.occurrenceStart,
-    alreadyStarted,
-  });
   return !alreadyStarted;
 }
 
@@ -654,30 +595,14 @@ function runPostJoinSideEffects(
     task: () => Promise<void>;
   },
 ) {
-  console.info('[live-session:debug][service] runPostJoinSideEffects queued', {
-    channelId: input.channelId,
-    sessionId: input.sessionId,
-    profileId: input.profileId,
-    usesExternalScheduler: Boolean(scheduler),
-  });
   const run =
     scheduler ??
     ((task) => {
       void task();
     });
   run(async () => {
-    console.info('[live-session:debug][service] runPostJoinSideEffects started', {
-      channelId: input.channelId,
-      sessionId: input.sessionId,
-      profileId: input.profileId,
-    });
     try {
       await input.task();
-      console.info('[live-session:debug][service] runPostJoinSideEffects completed', {
-        channelId: input.channelId,
-        sessionId: input.sessionId,
-        profileId: input.profileId,
-      });
     } catch (error) {
       logPostJoinSideEffectsError({
         channelId: input.channelId,
@@ -938,14 +863,6 @@ export async function createOrJoinLiveSession(input: {
   orgSlug: string;
   schedulePostJoinSideEffects?: PostJoinSideEffectsScheduler;
 }): Promise<CreateOrJoinLiveSessionResult> {
-  console.info('[live-session:debug][service] createOrJoinLiveSession started', {
-    authUserId: input.actor.authUserId,
-    accountId: input.actor.account.id,
-    profileId: input.actor.profile.id,
-    channelId: input.channelId,
-    orgSlug: input.orgSlug,
-    hasScheduler: Boolean(input.schedulePostJoinSideEffects),
-  });
   const account = input.actor.account;
   const profile = input.actor.profile;
 
@@ -984,17 +901,6 @@ export async function createOrJoinLiveSession(input: {
     orgId: channel.org_id,
     channelId: channel.id,
   });
-  console.info('[live-session:debug][service] resolved live-session scope', {
-    channelId: channel.id,
-    scopeKey: scope.scopeKey,
-    occurrenceKey: scope.occurrenceKey ?? null,
-    scheduleId: scope.schedule?.ids.id ?? null,
-    scheduleLearningSpaceId:
-      scope.schedule?.source.kind === 'class_session'
-        ? scope.schedule.source.learningSpaceId
-        : null,
-    isScheduledSessionWindow: scope.isScheduledSessionWindow === true,
-  });
 
   const activeSessionResponse = await getActiveLiveSession(
     input.serviceSupabase,
@@ -1008,12 +914,6 @@ export async function createOrJoinLiveSession(input: {
   const now = new Date().toISOString();
   const existingSession = activeSessionResponse.data ?? null;
   if (existingSession) {
-    console.info('[live-session:debug][service] reusing existing live session', {
-      channelId: channel.id,
-      sessionId: existingSession.id,
-      status: existingSession.status,
-      occurrenceKey: existingSession.occurrence_key ?? null,
-    });
     const sessionActivityParticipant =
       (
         await loadActivityParticipants({
@@ -1051,9 +951,6 @@ export async function createOrJoinLiveSession(input: {
           },
         });
         if (!scope.isScheduledSessionWindow) {
-          console.info(
-            '[live-session:debug][service] existing session join is outside scheduled window; publishing session.started',
-          );
           await publishSessionStartedActivity({
             supabase: input.serviceSupabase,
             context: {
@@ -1068,10 +965,6 @@ export async function createOrJoinLiveSession(input: {
             joinPath: existingSession.join_path,
             occurredAt: now,
           });
-        } else {
-          console.info(
-            '[live-session:debug][service] existing session join is within scheduled window; skipping extra session.started publish',
-          );
         }
         await publishMemberJoinedActivity({
           supabase: input.serviceSupabase,
@@ -1110,15 +1003,7 @@ export async function createOrJoinLiveSession(input: {
     (scope.schedule?.source.kind === 'class_session'
       ? scope.schedule.source.learningSpaceId
       : null);
-  console.info('[live-session:debug][service] creating new live session', {
-    channelId: channel.id,
-    provider: liveSessionConfig.provider,
-    joinPath,
-    learningSpaceId,
-    scheduleId: scope.schedule?.ids.id ?? null,
-    scopeKey: scope.scopeKey,
-    occurrenceKey: scope.occurrenceKey ?? null,
-  });
+
   const insertResponse = await input.serviceSupabase
     .from('channel_live_sessions')
     .insert({
@@ -1152,11 +1037,6 @@ export async function createOrJoinLiveSession(input: {
     .single<ChannelLiveSessionRowRecord>();
 
   if (insertResponse.error) {
-    console.warn('[live-session:debug][service] create session insert failed', {
-      channelId: channel.id,
-      scopeKey: scope.scopeKey,
-      error: insertResponse.error.message,
-    });
     const fallbackSessionResponse = await getActiveLiveSession(
       input.serviceSupabase,
       channel.org_id,
@@ -1164,13 +1044,7 @@ export async function createOrJoinLiveSession(input: {
     );
     if (fallbackSessionResponse.data) {
       const fallbackSession = fallbackSessionResponse.data;
-      console.info(
-        '[live-session:debug][service] using fallback existing session after insert failure',
-        {
-          channelId: channel.id,
-          sessionId: fallbackSession.id,
-        },
-      );
+
       const sessionActivityParticipant =
         (
           await loadActivityParticipants({
@@ -1252,13 +1126,7 @@ export async function createOrJoinLiveSession(input: {
   }
 
   const session = insertResponse.data;
-  console.info('[live-session:debug][service] created live session row', {
-    channelId: channel.id,
-    sessionId: session.id,
-    provider: session.provider,
-    occurrenceKey: session.occurrence_key ?? null,
-    joinPath: session.join_path,
-  });
+
   const sessionActivityParticipants = await loadActivityParticipants({
     supabase: input.serviceSupabase,
     orgId: session.org_id,
@@ -1321,17 +1189,7 @@ export async function createOrJoinLiveSession(input: {
             occurrenceStart,
             isScheduledSessionWindow: scope.isScheduledSessionWindow === true,
           });
-          console.info(
-            '[live-session:debug][service] custom provider started-event decision',
-            {
-              sessionId: session.id,
-              channelId: session.channel_id,
-              shouldPublishSessionStarted,
-              learningSpaceId,
-              scheduleId,
-              occurrenceStart,
-            },
-          );
+
           await insertParticipantEvent({
             supabase: input.serviceSupabase,
             orgId: session.org_id,
@@ -1472,14 +1330,7 @@ export async function createOrJoinLiveSession(input: {
           occurrenceStart,
           isScheduledSessionWindow: scope.isScheduledSessionWindow === true,
         });
-        console.info('[live-session:debug][service] provider started-event decision', {
-          sessionId: session.id,
-          channelId: session.channel_id,
-          shouldPublishSessionStarted,
-          learningSpaceId,
-          scheduleId,
-          occurrenceStart,
-        });
+
         await insertParticipantEvent({
           supabase: input.serviceSupabase,
           orgId: session.org_id,

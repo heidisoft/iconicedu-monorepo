@@ -127,13 +127,6 @@ const MESSAGES_PAGE_SIZE = 40;
 const READ_STATE_PERSIST_DEBOUNCE_MS = 220;
 const TYPING_REMOTE_TIMEOUT_MS = 4000;
 
-function isThreadUnreadDebugEnabled() {
-  return (
-    process.env.NEXT_PUBLIC_DEBUG_THREAD_UNREAD?.trim() === 'true' ||
-    process.env.DEBUG_THREAD_UNREAD?.trim() === 'true'
-  );
-}
-
 type AssignmentSendInput = {
   kind?: 'homework' | 'lesson';
   title: string;
@@ -563,15 +556,6 @@ export function MessagesContainer({
           },
         } as ThreadVM;
 
-        if (isThreadUnreadDebugEnabled()) {
-          console.info('[thread-unread][ui][open][request]', {
-            channelId: channel.ids.id,
-            threadId: thread.ids.id,
-            lastReadMessageId: latestReply.ids.id,
-            optimisticReadAt,
-          });
-        }
-
         setThreadData(optimisticThread, {
           replies: {
             items: resolvedReplies,
@@ -625,15 +609,6 @@ export function MessagesContainer({
                   unreadCount: Math.max(0, payload.unreadCount ?? 0),
                 },
               } as ThreadVM;
-
-              if (isThreadUnreadDebugEnabled()) {
-                console.info('[thread-unread][ui][open][response]', {
-                  channelId: channel.ids.id,
-                  threadId: thread.ids.id,
-                  lastReadMessageId: payload.lastReadMessageId ?? latestReply.ids.id,
-                  unreadCount: payload.unreadCount ?? 0,
-                });
-              }
 
               setThreadData(reconciledThread, {
                 replies: {
@@ -1704,6 +1679,7 @@ export function MessagesContainer({
                           ),
                           ...prev,
                         ];
+
                         return merged.sort(
                           (a, b) =>
                             new Date(b.createdAt).getTime() -

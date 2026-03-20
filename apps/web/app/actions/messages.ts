@@ -28,10 +28,7 @@ import {
   fetchLinkPreviewMetadata,
 } from '@iconicedu/web/lib/messages/link-preview';
 import { publishActivityEvent } from '@iconicedu/web/lib/activity-feed/publisher/activity-publisher';
-import {
-  filterDmRecipientsByLastReadRecency,
-  isDmActivitySuppressionDebugEnabled,
-} from '@iconicedu/web/lib/activity-feed/dm-activity-suppression';
+import { filterDmRecipientsByLastReadRecency } from '@iconicedu/web/lib/activity-feed/dm-activity-suppression';
 import {
   buildSupportVisibilityFields,
   isStaffActorInOrg,
@@ -1181,16 +1178,6 @@ async function resolveDmActivityRecipientProfileIds(input: {
 
   const accountIds = Array.from(new Set(Array.from(accountIdByProfileId.values())));
   if (!accountIds.length) {
-    if (isDmActivitySuppressionDebugEnabled()) {
-      console.log('[activity-feed:dm-suppression]', 'decision', {
-        eventType: input.eventType,
-        channelId: input.channelId,
-        candidateRecipients: candidateProfileIds,
-        suppressedRecipients: [],
-        emittedRecipients: candidateProfileIds,
-        reason: 'missing_account_mapping',
-      });
-    }
     return candidateProfileIds;
   }
 
@@ -1224,18 +1211,6 @@ async function resolveDmActivityRecipientProfileIds(input: {
     profileLastReadAtById,
     now: input.now,
   });
-
-  if (isDmActivitySuppressionDebugEnabled()) {
-    console.log('[activity-feed:dm-suppression]', 'decision', {
-      eventType: input.eventType,
-      channelId: input.channelId,
-      candidateRecipients: candidateProfileIds,
-      suppressedRecipients: decision.suppressedProfileIds,
-      emittedRecipients: decision.emittedProfileIds,
-      reason: 'recent_read_state',
-      cutoffAt: decision.cutoffIso,
-    });
-  }
 
   return decision.emittedProfileIds;
 }

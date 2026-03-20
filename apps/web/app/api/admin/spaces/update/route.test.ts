@@ -4,8 +4,7 @@ import { POST } from '@iconicedu/web/app/api/admin/spaces/update/route';
 import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
 
 const createSupabaseServerClientMock = vi.fn();
-const getAccountByAuthUserIdMock = vi.fn();
-const getProfileByAccountIdMock = vi.fn();
+const requireParentActorContextMock = vi.fn();
 const updateLearningSpaceFromPayloadMock = vi.fn();
 const APP_URL = resolveAppUrl();
 
@@ -14,12 +13,9 @@ vi.mock('@iconicedu/web/lib/supabase/server', () => ({
     createSupabaseServerClientMock(...args),
 }));
 
-vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
-  getAccountByAuthUserId: (...args: unknown[]) => getAccountByAuthUserIdMock(...args),
-}));
-
-vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
-  getProfileByAccountId: (...args: unknown[]) => getProfileByAccountIdMock(...args),
+vi.mock('@iconicedu/web/lib/family-view/actor-context', () => ({
+  requireParentActorContext: (...args: unknown[]) =>
+    requireParentActorContextMock(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/admin/learning-space-update', () => ({
@@ -77,11 +73,10 @@ describe('POST /api/admin/spaces/update', () => {
         getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user-1' } } })),
       },
     });
-    getAccountByAuthUserIdMock.mockResolvedValue({
-      data: { id: 'account-1', org_id: 'org-1' },
-    });
-    getProfileByAccountIdMock.mockResolvedValue({
-      data: { id: 'profile-actor-1' },
+    requireParentActorContextMock.mockResolvedValue({
+      account: { id: 'account-1', org_id: 'org-1' },
+      profile: { id: 'profile-actor-1', account_id: 'account-1', org_id: 'org-1' },
+      source: 'parent',
     });
     updateLearningSpaceFromPayloadMock.mockResolvedValue(undefined);
 

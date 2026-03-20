@@ -10,10 +10,7 @@ import type { SupabaseServiceClient } from '@iconicedu/web/lib/supabase/service'
 
 import { projectActivityEvents } from '@iconicedu/web/lib/activity-feed/projector/project-activity-events';
 import { getOrgById } from '@iconicedu/web/lib/org/queries/org.query';
-import {
-  isActivityVerbSuppressionDebugEnabled,
-  resolveActivityVerbSuppressionDecision,
-} from '@iconicedu/web/lib/activity-feed/suppression/activity-verb-suppression';
+import { resolveActivityVerbSuppressionDecision } from '@iconicedu/web/lib/activity-feed/suppression/activity-verb-suppression';
 
 type PublishActivityEventInput<TPayload extends object = Record<string, unknown>> = {
   supabase: SupabaseServiceClient;
@@ -61,19 +58,6 @@ export async function publishActivityEvent<TPayload extends object>(
     eventType: input.eventType,
     actorProfileId: input.actorProfileId ?? null,
   });
-
-  if (isActivityVerbSuppressionDebugEnabled()) {
-    console.log('[activity-feed:verb-suppression]', 'decision', {
-      emitter: input.emitterLabel ?? 'web:publishActivityEvent',
-      orgId: input.orgId,
-      eventType: input.eventType,
-      actorProfileId: input.actorProfileId ?? null,
-      action: suppressionDecision.shouldPublish ? 'published' : 'suppressed',
-      source: suppressionDecision.source,
-      ruleId: suppressionDecision.rule?.id ?? null,
-      ruleEnabled: suppressionDecision.rule?.is_enabled ?? null,
-    });
-  }
 
   if (!suppressionDecision.shouldPublish) {
     return null;
@@ -147,7 +131,6 @@ export async function publishActivityEvent<TPayload extends object>(
   } catch {
     // Keep the event durable even if immediate projection fails.
   }
-
   return insertResponse.data;
 }
 
@@ -158,6 +141,7 @@ export async function publishSystemNoticeActivity(input: {
   audienceRules: NonNullable<
     PublishActivityEventInput<SystemNoticeActivityEventPayload>['audienceRules']
   >;
+
   payload: SystemNoticeActivityEventPayload;
   dedupeKey?: string | null;
 }) {

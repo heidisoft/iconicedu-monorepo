@@ -3,10 +3,6 @@ import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { requireEffectiveActorContext } from '@iconicedu/web/lib/family-view/actor-context';
 
-function isThreadUnreadDebugEnabled() {
-  return process.env.DEBUG_THREAD_UNREAD?.trim() === 'true';
-}
-
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as {
     channelId?: string;
@@ -128,18 +124,6 @@ export async function POST(request: Request) {
 
   const now = new Date().toISOString();
 
-  if (isThreadUnreadDebugEnabled()) {
-    console.info('[thread-unread][api][request]', {
-      orgId: actor.account.org_id,
-      channelId,
-      threadId,
-      accountId: actor.account.id,
-      profileId: actor.profile.id,
-      requestedLastReadMessageId,
-      now,
-    });
-  }
-
   const recomputeResponse = await supabase.rpc('recompute_unread_for_account_thread', {
     p_org_id: actor.account.org_id,
     p_channel_id: channelId,
@@ -159,15 +143,6 @@ export async function POST(request: Request) {
 
   const unreadCount =
     typeof recomputeResponse.data === 'number' ? recomputeResponse.data : undefined;
-
-  if (isThreadUnreadDebugEnabled()) {
-    console.info('[thread-unread][api][response]', {
-      threadId,
-      lastReadMessageId: requestedLastReadMessageId,
-      unreadCount,
-      lastReadAt: now,
-    });
-  }
 
   return NextResponse.json({
     success: true,

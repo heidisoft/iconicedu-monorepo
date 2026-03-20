@@ -8,6 +8,7 @@ const {
   getOrCreateAccountMock,
   buildSidebarBaseDataMock,
   loadSidebarContextMock,
+  resolveEffectiveProfileForAccountInOrgMock,
   enablePersonaSwitchRunMock,
   enablePersonaAddRunMock,
   listActiveOrgSubjectCatalogMock,
@@ -25,6 +26,7 @@ const {
   getOrCreateAccountMock: vi.fn(),
   buildSidebarBaseDataMock: vi.fn(),
   loadSidebarContextMock: vi.fn(),
+  resolveEffectiveProfileForAccountInOrgMock: vi.fn(),
   enablePersonaSwitchRunMock: vi.fn(),
   enablePersonaAddRunMock: vi.fn(),
   listActiveOrgSubjectCatalogMock: vi.fn(),
@@ -69,6 +71,11 @@ vi.mock('@iconicedu/web/lib/sidebar/loadSidebarContext', () => ({
   loadSidebarContext: (...args: unknown[]) => loadSidebarContextMock(...args),
 }));
 
+vi.mock('@iconicedu/web/lib/family-view/effective-profile', () => ({
+  resolveEffectiveProfileForAccountInOrg: (...args: unknown[]) =>
+    resolveEffectiveProfileForAccountInOrgMock(...args),
+}));
+
 vi.mock('@iconicedu/web/flags', () => ({
   enablePersonaSwitch: {
     run: (...args: unknown[]) => enablePersonaSwitchRunMock(...args),
@@ -105,7 +112,7 @@ vi.mock('next/navigation', () => ({
 
 import Layout from '@iconicedu/web/app/(app)/[orgSlug]/layout';
 
-describe('org layout persona flags debug logging', () => {
+describe('org layout persona flags', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     delete process.env.DEBUG_POSTHOG_FLAGS;
@@ -117,6 +124,7 @@ describe('org layout persona flags debug logging', () => {
     getOrCreateAccountMock.mockReset();
     buildSidebarBaseDataMock.mockReset();
     loadSidebarContextMock.mockReset();
+    resolveEffectiveProfileForAccountInOrgMock.mockReset();
     enablePersonaSwitchRunMock.mockReset();
     enablePersonaAddRunMock.mockReset();
     listActiveOrgSubjectCatalogMock.mockReset();
@@ -139,6 +147,12 @@ describe('org layout persona flags debug logging', () => {
       invite: null,
     });
     shouldRedirectToAuthResumeMock.mockReturnValue(false);
+    resolveEffectiveProfileForAccountInOrgMock.mockResolvedValue({
+      effectiveProfile: { id: 'profile-1', account_id: 'account-1', org_id: 'org-1' },
+      familySwitchOptions: [],
+      isViewingAsChild: false,
+      viewingAsProfileId: null,
+    });
     buildSidebarBaseDataMock.mockResolvedValue({
       navigation: {},
       collections: { directMessages: [] },
@@ -171,7 +185,7 @@ describe('org layout persona flags debug logging', () => {
     expect(sidebarShellElement?.props?.isPersonaAddEnabled).toBe(false);
   });
 
-  it('emits layout debug logs only when debug mode is enabled', async () => {
+  it('does not emit layout debug logs', async () => {
     const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined);
 
     await Layout({
@@ -179,19 +193,5 @@ describe('org layout persona flags debug logging', () => {
       params: Promise.resolve({ orgSlug: 'iconic-academy' }),
     });
     expect(infoSpy).not.toHaveBeenCalled();
-
-    process.env.DEBUG_POSTHOG_FLAGS = 'true';
-    await Layout({
-      children: null,
-      params: Promise.resolve({ orgSlug: 'iconic-academy' }),
-    });
-
-    expect(infoSpy).toHaveBeenCalledWith('[persona-flags]', 'layout-evaluation-result', {
-      profileId: 'profile-1',
-      orgSlug: 'iconic-academy',
-      orgId: 'org-1',
-      isPersonaSwitchEnabled: true,
-      isPersonaAddEnabled: false,
-    });
   });
 });

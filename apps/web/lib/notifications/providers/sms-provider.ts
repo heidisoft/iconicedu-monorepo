@@ -6,12 +6,4 @@ type SmsNotificationPayload = {
   metadata?: Record<string, unknown>;
 };
 
-export async function sendSmsNotification(payload: SmsNotificationPayload) {
-  console.log('notifications.sms.send', {
-    orgId: payload.orgId,
-    recipientProfileId: payload.recipientProfileId,
-    prefKey: payload.prefKey,
-    message: payload.message,
-    metadata: payload.metadata ?? {},
-  });
-}
+export async function sendSmsNotification(_payload: SmsNotificationPayload) {}
