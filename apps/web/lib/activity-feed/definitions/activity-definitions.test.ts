@@ -2084,7 +2084,7 @@ describe('activity event definitions', () => {
       headline: { primary: 'Tehara Morgan joined the huddle' },
       leading: {
         kind: 'icon',
-        iconKey: 'PhoneOutgoing',
+        iconKey: 'Mic',
         tone: 'info',
       },
       summary: 'Joined at Mar 7 at 7:05 PM',

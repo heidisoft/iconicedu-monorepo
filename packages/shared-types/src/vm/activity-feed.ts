@@ -129,6 +129,7 @@ export type InboxIconKeyVM =
   | 'FileText'
   | 'GraduationCap'
   | 'MessageSquare'
+  | 'Mic'
   | 'Paperclip'
   | 'PhoneOutgoing'
   | 'Sparkles'

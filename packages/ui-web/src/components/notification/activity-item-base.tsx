@@ -15,6 +15,7 @@ import {
   CreditCard,
   FileText,
   GraduationCap,
+  Mic,
   MessageSquare,
   Paperclip,
   PhoneOutgoing,
@@ -64,6 +65,7 @@ const INBOX_ICON_MAP: Record<
   CreditCard,
   FileText,
   GraduationCap,
+  Mic,
   MessageSquare,
   Paperclip,
   PhoneOutgoing,
@@ -87,7 +89,7 @@ const getDefaultIconKey = (activity: ActivityFeedItemVM): InboxIconKeyVM => {
       return 'Video';
     }
     if (activity.verb === 'member.joined') {
-      return 'PhoneOutgoing';
+      return 'Mic';
     }
     switch (activity.grouping?.groupType) {
       case 'payment':
@@ -148,6 +150,7 @@ const getDefaultIconKey = (activity: ActivityFeedItemVM): InboxIconKeyVM => {
     case 'members.removed':
       return 'UserRoundMinus';
     case 'member.joined':
+      return 'Mic';
     case 'role.changed':
       return 'PhoneOutgoing';
     default:

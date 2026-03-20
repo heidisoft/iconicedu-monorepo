@@ -75,7 +75,7 @@ const TEACHER_JOINED_CLASS: ActivityFeedItemVM = {
     target: { kind: 'learning_space', id: LEARNING_SPACE_IDS.math },
   },
   content: {
-    leading: { kind: 'icon', iconKey: 'PhoneOutgoing', tone: 'info' },
+    leading: { kind: 'icon', iconKey: 'Mic', tone: 'info' },
     headline: {
       primary: 'Teacher joined the class',
       secondary: EDUCATOR_PRIYA_PROFILE.profile.displayName,
@@ -100,7 +100,7 @@ const STUDENT_JOINED_CLASS: ActivityFeedItemVM = {
     target: { kind: 'learning_space', id: LEARNING_SPACE_IDS.math },
   },
   content: {
-    leading: { kind: 'icon', iconKey: 'PhoneOutgoing', tone: 'success' },
+    leading: { kind: 'icon', iconKey: 'Mic', tone: 'success' },
     headline: {
       primary: 'Student joined the class',
       secondary: CHILD_TEVIN_PROFILE.profile.displayName,

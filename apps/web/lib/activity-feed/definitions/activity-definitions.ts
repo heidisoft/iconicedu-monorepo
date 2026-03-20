@@ -855,7 +855,7 @@ function buildSessionStartedLeading() {
 function buildSessionJoinLeading() {
   return {
     kind: 'icon',
-    iconKey: 'PhoneOutgoing',
+    iconKey: 'Mic',
     tone: 'info',
   } satisfies InboxLeadingVM;
 }
