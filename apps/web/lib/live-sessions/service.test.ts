@@ -543,6 +543,78 @@ describe('createOrJoinLiveSession', () => {
     ).toEqual(expect.arrayContaining(['session.started', 'member.joined']));
   });
 
+  it('uses schedule-derived learningSpaceId and scheduleId when channel metadata is missing', async () => {
+    vi.mocked(resolveChannelLiveSessionScope).mockResolvedValueOnce({
+      scopeKey: 'occurrence:2026-03-02T10:00:00.000Z',
+      occurrenceKey: '2026-03-02T10:00:00.000Z',
+      occurrenceLabel: 'Mar 2, 10:00 AM',
+      occurrenceEndAt: '2026-03-02T11:00:00.000Z',
+      isScheduledSessionWindow: true,
+      schedule: {
+        ids: { id: 'schedule-1', orgId: 'org-1' },
+        title: 'Math',
+        startAt: '2026-03-02T10:00:00.000Z',
+        endAt: '2026-03-02T11:00:00.000Z',
+        status: 'scheduled',
+        visibility: 'class-members',
+        participants: [],
+        source: {
+          kind: 'class_session',
+          learningSpaceId: 'space-derived',
+          channelId: 'channel-1',
+        },
+        audit: {
+          createdAt: '2026-03-01T00:00:00.000Z',
+          createdBy: 'profile-1',
+        },
+      },
+    });
+
+    const serviceSupabase = createServiceSupabaseStub({
+      channel: {
+        purpose: 'learning-space',
+        primary_entity_id: null,
+      },
+    });
+    const scheduler = createImmediateScheduler();
+
+    await createOrJoinLiveSession({
+      supabase: {} as never,
+      serviceSupabase: serviceSupabase as never,
+      authUserId: 'auth-user-1',
+      channelId: 'channel-1',
+      orgSlug: 'iconic-academy',
+      schedulePostJoinSideEffects: scheduler.schedule,
+    });
+
+    await scheduler.flush();
+
+    expect(vi.mocked(publishActivityEvent)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'session.started',
+        payload: expect.objectContaining({
+          learningSpaceId: 'space-derived',
+          scheduleId: 'schedule-1',
+          occurrenceStart: '2026-03-02T10:00:00.000Z',
+        }),
+      }),
+    );
+    expect(vi.mocked(publishActivityEvent)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'member.joined',
+        payload: expect.objectContaining({
+          learningSpaceId: 'space-derived',
+          scheduleId: 'schedule-1',
+          occurrenceStart: '2026-03-02T10:00:00.000Z',
+        }),
+      }),
+    );
+    expect(serviceSupabase.state.liveSessionRow?.app_metadata).toMatchObject({
+      learningSpaceId: 'space-derived',
+      scheduleId: 'schedule-1',
+    });
+  });
+
   it('skips publishing session.started when a scheduled learning-space start already exists', async () => {
     const serviceSupabase = createServiceSupabaseStub({
       existingSessionStartedActivity: true,

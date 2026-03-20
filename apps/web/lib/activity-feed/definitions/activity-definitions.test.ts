@@ -818,7 +818,7 @@ describe('activity event definitions', () => {
     expect(rendered.actionButton).toBeUndefined();
     expect(grouped?.headline.primary).toBe('Class updated');
     expect(grouped?.actionButton).toMatchObject({
-      label: 'Open classroom',
+      label: 'Open classroom chat',
       href: '../spaces/channel-1',
     });
     expect(grouped?.leading).toEqual({
@@ -1339,6 +1339,7 @@ describe('activity event definitions', () => {
         channelId: 'channel-1',
         messageId: 'message-6',
         learningSpaceId: 'space-1',
+        scheduleId: 'schedule-1',
         title: 'Algebra',
         occurrenceStart: '2026-03-03T12:40:00.000Z',
         reminderOffsetMinutes: 5,
@@ -1355,13 +1356,13 @@ describe('activity event definitions', () => {
     };
 
     expect(definition.group.buildGroupKey(event)).toBe(
-      'live-session:learning_space:space-1:2026-03-03T12:40',
+      'live-session:learning_space:space-1:schedule:schedule-1:2026-03-03T12:40',
     );
     expect(sessionStarted.group.buildGroupKey(event)).toBe(
-      'live-session:learning_space:space-1:2026-03-03T12:40',
+      'live-session:learning_space:space-1:schedule:schedule-1:2026-03-03T12:40',
     );
     expect(sessionEnded.group.buildGroupKey(event)).toBe(
-      'live-session:learning_space:space-1:2026-03-03T12:40',
+      'live-session:learning_space:space-1:schedule:schedule-1:2026-03-03T12:40',
     );
     const renderedReminder = definition.render(event);
     expect(renderedReminder).toMatchObject({
@@ -1618,6 +1619,7 @@ describe('activity event definitions', () => {
       liveSessionId: 'live-session-1',
       learningSpaceId: 'space-1',
       channelId: 'channel-1',
+      scheduleId: 'schedule-1',
       title: 'ELA with Mr Daniel',
       occurrenceStart: '2026-03-19T16:57:00.000Z',
       occurrenceLabel: 'Mar 19 at 12:57 PM EDT',
@@ -1661,10 +1663,10 @@ describe('activity event definitions', () => {
     };
 
     expect(started.group.buildGroupKey(startedEvent)).toBe(
-      'live-session:learning_space:space-1:2026-03-19T16:57',
+      'live-session:learning_space:space-1:schedule:schedule-1:2026-03-19T16:57',
     );
     expect(joined.group.buildGroupKey(joinedEvent)).toBe(
-      'live-session:learning_space:space-1:2026-03-19T16:57',
+      'live-session:learning_space:space-1:schedule:schedule-1:2026-03-19T16:57',
     );
   });
 

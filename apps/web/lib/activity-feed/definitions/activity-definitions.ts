@@ -173,6 +173,14 @@ function resolveSessionGroupAnchor(payload: Record<string, unknown>, fallback: s
   return `huddle-window:${fallback.slice(0, 16)}`;
 }
 
+function resolveSessionGroupScheduleId(payload: Record<string, unknown>) {
+  return (
+    asOptionalString(payload.scheduleId) ??
+    asOptionalString(payload.classSessionId) ??
+    null
+  );
+}
+
 function getContextTitle(payload: Record<string, unknown>) {
   return (
     asOptionalString(payload.learningSpaceTitle) ??
@@ -548,6 +556,10 @@ function buildSessionGroupKey(event: ActivityEventRow) {
     return null;
   }
   const sessionAnchor = resolveSessionGroupAnchor(payload, event.occurred_at);
+  const scheduleId = resolveSessionGroupScheduleId(payload);
+  if (scheduleId && !sessionAnchor.startsWith('huddle-window:')) {
+    return `live-session:${context.kind}:${context.id}:schedule:${scheduleId}:${sessionAnchor}`;
+  }
   return `live-session:${context.kind}:${context.id}:${sessionAnchor}`;
 }
 
@@ -611,7 +623,7 @@ function renderClassCreatedGroup(event: ActivityEventRow) {
       secondary: getContextTitle(payload),
     },
     summary: summaryParts.join('. '),
-    actionButton: sourceAction(event, payload, 'outline', 'Open classroom'),
+    actionButton: sourceAction(event, payload, 'outline', 'Open classroom chat'),
   } satisfies ActivityRenderResult;
 }
 
@@ -654,7 +666,7 @@ function renderLearningSpaceUpdatedGroup(event: ActivityEventRow) {
       asOptionalString(payload.changeSummary) ??
       (firstSessionLabel ? `Next session ${firstSessionLabel}.` : null) ??
       'Class details, participants, or schedule changed.',
-    actionButton: sourceAction(event, payload, 'outline', 'Open classroom'),
+    actionButton: sourceAction(event, payload, 'outline', 'Open classroom chat'),
   } satisfies ActivityRenderResult;
 }
 

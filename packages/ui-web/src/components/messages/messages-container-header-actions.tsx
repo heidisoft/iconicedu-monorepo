@@ -146,12 +146,19 @@ export const MessagesContainerHeaderActions = memo(
 
     const handleJoin = async () => {
       if (isJoinPending) {
+        console.info('[live-session:debug][header-join] join ignored: pending');
         return;
       }
       if (joinLiveSession) {
+        console.info(
+          '[live-session:debug][header-join] invoking joinLiveSession callback',
+        );
         setIsJoinPending(true);
         try {
           await joinLiveSession();
+          console.info(
+            '[live-session:debug][header-join] joinLiveSession callback resolved',
+          );
         } finally {
           setIsJoinPending(false);
         }
@@ -159,7 +166,17 @@ export const MessagesContainerHeaderActions = memo(
       }
 
       if (joinAction.joinHref) {
+        console.info(
+          '[live-session:debug][header-join] no callback; resolving join href directly',
+          {
+            joinHref: joinAction.joinHref,
+          },
+        );
         handleResolvedJoinHref(joinAction.joinHref);
+      } else {
+        console.info(
+          '[live-session:debug][header-join] no callback and no join href available',
+        );
       }
     };
 

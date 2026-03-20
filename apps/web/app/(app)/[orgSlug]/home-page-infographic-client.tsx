@@ -26,8 +26,20 @@ export function HomePageInfographicClient(props: HomePageInfographicClientProps)
         return;
       }
 
+      console.info('[live-session:debug][dashboard-join] join requested', {
+        orgSlug: props.orgSlug,
+        channelId: item.channelId ?? null,
+        joinHref: item.joinHref,
+        chatHref: item.chatHref,
+      });
       if (!item.channelId) {
         handleResolvedJoinHref(item.joinHref);
+        console.info(
+          '[live-session:debug][dashboard-join] no channelId; using direct joinHref',
+          {
+            joinHref: item.joinHref,
+          },
+        );
         return;
       }
 
@@ -47,12 +59,24 @@ export function HomePageInfographicClient(props: HomePageInfographicClientProps)
         joinPath?: string;
         error?: string;
       } | null;
+      console.info('[live-session:debug][dashboard-join] join response received', {
+        channelId: item.channelId,
+        status: response.status,
+        ok: response.ok,
+        success: payload?.success ?? null,
+        joinPath: payload?.joinPath ?? null,
+        error: payload?.error ?? null,
+      });
 
       if (!response.ok || !payload?.success || !payload.joinPath) {
         throw new Error(payload?.error ?? 'Failed to join live session');
       }
 
       handleResolvedJoinHref(payload.joinPath);
+      console.info('[live-session:debug][dashboard-join] resolved join href', {
+        channelId: item.channelId,
+        joinPath: payload.joinPath,
+      });
     },
     [handleResolvedJoinHref, props.orgSlug],
   );

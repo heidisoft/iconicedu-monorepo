@@ -1039,6 +1039,7 @@ describe('projectActivityEvents', () => {
         channelId: 'channel-1',
         messageId: 'message-6',
         learningSpaceId: 'space-1',
+        scheduleId: 'schedule-1',
         title: 'Algebra',
         occurrenceStart: '2026-03-03T12:40:00.000Z',
         reminderOffsetMinutes: 5,
@@ -1259,6 +1260,7 @@ describe('projectActivityEvents', () => {
         channelId: 'channel-1',
         messageId: 'message-feedback-1',
         learningSpaceId: 'space-1',
+        scheduleId: 'schedule-1',
         title: 'Algebra',
         occurrenceStart: '2026-03-03T12:40:00.000Z',
         channelRouteKind: 'space',
@@ -1455,6 +1457,141 @@ describe('projectActivityEvents', () => {
     expect(
       (childItem?.payload.metadata as { viewerRole?: string | null }).viewerRole,
     ).toBe('child');
+  });
+
+  it('keeps scheduled reminder/start/join/feedback activities in one group with a session.started parent', async () => {
+    const { supabase, upserts } = createSupabaseMock({
+      events: [
+        {
+          id: 'event-reminder-scheduled-1',
+          org_id: 'org-1',
+          event_type: 'session.reminder.sent',
+          occurred_at: '2026-03-03T12:34:00.000Z',
+          source_kind: 'system',
+          actor_profile_id: 'profile-system',
+          scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+          object_ref: { kind: 'message', id: 'message-reminder-1' },
+          target_ref: { kind: 'learning_space', id: 'space-1' },
+          payload: {
+            learningSpaceId: 'space-1',
+            channelId: 'channel-1',
+            scheduleId: 'schedule-1',
+            title: 'Algebra',
+            occurrenceStart: '2026-03-03T12:40:00.000Z',
+            reminderOffsetMinutes: 5,
+          },
+          audience_rules: [],
+          dedupe_key:
+            'session.reminder:org-1:space-1:channel-1:2026-03-03T12:40:00.000Z:5:activity',
+          projection_status: 'pending',
+          projection_attempts: 0,
+          created_at: '2026-03-03T12:34:00.000Z',
+          updated_at: '2026-03-03T12:34:00.000Z',
+        },
+        {
+          id: 'event-start-scheduled-1',
+          org_id: 'org-1',
+          event_type: 'session.started',
+          occurred_at: '2026-03-03T12:40:00.000Z',
+          source_kind: 'profile',
+          actor_profile_id: 'educator-profile-1',
+          scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+          object_ref: { kind: 'session', id: 'live-session-1' },
+          target_ref: { kind: 'learning_space', id: 'space-1' },
+          payload: {
+            liveSessionId: 'live-session-1',
+            learningSpaceId: 'space-1',
+            channelId: 'channel-1',
+            scheduleId: 'schedule-1',
+            title: 'Algebra',
+            occurrenceStart: '2026-03-03T12:40:00.000Z',
+            isScheduledSessionWindow: true,
+            startedByDisplayName: 'Taylor Reed',
+            mode: 'video',
+          },
+          audience_rules: [],
+          dedupe_key: 'session.started:live-session-1',
+          projection_status: 'pending',
+          projection_attempts: 0,
+          created_at: '2026-03-03T12:40:00.000Z',
+          updated_at: '2026-03-03T12:40:00.000Z',
+        },
+        {
+          id: 'event-joined-scheduled-1',
+          org_id: 'org-1',
+          event_type: 'member.joined',
+          occurred_at: '2026-03-03T12:41:00.000Z',
+          source_kind: 'profile',
+          actor_profile_id: 'child-profile-1',
+          scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+          object_ref: { kind: 'session', id: 'live-session-1' },
+          target_ref: { kind: 'learning_space', id: 'space-1' },
+          payload: {
+            liveSessionId: 'live-session-1',
+            learningSpaceId: 'space-1',
+            channelId: 'channel-1',
+            scheduleId: 'schedule-1',
+            title: 'Algebra',
+            occurrenceStart: '2026-03-03T12:40:00.000Z',
+            memberProfileId: 'child-profile-1',
+            memberDisplayName: 'Taylor Reed',
+            mode: 'video',
+          },
+          audience_rules: [],
+          dedupe_key: 'member.joined:live-session-1:child-profile-1',
+          projection_status: 'pending',
+          projection_attempts: 0,
+          created_at: '2026-03-03T12:41:00.000Z',
+          updated_at: '2026-03-03T12:41:00.000Z',
+        },
+        {
+          id: 'event-feedback-scheduled-1',
+          org_id: 'org-1',
+          event_type: 'session.feedback_request.sent',
+          occurred_at: '2026-03-03T13:15:00.000Z',
+          source_kind: 'system',
+          actor_profile_id: 'profile-system',
+          scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+          object_ref: { kind: 'message', id: 'message-feedback-1' },
+          target_ref: { kind: 'learning_space', id: 'space-1' },
+          payload: {
+            learningSpaceId: 'space-1',
+            channelId: 'channel-1',
+            scheduleId: 'schedule-1',
+            title: 'Algebra',
+            occurrenceStart: '2026-03-03T12:40:00.000Z',
+            messageId: 'message-feedback-1',
+          },
+          audience_rules: [],
+          dedupe_key:
+            'session.feedback_request:org-1:space-1:channel-1:2026-03-03T12:40:00.000Z:activity',
+          projection_status: 'pending',
+          projection_attempts: 0,
+          created_at: '2026-03-03T13:15:00.000Z',
+          updated_at: '2026-03-03T13:15:00.000Z',
+        },
+      ],
+    });
+
+    await projectActivityEvents(supabase as never);
+
+    const expectedGroupKey =
+      'live-session:learning_space:space-1:schedule:schedule-1:2026-03-03T12:40';
+    const groupUpserts = upserts.filter(
+      (entry) => entry.table === 'activity_feed_items' && entry.payload.kind === 'group',
+    );
+    const uniqueGroupKeys = Array.from(
+      new Set(groupUpserts.map((entry) => String(entry.payload.group_key))),
+    );
+
+    expect(uniqueGroupKeys).toEqual([expectedGroupKey]);
+    expect(
+      groupUpserts.some(
+        (entry) =>
+          entry.payload.group_key === expectedGroupKey &&
+          entry.payload.verb === 'session.started',
+      ),
+    ).toBe(true);
   });
 
   it('uses recipient and dedupe key for leaf upserts when an activity event has a dedupe key', async () => {

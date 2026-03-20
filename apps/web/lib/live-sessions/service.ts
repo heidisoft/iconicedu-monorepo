@@ -222,10 +222,34 @@ async function loadActivityParticipants(input: {
 function resolveSessionActivityLearningSpaceId(input: SessionActivityContext) {
   return (
     input.channel.primary_entity_id ??
+    (input.scope.schedule?.source.kind === 'class_session'
+      ? input.scope.schedule.source.learningSpaceId
+      : null) ??
     (typeof input.session.app_metadata?.learningSpaceId === 'string'
       ? input.session.app_metadata.learningSpaceId
       : null)
   );
+}
+
+function resolveSessionActivityScheduleId(input: SessionActivityContext) {
+  return (
+    input.scope.schedule?.ids.id ??
+    (typeof input.session.app_metadata?.scheduleId === 'string'
+      ? input.session.app_metadata.scheduleId
+      : null)
+  );
+}
+
+function resolveSessionLearningSpaceIdFromMetadata(session: ChannelLiveSessionRowRecord) {
+  return typeof session.app_metadata?.learningSpaceId === 'string'
+    ? session.app_metadata.learningSpaceId
+    : null;
+}
+
+function resolveSessionScheduleIdFromMetadata(session: ChannelLiveSessionRowRecord) {
+  return typeof session.app_metadata?.scheduleId === 'string'
+    ? session.app_metadata.scheduleId
+    : null;
 }
 
 function resolveSessionActivityTitle(input: SessionActivityContext) {
@@ -310,8 +334,22 @@ async function publishSessionStartedActivity(input: {
   occurredAt: string;
 }) {
   const learningSpaceId = resolveSessionActivityLearningSpaceId(input.context);
+  const scheduleId = resolveSessionActivityScheduleId(input.context);
   const title = resolveSessionActivityTitle(input.context);
   const mode = resolveSessionActivityMode(input.context);
+  console.info('[live-session:debug][service] publishing session.started', {
+    sessionId: input.context.session.id,
+    channelId: input.context.session.channel_id,
+    actorProfileId: input.actorProfileId,
+    learningSpaceId,
+    scheduleId,
+    occurredAt: input.occurredAt,
+    isScheduledSessionWindow: input.context.scope.isScheduledSessionWindow === true,
+    occurrenceStart:
+      input.context.scope.occurrenceKey ?? input.context.session.occurrence_key ?? null,
+    mode,
+    title,
+  });
 
   await publishActivityEvent({
     supabase: input.supabase,
@@ -329,6 +367,7 @@ async function publishSessionStartedActivity(input: {
       liveSessionId: input.context.session.id,
       channelId: input.context.session.channel_id,
       learningSpaceId,
+      scheduleId,
       title,
       joinPath: input.joinPath,
       mode,
@@ -358,9 +397,25 @@ async function publishMemberJoinedActivity(input: {
   sourceKind: 'profile' | 'provider_webhook';
 }) {
   const learningSpaceId = resolveSessionActivityLearningSpaceId(input.context);
+  const scheduleId = resolveSessionActivityScheduleId(input.context);
   const title = resolveSessionActivityTitle(input.context);
   const mode = resolveSessionActivityMode(input.context);
   const memberProfileId = input.member?.profileId ?? input.actorProfileId;
+  console.info('[live-session:debug][service] preparing member.joined publish', {
+    sessionId: input.context.session.id,
+    channelId: input.context.session.channel_id,
+    sourceKind: input.sourceKind,
+    actorProfileId: input.actorProfileId,
+    memberProfileId,
+    learningSpaceId,
+    scheduleId,
+    occurredAt: input.occurredAt,
+    isScheduledSessionWindow: input.context.scope.isScheduledSessionWindow === true,
+    occurrenceStart:
+      input.context.scope.occurrenceKey ?? input.context.session.occurrence_key ?? null,
+    mode,
+    title,
+  });
 
   if (input.sourceKind === 'provider_webhook') {
     const recentlyPublishedByApp = await hasRecentAppMemberJoinedActivity({
@@ -372,6 +427,15 @@ async function publishMemberJoinedActivity(input: {
       occurredAt: input.occurredAt,
     });
     if (recentlyPublishedByApp) {
+      console.info(
+        '[live-session:debug][service] skipping provider member.joined publish due to recent app event',
+        {
+          sessionId: input.context.session.id,
+          channelId: input.context.session.channel_id,
+          memberProfileId,
+          occurredAt: input.occurredAt,
+        },
+      );
       return;
     }
   }
@@ -392,6 +456,7 @@ async function publishMemberJoinedActivity(input: {
       liveSessionId: input.context.session.id,
       channelId: input.context.session.channel_id,
       learningSpaceId,
+      scheduleId,
       title,
       mode,
       isScheduledSessionWindow: input.context.scope.isScheduledSessionWindow === true,
@@ -424,6 +489,13 @@ async function publishMemberJoinedActivity(input: {
       input.occurredAt,
     ),
     createdBy: input.sourceKind === 'profile' ? input.actorProfileId : null,
+  });
+  console.info('[live-session:debug][service] published member.joined', {
+    sessionId: input.context.session.id,
+    channelId: input.context.session.channel_id,
+    memberProfileId,
+    sourceKind: input.sourceKind,
+    occurredAt: input.occurredAt,
   });
 }
 
@@ -465,11 +537,20 @@ async function shouldPublishSessionStartedForJoin(input: {
   occurrenceStart: string | null;
   isScheduledSessionWindow: boolean;
 }) {
+  console.info('[live-session:debug][service] evaluating session.started publish', {
+    channelId: input.channelId,
+    learningSpaceId: input.learningSpaceId,
+    occurrenceStart: input.occurrenceStart,
+    isScheduledSessionWindow: input.isScheduledSessionWindow,
+  });
   if (
     !input.isScheduledSessionWindow ||
     !input.learningSpaceId ||
     !input.occurrenceStart
   ) {
+    console.info(
+      '[live-session:debug][service] session.started publish allowed (non-scheduled context)',
+    );
     return true;
   }
 
@@ -481,6 +562,12 @@ async function shouldPublishSessionStartedForJoin(input: {
     occurrenceStart: input.occurrenceStart,
   });
 
+  console.info('[live-session:debug][service] session.started prior event check', {
+    channelId: input.channelId,
+    learningSpaceId: input.learningSpaceId,
+    occurrenceStart: input.occurrenceStart,
+    alreadyStarted,
+  });
   return !alreadyStarted;
 }
 
@@ -507,14 +594,30 @@ function runPostJoinSideEffects(
     task: () => Promise<void>;
   },
 ) {
+  console.info('[live-session:debug][service] runPostJoinSideEffects queued', {
+    channelId: input.channelId,
+    sessionId: input.sessionId,
+    profileId: input.profileId,
+    usesExternalScheduler: Boolean(scheduler),
+  });
   const run =
     scheduler ??
     ((task) => {
       void task();
     });
   run(async () => {
+    console.info('[live-session:debug][service] runPostJoinSideEffects started', {
+      channelId: input.channelId,
+      sessionId: input.sessionId,
+      profileId: input.profileId,
+    });
     try {
       await input.task();
+      console.info('[live-session:debug][service] runPostJoinSideEffects completed', {
+        channelId: input.channelId,
+        sessionId: input.sessionId,
+        profileId: input.profileId,
+      });
     } catch (error) {
       logPostJoinSideEffectsError({
         channelId: input.channelId,
@@ -772,6 +875,12 @@ export async function createOrJoinLiveSession(input: {
   orgSlug: string;
   schedulePostJoinSideEffects?: PostJoinSideEffectsScheduler;
 }): Promise<CreateOrJoinLiveSessionResult> {
+  console.info('[live-session:debug][service] createOrJoinLiveSession started', {
+    authUserId: input.authUserId,
+    channelId: input.channelId,
+    orgSlug: input.orgSlug,
+    hasScheduler: Boolean(input.schedulePostJoinSideEffects),
+  });
   const [accountResponse] = await Promise.all([
     getAccountByAuthUserId(input.supabase, input.authUserId),
   ]);
@@ -779,50 +888,59 @@ export async function createOrJoinLiveSession(input: {
   if (!accountResponse.data) {
     throw new Error('Account not found');
   }
+  const account = accountResponse.data;
 
-  const profileResponse = await getProfileByAccountId(
-    input.supabase,
-    accountResponse.data.id,
-  );
+  const profileResponse = await getProfileByAccountId(input.supabase, account.id);
   if (!profileResponse.data) {
     throw new Error('Profile not found');
   }
+  const profile = profileResponse.data;
 
   const channelResponse = await getChannelSummary(
     input.serviceSupabase,
-    accountResponse.data.org_id,
+    account.org_id,
     input.channelId,
   );
   if (!channelResponse.data) {
     throw new Error('Channel not found');
   }
+  const channel = channelResponse.data;
 
   const hasMembership = await verifyChannelMembership(
     input.serviceSupabase,
-    channelResponse.data.org_id,
-    channelResponse.data.id,
-    profileResponse.data.id,
+    channel.org_id,
+    channel.id,
+    profile.id,
   );
   if (!hasMembership) {
     throw new Error('Unauthorized');
   }
 
-  const liveSessionConfig = parseChannelLiveSessionConfig(
-    channelResponse.data.live_session_config,
-  );
+  const liveSessionConfig = parseChannelLiveSessionConfig(channel.live_session_config);
   if (!liveSessionConfig) {
     throw new Error('Live sessions are not enabled for this channel');
   }
 
   const scope = await resolveChannelLiveSessionScope({
     supabase: input.serviceSupabase,
-    orgId: channelResponse.data.org_id,
-    channelId: channelResponse.data.id,
+    orgId: channel.org_id,
+    channelId: channel.id,
+  });
+  console.info('[live-session:debug][service] resolved live-session scope', {
+    channelId: channel.id,
+    scopeKey: scope.scopeKey,
+    occurrenceKey: scope.occurrenceKey ?? null,
+    scheduleId: scope.schedule?.ids.id ?? null,
+    scheduleLearningSpaceId:
+      scope.schedule?.source.kind === 'class_session'
+        ? scope.schedule.source.learningSpaceId
+        : null,
+    isScheduledSessionWindow: scope.isScheduledSessionWindow === true,
   });
 
   const activeSessionResponse = await getActiveLiveSession(
     input.serviceSupabase,
-    channelResponse.data.org_id,
+    channel.org_id,
     scope.scopeKey,
   );
   if (activeSessionResponse.error) {
@@ -832,29 +950,35 @@ export async function createOrJoinLiveSession(input: {
   const now = new Date().toISOString();
   const existingSession = activeSessionResponse.data ?? null;
   if (existingSession) {
+    console.info('[live-session:debug][service] reusing existing live session', {
+      channelId: channel.id,
+      sessionId: existingSession.id,
+      status: existingSession.status,
+      occurrenceKey: existingSession.occurrence_key ?? null,
+    });
     const sessionActivityParticipant =
       (
         await loadActivityParticipants({
           supabase: input.serviceSupabase,
           orgId: existingSession.org_id,
-          profileIds: [profileResponse.data.id],
+          profileIds: [profile.id],
         })
       )[0] ?? null;
     await snapshotExpectedParticipantsForLiveSession({
       supabase: input.serviceSupabase,
       session: existingSession,
       scope,
-      createdBy: profileResponse.data.id,
+      createdBy: profile.id,
     });
     await upsertJoinRequestedParticipant({
       supabase: input.serviceSupabase,
       session: existingSession,
-      profileId: profileResponse.data.id,
+      profileId: profile.id,
     });
     runPostJoinSideEffects(input.schedulePostJoinSideEffects, {
       channelId: existingSession.channel_id,
       sessionId: existingSession.id,
-      profileId: profileResponse.data.id,
+      profileId: profile.id,
       task: async () => {
         await insertParticipantEvent({
           supabase: input.serviceSupabase,
@@ -863,35 +987,42 @@ export async function createOrJoinLiveSession(input: {
           liveSessionId: existingSession.id,
           provider: existingSession.provider as LiveSessionProviderVM,
           eventType: 'join_requested',
-          profileId: profileResponse.data.id,
+          profileId: profile.id,
           payload: {
             reused: true,
           },
         });
         if (!scope.isScheduledSessionWindow) {
+          console.info(
+            '[live-session:debug][service] existing session join is outside scheduled window; publishing session.started',
+          );
           await publishSessionStartedActivity({
             supabase: input.serviceSupabase,
             context: {
               session: existingSession,
-              channel: channelResponse.data,
+              channel: channel,
               scope,
             },
-            actorProfileId: profileResponse.data.id,
+            actorProfileId: profile.id,
             startedByDisplayName:
               sessionActivityParticipant?.displayName ?? 'Participant',
             participants: sessionActivityParticipant ? [sessionActivityParticipant] : [],
             joinPath: existingSession.join_path,
             occurredAt: now,
           });
+        } else {
+          console.info(
+            '[live-session:debug][service] existing session join is within scheduled window; skipping extra session.started publish',
+          );
         }
         await publishMemberJoinedActivity({
           supabase: input.serviceSupabase,
           context: {
             session: existingSession,
-            channel: channelResponse.data,
+            channel: channel,
             scope,
           },
-          actorProfileId: profileResponse.data.id,
+          actorProfileId: profile.id,
           member: sessionActivityParticipant,
           occurredAt: now,
           sourceKind: 'profile',
@@ -916,22 +1047,36 @@ export async function createOrJoinLiveSession(input: {
   if (liveSessionConfig.provider === 'custom' && !joinPath) {
     throw new Error('Custom live session join URL is missing');
   }
+  const learningSpaceId =
+    channel.primary_entity_id ??
+    (scope.schedule?.source.kind === 'class_session'
+      ? scope.schedule.source.learningSpaceId
+      : null);
+  console.info('[live-session:debug][service] creating new live session', {
+    channelId: channel.id,
+    provider: liveSessionConfig.provider,
+    joinPath,
+    learningSpaceId,
+    scheduleId: scope.schedule?.ids.id ?? null,
+    scopeKey: scope.scopeKey,
+    occurrenceKey: scope.occurrenceKey ?? null,
+  });
   const insertResponse = await input.serviceSupabase
     .from('channel_live_sessions')
     .insert({
-      org_id: channelResponse.data.org_id,
-      channel_id: channelResponse.data.id,
+      org_id: channel.org_id,
+      channel_id: channel.id,
       provider: liveSessionConfig.provider,
       session_scope_key: scope.scopeKey,
       occurrence_key: scope.occurrenceKey ?? null,
       status: 'starting',
-      started_by_profile_id: profileResponse.data.id,
+      started_by_profile_id: profile.id,
       join_path: joinPath,
       attendance_policy: getLiveSessionAttendancePolicy(null),
       report_status: 'pending',
       app_metadata: {
-        channelTopic: channelResponse.data.topic ?? null,
-        learningSpaceId: channelResponse.data.primary_entity_id ?? null,
+        channelTopic: channel.topic ?? null,
+        learningSpaceId,
         mode: liveSessionConfig.mode ?? 'video',
         isScheduledSessionWindow: scope.isScheduledSessionWindow === true,
         occurrenceEndAt: scope.occurrenceEndAt ?? null,
@@ -942,51 +1087,64 @@ export async function createOrJoinLiveSession(input: {
       started_at: now,
       created_at: now,
       updated_at: now,
-      created_by: profileResponse.data.id,
-      updated_by: profileResponse.data.id,
+      created_by: profile.id,
+      updated_by: profile.id,
     })
     .select('*')
     .single<ChannelLiveSessionRowRecord>();
 
   if (insertResponse.error) {
+    console.warn('[live-session:debug][service] create session insert failed', {
+      channelId: channel.id,
+      scopeKey: scope.scopeKey,
+      error: insertResponse.error.message,
+    });
     const fallbackSessionResponse = await getActiveLiveSession(
       input.serviceSupabase,
-      channelResponse.data.org_id,
+      channel.org_id,
       scope.scopeKey,
     );
     if (fallbackSessionResponse.data) {
+      const fallbackSession = fallbackSessionResponse.data;
+      console.info(
+        '[live-session:debug][service] using fallback existing session after insert failure',
+        {
+          channelId: channel.id,
+          sessionId: fallbackSession.id,
+        },
+      );
       const sessionActivityParticipant =
         (
           await loadActivityParticipants({
             supabase: input.serviceSupabase,
-            orgId: fallbackSessionResponse.data.org_id,
-            profileIds: [profileResponse.data.id],
+            orgId: fallbackSession.org_id,
+            profileIds: [profile.id],
           })
         )[0] ?? null;
       await snapshotExpectedParticipantsForLiveSession({
         supabase: input.serviceSupabase,
-        session: fallbackSessionResponse.data,
+        session: fallbackSession,
         scope,
-        createdBy: profileResponse.data.id,
+        createdBy: profile.id,
       });
       await upsertJoinRequestedParticipant({
         supabase: input.serviceSupabase,
-        session: fallbackSessionResponse.data,
-        profileId: profileResponse.data.id,
+        session: fallbackSession,
+        profileId: profile.id,
       });
       runPostJoinSideEffects(input.schedulePostJoinSideEffects, {
-        channelId: fallbackSessionResponse.data.channel_id,
-        sessionId: fallbackSessionResponse.data.id,
-        profileId: profileResponse.data.id,
+        channelId: fallbackSession.channel_id,
+        sessionId: fallbackSession.id,
+        profileId: profile.id,
         task: async () => {
           await insertParticipantEvent({
             supabase: input.serviceSupabase,
-            orgId: fallbackSessionResponse.data.org_id,
-            channelId: fallbackSessionResponse.data.channel_id,
-            liveSessionId: fallbackSessionResponse.data.id,
-            provider: fallbackSessionResponse.data.provider as LiveSessionProviderVM,
+            orgId: fallbackSession.org_id,
+            channelId: fallbackSession.channel_id,
+            liveSessionId: fallbackSession.id,
+            provider: fallbackSession.provider as LiveSessionProviderVM,
             eventType: 'join_requested',
-            profileId: profileResponse.data.id,
+            profileId: profile.id,
             payload: {
               reused: true,
               source: 'insert-conflict',
@@ -996,28 +1154,28 @@ export async function createOrJoinLiveSession(input: {
             await publishSessionStartedActivity({
               supabase: input.serviceSupabase,
               context: {
-                session: fallbackSessionResponse.data,
-                channel: channelResponse.data,
+                session: fallbackSession,
+                channel: channel,
                 scope,
               },
-              actorProfileId: profileResponse.data.id,
+              actorProfileId: profile.id,
               startedByDisplayName:
                 sessionActivityParticipant?.displayName ?? 'Participant',
               participants: sessionActivityParticipant
                 ? [sessionActivityParticipant]
                 : [],
-              joinPath: fallbackSessionResponse.data.join_path,
+              joinPath: fallbackSession.join_path,
               occurredAt: now,
             });
           }
           await publishMemberJoinedActivity({
             supabase: input.serviceSupabase,
             context: {
-              session: fallbackSessionResponse.data,
-              channel: channelResponse.data,
+              session: fallbackSession,
+              channel: channel,
               scope,
             },
-            actorProfileId: profileResponse.data.id,
+            actorProfileId: profile.id,
             member: sessionActivityParticipant,
             occurredAt: now,
             sourceKind: 'profile',
@@ -1025,33 +1183,40 @@ export async function createOrJoinLiveSession(input: {
         },
       });
       return {
-        sessionId: fallbackSessionResponse.data.id,
-        joinPath: fallbackSessionResponse.data.join_path,
-        status: fallbackSessionResponse.data.status,
+        sessionId: fallbackSession.id,
+        joinPath: fallbackSession.join_path,
+        status: fallbackSession.status,
         created: false,
-        provider: fallbackSessionResponse.data.provider as LiveSessionProviderVM,
+        provider: fallbackSession.provider as LiveSessionProviderVM,
       };
     }
     throw new Error(insertResponse.error.message);
   }
 
   const session = insertResponse.data;
+  console.info('[live-session:debug][service] created live session row', {
+    channelId: channel.id,
+    sessionId: session.id,
+    provider: session.provider,
+    occurrenceKey: session.occurrence_key ?? null,
+    joinPath: session.join_path,
+  });
   const sessionActivityParticipants = await loadActivityParticipants({
     supabase: input.serviceSupabase,
     orgId: session.org_id,
-    profileIds: [profileResponse.data.id],
+    profileIds: [profile.id],
   });
   const sessionTitle =
     scope.schedule?.title ??
-    channelResponse.data.topic ??
-    (channelResponse.data.purpose === 'learning-space' ? 'Class' : 'Live session');
+    channel.topic ??
+    (channel.purpose === 'learning-space' ? 'Class' : 'Live session');
 
   try {
     await snapshotExpectedParticipantsForLiveSession({
       supabase: input.serviceSupabase,
       session,
       scope,
-      createdBy: profileResponse.data.id,
+      createdBy: profile.id,
     });
 
     if (liveSessionConfig.provider === 'custom') {
@@ -1062,7 +1227,7 @@ export async function createOrJoinLiveSession(input: {
           join_path: joinPath,
           status: 'live',
           updated_at: new Date().toISOString(),
-          updated_by: profileResponse.data.id,
+          updated_by: profile.id,
         })
         .eq('id', session.id)
         .eq('org_id', session.org_id)
@@ -1076,14 +1241,19 @@ export async function createOrJoinLiveSession(input: {
       await upsertJoinRequestedParticipant({
         supabase: input.serviceSupabase,
         session: updateResponse.data,
-        profileId: profileResponse.data.id,
+        profileId: profile.id,
       });
       runPostJoinSideEffects(input.schedulePostJoinSideEffects, {
         channelId: session.channel_id,
         sessionId: session.id,
-        profileId: profileResponse.data.id,
+        profileId: profile.id,
         task: async () => {
-          const learningSpaceId = channelResponse.data.primary_entity_id ?? null;
+          const learningSpaceId =
+            channel.primary_entity_id ??
+            (scope.schedule?.source.kind === 'class_session'
+              ? scope.schedule.source.learningSpaceId
+              : null);
+          const scheduleId = scope.schedule?.ids.id ?? null;
           const occurrenceStart = scope.occurrenceKey ?? null;
           const shouldPublishSessionStarted = await shouldPublishSessionStartedForJoin({
             supabase: input.serviceSupabase,
@@ -1093,6 +1263,17 @@ export async function createOrJoinLiveSession(input: {
             occurrenceStart,
             isScheduledSessionWindow: scope.isScheduledSessionWindow === true,
           });
+          console.info(
+            '[live-session:debug][service] custom provider started-event decision',
+            {
+              sessionId: session.id,
+              channelId: session.channel_id,
+              shouldPublishSessionStarted,
+              learningSpaceId,
+              scheduleId,
+              occurrenceStart,
+            },
+          );
           await insertParticipantEvent({
             supabase: input.serviceSupabase,
             orgId: session.org_id,
@@ -1100,7 +1281,7 @@ export async function createOrJoinLiveSession(input: {
             liveSessionId: session.id,
             provider: liveSessionConfig.provider,
             eventType: 'session_started',
-            profileId: profileResponse.data.id,
+            profileId: profile.id,
             payload: {
               external: true,
             },
@@ -1113,7 +1294,7 @@ export async function createOrJoinLiveSession(input: {
               eventType: 'session.started',
               occurredAt: now,
               sourceKind: 'profile',
-              actorProfileId: profileResponse.data.id,
+              actorProfileId: profile.id,
               scope: buildLiveSessionTimelineScope(session.channel_id),
               objectRef: { kind: 'session', id: session.id },
               targetRef: learningSpaceId
@@ -1123,33 +1304,32 @@ export async function createOrJoinLiveSession(input: {
                 liveSessionId: session.id,
                 channelId: session.channel_id,
                 learningSpaceId,
+                scheduleId,
                 title: sessionTitle,
                 joinPath,
                 mode: liveSessionConfig.mode ?? 'video',
                 startedAt: now,
                 isScheduledSessionWindow: scope.isScheduledSessionWindow === true,
                 startedByDisplayName:
-                  profileResponse.data.display_name ??
-                  ([profileResponse.data.first_name, profileResponse.data.last_name]
-                    .filter(Boolean)
-                    .join(' ') ||
+                  profile.display_name ??
+                  ([profile.first_name, profile.last_name].filter(Boolean).join(' ') ||
                     'User'),
                 occurrenceStart,
                 occurrenceLabel: scope.occurrenceLabel ?? null,
                 participants: sessionActivityParticipants,
               },
               dedupeKey: `session.started:${session.id}`,
-              createdBy: profileResponse.data.id,
+              createdBy: profile.id,
             });
           }
           await publishMemberJoinedActivity({
             supabase: input.serviceSupabase,
             context: {
               session: updateResponse.data,
-              channel: channelResponse.data,
+              channel: channel,
               scope,
             },
-            actorProfileId: profileResponse.data.id,
+            actorProfileId: profile.id,
             member: sessionActivityParticipants[0] ?? null,
             occurredAt: now,
             sourceKind: 'profile',
@@ -1161,7 +1341,7 @@ export async function createOrJoinLiveSession(input: {
             liveSessionId: session.id,
             provider: liveSessionConfig.provider,
             eventType: 'join_requested',
-            profileId: profileResponse.data.id,
+            profileId: profile.id,
             payload: {
               created: true,
               external: true,
@@ -1198,7 +1378,7 @@ export async function createOrJoinLiveSession(input: {
         join_path: resolvedJoinPath,
         status: 'live',
         updated_at: new Date().toISOString(),
-        updated_by: profileResponse.data.id,
+        updated_by: profile.id,
       })
       .eq('id', session.id)
       .eq('org_id', session.org_id)
@@ -1212,14 +1392,19 @@ export async function createOrJoinLiveSession(input: {
     await upsertJoinRequestedParticipant({
       supabase: input.serviceSupabase,
       session: updateResponse.data,
-      profileId: profileResponse.data.id,
+      profileId: profile.id,
     });
     runPostJoinSideEffects(input.schedulePostJoinSideEffects, {
       channelId: session.channel_id,
       sessionId: session.id,
-      profileId: profileResponse.data.id,
+      profileId: profile.id,
       task: async () => {
-        const learningSpaceId = channelResponse.data.primary_entity_id ?? null;
+        const learningSpaceId =
+          channel.primary_entity_id ??
+          (scope.schedule?.source.kind === 'class_session'
+            ? scope.schedule.source.learningSpaceId
+            : null);
+        const scheduleId = scope.schedule?.ids.id ?? null;
         const occurrenceStart = scope.occurrenceKey ?? null;
         const shouldPublishSessionStarted = await shouldPublishSessionStartedForJoin({
           supabase: input.serviceSupabase,
@@ -1229,6 +1414,14 @@ export async function createOrJoinLiveSession(input: {
           occurrenceStart,
           isScheduledSessionWindow: scope.isScheduledSessionWindow === true,
         });
+        console.info('[live-session:debug][service] provider started-event decision', {
+          sessionId: session.id,
+          channelId: session.channel_id,
+          shouldPublishSessionStarted,
+          learningSpaceId,
+          scheduleId,
+          occurrenceStart,
+        });
         await insertParticipantEvent({
           supabase: input.serviceSupabase,
           orgId: session.org_id,
@@ -1236,7 +1429,7 @@ export async function createOrJoinLiveSession(input: {
           liveSessionId: session.id,
           provider: liveSessionConfig.provider,
           eventType: 'session_started',
-          profileId: profileResponse.data.id,
+          profileId: profile.id,
           payload: {},
           normalizedEventVersion: 'v1',
         });
@@ -1247,7 +1440,7 @@ export async function createOrJoinLiveSession(input: {
             eventType: 'session.started',
             occurredAt: now,
             sourceKind: 'profile',
-            actorProfileId: profileResponse.data.id,
+            actorProfileId: profile.id,
             scope: buildLiveSessionTimelineScope(session.channel_id),
             objectRef: { kind: 'session', id: session.id },
             targetRef: learningSpaceId
@@ -1257,33 +1450,32 @@ export async function createOrJoinLiveSession(input: {
               liveSessionId: session.id,
               channelId: session.channel_id,
               learningSpaceId,
+              scheduleId,
               title: sessionTitle,
               joinPath: resolvedJoinPath,
               mode: liveSessionConfig.mode ?? 'video',
               startedAt: now,
               isScheduledSessionWindow: scope.isScheduledSessionWindow === true,
               startedByDisplayName:
-                profileResponse.data.display_name ??
-                ([profileResponse.data.first_name, profileResponse.data.last_name]
-                  .filter(Boolean)
-                  .join(' ') ||
+                profile.display_name ??
+                ([profile.first_name, profile.last_name].filter(Boolean).join(' ') ||
                   'User'),
               occurrenceStart,
               occurrenceLabel: scope.occurrenceLabel ?? null,
               participants: sessionActivityParticipants,
             },
             dedupeKey: `session.started:${session.id}`,
-            createdBy: profileResponse.data.id,
+            createdBy: profile.id,
           });
         }
         await publishMemberJoinedActivity({
           supabase: input.serviceSupabase,
           context: {
             session: updateResponse.data,
-            channel: channelResponse.data,
+            channel: channel,
             scope,
           },
-          actorProfileId: profileResponse.data.id,
+          actorProfileId: profile.id,
           member: sessionActivityParticipants[0] ?? null,
           occurredAt: now,
           sourceKind: 'profile',
@@ -1295,7 +1487,7 @@ export async function createOrJoinLiveSession(input: {
           liveSessionId: session.id,
           provider: liveSessionConfig.provider,
           eventType: 'join_requested',
-          profileId: profileResponse.data.id,
+          profileId: profile.id,
           payload: {
             created: true,
           },
@@ -1319,7 +1511,7 @@ export async function createOrJoinLiveSession(input: {
         failed_at: new Date().toISOString(),
         failure_reason: error instanceof Error ? error.message : 'Unknown error',
         updated_at: new Date().toISOString(),
-        updated_by: profileResponse.data.id,
+        updated_by: profile.id,
       })
       .eq('id', session.id)
       .eq('org_id', session.org_id);
@@ -1524,6 +1716,8 @@ export async function processLiveSessionProviderWebhook(input: {
             sourceKind: 'provider_webhook',
           });
         } else {
+          const learningSpaceId = resolveSessionLearningSpaceIdFromMetadata(session);
+          const scheduleId = resolveSessionScheduleIdFromMetadata(session);
           await publishActivityEvent({
             supabase: input.supabase,
             orgId: session.org_id,
@@ -1533,17 +1727,14 @@ export async function processLiveSessionProviderWebhook(input: {
             actorProfileId: null,
             scope: buildLiveSessionTimelineScope(session.channel_id),
             objectRef: { kind: 'session', id: session.id },
-            targetRef:
-              typeof session.app_metadata?.learningSpaceId === 'string'
-                ? { kind: 'learning_space', id: session.app_metadata.learningSpaceId }
-                : undefined,
+            targetRef: learningSpaceId
+              ? { kind: 'learning_space', id: learningSpaceId }
+              : undefined,
             payload: {
               liveSessionId: session.id,
               channelId: session.channel_id,
-              learningSpaceId:
-                typeof session.app_metadata?.learningSpaceId === 'string'
-                  ? session.app_metadata.learningSpaceId
-                  : null,
+              learningSpaceId,
+              scheduleId,
               title:
                 typeof session.app_metadata?.scheduleTitle === 'string'
                   ? session.app_metadata.scheduleTitle
@@ -1643,6 +1834,8 @@ export async function processLiveSessionProviderWebhook(input: {
         orgId: session.org_id,
       });
 
+      const learningSpaceId = resolveSessionLearningSpaceIdFromMetadata(session);
+      const scheduleId = resolveSessionScheduleIdFromMetadata(session);
       await publishActivityEvent({
         supabase: input.supabase,
         orgId: session.org_id,
@@ -1652,17 +1845,14 @@ export async function processLiveSessionProviderWebhook(input: {
         actorProfileId: null,
         scope: buildLiveSessionTimelineScope(session.channel_id),
         objectRef: { kind: 'session', id: session.id },
-        targetRef:
-          typeof session.app_metadata?.learningSpaceId === 'string'
-            ? { kind: 'learning_space', id: session.app_metadata.learningSpaceId }
-            : undefined,
+        targetRef: learningSpaceId
+          ? { kind: 'learning_space', id: learningSpaceId }
+          : undefined,
         payload: {
           liveSessionId: session.id,
           channelId: session.channel_id,
-          learningSpaceId:
-            typeof session.app_metadata?.learningSpaceId === 'string'
-              ? session.app_metadata.learningSpaceId
-              : null,
+          learningSpaceId,
+          scheduleId,
           title:
             typeof session.app_metadata?.scheduleTitle === 'string'
               ? session.app_metadata.scheduleTitle
