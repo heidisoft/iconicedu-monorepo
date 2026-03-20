@@ -9,6 +9,7 @@ import { ensureSystemProfileId } from '@iconicedu/web/lib/automation/system-prof
 import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
 import { toStoredLiveSessionConfig } from '@iconicedu/web/lib/admin/live-session-config';
+import { withInfoPanelDisabled } from '@iconicedu/web/lib/channels/ui-defaults';
 import {
   addMinutesToIso,
   buildLearningSpaceSchedulesHashKeyFromPayload,
@@ -369,7 +370,7 @@ async function insertChannel(supabase: SupabaseClient, payload: ChannelInsertPay
     allow_threads: true,
     allow_reactions: true,
     ui_theme_key: payload.uiThemeKey,
-    ui_defaults: payload.uiDefaults ?? null,
+    ui_defaults: withInfoPanelDisabled(payload.uiDefaults),
     live_session_config: toStoredLiveSessionConfig(payload.liveSession),
     primary_entity_kind: 'learning_space',
     primary_entity_id: payload.primaryEntityId,

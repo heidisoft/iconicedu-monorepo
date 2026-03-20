@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { ProfileRow } from '@iconicedu/shared-types';
+import { withInfoPanelDisabled } from '@iconicedu/web/lib/channels/ui-defaults';
 import { OTHER_SUBJECT_OPTION, STANDARD_SUBJECT_OPTIONS } from '@iconicedu/shared-types';
 
 export const DASHBOARD_CLASS_REQUEST_SUBJECT_OPTIONS = [
@@ -173,9 +174,9 @@ export async function createPrivateClassRequestChannel(input: {
     posting_policy_kind: 'members-only',
     allow_threads: true,
     allow_reactions: true,
-    ui_defaults: {
+    ui_defaults: withInfoPanelDisabled({
       disabledTabs: ['members'],
-    },
+    }),
     created_by_profile_id: input.requesterProfile.id,
     created_at: input.nowIso,
     created_by: input.requesterProfile.id,

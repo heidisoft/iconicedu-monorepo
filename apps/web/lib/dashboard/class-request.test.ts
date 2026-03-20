@@ -91,7 +91,17 @@ describe('dashboard class request helpers', () => {
         kind: 'channel',
         purpose: 'chass-requests',
         ui_defaults: {
+          defaultRightPanelOpen: false,
+          defaultRightPanelKey: 'channel_info',
           disabledTabs: ['members'],
+          infoPanel: {
+            showHeader: false,
+            showDetails: false,
+            showMedia: false,
+            showMembers: false,
+            showQuickActions: false,
+            showHiddenQuickActions: false,
+          },
         },
       }),
     );

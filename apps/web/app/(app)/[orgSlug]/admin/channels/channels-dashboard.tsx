@@ -51,6 +51,7 @@ import type {
 import { ChannelsTable } from '@iconicedu/web/app/(app)/[orgSlug]/admin/channels/channels-table';
 import { LiveSessionSettingsSection } from '@iconicedu/web/components/admin/live-session-settings-section';
 import type { ChannelDetail } from '@iconicedu/web/lib/admin/channel-detail';
+import { withInfoPanelDisabled } from '@iconicedu/web/lib/channels/ui-defaults';
 import { DEFAULT_ADMIN_LIVE_SESSION_CONFIG } from '@iconicedu/web/lib/admin/live-session-config';
 
 const PAGE_SIZES = [10, 25, 50];
@@ -76,19 +77,10 @@ type CreateChannelFormState = {
 };
 
 function createDefaultChannelUiDefaults(): ChannelUiDefaultsVM {
-  return {
+  return withInfoPanelDisabled({
     themeKey: 'teal',
-    defaultRightPanelOpen: true,
     defaultRightPanelKey: 'channel_info',
-    infoPanel: {
-      showHeader: true,
-      showDetails: true,
-      showMedia: true,
-      showMembers: true,
-      showQuickActions: true,
-      showHiddenQuickActions: false,
-    },
-  };
+  });
 }
 
 export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {

@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { getChannelByDmKey } from '@iconicedu/web/lib/channels/queries/channels.query';
+import { withInfoPanelDisabled } from '@iconicedu/web/lib/channels/ui-defaults';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 
 function isChannelMemberInsertRlsError(error: { code?: string; message: string }) {
@@ -49,6 +50,7 @@ export async function ensureDirectMessageChannel(
     posting_policy_kind: 'members-only',
     allow_threads: true,
     allow_reactions: true,
+    ui_defaults: withInfoPanelDisabled(null),
     created_by_profile_id: currentProfileId,
     created_at: now,
     created_by: currentProfileId,

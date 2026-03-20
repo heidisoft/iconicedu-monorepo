@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { withInfoPanelDisabled } from '@iconicedu/web/lib/channels/ui-defaults';
 
 type EnsureSupportChannelInput = {
   supabase: SupabaseClient;
@@ -10,11 +11,10 @@ type EnsureSupportChannelInput = {
 const SUPPORT_TOPIC = 'Live Support';
 const SUPPORT_ICON_KEY = 'life-buoy';
 const SUPPORT_THEME_KEY = 'amber';
-const SUPPORT_UI_DEFAULTS = {
-  defaultRightPanelOpen: false,
+const SUPPORT_UI_DEFAULTS = withInfoPanelDisabled({
   defaultRightPanelKey: 'channel_info',
   disabledTabs: ['members'],
-} as const;
+});
 
 function hasExpectedSupportUiDefaults(uiDefaults: unknown): boolean {
   if (!uiDefaults || typeof uiDefaults !== 'object') {
@@ -24,14 +24,27 @@ function hasExpectedSupportUiDefaults(uiDefaults: unknown): boolean {
     defaultRightPanelOpen?: unknown;
     defaultRightPanelKey?: unknown;
     disabledTabs?: unknown;
+    infoPanel?: unknown;
   };
   const hasExpectedTabs =
     Array.isArray(candidate.disabledTabs) && candidate.disabledTabs.includes('members');
+  const infoPanel =
+    candidate.infoPanel && typeof candidate.infoPanel === 'object'
+      ? (candidate.infoPanel as Record<string, unknown>)
+      : null;
+  const hasInfoPanelDisabled =
+    infoPanel?.showHeader === false &&
+    infoPanel?.showDetails === false &&
+    infoPanel?.showMedia === false &&
+    infoPanel?.showMembers === false &&
+    infoPanel?.showQuickActions === false &&
+    infoPanel?.showHiddenQuickActions === false;
 
   return (
     candidate.defaultRightPanelOpen === false &&
     candidate.defaultRightPanelKey === 'channel_info' &&
-    hasExpectedTabs
+    hasExpectedTabs &&
+    hasInfoPanelDisabled
   );
 }
 
