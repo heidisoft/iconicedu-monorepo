@@ -153,6 +153,48 @@ function resolveAlertChannelLabel(
   } others`;
 }
 
+function resolveParticipantDisplayName(participant: UserProfileVM): string | null {
+  const displayName = getProfileDisplayName(participant.profile, '').trim();
+  if (!displayName) {
+    return null;
+  }
+
+  return displayName;
+}
+
+function getTutorLearningSpaceSubtitle(space: LearningSpaceVM): string {
+  const spaceParticipants = Array.isArray(space.participants) ? space.participants : [];
+  const channelParticipants = Array.isArray(
+    space.channels.primaryChannel.collections.participants,
+  )
+    ? space.channels.primaryChannel.collections.participants
+    : [];
+
+  const childParticipants = [...spaceParticipants, ...channelParticipants]
+    .filter((participant) => participant?.kind === 'child')
+    .filter(
+      (participant, index, array) =>
+        array.findIndex(
+          (candidate) =>
+            candidate.ids?.id === participant.ids?.id ||
+            candidate.ids?.accountId === participant.ids?.accountId,
+        ) === index,
+    );
+  const childDisplayNames = childParticipants
+    .map((participant) => resolveParticipantDisplayName(participant))
+    .filter((name): name is string => Boolean(name));
+
+  if (childDisplayNames.length === 0) {
+    return space.basics.subject ?? 'General';
+  }
+
+  if (childDisplayNames.length === 1) {
+    return `For ${childDisplayNames[0]}`;
+  }
+
+  return `For ${childDisplayNames[0]} and ${childDisplayNames.length - 1} more`;
+}
+
 function matchesActivePersonaParticipant(
   participant: UserProfileVM,
   activeProfile: Pick<UserProfileVM, 'ids' | 'kind'>,
@@ -756,6 +798,10 @@ export function SidebarLeft({
                     const iconKey =
                       space.basics.iconKey ?? channel.basics.iconKey ?? null;
                     const Icon = getLearningSpaceIcon(iconKey, Languages);
+                    const subtitle =
+                      userProfile.kind === 'educator'
+                        ? getTutorLearningSpaceSubtitle(space)
+                        : (space.basics.subject ?? 'General');
                     const isActive = activeLearningSpaceId === channel.ids.id;
                     const unreadCount = getLearningSpaceItemUnreadCountForUser(
                       space,
@@ -782,7 +828,7 @@ export function SidebarLeft({
                                 {space.basics.title}
                               </div>
                               <div className="truncate text-xs text-muted-foreground">
-                                {space.basics.subject ?? 'General'}
+                                {subtitle}
                               </div>
                             </div>
                             {unreadCount > 0 ? (

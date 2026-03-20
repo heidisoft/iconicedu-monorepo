@@ -82,6 +82,22 @@ function makeData() {
                     kind: 'educator',
                     ids: { id: 'profile-educator', accountId: 'account-educator' },
                   },
+                  {
+                    kind: 'child',
+                    ids: { id: 'profile-child-1', accountId: 'account-child-1' },
+                    profile: {
+                      displayName: 'Tevin Carter',
+                      firstName: 'Tevin',
+                    },
+                  },
+                  {
+                    kind: 'child',
+                    ids: { id: 'profile-child-2', accountId: 'account-child-2' },
+                    profile: {
+                      displayName: 'Maya Ellis',
+                      firstName: 'Maya',
+                    },
+                  },
                 ],
               },
             },
@@ -426,6 +442,7 @@ describe('SidebarLeft', () => {
 
     expect(screen.getByText('Classrooms')).toBeInTheDocument();
     expect(screen.getByText('Algebra 1')).toBeInTheDocument();
+    expect(screen.getByText('For Tevin Carter and 1 more')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Algebra 1/i })).toHaveAttribute(
       'href',
       '//spaces/channel-1',
