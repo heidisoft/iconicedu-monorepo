@@ -270,17 +270,12 @@ export function UserSettingsTabs({
   );
   const [notificationChannels, setNotificationChannels] = React.useState<
     Record<string, string[]>
-  >(() => {
-    if (!prefs.notificationDefaults) {
-      return {};
-    }
-    return Object.fromEntries(
-      Object.entries(prefs.notificationDefaults).map(([key, value]) => [
-        key,
-        value?.channels ?? [],
-      ]),
+  >(() => mapNotificationDefaultsToChannels(prefs.notificationDefaults));
+  React.useEffect(() => {
+    setNotificationChannels(
+      mapNotificationDefaultsToChannels(prefs.notificationDefaults),
     );
-  });
+  }, [profile.ids.id, prefs.notificationDefaults]);
   const guardianChildren = React.useMemo<ChildProfileVM[]>(
     () => (profile.kind === 'guardian' ? (profile.children?.items ?? []) : []),
     [profile],
@@ -597,5 +592,20 @@ export function UserSettingsTabs({
         </ScrollArea>
       </div>
     </Tabs>
+  );
+}
+
+function mapNotificationDefaultsToChannels(
+  notificationDefaults: UserProfileVM['prefs']['notificationDefaults'] | null | undefined,
+): Record<string, string[]> {
+  if (!notificationDefaults) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(notificationDefaults).map(([key, value]) => [
+      key,
+      value?.channels ?? [],
+    ]),
   );
 }

@@ -12,6 +12,8 @@ const {
   mockUpdateAccountRoleState,
   mockUpsertProfileForAccount,
   mockInsertProfileForAccount,
+  mockGetProfileByAccountId,
+  mockSeedSignupDefaultNotificationPreferences,
   mockUpsertUserRole,
   mockGetFamilyInviteAdminClient,
   mockGetOrgById,
@@ -28,6 +30,8 @@ const {
   mockUpdateAccountRoleState: vi.fn(),
   mockUpsertProfileForAccount: vi.fn(),
   mockInsertProfileForAccount: vi.fn(),
+  mockGetProfileByAccountId: vi.fn(),
+  mockSeedSignupDefaultNotificationPreferences: vi.fn(),
   mockUpsertUserRole: vi.fn(),
   mockGetFamilyInviteAdminClient: vi.fn(),
   mockGetOrgById: vi.fn(),
@@ -55,10 +59,16 @@ vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
 vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
   upsertProfileForAccount: mockUpsertProfileForAccount,
   insertProfileForAccount: mockInsertProfileForAccount,
+  getProfileByAccountId: mockGetProfileByAccountId,
 }));
 
 vi.mock('@iconicedu/web/lib/profile/queries/roles.query', () => ({
   upsertUserRole: mockUpsertUserRole,
+}));
+
+vi.mock('@iconicedu/web/lib/profile/queries/notification-defaults-seed.query', () => ({
+  seedSignupDefaultNotificationPreferences: (...args: unknown[]) =>
+    mockSeedSignupDefaultNotificationPreferences(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/profile/constants/theme', () => ({
@@ -157,6 +167,13 @@ describe('inviteAdminUserAction', () => {
     mockInsertProfileForAccount.mockResolvedValue({
       error: null,
       data: { id: 'profile-1' },
+    });
+    mockGetProfileByAccountId.mockResolvedValue({
+      error: null,
+      data: { id: 'profile-1' },
+    });
+    mockSeedSignupDefaultNotificationPreferences.mockResolvedValue({
+      error: null,
     });
     mockUpsertUserRole.mockResolvedValue({
       error: null,
@@ -273,6 +290,11 @@ describe('inviteAdminUserAction', () => {
           roleStatus: 'active',
           updatedBy: 'account-admin-1',
         }),
+      );
+      expect(mockSeedSignupDefaultNotificationPreferences).toHaveBeenCalledWith(
+        expect.anything(),
+        'org-1',
+        'profile-1',
       );
       expect(result.actionLink).toBe('http://localhost:3000/auth/callback?token=invite');
     },

@@ -14,6 +14,7 @@ import {
 import { loadChildProfiles } from '@iconicedu/web/lib/profile/builders/load-child-profiles';
 import { buildChildDisplayName } from '@iconicedu/web/lib/profile/display-name';
 import { requireParentActorContext } from '@iconicedu/web/lib/family-view/actor-context';
+import { seedSignupDefaultNotificationPreferences } from '@iconicedu/web/lib/profile/queries/notification-defaults-seed.query';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 
 const normalizeEmail = (value?: string | null) => value?.trim().toLowerCase() ?? null;
@@ -139,6 +140,37 @@ async function createOrLoadChildAccount(options: {
   }
 
   return { account: childAccount, created: true };
+}
+
+async function seedDefaultNotificationsIfMissing(input: {
+  serviceClient: SupabaseClient;
+  orgId: string;
+  profileId: string;
+}) {
+  const existingResponse = await input.serviceClient
+    .from('notification_preferences')
+    .select('id')
+    .eq('org_id', input.orgId)
+    .eq('profile_id', input.profileId)
+    .is('deleted_at', null)
+    .limit(1);
+
+  if (existingResponse.error) {
+    throw existingResponse.error;
+  }
+
+  if ((existingResponse.data ?? []).length > 0) {
+    return;
+  }
+
+  const seedResponse = await seedSignupDefaultNotificationPreferences(
+    input.serviceClient,
+    input.orgId,
+    input.profileId,
+  );
+  if (seedResponse.error) {
+    throw seedResponse.error;
+  }
 }
 
 type CreateChildProfileInput = {
@@ -271,6 +303,12 @@ export async function createChildProfileAction(
     }
 
     cleanupContext.profileId = profileRow.id;
+
+    await seedDefaultNotificationsIfMissing({
+      serviceClient,
+      orgId: guardianAccount.org_id,
+      profileId: profileRow.id,
+    });
 
     const familyId = await ensureFamilyForGuardian({
       supabase: serviceClient,

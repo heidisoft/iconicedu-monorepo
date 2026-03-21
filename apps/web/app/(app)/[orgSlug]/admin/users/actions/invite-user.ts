@@ -13,10 +13,12 @@ import {
   updateAccountStatus,
 } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import {
+  getProfileByAccountId,
   insertProfileForAccount,
   upsertProfileForAccount,
 } from '@iconicedu/web/lib/profile/queries/profiles.query';
 import { upsertUserRole } from '@iconicedu/web/lib/profile/queries/roles.query';
+import { seedSignupDefaultNotificationPreferences } from '@iconicedu/web/lib/profile/queries/notification-defaults-seed.query';
 import { getFamilyInviteAdminClient } from '@iconicedu/web/lib/family/queries/invite.query';
 import { pickRandomThemeKey } from '@iconicedu/web/lib/profile/constants/theme';
 import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
@@ -117,6 +119,7 @@ export async function inviteAdminUserAction(
   }
 
   let targetAccount: AccountRow | null | undefined = existingAccountResponse.data;
+  let createdNewAccount = false;
 
   if (!targetAccount) {
     const { data: insertedAccount, error: insertError } = await insertInvitedAccount(
@@ -133,6 +136,7 @@ export async function inviteAdminUserAction(
     }
 
     targetAccount = insertedAccount;
+    createdNewAccount = true;
   }
 
   if (!targetAccount?.id) {
@@ -157,21 +161,10 @@ export async function inviteAdminUserAction(
     }
   }
 
-  const { error: upsertError } = await upsertProfileForAccount(adminClient, {
-    orgId,
-    accountId: targetAccount.id,
-    kind: parsed.profileKind,
-    avatarSource: 'seed',
-    avatarUrl: null,
-    avatarSeed: targetAccount.id,
-    timezone: 'UTC',
-    locale: 'en-US',
-    status: 'invited',
-    uiThemeKey: parsed.profileKind === 'guardian' ? pickRandomThemeKey() : 'teal',
-  });
-
-  if (upsertError?.code === '42P10') {
-    const { error: insertError } = await insertProfileForAccount(adminClient, {
+  let seededProfileId: string | null = null;
+  const { data: upsertedProfile, error: upsertError } = await upsertProfileForAccount(
+    adminClient,
+    {
       orgId,
       accountId: targetAccount.id,
       kind: parsed.profileKind,
@@ -182,14 +175,54 @@ export async function inviteAdminUserAction(
       locale: 'en-US',
       status: 'invited',
       uiThemeKey: parsed.profileKind === 'guardian' ? pickRandomThemeKey() : 'teal',
-    });
+    },
+  );
+  seededProfileId = upsertedProfile?.id ?? null;
+
+  if (upsertError?.code === '42P10') {
+    const { data: insertedProfile, error: insertError } = await insertProfileForAccount(
+      adminClient,
+      {
+        orgId,
+        accountId: targetAccount.id,
+        kind: parsed.profileKind,
+        avatarSource: 'seed',
+        avatarUrl: null,
+        avatarSeed: targetAccount.id,
+        timezone: 'UTC',
+        locale: 'en-US',
+        status: 'invited',
+        uiThemeKey: parsed.profileKind === 'guardian' ? pickRandomThemeKey() : 'teal',
+      },
+    );
     if (insertError && insertError.code !== '23505') {
       throw insertError;
     }
+    seededProfileId = insertedProfile?.id ?? seededProfileId;
   } else if (upsertError?.code === '23505') {
     // profile already exists, no action needed
   } else if (upsertError) {
     throw upsertError;
+  }
+
+  if (createdNewAccount) {
+    const profileId =
+      seededProfileId ??
+      (await getProfileByAccountId(adminClient, targetAccount.id)).data?.id ??
+      null;
+
+    if (!profileId) {
+      throw new Error('Unable to resolve invited profile for notification defaults.');
+    }
+
+    const seedResponse = await seedSignupDefaultNotificationPreferences(
+      adminClient,
+      orgId,
+      profileId,
+    );
+    if (seedResponse.error) {
+      throw seedResponse.error;
+    }
   }
 
   const inviteRoleState = resolveInviteRoleState(parsed.profileKind);

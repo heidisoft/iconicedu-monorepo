@@ -12,6 +12,7 @@ import {
   getProfileByAccountId,
   upsertProfileForAccount,
 } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import { seedSignupDefaultNotificationPreferences } from '@iconicedu/web/lib/profile/queries/notification-defaults-seed.query';
 import { pickRandomThemeKey } from '@iconicedu/web/lib/profile/constants/theme';
 import {
   getAccountByEmail,
@@ -113,7 +114,7 @@ async function ensureInvitedAccountForRole(options: {
     throw insertedError ?? new Error('Unable to create invited account.');
   }
 
-  await upsertProfileForAccount(options.adminClient, {
+  const profileResponse = await upsertProfileForAccount(options.adminClient, {
     orgId: options.orgId,
     accountId: insertedAccount.id,
     kind: options.kind,
@@ -126,6 +127,18 @@ async function ensureInvitedAccountForRole(options: {
     status: 'invited',
     uiThemeKey,
   });
+  if (profileResponse.error || !profileResponse.data) {
+    throw profileResponse.error ?? new Error('Unable to create invited profile.');
+  }
+
+  const seedResponse = await seedSignupDefaultNotificationPreferences(
+    options.adminClient,
+    options.orgId,
+    profileResponse.data.id,
+  );
+  if (seedResponse.error) {
+    throw seedResponse.error;
+  }
 
   return insertedAccount;
 }
