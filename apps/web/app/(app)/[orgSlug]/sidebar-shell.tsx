@@ -234,6 +234,10 @@ export function SidebarShell({
         childProfileId: input.childProfileId,
       });
       if (typeof window !== 'undefined') {
+        if (input.childProfileId) {
+          window.location.assign(dashboardBasePath);
+          return;
+        }
         window.location.reload();
       }
     },
