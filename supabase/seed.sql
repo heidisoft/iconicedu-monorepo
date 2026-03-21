@@ -4,7 +4,7 @@ SET session_replication_role = replica;
 -- PostgreSQL database dump
 --
 
--- \restrict jMwm1vieg2UcH7a0eBh51mkqlTqFBioM5ozamoetrehaSBd4dyddv9FscodR8ci
+-- \restrict Uo7M89l27kVgmwhKv2a4amKWS4wGo7u5M86OkdCf8K2oCJyYbtopcQxhQ8iXv7o
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -35,6 +35,7 @@ COPY "public"."orgs" ("id", "name", "slug", "created_at", "created_by", "updated
 --
 
 COPY "public"."accounts" ("id", "org_id", "auth_user_id", "email", "phone_e164", "whatsapp_e164", "email_verified", "email_verified_at", "phone_verified", "phone_verified_at", "whatsapp_verified", "whatsapp_verified_at", "preferred_contact_channels", "status", "created_at", "created_by", "updated_at", "updated_by", "deleted_at", "deleted_by", "archived_at", "primary_role", "role_status", "onboarding_completed_at", "active_profile_id") FROM stdin;
+66bd5628-af1e-4bf4-9263-e0f097d388bd	6d121c93-6deb-4130-8fb0-fb449999d21b	209ad23e-3d3f-4e3e-890f-93f4ad490598	heshanmw+1@gmail.com	+13122808223	+13122808223	f	\N	f	\N	f	\N	{email}	active	2026-03-20 20:51:58.646542+00	ef1fe6ef-4bac-42ac-90a8-7aea69a0e41c	2026-03-21 09:06:17.906063+00	\N	\N	\N	\N	guardian	active	2026-03-21 09:06:08.587+00	31e0ac04-7de8-470b-8025-9f4c95913330
 ef1fe6ef-4bac-42ac-90a8-7aea69a0e41c	6d121c93-6deb-4130-8fb0-fb449999d21b	bdc2944f-7307-4aef-b742-fed48cff9822	heshanmw@gmail.com	+13369244399	+13369244399	f	\N	f	\N	f	\N	{email}	active	2026-03-20 20:49:50.956629+00	\N	2026-03-20 20:50:16.881537+00	ef1fe6ef-4bac-42ac-90a8-7aea69a0e41c	\N	\N	\N	owner	active	2026-03-20 20:49:52.68+00	bc6c30e6-0166-45cf-8f97-e7cfb08f4d88
 a88a0043-b643-4572-8093-ab690ea975b8	6d121c93-6deb-4130-8fb0-fb449999d21b	\N	heshanmw+2@gmail.com	\N	\N	f	\N	f	\N	f	\N	{email}	active	2026-03-20 20:55:32.325955+00	66bd5628-af1e-4bf4-9263-e0f097d388bd	2026-03-20 20:55:32.325955+00	66bd5628-af1e-4bf4-9263-e0f097d388bd	\N	\N	\N	\N	unassigned	\N	\N
 af53337b-4f36-43cc-b4ee-10e327eba042	6d121c93-6deb-4130-8fb0-fb449999d21b	\N	\N	\N	\N	f	\N	f	\N	f	\N	{email}	active	2026-03-20 20:56:21.304319+00	66bd5628-af1e-4bf4-9263-e0f097d388bd	2026-03-20 20:56:21.304319+00	66bd5628-af1e-4bf4-9263-e0f097d388bd	\N	\N	\N	\N	unassigned	\N	\N
@@ -43,7 +44,6 @@ bc1fbf5e-cdd7-4244-adda-2cbd666433be	6d121c93-6deb-4130-8fb0-fb449999d21b	694261
 afbcd7fe-92d6-48ad-9538-8a2aa392ed84	6d121c93-6deb-4130-8fb0-fb449999d21b	\N	\N	\N	\N	f	\N	f	\N	f	\N	\N	active	2026-03-20 21:15:22.757+00	\N	2026-03-20 21:15:22.757+00	\N	\N	\N	\N	\N	unassigned	\N	\N
 e11bc035-57c9-4c7f-8190-a598edd44e48	6d121c93-6deb-4130-8fb0-fb449999d21b	052935b9-f628-4bd6-9536-6e07030ad564	heshanmw+5@gmail.com	+17734153499	+17734153499	f	\N	f	\N	f	\N	{email}	active	2026-03-20 21:02:40.658566+00	ef1fe6ef-4bac-42ac-90a8-7aea69a0e41c	2026-03-21 00:25:37.409159+00	\N	\N	\N	\N	staff	active	2026-03-21 00:25:21.552+00	ca5949ee-ce1e-4290-9a7d-7e66d6cce106
 c107a6b5-730c-4b71-87a8-2d629268d5de	6d121c93-6deb-4130-8fb0-fb449999d21b	926b4c7c-df46-4ee1-9250-1fd0797239b8	heshanmw+4@gmail.com	+16164854665	+16164854665	f	\N	f	\N	f	\N	{email}	active	2026-03-20 20:59:05.8006+00	ef1fe6ef-4bac-42ac-90a8-7aea69a0e41c	2026-03-20 20:59:46.371221+00	c107a6b5-730c-4b71-87a8-2d629268d5de	\N	\N	\N	educator	active	2026-03-20 20:59:06.538+00	f59bebaa-0e3b-4fd7-8f75-f23e1913d23b
-66bd5628-af1e-4bf4-9263-e0f097d388bd	6d121c93-6deb-4130-8fb0-fb449999d21b	209ad23e-3d3f-4e3e-890f-93f4ad490598	heshanmw+1@gmail.com	+13122808223	+13122808223	f	\N	f	\N	f	\N	{email}	active	2026-03-20 20:51:58.646542+00	ef1fe6ef-4bac-42ac-90a8-7aea69a0e41c	2026-03-21 08:17:11.788819+00	\N	\N	\N	\N	guardian	active	2026-03-21 08:17:01.229+00	31e0ac04-7de8-470b-8025-9f4c95913330
 e093d55a-1ef6-4fd2-a4a7-3eb598647472	6d121c93-6deb-4130-8fb0-fb449999d21b	\N	\N	\N	\N	f	\N	f	\N	f	\N	{email}	active	2026-03-21 08:37:34.883406+00	66bd5628-af1e-4bf4-9263-e0f097d388bd	2026-03-21 08:37:34.883406+00	66bd5628-af1e-4bf4-9263-e0f097d388bd	\N	\N	\N	\N	unassigned	\N	\N
 efb4fd26-82fa-45b8-a27c-f717a1749c87	6d121c93-6deb-4130-8fb0-fb449999d21b	d51bba27-0c02-4f5e-895f-34c76044aa76	heshanmw+6@gmail.com	+19083134795	+19083134795	f	\N	f	\N	f	\N	{email}	active	2026-03-20 21:06:41.464024+00	ef1fe6ef-4bac-42ac-90a8-7aea69a0e41c	2026-03-21 08:42:14.075709+00	\N	\N	\N	\N	guardian	active	2026-03-21 08:42:06.035+00	07749528-7ac5-428e-8c07-82a3e3d25c80
 3360e33b-7423-4007-8aee-73301da2aa95	6d121c93-6deb-4130-8fb0-fb449999d21b	\N	\N	\N	\N	f	\N	f	\N	f	\N	{email}	active	2026-03-21 08:43:18.944362+00	efb4fd26-82fa-45b8-a27c-f717a1749c87	2026-03-21 08:43:18.944362+00	efb4fd26-82fa-45b8-a27c-f717a1749c87	\N	\N	\N	\N	unassigned	\N	\N
@@ -399,6 +399,8 @@ c97b2191-0503-4a15-962a-8d83dc4db979	6d121c93-6deb-4130-8fb0-fb449999d21b	66bd56
 e633d06e-8279-4cf5-b9b8-29eab29005c4	6d121c93-6deb-4130-8fb0-fb449999d21b	66bd5628-af1e-4bf4-9263-e0f097d388bd	209ad23e-3d3f-4e3e-890f-93f4ad490598	auth_success	{"method": "token_hash"}	2026-03-21 08:17:10.530084+00
 a56855ae-b711-481b-815f-a3333d451550	6d121c93-6deb-4130-8fb0-fb449999d21b	efb4fd26-82fa-45b8-a27c-f717a1749c87	d51bba27-0c02-4f5e-895f-34c76044aa76	auth_success	{"method": "token_hash"}	2026-03-21 08:41:07.85424+00
 51f195e6-6b28-4fef-96e1-87deb768b001	6d121c93-6deb-4130-8fb0-fb449999d21b	efb4fd26-82fa-45b8-a27c-f717a1749c87	d51bba27-0c02-4f5e-895f-34c76044aa76	auth_success	{"method": "token_hash"}	2026-03-21 08:42:13.58243+00
+ef4a676c-8609-4602-9dc3-065749bc6eaa	6d121c93-6deb-4130-8fb0-fb449999d21b	66bd5628-af1e-4bf4-9263-e0f097d388bd	209ad23e-3d3f-4e3e-890f-93f4ad490598	auth_success	{"method": "token_hash"}	2026-03-21 09:05:19.003422+00
+7d3439b4-07e3-4ad9-a54f-c110fd00d6a2	6d121c93-6deb-4130-8fb0-fb449999d21b	66bd5628-af1e-4bf4-9263-e0f097d388bd	209ad23e-3d3f-4e3e-890f-93f4ad490598	auth_success	{"method": "token_hash"}	2026-03-21 09:06:17.433665+00
 \.
 
 
@@ -1530,15 +1532,15 @@ f9051498-e2c7-4033-9e0c-a68f14b5460d	6d121c93-6deb-4130-8fb0-fb449999d21b	Langua
 
 COPY "public"."profile_presence" ("id", "org_id", "profile_id", "state_text", "state_emoji", "state_expires_at", "live_status", "display_status", "last_seen_at", "presence_loaded", "created_at", "created_by", "updated_at", "updated_by", "deleted_at", "deleted_by") FROM stdin;
 270c3084-ae24-4ae6-abac-68bbece8dff9	6d121c93-6deb-4130-8fb0-fb449999d21b	ca5949ee-ce1e-4290-9a7d-7e66d6cce106	\N	\N	\N	in_class	online	2026-03-21 00:33:31.705+00	t	2026-03-20 21:02:55.671441+00	\N	2026-03-21 00:33:31.776129+00	\N	\N	\N
+44b7110f-ba5c-4da1-a725-e8526b62a004	6d121c93-6deb-4130-8fb0-fb449999d21b	18a0252b-e80e-41ac-a280-b330290d5c5e	\N	\N	\N	in_class	online	2026-03-21 09:04:51.098+00	t	2026-03-21 08:45:01.262407+00	\N	2026-03-21 09:04:51.158435+00	\N	\N	\N
+59cfdb40-4ba9-4fe1-b9fb-1a8f8b79af6d	6d121c93-6deb-4130-8fb0-fb449999d21b	31e0ac04-7de8-470b-8025-9f4c95913330	\N	\N	\N	offline	offline	2026-03-21 09:36:26.882+00	t	2026-03-20 20:53:14.61673+00	\N	2026-03-21 09:36:26.972871+00	\N	\N	\N
+144d1e84-aa65-41ce-af6e-054cf1fd935c	6d121c93-6deb-4130-8fb0-fb449999d21b	bc6c30e6-0166-45cf-8f97-e7cfb08f4d88	\N	\N	\N	offline	offline	2026-03-21 09:38:57.452+00	t	2026-03-20 20:49:57.281366+00	\N	2026-03-21 09:38:57.535112+00	\N	\N	\N
+a836ab65-0010-48bb-a195-671894ed8348	6d121c93-6deb-4130-8fb0-fb449999d21b	f2006be7-2563-40fe-ade4-8d3561e0877e	\N	\N	\N	in_class	online	2026-03-21 09:07:09.64+00	t	2026-03-21 08:00:14.585217+00	\N	2026-03-21 09:07:09.713525+00	\N	\N	\N
 f8810292-1070-4a69-becb-e3d69d32608d	6d121c93-6deb-4130-8fb0-fb449999d21b	20153b53-c8b9-4558-8472-146bedb9f76b	\N	\N	\N	offline	offline	2026-03-20 20:58:43.414+00	t	2026-03-20 20:57:14.933465+00	\N	2026-03-20 20:58:43.470042+00	\N	\N	\N
-44b7110f-ba5c-4da1-a725-e8526b62a004	6d121c93-6deb-4130-8fb0-fb449999d21b	18a0252b-e80e-41ac-a280-b330290d5c5e	\N	\N	\N	in_class	online	2026-03-21 08:50:02.378+00	t	2026-03-21 08:45:01.262407+00	\N	2026-03-21 08:50:02.450748+00	\N	\N	\N
 6b213c12-fadf-4444-b571-216db6b65f79	6d121c93-6deb-4130-8fb0-fb449999d21b	f59bebaa-0e3b-4fd7-8f75-f23e1913d23b	\N	\N	\N	offline	offline	2026-03-20 21:02:18.344+00	t	2026-03-20 20:59:19.911352+00	\N	2026-03-20 21:02:18.40513+00	\N	\N	\N
-a836ab65-0010-48bb-a195-671894ed8348	6d121c93-6deb-4130-8fb0-fb449999d21b	f2006be7-2563-40fe-ade4-8d3561e0877e	\N	\N	\N	in_class	online	2026-03-21 08:21:54.905+00	t	2026-03-21 08:00:14.585217+00	\N	2026-03-21 08:21:55.001532+00	\N	\N	\N
-59cfdb40-4ba9-4fe1-b9fb-1a8f8b79af6d	6d121c93-6deb-4130-8fb0-fb449999d21b	31e0ac04-7de8-470b-8025-9f4c95913330	\N	\N	\N	in_class	online	2026-03-21 08:37:54.305+00	t	2026-03-20 20:53:14.61673+00	\N	2026-03-21 08:37:54.382549+00	\N	\N	\N
-7d219d27-5673-4667-94d3-aedefd05557d	6d121c93-6deb-4130-8fb0-fb449999d21b	cdfb63cf-5603-455a-a7b8-a989256a1245	\N	\N	\N	in_class	online	2026-03-21 08:09:23.468+00	t	2026-03-21 07:57:11.397772+00	\N	2026-03-21 08:09:23.533887+00	\N	\N	\N
-144d1e84-aa65-41ce-af6e-054cf1fd935c	6d121c93-6deb-4130-8fb0-fb449999d21b	bc6c30e6-0166-45cf-8f97-e7cfb08f4d88	\N	\N	\N	in_class	online	2026-03-21 08:58:18.812+00	t	2026-03-20 20:49:57.281366+00	\N	2026-03-21 08:58:18.929662+00	\N	\N	\N
-2f0d6ab7-35f7-4257-ae13-f7e10762017c	6d121c93-6deb-4130-8fb0-fb449999d21b	26c8d9a4-75d1-4945-8de1-6f1006af8471	\N	\N	\N	in_class	online	2026-03-21 08:39:41.529+00	t	2026-03-21 08:38:02.287436+00	\N	2026-03-21 08:39:41.600938+00	\N	\N	\N
+2f0d6ab7-35f7-4257-ae13-f7e10762017c	6d121c93-6deb-4130-8fb0-fb449999d21b	26c8d9a4-75d1-4945-8de1-6f1006af8471	\N	\N	\N	in_class	online	2026-03-21 09:13:15.647+00	t	2026-03-21 08:38:02.287436+00	\N	2026-03-21 09:13:15.726389+00	\N	\N	\N
 3494ffca-5c3f-4870-bdd2-475a6d3be154	6d121c93-6deb-4130-8fb0-fb449999d21b	07749528-7ac5-428e-8c07-82a3e3d25c80	\N	\N	\N	in_class	online	2026-03-21 08:59:26.273+00	t	2026-03-20 21:06:55.65191+00	\N	2026-03-21 08:59:26.354484+00	\N	\N	\N
+7d219d27-5673-4667-94d3-aedefd05557d	6d121c93-6deb-4130-8fb0-fb449999d21b	cdfb63cf-5603-455a-a7b8-a989256a1245	\N	\N	\N	in_class	online	2026-03-21 09:15:58.011+00	t	2026-03-21 07:57:11.397772+00	\N	2026-03-21 09:15:58.071373+00	\N	\N	\N
 ac05ba27-973b-495d-845c-b00dcd6ef568	6d121c93-6deb-4130-8fb0-fb449999d21b	0068cfbc-7abb-4c7d-8312-78c6fe3ddbbe	\N	\N	\N	in_class	online	2026-03-21 08:44:31.37+00	t	2026-03-21 08:44:26.861926+00	\N	2026-03-21 08:44:31.444964+00	\N	\N	\N
 \.
 
@@ -1769,8 +1771,8 @@ dce17c53-51bf-4fc4-b0a0-8c4b77495199	6d121c93-6deb-4130-8fb0-fb449999d21b	ef1fe6
 6ceea1c6-96fc-4dcc-92ca-01b4d35a8a0a	6d121c93-6deb-4130-8fb0-fb449999d21b	bc1fbf5e-cdd7-4244-adda-2cbd666433be	educator	ef1fe6ef-4bac-42ac-90a8-7aea69a0e41c	2026-03-20 20:56:58.003+00	2026-03-20 20:56:58.06186+00	\N	2026-03-20 20:56:58.06186+00	\N	\N	\N
 7b7cafe1-126e-4108-82b5-bb047eb04bda	6d121c93-6deb-4130-8fb0-fb449999d21b	c107a6b5-730c-4b71-87a8-2d629268d5de	educator	ef1fe6ef-4bac-42ac-90a8-7aea69a0e41c	2026-03-20 20:59:06.406+00	2026-03-20 20:59:06.468241+00	\N	2026-03-20 20:59:06.468241+00	\N	\N	\N
 31c23b51-227f-4379-b15a-b5790c593862	6d121c93-6deb-4130-8fb0-fb449999d21b	e11bc035-57c9-4c7f-8190-a598edd44e48	staff	ef1fe6ef-4bac-42ac-90a8-7aea69a0e41c	2026-03-21 00:25:21.426+00	2026-03-20 21:02:41.497241+00	\N	2026-03-21 00:25:21.500833+00	\N	\N	\N
-5359394e-4a38-4a94-a0b2-d0dc010db448	6d121c93-6deb-4130-8fb0-fb449999d21b	66bd5628-af1e-4bf4-9263-e0f097d388bd	guardian	ef1fe6ef-4bac-42ac-90a8-7aea69a0e41c	2026-03-21 08:17:01.114+00	2026-03-20 20:51:59.389192+00	\N	2026-03-21 08:17:01.190834+00	\N	\N	\N
 bd6e3bb7-381f-45c4-a79b-f0d09bbb4ddc	6d121c93-6deb-4130-8fb0-fb449999d21b	efb4fd26-82fa-45b8-a27c-f717a1749c87	guardian	ef1fe6ef-4bac-42ac-90a8-7aea69a0e41c	2026-03-21 08:42:05.892+00	2026-03-20 21:06:42.176455+00	\N	2026-03-21 08:42:05.991076+00	\N	\N	\N
+5359394e-4a38-4a94-a0b2-d0dc010db448	6d121c93-6deb-4130-8fb0-fb449999d21b	66bd5628-af1e-4bf4-9263-e0f097d388bd	guardian	ef1fe6ef-4bac-42ac-90a8-7aea69a0e41c	2026-03-21 09:06:08.466+00	2026-03-20 20:51:59.389192+00	\N	2026-03-21 09:06:08.53681+00	\N	\N	\N
 \.
 
 
@@ -1778,6 +1780,6 @@ bd6e3bb7-381f-45c4-a79b-f0d09bbb4ddc	6d121c93-6deb-4130-8fb0-fb449999d21b	efb4fd
 -- PostgreSQL database dump complete
 --
 
--- \unrestrict jMwm1vieg2UcH7a0eBh51mkqlTqFBioM5ozamoetrehaSBd4dyddv9FscodR8ci
+-- \unrestrict Uo7M89l27kVgmwhKv2a4amKWS4wGo7u5M86OkdCf8K2oCJyYbtopcQxhQ8iXv7o
 
 RESET ALL;
