@@ -77,14 +77,18 @@ export function getTimezoneDisplayLabel(timezone?: string | null) {
   }
 
   const segments = value.split('/');
-  const cityOrRegion = segments.at(-1) ?? value;
+  const cityOrRegion = segments.length > 0 ? segments[segments.length - 1] : value;
   const normalized = toWords(cityOrRegion);
   if (!normalized) {
     return `${DEFAULT_TIMEZONE} time`;
   }
 
   const country = getCountryForTimezone(value);
-  const countryName = country?.name?.trim();
+  if (!country) {
+    return `${normalized} time`;
+  }
+
+  const countryName = country.name.trim();
   if (!countryName) {
     return `${normalized} time`;
   }
