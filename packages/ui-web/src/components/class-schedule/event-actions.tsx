@@ -2,8 +2,7 @@
 
 import type { ClassScheduleVM } from '@iconicedu/shared-types';
 import { Button } from '@iconicedu/ui-web/ui/button';
-import { MessageSquare, Video, X } from 'lucide-react';
-import { cn } from '@iconicedu/ui-web/lib/utils';
+import { CalendarDays, X } from 'lucide-react';
 
 interface EventActionsProps {
   event: ClassScheduleVM;
@@ -11,53 +10,32 @@ interface EventActionsProps {
 }
 
 export function EventActions({ event, onClose }: EventActionsProps) {
-  const joinLink = event.meetingLink ?? null;
-  const chatLink =
+  const scheduleTabLink =
     event.source.kind === 'class_session' && event.source.channelId
-      ? `/s/${event.source.channelId}`
+      ? (() => {
+          if (typeof window === 'undefined') {
+            return `/s/${event.source.channelId}#sessions`;
+          }
+          const firstSegment = window.location.pathname.split('/').filter(Boolean)[0];
+          const orgBasePath = firstSegment ? `/${firstSegment}` : '';
+          return `${orgBasePath}/s/${event.source.channelId}#sessions`;
+        })()
       : null;
-  const themeClassName = event.themeKey ? `theme-${event.themeKey}` : '';
-  const joinStyle = event.themeKey
-    ? {
-        backgroundColor: 'color-mix(in oklab, var(--theme-bg) 16%, transparent)',
-        borderColor: 'color-mix(in oklab, var(--theme-bg) 32%, transparent)',
-        color: 'var(--theme-bg)',
-      }
-    : undefined;
 
   return (
     <div className="flex justify-between items-center">
       <div className="flex gap-2">
-        {joinLink ? (
-          <Button
-            size="sm"
-            variant="outline"
-            className={cn('border', themeClassName)}
-            style={joinStyle}
-            asChild
-          >
-            <a href={joinLink} target="_blank" rel="noreferrer">
-              <Video className="h-4 w-4 mr-2" />
-              Join
-            </a>
-          </Button>
-        ) : (
-          <Button size="sm" variant="outline" disabled>
-            <Video className="h-4 w-4 mr-2" />
-            Join
-          </Button>
-        )}
-        {chatLink ? (
+        {scheduleTabLink ? (
           <Button size="sm" variant="outline" asChild>
-            <a href={chatLink}>
-              <MessageSquare className="h-4 w-4 mr-2" />
-              Chat
+            <a href={scheduleTabLink}>
+              <CalendarDays className="h-4 w-4 mr-2" />
+              View full schedule
             </a>
           </Button>
         ) : (
           <Button size="sm" variant="outline" disabled>
-            <MessageSquare className="h-4 w-4 mr-2" />
-            Chat
+            <CalendarDays className="h-4 w-4 mr-2" />
+            View full schedule
           </Button>
         )}
       </div>
