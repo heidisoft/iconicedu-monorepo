@@ -118,6 +118,9 @@ export function NavUser({
   onPersonaAdd,
   isPersonaSwitchEnabled,
   isPersonaAddEnabled,
+  isViewingAsChild = false,
+  viewingAsProfileId = null,
+  childHasAuthAccount,
 }: {
   profile: UserProfileVM;
   account?: UserAccountVM | null;
@@ -221,10 +224,18 @@ export function NavUser({
   isPersonaSwitchEnabled?: boolean;
   isPersonaAddEnabled?: boolean;
   onOnboardingComplete?: () => void;
+  isViewingAsChild?: boolean;
+  viewingAsProfileId?: string | null;
+  childHasAuthAccount?: boolean;
 }) {
   const profileDisplayName = getProfileFullName(profile.profile);
-  const secondaryLabel =
-    account?.contacts.email ?? profile.prefs.locale ?? profile.prefs.timezone ?? '';
+  const localeLabel =
+    profile.prefs.locale === 'en-US' ? '' : (profile.prefs.locale ?? '');
+  const fallbackSecondaryLabel = localeLabel || '';
+  const secondaryLabel = isViewingAsChild
+    ? fallbackSecondaryLabel
+    : (account?.contacts.email ?? fallbackSecondaryLabel);
+  const viewingAsLabel = isViewingAsChild ? `Viewing as ${profileDisplayName}` : null;
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   const [settingsTab, setSettingsTab] = React.useState<UserSettingsTab>('account');
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
@@ -381,6 +392,8 @@ export function NavUser({
       label: string;
     } => persona.kind !== 'system',
   );
+  const accountTabDisabled =
+    isViewingAsChild && profile.kind === 'child' && childHasAuthAccount === false;
 
   return (
     <SidebarMenu>
@@ -402,6 +415,11 @@ export function NavUser({
               />
               <div className="grid min-w-0 flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
                 <span className="truncate font-medium">{profileDisplayName}</span>
+                {viewingAsLabel ? (
+                  <span className="truncate text-[11px] text-muted-foreground">
+                    {viewingAsLabel}
+                  </span>
+                ) : null}
                 {secondaryLabel ? (
                   <span className="truncate text-xs">{secondaryLabel}</span>
                 ) : null}
@@ -428,6 +446,11 @@ export function NavUser({
                 />
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">{profileDisplayName}</span>
+                  {viewingAsLabel ? (
+                    <span className="truncate text-[11px] text-muted-foreground">
+                      {viewingAsLabel}
+                    </span>
+                  ) : null}
                   {secondaryLabel ? (
                     <span className="truncate text-xs">{secondaryLabel}</span>
                   ) : null}
@@ -441,7 +464,7 @@ export function NavUser({
                 {currentStatusSummary || 'Set a status'}
               </DropdownMenuItem>
             </DropdownMenuGroup>
-            {isPersonaSwitchEnabled && personaChoices.length > 1 ? (
+            {isPersonaSwitchEnabled && !isViewingAsChild && personaChoices.length > 1 ? (
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
@@ -489,7 +512,7 @@ export function NavUser({
                 </DropdownMenuGroup>
               </>
             ) : null}
-            {isPersonaAddEnabled && personaAdds.length > 0 ? (
+            {isPersonaAddEnabled && !isViewingAsChild && personaAdds.length > 0 ? (
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
@@ -518,9 +541,12 @@ export function NavUser({
             ) : null}
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem onSelect={() => openSettings('account')}>
+              <DropdownMenuItem
+                disabled={accountTabDisabled}
+                onSelect={() => openSettings('account')}
+              >
                 <BadgeCheck />
-                Account
+                {accountTabDisabled ? 'Account (child login required)' : 'Account'}
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
@@ -593,6 +619,9 @@ export function NavUser({
           onStaffProfileSave={onStaffProfileSave}
           onboardingStep={onboardingStatus?.currentStep ?? null}
           onOnboardingComplete={onOnboardingComplete}
+          isViewingAsChild={isViewingAsChild}
+          viewingAsProfileId={viewingAsProfileId}
+          childHasAuthAccount={childHasAuthAccount}
         />
         <Dialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
           <DialogContent className="max-w-lg">

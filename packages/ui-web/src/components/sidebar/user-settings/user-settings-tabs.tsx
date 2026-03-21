@@ -54,6 +54,7 @@ import {
   dedupeChildMembersByEmail,
   filterInvitesWithExistingAccounts,
   formatChildName,
+  shouldDisableAccountTabInChildView,
 } from '@iconicedu/ui-web/components/sidebar/user-settings/user-settings-tabs.utils';
 
 export type UserSettingsTabsProps = {
@@ -143,6 +144,9 @@ export type UserSettingsTabsProps = {
   onStaffProfileSave?: (input: StaffProfileSaveInput) => Promise<void> | void;
   onboardingStep?: OnboardingStep | null;
   scrollToken?: number;
+  isViewingAsChild?: boolean;
+  viewingAsProfileId?: string | null;
+  childHasAuthAccount?: boolean;
 };
 
 const ONBOARDING_SECTION_CONFIG: Record<
@@ -188,6 +192,9 @@ export function UserSettingsTabs({
   onStaffProfileSave,
   onboardingStep,
   scrollToken = 0,
+  isViewingAsChild = false,
+  viewingAsProfileId: _viewingAsProfileId,
+  childHasAuthAccount,
 }: UserSettingsTabsProps) {
   const { isMobile } = useSidebar();
   const profileBlock = profile.profile;
@@ -378,6 +385,17 @@ export function UserSettingsTabs({
     }
     return true;
   });
+  const accountTabDisabled = shouldDisableAccountTabInChildView({
+    isViewingAsChild,
+    isChildProfile: profile.kind === 'child',
+    childHasAuthAccount,
+  });
+
+  React.useEffect(() => {
+    if (accountTabDisabled && value === 'account') {
+      onValueChange('profile');
+    }
+  }, [accountTabDisabled, onValueChange, value]);
 
   const handleLogoutClick = React.useCallback(() => {
     if (!onLogout) {
@@ -416,6 +434,7 @@ export function UserSettingsTabs({
                 <TabsTrigger
                   key={tab.value}
                   value={tab.value}
+                  disabled={tab.value === 'account' ? accountTabDisabled : false}
                   className={USER_SETTINGS_TAB_TRIGGER_CLASS}
                 >
                   <Icon className="size-4" />
@@ -424,6 +443,12 @@ export function UserSettingsTabs({
               );
             })}
           </TabsList>
+          {accountTabDisabled ? (
+            <p className="text-muted-foreground px-2 pt-2 text-xs">
+              Account settings are disabled because this child does not have their own
+              login account yet.
+            </p>
+          ) : null}
           {onboardingStep ? (
             <>
               <Separator className="my-2" />
@@ -507,20 +532,27 @@ export function UserSettingsTabs({
           ) : null}
 
           <TabsContent value="account" className="mt-0 space-y-8 w-full px-1">
-            <AccountTab
-              contacts={contacts}
-              email={email}
-              preferredChannelSelections={preferredChannelSelections}
-              togglePreferredChannel={togglePreferredChannel}
-              scrollToRequired={value === 'account' || isAccountPhoneOnboarding}
-              scrollToken={scrollToken}
-              accountId={account?.ids.id}
-              orgId={account?.ids.orgId}
-              onAccountUpdate={onAccountUpdate}
-              onboardingRequiredSection={accountSectionKey}
-              lockSections={Boolean(accountGuidance)}
-              isChildAccount={profile.kind === 'child'}
-            />
+            {accountTabDisabled ? (
+              <div className="rounded-xl border bg-muted/30 p-4 text-sm">
+                Account settings are unavailable while viewing as this child because they
+                do not have their own login account yet.
+              </div>
+            ) : (
+              <AccountTab
+                contacts={contacts}
+                email={email}
+                preferredChannelSelections={preferredChannelSelections}
+                togglePreferredChannel={togglePreferredChannel}
+                scrollToRequired={value === 'account' || isAccountPhoneOnboarding}
+                scrollToken={scrollToken}
+                accountId={account?.ids.id}
+                orgId={account?.ids.orgId}
+                onAccountUpdate={onAccountUpdate}
+                onboardingRequiredSection={accountSectionKey}
+                lockSections={Boolean(accountGuidance)}
+                isChildAccount={profile.kind === 'child'}
+              />
+            )}
           </TabsContent>
 
           <TabsContent value="preferences" className="mt-0 space-y-8 w-full px-1">

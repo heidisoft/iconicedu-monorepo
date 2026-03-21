@@ -1148,6 +1148,13 @@ export function SidebarLeft({
           onPersonaAdd={onPersonaAdd}
           isPersonaSwitchEnabled={isPersonaSwitchEnabled}
           isPersonaAddEnabled={isPersonaAddEnabled}
+          isViewingAsChild={Boolean(data.user.isViewingAsChild)}
+          viewingAsProfileId={data.user.viewingAsProfileId ?? null}
+          childHasAuthAccount={
+            data.user.profile.kind === 'child'
+              ? Boolean(data.user.profile.accountAuthUserId)
+              : undefined
+          }
           subjectOptions={subjectOptions}
         />
       </SidebarFooter>

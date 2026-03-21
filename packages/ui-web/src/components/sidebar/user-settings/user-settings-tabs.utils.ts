@@ -70,3 +70,15 @@ export function filterInvitesWithExistingAccounts<T extends FamilyMemberLite>(
     return !existingAccountEmails.has(inviteEmail);
   });
 }
+
+export function shouldDisableAccountTabInChildView(input: {
+  isViewingAsChild?: boolean;
+  isChildProfile: boolean;
+  childHasAuthAccount?: boolean;
+}): boolean {
+  if (!input.isViewingAsChild || !input.isChildProfile) {
+    return false;
+  }
+
+  return input.childHasAuthAccount === false;
+}

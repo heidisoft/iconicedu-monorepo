@@ -5,6 +5,7 @@ import {
   dedupeChildMembersByEmail,
   filterInvitesWithExistingAccounts,
   formatChildName,
+  shouldDisableAccountTabInChildView,
 } from './user-settings-tabs.utils';
 
 describe('dedupeChildMembersByEmail', () => {
@@ -46,5 +47,37 @@ describe('formatChildName', () => {
 
   it('falls back when first name is missing', () => {
     expect(formatChildName('', 'Johnson', 'Child Name')).toBe('Child Name');
+  });
+});
+
+describe('shouldDisableAccountTabInChildView', () => {
+  it('disables account tab for child view when child has no auth account', () => {
+    expect(
+      shouldDisableAccountTabInChildView({
+        isViewingAsChild: true,
+        isChildProfile: true,
+        childHasAuthAccount: false,
+      }),
+    ).toBe(true);
+  });
+
+  it('keeps account tab enabled for child view when child has an auth account', () => {
+    expect(
+      shouldDisableAccountTabInChildView({
+        isViewingAsChild: true,
+        isChildProfile: true,
+        childHasAuthAccount: true,
+      }),
+    ).toBe(false);
+  });
+
+  it('keeps account tab enabled outside child view', () => {
+    expect(
+      shouldDisableAccountTabInChildView({
+        isViewingAsChild: false,
+        isChildProfile: true,
+        childHasAuthAccount: false,
+      }),
+    ).toBe(false);
   });
 });

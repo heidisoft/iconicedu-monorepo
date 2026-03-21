@@ -201,4 +201,46 @@ describe('NavUser', () => {
       expect(screen.queryByText('Switching profile...')).not.toBeInTheDocument();
     });
   });
+
+  it('shows child view indicator and disables account menu when child has no auth account', () => {
+    const childProfile: UserProfileVM = {
+      kind: 'child',
+      ids: {
+        id: 'profile-child-1',
+        orgId: 'org-1',
+        accountId: 'account-child-1',
+      },
+      profile: {
+        displayName: 'Aiden One',
+        firstName: 'Aiden',
+        lastName: 'One',
+        avatar: { source: 'seed', seed: 'aiden' },
+      },
+      prefs: {
+        locale: 'en-US',
+        timezone: 'UTC',
+      },
+      meta: {},
+      ui: {
+        themeKey: 'teal',
+      },
+      accountAuthUserId: null,
+    } as UserProfileVM;
+
+    render(
+      <NavUser
+        profile={childProfile}
+        account={account}
+        isViewingAsChild
+        viewingAsProfileId="profile-child-1"
+        childHasAuthAccount={false}
+      />,
+    );
+
+    expect(screen.getAllByText('Viewing as Aiden One').length).toBeGreaterThan(0);
+    expect(screen.queryByText('educator@example.com')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Account (child login required)' }),
+    ).toBeDisabled();
+  });
 });

@@ -157,15 +157,15 @@ All six sub-tables (`educator_profile_subjects`, `educator_profile_grade_levels`
 
 #### `notification_preferences`
 
-| Operation | Who                |
-| --------- | ------------------ |
-| ALL       | Profile owner only |
+| Operation | Who                                                        |
+| --------- | ---------------------------------------------------------- |
+| ALL       | Profile owner OR linked guardian of child profile OR admin |
 
 #### `notification_preference_scopes` _(migration 029)_
 
-| Operation | Who                |
-| --------- | ------------------ |
-| ALL       | Profile owner only |
+| Operation | Who                                                        |
+| --------- | ---------------------------------------------------------- |
+| ALL       | Profile owner OR linked guardian of child profile OR admin |
 
 ---
 

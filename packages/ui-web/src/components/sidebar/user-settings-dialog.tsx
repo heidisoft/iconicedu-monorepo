@@ -137,6 +137,9 @@ type UserSettingsDialogProps = {
   onStaffProfileSave?: (input: StaffProfileSaveInput) => Promise<void> | void;
   onboardingStep?: OnboardingStep | null;
   onOnboardingComplete?: () => void;
+  isViewingAsChild?: boolean;
+  viewingAsProfileId?: string | null;
+  childHasAuthAccount?: boolean;
 };
 
 export function UserSettingsDialog({
@@ -169,6 +172,9 @@ export function UserSettingsDialog({
   onStaffProfileSave,
   onboardingStep,
   onOnboardingComplete,
+  isViewingAsChild = false,
+  viewingAsProfileId = null,
+  childHasAuthAccount,
 }: UserSettingsDialogProps) {
   const handleLocationContinue = React.useCallback(
     (input: {
@@ -277,6 +283,9 @@ export function UserSettingsDialog({
       onStaffProfileSave={onStaffProfileSave}
       onboardingStep={onboardingStep}
       scrollToken={scrollToken}
+      isViewingAsChild={isViewingAsChild}
+      viewingAsProfileId={viewingAsProfileId}
+      childHasAuthAccount={childHasAuthAccount}
     />
   );
   const { isMobile } = useSidebar();
