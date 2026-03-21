@@ -1,7 +1,7 @@
 import { parseISO } from 'date-fns';
 import { formatInTimeZone, fromZonedTime, toZonedTime } from 'date-fns-tz';
 
-import { DEFAULT_TIMEZONE } from './timezones';
+import { DEFAULT_TIMEZONE, getTimezoneDisplayLabel } from './timezones';
 
 export type DateTimeStylePreset =
   | 'natural'
@@ -15,8 +15,8 @@ export type TimeStylePreset = 'short' | 'withZone' | 'withSeconds';
 const DATE_TIME_PATTERNS: Record<DateTimeStylePreset, string> = {
   natural: "MMM d 'at' h:mm a",
   short: 'MMM d, yyyy h:mm a',
-  weekdayTimeWithZone: 'EEE h:mm a zzz',
-  weekdayAndTimeWithZone: 'EEEE, MMM d, yyyy h:mm a zzz',
+  weekdayTimeWithZone: 'EEE h:mm a',
+  weekdayAndTimeWithZone: 'EEEE, MMM d, yyyy h:mm a',
 };
 
 const DATE_PATTERNS: Record<DateStylePreset, string> = {
@@ -27,9 +27,16 @@ const DATE_PATTERNS: Record<DateStylePreset, string> = {
 
 const TIME_PATTERNS: Record<TimeStylePreset, string> = {
   short: 'h:mm a',
-  withZone: 'h:mm a zzz',
+  withZone: 'h:mm a',
   withSeconds: 'h:mm:ss a',
 };
+
+function appendTimezoneLabel(value: string, timezone: string, includeTimezone: boolean) {
+  if (!includeTimezone) {
+    return value;
+  }
+  return `${value} ${getTimezoneDisplayLabel(timezone)}`;
+}
 
 export function isValidTimezone(value?: string | null) {
   if (!value || !value.trim()) {
@@ -124,7 +131,11 @@ export function formatDateTime(
     return undefined;
   }
   const zone = resolveViewerTimezone(timezone);
-  return formatInTimeZone(utcDate, zone, DATE_TIME_PATTERNS[stylePreset]);
+  return appendTimezoneLabel(
+    formatInTimeZone(utcDate, zone, DATE_TIME_PATTERNS[stylePreset]),
+    zone,
+    stylePreset === 'weekdayTimeWithZone' || stylePreset === 'weekdayAndTimeWithZone',
+  );
 }
 
 export function formatDate(
@@ -150,7 +161,11 @@ export function formatTime(
     return undefined;
   }
   const zone = resolveViewerTimezone(timezone);
-  return formatInTimeZone(utcDate, zone, TIME_PATTERNS[stylePreset]);
+  return appendTimezoneLabel(
+    formatInTimeZone(utcDate, zone, TIME_PATTERNS[stylePreset]),
+    zone,
+    stylePreset === 'withZone',
+  );
 }
 
 export function formatDateInTimezone(isoUtc: string, timezone: string) {

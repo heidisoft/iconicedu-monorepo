@@ -6,7 +6,7 @@ import { Button } from '@iconicedu/ui-web/ui/button';
 import { Textarea } from '@iconicedu/ui-web/ui/textarea';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import {
-  formatScheduleDisplayValue,
+  formatScheduleDisplayTimeWithZone,
   resolveScheduleDisplayTimeZone,
 } from '@iconicedu/ui-web/lib/schedule-display-timezone';
 import type { ActivityFeedLeafItemVM } from '@iconicedu/shared-types';
@@ -92,13 +92,12 @@ function formatSubmittedAtTooltip(submittedAt: string | null) {
   }
 
   const userTimeZone = resolveScheduleDisplayTimeZone();
-  const formatted = formatScheduleDisplayValue(submittedDate, userTimeZone, {
+  const formatted = formatScheduleDisplayTimeWithZone(submittedDate, userTimeZone, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
-    timeZoneName: 'short',
   });
   if (!formatted) {
     return null;

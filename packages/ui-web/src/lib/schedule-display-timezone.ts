@@ -1,3 +1,5 @@
+import { getTimezoneDisplayLabel } from '@iconicedu/utils';
+
 export const DEFAULT_SCHEDULE_DISPLAY_TIMEZONE = 'UTC';
 
 export interface ScheduleDisplayTimeZoneOptions {
@@ -231,13 +233,8 @@ export function getScheduleDisplayTimeZoneAbbreviation(
     return null;
   }
 
-  const formatter = buildFormatter(timezone, {
-    timeZoneName: 'short',
-  });
-  const part = formatter
-    .formatToParts(date)
-    .find((entry) => entry.type === 'timeZoneName')?.value;
-  return part ?? null;
+  const resolvedTimezone = resolveScheduleDisplayTimeZone(timezone);
+  return getTimezoneDisplayLabel(resolvedTimezone);
 }
 
 export function formatScheduleDisplayTimeWithZone(
@@ -250,10 +247,10 @@ export function formatScheduleDisplayTimeWithZone(
     return null;
   }
 
-  const abbreviation = getScheduleDisplayTimeZoneAbbreviation(input, timezone);
-  if (!abbreviation) {
+  const timezoneLabel = getScheduleDisplayTimeZoneAbbreviation(input, timezone);
+  if (!timezoneLabel) {
     return formatted;
   }
 
-  return `${formatted} ${abbreviation}`;
+  return `${formatted} ${timezoneLabel}`;
 }

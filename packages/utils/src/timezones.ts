@@ -1,4 +1,8 @@
-import { getAllTimezones } from 'countries-and-timezones';
+import {
+  getAllTimezones,
+  getCountryForTimezone,
+  getTimezonesForCountry,
+} from 'countries-and-timezones';
 
 export type TimezoneOption = {
   name: string;
@@ -60,4 +64,35 @@ export function getBrowserTimezone() {
     return null;
   }
   return Intl.DateTimeFormat().resolvedOptions().timeZone ?? null;
+}
+
+function toWords(value: string) {
+  return value.replace(/[_-]+/g, ' ').trim();
+}
+
+export function getTimezoneDisplayLabel(timezone?: string | null) {
+  const value = timezone?.trim();
+  if (!value) {
+    return `${DEFAULT_TIMEZONE} time`;
+  }
+
+  const segments = value.split('/');
+  const cityOrRegion = segments.at(-1) ?? value;
+  const normalized = toWords(cityOrRegion);
+  if (!normalized) {
+    return `${DEFAULT_TIMEZONE} time`;
+  }
+
+  const country = getCountryForTimezone(value);
+  const countryName = country?.name?.trim();
+  if (!countryName) {
+    return `${normalized} time`;
+  }
+
+  const countryTimezones = getTimezonesForCountry(country.id) ?? [];
+  if (countryTimezones.length === 1) {
+    return `${countryName} time`;
+  }
+
+  return `${normalized} time`;
 }

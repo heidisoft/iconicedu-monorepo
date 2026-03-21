@@ -37,6 +37,7 @@ export {
 export {
   type TimezoneOption,
   DEFAULT_TIMEZONE,
+  getTimezoneDisplayLabel,
   getTimezoneOptions,
   getBrowserTimezone,
   normalizeTimezone,

@@ -4,10 +4,11 @@ import {
   buildOccurrenceKey,
   formatDateTime,
   formatTime,
+  getTimezoneDisplayLabel,
   isOvernight,
   resolveViewerTimezone,
   toUtcFromLocal,
-} from './time';
+} from './index';
 
 describe('time utilities', () => {
   it('resolves timezone precedence profile -> browser -> UTC', () => {
@@ -33,6 +34,18 @@ describe('time utilities', () => {
     const value = '2026-03-09T13:00:00.000Z';
     expect(formatDateTime(value, 'America/New_York', 'natural')).toBe('Mar 9 at 9:00 AM');
     expect(formatTime(value, 'America/New_York', 'short')).toBe('9:00 AM');
+    expect(formatDateTime(value, 'America/New_York', 'weekdayTimeWithZone')).toBe(
+      'Mon 9:00 AM New York time',
+    );
+    expect(formatTime(value, 'America/New_York', 'withZone')).toBe(
+      '9:00 AM New York time',
+    );
+  });
+
+  it('builds human-readable timezone labels', () => {
+    expect(getTimezoneDisplayLabel('America/New_York')).toBe('New York time');
+    expect(getTimezoneDisplayLabel('Asia/Colombo')).toBe('Sri Lanka time');
+    expect(getTimezoneDisplayLabel('UTC')).toBe('UTC time');
   });
 
   it('detects overnight ranges', () => {

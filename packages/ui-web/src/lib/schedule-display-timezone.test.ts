@@ -15,7 +15,7 @@ describe('schedule-display-timezone', () => {
     ).toBe('Asia/Colombo');
   });
 
-  it('formats using the viewer timezone abbreviation for the occurrence date', () => {
+  it('formats using the viewer timezone label for the occurrence date', () => {
     expect(
       formatScheduleDisplayTimeWithZone(
         '2026-03-08T20:00:00.000Z',
@@ -29,6 +29,6 @@ describe('schedule-display-timezone', () => {
           hour12: true,
         },
       ),
-    ).toBe('1:30 AM GMT+5:30');
+    ).toBe('1:30 AM Sri Lanka time');
   });
 });

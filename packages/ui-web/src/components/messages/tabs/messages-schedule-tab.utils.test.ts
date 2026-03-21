@@ -96,7 +96,7 @@ describe('messages-schedule-tab.utils', () => {
       'America/New_York',
     );
 
-    expect(groups[0]?.sessions[0]?.time).toBe('Fri 11:00am EDT');
+    expect(groups[0]?.sessions[0]?.time).toBe('Fri 11:00am New York time');
     expect(groups[0]?.sessions[0]?.dayNum).toBe('13');
   });
 
@@ -120,7 +120,7 @@ describe('messages-schedule-tab.utils', () => {
       'Asia/Colombo',
     );
 
-    expect(groups[0]?.sessions[0]?.time).toBe('Sat 1:30am GMT+5:30');
+    expect(groups[0]?.sessions[0]?.time).toBe('Sat 1:30am Sri Lanka time');
   });
 
   it('groups a session into the viewer-local month when it crosses a UTC month boundary', () => {
@@ -135,7 +135,7 @@ describe('messages-schedule-tab.utils', () => {
     expect(groups[0]?.monthKey).toBe('2026-02');
     expect(groups[0]?.month).toBe('February');
     expect(groups[0]?.sessions[0]?.dayNum).toBe('28');
-    expect(groups[0]?.sessions[0]?.time).toContain('Sat 4:30pm PST');
+    expect(groups[0]?.sessions[0]?.time).toContain('Sat 4:30pm Los Angeles time');
   });
 
   it('marks today using the viewer timezone when UTC falls on a different local day', () => {
@@ -400,7 +400,9 @@ describe('messages-schedule-tab.utils', () => {
       new Date('2026-03-01T00:00:00.000Z'),
     );
 
-    expect(mapped[0]?.sessions[0]?.time).toMatch(/^Tue \d{1,2}:\d{2}(am|pm) [A-Z]{2,4}$/);
+    expect(mapped[0]?.sessions[0]?.time).toMatch(
+      /^Tue \d{1,2}:\d{2}(am|pm) [A-Za-z,' -]+ time$/,
+    );
   });
 
   it('marks sessions live only while current time is within session window', () => {

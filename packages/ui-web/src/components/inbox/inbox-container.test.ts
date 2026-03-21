@@ -630,14 +630,14 @@ describe('InboxContainer rendering behavior', () => {
     expect(scheduled.content.summary).not.toContain('2026-03-04T12:40:00.000Z');
     expect(rescheduled.content.headline.primary).toBe('Class session rescheduled');
     expect(rescheduled.content.summary).toBe(
-      'Session: Math Foundations weekly session (Wed, Mar 4) moved from 4:40 AM to 5:10 AM PST',
+      'Session: Math Foundations weekly session (Wed, Mar 4) moved from 4:40 AM to 5:10 AM Los Angeles time',
     );
     expect(crossDayRescheduled.content.summary).toBe(
-      'Session: Math Foundations weekly session moved from Wed, Mar 4, 4:40 AM PST to Wed, Mar 11, 5:40 AM PDT',
+      'Session: Math Foundations weekly session moved from Wed, Mar 4, 4:40 AM Los Angeles time to Wed, Mar 11, 5:40 AM Los Angeles time',
     );
     expect(canceled.content.headline.primary).toBe('Class session cancelled');
     expect(canceled.content.summary).toBe(
-      'Session: Math Foundations weekly session (Wed, Mar 4 4:40 AM PST) canceled due to Holiday',
+      'Session: Math Foundations weekly session (Wed, Mar 4 4:40 AM Los Angeles time) canceled due to Holiday',
     );
   });
 });

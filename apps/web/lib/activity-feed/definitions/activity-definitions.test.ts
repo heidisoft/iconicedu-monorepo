@@ -1123,7 +1123,7 @@ describe('activity event definitions', () => {
     });
 
     expect(rendered.summary).toBe(
-      'First session: Sat 2:00 PM PST, then weekly 2:00 PM PST',
+      'First session: Sat 2:00 PM Los Angeles time, then weekly 2:00 PM Los Angeles time',
     );
     expect(rendered.leading).toEqual({
       kind: 'icon',
@@ -1209,7 +1209,7 @@ describe('activity event definitions', () => {
     expect(rescheduledRendered.headline.primary).toBe('Class session rescheduled');
     expect(rescheduledRendered.headline.secondary).toBe('Math Foundations');
     expect(rescheduledRendered.summary).toBe(
-      'Session: Math Foundations weekly session moved from Sun, Mar 8, 3:00 PM PT to Sun, Mar 15, 2:30 PM PT',
+      'Session: Math Foundations weekly session moved from Sun, Mar 8, 3:00 PM Los Angeles time to Sun, Mar 15, 2:30 PM Los Angeles time',
     );
     expect(rescheduledRendered.leading).toEqual({
       kind: 'icon',
@@ -1247,7 +1247,7 @@ describe('activity event definitions', () => {
     expect(canceledRendered.headline.primary).toBe('Class session cancelled');
     expect(canceledRendered.headline.secondary).toBe('Math Foundations');
     expect(canceledRendered.summary).toBe(
-      'Session: Math Foundations weekly session (Sun, Mar 15 2:30 PM PT) canceled due to Holiday',
+      'Session: Math Foundations weekly session (Sun, Mar 15 2:30 PM Los Angeles time) canceled due to Holiday',
     );
     expect(canceledRendered.leading).toEqual({
       kind: 'icon',
@@ -1630,7 +1630,7 @@ describe('activity event definitions', () => {
       scheduleId: 'schedule-1',
       title: 'ELA with Mr Daniel',
       occurrenceStart: '2026-03-19T16:57:00.000Z',
-      occurrenceLabel: 'Mar 19 at 12:57 PM EDT',
+      occurrenceLabel: 'Mar 19 at 12:57 PM New York time',
       isScheduledSessionWindow: true,
       mode: 'video',
     };

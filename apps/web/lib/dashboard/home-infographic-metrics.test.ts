@@ -396,7 +396,7 @@ describe('buildDashboardHomeInfographicMetrics', () => {
     });
 
     expect(result.upcomingSessionsPage.thisWeek.items[0]?.session.time).toContain(
-      'Fri 11:00am EDT',
+      'Fri 11:00am New York time',
     );
     expect(result.upcomingSessionsPage.thisWeek.items[0]?.session.time).not.toContain(
       '3:00pm UTC',
@@ -448,10 +448,10 @@ describe('buildDashboardHomeInfographicMetrics', () => {
     });
 
     expect(result.upcomingSessionsPage.thisWeek.items[0]?.session.time).toContain(
-      'Sat 1:30am GMT+5:30',
+      'Sat 1:30am Sri Lanka time',
     );
     expect(result.upcomingSessionsPage.thisWeek.items[0]?.session.time).not.toContain(
-      '4:00pm EDT',
+      '4:00pm New York time',
     );
   });
 
@@ -515,7 +515,7 @@ describe('buildDashboardHomeInfographicMetrics', () => {
     expect(result.upcomingSessionsPage.thisWeek.items[0]?.weekBucket).toBe('this-week');
     expect(result.upcomingSessionsPage.nextWeek.items).toHaveLength(0);
     expect(result.upcomingSessionsPage.thisWeek.items[0]?.session.time).toContain(
-      'Sun 5:30pm PDT',
+      'Sun 5:30pm Los Angeles time',
     );
   });
 });

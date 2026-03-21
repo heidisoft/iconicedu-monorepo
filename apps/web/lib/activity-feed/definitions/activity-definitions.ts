@@ -13,6 +13,7 @@ import {
   formatDate,
   formatDateTime,
   formatTime,
+  getTimezoneDisplayLabel,
   resolveViewerTimezone,
 } from '@iconicedu/utils';
 import type { ActivityEventRow } from '@iconicedu/shared-types';
@@ -465,12 +466,16 @@ function formatScheduleDayLabel(value: string, timezone: unknown) {
 }
 
 function formatScheduleTimeLabel(value: string, timezone: unknown, includeZone = false) {
-  return formatScheduleChangePart(value, timezone, {
+  const formatted = formatScheduleChangePart(value, timezone, {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
-    ...(includeZone ? { timeZoneName: 'shortGeneric' } : {}),
   });
+  if (!formatted || !includeZone) {
+    return formatted;
+  }
+
+  return `${formatted} ${getTimezoneDisplayLabel(resolveDisplayTimezone(timezone))}`;
 }
 
 function formatScheduleDateTimeLabel(
