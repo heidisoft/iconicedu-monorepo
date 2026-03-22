@@ -131,6 +131,33 @@ async function getSupabaseApiKeys(projectRef) {
   );
 }
 
+async function applyPreviewDatabaseBootstrap(projectRef) {
+  const result = await runCommand(
+    'supabase',
+    [
+      '--project-ref',
+      projectRef,
+      'db',
+      'push',
+      '--linked',
+      '--include-all',
+      '--include-seed',
+    ],
+    { cwd: SUPABASE_CLI_WORKDIR, tolerateFailure: true },
+  );
+
+  if (!result.ok) {
+    throw new Error(
+      `Failed to apply migrations and seed.sql to preview branch ${projectRef}\n${result.stderr || result.stdout || 'Unknown error'}`,
+    );
+  }
+
+  return {
+    applied: true,
+    output: result.stdout || 'Applied migrations and seed.sql with supabase db push.',
+  };
+}
+
 function normalizeApiKeys(payload) {
   const items = Array.isArray(payload)
     ? payload
@@ -514,6 +541,7 @@ async function main() {
     const initialBranch = await ensureSupabaseBranch(previewBranchName, rootProjectRef);
     const healthyBranch = await waitForHealthyBranch(previewBranchName, rootProjectRef);
     const branchProjectRef = findProjectRef(healthyBranch ?? initialBranch);
+    const databaseBootstrap = await applyPreviewDatabaseBootstrap(branchProjectRef);
     const apiUrl = `https://${branchProjectRef}.supabase.co`;
     const dashboardUrl = dashboardUrlForProjectRef(branchProjectRef);
     const apiKeys = normalizeApiKeys(await getSupabaseApiKeys(branchProjectRef));
@@ -574,6 +602,7 @@ async function main() {
       supabase: {
         projectRef: branchProjectRef,
         rootProjectRef,
+        databaseBootstrap,
         apiUrl,
         dashboardUrl,
         anonKey: apiKeys.anonKey,
