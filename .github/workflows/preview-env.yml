@@ -171,7 +171,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          ENV_NAME="pr-${PR_NUMBER}"
+          ENV_NAME="${BRANCH_NAME//\//-}"
           SERVICE_ID="${{ secrets.RAILWAY_SERVICE_ID }}"
           GQL="https://backboard.railway.app/graphql/v2"
           AUTH="-H \"Authorization: Bearer $RAILWAY_TOKEN\""
@@ -267,6 +267,7 @@ jobs:
       # 6. Set Vercel branch env vars
       - name: Configure Vercel preview env vars
         id: vercel
+        continue-on-error: true
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -323,7 +324,7 @@ jobs:
           if [[ -n "$LATEST_DEPLOYMENT" ]]; then
             echo "vercel_url=https://${LATEST_DEPLOYMENT}" >> "$GITHUB_OUTPUT"
           else
-            echo "vercel_url=https://vercel.com/dashboard (deployment in progress)" >> "$GITHUB_OUTPUT"
+            echo "vercel_url=https://vercel.com/dashboard" >> "$GITHUB_OUTPUT"
           fi
 
       # 7. Post PR comment

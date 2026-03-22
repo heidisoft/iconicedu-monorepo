@@ -47,13 +47,24 @@ jobs:
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
         run: |
-          ENV_NAME="pr-${PR_NUMBER}"
-          npm install -g @railway/cli --silent
+          ENV_NAME="${BRANCH_NAME//\//-}"
+          GQL="https://backboard.railway.app/graphql/v2"
 
-          railway environment delete "$ENV_NAME" \
-            --project "${{ secrets.RAILWAY_PROJECT_ID }}" \
-            --yes 2>/dev/null && echo "Deleted Railway environment: $ENV_NAME" \
-            || echo "No Railway environment found for $ENV_NAME — skipping"
+          ENV_ID=$(curl -sf \
+            -H "Authorization: Bearer $RAILWAY_TOKEN" \
+            -H "Content-Type: application/json" "$GQL" \
+            -d "{\"query\":\"query { project(id: \\\"${{ secrets.RAILWAY_PROJECT_ID }}\\\") { environments { edges { node { id name } } } } }\"}" \
+            | jq -r ".data.project.environments.edges[]? | select(.node.name==\"$ENV_NAME\") | .node.id // empty")
+
+          if [[ -n "$ENV_ID" ]]; then
+            curl -sf \
+              -H "Authorization: Bearer $RAILWAY_TOKEN" \
+              -H "Content-Type: application/json" "$GQL" \
+              -d "{\"query\":\"mutation { environmentDelete(id: \\\"$ENV_ID\\\") }\"}"
+            echo "Deleted Railway environment: $ENV_NAME ($ENV_ID)"
+          else
+            echo "No Railway environment found for $ENV_NAME — skipping"
+          fi
 
       # ── 3. Remove Vercel branch-scoped env vars ────────────────────────────
       - name: Remove Vercel branch env vars
