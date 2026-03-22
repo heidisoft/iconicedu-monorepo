@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import {
+  ArrowRightLeft,
   Bell,
   Building2,
   Calendar,
@@ -769,7 +770,10 @@ export function SidebarLeft({
                         aria-label="Switch classroom profile"
                         disabled={isSwitchingClassroomPersona}
                       >
-                        <span className="text-muted-foreground">View as</span>
+                        <span className="text-muted-foreground inline-flex items-center gap-1.5">
+                          <ArrowRightLeft className="size-3.5 shrink-0" />
+                          <span>View as</span>
+                        </span>
                         <span className="ml-2 truncate">{activeFamilyPersonaLabel}</span>
                         <ChevronDown className="text-muted-foreground ml-auto size-3.5 shrink-0" />
                       </Button>
@@ -805,7 +809,7 @@ export function SidebarLeft({
                         return (
                           <DropdownMenuItem
                             key={option.profileId}
-                            className="px-1 py-1"
+                            className="px-1 py-1 data-[highlighted]:bg-transparent data-[highlighted]:text-inherit"
                             disabled={option.isActive || isSwitchingClassroomPersona}
                             onSelect={async () => {
                               if (option.isActive) {
@@ -872,13 +876,17 @@ export function SidebarLeft({
                                   className={`flex size-5 shrink-0 items-center justify-center rounded-full border ${
                                     option.isActive
                                       ? 'border-primary'
-                                      : 'border-muted-foreground/40'
+                                      : 'border-muted-foreground/40 group-data-[highlighted]/dropdown-menu-item:border-primary'
                                   }`}
                                   aria-hidden
                                 >
-                                  {option.isActive ? (
-                                    <span className="bg-primary size-2.5 rounded-full" />
-                                  ) : null}
+                                  <span
+                                    className={`bg-primary size-2.5 rounded-full ${
+                                      option.isActive
+                                        ? 'opacity-100'
+                                        : 'opacity-0 group-data-[highlighted]/dropdown-menu-item:opacity-100'
+                                    }`}
+                                  />
                                 </span>
                               </span>
                             )}

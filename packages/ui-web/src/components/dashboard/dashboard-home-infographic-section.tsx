@@ -48,6 +48,7 @@ export interface DashboardHomeInfographicSectionProps {
   orgSlug: string;
   isStaffView?: boolean;
   isParentView?: boolean;
+  isStudentView?: boolean;
   isTutorView?: boolean;
   topMetrics: {
     upcomingSessionsThisWeek: number;
@@ -73,6 +74,7 @@ export function DashboardHomeInfographicSection({
   orgSlug,
   isStaffView = false,
   isParentView = false,
+  isStudentView = false,
   isTutorView = false,
   topMetrics,
   upcomingSessionsPage,
@@ -155,6 +157,7 @@ export function DashboardHomeInfographicSection({
   const infographicContentClassName = 'relative z-10';
   const infographicPatternClassName =
     'text-primary/20 [mask-image:radial-gradient(250px_circle_at_center,black,transparent_78%)]';
+  const shouldShowBoostLearningSection = isParentView || isStudentView;
 
   return (
     <section aria-label="Dashboard classroom sessions" className="space-y-4">
@@ -366,53 +369,55 @@ export function DashboardHomeInfographicSection({
             </a>
           </div>
 
-          <div className="mt-5 rounded-2xl border border-primary/30 bg-primary/10 p-5">
-            <div className="flex items-center gap-3">
-              <div className="rounded-full bg-primary/20 p-2.5 text-primary">
-                <Sparkle className="size-5" aria-hidden="true" />
+          {shouldShowBoostLearningSection ? (
+            <div className="mt-5 rounded-2xl border border-primary/30 bg-primary/10 p-5">
+              <div className="flex items-center gap-3">
+                <div className="rounded-full bg-primary/20 p-2.5 text-primary">
+                  <Sparkle className="size-5" aria-hidden="true" />
+                </div>
+                <div>
+                  <p className="font-semibold">Boost Your Learning!</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Add more subjects or increase session frequency for better results.
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="font-semibold">Boost Your Learning!</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Add more subjects or increase session frequency for better results.
-                </p>
-              </div>
-            </div>
 
-            <ClassRequestAction
-              orgSlug={orgSlug}
-              fallbackHref={browseHref}
-              canRequestClasses={canRequestClasses}
-              requestRole={requestRole}
-              requestableStudents={requestableStudents}
-              subjectOptions={subjectOptions}
-              onClassRequestCreated={onClassRequestCreated}
-              renderTrigger={({
-                canRequestClasses: canRequest,
-                fallbackHref,
-                openDialog,
-              }) =>
-                canRequest ? (
-                  <button
-                    type="button"
-                    onClick={openDialog}
-                    className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
-                  >
-                    <Sparkle className="mr-2 size-4" aria-hidden="true" />
-                    Explore More Classes
-                  </button>
-                ) : (
-                  <a
-                    href={fallbackHref}
-                    className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
-                  >
-                    <Sparkle className="mr-2 size-4" aria-hidden="true" />
-                    Explore More Classes
-                  </a>
-                )
-              }
-            />
-          </div>
+              <ClassRequestAction
+                orgSlug={orgSlug}
+                fallbackHref={browseHref}
+                canRequestClasses={canRequestClasses}
+                requestRole={requestRole}
+                requestableStudents={requestableStudents}
+                subjectOptions={subjectOptions}
+                onClassRequestCreated={onClassRequestCreated}
+                renderTrigger={({
+                  canRequestClasses: canRequest,
+                  fallbackHref,
+                  openDialog,
+                }) =>
+                  canRequest ? (
+                    <button
+                      type="button"
+                      onClick={openDialog}
+                      className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+                    >
+                      <Sparkle className="mr-2 size-4" aria-hidden="true" />
+                      Explore More Classes
+                    </button>
+                  ) : (
+                    <a
+                      href={fallbackHref}
+                      className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+                    >
+                      <Sparkle className="mr-2 size-4" aria-hidden="true" />
+                      Explore More Classes
+                    </a>
+                  )
+                }
+              />
+            </div>
+          ) : null}
         </aside>
       </div>
       <ExternalLiveSessionJoinDialog
