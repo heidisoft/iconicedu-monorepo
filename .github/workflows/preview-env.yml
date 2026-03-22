@@ -235,32 +235,33 @@ jobs:
           DEPLOY_RESP=$(api "{\"query\":\"mutation { serviceInstanceDeploy(serviceId: \\\"$SERVICE_ID\\\", environmentId: \\\"$ENV_ID\\\") }\"}")
           echo "Deploy response: $(echo "$DEPLOY_RESP" | jq '.errors // .data')"
 
-          # ── 4. Poll for deployment URL and health ────────────────────────────
+          # ── 4. Poll for deployment health (3 attempts) ──────────────────────
+          # Note: latestDeployment.url is masked by GitHub Actions (contains Railway IDs).
+          # We use serviceDomains instead — the stable service URL doesn't contain UUIDs.
           echo "Waiting for Railway API to become healthy..."
           RAILWAY_API_URL=""
-          for i in $(seq 1 18); do
-            DEPLOY_INFO=$(api "{\"query\":\"query { serviceInstance(serviceId: \\\"$SERVICE_ID\\\", environmentId: \\\"$ENV_ID\\\") { latestDeployment { status url } } }\"}")
-            [[ $i -eq 1 ]] && echo "Poll response sample: $(echo "$DEPLOY_INFO" | jq '.errors // .data')"
+          for i in $(seq 1 3); do
+            DEPLOY_INFO=$(api "{\"query\":\"query { serviceInstance(serviceId: \\\"$SERVICE_ID\\\", environmentId: \\\"$ENV_ID\\\") { latestDeployment { status } domains { serviceDomains { domain } } } }\"}")
             DEPLOY_STATUS=$(echo "$DEPLOY_INFO" | jq -r '.data.serviceInstance.latestDeployment.status // empty')
-            DEPLOY_URL=$(echo "$DEPLOY_INFO" | jq -r '.data.serviceInstance.latestDeployment.url // empty')
-            echo "  Status: ${DEPLOY_STATUS:-(pending)} (attempt $i)"
+            DEPLOY_DOMAIN=$(echo "$DEPLOY_INFO" | jq -r '.data.serviceInstance.domains.serviceDomains[0].domain // empty')
+            echo "  Status: ${DEPLOY_STATUS:-(pending)}, Domain: ${DEPLOY_DOMAIN:-(none)} (attempt $i)"
 
-            if [[ -n "$DEPLOY_URL" ]]; then
-              RAILWAY_API_URL="$DEPLOY_URL"
+            if [[ -n "$DEPLOY_DOMAIN" ]]; then
+              RAILWAY_API_URL="$DEPLOY_DOMAIN"
               HEALTH_STATUS=$(curl -sf -o /dev/null -w "%{http_code}" \
-                "https://${DEPLOY_URL}/healthz" 2>/dev/null || echo "000")
+                "https://${DEPLOY_DOMAIN}/healthz" 2>/dev/null || echo "000")
               echo "  Health: $HEALTH_STATUS"
               if [[ "$HEALTH_STATUS" == "200" ]]; then
-                echo "railway_api_url=https://${DEPLOY_URL}" >> "$GITHUB_OUTPUT"
+                echo "railway_api_url=https://${DEPLOY_DOMAIN}" >> "$GITHUB_OUTPUT"
                 break
               fi
             fi
 
-            if [[ $i -eq 18 ]]; then
-              echo "::warning::Railway deployment health check timed out"
+            if [[ $i -eq 3 ]]; then
+              echo "::warning::Railway health check timed out — deployment may still be starting"
               echo "railway_api_url=https://${RAILWAY_API_URL:-pending}" >> "$GITHUB_OUTPUT"
             fi
-            sleep 10
+            sleep 20
           done
 
       # 6. Set Vercel branch env vars
@@ -273,27 +274,32 @@ jobs:
           set -euo pipefail
           PROJECT_ID="${{ secrets.VERCEL_PROJECT_ID }}"
           BRANCH="${{ env.BRANCH_NAME }}"
-          # Team scope — required for team/org projects; harmless for personal accounts
-          TEAM="teamId=${VERCEL_ORG_ID}"
+          # teamId only needed for team/org accounts (team_ prefix); personal accounts use user_ prefix
+          TEAM_AMP=""
+          TEAM_Q=""
+          if [[ "${VERCEL_ORG_ID:-}" == team_* ]]; then
+            TEAM_AMP="&teamId=${VERCEL_ORG_ID}"
+            TEAM_Q="?teamId=${VERCEL_ORG_ID}"
+          fi
 
           set_vercel_env() {
             local KEY="$1" VALUE="$2"
             # Delete existing branch-scoped var if present
             EXISTING_ID=$(curl -sf \
               -H "Authorization: Bearer $VERCEL_TOKEN" \
-              "https://api.vercel.com/v10/projects/${PROJECT_ID}/env?gitBranch=${BRANCH}&${TEAM}" \
+              "https://api.vercel.com/v10/projects/${PROJECT_ID}/env?gitBranch=${BRANCH}${TEAM_AMP}" \
               | jq -r --arg k "$KEY" '.envs[] | select(.key==$k) | .id' 2>/dev/null || echo "")
 
             if [[ -n "$EXISTING_ID" ]]; then
               curl -sf -X DELETE \
                 -H "Authorization: Bearer $VERCEL_TOKEN" \
-                "https://api.vercel.com/v10/projects/${PROJECT_ID}/env/${EXISTING_ID}?${TEAM}" > /dev/null
+                "https://api.vercel.com/v10/projects/${PROJECT_ID}/env/${EXISTING_ID}${TEAM_Q}" > /dev/null
             fi
 
             POST_RESP=$(curl -s -w "\n%{http_code}" -X POST \
               -H "Authorization: Bearer $VERCEL_TOKEN" \
               -H "Content-Type: application/json" \
-              "https://api.vercel.com/v10/projects/${PROJECT_ID}/env?${TEAM}" \
+              "https://api.vercel.com/v10/projects/${PROJECT_ID}/env${TEAM_Q}" \
               -d "$(jq -n --arg k "$KEY" --arg v "$VALUE" --arg b "$BRANCH" \
                 '{"key":$k,"value":$v,"target":["preview"],"gitBranch":$b,"type":"encrypted"}')")
             POST_STATUS=$(echo "$POST_RESP" | tail -1)
@@ -311,7 +317,7 @@ jobs:
           # Fetch latest preview deployment URL for this branch
           LATEST_DEPLOYMENT=$(curl -sf \
             -H "Authorization: Bearer $VERCEL_TOKEN" \
-            "https://api.vercel.com/v6/deployments?projectId=${PROJECT_ID}&target=preview&limit=1&meta-githubCommitRef=${BRANCH}&${TEAM}" \
+            "https://api.vercel.com/v6/deployments?projectId=${PROJECT_ID}&target=preview&limit=1&meta-githubCommitRef=${BRANCH}${TEAM_AMP}" \
             | jq -r '.deployments[0].url // ""')
 
           if [[ -n "$LATEST_DEPLOYMENT" ]]; then
