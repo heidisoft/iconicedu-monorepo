@@ -275,8 +275,6 @@ jobs:
         run: |
           set -euo pipefail
           BRANCH="${{ env.BRANCH_NAME }}"
-          LINKED_PROJECT_ID=$(jq -r '.projectId // empty' apps/web/.vercel/project.json)
-          LINKED_ORG_ID=$(jq -r '.orgId // empty' apps/web/.vercel/project.json)
           PROJECT_ID="${VERCEL_PROJECT_ID:-}"
           ORG_ID="${VERCEL_ORG_ID:-}"
           TEAM_AMP=""
@@ -288,23 +286,11 @@ jobs:
           }
 
           if [[ -z "$PROJECT_ID" ]]; then
-            fail_vercel_config "Missing VERCEL_PROJECT_ID. Expected linked project id: ${LINKED_PROJECT_ID}."
-          fi
-
-          if [[ -z "$LINKED_PROJECT_ID" || -z "$LINKED_ORG_ID" ]]; then
-            fail_vercel_config "Missing linked Vercel metadata in apps/web/.vercel/project.json."
-          fi
-
-          if [[ "$PROJECT_ID" != "$LINKED_PROJECT_ID" ]]; then
-            fail_vercel_config "VERCEL_PROJECT_ID does not match apps/web/.vercel/project.json. Expected ${LINKED_PROJECT_ID}."
+            fail_vercel_config "Missing VERCEL_PROJECT_ID."
           fi
 
           if [[ -z "$ORG_ID" ]]; then
-            fail_vercel_config "Missing VERCEL_ORG_ID. Expected linked org id: ${LINKED_ORG_ID}."
-          fi
-
-          if [[ "$ORG_ID" != "$LINKED_ORG_ID" ]]; then
-            fail_vercel_config "VERCEL_ORG_ID does not match apps/web/.vercel/project.json. Expected ${LINKED_ORG_ID}."
+            fail_vercel_config "Missing VERCEL_ORG_ID."
           fi
 
           case "$ORG_ID" in
@@ -315,7 +301,7 @@ jobs:
             user_*)
               ;;
             *)
-              fail_vercel_config "VERCEL_ORG_ID must start with team_ or user_. Linked org id is ${LINKED_ORG_ID}."
+              fail_vercel_config "VERCEL_ORG_ID must start with team_ or user_."
               ;;
           esac
 
@@ -324,7 +310,7 @@ jobs:
             "https://api.vercel.com/v9/projects/${PROJECT_ID}${TEAM_Q}")
           PROJECT_STATUS=$(echo "$PROJECT_RESP" | tail -1)
           if [[ "$PROJECT_STATUS" != "200" ]]; then
-            fail_vercel_config "Vercel project preflight failed (HTTP ${PROJECT_STATUS}). Verify VERCEL_TOKEN access and that project ${LINKED_PROJECT_ID} is accessible under org ${LINKED_ORG_ID}."
+            fail_vercel_config "Vercel project preflight failed (HTTP ${PROJECT_STATUS}). Verify VERCEL_TOKEN access and that project ${PROJECT_ID} is accessible under org ${ORG_ID}."
           fi
 
           set_vercel_env() {
@@ -348,8 +334,8 @@ jobs:
               -d "$(jq -n --arg k "$KEY" --arg v "$VALUE" --arg b "$BRANCH" \
                 '{"key":$k,"value":$v,"target":["preview"],"gitBranch":$b,"type":"encrypted"}')")
             POST_STATUS=$(echo "$POST_RESP" | tail -1)
-            if [[ "$POST_STATUS" != "200" ]]; then
-              echo "::error::Vercel env set failed for $KEY (HTTP $POST_STATUS): $(echo "$POST_RESP" | head -1)"
+            if [[ ! "$POST_STATUS" =~ ^2[0-9][0-9]$ ]]; then
+              echo "::error::Vercel env write failed for $KEY after successful project preflight (HTTP $POST_STATUS): $(echo "$POST_RESP" | head -1)"
               exit 1
             fi
           }

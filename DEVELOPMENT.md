@@ -248,8 +248,8 @@ Set these in GitHub → Settings → Secrets and variables → Actions before pr
 | `RAILWAY_SERVICE_ID`           | Railway API service identifier                         |
 | `EXPO_TOKEN`                   | EAS CLI auth for triggering builds                     |
 | `VERCEL_TOKEN`                 | Vercel API token for setting branch env vars           |
-| `VERCEL_ORG_ID`                | From `.vercel/project.json` (run `vercel link` first)  |
-| `VERCEL_PROJECT_ID`            | From `.vercel/project.json`                            |
+| `VERCEL_ORG_ID`                | From `cd apps/web && vercel link`                      |
+| `VERCEL_PROJECT_ID`            | From `cd apps/web && vercel link`                      |
 | `NEXT_PUBLIC_POSTHOG_KEY`      | PostHog client key                                     |
 | `NEXT_PUBLIC_POSTHOG_HOST`     | PostHog host                                           |
 | `POSTHOG_KEY`                  | PostHog server key                                     |
@@ -283,7 +283,7 @@ Set these in GitHub → Settings → Secrets and variables → Actions before pr
 cd apps/web && vercel link
 ```
 
-Commit `.vercel/project.json` to the repo, then copy `orgId` and `projectId` to GitHub Secrets as `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID`.
+Do not commit `apps/web/.vercel/`. After linking locally, copy `orgId` and `projectId` from `apps/web/.vercel/project.json` into GitHub Secrets as `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID`.
 
 In the Vercel dashboard, set:
 
