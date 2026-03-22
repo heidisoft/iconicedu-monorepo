@@ -26,7 +26,10 @@ SET row_security = off;
 -- These UUIDs match the auth_user_id values in the accounts
 -- seed data below. Password for all seed users: Seed123!
 -- ============================================================
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+-- pgcrypto is pre-installed by Supabase in the extensions schema.
+-- Temporarily expose it so crypt() / gen_salt() resolve without schema prefix.
+SELECT pg_catalog.set_config('search_path', 'extensions, public, auth', false);
 
 INSERT INTO auth.users (
   instance_id, id, aud, role, email, encrypted_password,
@@ -89,6 +92,9 @@ INSERT INTO auth.identities (
    '{"sub":"d51bba27-0c02-4f5e-895f-34c76044aa76","email":"heshanmw+6@gmail.com"}'::jsonb,
    'email', NOW(), NOW(), NOW(), gen_random_uuid())
 ON CONFLICT (provider, provider_id) DO NOTHING;
+
+-- Restore empty search_path for the rest of the seed.
+SELECT pg_catalog.set_config('search_path', '', false);
 
 --
 -- Data for Name: orgs; Type: TABLE DATA; Schema: public; Owner: postgres
