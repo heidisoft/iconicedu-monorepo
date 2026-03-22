@@ -291,6 +291,36 @@ describe('DashboardHomeInfographicSection', () => {
     );
   });
 
+  it('shows boost your learning section for student view', () => {
+    render(
+      <DashboardHomeInfographicSection
+        orgSlug="iconic-academy"
+        isStudentView
+        canRequestClasses
+        requestRole="students"
+        requestableStudents={[{ profileId: 'child-1', displayName: 'Maya Morgan' }]}
+        topMetrics={{
+          upcomingSessionsThisWeek: 2,
+          completedClassesThisMonth: 3,
+          activeSubjectsCount: 2,
+          activeSubjectsLabel: 'Math, Science',
+        }}
+        upcomingSessionsPage={{
+          thisWeek: { items: [], total: 0, pageSize: 3, totalPages: 1 },
+          nextWeek: { items: [], total: 0, pageSize: 3, totalPages: 1 },
+        }}
+        calendarHref="/iconic-academy/class-schedule"
+        notificationsHref="/iconic-academy/notifications"
+        browseHref="/iconic-academy/s"
+      />,
+    );
+
+    expect(screen.getByText('Boost Your Learning!')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Explore More Classes' }),
+    ).toBeInTheDocument();
+  });
+
   it('renders empty state when no classroom sessions are available', () => {
     render(
       <DashboardHomeInfographicSection
@@ -337,10 +367,10 @@ describe('DashboardHomeInfographicSection', () => {
       />,
     );
 
-    expect(screen.getByRole('link', { name: 'Explore More Classes' })).toHaveAttribute(
-      'href',
-      '/iconic-academy/s',
-    );
+    expect(screen.queryByText('Boost Your Learning!')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Explore More Classes' }),
+    ).not.toBeInTheDocument();
   });
 
   it('opens request dialog for parents and submits successfully', async () => {
