@@ -5,6 +5,7 @@ import {
   parseArgs,
   readJsonFile,
   requireArg,
+  toSummaryError,
 } from './utils.mjs';
 
 const DEFAULT_STATUS_FILE = '.tmp/preview-status.json';
@@ -84,7 +85,27 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
   const prNumber = requireArg(args, 'pr');
   const statusFile = args['status-file'] ?? DEFAULT_STATUS_FILE;
-  const summary = await readJsonFile(statusFile);
+  const gitBranch = args.branch?.trim() || 'unknown';
+  const previewBranchName = args['preview-branch']?.trim() || 'unknown';
+
+  const summary = await readJsonFile(statusFile).catch((error) => ({
+    marker: 'iconicedu-preview-env',
+    state: 'failed',
+    updatedAt: new Date().toISOString(),
+    prNumber,
+    gitBranch,
+    previewBranchName,
+    webUrl: null,
+    supabase: null,
+    vercel: null,
+    expo: {
+      requested: false,
+      triggered: false,
+      status: 'not-requested',
+      note: 'Preview provisioning did not create a status file.',
+    },
+    errors: [`Status file missing: ${statusFile}`, toSummaryError(error)],
+  }));
 
   const token = process.env.GITHUB_TOKEN?.trim();
   const repository = process.env.GITHUB_REPOSITORY?.trim();

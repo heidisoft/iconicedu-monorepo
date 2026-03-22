@@ -89,9 +89,10 @@ jobs:
 
       - name: Update PR comment
         if: always()
-        run: pnpm preview:comment --pr "${PR_NUMBER}" --status-file .tmp/preview-status.json
+        run: pnpm preview:comment --pr "${PR_NUMBER}" --branch "${GIT_BRANCH}" --status-file .tmp/preview-status.json
         env:
           PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+          GIT_BRANCH: ${{ github.event.pull_request.head.ref || inputs.git_branch }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
 
@@ -149,8 +150,9 @@ jobs:
 
       - name: Update PR comment
         if: always()
-        run: pnpm preview:comment --pr "${PR_NUMBER}" --status-file .tmp/preview-status.json
+        run: pnpm preview:comment --pr "${PR_NUMBER}" --branch "${GIT_BRANCH}" --status-file .tmp/preview-status.json
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          GIT_BRANCH: ${{ github.event.pull_request.head.ref }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}

@@ -18,6 +18,7 @@ import {
   writeJsonFile,
 } from './utils.mjs';
 import { PREVIEW_USERS, STORAGE_FIXTURES } from './fixtures.mjs';
+import { readFile } from 'node:fs/promises';
 
 const DEFAULT_STATUS_FILE = '.tmp/preview-status.json';
 const SUPABASE_CLI_WORKDIR = 'supabase';
@@ -437,15 +438,37 @@ function buildPreviewSummary(input) {
   };
 }
 
+async function resolveRootProjectRef() {
+  const fromEnv = optionalEnv('SUPABASE_PROJECT_REF');
+  if (fromEnv) {
+    return fromEnv;
+  }
+
+  const candidateFiles = [
+    'supabase/.temp/project-ref',
+    'supabase/supabase/.temp/project-ref',
+  ];
+  for (const filePath of candidateFiles) {
+    try {
+      const value = (await readFile(filePath, 'utf8')).trim();
+      if (value) {
+        return value;
+      }
+    } catch {
+      // Keep trying the next fallback.
+    }
+  }
+
+  throw new Error(
+    'Missing required Supabase project ref. Set SUPABASE_PROJECT_REF in GitHub secrets or ensure supabase/.temp/project-ref is available in CI.',
+  );
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const prNumber = requireArg(args, 'pr');
   const gitBranch = requireArg(args, 'branch');
   const statusFile = args['status-file'] ?? DEFAULT_STATUS_FILE;
-
-  const rootProjectRef = requireEnv('SUPABASE_PROJECT_REF');
-  requireEnv('SUPABASE_ACCESS_TOKEN');
-
   const previewBranchName = buildPreviewBranchName(prNumber, gitBranch);
   const requestedWebUrl = normalizeUrl(
     args['web-url'] ?? optionalEnv('PREVIEW_WEB_URL') ?? '',
@@ -454,6 +477,9 @@ async function main() {
   const errors = [];
 
   try {
+    requireEnv('SUPABASE_ACCESS_TOKEN');
+    const rootProjectRef = await resolveRootProjectRef();
+
     const initialBranch = await ensureSupabaseBranch(previewBranchName, rootProjectRef);
     const healthyBranch = await waitForHealthyBranch(previewBranchName, rootProjectRef);
     const branchProjectRef = findProjectRef(healthyBranch ?? initialBranch);
@@ -509,6 +535,7 @@ async function main() {
       webUrl: requestedWebUrl,
       supabase: {
         projectRef: branchProjectRef,
+        rootProjectRef,
         apiUrl,
         dashboardUrl,
         anonKey: apiKeys.anonKey,
