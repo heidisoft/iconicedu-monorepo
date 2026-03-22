@@ -22,9 +22,14 @@ jobs:
     name: EAS Preview Build (PR #${{ github.event.inputs.pr_number }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: read
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: "refs/pull/${{ github.event.inputs.pr_number }}/head"
 
       - uses: actions/setup-node@v4
         with:

@@ -37,12 +37,24 @@ jobs:
           set -euo pipefail
           BRANCH_NAME="pr-${PR_NUMBER}"
 
-          # Create branch (idempotent — ignore error if it already exists)
-          supabase branches create \
+          # Check if branch already exists (synchronize runs reuse the same branch)
+          EXISTING_ID=$(supabase branches list \
             --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}" \
-            --name "$BRANCH_NAME" \
-            --region ap-southeast-1 \
-            2>&1 | grep -v "already exists" || true
+            --output json \
+            | jq -r --arg name "$BRANCH_NAME" '.[] | select(.name==$name) | .id // ""')
+
+          if [[ -z "$EXISTING_ID" ]]; then
+            echo "Creating new branch: $BRANCH_NAME"
+            supabase branches create \
+              --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}" \
+              --name "$BRANCH_NAME" \
+              --region ap-southeast-1 \
+              2>&1 || true
+            echo "branch_new=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Branch $BRANCH_NAME already exists (id: $EXISTING_ID)"
+            echo "branch_new=false" >> "$GITHUB_OUTPUT"
+          fi
 
           echo "Waiting for branch migrations to complete..."
           for i in $(seq 1 30); do
@@ -111,7 +123,8 @@ jobs:
           DB_PASS="${{ secrets.SUPABASE_DB_PASSWORD }}"
           echo "::add-mask::$DB_PASS"
           DATABASE_URL="postgresql://postgres.${BRANCH_REF}:${DB_PASS}@aws-0-${REGION}.pooler.supabase.com:6543/postgres"
-          DIRECT_URL="postgresql://postgres.${BRANCH_REF}:${DB_PASS}@aws-0-${REGION}.pooler.supabase.com:5432/postgres"
+          # Direct (non-pooled) connection — required for COPY FROM stdin in seed and Prisma migrations
+          DIRECT_URL="postgresql://postgres:${DB_PASS}@db.${BRANCH_REF}.supabase.co:5432/postgres"
           echo "::add-mask::$DATABASE_URL"
           echo "::add-mask::$DIRECT_URL"
           echo "database_url=$DATABASE_URL" >> "$GITHUB_OUTPUT"
@@ -127,12 +140,12 @@ jobs:
 
           echo "branch_api_url=https://${BRANCH_REF}.supabase.co" >> "$GITHUB_OUTPUT"
 
-      # ── 3. Seed preview branch ─────────────────────────────────────────────
+      # ── 3. Seed preview branch (new branches only) ─────────────────────────
       - name: Seed preview branch
+        if: steps.supabase-branch.outputs.branch_new == 'true'
         env:
           DIRECT_URL: ${{ steps.branch-creds.outputs.direct_url }}
         run: |
-          # seed.sql contains auth.users + all app data; ON CONFLICT DO NOTHING makes it idempotent
           psql "$DIRECT_URL" -f supabase/seed.sql
 
       # ── 4. Deploy edge functions (no cron triggers) ────────────────────────
