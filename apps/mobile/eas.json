@@ -7,24 +7,15 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": ""
-      }
+      "environment": "development"
     },
     "preview": {
       "distribution": "internal",
-      "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": ""
-      }
+      "environment": "preview"
     },
     "production": {
       "autoIncrement": true,
-      "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": ""
-      }
+      "environment": "production"
     }
   },
   "submit": {

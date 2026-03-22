@@ -1,24 +1,28 @@
 const DEFAULT_APP_URL = 'http://localhost:3000';
 
-export function resolveAppUrl(): string {
-  const configuredUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
-  const isProduction = process.env.NODE_ENV === 'production';
-
-  if (!configuredUrl) {
-    return DEFAULT_APP_URL;
+function normalizeAbsoluteUrl(value: string | undefined): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return null;
   }
 
   try {
-    const parsed = new URL(configuredUrl);
-    const isLocalHost =
-      parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
-
-    if (!isProduction && !isLocalHost) {
-      return DEFAULT_APP_URL;
-    }
-
-    return configuredUrl.replace(/\/$/, '');
+    const withProtocol =
+      trimmed.startsWith('http://') || trimmed.startsWith('https://')
+        ? trimmed
+        : `https://${trimmed}`;
+    const parsed = new URL(withProtocol);
+    return parsed.toString().replace(/\/$/, '');
   } catch {
-    return DEFAULT_APP_URL;
+    return null;
   }
+}
+
+export function resolveAppUrl(): string {
+  return (
+    normalizeAbsoluteUrl(process.env.NEXT_PUBLIC_APP_URL) ??
+    normalizeAbsoluteUrl(process.env.VERCEL_BRANCH_URL) ??
+    normalizeAbsoluteUrl(process.env.VERCEL_URL) ??
+    DEFAULT_APP_URL
+  );
 }

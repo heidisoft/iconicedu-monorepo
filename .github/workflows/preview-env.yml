@@ -1,0 +1,156 @@
+name: Preview Environment
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, closed]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number
+        required: true
+      git_branch:
+        description: Git branch name
+        required: true
+      web_url:
+        description: Optional preview URL override
+        required: false
+
+concurrency:
+  group: preview-env-${{ github.event.pull_request.number || inputs.pr_number }}
+  cancel-in-progress: false
+
+env:
+  TURBO_TELEMETRY_DISABLED: 1
+
+jobs:
+  provision:
+    if: github.event_name == 'workflow_dispatch' || github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+          cache: pnpm
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Provision preview environment
+        run: >
+          pnpm preview:provision
+          --pr "${PR_NUMBER}"
+          --branch "${GIT_BRANCH}"
+          ${WEB_URL:+--web-url "$WEB_URL"}
+          --status-file .tmp/preview-status.json
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+          GIT_BRANCH: ${{ github.event.pull_request.head.ref || inputs.git_branch }}
+          WEB_URL: ${{ inputs.web_url }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
+          INTERNAL_REMINDERS_TOKEN: ${{ secrets.INTERNAL_REMINDERS_TOKEN }}
+          INTERNAL_ACTIVITY_FEED_TOKEN: ${{ secrets.INTERNAL_ACTIVITY_FEED_TOKEN }}
+          INTERNAL_NOTIFICATIONS_TOKEN: ${{ secrets.INTERNAL_NOTIFICATIONS_TOKEN }}
+
+      - name: Trigger Expo preview build when requested
+        if: contains(join(github.event.pull_request.labels.*.name, ','), 'expo-preview') || github.event_name == 'workflow_dispatch'
+        run: |
+          SUPABASE_URL="$(node -e "const fs=require('node:fs'); const data=JSON.parse(fs.readFileSync('.tmp/preview-status.json','utf8')); process.stdout.write(data.supabase?.apiUrl ?? '')")"
+          SUPABASE_ANON_KEY="$(node -e "const fs=require('node:fs'); const data=JSON.parse(fs.readFileSync('.tmp/preview-status.json','utf8')); process.stdout.write(data.supabase?.anonKey ?? '')")"
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "Preview status file does not contain Expo-ready Supabase credentials"
+            exit 1
+          fi
+          pnpm preview:expo --pr "${PR_NUMBER}" --supabase-url "$SUPABASE_URL" --anon-key "$SUPABASE_ANON_KEY" --status-file .tmp/preview-status.json
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Update PR comment
+        if: always()
+        run: pnpm preview:comment --pr "${PR_NUMBER}" --status-file .tmp/preview-status.json
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+
+      - name: Upload preview status
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-status-${{ github.event.pull_request.number || inputs.pr_number }}
+          path: .tmp/preview-status.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+  teardown:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+          cache: pnpm
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Tear down preview environment
+        run: >
+          pnpm preview:teardown
+          --pr "${PR_NUMBER}"
+          --branch "${GIT_BRANCH}"
+          --status-file .tmp/preview-status.json
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GIT_BRANCH: ${{ github.event.pull_request.head.ref }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
+
+      - name: Update PR comment
+        if: always()
+        run: pnpm preview:comment --pr "${PR_NUMBER}" --status-file .tmp/preview-status.json
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
