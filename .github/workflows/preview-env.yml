@@ -69,6 +69,10 @@ jobs:
 
             if [[ "$STATUS" == "MIGRATIONS_PASSED" ]]; then
               echo "branch_id=$BRANCH_ID" >> "$GITHUB_OUTPUT"
+              # Extract project_ref here — avoids a race condition in the creds step
+              # where the separate /v1/branches/{id} API call can return null briefly.
+              BRANCH_REF=$(echo "$BRANCH_DATA" | jq -r '.project_ref // .ref // ""')
+              echo "branch_ref=$BRANCH_REF" >> "$GITHUB_OUTPUT"
               break
             elif [[ "$STATUS" == "MIGRATIONS_FAILED" ]]; then
               echo "::error::Supabase branch migrations failed"
@@ -89,14 +93,12 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           set -euo pipefail
-          BRANCH_ID="${{ steps.supabase-branch.outputs.branch_id }}"
+          BRANCH_REF="${{ steps.supabase-branch.outputs.branch_ref }}"
 
-          # Get branch project ref
-          BRANCH_REF=$(curl -sf \
-            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
-            "https://api.supabase.com/v1/branches/${BRANCH_ID}" \
-            | jq -r '.project_ref')
-          echo "branch_ref=$BRANCH_REF" >> "$GITHUB_OUTPUT"
+          if [[ -z "$BRANCH_REF" || "$BRANCH_REF" == "null" ]]; then
+            echo "::error::branch_ref is empty — branches list did not return a project_ref for this branch"
+            exit 1
+          fi
           echo "Branch project ref: $BRANCH_REF"
 
           # Get API keys
