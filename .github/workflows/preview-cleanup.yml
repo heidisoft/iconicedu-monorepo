@@ -1,0 +1,94 @@
+name: Preview Environment Cleanup
+
+on:
+  pull_request:
+    types: [closed]
+
+env:
+  PR_NUMBER: ${{ github.event.pull_request.number }}
+  BRANCH_NAME: ${{ github.head_ref }}
+
+jobs:
+  cleanup:
+    name: Delete Preview Environment
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # ── 1. Delete Supabase preview branch ──────────────────────────────────
+      - name: Delete Supabase branch
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          BRANCH_NAME="pr-${PR_NUMBER}"
+
+          BRANCH_ID=$(supabase branches list \
+            --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}" \
+            --output json \
+            | jq -r --arg name "$BRANCH_NAME" '.[] | select(.name==$name) | .id // ""')
+
+          if [[ -n "$BRANCH_ID" ]]; then
+            supabase branches delete "$BRANCH_ID" \
+              --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}"
+            echo "Deleted Supabase branch: $BRANCH_NAME ($BRANCH_ID)"
+          else
+            echo "No Supabase branch found for $BRANCH_NAME — skipping"
+          fi
+
+      # ── 2. Delete Railway preview environment ──────────────────────────────
+      - name: Delete Railway environment
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
+        run: |
+          ENV_NAME="pr-${PR_NUMBER}"
+          npm install -g @railway/cli --silent
+
+          railway environment delete "$ENV_NAME" \
+            --project "${{ secrets.RAILWAY_PROJECT_ID }}" \
+            --yes 2>/dev/null && echo "Deleted Railway environment: $ENV_NAME" \
+            || echo "No Railway environment found for $ENV_NAME — skipping"
+
+      # ── 3. Remove Vercel branch-scoped env vars ────────────────────────────
+      - name: Remove Vercel branch env vars
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          PROJECT_ID="${{ secrets.VERCEL_PROJECT_ID }}"
+          BRANCH="${{ env.BRANCH_NAME }}"
+
+          # List all env vars scoped to this branch
+          ENV_IDS=$(curl -sf \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v10/projects/${PROJECT_ID}/env?gitBranch=${BRANCH}" \
+            | jq -r '.envs[].id' 2>/dev/null || echo "")
+
+          if [[ -n "$ENV_IDS" ]]; then
+            while IFS= read -r ENV_ID; do
+              curl -sf -X DELETE \
+                -H "Authorization: Bearer $VERCEL_TOKEN" \
+                "https://api.vercel.com/v10/projects/${PROJECT_ID}/env/${ENV_ID}" > /dev/null \
+                && echo "Deleted Vercel env var: $ENV_ID"
+            done <<< "$ENV_IDS"
+          else
+            echo "No Vercel branch env vars found for $BRANCH — skipping"
+          fi
+
+      # ── 4. Post cleanup comment ────────────────────────────────────────────
+      - name: Post cleanup comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: '🧹 Preview environment cleaned up (Supabase branch, Railway environment, and Vercel env vars removed).',
+            });

@@ -21,6 +21,75 @@ SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
 
+-- ============================================================
+-- AUTH USERS (must precede public.accounts FK references)
+-- These UUIDs match the auth_user_id values in the accounts
+-- seed data below. Password for all seed users: Seed123!
+-- ============================================================
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+INSERT INTO auth.users (
+  instance_id, id, aud, role, email, encrypted_password,
+  email_confirmed_at, created_at, updated_at,
+  raw_app_meta_data, raw_user_meta_data,
+  confirmation_token, email_change, email_change_token_new, recovery_token
+) VALUES
+  ('00000000-0000-0000-0000-000000000000',
+   'bdc2944f-7307-4aef-b742-fed48cff9822',
+   'authenticated', 'authenticated', 'heshanmw@gmail.com',
+   crypt('Seed123!', gen_salt('bf')), NOW(), NOW(), NOW(),
+   '{"provider":"email","providers":["email"]}', '{}', '', '', '', ''),
+  ('00000000-0000-0000-0000-000000000000',
+   '209ad23e-3d3f-4e3e-890f-93f4ad490598',
+   'authenticated', 'authenticated', 'heshanmw+1@gmail.com',
+   crypt('Seed123!', gen_salt('bf')), NOW(), NOW(), NOW(),
+   '{"provider":"email","providers":["email"]}', '{}', '', '', '', ''),
+  ('00000000-0000-0000-0000-000000000000',
+   '694261dd-b89c-4a1f-bde5-d1b4700d8430',
+   'authenticated', 'authenticated', 'heshanmw+3@gmail.com',
+   crypt('Seed123!', gen_salt('bf')), NOW(), NOW(), NOW(),
+   '{"provider":"email","providers":["email"]}', '{}', '', '', '', ''),
+  ('00000000-0000-0000-0000-000000000000',
+   '926b4c7c-df46-4ee1-9250-1fd0797239b8',
+   'authenticated', 'authenticated', 'heshanmw+4@gmail.com',
+   crypt('Seed123!', gen_salt('bf')), NOW(), NOW(), NOW(),
+   '{"provider":"email","providers":["email"]}', '{}', '', '', '', ''),
+  ('00000000-0000-0000-0000-000000000000',
+   '052935b9-f628-4bd6-9536-6e07030ad564',
+   'authenticated', 'authenticated', 'heshanmw+5@gmail.com',
+   crypt('Seed123!', gen_salt('bf')), NOW(), NOW(), NOW(),
+   '{"provider":"email","providers":["email"]}', '{}', '', '', '', ''),
+  ('00000000-0000-0000-0000-000000000000',
+   'd51bba27-0c02-4f5e-895f-34c76044aa76',
+   'authenticated', 'authenticated', 'heshanmw+6@gmail.com',
+   crypt('Seed123!', gen_salt('bf')), NOW(), NOW(), NOW(),
+   '{"provider":"email","providers":["email"]}', '{}', '', '', '', '')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO auth.identities (
+  provider_id, user_id, identity_data, provider,
+  last_sign_in_at, created_at, updated_at, id
+) VALUES
+  ('heshanmw@gmail.com', 'bdc2944f-7307-4aef-b742-fed48cff9822',
+   '{"sub":"bdc2944f-7307-4aef-b742-fed48cff9822","email":"heshanmw@gmail.com"}'::jsonb,
+   'email', NOW(), NOW(), NOW(), gen_random_uuid()),
+  ('heshanmw+1@gmail.com', '209ad23e-3d3f-4e3e-890f-93f4ad490598',
+   '{"sub":"209ad23e-3d3f-4e3e-890f-93f4ad490598","email":"heshanmw+1@gmail.com"}'::jsonb,
+   'email', NOW(), NOW(), NOW(), gen_random_uuid()),
+  ('heshanmw+3@gmail.com', '694261dd-b89c-4a1f-bde5-d1b4700d8430',
+   '{"sub":"694261dd-b89c-4a1f-bde5-d1b4700d8430","email":"heshanmw+3@gmail.com"}'::jsonb,
+   'email', NOW(), NOW(), NOW(), gen_random_uuid()),
+  ('heshanmw+4@gmail.com', '926b4c7c-df46-4ee1-9250-1fd0797239b8',
+   '{"sub":"926b4c7c-df46-4ee1-9250-1fd0797239b8","email":"heshanmw+4@gmail.com"}'::jsonb,
+   'email', NOW(), NOW(), NOW(), gen_random_uuid()),
+  ('heshanmw+5@gmail.com', '052935b9-f628-4bd6-9536-6e07030ad564',
+   '{"sub":"052935b9-f628-4bd6-9536-6e07030ad564","email":"heshanmw+5@gmail.com"}'::jsonb,
+   'email', NOW(), NOW(), NOW(), gen_random_uuid()),
+  ('heshanmw+6@gmail.com', 'd51bba27-0c02-4f5e-895f-34c76044aa76',
+   '{"sub":"d51bba27-0c02-4f5e-895f-34c76044aa76","email":"heshanmw+6@gmail.com"}'::jsonb,
+   'email', NOW(), NOW(), NOW(), gen_random_uuid())
+ON CONFLICT (provider, provider_id) DO NOTHING;
+
 --
 -- Data for Name: orgs; Type: TABLE DATA; Schema: public; Owner: postgres
 --
