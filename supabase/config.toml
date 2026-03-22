@@ -57,7 +57,9 @@ schema_paths = []
 
 [db.seed]
 # If enabled, seeds the database after migrations during a db reset.
-enabled = true
+# Disabled: seed contains COPY FROM stdin which the CLI's Go/pgx batch executor
+# cannot handle. Run seed manually: psql "$DB_URL" -f supabase/seed.sql
+enabled = false
 # Specifies an ordered list of seed files to load during db reset.
 # Supports glob patterns relative to supabase directory: "./seeds/*.sql"
 sql_paths = ["./seed.sql"]
