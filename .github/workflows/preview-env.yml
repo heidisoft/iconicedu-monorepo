@@ -262,9 +262,11 @@ jobs:
               }" > /dev/null
           }
 
-          set_vercel_env "NEXT_PUBLIC_SUPABASE_URL"      "${{ steps.branch-creds.outputs.branch_api_url }}"
-          set_vercel_env "NEXT_PUBLIC_SUPABASE_ANON_KEY" "${{ steps.branch-creds.outputs.anon_key }}"
-          set_vercel_env "SUPABASE_SERVICE_ROLE_KEY"     "${{ steps.branch-creds.outputs.service_role_key }}"
+          set_vercel_env "NEXT_PUBLIC_SUPABASE_URL"              "${{ steps.branch-creds.outputs.branch_api_url }}"
+          set_vercel_env "SUPABASE_URL"                        "${{ steps.branch-creds.outputs.branch_api_url }}"
+          set_vercel_env "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" "${{ steps.branch-creds.outputs.anon_key }}"
+          set_vercel_env "NEXT_PUBLIC_SUPABASE_ANON_KEY"       "${{ steps.branch-creds.outputs.anon_key }}"
+          set_vercel_env "SUPABASE_SERVICE_ROLE_KEY"           "${{ steps.branch-creds.outputs.service_role_key }}"
           set_vercel_env "NEXT_PUBLIC_API_URL"           "${{ steps.railway.outputs.railway_api_url }}"
           set_vercel_env "NEXT_PUBLIC_APP_ENV"           "preview"
 

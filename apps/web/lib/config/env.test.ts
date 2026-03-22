@@ -7,7 +7,19 @@ describe('web env config', () => {
     expect(
       getPublicWebEnv({
         NEXT_PUBLIC_SUPABASE_URL: 'https://example.supabase.co',
-        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: 'publishable-key',
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'publishable-key',
+      }),
+    ).toEqual({
+      supabaseUrl: 'https://example.supabase.co',
+      supabasePublishableKey: 'publishable-key',
+    });
+  });
+
+  it('accepts SUPABASE_URL (Vercel connector server-side name) as url fallback', () => {
+    expect(
+      getPublicWebEnv({
+        SUPABASE_URL: 'https://example.supabase.co',
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'publishable-key',
       }),
     ).toEqual({
       supabaseUrl: 'https://example.supabase.co',
@@ -31,7 +43,7 @@ describe('web env config', () => {
     expect(() =>
       getPublicWebEnv({
         NEXT_PUBLIC_SUPABASE_URL: 'not-a-url',
-        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: 'publishable-key',
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'publishable-key',
       }),
     ).toThrow('Environment variable NEXT_PUBLIC_SUPABASE_URL must be a valid URL');
 
@@ -46,7 +58,7 @@ describe('web env config', () => {
     expect(
       getServiceWebEnv({
         NEXT_PUBLIC_SUPABASE_URL: 'https://example.supabase.co',
-        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: 'publishable-key',
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'publishable-key',
         SUPABASE_SERVICE_ROLE_KEY: 'service-role-key',
       }),
     ).toEqual({
@@ -58,7 +70,7 @@ describe('web env config', () => {
     expect(() =>
       getServiceWebEnv({
         NEXT_PUBLIC_SUPABASE_URL: 'https://example.supabase.co',
-        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: 'publishable-key',
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'publishable-key',
       }),
     ).toThrow('Missing required environment variable: SUPABASE_SERVICE_ROLE_KEY');
   });
