@@ -1,0 +1,166 @@
+name: 'EAS Preview Build'
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to build against (e.g. 42)'
+        required: true
+        type: string
+      platform:
+        description: 'Platform to build'
+        required: true
+        type: choice
+        default: 'all'
+        options:
+          - 'all'
+          - 'ios'
+          - 'android'
+
+jobs:
+  eas-build:
+    name: 'EAS Preview Build (PR #${{ github.event.inputs.pr_number }})'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 'refs/pull/${{ github.event.inputs.pr_number }}/head'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.19.0'
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '9.12.0'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # 1. Fetch Supabase branch credentials
+      - name: Fetch Supabase branch credentials
+        id: branch-creds
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          BRANCH_NAME="pr-${{ github.event.inputs.pr_number }}"
+
+          BRANCH_DATA=$(supabase branches list \
+            --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}" \
+            --output json \
+            | jq --arg name "$BRANCH_NAME" '.[] | select(.name==$name)')
+
+          if [[ -z "$BRANCH_DATA" ]]; then
+            echo "::error::No Supabase branch found for '$BRANCH_NAME'. Make sure the PR is open and the preview-env workflow has completed."
+            exit 1
+          fi
+
+          BRANCH_ID=$(echo "$BRANCH_DATA" | jq -r '.id')
+
+          BRANCH_REF=$(curl -sf \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/branches/${BRANCH_ID}" \
+            | jq -r '.project_ref')
+
+          ANON_KEY=$(curl -sf \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/${BRANCH_REF}/api-keys" \
+            | jq -r '.[] | select(.name=="anon") | .api_key')
+          echo "::add-mask::$ANON_KEY"
+
+          echo "branch_ref=$BRANCH_REF" >> "$GITHUB_OUTPUT"
+          echo "anon_key=$ANON_KEY" >> "$GITHUB_OUTPUT"
+          echo "branch_api_url=https://${BRANCH_REF}.supabase.co" >> "$GITHUB_OUTPUT"
+
+      # 2. Fetch Railway preview API URL
+      - name: Fetch Railway preview API URL
+        id: railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
+        run: |
+          npm install -g @railway/cli --silent
+          ENV_NAME="pr-${{ github.event.inputs.pr_number }}"
+
+          RAILWAY_DOMAIN=$(railway domain \
+            --service "${{ secrets.RAILWAY_SERVICE_ID }}" \
+            --environment "$ENV_NAME" \
+            --project "${{ secrets.RAILWAY_PROJECT_ID }}" 2>/dev/null || echo "")
+
+          if [[ -n "$RAILWAY_DOMAIN" ]]; then
+            echo "railway_api_url=https://${RAILWAY_DOMAIN}" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Could not fetch Railway API URL for $ENV_NAME"
+            echo "railway_api_url=" >> "$GITHUB_OUTPUT"
+          fi
+
+      # 3. Trigger EAS build
+      - name: Trigger EAS preview build
+        id: eas-build
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          set -euo pipefail
+          npm install -g eas-cli --silent
+
+          cd apps/mobile
+
+          BUILD_OUTPUT=$(eas build \
+            --profile preview \
+            --platform "${{ github.event.inputs.platform }}" \
+            --non-interactive \
+            --no-wait \
+            -e EXPO_PUBLIC_SUPABASE_URL="${{ steps.branch-creds.outputs.branch_api_url }}" \
+            -e EXPO_PUBLIC_SUPABASE_ANON_KEY="${{ steps.branch-creds.outputs.anon_key }}" \
+            -e EXPO_PUBLIC_APP_ENV="preview" \
+            -e EXPO_PUBLIC_API_URL="${{ steps.railway.outputs.railway_api_url }}" \
+            2>&1)
+
+          echo "$BUILD_OUTPUT"
+
+          # Extract build URL from output
+          BUILD_URL=$(echo "$BUILD_OUTPUT" | grep -oP 'https://expo\.dev/accounts/[^\s]+' | head -1 || echo "")
+          echo "build_url=$BUILD_URL" >> "$GITHUB_OUTPUT"
+
+      # 4. Post comment on PR
+      - name: Post build comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = parseInt('${{ github.event.inputs.pr_number }}');
+            const platform = '${{ github.event.inputs.platform }}';
+            const buildUrl = '${{ steps.eas-build.outputs.build_url }}';
+            const supabaseUrl = '${{ steps.branch-creds.outputs.branch_api_url }}';
+            const apiUrl = '${{ steps.railway.outputs.railway_api_url }}';
+
+            const platformLabel =
+              platform === 'all'
+                ? 'iOS + Android'
+                : platform.charAt(0).toUpperCase() + platform.slice(1);
+            const buildLink = buildUrl ? `[Track build](${buildUrl})` : 'Check your [Expo dashboard](https://expo.dev)';
+
+            const body = [
+              '### EAS Preview Build Triggered',
+              '',
+              `**Platform:** ${platformLabel}`,
+              `**Supabase branch:** \`${supabaseUrl}\``,
+              `**API:** ${apiUrl || 'n/a'}`,
+              '',
+              `${buildLink} - install via internal distribution once the build completes.`,
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body,
+            });

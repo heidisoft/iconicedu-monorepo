@@ -1,0 +1,408 @@
+name: 'Preview Environment'
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: 'preview-${{ github.event.pull_request.number }}'
+  cancel-in-progress: true
+
+env:
+  PR_NUMBER: ${{ github.event.pull_request.number }}
+  BRANCH_NAME: ${{ github.head_ref }}
+
+jobs:
+  create-preview-env:
+    name: 'Create Preview Environment'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: write
+      deployments: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # 1. Create Supabase preview branch (idempotent — skips if already exists)
+      - name: Create Supabase branch
+        id: supabase-branch
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Use the GitHub branch name — stable across pushes to the same PR branch.
+          SUPABASE_BRANCH="${BRANCH_NAME}"
+
+          EXISTING_ID=$(supabase branches list \
+            --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}" \
+            --output json \
+            | jq -r --arg name "$SUPABASE_BRANCH" '.[] | select(.name==$name) | .id // ""')
+
+          if [[ -n "$EXISTING_ID" ]]; then
+            echo "Branch $SUPABASE_BRANCH already exists — skipping create and seed"
+            echo "branch_new=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Creating branch: $SUPABASE_BRANCH"
+            supabase branches create "$SUPABASE_BRANCH" \
+              --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}" \
+              --region ap-southeast-1
+            echo "branch_new=true" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "Waiting for branch migrations to complete..."
+          for i in $(seq 1 30); do
+            BRANCH_DATA=$(supabase branches list \
+              --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}" \
+              --output json \
+              | jq --arg name "$SUPABASE_BRANCH" '.[] | select(.name==$name)')
+
+            STATUS=$(echo "$BRANCH_DATA" | jq -r '.status // ""')
+            BRANCH_ID=$(echo "$BRANCH_DATA" | jq -r '.id // ""')
+
+            echo "  Status: ${STATUS:-(pending)}"
+
+            if [[ "$STATUS" == "MIGRATIONS_PASSED" || "$STATUS" == "FUNCTIONS_DEPLOYED" ]]; then
+              echo "branch_id=$BRANCH_ID" >> "$GITHUB_OUTPUT"
+              # Extract project_ref here — avoids a race condition in the creds step
+              # where the separate /v1/branches/{id} API call can return null briefly.
+              BRANCH_REF=$(echo "$BRANCH_DATA" | jq -r '.project_ref // .ref // ""')
+              echo "branch_ref=$BRANCH_REF" >> "$GITHUB_OUTPUT"
+              break
+            elif [[ "$STATUS" == "MIGRATIONS_FAILED" ]]; then
+              echo "::error::Supabase branch migrations failed"
+              exit 1
+            fi
+
+            if [[ $i -eq 30 ]]; then
+              echo "::error::Timed out waiting for Supabase branch"
+              exit 1
+            fi
+            sleep 10
+          done
+
+      # 2. Fetch branch credentials
+      - name: Fetch branch credentials
+        id: branch-creds
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          BRANCH_REF="${{ steps.supabase-branch.outputs.branch_ref }}"
+
+          if [[ -z "$BRANCH_REF" || "$BRANCH_REF" == "null" ]]; then
+            echo "::error::branch_ref is empty — branches list did not return a project_ref for this branch"
+            exit 1
+          fi
+          echo "Branch project ref: $BRANCH_REF"
+
+          # Get API keys
+          ANON_KEY=$(curl -sf \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/${BRANCH_REF}/api-keys" \
+            | jq -r '.[] | select(.name=="anon") | .api_key')
+          echo "::add-mask::$ANON_KEY"
+          echo "anon_key=$ANON_KEY" >> "$GITHUB_OUTPUT"
+
+          SERVICE_ROLE_KEY=$(curl -sf \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/${BRANCH_REF}/api-keys" \
+            | jq -r '.[] | select(.name=="service_role") | .api_key')
+          echo "::add-mask::$SERVICE_ROLE_KEY"
+          echo "service_role_key=$SERVICE_ROLE_KEY" >> "$GITHUB_OUTPUT"
+
+          # Build connection strings (transaction pooler for app, session for migrations)
+          # Region derived from prod project — update if your Supabase region differs
+          REGION="ap-southeast-1"
+          DB_PASS="${{ secrets.SUPABASE_DB_PASSWORD }}"
+          echo "::add-mask::$DB_PASS"
+          DATABASE_URL="postgresql://postgres.${BRANCH_REF}:${DB_PASS}@aws-0-${REGION}.pooler.supabase.com:6543/postgres"
+          # Direct (non-pooled) connection — required for COPY FROM stdin in seed and Prisma migrations
+          DIRECT_URL="postgresql://postgres:${DB_PASS}@db.${BRANCH_REF}.supabase.co:5432/postgres"
+          echo "::add-mask::$DATABASE_URL"
+          echo "::add-mask::$DIRECT_URL"
+          echo "database_url=$DATABASE_URL" >> "$GITHUB_OUTPUT"
+          echo "direct_url=$DIRECT_URL" >> "$GITHUB_OUTPUT"
+
+          # Get JWT secret
+          JWT_SECRET=$(curl -sf \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/${BRANCH_REF}/config/auth" \
+            | jq -r '.jwt_secret')
+          echo "::add-mask::$JWT_SECRET"
+          echo "jwt_secret=$JWT_SECRET" >> "$GITHUB_OUTPUT"
+
+          echo "branch_api_url=https://${BRANCH_REF}.supabase.co" >> "$GITHUB_OUTPUT"
+
+      # 3. Seed preview branch (new branches only)
+      - name: Seed preview branch
+        if: steps.supabase-branch.outputs.branch_new == 'true'
+        env:
+          DIRECT_URL: ${{ steps.branch-creds.outputs.direct_url }}
+        run: |
+          psql "$DIRECT_URL" -f supabase/seed.sql
+
+      # 4. Deploy edge functions (no cron triggers)
+      - name: Deploy edge functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          BRANCH_REF="${{ steps.supabase-branch.outputs.branch_ref }}"
+          for fn in reminders-dispatch notifications-dispatch channel-read-state-repair; do
+            supabase functions deploy "$fn" \
+              --project-ref "$BRANCH_REF" \
+              --no-verify-jwt \
+              2>&1 || echo "Warning: failed to deploy $fn (non-fatal)"
+          done
+          # Note: cron triggers are NOT configured on preview branches,
+          # so functions exist but won't fire automatically.
+
+      # 5. Deploy Railway preview environment
+      - name: Deploy Railway preview API
+        id: railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+
+          ENV_NAME="${BRANCH_NAME//\//-}"
+          SERVICE_ID="${{ secrets.RAILWAY_SERVICE_ID }}"
+          GQL="https://backboard.railway.app/graphql/v2"
+          AUTH="-H \"Authorization: Bearer $RAILWAY_TOKEN\""
+
+          api() {
+            curl -sf \
+              -H "Authorization: Bearer $RAILWAY_TOKEN" \
+              -H "Content-Type: application/json" \
+              "$GQL" \
+              -d "$1" || echo "{}"
+          }
+
+          # ── 1. Create environment via Railway API (idempotent) ──────────────
+          echo "Ensuring Railway environment: $ENV_NAME"
+          CREATE_RESP=$(api "{\"query\":\"mutation { environmentCreate(input: {projectId: \\\"$RAILWAY_PROJECT_ID\\\", name: \\\"$ENV_NAME\\\"}) { id } }\"}")
+
+          ENV_ID=$(echo "$CREATE_RESP" | jq -r '.data.environmentCreate.id // empty')
+          echo "Create response: $(echo "$CREATE_RESP" | jq '.errors // "ok"')"
+
+          if [[ -z "$ENV_ID" ]]; then
+            echo "Environment may already exist — fetching by name"
+            LIST_RESP=$(api "{\"query\":\"query { project(id: \\\"$RAILWAY_PROJECT_ID\\\") { environments { edges { node { id name } } } } }\"}")
+            echo "List response: $(echo "$LIST_RESP" | jq '.errors // "ok"')"
+            ENV_ID=$(echo "$LIST_RESP" | jq -r ".data.project.environments.edges[]? | select(.node.name==\"$ENV_NAME\") | .node.id // empty")
+          fi
+
+          if [[ -z "$ENV_ID" ]]; then
+            echo "::error::Failed to create or find Railway environment $ENV_NAME"
+            exit 1
+          fi
+          echo "Environment ID: $ENV_ID"
+
+          # ── 2. Set variables via Railway API ────────────────────────────────
+          VARS_JSON=$(jq -n \
+            --arg db    "${{ steps.branch-creds.outputs.database_url }}" \
+            --arg dir   "${{ steps.branch-creds.outputs.direct_url }}" \
+            --arg surl  "${{ steps.branch-creds.outputs.branch_api_url }}" \
+            --arg srkey "${{ steps.branch-creds.outputs.service_role_key }}" \
+            --arg jwt   "${{ steps.branch-creds.outputs.jwt_secret }}" \
+            --arg rem   "${{ secrets.INTERNAL_REMINDERS_TOKEN }}" \
+            --arg not   "${{ secrets.INTERNAL_NOTIFICATIONS_TOKEN }}" \
+            --arg phk   "${{ secrets.POSTHOG_KEY }}" \
+            --arg phh   "${{ secrets.NEXT_PUBLIC_POSTHOG_HOST }}" \
+            '{DATABASE_URL:$db, DIRECT_URL:$dir, SUPABASE_URL:$surl,
+              SUPABASE_SERVICE_ROLE_KEY:$srkey, JWT_SECRET:$jwt,
+              INTERNAL_REMINDERS_TOKEN_API:$rem, INTERNAL_NOTIFICATIONS_TOKEN:$not,
+              NODE_ENV:"production", NEXT_PUBLIC_APP_ENV:"preview",
+              POSTHOG_KEY:$phk, POSTHOG_HOST:$phh}')
+
+          api "$(jq -n \
+            --arg pid "$RAILWAY_PROJECT_ID" \
+            --arg eid "$ENV_ID" \
+            --arg sid "$SERVICE_ID" \
+            --argjson vars "$VARS_JSON" \
+            '{query:"mutation variableCollectionUpsert($input: VariableCollectionUpsertInput!) { variableCollectionUpsert(input: $input) }",
+              variables:{input:{projectId:$pid, environmentId:$eid, serviceId:$sid, variables:$vars}}}')"
+          echo "Variables set"
+
+          # ── 3. Trigger deployment via API ────────────────────────────────────
+          echo "Triggering Railway deployment..."
+          DEPLOY_RESP=$(api "{\"query\":\"mutation { serviceInstanceDeploy(serviceId: \\\"$SERVICE_ID\\\", environmentId: \\\"$ENV_ID\\\") }\"}")
+          echo "Deploy response: $(echo "$DEPLOY_RESP" | jq '.errors // .data')"
+
+          # ── 4. Poll for deployment health (3 attempts) ──────────────────────
+          # Note: latestDeployment.url is masked by GitHub Actions (contains Railway IDs).
+          # We use serviceDomains instead — the stable service URL doesn't contain UUIDs.
+          echo "Waiting for Railway API to become healthy..."
+          RAILWAY_API_URL=""
+          for i in $(seq 1 3); do
+            DEPLOY_INFO=$(api "{\"query\":\"query { serviceInstance(serviceId: \\\"$SERVICE_ID\\\", environmentId: \\\"$ENV_ID\\\") { latestDeployment { status } domains { serviceDomains { domain } } } }\"}")
+            DEPLOY_STATUS=$(echo "$DEPLOY_INFO" | jq -r '.data.serviceInstance.latestDeployment.status // empty')
+            DEPLOY_DOMAIN=$(echo "$DEPLOY_INFO" | jq -r '.data.serviceInstance.domains.serviceDomains[0].domain // empty')
+            echo "  Status: ${DEPLOY_STATUS:-(pending)}, Domain: ${DEPLOY_DOMAIN:-(none)} (attempt $i)"
+
+            if [[ -n "$DEPLOY_DOMAIN" ]]; then
+              RAILWAY_API_URL="$DEPLOY_DOMAIN"
+              HEALTH_STATUS=$(curl -sf -o /dev/null -w "%{http_code}" \
+                "https://${DEPLOY_DOMAIN}/healthz" 2>/dev/null || echo "000")
+              echo "  Health: $HEALTH_STATUS"
+              if [[ "$HEALTH_STATUS" == "200" ]]; then
+                echo "railway_api_url=https://${DEPLOY_DOMAIN}" >> "$GITHUB_OUTPUT"
+                break
+              fi
+            fi
+
+            if [[ $i -eq 3 ]]; then
+              echo "::warning::Railway health check timed out — deployment may still be starting"
+              echo "railway_api_url=https://${RAILWAY_API_URL:-pending}" >> "$GITHUB_OUTPUT"
+            fi
+            sleep 20
+          done
+
+      # 6. Set Vercel branch env vars
+      - name: Configure Vercel preview env vars
+        id: vercel
+        continue-on-error: true
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+        run: |
+          set -euo pipefail
+          BRANCH="${{ env.BRANCH_NAME }}"
+          PROJECT_ID="${VERCEL_PROJECT_ID:-}"
+          ORG_ID="${VERCEL_ORG_ID:-}"
+          TEAM_AMP=""
+          TEAM_Q=""
+
+          fail_vercel_config() {
+            echo "::error::$1"
+            exit 1
+          }
+
+          if [[ -z "$PROJECT_ID" ]]; then
+            fail_vercel_config "Missing VERCEL_PROJECT_ID."
+          fi
+
+          if [[ -z "$ORG_ID" ]]; then
+            fail_vercel_config "Missing VERCEL_ORG_ID."
+          fi
+
+          case "$ORG_ID" in
+            team_*)
+              TEAM_AMP="&teamId=${ORG_ID}"
+              TEAM_Q="?teamId=${ORG_ID}"
+              ;;
+            user_*)
+              ;;
+            *)
+              fail_vercel_config "VERCEL_ORG_ID must start with team_ or user_."
+              ;;
+          esac
+
+          PROJECT_RESP=$(curl -s -w "\n%{http_code}" \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v9/projects/${PROJECT_ID}${TEAM_Q}")
+          PROJECT_STATUS=$(echo "$PROJECT_RESP" | tail -1)
+          if [[ "$PROJECT_STATUS" != "200" ]]; then
+            fail_vercel_config "Vercel project preflight failed (HTTP ${PROJECT_STATUS}). Verify VERCEL_TOKEN access and that project ${PROJECT_ID} is accessible under org ${ORG_ID}."
+          fi
+
+          set_vercel_env() {
+            local KEY="$1" VALUE="$2"
+            # Delete existing branch-scoped var if present
+            EXISTING_ID=$(curl -sf \
+              -H "Authorization: Bearer $VERCEL_TOKEN" \
+              "https://api.vercel.com/v10/projects/${PROJECT_ID}/env?gitBranch=${BRANCH}${TEAM_AMP}" \
+              | jq -r --arg k "$KEY" '.envs[] | select(.key==$k) | .id' 2>/dev/null || echo "")
+
+            if [[ -n "$EXISTING_ID" ]]; then
+              curl -sf -X DELETE \
+                -H "Authorization: Bearer $VERCEL_TOKEN" \
+                "https://api.vercel.com/v10/projects/${PROJECT_ID}/env/${EXISTING_ID}${TEAM_Q}" > /dev/null
+            fi
+
+            POST_RESP=$(curl -s -w "\n%{http_code}" -X POST \
+              -H "Authorization: Bearer $VERCEL_TOKEN" \
+              -H "Content-Type: application/json" \
+              "https://api.vercel.com/v10/projects/${PROJECT_ID}/env${TEAM_Q}" \
+              -d "$(jq -n --arg k "$KEY" --arg v "$VALUE" --arg b "$BRANCH" \
+                '{"key":$k,"value":$v,"target":["preview"],"gitBranch":$b,"type":"encrypted"}')")
+            POST_STATUS=$(echo "$POST_RESP" | tail -1)
+            if [[ ! "$POST_STATUS" =~ ^2[0-9][0-9]$ ]]; then
+              echo "::error::Vercel env write failed for $KEY after successful project preflight (HTTP $POST_STATUS): $(echo "$POST_RESP" | head -1)"
+              exit 1
+            fi
+          }
+
+          # Only set vars the Vercel+Supabase connector doesn't manage.
+          # Supabase URL/keys are handled by the connector per-environment.
+          set_vercel_env "NEXT_PUBLIC_API_URL" "${{ steps.railway.outputs.railway_api_url }}"
+          set_vercel_env "NEXT_PUBLIC_APP_ENV" "preview"
+
+          # Fetch latest preview deployment URL for this branch
+          LATEST_DEPLOYMENT=$(curl -sf \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v6/deployments?projectId=${PROJECT_ID}&target=preview&limit=1&meta-githubCommitRef=${BRANCH}${TEAM_AMP}" \
+            | jq -r '.deployments[0].url // ""')
+
+          if [[ -n "$LATEST_DEPLOYMENT" ]]; then
+            echo "vercel_url=https://${LATEST_DEPLOYMENT}" >> "$GITHUB_OUTPUT"
+          else
+            echo "vercel_url=https://vercel.com/dashboard" >> "$GITHUB_OUTPUT"
+          fi
+
+      # 7. Post PR comment
+      - name: Post preview environment comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const webUrl = '${{ steps.vercel.outputs.vercel_url }}';
+            const apiUrl = '${{ steps.railway.outputs.railway_api_url }}';
+            const branchRef = '${{ steps.branch-creds.outputs.branch_ref }}';
+            const studioUrl = `https://supabase.com/dashboard/project/${branchRef}`;
+
+            const body = [
+              '## Preview Environment Ready',
+              '',
+              '| Service | URL |',
+              '|---------|-----|',
+              `| Web (Vercel) | ${webUrl} |`,
+              `| API (Railway) | ${apiUrl}/healthz |`,
+              `| Supabase Studio | ${studioUrl} |`,
+              '',
+              `**Mobile build** - [Actions -> EAS Preview Build](../../actions/workflows/eas-preview-build.yml) -> PR number: \`${prNumber}\``,
+            ].join('\n');
+
+            // Find and update existing comment, or create new one
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+            });
+
+            const existing = comments.find(c =>
+              c.user.type === 'Bot' && c.body.includes('Preview Environment Ready')
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body,
+              });
+            }

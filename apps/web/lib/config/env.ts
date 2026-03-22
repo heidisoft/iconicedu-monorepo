@@ -19,8 +19,10 @@ function requireUrlEnvValue(value: string | undefined, name: string): string {
 }
 
 function getPublicSupabaseUrl(source: EnvSource): string {
-  // Keep direct property access so Next.js can inline NEXT_PUBLIC_* vars for client bundles.
-  return requireUrlEnvValue(source.NEXT_PUBLIC_SUPABASE_URL, 'NEXT_PUBLIC_SUPABASE_URL');
+  // NEXT_PUBLIC_SUPABASE_URL — kept as NEXT_PUBLIC_ so Next.js inlines it into client bundles.
+  // SUPABASE_URL — Vercel+Supabase connector name (server-side only, not available in browser).
+  const url = source.NEXT_PUBLIC_SUPABASE_URL ?? source.SUPABASE_URL;
+  return requireUrlEnvValue(url, 'NEXT_PUBLIC_SUPABASE_URL');
 }
 
 function getServiceRoleKey(source: EnvSource): string {
@@ -28,16 +30,15 @@ function getServiceRoleKey(source: EnvSource): string {
 }
 
 function getPublishableKey(source: EnvSource): string {
-  const publishable = source.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
-  if (publishable?.trim()) {
-    return publishable.trim();
-  }
-  const anon = source.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (anon?.trim()) {
-    return anon.trim();
+  // NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY — Vercel+Supabase connector name.
+  // NEXT_PUBLIC_SUPABASE_ANON_KEY — fallback for local dev / manual setup.
+  const key =
+    source.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? source.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (key?.trim()) {
+    return key.trim();
   }
   throw new Error(
-    'Missing required environment variable: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY',
+    'Missing required environment variable: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
   );
 }
 
@@ -46,8 +47,9 @@ export function getPublicWebEnv(source?: EnvSource) {
   // statically inline NEXT_PUBLIC_* values into the client bundle.
   const s = source ?? {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY:
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY,
+    SUPABASE_URL: process.env.SUPABASE_URL, // Vercel+Supabase connector (server-side only)
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   };
   return {
