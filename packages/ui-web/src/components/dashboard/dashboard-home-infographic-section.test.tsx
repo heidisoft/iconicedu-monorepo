@@ -440,6 +440,7 @@ describe('DashboardHomeInfographicSection', () => {
     render(
       <DashboardHomeInfographicSection
         orgSlug="iconic-academy"
+        isStudentView
         canRequestClasses
         requestRole="students"
         requestableStudents={[{ profileId: 'child-1', displayName: 'Maya Morgan' }]}
