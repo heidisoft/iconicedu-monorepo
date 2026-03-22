@@ -29,8 +29,8 @@ jobs:
         with:
           version: latest
 
-      # 1. Create Supabase preview branch
-      - name: Create Supabase branch
+      # 1. Wait for Supabase preview branch (created automatically by GitHub Integration)
+      - name: Wait for Supabase branch
         id: supabase-branch
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
@@ -38,38 +38,33 @@ jobs:
           set -euo pipefail
           BRANCH_NAME="pr-${PR_NUMBER}"
 
-          # Check if branch already exists (synchronize runs reuse the same branch)
+          # Detect new vs existing before waiting — determines whether to seed below.
+          # On `opened`: branch won't exist yet (Integration creates it asynchronously).
+          # On `synchronize`: branch already exists from the previous run.
           EXISTING_ID=$(supabase branches list \
             --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}" \
             --output json \
             | jq -r --arg name "$BRANCH_NAME" '.[] | select(.name==$name) | .id // ""')
 
-          if [[ -z "$EXISTING_ID" ]]; then
-            echo "Creating new branch: $BRANCH_NAME"
-            supabase branches create \
-              --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}" \
-              --name "$BRANCH_NAME" \
-              --region ap-southeast-1 \
-              2>&1 || true
-            echo "branch_new=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "Branch $BRANCH_NAME already exists (id: $EXISTING_ID)"
+          if [[ -n "$EXISTING_ID" ]]; then
+            echo "Branch $BRANCH_NAME already exists — skipping seed"
             echo "branch_new=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Branch $BRANCH_NAME not yet present — will seed once ready"
+            echo "branch_new=true" >> "$GITHUB_OUTPUT"
           fi
 
-          echo "Waiting for branch migrations to complete..."
+          echo "Waiting for Supabase GitHub Integration to finish..."
           for i in $(seq 1 30); do
-            STATUS=$(supabase branches list \
+            BRANCH_DATA=$(supabase branches list \
               --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}" \
               --output json \
-              | jq -r --arg name "$BRANCH_NAME" '.[] | select(.name==$name) | .status')
+              | jq --arg name "$BRANCH_NAME" '.[] | select(.name==$name)')
 
-            BRANCH_ID=$(supabase branches list \
-              --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}" \
-              --output json \
-              | jq -r --arg name "$BRANCH_NAME" '.[] | select(.name==$name) | .id')
+            STATUS=$(echo "$BRANCH_DATA" | jq -r '.status // ""')
+            BRANCH_ID=$(echo "$BRANCH_DATA" | jq -r '.id // ""')
 
-            echo "  Status: $STATUS"
+            echo "  Status: ${STATUS:-(not yet created)}"
 
             if [[ "$STATUS" == "MIGRATIONS_PASSED" ]]; then
               echo "branch_id=$BRANCH_ID" >> "$GITHUB_OUTPUT"
