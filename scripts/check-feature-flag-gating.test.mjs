@@ -56,3 +56,16 @@ test('passes with explicit exemption tag', () => {
 
   assert.equal(violations.length, 0);
 });
+
+test('passes for web config plumbing changes without flag usage', () => {
+  const violations = evaluateFeatureFlagGating({
+    changedFiles: ['apps/web/lib/config/env.ts'],
+    sources: {
+      'apps/web/lib/config/env.ts': 'export function getPublicWebEnv() { return {}; }',
+    },
+    prBody: '',
+    commitMessage: '',
+  });
+
+  assert.equal(violations.length, 0);
+});
