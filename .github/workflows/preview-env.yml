@@ -152,7 +152,7 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
-          BRANCH_REF="${{ steps.branch-creds.outputs.branch_ref }}"
+          BRANCH_REF="${{ steps.supabase-branch.outputs.branch_ref }}"
           for fn in reminders-dispatch notifications-dispatch channel-read-state-repair; do
             supabase functions deploy "$fn" \
               --project-ref "$BRANCH_REF" \
@@ -239,9 +239,10 @@ jobs:
           echo "Waiting for Railway API to become healthy..."
           RAILWAY_API_URL=""
           for i in $(seq 1 18); do
-            DEPLOY_INFO=$(api "{\"query\":\"query { deployments(input: {projectId: \\\"$RAILWAY_PROJECT_ID\\\", environmentId: \\\"$ENV_ID\\\", serviceId: \\\"$SERVICE_ID\\\"}) { edges { node { status url } } } }\"}")
-            DEPLOY_STATUS=$(echo "$DEPLOY_INFO" | jq -r '.data.deployments.edges[0].node.status // empty')
-            DEPLOY_URL=$(echo "$DEPLOY_INFO" | jq -r '.data.deployments.edges[0].node.url // empty')
+            DEPLOY_INFO=$(api "{\"query\":\"query { serviceInstance(serviceId: \\\"$SERVICE_ID\\\", environmentId: \\\"$ENV_ID\\\") { latestDeployment { status url } } }\"}")
+            [[ $i -eq 1 ]] && echo "Poll response sample: $(echo "$DEPLOY_INFO" | jq '.errors // .data')"
+            DEPLOY_STATUS=$(echo "$DEPLOY_INFO" | jq -r '.data.serviceInstance.latestDeployment.status // empty')
+            DEPLOY_URL=$(echo "$DEPLOY_INFO" | jq -r '.data.serviceInstance.latestDeployment.url // empty')
             echo "  Status: ${DEPLOY_STATUS:-(pending)} (attempt $i)"
 
             if [[ -n "$DEPLOY_URL" ]]; then
@@ -286,17 +287,17 @@ jobs:
                 "https://api.vercel.com/v10/projects/${PROJECT_ID}/env/${EXISTING_ID}" > /dev/null
             fi
 
-            curl -sf -X POST \
+            POST_RESP=$(curl -s -w "\n%{http_code}" -X POST \
               -H "Authorization: Bearer $VERCEL_TOKEN" \
               -H "Content-Type: application/json" \
               "https://api.vercel.com/v10/projects/${PROJECT_ID}/env" \
-              -d "{
-                \"key\": \"$KEY\",
-                \"value\": \"$VALUE\",
-                \"target\": [\"preview\"],
-                \"gitBranch\": \"$BRANCH\",
-                \"type\": \"encrypted\"
-              }" > /dev/null
+              -d "$(jq -n --arg k "$KEY" --arg v "$VALUE" --arg b "$BRANCH" \
+                '{"key":$k,"value":$v,"target":["preview"],"gitBranch":$b,"type":"encrypted"}')")
+            POST_STATUS=$(echo "$POST_RESP" | tail -1)
+            if [[ "$POST_STATUS" != "200" ]]; then
+              echo "::error::Vercel env set failed for $KEY (HTTP $POST_STATUS): $(echo "$POST_RESP" | head -1)"
+              exit 1
+            fi
           }
 
           set_vercel_env "NEXT_PUBLIC_SUPABASE_URL"              "${{ steps.branch-creds.outputs.branch_api_url }}"
