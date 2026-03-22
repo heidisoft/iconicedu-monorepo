@@ -4,16 +4,12 @@ import Constants from 'expo-constants';
 import { PostHogProvider, usePostHog } from 'posthog-react-native';
 import type { AnalyticsClient } from '@iconicedu/utils';
 import { createNoopAnalytics } from '@iconicedu/utils';
+import { getMobilePostHogEnv } from '@/lib/config/env';
 
-const POSTHOG_KEY: string =
-  (Constants.expoConfig?.extra?.['posthogKey'] as string | undefined) ??
-  process.env.EXPO_PUBLIC_POSTHOG_KEY ??
-  '';
-
-const POSTHOG_HOST: string =
-  (Constants.expoConfig?.extra?.['posthogHost'] as string | undefined) ??
-  process.env.EXPO_PUBLIC_POSTHOG_HOST ??
-  'https://us.i.posthog.com';
+const { posthogKey: POSTHOG_KEY, posthogHost: POSTHOG_HOST } = getMobilePostHogEnv({
+  expoExtra:
+    (Constants.expoConfig?.extra as Record<string, unknown> | undefined) ?? undefined,
+});
 
 // Only enable session replay when the native module is actually linked.
 // Without this guard, PostHogProvider crashes in Expo Go / non-prebuild builds,

@@ -1,0 +1,68 @@
+name: Staging Reseed
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 4 * * *'
+
+jobs:
+  reseed:
+    name: Reset, Migrate, and Seed Staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: staging
+
+    env:
+      ICONIC_ENV_NAME: staging
+      ICONIC_ENV_TIER: staging
+      SUPABASE_PROJECT_REF: ${{ secrets.STAGING_SUPABASE_PROJECT_REF }}
+      DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+      SEED_DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+      SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}
+      JWT_SECRET: ${{ secrets.STAGING_JWT_SECRET }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.STAGING_NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.STAGING_NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.STAGING_EXPO_PUBLIC_SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.STAGING_EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+      NEXT_PUBLIC_POSTHOG_KEY: ${{ secrets.STAGING_NEXT_PUBLIC_POSTHOG_KEY }}
+      NEXT_PUBLIC_POSTHOG_HOST: ${{ secrets.STAGING_NEXT_PUBLIC_POSTHOG_HOST }}
+      POSTHOG_KEY: ${{ secrets.STAGING_POSTHOG_KEY }}
+      POSTHOG_HOST: ${{ secrets.STAGING_POSTHOG_HOST }}
+      EXPO_PUBLIC_POSTHOG_KEY: ${{ secrets.STAGING_EXPO_PUBLIC_POSTHOG_KEY }}
+      EXPO_PUBLIC_POSTHOG_HOST: ${{ secrets.STAGING_EXPO_PUBLIC_POSTHOG_HOST }}
+      INTERNAL_REMINDERS_TOKEN: ${{ secrets.STAGING_INTERNAL_REMINDERS_TOKEN }}
+      INTERNAL_NOTIFICATIONS_TOKEN: ${{ secrets.STAGING_INTERNAL_NOTIFICATIONS_TOKEN }}
+      INTERNAL_ACTIVITY_FEED_TOKEN: ${{ secrets.STAGING_INTERNAL_ACTIVITY_FEED_TOKEN }}
+      INTERNAL_REMINDERS_TOKEN_API: ${{ secrets.STAGING_INTERNAL_REMINDERS_TOKEN_API }}
+      DAILY_API_KEY: ${{ secrets.STAGING_DAILY_API_KEY }}
+      DAILY_WEBHOOK_SECRET: ${{ secrets.STAGING_DAILY_WEBHOOK_SECRET }}
+      REMINDERS_DISPATCH_URL: ${{ secrets.STAGING_REMINDERS_DISPATCH_URL }}
+      NOTIFICATIONS_DISPATCH_URL: ${{ secrets.STAGING_NOTIFICATIONS_DISPATCH_URL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate staging environment contract
+        run: pnpm env:validate:staging
+
+      - name: Apply staging migrations before reseed
+        run: supabase db push --db-url "$DATABASE_URL" --include-all --yes
+
+      - name: Reseed staging database
+        run: pnpm seed:staging

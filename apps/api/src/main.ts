@@ -2,8 +2,11 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from '@iconicedu/api/app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { validateApiRuntimeEnv } from '@iconicedu/api/config/env';
 
 async function bootstrap() {
+  validateApiRuntimeEnv();
+
   const app = await NestFactory.create(AppModule, { cors: true });
 
   app.useGlobalPipes(

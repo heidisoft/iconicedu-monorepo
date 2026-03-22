@@ -15,6 +15,13 @@ export {
 } from './analytics';
 
 export {
+  type EmailNotificationPayload,
+  type EmailNotificationProvider,
+  type SmsNotificationPayload,
+  type SmsNotificationProvider,
+} from './notifications';
+
+export {
   type DateStylePreset,
   type DateTimeStylePreset,
   type TimeStylePreset,

@@ -8,22 +8,37 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
+        "ICONIC_ENV_NAME": "local-mobile",
+        "ICONIC_ENV_TIER": "local",
         "EXPO_PUBLIC_SUPABASE_URL": "",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": ""
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "",
+        "EXPO_PUBLIC_POSTHOG_KEY": "",
+        "EXPO_PUBLIC_POSTHOG_HOST": "https://us.i.posthog.com",
+        "EAS_PROJECT_ID": ""
       }
     },
     "preview": {
       "distribution": "internal",
       "env": {
+        "ICONIC_ENV_NAME": "preview",
+        "ICONIC_ENV_TIER": "preview",
         "EXPO_PUBLIC_SUPABASE_URL": "",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": ""
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "",
+        "EXPO_PUBLIC_POSTHOG_KEY": "",
+        "EXPO_PUBLIC_POSTHOG_HOST": "https://us.i.posthog.com",
+        "EAS_PROJECT_ID": ""
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
+        "ICONIC_ENV_NAME": "production",
+        "ICONIC_ENV_TIER": "production",
         "EXPO_PUBLIC_SUPABASE_URL": "",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": ""
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "",
+        "EXPO_PUBLIC_POSTHOG_KEY": "",
+        "EXPO_PUBLIC_POSTHOG_HOST": "https://us.i.posthog.com",
+        "EAS_PROJECT_ID": ""
       }
     }
   },

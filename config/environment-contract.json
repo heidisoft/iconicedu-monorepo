@@ -1,0 +1,423 @@
+{
+  "variables": {
+    "ICONIC_ENV_NAME": {
+      "description": "Human-readable environment name shared across web, api, mobile, and CI.",
+      "example": "local",
+      "owner": "platform",
+      "classification": "public"
+    },
+    "ICONIC_ENV_TIER": {
+      "description": "Environment tier identifier for promotion policy and automation.",
+      "example": "local",
+      "owner": "platform",
+      "classification": "public"
+    },
+    "ICONIC_PREVIEW_BRANCH": {
+      "description": "Git branch or PR identifier for preview deployments.",
+      "example": "pr-123",
+      "owner": "platform",
+      "classification": "public"
+    },
+    "ICONIC_PREVIEW_REF": {
+      "description": "Stable preview deployment reference shared across services.",
+      "example": "preview-pr-123",
+      "owner": "platform",
+      "classification": "public"
+    },
+    "SUPABASE_PROJECT_REF": {
+      "description": "Hosted Supabase project or branch ref for the active environment.",
+      "example": "abcdefgh",
+      "owner": "supabase",
+      "classification": "public"
+    },
+    "NEXT_PUBLIC_SUPABASE_URL": {
+      "description": "Browser-safe Supabase project URL for the web app.",
+      "example": "http://127.0.0.1:54321",
+      "owner": "supabase",
+      "classification": "public"
+    },
+    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY": {
+      "description": "Preferred publishable Supabase key for the web app.",
+      "example": "your-local-publishable-key",
+      "owner": "supabase",
+      "classification": "public"
+    },
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": {
+      "description": "Legacy anon Supabase key fallback for the web app.",
+      "example": "your-local-anon-key",
+      "owner": "supabase",
+      "classification": "public"
+    },
+    "SUPABASE_SERVICE_ROLE_KEY": {
+      "description": "Server-only Supabase service role key used by web, api, and edge jobs.",
+      "example": "your-service-role-key",
+      "owner": "supabase",
+      "classification": "secret"
+    },
+    "SUPABASE_URL": {
+      "description": "Server-side Supabase project URL for the API and edge functions.",
+      "example": "http://127.0.0.1:54321",
+      "owner": "supabase",
+      "classification": "secret"
+    },
+    "SUPABASE_JWT_SECRET": {
+      "description": "Supabase JWT secret for cookie signing and admin flows where needed.",
+      "example": "your-jwt-secret",
+      "owner": "supabase",
+      "classification": "secret"
+    },
+    "DATABASE_URL": {
+      "description": "Primary pooled Postgres connection string for the API and scripts.",
+      "example": "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
+      "owner": "supabase",
+      "classification": "secret"
+    },
+    "DIRECT_URL": {
+      "description": "Direct Postgres connection string for Prisma migrations and admin work.",
+      "example": "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
+      "owner": "supabase",
+      "classification": "secret"
+    },
+    "JWT_SECRET": {
+      "description": "JWT secret used by the API to verify Supabase-issued tokens.",
+      "example": "your-jwt-secret",
+      "owner": "supabase",
+      "classification": "secret"
+    },
+    "SEED_DATABASE_URL": {
+      "description": "Optional override for deterministic seed packs.",
+      "example": "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
+      "owner": "supabase",
+      "classification": "secret"
+    },
+    "EXPO_PUBLIC_SUPABASE_URL": {
+      "description": "Public Supabase URL inlined into Expo builds.",
+      "example": "http://127.0.0.1:54321",
+      "owner": "supabase",
+      "classification": "public"
+    },
+    "EXPO_PUBLIC_SUPABASE_ANON_KEY": {
+      "description": "Public Supabase anon key inlined into Expo builds.",
+      "example": "your-local-anon-key",
+      "owner": "supabase",
+      "classification": "public"
+    },
+    "NEXT_PUBLIC_POSTHOG_KEY": {
+      "description": "Browser-safe PostHog project key for the web app.",
+      "example": "phc_non_prod_key",
+      "owner": "posthog",
+      "classification": "public"
+    },
+    "NEXT_PUBLIC_POSTHOG_HOST": {
+      "description": "PostHog ingestion host for the web app.",
+      "example": "https://us.i.posthog.com",
+      "owner": "posthog",
+      "classification": "public"
+    },
+    "POSTHOG_KEY": {
+      "description": "Server-side PostHog project key for API analytics and web flag evaluation.",
+      "example": "phc_non_prod_key",
+      "owner": "posthog",
+      "classification": "secret"
+    },
+    "POSTHOG_HOST": {
+      "description": "Server-side PostHog host for API analytics and flag evaluation.",
+      "example": "https://us.i.posthog.com",
+      "owner": "posthog",
+      "classification": "secret"
+    },
+    "EXPO_PUBLIC_POSTHOG_KEY": {
+      "description": "Public PostHog project key inlined into Expo builds.",
+      "example": "phc_non_prod_key",
+      "owner": "posthog",
+      "classification": "public"
+    },
+    "EXPO_PUBLIC_POSTHOG_HOST": {
+      "description": "PostHog ingestion host for the Expo app.",
+      "example": "https://us.i.posthog.com",
+      "owner": "posthog",
+      "classification": "public"
+    },
+    "DAILY_API_KEY": {
+      "description": "Daily REST API key for hosted live-session room creation.",
+      "example": "daily_sandbox_key",
+      "owner": "daily",
+      "classification": "secret"
+    },
+    "DAILY_REST_BASE_URL": {
+      "description": "Optional Daily API base URL override.",
+      "example": "https://api.daily.co/v1",
+      "owner": "daily",
+      "classification": "public"
+    },
+    "DAILY_WEBHOOK_SECRET": {
+      "description": "Daily webhook signing secret.",
+      "example": "daily_webhook_secret",
+      "owner": "daily",
+      "classification": "secret"
+    },
+    "INTERNAL_REMINDERS_TOKEN": {
+      "description": "Web or edge-function token for internal reminders dispatch endpoints.",
+      "example": "replace-with-long-random-secret",
+      "owner": "platform",
+      "classification": "secret"
+    },
+    "INTERNAL_REMINDERS_TOKEN_API": {
+      "description": "API-side token for reminders dispatch auth.",
+      "example": "replace-with-long-random-secret",
+      "owner": "platform",
+      "classification": "secret"
+    },
+    "INTERNAL_NOTIFICATIONS_TOKEN": {
+      "description": "Internal token for notifications dispatch endpoints.",
+      "example": "replace-with-long-random-secret",
+      "owner": "platform",
+      "classification": "secret"
+    },
+    "INTERNAL_ACTIVITY_FEED_TOKEN": {
+      "description": "Internal token for activity-feed projection endpoints.",
+      "example": "replace-with-long-random-secret",
+      "owner": "platform",
+      "classification": "secret"
+    },
+    "REMINDERS_DISPATCH_URL": {
+      "description": "Supabase Edge Function target URL for reminders dispatch.",
+      "example": "http://127.0.0.1:3001/internal/reminders/dispatch",
+      "owner": "platform",
+      "classification": "secret"
+    },
+    "NOTIFICATIONS_DISPATCH_URL": {
+      "description": "Supabase Edge Function target URL for notifications dispatch.",
+      "example": "http://127.0.0.1:3000/api/internal/notifications/dispatch",
+      "owner": "platform",
+      "classification": "secret"
+    },
+    "REMINDERS_DISPATCH_LIMIT": {
+      "description": "Optional reminders dispatch batch size override.",
+      "example": "100",
+      "owner": "platform",
+      "classification": "public"
+    },
+    "REMINDERS_DISPATCH_LEASE_SECONDS": {
+      "description": "Optional reminders lease duration override.",
+      "example": "120",
+      "owner": "platform",
+      "classification": "public"
+    },
+    "REMINDERS_DISPATCH_LEASE_OWNER": {
+      "description": "Optional reminders lease owner identifier.",
+      "example": "supabase-edge-cron",
+      "owner": "platform",
+      "classification": "public"
+    },
+    "NOTIFICATIONS_DISPATCH_LIMIT": {
+      "description": "Optional notifications dispatch batch size override.",
+      "example": "100",
+      "owner": "platform",
+      "classification": "public"
+    },
+    "NOTIFICATIONS_DISPATCH_LEASE_SECONDS": {
+      "description": "Optional notifications lease duration override.",
+      "example": "120",
+      "owner": "platform",
+      "classification": "public"
+    },
+    "NOTIFICATIONS_DISPATCH_LEASE_OWNER": {
+      "description": "Optional notifications lease owner identifier.",
+      "example": "supabase-edge-cron",
+      "owner": "platform",
+      "classification": "public"
+    },
+    "EAS_PROJECT_ID": {
+      "description": "Expo Application Services project identifier for push and build coordination.",
+      "example": "00000000-0000-0000-0000-000000000000",
+      "owner": "expo",
+      "classification": "public"
+    }
+  },
+  "files": {
+    "apps/web/.env.local.example": [
+      "ICONIC_ENV_NAME",
+      "ICONIC_ENV_TIER",
+      "ICONIC_PREVIEW_BRANCH",
+      "ICONIC_PREVIEW_REF",
+      "SUPABASE_PROJECT_REF",
+      "NEXT_PUBLIC_SUPABASE_URL",
+      "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY",
+      "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+      "SUPABASE_SERVICE_ROLE_KEY",
+      "INTERNAL_REMINDERS_TOKEN",
+      "INTERNAL_NOTIFICATIONS_TOKEN",
+      "INTERNAL_ACTIVITY_FEED_TOKEN",
+      "NEXT_PUBLIC_POSTHOG_KEY",
+      "NEXT_PUBLIC_POSTHOG_HOST",
+      "POSTHOG_KEY",
+      "POSTHOG_HOST",
+      "DAILY_API_KEY",
+      "DAILY_REST_BASE_URL",
+      "DAILY_WEBHOOK_SECRET"
+    ],
+    "apps/mobile/.env.example": [
+      "ICONIC_ENV_NAME",
+      "ICONIC_ENV_TIER",
+      "ICONIC_PREVIEW_BRANCH",
+      "ICONIC_PREVIEW_REF",
+      "SUPABASE_PROJECT_REF",
+      "EXPO_PUBLIC_SUPABASE_URL",
+      "EXPO_PUBLIC_SUPABASE_ANON_KEY",
+      "EXPO_PUBLIC_POSTHOG_KEY",
+      "EXPO_PUBLIC_POSTHOG_HOST",
+      "EAS_PROJECT_ID"
+    ],
+    "apps/api/.env.example": [
+      "ICONIC_ENV_NAME",
+      "ICONIC_ENV_TIER",
+      "ICONIC_PREVIEW_BRANCH",
+      "ICONIC_PREVIEW_REF",
+      "SUPABASE_PROJECT_REF",
+      "DATABASE_URL",
+      "DIRECT_URL",
+      "SEED_DATABASE_URL",
+      "SUPABASE_URL",
+      "SUPABASE_SERVICE_ROLE_KEY",
+      "JWT_SECRET",
+      "SUPABASE_JWT_SECRET",
+      "INTERNAL_REMINDERS_TOKEN_API",
+      "POSTHOG_KEY",
+      "POSTHOG_HOST"
+    ]
+  },
+  "targets": {
+    "local-web": {
+      "required": [
+        "ICONIC_ENV_NAME",
+        "ICONIC_ENV_TIER",
+        "NEXT_PUBLIC_SUPABASE_URL",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "INTERNAL_REMINDERS_TOKEN",
+        "INTERNAL_NOTIFICATIONS_TOKEN",
+        "INTERNAL_ACTIVITY_FEED_TOKEN"
+      ],
+      "anyOf": [
+        ["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY"],
+        ["NEXT_PUBLIC_SUPABASE_ANON_KEY"]
+      ]
+    },
+    "local-api": {
+      "required": [
+        "ICONIC_ENV_NAME",
+        "ICONIC_ENV_TIER",
+        "DATABASE_URL",
+        "DIRECT_URL",
+        "SUPABASE_URL",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "JWT_SECRET"
+      ]
+    },
+    "local-mobile": {
+      "required": [
+        "ICONIC_ENV_NAME",
+        "ICONIC_ENV_TIER",
+        "EXPO_PUBLIC_SUPABASE_URL",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY"
+      ]
+    },
+    "preview": {
+      "required": [
+        "ICONIC_ENV_NAME",
+        "ICONIC_ENV_TIER",
+        "ICONIC_PREVIEW_BRANCH",
+        "ICONIC_PREVIEW_REF",
+        "SUPABASE_PROJECT_REF",
+        "NEXT_PUBLIC_SUPABASE_URL",
+        "SUPABASE_URL",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "DATABASE_URL",
+        "DIRECT_URL",
+        "JWT_SECRET",
+        "EXPO_PUBLIC_SUPABASE_URL",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY",
+        "NEXT_PUBLIC_POSTHOG_KEY",
+        "NEXT_PUBLIC_POSTHOG_HOST",
+        "POSTHOG_KEY",
+        "POSTHOG_HOST",
+        "EXPO_PUBLIC_POSTHOG_KEY",
+        "EXPO_PUBLIC_POSTHOG_HOST",
+        "INTERNAL_REMINDERS_TOKEN",
+        "INTERNAL_NOTIFICATIONS_TOKEN",
+        "INTERNAL_ACTIVITY_FEED_TOKEN",
+        "INTERNAL_REMINDERS_TOKEN_API"
+      ],
+      "anyOf": [
+        ["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY"],
+        ["NEXT_PUBLIC_SUPABASE_ANON_KEY"]
+      ]
+    },
+    "staging": {
+      "required": [
+        "ICONIC_ENV_NAME",
+        "ICONIC_ENV_TIER",
+        "SUPABASE_PROJECT_REF",
+        "NEXT_PUBLIC_SUPABASE_URL",
+        "SUPABASE_URL",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "DATABASE_URL",
+        "DIRECT_URL",
+        "JWT_SECRET",
+        "EXPO_PUBLIC_SUPABASE_URL",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY",
+        "NEXT_PUBLIC_POSTHOG_KEY",
+        "NEXT_PUBLIC_POSTHOG_HOST",
+        "POSTHOG_KEY",
+        "POSTHOG_HOST",
+        "EXPO_PUBLIC_POSTHOG_KEY",
+        "EXPO_PUBLIC_POSTHOG_HOST",
+        "INTERNAL_REMINDERS_TOKEN",
+        "INTERNAL_NOTIFICATIONS_TOKEN",
+        "INTERNAL_ACTIVITY_FEED_TOKEN",
+        "INTERNAL_REMINDERS_TOKEN_API",
+        "DAILY_API_KEY",
+        "DAILY_WEBHOOK_SECRET",
+        "REMINDERS_DISPATCH_URL",
+        "NOTIFICATIONS_DISPATCH_URL"
+      ],
+      "anyOf": [
+        ["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY"],
+        ["NEXT_PUBLIC_SUPABASE_ANON_KEY"]
+      ]
+    },
+    "production": {
+      "required": [
+        "ICONIC_ENV_NAME",
+        "ICONIC_ENV_TIER",
+        "SUPABASE_PROJECT_REF",
+        "NEXT_PUBLIC_SUPABASE_URL",
+        "SUPABASE_URL",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "DATABASE_URL",
+        "DIRECT_URL",
+        "JWT_SECRET",
+        "EXPO_PUBLIC_SUPABASE_URL",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY",
+        "NEXT_PUBLIC_POSTHOG_KEY",
+        "NEXT_PUBLIC_POSTHOG_HOST",
+        "POSTHOG_KEY",
+        "POSTHOG_HOST",
+        "EXPO_PUBLIC_POSTHOG_KEY",
+        "EXPO_PUBLIC_POSTHOG_HOST",
+        "INTERNAL_REMINDERS_TOKEN",
+        "INTERNAL_NOTIFICATIONS_TOKEN",
+        "INTERNAL_ACTIVITY_FEED_TOKEN",
+        "INTERNAL_REMINDERS_TOKEN_API",
+        "DAILY_API_KEY",
+        "DAILY_WEBHOOK_SECRET",
+        "REMINDERS_DISPATCH_URL",
+        "NOTIFICATIONS_DISPATCH_URL"
+      ],
+      "anyOf": [
+        ["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY"],
+        ["NEXT_PUBLIC_SUPABASE_ANON_KEY"]
+      ]
+    }
+  }
+}

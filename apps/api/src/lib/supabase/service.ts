@@ -1,16 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
-
-function requireEnv(name: string): string {
-  const value = process.env[name]?.trim();
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`);
-  }
-  return value;
-}
+import { getApiRuntimeEnv } from '@iconicedu/api/config/env';
 
 export function createSupabaseServiceClient() {
-  const supabaseUrl = requireEnv('SUPABASE_URL');
-  const supabaseServiceRoleKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
+  const { supabaseUrl, supabaseServiceRoleKey } = getApiRuntimeEnv();
 
   return createClient(supabaseUrl, supabaseServiceRoleKey, {
     auth: { persistSession: false },

@@ -1,0 +1,123 @@
+name: Preview Branch Attach And Provision
+
+on:
+  workflow_call:
+    inputs:
+      preview_branch_name:
+        description: Existing Supabase preview branch or PR identifier to attach to.
+        required: true
+        type: string
+      fresh_branch:
+        description: Whether the attached Supabase-managed preview branch is freshly created.
+        required: false
+        default: true
+        type: boolean
+    secrets:
+      PREVIEW_DATABASE_URL:
+        required: true
+      PREVIEW_SUPABASE_PROJECT_REF:
+        required: true
+      PREVIEW_SUPABASE_URL:
+        required: true
+      PREVIEW_SUPABASE_SERVICE_ROLE_KEY:
+        required: true
+      PREVIEW_JWT_SECRET:
+        required: true
+      PREVIEW_NEXT_PUBLIC_SUPABASE_URL:
+        required: true
+      PREVIEW_NEXT_PUBLIC_SUPABASE_ANON_KEY:
+        required: true
+      PREVIEW_EXPO_PUBLIC_SUPABASE_URL:
+        required: true
+      PREVIEW_EXPO_PUBLIC_SUPABASE_ANON_KEY:
+        required: true
+      PREVIEW_NEXT_PUBLIC_POSTHOG_KEY:
+        required: true
+      PREVIEW_NEXT_PUBLIC_POSTHOG_HOST:
+        required: true
+      PREVIEW_POSTHOG_KEY:
+        required: true
+      PREVIEW_POSTHOG_HOST:
+        required: true
+      PREVIEW_EXPO_PUBLIC_POSTHOG_KEY:
+        required: true
+      PREVIEW_EXPO_PUBLIC_POSTHOG_HOST:
+        required: true
+      PREVIEW_INTERNAL_REMINDERS_TOKEN:
+        required: true
+      PREVIEW_INTERNAL_NOTIFICATIONS_TOKEN:
+        required: true
+      PREVIEW_INTERNAL_ACTIVITY_FEED_TOKEN:
+        required: true
+      PREVIEW_INTERNAL_REMINDERS_TOKEN_API:
+        required: true
+
+jobs:
+  provision:
+    name: Attach, Migrate, and Seed Preview Branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      ICONIC_ENV_NAME: preview
+      ICONIC_ENV_TIER: preview
+      ICONIC_PREVIEW_BRANCH: ${{ inputs.preview_branch_name }}
+      ICONIC_PREVIEW_REF: preview-${{ inputs.preview_branch_name }}
+      SUPABASE_PROJECT_REF: ${{ secrets.PREVIEW_SUPABASE_PROJECT_REF }}
+      DATABASE_URL: ${{ secrets.PREVIEW_DATABASE_URL }}
+      SEED_DATABASE_URL: ${{ secrets.PREVIEW_DATABASE_URL }}
+      SUPABASE_URL: ${{ secrets.PREVIEW_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.PREVIEW_SUPABASE_SERVICE_ROLE_KEY }}
+      JWT_SECRET: ${{ secrets.PREVIEW_JWT_SECRET }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.PREVIEW_NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.PREVIEW_NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.PREVIEW_EXPO_PUBLIC_SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.PREVIEW_EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+      NEXT_PUBLIC_POSTHOG_KEY: ${{ secrets.PREVIEW_NEXT_PUBLIC_POSTHOG_KEY }}
+      NEXT_PUBLIC_POSTHOG_HOST: ${{ secrets.PREVIEW_NEXT_PUBLIC_POSTHOG_HOST }}
+      POSTHOG_KEY: ${{ secrets.PREVIEW_POSTHOG_KEY }}
+      POSTHOG_HOST: ${{ secrets.PREVIEW_POSTHOG_HOST }}
+      EXPO_PUBLIC_POSTHOG_KEY: ${{ secrets.PREVIEW_EXPO_PUBLIC_POSTHOG_KEY }}
+      EXPO_PUBLIC_POSTHOG_HOST: ${{ secrets.PREVIEW_EXPO_PUBLIC_POSTHOG_HOST }}
+      INTERNAL_REMINDERS_TOKEN: ${{ secrets.PREVIEW_INTERNAL_REMINDERS_TOKEN }}
+      INTERNAL_NOTIFICATIONS_TOKEN: ${{ secrets.PREVIEW_INTERNAL_NOTIFICATIONS_TOKEN }}
+      INTERNAL_ACTIVITY_FEED_TOKEN: ${{ secrets.PREVIEW_INTERNAL_ACTIVITY_FEED_TOKEN }}
+      INTERNAL_REMINDERS_TOKEN_API: ${{ secrets.PREVIEW_INTERNAL_REMINDERS_TOKEN_API }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate preview environment contract
+        run: pnpm env:validate:preview
+
+      - name: Confirm workflow ownership model
+        run: |
+          echo "This workflow attaches to an existing Supabase preview branch."
+          echo "Supabase GitHub integration owns preview branch lifecycle."
+          echo "This repo workflow owns validation, migrations, and guarded seeding only."
+
+      - name: Apply preview migrations
+        run: supabase db push --db-url "$DATABASE_URL" --include-all --yes
+
+      - name: Seed preview branch
+        if: ${{ inputs.fresh_branch }}
+        run: pnpm seed:preview
+
+      - name: Skip non-fresh preview branch reseed
+        if: ${{ !inputs.fresh_branch }}
+        run: echo "Skipping preview seed import because the branch is not fresh."

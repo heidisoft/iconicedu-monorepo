@@ -2,6 +2,10 @@
 
 Step-by-step guide to get the IconicEdu monorepo running on your machine.
 
+For full operator setup across local, preview, staging, and external dependencies, use
+[docs/environments-runbook.md](./environments-runbook.md). This document stays focused on local
+developer bootstrap.
+
 ---
 
 ## Table of Contents
@@ -158,10 +162,13 @@ This pulls Docker images and starts local Postgres, Auth, Storage, and Studio on
 #### 2. Apply migrations
 
 ```bash
-supabase db reset
+supabase db reset --yes
 ```
 
 `db reset` drops and recreates the local database, then applies all migrations from `supabase/migrations/` in order. Use this any time you pull new migrations.
+Because [`supabase/config.toml`](/Users/hwanigasooriya/Workspace/hobby/iconicedu-monorepo/supabase/config.toml)
+points `db.seed.sql_paths` at `./seed.sql`, local reset also imports the current non-production
+seed dataset automatically.
 
 For incremental updates (without a full reset):
 
@@ -199,6 +206,33 @@ supabase stop
 
 Create the following files. Never commit `.env` files — they are in `.gitignore`.
 
+The canonical contract lives in [docs/environment-contract.md](./environment-contract.md) and
+`config/environment-contract.json`. Regenerate example files with:
+
+```bash
+pnpm env:generate
+```
+
+Validate local targets with:
+
+```bash
+pnpm env:validate:local-web
+pnpm env:validate:local-api
+pnpm env:validate:local-mobile
+```
+
+Remote non-production imports use the guarded commands below. They are blocked for production and
+intentionally require explicit safety flags:
+
+```bash
+pnpm seed:preview
+pnpm seed:staging
+```
+
+If Supabase GitHub integration already creates preview branches for PRs, treat `pnpm seed:preview`
+as an attach-and-seed step for that existing branch. Do not introduce a second preview branch
+creation path in repo automation.
+
 ### apps/web/.env.local
 
 ```bash
@@ -228,7 +262,8 @@ EXPO_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 ```
 
-> **Note:** Mobile reads env via `Constants.expoConfig?.extra`, not `process.env`. The `app.config.js` bridges these at build time.
+> **Note:** Mobile reads env via `Constants.expoConfig?.extra`, not `process.env`. The
+> checked-in `app.config.js` bridges `EXPO_PUBLIC_*` variables into `extra` at build time.
 
 ### apps/api/.env
 

@@ -2,6 +2,10 @@
 
 How to deploy each app in the IconicEdu monorepo to production.
 
+For full operator setup across local, preview, staging, and all external dependencies, use
+[docs/environments-runbook.md](./environments-runbook.md). This document stays focused on deploy
+surfaces and production-oriented deployment behavior.
+
 ---
 
 ## Table of Contents
@@ -241,9 +245,45 @@ Always test migrations locally first:
 supabase db reset   # wipe + reapply all migrations locally
 ```
 
+Local reset automatically imports `supabase/seed.sql` because it is configured in
+`supabase/config.toml`.
+
 ### Branching (preview environments)
 
-Supabase supports database branching for preview deployments. Each Vercel preview can have its own Supabase branch. See [Supabase Branching docs](https://supabase.com/docs/guides/platform/branching) for setup.
+Supabase supports database branching for preview deployments. Each Vercel preview can have its own
+Supabase branch.
+
+If Supabase GitHub integration is enabled, let it remain the only owner of preview branch
+lifecycle. In that setup:
+
+- Supabase GitHub integration creates and tears down preview branches.
+- Vercel GitHub integration creates web preview deployments.
+- this repo's preview workflow attaches to the existing Supabase branch and runs validation,
+  migrations, and guarded seeding.
+
+Do not add a second branch-creation path in repo automation for the same PR. See
+[Supabase Branching docs](https://supabase.com/docs/guides/platform/branching) for setup.
+
+### Non-production seeding
+
+- `supabase/seed.sql` is the single non-production seed artifact.
+- Local: `supabase db reset --yes` imports it automatically.
+- Preview: import only on a fresh Supabase-managed preview branch after `supabase db push`.
+- Staging: import only in a destructive reseed workflow after reset/recreate and migration replay.
+- Production: do not import `seed.sql`.
+
+Remote imports use:
+
+```bash
+pnpm seed:preview
+pnpm seed:staging
+```
+
+Both commands use `psql -v ON_ERROR_STOP=1` under the hood and are blocked by safety checks if the
+environment is production-like. `seed.sql` is treated as a non-idempotent full-load import, so do
+not replay it into a long-lived shared database without resetting or recreating that database first.
+If Supabase GitHub integration is already auto-seeding preview branches, disable that before using
+`pnpm seed:preview` to avoid duplicate imports.
 
 ### Backups
 
@@ -252,6 +292,18 @@ Supabase automatically takes daily backups on paid plans. For additional safety,
 ---
 
 ## Environment Variables Reference
+
+The repo-level contract for all environments lives in
+[docs/environment-contract.md](./environment-contract.md) and
+`config/environment-contract.json`.
+
+Before promoting an environment, run the matching validator:
+
+```bash
+pnpm env:validate:preview
+pnpm env:validate:staging
+pnpm env:validate:production
+```
 
 | Variable                        | Web         | Mobile | API | Notes                      |
 | ------------------------------- | ----------- | ------ | --- | -------------------------- |

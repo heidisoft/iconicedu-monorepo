@@ -4,10 +4,13 @@ import '@iconicedu/ui-web/styles.css';
 import { ThemeProvider, Toaster } from '@iconicedu/ui-web';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { PostHogPageView } from '@iconicedu/web/components/analytics-provider';
+import { validateWebRuntimeEnv } from '@iconicedu/web/lib/config/env';
 
 export { metadata } from './layout.metadata';
 
 export default function RootLayout({ children }: { children: ReactNode }) {
+  validateWebRuntimeEnv();
+
   return (
     <html
       lang="en"

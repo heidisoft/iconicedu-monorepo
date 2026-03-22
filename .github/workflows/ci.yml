@@ -46,6 +46,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Check generated env examples
+        run: |
+          pnpm env:generate
+          git diff --exit-code -- \
+            apps/web/.env.local.example \
+            apps/mobile/.env.example \
+            apps/api/.env.example
+
       - name: Restore Turbo cache
         uses: actions/cache@v4
         with:

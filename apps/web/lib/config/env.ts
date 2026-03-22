@@ -62,3 +62,7 @@ export function getServiceWebEnv(source: EnvSource = process.env) {
     supabaseServiceRoleKey: getServiceRoleKey(source),
   };
 }
+
+export function validateWebRuntimeEnv(source: EnvSource = process.env) {
+  return getServiceWebEnv(source);
+}

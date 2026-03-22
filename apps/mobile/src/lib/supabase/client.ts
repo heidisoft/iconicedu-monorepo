@@ -1,10 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
+import { getMobilePublicEnv } from '@/lib/config/env';
 
-const SUPABASE_URL =
-  process.env.EXPO_PUBLIC_SUPABASE_URL ?? 'https://yneiylhtjuvraivkeone.supabase.co';
-
-const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? 'test-anon-key';
+const { supabaseUrl: SUPABASE_URL, supabaseAnonKey: SUPABASE_ANON_KEY } =
+  getMobilePublicEnv();
 
 const secureStoreAdapter = {
   getItem: (key: string) => SecureStore.getItemAsync(key),

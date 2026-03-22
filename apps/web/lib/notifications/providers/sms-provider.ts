@@ -1,9 +1,9 @@
-type SmsNotificationPayload = {
-  orgId: string;
-  recipientProfileId: string;
-  prefKey: string;
-  message: string;
-  metadata?: Record<string, unknown>;
+import type { SmsNotificationPayload, SmsNotificationProvider } from '@iconicedu/utils';
+
+const noopSmsProvider: SmsNotificationProvider = {
+  async send(_payload) {},
 };
 
-export async function sendSmsNotification(_payload: SmsNotificationPayload) {}
+export async function sendSmsNotification(payload: SmsNotificationPayload) {
+  await noopSmsProvider.send(payload);
+}
