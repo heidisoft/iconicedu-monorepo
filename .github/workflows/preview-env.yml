@@ -347,16 +347,6 @@ jobs:
               `| API (Railway) | ${apiUrl}/healthz |`,
               `| Supabase Studio | ${studioUrl} |`,
               '',
-              '**Seed credentials** (password: `Seed123!` for all)',
-              '| Email | Role |',
-              '|-------|------|',
-              '| heshanmw@gmail.com | Owner (Marc F) |',
-              '| heshanmw+1@gmail.com | Guardian (Lura H) |',
-              '| heshanmw+3@gmail.com | Educator (Denise R) |',
-              '| heshanmw+4@gmail.com | Educator (Barbara Y) |',
-              '| heshanmw+5@gmail.com | Staff (Harold B) |',
-              '| heshanmw+6@gmail.com | Guardian (Jessica K) |',
-              '',
               `**Mobile build** - [Actions -> EAS Preview Build](../../actions/workflows/eas-preview-build.yml) -> PR number: \`${prNumber}\``,
             ].join('\n');
 
