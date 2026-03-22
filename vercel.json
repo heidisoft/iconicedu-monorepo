@@ -1,7 +1,0 @@
-{
-  "framework": null,
-  "installCommand": "pnpm install",
-  "buildCommand": "pnpm build:web",
-  "outputDirectory": "apps/web/.next",
-  "rootDirectory": "apps/web"
-}
