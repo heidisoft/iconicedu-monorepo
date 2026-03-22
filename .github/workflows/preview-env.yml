@@ -170,30 +170,30 @@ jobs:
           RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
         run: |
           set -euo pipefail
-          npm install -g @railway/cli --silent
 
           ENV_NAME="pr-${PR_NUMBER}"
           SERVICE_ID="${{ secrets.RAILWAY_SERVICE_ID }}"
           GQL="https://backboard.railway.app/graphql/v2"
+          AUTH="-H \"Authorization: Bearer $RAILWAY_TOKEN\""
+
+          api() {
+            curl -sf \
+              -H "Authorization: Bearer $RAILWAY_TOKEN" \
+              -H "Content-Type: application/json" \
+              "$GQL" \
+              -d "$1" || echo "{}"
+          }
 
           # ── 1. Create environment via Railway API (idempotent) ──────────────
           echo "Ensuring Railway environment: $ENV_NAME"
-          CREATE_RESP=$(curl -sf \
-            -H "Authorization: Bearer $RAILWAY_TOKEN" \
-            -H "Content-Type: application/json" \
-            "$GQL" \
-            -d "{\"query\":\"mutation { environmentCreate(input: {projectId: \\\"$RAILWAY_PROJECT_ID\\\", name: \\\"$ENV_NAME\\\"}) { id } }\"}" || echo "{}")
+          CREATE_RESP=$(api "{\"query\":\"mutation { environmentCreate(input: {projectId: \\\"$RAILWAY_PROJECT_ID\\\", name: \\\"$ENV_NAME\\\"}) { id } }\"}")
 
           ENV_ID=$(echo "$CREATE_RESP" | jq -r '.data.environmentCreate.id // empty')
           echo "Create response: $(echo "$CREATE_RESP" | jq '.errors // "ok"')"
 
           if [[ -z "$ENV_ID" ]]; then
             echo "Environment may already exist — fetching by name"
-            LIST_RESP=$(curl -s \
-              -H "Authorization: Bearer $RAILWAY_TOKEN" \
-              -H "Content-Type: application/json" \
-              "$GQL" \
-              -d "{\"query\":\"query { project(id: \\\"$RAILWAY_PROJECT_ID\\\") { environments { edges { node { id name } } } } }\"}")
+            LIST_RESP=$(api "{\"query\":\"query { project(id: \\\"$RAILWAY_PROJECT_ID\\\") { environments { edges { node { id name } } } } }\"}")
             echo "List response: $(echo "$LIST_RESP" | jq '.errors // "ok"')"
             ENV_ID=$(echo "$LIST_RESP" | jq -r ".data.project.environments.edges[]? | select(.node.name==\"$ENV_NAME\") | .node.id // empty")
           fi
@@ -221,47 +221,42 @@ jobs:
               NODE_ENV:"production", NEXT_PUBLIC_APP_ENV:"preview",
               POSTHOG_KEY:$phk, POSTHOG_HOST:$phh}')
 
-          curl -sf \
-            -H "Authorization: Bearer $RAILWAY_TOKEN" \
-            -H "Content-Type: application/json" \
-            "$GQL" \
-            -d "$(jq -n \
-              --arg pid "$RAILWAY_PROJECT_ID" \
-              --arg eid "$ENV_ID" \
-              --arg sid "$SERVICE_ID" \
-              --argjson vars "$VARS_JSON" \
-              '{query:"mutation variableCollectionUpsert($input: VariableCollectionUpsertInput!) { variableCollectionUpsert(input: $input) }",
-                variables:{input:{projectId:$pid, environmentId:$eid, serviceId:$sid, variables:$vars}}}')"
+          api "$(jq -n \
+            --arg pid "$RAILWAY_PROJECT_ID" \
+            --arg eid "$ENV_ID" \
+            --arg sid "$SERVICE_ID" \
+            --argjson vars "$VARS_JSON" \
+            '{query:"mutation variableCollectionUpsert($input: VariableCollectionUpsertInput!) { variableCollectionUpsert(input: $input) }",
+              variables:{input:{projectId:$pid, environmentId:$eid, serviceId:$sid, variables:$vars}}}')"
           echo "Variables set"
 
-          # ── 3. Link project + environment for CLI commands ──────────────────
-          mkdir -p .railway
-          echo "{\"projectId\":\"$RAILWAY_PROJECT_ID\",\"environmentId\":\"$ENV_ID\"}" > .railway/config.json
+          # ── 3. Trigger deployment via API ────────────────────────────────────
+          echo "Triggering Railway deployment..."
+          DEPLOY_RESP=$(api "{\"query\":\"mutation { serviceInstanceDeploy(serviceId: \\\"$SERVICE_ID\\\", environmentId: \\\"$ENV_ID\\\") }\"}")
+          echo "Deploy response: $(echo "$DEPLOY_RESP" | jq '.errors // .data')"
 
-          # Deploy
-          railway up \
-            --service "$SERVICE_ID" \
-            --environment "$ENV_NAME" \
-            --detach
-
-          # Wait for healthcheck (max 3 min)
+          # ── 4. Poll for deployment URL and health ────────────────────────────
           echo "Waiting for Railway API to become healthy..."
+          RAILWAY_API_URL=""
           for i in $(seq 1 18); do
-            RAILWAY_API_URL=$(railway domain \
-              --service "$SERVICE_ID" \
-              --environment "$ENV_NAME" 2>/dev/null || echo "")
+            DEPLOY_INFO=$(api "{\"query\":\"query { deployments(input: {projectId: \\\"$RAILWAY_PROJECT_ID\\\", environmentId: \\\"$ENV_ID\\\", serviceId: \\\"$SERVICE_ID\\\"}) { edges { node { status url } } } }\"}")
+            DEPLOY_STATUS=$(echo "$DEPLOY_INFO" | jq -r '.data.deployments.edges[0].node.status // empty')
+            DEPLOY_URL=$(echo "$DEPLOY_INFO" | jq -r '.data.deployments.edges[0].node.url // empty')
+            echo "  Status: ${DEPLOY_STATUS:-(pending)} (attempt $i)"
 
-            if [[ -n "$RAILWAY_API_URL" ]]; then
+            if [[ -n "$DEPLOY_URL" ]]; then
+              RAILWAY_API_URL="$DEPLOY_URL"
               HEALTH_STATUS=$(curl -sf -o /dev/null -w "%{http_code}" \
-                "https://${RAILWAY_API_URL}/healthz" 2>/dev/null || echo "000")
-              echo "  Health: $HEALTH_STATUS (attempt $i)"
+                "https://${DEPLOY_URL}/healthz" 2>/dev/null || echo "000")
+              echo "  Health: $HEALTH_STATUS"
               if [[ "$HEALTH_STATUS" == "200" ]]; then
-                echo "railway_api_url=https://${RAILWAY_API_URL}" >> "$GITHUB_OUTPUT"
+                echo "railway_api_url=https://${DEPLOY_URL}" >> "$GITHUB_OUTPUT"
                 break
               fi
             fi
+
             if [[ $i -eq 18 ]]; then
-              echo "::warning::Railway API health check timed out — URL may not be ready yet"
+              echo "::warning::Railway deployment health check timed out"
               echo "railway_api_url=https://${RAILWAY_API_URL:-pending}" >> "$GITHUB_OUTPUT"
             fi
             sleep 10
