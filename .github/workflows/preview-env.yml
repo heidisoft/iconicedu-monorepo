@@ -268,29 +268,32 @@ jobs:
         id: vercel
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
         run: |
           set -euo pipefail
           PROJECT_ID="${{ secrets.VERCEL_PROJECT_ID }}"
           BRANCH="${{ env.BRANCH_NAME }}"
+          # Team scope — required for team/org projects; harmless for personal accounts
+          TEAM="teamId=${VERCEL_ORG_ID}"
 
           set_vercel_env() {
             local KEY="$1" VALUE="$2"
             # Delete existing branch-scoped var if present
             EXISTING_ID=$(curl -sf \
               -H "Authorization: Bearer $VERCEL_TOKEN" \
-              "https://api.vercel.com/v10/projects/${PROJECT_ID}/env?gitBranch=${BRANCH}" \
+              "https://api.vercel.com/v10/projects/${PROJECT_ID}/env?gitBranch=${BRANCH}&${TEAM}" \
               | jq -r --arg k "$KEY" '.envs[] | select(.key==$k) | .id' 2>/dev/null || echo "")
 
             if [[ -n "$EXISTING_ID" ]]; then
               curl -sf -X DELETE \
                 -H "Authorization: Bearer $VERCEL_TOKEN" \
-                "https://api.vercel.com/v10/projects/${PROJECT_ID}/env/${EXISTING_ID}" > /dev/null
+                "https://api.vercel.com/v10/projects/${PROJECT_ID}/env/${EXISTING_ID}?${TEAM}" > /dev/null
             fi
 
             POST_RESP=$(curl -s -w "\n%{http_code}" -X POST \
               -H "Authorization: Bearer $VERCEL_TOKEN" \
               -H "Content-Type: application/json" \
-              "https://api.vercel.com/v10/projects/${PROJECT_ID}/env" \
+              "https://api.vercel.com/v10/projects/${PROJECT_ID}/env?${TEAM}" \
               -d "$(jq -n --arg k "$KEY" --arg v "$VALUE" --arg b "$BRANCH" \
                 '{"key":$k,"value":$v,"target":["preview"],"gitBranch":$b,"type":"encrypted"}')")
             POST_STATUS=$(echo "$POST_RESP" | tail -1)
@@ -300,18 +303,15 @@ jobs:
             fi
           }
 
-          set_vercel_env "NEXT_PUBLIC_SUPABASE_URL"              "${{ steps.branch-creds.outputs.branch_api_url }}"
-          set_vercel_env "SUPABASE_URL"                        "${{ steps.branch-creds.outputs.branch_api_url }}"
-          set_vercel_env "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" "${{ steps.branch-creds.outputs.anon_key }}"
-          set_vercel_env "NEXT_PUBLIC_SUPABASE_ANON_KEY"       "${{ steps.branch-creds.outputs.anon_key }}"
-          set_vercel_env "SUPABASE_SERVICE_ROLE_KEY"           "${{ steps.branch-creds.outputs.service_role_key }}"
-          set_vercel_env "NEXT_PUBLIC_API_URL"           "${{ steps.railway.outputs.railway_api_url }}"
-          set_vercel_env "NEXT_PUBLIC_APP_ENV"           "preview"
+          # Only set vars the Vercel+Supabase connector doesn't manage.
+          # Supabase URL/keys are handled by the connector per-environment.
+          set_vercel_env "NEXT_PUBLIC_API_URL" "${{ steps.railway.outputs.railway_api_url }}"
+          set_vercel_env "NEXT_PUBLIC_APP_ENV" "preview"
 
-          # Trigger a redeploy so the new env vars take effect
+          # Fetch latest preview deployment URL for this branch
           LATEST_DEPLOYMENT=$(curl -sf \
             -H "Authorization: Bearer $VERCEL_TOKEN" \
-            "https://api.vercel.com/v6/deployments?projectId=${PROJECT_ID}&target=preview&limit=1&meta-githubCommitRef=${BRANCH}" \
+            "https://api.vercel.com/v6/deployments?projectId=${PROJECT_ID}&target=preview&limit=1&meta-githubCommitRef=${BRANCH}&${TEAM}" \
             | jq -r '.deployments[0].url // ""')
 
           if [[ -n "$LATEST_DEPLOYMENT" ]]; then
