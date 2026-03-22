@@ -65,6 +65,7 @@ jobs:
       ICONIC_PREVIEW_REF: preview-${{ inputs.preview_branch_name }}
       SUPABASE_PROJECT_REF: ${{ secrets.PREVIEW_SUPABASE_PROJECT_REF }}
       DATABASE_URL: ${{ secrets.PREVIEW_DATABASE_URL }}
+      DIRECT_URL: ${{ secrets.PREVIEW_DATABASE_URL }}
       SEED_DATABASE_URL: ${{ secrets.PREVIEW_DATABASE_URL }}
       SUPABASE_URL: ${{ secrets.PREVIEW_SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.PREVIEW_SUPABASE_SERVICE_ROLE_KEY }}
