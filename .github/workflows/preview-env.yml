@@ -167,6 +167,7 @@ jobs:
         id: railway
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
         run: |
           set -euo pipefail
           npm install -g @railway/cli --silent
@@ -174,14 +175,12 @@ jobs:
           ENV_NAME="pr-${PR_NUMBER}"
 
           # Create environment (ignore error if exists)
-          railway environment create "$ENV_NAME" \
-            --project "${{ secrets.RAILWAY_PROJECT_ID }}" 2>/dev/null || true
+          railway environment create "$ENV_NAME" 2>/dev/null || true
 
           # Set environment variables
           railway variables set \
             --environment "$ENV_NAME" \
             --service "${{ secrets.RAILWAY_SERVICE_ID }}" \
-            --project "${{ secrets.RAILWAY_PROJECT_ID }}" \
             "DATABASE_URL=${{ steps.branch-creds.outputs.database_url }}" \
             "DIRECT_URL=${{ steps.branch-creds.outputs.direct_url }}" \
             "SUPABASE_URL=${{ steps.branch-creds.outputs.branch_api_url }}" \
@@ -198,7 +197,6 @@ jobs:
           railway up \
             --service "${{ secrets.RAILWAY_SERVICE_ID }}" \
             --environment "$ENV_NAME" \
-            --project "${{ secrets.RAILWAY_PROJECT_ID }}" \
             --detach
 
           # Wait for healthcheck (max 3 min)
@@ -206,8 +204,7 @@ jobs:
           for i in $(seq 1 18); do
             RAILWAY_API_URL=$(railway domain \
               --service "${{ secrets.RAILWAY_SERVICE_ID }}" \
-              --environment "$ENV_NAME" \
-              --project "${{ secrets.RAILWAY_PROJECT_ID }}" 2>/dev/null || echo "")
+              --environment "$ENV_NAME" 2>/dev/null || echo "")
 
             if [[ -n "$RAILWAY_API_URL" ]]; then
               HEALTH_STATUS=$(curl -sf -o /dev/null -w "%{http_code}" \
