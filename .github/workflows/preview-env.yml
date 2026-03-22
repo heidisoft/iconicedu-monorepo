@@ -185,15 +185,17 @@ jobs:
             -d "{\"query\":\"mutation { environmentCreate(input: {projectId: \\\"$RAILWAY_PROJECT_ID\\\", name: \\\"$ENV_NAME\\\"}) { id } }\"}" || echo "{}")
 
           ENV_ID=$(echo "$CREATE_RESP" | jq -r '.data.environmentCreate.id // empty')
+          echo "Create response: $(echo "$CREATE_RESP" | jq '.errors // "ok"')"
 
           if [[ -z "$ENV_ID" ]]; then
             echo "Environment may already exist — fetching by name"
-            LIST_RESP=$(curl -sf \
+            LIST_RESP=$(curl -s \
               -H "Authorization: Bearer $RAILWAY_TOKEN" \
               -H "Content-Type: application/json" \
               "$GQL" \
               -d "{\"query\":\"query { project(id: \\\"$RAILWAY_PROJECT_ID\\\") { environments { edges { node { id name } } } } }\"}")
-            ENV_ID=$(echo "$LIST_RESP" | jq -r ".data.project.environments.edges[] | select(.node.name==\"$ENV_NAME\") | .node.id")
+            echo "List response: $(echo "$LIST_RESP" | jq '.errors // "ok"')"
+            ENV_ID=$(echo "$LIST_RESP" | jq -r ".data.project.environments.edges[]? | select(.node.name==\"$ENV_NAME\") | .node.id // empty")
           fi
 
           if [[ -z "$ENV_ID" ]]; then
