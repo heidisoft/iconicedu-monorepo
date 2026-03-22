@@ -29,8 +29,6 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
-          BRANCH_NAME="pr-${PR_NUMBER}"
-
           BRANCH_ID=$(supabase branches list \
             --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}" \
             --output json \
