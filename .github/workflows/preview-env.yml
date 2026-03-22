@@ -19,6 +19,11 @@ concurrency:
   group: preview-env-${{ github.event.pull_request.number || inputs.pr_number }}
   cancel-in-progress: false
 
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
 env:
   TURBO_TELEMETRY_DISABLED: 1
 
@@ -89,6 +94,7 @@ jobs:
 
       - name: Update PR comment
         if: always()
+        continue-on-error: true
         run: pnpm preview:comment --pr "${PR_NUMBER}" --branch "${GIT_BRANCH}" --status-file .tmp/preview-status.json
         env:
           PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
@@ -150,6 +156,7 @@ jobs:
 
       - name: Update PR comment
         if: always()
+        continue-on-error: true
         run: pnpm preview:comment --pr "${PR_NUMBER}" --branch "${GIT_BRANCH}" --status-file .tmp/preview-status.json
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}

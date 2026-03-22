@@ -103,13 +103,39 @@ export async function runJsonCommand(command, args, options = {}) {
     throw new Error(`Command returned no JSON output: ${command} ${args.join(' ')}`);
   }
 
+  const normalized = extractJsonPayload(result.stdout);
   try {
-    return JSON.parse(result.stdout);
+    return JSON.parse(normalized);
   } catch (error) {
     throw new Error(
       `Failed to parse JSON from ${command} ${args.join(' ')}\n${result.stdout}\n${error}`,
     );
   }
+}
+
+function extractJsonPayload(stdout) {
+  const trimmed = stdout.trim();
+  if (!trimmed) {
+    return trimmed;
+  }
+
+  const objectStart = trimmed.indexOf('{');
+  const arrayStart = trimmed.indexOf('[');
+
+  let start = -1;
+  if (objectStart >= 0 && arrayStart >= 0) {
+    start = Math.min(objectStart, arrayStart);
+  } else if (objectStart >= 0) {
+    start = objectStart;
+  } else if (arrayStart >= 0) {
+    start = arrayStart;
+  }
+
+  if (start === -1) {
+    return trimmed;
+  }
+
+  return trimmed.slice(start);
 }
 
 export function pickFirstString(input, candidateKeys) {
