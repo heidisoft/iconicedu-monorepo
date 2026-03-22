@@ -22,6 +22,8 @@ import { readFile } from 'node:fs/promises';
 
 const DEFAULT_STATUS_FILE = '.tmp/preview-status.json';
 const SUPABASE_CLI_WORKDIR = 'supabase';
+const DEFAULT_BRANCH_WAIT_ATTEMPTS = 90;
+const DEFAULT_BRANCH_WAIT_INTERVAL_MS = 10_000;
 
 async function ensureSupabaseBranch(branchName, projectRef) {
   const getArgs = [
@@ -73,23 +75,52 @@ function getBranchStatus(payload) {
   return null;
 }
 
+function isHealthyBranchStatus(status) {
+  if (!status) return false;
+
+  const normalized = status.toLowerCase();
+  return (
+    normalized === 'healthy' ||
+    normalized === 'active' ||
+    normalized === 'ready' ||
+    normalized.includes('healthy') ||
+    normalized.includes('ready') ||
+    normalized.includes('active')
+  );
+}
+
 async function waitForHealthyBranch(branchName, projectRef) {
-  for (let attempt = 0; attempt < 30; attempt += 1) {
+  const maxAttempts = Number.parseInt(
+    process.env.SUPABASE_BRANCH_WAIT_ATTEMPTS ?? `${DEFAULT_BRANCH_WAIT_ATTEMPTS}`,
+    10,
+  );
+  const intervalMs = Number.parseInt(
+    process.env.SUPABASE_BRANCH_WAIT_INTERVAL_MS ?? `${DEFAULT_BRANCH_WAIT_INTERVAL_MS}`,
+    10,
+  );
+
+  let lastStatus = 'unknown';
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const payload = await runJsonCommand(
       'supabase',
       ['branches', 'get', branchName, '--project-ref', projectRef, '-o', 'json'],
       { cwd: SUPABASE_CLI_WORKDIR },
     );
 
-    const status = getBranchStatus(payload)?.toLowerCase();
-    if (status && ['healthy', 'active', 'ready'].includes(status)) {
+    const status = getBranchStatus(payload);
+    lastStatus = status ?? 'unknown';
+
+    if (isHealthyBranchStatus(status)) {
       return payload;
     }
 
-    await sleep(10_000);
+    await sleep(intervalMs);
   }
 
-  throw new Error(`Supabase preview branch ${branchName} did not become healthy in time`);
+  throw new Error(
+    `Supabase preview branch ${branchName} did not become healthy in time. Last observed status: ${lastStatus}. Adjust SUPABASE_BRANCH_WAIT_ATTEMPTS or SUPABASE_BRANCH_WAIT_INTERVAL_MS if your project takes longer to provision.`,
+  );
 }
 
 async function getSupabaseApiKeys(projectRef) {
@@ -494,11 +525,18 @@ async function main() {
       );
     }
 
+    const internalNotificationsToken = optionalEnv('INTERNAL_NOTIFICATIONS_TOKEN');
+    if (!internalNotificationsToken) {
+      errors.push(
+        'INTERNAL_NOTIFICATIONS_TOKEN is not configured. notifications-dispatch will be deployed in degraded mode until the token is provided.',
+      );
+    }
+
     await setSupabaseSecrets(branchProjectRef, {
       SUPABASE_URL: apiUrl,
       SUPABASE_SERVICE_ROLE_KEY: apiKeys.serviceRoleKey,
       NOTIFICATIONS_DISPATCH_URL: notificationsUrl ?? '',
-      INTERNAL_NOTIFICATIONS_TOKEN: requireEnv('INTERNAL_NOTIFICATIONS_TOKEN'),
+      INTERNAL_NOTIFICATIONS_TOKEN: internalNotificationsToken ?? '',
     });
 
     const edgeFunctions = await deployEdgeFunctions(branchProjectRef);
@@ -545,7 +583,11 @@ async function main() {
         seededUsers,
         storage,
         notes: notificationsUrl
-          ? []
+          ? internalNotificationsToken
+            ? []
+            : [
+                'notifications-dispatch is missing INTERNAL_NOTIFICATIONS_TOKEN and remains degraded until that secret is configured.',
+              ]
           : [
               'notifications-dispatch was deployed without NOTIFICATIONS_DISPATCH_URL because no preview web URL was available at provisioning time.',
             ],

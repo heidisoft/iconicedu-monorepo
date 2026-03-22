@@ -14,6 +14,19 @@ test('passes when no feature-bearing files changed', () => {
   assert.equal(violations.length, 0);
 });
 
+test('passes for web config-layer changes without flags', () => {
+  const violations = evaluateFeatureFlagGating({
+    changedFiles: ['apps/web/lib/config/app-url.ts'],
+    sources: {
+      'apps/web/lib/config/app-url.ts': 'export function resolveAppUrl() { return ""; }',
+    },
+    prBody: '',
+    commitMessage: '',
+  });
+
+  assert.equal(violations.length, 0);
+});
+
 test('fails when feature-bearing file changes without flag usage', () => {
   const violations = evaluateFeatureFlagGating({
     changedFiles: ['apps/web/app/(app)/[orgSlug]/page.tsx'],
