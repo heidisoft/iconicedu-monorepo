@@ -1,4 +1,4 @@
-name: EAS Preview Build
+name: 'EAS Preview Build'
 
 on:
   workflow_dispatch:
@@ -11,15 +11,15 @@ on:
         description: 'Platform to build'
         required: true
         type: choice
-        default: all
+        default: 'all'
         options:
-          - all
-          - ios
-          - android
+          - 'all'
+          - 'ios'
+          - 'android'
 
 jobs:
   eas-build:
-    name: EAS Preview Build (PR #${{ github.event.inputs.pr_number }})
+    name: 'EAS Preview Build (PR #${{ github.event.inputs.pr_number }})'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -29,7 +29,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: "refs/pull/${{ github.event.inputs.pr_number }}/head"
+          ref: 'refs/pull/${{ github.event.inputs.pr_number }}/head'
 
       - uses: actions/setup-node@v4
         with:
@@ -46,7 +46,7 @@ jobs:
         with:
           version: latest
 
-      # ── 1. Fetch Supabase branch credentials ──────────────────────────────
+      # 1. Fetch Supabase branch credentials
       - name: Fetch Supabase branch credentials
         id: branch-creds
         env:
@@ -82,7 +82,7 @@ jobs:
           echo "anon_key=$ANON_KEY" >> "$GITHUB_OUTPUT"
           echo "branch_api_url=https://${BRANCH_REF}.supabase.co" >> "$GITHUB_OUTPUT"
 
-      # ── 2. Fetch Railway preview API URL ──────────────────────────────────
+      # 2. Fetch Railway preview API URL
       - name: Fetch Railway preview API URL
         id: railway
         env:
@@ -103,7 +103,7 @@ jobs:
             echo "railway_api_url=" >> "$GITHUB_OUTPUT"
           fi
 
-      # ── 3. Trigger EAS build ───────────────────────────────────────────────
+      # 3. Trigger EAS build
       - name: Trigger EAS preview build
         id: eas-build
         env:
@@ -131,7 +131,7 @@ jobs:
           BUILD_URL=$(echo "$BUILD_OUTPUT" | grep -oP 'https://expo\.dev/accounts/[^\s]+' | head -1 || echo "")
           echo "build_url=$BUILD_URL" >> "$GITHUB_OUTPUT"
 
-      # ── 4. Post comment on PR ──────────────────────────────────────────────
+      # 4. Post comment on PR
       - name: Post build comment on PR
         uses: actions/github-script@v7
         with:
@@ -142,16 +142,21 @@ jobs:
             const supabaseUrl = '${{ steps.branch-creds.outputs.branch_api_url }}';
             const apiUrl = '${{ steps.railway.outputs.railway_api_url }}';
 
-            const platformLabel = platform === 'all' ? 'iOS + Android' : platform.charAt(0).toUpperCase() + platform.slice(1);
+            const platformLabel =
+              platform === 'all'
+                ? 'iOS + Android'
+                : platform.charAt(0).toUpperCase() + platform.slice(1);
             const buildLink = buildUrl ? `[Track build](${buildUrl})` : 'Check your [Expo dashboard](https://expo.dev)';
 
-            const body = `### EAS Preview Build Triggered
-
-**Platform:** ${platformLabel}
-**Supabase branch:** \`${supabaseUrl}\`
-**API:** ${apiUrl || 'n/a'}
-
-${buildLink} — install via internal distribution once the build completes.`;
+            const body = [
+              '### EAS Preview Build Triggered',
+              '',
+              `**Platform:** ${platformLabel}`,
+              `**Supabase branch:** \`${supabaseUrl}\``,
+              `**API:** ${apiUrl || 'n/a'}`,
+              '',
+              `${buildLink} - install via internal distribution once the build completes.`,
+            ].join('\n');
 
             await github.rest.issues.createComment({
               owner: context.repo.owner,

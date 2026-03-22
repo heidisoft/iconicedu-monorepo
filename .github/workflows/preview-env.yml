@@ -1,11 +1,11 @@
-name: Preview Environment
+name: 'Preview Environment'
 
 on:
   pull_request:
     types: [opened, synchronize, reopened]
 
 concurrency:
-  group: preview-${{ github.event.pull_request.number }}
+  group: 'preview-${{ github.event.pull_request.number }}'
   cancel-in-progress: true
 
 env:
@@ -14,7 +14,7 @@ env:
 
 jobs:
   create-preview-env:
-    name: Create Preview Environment
+    name: 'Create Preview Environment'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -28,7 +28,7 @@ jobs:
         with:
           version: latest
 
-      # ── 1. Create Supabase preview branch ──────────────────────────────────
+      # 1. Create Supabase preview branch
       - name: Create Supabase branch
         id: supabase-branch
         env:
@@ -85,7 +85,7 @@ jobs:
             sleep 10
           done
 
-      # ── 2. Fetch branch credentials ────────────────────────────────────────
+      # 2. Fetch branch credentials
       - name: Fetch branch credentials
         id: branch-creds
         env:
@@ -140,7 +140,7 @@ jobs:
 
           echo "branch_api_url=https://${BRANCH_REF}.supabase.co" >> "$GITHUB_OUTPUT"
 
-      # ── 3. Seed preview branch (new branches only) ─────────────────────────
+      # 3. Seed preview branch (new branches only)
       - name: Seed preview branch
         if: steps.supabase-branch.outputs.branch_new == 'true'
         env:
@@ -148,7 +148,7 @@ jobs:
         run: |
           psql "$DIRECT_URL" -f supabase/seed.sql
 
-      # ── 4. Deploy edge functions (no cron triggers) ────────────────────────
+      # 4. Deploy edge functions (no cron triggers)
       - name: Deploy edge functions
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
@@ -163,7 +163,7 @@ jobs:
           # Note: cron triggers are NOT configured on preview branches,
           # so functions exist but won't fire automatically.
 
-      # ── 5. Deploy Railway preview environment ─────────────────────────────
+      # 5. Deploy Railway preview environment
       - name: Deploy Railway preview API
         id: railway
         env:
@@ -226,7 +226,7 @@ jobs:
             sleep 10
           done
 
-      # ── 6. Set Vercel branch env vars ──────────────────────────────────────
+      # 6. Set Vercel branch env vars
       - name: Configure Vercel preview env vars
         id: vercel
         env:
@@ -281,36 +281,38 @@ jobs:
             echo "vercel_url=https://vercel.com/dashboard (deployment in progress)" >> "$GITHUB_OUTPUT"
           fi
 
-      # ── 7. Post PR comment ─────────────────────────────────────────────────
+      # 7. Post PR comment
       - name: Post preview environment comment
         uses: actions/github-script@v7
         with:
           script: |
             const prNumber = context.payload.pull_request.number;
-            const webUrl     = '${{ steps.vercel.outputs.vercel_url }}';
-            const apiUrl     = '${{ steps.railway.outputs.railway_api_url }}';
-            const branchRef  = '${{ steps.branch-creds.outputs.branch_ref }}';
-            const studioUrl  = `https://supabase.com/dashboard/project/${branchRef}`;
+            const webUrl = '${{ steps.vercel.outputs.vercel_url }}';
+            const apiUrl = '${{ steps.railway.outputs.railway_api_url }}';
+            const branchRef = '${{ steps.branch-creds.outputs.branch_ref }}';
+            const studioUrl = `https://supabase.com/dashboard/project/${branchRef}`;
 
-            const body = `## Preview Environment Ready
-
-| Service | URL |
-|---------|-----|
-| Web (Vercel) | ${webUrl} |
-| API (Railway) | ${apiUrl}/healthz |
-| Supabase Studio | ${studioUrl} |
-
-**Seed credentials** (password: \`Seed123!\` for all)
-| Email | Role |
-|-------|------|
-| heshanmw@gmail.com | Owner (Marc F) |
-| heshanmw+1@gmail.com | Guardian (Lura H) |
-| heshanmw+3@gmail.com | Educator (Denise R) |
-| heshanmw+4@gmail.com | Educator (Barbara Y) |
-| heshanmw+5@gmail.com | Staff (Harold B) |
-| heshanmw+6@gmail.com | Guardian (Jessica K) |
-
-**Mobile build** — [Actions → EAS Preview Build](../../actions/workflows/eas-preview-build.yml) → PR number: \`${prNumber}\``;
+            const body = [
+              '## Preview Environment Ready',
+              '',
+              '| Service | URL |',
+              '|---------|-----|',
+              `| Web (Vercel) | ${webUrl} |`,
+              `| API (Railway) | ${apiUrl}/healthz |`,
+              `| Supabase Studio | ${studioUrl} |`,
+              '',
+              '**Seed credentials** (password: `Seed123!` for all)',
+              '| Email | Role |',
+              '|-------|------|',
+              '| heshanmw@gmail.com | Owner (Marc F) |',
+              '| heshanmw+1@gmail.com | Guardian (Lura H) |',
+              '| heshanmw+3@gmail.com | Educator (Denise R) |',
+              '| heshanmw+4@gmail.com | Educator (Barbara Y) |',
+              '| heshanmw+5@gmail.com | Staff (Harold B) |',
+              '| heshanmw+6@gmail.com | Guardian (Jessica K) |',
+              '',
+              `**Mobile build** - [Actions -> EAS Preview Build](../../actions/workflows/eas-preview-build.yml) -> PR number: \`${prNumber}\``,
+            ].join('\n');
 
             // Find and update existing comment, or create new one
             const { data: comments } = await github.rest.issues.listComments({
