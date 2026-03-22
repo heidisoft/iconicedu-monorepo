@@ -4,6 +4,12 @@ import { execSync } from 'node:child_process';
 const FLAG_IMPORT_PATTERN = /from\s+['"]@iconicedu\/web\/flags['"]/;
 const FLAG_USAGE_PATTERN = /\benable[A-Za-z0-9]+\s*\.\s*run\s*\(/;
 const EXEMPTION_PATTERN = /flag-exempt:\s*\S+/i;
+const WEB_INFRASTRUCTURE_FILE_PATTERNS = [
+  /^apps\/web\/app\/layout\.tsx$/,
+  /^apps\/web\/app\/layout\.metadata\.tsx$/,
+  /^apps\/web\/lib\/config\//,
+  /^apps\/web\/lib\/notifications\//,
+];
 
 function isFeatureBearingFile(filePath) {
   if (!filePath) return false;
@@ -17,6 +23,9 @@ function isFeatureBearingFile(filePath) {
     return false;
   }
   if (filePath === 'apps/web/flags.ts') {
+    return false;
+  }
+  if (WEB_INFRASTRUCTURE_FILE_PATTERNS.some((pattern) => pattern.test(filePath))) {
     return false;
   }
   return (

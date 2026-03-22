@@ -14,6 +14,29 @@ test('passes when no feature-bearing files changed', () => {
   assert.equal(violations.length, 0);
 });
 
+test('passes for web infrastructure-only changes', () => {
+  const violations = evaluateFeatureFlagGating({
+    changedFiles: [
+      'apps/web/app/layout.tsx',
+      'apps/web/lib/config/env.ts',
+      'apps/web/lib/notifications/providers/email-provider.ts',
+      'apps/web/lib/notifications/providers/sms-provider.ts',
+    ],
+    sources: {
+      'apps/web/app/layout.tsx': 'export default function RootLayout() { return null; }',
+      'apps/web/lib/config/env.ts': 'export function validateWebRuntimeEnv() {}',
+      'apps/web/lib/notifications/providers/email-provider.ts':
+        'export async function sendEmailNotification() {}',
+      'apps/web/lib/notifications/providers/sms-provider.ts':
+        'export async function sendSmsNotification() {}',
+    },
+    prBody: '',
+    commitMessage: '',
+  });
+
+  assert.equal(violations.length, 0);
+});
+
 test('fails when feature-bearing file changes without flag usage', () => {
   const violations = evaluateFeatureFlagGating({
     changedFiles: ['apps/web/app/(app)/[orgSlug]/page.tsx'],
