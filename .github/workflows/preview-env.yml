@@ -67,7 +67,7 @@ jobs:
 
             echo "  Status: ${STATUS:-(pending)}"
 
-            if [[ "$STATUS" == "MIGRATIONS_PASSED" ]]; then
+            if [[ "$STATUS" == "MIGRATIONS_PASSED" || "$STATUS" == "FUNCTIONS_DEPLOYED" ]]; then
               echo "branch_id=$BRANCH_ID" >> "$GITHUB_OUTPUT"
               # Extract project_ref here — avoids a race condition in the creds step
               # where the separate /v1/branches/{id} API call can return null briefly.
