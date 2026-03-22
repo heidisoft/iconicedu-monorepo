@@ -172,41 +172,73 @@ jobs:
           set -euo pipefail
           npm install -g @railway/cli --silent
 
-          # Link project context (Railway CLI requires this even when RAILWAY_PROJECT_ID is set)
-          mkdir -p .railway
-          echo '{"projectId":"'"$RAILWAY_PROJECT_ID"'"}' > .railway/config.json
-
           ENV_NAME="pr-${PR_NUMBER}"
+          SERVICE_ID="${{ secrets.RAILWAY_SERVICE_ID }}"
+          GQL="https://backboard.railway.app/graphql/v2"
 
-          # Create environment only if it doesn't already exist
-          EXISTING_ENV=$(railway environment list --json 2>/dev/null \
-            | jq -r --arg n "$ENV_NAME" '.[] | select(.name==$n) | .name // ""' || echo "")
-          if [[ -z "$EXISTING_ENV" ]]; then
-            echo "Creating Railway environment: $ENV_NAME"
-            railway environment create "$ENV_NAME"
-          else
-            echo "Railway environment $ENV_NAME already exists — skipping create"
+          # ── 1. Create environment via Railway API (idempotent) ──────────────
+          echo "Ensuring Railway environment: $ENV_NAME"
+          CREATE_RESP=$(curl -sf \
+            -H "Authorization: Bearer $RAILWAY_TOKEN" \
+            -H "Content-Type: application/json" \
+            "$GQL" \
+            -d "{\"query\":\"mutation { environmentCreate(input: {projectId: \\\"$RAILWAY_PROJECT_ID\\\", name: \\\"$ENV_NAME\\\"}) { id } }\"}" || echo "{}")
+
+          ENV_ID=$(echo "$CREATE_RESP" | jq -r '.data.environmentCreate.id // empty')
+
+          if [[ -z "$ENV_ID" ]]; then
+            echo "Environment may already exist — fetching by name"
+            LIST_RESP=$(curl -sf \
+              -H "Authorization: Bearer $RAILWAY_TOKEN" \
+              -H "Content-Type: application/json" \
+              "$GQL" \
+              -d "{\"query\":\"query { project(id: \\\"$RAILWAY_PROJECT_ID\\\") { environments { edges { node { id name } } } } }\"}")
+            ENV_ID=$(echo "$LIST_RESP" | jq -r ".data.project.environments.edges[] | select(.node.name==\"$ENV_NAME\") | .node.id")
           fi
 
-          # Set environment variables
-          railway variables set \
-            --environment "$ENV_NAME" \
-            --service "${{ secrets.RAILWAY_SERVICE_ID }}" \
-            "DATABASE_URL=${{ steps.branch-creds.outputs.database_url }}" \
-            "DIRECT_URL=${{ steps.branch-creds.outputs.direct_url }}" \
-            "SUPABASE_URL=${{ steps.branch-creds.outputs.branch_api_url }}" \
-            "SUPABASE_SERVICE_ROLE_KEY=${{ steps.branch-creds.outputs.service_role_key }}" \
-            "JWT_SECRET=${{ steps.branch-creds.outputs.jwt_secret }}" \
-            "INTERNAL_REMINDERS_TOKEN_API=${{ secrets.INTERNAL_REMINDERS_TOKEN }}" \
-            "INTERNAL_NOTIFICATIONS_TOKEN=${{ secrets.INTERNAL_NOTIFICATIONS_TOKEN }}" \
-            "NODE_ENV=production" \
-            "NEXT_PUBLIC_APP_ENV=preview" \
-            "POSTHOG_KEY=${{ secrets.POSTHOG_KEY }}" \
-            "POSTHOG_HOST=${{ secrets.NEXT_PUBLIC_POSTHOG_HOST }}"
+          if [[ -z "$ENV_ID" ]]; then
+            echo "::error::Failed to create or find Railway environment $ENV_NAME"
+            exit 1
+          fi
+          echo "Environment ID: $ENV_ID"
+
+          # ── 2. Set variables via Railway API ────────────────────────────────
+          VARS_JSON=$(jq -n \
+            --arg db    "${{ steps.branch-creds.outputs.database_url }}" \
+            --arg dir   "${{ steps.branch-creds.outputs.direct_url }}" \
+            --arg surl  "${{ steps.branch-creds.outputs.branch_api_url }}" \
+            --arg srkey "${{ steps.branch-creds.outputs.service_role_key }}" \
+            --arg jwt   "${{ steps.branch-creds.outputs.jwt_secret }}" \
+            --arg rem   "${{ secrets.INTERNAL_REMINDERS_TOKEN }}" \
+            --arg not   "${{ secrets.INTERNAL_NOTIFICATIONS_TOKEN }}" \
+            --arg phk   "${{ secrets.POSTHOG_KEY }}" \
+            --arg phh   "${{ secrets.NEXT_PUBLIC_POSTHOG_HOST }}" \
+            '{DATABASE_URL:$db, DIRECT_URL:$dir, SUPABASE_URL:$surl,
+              SUPABASE_SERVICE_ROLE_KEY:$srkey, JWT_SECRET:$jwt,
+              INTERNAL_REMINDERS_TOKEN_API:$rem, INTERNAL_NOTIFICATIONS_TOKEN:$not,
+              NODE_ENV:"production", NEXT_PUBLIC_APP_ENV:"preview",
+              POSTHOG_KEY:$phk, POSTHOG_HOST:$phh}')
+
+          curl -sf \
+            -H "Authorization: Bearer $RAILWAY_TOKEN" \
+            -H "Content-Type: application/json" \
+            "$GQL" \
+            -d "$(jq -n \
+              --arg pid "$RAILWAY_PROJECT_ID" \
+              --arg eid "$ENV_ID" \
+              --arg sid "$SERVICE_ID" \
+              --argjson vars "$VARS_JSON" \
+              '{query:"mutation variableCollectionUpsert($input: VariableCollectionUpsertInput!) { variableCollectionUpsert(input: $input) }",
+                variables:{input:{projectId:$pid, environmentId:$eid, serviceId:$sid, variables:$vars}}}')"
+          echo "Variables set"
+
+          # ── 3. Link project + environment for CLI commands ──────────────────
+          mkdir -p .railway
+          echo "{\"projectId\":\"$RAILWAY_PROJECT_ID\",\"environmentId\":\"$ENV_ID\"}" > .railway/config.json
 
           # Deploy
           railway up \
-            --service "${{ secrets.RAILWAY_SERVICE_ID }}" \
+            --service "$SERVICE_ID" \
             --environment "$ENV_NAME" \
             --detach
 
@@ -214,7 +246,7 @@ jobs:
           echo "Waiting for Railway API to become healthy..."
           for i in $(seq 1 18); do
             RAILWAY_API_URL=$(railway domain \
-              --service "${{ secrets.RAILWAY_SERVICE_ID }}" \
+              --service "$SERVICE_ID" \
               --environment "$ENV_NAME" 2>/dev/null || echo "")
 
             if [[ -n "$RAILWAY_API_URL" ]]; then
