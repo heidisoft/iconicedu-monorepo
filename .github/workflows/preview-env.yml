@@ -172,10 +172,21 @@ jobs:
           set -euo pipefail
           npm install -g @railway/cli --silent
 
+          # Link project context (Railway CLI requires this even when RAILWAY_PROJECT_ID is set)
+          mkdir -p .railway
+          echo '{"projectId":"'"$RAILWAY_PROJECT_ID"'"}' > .railway/config.json
+
           ENV_NAME="pr-${PR_NUMBER}"
 
-          # Create environment (ignore error if exists)
-          railway environment create "$ENV_NAME" 2>/dev/null || true
+          # Create environment only if it doesn't already exist
+          EXISTING_ENV=$(railway environment list --json 2>/dev/null \
+            | jq -r --arg n "$ENV_NAME" '.[] | select(.name==$n) | .name // ""' || echo "")
+          if [[ -z "$EXISTING_ENV" ]]; then
+            echo "Creating Railway environment: $ENV_NAME"
+            railway environment create "$ENV_NAME"
+          else
+            echo "Railway environment $ENV_NAME already exists — skipping create"
+          fi
 
           # Set environment variables
           railway variables set \
