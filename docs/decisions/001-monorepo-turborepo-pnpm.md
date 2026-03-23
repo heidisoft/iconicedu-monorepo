@@ -42,7 +42,7 @@ Use a **pnpm monorepo** with **Turborepo** for task orchestration.
 - Single `pnpm install` at root links all packages
 - `@iconicedu/shared-types` changes are instantly visible across all apps
 - Turborepo caches build outputs — `pnpm build:packages` is nearly instant if nothing changed
-- CI runs the entire pipeline with a single `pnpm ci` command
+- CI runs the entire pipeline with a single `pnpm run ci` command
 - TypeScript path aliases work across the monorepo via `tsconfig.base.json`
 
 ### Negative / trade-offs

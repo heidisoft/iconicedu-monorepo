@@ -129,7 +129,7 @@ import { something } from '@iconicedu/utils';
 The pipeline is: `^build` (dependencies) → `build` → `lint | typecheck | test`. This means:
 
 - You **must** build packages before running lint/typecheck/test on apps
-- `pnpm ci` handles this automatically via the dependency graph
+- `pnpm run ci` handles this automatically via the dependency graph
 - If you see "module not found" errors in lint or typecheck, run `pnpm build:packages` first
 
 ---

@@ -125,18 +125,30 @@ test('sync-env updates only targeted keys and preserves unrelated content', () =
   );
   fs.writeFileSync(
     path.join(tempRoot, 'apps', 'mobile', '.env'),
-    ['UNRELATED_MOBILE=value', 'EXPO_PUBLIC_SUPABASE_ANON_KEY=old-mobile-anon', ''].join('\n'),
+    ['UNRELATED_MOBILE=value', 'EXPO_PUBLIC_SUPABASE_ANON_KEY=old-mobile-anon', ''].join(
+      '\n',
+    ),
   );
   fs.writeFileSync(
     path.join(tempRoot, 'apps', 'api', '.env'),
-    ['# api comment', 'DATABASE_URL=old-db', 'INTERNAL_REMINDERS_TOKEN_API=existing-reminder', '']
-      .join('\n'),
+    [
+      '# api comment',
+      'DATABASE_URL=old-db',
+      'INTERNAL_REMINDERS_TOKEN_API=existing-reminder',
+      '',
+    ].join('\n'),
   );
 
   const output = runSync(tempRoot, binDir);
 
-  const webEnv = fs.readFileSync(path.join(tempRoot, 'apps', 'web', '.env.local'), 'utf8');
-  const mobileEnv = fs.readFileSync(path.join(tempRoot, 'apps', 'mobile', '.env'), 'utf8');
+  const webEnv = fs.readFileSync(
+    path.join(tempRoot, 'apps', 'web', '.env.local'),
+    'utf8',
+  );
+  const mobileEnv = fs.readFileSync(
+    path.join(tempRoot, 'apps', 'mobile', '.env'),
+    'utf8',
+  );
   const apiEnv = fs.readFileSync(path.join(tempRoot, 'apps', 'api', '.env'), 'utf8');
 
   assert.match(webEnv, /# keep this comment/);
@@ -155,15 +167,24 @@ test('sync-env updates only targeted keys and preserves unrelated content', () =
   assert.match(mobileEnv, /EXPO_PUBLIC_SUPABASE_ANON_KEY=anon-local/);
 
   assert.match(apiEnv, /# api comment/);
-  assert.match(apiEnv, /DATABASE_URL=postgresql:\/\/postgres:postgres@127\.0\.0\.1:54322\/postgres/);
-  assert.match(apiEnv, /DIRECT_URL=postgresql:\/\/postgres:postgres@127\.0\.0\.1:54322\/postgres/);
+  assert.match(
+    apiEnv,
+    /DATABASE_URL=postgresql:\/\/postgres:postgres@127\.0\.0\.1:54322\/postgres/,
+  );
+  assert.match(
+    apiEnv,
+    /DIRECT_URL=postgresql:\/\/postgres:postgres@127\.0\.0\.1:54322\/postgres/,
+  );
   assert.match(apiEnv, /SUPABASE_URL=http:\/\/127\.0\.0\.1:54321/);
   assert.match(apiEnv, /SUPABASE_SERVICE_ROLE_KEY=service-role-local/);
   assert.match(apiEnv, /JWT_SECRET=local-jwt-secret/);
   assert.match(apiEnv, /INTERNAL_REMINDERS_TOKEN_API=existing-reminder/);
 
   assert.match(output, /Env sync complete!/);
-  assert.match(output, /Mobile local Supabase URL is pinned to http:\/\/127\.0\.0\.1:54321 by choice\./);
+  assert.match(
+    output,
+    /Mobile local Supabase URL is pinned to http:\/\/127\.0\.0\.1:54321 by choice\./,
+  );
 });
 
 test('sync-env does not add NEXT_PUBLIC_SUPABASE_ANON_KEY when publishable key is present and anon key is absent', () => {
@@ -177,7 +198,10 @@ test('sync-env does not add NEXT_PUBLIC_SUPABASE_ANON_KEY when publishable key i
 
   runSync(tempRoot, binDir);
 
-  const webEnv = fs.readFileSync(path.join(tempRoot, 'apps', 'web', '.env.local'), 'utf8');
+  const webEnv = fs.readFileSync(
+    path.join(tempRoot, 'apps', 'web', '.env.local'),
+    'utf8',
+  );
   assert.match(webEnv, /NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_local/);
   assert.doesNotMatch(webEnv, /^NEXT_PUBLIC_SUPABASE_ANON_KEY=/m);
 });
@@ -187,13 +211,25 @@ test('sync-env is idempotent across repeated runs', () => {
   const binDir = createBinDir(tempRoot);
 
   runSync(tempRoot, binDir);
-  const firstWeb = fs.readFileSync(path.join(tempRoot, 'apps', 'web', '.env.local'), 'utf8');
-  const firstMobile = fs.readFileSync(path.join(tempRoot, 'apps', 'mobile', '.env'), 'utf8');
+  const firstWeb = fs.readFileSync(
+    path.join(tempRoot, 'apps', 'web', '.env.local'),
+    'utf8',
+  );
+  const firstMobile = fs.readFileSync(
+    path.join(tempRoot, 'apps', 'mobile', '.env'),
+    'utf8',
+  );
   const firstApi = fs.readFileSync(path.join(tempRoot, 'apps', 'api', '.env'), 'utf8');
 
   runSync(tempRoot, binDir);
-  const secondWeb = fs.readFileSync(path.join(tempRoot, 'apps', 'web', '.env.local'), 'utf8');
-  const secondMobile = fs.readFileSync(path.join(tempRoot, 'apps', 'mobile', '.env'), 'utf8');
+  const secondWeb = fs.readFileSync(
+    path.join(tempRoot, 'apps', 'web', '.env.local'),
+    'utf8',
+  );
+  const secondMobile = fs.readFileSync(
+    path.join(tempRoot, 'apps', 'mobile', '.env'),
+    'utf8',
+  );
   const secondApi = fs.readFileSync(path.join(tempRoot, 'apps', 'api', '.env'), 'utf8');
 
   assert.equal(secondWeb, firstWeb);

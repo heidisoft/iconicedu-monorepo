@@ -81,15 +81,15 @@ supabase db reset
 pnpm lint
 pnpm typecheck
 pnpm test
-pnpm ci
+pnpm run ci
 ```
 
 Scoped checks:
 
 ```bash
-pnpm ci:web
-pnpm ci:mobile
-pnpm ci:api
+pnpm run ci:web
+pnpm run ci:mobile
+pnpm run ci:api
 pnpm test:affected
 pnpm test:staged
 pnpm --filter web test:e2e

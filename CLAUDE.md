@@ -15,7 +15,7 @@ pnpm build:packages
 pnpm lint
 pnpm typecheck
 pnpm test
-pnpm ci
+pnpm run ci
 ```
 
 ## Canonical References

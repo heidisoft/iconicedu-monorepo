@@ -62,7 +62,7 @@ pnpm dev:api
 pnpm lint
 pnpm typecheck
 pnpm test
-pnpm ci
+pnpm run ci
 ```
 
 ## Documentation Model

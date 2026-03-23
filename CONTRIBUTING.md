@@ -84,10 +84,10 @@ Keep PRs focused on one concern.
 Before opening a PR, run the relevant checks:
 
 ```bash
-pnpm ci
-pnpm ci:web
-pnpm ci:mobile
-pnpm ci:api
+pnpm run ci
+pnpm run ci:web
+pnpm run ci:mobile
+pnpm run ci:api
 ```
 
 PR expectations:
