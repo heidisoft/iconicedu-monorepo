@@ -253,6 +253,31 @@ pnpm supabase:email:push
 
 The preview branch workflow uses this push step automatically after each Supabase preview branch is created or refreshed, so git-tracked email templates apply to preview branches as well.
 
+## Supabase Storage Buckets
+
+The repo also tracks seeded Supabase Storage objects under:
+
+- `supabase/storage/public-message-thumbnails/`
+- `supabase/storage/channel-files/`
+- `supabase/storage/public-avatars/`
+
+Local Supabase reads those directories from the bucket definitions in `supabase/config.toml`.
+
+To seed the git-tracked storage files into local Supabase:
+
+```bash
+supabase seed buckets --local
+```
+
+Preview branches use the Supabase CLI in GitHub Actions:
+
+```bash
+supabase link --project-ref <branch-project-ref>
+supabase seed buckets --linked
+```
+
+That workflow seeds only the files tracked in `supabase/storage/`, so preview branches receive only the repo’s test assets.
+
 ---
 
 ## Environment Variables

@@ -134,11 +134,12 @@ Preview environment behavior:
 2. Preview provisioning runs only after `CI` completes successfully for that PR.
 3. Create or reuse a Supabase preview branch.
 4. Push the git-tracked Supabase email templates into that branch auth config.
-5. Seed it with `supabase/seed.sql`.
-6. Deploy edge functions without cron triggers.
-7. Deploy a Railway preview environment for the API.
-8. Redeploy web against the preview backend.
-9. Comment on the PR with URLs and seed credentials.
+5. Link the Supabase CLI to that branch and run `supabase seed buckets --linked`.
+6. Link the Supabase CLI to that branch and run `supabase db push --linked --include-seed` for schema + seed data.
+7. Deploy edge functions without cron triggers.
+8. Deploy a Railway preview environment for the API.
+9. Redeploy web against the preview backend.
+10. Comment on the PR with URLs and seed credentials.
 
 Cleanup runs automatically when the PR closes or merges.
 

@@ -1,12 +1,12 @@
-name: 'Preview Environment'
+name: "Provision Preview Environment"
 
 on:
   workflow_run:
-    workflows: ['CI']
+    workflows: ["CI"]
     types: [completed]
 
 concurrency:
-  group: 'preview-${{ github.event.workflow_run.pull_requests[0].number }}'
+  group: "preview-${{ github.event.workflow_run.pull_requests[0].number }}"
   cancel-in-progress: true
 
 env:
@@ -15,7 +15,7 @@ env:
 
 jobs:
   create-preview-env:
-    name: 'Create Preview Environment'
+    name: "Create Preview Environment"
     if: >-
       ${{
         github.event.workflow_run.conclusion == 'success' &&
@@ -156,13 +156,23 @@ jobs:
         run: |
           node scripts/supabase/push-email-templates.mjs
 
-      # 4. Seed preview branch (new branches only)
-      - name: Seed preview branch
+      - name: Seed storage buckets to Supabase preview branch
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          BRANCH_REF="${{ steps.supabase-branch.outputs.branch_ref }}"
+          supabase link --project-ref "$BRANCH_REF"
+          supabase seed buckets --linked
+
+      # 4. Apply schema + seed data to new preview branches
+      - name: Push schema and seed data to preview branch
         if: steps.supabase-branch.outputs.branch_new == 'true'
         env:
-          DIRECT_URL: ${{ steps.branch-creds.outputs.direct_url }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
-          psql "$DIRECT_URL" -f supabase/seed.sql
+          BRANCH_REF="${{ steps.supabase-branch.outputs.branch_ref }}"
+          supabase link --project-ref "$BRANCH_REF"
+          supabase db push --linked --include-seed
 
       # 5. Deploy edge functions (no cron triggers)
       - name: Deploy edge functions
