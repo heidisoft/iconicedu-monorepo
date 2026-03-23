@@ -130,9 +130,9 @@ The workflow is defined in [`.github/workflows/preview-env.yml`](../../.github/w
 
 Preview environment behavior:
 
-1. Create or reuse a Supabase preview branch.
-2. Seed it with `supabase/seed.sql`.
-3. Deploy edge functions without cron triggers.
+1. A PR triggers the `CI` workflow first.
+2. Preview provisioning runs only after `CI` completes successfully for that PR.
+3. Create or reuse a Supabase preview branch.
 4. Deploy a Railway preview environment for the API.
 5. Redeploy web against the preview backend.
 6. Comment on the PR with URLs and seed credentials.

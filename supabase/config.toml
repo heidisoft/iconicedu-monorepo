@@ -105,12 +105,20 @@ enabled = true
 # The maximum file size allowed (e.g. "5MB", "500KB").
 file_size_limit = "50MiB"
 
-# Uncomment to configure local storage buckets
-# [storage.buckets.images]
-# public = false
-# file_size_limit = "50MiB"
-# allowed_mime_types = ["image/png", "image/jpeg"]
-# objects_path = "./images"
+[storage.buckets.public-message-thumbnails]
+public = true
+file_size_limit = "50MiB"
+objects_path = "./storage/public-message-thumbnails"
+
+[storage.buckets.channel-files]
+public = false
+file_size_limit = "50MiB"
+objects_path = "./storage/channel-files"
+
+[storage.buckets.public-avatars]
+public = false
+file_size_limit = "50MiB"
+objects_path = "./storage/public-avatars"
 
 # Allow connections via S3 compatible clients
 [storage.s3_protocol]
@@ -220,16 +228,35 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
-# Uncomment to customize email template
-# [auth.email.template.invite]
-# subject = "You have been invited"
-# content_path = "./supabase/templates/invite.html"
+# BEGIN managed by supabase email templates
+# Managed email templates tracked in git.
+# Update the HTML files in ./supabase/templates/email and use `pnpm supabase:email:push` to apply them to hosted branches.
 
-# Uncomment to customize notification email template
-# [auth.email.notification.password_changed]
-# enabled = true
-# subject = "Your password has been changed"
-# content_path = "./templates/password_changed_notification.html"
+[auth.email.template.confirmation]
+subject = "Confirm your email"
+content_path = "./supabase/templates/email/confirmation.html"
+
+[auth.email.template.invite]
+subject = "You’re invited to join ICONIC Academy"
+content_path = "./supabase/templates/email/invite.html"
+
+[auth.email.template.magic_link]
+subject = "Your verification code"
+content_path = "./supabase/templates/email/magic_link.html"
+
+[auth.email.template.recovery]
+subject = "Reset your password"
+content_path = "./supabase/templates/email/recovery.html"
+
+[auth.email.template.reauthentication]
+subject = "Your ICONIC Academy verification code"
+content_path = "./supabase/templates/email/reauthentication.html"
+
+[auth.email.template.email_change]
+subject = "Confirm your email change"
+content_path = "./supabase/templates/email/email_change.html"
+
+# END managed by supabase email templates
 
 [auth.sms]
 # Allow/disallow new user signups via SMS to your project.

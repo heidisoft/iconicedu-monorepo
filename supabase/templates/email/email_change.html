@@ -1,0 +1,170 @@
+<!doctype html>
+<html>
+  <body
+    style="
+      margin: 0;
+      padding: 0;
+      background: #f6f8f7;
+      font-family:
+        Inter,
+        Segoe UI,
+        Roboto,
+        Helvetica,
+        Arial,
+        sans-serif;
+      color: #0f172a;
+    "
+  >
+    <table
+      role="presentation"
+      width="100%"
+      cellpadding="0"
+      cellspacing="0"
+      style="padding: 24px 12px"
+    >
+      <tr>
+        <td align="center">
+          <table
+            role="presentation"
+            width="100%"
+            cellpadding="0"
+            cellspacing="0"
+            style="
+              max-width: 560px;
+              background: #ffffff;
+              border: 1px solid #e2e8f0;
+              border-radius: 20px;
+              overflow: hidden;
+            "
+          >
+            <tr>
+              <td style="padding: 28px 28px 8px 28px; text-align: center">
+                <a
+                  href="{{ .SiteURL }}"
+                  style="
+                    display: inline-block;
+                    text-decoration: none;
+                    font-size: 12px;
+                    letter-spacing: 0.08em;
+                    text-transform: uppercase;
+                    color: #64748b;
+                    margin-bottom: 10px;
+                  "
+                >
+                  ICONIC Academy
+                </a>
+                <h1 style="margin: 0; font-size: 28px; line-height: 1.2; color: #0f172a">
+                  Confirm change of email
+                </h1>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding: 0 28px 6px 28px; text-align: center">
+                <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #475569">
+                  Follow this link to confirm updating your email from
+                  <strong>{{ .Email }}</strong> to <strong>{{ .NewEmail }}</strong>.
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding: 18px 28px 8px 28px; text-align: center">
+                <a
+                  href="{{ .ConfirmationURL }}"
+                  style="
+                    display: inline-block;
+                    background: #16a34a;
+                    color: #ffffff;
+                    text-decoration: none;
+                    font-weight: 600;
+                    font-size: 15px;
+                    padding: 12px 24px;
+                    border-radius: 999px;
+                  "
+                >
+                  Change email
+                </a>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding: 8px 28px 4px 28px; text-align: center">
+                <p style="margin: 0; font-size: 13px; color: #64748b">
+                  Secure verification • Account protection • Trusted access
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding: 18px 28px 24px 28px">
+                <div
+                  style="
+                    background: #f8fafc;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 12px;
+                    padding: 12px 14px;
+                  "
+                >
+                  <p style="margin: 0; font-size: 12px; line-height: 1.6; color: #64748b">
+                    If the button doesn’t work, copy and paste this URL:<br />
+                    <a
+                      href="{{ .ConfirmationURL }}"
+                      style="color: #16a34a; word-break: break-all"
+                      >{{ .ConfirmationURL }}</a
+                    >
+                  </p>
+                </div>
+                <p
+                  style="
+                    margin: 12px 0 0 0;
+                    font-size: 12px;
+                    line-height: 1.6;
+                    color: #94a3b8;
+                    text-align: center;
+                  "
+                >
+                  If you didn’t request this change, please ignore this email and secure
+                  your account.
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td
+                style="
+                  padding: 14px 20px 20px 20px;
+                  border-top: 1px solid #eef2f7;
+                  text-align: center;
+                "
+              >
+                <p style="margin: 0 0 8px 0; font-size: 12px; color: #94a3b8">
+                  © 2026 ICONIC Academy. All rights reserved.
+                </p>
+                <p style="margin: 0; font-size: 12px; line-height: 1.6">
+                  <a
+                    href="{{ .SiteURL }}/privacy"
+                    style="color: #64748b; text-decoration: underline"
+                    >Privacy Policy</a
+                  >
+                  &nbsp;•&nbsp;
+                  <a
+                    href="{{ .SiteURL }}/terms"
+                    style="color: #64748b; text-decoration: underline"
+                    >Terms</a
+                  >
+                  &nbsp;•&nbsp;
+                  <a
+                    href="{{ .SiteURL }}/contact"
+                    style="color: #64748b; text-decoration: underline"
+                    >Contact</a
+                  >
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

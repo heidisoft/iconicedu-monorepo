@@ -1,20 +1,29 @@
-name: 'Preview Environment'
+name: 'Provision Preview Environment'
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
 
 concurrency:
-  group: 'preview-${{ github.event.pull_request.number }}'
+  group: 'preview-${{ github.event.workflow_run.pull_requests[0].number }}'
   cancel-in-progress: true
 
 env:
-  PR_NUMBER: ${{ github.event.pull_request.number }}
-  BRANCH_NAME: ${{ github.head_ref }}
+  PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+  BRANCH_NAME: ${{ github.event.workflow_run.head_branch }}
 
 jobs:
   create-preview-env:
     name: 'Create Preview Environment'
+    # workflow_run executes with repository secrets, so only allow trusted same-repo PRs.
+    if: >-
+      ${{
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'pull_request' &&
+        github.event.workflow_run.pull_requests[0].number &&
+        github.event.workflow_run.head_repository.full_name == github.repository
+      }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -24,6 +33,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - uses: supabase/setup-cli@v1
         with:
@@ -139,30 +150,7 @@ jobs:
 
           echo "branch_api_url=https://${BRANCH_REF}.supabase.co" >> "$GITHUB_OUTPUT"
 
-      # 3. Seed preview branch (new branches only)
-      - name: Seed preview branch
-        if: steps.supabase-branch.outputs.branch_new == 'true'
-        env:
-          DIRECT_URL: ${{ steps.branch-creds.outputs.direct_url }}
-        run: |
-          psql "$DIRECT_URL" -f supabase/seed.sql
-
-      # 4. Deploy edge functions (no cron triggers)
-      - name: Deploy edge functions
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: |
-          BRANCH_REF="${{ steps.supabase-branch.outputs.branch_ref }}"
-          for fn in reminders-dispatch notifications-dispatch channel-read-state-repair; do
-            supabase functions deploy "$fn" \
-              --project-ref "$BRANCH_REF" \
-              --no-verify-jwt \
-              2>&1 || echo "Warning: failed to deploy $fn (non-fatal)"
-          done
-          # Note: cron triggers are NOT configured on preview branches,
-          # so functions exist but won't fire automatically.
-
-      # 5. Deploy Railway preview environment
+      # 3. Deploy Railway preview environment
       - name: Deploy Railway preview API
         id: railway
         env:
@@ -264,7 +252,7 @@ jobs:
             sleep 20
           done
 
-      # 6. Set Vercel branch env vars
+      # 4. Set Vercel branch env vars
       - name: Configure Vercel preview env vars
         id: vercel
         continue-on-error: true
@@ -357,12 +345,12 @@ jobs:
             echo "vercel_url=https://vercel.com/dashboard" >> "$GITHUB_OUTPUT"
           fi
 
-      # 7. Post PR comment
+      # 5. Post PR comment
       - name: Post preview environment comment
         uses: actions/github-script@v7
         with:
           script: |
-            const prNumber = context.payload.pull_request.number;
+            const prNumber = context.payload.workflow_run.pull_requests[0].number;
             const webUrl = '${{ steps.vercel.outputs.vercel_url }}';
             const apiUrl = '${{ steps.railway.outputs.railway_api_url }}';
             const branchRef = '${{ steps.branch-creds.outputs.branch_ref }}';
