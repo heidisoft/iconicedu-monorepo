@@ -148,7 +148,15 @@ jobs:
 
           echo "branch_api_url=https://${BRANCH_REF}.supabase.co" >> "$GITHUB_OUTPUT"
 
-      # 3. Seed preview branch (new branches only)
+      # 3. Apply git-tracked email templates to the preview branch auth config
+      - name: Push email templates to Supabase preview branch
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ steps.supabase-branch.outputs.branch_ref }}
+        run: |
+          node scripts/supabase/push-email-templates.mjs
+
+      # 4. Seed preview branch (new branches only)
       - name: Seed preview branch
         if: steps.supabase-branch.outputs.branch_new == 'true'
         env:
@@ -156,7 +164,7 @@ jobs:
         run: |
           psql "$DIRECT_URL" -f supabase/seed.sql
 
-      # 4. Deploy edge functions (no cron triggers)
+      # 5. Deploy edge functions (no cron triggers)
       - name: Deploy edge functions
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
@@ -171,7 +179,7 @@ jobs:
           # Note: cron triggers are NOT configured on preview branches,
           # so functions exist but won't fire automatically.
 
-      # 5. Deploy Railway preview environment
+      # 6. Deploy Railway preview environment
       - name: Deploy Railway preview API
         id: railway
         env:
@@ -273,7 +281,7 @@ jobs:
             sleep 20
           done
 
-      # 6. Set Vercel branch env vars
+      # 7. Set Vercel branch env vars
       - name: Configure Vercel preview env vars
         id: vercel
         continue-on-error: true
@@ -366,7 +374,7 @@ jobs:
             echo "vercel_url=https://vercel.com/dashboard" >> "$GITHUB_OUTPUT"
           fi
 
-      # 7. Post PR comment
+      # 8. Post PR comment
       - name: Post preview environment comment
         uses: actions/github-script@v7
         with:

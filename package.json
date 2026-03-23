@@ -53,6 +53,8 @@
     "mobile:eas:submit": "pnpm --filter mobile eas:submit",
     "----------- UTILITIES -----------": "",
     "env:sync:local": "bash scripts/setup-local.sh --sync-env",
+    "supabase:email:push": "node scripts/supabase/push-email-templates.mjs",
+    "test:supabase:email-push": "node --test scripts/supabase/push-email-templates.test.mjs",
     "clean": "turbo run clean && rm -rf node_modules/.cache",
     "clean:all": "turbo run clean && rm -rf node_modules",
     "format": "prettier --write .",

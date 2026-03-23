@@ -156,6 +156,10 @@ This applies every file in `supabase/migrations/` in order. Run this again whene
 
 Check the Supabase dashboard → Table Editor. You should see tables like `profiles`, `accounts`, `channels`, `messages`, etc.
 
+#### 6. Use the tracked email templates
+
+Customized Supabase Auth email templates are already tracked in this repo under `supabase/templates/email/`, and local Supabase uses them through the managed block in `supabase/config.toml`.
+
 ---
 
 ### Option B: Supabase Local
@@ -222,6 +226,32 @@ That command reads `supabase status --output json` and updates only the matching
 ```bash
 supabase stop
 ```
+
+If you sync or edit local email templates, restart the local stack so GoTrue reloads `supabase/config.toml` and the template files:
+
+```bash
+supabase stop
+supabase start
+```
+
+## Supabase Email Templates
+
+The customized Supabase Auth email templates are already tracked in git under:
+
+- `supabase/templates/email/*.html`
+- the managed email-template block inside `supabase/config.toml`
+
+To push the git-tracked templates back into a hosted Supabase project or branch:
+
+```bash
+export SUPABASE_ACCESS_TOKEN=<your-management-api-token>
+export SUPABASE_PROJECT_REF=<target-project-or-branch-ref>
+
+pnpm supabase:email:push -- --dry-run
+pnpm supabase:email:push
+```
+
+The preview branch workflow uses this push step automatically after each Supabase preview branch is created or refreshed, so git-tracked email templates apply to preview branches as well.
 
 ---
 
