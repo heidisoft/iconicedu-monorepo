@@ -16,11 +16,13 @@ env:
 jobs:
   create-preview-env:
     name: 'Create Preview Environment'
+    # workflow_run executes with repository secrets, so only allow trusted same-repo PRs.
     if: >-
       ${{
         github.event.workflow_run.conclusion == 'success' &&
         github.event.workflow_run.event == 'pull_request' &&
-        github.event.workflow_run.pull_requests[0].number
+        github.event.workflow_run.pull_requests[0].number &&
+        github.event.workflow_run.head_repository.full_name == github.repository
       }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
