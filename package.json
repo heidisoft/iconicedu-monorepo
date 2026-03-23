@@ -38,6 +38,7 @@
     "test:watch": "turbo run test:watch",
     "----------- CI / CD -----------": "",
     "ci": "pnpm format:check && turbo run lint typecheck test build",
+    "check": "pnpm run ci",
     "ci:web": "turbo run lint typecheck test build --filter=web...",
     "ci:mobile": "turbo run lint typecheck test build --filter=mobile...",
     "ci:api": "turbo run lint typecheck test build --filter=api...",

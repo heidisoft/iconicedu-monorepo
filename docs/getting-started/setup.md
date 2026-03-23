@@ -1,5 +1,24 @@
 # Local Environment Setup
 
+## Purpose
+
+This is the canonical setup guide for getting the IconicEdu monorepo running locally.
+
+## Intended Audience
+
+Internal engineers setting up web, mobile, API, and local Supabase development.
+
+## Last Updated
+
+2026-03-23
+
+## Related Docs
+
+- [Documentation Hub](../README.md)
+- [Development Workflow](development-workflow.md)
+- [Contributing](../../CONTRIBUTING.md)
+- [Architecture Overview](../architecture/overview.md)
+
 Step-by-step guide to get the IconicEdu monorepo running on your machine.
 
 ---

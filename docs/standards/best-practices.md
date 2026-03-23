@@ -1,6 +1,25 @@
 # Best Practices
 
-Code conventions and patterns for the IconicEdu monorepo. For architecture detail and type system internals, see [AGENTS.md](AGENTS.md).
+## Purpose
+
+Canonical engineering standards and coding conventions for the monorepo.
+
+## Intended Audience
+
+Engineers implementing or reviewing production code.
+
+## Last Updated
+
+2026-03-23
+
+## Related Docs
+
+- [Documentation Hub](../README.md)
+- [Architecture Overview](../architecture/overview.md)
+- [Shared Packages](../architecture/packages.md)
+- [Contributing](../../CONTRIBUTING.md)
+
+Code conventions and patterns for the IconicEdu monorepo. For internal AI collaboration guidance, see [../internal/ai/agents.md](../internal/ai/agents.md).
 
 ---
 
@@ -110,7 +129,7 @@ import { something } from '@iconicedu/utils';
 The pipeline is: `^build` (dependencies) → `build` → `lint | typecheck | test`. This means:
 
 - You **must** build packages before running lint/typecheck/test on apps
-- `pnpm ci` handles this automatically via the dependency graph
+- `pnpm run ci` handles this automatically via the dependency graph
 - If you see "module not found" errors in lint or typecheck, run `pnpm build:packages` first
 
 ---

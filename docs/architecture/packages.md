@@ -1,5 +1,23 @@
 # Shared Packages
 
+## Purpose
+
+Canonical package-level architecture guide for shared libraries in the monorepo.
+
+## Intended Audience
+
+Engineers changing shared types, UI packages, utilities, or workspace configuration.
+
+## Last Updated
+
+2026-03-23
+
+## Related Docs
+
+- [Documentation Hub](../README.md)
+- [Architecture Overview](overview.md)
+- [Best Practices](../standards/best-practices.md)
+
 Documentation for each package in the `packages/` directory.
 
 Packages are internal libraries consumed by apps via `workspace:*` dependencies. They are built by Turborepo before any app can import from them (`pnpm build:packages`).
@@ -119,7 +137,7 @@ import type { ViewProps } from 'react-native';
 const StyledView = View as React.ComponentType<ViewProps & { className?: string }>;
 ```
 
-See [docs/best-practices.md#nativewind-classname-casting](best-practices.md) for details.
+See [../standards/best-practices.md#nativewind-classname-casting](../standards/best-practices.md#nativewind-classname-casting) for details.
 
 ### Testing
 

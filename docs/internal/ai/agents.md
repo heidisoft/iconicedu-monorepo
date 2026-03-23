@@ -1,5 +1,24 @@
 # AI Project Instructions
 
+## Purpose
+
+Canonical long-form guidance for AI assistants operating in this repository.
+
+## Intended Audience
+
+AI coding agents and engineers maintaining agent-facing repo guidance.
+
+## Last Updated
+
+2026-03-23
+
+## Related Docs
+
+- [Root AGENTS Entry](../../../AGENTS.md)
+- [Documentation Hub](../../README.md)
+- [Architecture Overview](../../architecture/overview.md)
+- [Best Practices](../../standards/best-practices.md)
+
 ## 1. Project Overview
 
 - This monorepo powers a multi-platform education platform (web, mobile, API).
