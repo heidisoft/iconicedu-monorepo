@@ -361,6 +361,38 @@ Then in the Expo terminal:
 - Press `a` — open Android Emulator
 - Scan QR code — open on physical device with Expo Go
 
+### Log In To The Website Locally
+
+For local email-based authentication flows such as sign-in, sign-up, password reset, and OTP verification, Supabase routes emails to Mailpit instead of sending real email.
+
+1. Start the local Supabase stack:
+
+```bash
+supabase start
+```
+
+2. Get the local service URLs:
+
+```bash
+supabase status
+```
+
+3. Open the Mailpit URL shown in the output.
+   The default local URL is usually `http://127.0.0.1:54324`.
+
+4. Trigger the auth flow in the local web app:
+   sign in, request an OTP, create an account, or start a password reset.
+
+5. Find the captured email in Mailpit and open it.
+
+6. Copy the code, magic link, or token from the email and use it in the app’s verification step.
+
+If you prefer the machine-readable version of the local Supabase endpoints, you can also run:
+
+```bash
+supabase status --output json
+```
+
 ---
 
 ## Mobile Setup
