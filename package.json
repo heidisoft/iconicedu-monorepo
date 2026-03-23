@@ -42,6 +42,7 @@
     "ci:web": "turbo run lint typecheck test build --filter=web...",
     "ci:mobile": "turbo run lint typecheck test build --filter=mobile...",
     "ci:api": "turbo run lint typecheck test build --filter=api...",
+    "start": "pnpm --filter api start:prod",
     "----------- MOBILE NATIVE BUILDS -----------": "",
     "mobile:start": "pnpm --filter mobile start",
     "mobile:ios": "pnpm --filter mobile ios",
