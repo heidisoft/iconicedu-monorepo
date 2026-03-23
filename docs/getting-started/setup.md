@@ -241,18 +241,6 @@ The customized Supabase Auth email templates are already tracked in git under:
 - `supabase/templates/email/*.html`
 - the managed email-template block inside `supabase/config.toml`
 
-To push the git-tracked templates back into a hosted Supabase project or branch:
-
-```bash
-export SUPABASE_ACCESS_TOKEN=<your-management-api-token>
-export SUPABASE_PROJECT_REF=<target-project-or-branch-ref>
-
-pnpm supabase:email:push -- --dry-run
-pnpm supabase:email:push
-```
-
-The preview branch workflow uses this push step automatically after each Supabase preview branch is created or refreshed, so git-tracked email templates apply to preview branches as well.
-
 ## Supabase Storage Buckets
 
 The repo also tracks seeded Supabase Storage objects under:
@@ -268,17 +256,6 @@ To seed the git-tracked storage files into local Supabase:
 ```bash
 supabase seed buckets --local
 ```
-
-Preview branches use the Supabase CLI in GitHub Actions:
-
-```bash
-supabase link --project-ref <branch-project-ref>
-supabase seed buckets --linked
-```
-
-That workflow seeds only the files tracked in `supabase/storage/`, so preview branches receive only the repo’s test assets.
-
----
 
 ## Environment Variables
 

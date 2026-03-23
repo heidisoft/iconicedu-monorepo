@@ -1,12 +1,12 @@
-name: "Provision Preview Environment"
+name: 'Provision Preview Environment'
 
 on:
   workflow_run:
-    workflows: ["CI"]
+    workflows: ['CI']
     types: [completed]
 
 concurrency:
-  group: "preview-${{ github.event.workflow_run.pull_requests[0].number }}"
+  group: 'preview-${{ github.event.workflow_run.pull_requests[0].number }}'
   cancel-in-progress: true
 
 env:
@@ -15,7 +15,7 @@ env:
 
 jobs:
   create-preview-env:
-    name: "Create Preview Environment"
+    name: 'Create Preview Environment'
     if: >-
       ${{
         github.event.workflow_run.conclusion == 'success' &&
@@ -148,48 +148,7 @@ jobs:
 
           echo "branch_api_url=https://${BRANCH_REF}.supabase.co" >> "$GITHUB_OUTPUT"
 
-      # 3. Apply git-tracked email templates to the preview branch auth config
-      - name: Push email templates to Supabase preview branch
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_PROJECT_REF: ${{ steps.supabase-branch.outputs.branch_ref }}
-        run: |
-          node scripts/supabase/push-email-templates.mjs
-
-      - name: Seed storage buckets to Supabase preview branch
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: |
-          BRANCH_REF="${{ steps.supabase-branch.outputs.branch_ref }}"
-          supabase link --project-ref "$BRANCH_REF"
-          supabase seed buckets --linked
-
-      # 4. Apply schema + seed data to new preview branches
-      - name: Push schema and seed data to preview branch
-        if: steps.supabase-branch.outputs.branch_new == 'true'
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: |
-          BRANCH_REF="${{ steps.supabase-branch.outputs.branch_ref }}"
-          supabase link --project-ref "$BRANCH_REF"
-          supabase db push --linked --include-seed
-
-      # 5. Deploy edge functions (no cron triggers)
-      - name: Deploy edge functions
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: |
-          BRANCH_REF="${{ steps.supabase-branch.outputs.branch_ref }}"
-          for fn in reminders-dispatch notifications-dispatch channel-read-state-repair; do
-            supabase functions deploy "$fn" \
-              --project-ref "$BRANCH_REF" \
-              --no-verify-jwt \
-              2>&1 || echo "Warning: failed to deploy $fn (non-fatal)"
-          done
-          # Note: cron triggers are NOT configured on preview branches,
-          # so functions exist but won't fire automatically.
-
-      # 6. Deploy Railway preview environment
+      # 3. Deploy Railway preview environment
       - name: Deploy Railway preview API
         id: railway
         env:
@@ -291,7 +250,7 @@ jobs:
             sleep 20
           done
 
-      # 7. Set Vercel branch env vars
+      # 4. Set Vercel branch env vars
       - name: Configure Vercel preview env vars
         id: vercel
         continue-on-error: true
@@ -384,7 +343,7 @@ jobs:
             echo "vercel_url=https://vercel.com/dashboard" >> "$GITHUB_OUTPUT"
           fi
 
-      # 8. Post PR comment
+      # 5. Post PR comment
       - name: Post preview environment comment
         uses: actions/github-script@v7
         with:
