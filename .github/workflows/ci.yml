@@ -21,6 +21,9 @@ jobs:
   # Push to main: all packages (full confidence)
   # ──────────────────────────────────────────────────────────────
   quality:
+    # Branch protection depends on this exact job name.
+    # If you rename it, update .github/branch-protection/main.json and
+    # scripts/github/apply-branch-protection.sh in the same change.
     name: Quality (format · lint · typecheck)
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -82,6 +85,9 @@ jobs:
   # PRs: affected packages only. Push to main: all packages.
   # ──────────────────────────────────────────────────────────────
   test:
+    # Branch protection depends on this exact job name.
+    # If you rename it, update .github/branch-protection/main.json and
+    # scripts/github/apply-branch-protection.sh in the same change.
     name: Test
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -150,6 +156,9 @@ jobs:
   # Job 3: Build apps — only runs after quality + test both pass
   # ──────────────────────────────────────────────────────────────
   build:
+    # Branch protection depends on this exact job name.
+    # If you rename it, update .github/branch-protection/main.json and
+    # scripts/github/apply-branch-protection.sh in the same change.
     name: Build
     needs: [quality, test]
     runs-on: ubuntu-latest

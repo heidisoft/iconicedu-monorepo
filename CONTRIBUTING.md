@@ -140,3 +140,24 @@ Use `workspace:*` for internal packages.
 
 - Use squash merge for normal feature work.
 - Use merge commits only when preserving branch history is intentionally required.
+
+## Branch Protection
+
+`main` should be protected so PRs cannot merge until CI completes successfully.
+
+Required status checks:
+
+- `Quality (format · lint · typecheck)`
+- `Test`
+- `Build`
+
+`Build` already depends on `Quality` and `Test`, but all three are listed as required checks so GitHub blocks merges while any part of the CI pipeline is still pending or failing.
+
+To apply the protection through the GitHub API:
+
+```bash
+export GITHUB_TOKEN=<repo-admin-token>
+bash scripts/github/apply-branch-protection.sh
+```
+
+The source of truth for this protection is [`main.json`](/Users/hwanigasooriya/Workspace/hobby/iconicedu-monorepo/.github/branch-protection/main.json).

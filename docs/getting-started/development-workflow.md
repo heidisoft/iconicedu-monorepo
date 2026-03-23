@@ -107,6 +107,16 @@ Workflow:
 4. Ensure required checks pass.
 5. Squash merge when approved.
 
+## Required PR Checks
+
+GitHub branch protection for `main` should require these CI checks before merge:
+
+- `Quality (format · lint · typecheck)`
+- `Test`
+- `Build`
+
+The protection payload is tracked in [`.github/branch-protection/main.json`](../../.github/branch-protection/main.json), and can be applied with [`scripts/github/apply-branch-protection.sh`](../../scripts/github/apply-branch-protection.sh).
+
 ## Preview Environments
 
 Every PR can provision an isolated preview stack:
