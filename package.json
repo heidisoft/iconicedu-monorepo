@@ -51,6 +51,7 @@
     "mobile:eas:build:prod": "pnpm --filter mobile eas:build:prod",
     "mobile:eas:submit": "pnpm --filter mobile eas:submit",
     "----------- UTILITIES -----------": "",
+    "env:sync:local": "bash scripts/setup-local.sh --sync-env",
     "clean": "turbo run clean && rm -rf node_modules/.cache",
     "clean:all": "turbo run clean && rm -rf node_modules",
     "format": "prettier --write .",

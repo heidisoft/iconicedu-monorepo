@@ -172,20 +172,31 @@ supabase migration up
 #### 3. Get your local credentials
 
 ```bash
-supabase status
+supabase status --output json
 ```
 
-This prints everything you need:
+The current CLI returns values like:
 
-```
-API URL: http://localhost:54321
-anon key: eyJ...
-service_role key: eyJ...
-DB URL: postgresql://postgres:postgres@localhost:54322/postgres
-Studio URL: http://localhost:54323
+```json
+{
+  "API_URL": "http://127.0.0.1:54321",
+  "DB_URL": "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
+  "JWT_SECRET": "super-secret-jwt-token-with-at-least-32-characters-long",
+  "PUBLISHABLE_KEY": "sb_publishable_...",
+  "ANON_KEY": "eyJ...",
+  "SECRET_KEY": "sb_secret_...",
+  "SERVICE_ROLE_KEY": "eyJ...",
+  "STUDIO_URL": "http://127.0.0.1:54323"
+}
 ```
 
-Use these values in your `.env` files (see next section).
+You can wire these into local env files automatically with:
+
+```bash
+pnpm env:sync:local
+```
+
+That command reads `supabase status --output json` and updates only the matching keys inside the existing env files. It does not replace the whole file.
 
 #### 4. Stop local Supabase
 
@@ -199,6 +210,22 @@ supabase stop
 
 Create the following files. Never commit `.env` files — they are in `.gitignore`.
 
+For local Supabase, prefer:
+
+```bash
+pnpm env:sync:local
+```
+
+This command:
+
+- reads the running local Supabase credentials from `supabase status --output json`
+- updates only the supported keys in `apps/web/.env.local`, `apps/mobile/.env`, and `apps/api/.env`
+- preserves unrelated comments and env vars already in those files
+- auto-generates local internal reminder/activity tokens if they are missing
+- leaves optional integrations like PostHog and Daily unchanged, then reports what is still unset
+
+If the env files do not exist yet, create them first from the examples below, then run `pnpm env:sync:local`.
+
 ### apps/web/.env.local
 
 ```bash
@@ -206,15 +233,29 @@ cp apps/web/.env.local.example apps/web/.env.local
 ```
 
 ```env
-# From Supabase project → Settings → API
+# Cloud / manual setup
 NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+
+# Optional fallback for local/manual setups
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+
+# Useful for server-side local usage as well
+SUPABASE_URL=https://your-project-ref.supabase.co
 
 # Keep this secret — never expose to the browser
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
 
-For local Supabase, use `http://localhost:54321` as the URL and the keys from `supabase status`.
+When synced from local Supabase, the command writes:
+
+- `NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321`
+- `SUPABASE_URL=http://127.0.0.1:54321`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<PUBLISHABLE_KEY>`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY=<ANON_KEY>` only if that key already exists or publishable key is absent
+- `SUPABASE_SERVICE_ROLE_KEY=<SERVICE_ROLE_KEY>`
+- `NEXT_PUBLIC_APP_URL=http://127.0.0.1:3000` if missing
+- `INTERNAL_REMINDERS_TOKEN` and `INTERNAL_ACTIVITY_FEED_TOKEN` if missing
 
 ### apps/mobile/.env
 
@@ -228,7 +269,14 @@ EXPO_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 ```
 
+When synced from local Supabase, the command writes:
+
+- `EXPO_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321`
+- `EXPO_PUBLIC_SUPABASE_ANON_KEY=<ANON_KEY>`
+
 > **Note:** Mobile reads env via `Constants.expoConfig?.extra`, not `process.env`. The `app.config.js` bridges these at build time.
+>
+> For this repo’s local setup, mobile is intentionally pinned to `127.0.0.1`. If you run on a physical device, update that URL manually to a reachable host.
 
 ### apps/api/.env
 
@@ -239,7 +287,7 @@ cp apps/api/.env.example apps/api/.env
 ```env
 # Supabase Postgres connection string
 # Cloud: find in Supabase dashboard → Settings → Database → Connection string (URI)
-# Local: postgresql://postgres:postgres@localhost:54322/postgres
+# Local: postgresql://postgres:postgres@127.0.0.1:54322/postgres
 DATABASE_URL=postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:5432/postgres
 
 # For direct connections (Prisma migrations) use the non-pooling URL
@@ -252,6 +300,15 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 # JWT secret — from Supabase dashboard → Settings → API → JWT Settings
 JWT_SECRET=your-jwt-secret
 ```
+
+When synced from local Supabase, the command writes:
+
+- `DATABASE_URL=<DB_URL>`
+- `DIRECT_URL=<DB_URL>`
+- `SUPABASE_URL=<API_URL>`
+- `SUPABASE_SERVICE_ROLE_KEY=<SERVICE_ROLE_KEY>`
+- `JWT_SECRET=<JWT_SECRET>`
+- `INTERNAL_REMINDERS_TOKEN_API` if missing
 
 ---
 
