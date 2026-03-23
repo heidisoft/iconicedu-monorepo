@@ -1,8 +1,6 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
 
@@ -18,7 +16,6 @@ jobs:
   # ──────────────────────────────────────────────────────────────
   # Job 1: Code quality — format · lint · typecheck
   # PRs: affected packages only (fast feedback)
-  # Push to main: all packages (full confidence)
   # ──────────────────────────────────────────────────────────────
   quality:
     # Branch protection depends on this exact job name.
@@ -73,7 +70,7 @@ jobs:
       - name: Guard feature flags
         run: pnpm guard:feature-flags
 
-      # PRs: only affected packages. Push to main: all packages.
+      # PRs: only affected packages.
       - name: Lint + Typecheck
         run: pnpm exec turbo run lint typecheck ${{ github.event_name == 'pull_request' && '--affected' || '' }}
         env:
