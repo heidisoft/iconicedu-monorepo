@@ -403,7 +403,7 @@ pnpm dev:api
 ### Mobile only
 
 ```bash
-pnpm dev:mobile
+pnpm mobile:start
 ```
 
 Then in the Expo terminal:
