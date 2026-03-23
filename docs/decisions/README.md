@@ -1,5 +1,22 @@
 # Architecture Decision Records
 
+## Purpose
+
+Canonical index for major architectural decisions in the repository.
+
+## Intended Audience
+
+Engineers who need rationale for technical choices or need to record a new decision.
+
+## Last Updated
+
+2026-03-23
+
+## Related Docs
+
+- [Documentation Hub](../README.md)
+- [Architecture Overview](../architecture/overview.md)
+
 An Architecture Decision Record (ADR) documents a significant architectural choice: the context that led to it, the decision made, and the consequences.
 
 ADRs are written when a decision is made and are **never deleted** — if a decision is reversed, a new ADR is written that supersedes the old one. This gives future contributors (and your future self) a record of why things are the way they are.
@@ -17,7 +34,7 @@ ADRs are written when a decision is made and are **never deleted** — if a deci
 Copy `template.md` and name the file `NNN-short-title.md` where `NNN` is the next available number.
 
 ```bash
-cp docs/adr/template.md docs/adr/004-my-decision.md
+cp docs/decisions/template.md docs/decisions/004-my-decision.md
 ```
 
 Fill in all sections. Status options:

@@ -1,6 +1,25 @@
 # Best Practices
 
-Code conventions and patterns for the IconicEdu monorepo. For architecture detail and type system internals, see [AGENTS.md](AGENTS.md).
+## Purpose
+
+Canonical engineering standards and coding conventions for the monorepo.
+
+## Intended Audience
+
+Engineers implementing or reviewing production code.
+
+## Last Updated
+
+2026-03-23
+
+## Related Docs
+
+- [Documentation Hub](../README.md)
+- [Architecture Overview](../architecture/overview.md)
+- [Shared Packages](../architecture/packages.md)
+- [Contributing](../../CONTRIBUTING.md)
+
+Code conventions and patterns for the IconicEdu monorepo. For internal AI collaboration guidance, see [../internal/ai/agents.md](../internal/ai/agents.md).
 
 ---
 

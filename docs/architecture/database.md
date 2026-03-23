@@ -1,5 +1,24 @@
 # Database Guide
 
+## Purpose
+
+Canonical guide to schema structure, migrations, and Supabase database conventions.
+
+## Intended Audience
+
+Engineers changing database schema, RLS, Prisma, or Supabase-backed data access.
+
+## Last Updated
+
+2026-03-23
+
+## Related Docs
+
+- [Documentation Hub](../README.md)
+- [Architecture Overview](overview.md)
+- [Deployment](../operations/deployment.md)
+- [Security and RLS Report](../reports/security-rls.md)
+
 Overview of the IconicEdu database schema, migration workflow, and Supabase conventions.
 
 The source of truth for the live schema is `supabase/migrations/`. The Prisma schema (`apps/api/prisma/schema.prisma`) mirrors it for the NestJS ORM layer.

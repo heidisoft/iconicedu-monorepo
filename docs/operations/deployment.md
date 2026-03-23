@@ -1,5 +1,23 @@
 # Deployment Guide
 
+## Purpose
+
+Canonical deployment guide for web, mobile, API, and database delivery.
+
+## Intended Audience
+
+Internal engineers and operators responsible for shipping or validating production changes.
+
+## Last Updated
+
+2026-03-23
+
+## Related Docs
+
+- [Documentation Hub](../README.md)
+- [Development Workflow](../getting-started/development-workflow.md)
+- [Reminders Runbook](reminders.md)
+
 How to deploy each app in the IconicEdu monorepo to production.
 
 ---

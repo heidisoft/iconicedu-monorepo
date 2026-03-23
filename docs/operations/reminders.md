@@ -1,5 +1,22 @@
 # Reminders Cron Ops (Supabase Edge Function -> API)
 
+## Purpose
+
+Operational runbook for the reminders dispatch pipeline.
+
+## Intended Audience
+
+Engineers operating or debugging scheduled reminder delivery.
+
+## Last Updated
+
+2026-03-23
+
+## Related Docs
+
+- [Documentation Hub](../README.md)
+- [Deployment](deployment.md)
+
 This sets up a Supabase scheduled Edge Function that calls:
 
 - `POST /internal/reminders/dispatch` on the API service (Railway).

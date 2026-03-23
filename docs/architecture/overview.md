@@ -1,6 +1,24 @@
 # Architecture Overview
 
-High-level guide to how IconicEdu is structured and how the pieces connect. For deep technical detail on the type system, data flow, and patterns, see [AGENTS.md](AGENTS.md).
+## Purpose
+
+High-level guide to how IconicEdu is structured and how the pieces connect.
+
+## Intended Audience
+
+Engineers who need a system-level mental model before changing features or infrastructure.
+
+## Last Updated
+
+2026-03-23
+
+## Related Docs
+
+- [Documentation Hub](../README.md)
+- [Shared Packages](packages.md)
+- [Database](database.md)
+- [ADR Index](../decisions/README.md)
+- [Canonical AI Guidance](../internal/ai/agents.md)
 
 ---
 
@@ -89,7 +107,7 @@ packages/
 └── config-tsconfig/ Shared TypeScript config base
 ```
 
-See [docs/packages.md](packages.md) for a full breakdown.
+See [packages.md](packages.md) for a full breakdown.
 
 ---
 
@@ -181,6 +199,6 @@ RLS policies enforce these boundaries at the database level — not just in appl
 
 For the reasoning behind significant choices, see the Architecture Decision Records:
 
-- [ADR-001 — Monorepo with Turborepo + pnpm](adr/001-monorepo-turborepo-pnpm.md)
-- [ADR-002 — Supabase as database and auth platform](adr/002-supabase.md)
-- [ADR-003 — Expo for cross-platform mobile](adr/003-expo-react-native.md)
+- [ADR-001 — Monorepo with Turborepo + pnpm](../decisions/001-monorepo-turborepo-pnpm.md)
+- [ADR-002 — Supabase as database and auth platform](../decisions/002-supabase.md)
+- [ADR-003 — Expo for cross-platform mobile](../decisions/003-expo-react-native.md)

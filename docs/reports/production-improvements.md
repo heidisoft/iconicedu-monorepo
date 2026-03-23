@@ -28,7 +28,7 @@ Each finding is labelled with a severity: **P0** (must fix before prod), **P1** 
 
 ### P0 — JWT tokens are decoded but never verified
 
-**File**: [apps/api/src/modules/auth/auth.service.ts](../apps/api/src/modules/auth/auth.service.ts)
+**File**: [apps/api/src/modules/auth/auth.service.ts](../../apps/api/src/modules/auth/auth.service.ts)
 
 ```ts
 // Current — attacker can forge any payload
@@ -59,7 +59,7 @@ async verifyToken(token: string) {
 
 ### P0 — `req.user` is untyped — role escalation surface
 
-**File**: [apps/api/src/modules/auth/auth.guard.ts](../apps/api/src/modules/auth/auth.guard.ts:26)
+**File**: `apps/api/src/modules/auth/auth.guard.ts:26`
 
 ```ts
 req.user = {
@@ -97,7 +97,7 @@ Only `apps/web/lib/supabase/service.ts` and server actions may import it.
 
 ### P1 — Link preview fetches arbitrary user-supplied URLs server-side
 
-**File**: [apps/web/lib/messages/link-preview.ts](../apps/web/lib/messages/link-preview.ts)
+**File**: [apps/web/lib/messages/link-preview.ts](../../apps/web/lib/messages/link-preview.ts)
 
 A user can supply `http://169.254.169.254/latest/meta-data/` (AWS IMDS) or internal hostnames. Add an allowlist/denylist for private IP ranges before fetching, or use a dedicated sandboxed preview service.
 
@@ -116,7 +116,7 @@ function isSafeUrl(url: string): boolean {
 
 ### P0 — ChannelsService returns all channels regardless of user
 
-**File**: [apps/api/src/modules/channels/channels.service.ts](../apps/api/src/modules/channels/channels.service.ts:8-14)
+**File**: `apps/api/src/modules/channels/channels.service.ts:8-14`
 
 ```ts
 listChannelsForUser(userId: string) {
@@ -166,7 +166,7 @@ The `@ApiTags` decorators are present but there are no `@ApiResponse` or `@ApiBo
 
 ### P1 — `resolveProfilesById` fires one query per profile
 
-**File**: [apps/web/lib/messages/builders/thread.builder.ts](../apps/web/lib/messages/builders/thread.builder.ts:97-111)
+**File**: `apps/web/lib/messages/builders/thread.builder.ts:97-111`
 
 ```ts
 async function resolveProfilesById(supabase, profileIds) {
@@ -195,7 +195,7 @@ This pattern appears in several builders. Fix it consistently.
 
 ### P1 — Activity feed builder has a sequential waterfall
 
-**File**: [apps/web/lib/activity-feed/builders/activity-feed.builder.ts](../apps/web/lib/activity-feed/)
+**File**: [apps/web/lib/activity-feed/builders/activity-feed.builder.ts](../../apps/web/lib/activity-feed/builders/activity-feed.builder.ts)
 
 The feed builder loads items, then loads actors, then loads group members — sequentially. Use `Promise.all` where the data shapes are known upfront, or batch the second/third fetches into the initial query with Supabase `select` joins.
 

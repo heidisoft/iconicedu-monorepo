@@ -69,6 +69,6 @@ Use **Expo** (managed workflow with EAS) built on **React Native**.
 ## References
 
 - `apps/mobile/package.json` — exact SDK and dependency versions
-- `docs/setup.md#mobile-setup` — local development setup
-- `docs/deployment.md#mobile--eas-build-and-submit` — EAS build and release process
+- `docs/getting-started/setup.md#mobile-setup` — local development setup
+- `docs/operations/deployment.md#mobile--eas-build-and-submit` — EAS build and release process
 - [Expo SDK 54 release notes](https://expo.dev/changelog/sdk-54)

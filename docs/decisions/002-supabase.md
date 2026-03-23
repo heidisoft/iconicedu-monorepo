@@ -71,4 +71,4 @@ All database schema changes are managed via migration files in `supabase/migrati
 ## References
 
 - `supabase/migrations/` — all schema migrations
-- `docs/database.md` — migration workflow and RLS patterns
+- `docs/architecture/database.md` — migration workflow and RLS patterns

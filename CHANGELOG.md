@@ -12,14 +12,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - PR template, issue templates, and GitHub Actions CI workflow
 - `SECURITY.md`, `CODE_OF_CONDUCT.md`, `CHANGELOG.md`
-- `docs/setup.md` — full local environment setup guide with Supabase instructions
-- `docs/contributing.md` — branch naming, commit conventions, PR process
-- `docs/best-practices.md` — TypeScript, monorepo, web, mobile, and database conventions
-- `docs/deployment.md` — Vercel (web), EAS (mobile), and API deployment guides
-- `docs/database.md` — schema overview, migration workflow, RLS patterns
-- `docs/architecture.md` — high-level system architecture and data flow
-- `docs/packages.md` — documentation for each shared package
-- `docs/adr/` — Architecture Decision Records
+- `docs/getting-started/setup.md` — full local environment setup guide with Supabase instructions
+- `CONTRIBUTING.md` — branch naming, commit conventions, PR process
+- `docs/standards/best-practices.md` — TypeScript, monorepo, web, mobile, and database conventions
+- `docs/operations/deployment.md` — Vercel (web), EAS (mobile), and API deployment guides
+- `docs/architecture/database.md` — schema overview, migration workflow, RLS patterns
+- `docs/architecture/overview.md` — high-level system architecture and data flow
+- `docs/architecture/packages.md` — documentation for each shared package
+- `docs/decisions/` — Architecture Decision Records
 - `.env.*.example` files for all apps
 - `.editorconfig` for consistent editor settings
 - `.github/CODEOWNERS` for automatic reviewer assignment

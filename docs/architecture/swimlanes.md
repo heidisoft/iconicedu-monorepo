@@ -1,5 +1,23 @@
 # Architecture Control Flow — Swimlane Diagram
 
+## Purpose
+
+Reference swimlane view of the most important cross-system request and data flows.
+
+## Intended Audience
+
+Engineers tracing behavior across web, mobile, API, and Supabase boundaries.
+
+## Last Updated
+
+2026-03-23
+
+## Related Docs
+
+- [Documentation Hub](../README.md)
+- [Architecture Overview](overview.md)
+- [Diagrams](diagrams.md)
+
 Six major flows across the Web (Next.js), Mobile (Expo), API (NestJS), Supabase Auth, and PostgreSQL layers.
 
 ```mermaid
@@ -105,7 +123,7 @@ sequenceDiagram
 
 Browser triggers OAuth or Magic Link → Supabase issues tokens and redirects to `/auth/callback` → Next.js exchanges the auth code for a session via `exchangeCodeForSession` → sets a server-side cookie (Supabase SSR pattern) → calls `/api/accounts/activate` to create or activate the account row in Postgres → redirects the user to `/{orgSlug}/dashboard`.
 
-Key files: [apps/web/app/(auth)/auth/callback/page.tsx](<../apps/web/app/(auth)/auth/callback/page.tsx>) · [apps/web/app/api/accounts/activate/route.ts](../apps/web/app/api/accounts/activate/route.ts) · [apps/web/lib/supabase/server.ts](../apps/web/lib/supabase/server.ts)
+Key files: [apps/web/app/(auth)/auth/callback/page.tsx](<../../apps/web/app/(auth)/auth/callback/page.tsx>) · [apps/web/app/api/accounts/activate/route.ts](../../apps/web/app/api/accounts/activate/route.ts) · [apps/web/lib/supabase/server.ts](../../apps/web/lib/supabase/server.ts)
 
 ---
 
@@ -113,7 +131,7 @@ Key files: [apps/web/app/(auth)/auth/callback/page.tsx](<../apps/web/app/(auth)/
 
 `AuthProvider` in Expo calls `signInWithOtp` (email code) or `signInWithGoogle` (implicit OAuth flow — no PKCE to avoid React Native race conditions) → Supabase returns a session JWT via URL hash → session is stored in `expo-secure-store` → `checkOrgAssignment` validates the user has an assigned org → `activateAccount` marks the account active → Expo Router redirects to `/(app)/(tabs)`.
 
-Key files: [apps/mobile/src/providers/auth-provider.tsx](../apps/mobile/src/providers/auth-provider.tsx) · [apps/mobile/src/lib/supabase/client.ts](../apps/mobile/src/lib/supabase/client.ts)
+Key files: [apps/mobile/src/providers/auth-provider.tsx](../../apps/mobile/src/providers/auth-provider.tsx) · [apps/mobile/src/lib/supabase/client.ts](../../apps/mobile/src/lib/supabase/client.ts)
 
 ---
 
@@ -129,7 +147,7 @@ Every request to `/{orgSlug}/*` passes through `[orgSlug]/layout.tsx`:
 6. Page Server Component runs its own `buildX()` queries and maps rows → VMs
 7. Typed VMs are passed as props to `packages/ui-web` components for rendering
 
-Key files: [apps/web/app/(app)/[orgSlug]/layout.tsx](<../apps/web/app/(app)/[orgSlug]/layout.tsx>) · [apps/web/lib/sidebar/buildSidebarBaseData.ts](../apps/web/lib/sidebar/buildSidebarBaseData.ts) · [apps/web/lib/auth/requireAuthedUser.ts](../apps/web/lib/auth/requireAuthedUser.ts)
+Key files: [apps/web/app/(app)/[orgSlug]/layout.tsx](<../../apps/web/app/(app)/[orgSlug]/layout.tsx>) · [apps/web/lib/sidebar/buildSidebarBaseData.ts](../../apps/web/lib/sidebar/buildSidebarBaseData.ts) · [apps/web/lib/auth/requireAuthedUser.ts](../../apps/web/lib/auth/requireAuthedUser.ts)
 
 ---
 
@@ -143,7 +161,7 @@ Client components invoke `'use server'` functions in `app/actions/`. Each action
 4. Writes directly to Supabase (insert + payload table, with manual rollback on error)
 5. Maps the returned row to a VM via `shared-types` mappers and returns it to the client
 
-Key files: [apps/web/app/actions/messages.ts](../apps/web/app/actions/messages.ts) · [apps/web/lib/auth/admin-actions.ts](../apps/web/lib/auth/admin-actions.ts)
+Key files: [apps/web/app/actions/messages.ts](../../apps/web/app/actions/messages.ts) · [apps/web/lib/auth/admin-actions.ts](../../apps/web/lib/auth/admin-actions.ts)
 
 ---
 
@@ -158,7 +176,7 @@ The NestJS API (`apps/api`) handles HTTP requests from Mobile (and optionally We
 
 Modules: `AuthModule` · `UsersModule` · `ChannelsModule` · `ClassesModule`
 
-Key files: [apps/api/src/main.ts](../apps/api/src/main.ts) · [apps/api/src/modules/auth/auth.guard.ts](../apps/api/src/modules/auth/auth.guard.ts) · [apps/api/src/prisma/prisma.service.ts](../apps/api/src/prisma/prisma.service.ts)
+Key files: [apps/api/src/main.ts](../../apps/api/src/main.ts) · [apps/api/src/modules/auth/auth.guard.ts](../../apps/api/src/modules/auth/auth.guard.ts) · [apps/api/src/prisma/prisma.service.ts](../../apps/api/src/prisma/prisma.service.ts)
 
 ---
 
@@ -172,7 +190,7 @@ Screens consume custom React Query hooks (`useMessages`, `useChannels`, `useAcco
 - A **Supabase Realtime** subscription on `postgres_changes` fires `queryClient.invalidateQueries()` on `INSERT`/`UPDATE`/`DELETE` events → triggers a background re-fetch
 - Mutations (e.g. reactions) use **optimistic updates** with cache rollback on error
 
-Key files: [apps/mobile/src/lib/api/queries.ts](../apps/mobile/src/lib/api/queries.ts) · [apps/mobile/src/providers/query-provider.tsx](../apps/mobile/src/providers/query-provider.tsx)
+Key files: [apps/mobile/src/lib/api/queries.ts](../../apps/mobile/src/lib/api/queries.ts) · [apps/mobile/src/providers/query-provider.tsx](../../apps/mobile/src/providers/query-provider.tsx)
 
 ---
 
