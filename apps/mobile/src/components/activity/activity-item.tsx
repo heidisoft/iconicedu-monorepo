@@ -160,11 +160,11 @@ export function makeActivityItemStyles(C: AppColors) {
     itemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
 
     // Avatar
-    avatarWrap: { width: 52, height: 52, flexShrink: 0 },
+    avatarWrap: { width: 40, height: 40, flexShrink: 0 },
     avatar: {
-      width: 52,
-      height: 52,
-      borderRadius: 26,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -403,7 +403,7 @@ export function ActivityItem({
         <View style={s.itemRow}>
           <View style={s.avatarWrap}>
             <View style={[s.avatar, { backgroundColor: iconBg }]}>
-              <IconComponent size={22} color={iconFg} />
+              <IconComponent size={18} color={iconFg} />
             </View>
           </View>
 

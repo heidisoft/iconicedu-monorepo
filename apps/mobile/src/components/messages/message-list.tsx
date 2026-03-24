@@ -7,6 +7,7 @@ import {
   StyleSheet,
   AppState,
 } from 'react-native';
+import { MessageSquare } from 'lucide-react-native';
 import type { MessageVM } from '@iconicedu/shared-types';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
@@ -119,6 +120,8 @@ type MessageListProps = {
   isReadOnly?: boolean;
   onUnreadViewed?: (lastReadMessageId: string) => void;
   isScreenActive?: boolean;
+  emptyTitle?: string;
+  emptyDescription?: string;
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -139,6 +142,8 @@ export const MessageList: React.FC<MessageListProps> = ({
   isReadOnly,
   onUnreadViewed,
   isScreenActive = true,
+  emptyTitle,
+  emptyDescription,
 }) => {
   const flatListRef = useRef<FlatList>(null);
   const { colors } = useTheme();
@@ -256,6 +261,26 @@ export const MessageList: React.FC<MessageListProps> = ({
     return item.ids.id;
   }, []);
 
+  const isEmpty =
+    !loading && listData.length === 0 && !(pendingUploads && pendingUploads.length);
+
+  if (isEmpty) {
+    return (
+      <View style={emptyStyles.wrap}>
+        <View style={[emptyStyles.iconWrap, { backgroundColor: colors.inputBg }]}>
+          <MessageSquare size={28} color={colors.teal} />
+        </View>
+        <Text style={[emptyStyles.title, { color: colors.text }]}>
+          {emptyTitle ?? 'Start the conversation'}
+        </Text>
+        <Text style={[emptyStyles.description, { color: colors.textMuted }]}>
+          {emptyDescription ??
+            'Share a welcome message, lesson update, or question to begin the discussion.'}
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <FlatList
       ref={flatListRef}
@@ -300,3 +325,30 @@ export const MessageList: React.FC<MessageListProps> = ({
     />
   );
 };
+
+const emptyStyles = StyleSheet.create({
+  wrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    gap: 12,
+  },
+  iconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  description: {
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: 'center',
+  },
+});

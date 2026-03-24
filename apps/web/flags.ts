@@ -1,4 +1,5 @@
 import { flag, getProviderData as getCodeProviderData } from 'flags/next';
+import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
 
 function resolveDistinctId(profileId?: string | null) {
   const resolved = profileId?.trim();
@@ -96,6 +97,13 @@ export const webFlags = {
 export type WebFlagKey = keyof typeof webFlags;
 
 export function isVercelFlagsSdkConfigured() {
+  const appUrl = resolveAppUrl();
+  const hostname = new URL(appUrl).hostname;
+  const isLocalHost = hostname === 'localhost' || hostname === '127.0.0.1';
+  if (isLocalHost) {
+    return false;
+  }
+
   const posthogKey =
     process.env.POSTHOG_KEY?.trim() ?? process.env.NEXT_PUBLIC_POSTHOG_KEY?.trim() ?? '';
   const posthogHost =

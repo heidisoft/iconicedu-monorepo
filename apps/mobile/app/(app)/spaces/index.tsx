@@ -1,19 +1,20 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, FlatList, ActivityIndicator } from 'react-native';
+import { View, FlatList, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   Typography,
   SearchBar,
-  Avatar,
   ListItem,
   EmptyState,
   Separator,
   Chip,
   NAV_THEME,
 } from '@iconicedu/ui-native';
+import { BookOpenCheck } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAccount } from '@/hooks/use-account';
 import { useLearningSpaces } from '@/hooks/use-learning-spaces';
+import { LearningSpaceIconBadge } from '@/lib/learning-space-icons';
 
 export default function SpacesListScreen() {
   const [search, setSearch] = useState('');
@@ -55,7 +56,7 @@ export default function SpacesListScreen() {
           ItemSeparatorComponent={() => <Separator className="ml-14" />}
           ListEmptyComponent={
             <EmptyState
-              icon={<Text className="text-4xl">📚</Text>}
+              icon={<BookOpenCheck size={32} color={NAV_THEME.dark.primary} />}
               title="No classes"
               description="Your classes will appear here"
             />
@@ -71,7 +72,16 @@ export default function SpacesListScreen() {
 
             return (
               <ListItem
-                leading={<Avatar name={title} size="md" />}
+                leading={
+                  <LearningSpaceIconBadge
+                    iconKey={(item.icon_key as string | null | undefined) ?? null}
+                    size={40}
+                    iconSize={20}
+                    borderRadius={12}
+                    backgroundColor={NAV_THEME.dark.card}
+                    color={NAV_THEME.dark.primary}
+                  />
+                }
                 title={title}
                 subtitle={subject}
                 trailing={

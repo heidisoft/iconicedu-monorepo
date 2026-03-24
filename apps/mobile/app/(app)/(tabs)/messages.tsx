@@ -4,6 +4,7 @@ import {
   Text,
   Image,
   FlatList,
+  ScrollView,
   TouchableOpacity,
   StyleSheet,
   Pressable,
@@ -11,16 +12,31 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  BookOpenCheck,
+  ChevronRight,
+  CircleOff,
+  Clock3,
+  MessageSquare,
+  Minus,
+} from 'lucide-react-native';
 import { useAccount } from '@/hooks/use-account';
 import { useDirectMessages } from '@/hooks/use-direct-messages';
 import { useLearningSpaceChannels } from '@/hooks/use-learning-space-channels';
+import {
+  useOnlineProfileIds,
+  type PresenceDisplayStatus,
+} from '@/hooks/use-online-profile-ids';
 import { useSupervisedDirectMessages } from '@/hooks/use-supervised-direct-messages';
 import { useTheme } from '@/providers/theme-provider';
+import { LearningSpaceIconBadge } from '@/lib/learning-space-icons';
 import type { AppColors } from '@/lib/theme';
 import type { ChannelListItem, DmParticipant } from '@/lib/api/queries';
 import { ChannelListSkeleton } from '@/components/skeletons';
+import { RoleAvatarBadge } from '@/components/profile/role-avatar-badge';
 
 type Tab = 'all' | 'dms' | 'channels';
+type ClassroomStudentTab = 'all' | string;
 
 type SectionHeaderItem = { _type: 'section-header'; title: string; id: string };
 type ListRow = ChannelListItem | SectionHeaderItem;
@@ -69,6 +85,35 @@ function avatarColor(id: string): string {
   return AVATAR_COLORS[h % AVATAR_COLORS.length];
 }
 
+const THEME_TEXT_COLORS: Record<string, string> = {
+  slate: '#64748b',
+  gray: '#6b7280',
+  zinc: '#71717a',
+  neutral: '#737373',
+  stone: '#78716c',
+  red: '#ef4444',
+  orange: '#f97316',
+  amber: '#f59e0b',
+  yellow: '#ca8a04',
+  lime: '#65a30d',
+  green: '#16a34a',
+  emerald: '#059669',
+  teal: '#0d9488',
+  cyan: '#0891b2',
+  sky: '#0284c7',
+  blue: '#2563eb',
+  indigo: '#4f46e5',
+  violet: '#7c3aed',
+  purple: '#9333ea',
+  fuchsia: '#c026d3',
+  pink: '#db2777',
+  rose: '#e11d48',
+};
+
+function themeTextColor(themeKey?: string | null, fallback?: string): string {
+  return (themeKey && THEME_TEXT_COLORS[themeKey]) || fallback || '#64748b';
+}
+
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 function makeStyles(C: AppColors) {
@@ -102,6 +147,24 @@ function makeStyles(C: AppColors) {
       paddingHorizontal: 4,
     },
     tabBadgeText: { fontSize: 10, fontWeight: '700', color: '#ffffff' },
+    subTabScroll: { maxHeight: 44 },
+    subTabContent: { paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
+    subTab: {
+      minHeight: 32,
+      paddingHorizontal: 12,
+      borderRadius: 16,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: C.border,
+      backgroundColor: C.card,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    subTabActive: {
+      backgroundColor: C.tealBg,
+      borderColor: C.teal,
+    },
+    subTabText: { fontSize: 13, fontWeight: '600', color: C.textMuted },
+    subTabTextActive: { color: C.teal },
 
     itemOuter: { marginHorizontal: 16 },
     itemWrap: {
@@ -113,19 +176,24 @@ function makeStyles(C: AppColors) {
       paddingVertical: 16,
       overflow: 'hidden',
     },
+    itemWrapUnread: {
+      backgroundColor: C.tealBg,
+      borderColor: C.teal,
+    },
     itemRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+    rowChevron: { flexShrink: 0, marginLeft: 8 },
     separator: { height: 10 },
 
     // ── DM avatar — single person ──────────────────────────────────────────────
-    avatarWrap: { position: 'relative', width: 52, height: 52, flexShrink: 0 },
+    avatarWrap: { position: 'relative', width: 44, height: 44, flexShrink: 0 },
     avatarCircle: {
-      width: 52,
-      height: 52,
-      borderRadius: 26,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    avatarTxt: { color: '#fff', fontWeight: '700', fontSize: 18, letterSpacing: 0.3 },
+    avatarTxt: { color: '#fff', fontWeight: '700', fontSize: 16, letterSpacing: 0.3 },
     onlineDot: {
       position: 'absolute',
       bottom: 1,
@@ -137,16 +205,28 @@ function makeStyles(C: AppColors) {
       borderWidth: 2,
       borderColor: C.card,
     },
+    statusBadge: {
+      position: 'absolute',
+      bottom: 1,
+      right: 1,
+      width: 13,
+      height: 13,
+      borderRadius: 7,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 2,
+      borderColor: C.card,
+    },
 
     // ── DM avatar — group (stacked) ────────────────────────────────────────────
-    groupWrap: { width: 52, height: 52, flexShrink: 0, position: 'relative' },
+    groupWrap: { width: 44, height: 44, flexShrink: 0, position: 'relative' },
     groupBack: {
       position: 'absolute',
       right: 0,
       bottom: 0,
-      width: 36,
-      height: 36,
-      borderRadius: 18,
+      width: 30,
+      height: 30,
+      borderRadius: 15,
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 2,
@@ -156,20 +236,22 @@ function makeStyles(C: AppColors) {
       position: 'absolute',
       left: 0,
       top: 0,
-      width: 36,
-      height: 36,
-      borderRadius: 18,
+      width: 30,
+      height: 30,
+      borderRadius: 15,
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 2,
       borderColor: C.card,
     },
-    groupTxt: { color: '#fff', fontWeight: '700', fontSize: 13 },
+    groupTxt: { color: '#fff', fontWeight: '700', fontSize: 12 },
+    groupBadgeFront: { top: -3 },
+    groupBadgeBack: { top: -3 },
 
     // ── Class avatar ──────────────────────────────────────────────────
     channelAvatar: {
-      width: 52,
-      height: 52,
+      width: 44,
+      height: 44,
       borderRadius: 14,
       alignItems: 'center',
       justifyContent: 'center',
@@ -181,15 +263,27 @@ function makeStyles(C: AppColors) {
     channelEmoji: { fontSize: 24 },
 
     content: { flex: 1, gap: 4 },
-    topRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    rowName: { flex: 1, fontSize: 15, fontWeight: '700', color: C.text },
+    topRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    rowName: {
+      flex: 1,
+      minWidth: 0,
+      fontSize: 15,
+      fontWeight: '700',
+      color: C.text,
+    },
     rowNameUnread: { fontWeight: '800' },
+    rowMetaRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'flex-end',
+      gap: 6,
+      flexShrink: 0,
+      marginLeft: 'auto',
+    },
     rowTime: { fontSize: 12, color: C.textFaint },
-    bottomRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    rowPreview: { flex: 1, fontSize: 13, color: C.textMuted, lineHeight: 18 },
-    rowPreviewUnread: { color: C.text, fontWeight: '600' },
-    forStudent: { fontWeight: '600', color: C.teal },
-
+    rowMeta: { fontSize: 12, color: C.textFaint, lineHeight: 17 },
+    rowMetaName: { fontWeight: '600' },
+    rowPreview: { fontSize: 13, color: C.textMuted, lineHeight: 18 },
     badge: {
       minWidth: 20,
       height: 20,
@@ -249,15 +343,53 @@ function makeStyles(C: AppColors) {
   });
 }
 
+function PresenceBadge({
+  status,
+  s,
+}: {
+  status?: PresenceDisplayStatus | null;
+  s: ReturnType<typeof makeStyles>;
+}) {
+  if (!status) return null;
+
+  if (status === 'online') {
+    return <View style={s.onlineDot} />;
+  }
+
+  if (status === 'away' || status === 'idle') {
+    return (
+      <View style={[s.statusBadge, { backgroundColor: '#eab308' }]}>
+        <Clock3 size={7} color="#ffffff" strokeWidth={2.6} />
+      </View>
+    );
+  }
+
+  if (status === 'busy') {
+    return (
+      <View style={[s.statusBadge, { backgroundColor: '#dc2626' }]}>
+        <Minus size={8} color="#ffffff" strokeWidth={3} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={[s.statusBadge, { backgroundColor: '#4b5563' }]}>
+      <CircleOff size={7} color="#ffffff" strokeWidth={2.4} />
+    </View>
+  );
+}
+
 // ─── DM avatar ────────────────────────────────────────────────────────────────
 
 function DmAvatar({
   participants,
   fallbackId,
+  presenceStatus,
   s,
 }: {
   participants: DmParticipant[];
   fallbackId: string;
+  presenceStatus: PresenceDisplayStatus | null;
   s: ReturnType<typeof makeStyles>;
 }) {
   const isGroup = participants.length > 1;
@@ -277,6 +409,7 @@ function DmAvatar({
             <Text style={s.groupTxt}>{getInitials(participantName(back!))}</Text>
           </View>
         )}
+        <RoleAvatarBadge role={back?.kind} size={14} style={s.groupBadgeBack} />
         {front!.avatar_url ? (
           <Image
             source={{ uri: front!.avatar_url }}
@@ -288,6 +421,8 @@ function DmAvatar({
             <Text style={s.groupTxt}>{getInitials(participantName(front!))}</Text>
           </View>
         )}
+        <RoleAvatarBadge role={front?.kind} size={14} style={s.groupBadgeFront} />
+        <PresenceBadge status={presenceStatus ?? 'offline'} s={s} />
       </View>
     );
   }
@@ -310,7 +445,8 @@ function DmAvatar({
         </View>
       )}
       {/* Online dot — presence tracking can be layered on top later */}
-      <View style={s.onlineDot} />
+      <PresenceBadge status={presenceStatus ?? 'offline'} s={s} />
+      <RoleAvatarBadge role={person?.kind} size={16} />
     </View>
   );
 }
@@ -336,11 +472,13 @@ function SectionHeader({
 function ChannelRow({
   item,
   onPress,
+  presenceByProfileId,
   s,
   colors,
 }: {
   item: ChannelListItem;
   onPress: () => void;
+  presenceByProfileId: Map<string, PresenceDisplayStatus>;
   s: ReturnType<typeof makeStyles>;
   colors: AppColors;
 }) {
@@ -375,19 +513,24 @@ function ChannelRow({
             last_name: null,
             avatar_url: null,
             avatar_seed: null,
+            kind: 'child',
           },
           ...(participants.length > 0 ? [participants[0]!] : []),
         ]
       : participants;
+  const presenceStatus = isDm
+    ? (presenceByProfileId.get(avatarParticipants[0]?.id ?? '') ?? 'offline')
+    : null;
 
   const text = item.last_message_text;
   const sender = item.last_message_sender;
   const time = formatListTime(item.last_message_at ?? item.updated_at);
   const unread = item.unread_count ?? 0;
   const hasUnread = unread > 0;
-  const studentName = !isDm ? item.student_name : null;
-  // For channels prefix the sender name ("Alice: Hey there"); for DMs it's obvious who sent it
-  const previewText =
+  const studentProfiles = !isDm ? (item.student_profiles ?? []) : [];
+  const hasChannelMeta =
+    !isDm && (Boolean(item.description) || studentProfiles.length > 0);
+  const dmPreviewText =
     item.is_supervised && item.supervised_child_name
       ? `Viewing ${item.supervised_child_name}'s conversation`
       : text
@@ -402,21 +545,29 @@ function ChannelRow({
         onPress={onPress}
         style={({ pressed }) => [
           s.itemWrap,
+          hasUnread && s.itemWrapUnread,
           pressed && { backgroundColor: colors.inputBg },
         ]}
       >
         <View style={s.itemRow}>
           {/* Avatar */}
           {isDm ? (
-            <DmAvatar participants={avatarParticipants} fallbackId={item.id} s={s} />
-          ) : item.icon_emoji ? (
-            <View style={s.channelAvatar}>
-              <Text style={s.channelEmoji}>{item.icon_emoji}</Text>
-            </View>
+            <DmAvatar
+              participants={avatarParticipants}
+              fallbackId={item.id}
+              presenceStatus={presenceStatus}
+              s={s}
+            />
           ) : (
-            <View style={s.channelAvatar}>
-              <Text style={s.channelEmoji}>📚</Text>
-            </View>
+            <LearningSpaceIconBadge
+              iconKey={item.icon_key}
+              size={40}
+              iconSize={20}
+              borderRadius={14}
+              backgroundColor={colors.inputBg}
+              color={colors.text}
+              style={s.channelAvatar}
+            />
           )}
 
           {/* Content */}
@@ -430,30 +581,40 @@ function ChannelRow({
                   <Text style={s.supervisedBadgeTxt}>Supervised</Text>
                 </View>
               )}
-              <Text style={s.rowTime}>{time}</Text>
-            </View>
-            <View style={s.bottomRow}>
-              <Text
-                style={[s.rowPreview, hasUnread && s.rowPreviewUnread]}
-                numberOfLines={1}
-              >
-                {studentName ? (
-                  <>
-                    <Text style={s.forStudent}>For {studentName}</Text>
-                    {'  '}
-                    {previewText}
-                  </>
-                ) : (
-                  previewText
+              <View style={s.rowMetaRight}>
+                <Text style={s.rowTime}>{time}</Text>
+                {hasUnread && (
+                  <View style={s.badge}>
+                    <Text style={s.badgeTxt}>{unread > 99 ? '99+' : unread}</Text>
+                  </View>
                 )}
-              </Text>
-              {hasUnread && (
-                <View style={s.badge}>
-                  <Text style={s.badgeTxt}>{unread > 99 ? '99+' : unread}</Text>
-                </View>
-              )}
+              </View>
             </View>
+            {!isDm && hasChannelMeta ? (
+              <Text style={s.rowMeta} numberOfLines={1}>
+                {item.description ?? ''}
+                {item.description && studentProfiles.length > 0 ? ' · ' : ''}
+                {studentProfiles.map((student, index) => (
+                  <Text
+                    key={`${item.id}-student-${student.name}-${index}`}
+                    style={[
+                      s.rowMetaName,
+                      { color: themeTextColor(student.themeKey, colors.textMuted) },
+                    ]}
+                  >
+                    {index > 0 ? ', ' : ''}
+                    {student.name}
+                  </Text>
+                ))}
+              </Text>
+            ) : null}
+            {isDm && dmPreviewText ? (
+              <Text style={s.rowPreview} numberOfLines={1}>
+                {dmPreviewText}
+              </Text>
+            ) : null}
           </View>
+          <ChevronRight size={18} color={colors.textFaint} style={s.rowChevron} />
         </View>
       </Pressable>
     </View>
@@ -467,6 +628,7 @@ export default function MessagesScreen() {
   const resolvedTab: Tab =
     tabParam === 'channels' || tabParam === 'dms' ? tabParam : 'all';
   const [activeTab, setActiveTab] = useState<Tab>(resolvedTab);
+  const [activeStudentTab, setActiveStudentTab] = useState<ClassroomStudentTab>('all');
 
   React.useEffect(() => {
     setActiveTab(resolvedTab);
@@ -492,12 +654,12 @@ export default function MessagesScreen() {
     data: dms,
     isPending: dmsLoading,
     refetch: refetchDms,
-  } = useDirectMessages(orgId, myProfileId);
+  } = useDirectMessages(orgId, myProfileId, accountId);
   const {
     data: channels,
     isPending: channelsLoading,
     refetch: refetchChannels,
-  } = useLearningSpaceChannels(orgId, myProfileId);
+  } = useLearningSpaceChannels(orgId, myProfileId, accountId);
   const {
     data: supervisedDms,
     isPending: supervisedLoading,
@@ -513,7 +675,53 @@ export default function MessagesScreen() {
 
   const allDms = useMemo(() => dms ?? [], [dms]);
   const allChannels = useMemo(() => channels ?? [], [channels]);
+  const classroomChannels = useMemo(
+    () => allChannels.filter((channel) => !channel.is_support),
+    [allChannels],
+  );
+  const classroomStudentTabs = useMemo(() => {
+    const seen = new Set<string>();
+    const tabs: Array<{
+      key: ClassroomStudentTab;
+      label: string;
+      themeKey?: string | null;
+    }> = [{ key: 'all', label: 'All' }];
+
+    for (const channel of classroomChannels) {
+      for (const student of channel.student_profiles ?? []) {
+        const name = student.name.trim();
+        if (!name || seen.has(name)) continue;
+        seen.add(name);
+        tabs.push({ key: name, label: name, themeKey: student.themeKey ?? null });
+      }
+    }
+
+    return tabs;
+  }, [classroomChannels]);
+  const hasClassroomStudentTabs = classroomStudentTabs.length > 2;
   const allSupervisedDms = useMemo(() => supervisedDms ?? [], [supervisedDms]);
+  const dmParticipantIds = useMemo(
+    () =>
+      [...allDms, ...allSupervisedDms].flatMap((channel) =>
+        (channel.participants ?? []).map((participant) => participant.id),
+      ),
+    [allDms, allSupervisedDms],
+  );
+  const presenceByProfileId = useOnlineProfileIds(orgId, myProfileId, dmParticipantIds);
+
+  React.useEffect(() => {
+    if (activeTab !== 'channels') {
+      setActiveStudentTab('all');
+      return;
+    }
+
+    if (
+      activeStudentTab !== 'all' &&
+      !classroomStudentTabs.some((tab) => tab.key === activeStudentTab)
+    ) {
+      setActiveStudentTab('all');
+    }
+  }, [activeStudentTab, activeTab, classroomStudentTabs]);
 
   const allItems = useMemo(
     () =>
@@ -542,9 +750,24 @@ export default function MessagesScreen() {
     ],
     [allDms, allSupervisedDms],
   );
+  const filteredClassroomChannels = useMemo(
+    () =>
+      activeStudentTab === 'all'
+        ? classroomChannels
+        : classroomChannels.filter((channel) =>
+            (channel.student_profiles ?? []).some(
+              (student) => student.name === activeStudentTab,
+            ),
+          ),
+    [activeStudentTab, classroomChannels],
+  );
 
   const data: ListRow[] =
-    activeTab === 'all' ? allItems : activeTab === 'dms' ? dmsData : allChannels;
+    activeTab === 'all'
+      ? allItems
+      : activeTab === 'dms'
+        ? dmsData
+        : filteredClassroomChannels;
 
   const unreadAll = useMemo(
     () => allItems.reduce((n, i) => n + (i.unread_count ?? 0), 0),
@@ -555,8 +778,8 @@ export default function MessagesScreen() {
     [allDms, allSupervisedDms],
   );
   const unreadChannels = useMemo(
-    () => allChannels.reduce((n, i) => n + (i.unread_count ?? 0), 0),
-    [allChannels],
+    () => classroomChannels.reduce((n, i) => n + (i.unread_count ?? 0), 0),
+    [classroomChannels],
   );
 
   const TABS: { key: Tab; label: string; count: number }[] = [
@@ -569,17 +792,17 @@ export default function MessagesScreen() {
 
   const emptyConfig = {
     all: {
-      icon: '💬',
+      icon: MessageSquare,
       title: 'No messages yet',
       desc: 'Your conversations will appear here',
     },
     dms: {
-      icon: '💬',
+      icon: MessageSquare,
       title: 'No direct messages',
       desc: 'Start a conversation with a tutor or educator',
     },
     channels: {
-      icon: '📚',
+      icon: BookOpenCheck,
       title: 'No classes',
       desc: 'Channels you join will appear here',
     },
@@ -604,11 +827,13 @@ export default function MessagesScreen() {
       const displayTitle = isDm ? partnerTitle : (channel.topic ?? 'Channel');
       const avatarSeed = isDm ? (participants[0]?.id ?? '') : '';
       const avatarUrl = isDm ? (participants[0]?.avatar_url ?? '') : '';
-      const iconEmoji = !isDm ? (channel.icon_emoji ?? '') : '';
+      const avatarRole = isDm ? (participants[0]?.kind ?? '') : '';
+      const iconKey = !isDm ? (channel.icon_key ?? '') : '';
       const subtitle = isDm ? 'Direct Message' : (channel.description ?? '');
       return (
         <ChannelRow
           item={channel}
+          presenceByProfileId={presenceByProfileId}
           s={s}
           colors={colors}
           onPress={() => {
@@ -619,12 +844,14 @@ export default function MessagesScreen() {
                 topic: displayTitle,
                 avatarSeed,
                 avatarUrl,
-                iconEmoji,
+                avatarRole,
+                iconKey,
                 subtitle,
                 ...(channel.is_supervised
                   ? {
                       isSupervisedReadOnly: '1',
                       supervisedChildName: channel.supervised_child_name ?? '',
+                      secondaryAvatarRole: 'child',
                     }
                   : {}),
               },
@@ -633,11 +860,11 @@ export default function MessagesScreen() {
         />
       );
     },
-    [s, colors, router],
+    [s, colors, router, presenceByProfileId],
   );
 
   return (
-    <SafeAreaView style={s.safe}>
+    <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.header}>
         <Text style={s.title}>Messages</Text>
       </View>
@@ -664,12 +891,50 @@ export default function MessagesScreen() {
         })}
       </View>
 
+      {activeTab === 'channels' && hasClassroomStudentTabs ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={s.subTabScroll}
+          contentContainerStyle={s.subTabContent}
+        >
+          {classroomStudentTabs.map((tab) => {
+            const isActive = activeStudentTab === tab.key;
+            return (
+              <TouchableOpacity
+                key={tab.key}
+                style={[s.subTab, isActive && s.subTabActive]}
+                onPress={() => setActiveStudentTab(tab.key)}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[
+                    s.subTabText,
+                    isActive && s.subTabTextActive,
+                    tab.key !== 'all'
+                      ? {
+                          color: themeTextColor(
+                            tab.themeKey,
+                            isActive ? colors.teal : colors.textMuted,
+                          ),
+                        }
+                      : null,
+                  ]}
+                >
+                  {tab.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      ) : null}
+
       {isLoading || refreshing ? (
         <ChannelListSkeleton count={6} />
       ) : isEmpty ? (
         <View style={s.emptyWrap}>
           <View style={[s.emptyIcon, { backgroundColor: colors.inputBg }]}>
-            <Text style={{ fontSize: 32 }}>{emptyConfig.icon}</Text>
+            <emptyConfig.icon size={32} color={colors.textMuted} />
           </View>
           <Text style={[s.emptyTitle, { color: colors.text }]}>{emptyConfig.title}</Text>
           <Text style={[s.emptyDesc, { color: colors.textMuted }]}>
@@ -680,7 +945,7 @@ export default function MessagesScreen() {
         <FlatList
           data={data}
           keyExtractor={(item) => ('_type' in item ? item.id : item.id)}
-          contentContainerStyle={{ paddingTop: 16, paddingBottom: 40 }}
+          contentContainerStyle={{ paddingTop: 16, paddingBottom: 24 }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

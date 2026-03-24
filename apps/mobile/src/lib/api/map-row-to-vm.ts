@@ -24,6 +24,7 @@ export type RawMessageRow = {
     last_name: string | null;
     avatar_url: string | null;
     avatar_seed: string | null;
+    kind?: string | null;
   };
 };
 
@@ -39,7 +40,7 @@ export function buildSenderProfile(
 
   return {
     ids: { id: sender.id, orgId, accountId: '' },
-    kind: 'educator',
+    kind: (sender.kind as UserProfileVM['kind'] | null) ?? 'educator',
     profile: {
       displayName,
       avatar: sender.avatar_url
@@ -204,19 +205,19 @@ export function getMessagePreview(msg: {
 }): string {
   if (msg.content?.text) return msg.content.text;
   const labels: Record<string, string> = {
-    'lesson-assignment': '📚 Assignment',
-    'homework-submission': '📝 Homework submitted',
-    'progress-update': '📈 Progress update',
-    'event-reminder': '📅 Event reminder',
-    'session-summary': '📋 Session summary',
-    'session-complete': '✓ Session complete',
-    'session-booking': '🗓 Session booked',
-    'payment-reminder': '💳 Payment reminder',
-    'feedback-request': '💬 Feedback request',
-    image: '🖼 Image',
-    file: '📎 File',
-    'audio-recording': '🎙 Voice message',
-    'link-preview': '🔗 Link',
+    'lesson-assignment': 'Assignment',
+    'homework-submission': 'Homework submitted',
+    'progress-update': 'Progress update',
+    'event-reminder': 'Event reminder',
+    'session-summary': 'Session summary',
+    'session-complete': 'Session complete',
+    'session-booking': 'Session booked',
+    'payment-reminder': 'Payment reminder',
+    'feedback-request': 'Feedback request',
+    image: 'Image',
+    file: 'File',
+    'audio-recording': 'Voice message',
+    'link-preview': 'Link',
   };
   return labels[msg.type] ?? 'Message';
 }

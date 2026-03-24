@@ -19,6 +19,9 @@ const POSTHOG_HOST: string =
 // Without this guard, PostHogProvider crashes in Expo Go / non-prebuild builds,
 // taking ALL event capture down with it.
 const ENABLE_SESSION_REPLAY = !!NativeModules.PosthogReactNativeSessionReplay;
+const POSTHOG_DISABLED_LOCALLY =
+  // eslint-disable-next-line no-undef
+  typeof __DEV__ !== 'undefined' && __DEV__;
 
 // ─── Vendor-agnostic context ──────────────────────────────────────────────────
 
@@ -69,7 +72,7 @@ function AnalyticsBridge({ children }: { children: React.ReactNode }) {
  * in the PostHog Activity Feed immediately without waiting for the 30 s batch.
  */
 export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
-  if (!POSTHOG_KEY) {
+  if (!POSTHOG_KEY || POSTHOG_DISABLED_LOCALLY) {
     // No key configured — use noop in dev/CI to avoid crashing.
     return (
       <AnalyticsContext.Provider value={createNoopAnalytics()}>

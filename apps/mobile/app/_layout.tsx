@@ -8,6 +8,7 @@ import { useTheme } from '@/providers/theme-provider';
 import { useAuth } from '@/providers/auth-provider';
 import { ScreenTracker } from '@/components/analytics/screen-tracker';
 import { AppLifecycleTracker } from '@/components/analytics/app-lifecycle-tracker';
+import { PresenceTracker } from '@/components/presence/presence-tracker';
 
 function SpinnerScreen() {
   const { colors } = useTheme();
@@ -44,6 +45,7 @@ function RootContent() {
       <SystemBars style={isDark ? 'light' : 'dark'} />
       <ScreenTracker />
       <AppLifecycleTracker />
+      <PresenceTracker />
       <Slot />
     </>
   );

@@ -8,6 +8,7 @@ import { useAccount } from '@/hooks/use-account';
 import { useMessages } from '@/hooks/use-messages';
 import { sendTextMessage, deleteMessage, markChannelReadState } from '@/lib/api/queries';
 import { useTheme } from '@/providers/theme-provider';
+import { useOnlineProfileIds } from '@/hooks/use-online-profile-ids';
 import { MessageList } from '@/components/messages/message-list';
 import { MessageInput } from '@/components/messages/message-input';
 import { TypingIndicator } from '@/components/messages/typing-indicator';
@@ -22,17 +23,21 @@ export default function DmConversationScreen() {
     topic,
     avatarSeed,
     avatarUrl,
+    avatarRole,
     subtitle,
     isSupervisedReadOnly,
     supervisedChildName,
+    secondaryAvatarRole,
   } = useLocalSearchParams<{
     channelId: string;
     topic?: string;
     avatarSeed?: string;
     avatarUrl?: string;
+    avatarRole?: string;
     subtitle?: string;
     isSupervisedReadOnly?: string;
     supervisedChildName?: string;
+    secondaryAvatarRole?: string;
   }>();
 
   const isSupervised = isSupervisedReadOnly === '1';
@@ -58,6 +63,14 @@ export default function DmConversationScreen() {
   const profileId = profileArr?.[0]?.id ?? '';
   const senderName =
     profileArr?.[0]?.display_name?.trim() || profileArr?.[0]?.first_name?.trim() || 'Me';
+  const presenceByProfileId = useOnlineProfileIds(
+    orgId,
+    profileId,
+    avatarSeed ? [avatarSeed] : [],
+  );
+  const headerPresenceStatus = avatarSeed
+    ? (presenceByProfileId.get(avatarSeed) ?? null)
+    : null;
 
   const {
     data: messages,
@@ -167,9 +180,12 @@ export default function DmConversationScreen() {
         kind="dm"
         avatarSeed={avatarSeed}
         avatarUrl={avatarUrl || undefined}
+        avatarRole={avatarRole}
+        presenceStatus={headerPresenceStatus}
         secondaryAvatarSeed={
           isSupervised && supervisedChildName ? supervisedChildName : undefined
         }
+        secondaryAvatarRole={isSupervised ? (secondaryAvatarRole ?? 'child') : undefined}
         isReadOnly={isSupervised}
         onBack={() => router.back()}
         onMore={() => setInfoVisible(true)}
@@ -236,6 +252,7 @@ export default function DmConversationScreen() {
         subtitle={subtitle}
         kind="dm"
         avatarSeed={avatarSeed}
+        avatarRole={avatarRole}
         onClose={() => setInfoVisible(false)}
       />
 

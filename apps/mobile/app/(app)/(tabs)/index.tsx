@@ -7,24 +7,34 @@ import {
   TouchableOpacity,
   StyleSheet,
   RefreshControl,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Bell, MessageCircle, BookOpen } from 'lucide-react-native';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  CalendarClock,
+  CalendarCheck,
+  BookOpenCheck,
+  Users,
+  LayoutGrid,
+  LifeBuoy,
+} from 'lucide-react-native';
+import { SiteLogo } from '@iconicedu/ui-native';
 import { useAuth } from '@/providers/auth-provider';
+import { useAccount } from '@/hooks/use-account';
 import { useProfile } from '@/hooks/use-profile';
-import { useActivityFeed, useMarkActivityFeedRead } from '@/hooks/use-activity-feed';
 import { useUpcomingSessions } from '@/hooks/use-upcoming-sessions';
+import { useFamilyLinks } from '@/hooks/use-family-links';
+import { useLearningSpaces } from '@/hooks/use-learning-spaces';
+import { useSupportChannel } from '@/hooks/use-support-channel';
 import { useTheme } from '@/providers/theme-provider';
-import { ActivityFeedSkeleton } from '@/components/skeletons';
 import { PulseBox } from '@/components/skeletons/pulse-box';
 import { SessionCard } from '@/components/sessions/session-card';
-import {
-  ActivityItem,
-  makeActivityItemStyles,
-} from '@/components/activity/activity-item';
+import { AppSupportFooter } from '@/components/support/app-support-footer';
+import { buildHomeMetricSummary } from '@/lib/home-metrics';
+import { fetchOrgSessions, queryKeys } from '@/lib/api/queries';
 import type { AppColors } from '@/lib/theme';
-import type { ActivityFeedItemVM } from '@iconicedu/shared-types';
 
 // ---------------------------------------------------------------------------
 // Avatar color helpers — ui_theme_key → hex, fallback to seed palette
@@ -80,14 +90,6 @@ function resolveAvatarColor(
   return { bg, fg: '#ffffff' };
 }
 
-function getRecentItems(
-  sections: ActivityFeedItemVM[][] | undefined,
-  n: number,
-): ActivityFeedItemVM[] {
-  if (!sections) return [];
-  return sections.flat().slice(0, n);
-}
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -99,30 +101,18 @@ function getGreeting() {
   return 'Good evening';
 }
 
-const quickNav: Array<{
-  label: string;
-  Icon: React.ComponentType<{ size: number; color: string }>;
-  pathname: string;
-  params?: Record<string, string>;
-  desc: string;
-}> = [
-  {
-    label: 'Messages',
-    Icon: MessageCircle,
-    pathname: '/(app)/(tabs)/messages',
-    params: { tab: 'all' },
-    desc: 'Your conversations',
-  },
-  {
-    label: 'Classrooms',
-    Icon: BookOpen,
-    pathname: '/(app)/(tabs)/messages',
-    params: { tab: 'channels' },
-    desc: 'Your classes',
-  },
-];
+function getSupportPalette(C: AppColors) {
+  const isDark = C.bg === C.pageBg && C.text === '#FFFFFF';
+  return {
+    bg: isDark ? '#f59e0b22' : '#fff7ed',
+    border: isDark ? '#f59e0b55' : '#fdba74',
+    text: isDark ? '#fbbf24' : '#c2410c',
+  };
+}
 
 function makeStyles(C: AppColors) {
+  const supportPalette = getSupportPalette(C);
+
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: C.pageBg },
     scroll: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 32, gap: 22 },
@@ -134,21 +124,45 @@ function makeStyles(C: AppColors) {
       justifyContent: 'center',
     },
     avatarTxt: { color: '#ffffff', fontWeight: '800', fontSize: 18 },
-    bellBtn: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
-      backgroundColor: C.tealBg,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
     greetingLine: { fontSize: 15, color: C.textMuted, fontWeight: '500' },
+    headlineRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
     headline: {
       fontSize: 28,
       fontWeight: '800',
       color: C.text,
       letterSpacing: -0.5,
       lineHeight: 34,
+      flex: 1,
+    },
+    supportBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 5,
+      paddingHorizontal: 10,
+      height: 32,
+      borderRadius: 999,
+      backgroundColor: supportPalette.bg,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: supportPalette.border,
+      position: 'relative',
+    },
+    supportBtnText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: supportPalette.text,
+    },
+    supportIconWrap: {
+      width: 14,
+      height: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      position: 'relative',
     },
     sectionLabel: {
       fontSize: 12,
@@ -157,26 +171,50 @@ function makeStyles(C: AppColors) {
       textTransform: 'uppercase',
       letterSpacing: 0.8,
     },
-    grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-    gridItem: {
-      width: '47%',
+    metricsRow: { gap: 12, paddingRight: 20 },
+    metricCard: {
+      minHeight: 148,
       backgroundColor: C.card,
       borderRadius: 14,
       borderWidth: 1,
       borderColor: C.border,
-      padding: 16,
-      gap: 6,
+      padding: 14,
+      justifyContent: 'space-between',
     },
-    gridTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    gridLabel: { fontSize: 14, fontWeight: '700', color: C.text },
-    gridDesc: { fontSize: 12, color: C.textMuted, lineHeight: 17 },
+    metricHeader: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      gap: 8,
+    },
+    metricTitle: {
+      flex: 1,
+      fontSize: 14,
+      fontWeight: '700',
+      color: C.text,
+      lineHeight: 18,
+    },
+    metricIconWrap: {
+      width: 36,
+      height: 36,
+      borderRadius: 12,
+      backgroundColor: C.tealBg,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    metricValue: {
+      fontSize: 32,
+      fontWeight: '800',
+      color: C.text,
+      letterSpacing: -0.8,
+      lineHeight: 36,
+    },
+    metricLabel: { fontSize: 12, color: C.textMuted, lineHeight: 16 },
     activityHeader: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
     },
-    activitySeeAll: { fontSize: 13, fontWeight: '600', color: C.teal },
-    activityList: { gap: 8 },
   });
 }
 
@@ -186,23 +224,57 @@ function makeStyles(C: AppColors) {
 
 export default function HomeScreen() {
   const { user } = useAuth();
-  const { data: profile } = useProfile();
-  const { data: feed, isPending: feedLoading, refetch: refetchFeed } = useActivityFeed();
-  const { mutate: markRead } = useMarkActivityFeedRead();
+  const queryClient = useQueryClient();
+  const {
+    data: profile,
+    isPending: profileLoading,
+    refetch: refetchProfile,
+  } = useProfile();
   const {
     sessions,
     isPending: sessionsLoading,
     refetch: refetchSessions,
   } = useUpcomingSessions();
-  const { colors, isDark } = useTheme();
+  const {
+    data: account,
+    isPending: accountLoading,
+    refetch: refetchAccount,
+  } = useAccount();
+  const { width: windowWidth } = useWindowDimensions();
+  const orgId = (account as Record<string, unknown> | undefined)?.org_id as
+    | string
+    | undefined;
+  const primaryRole = (account as Record<string, unknown> | undefined)?.primary_role as
+    | string
+    | null
+    | undefined;
+  const { childProfiles } = useFamilyLinks();
+  const {
+    data: learningSpaces = [],
+    isPending: learningSpacesLoading,
+    refetch: refetchLearningSpaces,
+  } = useLearningSpaces(orgId ?? '');
+  const { data: supportChannel, refetch: refetchSupportChannel } = useSupportChannel(
+    orgId ?? '',
+  );
+  const {
+    data: orgSchedules = [],
+    isPending: schedulesSummaryLoading,
+    refetch: refetchOrgSchedules,
+  } = useQuery({
+    queryKey: queryKeys.orgSessions(orgId ?? ''),
+    queryFn: () => fetchOrgSessions(orgId!),
+    enabled: !!orgId,
+    staleTime: 5 * 60 * 1000,
+  });
+  const { colors } = useTheme();
   const router = useRouter();
   const s = React.useMemo(() => makeStyles(colors), [colors]);
-  const activityS = React.useMemo(
-    () => ({ ...makeActivityItemStyles(colors), itemOuter: { marginHorizontal: 0 } }),
-    [colors],
-  );
+  const supportPalette = React.useMemo(() => getSupportPalette(colors), [colors]);
 
   const profileData = profile as {
+    id?: string | null;
+    kind?: string | null;
     first_name?: string | null;
     display_name?: string | null;
     avatar_url?: string | null;
@@ -221,34 +293,85 @@ export default function HomeScreen() {
     profileData?.avatar_seed ?? user?.id ?? user?.email,
   );
 
-  const recentItems = React.useMemo(
+  const topMetrics = React.useMemo(
     () =>
-      getRecentItems(
-        feed?.sections.map((sec) => sec.items),
-        5,
-      ),
-    [feed],
+      buildHomeMetricSummary({
+        schedules: orgSchedules,
+        learningSpaces: learningSpaces.map((space) => ({
+          id: String((space as Record<string, unknown>).id),
+          status: ((space as Record<string, unknown>).status as string | null) ?? null,
+          subject: ((space as Record<string, unknown>).subject as string | null) ?? null,
+          title: ((space as Record<string, unknown>).title as string | null) ?? null,
+        })),
+        profileKind: profileData?.kind ?? null,
+        primaryRole: primaryRole ?? null,
+        profileId: profileData?.id ?? null,
+        childProfileIds: (childProfiles as Record<string, unknown>[]).map(
+          (child) => child.id as string,
+        ),
+      }),
+    [
+      childProfiles,
+      learningSpaces,
+      orgSchedules,
+      primaryRole,
+      profileData?.id,
+      profileData?.kind,
+    ],
   );
-
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const onToggle = useCallback((id: string) => {
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-  const onMarkRead = useCallback((id: string) => markRead([id]), [markRead]);
+  const metricCardWidth = Math.max(160, (windowWidth - 40 - 12) / 2);
+  const ThirdMetricIcon =
+    topMetrics.thirdMetricTitle === 'Active Subjects'
+      ? BookOpenCheck
+      : topMetrics.thirdMetricTitle === 'Active Students'
+        ? Users
+        : LayoutGrid;
 
   const [refreshing, setRefreshing] = useState(false);
+  const homeHeaderLoading = refreshing || accountLoading || profileLoading;
+  const overviewLoading =
+    refreshing ||
+    accountLoading ||
+    profileLoading ||
+    schedulesSummaryLoading ||
+    learningSpacesLoading;
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    Promise.all([refetchFeed(), refetchSessions()]).finally(() => setRefreshing(false));
-  }, [refetchFeed, refetchSessions]);
+    Promise.all([
+      refetchAccount(),
+      refetchProfile(),
+      refetchSessions(),
+      refetchLearningSpaces(),
+      refetchSupportChannel(),
+      refetchOrgSchedules(),
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.familyLinks(
+          orgId ?? '',
+          ((account as Record<string, unknown> | undefined)?.id as string) ?? '',
+        ),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.childProfiles(
+          orgId ?? '',
+          (childProfiles as Record<string, unknown>[]).map((child) => child.id as string),
+        ),
+      }),
+    ]).finally(() => setRefreshing(false));
+  }, [
+    account,
+    childProfiles,
+    orgId,
+    queryClient,
+    refetchAccount,
+    refetchLearningSpaces,
+    refetchOrgSchedules,
+    refetchProfile,
+    refetchSessions,
+    refetchSupportChannel,
+  ]);
 
   return (
-    <SafeAreaView style={s.safe}>
+    <SafeAreaView style={s.safe} edges={['top']}>
       <ScrollView
         contentContainerStyle={s.scroll}
         showsVerticalScrollIndicator={false}
@@ -261,71 +384,160 @@ export default function HomeScreen() {
         }
       >
         {/* Top bar */}
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <TouchableOpacity
-            style={[
-              s.avatar,
-              {
-                backgroundColor: avatarUrl ? 'transparent' : avatarBg,
-                overflow: 'hidden',
-              },
-            ]}
-            onPress={() => router.push('/(app)/(tabs)/account')}
-            activeOpacity={0.8}
-            accessibilityLabel="Open account"
+        {homeHeaderLoading ? (
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
           >
-            {avatarUrl ? (
-              <Image source={{ uri: avatarUrl }} style={{ width: 44, height: 44 }} />
-            ) : (
-              <Text style={[s.avatarTxt, { color: avatarFg }]}>{initial}</Text>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={s.bellBtn}
-            onPress={() => router.push('/(app)/(tabs)/inbox')}
-            activeOpacity={0.8}
-            accessibilityLabel="Open inbox"
+            <PulseBox width={44} height={44} radius={22} />
+            <PulseBox width={42} height={42} radius={12} />
+          </View>
+        ) : (
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
           >
-            <Bell size={20} color={colors.text} />
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              style={[
+                s.avatar,
+                {
+                  backgroundColor: avatarUrl ? 'transparent' : avatarBg,
+                  overflow: 'hidden',
+                },
+              ]}
+              onPress={() => router.push('/(app)/(tabs)/account')}
+              activeOpacity={0.8}
+              accessibilityLabel="Open account"
+            >
+              {avatarUrl ? (
+                <Image source={{ uri: avatarUrl }} style={{ width: 44, height: 44 }} />
+              ) : (
+                <Text style={[s.avatarTxt, { color: avatarFg }]}>{initial}</Text>
+              )}
+            </TouchableOpacity>
+            <SiteLogo height={32} color={colors.text} />
+          </View>
+        )}
 
         {/* Greeting */}
-        <View style={{ gap: 6 }}>
-          <Text style={s.greetingLine}>
-            {getGreeting()}, {firstName} 👋
-          </Text>
-          <Text style={s.headline}>Welcome back</Text>
-        </View>
-
-        {/* Quick nav */}
-        <View style={{ gap: 10 }}>
-          <Text style={s.sectionLabel}>Quick access</Text>
-          <View style={s.grid}>
-            {quickNav.map((item) => (
-              <TouchableOpacity
-                key={item.label}
-                style={s.gridItem}
-                onPress={() =>
-                  router.push({ pathname: item.pathname, params: item.params } as never)
-                }
-                activeOpacity={0.75}
-                accessibilityLabel={item.label}
-              >
-                <View style={s.gridTitleRow}>
-                  <item.Icon size={20} color={colors.text} />
-                  <Text style={s.gridLabel}>{item.label}</Text>
-                </View>
-                <Text style={s.gridDesc}>{item.desc}</Text>
-              </TouchableOpacity>
-            ))}
+        {homeHeaderLoading ? (
+          <View style={{ gap: 8 }}>
+            <PulseBox width={160} height={16} radius={4} />
+            <View style={s.headlineRow}>
+              <PulseBox width={220} height={30} radius={6} />
+              <PulseBox width={96} height={32} radius={16} />
+            </View>
           </View>
+        ) : (
+          <View style={{ gap: 6 }}>
+            <Text style={s.greetingLine}>
+              {getGreeting()}, {firstName}
+            </Text>
+            <View style={s.headlineRow}>
+              <Text style={s.headline}>Welcome back</Text>
+              {supportChannel?.id ? (
+                <TouchableOpacity
+                  style={s.supportBtn}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/(app)/channel/[channelId]',
+                      params: {
+                        channelId: supportChannel.id,
+                        topic: supportChannel.topic ?? 'Live Support',
+                      },
+                    })
+                  }
+                  activeOpacity={0.8}
+                  accessibilityLabel="Open live support"
+                >
+                  <View style={s.supportIconWrap}>
+                    <LifeBuoy size={14} color={supportPalette.text} />
+                  </View>
+                  <Text style={s.supportBtnText}>Support</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          </View>
+        )}
+
+        <View style={{ gap: 10 }}>
+          <Text style={s.sectionLabel}>Overview</Text>
+          {overviewLoading ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={s.metricsRow}
+            >
+              {[0, 1, 2].map((index) => (
+                <View
+                  key={index}
+                  style={[s.metricCard, { width: metricCardWidth, gap: 18 }]}
+                >
+                  <View style={s.metricHeader}>
+                    <PulseBox width={110} height={16} radius={4} />
+                    <PulseBox width={36} height={36} radius={12} />
+                  </View>
+                  <View style={{ gap: 8 }}>
+                    <PulseBox width={index === 1 ? 42 : 34} height={34} radius={6} />
+                    <PulseBox width={90} height={12} radius={4} />
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+          ) : (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={s.metricsRow}
+            >
+              <View style={[s.metricCard, { width: metricCardWidth }]}>
+                <View style={s.metricHeader}>
+                  <Text style={s.metricTitle}>Upcoming Sessions</Text>
+                  <View style={s.metricIconWrap}>
+                    <CalendarClock size={18} color={colors.teal} />
+                  </View>
+                </View>
+                <View>
+                  <Text style={s.metricValue}>{topMetrics.upcomingSessionsThisWeek}</Text>
+                  <Text style={s.metricLabel}>This week</Text>
+                </View>
+              </View>
+
+              <View style={[s.metricCard, { width: metricCardWidth }]}>
+                <View style={s.metricHeader}>
+                  <Text style={s.metricTitle}>Completed Classes</Text>
+                  <View style={s.metricIconWrap}>
+                    <CalendarCheck size={18} color={colors.teal} />
+                  </View>
+                </View>
+                <View>
+                  <Text style={s.metricValue}>
+                    {topMetrics.completedClassesThisMonth}
+                  </Text>
+                  <Text style={s.metricLabel}>This month</Text>
+                </View>
+              </View>
+
+              <View style={[s.metricCard, { width: metricCardWidth }]}>
+                <View style={s.metricHeader}>
+                  <Text style={s.metricTitle}>{topMetrics.thirdMetricTitle}</Text>
+                  <View style={s.metricIconWrap}>
+                    <ThirdMetricIcon size={18} color={colors.teal} />
+                  </View>
+                </View>
+                <View>
+                  <Text style={s.metricValue}>{topMetrics.thirdMetricValue}</Text>
+                  <Text style={s.metricLabel}>{topMetrics.thirdMetricLabel}</Text>
+                </View>
+              </View>
+            </ScrollView>
+          )}
         </View>
 
         {/* Upcoming sessions */}
@@ -370,38 +582,7 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* Recent activity */}
-        {(feedLoading || refreshing || recentItems.length > 0) && (
-          <View style={{ gap: 10 }}>
-            <View style={s.activityHeader}>
-              <Text style={s.sectionLabel}>Recent activity</Text>
-              <TouchableOpacity
-                onPress={() => router.push('/(app)/(tabs)/inbox')}
-                hitSlop={8}
-              >
-                <Text style={s.activitySeeAll}>See all</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={s.activityList}>
-              {feedLoading || refreshing ? (
-                <ActivityFeedSkeleton count={3} />
-              ) : (
-                recentItems.map((item) => (
-                  <ActivityItem
-                    key={item.ids.id}
-                    item={item}
-                    colors={colors}
-                    isDark={isDark}
-                    s={activityS}
-                    onMarkRead={onMarkRead}
-                    expandedIds={expandedIds}
-                    onToggle={onToggle}
-                  />
-                ))
-              )}
-            </View>
-          </View>
-        )}
+        <AppSupportFooter />
       </ScrollView>
     </SafeAreaView>
   );

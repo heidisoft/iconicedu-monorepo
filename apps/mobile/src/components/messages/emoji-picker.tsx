@@ -9,6 +9,14 @@ import {
   TouchableWithoutFeedback,
 } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
+import {
+  Clock3,
+  GraduationCap,
+  Hand,
+  Heart,
+  PartyPopper,
+  SmilePlus,
+} from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 
@@ -45,71 +53,58 @@ function addToRecentCache(emoji: string): string[] {
   return updated;
 }
 
-const EMOJI_CATEGORIES: { icon: string; label: string; emojis: string[] }[] = [
+const EMOJI_CATEGORIES: {
+  icon: React.ComponentType<{ size?: number; color?: string }>;
+  label: string;
+  emojis: string[];
+}[] = [
   {
-    icon: '😊',
+    icon: SmilePlus,
     label: 'Smileys',
     emojis: [
       '😀',
       '😃',
       '😄',
       '😁',
-      '😆',
       '😅',
-      '😂',
-      '🤣',
       '😊',
       '😇',
-      '🙂',
-      '😉',
-      '😍',
       '🥰',
+      '😍',
+      '🤩',
       '😘',
       '😋',
-      '😛',
-      '😜',
-      '🤩',
-      '😮',
-      '😲',
-      '🥳',
-      '😢',
-      '😭',
-      '😤',
-      '😠',
-      '🤬',
-      '🤯',
-      '😱',
       '😎',
+      '🤓',
+      '🧐',
+      '🤔',
+      '🤗',
+      '🤭',
+      '😌',
+      '😔',
     ],
   },
   {
-    icon: '👍',
+    icon: Hand,
     label: 'Gestures',
     emojis: [
       '👍',
       '👎',
       '👏',
       '🙌',
-      '🤝',
-      '🤜',
-      '🤛',
-      '✊',
       '👊',
-      '🤚',
-      '👋',
-      '🖐',
+      '✊',
+      '🤝',
+      '🙏',
       '✋',
       '💪',
-      '🙏',
-      '🤲',
-      '👐',
+      '✌️',
       '🤞',
-      '🤟',
-      '🤘',
+      '👌',
     ],
   },
   {
-    icon: '❤️',
+    icon: Heart,
     label: 'Hearts',
     emojis: [
       '❤️',
@@ -120,81 +115,37 @@ const EMOJI_CATEGORIES: { icon: string; label: string; emojis: string[] }[] = [
       '💜',
       '🖤',
       '🤍',
-      '🤎',
       '💕',
       '💞',
       '💓',
       '💗',
       '💖',
       '💘',
-      '💝',
-      '💟',
-      '❣️',
-      '💔',
-      '🔥',
     ],
   },
   {
-    icon: '📚',
+    icon: GraduationCap,
     label: 'Education',
     emojis: [
       '📚',
       '📖',
-      '✏️',
       '📝',
-      '📒',
-      '📓',
-      '📔',
-      '📕',
-      '📗',
-      '📘',
-      '📙',
-      '📋',
+      '✏️',
       '📌',
-      '📎',
-      '✂️',
-      '🔬',
-      '🔭',
-      '📐',
-      '📏',
-      '🗒️',
-      '📊',
-      '📈',
-      '📉',
-      '🗂️',
-      '🏆',
-      '🥇',
+      '📍',
       '🎓',
-      '🖊️',
-      '🖋️',
-      '✒️',
+      '🏆',
+      '⭐',
+      '✨',
+      '💡',
+      '🔖',
+      '📎',
     ],
   },
   {
-    icon: '🎉',
+    icon: PartyPopper,
     label: 'Celebrate',
-    emojis: [
-      '🎉',
-      '🎊',
-      '🎈',
-      '🎁',
-      '🥳',
-      '🎂',
-      '🍾',
-      '🥂',
-      '🎆',
-      '🎇',
-      '✨',
-      '⭐',
-      '🌟',
-      '💫',
-      '🔥',
-      '✅',
-      '☑️',
-      '💯',
-      '🏅',
-      '🎖️',
-    ],
+    emojis: ['🎉', '🎊', '🎈', '🎁', '🏅', '🥈', '🥉', '🌟', '✅', '💯', '🔥', '👑'],
   },
 ];
 
@@ -248,7 +199,12 @@ function makeStyles(C: AppColors) {
     tabActive: {
       borderBottomColor: C.teal,
     },
-    tabIcon: { fontSize: 20 },
+    tabIconWrap: {
+      width: 24,
+      height: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
 
     // Section label (inside grid)
     sectionLabel: {
@@ -362,7 +318,12 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
                       onPress={() => setActiveTab('recent')}
                       accessibilityLabel="Recently used"
                     >
-                      <Text style={s.tabIcon}>🕐</Text>
+                      <View style={s.tabIconWrap}>
+                        <Clock3
+                          size={18}
+                          color={activeTab === 'recent' ? colors.teal : colors.textMuted}
+                        />
+                      </View>
                     </TouchableOpacity>
                   )}
 
@@ -373,7 +334,12 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
                       onPress={() => setActiveTab(i)}
                       accessibilityLabel={cat.label}
                     >
-                      <Text style={s.tabIcon}>{cat.icon}</Text>
+                      <View style={s.tabIconWrap}>
+                        <cat.icon
+                          size={18}
+                          color={i === activeTab ? colors.teal : colors.textMuted}
+                        />
+                      </View>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>

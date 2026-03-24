@@ -72,7 +72,14 @@ function makeStyles(C: AppColors) {
     divider: { height: 1, backgroundColor: C.border, marginLeft: 60 },
     loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     emptyCard: { padding: 24, alignItems: 'center', gap: 8 },
-    emptyIcon: { fontSize: 32 },
+    emptyIconWrap: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: C.inputBg,
+    },
     emptyTitle: { fontSize: 15, fontWeight: '600', color: C.text },
     emptyDesc: { fontSize: 13, color: C.textMuted, textAlign: 'center' },
     hint: { fontSize: 12, color: C.textFaint, paddingHorizontal: 4 },
@@ -152,7 +159,9 @@ export default function NotificationsScreen() {
           <>
             <Text style={s.sectionLabel}>Categories</Text>
             <View style={[s.card, s.emptyCard]}>
-              <Text style={s.emptyIcon}>🔔</Text>
+              <View style={s.emptyIconWrap}>
+                <Bell size={28} color={colors.textMuted} />
+              </View>
               <Text style={s.emptyTitle}>No preferences configured</Text>
               <Text style={s.emptyDesc}>
                 Notification categories will appear here once they are available for your

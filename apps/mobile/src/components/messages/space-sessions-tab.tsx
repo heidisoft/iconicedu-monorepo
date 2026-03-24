@@ -189,7 +189,7 @@ export function expandRecurringSchedules(
         ids: { ...event.ids, id: `${event.ids.id}__${occurrenceKey}` },
         startAt: effectiveStart.toISOString(),
         endAt: effectiveEnd.toISOString(),
-        status: override?.status ?? event.status,
+        status: override?.status ?? (hasOverride ? 'rescheduled' : event.status),
         recurrence: undefined,
         uiState: override
           ? {
@@ -281,6 +281,8 @@ function splitAndGroupSessions(schedules: ClassScheduleVM[]): {
           isPast,
           status: s.status,
           meetingLink: s.meetingLink ?? null,
+          channelId:
+            s.source.kind === 'class_session' ? (s.source.channelId ?? null) : null,
           variant: s.uiState?.kind ?? 'default',
           disabled: s.uiState?.disabled ?? false,
           reason: s.uiState?.reason ?? null,
@@ -328,6 +330,18 @@ export function SpaceSessionsTab({
   const autoSwitchedRef = useRef(false);
 
   const { upcoming, past } = useMemo(() => splitAndGroupSessions(schedules), [schedules]);
+  const activeJoinSessionId = useMemo(() => {
+    for (const group of upcoming) {
+      const joinable = group.sessions.find(
+        (session) =>
+          !session.disabled &&
+          !session.isPast &&
+          (!!session.meetingLink || !!session.channelId),
+      );
+      if (joinable) return joinable.id;
+    }
+    return null;
+  }, [upcoming]);
 
   const toggleMonth = (key: string) => {
     setExpandedMonths((prev) => {
@@ -490,6 +504,11 @@ export function SpaceSessionsTab({
                       key={session.id}
                       session={session}
                       style={s.sessionCardItem}
+                      joinEnabled={
+                        activeSubTab !== 'upcoming'
+                          ? false
+                          : session.id === activeJoinSessionId
+                      }
                     />
                   ))}
               </View>

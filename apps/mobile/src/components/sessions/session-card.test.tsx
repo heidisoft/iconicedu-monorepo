@@ -1,6 +1,10 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react-native';
+import { Linking } from 'react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 import { SessionCard, type ClassSession } from './session-card';
+
+const mockPush = jest.fn();
+const mockOpenURL = jest.fn();
 
 jest.mock('@/providers/theme-provider', () => ({
   useTheme: () => ({
@@ -17,7 +21,8 @@ jest.mock('@/providers/theme-provider', () => ({
   }),
 }));
 
-jest.mock('expo-router', () => ({ useRouter: () => ({ push: jest.fn() }) }));
+jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
+jest.spyOn(Linking, 'openURL').mockImplementation(mockOpenURL);
 
 const baseSession: ClassSession = {
   id: 'test-1',
@@ -38,6 +43,11 @@ const baseSession: ClassSession = {
 };
 
 describe('SessionCard', () => {
+  beforeEach(() => {
+    mockPush.mockClear();
+    mockOpenURL.mockClear();
+  });
+
   it('renders without crashing', () => {
     render(<SessionCard session={baseSession} />);
   });
@@ -62,19 +72,67 @@ describe('SessionCard', () => {
   });
 
   it('shows Join button for upcoming sessions', () => {
-    render(<SessionCard session={baseSession} />);
+    render(
+      <SessionCard
+        session={{ ...baseSession, meetingLink: 'https://meet.example.com/abc' }}
+      />,
+    );
     expect(screen.getByText('Join')).toBeTruthy();
+  });
+
+  it('does not show join button when join action is disabled by parent', () => {
+    render(<SessionCard session={baseSession} showJoinButton={false} />);
+    expect(screen.queryByText('Join')).toBeNull();
+    expect(screen.queryByText('Join Now')).toBeNull();
+  });
+
+  it('opens the meeting link from the join button', () => {
+    render(
+      <SessionCard
+        session={{ ...baseSession, meetingLink: 'https://meet.example.com/abc' }}
+      />,
+    );
+
+    fireEvent.press(screen.getByLabelText('Join session'));
+
+    expect(mockOpenURL).toHaveBeenCalledWith('https://meet.example.com/abc');
+  });
+
+  it('falls back to the classroom sessions tab when no meeting link is present', () => {
+    render(<SessionCard session={baseSession} />);
+
+    fireEvent.press(screen.getByLabelText('Join session'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/spaces/[channelId]',
+      params: { channelId: 'channel-1', tab: 'sessions' },
+    });
+  });
+
+  it('opens classroom chat from the chat button', () => {
+    render(<SessionCard session={baseSession} />);
+
+    fireEvent.press(screen.getByLabelText('Open classroom chat'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/spaces/[channelId]',
+      params: { channelId: 'channel-1', tab: 'messages' },
+    });
   });
 
   it('shows Recording button for past sessions', () => {
     render(<SessionCard session={{ ...baseSession, isPast: true }} />);
     expect(screen.getByText('Recording')).toBeTruthy();
-    expect(screen.getByText('Completed')).toBeTruthy();
   });
 
-  it('shows Skipped badge for exception variant', () => {
+  it('shows Canceled badge for exception variant', () => {
     render(<SessionCard session={{ ...baseSession, variant: 'exception' }} />);
-    expect(screen.getByText('Skipped')).toBeTruthy();
+    expect(screen.getByText('Canceled')).toBeTruthy();
+  });
+
+  it('shows Rescheduled badge for override variant', () => {
+    render(<SessionCard session={{ ...baseSession, variant: 'override' }} />);
+    expect(screen.getByText('Rescheduled')).toBeTruthy();
   });
 
   it('shows student names next to the time', () => {
@@ -91,6 +149,22 @@ describe('SessionCard', () => {
     );
     expect(screen.getByText('Alice')).toBeTruthy();
     expect(screen.getByText('Bob')).toBeTruthy();
+  });
+
+  it('shows participant names next to the time', () => {
+    render(
+      <SessionCard
+        session={{
+          ...baseSession,
+          participants: [
+            { name: 'Alice', themeKey: 'blue' },
+            { name: 'Mr. Chen', themeKey: 'teal' },
+          ],
+        }}
+      />,
+    );
+    expect(screen.getByText('Alice')).toBeTruthy();
+    expect(screen.getByText('Mr. Chen')).toBeTruthy();
   });
 
   it('does not render student separator when no students', () => {

@@ -1,10 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { fetchLearningSpaceChannels } from '@/lib/api/queries';
 
-export function useLearningSpaceChannels(orgId: string, myProfileId: string) {
+export function useLearningSpaceChannels(
+  orgId: string,
+  myProfileId: string,
+  myAccountId: string,
+) {
   return useQuery({
     queryKey: ['learningSpaceChannels', orgId, myProfileId] as const,
-    queryFn: () => fetchLearningSpaceChannels(orgId, myProfileId),
-    enabled: !!orgId && !!myProfileId,
+    queryFn: () => fetchLearningSpaceChannels(orgId, myProfileId, myAccountId),
+    enabled: !!orgId && !!myProfileId && !!myAccountId,
   });
 }

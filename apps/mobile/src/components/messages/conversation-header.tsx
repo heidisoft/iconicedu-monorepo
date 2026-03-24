@@ -1,8 +1,19 @@
 import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Linking, Image } from 'react-native';
-import { ChevronLeft, Video, MoreVertical } from 'lucide-react-native';
+import {
+  ChevronLeft,
+  Video,
+  MoreVertical,
+  Clock3,
+  Minus,
+  CircleOff,
+} from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
+import { getLearningSpaceIcon } from '@/lib/learning-space-icons';
+import { PulseBox } from '@/components/skeletons/pulse-box';
+import { RoleAvatarBadge } from '@/components/profile/role-avatar-badge';
+import type { PresenceDisplayStatus } from '@/hooks/use-online-profile-ids';
 
 // ─── Avatar color helpers (same palette as messages list) ────────────────────
 
@@ -39,8 +50,10 @@ export type ConversationHeaderProps = {
   avatarSeed?: string | null;
   /** DM: profile photo URL — shown instead of initials when available. */
   avatarUrl?: string | null;
-  /** Channel/space: emoji icon shown instead of initials */
-  iconEmoji?: string | null;
+  /** DM: role used for the avatar badge. */
+  avatarRole?: string | null;
+  /** Channel/space: learning-space icon key */
+  iconKey?: string | null;
   onBack: () => void;
   onCall?: () => void;
   onVideo?: () => void;
@@ -57,8 +70,11 @@ export type ConversationHeaderProps = {
    * where both the child and the partner's initials are shown.
    */
   secondaryAvatarSeed?: string | null;
+  secondaryAvatarRole?: string | null;
+  presenceStatus?: PresenceDisplayStatus | null;
   /** When true, hides all action buttons and the online dot (supervised read-only mode). */
   isReadOnly?: boolean;
+  loading?: boolean;
 };
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
@@ -70,7 +86,9 @@ function makeStyles(C: AppColors) {
       alignItems: 'center',
       paddingHorizontal: 6,
       paddingVertical: 10,
-      backgroundColor: C.teal,
+      backgroundColor: C.pageBg,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: C.border,
       gap: 4,
     },
     backBtn: {
@@ -80,7 +98,7 @@ function makeStyles(C: AppColors) {
       justifyContent: 'center',
       borderRadius: 22,
     },
-    backArrow: { fontSize: 26, color: '#fff', fontWeight: '300', lineHeight: 30 },
+    backArrow: { fontSize: 26, color: C.text, fontWeight: '300', lineHeight: 30 },
 
     // ── DM avatar ──────────────────────────────────────────────────────────────
     avatarWrap: { position: 'relative', width: 42, height: 42, flexShrink: 0 },
@@ -101,7 +119,19 @@ function makeStyles(C: AppColors) {
       borderRadius: 6,
       backgroundColor: '#22c55e',
       borderWidth: 2,
-      borderColor: C.teal,
+      borderColor: C.pageBg,
+    },
+    statusBadge: {
+      position: 'absolute',
+      bottom: 0,
+      right: 0,
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 2,
+      borderColor: C.pageBg,
     },
 
     // ── DM avatar — grouped (supervised: child + partner stacked) ──────────────
@@ -116,7 +146,7 @@ function makeStyles(C: AppColors) {
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 2,
-      borderColor: C.teal,
+      borderColor: C.pageBg,
     },
     groupFront: {
       position: 'absolute',
@@ -128,26 +158,27 @@ function makeStyles(C: AppColors) {
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 2,
-      borderColor: C.teal,
+      borderColor: C.pageBg,
     },
     groupTxt: { color: '#fff', fontWeight: '700', fontSize: 13 },
+    groupBadgeFront: { top: -3 },
+    groupBadgeBack: { top: -3 },
 
     // ── Channel/space icon ─────────────────────────────────────────────────────
     iconBox: {
       width: 42,
       height: 42,
       borderRadius: 12,
-      backgroundColor: 'rgba(255,255,255,0.2)',
+      backgroundColor: C.tealBg,
       alignItems: 'center',
       justifyContent: 'center',
       flexShrink: 0,
     },
-    iconEmojiTxt: { fontSize: 22 },
-
     // ── Title block ────────────────────────────────────────────────────────────
     titleBlock: { flex: 1, paddingLeft: 8, justifyContent: 'center', gap: 2 },
-    title: { fontSize: 16, fontWeight: '700', color: '#fff', letterSpacing: -0.2 },
-    subtitle: { fontSize: 12, color: 'rgba(255,255,255,0.78)' },
+    title: { fontSize: 16, fontWeight: '700', color: C.text, letterSpacing: -0.2 },
+    subtitle: { fontSize: 12, color: C.textMuted },
+    titleSkeletonWrap: { gap: 6, paddingTop: 2 },
 
     // ── Action buttons ─────────────────────────────────────────────────────────
     actions: { flexDirection: 'row', alignItems: 'center' },
@@ -158,8 +189,8 @@ function makeStyles(C: AppColors) {
       justifyContent: 'center',
       borderRadius: 20,
     },
-    actionIcon: { fontSize: 19, color: 'rgba(255,255,255,0.9)' },
-    moreIcon: { fontSize: 24, color: 'rgba(255,255,255,0.9)' },
+    actionIcon: { fontSize: 19, color: C.text },
+    moreIcon: { fontSize: 24, color: C.text },
 
     // ── Live session join pill — mirrors web MessagesContainerHeaderActions Join button ──
     joinPill: {
@@ -169,7 +200,7 @@ function makeStyles(C: AppColors) {
       paddingHorizontal: 12,
       paddingVertical: 7,
       borderRadius: 20,
-      backgroundColor: '#fff',
+      backgroundColor: C.tealBg,
     },
     joinPillTxt: { fontSize: 13, fontWeight: '700', color: C.teal },
   });
@@ -183,26 +214,57 @@ export function ConversationHeader({
   kind,
   avatarSeed,
   avatarUrl,
-  iconEmoji,
+  avatarRole,
+  iconKey,
   onBack,
   onCall: _onCall,
   onVideo,
   onMore,
   liveJoinUrl,
   secondaryAvatarSeed,
+  secondaryAvatarRole,
+  presenceStatus,
   isReadOnly = false,
+  loading = false,
 }: ConversationHeaderProps) {
   const { colors } = useTheme();
   const s = useMemo(() => makeStyles(colors), [colors]);
 
   const isDm = kind === 'dm';
   const seed = avatarSeed ?? title;
+  const LearningSpaceIcon = !isDm ? getLearningSpaceIcon(iconKey) : null;
+
+  const presenceBadge = useMemo(() => {
+    if (!presenceStatus || isReadOnly) return null;
+    if (presenceStatus === 'online') {
+      return <View style={s.onlineDot} />;
+    }
+    if (presenceStatus === 'away' || presenceStatus === 'idle') {
+      return (
+        <View style={[s.statusBadge, { backgroundColor: '#eab308' }]}>
+          <Clock3 size={7} color="#ffffff" strokeWidth={2.6} />
+        </View>
+      );
+    }
+    if (presenceStatus === 'busy') {
+      return (
+        <View style={[s.statusBadge, { backgroundColor: '#dc2626' }]}>
+          <Minus size={8} color="#ffffff" strokeWidth={3} />
+        </View>
+      );
+    }
+    return (
+      <View style={[s.statusBadge, { backgroundColor: '#4b5563' }]}>
+        <CircleOff size={7} color="#ffffff" strokeWidth={2.4} />
+      </View>
+    );
+  }, [isReadOnly, presenceStatus, s]);
 
   return (
     <View style={s.container}>
       {/* Back */}
       <TouchableOpacity style={s.backBtn} onPress={onBack} hitSlop={8}>
-        <ChevronLeft size={28} color="#fff" />
+        <ChevronLeft size={28} color={colors.text} />
       </TouchableOpacity>
 
       {/* Avatar (DM) or icon box (channel/space) */}
@@ -214,6 +276,11 @@ export function ConversationHeader({
           >
             <Text style={s.groupTxt}>{getInitials(secondaryAvatarSeed)}</Text>
           </View>
+          <RoleAvatarBadge
+            role={secondaryAvatarRole}
+            size={14}
+            style={s.groupBadgeBack}
+          />
           {avatarUrl ? (
             <Image source={{ uri: avatarUrl }} style={s.groupFront} />
           ) : (
@@ -221,6 +288,7 @@ export function ConversationHeader({
               <Text style={s.groupTxt}>{getInitials(title)}</Text>
             </View>
           )}
+          <RoleAvatarBadge role={avatarRole} size={14} style={s.groupBadgeFront} />
         </View>
       ) : isDm ? (
         // Regular DM — single avatar with optional photo
@@ -232,25 +300,33 @@ export function ConversationHeader({
               <Text style={s.avatarTxt}>{getInitials(title)}</Text>
             </View>
           )}
-          {!isReadOnly && <View style={s.onlineDot} />}
+          {presenceBadge}
+          <RoleAvatarBadge role={avatarRole} size={16} />
         </View>
       ) : (
         <View style={s.iconBox}>
-          <Text style={s.iconEmojiTxt}>
-            {iconEmoji ?? (kind === 'space' ? '🚀' : '📚')}
-          </Text>
+          {LearningSpaceIcon ? <LearningSpaceIcon size={22} color={colors.teal} /> : null}
         </View>
       )}
 
       {/* Title + subtitle */}
       <View style={s.titleBlock}>
-        <Text style={s.title} numberOfLines={1}>
-          {secondaryAvatarSeed ? `${secondaryAvatarSeed} <> ${title}` : title}
-        </Text>
-        {!!subtitle && (
-          <Text style={s.subtitle} numberOfLines={1}>
-            {subtitle}
-          </Text>
+        {loading ? (
+          <View style={s.titleSkeletonWrap}>
+            <PulseBox width={148} height={16} radius={5} />
+            <PulseBox width={96} height={12} radius={5} />
+          </View>
+        ) : (
+          <>
+            <Text style={s.title} numberOfLines={1}>
+              {secondaryAvatarSeed ? `${secondaryAvatarSeed} <> ${title}` : title}
+            </Text>
+            {!!subtitle && (
+              <Text style={s.subtitle} numberOfLines={1}>
+                {subtitle}
+              </Text>
+            )}
+          </>
         )}
       </View>
 
@@ -270,11 +346,11 @@ export function ConversationHeader({
             </TouchableOpacity>
           ) : (
             <TouchableOpacity style={s.actionBtn} onPress={onVideo} hitSlop={8}>
-              <Video size={20} color="rgba(255,255,255,0.9)" />
+              <Video size={20} color={colors.text} />
             </TouchableOpacity>
           )}
           <TouchableOpacity style={s.actionBtn} onPress={onMore} hitSlop={8}>
-            <MoreVertical size={22} color="rgba(255,255,255,0.9)" />
+            <MoreVertical size={22} color={colors.text} />
           </TouchableOpacity>
         </View>
       )}

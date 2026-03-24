@@ -1,5 +1,10 @@
 'use client';
 
+import {
+  DEFAULT_LEARNING_SPACE_ICON_KEY,
+  LEARNING_SPACE_ICON_OPTIONS,
+  type LearningSpaceIconKey,
+} from '@iconicedu/shared-types';
 import type { LucideIcon } from 'lucide-react';
 import {
   Calculator,
@@ -43,33 +48,11 @@ export const LEARNING_SPACE_ICON_MAP = {
   map: Map,
 } as const;
 
-export type LearningSpaceIconKey = keyof typeof LEARNING_SPACE_ICON_MAP;
-
-export const DEFAULT_LEARNING_SPACE_ICON_KEY: LearningSpaceIconKey = 'sparkles';
-
-export const LEARNING_SPACE_ICON_OPTIONS: {
-  value: LearningSpaceIconKey;
-  label: string;
-}[] = [
-  { value: 'sparkles', label: 'Sparkles' },
-  { value: 'square-pi', label: 'Math' },
-  { value: 'languages', label: 'Languages' },
-  { value: 'chef-hat', label: 'Creative' },
-  { value: 'earth', label: 'World' },
-  { value: 'chess-knight', label: 'Chess' },
-  { value: 'palette', label: 'Arts Palette' },
-  { value: 'paintbrush', label: 'Arts Brush' },
-  { value: 'scissors', label: 'Arts Scissors' },
-  { value: 'calculator', label: 'Math Calculator' },
-  { value: 'ruler', label: 'Math Ruler' },
-  { value: 'pen-tool', label: 'ELA Pen' },
-  { value: 'notebook-pen', label: 'ELA Notebook' },
-  { value: 'notebook-text', label: 'Homework Notebook' },
-  { value: 'clipboard-check', label: 'Homework Checklist' },
-  { value: 'graduation-cap', label: 'SHSAT / SAT' },
-  { value: 'landmark', label: 'Social Studies Landmark' },
-  { value: 'map', label: 'Social Studies Map' },
-];
+export {
+  DEFAULT_LEARNING_SPACE_ICON_KEY,
+  LEARNING_SPACE_ICON_OPTIONS,
+  type LearningSpaceIconKey,
+};
 
 export function getLearningSpaceIcon(
   iconKey?: string | null,

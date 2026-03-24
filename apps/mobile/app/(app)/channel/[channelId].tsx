@@ -38,10 +38,10 @@ import { SpaceSessionsTab } from '@/components/messages/space-sessions-tab';
 type ChannelTab = 'messages' | 'sessions';
 
 export default function ChannelConversationScreen() {
-  const { channelId, topic, iconEmoji, subtitle } = useLocalSearchParams<{
+  const { channelId, topic, iconKey, subtitle } = useLocalSearchParams<{
     channelId: string;
     topic?: string;
-    iconEmoji?: string;
+    iconKey?: string;
     subtitle?: string;
   }>();
   const router = useRouter();
@@ -312,8 +312,8 @@ export default function ChannelConversationScreen() {
   if (!channelId) return null;
 
   const isOwnMessage = (msg: MessageVM) => msg.core.sender.ids.id === profileId;
-  // Show the Sessions tab only for class channels (identified by having an iconEmoji)
-  const isSpaceChannel = Boolean(iconEmoji);
+  // Show the Sessions tab only for class channels (identified by having a learning-space icon)
+  const isSpaceChannel = Boolean(iconKey);
 
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: colors.pageBg }]} edges={['top']}>
@@ -321,7 +321,7 @@ export default function ChannelConversationScreen() {
         title={topic ?? 'Channel'}
         subtitle={subtitle}
         kind={isSpaceChannel ? 'space' : 'channel'}
-        iconEmoji={iconEmoji}
+        iconKey={iconKey}
         onBack={() => router.back()}
         onMore={() => setInfoVisible(true)}
       />
@@ -383,6 +383,8 @@ export default function ChannelConversationScreen() {
             onRetryUpload={handleRetryUpload}
             onUnreadViewed={handleUnreadViewed}
             isScreenActive={isFocused && activeTab === 'messages'}
+            emptyTitle="Start the conversation"
+            emptyDescription="Share a welcome message, lesson update, or question to begin the class discussion."
           />
           <TypingIndicator typingUsers={typingUsers} />
           <MessageInput
@@ -405,7 +407,7 @@ export default function ChannelConversationScreen() {
         title={topic ?? 'Channel'}
         subtitle={subtitle}
         kind={isSpaceChannel ? 'space' : 'channel'}
-        iconEmoji={iconEmoji}
+        iconKey={iconKey}
         messages={messages ?? []}
         onClose={() => setInfoVisible(false)}
       />

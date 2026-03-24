@@ -27,6 +27,8 @@ import {
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 import type { MessageVM, TextMessageVM, UserProfileVM } from '@iconicedu/shared-types';
+import { getLearningSpaceIcon } from '@/lib/learning-space-icons';
+import { RoleAvatarBadge } from '@/components/profile/role-avatar-badge';
 
 const CHANNEL_FILES_BUCKET = 'channel-files';
 
@@ -104,24 +106,29 @@ function getMessagePreview(msg: MessageVM): string {
     case 'text':
       return (msg as TextMessageVM).content.text.slice(0, 120);
     case 'image':
-      return '📷 Photo';
+      return 'Photo';
     case 'file':
-      return `📎 ${(msg as unknown as { attachment: { name: string } }).attachment.name}`;
+      return (msg as unknown as { attachment: { name: string } }).attachment.name;
     case 'audio-recording':
-      return '🎤 Voice message';
+      return 'Voice message';
     default:
       return 'Message';
   }
 }
 
-function extractSaved(
-  messages: MessageVM[],
-): Array<{ id: string; senderName: string; preview: string; createdAt: string }> {
+function extractSaved(messages: MessageVM[]): Array<{
+  id: string;
+  senderName: string;
+  senderRole?: string | null;
+  preview: string;
+  createdAt: string;
+}> {
   return messages
     .filter((m) => m.state?.isSaved)
     .map((m) => ({
       id: m.ids.id,
       senderName: getSenderName(m.core.sender),
+      senderRole: m.core.sender.kind,
       preview: getMessagePreview(m),
       createdAt: m.core.createdAt,
     }))
@@ -130,20 +137,33 @@ function extractSaved(
 
 function extractMembers(
   messages: MessageVM[],
-  extraMembers?: Array<{ id: string; name: string; avatarSeed?: string | null }> | null,
-): Array<{ id: string; name: string; seed: string }> {
-  const map = new Map<string, { id: string; name: string; seed: string }>();
+  extraMembers?: Array<{
+    id: string;
+    name: string;
+    avatarSeed?: string | null;
+    role?: string | null;
+  }> | null,
+): Array<{ id: string; name: string; seed: string; role?: string | null }> {
+  const map = new Map<
+    string,
+    { id: string; name: string; seed: string; role?: string | null }
+  >();
   for (const msg of messages) {
     const s = msg.core.sender;
     if (!map.has(s.ids.id)) {
       const name = getSenderName(s);
-      map.set(s.ids.id, { id: s.ids.id, name, seed: name });
+      map.set(s.ids.id, { id: s.ids.id, name, seed: name, role: s.kind });
     }
   }
   if (extraMembers) {
     for (const m of extraMembers) {
       if (!map.has(m.id)) {
-        map.set(m.id, { id: m.id, name: m.name, seed: m.avatarSeed ?? m.name });
+        map.set(m.id, {
+          id: m.id,
+          name: m.name,
+          seed: m.avatarSeed ?? m.name,
+          role: m.role,
+        });
       }
     }
   }
@@ -161,10 +181,16 @@ export type ChannelInfoSheetProps = {
   subtitle?: string | null;
   kind: 'dm' | 'channel' | 'space';
   avatarSeed?: string | null;
-  iconEmoji?: string | null;
+  avatarRole?: string | null;
+  iconKey?: string | null;
   memberCount?: number | null;
   description?: string | null;
-  members?: Array<{ id: string; name: string; avatarSeed?: string | null }> | null;
+  members?: Array<{
+    id: string;
+    name: string;
+    avatarSeed?: string | null;
+    role?: string | null;
+  }> | null;
   messages?: MessageVM[];
   onClose: () => void;
 };
@@ -265,10 +291,11 @@ type TabContentProps = {
   savedItems: Array<{
     id: string;
     senderName: string;
+    senderRole?: string | null;
     preview: string;
     createdAt: string;
   }>;
-  memberItems: Array<{ id: string; name: string; seed: string }>;
+  memberItems: Array<{ id: string; name: string; seed: string; role?: string | null }>;
   colors: AppColors;
   s: ReturnType<typeof makeStyles>;
   memberCount?: number | null;
@@ -330,8 +357,11 @@ function TabContent({
           const color = avatarColor(item.senderName);
           return (
             <View key={item.id} style={s.savedItem}>
-              <View style={[s.savedAvatar, { backgroundColor: color }]}>
-                <Text style={s.savedAvatarTxt}>{getInitials(item.senderName)}</Text>
+              <View style={{ width: 40, height: 40, position: 'relative' }}>
+                <View style={[s.savedAvatar, { backgroundColor: color }]}>
+                  <Text style={s.savedAvatarTxt}>{getInitials(item.senderName)}</Text>
+                </View>
+                <RoleAvatarBadge role={item.senderRole} size={14} />
               </View>
               <View style={s.savedBody}>
                 <View style={s.savedSenderRow}>
@@ -368,8 +398,11 @@ function TabContent({
       </View>
       {memberItems.map((member) => (
         <View key={member.id} style={s.memberRow}>
-          <View style={[s.memberAvatar, { backgroundColor: avatarColor(member.seed) }]}>
-            <Text style={s.memberAvatarTxt}>{getInitials(member.name)}</Text>
+          <View style={{ width: 36, height: 36, position: 'relative' }}>
+            <View style={[s.memberAvatar, { backgroundColor: avatarColor(member.seed) }]}>
+              <Text style={s.memberAvatarTxt}>{getInitials(member.name)}</Text>
+            </View>
+            <RoleAvatarBadge role={member.role} size={14} />
           </View>
           <Text style={s.memberName}>{member.name}</Text>
         </View>
@@ -488,8 +521,6 @@ function makeStyles(C: AppColors) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    iconEmojiTxt: { fontSize: 36 },
-    iconEmojiTxtCompact: { fontSize: 28 },
     heroName: { fontSize: 22, fontWeight: '700', color: C.text, textAlign: 'center' },
     heroNameCompact: {
       fontSize: 18,
@@ -715,7 +746,8 @@ export function ChannelInfoSheet({
   subtitle,
   kind,
   avatarSeed,
-  iconEmoji,
+  avatarRole,
+  iconKey,
   memberCount,
   description,
   members,
@@ -738,6 +770,7 @@ export function ChannelInfoSheet({
   const isDm = kind === 'dm';
   const seed = avatarSeed ?? title;
   const typeLabel = isDm ? 'Direct Message' : kind === 'space' ? 'Class' : 'Channel';
+  const LearningSpaceIcon = !isDm ? getLearningSpaceIcon(iconKey) : null;
 
   // ── Files: fetch directly from channel_files + channel_media tables ─────────
   // Messages are paginated (last ~40), so we can't extract files from them reliably.
@@ -999,8 +1032,11 @@ export function ChannelInfoSheet({
           <ScrollView showsVerticalScrollIndicator={false} scrollEnabled={isFullScreen}>
             {/* Hero */}
             <View style={s.hero}>
-              <View style={[s.avatarCircle, { backgroundColor: avatarColor(seed) }]}>
-                <Text style={s.avatarTxt}>{getInitials(title)}</Text>
+              <View style={{ width: 72, height: 72, position: 'relative' }}>
+                <View style={[s.avatarCircle, { backgroundColor: avatarColor(seed) }]}>
+                  <Text style={s.avatarTxt}>{getInitials(title)}</Text>
+                </View>
+                <RoleAvatarBadge role={avatarRole} size={18} />
               </View>
               <Text style={s.heroName}>{title}</Text>
               {!!subtitle && <Text style={s.heroSub}>{subtitle}</Text>}
@@ -1054,7 +1090,9 @@ export function ChannelInfoSheet({
               {...(isFullScreen ? panResponder.panHandlers : {})}
             >
               <View style={[s.iconBoxCompact, { backgroundColor: colors.tealBg }]}>
-                <Text style={s.iconEmojiTxtCompact}>{iconEmoji ?? '📚'}</Text>
+                {LearningSpaceIcon ? (
+                  <LearningSpaceIcon size={28} color={colors.teal} />
+                ) : null}
               </View>
               <Text style={s.heroNameCompact}>{title}</Text>
               {!!subtitle && <Text style={s.heroSub}>{subtitle}</Text>}

@@ -43,9 +43,11 @@ export const queryKeys = {
   directMessages: (orgId: string, profileId: string) =>
     ['directMessages', orgId, profileId] as const,
   channel: (channelId: string) => ['channel', channelId] as const,
+  spaceChannelMeta: (channelId: string) => ['spaceChannelMeta', channelId] as const,
   messages: (channelId: string) => ['messages', channelId] as const,
   learningSpaces: (orgId: string) => ['learningSpaces', orgId] as const,
   learningSpace: (spaceId: string) => ['learningSpace', spaceId] as const,
+  supportChannel: (orgId: string) => ['supportChannel', orgId] as const,
   inbox: (orgId: string, profileId: string) => ['inbox', orgId, profileId] as const,
   sidebar: (orgId: string, profileId: string) => ['sidebar', orgId, profileId] as const,
   notificationPrefs: (orgId: string, profileId: string) =>
@@ -132,6 +134,7 @@ export type DmParticipant = {
   last_name: string | null;
   avatar_url: string | null;
   avatar_seed: string | null;
+  kind?: string | null;
 };
 
 export type ChannelListItem = {
@@ -145,23 +148,28 @@ export type ChannelListItem = {
   last_message_text: string | null;
   last_message_at: string | null;
   last_message_sender: string | null;
-  /** Class subject emoji, e.g. "📐". */
-  icon_emoji?: string | null;
+  /** Learning-space icon key shared with web. */
+  icon_key?: string | null;
   /** Primary student name this space is for. */
   student_name?: string | null;
+  /** Student participants for classroom channels. */
+  student_profiles?: Array<{ name: string; themeKey?: string | null }>;
   /** DM channel participants (other people, self excluded). */
   participants?: DmParticipant[];
   /** True when guardian is viewing a child's DM they do not participate in. */
   is_supervised?: boolean;
   /** Display name of the child whose conversation this is. */
   supervised_child_name?: string | null;
+  /** True when the row is the org support channel, not a learning space. */
+  is_support?: boolean;
 };
 
 export async function fetchDirectMessages(
   orgId: string,
   myProfileId: string,
+  myAccountId: string,
 ): Promise<ChannelListItem[]> {
-  if (!myProfileId) return [];
+  if (!myProfileId || !myAccountId) return [];
 
   // Step 1: get channel IDs where the logged-in user is a member
   // Uses channel_members (the correct table — mirrors web's channel_members table)
@@ -195,13 +203,27 @@ export async function fetchDirectMessages(
   const { data: memberRows } = await supabase
     .from('channel_members')
     .select(
-      'channel_id, profile_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed)',
+      'channel_id, profile_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed, kind)',
     )
     .in(
       'channel_id',
       chRows.map((c) => c.id),
     )
     .is('deleted_at', null);
+
+  const { data: readStateRows } = await supabase
+    .from('channel_read_state')
+    .select('channel_id, unread_count')
+    .eq('account_id', myAccountId)
+    .in(
+      'channel_id',
+      chRows.map((c) => c.id),
+    )
+    .is('deleted_at', null);
+
+  const readStateByChannelId = new Map(
+    (readStateRows ?? []).map((row) => [row.channel_id as string, row.unread_count ?? 0]),
+  );
 
   // Build channelId → DmParticipant[] map, excluding self
   const participantMap = new Map<string, DmParticipant[]>();
@@ -224,7 +246,7 @@ export async function fetchDirectMessages(
       description: ch.description ?? null,
       kind: ch.kind,
       updated_at: ch.updated_at,
-      unread_count: 0,
+      unread_count: Math.max(0, readStateByChannelId.get(ch.id) ?? 0),
       last_message_text: last?.text ?? null,
       last_message_at: last?.at ?? null,
       last_message_sender: last?.sender ?? null,
@@ -310,11 +332,28 @@ export async function fetchSupervisedDirectMessages(
       .order('updated_at', { ascending: false });
     if (!chRows?.length) continue;
 
+    const { data: readStateRows } = await supabase
+      .from('channel_read_state')
+      .select('channel_id, unread_count')
+      .eq('account_id', child.account_id)
+      .in(
+        'channel_id',
+        chRows.map((c: { id: string }) => c.id),
+      )
+      .is('deleted_at', null);
+
+    const readStateByChannelId = new Map(
+      (readStateRows ?? []).map((row) => [
+        row.channel_id as string,
+        row.unread_count ?? 0,
+      ]),
+    );
+
     // Fetch participants for display (exclude the child — show the other party)
     const { data: memberRows } = await supabase
       .from('channel_members')
       .select(
-        'channel_id, profile_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed)',
+        'channel_id, profile_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed, kind)',
       )
       .in(
         'channel_id',
@@ -352,7 +391,7 @@ export async function fetchSupervisedDirectMessages(
         description: ch.description ?? null,
         kind: ch.kind,
         updated_at: ch.updated_at,
-        unread_count: 0,
+        unread_count: Math.max(0, readStateByChannelId.get(ch.id) ?? 0),
         last_message_text: null,
         last_message_at: null,
         last_message_sender: null,
@@ -377,18 +416,18 @@ export async function fetchSupervisedDirectMessages(
 type LastMessageInfo = { text: string | null; at: string | null; sender: string | null };
 
 const PREVIEW_LABELS: Record<string, string> = {
-  image: '🖼 Image',
-  file: '📎 File',
-  'audio-recording': '🎙 Voice message',
-  'lesson-assignment': '📚 Assignment',
-  'homework-submission': '📝 Homework submitted',
-  'progress-update': '📈 Progress update',
-  'event-reminder': '📅 Event reminder',
-  'session-summary': '📋 Session summary',
-  'session-complete': '✓ Session complete',
-  'session-booking': '🗓 Session booked',
-  'payment-reminder': '💳 Payment reminder',
-  'feedback-request': '💬 Feedback request',
+  image: 'Image',
+  file: 'File',
+  'audio-recording': 'Voice message',
+  'lesson-assignment': 'Assignment',
+  'homework-submission': 'Homework submitted',
+  'progress-update': 'Progress update',
+  'event-reminder': 'Event reminder',
+  'session-summary': 'Session summary',
+  'session-complete': 'Session complete',
+  'session-booking': 'Session booked',
+  'payment-reminder': 'Payment reminder',
+  'feedback-request': 'Feedback request',
 };
 
 /**
@@ -518,7 +557,7 @@ export async function fetchChannels(orgId: string): Promise<ChannelListItem[]> {
 // Only select columns that actually exist on the messages table.
 const BASE_MESSAGE_SELECT = `
   id, org_id, channel_id, sender_profile_id, type, created_at, updated_at, thread_parent_id,
-  sender:profiles!sender_profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed)
+  sender:profiles!sender_profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed, kind)
 `;
 
 /** message type → payload table name */
@@ -671,7 +710,7 @@ async function loadThreads(parentMessageIds: string[]): Promise<Map<string, Thre
   const { data: participantRows, error: participantError } = await supabase
     .from('thread_participants')
     .select(
-      'thread_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed)',
+      'thread_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed, kind)',
     )
     .in('thread_id', threadIds)
     .is('deleted_at', null);
@@ -914,19 +953,74 @@ export async function fetchLearningSpaces(orgId: string) {
   return data ?? [];
 }
 
-/** Emoji icon for each class icon_key (Lucide icon keys mapped to emoji equivalents). */
-const SPACE_ICON_EMOJI: Record<string, string> = {
-  'square-pi': '📐',
-  languages: '🌐',
-  'chef-hat': '👨‍🍳',
-  earth: '🌍',
-  sparkles: '✨',
-  'book-open': '📖',
-  'flask-conical': '🧪',
-  music: '🎵',
-  palette: '🎨',
-  dumbbell: '🏋️',
-};
+export async function fetchSpaceChannelMetaByChannelId(channelId: string): Promise<{
+  title: string | null;
+  subtitle: string | null;
+  iconKey: string | null;
+  description: string | null;
+} | null> {
+  if (!channelId) return null;
+
+  const { data, error } = await supabase
+    .from('learning_space_channels')
+    .select(
+      `
+      space:learning_spaces!learning_space_id(
+        title,
+        subject,
+        icon_key,
+        description,
+        deleted_at
+      )
+    `,
+    )
+    .eq('channel_id', channelId)
+    .eq('is_primary', true)
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  const space = data?.space as
+    | {
+        title: string | null;
+        subject: string | null;
+        icon_key: string | null;
+        description: string | null;
+        deleted_at: string | null;
+      }
+    | null
+    | undefined;
+
+  if (!space || space.deleted_at) return null;
+
+  return {
+    title: space.title ?? null,
+    subtitle: space.subject ?? null,
+    iconKey: space.icon_key ?? null,
+    description: space.description ?? null,
+  };
+}
+
+export async function fetchSupportChannel(orgId: string): Promise<{
+  id: string;
+  topic: string | null;
+  description: string | null;
+  icon_key?: string | null;
+  updated_at?: string | null;
+} | null> {
+  const { data, error } = await supabase
+    .from('channels')
+    .select('id, topic, description, icon_key, updated_at')
+    .eq('org_id', orgId)
+    .eq('purpose', 'support')
+    .eq('status', 'active')
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data ?? null;
+}
 
 /**
  * Fetches class primary channels for the messages tab, scoped to
@@ -936,8 +1030,9 @@ const SPACE_ICON_EMOJI: Record<string, string> = {
 export async function fetchLearningSpaceChannels(
   orgId: string,
   myProfileId: string,
+  myAccountId: string,
 ): Promise<ChannelListItem[]> {
-  if (!myProfileId) return [];
+  if (!myProfileId || !myAccountId) return [];
 
   // Step 1: get class IDs where the user is a participant
   // Uses learning_space_participants (mirrors web's getLearningSpaceParticipantsByLearningSpaceIds)
@@ -983,6 +1078,75 @@ export async function fetchLearningSpaceChannels(
   const toChannel = (r: Row) =>
     r.channel as unknown as { id: string; org_id: string; updated_at: string } | null;
 
+  const channelIds = (data ?? [])
+    .map((row) => {
+      const channel = toChannel(row);
+      return channel?.id ?? null;
+    })
+    .filter(Boolean) as string[];
+  const learningSpaceIds = (data ?? [])
+    .map((row) => {
+      const space = toSpace(row);
+      return space?.id ?? null;
+    })
+    .filter(Boolean) as string[];
+
+  const { data: readStateRows } = channelIds.length
+    ? await supabase
+        .from('channel_read_state')
+        .select('channel_id, unread_count')
+        .eq('account_id', myAccountId)
+        .in('channel_id', channelIds)
+        .is('deleted_at', null)
+    : { data: [] as Array<{ channel_id: string; unread_count: number | null }> };
+
+  const readStateByChannelId = new Map(
+    (readStateRows ?? []).map((row) => [row.channel_id as string, row.unread_count ?? 0]),
+  );
+
+  const { data: participantRows } = learningSpaceIds.length
+    ? await supabase
+        .from('learning_space_participants')
+        .select(
+          `
+          learning_space_id,
+          profile:profiles!profile_id(display_name, first_name, last_name, kind, ui_theme_key)
+          `,
+        )
+        .eq('org_id', orgId)
+        .in('learning_space_id', learningSpaceIds)
+        .is('deleted_at', null)
+    : {
+        data: [] as Array<{
+          learning_space_id: string;
+          profile: {
+            display_name: string | null;
+            first_name: string | null;
+            last_name: string | null;
+            kind: string | null;
+            ui_theme_key: string | null;
+          } | null;
+        }>,
+      };
+
+  const studentProfilesBySpaceId = new Map<
+    string,
+    Array<{ name: string; themeKey?: string | null }>
+  >();
+  for (const row of participantRows ?? []) {
+    const profile = Array.isArray(row.profile) ? row.profile[0] : row.profile;
+    if (!profile || profile.kind !== 'child') continue;
+    const displayName =
+      profile?.display_name?.trim() ||
+      [profile?.first_name, profile?.last_name].filter(Boolean).join(' ').trim();
+    if (!displayName) continue;
+    const list = studentProfilesBySpaceId.get(row.learning_space_id) ?? [];
+    if (!list.some((item) => item.name === displayName)) {
+      list.push({ name: displayName, themeKey: profile.ui_theme_key ?? null });
+      studentProfilesBySpaceId.set(row.learning_space_id, list);
+    }
+  }
+
   const items = (data ?? [])
     .filter((row) => {
       const sp = toSpace(row);
@@ -1001,21 +1165,69 @@ export async function fetchLearningSpaceChannels(
         description: sp.subject ?? null,
         kind: 'channel' as const,
         updated_at: ch.updated_at,
-        unread_count: 0,
+        unread_count: Math.max(0, readStateByChannelId.get(ch.id) ?? 0),
         last_message_text: null as string | null,
         last_message_at: null as string | null,
         last_message_sender: null as string | null,
-        icon_emoji: SPACE_ICON_EMOJI[sp.icon_key ?? ''] ?? null,
+        icon_key: sp.icon_key ?? null,
         student_name: null,
+        student_profiles: studentProfilesBySpaceId.get(sp.id) ?? [],
+        is_support: false,
       };
     });
 
-  const lastMessages = await fetchLastMessages(items.map((i) => i.id));
+  const supportChannel = await fetchSupportChannel(orgId);
+  const supportItems: ChannelListItem[] = supportChannel
+    ? [
+        {
+          id: supportChannel.id,
+          org_id: orgId,
+          topic: supportChannel.topic ?? 'Support',
+          description: supportChannel.description ?? null,
+          kind: 'channel' as const,
+          updated_at: supportChannel.updated_at ?? new Date(0).toISOString(),
+          unread_count: 0,
+          last_message_text: null,
+          last_message_at: null,
+          last_message_sender: null,
+          icon_key: supportChannel.icon_key ?? 'support',
+          student_name: null,
+          student_profiles: [],
+          is_support: true,
+        },
+      ]
+    : [];
 
-  return items.map((item) => {
+  const allItems = [...items, ...supportItems];
+  const allChannelIds = allItems.map((i) => i.id);
+
+  const supportReadStateRows = supportItems.length
+    ? await supabase
+        .from('channel_read_state')
+        .select('channel_id, unread_count')
+        .eq('account_id', myAccountId)
+        .in(
+          'channel_id',
+          supportItems.map((item) => item.id),
+        )
+        .is('deleted_at', null)
+    : { data: [] as Array<{ channel_id: string; unread_count: number | null }> };
+
+  const mergedReadStateByChannelId = new Map(readStateByChannelId);
+  for (const row of supportReadStateRows.data ?? []) {
+    mergedReadStateByChannelId.set(row.channel_id as string, row.unread_count ?? 0);
+  }
+
+  const lastMessages = await fetchLastMessages(allChannelIds);
+
+  return allItems.map((item) => {
     const last = lastMessages.get(item.id);
     return {
       ...item,
+      unread_count: Math.max(
+        0,
+        mergedReadStateByChannelId.get(item.id) ?? item.unread_count,
+      ),
       last_message_text: last?.text ?? null,
       last_message_at: last?.at ?? null,
       last_message_sender: last?.sender ?? null,
@@ -1839,7 +2051,7 @@ function mapClassScheduleRow(row: Record<string, unknown>): ClassScheduleVM {
   const participants: ClassScheduleParticipantVM[] = (
     (row.participants as Record<string, unknown>[]) ?? []
   ).map((p) => ({
-    ids: { id: p.id as string, orgId },
+    ids: { id: p.profile_id as string, orgId },
     role: p.role as ParticipantRoleVM,
     status: (p.status as ParticipationStatusVM | null) ?? undefined,
     displayName: (p.display_name as string | null) ?? undefined,
@@ -1881,7 +2093,7 @@ const CLASS_SCHEDULE_SELECT = `
   source_related_learning_space_id,
   created_at, created_by, updated_at, updated_by,
   participants:class_schedule_participants(
-    id, org_id, role, status, display_name, avatar_url, theme_key
+    id, org_id, profile_id, role, status, display_name, avatar_url, theme_key
   ),
   recurrence:class_schedule_recurrence(
     id, org_id, frequency, interval, count, until, timezone, byday,

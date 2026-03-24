@@ -28,8 +28,34 @@ function makeStyles(C: AppColors) {
     safe: { flex: 1, backgroundColor: C.bg },
 
     // Header
-    header: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 12 },
+    header: {
+      paddingHorizontal: 20,
+      paddingTop: 18,
+      paddingBottom: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
     title: { fontSize: 30, fontWeight: '800', color: C.text, letterSpacing: -0.5 },
+    markAllBtn: {
+      minHeight: 32,
+      paddingHorizontal: 12,
+      borderRadius: 999,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: C.border,
+      backgroundColor: C.card,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    markAllBtnDisabled: {
+      opacity: 0.45,
+    },
+    markAllBtnText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: C.teal,
+    },
 
     // Full-width underline tab bar (matches web shadcn Tabs)
     tabBar: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: C.border },
@@ -176,6 +202,22 @@ export default function InboxScreen() {
       {} as Record<string, number>,
     );
   }, [feedSections, feedTabs]);
+  const unreadIdsForActiveTab = useMemo(
+    () =>
+      feedSections.flatMap((section) =>
+        section.items
+          .filter(
+            (item) =>
+              (activeTab === 'all' || item.tabKey === activeTab) && !item.state?.isRead,
+          )
+          .map((item) => item.ids.id),
+      ),
+    [activeTab, feedSections],
+  );
+  const handleMarkAllRead = useCallback(() => {
+    if (unreadIdsForActiveTab.length === 0) return;
+    markRead(unreadIdsForActiveTab);
+  }, [markRead, unreadIdsForActiveTab]);
 
   // Filter sections by active tab, drop empty
   const filteredSections = useMemo<FeedSection[]>(() => {
@@ -190,10 +232,22 @@ export default function InboxScreen() {
   }, [feedSections, activeTab]);
 
   return (
-    <SafeAreaView style={s.safe}>
+    <SafeAreaView style={s.safe} edges={['top']}>
       {/* Header */}
       <View style={s.header}>
-        <Text style={s.title}>Inbox</Text>
+        <Text style={s.title}>Notifications</Text>
+        <TouchableOpacity
+          style={[
+            s.markAllBtn,
+            unreadIdsForActiveTab.length === 0 && s.markAllBtnDisabled,
+          ]}
+          onPress={handleMarkAllRead}
+          disabled={unreadIdsForActiveTab.length === 0}
+          activeOpacity={0.8}
+          accessibilityLabel="Mark all notifications as read"
+        >
+          <Text style={s.markAllBtnText}>Mark all read</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Full-width underline tab bar */}
@@ -238,7 +292,7 @@ export default function InboxScreen() {
           sections={filteredSections}
           keyExtractor={(item, index) => item?.ids?.id ?? String(index)}
           stickySectionHeadersEnabled={false}
-          contentContainerStyle={{ paddingTop: 8, paddingBottom: 40 }}
+          contentContainerStyle={{ paddingTop: 8, paddingBottom: 24 }}
           viewabilityConfig={VIEWABILITY_CONFIG}
           onViewableItemsChanged={onViewableItemsChanged}
           refreshControl={

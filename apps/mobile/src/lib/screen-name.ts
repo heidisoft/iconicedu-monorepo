@@ -23,7 +23,7 @@ const ROUTE_NAMES: Record<string, string> = {
   '/(app)/(tabs)': 'Home',
   '/(app)/(tabs)/index': 'Home',
   '/(app)/(tabs)/schedule': 'Schedule',
-  '/(app)/(tabs)/inbox': 'Inbox',
+  '/(app)/(tabs)/inbox': 'Notifications',
   '/(app)/(tabs)/messages': 'Messages',
   '/(app)/(tabs)/account': 'Account',
 

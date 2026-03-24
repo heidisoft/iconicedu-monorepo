@@ -180,7 +180,7 @@ export default function AccountScreen() {
 
   if (accountLoading || profileLoading || refreshing) {
     return (
-      <SafeAreaView style={s.safe}>
+      <SafeAreaView style={s.safe} edges={['top']}>
         <View style={s.header}>
           <Text style={s.pageTitle}>Account</Text>
         </View>
@@ -197,7 +197,7 @@ export default function AccountScreen() {
   };
 
   return (
-    <SafeAreaView style={s.safe}>
+    <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.header}>
         <Text style={s.pageTitle}>Account</Text>
       </View>
@@ -217,7 +217,9 @@ export default function AccountScreen() {
         <View style={s.profileCard}>
           <View style={s.profileRow}>
             {avatarUrl ? (
-              <Image source={{ uri: avatarUrl }} style={s.avatarWrap} />
+              <View style={s.avatarWrap}>
+                <Image source={{ uri: avatarUrl }} style={s.avatarWrap} />
+              </View>
             ) : (
               <View style={[s.avatarWrap, { backgroundColor: avatarBg }]}>
                 <Text style={[s.avatarTxt, { color: avatarFg }]}>{initial}</Text>
@@ -317,7 +319,6 @@ export default function AccountScreen() {
             labelColor={colors.red}
           />
         </View>
-
         <Text style={s.version}>IconicEdu v0.1.0</Text>
       </ScrollView>
     </SafeAreaView>

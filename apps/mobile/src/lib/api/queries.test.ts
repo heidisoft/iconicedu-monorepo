@@ -170,6 +170,7 @@ describe('fetchSpaceSchedulesByChannelId', () => {
         {
           id: 'p-1',
           org_id: ORG_ID,
+          profile_id: 'profile-teacher-1',
           role: 'teacher',
           status: 'accepted',
           display_name: 'Ms Smith',
@@ -179,6 +180,7 @@ describe('fetchSpaceSchedulesByChannelId', () => {
         {
           id: 'p-2',
           org_id: ORG_ID,
+          profile_id: 'profile-student-1',
           role: 'student',
           status: 'pending',
           display_name: 'Jane',
@@ -194,12 +196,12 @@ describe('fetchSpaceSchedulesByChannelId', () => {
 
     expect(result[0]!.participants).toHaveLength(2);
     expect(result[0]!.participants[0]).toMatchObject({
-      ids: { id: 'p-1' },
+      ids: { id: 'profile-teacher-1' },
       role: 'teacher',
       displayName: 'Ms Smith',
     });
     expect(result[0]!.participants[1]).toMatchObject({
-      ids: { id: 'p-2' },
+      ids: { id: 'profile-student-1' },
       role: 'student',
       avatarUrl: 'https://img/a.png',
       themeKey: 'teal',

@@ -47,11 +47,23 @@ import {
   Play,
   Pause,
   Video,
+  BookOpenCheck,
+  CalendarDays,
+  ClipboardList,
+  CreditCard,
+  GraduationCap,
+  Image as ImageIcon,
+  LocateFixed,
+  MessageSquareText,
+  NotebookPen,
+  TrendingUp,
+  Check,
 } from 'lucide-react-native';
 import { AudioPlayer, createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import type { AudioStatus } from 'expo-audio';
 import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '@/lib/supabase/client';
+import { RoleAvatarBadge } from '@/components/profile/role-avatar-badge';
 
 const CHANNEL_FILES_BUCKET = 'channel-files';
 
@@ -115,29 +127,58 @@ function MessageAvatar({
   name,
   src,
   seed,
+  role,
+  size = AVATAR_SIZE,
+  badgeSizeOverride,
 }: {
   name: string;
   src: string | null;
   seed: string;
+  role?: string | null;
+  size?: number;
+  badgeSizeOverride?: number;
 }) {
+  const radius = size / 2;
+  const initialsSize = Math.max(10, Math.round(size * 0.36));
+  const badgeSize = badgeSizeOverride ?? Math.max(10, Math.round(size * 0.42));
+
   if (src) {
     return (
-      <Image source={{ uri: src }} style={avatarStyles.img} accessibilityLabel={name} />
+      <View style={[avatarStyles.wrap, { width: size, height: size }]}>
+        <Image
+          source={{ uri: src }}
+          style={{ width: size, height: size, borderRadius: radius }}
+          accessibilityLabel={name}
+        />
+        <RoleAvatarBadge role={role} size={badgeSize} />
+      </View>
     );
   }
   return (
-    <View style={[avatarStyles.circle, { backgroundColor: avatarBgColor(seed) }]}>
-      <Text style={avatarStyles.initials}>{getInitials(name)}</Text>
+    <View style={[avatarStyles.wrap, { width: size, height: size }]}>
+      <View
+        style={[
+          avatarStyles.circle,
+          {
+            width: size,
+            height: size,
+            borderRadius: radius,
+            backgroundColor: avatarBgColor(seed),
+          },
+        ]}
+      >
+        <Text style={[avatarStyles.initials, { fontSize: initialsSize }]}>
+          {getInitials(name)}
+        </Text>
+      </View>
+      <RoleAvatarBadge role={role} size={badgeSize} />
     </View>
   );
 }
 
 const avatarStyles = StyleSheet.create({
-  img: { width: AVATAR_SIZE, height: AVATAR_SIZE, borderRadius: AVATAR_SIZE / 2 },
+  wrap: { position: 'relative' },
   circle: {
-    width: AVATAR_SIZE,
-    height: AVATAR_SIZE,
-    borderRadius: AVATAR_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -454,6 +495,7 @@ function ThreadPill({
             const name = p.profile.displayName;
             const avatarProfile = p.profile as {
               avatar?: { source?: string; url?: string | null; seed?: string | null };
+              kind?: string | null;
             };
             const src =
               avatarProfile.avatar?.source === 'url'
@@ -464,38 +506,64 @@ function ThreadPill({
                 ? (avatarProfile.avatar.seed ?? p.ids.id)
                 : p.ids.id;
             return src ? (
-              <Image
+              <View
                 key={p.ids.id}
-                source={{ uri: src }}
                 style={{
                   width: 20,
                   height: 20,
-                  borderRadius: 10,
-                  borderWidth: 1.5,
-                  borderColor: colors.pageBg,
                   marginLeft: i > 0 ? -6 : 0,
                   zIndex: participants.length - i,
+                  position: 'relative',
                 }}
-              />
+              >
+                <Image
+                  source={{ uri: src }}
+                  style={{
+                    width: 20,
+                    height: 20,
+                    borderRadius: 10,
+                    borderWidth: 1.5,
+                    borderColor: colors.pageBg,
+                  }}
+                />
+                <RoleAvatarBadge
+                  role={avatarProfile.kind}
+                  size={10}
+                  style={{ top: -2 }}
+                />
+              </View>
             ) : (
               <View
                 key={p.ids.id}
                 style={{
                   width: 20,
                   height: 20,
-                  borderRadius: 10,
-                  backgroundColor: avatarBgColor(seed),
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderWidth: 1.5,
-                  borderColor: colors.pageBg,
                   marginLeft: i > 0 ? -6 : 0,
                   zIndex: participants.length - i,
+                  position: 'relative',
                 }}
               >
-                <Text style={{ color: '#fff', fontSize: 8, fontWeight: '700' }}>
-                  {getInitials(name)[0]}
-                </Text>
+                <View
+                  style={{
+                    width: 20,
+                    height: 20,
+                    borderRadius: 10,
+                    backgroundColor: avatarBgColor(seed),
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderWidth: 1.5,
+                    borderColor: colors.pageBg,
+                  }}
+                >
+                  <Text style={{ color: '#fff', fontSize: 8, fontWeight: '700' }}>
+                    {getInitials(name)[0]}
+                  </Text>
+                </View>
+                <RoleAvatarBadge
+                  role={avatarProfile.kind}
+                  size={10}
+                  style={{ top: -2 }}
+                />
               </View>
             );
           })}
@@ -511,34 +579,21 @@ function InlineReply({ message, colors }: { message: MessageVM; colors: AppColor
   const senderName = message.core.sender.profile.displayName;
   const time = formatTime(message.core.createdAt);
   const { url: src, seed } = getAvatarInfo(message);
+  const senderRole = message.core.sender.kind;
   const text = (message as { content?: { text?: string } }).content?.text ?? '';
   const mentions = (message as { content?: { mentions?: MessageMentionVM[] } }).content
     ?.mentions;
 
   return (
     <View style={{ flexDirection: 'row', gap: 8, paddingVertical: 4 }}>
-      {src ? (
-        <Image
-          source={{ uri: src }}
-          style={{ width: 28, height: 28, borderRadius: 14 }}
-          accessibilityLabel={senderName}
-        />
-      ) : (
-        <View
-          style={{
-            width: 28,
-            height: 28,
-            borderRadius: 14,
-            backgroundColor: avatarBgColor(seed),
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>
-            {getInitials(senderName)}
-          </Text>
-        </View>
-      )}
+      <MessageAvatar
+        name={senderName}
+        src={src}
+        seed={seed}
+        role={senderRole}
+        size={28}
+        badgeSizeOverride={12}
+      />
       <View style={{ flex: 1 }}>
         <View
           style={{
@@ -568,13 +623,13 @@ function InlineReply({ message, colors }: { message: MessageVM; colors: AppColor
 // ─── Card sub-renderers ───────────────────────────────────────────────────────
 
 function CardHeader({
-  emoji,
+  icon: Icon,
   label,
   tag,
   colors,
   s,
 }: {
-  emoji: string;
+  icon: React.ComponentType<{ size?: number; color?: string }>;
   label: string;
   tag?: string;
   colors: AppColors;
@@ -582,7 +637,7 @@ function CardHeader({
 }) {
   return (
     <View style={s.cardHeader}>
-      <Text style={{ fontSize: 16 }}>{emoji}</Text>
+      <Icon size={16} color={colors.teal} />
       <Text style={[s.cardHeaderLabel, { color: colors.teal }]}>{label}</Text>
       {!!tag && (
         <View style={[s.subjectTag, { backgroundColor: colors.tealBg }]}>
@@ -610,7 +665,7 @@ function AssignmentCard({
   return (
     <View style={[s.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
       <CardHeader
-        emoji="📚"
+        icon={BookOpenCheck}
         label="Assignment"
         tag={assignment.subject}
         colors={colors}
@@ -622,11 +677,11 @@ function AssignmentCard({
       </Text>
       <View style={s.cardMeta}>
         <Text style={[s.metaChip, { color: colors.textMuted }]}>
-          📅 Due {formatDate(assignment.dueAt)}
+          Due {formatDate(assignment.dueAt)}
         </Text>
         {!!assignment.estimatedDuration && (
           <Text style={[s.metaChip, { color: colors.textMuted }]}>
-            ⏱ {assignment.estimatedDuration} min
+            {assignment.estimatedDuration} min
           </Text>
         )}
         {!!assignment.difficulty && (
@@ -637,7 +692,7 @@ function AssignmentCard({
       </View>
       {assignment.attachments?.map((att, i) => (
         <View key={i} style={[s.attachRow, { borderColor: colors.border }]}>
-          <Text style={{ fontSize: 14 }}>📎</Text>
+          <FileText size={14} color={colors.textMuted} />
           <Text style={[s.attachName, { color: colors.text }]} numberOfLines={1}>
             {att.name}
           </Text>
@@ -659,7 +714,7 @@ function SessionSummaryCard({
   const { session } = message;
   return (
     <View style={[s.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
-      <CardHeader emoji="📋" label="Session Summary" colors={colors} s={s} />
+      <CardHeader icon={ClipboardList} label="Session Summary" colors={colors} s={s} />
       <Text style={[s.cardTitle, { color: colors.text }]}>{session.title}</Text>
       <Text style={[s.metaChip, { color: colors.textMuted, marginBottom: 4 }]}>
         {formatDate(session.startAt)}
@@ -705,7 +760,7 @@ function ProgressCard({
   return (
     <View style={[s.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
       <CardHeader
-        emoji="📈"
+        icon={TrendingUp}
         label="Progress Update"
         tag={progress.subject}
         colors={colors}
@@ -768,14 +823,17 @@ function EventCard({
   const { event } = message;
   return (
     <View style={[s.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
-      <CardHeader emoji="📅" label="Event Reminder" colors={colors} s={s} />
+      <CardHeader icon={CalendarDays} label="Event Reminder" colors={colors} s={s} />
       <Text style={[s.cardTitle, { color: colors.text }]}>{event.title}</Text>
       <Text style={[s.metaChip, { color: colors.textMuted }]}>
         {formatDate(event.startAt)} · {formatTime(event.startAt)}
         {event.endAt ? ` – ${formatTime(event.endAt)}` : ''}
       </Text>
       {!!event.location && (
-        <Text style={[s.metaChip, { color: colors.textMuted }]}>📍 {event.location}</Text>
+        <View style={s.metaRow}>
+          <LocateFixed size={13} color={colors.textMuted} />
+          <Text style={[s.metaChip, { color: colors.textMuted }]}>{event.location}</Text>
+        </View>
       )}
       {!!event.meetingLink && (
         <TouchableOpacity
@@ -808,13 +866,13 @@ function HomeworkCard({
         ? '#f59e0b'
         : colors.teal;
   const statusLabel = {
-    submitted: '✓ Submitted',
-    graded: '✓ Graded',
-    'needs-revision': '⚠ Needs Revision',
+    submitted: 'Submitted',
+    graded: 'Graded',
+    'needs-revision': 'Needs Revision',
   }[homework.status];
   return (
     <View style={[s.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
-      <CardHeader emoji="📝" label="Homework Submitted" colors={colors} s={s} />
+      <CardHeader icon={NotebookPen} label="Homework Submitted" colors={colors} s={s} />
       <Text style={[s.cardTitle, { color: colors.text }]}>
         {homework.assignmentTitle}
       </Text>
@@ -825,7 +883,11 @@ function HomeworkCard({
       </View>
       {homework.attachments.map((att, i) => (
         <View key={i} style={[s.attachRow, { borderColor: colors.border }]}>
-          <Text style={{ fontSize: 14 }}>{att.type === 'image' ? '🖼' : '📎'}</Text>
+          {att.type === 'image' ? (
+            <ImageIcon size={14} color={colors.textMuted} />
+          ) : (
+            <FileText size={14} color={colors.textMuted} />
+          )}
           <Text style={[s.attachName, { color: colors.text }]} numberOfLines={1}>
             {att.name}
           </Text>
@@ -858,7 +920,7 @@ function FeedbackRequestCard({
   return (
     <View style={[s.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
       <CardHeader
-        emoji="💬"
+        icon={MessageSquareText}
         label="Feedback Request"
         tag={message.feedback?.sessionTitle ?? undefined}
         colors={colors}
@@ -900,15 +962,15 @@ function SessionBookingCard({
       completed: colors.teal,
     }[session.status] ?? colors.textMuted;
   const statusLabel = {
-    scheduled: '📅 Scheduled',
-    confirmed: '✓ Confirmed',
-    cancelled: '✗ Cancelled',
-    completed: '✓ Completed',
+    scheduled: 'Scheduled',
+    confirmed: 'Confirmed',
+    cancelled: 'Cancelled',
+    completed: 'Completed',
   }[session.status];
   return (
     <View style={[s.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
       <CardHeader
-        emoji="🗓"
+        icon={GraduationCap}
         label="Session Booked"
         tag={session.subject}
         colors={colors}
@@ -951,12 +1013,12 @@ function PaymentReminderCard({
   const statusColor =
     { pending: '#f59e0b', paid: '#22c55e', overdue: '#ef4444' }[payment.status] ??
     colors.textMuted;
-  const statusLabel = { pending: '⏳ Pending', paid: '✓ Paid', overdue: '⚠ Overdue' }[
+  const statusLabel = { pending: 'Pending', paid: 'Paid', overdue: 'Overdue' }[
     payment.status
   ];
   return (
     <View style={[s.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
-      <CardHeader emoji="💳" label="Payment Reminder" colors={colors} s={s} />
+      <CardHeader icon={CreditCard} label="Payment Reminder" colors={colors} s={s} />
       <Text style={[s.cardTitle, { color: colors.text }]}>
         {payment.currency} {payment.amount.toLocaleString()}
       </Text>
@@ -996,7 +1058,7 @@ function SessionCompleteBar({
             { backgroundColor: colors.tealBg, borderColor: colors.teal },
           ]}
         >
-          <Text style={{ color: colors.teal, fontSize: 14 }}>✓</Text>
+          <Check size={14} color={colors.teal} />
         </View>
         <Text
           style={[s.sessionCompleteTitle, { color: colors.textMuted }]}
@@ -1303,6 +1365,7 @@ function makeStyles(colors: AppColors) {
     cardTitle: { fontSize: 16, fontWeight: '700', marginBottom: 2 },
     cardDesc: { fontSize: 13, lineHeight: 19 },
     cardMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
+    metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
     metaChip: { fontSize: 12 },
     sectionLabel: { fontSize: 12, fontWeight: '700', marginBottom: 4 },
     listItem: { fontSize: 13, lineHeight: 20 },
@@ -1503,6 +1566,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 
   const senderDisplayName = message.core.sender.profile.displayName;
   const { url: avatarUrl, seed: avatarSeed } = getAvatarInfo(message);
+  const senderRole = message.core.sender.kind;
   const time = formatTime(message.core.createdAt);
   const reactions = message.social?.reactions ?? [];
   const thread = message.social?.thread ?? null;
@@ -2079,7 +2143,12 @@ export const MessageItem: React.FC<MessageItemProps> = ({
       >
         <View style={s.avatarSlot}>
           {isGroupStart && (
-            <MessageAvatar name={senderDisplayName} src={avatarUrl} seed={avatarSeed} />
+            <MessageAvatar
+              name={senderDisplayName}
+              src={avatarUrl}
+              seed={avatarSeed}
+              role={senderRole}
+            />
           )}
         </View>
         <View style={[s.contentCol, isOwn && s.contentColOwn]}>
@@ -2199,7 +2268,12 @@ export const MessageItem: React.FC<MessageItemProps> = ({
       {/* Avatar slot */}
       <View style={s.avatarSlot}>
         {isGroupStart && (
-          <MessageAvatar name={senderDisplayName} src={avatarUrl} seed={avatarSeed} />
+          <MessageAvatar
+            name={senderDisplayName}
+            src={avatarUrl}
+            seed={avatarSeed}
+            role={senderRole}
+          />
         )}
       </View>
 

@@ -9,7 +9,9 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Bell, CircleUserRound, HelpCircle, Lock, Palette } from 'lucide-react-native';
 import { useAuth } from '@/providers/auth-provider';
+import { AppSupportFooter } from '@/components/support/app-support-footer';
 
 const C = {
   bg: '#ffffff',
@@ -25,11 +27,11 @@ const C = {
 };
 
 const settingsItems = [
-  { label: 'Edit Profile', icon: '👤' },
-  { label: 'Notifications', icon: '🔔' },
-  { label: 'Privacy & Security', icon: '🔒' },
-  { label: 'Appearance', icon: '🎨' },
-  { label: 'Help & Support', icon: '❓' },
+  { label: 'Edit Profile', icon: CircleUserRound },
+  { label: 'Notifications', icon: Bell },
+  { label: 'Privacy & Security', icon: Lock },
+  { label: 'Appearance', icon: Palette },
+  { label: 'Help & Support', icon: HelpCircle },
 ];
 
 export default function ProfileScreen() {
@@ -72,7 +74,7 @@ export default function ProfileScreen() {
               <Pressable
                 style={({ pressed }) => [s.row, pressed && { backgroundColor: C.bg2 }]}
               >
-                <Text style={s.rowIcon}>{item.icon}</Text>
+                <item.icon size={18} color={C.gray} />
                 <Text style={s.rowLabel}>{item.label}</Text>
                 <Text style={s.rowChevron}>›</Text>
               </Pressable>
@@ -87,6 +89,7 @@ export default function ProfileScreen() {
         </TouchableOpacity>
 
         <Text style={s.version}>IconicEdu Mobile v0.1.0</Text>
+        <AppSupportFooter />
       </ScrollView>
     </SafeAreaView>
   );
@@ -147,7 +150,6 @@ const s = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
-  rowIcon: { fontSize: 18, width: 28, textAlign: 'center' },
   rowLabel: { flex: 1, fontSize: 15, color: C.dark, fontWeight: '500' },
   rowChevron: { fontSize: 20, color: C.grayLight },
   divider: { height: 1, backgroundColor: C.border, marginLeft: 56 },
