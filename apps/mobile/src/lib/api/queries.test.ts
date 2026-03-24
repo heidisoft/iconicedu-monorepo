@@ -727,6 +727,13 @@ describe('fetchSupervisedDirectMessages', () => {
         error: null,
       }),
     );
+    // child read state
+    mockFrom.mockReturnValueOnce(
+      createIsChain({
+        data: [{ channel_id: SUPERVISED_CH, unread_count: 0 }],
+        error: null,
+      }),
+    );
     // member rows for participant display
     mockFrom.mockReturnValueOnce(
       createIsChain({

@@ -21,7 +21,7 @@ const POSTHOG_HOST: string =
 const ENABLE_SESSION_REPLAY = !!NativeModules.PosthogReactNativeSessionReplay;
 const POSTHOG_DISABLED_LOCALLY =
   // eslint-disable-next-line no-undef
-  typeof __DEV__ !== 'undefined' && __DEV__;
+  typeof __DEV__ !== 'undefined' && __DEV__ && process.env.NODE_ENV !== 'test';
 
 // ─── Vendor-agnostic context ──────────────────────────────────────────────────
 

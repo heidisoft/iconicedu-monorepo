@@ -24,6 +24,9 @@ function getPosthogKey() {
 }
 
 function isLocalWebEnvironment() {
+  if (process.env.NODE_ENV !== 'development') {
+    return false;
+  }
   const hostname = new URL(resolveAppUrl()).hostname;
   return hostname === 'localhost' || hostname === '127.0.0.1';
 }

@@ -99,7 +99,9 @@ export type WebFlagKey = keyof typeof webFlags;
 export function isVercelFlagsSdkConfigured() {
   const appUrl = resolveAppUrl();
   const hostname = new URL(appUrl).hostname;
-  const isLocalHost = hostname === 'localhost' || hostname === '127.0.0.1';
+  const isLocalHost =
+    process.env.NODE_ENV === 'development' &&
+    (hostname === 'localhost' || hostname === '127.0.0.1');
   if (isLocalHost) {
     return false;
   }

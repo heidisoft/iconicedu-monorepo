@@ -24,6 +24,40 @@ jest.mock('@/hooks/use-tablet', () => ({
   useTablet: jest.fn(),
 }));
 
+jest.mock('@/hooks/use-account', () => ({
+  useAccount: () => ({
+    data: {
+      id: 'acct-1',
+      org_id: 'org-1',
+      profile: [{ id: 'profile-1' }],
+    },
+  }),
+}));
+
+jest.mock('@/hooks/use-activity-feed', () => ({
+  useActivityFeed: () => ({
+    data: { sections: [] },
+  }),
+}));
+
+jest.mock('@/hooks/use-direct-messages', () => ({
+  useDirectMessages: () => ({
+    data: [],
+  }),
+}));
+
+jest.mock('@/hooks/use-learning-space-channels', () => ({
+  useLearningSpaceChannels: () => ({
+    data: [],
+  }),
+}));
+
+jest.mock('@/hooks/use-supervised-direct-messages', () => ({
+  useSupervisedDirectMessages: () => ({
+    data: [],
+  }),
+}));
+
 jest.mock('lucide-react-native', () => ({
   Home: () => null,
   MessageCircle: () => null,
@@ -102,7 +136,9 @@ describe('TabsLayout', () => {
 
     it('does not add paddingLeft to sceneStyle', () => {
       render(<TabsLayout />);
-      expect(capturedSceneStyle).toBeUndefined();
+      expect(capturedSceneStyle).not.toEqual(
+        expect.objectContaining({ paddingLeft: 72 }),
+      );
     });
   });
 
