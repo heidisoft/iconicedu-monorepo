@@ -338,7 +338,7 @@ export function ConversationHeader({
           </View>
         ) : (
           <>
-            <Text style={s.title} numberOfLines={1}>
+            <Text style={s.title} numberOfLines={1} ellipsizeMode="tail">
               {secondaryAvatarSeed ? `${secondaryAvatarSeed} <> ${title}` : title}
             </Text>
             {!!(subtitle || localTimeLabel) &&
@@ -351,7 +351,11 @@ export function ConversationHeader({
                   accessibilityLabel="Explain local time"
                 >
                   <View style={s.subtitleRow}>
-                    {!!subtitle && <Text style={s.subtitleText}>{subtitle}</Text>}
+                    {!!subtitle && (
+                      <Text style={s.subtitleText} numberOfLines={1} ellipsizeMode="tail">
+                        {subtitle}
+                      </Text>
+                    )}
                     {!!subtitle && !!localTimeLabel && (
                       <Text style={s.subtitleSeparator}>{'\u00b7'}</Text>
                     )}
@@ -370,7 +374,11 @@ export function ConversationHeader({
                 </TouchableOpacity>
               ) : (
                 <View style={s.subtitleRow}>
-                  {!!subtitle && <Text style={s.subtitleText}>{subtitle}</Text>}
+                  {!!subtitle && (
+                    <Text style={s.subtitleText} numberOfLines={1} ellipsizeMode="tail">
+                      {subtitle}
+                    </Text>
+                  )}
                   {!!subtitle && !!localTimeLabel && (
                     <Text style={s.subtitleSeparator}>{'\u00b7'}</Text>
                   )}
