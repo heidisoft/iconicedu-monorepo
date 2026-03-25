@@ -8,7 +8,6 @@ const {
   getProfilesByAccountId,
   insertProfileForAccount,
   revalidatePath,
-  enablePersonaAddRun,
 } = vi.hoisted(() => ({
   createSupabaseServerClient: vi.fn(),
   requireAuthedUser: vi.fn(),
@@ -17,7 +16,6 @@ const {
   getProfilesByAccountId: vi.fn(),
   insertProfileForAccount: vi.fn(),
   revalidatePath: vi.fn(),
-  enablePersonaAddRun: vi.fn(),
 }));
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
@@ -39,11 +37,6 @@ vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
 vi.mock('next/cache', () => ({
   revalidatePath,
 }));
-vi.mock('@iconicedu/web/flags', () => ({
-  enablePersonaAdd: {
-    run: (...args: unknown[]) => enablePersonaAddRun(...args),
-  },
-}));
 
 import { addPersonaAction } from './add-persona';
 
@@ -60,7 +53,6 @@ describe('addPersonaAction', () => {
     getProfilesByAccountId.mockReset();
     insertProfileForAccount.mockReset();
     revalidatePath.mockReset();
-    enablePersonaAddRun.mockReset();
 
     createSupabaseServerClient.mockResolvedValue({} as never);
     requireAuthedUser.mockResolvedValue({ id: 'auth-1' });
@@ -69,36 +61,7 @@ describe('addPersonaAction', () => {
     });
   });
 
-  it('blocks persona creation when feature flag is disabled', async () => {
-    enablePersonaAddRun.mockResolvedValue(false);
-
-    await expect(
-      addPersonaAction({
-        orgId: 'org-1',
-        orgSlug: 'iconic-academy',
-        kind: 'educator',
-      }),
-    ).rejects.toThrow('Persona add is disabled.');
-  });
-
-  it('does not log debug context when persona add is blocked', async () => {
-    process.env.DEBUG_POSTHOG_FLAGS = 'true';
-    enablePersonaAddRun.mockResolvedValue(false);
-    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined);
-
-    await expect(
-      addPersonaAction({
-        orgId: 'org-1',
-        orgSlug: 'iconic-academy',
-        kind: 'educator',
-      }),
-    ).rejects.toThrow('Persona add is disabled.');
-
-    expect(infoSpy).not.toHaveBeenCalled();
-  });
-
-  it('creates persona profile when flag and role checks pass', async () => {
-    enablePersonaAddRun.mockResolvedValue(true);
+  it('creates persona profile when role checks pass', async () => {
     getUserRoles.mockResolvedValue({ data: [{ role_key: 'educator' }] });
     getProfilesByAccountId.mockResolvedValue({
       data: [
@@ -137,5 +100,41 @@ describe('addPersonaAction', () => {
       }),
     );
     expect(revalidatePath).toHaveBeenCalledWith('/iconic-academy');
+  });
+
+  it('rejects persona creation when the required role is missing', async () => {
+    getUserRoles.mockResolvedValue({ data: [{ role_key: 'guardian' }] });
+
+    await expect(
+      addPersonaAction({
+        orgId: 'org-1',
+        orgSlug: 'iconic-academy',
+        kind: 'educator',
+      }),
+    ).rejects.toThrow('Required role is not assigned for this persona.');
+  });
+
+  it('rejects persona creation when the persona already exists', async () => {
+    getUserRoles.mockResolvedValue({ data: [{ role_key: 'educator' }] });
+    getProfilesByAccountId.mockResolvedValue({
+      data: [
+        {
+          id: 'profile-1',
+          kind: 'guardian',
+        },
+        {
+          id: 'profile-2',
+          kind: 'educator',
+        },
+      ],
+    });
+
+    await expect(
+      addPersonaAction({
+        orgId: 'org-1',
+        orgSlug: 'iconic-academy',
+        kind: 'educator',
+      }),
+    ).rejects.toThrow('Persona already exists for this account.');
   });
 });

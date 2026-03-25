@@ -94,7 +94,7 @@ describe('evaluatePosthogBooleanFlag', () => {
         ok: true,
         json: async () => ({
           featureFlags: {
-            'enable-persona-add': 'variant-a',
+            'enable-message-type-composer': 'variant-a',
           },
         }),
       })),
@@ -102,7 +102,7 @@ describe('evaluatePosthogBooleanFlag', () => {
 
     await expect(
       evaluatePosthogBooleanFlag({
-        flagKey: 'enable-persona-add',
+        flagKey: 'enable-message-type-composer',
         distinctId: 'profile-1',
       }),
     ).resolves.toBe(true);
@@ -117,7 +117,7 @@ describe('evaluatePosthogBooleanFlag', () => {
         ok: true,
         json: async () => ({
           featureFlags: {
-            'enable-persona-add': 0,
+            'enable-message-type-composer': 0,
           },
         }),
       })),
@@ -125,7 +125,7 @@ describe('evaluatePosthogBooleanFlag', () => {
 
     await expect(
       evaluatePosthogBooleanFlag({
-        flagKey: 'enable-persona-add',
+        flagKey: 'enable-message-type-composer',
         distinctId: 'profile-1',
       }),
     ).resolves.toBe(false);
@@ -141,7 +141,7 @@ describe('evaluatePosthogBooleanFlag', () => {
         ok: true,
         json: async () => ({
           featureFlags: {
-            'enable-persona-add': true,
+            'enable-message-type-composer': true,
           },
         }),
       })),
@@ -149,7 +149,7 @@ describe('evaluatePosthogBooleanFlag', () => {
 
     await expect(
       evaluatePosthogBooleanFlag({
-        flagKey: 'enable-persona-add',
+        flagKey: 'enable-message-type-composer',
         distinctId: 'profile-1',
       }),
     ).resolves.toBe(true);
@@ -168,7 +168,7 @@ describe('evaluatePosthogBooleanFlag', () => {
         ok: true,
         json: async () => ({
           featureFlags: {
-            'enable-persona-add': 'variant-a',
+            'enable-message-type-composer': 'variant-a',
           },
         }),
       })),
@@ -176,7 +176,7 @@ describe('evaluatePosthogBooleanFlag', () => {
 
     await expect(
       evaluatePosthogBooleanFlag({
-        flagKey: 'enable-persona-add',
+        flagKey: 'enable-message-type-composer',
         distinctId: 'profile-1',
       }),
     ).resolves.toBe(true);

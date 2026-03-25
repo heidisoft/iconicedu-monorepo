@@ -9,8 +9,6 @@ vi.mock('@iconicedu/web/lib/flags/posthog-flags', () => ({
 import {
   enableChannelCommunications,
   enableMessageTypeComposer,
-  enablePersonaAdd,
-  enablePersonaSwitch,
   getFlagsProviderData,
   isVercelFlagsSdkConfigured,
   webFlags,
@@ -35,18 +33,6 @@ describe('web flags', () => {
     expect(enableMessageTypeComposer.key).toBe('enable-message-type-composer');
     expect(enableMessageTypeComposer.defaultValue).toBe(false);
     expect(webFlags.enableMessageTypeComposer).toBe(enableMessageTypeComposer);
-  });
-
-  it('declares persona switch flag with stable metadata', () => {
-    expect(enablePersonaSwitch.key).toBe('enable-persona-switch');
-    expect(enablePersonaSwitch.defaultValue).toBe(false);
-    expect(webFlags.enablePersonaSwitch).toBe(enablePersonaSwitch);
-  });
-
-  it('declares persona add flag with stable metadata', () => {
-    expect(enablePersonaAdd.key).toBe('enable-persona-add');
-    expect(enablePersonaAdd.defaultValue).toBe(false);
-    expect(webFlags.enablePersonaAdd).toBe(enablePersonaAdd);
   });
 
   it('does not require FLAGS env to load the catalog', () => {
@@ -78,49 +64,11 @@ describe('web flags', () => {
     });
   });
 
-  it('evaluates persona switch via PostHog using profileId', async () => {
-    evaluatePosthogBooleanFlag.mockResolvedValueOnce(true);
-
-    await expect(
-      (
-        enablePersonaSwitch as unknown as {
-          decide: (input: {
-            entities?: { profileId?: string | null };
-          }) => Promise<boolean>;
-        }
-      ).decide({ entities: { profileId: 'profile-42' } }),
-    ).resolves.toBe(true);
-    expect(evaluatePosthogBooleanFlag).toHaveBeenCalledWith({
-      flagKey: 'enable-persona-switch',
-      distinctId: 'profile-42',
-    });
-  });
-
-  it('evaluates persona add via PostHog using profileId', async () => {
-    evaluatePosthogBooleanFlag.mockResolvedValueOnce(false);
-
-    await expect(
-      (
-        enablePersonaAdd as unknown as {
-          decide: (input: {
-            entities?: { profileId?: string | null };
-          }) => Promise<boolean>;
-        }
-      ).decide({ entities: { profileId: 'profile-99' } }),
-    ).resolves.toBe(false);
-    expect(evaluatePosthogBooleanFlag).toHaveBeenCalledWith({
-      flagKey: 'enable-persona-add',
-      distinctId: 'profile-99',
-    });
-  });
-
   it('builds provider data for flag discovery', async () => {
     const providerData = await getFlagsProviderData();
 
     expect(providerData).toBeTruthy();
     expect(JSON.stringify(providerData)).toContain('enable-channel-communications');
     expect(JSON.stringify(providerData)).toContain('enable-message-type-composer');
-    expect(JSON.stringify(providerData)).toContain('enable-persona-switch');
-    expect(JSON.stringify(providerData)).toContain('enable-persona-add');
   });
 });
