@@ -203,6 +203,38 @@ const getOtherParticipant = (participants: UserProfileVM[], currentUserId: strin
   participants.find((participant) => participant.ids.id !== currentUserId) ??
   participants[0];
 
+function formatRelativeLastSeen(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const diffMs = Math.max(0, Date.now() - new Date(iso).getTime());
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return `${weeks}w ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  const years = Math.floor(days / 365);
+  return `${years}y ago`;
+}
+
+function formatLocalTime(timezone: string | null | undefined): string | null {
+  const tz = timezone?.trim();
+  if (!tz) return null;
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZone: tz,
+    }).format(new Date());
+  } catch {
+    return null;
+  }
+}
+
 export const MessagesContainerHeader = memo(function MessagesContainerHeader({
   channel,
 }: MessagesContainerHeaderProps) {
@@ -239,7 +271,6 @@ export const MessagesContainerHeader = memo(function MessagesContainerHeader({
             name={otherParticipantName}
             avatar={otherParticipant.profile.avatar}
             presence={otherParticipant.presence}
-            showStatus={false}
             themeKey={otherParticipant.ui?.themeKey}
             sizeClassName="h-8 w-8"
             initialsLength={1}
@@ -300,14 +331,25 @@ export const MessagesContainerHeader = memo(function MessagesContainerHeader({
     if (channel.basics.kind !== 'dm') {
       return null;
     }
-    const statusText = otherParticipant?.presence?.state?.text?.trim();
-    const statusEmoji = otherParticipant?.presence?.state?.emoji?.trim();
-    const value = [statusEmoji, statusText].filter(Boolean).join(' ').trim();
-    return value || null;
+    const summary =
+      otherParticipant?.presence?.displayStatus === 'online'
+        ? 'Available'
+        : (() => {
+            const relative = formatRelativeLastSeen(
+              otherParticipant?.presence?.lastSeenAt,
+            );
+            return relative ? `Last seen ${relative}` : null;
+          })();
+    const localTime = formatLocalTime(otherParticipant?.prefs?.timezone);
+    if (summary && localTime) {
+      return `${summary} · ${localTime} (Local time)`;
+    }
+    return summary ?? (localTime ? `${localTime} (Local time)` : null);
   }, [
     channel.basics.kind,
-    otherParticipant?.presence?.state?.emoji,
-    otherParticipant?.presence?.state?.text,
+    otherParticipant?.presence?.displayStatus,
+    otherParticipant?.presence?.lastSeenAt,
+    otherParticipant?.prefs?.timezone,
   ]);
 
   return (

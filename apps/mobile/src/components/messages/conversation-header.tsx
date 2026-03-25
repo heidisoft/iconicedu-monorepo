@@ -198,13 +198,12 @@ function makeStyles(C: AppColors) {
     subtitle: { fontSize: 12, color: C.textMuted },
     subtitleRow: {
       flexDirection: 'row',
-      alignItems: 'flex-start',
-      flexWrap: 'wrap',
+      alignItems: 'center',
       gap: 6,
       flexShrink: 1,
       minWidth: 0,
     },
-    subtitleText: { fontSize: 12, color: C.textMuted, flexShrink: 1 },
+    subtitleText: { fontSize: 12, color: C.textMuted, flexShrink: 0 },
     subtitleSeparator: { fontSize: 12, color: C.textMuted },
     localTimeWrap: { flexShrink: 1, minWidth: 0 },
     localTimeText: { fontSize: 12, color: C.textMuted, flexShrink: 1 },
@@ -352,11 +351,7 @@ export function ConversationHeader({
                   accessibilityLabel="Explain local time"
                 >
                   <View style={s.subtitleRow}>
-                    {!!subtitle && (
-                      <Text style={s.subtitleText} numberOfLines={2} ellipsizeMode="tail">
-                        {subtitle}
-                      </Text>
-                    )}
+                    {!!subtitle && <Text style={s.subtitleText}>{subtitle}</Text>}
                     {!!subtitle && !!localTimeLabel && (
                       <Text style={s.subtitleSeparator}>{'\u00b7'}</Text>
                     )}
@@ -364,7 +359,7 @@ export function ConversationHeader({
                       <View style={s.localTimeWrap}>
                         <Text
                           style={s.localTimeText}
-                          numberOfLines={2}
+                          numberOfLines={1}
                           ellipsizeMode="tail"
                         >
                           {localTimeLabel}
@@ -375,11 +370,7 @@ export function ConversationHeader({
                 </TouchableOpacity>
               ) : (
                 <View style={s.subtitleRow}>
-                  {!!subtitle && (
-                    <Text style={s.subtitleText} numberOfLines={2} ellipsizeMode="tail">
-                      {subtitle}
-                    </Text>
-                  )}
+                  {!!subtitle && <Text style={s.subtitleText}>{subtitle}</Text>}
                   {!!subtitle && !!localTimeLabel && (
                     <Text style={s.subtitleSeparator}>{'\u00b7'}</Text>
                   )}
@@ -387,7 +378,7 @@ export function ConversationHeader({
                     <View style={s.localTimeWrap}>
                       <Text
                         style={s.localTimeText}
-                        numberOfLines={2}
+                        numberOfLines={1}
                         ellipsizeMode="tail"
                       >
                         {localTimeLabel}

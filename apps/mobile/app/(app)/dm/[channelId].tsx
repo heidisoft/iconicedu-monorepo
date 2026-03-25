@@ -125,7 +125,12 @@ export default function DmConversationScreen() {
         }
         return `Last seen ${relative}`;
       })();
-  const headerLocalTime = isSupervised ? null : localTimeText(avatarTimezone);
+  const headerLocalTime = isSupervised
+    ? null
+    : (() => {
+        const timeText = localTimeText(avatarTimezone);
+        return timeText ? `${timeText} (Local time)` : null;
+      })();
 
   const handleSubtitlePress = useCallback(() => {
     const tz = avatarTimezone?.trim();
