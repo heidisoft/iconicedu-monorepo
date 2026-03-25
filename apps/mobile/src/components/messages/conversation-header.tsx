@@ -1,13 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Linking, Image } from 'react-native';
-import {
-  ChevronLeft,
-  Video,
-  MoreVertical,
-  Clock3,
-  Minus,
-  CircleOff,
-} from 'lucide-react-native';
+import { ChevronLeft, Video, MoreVertical } from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 import { getLearningSpaceIcon } from '@/lib/learning-space-icons';
@@ -240,24 +233,12 @@ export function ConversationHeader({
       return <View style={s.onlineDot} />;
     }
     if (presenceStatus === 'away' || presenceStatus === 'idle') {
-      return (
-        <View style={[s.statusBadge, { backgroundColor: '#eab308' }]}>
-          <Clock3 size={7} color="#ffffff" strokeWidth={2.6} />
-        </View>
-      );
+      return <View style={[s.statusBadge, { backgroundColor: '#eab308' }]} />;
     }
     if (presenceStatus === 'busy') {
-      return (
-        <View style={[s.statusBadge, { backgroundColor: '#dc2626' }]}>
-          <Minus size={8} color="#ffffff" strokeWidth={3} />
-        </View>
-      );
+      return <View style={[s.statusBadge, { backgroundColor: '#dc2626' }]} />;
     }
-    return (
-      <View style={[s.statusBadge, { backgroundColor: '#4b5563' }]}>
-        <CircleOff size={7} color="#ffffff" strokeWidth={2.4} />
-      </View>
-    );
+    return <View style={[s.statusBadge, { backgroundColor: '#4b5563' }]} />;
   }, [isReadOnly, presenceStatus, s]);
 
   return (

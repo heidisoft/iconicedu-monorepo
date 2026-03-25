@@ -407,15 +407,12 @@ function SocialBar({
                 expanded={threadExpanded}
               />
             ) : (
-              <TouchableOpacity
-                onPress={disabledActions ? undefined : onThreadPress}
-                activeOpacity={disabledActions ? 1 : 0.7}
-                style={[actionBtnStyle, disabledActions && { opacity: 0.4 }]}
-                accessibilityLabel="Reply in thread"
-                accessibilityState={{ disabled: disabledActions ?? false }}
-              >
-                <CornerUpLeft size={15} color={colors.textMuted} />
-              </TouchableOpacity>
+              <ThreadReplyButton
+                colors={colors}
+                onPress={onThreadPress}
+                disabled={disabledActions ?? false}
+                inline
+              />
             )}
           </>
         )}
@@ -617,6 +614,46 @@ function InlineReply({ message, colors }: { message: MessageVM; colors: AppColor
         />
       </View>
     </View>
+  );
+}
+
+function ThreadReplyButton({
+  colors,
+  onPress,
+  disabled,
+  inline = false,
+}: {
+  colors: AppColors;
+  onPress?: () => void;
+  disabled?: boolean;
+  inline?: boolean;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={disabled ? undefined : onPress}
+      activeOpacity={disabled ? 1 : 0.75}
+      accessibilityLabel="Reply to thread"
+      accessibilityState={{ disabled: disabled ?? false }}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: inline ? 'auto' : 'flex-start',
+        gap: 6,
+        marginTop: inline ? 0 : 8,
+        paddingHorizontal: 10,
+        paddingVertical: inline ? 6 : 7,
+        borderRadius: 18,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: colors.border,
+        backgroundColor: colors.card,
+        opacity: disabled ? 0.45 : 1,
+      }}
+    >
+      <CornerUpLeft size={14} color={colors.textMuted} />
+      <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textMuted }}>
+        Reply
+      </Text>
+    </TouchableOpacity>
   );
 }
 
@@ -1684,6 +1721,10 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     }
   }, [thread, threadExpanded, message, onThreadOpen, currentProfileId, currentAccountId]);
 
+  const handleThreadReplyPress = useCallback(() => {
+    onThreadOpen?.(message);
+  }, [message, onThreadOpen]);
+
   // session-complete: full-width centred divider, no bubble
   if (type === 'session-complete') {
     return (
@@ -2245,9 +2286,16 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                     <ActivityIndicator size="small" color={colors.teal} />
                   </View>
                 ) : (
-                  threadReplies.map((reply) => (
-                    <InlineReply key={reply.ids.id} message={reply} colors={colors} />
-                  ))
+                  <>
+                    {threadReplies.map((reply) => (
+                      <InlineReply key={reply.ids.id} message={reply} colors={colors} />
+                    ))}
+                    <ThreadReplyButton
+                      colors={colors}
+                      onPress={handleThreadReplyPress}
+                      disabled={isReadOnly ?? false}
+                    />
+                  </>
                 )}
               </View>
             </View>
@@ -2328,9 +2376,16 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                   <ActivityIndicator size="small" color={colors.teal} />
                 </View>
               ) : (
-                threadReplies.map((reply) => (
-                  <InlineReply key={reply.ids.id} message={reply} colors={colors} />
-                ))
+                <>
+                  {threadReplies.map((reply) => (
+                    <InlineReply key={reply.ids.id} message={reply} colors={colors} />
+                  ))}
+                  <ThreadReplyButton
+                    colors={colors}
+                    onPress={handleThreadReplyPress}
+                    disabled={isReadOnly ?? false}
+                  />
+                </>
               )}
             </View>
           </View>

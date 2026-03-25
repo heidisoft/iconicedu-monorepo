@@ -116,15 +116,68 @@ export async function fetchProfile(profileId: string) {
 
 /** Fetch the profile belonging to a given account (profiles.account_id → accounts.id). */
 export async function fetchProfileByAccountId(accountId: string) {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('account_id', accountId)
+  const { data: account, error: accountError } = await supabase
+    .from('accounts')
+    .select('id, org_id, active_profile_id')
+    .eq('id', accountId)
     .is('deleted_at', null)
     .maybeSingle();
 
-  if (error) throw error;
-  return data ?? null;
+  if (accountError) throw accountError;
+
+  if (account?.active_profile_id) {
+    const { data: activeProfile, error: activeProfileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', account.active_profile_id)
+      .eq('account_id', accountId)
+      .eq('org_id', account.org_id)
+      .is('deleted_at', null)
+      .maybeSingle();
+
+    if (activeProfileError) throw activeProfileError;
+    if (activeProfile) {
+      return activeProfile;
+    }
+  }
+
+  let fallbackQuery = supabase
+    .from('profiles')
+    .select('*')
+    .eq('account_id', accountId)
+    .is('deleted_at', null);
+
+  if (account?.org_id) {
+    fallbackQuery = fallbackQuery.eq('org_id', account.org_id);
+  }
+
+  const { data: fallbackProfile, error: fallbackError } = await fallbackQuery
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (fallbackError) throw fallbackError;
+
+  if (
+    fallbackProfile &&
+    account?.id &&
+    account.active_profile_id !== fallbackProfile.id
+  ) {
+    const { error: healError } = await supabase
+      .from('accounts')
+      .update({ active_profile_id: fallbackProfile.id })
+      .eq('id', account.id)
+      .is('deleted_at', null);
+
+    if (healError) {
+      console.warn(
+        '[fetchProfileByAccountId] failed to heal active_profile_id:',
+        healError,
+      );
+    }
+  }
+
+  return fallbackProfile ?? null;
 }
 
 export type DmParticipant = {
@@ -134,6 +187,7 @@ export type DmParticipant = {
   last_name: string | null;
   avatar_url: string | null;
   avatar_seed: string | null;
+  timezone?: string | null;
   kind?: string | null;
 };
 
@@ -203,7 +257,7 @@ export async function fetchDirectMessages(
   const { data: memberRows } = await supabase
     .from('channel_members')
     .select(
-      'channel_id, profile_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed, kind)',
+      'channel_id, profile_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed, timezone, kind)',
     )
     .in(
       'channel_id',
@@ -353,7 +407,7 @@ export async function fetchSupervisedDirectMessages(
     const { data: memberRows } = await supabase
       .from('channel_members')
       .select(
-        'channel_id, profile_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed, kind)',
+        'channel_id, profile_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed, timezone, kind)',
       )
       .in(
         'channel_id',
@@ -1643,139 +1697,42 @@ export async function sendTextMessage(
   threadParentId?: string,
   threadId?: string, // threads.id — set when replying to existing thread
 ) {
-  const now = new Date().toISOString();
-  let resolvedThreadId = threadId;
-
-  // ── Thread lifecycle (replies only) ──────────────────────────────────────
-  if (threadParentId) {
-    if (!resolvedThreadId) {
-      // ─ New thread: fetch parent message context, then create threads row ─
-      const [{ data: parentMsg }, { data: parentText }] = await Promise.all([
-        supabase
-          .from('messages')
-          .select(
-            'sender_profile_id, sender:profiles!sender_profile_id(display_name, first_name, last_name)',
-          )
-          .eq('id', threadParentId)
-          .maybeSingle(),
-        supabase
-          .from('message_text')
-          .select('payload')
-          .eq('message_id', threadParentId)
-          .maybeSingle(),
-      ]);
-
-      type ParentSenderShape = {
-        display_name: string | null;
-        first_name: string | null;
-        last_name: string | null;
-      };
-      const parentSenderProfileId =
-        (parentMsg as { sender_profile_id?: string } | null)?.sender_profile_id ?? null;
-      const parentSender =
-        (parentMsg as { sender?: ParentSenderShape } | null)?.sender ?? null;
-      const authorName =
-        parentSender?.display_name?.trim() ||
-        [parentSender?.first_name, parentSender?.last_name].filter(Boolean).join(' ') ||
-        null;
-      // Use parent message text as snippet (thread context); fall back to reply text
-      const snippet =
-        (
-          (parentText?.payload as Record<string, unknown> | null)?.text as
-            | string
-            | undefined
-        )?.slice(0, 100) ?? text.slice(0, 100);
-
-      // Create the threads row (mirrors web's sendTextMessageAction)
-      const { data: newThread, error: threadError } = await supabase
-        .from('threads')
-        .insert({
-          org_id: orgId,
-          channel_id: channelId,
-          parent_message_id: threadParentId,
-          snippet,
-          author_id: parentSenderProfileId,
-          author_name: authorName,
-          message_count: 1,
-          last_reply_at: now,
-        })
-        .select('id')
-        .single();
-
-      if (threadError) throw threadError;
-      resolvedThreadId = newThread.id;
-
-      // Update parent message thread_id FK so loadThreads can find it
-      await supabase
-        .from('messages')
-        .update({ thread_id: resolvedThreadId })
-        .eq('id', threadParentId);
-
-      // Add participants: parent author + reply sender (deduped)
-      const participantIds = Array.from(
-        new Set([
-          senderProfileId,
-          ...(parentSenderProfileId ? [parentSenderProfileId] : []),
-        ]),
-      );
-      await supabase.from('thread_participants').upsert(
-        participantIds.map((profileId) => ({
-          thread_id: resolvedThreadId!,
-          org_id: orgId,
-          profile_id: profileId,
-        })),
-        { ignoreDuplicates: true },
-      );
-    } else {
-      // ─ Existing thread: increment message_count, update last_reply_at, upsert participant ─
-      const { data: threadRow } = await supabase
-        .from('threads')
-        .select('message_count')
-        .eq('id', resolvedThreadId)
-        .single();
-
-      await supabase
-        .from('threads')
-        .update({
-          message_count: (threadRow?.message_count ?? 0) + 1,
-          last_reply_at: now,
-        })
-        .eq('id', resolvedThreadId);
-
-      await supabase
-        .from('thread_participants')
-        .upsert(
-          [{ thread_id: resolvedThreadId, org_id: orgId, profile_id: senderProfileId }],
-          { ignoreDuplicates: true },
-        );
-    }
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const accessToken = session?.access_token?.trim();
+  if (!accessToken) {
+    throw new Error('Not authenticated');
   }
 
-  // ── Insert the message row ───────────────────────────────────────────────
-  const { data: msg, error: msgError } = await supabase
-    .from('messages')
-    .insert({
-      channel_id: channelId,
-      sender_profile_id: senderProfileId,
-      org_id: orgId,
-      type: 'text',
-      thread_parent_id: threadParentId ?? null,
-      ...(resolvedThreadId ? { thread_id: resolvedThreadId } : {}),
-    })
-    .select('id')
-    .single();
+  const apiBaseUrl = process.env.EXPO_PUBLIC_API_URL?.trim() || 'http://localhost:3000';
 
-  if (msgError) throw msgError;
-
-  // ── Insert the text payload ──────────────────────────────────────────────
-  const { error: textError } = await supabase.from('message_text').insert({
-    message_id: msg.id,
-    org_id: orgId,
-    payload: { text },
+  const response = await fetch(`${apiBaseUrl.replace(/\/+$/g, '')}/messages/text`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      orgId,
+      channelId,
+      senderProfileId,
+      content: text,
+      threadParentId: threadParentId ?? null,
+      threadId: threadId ?? null,
+    }),
   });
 
-  if (textError) throw textError;
-  return msg;
+  const body = (await response.json().catch(() => null)) as {
+    message?: string;
+    id?: string;
+  } | null;
+
+  if (!response.ok) {
+    throw new Error(body?.message ?? 'Unable to send message.');
+  }
+
+  return body;
 }
 
 // ─── File / Image / Audio upload + message creation ───────────────────────────

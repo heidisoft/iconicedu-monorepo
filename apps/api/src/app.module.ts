@@ -5,6 +5,7 @@ import { AuthModule } from '@iconicedu/api/modules/auth/auth.module';
 import { UsersModule } from '@iconicedu/api/modules/users/users.module';
 import { ChannelsModule } from '@iconicedu/api/modules/channels/channels.module';
 import { ClassesModule } from '@iconicedu/api/modules/classes/classes.module';
+import { MessagesModule } from '@iconicedu/api/modules/messages/messages.module';
 import { RemindersModule } from '@iconicedu/api/modules/reminders/reminders.module';
 import { AnalyticsModule } from '@iconicedu/api/analytics/analytics.module';
 
@@ -17,6 +18,7 @@ import { AnalyticsModule } from '@iconicedu/api/analytics/analytics.module';
     UsersModule,
     ChannelsModule,
     ClassesModule,
+    MessagesModule,
     RemindersModule,
   ],
 })

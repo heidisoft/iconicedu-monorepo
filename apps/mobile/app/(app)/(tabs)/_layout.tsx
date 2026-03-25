@@ -7,6 +7,7 @@ import { useTheme } from '@/providers/theme-provider';
 import { useTablet } from '@/hooks/use-tablet';
 import { useActivityFeed } from '@/hooks/use-activity-feed';
 import { useAccount } from '@/hooks/use-account';
+import { useProfile } from '@/hooks/use-profile';
 import { useDirectMessages } from '@/hooks/use-direct-messages';
 import { useLearningSpaceChannels } from '@/hooks/use-learning-space-channels';
 import { useSupervisedDirectMessages } from '@/hooks/use-supervised-direct-messages';
@@ -119,14 +120,13 @@ export default function TabsLayout() {
   const insets = useSafeAreaInsets();
   const isTablet = useTablet();
   const { data: account } = useAccount();
+  const { data: profile } = useProfile();
   const { data: feed } = useActivityFeed();
   const orgId = account?.org_id ?? '';
   const accountId =
     ((account as Record<string, unknown> | undefined)?.id as string) ?? '';
-  const profileArr = (account as Record<string, unknown> | undefined)?.profile as Array<{
-    id: string;
-  }> | null;
-  const profileId = profileArr?.[0]?.id ?? '';
+  const profileId =
+    ((profile as Record<string, unknown> | undefined)?.id as string | undefined) ?? '';
   const { data: dms } = useDirectMessages(orgId, profileId, accountId);
   const { data: channels } = useLearningSpaceChannels(orgId, profileId, accountId);
   const { data: supervisedDms } = useSupervisedDirectMessages(

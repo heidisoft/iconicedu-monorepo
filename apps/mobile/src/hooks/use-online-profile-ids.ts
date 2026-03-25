@@ -14,6 +14,11 @@ type PresenceRow = {
   deleted_at?: string | null;
 };
 
+export type PresenceSummary = {
+  status: PresenceDisplayStatus | null;
+  lastSeenAt: string | null;
+};
+
 type PresenceMeta = {
   profile_id?: string;
 };
@@ -263,4 +268,82 @@ export function useOnlineProfileIds(
   }, [orgId, stableProfileIds, stableProfileIdsKey, stableProfileIdSet]);
 
   return presenceByProfileId;
+}
+
+export function useProfilePresenceSummary(orgId: string, profileId: string) {
+  const [summary, setSummary] = useState<PresenceSummary>({
+    status: null,
+    lastSeenAt: null,
+  });
+
+  useEffect(() => {
+    if (!orgId || !profileId) {
+      setSummary({ status: null, lastSeenAt: null });
+      return;
+    }
+
+    let cancelled = false;
+    let dbRow: PresenceRow | null = null;
+    let realtimeOnline = false;
+
+    const syncSummary = () => {
+      if (cancelled) return;
+      const dbStatus = getPresenceDisplayStatus(dbRow);
+      setSummary({
+        status: realtimeOnline ? (dbStatus === 'busy' ? 'busy' : 'online') : dbStatus,
+        lastSeenAt: dbRow?.last_seen_at ?? null,
+      });
+    };
+
+    void supabase
+      .from('profile_presence')
+      .select('profile_id, live_status, display_status, last_seen_at, deleted_at')
+      .eq('org_id', orgId)
+      .eq('profile_id', profileId)
+      .is('deleted_at', null)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (cancelled || error) return;
+        dbRow = (data as PresenceRow | null) ?? null;
+        syncSummary();
+      });
+
+    const unsubscribeRealtimePresence = subscribeToOrgRealtimePresence(
+      orgId,
+      (onlineIds) => {
+        realtimeOnline = onlineIds.has(profileId);
+        syncSummary();
+      },
+    );
+
+    const channel = supabase.channel(`profile-presence-summary:${orgId}:${profileId}`);
+    channel.on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'profile_presence',
+        filter: `org_id=eq.${orgId}`,
+      },
+      (payload) => {
+        const row =
+          payload.eventType === 'DELETE'
+            ? ((payload.old as PresenceRow | null) ?? null)
+            : ((payload.new as PresenceRow | null) ?? null);
+        if (row?.profile_id !== profileId) return;
+        dbRow = payload.eventType === 'DELETE' ? null : row;
+        syncSummary();
+      },
+    );
+
+    channel.subscribe();
+
+    return () => {
+      cancelled = true;
+      unsubscribeRealtimePresence();
+      supabase.removeChannel(channel);
+    };
+  }, [orgId, profileId]);
+
+  return summary;
 }

@@ -5,10 +5,14 @@ import { useIsFocused } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { MessageVM } from '@iconicedu/shared-types';
 import { useAccount } from '@/hooks/use-account';
+import { useProfile } from '@/hooks/use-profile';
 import { useMessages } from '@/hooks/use-messages';
 import { sendTextMessage, deleteMessage, markChannelReadState } from '@/lib/api/queries';
 import { useTheme } from '@/providers/theme-provider';
-import { useOnlineProfileIds } from '@/hooks/use-online-profile-ids';
+import {
+  useOnlineProfileIds,
+  useProfilePresenceSummary,
+} from '@/hooks/use-online-profile-ids';
 import { MessageList } from '@/components/messages/message-list';
 import { MessageInput } from '@/components/messages/message-input';
 import { TypingIndicator } from '@/components/messages/typing-indicator';
@@ -24,6 +28,7 @@ export default function DmConversationScreen() {
     avatarSeed,
     avatarUrl,
     avatarRole,
+    avatarTimezone,
     subtitle,
     isSupervisedReadOnly,
     supervisedChildName,
@@ -34,6 +39,7 @@ export default function DmConversationScreen() {
     avatarSeed?: string;
     avatarUrl?: string;
     avatarRole?: string;
+    avatarTimezone?: string;
     subtitle?: string;
     isSupervisedReadOnly?: string;
     supervisedChildName?: string;
@@ -41,28 +47,21 @@ export default function DmConversationScreen() {
   }>();
 
   const isSupervised = isSupervisedReadOnly === '1';
-  const headerSubtitle = isSupervised
-    ? supervisedChildName
-      ? `Supervising ${supervisedChildName}'s conversation`
-      : 'Supervised Inbox'
-    : (subtitle ?? 'Direct Message');
   const router = useRouter();
   const isFocused = useIsFocused();
   const { data: account } = useAccount();
+  const { data: profile } = useProfile();
   const { colors } = useTheme();
 
   const orgId = account?.org_id ?? '';
   const accountId =
     ((account as Record<string, unknown> | undefined)?.id as string) ?? '';
-  // Profile is joined in fetchUserAccount — no extra round-trip needed
-  const profileArr = (account as Record<string, unknown> | undefined)?.profile as Array<{
-    id: string;
-    display_name: string | null;
-    first_name: string | null;
-  }> | null;
-  const profileId = profileArr?.[0]?.id ?? '';
+  const profileRecord = (profile as Record<string, unknown> | undefined) ?? undefined;
+  const profileId = (profileRecord?.id as string | undefined) ?? '';
   const senderName =
-    profileArr?.[0]?.display_name?.trim() || profileArr?.[0]?.first_name?.trim() || 'Me';
+    (profileRecord?.display_name as string | undefined)?.trim() ||
+    (profileRecord?.first_name as string | undefined)?.trim() ||
+    'Me';
   const presenceByProfileId = useOnlineProfileIds(
     orgId,
     profileId,
@@ -71,6 +70,54 @@ export default function DmConversationScreen() {
   const headerPresenceStatus = avatarSeed
     ? (presenceByProfileId.get(avatarSeed) ?? null)
     : null;
+  const headerPresenceSummary = useProfilePresenceSummary(orgId, avatarSeed ?? '');
+
+  const formatRelativeLastSeen = useCallback((iso: string | null) => {
+    if (!iso) return null;
+    const diffMs = Math.max(0, Date.now() - new Date(iso).getTime());
+    const minutes = Math.floor(diffMs / 60000);
+    if (minutes < 1) return 'just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days}d ago`;
+    const weeks = Math.floor(days / 7);
+    if (weeks < 5) return `${weeks}w ago`;
+    const months = Math.floor(days / 30);
+    if (months < 12) return `${months}mo ago`;
+    const years = Math.floor(days / 365);
+    return `${years}y ago`;
+  }, []);
+
+  const localTimeText = useCallback((timezone: string | undefined) => {
+    const tz = timezone?.trim();
+    if (!tz) return null;
+    try {
+      return new Intl.DateTimeFormat(undefined, {
+        hour: 'numeric',
+        minute: '2-digit',
+        timeZone: tz,
+      }).format(new Date());
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const headerSubtitle = isSupervised
+    ? supervisedChildName
+      ? `Supervising ${supervisedChildName}'s conversation`
+      : 'Supervised Inbox'
+    : headerPresenceSummary.status === 'online'
+      ? 'Available'
+      : (() => {
+          const relative = formatRelativeLastSeen(headerPresenceSummary.lastSeenAt);
+          if (!relative) return subtitle ?? 'Direct Message';
+          const localTime = localTimeText(avatarTimezone);
+          return localTime
+            ? `Last seen ${relative} · ${localTime}`
+            : `Last seen ${relative}`;
+        })();
 
   const {
     data: messages,

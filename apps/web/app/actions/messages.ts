@@ -10,6 +10,7 @@ import type {
   MessageToggleReactionInput,
   MessageVM,
 } from '@iconicedu/shared-types';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
@@ -80,7 +81,7 @@ type VisibilityAudienceResolution = {
 };
 
 async function resolveEffectiveMessageActor(input: {
-  supabase: SupabaseServerClient;
+  supabase: SupabaseClient;
   authUserId: string;
   orgId: string;
 }) {
@@ -1215,19 +1216,23 @@ async function resolveDmActivityRecipientProfileIds(input: {
   return decision.emittedProfileIds;
 }
 
-export async function sendTextMessageAction(
+export async function sendTextMessageWithSupabase(
   input: MessageSendTextInput,
+  deps: {
+    supabase: SupabaseClient;
+    serviceSupabase: SupabaseServiceClient;
+    authUserId: string;
+  },
 ): Promise<MessageVM> {
-  const supabase = await createSupabaseServerClient();
-  const authUser = await requireAuthedUser(supabase);
+  const supabase = deps.supabase;
   const actor = await resolveEffectiveMessageActor({
     supabase,
-    authUserId: authUser.id,
+    authUserId: deps.authUserId,
     orgId: input.orgId,
   });
   const accountOrgId = actor.account.org_id;
   const currentProfileId = actor.profile.id;
-  const serviceSupabase = createSupabaseServiceClient();
+  const serviceSupabase = deps.serviceSupabase;
 
   if (input.senderProfileId !== currentProfileId) {
     throw new Error('Invalid sender');
@@ -1578,6 +1583,20 @@ export async function sendTextMessageAction(
           },
     reactions: [],
     thread: thread ?? undefined,
+  });
+}
+
+export async function sendTextMessageAction(
+  input: MessageSendTextInput,
+): Promise<MessageVM> {
+  const supabase = await createSupabaseServerClient();
+  const authUser = await requireAuthedUser(supabase);
+  const serviceSupabase = createSupabaseServiceClient();
+
+  return sendTextMessageWithSupabase(input, {
+    supabase,
+    serviceSupabase,
+    authUserId: authUser.id,
   });
 }
 

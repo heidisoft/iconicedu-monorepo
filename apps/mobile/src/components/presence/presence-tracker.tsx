@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 import { supabase } from '@/lib/supabase/client';
 import { useAccount } from '@/hooks/use-account';
+import { useProfile } from '@/hooks/use-profile';
 
 type PresenceConnectionStatus = 'online' | 'away' | 'offline';
 
@@ -21,17 +22,14 @@ function mapConnectionStatusToDisplayStatus(status: PresenceConnectionStatus) {
 
 export function PresenceTracker() {
   const { data: account } = useAccount();
+  const { data: profile } = useProfile();
   const previousState = useRef<AppStateStatus>(AppState.currentState);
   const lastPublishedStatusRef = useRef<PresenceConnectionStatus | null>(null);
   const lastHeartbeatAtRef = useRef(0);
 
   const orgId = account?.org_id ?? '';
   const profileId =
-    (
-      (account as Record<string, unknown> | undefined)?.profile as Array<{
-        id: string;
-      }> | null
-    )?.[0]?.id ?? '';
+    ((profile as Record<string, unknown> | undefined)?.id as string | undefined) ?? '';
 
   useEffect(() => {
     if (!orgId || !profileId) return;

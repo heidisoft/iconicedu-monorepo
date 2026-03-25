@@ -7,9 +7,14 @@ export function useProfile() {
   const accountId = (account as Record<string, unknown> | undefined)?.id as
     | string
     | undefined;
+  const activeProfileId = (account as Record<string, unknown> | undefined)
+    ?.active_profile_id as string | null | undefined;
+  const orgId = (account as Record<string, unknown> | undefined)?.org_id as
+    | string
+    | undefined;
 
   return useQuery({
-    queryKey: ['profile-by-account', accountId],
+    queryKey: ['profile-by-account', accountId, orgId, activeProfileId],
     queryFn: () => fetchProfileByAccountId(accountId!),
     enabled: !!accountId,
   });

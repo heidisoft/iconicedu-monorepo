@@ -12,15 +12,9 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import {
-  BookOpenCheck,
-  ChevronRight,
-  CircleOff,
-  Clock3,
-  MessageSquare,
-  Minus,
-} from 'lucide-react-native';
+import { BookOpenCheck, ChevronRight, MessageSquare } from 'lucide-react-native';
 import { useAccount } from '@/hooks/use-account';
+import { useProfile } from '@/hooks/use-profile';
 import { useDirectMessages } from '@/hooks/use-direct-messages';
 import { useLearningSpaceChannels } from '@/hooks/use-learning-space-channels';
 import {
@@ -357,26 +351,14 @@ function PresenceBadge({
   }
 
   if (status === 'away' || status === 'idle') {
-    return (
-      <View style={[s.statusBadge, { backgroundColor: '#eab308' }]}>
-        <Clock3 size={7} color="#ffffff" strokeWidth={2.6} />
-      </View>
-    );
+    return <View style={[s.statusBadge, { backgroundColor: '#eab308' }]} />;
   }
 
   if (status === 'busy') {
-    return (
-      <View style={[s.statusBadge, { backgroundColor: '#dc2626' }]}>
-        <Minus size={8} color="#ffffff" strokeWidth={3} />
-      </View>
-    );
+    return <View style={[s.statusBadge, { backgroundColor: '#dc2626' }]} />;
   }
 
-  return (
-    <View style={[s.statusBadge, { backgroundColor: '#4b5563' }]}>
-      <CircleOff size={7} color="#ffffff" strokeWidth={2.4} />
-    </View>
-  );
+  return <View style={[s.statusBadge, { backgroundColor: '#4b5563' }]} />;
 }
 
 // ─── DM avatar ────────────────────────────────────────────────────────────────
@@ -635,6 +617,7 @@ export default function MessagesScreen() {
   }, [resolvedTab]);
 
   const { data: account, isPending: accountLoading } = useAccount();
+  const { data: profile } = useProfile();
   const { colors } = useTheme();
   const router = useRouter();
   const s = useMemo(() => makeStyles(colors), [colors]);
@@ -642,13 +625,8 @@ export default function MessagesScreen() {
   const orgId = account?.org_id ?? '';
   const accountId =
     ((account as Record<string, unknown> | undefined)?.id as string) ?? '';
-  // Profile ID comes from the account query (profile joined in fetchUserAccount)
   const myProfileId =
-    (
-      (account as Record<string, unknown> | undefined)?.profile as Array<{
-        id: string;
-      }> | null
-    )?.[0]?.id ?? '';
+    ((profile as Record<string, unknown> | undefined)?.id as string | undefined) ?? '';
 
   const {
     data: dms,
@@ -828,6 +806,7 @@ export default function MessagesScreen() {
       const avatarSeed = isDm ? (participants[0]?.id ?? '') : '';
       const avatarUrl = isDm ? (participants[0]?.avatar_url ?? '') : '';
       const avatarRole = isDm ? (participants[0]?.kind ?? '') : '';
+      const avatarTimezone = isDm ? (participants[0]?.timezone ?? '') : '';
       const iconKey = !isDm ? (channel.icon_key ?? '') : '';
       const subtitle = isDm ? 'Direct Message' : (channel.description ?? '');
       return (
@@ -845,6 +824,7 @@ export default function MessagesScreen() {
                 avatarSeed,
                 avatarUrl,
                 avatarRole,
+                avatarTimezone,
                 iconKey,
                 subtitle,
                 ...(channel.is_supervised
