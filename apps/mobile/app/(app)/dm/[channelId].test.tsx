@@ -27,6 +27,16 @@ jest.mock('@/hooks/use-account', () => ({
   }),
 }));
 
+jest.mock('@/hooks/use-profile', () => ({
+  useProfile: () => ({
+    data: {
+      id: 'prof-1',
+      display_name: 'Me',
+      first_name: 'Me',
+    },
+  }),
+}));
+
 jest.mock('@/hooks/use-messages', () => ({
   useMessages: () => ({
     data: [],

@@ -34,6 +34,15 @@ jest.mock('@/hooks/use-account', () => ({
   }),
 }));
 
+jest.mock('@/hooks/use-profile', () => ({
+  useProfile: () => ({
+    data: {
+      id: 'profile-1',
+      kind: 'guardian',
+    },
+  }),
+}));
+
 jest.mock('@/hooks/use-activity-feed', () => ({
   useActivityFeed: () => ({
     data: { sections: [] },

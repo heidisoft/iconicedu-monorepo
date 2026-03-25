@@ -127,8 +127,16 @@ export default function TabsLayout() {
     ((account as Record<string, unknown> | undefined)?.id as string) ?? '';
   const profileId =
     ((profile as Record<string, unknown> | undefined)?.id as string | undefined) ?? '';
+  const profileKind =
+    ((profile as Record<string, unknown> | undefined)?.kind as string | undefined) ??
+    null;
   const { data: dms } = useDirectMessages(orgId, profileId, accountId);
-  const { data: channels } = useLearningSpaceChannels(orgId, profileId, accountId);
+  const { data: channels } = useLearningSpaceChannels(
+    orgId,
+    profileId,
+    accountId,
+    profileKind,
+  );
   const { data: supervisedDms } = useSupervisedDirectMessages(
     orgId,
     accountId,

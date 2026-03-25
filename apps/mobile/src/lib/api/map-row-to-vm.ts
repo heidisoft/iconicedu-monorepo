@@ -13,6 +13,8 @@ export type RawMessageRow = {
   org_id: string;
   channel_id: string;
   sender_profile_id: string;
+  visibility_type?: 'all' | 'specific-users' | null;
+  visibility_user_ids?: string[] | null;
   type: string;
   created_at: string;
   updated_at: string;
@@ -74,7 +76,13 @@ export function mapRowToMessageVM(
       type: row.type,
       sender,
       createdAt: row.created_at,
-      visibility: { type: 'all' as const },
+      visibility:
+        row.visibility_type === 'specific-users'
+          ? {
+              type: 'specific-users' as const,
+              userIds: row.visibility_user_ids ?? [],
+            }
+          : { type: 'all' as const },
     },
     social: { reactions, ...(thread ? { thread } : {}) },
   };

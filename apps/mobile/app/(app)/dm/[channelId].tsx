@@ -1,5 +1,12 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import {
+  Alert,
+  View,
+  Text,
+  StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -108,16 +115,26 @@ export default function DmConversationScreen() {
     ? supervisedChildName
       ? `Supervising ${supervisedChildName}'s conversation`
       : 'Supervised Inbox'
-    : headerPresenceSummary.status === 'online'
-      ? 'Available'
-      : (() => {
-          const relative = formatRelativeLastSeen(headerPresenceSummary.lastSeenAt);
-          if (!relative) return subtitle ?? 'Direct Message';
-          const localTime = localTimeText(avatarTimezone);
-          return localTime
-            ? `Last seen ${relative} · ${localTime}`
-            : `Last seen ${relative}`;
-        })();
+    : (() => {
+        if (headerPresenceSummary.status === 'online') {
+          return 'Available';
+        }
+        const relative = formatRelativeLastSeen(headerPresenceSummary.lastSeenAt);
+        if (!relative) {
+          return subtitle ?? 'Direct Message';
+        }
+        return `Last seen ${relative}`;
+      })();
+  const headerLocalTime = isSupervised ? null : localTimeText(avatarTimezone);
+
+  const handleSubtitlePress = useCallback(() => {
+    const tz = avatarTimezone?.trim();
+    if (!tz || isSupervised) return;
+    Alert.alert(
+      'Local time',
+      'You are seeing their current local time here, based on the timezone saved on their profile.',
+    );
+  }, [avatarTimezone, isSupervised]);
 
   const {
     data: messages,
@@ -224,6 +241,8 @@ export default function DmConversationScreen() {
       <ConversationHeader
         title={topic ?? 'Direct Message'}
         subtitle={headerSubtitle}
+        onSubtitlePress={headerLocalTime ? handleSubtitlePress : null}
+        localTimeLabel={headerLocalTime}
         kind="dm"
         avatarSeed={avatarSeed}
         avatarUrl={avatarUrl || undefined}

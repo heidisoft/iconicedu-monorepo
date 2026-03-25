@@ -3,6 +3,7 @@ import { UiTrackingContext } from '@iconicedu/ui-native';
 import { usePathname } from 'expo-router';
 import { getScreenName } from '@/lib/screen-name';
 import { AuthProvider } from '@/providers/auth-provider';
+import { FamilyViewProvider } from '@/providers/family-view-provider';
 import { QueryProvider } from '@/providers/query-provider';
 import { ThemeProvider } from '@/providers/theme-provider';
 import { AnalyticsProvider, useAnalytics } from '@/providers/analytics-provider';
@@ -45,7 +46,9 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
         <CrashBoundaryBridge>
           <UiTrackingBridge>
             <QueryProvider>
-              <AuthProvider>{children}</AuthProvider>
+              <AuthProvider>
+                <FamilyViewProvider>{children}</FamilyViewProvider>
+              </AuthProvider>
             </QueryProvider>
           </UiTrackingBridge>
         </CrashBoundaryBridge>

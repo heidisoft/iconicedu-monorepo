@@ -34,7 +34,7 @@ export function useMessages(
   const queryClient = useQueryClient();
 
   const query = useQuery({
-    queryKey: queryKeys.messages(channelId),
+    queryKey: queryKeys.messages(channelId, currentProfileId),
     queryFn: () => fetchChannelMessages(channelId, currentProfileId, currentAccountId),
     enabled: !!channelId,
   });
@@ -77,7 +77,9 @@ export function useMessages(
           filter: `channel_id=eq.${channelId}`,
         },
         () => {
-          queryClient.invalidateQueries({ queryKey: queryKeys.messages(channelId) });
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.messages(channelId, currentProfileIdRef.current),
+          });
         },
       )
       .on(
@@ -89,7 +91,9 @@ export function useMessages(
           filter: `channel_id=eq.${channelId}`,
         },
         () => {
-          queryClient.invalidateQueries({ queryKey: queryKeys.messages(channelId) });
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.messages(channelId, currentProfileIdRef.current),
+          });
         },
       )
       .on(
@@ -101,7 +105,9 @@ export function useMessages(
           filter: `channel_id=eq.${channelId}`,
         },
         () => {
-          queryClient.invalidateQueries({ queryKey: queryKeys.messages(channelId) });
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.messages(channelId, currentProfileIdRef.current),
+          });
         },
       )
       // ── Postgres changes: message payload tables ──
@@ -109,14 +115,18 @@ export function useMessages(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'message_text' },
         () => {
-          queryClient.invalidateQueries({ queryKey: queryKeys.messages(channelId) });
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.messages(channelId, currentProfileIdRef.current),
+          });
         },
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'message_reactions' },
         () => {
-          queryClient.invalidateQueries({ queryKey: queryKeys.messages(channelId) });
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.messages(channelId, currentProfileIdRef.current),
+          });
         },
       )
       // ── Postgres changes: threads table (reply count updates) ──
@@ -129,7 +139,9 @@ export function useMessages(
           ...(orgId ? { filter: `org_id=eq.${orgId}` } : {}),
         },
         () => {
-          queryClient.invalidateQueries({ queryKey: queryKeys.messages(channelId) });
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.messages(channelId, currentProfileIdRef.current),
+          });
         },
       )
       // ── Broadcast: typing events (shared channel with web) ──
@@ -142,7 +154,7 @@ export function useMessages(
         const resolveDisplayName = () => {
           if (name) return name;
           const msgs = queryClient.getQueryData<MessageVM[]>(
-            queryKeys.messages(channelId),
+            queryKeys.messages(channelId, currentProfileIdRef.current),
           );
           const found = msgs?.find((m) => m.core.sender.ids.id === profileId);
           return found?.core.sender.profile.displayName ?? 'Someone';
@@ -262,10 +274,10 @@ export function useMessages(
       oldest.core.createdAt,
     );
 
-    queryClient.setQueryData(queryKeys.messages(channelId), (prev: typeof messages) => [
-      ...olderMessages,
-      ...(prev ?? []),
-    ]);
+    queryClient.setQueryData(
+      queryKeys.messages(channelId, currentProfileId),
+      (prev: typeof messages) => [...olderMessages, ...(prev ?? [])],
+    );
   }, [channelId, currentProfileId, currentAccountId, messages, queryClient]);
 
   // ── Reaction toggle ───────────────────────────────────────────────────────
@@ -276,7 +288,7 @@ export function useMessages(
    */
   const toggleReaction = useCallback(
     async (messageId: string, emoji: string) => {
-      const key = queryKeys.messages(channelId);
+      const key = queryKeys.messages(channelId, currentProfileId);
 
       // Snapshot for rollback
       const previous = queryClient.getQueryData<MessageVM[]>(key);
@@ -327,7 +339,7 @@ export function useMessages(
         queryClient.invalidateQueries({ queryKey: key });
       }
     },
-    [channelId, currentAccountId, orgId, queryClient],
+    [channelId, currentAccountId, currentProfileId, orgId, queryClient],
   );
 
   return {

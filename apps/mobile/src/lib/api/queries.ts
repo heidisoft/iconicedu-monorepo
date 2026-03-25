@@ -44,7 +44,8 @@ export const queryKeys = {
     ['directMessages', orgId, profileId] as const,
   channel: (channelId: string) => ['channel', channelId] as const,
   spaceChannelMeta: (channelId: string) => ['spaceChannelMeta', channelId] as const,
-  messages: (channelId: string) => ['messages', channelId] as const,
+  messages: (channelId: string, profileId = '') =>
+    ['messages', channelId, profileId] as const,
   learningSpaces: (orgId: string) => ['learningSpaces', orgId] as const,
   learningSpace: (spaceId: string) => ['learningSpace', spaceId] as const,
   supportChannel: (orgId: string) => ['supportChannel', orgId] as const,
@@ -178,6 +179,40 @@ export async function fetchProfileByAccountId(accountId: string) {
   }
 
   return fallbackProfile ?? null;
+}
+
+export async function fetchProfilesForAccount(accountId: string, orgId?: string) {
+  let query = supabase
+    .from('profiles')
+    .select(
+      'id, org_id, account_id, kind, status, display_name, first_name, last_name, avatar_url, avatar_seed, ui_theme_key, deleted_at',
+    )
+    .eq('account_id', accountId)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: true });
+
+  if (orgId) {
+    query = query.eq('org_id', orgId);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function fetchAccountsByIds(accountIds: string[]) {
+  if (!accountIds.length) return [];
+
+  const { data, error } = await supabase
+    .from('accounts')
+    .select(
+      '*, profile:profiles!account_id(id, display_name, first_name, last_name, avatar_seed)',
+    )
+    .in('id', accountIds)
+    .is('deleted_at', null);
+
+  if (error) throw error;
+  return data ?? [];
 }
 
 export type DmParticipant = {
@@ -610,9 +645,26 @@ export async function fetchChannels(orgId: string): Promise<ChannelListItem[]> {
 // messages table has no `content` column — payloads are in type-specific tables.
 // Only select columns that actually exist on the messages table.
 const BASE_MESSAGE_SELECT = `
-  id, org_id, channel_id, sender_profile_id, type, created_at, updated_at, thread_parent_id,
+  id, org_id, channel_id, sender_profile_id, visibility_type, visibility_user_ids, type, created_at, updated_at, thread_parent_id,
   sender:profiles!sender_profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed, kind)
 `;
+
+export function filterVisibleMessageRows<T extends RawMessageRow>(
+  rows: T[],
+  currentProfileId = '',
+): T[] {
+  return rows.filter((row) => {
+    if (row.visibility_type !== 'specific-users') {
+      return true;
+    }
+
+    if (!currentProfileId) {
+      return false;
+    }
+
+    return (row.visibility_user_ids ?? []).includes(currentProfileId);
+  });
+}
 
 /** message type → payload table name */
 const TYPE_TABLE: Record<string, string> = {
@@ -809,7 +861,7 @@ async function loadThreads(parentMessageIds: string[]): Promise<Map<string, Thre
 
 export async function fetchChannelMessages(
   channelId: string,
-  _currentProfileId = '',
+  currentProfileId = '',
   currentAccountId = '',
   limit = 40,
   before?: string,
@@ -831,7 +883,11 @@ export async function fetchChannelMessages(
   if (error) throw error;
   if (!rows || rows.length === 0) return [];
 
-  const typedRows = rows as unknown as RawMessageRow[];
+  const typedRows = filterVisibleMessageRows(
+    rows as unknown as RawMessageRow[],
+    currentProfileId,
+  );
+  if (typedRows.length === 0) return [];
   const messageIds = typedRows.map((r) => r.id);
 
   const [payloadMap, reactionMap, threadsMap] = await Promise.all([
@@ -864,7 +920,7 @@ export async function fetchChannelMessages(
 export async function fetchThreadMessages(
   threadId: string,
   parentMessageId: string,
-  _currentProfileId = '',
+  currentProfileId = '',
   currentAccountId = '',
 ): Promise<MessageVM[]> {
   // Try thread_id first (web-aligned — replies have thread_id → threads.id).
@@ -892,7 +948,11 @@ export async function fetchThreadMessages(
   if (error) throw error;
   if (!rows || rows.length === 0) return [];
 
-  const typedRows = rows as unknown as RawMessageRow[];
+  const typedRows = filterVisibleMessageRows(
+    rows as unknown as RawMessageRow[],
+    currentProfileId,
+  );
+  if (typedRows.length === 0) return [];
   const messageIds = typedRows.map((r) => r.id);
 
   const [payloadMap, reactionMap] = await Promise.all([
@@ -1085,6 +1145,7 @@ export async function fetchLearningSpaceChannels(
   orgId: string,
   myProfileId: string,
   myAccountId: string,
+  myProfileKind?: string | null,
 ): Promise<ChannelListItem[]> {
   if (!myProfileId || !myAccountId) return [];
 
@@ -1230,7 +1291,8 @@ export async function fetchLearningSpaceChannels(
       };
     });
 
-  const supportChannel = await fetchSupportChannel(orgId);
+  const supportChannel =
+    myProfileKind === 'child' ? null : await fetchSupportChannel(orgId);
   const supportItems: ChannelListItem[] = supportChannel
     ? [
         {
@@ -1316,7 +1378,7 @@ export async function fetchProfilesByAccountIds(orgId: string, accountIds: strin
   const { data, error } = await supabase
     .from('profiles')
     .select(
-      'id, account_id, display_name, first_name, last_name, avatar_url, avatar_seed, kind',
+      'id, org_id, account_id, display_name, first_name, last_name, avatar_url, avatar_seed, kind, status, ui_theme_key',
     )
     .eq('org_id', orgId)
     .in('account_id', accountIds)

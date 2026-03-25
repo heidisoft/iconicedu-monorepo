@@ -135,6 +135,17 @@ describe('SessionCard', () => {
     expect(screen.getByText('Rescheduled')).toBeTruthy();
   });
 
+  it('opens classroom messages from the card when configured', () => {
+    render(<SessionCard session={baseSession} pressTarget="messages" />);
+
+    fireEvent.press(screen.getByLabelText('Open session details'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/spaces/[channelId]',
+      params: { channelId: 'channel-1', tab: 'messages' },
+    });
+  });
+
   it('shows student names next to the time', () => {
     render(
       <SessionCard

@@ -25,6 +25,7 @@ import { useSupervisedDirectMessages } from '@/hooks/use-supervised-direct-messa
 import { useTheme } from '@/providers/theme-provider';
 import { LearningSpaceIconBadge } from '@/lib/learning-space-icons';
 import type { AppColors } from '@/lib/theme';
+import { createHeaderSurface } from '@/lib/header-surface';
 import type { ChannelListItem, DmParticipant } from '@/lib/api/queries';
 import { ChannelListSkeleton } from '@/components/skeletons';
 import { RoleAvatarBadge } from '@/components/profile/role-avatar-badge';
@@ -115,7 +116,12 @@ function makeStyles(C: AppColors) {
     safe: { flex: 1, backgroundColor: C.bg },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
-    header: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 12 },
+    header: {
+      ...createHeaderSurface(C.bg, C.border),
+      paddingHorizontal: 20,
+      paddingTop: 18,
+      paddingBottom: 12,
+    },
     title: { fontSize: 30, fontWeight: '800', color: C.text, letterSpacing: -0.5 },
 
     tabBar: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: C.border },
@@ -627,6 +633,10 @@ export default function MessagesScreen() {
     ((account as Record<string, unknown> | undefined)?.id as string) ?? '';
   const myProfileId =
     ((profile as Record<string, unknown> | undefined)?.id as string | undefined) ?? '';
+  const profileKind =
+    ((profile as Record<string, unknown> | undefined)?.kind as string | undefined) ??
+    null;
+  const isStudentView = profileKind === 'child';
 
   const {
     data: dms,
@@ -637,7 +647,7 @@ export default function MessagesScreen() {
     data: channels,
     isPending: channelsLoading,
     refetch: refetchChannels,
-  } = useLearningSpaceChannels(orgId, myProfileId, accountId);
+  } = useLearningSpaceChannels(orgId, myProfileId, accountId, profileKind);
   const {
     data: supervisedDms,
     isPending: supervisedLoading,
@@ -688,7 +698,7 @@ export default function MessagesScreen() {
   const presenceByProfileId = useOnlineProfileIds(orgId, myProfileId, dmParticipantIds);
 
   React.useEffect(() => {
-    if (activeTab !== 'channels') {
+    if (activeTab !== 'channels' || isStudentView) {
       setActiveStudentTab('all');
       return;
     }
@@ -699,7 +709,7 @@ export default function MessagesScreen() {
     ) {
       setActiveStudentTab('all');
     }
-  }, [activeStudentTab, activeTab, classroomStudentTabs]);
+  }, [activeStudentTab, activeTab, classroomStudentTabs, isStudentView]);
 
   const allItems = useMemo(
     () =>
@@ -871,7 +881,7 @@ export default function MessagesScreen() {
         })}
       </View>
 
-      {activeTab === 'channels' && hasClassroomStudentTabs ? (
+      {activeTab === 'channels' && !isStudentView && hasClassroomStudentTabs ? (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}

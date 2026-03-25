@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/providers/theme-provider';
 import { useActivityFeed, useMarkActivityFeedRead } from '@/hooks/use-activity-feed';
 import { ActivityFeedSkeleton } from '@/components/skeletons';
+import { createHeaderSurface } from '@/lib/header-surface';
 import {
   ActivityItem,
   makeActivityItemStyles,
@@ -29,6 +30,7 @@ function makeStyles(C: AppColors) {
 
     // Header
     header: {
+      ...createHeaderSurface(C.bg, C.border),
       paddingHorizontal: 20,
       paddingTop: 18,
       paddingBottom: 12,

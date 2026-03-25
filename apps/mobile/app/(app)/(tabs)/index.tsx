@@ -5,6 +5,8 @@ import {
   Image,
   ScrollView,
   TouchableOpacity,
+  Modal,
+  Pressable,
   StyleSheet,
   RefreshControl,
   useWindowDimensions,
@@ -15,10 +17,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CalendarClock,
   CalendarCheck,
+  CalendarDays,
   BookOpenCheck,
   Users,
   LayoutGrid,
   LifeBuoy,
+  ArrowRightLeft,
+  Check,
 } from 'lucide-react-native';
 import { SiteLogo } from '@iconicedu/ui-native';
 import { useAuth } from '@/providers/auth-provider';
@@ -29,6 +34,7 @@ import { useFamilyLinks } from '@/hooks/use-family-links';
 import { useLearningSpaces } from '@/hooks/use-learning-spaces';
 import { useSupportChannel } from '@/hooks/use-support-channel';
 import { useTheme } from '@/providers/theme-provider';
+import { useFamilyView } from '@/providers/family-view-provider';
 import { PulseBox } from '@/components/skeletons/pulse-box';
 import { SessionCard } from '@/components/sessions/session-card';
 import { AppSupportFooter } from '@/components/support/app-support-footer';
@@ -110,12 +116,58 @@ function getSupportPalette(C: AppColors) {
   };
 }
 
+function getInitials(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) return 'U';
+  const words = trimmed.split(/\s+/);
+  if (words.length >= 2) {
+    return `${words[0]?.[0] ?? ''}${words[1]?.[0] ?? ''}`.toUpperCase();
+  }
+  return trimmed[0]?.toUpperCase() ?? 'U';
+}
+
+function startOfDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function startOfWeekMonday(date: Date): Date {
+  const day = startOfDay(date);
+  const weekday = day.getDay();
+  const diff = weekday === 0 ? -6 : 1 - weekday;
+  return new Date(day.getTime() + diff * 86_400_000);
+}
+
+function addDays(date: Date, days: number): Date {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
 function makeStyles(C: AppColors) {
   const supportPalette = getSupportPalette(C);
 
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: C.pageBg },
     scroll: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 32, gap: 22 },
+    topBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    topBarLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      flexShrink: 1,
+      minWidth: 0,
+    },
+    profileTrigger: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      flexShrink: 1,
+      minWidth: 0,
+    },
     avatar: {
       width: 44,
       height: 44,
@@ -124,6 +176,96 @@ function makeStyles(C: AppColors) {
       justifyContent: 'center',
     },
     avatarTxt: { color: '#ffffff', fontWeight: '800', fontSize: 18 },
+    profileTextWrap: {
+      gap: 2,
+      flexShrink: 1,
+      minWidth: 0,
+    },
+    profileName: { fontSize: 15, color: C.text, fontWeight: '700' },
+    profileEmail: { fontSize: 12, color: C.textMuted },
+    familyViewButton: {
+      alignItems: 'center',
+      height: 32,
+      width: 32,
+      justifyContent: 'center',
+      borderRadius: 999,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: C.border,
+      backgroundColor: C.card,
+      flexShrink: 0,
+    },
+    modalBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(15, 23, 42, 0.45)',
+      justifyContent: 'flex-end',
+    },
+    sheetSafeArea: {
+      paddingHorizontal: 16,
+      paddingBottom: 18,
+    },
+    sheetCard: {
+      borderRadius: 20,
+      backgroundColor: C.card,
+      borderWidth: 1,
+      borderColor: C.border,
+      padding: 18,
+      gap: 12,
+    },
+    sheetHeader: {
+      gap: 4,
+    },
+    sheetTitle: {
+      fontSize: 18,
+      fontWeight: '800',
+      color: C.text,
+    },
+    sheetSubtitle: {
+      fontSize: 13,
+      color: C.textMuted,
+      lineHeight: 18,
+    },
+    switchOption: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.bg,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+    },
+    switchOptionActive: {
+      borderColor: C.teal,
+      backgroundColor: C.tealBg,
+    },
+    switchOptionText: {
+      flex: 1,
+      minWidth: 0,
+      gap: 2,
+    },
+    switchOptionAvatar: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+    },
+    switchOptionAvatarText: {
+      color: '#ffffff',
+      fontSize: 14,
+      fontWeight: '800',
+    },
+    switchOptionLabel: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: C.text,
+    },
+    switchOptionSubtext: {
+      fontSize: 12,
+      color: C.textMuted,
+    },
     greetingLine: { fontSize: 15, color: C.textMuted, fontWeight: '500' },
     headlineRow: {
       flexDirection: 'row',
@@ -215,6 +357,40 @@ function makeStyles(C: AppColors) {
       alignItems: 'center',
       justifyContent: 'space-between',
     },
+    emptyWrap: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 12,
+      paddingVertical: 18,
+    },
+    emptyStateCard: {
+      borderRadius: 16,
+      borderWidth: 1,
+      borderStyle: 'dashed',
+      borderColor: C.border,
+      backgroundColor: C.card,
+      paddingHorizontal: 8,
+      overflow: 'hidden',
+    },
+    emptyIcon: {
+      width: 72,
+      height: 72,
+      borderRadius: 36,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    emptyTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: C.text,
+    },
+    emptyDesc: {
+      fontSize: 14,
+      color: C.textMuted,
+      textAlign: 'center',
+      paddingHorizontal: 40,
+      lineHeight: 21,
+    },
   });
 }
 
@@ -225,6 +401,7 @@ function makeStyles(C: AppColors) {
 export default function HomeScreen() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { familySwitchOptions, switchFamilyView, isViewingAsChild } = useFamilyView();
   const {
     data: profile,
     isPending: profileLoading,
@@ -254,9 +431,11 @@ export default function HomeScreen() {
     isPending: learningSpacesLoading,
     refetch: refetchLearningSpaces,
   } = useLearningSpaces(orgId ?? '');
-  const { data: supportChannel, refetch: refetchSupportChannel } = useSupportChannel(
-    orgId ?? '',
-  );
+  const {
+    data: supportChannel,
+    isPending: supportLoading,
+    refetch: refetchSupportChannel,
+  } = useSupportChannel(orgId ?? '');
   const {
     data: orgSchedules = [],
     isPending: schedulesSummaryLoading,
@@ -276,11 +455,19 @@ export default function HomeScreen() {
     id?: string | null;
     kind?: string | null;
     first_name?: string | null;
+    last_name?: string | null;
     display_name?: string | null;
     avatar_url?: string | null;
     avatar_seed?: string | null;
     ui_theme_key?: string | null;
   } | null;
+  const fullName =
+    [profileData?.first_name?.trim(), profileData?.last_name?.trim()]
+      .filter((value): value is string => Boolean(value))
+      .join(' ') ||
+    profileData?.display_name?.trim() ||
+    user?.email?.split('@')[0] ||
+    'User';
   const firstName =
     profileData?.first_name?.trim() ||
     profileData?.display_name?.trim()?.split(' ')[0] ||
@@ -292,6 +479,9 @@ export default function HomeScreen() {
     profileData?.ui_theme_key,
     profileData?.avatar_seed ?? user?.id ?? user?.email,
   );
+  const secondaryHeaderText = isViewingAsChild
+    ? 'Viewing as student'
+    : (user?.email ?? '');
 
   const topMetrics = React.useMemo(
     () =>
@@ -328,13 +518,37 @@ export default function HomeScreen() {
         : LayoutGrid;
 
   const [refreshing, setRefreshing] = useState(false);
-  const homeHeaderLoading = refreshing || accountLoading || profileLoading;
+  const [familySwitchOpen, setFamilySwitchOpen] = useState(false);
+  const [switchingProfileId, setSwitchingProfileId] = useState<string | null>(null);
+  const weekAnchor = new Date();
+  const thisWeekStartMs = startOfWeekMonday(weekAnchor).getTime();
+  const nextWeekStartMs = addDays(startOfWeekMonday(weekAnchor), 7).getTime();
+  const weekAfterNextStartMs = addDays(startOfWeekMonday(weekAnchor), 14).getTime();
+  const thisWeekSessions = React.useMemo(
+    () =>
+      sessions.filter((session) => {
+        const startAt = new Date(session.startAt).getTime();
+        return startAt >= thisWeekStartMs && startAt < nextWeekStartMs;
+      }),
+    [nextWeekStartMs, sessions, thisWeekStartMs],
+  );
+  const nextWeekSessions = React.useMemo(
+    () =>
+      sessions.filter((session) => {
+        const startAt = new Date(session.startAt).getTime();
+        return startAt >= nextWeekStartMs && startAt < weekAfterNextStartMs;
+      }),
+    [nextWeekStartMs, sessions, weekAfterNextStartMs],
+  );
+  const homeHeaderLoading =
+    refreshing || accountLoading || profileLoading || supportLoading;
   const overviewLoading =
     refreshing ||
     accountLoading ||
     profileLoading ||
     schedulesSummaryLoading ||
     learningSpacesLoading;
+  const supportFooterLoading = refreshing || accountLoading || supportLoading;
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     Promise.all([
@@ -369,6 +583,58 @@ export default function HomeScreen() {
     refetchSessions,
     refetchSupportChannel,
   ]);
+  const canShowFamilySwitcher =
+    familySwitchOptions.length > 1 &&
+    profileData?.kind &&
+    ['guardian', 'child'].includes(profileData.kind);
+  const handleFamilySwitch = useCallback(
+    async (childProfileId: string | null) => {
+      setSwitchingProfileId(childProfileId ?? '__parent__');
+      setRefreshing(true);
+      try {
+        await switchFamilyView(childProfileId);
+        await Promise.all([
+          refetchAccount(),
+          refetchProfile(),
+          refetchSessions(),
+          refetchLearningSpaces(),
+          refetchSupportChannel(),
+          refetchOrgSchedules(),
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.familyLinks(
+              orgId ?? '',
+              ((account as Record<string, unknown> | undefined)?.id as string) ?? '',
+            ),
+          }),
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.childProfiles(
+              orgId ?? '',
+              (childProfiles as Record<string, unknown>[]).map(
+                (child) => child.id as string,
+              ),
+            ),
+          }),
+        ]);
+        setFamilySwitchOpen(false);
+      } finally {
+        setSwitchingProfileId(null);
+        setRefreshing(false);
+      }
+    },
+    [
+      account,
+      childProfiles,
+      orgId,
+      queryClient,
+      refetchAccount,
+      refetchLearningSpaces,
+      refetchOrgSchedules,
+      refetchProfile,
+      refetchSessions,
+      refetchSupportChannel,
+      switchFamilyView,
+    ],
+  );
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -385,42 +651,71 @@ export default function HomeScreen() {
       >
         {/* Top bar */}
         {homeHeaderLoading ? (
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}
-          >
-            <PulseBox width={44} height={44} radius={22} />
+          <View style={s.topBar}>
+            <View style={s.topBarLeft}>
+              <View style={s.profileTrigger}>
+                <PulseBox width={44} height={44} radius={22} />
+                <View style={s.profileTextWrap}>
+                  <PulseBox width={132} height={14} radius={4} />
+                  <PulseBox width={168} height={12} radius={4} />
+                </View>
+              </View>
+              <PulseBox width={112} height={32} radius={16} />
+            </View>
             <PulseBox width={42} height={42} radius={12} />
           </View>
         ) : (
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}
-          >
-            <TouchableOpacity
-              style={[
-                s.avatar,
-                {
-                  backgroundColor: avatarUrl ? 'transparent' : avatarBg,
-                  overflow: 'hidden',
-                },
-              ]}
-              onPress={() => router.push('/(app)/(tabs)/account')}
-              activeOpacity={0.8}
-              accessibilityLabel="Open account"
-            >
-              {avatarUrl ? (
-                <Image source={{ uri: avatarUrl }} style={{ width: 44, height: 44 }} />
-              ) : (
-                <Text style={[s.avatarTxt, { color: avatarFg }]}>{initial}</Text>
-              )}
-            </TouchableOpacity>
+          <View style={s.topBar}>
+            <View style={s.topBarLeft}>
+              <TouchableOpacity
+                style={s.profileTrigger}
+                onPress={() => router.push('/(app)/(tabs)/account')}
+                activeOpacity={0.8}
+                accessibilityLabel="Open account"
+              >
+                <View
+                  style={[
+                    s.avatar,
+                    {
+                      backgroundColor: avatarUrl ? 'transparent' : avatarBg,
+                      overflow: 'hidden',
+                    },
+                  ]}
+                >
+                  {avatarUrl ? (
+                    <Image
+                      source={{ uri: avatarUrl }}
+                      style={{ width: 44, height: 44 }}
+                    />
+                  ) : (
+                    <Text style={[s.avatarTxt, { color: avatarFg }]}>{initial}</Text>
+                  )}
+                </View>
+                <View style={s.profileTextWrap}>
+                  <Text numberOfLines={1} style={s.profileName}>
+                    {fullName}
+                  </Text>
+                  {!!secondaryHeaderText && (
+                    <Text numberOfLines={1} style={s.profileEmail}>
+                      {secondaryHeaderText}
+                    </Text>
+                  )}
+                </View>
+              </TouchableOpacity>
+              {canShowFamilySwitcher ? (
+                <TouchableOpacity
+                  style={s.familyViewButton}
+                  onPress={() => setFamilySwitchOpen(true)}
+                  activeOpacity={0.85}
+                  accessibilityLabel="Switch family view"
+                >
+                  <ArrowRightLeft
+                    size={16}
+                    color={isViewingAsChild ? colors.teal : colors.textMuted}
+                  />
+                </TouchableOpacity>
+              ) : null}
+            </View>
             <SiteLogo height={32} color={colors.text} />
           </View>
         )}
@@ -504,7 +799,7 @@ export default function HomeScreen() {
                   </View>
                 </View>
                 <View>
-                  <Text style={s.metricValue}>{topMetrics.upcomingSessionsThisWeek}</Text>
+                  <Text style={s.metricValue}>{thisWeekSessions.length}</Text>
                   <Text style={s.metricLabel}>This week</Text>
                 </View>
               </View>
@@ -541,49 +836,189 @@ export default function HomeScreen() {
         </View>
 
         {/* Upcoming sessions */}
-        {(sessionsLoading || sessions.length > 0) && (
-          <View style={{ gap: 10 }}>
-            <View style={s.activityHeader}>
-              <Text style={s.sectionLabel}>Upcoming sessions</Text>
-            </View>
-            {sessionsLoading || refreshing ? (
-              <View style={{ gap: 6 }}>
-                {[0, 1].map((i) => (
-                  <View
-                    key={i}
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 10,
-                      paddingHorizontal: 14,
-                      paddingVertical: 10,
-                      borderRadius: 12,
-                      borderWidth: StyleSheet.hairlineWidth,
-                      borderColor: colors.border,
-                      backgroundColor: colors.card,
-                    }}
-                  >
-                    <PulseBox width={44} height={60} radius={10} />
-                    <View style={{ flex: 1, gap: 6 }}>
-                      <PulseBox width={i === 0 ? 140 : 120} height={13} radius={4} />
-                      <PulseBox width={80} height={11} radius={4} />
-                    </View>
-                    <PulseBox width={50} height={26} radius={20} />
-                  </View>
-                ))}
-              </View>
-            ) : (
-              <View style={{ gap: 6 }}>
-                {sessions.map((session) => (
-                  <SessionCard key={session.id} session={session} />
-                ))}
-              </View>
-            )}
+        <View style={{ gap: 10 }}>
+          <View style={s.activityHeader}>
+            <Text style={s.sectionLabel}>Upcoming sessions</Text>
           </View>
-        )}
+          {sessionsLoading || refreshing ? (
+            <View style={{ gap: 6 }}>
+              {[0, 1].map((i) => (
+                <View
+                  key={i}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 10,
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    borderRadius: 12,
+                    borderWidth: StyleSheet.hairlineWidth,
+                    borderColor: colors.border,
+                    backgroundColor: colors.card,
+                  }}
+                >
+                  <PulseBox width={44} height={60} radius={10} />
+                  <View style={{ flex: 1, gap: 6 }}>
+                    <PulseBox width={i === 0 ? 140 : 120} height={13} radius={4} />
+                    <PulseBox width={80} height={11} radius={4} />
+                  </View>
+                  <PulseBox width={50} height={26} radius={20} />
+                </View>
+              ))}
+            </View>
+          ) : thisWeekSessions.length > 0 ? (
+            <View style={{ gap: 6 }}>
+              {thisWeekSessions.map((session) => (
+                <SessionCard key={session.id} session={session} pressTarget="messages" />
+              ))}
+            </View>
+          ) : (
+            <View style={s.emptyStateCard}>
+              <View style={s.emptyWrap}>
+                <View style={[s.emptyIcon, { backgroundColor: colors.inputBg }]}>
+                  <CalendarDays size={32} color={colors.textMuted} />
+                </View>
+                <Text style={s.emptyTitle}>No upcoming sessions this week</Text>
+                <Text style={s.emptyDesc}>
+                  Sessions scheduled for this week will appear here.
+                </Text>
+              </View>
+            </View>
+          )}
+        </View>
 
-        <AppSupportFooter />
+        <View style={{ gap: 10 }}>
+          <View style={s.activityHeader}>
+            <Text style={s.sectionLabel}>Next week</Text>
+          </View>
+          {sessionsLoading || refreshing ? (
+            <View style={{ gap: 6 }}>
+              {[0, 1].map((i) => (
+                <View
+                  key={`next-week-skeleton-${i}`}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 10,
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    borderRadius: 12,
+                    borderWidth: StyleSheet.hairlineWidth,
+                    borderColor: colors.border,
+                    backgroundColor: colors.card,
+                  }}
+                >
+                  <PulseBox width={44} height={60} radius={10} />
+                  <View style={{ flex: 1, gap: 6 }}>
+                    <PulseBox width={i === 0 ? 140 : 120} height={13} radius={4} />
+                    <PulseBox width={80} height={11} radius={4} />
+                  </View>
+                  <PulseBox width={50} height={26} radius={20} />
+                </View>
+              ))}
+            </View>
+          ) : nextWeekSessions.length > 0 ? (
+            <View style={{ gap: 6 }}>
+              {nextWeekSessions.map((session) => (
+                <SessionCard key={session.id} session={session} pressTarget="messages" />
+              ))}
+            </View>
+          ) : (
+            <View style={s.emptyStateCard}>
+              <View style={s.emptyWrap}>
+                <View style={[s.emptyIcon, { backgroundColor: colors.inputBg }]}>
+                  <CalendarDays size={32} color={colors.textMuted} />
+                </View>
+                <Text style={s.emptyTitle}>No sessions next week</Text>
+                <Text style={s.emptyDesc}>
+                  Sessions scheduled for next week will appear here.
+                </Text>
+              </View>
+            </View>
+          )}
+        </View>
+
+        <AppSupportFooter isLoading={supportFooterLoading} />
       </ScrollView>
+      <Modal
+        visible={familySwitchOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setFamilySwitchOpen(false)}
+      >
+        <Pressable style={s.modalBackdrop} onPress={() => setFamilySwitchOpen(false)}>
+          <Pressable style={s.sheetSafeArea} onPress={(event) => event.stopPropagation()}>
+            <View style={s.sheetCard}>
+              <View style={s.sheetHeader}>
+                <Text style={s.sheetTitle}>View as</Text>
+                <Text style={s.sheetSubtitle}>
+                  Switch between your parent view and linked student accounts.
+                </Text>
+              </View>
+              {familySwitchOptions.map((option) => {
+                const optionTitle = option.displayName?.trim() || option.label;
+                const optionSubtitle = option.isParentOption ? 'Parent' : 'Student';
+                const isSwitching =
+                  switchingProfileId ===
+                  (option.isParentOption ? '__parent__' : option.profileId);
+                const optionSeed = option.avatarSeed ?? option.profileId;
+                const { bg: optionAvatarBg, fg: optionAvatarFg } = resolveAvatarColor(
+                  option.themeKey ?? null,
+                  optionSeed,
+                );
+
+                return (
+                  <TouchableOpacity
+                    key={option.profileId}
+                    style={[
+                      s.switchOption,
+                      option.isActive ? s.switchOptionActive : null,
+                    ]}
+                    activeOpacity={0.85}
+                    disabled={option.isActive || Boolean(switchingProfileId)}
+                    onPress={() =>
+                      handleFamilySwitch(option.isParentOption ? null : option.profileId)
+                    }
+                  >
+                    <View
+                      style={[
+                        s.switchOptionAvatar,
+                        {
+                          backgroundColor: option.avatarUrl
+                            ? 'transparent'
+                            : optionAvatarBg,
+                        },
+                      ]}
+                    >
+                      {option.avatarUrl ? (
+                        <Image
+                          source={{ uri: option.avatarUrl }}
+                          style={{ width: 36, height: 36 }}
+                        />
+                      ) : (
+                        <Text
+                          style={[s.switchOptionAvatarText, { color: optionAvatarFg }]}
+                        >
+                          {getInitials(optionTitle)}
+                        </Text>
+                      )}
+                    </View>
+                    <View style={s.switchOptionText}>
+                      <Text numberOfLines={1} style={s.switchOptionLabel}>
+                        {optionTitle}
+                      </Text>
+                      <Text numberOfLines={1} style={s.switchOptionSubtext}>
+                        {isSwitching ? 'Switching...' : optionSubtitle}
+                      </Text>
+                    </View>
+                    {option.isActive ? <Check size={18} color={colors.teal} /> : null}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }

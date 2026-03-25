@@ -26,6 +26,7 @@ import { useTheme } from '@/providers/theme-provider';
 import { useAccount } from '@/hooks/use-account';
 import { useProfile } from '@/hooks/use-profile';
 import type { AppColors } from '@/lib/theme';
+import { createHeaderSurface } from '@/lib/header-surface';
 import { ProfileSkeleton } from '@/components/skeletons';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -88,7 +89,12 @@ const ROLE_LABELS: Record<string, string> = {
 function makeStyles(C: AppColors) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: C.pageBg },
-    header: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 10 },
+    header: {
+      ...createHeaderSurface(C.pageBg, C.border),
+      paddingHorizontal: 20,
+      paddingTop: 18,
+      paddingBottom: 10,
+    },
     pageTitle: { fontSize: 28, fontWeight: '800', color: C.text, letterSpacing: -0.5 },
     scroll: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 48, gap: 20 },
 

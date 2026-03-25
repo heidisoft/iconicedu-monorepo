@@ -1,5 +1,13 @@
 import React, { useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Linking, Image } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Linking,
+  Image,
+  Platform,
+} from 'react-native';
 import { ChevronLeft, Video, MoreVertical } from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
@@ -38,6 +46,8 @@ export type ConversationHeaderProps = {
   title: string;
   /** Subtitle — e.g. "Direct Message" or space subject */
   subtitle?: string | null;
+  onSubtitlePress?: (() => void) | null;
+  localTimeLabel?: string | null;
   kind: 'dm' | 'channel' | 'space';
   /** DM: seed used for avatar background color. Defaults to title. */
   avatarSeed?: string | null;
@@ -80,9 +90,17 @@ function makeStyles(C: AppColors) {
       paddingHorizontal: 6,
       paddingVertical: 10,
       backgroundColor: C.pageBg,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: C.border,
       gap: 4,
+    },
+    containerElevated: {
+      borderBottomWidth: 1,
+      borderBottomColor: C.border,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: Platform.OS === 'ios' ? 0 : 0.08,
+      shadowRadius: Platform.OS === 'ios' ? 0 : 6,
+      elevation: Platform.OS === 'android' ? 3 : 0,
+      zIndex: 2,
     },
     backBtn: {
       width: 40,
@@ -168,13 +186,33 @@ function makeStyles(C: AppColors) {
       flexShrink: 0,
     },
     // ── Title block ────────────────────────────────────────────────────────────
-    titleBlock: { flex: 1, paddingLeft: 8, justifyContent: 'center', gap: 2 },
+    titleBlock: {
+      flex: 1,
+      minWidth: 0,
+      paddingLeft: 8,
+      paddingRight: 8,
+      justifyContent: 'center',
+      gap: 2,
+    },
     title: { fontSize: 16, fontWeight: '700', color: C.text, letterSpacing: -0.2 },
     subtitle: { fontSize: 12, color: C.textMuted },
+    subtitleRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      flexWrap: 'wrap',
+      gap: 6,
+      flexShrink: 1,
+      minWidth: 0,
+    },
+    subtitleText: { fontSize: 12, color: C.textMuted, flexShrink: 1 },
+    subtitleSeparator: { fontSize: 12, color: C.textMuted },
+    localTimeWrap: { flexShrink: 1, minWidth: 0 },
+    localTimeText: { fontSize: 12, color: C.textMuted, flexShrink: 1 },
+    subtitleButton: { alignSelf: 'stretch', minWidth: 0 },
     titleSkeletonWrap: { gap: 6, paddingTop: 2 },
 
     // ── Action buttons ─────────────────────────────────────────────────────────
-    actions: { flexDirection: 'row', alignItems: 'center' },
+    actions: { flexDirection: 'row', alignItems: 'center', flexShrink: 0 },
     actionBtn: {
       width: 40,
       height: 40,
@@ -204,6 +242,8 @@ function makeStyles(C: AppColors) {
 export function ConversationHeader({
   title,
   subtitle,
+  onSubtitlePress,
+  localTimeLabel,
   kind,
   avatarSeed,
   avatarUrl,
@@ -242,7 +282,7 @@ export function ConversationHeader({
   }, [isReadOnly, presenceStatus, s]);
 
   return (
-    <View style={s.container}>
+    <View style={[s.container, isDm ? s.containerElevated : null]}>
       {/* Back */}
       <TouchableOpacity style={s.backBtn} onPress={onBack} hitSlop={8}>
         <ChevronLeft size={28} color={colors.text} />
@@ -302,11 +342,60 @@ export function ConversationHeader({
             <Text style={s.title} numberOfLines={1}>
               {secondaryAvatarSeed ? `${secondaryAvatarSeed} <> ${title}` : title}
             </Text>
-            {!!subtitle && (
-              <Text style={s.subtitle} numberOfLines={1}>
-                {subtitle}
-              </Text>
-            )}
+            {!!(subtitle || localTimeLabel) &&
+              (onSubtitlePress ? (
+                <TouchableOpacity
+                  style={s.subtitleButton}
+                  onPress={onSubtitlePress}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel="Explain local time"
+                >
+                  <View style={s.subtitleRow}>
+                    {!!subtitle && (
+                      <Text style={s.subtitleText} numberOfLines={2} ellipsizeMode="tail">
+                        {subtitle}
+                      </Text>
+                    )}
+                    {!!subtitle && !!localTimeLabel && (
+                      <Text style={s.subtitleSeparator}>{'\u00b7'}</Text>
+                    )}
+                    {!!localTimeLabel && (
+                      <View style={s.localTimeWrap}>
+                        <Text
+                          style={s.localTimeText}
+                          numberOfLines={2}
+                          ellipsizeMode="tail"
+                        >
+                          {localTimeLabel}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              ) : (
+                <View style={s.subtitleRow}>
+                  {!!subtitle && (
+                    <Text style={s.subtitleText} numberOfLines={2} ellipsizeMode="tail">
+                      {subtitle}
+                    </Text>
+                  )}
+                  {!!subtitle && !!localTimeLabel && (
+                    <Text style={s.subtitleSeparator}>{'\u00b7'}</Text>
+                  )}
+                  {!!localTimeLabel && (
+                    <View style={s.localTimeWrap}>
+                      <Text
+                        style={s.localTimeText}
+                        numberOfLines={2}
+                        ellipsizeMode="tail"
+                      >
+                        {localTimeLabel}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              ))}
           </>
         )}
       </View>

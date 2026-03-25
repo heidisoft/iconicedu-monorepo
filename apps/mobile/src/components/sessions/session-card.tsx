@@ -110,11 +110,13 @@ export function SessionCard({
   style,
   showJoinButton = true,
   joinEnabled = true,
+  pressTarget = 'sessions',
 }: {
   session: ClassSession;
   style?: ViewStyle;
   showJoinButton?: boolean;
   joinEnabled?: boolean;
+  pressTarget?: 'sessions' | 'messages';
 }) {
   const { colors } = useTheme();
   const router = useRouter();
@@ -141,7 +143,7 @@ export function SessionCard({
     ? () =>
         router.push({
           pathname: '/(app)/spaces/[channelId]',
-          params: { channelId: session.channelId!, tab: 'sessions' },
+          params: { channelId: session.channelId!, tab: pressTarget },
         } as never)
     : undefined;
   const handleOpenChat = session.channelId
@@ -183,6 +185,8 @@ export function SessionCard({
         isPast && s.sessionCardPast,
         style,
       ]}
+      accessibilityRole="button"
+      accessibilityLabel="Open session details"
       onPress={handlePress}
       disabled={!session.channelId}
       activeOpacity={0.75}

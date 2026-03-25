@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Bell, CircleUserRound, HelpCircle, Lock, Palette } from 'lucide-react-native';
 import { useAuth } from '@/providers/auth-provider';
 import { AppSupportFooter } from '@/components/support/app-support-footer';
+import { createHeaderSurface } from '@/lib/header-surface';
 
 const C = {
   bg: '#ffffff',
@@ -99,13 +100,12 @@ const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
 
   nav: {
+    ...createHeaderSurface(C.bg, C.border),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: C.border,
   },
   navBack: { paddingHorizontal: 4 },
   navBackTxt: { fontSize: 15, color: C.teal, fontWeight: '600' },
