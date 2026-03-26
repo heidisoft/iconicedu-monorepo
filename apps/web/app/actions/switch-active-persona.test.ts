@@ -9,7 +9,6 @@ const {
   getProfilesByAccountId,
   updateAccountActiveProfile,
   revalidatePath,
-  enablePersonaSwitchRun,
 } = vi.hoisted(() => ({
   createSupabaseServerClient: vi.fn(),
   requireAuthedUser: vi.fn(),
@@ -19,7 +18,6 @@ const {
   getProfilesByAccountId: vi.fn(),
   updateAccountActiveProfile: vi.fn(),
   revalidatePath: vi.fn(),
-  enablePersonaSwitchRun: vi.fn(),
 }));
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
@@ -42,11 +40,6 @@ vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
 vi.mock('next/cache', () => ({
   revalidatePath,
 }));
-vi.mock('@iconicedu/web/flags', () => ({
-  enablePersonaSwitch: {
-    run: (...args: unknown[]) => enablePersonaSwitchRun(...args),
-  },
-}));
 
 import { switchActivePersonaAction } from './switch-active-persona';
 
@@ -64,7 +57,6 @@ describe('switchActivePersonaAction', () => {
     getProfilesByAccountId.mockReset();
     updateAccountActiveProfile.mockReset();
     revalidatePath.mockReset();
-    enablePersonaSwitchRun.mockReset();
 
     createSupabaseServerClient.mockResolvedValue({} as never);
     requireAuthedUser.mockResolvedValue({ id: 'auth-1' });
@@ -73,36 +65,7 @@ describe('switchActivePersonaAction', () => {
     });
   });
 
-  it('blocks switching when feature flag is disabled', async () => {
-    enablePersonaSwitchRun.mockResolvedValue(false);
-
-    await expect(
-      switchActivePersonaAction({
-        orgId: 'org-1',
-        orgSlug: 'iconic-academy',
-        profileId: 'profile-2',
-      }),
-    ).rejects.toThrow('Persona switch is disabled.');
-  });
-
-  it('does not log debug context when persona switch is blocked', async () => {
-    process.env.DEBUG_POSTHOG_FLAGS = 'true';
-    enablePersonaSwitchRun.mockResolvedValue(false);
-    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined);
-
-    await expect(
-      switchActivePersonaAction({
-        orgId: 'org-1',
-        orgSlug: 'iconic-academy',
-        profileId: 'profile-2',
-      }),
-    ).rejects.toThrow('Persona switch is disabled.');
-
-    expect(infoSpy).not.toHaveBeenCalled();
-  });
-
-  it('switches active persona when feature flag and role checks pass', async () => {
-    enablePersonaSwitchRun.mockResolvedValue(true);
+  it('switches active persona when role checks pass', async () => {
     getProfileById.mockResolvedValue({
       data: {
         id: 'profile-2',
@@ -130,5 +93,44 @@ describe('switchActivePersonaAction', () => {
       }),
     );
     expect(revalidatePath).toHaveBeenCalledWith('/iconic-academy');
+  });
+
+  it('rejects switching when the target profile is not available for the account', async () => {
+    getProfileById.mockResolvedValue({
+      data: {
+        id: 'profile-2',
+        org_id: 'org-1',
+        account_id: 'account-2',
+        kind: 'guardian',
+      },
+    });
+
+    await expect(
+      switchActivePersonaAction({
+        orgId: 'org-1',
+        orgSlug: 'iconic-academy',
+        profileId: 'profile-2',
+      }),
+    ).rejects.toThrow('Profile is not available for this account.');
+  });
+
+  it('rejects switching when the required role is not assigned', async () => {
+    getProfileById.mockResolvedValue({
+      data: {
+        id: 'profile-2',
+        org_id: 'org-1',
+        account_id: 'account-1',
+        kind: 'educator',
+      },
+    });
+    getUserRoles.mockResolvedValue({ data: [{ role_key: 'guardian' }] });
+
+    await expect(
+      switchActivePersonaAction({
+        orgId: 'org-1',
+        orgSlug: 'iconic-academy',
+        profileId: 'profile-2',
+      }),
+    ).rejects.toThrow('Required role is not assigned for this persona.');
   });
 });

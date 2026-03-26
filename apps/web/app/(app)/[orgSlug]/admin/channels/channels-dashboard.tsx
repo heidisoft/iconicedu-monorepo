@@ -343,7 +343,7 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
               Create channel
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="sm:max-w-[48rem]">
             <DialogHeader>
               <DialogTitle>
                 {dialogMode === 'edit' ? 'Edit channel' : 'Create channel'}

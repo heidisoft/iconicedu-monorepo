@@ -1,16 +1,29 @@
-import { useQuery } from '@tanstack/react-query';
-import { fetchProfileByAccountId } from '@/lib/api/queries';
-import { useAccount } from './use-account';
+import { useFamilyView } from '@/providers/family-view-provider';
 
-export function useProfile() {
-  const { data: account } = useAccount();
-  const accountId = (account as Record<string, unknown> | undefined)?.id as
-    | string
-    | undefined;
+export type MobileProfileRecord = {
+  id?: string | null;
+  kind?: string | null;
+  display_name?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  avatar_url?: string | null;
+  avatar_seed?: string | null;
+  timezone?: string | null;
+  [key: string]: unknown;
+};
 
-  return useQuery({
-    queryKey: ['profile-by-account', accountId],
-    queryFn: () => fetchProfileByAccountId(accountId!),
-    enabled: !!accountId,
-  });
+type MobileProfileQueryResult = {
+  data: MobileProfileRecord | null;
+  isPending: boolean;
+  refetch: () => Promise<void>;
+};
+
+export function useProfile(): MobileProfileQueryResult {
+  const familyView = useFamilyView();
+
+  return {
+    data: familyView.profile,
+    isPending: familyView.isPending,
+    refetch: familyView.refresh,
+  };
 }

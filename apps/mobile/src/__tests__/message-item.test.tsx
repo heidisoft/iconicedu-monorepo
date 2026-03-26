@@ -33,6 +33,43 @@ const baseMessage: MessageVM = {
   content: { text: 'Hello world' },
 } as unknown as MessageVM;
 
+const staffMessage: MessageVM = {
+  ...baseMessage,
+  core: {
+    ...baseMessage.core,
+    sender: {
+      ...sender,
+      kind: 'staff',
+      profile: {
+        ...sender.profile,
+        displayName: 'Staff Member',
+      },
+    } as MessageVM['core']['sender'],
+  },
+} as unknown as MessageVM;
+
+const threadedUnreadMessage: MessageVM = {
+  ...baseMessage,
+  social: {
+    reactions: [],
+    thread: {
+      ids: { id: 'thread-1', orgId: 'org-1' },
+      parent: {
+        messageId: 'msg-1',
+      },
+      stats: {
+        messageCount: 3,
+        lastReplyAt: '2025-01-15T11:00:00Z',
+      },
+      participants: [sender],
+      readState: {
+        threadId: 'thread-1',
+        unreadCount: 2,
+      },
+    },
+  },
+} as unknown as MessageVM;
+
 const colors = LIGHT;
 
 describe('MessageItem', () => {
@@ -48,6 +85,15 @@ describe('MessageItem', () => {
       <MessageItem message={baseMessage} isOwn={false} isGroupStart colors={colors} />,
     );
     expect(screen.getByText('John Doe')).toBeTruthy();
+  });
+
+  it('renders the staff indicator next to staff sender names', () => {
+    render(
+      <MessageItem message={staffMessage} isOwn={false} isGroupStart colors={colors} />,
+    );
+
+    expect(screen.getByText('Staff Member')).toBeTruthy();
+    expect(screen.getAllByTestId('staff-name-indicator').length).toBeGreaterThan(0);
   });
 
   it('hides sender name when isGroupStart is false', () => {
@@ -76,5 +122,20 @@ describe('MessageItem', () => {
     render(<MessageItem message={audioMsg} isOwn={false} isGroupStart colors={colors} />);
     // Duration should show 1:05
     expect(screen.getByText('1:05')).toBeTruthy();
+  });
+
+  it('renders unread thread indicators when a thread has unread replies', () => {
+    render(
+      <MessageItem
+        message={threadedUnreadMessage}
+        isOwn={false}
+        isGroupStart
+        colors={colors}
+      />,
+    );
+
+    expect(screen.getByTestId('thread-unread-new-badge')).toBeTruthy();
+    expect(screen.getByTestId('thread-unread-count-badge')).toBeTruthy();
+    expect(screen.getByText('2')).toBeTruthy();
   });
 });

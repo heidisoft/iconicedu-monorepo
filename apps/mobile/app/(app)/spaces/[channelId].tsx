@@ -4,11 +4,18 @@ import { MessageCircle, CalendarDays } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useQuery } from '@tanstack/react-query';
 import { useAccount } from '@/hooks/use-account';
 import { useProfile } from '@/hooks/use-profile';
 import { useMessages } from '@/hooks/use-messages';
 import { useSpaceSessions } from '@/hooks/use-space-sessions';
-import { sendTextMessage, markChannelReadState } from '@/lib/api/queries';
+import {
+  sendTextMessage,
+  markChannelReadState,
+  fetchSpaceChannelMetaByChannelId,
+  fetchChannelReadState,
+  queryKeys,
+} from '@/lib/api/queries';
 import { useTheme } from '@/providers/theme-provider';
 import { MessageList } from '@/components/messages/message-list';
 import { MessageInput } from '@/components/messages/message-input';
@@ -20,10 +27,11 @@ import { SpaceSessionsTab } from '@/components/messages/space-sessions-tab';
 type SpaceTab = 'messages' | 'sessions';
 
 export default function SpaceDetailScreen() {
-  const { channelId, topic, iconEmoji, subtitle, tab } = useLocalSearchParams<{
+  const { channelId, topic, iconKey, themeKey, subtitle, tab } = useLocalSearchParams<{
     channelId: string;
     topic?: string;
-    iconEmoji?: string;
+    iconKey?: string;
+    themeKey?: string;
     subtitle?: string;
     tab?: string;
   }>();
@@ -40,6 +48,18 @@ export default function SpaceDetailScreen() {
     ((profile as Record<string, unknown> | undefined)?.id as string) ?? '';
 
   const { data: messages, isLoading, loadMore } = useMessages(channelId ?? '');
+  const { data: spaceMeta, isLoading: isLoadingMeta } = useQuery({
+    queryKey: queryKeys.spaceChannelMeta(channelId ?? ''),
+    queryFn: () => fetchSpaceChannelMetaByChannelId(channelId ?? ''),
+    enabled: !!channelId,
+    staleTime: 5 * 60 * 1000,
+  });
+  const { data: channelReadState } = useQuery({
+    queryKey: queryKeys.channelReadState(channelId ?? '', accountId),
+    queryFn: () => fetchChannelReadState(channelId ?? '', accountId),
+    enabled: !!channelId && !!accountId,
+    staleTime: 30_000,
+  });
 
   const {
     schedules,
@@ -104,14 +124,28 @@ export default function SpaceDetailScreen() {
   );
   if (!channelId) return null;
 
+  const resolvedTitle = spaceMeta?.title ?? topic ?? 'Class';
+  const resolvedSubtitle = (spaceMeta?.subtitle ?? subtitle ?? '').trim() || null;
+  const resolvedStudentProfiles = spaceMeta?.studentProfiles ?? [];
+  const resolvedIconKey = spaceMeta?.iconKey ?? iconKey ?? null;
+  const resolvedThemeKey = spaceMeta?.themeKey ?? themeKey ?? null;
+  const resolvedLiveJoinUrl =
+    spaceMeta?.liveSession?.joinUrl ??
+    (spaceMeta?.liveSession?.enabled ? (liveSession?.meetingLink ?? null) : null);
+
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: colors.pageBg }]} edges={['top']}>
       <ConversationHeader
-        title={topic ?? 'Class'}
+        title={resolvedTitle}
         kind="space"
+        subtitle={resolvedSubtitle}
+        studentProfiles={resolvedStudentProfiles}
+        iconKey={resolvedIconKey}
+        themeKey={resolvedThemeKey}
+        loading={isLoadingMeta && !spaceMeta && !topic}
         onBack={() => router.back()}
         onMore={() => setInfoVisible(true)}
-        liveJoinUrl={liveSession?.meetingLink ?? null}
+        liveJoinUrl={resolvedLiveJoinUrl}
       />
 
       {/* Tab bar: Messages | Sessions */}
@@ -146,16 +180,17 @@ export default function SpaceDetailScreen() {
             messages={messages ?? []}
             currentProfileId={profileId}
             currentAccountId={accountId}
+            lastReadMessageId={channelReadState?.lastReadMessageId ?? null}
+            unreadCount={channelReadState?.unreadCount ?? 0}
             onLoadMore={loadMore}
             loading={isLoading}
             onUnreadViewed={handleUnreadViewed}
             isScreenActive={isFocused && activeTab === 'messages'}
+            emptyTitle="Start the conversation"
+            emptyDescription="Share a welcome message, lesson update, or question to begin the class discussion."
           />
           <TypingIndicator typingUsers={[]} />
-          <MessageInput
-            onSend={handleSend}
-            placeholder={`Message ${topic ?? 'Class'}…`}
-          />
+          <MessageInput onSend={handleSend} placeholder={`Message ${resolvedTitle}…`} />
         </View>
       ) : (
         <View style={[s.flex, { backgroundColor: colors.pageBg }]}>
@@ -171,10 +206,11 @@ export default function SpaceDetailScreen() {
       <ChannelInfoSheet
         visible={infoVisible}
         channelId={channelId ?? ''}
-        title={topic ?? 'Class'}
-        subtitle={subtitle}
+        title={resolvedTitle}
+        subtitle={resolvedSubtitle}
         kind="space"
-        iconEmoji={iconEmoji}
+        iconKey={resolvedIconKey}
+        themeKey={resolvedThemeKey}
         messages={messages ?? []}
         onClose={() => setInfoVisible(false)}
       />

@@ -8,11 +8,14 @@ import {
   ActivityIndicator,
   Image as RNImage,
   ScrollView,
+  Keyboard,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AudioPlayer, createAudioPlayer } from 'expo-audio';
 import type { AudioStatus } from 'expo-audio';
 import { useTheme } from '@/providers/theme-provider';
+import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
 import type { AppColors } from '@/lib/theme';
 import type { MessageVM } from '@iconicedu/shared-types';
 import { EmojiPicker } from './emoji-picker';
@@ -25,9 +28,9 @@ function getMessagePreviewText(message: MessageVM): string {
   const text = (message as { content?: { text?: string } }).content?.text;
   if (text) return text;
   const type = message.core?.type;
-  if (type === 'image') return '🖼 Image';
-  if (type === 'audio-recording') return '🎵 Voice message';
-  if (type === 'file') return '📎 File';
+  if (type === 'image') return 'Image';
+  if (type === 'audio-recording') return 'Voice message';
+  if (type === 'file') return 'File';
   return 'Message';
 }
 
@@ -35,6 +38,12 @@ function fmtDuration(s: number): string {
   const m = Math.floor(s / 60);
   const sec = Math.floor(s % 60);
   return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+}
+
+function truncatePlaceholder(value?: string, maxLength = 25): string {
+  const text = value?.trim() || 'Type your message';
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength).trimEnd()}...`;
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -61,7 +70,7 @@ type MessageInputProps = {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-function makeStyles(C: AppColors, bottomInset: number) {
+function makeStyles(C: AppColors, bottomInset: number, keyboardVisible: boolean) {
   return StyleSheet.create({
     // Reply-in-thread preview banner (sits above the bar)
     replyPreview: {
@@ -189,12 +198,11 @@ function makeStyles(C: AppColors, bottomInset: number) {
     // Main input bar
     bar: {
       flexDirection: 'row',
-      alignItems: 'flex-end',
+      alignItems: 'center',
       gap: 10,
       paddingHorizontal: 12,
-      paddingTop: 10,
-      // Respect home-indicator inset; keyboard hides it so insets.bottom → 0 when open
-      paddingBottom: Math.max(bottomInset, 12),
+      paddingTop: 8,
+      paddingBottom: keyboardVisible ? 8 : Math.max(bottomInset, 12),
       backgroundColor: C.bg,
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: C.border,
@@ -218,6 +226,7 @@ function makeStyles(C: AppColors, bottomInset: number) {
       flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
+      minHeight: 40,
       backgroundColor: C.inputBg,
       borderRadius: 20,
       borderWidth: StyleSheet.hairlineWidth,
@@ -232,6 +241,7 @@ function makeStyles(C: AppColors, bottomInset: number) {
       color: C.text,
       lineHeight: 20,
       paddingVertical: 0,
+      textAlignVertical: 'center',
     },
 
     // Smiley inside pill — right side
@@ -275,6 +285,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const [pendingAttachments, setPendingAttachments] = useState<AttachmentPayload[]>([]);
   const [loadedImageUris, setLoadedImageUris] = useState<Set<string>>(new Set());
   const [audioPlaying, setAudioPlaying] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const audioSoundRef = useRef<AudioPlayer | null>(null);
   const audioSubRef = useRef<{ remove(): void } | null>(null);
   const MAX_INPUT_HEIGHT = 120;
@@ -282,8 +293,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
   const s = React.useMemo(
-    () => makeStyles(colors, insets.bottom),
-    [colors, insets.bottom],
+    () => makeStyles(colors, insets.bottom, keyboardVisible),
+    [colors, insets.bottom, keyboardVisible],
   );
 
   // Auto-focus the input whenever a reply target is set
@@ -303,6 +314,18 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     return () => {
       audioSubRef.current?.remove();
       audioSoundRef.current?.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
     };
   }, []);
 
@@ -403,6 +426,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   }, []);
 
   const canSend = (text.trim().length > 0 || pendingAttachments.length > 0) && !disabled;
+  const resolvedPlaceholder = truncatePlaceholder(placeholder);
 
   return (
     <>
@@ -411,9 +435,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         <View style={s.replyPreview}>
           <View style={s.replyAccent} />
           <View style={s.replyInfo}>
-            <Text style={s.replySender} numberOfLines={1}>
-              {replyTo.core.sender.profile.displayName}
-            </Text>
+            <RoleNameIndicator
+              name={replyTo.core.sender.profile.displayName}
+              role={replyTo.core.sender.kind}
+              textStyle={s.replySender}
+              numberOfLines={1}
+              iconSize={12}
+            />
             <Text style={s.replyText} numberOfLines={1}>
               {getMessagePreviewText(replyTo)}
             </Text>
@@ -542,7 +570,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             value={text}
             onChangeText={handleChangeText}
             onContentSizeChange={handleContentSizeChange}
-            placeholder={placeholder ?? 'Type your message'}
+            placeholder={resolvedPlaceholder}
             placeholderTextColor={colors.textFaint}
             multiline
             scrollEnabled={inputHeight > MAX_INPUT_HEIGHT}

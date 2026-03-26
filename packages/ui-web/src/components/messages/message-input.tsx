@@ -1593,7 +1593,7 @@ export function MessageInput({
         </div>
       </div>
       <Dialog open={isAssignmentDialogOpen} onOpenChange={setIsAssignmentDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-[42rem]">
           <DialogHeader>
             <DialogTitle>
               Create {getAssignmentKindLabel(assignmentDraft.kind).toLowerCase()}{' '}

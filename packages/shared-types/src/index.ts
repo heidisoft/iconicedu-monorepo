@@ -5,6 +5,7 @@ export * from './shared/messages-realtime';
 export * from './shared/availability';
 export * from './shared/working-hours';
 export * from './shared/subjects';
+export * from './shared/learning-space-icons';
 export * from './vm/class-schedule';
 export * from './vm/channel';
 export * from './vm/activity-feed';

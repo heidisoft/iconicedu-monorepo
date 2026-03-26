@@ -43,9 +43,14 @@ export const queryKeys = {
   directMessages: (orgId: string, profileId: string) =>
     ['directMessages', orgId, profileId] as const,
   channel: (channelId: string) => ['channel', channelId] as const,
-  messages: (channelId: string) => ['messages', channelId] as const,
+  spaceChannelMeta: (channelId: string) => ['spaceChannelMeta', channelId] as const,
+  messages: (channelId: string, profileId = '') =>
+    ['messages', channelId, profileId] as const,
+  channelReadState: (channelId: string, accountId: string) =>
+    ['channelReadState', channelId, accountId] as const,
   learningSpaces: (orgId: string) => ['learningSpaces', orgId] as const,
   learningSpace: (spaceId: string) => ['learningSpace', spaceId] as const,
+  supportChannel: (orgId: string) => ['supportChannel', orgId] as const,
   inbox: (orgId: string, profileId: string) => ['inbox', orgId, profileId] as const,
   sidebar: (orgId: string, profileId: string) => ['sidebar', orgId, profileId] as const,
   notificationPrefs: (orgId: string, profileId: string) =>
@@ -114,15 +119,129 @@ export async function fetchProfile(profileId: string) {
 
 /** Fetch the profile belonging to a given account (profiles.account_id → accounts.id). */
 export async function fetchProfileByAccountId(accountId: string) {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('account_id', accountId)
+  const { data: account, error: accountError } = await supabase
+    .from('accounts')
+    .select('id, org_id, active_profile_id')
+    .eq('id', accountId)
     .is('deleted_at', null)
     .maybeSingle();
 
+  if (accountError) throw accountError;
+
+  if (account?.active_profile_id) {
+    const { data: activeProfile, error: activeProfileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', account.active_profile_id)
+      .eq('account_id', accountId)
+      .eq('org_id', account.org_id)
+      .is('deleted_at', null)
+      .maybeSingle();
+
+    if (activeProfileError) throw activeProfileError;
+    if (activeProfile) {
+      return activeProfile;
+    }
+  }
+
+  let fallbackQuery = supabase
+    .from('profiles')
+    .select('*')
+    .eq('account_id', accountId)
+    .is('deleted_at', null);
+
+  if (account?.org_id) {
+    fallbackQuery = fallbackQuery.eq('org_id', account.org_id);
+  }
+
+  const { data: fallbackProfile, error: fallbackError } = await fallbackQuery
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (fallbackError) throw fallbackError;
+
+  if (
+    fallbackProfile &&
+    account?.id &&
+    account.active_profile_id !== fallbackProfile.id
+  ) {
+    const { error: healError } = await supabase
+      .from('accounts')
+      .update({ active_profile_id: fallbackProfile.id })
+      .eq('id', account.id)
+      .is('deleted_at', null);
+
+    if (healError) {
+      console.warn(
+        '[fetchProfileByAccountId] failed to heal active_profile_id:',
+        healError,
+      );
+    }
+  }
+
+  return fallbackProfile ?? null;
+}
+
+export async function fetchProfilesForAccount(accountId: string, orgId?: string) {
+  let query = supabase
+    .from('profiles')
+    .select(
+      'id, org_id, account_id, kind, status, display_name, first_name, last_name, avatar_url, avatar_seed, ui_theme_key, deleted_at',
+    )
+    .eq('account_id', accountId)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: true });
+
+  if (orgId) {
+    query = query.eq('org_id', orgId);
+  }
+
+  const { data, error } = await query;
   if (error) throw error;
-  return data ?? null;
+  return data ?? [];
+}
+
+export async function fetchChannelReadState(channelId: string, accountId: string) {
+  if (!channelId || !accountId) return null;
+
+  const { data, error } = await supabase
+    .from('channel_read_state')
+    .select('channel_id, last_read_message_id, last_read_at, unread_count')
+    .eq('channel_id', channelId)
+    .eq('account_id', accountId)
+    .is('deleted_at', null)
+    .maybeSingle<{
+      channel_id: string;
+      last_read_message_id: string | null;
+      last_read_at: string | null;
+      unread_count: number | null;
+    }>();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  return {
+    channelId: data.channel_id,
+    lastReadMessageId: data.last_read_message_id ?? null,
+    lastReadAt: data.last_read_at ?? null,
+    unreadCount: data.unread_count ?? 0,
+  };
+}
+
+export async function fetchAccountsByIds(accountIds: string[]) {
+  if (!accountIds.length) return [];
+
+  const { data, error } = await supabase
+    .from('accounts')
+    .select(
+      '*, profile:profiles!account_id(id, display_name, first_name, last_name, avatar_seed)',
+    )
+    .in('id', accountIds)
+    .is('deleted_at', null);
+
+  if (error) throw error;
+  return data ?? [];
 }
 
 export type DmParticipant = {
@@ -132,6 +251,8 @@ export type DmParticipant = {
   last_name: string | null;
   avatar_url: string | null;
   avatar_seed: string | null;
+  timezone?: string | null;
+  kind?: string | null;
 };
 
 export type ChannelListItem = {
@@ -145,23 +266,30 @@ export type ChannelListItem = {
   last_message_text: string | null;
   last_message_at: string | null;
   last_message_sender: string | null;
-  /** Class subject emoji, e.g. "📐". */
-  icon_emoji?: string | null;
+  /** Learning-space icon key shared with web. */
+  icon_key?: string | null;
+  /** Channel/space UI theme key from settings. */
+  themeKey?: string | null;
   /** Primary student name this space is for. */
   student_name?: string | null;
+  /** Student participants for classroom channels. */
+  student_profiles?: Array<{ name: string; themeKey?: string | null }>;
   /** DM channel participants (other people, self excluded). */
   participants?: DmParticipant[];
   /** True when guardian is viewing a child's DM they do not participate in. */
   is_supervised?: boolean;
   /** Display name of the child whose conversation this is. */
   supervised_child_name?: string | null;
+  /** True when the row is the org support channel, not a learning space. */
+  is_support?: boolean;
 };
 
 export async function fetchDirectMessages(
   orgId: string,
   myProfileId: string,
+  myAccountId: string,
 ): Promise<ChannelListItem[]> {
-  if (!myProfileId) return [];
+  if (!myProfileId || !myAccountId) return [];
 
   // Step 1: get channel IDs where the logged-in user is a member
   // Uses channel_members (the correct table — mirrors web's channel_members table)
@@ -195,13 +323,27 @@ export async function fetchDirectMessages(
   const { data: memberRows } = await supabase
     .from('channel_members')
     .select(
-      'channel_id, profile_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed)',
+      'channel_id, profile_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed, timezone, kind)',
     )
     .in(
       'channel_id',
       chRows.map((c) => c.id),
     )
     .is('deleted_at', null);
+
+  const { data: readStateRows } = await supabase
+    .from('channel_read_state')
+    .select('channel_id, unread_count')
+    .eq('account_id', myAccountId)
+    .in(
+      'channel_id',
+      chRows.map((c) => c.id),
+    )
+    .is('deleted_at', null);
+
+  const readStateByChannelId = new Map(
+    (readStateRows ?? []).map((row) => [row.channel_id as string, row.unread_count ?? 0]),
+  );
 
   // Build channelId → DmParticipant[] map, excluding self
   const participantMap = new Map<string, DmParticipant[]>();
@@ -224,7 +366,7 @@ export async function fetchDirectMessages(
       description: ch.description ?? null,
       kind: ch.kind,
       updated_at: ch.updated_at,
-      unread_count: 0,
+      unread_count: Math.max(0, readStateByChannelId.get(ch.id) ?? 0),
       last_message_text: last?.text ?? null,
       last_message_at: last?.at ?? null,
       last_message_sender: last?.sender ?? null,
@@ -310,11 +452,28 @@ export async function fetchSupervisedDirectMessages(
       .order('updated_at', { ascending: false });
     if (!chRows?.length) continue;
 
+    const { data: readStateRows } = await supabase
+      .from('channel_read_state')
+      .select('channel_id, unread_count')
+      .eq('account_id', child.account_id)
+      .in(
+        'channel_id',
+        chRows.map((c: { id: string }) => c.id),
+      )
+      .is('deleted_at', null);
+
+    const readStateByChannelId = new Map(
+      (readStateRows ?? []).map((row) => [
+        row.channel_id as string,
+        row.unread_count ?? 0,
+      ]),
+    );
+
     // Fetch participants for display (exclude the child — show the other party)
     const { data: memberRows } = await supabase
       .from('channel_members')
       .select(
-        'channel_id, profile_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed)',
+        'channel_id, profile_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed, timezone, kind)',
       )
       .in(
         'channel_id',
@@ -352,7 +511,7 @@ export async function fetchSupervisedDirectMessages(
         description: ch.description ?? null,
         kind: ch.kind,
         updated_at: ch.updated_at,
-        unread_count: 0,
+        unread_count: Math.max(0, readStateByChannelId.get(ch.id) ?? 0),
         last_message_text: null,
         last_message_at: null,
         last_message_sender: null,
@@ -372,23 +531,122 @@ export async function fetchSupervisedDirectMessages(
   });
 }
 
+export async function findDirectMessageChannelForProfiles(
+  orgId: string,
+  currentProfileId: string,
+  targetProfileId: string,
+): Promise<{
+  channelId: string;
+  topic: string;
+  avatarSeed: string | null;
+  avatarUrl: string | null;
+  avatarRole: string | null;
+  avatarTimezone: string | null;
+} | null> {
+  if (
+    !orgId ||
+    !currentProfileId ||
+    !targetProfileId ||
+    currentProfileId === targetProfileId
+  ) {
+    return null;
+  }
+
+  const [
+    { data: currentMemberships, error: currentError },
+    { data: targetMemberships, error: targetError },
+  ] = await Promise.all([
+    supabase
+      .from('channel_members')
+      .select('channel_id')
+      .eq('org_id', orgId)
+      .eq('profile_id', currentProfileId)
+      .is('deleted_at', null),
+    supabase
+      .from('channel_members')
+      .select('channel_id')
+      .eq('org_id', orgId)
+      .eq('profile_id', targetProfileId)
+      .is('deleted_at', null),
+  ]);
+
+  if (currentError) throw currentError;
+  if (targetError) throw targetError;
+
+  const currentChannelIds = new Set(
+    (currentMemberships ?? []).map((row) => row.channel_id as string),
+  );
+  const sharedChannelIds = (targetMemberships ?? [])
+    .map((row) => row.channel_id as string)
+    .filter((channelId) => currentChannelIds.has(channelId));
+
+  if (sharedChannelIds.length === 0) return null;
+
+  const [
+    { data: channels, error: channelsError },
+    { data: targetProfile, error: profileError },
+  ] = await Promise.all([
+    supabase
+      .from('channels')
+      .select('id, updated_at')
+      .eq('org_id', orgId)
+      .eq('kind', 'dm')
+      .eq('status', 'active')
+      .in('id', sharedChannelIds)
+      .is('deleted_at', null)
+      .order('updated_at', { ascending: false })
+      .limit(1),
+    supabase
+      .from('profiles')
+      .select(
+        'id, display_name, first_name, last_name, avatar_url, avatar_seed, timezone, kind',
+      )
+      .eq('id', targetProfileId)
+      .is('deleted_at', null)
+      .maybeSingle(),
+  ]);
+
+  if (channelsError) throw channelsError;
+  if (profileError) throw profileError;
+
+  const channel = channels?.[0];
+  if (!channel || !targetProfile) return null;
+
+  const topic =
+    targetProfile.display_name?.trim() ||
+    [targetProfile.first_name, targetProfile.last_name]
+      .filter(Boolean)
+      .join(' ')
+      .trim() ||
+    'Direct Message';
+
+  return {
+    channelId: channel.id,
+    topic,
+    avatarSeed: (targetProfile.avatar_seed as string | null) ?? targetProfile.id,
+    avatarUrl: (targetProfile.avatar_url as string | null) ?? null,
+    avatarRole: (targetProfile.kind as string | null) ?? null,
+    avatarTimezone: (targetProfile.timezone as string | null) ?? null,
+  };
+}
+
 // ─── Shared preview helper ────────────────────────────────────────────────────
 
 type LastMessageInfo = { text: string | null; at: string | null; sender: string | null };
 
 const PREVIEW_LABELS: Record<string, string> = {
-  image: '🖼 Image',
-  file: '📎 File',
-  'audio-recording': '🎙 Voice message',
-  'lesson-assignment': '📚 Assignment',
-  'homework-submission': '📝 Homework submitted',
-  'progress-update': '📈 Progress update',
-  'event-reminder': '📅 Event reminder',
-  'session-summary': '📋 Session summary',
-  'session-complete': '✓ Session complete',
-  'session-booking': '🗓 Session booked',
-  'payment-reminder': '💳 Payment reminder',
-  'feedback-request': '💬 Feedback request',
+  image: 'Image',
+  file: 'File',
+  'audio-recording': 'Voice message',
+  'lesson-assignment': 'Assignment',
+  'homework-submission': 'Homework submitted',
+  'progress-update': 'Progress update',
+  'event-reminder': 'Event reminder',
+  'session-summary': 'Session summary',
+  'session-complete': 'Session complete',
+  'session-booking': 'Session booked',
+  'payment-reminder': 'Payment reminder',
+  'feedback-request': 'Feedback request',
 };
 
 /**
@@ -517,9 +775,26 @@ export async function fetchChannels(orgId: string): Promise<ChannelListItem[]> {
 // messages table has no `content` column — payloads are in type-specific tables.
 // Only select columns that actually exist on the messages table.
 const BASE_MESSAGE_SELECT = `
-  id, org_id, channel_id, sender_profile_id, type, created_at, updated_at, thread_parent_id,
-  sender:profiles!sender_profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed)
+  id, org_id, channel_id, sender_profile_id, visibility_type, visibility_user_ids, type, created_at, updated_at, thread_parent_id,
+  sender:profiles!sender_profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed, kind)
 `;
+
+export function filterVisibleMessageRows<T extends RawMessageRow>(
+  rows: T[],
+  currentProfileId = '',
+): T[] {
+  return rows.filter((row) => {
+    if (row.visibility_type !== 'specific-users') {
+      return true;
+    }
+
+    if (!currentProfileId) {
+      return false;
+    }
+
+    return (row.visibility_user_ids ?? []).includes(currentProfileId);
+  });
+}
 
 /** message type → payload table name */
 const TYPE_TABLE: Record<string, string> = {
@@ -645,11 +920,22 @@ type RawThreadParticipantRow = {
   profile: RawSenderProfile | null;
 };
 
+type RawThreadReadStateRow = {
+  thread_id: string;
+  channel_id: string | null;
+  last_read_message_id: string | null;
+  last_read_at: string | null;
+  unread_count: number | null;
+};
+
 /**
  * Fetch threads from the canonical `threads` table (mirrors web's buildThreadsByChannelId).
  * Returns a map of parent_message_id → ThreadVM.
  */
-async function loadThreads(parentMessageIds: string[]): Promise<Map<string, ThreadVM>> {
+async function loadThreads(
+  parentMessageIds: string[],
+  currentAccountId?: string,
+): Promise<Map<string, ThreadVM>> {
   if (!parentMessageIds.length) return new Map();
 
   const { data: threadRows, error: threadError } = await supabase
@@ -668,13 +954,26 @@ async function loadThreads(parentMessageIds: string[]): Promise<Map<string, Thre
   const typedThreadRows = threadRows as RawThreadRow[];
   const threadIds = typedThreadRows.map((t) => t.id);
 
-  const { data: participantRows, error: participantError } = await supabase
-    .from('thread_participants')
-    .select(
-      'thread_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed)',
-    )
-    .in('thread_id', threadIds)
-    .is('deleted_at', null);
+  const [{ data: participantRows, error: participantError }, { data: readStateRows }] =
+    await Promise.all([
+      supabase
+        .from('thread_participants')
+        .select(
+          'thread_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed, kind)',
+        )
+        .in('thread_id', threadIds)
+        .is('deleted_at', null),
+      currentAccountId
+        ? supabase
+            .from('thread_read_state')
+            .select(
+              'thread_id, channel_id, last_read_message_id, last_read_at, unread_count',
+            )
+            .eq('account_id', currentAccountId)
+            .in('thread_id', threadIds)
+            .is('deleted_at', null)
+        : Promise.resolve({ data: [] as RawThreadReadStateRow[] }),
+    ]);
 
   if (participantError) {
     console.warn('[loadThreads] participants query failed:', participantError.message);
@@ -688,6 +987,19 @@ async function loadThreads(parentMessageIds: string[]): Promise<Map<string, Thre
     list.push(p.profile);
     participantsByThread.set(p.thread_id, list);
   }
+
+  const readStateByThread = new Map(
+    ((readStateRows ?? []) as RawThreadReadStateRow[]).map((row) => [
+      row.thread_id,
+      {
+        threadId: row.thread_id,
+        channelId: row.channel_id ?? undefined,
+        lastReadMessageId: row.last_read_message_id ?? undefined,
+        lastReadAt: row.last_read_at ?? undefined,
+        unreadCount: row.unread_count ?? undefined,
+      },
+    ]),
+  );
 
   const result = new Map<string, ThreadVM>();
   for (const t of typedThreadRows) {
@@ -708,6 +1020,12 @@ async function loadThreads(parentMessageIds: string[]): Promise<Map<string, Thre
         lastReplyAt: t.last_reply_at ?? t.created_at, // fallback = thread created_at
       },
       participants,
+      readState:
+        readStateByThread.get(t.id) ??
+        ({
+          threadId: t.id,
+          channelId: t.channel_id,
+        } as ThreadVM['readState']),
     });
   }
 
@@ -716,7 +1034,7 @@ async function loadThreads(parentMessageIds: string[]): Promise<Map<string, Thre
 
 export async function fetchChannelMessages(
   channelId: string,
-  _currentProfileId = '',
+  currentProfileId = '',
   currentAccountId = '',
   limit = 40,
   before?: string,
@@ -738,13 +1056,17 @@ export async function fetchChannelMessages(
   if (error) throw error;
   if (!rows || rows.length === 0) return [];
 
-  const typedRows = rows as unknown as RawMessageRow[];
+  const typedRows = filterVisibleMessageRows(
+    rows as unknown as RawMessageRow[],
+    currentProfileId,
+  );
+  if (typedRows.length === 0) return [];
   const messageIds = typedRows.map((r) => r.id);
 
   const [payloadMap, reactionMap, threadsMap] = await Promise.all([
     loadPayloads(typedRows),
     loadReactions(messageIds, currentAccountId),
-    loadThreads(messageIds),
+    loadThreads(messageIds, currentAccountId),
   ]);
 
   // Reverse a copy (oldest→newest) without mutating the typed rows array.
@@ -771,7 +1093,7 @@ export async function fetchChannelMessages(
 export async function fetchThreadMessages(
   threadId: string,
   parentMessageId: string,
-  _currentProfileId = '',
+  currentProfileId = '',
   currentAccountId = '',
 ): Promise<MessageVM[]> {
   // Try thread_id first (web-aligned — replies have thread_id → threads.id).
@@ -799,7 +1121,11 @@ export async function fetchThreadMessages(
   if (error) throw error;
   if (!rows || rows.length === 0) return [];
 
-  const typedRows = rows as unknown as RawMessageRow[];
+  const typedRows = filterVisibleMessageRows(
+    rows as unknown as RawMessageRow[],
+    currentProfileId,
+  );
+  if (typedRows.length === 0) return [];
   const messageIds = typedRows.map((r) => r.id);
 
   const [payloadMap, reactionMap] = await Promise.all([
@@ -914,19 +1240,152 @@ export async function fetchLearningSpaces(orgId: string) {
   return data ?? [];
 }
 
-/** Emoji icon for each class icon_key (Lucide icon keys mapped to emoji equivalents). */
-const SPACE_ICON_EMOJI: Record<string, string> = {
-  'square-pi': '📐',
-  languages: '🌐',
-  'chef-hat': '👨‍🍳',
-  earth: '🌍',
-  sparkles: '✨',
-  'book-open': '📖',
-  'flask-conical': '🧪',
-  music: '🎵',
-  palette: '🎨',
-  dumbbell: '🏋️',
-};
+export async function fetchSpaceChannelMetaByChannelId(channelId: string): Promise<{
+  title: string | null;
+  subtitle: string | null;
+  iconKey: string | null;
+  themeKey: string | null;
+  description: string | null;
+  liveSession: {
+    enabled: boolean;
+    provider: 'daily' | 'zoom' | 'jitsi' | 'custom';
+    mode: 'video' | 'audio' | null;
+    joinUrl: string | null;
+  } | null;
+  studentProfiles: Array<{ name: string; themeKey?: string | null }>;
+} | null> {
+  if (!channelId) return null;
+
+  const { data, error } = await supabase
+    .from('learning_space_channels')
+    .select(
+      `
+      space:learning_spaces!learning_space_id(
+        id,
+        title,
+        subject,
+        icon_key,
+        description,
+        deleted_at
+      ),
+      channel:channels!channel_id(ui_theme_key, live_session_config)
+    `,
+    )
+    .eq('channel_id', channelId)
+    .eq('is_primary', true)
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  const space = data?.space as
+    | {
+        id: string;
+        title: string | null;
+        subject: string | null;
+        icon_key: string | null;
+        description: string | null;
+        deleted_at: string | null;
+      }
+    | null
+    | undefined;
+  const channel = data?.channel as
+    | { ui_theme_key: string | null; live_session_config?: unknown }
+    | null
+    | undefined;
+
+  if (!space || space.deleted_at) return null;
+
+  const { data: participantRows, error: participantError } = await supabase
+    .from('learning_space_participants')
+    .select(
+      `
+      profile:profiles!profile_id(display_name, first_name, last_name, kind, ui_theme_key)
+    `,
+    )
+    .eq('learning_space_id', space.id)
+    .is('deleted_at', null);
+
+  if (participantError) throw participantError;
+
+  const studentProfiles: Array<{ name: string; themeKey?: string | null }> = [];
+  for (const row of participantRows ?? []) {
+    const profile = Array.isArray(row.profile) ? row.profile[0] : row.profile;
+    if (!profile || profile.kind !== 'child') continue;
+    const displayName =
+      profile.display_name?.trim() ||
+      [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim();
+    if (displayName && !studentProfiles.some((student) => student.name === displayName)) {
+      studentProfiles.push({
+        name: displayName,
+        themeKey: profile.ui_theme_key ?? null,
+      });
+    }
+  }
+
+  const liveSessionConfig = (() => {
+    const value = channel?.live_session_config;
+    if (!value || typeof value !== 'object') return null;
+    const candidate = value as Record<string, unknown>;
+    if (candidate.enabled !== true || typeof candidate.provider !== 'string') {
+      return null;
+    }
+    if (
+      candidate.provider !== 'daily' &&
+      candidate.provider !== 'zoom' &&
+      candidate.provider !== 'jitsi' &&
+      candidate.provider !== 'custom'
+    ) {
+      return null;
+    }
+    const mode =
+      candidate.mode === 'video' || candidate.mode === 'audio'
+        ? (candidate.mode as 'video' | 'audio')
+        : null;
+    const joinUrl =
+      typeof candidate.joinUrl === 'string' && candidate.joinUrl.trim().length > 0
+        ? candidate.joinUrl.trim()
+        : null;
+    const provider = candidate.provider as 'daily' | 'zoom' | 'jitsi' | 'custom';
+    return {
+      enabled: true,
+      provider,
+      mode,
+      joinUrl,
+    };
+  })();
+
+  return {
+    title: space.title ?? null,
+    subtitle: space.subject ?? null,
+    iconKey: space.icon_key ?? null,
+    themeKey: channel?.ui_theme_key ?? null,
+    description: space.description ?? null,
+    liveSession: liveSessionConfig,
+    studentProfiles,
+  };
+}
+
+export async function fetchSupportChannel(orgId: string): Promise<{
+  id: string;
+  topic: string | null;
+  description: string | null;
+  icon_key?: string | null;
+  themeKey?: string | null;
+  updated_at?: string | null;
+} | null> {
+  const { data, error } = await supabase
+    .from('channels')
+    .select('id, topic, description, icon_key, ui_theme_key, updated_at')
+    .eq('org_id', orgId)
+    .eq('purpose', 'support')
+    .eq('status', 'active')
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data ?? null;
+}
 
 /**
  * Fetches class primary channels for the messages tab, scoped to
@@ -936,8 +1395,10 @@ const SPACE_ICON_EMOJI: Record<string, string> = {
 export async function fetchLearningSpaceChannels(
   orgId: string,
   myProfileId: string,
+  myAccountId: string,
+  myProfileKind?: string | null,
 ): Promise<ChannelListItem[]> {
-  if (!myProfileId) return [];
+  if (!myProfileId || !myAccountId) return [];
 
   // Step 1: get class IDs where the user is a participant
   // Uses learning_space_participants (mirrors web's getLearningSpaceParticipantsByLearningSpaceIds)
@@ -960,7 +1421,7 @@ export async function fetchLearningSpaceChannels(
       `
       channel_id,
       space:learning_spaces!learning_space_id(id, title, icon_key, subject, status, deleted_at),
-      channel:channels!channel_id(id, org_id, updated_at)
+      channel:channels!channel_id(id, org_id, ui_theme_key, updated_at)
       `,
     )
     .eq('org_id', orgId)
@@ -981,7 +1442,81 @@ export async function fetchLearningSpaceChannels(
       deleted_at: string | null;
     } | null;
   const toChannel = (r: Row) =>
-    r.channel as unknown as { id: string; org_id: string; updated_at: string } | null;
+    r.channel as unknown as {
+      id: string;
+      org_id: string;
+      ui_theme_key: string | null;
+      updated_at: string;
+    } | null;
+
+  const channelIds = (data ?? [])
+    .map((row) => {
+      const channel = toChannel(row);
+      return channel?.id ?? null;
+    })
+    .filter(Boolean) as string[];
+  const learningSpaceIds = (data ?? [])
+    .map((row) => {
+      const space = toSpace(row);
+      return space?.id ?? null;
+    })
+    .filter(Boolean) as string[];
+
+  const { data: readStateRows } = channelIds.length
+    ? await supabase
+        .from('channel_read_state')
+        .select('channel_id, unread_count')
+        .eq('account_id', myAccountId)
+        .in('channel_id', channelIds)
+        .is('deleted_at', null)
+    : { data: [] as Array<{ channel_id: string; unread_count: number | null }> };
+
+  const readStateByChannelId = new Map(
+    (readStateRows ?? []).map((row) => [row.channel_id as string, row.unread_count ?? 0]),
+  );
+
+  const { data: participantRows } = learningSpaceIds.length
+    ? await supabase
+        .from('learning_space_participants')
+        .select(
+          `
+          learning_space_id,
+          profile:profiles!profile_id(display_name, first_name, last_name, kind, ui_theme_key)
+          `,
+        )
+        .eq('org_id', orgId)
+        .in('learning_space_id', learningSpaceIds)
+        .is('deleted_at', null)
+    : {
+        data: [] as Array<{
+          learning_space_id: string;
+          profile: {
+            display_name: string | null;
+            first_name: string | null;
+            last_name: string | null;
+            kind: string | null;
+            ui_theme_key: string | null;
+          } | null;
+        }>,
+      };
+
+  const studentProfilesBySpaceId = new Map<
+    string,
+    Array<{ name: string; themeKey?: string | null }>
+  >();
+  for (const row of participantRows ?? []) {
+    const profile = Array.isArray(row.profile) ? row.profile[0] : row.profile;
+    if (!profile || profile.kind !== 'child') continue;
+    const displayName =
+      profile?.display_name?.trim() ||
+      [profile?.first_name, profile?.last_name].filter(Boolean).join(' ').trim();
+    if (!displayName) continue;
+    const list = studentProfilesBySpaceId.get(row.learning_space_id) ?? [];
+    if (!list.some((item) => item.name === displayName)) {
+      list.push({ name: displayName, themeKey: profile.ui_theme_key ?? null });
+      studentProfilesBySpaceId.set(row.learning_space_id, list);
+    }
+  }
 
   const items = (data ?? [])
     .filter((row) => {
@@ -1001,21 +1536,72 @@ export async function fetchLearningSpaceChannels(
         description: sp.subject ?? null,
         kind: 'channel' as const,
         updated_at: ch.updated_at,
-        unread_count: 0,
+        unread_count: Math.max(0, readStateByChannelId.get(ch.id) ?? 0),
         last_message_text: null as string | null,
         last_message_at: null as string | null,
         last_message_sender: null as string | null,
-        icon_emoji: SPACE_ICON_EMOJI[sp.icon_key ?? ''] ?? null,
+        icon_key: sp.icon_key ?? null,
+        themeKey: ch.ui_theme_key ?? null,
         student_name: null,
+        student_profiles: studentProfilesBySpaceId.get(sp.id) ?? [],
+        is_support: false,
       };
     });
 
-  const lastMessages = await fetchLastMessages(items.map((i) => i.id));
+  const supportChannel =
+    myProfileKind === 'child' ? null : await fetchSupportChannel(orgId);
+  const supportItems: ChannelListItem[] = supportChannel
+    ? [
+        {
+          id: supportChannel.id,
+          org_id: orgId,
+          topic: supportChannel.topic ?? 'Support',
+          description: supportChannel.description ?? null,
+          kind: 'channel' as const,
+          updated_at: supportChannel.updated_at ?? new Date(0).toISOString(),
+          unread_count: 0,
+          last_message_text: null,
+          last_message_at: null,
+          last_message_sender: null,
+          icon_key: supportChannel.icon_key ?? 'support',
+          themeKey: supportChannel.themeKey ?? null,
+          student_name: null,
+          student_profiles: [],
+          is_support: true,
+        },
+      ]
+    : [];
 
-  return items.map((item) => {
+  const allItems = [...items, ...supportItems];
+  const allChannelIds = allItems.map((i) => i.id);
+
+  const supportReadStateRows = supportItems.length
+    ? await supabase
+        .from('channel_read_state')
+        .select('channel_id, unread_count')
+        .eq('account_id', myAccountId)
+        .in(
+          'channel_id',
+          supportItems.map((item) => item.id),
+        )
+        .is('deleted_at', null)
+    : { data: [] as Array<{ channel_id: string; unread_count: number | null }> };
+
+  const mergedReadStateByChannelId = new Map(readStateByChannelId);
+  for (const row of supportReadStateRows.data ?? []) {
+    mergedReadStateByChannelId.set(row.channel_id as string, row.unread_count ?? 0);
+  }
+
+  const lastMessages = await fetchLastMessages(allChannelIds);
+
+  return allItems.map((item) => {
     const last = lastMessages.get(item.id);
     return {
       ...item,
+      unread_count: Math.max(
+        0,
+        mergedReadStateByChannelId.get(item.id) ?? item.unread_count,
+      ),
       last_message_text: last?.text ?? null,
       last_message_at: last?.at ?? null,
       last_message_sender: last?.sender ?? null,
@@ -1050,7 +1636,7 @@ export async function fetchProfilesByAccountIds(orgId: string, accountIds: strin
   const { data, error } = await supabase
     .from('profiles')
     .select(
-      'id, account_id, display_name, first_name, last_name, avatar_url, avatar_seed, kind',
+      'id, org_id, account_id, display_name, first_name, last_name, avatar_url, avatar_seed, kind, status, ui_theme_key',
     )
     .eq('org_id', orgId)
     .in('account_id', accountIds)
@@ -1431,139 +2017,42 @@ export async function sendTextMessage(
   threadParentId?: string,
   threadId?: string, // threads.id — set when replying to existing thread
 ) {
-  const now = new Date().toISOString();
-  let resolvedThreadId = threadId;
-
-  // ── Thread lifecycle (replies only) ──────────────────────────────────────
-  if (threadParentId) {
-    if (!resolvedThreadId) {
-      // ─ New thread: fetch parent message context, then create threads row ─
-      const [{ data: parentMsg }, { data: parentText }] = await Promise.all([
-        supabase
-          .from('messages')
-          .select(
-            'sender_profile_id, sender:profiles!sender_profile_id(display_name, first_name, last_name)',
-          )
-          .eq('id', threadParentId)
-          .maybeSingle(),
-        supabase
-          .from('message_text')
-          .select('payload')
-          .eq('message_id', threadParentId)
-          .maybeSingle(),
-      ]);
-
-      type ParentSenderShape = {
-        display_name: string | null;
-        first_name: string | null;
-        last_name: string | null;
-      };
-      const parentSenderProfileId =
-        (parentMsg as { sender_profile_id?: string } | null)?.sender_profile_id ?? null;
-      const parentSender =
-        (parentMsg as { sender?: ParentSenderShape } | null)?.sender ?? null;
-      const authorName =
-        parentSender?.display_name?.trim() ||
-        [parentSender?.first_name, parentSender?.last_name].filter(Boolean).join(' ') ||
-        null;
-      // Use parent message text as snippet (thread context); fall back to reply text
-      const snippet =
-        (
-          (parentText?.payload as Record<string, unknown> | null)?.text as
-            | string
-            | undefined
-        )?.slice(0, 100) ?? text.slice(0, 100);
-
-      // Create the threads row (mirrors web's sendTextMessageAction)
-      const { data: newThread, error: threadError } = await supabase
-        .from('threads')
-        .insert({
-          org_id: orgId,
-          channel_id: channelId,
-          parent_message_id: threadParentId,
-          snippet,
-          author_id: parentSenderProfileId,
-          author_name: authorName,
-          message_count: 1,
-          last_reply_at: now,
-        })
-        .select('id')
-        .single();
-
-      if (threadError) throw threadError;
-      resolvedThreadId = newThread.id;
-
-      // Update parent message thread_id FK so loadThreads can find it
-      await supabase
-        .from('messages')
-        .update({ thread_id: resolvedThreadId })
-        .eq('id', threadParentId);
-
-      // Add participants: parent author + reply sender (deduped)
-      const participantIds = Array.from(
-        new Set([
-          senderProfileId,
-          ...(parentSenderProfileId ? [parentSenderProfileId] : []),
-        ]),
-      );
-      await supabase.from('thread_participants').upsert(
-        participantIds.map((profileId) => ({
-          thread_id: resolvedThreadId!,
-          org_id: orgId,
-          profile_id: profileId,
-        })),
-        { ignoreDuplicates: true },
-      );
-    } else {
-      // ─ Existing thread: increment message_count, update last_reply_at, upsert participant ─
-      const { data: threadRow } = await supabase
-        .from('threads')
-        .select('message_count')
-        .eq('id', resolvedThreadId)
-        .single();
-
-      await supabase
-        .from('threads')
-        .update({
-          message_count: (threadRow?.message_count ?? 0) + 1,
-          last_reply_at: now,
-        })
-        .eq('id', resolvedThreadId);
-
-      await supabase
-        .from('thread_participants')
-        .upsert(
-          [{ thread_id: resolvedThreadId, org_id: orgId, profile_id: senderProfileId }],
-          { ignoreDuplicates: true },
-        );
-    }
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const accessToken = session?.access_token?.trim();
+  if (!accessToken) {
+    throw new Error('Not authenticated');
   }
 
-  // ── Insert the message row ───────────────────────────────────────────────
-  const { data: msg, error: msgError } = await supabase
-    .from('messages')
-    .insert({
-      channel_id: channelId,
-      sender_profile_id: senderProfileId,
-      org_id: orgId,
-      type: 'text',
-      thread_parent_id: threadParentId ?? null,
-      ...(resolvedThreadId ? { thread_id: resolvedThreadId } : {}),
-    })
-    .select('id')
-    .single();
+  const apiBaseUrl = process.env.EXPO_PUBLIC_API_URL?.trim() || 'http://localhost:3000';
 
-  if (msgError) throw msgError;
-
-  // ── Insert the text payload ──────────────────────────────────────────────
-  const { error: textError } = await supabase.from('message_text').insert({
-    message_id: msg.id,
-    org_id: orgId,
-    payload: { text },
+  const response = await fetch(`${apiBaseUrl.replace(/\/+$/g, '')}/messages/text`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      orgId,
+      channelId,
+      senderProfileId,
+      content: text,
+      threadParentId: threadParentId ?? null,
+      threadId: threadId ?? null,
+    }),
   });
 
-  if (textError) throw textError;
-  return msg;
+  const body = (await response.json().catch(() => null)) as {
+    message?: string;
+    id?: string;
+  } | null;
+
+  if (!response.ok) {
+    throw new Error(body?.message ?? 'Unable to send message.');
+  }
+
+  return body;
 }
 
 // ─── File / Image / Audio upload + message creation ───────────────────────────
@@ -1839,7 +2328,7 @@ function mapClassScheduleRow(row: Record<string, unknown>): ClassScheduleVM {
   const participants: ClassScheduleParticipantVM[] = (
     (row.participants as Record<string, unknown>[]) ?? []
   ).map((p) => ({
-    ids: { id: p.id as string, orgId },
+    ids: { id: p.profile_id as string, orgId },
     role: p.role as ParticipantRoleVM,
     status: (p.status as ParticipationStatusVM | null) ?? undefined,
     displayName: (p.display_name as string | null) ?? undefined,
@@ -1881,7 +2370,7 @@ const CLASS_SCHEDULE_SELECT = `
   source_related_learning_space_id,
   created_at, created_by, updated_at, updated_by,
   participants:class_schedule_participants(
-    id, org_id, role, status, display_name, avatar_url, theme_key
+    id, org_id, profile_id, role, status, display_name, avatar_url, theme_key
   ),
   recurrence:class_schedule_recurrence(
     id, org_id, frequency, interval, count, until, timezone, byday,
@@ -2249,6 +2738,123 @@ export async function markChannelReadState(input: {
     p_channel_id: input.channelId,
     p_account_id: input.accountId,
     p_last_read_message_id: input.lastReadMessageId,
+    p_last_read_at: new Date().toISOString(),
+    p_actor_profile_id: input.profileId,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return typeof data === 'number' ? data : 0;
+}
+
+export async function markChannelsReadByIds(input: {
+  orgId: string;
+  accountId: string;
+  profileId: string;
+  channelIds: string[];
+}): Promise<void> {
+  const uniqueChannelIds = [...new Set(input.channelIds.filter(Boolean))];
+  if (uniqueChannelIds.length === 0) return;
+
+  await Promise.all(
+    uniqueChannelIds.map(async (channelId) => {
+      const latestMessageLookup = await supabase
+        .from('messages')
+        .select('id')
+        .eq('org_id', input.orgId)
+        .eq('channel_id', channelId)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle<{ id: string }>();
+
+      if (latestMessageLookup.error) {
+        throw latestMessageLookup.error;
+      }
+
+      const lastReadMessageId = latestMessageLookup.data?.id;
+      if (!lastReadMessageId) {
+        return;
+      }
+
+      await markChannelReadState({
+        orgId: input.orgId,
+        accountId: input.accountId,
+        profileId: input.profileId,
+        channelId,
+        lastReadMessageId,
+      });
+    }),
+  );
+}
+
+export async function markThreadReadState(input: {
+  orgId: string;
+  accountId: string;
+  profileId: string;
+  channelId: string;
+  threadId: string;
+  lastReadMessageId?: string | null;
+}): Promise<number> {
+  const threadLookup = await supabase
+    .from('threads')
+    .select('id')
+    .eq('org_id', input.orgId)
+    .eq('id', input.threadId)
+    .eq('channel_id', input.channelId)
+    .is('deleted_at', null)
+    .maybeSingle<{ id: string }>();
+
+  if (threadLookup.error) {
+    throw threadLookup.error;
+  }
+  if (!threadLookup.data) {
+    throw new Error('Thread not found or access denied');
+  }
+
+  const participantLookup = await supabase
+    .from('thread_participants')
+    .select('id')
+    .eq('org_id', input.orgId)
+    .eq('thread_id', input.threadId)
+    .eq('profile_id', input.profileId)
+    .is('deleted_at', null)
+    .maybeSingle<{ id: string }>();
+
+  if (participantLookup.error) {
+    throw participantLookup.error;
+  }
+  if (!participantLookup.data) {
+    throw new Error('Thread not found or access denied');
+  }
+
+  if (input.lastReadMessageId) {
+    const messageLookup = await supabase
+      .from('messages')
+      .select('id')
+      .eq('org_id', input.orgId)
+      .eq('channel_id', input.channelId)
+      .eq('thread_id', input.threadId)
+      .eq('id', input.lastReadMessageId)
+      .is('deleted_at', null)
+      .maybeSingle<{ id: string }>();
+
+    if (messageLookup.error) {
+      throw messageLookup.error;
+    }
+    if (!messageLookup.data) {
+      throw new Error('Invalid lastReadMessageId for thread');
+    }
+  }
+
+  const { data, error } = await supabase.rpc('recompute_unread_for_account_thread', {
+    p_org_id: input.orgId,
+    p_channel_id: input.channelId,
+    p_thread_id: input.threadId,
+    p_account_id: input.accountId,
+    p_last_read_message_id: input.lastReadMessageId ?? null,
     p_last_read_at: new Date().toISOString(),
     p_actor_profile_id: input.profileId,
   });

@@ -1,4 +1,5 @@
 // Components
+export * from '@iconicedu/ui-native/components/SiteLogo';
 export * from '@iconicedu/ui-native/components/SiteLogoFull';
 export * from '@iconicedu/ui-native/components/Button';
 export * from '@iconicedu/ui-native/components/Text';

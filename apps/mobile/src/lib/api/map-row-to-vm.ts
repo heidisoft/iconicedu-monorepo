@@ -13,6 +13,8 @@ export type RawMessageRow = {
   org_id: string;
   channel_id: string;
   sender_profile_id: string;
+  visibility_type?: 'all' | 'specific-users' | null;
+  visibility_user_ids?: string[] | null;
   type: string;
   created_at: string;
   updated_at: string;
@@ -24,6 +26,7 @@ export type RawMessageRow = {
     last_name: string | null;
     avatar_url: string | null;
     avatar_seed: string | null;
+    kind?: string | null;
   };
 };
 
@@ -39,7 +42,7 @@ export function buildSenderProfile(
 
   return {
     ids: { id: sender.id, orgId, accountId: '' },
-    kind: 'educator',
+    kind: (sender.kind as UserProfileVM['kind'] | null) ?? 'educator',
     profile: {
       displayName,
       avatar: sender.avatar_url
@@ -73,7 +76,13 @@ export function mapRowToMessageVM(
       type: row.type,
       sender,
       createdAt: row.created_at,
-      visibility: { type: 'all' as const },
+      visibility:
+        row.visibility_type === 'specific-users'
+          ? {
+              type: 'specific-users' as const,
+              userIds: row.visibility_user_ids ?? [],
+            }
+          : { type: 'all' as const },
     },
     social: { reactions, ...(thread ? { thread } : {}) },
   };
@@ -204,19 +213,19 @@ export function getMessagePreview(msg: {
 }): string {
   if (msg.content?.text) return msg.content.text;
   const labels: Record<string, string> = {
-    'lesson-assignment': '📚 Assignment',
-    'homework-submission': '📝 Homework submitted',
-    'progress-update': '📈 Progress update',
-    'event-reminder': '📅 Event reminder',
-    'session-summary': '📋 Session summary',
-    'session-complete': '✓ Session complete',
-    'session-booking': '🗓 Session booked',
-    'payment-reminder': '💳 Payment reminder',
-    'feedback-request': '💬 Feedback request',
-    image: '🖼 Image',
-    file: '📎 File',
-    'audio-recording': '🎙 Voice message',
-    'link-preview': '🔗 Link',
+    'lesson-assignment': 'Assignment',
+    'homework-submission': 'Homework submitted',
+    'progress-update': 'Progress update',
+    'event-reminder': 'Event reminder',
+    'session-summary': 'Session summary',
+    'session-complete': 'Session complete',
+    'session-booking': 'Session booked',
+    'payment-reminder': 'Payment reminder',
+    'feedback-request': 'Feedback request',
+    image: 'Image',
+    file: 'File',
+    'audio-recording': 'Voice message',
+    'link-preview': 'Link',
   };
   return labels[msg.type] ?? 'Message';
 }

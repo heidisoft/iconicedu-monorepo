@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { MessagesContainerHeader } from './messages-container-header';
 
@@ -27,7 +27,11 @@ const makeParticipant = (id: string, overrides?: Record<string, unknown>) =>
   }) as any;
 
 describe('MessagesContainerHeader', () => {
-  it('hides online status indicator for DM profile avatar', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('shows online status indicator for DM profile avatar', () => {
     const { container } = render(
       <MessagesContainerHeader
         channel={
@@ -47,11 +51,14 @@ describe('MessagesContainerHeader', () => {
       />,
     );
 
-    expect(screen.queryByLabelText('Status: online')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Status: online')).toBeInTheDocument();
     expect(container.querySelector('.h-8.w-8')).toBeInTheDocument();
   });
 
-  it('shows participant status message directly under the header name', () => {
+  it('shows last seen and local time directly under the header name for offline DMs', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-25T14:41:00.000Z'));
+
     render(
       <MessagesContainerHeader
         channel={
@@ -61,10 +68,12 @@ describe('MessagesContainerHeader', () => {
               participants: [
                 makeParticipant('profile-self'),
                 makeParticipant('profile-other', {
+                  prefs: { timezone: 'America/New_York' },
                   presence: {
-                    liveStatus: 'in_class',
-                    displayStatus: 'online',
-                    state: { emoji: '🏠', text: 'Working remotely' },
+                    liveStatus: 'away',
+                    displayStatus: 'away',
+                    state: {},
+                    lastSeenAt: '2026-03-25T14:40:00.000Z',
                   },
                 }),
               ],
@@ -75,7 +84,40 @@ describe('MessagesContainerHeader', () => {
       />,
     );
 
-    const statusText = screen.getByText('🏠 Working remotely');
+    const statusText = screen.getByText('Last seen 1m ago · 10:41 AM (Local time)');
+    expect(statusText).toBeInTheDocument();
+    expect(statusText).toHaveClass('text-xs');
+  });
+
+  it('shows available and local time for online DMs', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-25T14:41:00.000Z'));
+
+    render(
+      <MessagesContainerHeader
+        channel={
+          {
+            basics: { kind: 'dm', topic: 'DM' },
+            collections: {
+              participants: [
+                makeParticipant('profile-self'),
+                makeParticipant('profile-other', {
+                  prefs: { timezone: 'America/New_York' },
+                  presence: {
+                    liveStatus: 'online',
+                    displayStatus: 'online',
+                    state: {},
+                  },
+                }),
+              ],
+            },
+            ui: { headerQuickMetaActions: [] },
+          } as any
+        }
+      />,
+    );
+
+    const statusText = screen.getByText('Available · 10:41 AM (Local time)');
     expect(statusText).toBeInTheDocument();
     expect(statusText).toHaveClass('text-xs');
   });

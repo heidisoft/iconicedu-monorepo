@@ -50,7 +50,14 @@ function makeStyles(C: AppColors) {
     valueText: { fontSize: 13, color: C.textMuted, maxWidth: 160, textAlign: 'right' },
     emptyValue: { fontSize: 13, color: C.textFaint, fontStyle: 'italic' },
     emptyCard: { padding: 24, alignItems: 'center', gap: 8 },
-    emptyIcon: { fontSize: 32 },
+    emptyIconWrap: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: C.inputBg,
+    },
     emptyTitle: { fontSize: 15, fontWeight: '600', color: C.text },
     emptyDesc: { fontSize: 13, color: C.textMuted, textAlign: 'center' },
   });
@@ -93,7 +100,9 @@ export default function LocationScreen() {
 
         {!hasAnyLocation ? (
           <View style={[s.card, s.emptyCard]}>
-            <Text style={s.emptyIcon}>📍</Text>
+            <View style={s.emptyIconWrap}>
+              <MapPin size={28} color={colors.textMuted} />
+            </View>
             <Text style={s.emptyTitle}>No location set</Text>
             <Text style={s.emptyDesc}>
               Location details appear here once your profile is updated.

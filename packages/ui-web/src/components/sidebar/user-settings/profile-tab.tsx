@@ -1,12 +1,7 @@
 import * as React from 'react';
-import { ArrowRight, Info, User, X } from 'lucide-react';
+import { Info, User } from 'lucide-react';
 
-import type {
-  EducatorProfileVM,
-  GradeLevelOption,
-  StaffProfileVM,
-  UserProfileVM,
-} from '@iconicedu/shared-types';
+import type { StaffProfileVM, UserProfileVM } from '@iconicedu/shared-types';
 import { Avatar, AvatarFallback, AvatarImage } from '@iconicedu/ui-web/ui/avatar';
 import { BorderBeam } from '@iconicedu/ui-web/ui/border-beam';
 import {
@@ -24,18 +19,9 @@ import { cn } from '@iconicedu/ui-web/lib/utils';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { Input } from '@iconicedu/ui-web/ui/input';
 import { Label } from '@iconicedu/ui-web/ui/label';
-import { Separator } from '@iconicedu/ui-web/ui/separator';
 import { Textarea } from '@iconicedu/ui-web/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@iconicedu/ui-web/ui/tooltip';
 import { UserSettingsTabSection } from '@iconicedu/ui-web/components/sidebar/user-settings/components/user-settings-tab-section';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@iconicedu/ui-web/ui/select';
-import { ChevronIcon } from '@iconicedu/ui-web/components/sidebar/user-settings/components/chevron-icon';
 import { useSequentialHighlight } from '@iconicedu/ui-web/components/sidebar/user-settings/hooks/use-sequential-highlight';
 import { resolveProfileDisplayNameForSave } from '@iconicedu/ui-web/components/sidebar/user-settings/profile-tab.utils';
 import { getProfileFullName } from '@iconicedu/ui-web/lib/display-name';
@@ -78,8 +64,8 @@ export type ProfileAvatarRemoveInput = {
 export function ProfileTab({
   profile,
   profileBlock,
-  staffProfile,
-  staffSpecialties = [],
+  staffProfile: _staffProfile,
+  staffSpecialties: _staffSpecialties = [],
   expandProfileDetails = false,
   scrollToRequired = false,
   scrollToken = 0,
@@ -87,7 +73,7 @@ export function ProfileTab({
   onProfileSave,
   onAvatarUpload,
   onAvatarRemove,
-  showProfileTaskToast,
+  showProfileTaskToast: _showProfileTaskToast,
 }: ProfileTabProps) {
   const [profileDetailsOpen, setProfileDetailsOpen] =
     React.useState(expandProfileDetails);
@@ -106,10 +92,6 @@ export function ProfileTab({
   });
   const showFirstNameBeam = sequentialProfileHighlight.isActive('first');
   const showLastNameBeam = sequentialProfileHighlight.isActive('last');
-  const [isFirstFocused, setIsFirstFocused] = React.useState(false);
-  const [isLastFocused, setIsLastFocused] = React.useState(false);
-  const showToast = showProfileTaskToast ?? expandProfileDetails;
-  const [isProfileToastDismissed, setIsProfileToastDismissed] = React.useState(false);
   const [displayNameValue, setDisplayNameValue] = React.useState(
     profileBlock.displayName ?? '',
   );
@@ -125,14 +107,6 @@ export function ProfileTab({
   const [isRemoveDialogOpen, setIsRemoveDialogOpen] = React.useState(false);
   const [avatarRemoved, setAvatarRemoved] = React.useState(false);
   const avatarInputRef = React.useRef<HTMLInputElement | null>(null);
-  const toggleSelection = React.useCallback(
-    (value: string, setter: React.Dispatch<React.SetStateAction<string[]>>) => {
-      setter((prev) =>
-        prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value],
-      );
-    },
-    [],
-  );
   const firstNameRef = React.useRef<HTMLInputElement | null>(null);
   const lastNameRef = React.useRef<HTMLInputElement | null>(null);
   const requiredProfileFieldsMissing = !firstNameValue.trim() || !lastNameValue.trim();
@@ -258,6 +232,7 @@ export function ProfileTab({
     [
       bioValue,
       displayNameValue,
+      expandProfileDetails,
       firstNameValue,
       lastNameValue,
       onProfileSave,
@@ -516,8 +491,6 @@ export function ProfileTab({
                     required
                     className="relative"
                     placeholder="Enter your first name"
-                    onFocus={() => setIsFirstFocused(true)}
-                    onBlur={() => setIsFirstFocused(false)}
                     onChange={(event) => {
                       setFirstNameValue(event.target.value);
                       if (showRequiredErrors && event.target.value.trim()) {
@@ -551,10 +524,6 @@ export function ProfileTab({
                     required
                     className="relative"
                     placeholder="Enter your last name"
-                    onFocus={() => setIsLastFocused(true)}
-                    onBlur={() => {
-                      setIsLastFocused(false);
-                    }}
                     onChange={(event) => {
                       setLastNameValue(event.target.value);
                       if (showRequiredErrors && event.target.value.trim()) {

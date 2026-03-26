@@ -15,8 +15,10 @@ export class AnalyticsService implements AnalyticsClient, OnModuleDestroy {
   constructor(private readonly config: ConfigService) {
     const key = config.get<string>('POSTHOG_KEY');
     const host = config.get<string>('POSTHOG_HOST') ?? 'https://t.iconicedu.lk';
+    const nodeEnv = config.get<string>('NODE_ENV') ?? 'development';
+    const isLocal = nodeEnv !== 'production';
 
-    if (key) {
+    if (key && !isLocal) {
       this.client = new PostHog(key, {
         host,
         flushAt: 20,

@@ -12,7 +12,6 @@ import {
 } from '@iconicedu/web/lib/profile/queries/profiles.query';
 import { updateAccountActiveProfile } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import type { UserProfileVM } from '@iconicedu/shared-types';
-import { enablePersonaSwitch } from '@iconicedu/web/flags';
 
 type SwitchActivePersonaInput = {
   orgId: string;
@@ -48,15 +47,6 @@ export async function switchActivePersonaAction(input: SwitchActivePersonaInput)
   const account = accountResponse.data;
   if (!account) {
     throw new Error('Account not found for organization.');
-  }
-
-  const isEnabled = await enablePersonaSwitch.run({
-    identify: {
-      profileId: account.active_profile_id ?? undefined,
-    },
-  });
-  if (!isEnabled) {
-    throw new Error('Persona switch is disabled.');
   }
 
   let targetProfileId = input.profileId ?? null;

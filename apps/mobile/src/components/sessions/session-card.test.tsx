@@ -1,6 +1,11 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react-native';
+import { Linking, Share } from 'react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 import { SessionCard, type ClassSession } from './session-card';
+
+const mockPush = jest.fn();
+const mockOpenURL = jest.fn();
+const mockFetchSpaceChannelMetaByChannelId = jest.fn();
 
 jest.mock('@/providers/theme-provider', () => ({
   useTheme: () => ({
@@ -17,7 +22,13 @@ jest.mock('@/providers/theme-provider', () => ({
   }),
 }));
 
-jest.mock('expo-router', () => ({ useRouter: () => ({ push: jest.fn() }) }));
+jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
+jest.mock('@/lib/api/queries', () => ({
+  fetchSpaceChannelMetaByChannelId: (...args: unknown[]) =>
+    mockFetchSpaceChannelMetaByChannelId(...args),
+}));
+jest.spyOn(Linking, 'openURL').mockImplementation(mockOpenURL);
+jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' } as never);
 
 const baseSession: ClassSession = {
   id: 'test-1',
@@ -38,6 +49,12 @@ const baseSession: ClassSession = {
 };
 
 describe('SessionCard', () => {
+  beforeEach(() => {
+    mockPush.mockClear();
+    mockOpenURL.mockClear();
+    mockFetchSpaceChannelMetaByChannelId.mockReset();
+  });
+
   it('renders without crashing', () => {
     render(<SessionCard session={baseSession} />);
   });
@@ -62,19 +79,144 @@ describe('SessionCard', () => {
   });
 
   it('shows Join button for upcoming sessions', () => {
-    render(<SessionCard session={baseSession} />);
+    render(
+      <SessionCard
+        session={{ ...baseSession, meetingLink: 'https://meet.example.com/abc' }}
+      />,
+    );
     expect(screen.getByText('Join')).toBeTruthy();
+  });
+
+  it('does not show join button when join action is disabled by parent', () => {
+    render(<SessionCard session={baseSession} showJoinButton={false} />);
+    expect(screen.queryByText('Join')).toBeNull();
+    expect(screen.queryByText('Join Now')).toBeNull();
+  });
+
+  it('shows the external join dialog from the join button', () => {
+    render(
+      <SessionCard session={{ ...baseSession, meetingLink: 'https://zoom.us/j/abc' }} />,
+    );
+
+    fireEvent.press(screen.getByLabelText('Join session'));
+
+    expect(screen.getByText('Session ready to join')).toBeTruthy();
+    expect(screen.getByText('https://zoom.us/j/abc')).toBeTruthy();
+    expect(screen.getByText('Share')).toBeTruthy();
+    expect(screen.getByText('Join Zoom')).toBeTruthy();
+    expect(screen.getByLabelText('Share join link')).toBeTruthy();
+    expect(screen.getByLabelText('Open Zoom')).toBeTruthy();
+    expect(screen.getByLabelText('Close join dialog')).toBeTruthy();
+    expect(mockOpenURL).not.toHaveBeenCalled();
+  });
+
+  it('opens internal meeting links directly from the join button', () => {
+    render(
+      <SessionCard session={{ ...baseSession, meetingLink: '/live-sessions/abc' }} />,
+    );
+
+    fireEvent.press(screen.getByLabelText('Join session'));
+
+    expect(mockOpenURL).toHaveBeenCalledWith('http://localhost:3000/live-sessions/abc');
+  });
+
+  it('shows the external join dialog from channel live session config', async () => {
+    mockFetchSpaceChannelMetaByChannelId.mockResolvedValue({
+      liveSession: {
+        enabled: true,
+        provider: 'zoom',
+        mode: 'video',
+        joinUrl: 'https://zoom.us/j/from-channel',
+      },
+    });
+
+    render(<SessionCard session={baseSession} />);
+
+    fireEvent.press(screen.getByLabelText('Join session'));
+
+    expect(await screen.findByText('https://zoom.us/j/from-channel')).toBeTruthy();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('opens internal channel join urls directly from the join button', async () => {
+    mockFetchSpaceChannelMetaByChannelId.mockResolvedValue({
+      liveSession: {
+        enabled: true,
+        provider: 'daily',
+        mode: 'video',
+        joinUrl: '/acme/live-sessions/abc',
+      },
+    });
+
+    render(<SessionCard session={baseSession} />);
+
+    fireEvent.press(screen.getByLabelText('Join session'));
+
+    await screen.findByText('Mar · Week 2');
+    expect(mockOpenURL).toHaveBeenCalledWith(
+      'http://localhost:3000/acme/live-sessions/abc',
+    );
+  });
+
+  it('falls back to the classroom sessions tab when no meeting link is present', async () => {
+    mockFetchSpaceChannelMetaByChannelId.mockResolvedValue({
+      liveSession: null,
+    });
+
+    render(<SessionCard session={baseSession} />);
+
+    fireEvent.press(screen.getByLabelText('Join session'));
+
+    expect(await screen.findByText('Mar · Week 2')).toBeTruthy();
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/spaces/[channelId]',
+      params: { channelId: 'channel-1', tab: 'sessions' },
+    });
+  });
+
+  it('opens classroom chat from the chat button', () => {
+    render(<SessionCard session={baseSession} />);
+
+    fireEvent.press(screen.getByLabelText('Open classroom chat'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/spaces/[channelId]',
+      params: { channelId: 'channel-1', tab: 'messages' },
+    });
   });
 
   it('shows Recording button for past sessions', () => {
     render(<SessionCard session={{ ...baseSession, isPast: true }} />);
     expect(screen.getByText('Recording')).toBeTruthy();
-    expect(screen.getByText('Completed')).toBeTruthy();
   });
 
-  it('shows Skipped badge for exception variant', () => {
+  it('shows Canceled badge for exception variant', () => {
     render(<SessionCard session={{ ...baseSession, variant: 'exception' }} />);
-    expect(screen.getByText('Skipped')).toBeTruthy();
+    expect(screen.getByText('Canceled')).toBeTruthy();
+  });
+
+  it('shows Rescheduled badge for override variant', () => {
+    render(<SessionCard session={{ ...baseSession, variant: 'override' }} />);
+    expect(screen.getByText('Rescheduled')).toBeTruthy();
+  });
+
+  it('opens classroom messages from the card when configured', () => {
+    render(<SessionCard session={baseSession} pressTarget="messages" />);
+
+    fireEvent.press(screen.getByLabelText('Open session details'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/spaces/[channelId]',
+      params: { channelId: 'channel-1', tab: 'messages' },
+    });
+  });
+
+  it('does not navigate from the card when card press is disabled', () => {
+    render(<SessionCard session={baseSession} enableCardPress={false} />);
+
+    fireEvent.press(screen.getByLabelText('Open session details'));
+
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it('shows student names next to the time', () => {
@@ -91,6 +233,22 @@ describe('SessionCard', () => {
     );
     expect(screen.getByText('Alice')).toBeTruthy();
     expect(screen.getByText('Bob')).toBeTruthy();
+  });
+
+  it('shows participant names next to the time', () => {
+    render(
+      <SessionCard
+        session={{
+          ...baseSession,
+          participants: [
+            { name: 'Alice', themeKey: 'blue' },
+            { name: 'Mr. Chen', themeKey: 'teal' },
+          ],
+        }}
+      />,
+    );
+    expect(screen.getByText('Alice')).toBeTruthy();
+    expect(screen.getByText('Mr. Chen')).toBeTruthy();
   });
 
   it('does not render student separator when no students', () => {

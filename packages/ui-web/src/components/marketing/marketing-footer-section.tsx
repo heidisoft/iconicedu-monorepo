@@ -1,6 +1,12 @@
 import { FOOTER_LINK_GROUPS } from './marketing.constants';
 
-export function MarketingFooterSection() {
+type MarketingFooterSectionProps = {
+  loginHref?: string;
+};
+
+export function MarketingFooterSection({
+  loginHref = '/iconic-academy/login',
+}: MarketingFooterSectionProps) {
   return (
     <footer id="about" className="border-t border-border/60 bg-card/40">
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
@@ -21,7 +27,7 @@ export function MarketingFooterSection() {
                 {group.links.map((link) => (
                   <li key={link.label}>
                     <a
-                      href={link.href}
+                      href={link.label === 'Become a Tutor' ? loginHref : link.href}
                       className="text-sm text-foreground/80 transition hover:text-foreground"
                     >
                       {link.label}

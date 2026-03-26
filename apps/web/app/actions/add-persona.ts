@@ -11,7 +11,6 @@ import {
   getProfilesByAccountId,
   insertProfileForAccount,
 } from '@iconicedu/web/lib/profile/queries/profiles.query';
-import { enablePersonaAdd } from '@iconicedu/web/flags';
 
 type AddPersonaInput = {
   orgId: string;
@@ -38,15 +37,6 @@ export async function addPersonaAction(input: AddPersonaInput) {
   const account = accountResponse.data;
   if (!account) {
     throw new Error('Account not found for organization.');
-  }
-
-  const isEnabled = await enablePersonaAdd.run({
-    identify: {
-      profileId: account.active_profile_id ?? undefined,
-    },
-  });
-  if (!isEnabled) {
-    throw new Error('Persona add is disabled.');
   }
 
   const targetRoleKey = roleKeyFromKind(input.kind);

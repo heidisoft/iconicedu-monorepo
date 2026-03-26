@@ -11,8 +11,10 @@ import { MessageCircle, CalendarDays } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useQuery } from '@tanstack/react-query';
 import type { MessageVM } from '@iconicedu/shared-types';
 import { useAccount } from '@/hooks/use-account';
+import { useProfile } from '@/hooks/use-profile';
 import { useMessages } from '@/hooks/use-messages';
 import { useSpaceSessions } from '@/hooks/use-space-sessions';
 import {
@@ -23,6 +25,8 @@ import {
   buildMessageStoragePath,
   deleteMessage,
   markChannelReadState,
+  fetchChannelReadState,
+  queryKeys,
 } from '@/lib/api/queries';
 import type { AttachmentPayload } from '@/components/messages/attachment-sheet';
 import type { PendingUpload } from '@/components/messages/pending-message-row';
@@ -37,30 +41,41 @@ import { SpaceSessionsTab } from '@/components/messages/space-sessions-tab';
 
 type ChannelTab = 'messages' | 'sessions';
 
+type HeaderStudentProfile = { name: string; themeKey?: string | null };
+
 export default function ChannelConversationScreen() {
-  const { channelId, topic, iconEmoji, subtitle } = useLocalSearchParams<{
+  const {
+    channelId,
+    topic,
+    iconKey,
+    themeKey,
+    subtitle,
+    studentProfiles,
+    isLearningSpace,
+  } = useLocalSearchParams<{
     channelId: string;
     topic?: string;
-    iconEmoji?: string;
+    iconKey?: string;
+    themeKey?: string;
     subtitle?: string;
+    studentProfiles?: string;
+    isLearningSpace?: string;
   }>();
   const router = useRouter();
   const isFocused = useIsFocused();
   const { data: account } = useAccount();
+  const { data: profile } = useProfile();
   const { colors } = useTheme();
 
   const orgId = account?.org_id ?? '';
   const accountId =
     ((account as Record<string, unknown> | undefined)?.id as string) ?? '';
-  // Profile is joined in fetchUserAccount — no extra round-trip needed
-  const profileArr = (account as Record<string, unknown> | undefined)?.profile as Array<{
-    id: string;
-    display_name: string | null;
-    first_name: string | null;
-  }> | null;
-  const profileId = profileArr?.[0]?.id ?? '';
+  const profileRecord = (profile as Record<string, unknown> | undefined) ?? undefined;
+  const profileId = (profileRecord?.id as string | undefined) ?? '';
   const senderName =
-    profileArr?.[0]?.display_name?.trim() || profileArr?.[0]?.first_name?.trim() || 'Me';
+    (profileRecord?.display_name as string | undefined)?.trim() ||
+    (profileRecord?.first_name as string | undefined)?.trim() ||
+    'Me';
 
   const {
     data: messages,
@@ -79,6 +94,12 @@ export default function ChannelConversationScreen() {
     isLoading: isLoadingSessions,
     error: sessionsError,
   } = useSpaceSessions(channelId ?? '', orgId);
+  const { data: channelReadState } = useQuery({
+    queryKey: queryKeys.channelReadState(channelId ?? '', accountId),
+    queryFn: () => fetchChannelReadState(channelId ?? '', accountId),
+    enabled: !!channelId && !!accountId,
+    staleTime: 30_000,
+  });
 
   // ── Tab state ──
   const [activeTab, setActiveTab] = useState<ChannelTab>('messages');
@@ -309,19 +330,40 @@ export default function ChannelConversationScreen() {
     },
     [accountId, channelId, orgId, profileId],
   );
-  if (!channelId) return null;
-
+  const headerStudentProfiles = useMemo(() => {
+    if (!studentProfiles) return [] as HeaderStudentProfile[];
+    try {
+      const parsed = JSON.parse(studentProfiles) as unknown;
+      if (!Array.isArray(parsed)) return [];
+      return parsed.flatMap((student) => {
+        if (!student || typeof student !== 'object') return [];
+        const { name, themeKey } = student as {
+          name?: unknown;
+          themeKey?: unknown;
+        };
+        return typeof name === 'string' && name.trim()
+          ? [{ name, themeKey: typeof themeKey === 'string' ? themeKey : null }]
+          : [];
+      });
+    } catch {
+      return [];
+    }
+  }, [studentProfiles]);
+  const resolvedSubtitle = subtitle?.trim() || null;
+  const isSpaceChannel = isLearningSpace === '1';
   const isOwnMessage = (msg: MessageVM) => msg.core.sender.ids.id === profileId;
-  // Show the Sessions tab only for class channels (identified by having an iconEmoji)
-  const isSpaceChannel = Boolean(iconEmoji);
+
+  if (!channelId) return null;
 
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: colors.pageBg }]} edges={['top']}>
       <ConversationHeader
         title={topic ?? 'Channel'}
-        subtitle={subtitle}
+        subtitle={resolvedSubtitle}
+        studentProfiles={headerStudentProfiles}
         kind={isSpaceChannel ? 'space' : 'channel'}
-        iconEmoji={iconEmoji}
+        iconKey={iconKey}
+        themeKey={themeKey ?? null}
         onBack={() => router.back()}
         onMore={() => setInfoVisible(true)}
       />
@@ -372,6 +414,8 @@ export default function ChannelConversationScreen() {
             messages={messages ?? []}
             currentProfileId={profileId}
             currentAccountId={accountId}
+            lastReadMessageId={channelReadState?.lastReadMessageId ?? null}
+            unreadCount={channelReadState?.unreadCount ?? 0}
             onLoadMore={loadMore}
             loading={isLoading}
             refreshing={isRefetching}
@@ -383,6 +427,8 @@ export default function ChannelConversationScreen() {
             onRetryUpload={handleRetryUpload}
             onUnreadViewed={handleUnreadViewed}
             isScreenActive={isFocused && activeTab === 'messages'}
+            emptyTitle="Start the conversation"
+            emptyDescription="Share a welcome message, lesson update, or question to begin the class discussion."
           />
           <TypingIndicator typingUsers={typingUsers} />
           <MessageInput
@@ -403,9 +449,10 @@ export default function ChannelConversationScreen() {
         visible={infoVisible}
         channelId={channelId ?? ''}
         title={topic ?? 'Channel'}
-        subtitle={subtitle}
+        subtitle={resolvedSubtitle}
         kind={isSpaceChannel ? 'space' : 'channel'}
-        iconEmoji={iconEmoji}
+        iconKey={iconKey}
+        themeKey={themeKey ?? null}
         messages={messages ?? []}
         onClose={() => setInfoVisible(false)}
       />

@@ -1,10 +1,16 @@
 import React from 'react';
-import { View, TouchableOpacity } from 'react-native';
+import { View, TouchableOpacity, Text } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Home, MessageCircle, Bell, User } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/providers/theme-provider';
 import { useTablet } from '@/hooks/use-tablet';
+import { useActivityFeed } from '@/hooks/use-activity-feed';
+import { useAccount } from '@/hooks/use-account';
+import { useProfile } from '@/hooks/use-profile';
+import { useDirectMessages } from '@/hooks/use-direct-messages';
+import { useLearningSpaceChannels } from '@/hooks/use-learning-space-channels';
+import { useSupervisedDirectMessages } from '@/hooks/use-supervised-direct-messages';
 
 // Fixed height for the icon + label content area.
 const TAB_CONTENT_HEIGHT = 57;
@@ -20,16 +26,17 @@ const SIDE_RAIL_WIDTH = 72;
 const VISIBLE_TABS = [
   { name: 'index', title: 'Home', Icon: Home },
   { name: 'messages', title: 'Messages', Icon: MessageCircle },
-  { name: 'inbox', title: 'Inbox', Icon: Bell },
+  { name: 'inbox', title: 'Notifications', Icon: Bell },
   { name: 'account', title: 'Account', Icon: User },
 ] as const;
 
 type SideRailProps = {
   state: { routes: Array<{ name: string; key: string }>; index: number };
   navigation: { navigate: (name: string) => void };
+  inboxUnreadCount: number;
 };
 
-function SideRail({ state, navigation }: SideRailProps) {
+function SideRail({ state, navigation, inboxUnreadCount }: SideRailProps) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -72,7 +79,35 @@ function SideRail({ state, navigation }: SideRailProps) {
               backgroundColor: isFocused ? colors.tealBg : 'transparent',
             }}
           >
-            <Icon size={22} color={color} />
+            <View style={{ position: 'relative' }}>
+              <Icon size={22} color={color} />
+              {name === 'inbox' && inboxUnreadCount > 0 ? (
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: -6,
+                    right: -10,
+                    minWidth: 18,
+                    height: 18,
+                    paddingHorizontal: 4,
+                    borderRadius: 9,
+                    backgroundColor: '#ef4444',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: '#fff',
+                      fontSize: 10,
+                      fontWeight: '700',
+                    }}
+                  >
+                    {inboxUnreadCount > 99 ? '99+' : inboxUnreadCount}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
           </TouchableOpacity>
         );
       })}
@@ -84,6 +119,39 @@ export default function TabsLayout() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const isTablet = useTablet();
+  const { data: account } = useAccount();
+  const { data: profile } = useProfile();
+  const { data: feed } = useActivityFeed();
+  const orgId = account?.org_id ?? '';
+  const accountId =
+    ((account as Record<string, unknown> | undefined)?.id as string) ?? '';
+  const profileId =
+    ((profile as Record<string, unknown> | undefined)?.id as string | undefined) ?? '';
+  const profileKind =
+    ((profile as Record<string, unknown> | undefined)?.kind as string | undefined) ??
+    null;
+  const { data: dms } = useDirectMessages(orgId, profileId, accountId);
+  const { data: channels } = useLearningSpaceChannels(
+    orgId,
+    profileId,
+    accountId,
+    profileKind,
+  );
+  const { data: supervisedDms } = useSupervisedDirectMessages(
+    orgId,
+    accountId,
+    profileId,
+  );
+  const inboxUnreadCount =
+    feed?.sections.reduce(
+      (total, section) =>
+        total + section.items.filter((item) => !item.state?.isRead).length,
+      0,
+    ) ?? 0;
+  const messagesUnreadCount =
+    (dms?.reduce((total, item) => total + (item.unread_count ?? 0), 0) ?? 0) +
+    (channels?.reduce((total, item) => total + (item.unread_count ?? 0), 0) ?? 0) +
+    (supervisedDms?.reduce((total, item) => total + (item.unread_count ?? 0), 0) ?? 0);
 
   // insets.bottom accounts for the navigation type automatically:
   //   Gesture navigation → gesture hint height  (~28–34 dp)
@@ -95,10 +163,17 @@ export default function TabsLayout() {
 
   return (
     <Tabs
-      tabBar={isTablet ? (props) => <SideRail {...props} /> : undefined}
+      tabBar={
+        isTablet
+          ? (props) => <SideRail {...props} inboxUnreadCount={inboxUnreadCount} />
+          : undefined
+      }
       screenOptions={{
         headerShown: false,
-        sceneStyle: isTablet ? { paddingLeft: SIDE_RAIL_WIDTH } : undefined,
+        sceneStyle: {
+          backgroundColor: colors.pageBg,
+          ...(isTablet ? { paddingLeft: SIDE_RAIL_WIDTH } : null),
+        },
         tabBarStyle: {
           backgroundColor: colors.tabBg,
           borderTopColor: colors.tabBorder,
@@ -141,13 +216,37 @@ export default function TabsLayout() {
         options={{
           title: 'Messages',
           tabBarIcon: ({ color }) => <MessageCircle size={22} color={color} />,
+          tabBarBadge:
+            messagesUnreadCount > 0
+              ? messagesUnreadCount > 99
+                ? '99+'
+                : messagesUnreadCount
+              : undefined,
+          tabBarBadgeStyle: {
+            backgroundColor: '#ef4444',
+            color: '#fff',
+            fontSize: 10,
+            fontWeight: '700',
+          },
         }}
       />
       <Tabs.Screen
         name="inbox"
         options={{
-          title: 'Inbox',
+          title: 'Notifications',
           tabBarIcon: ({ color }) => <Bell size={22} color={color} />,
+          tabBarBadge:
+            inboxUnreadCount > 0
+              ? inboxUnreadCount > 99
+                ? '99+'
+                : inboxUnreadCount
+              : undefined,
+          tabBarBadgeStyle: {
+            backgroundColor: '#ef4444',
+            color: '#fff',
+            fontSize: 10,
+            fontWeight: '700',
+          },
         }}
       />
       <Tabs.Screen

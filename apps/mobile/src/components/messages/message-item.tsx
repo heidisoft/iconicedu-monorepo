@@ -35,7 +35,7 @@ import type {
   ReactionVM,
 } from '@iconicedu/shared-types';
 import type { AppColors } from '@/lib/theme';
-import { fetchThreadMessages } from '@/lib/api/queries';
+import { fetchThreadMessages, markThreadReadState } from '@/lib/api/queries';
 import { EmojiPicker } from './emoji-picker';
 import {
   SmilePlus,
@@ -47,11 +47,24 @@ import {
   Play,
   Pause,
   Video,
+  BookOpenCheck,
+  CalendarDays,
+  ClipboardList,
+  CreditCard,
+  GraduationCap,
+  Image as ImageIcon,
+  LocateFixed,
+  MessageSquareText,
+  NotebookPen,
+  TrendingUp,
+  Check,
 } from 'lucide-react-native';
 import { AudioPlayer, createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import type { AudioStatus } from 'expo-audio';
 import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '@/lib/supabase/client';
+import { RoleAvatarBadge } from '@/components/profile/role-avatar-badge';
+import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
 
 const CHANNEL_FILES_BUCKET = 'channel-files';
 
@@ -115,29 +128,58 @@ function MessageAvatar({
   name,
   src,
   seed,
+  role,
+  size = AVATAR_SIZE,
+  badgeSizeOverride,
 }: {
   name: string;
   src: string | null;
   seed: string;
+  role?: string | null;
+  size?: number;
+  badgeSizeOverride?: number;
 }) {
+  const radius = size / 2;
+  const initialsSize = Math.max(10, Math.round(size * 0.36));
+  const badgeSize = badgeSizeOverride ?? Math.max(10, Math.round(size * 0.42));
+
   if (src) {
     return (
-      <Image source={{ uri: src }} style={avatarStyles.img} accessibilityLabel={name} />
+      <View style={[avatarStyles.wrap, { width: size, height: size }]}>
+        <Image
+          source={{ uri: src }}
+          style={{ width: size, height: size, borderRadius: radius }}
+          accessibilityLabel={name}
+        />
+        <RoleAvatarBadge role={role} size={badgeSize} />
+      </View>
     );
   }
   return (
-    <View style={[avatarStyles.circle, { backgroundColor: avatarBgColor(seed) }]}>
-      <Text style={avatarStyles.initials}>{getInitials(name)}</Text>
+    <View style={[avatarStyles.wrap, { width: size, height: size }]}>
+      <View
+        style={[
+          avatarStyles.circle,
+          {
+            width: size,
+            height: size,
+            borderRadius: radius,
+            backgroundColor: avatarBgColor(seed),
+          },
+        ]}
+      >
+        <Text style={[avatarStyles.initials, { fontSize: initialsSize }]}>
+          {getInitials(name)}
+        </Text>
+      </View>
+      <RoleAvatarBadge role={role} size={badgeSize} />
     </View>
   );
 }
 
 const avatarStyles = StyleSheet.create({
-  img: { width: AVATAR_SIZE, height: AVATAR_SIZE, borderRadius: AVATAR_SIZE / 2 },
+  wrap: { position: 'relative' },
   circle: {
-    width: AVATAR_SIZE,
-    height: AVATAR_SIZE,
-    borderRadius: AVATAR_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -267,6 +309,7 @@ function FormattedText({
 type SocialBarProps = {
   reactions: ReactionVM[];
   thread: ThreadVM | null;
+  threadUnreadCount?: number;
   messageId: string;
   colors: AppColors;
   onReactionToggle?: (messageId: string, emoji: string) => void;
@@ -280,6 +323,7 @@ type SocialBarProps = {
 function SocialBar({
   reactions,
   thread,
+  threadUnreadCount,
   messageId,
   colors,
   onReactionToggle,
@@ -364,17 +408,15 @@ function SocialBar({
                 colors={colors}
                 onPress={disabledActions ? () => {} : (onThreadPress ?? (() => {}))}
                 expanded={threadExpanded}
+                unreadCount={threadUnreadCount}
               />
             ) : (
-              <TouchableOpacity
-                onPress={disabledActions ? undefined : onThreadPress}
-                activeOpacity={disabledActions ? 1 : 0.7}
-                style={[actionBtnStyle, disabledActions && { opacity: 0.4 }]}
-                accessibilityLabel="Reply in thread"
-                accessibilityState={{ disabled: disabledActions ?? false }}
-              >
-                <CornerUpLeft size={15} color={colors.textMuted} />
-              </TouchableOpacity>
+              <ThreadReplyButton
+                colors={colors}
+                onPress={onThreadPress}
+                disabled={disabledActions ?? false}
+                inline
+              />
             )}
           </>
         )}
@@ -386,6 +428,7 @@ function SocialBar({
             colors={colors}
             onPress={onThreadPress ?? (() => {})}
             expanded={threadExpanded}
+            unreadCount={threadUnreadCount}
           />
         )}
       </View>
@@ -408,14 +451,18 @@ function ThreadPill({
   colors,
   onPress,
   expanded,
+  unreadCount,
 }: {
   thread: ThreadVM;
   colors: AppColors;
   onPress: () => void;
   expanded?: boolean;
+  unreadCount?: number;
 }) {
   const count = thread.stats.messageCount;
   const participants = thread.participants.slice(0, 3);
+  const resolvedUnreadCount = unreadCount ?? thread.readState?.unreadCount ?? 0;
+  const hasUnread = resolvedUnreadCount > 0;
 
   return (
     <TouchableOpacity
@@ -447,6 +494,56 @@ function ThreadPill({
         {count} {count === 1 ? 'reply' : 'replies'}
       </Text>
 
+      {hasUnread && (
+        <View
+          testID="thread-unread-new-badge"
+          style={{
+            borderRadius: 999,
+            paddingHorizontal: 6,
+            paddingVertical: 2,
+            backgroundColor: colors.tealBg,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 10,
+              lineHeight: 12,
+              fontWeight: '700',
+              color: colors.teal,
+              textTransform: 'uppercase',
+            }}
+          >
+            New
+          </Text>
+        </View>
+      )}
+
+      {hasUnread && (
+        <View
+          testID="thread-unread-count-badge"
+          style={{
+            minWidth: 20,
+            height: 20,
+            borderRadius: 10,
+            paddingHorizontal: 6,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: colors.teal,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 11,
+              lineHeight: 13,
+              fontWeight: '700',
+              color: colors.tealFg,
+            }}
+          >
+            {resolvedUnreadCount}
+          </Text>
+        </View>
+      )}
+
       {/* Overlapping participant initials/avatars */}
       {participants.length > 0 && (
         <View style={{ flexDirection: 'row', marginLeft: 2 }}>
@@ -454,6 +551,7 @@ function ThreadPill({
             const name = p.profile.displayName;
             const avatarProfile = p.profile as {
               avatar?: { source?: string; url?: string | null; seed?: string | null };
+              kind?: string | null;
             };
             const src =
               avatarProfile.avatar?.source === 'url'
@@ -464,38 +562,64 @@ function ThreadPill({
                 ? (avatarProfile.avatar.seed ?? p.ids.id)
                 : p.ids.id;
             return src ? (
-              <Image
+              <View
                 key={p.ids.id}
-                source={{ uri: src }}
                 style={{
                   width: 20,
                   height: 20,
-                  borderRadius: 10,
-                  borderWidth: 1.5,
-                  borderColor: colors.pageBg,
                   marginLeft: i > 0 ? -6 : 0,
                   zIndex: participants.length - i,
+                  position: 'relative',
                 }}
-              />
+              >
+                <Image
+                  source={{ uri: src }}
+                  style={{
+                    width: 20,
+                    height: 20,
+                    borderRadius: 10,
+                    borderWidth: 1.5,
+                    borderColor: colors.pageBg,
+                  }}
+                />
+                <RoleAvatarBadge
+                  role={avatarProfile.kind}
+                  size={10}
+                  style={{ top: -2 }}
+                />
+              </View>
             ) : (
               <View
                 key={p.ids.id}
                 style={{
                   width: 20,
                   height: 20,
-                  borderRadius: 10,
-                  backgroundColor: avatarBgColor(seed),
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderWidth: 1.5,
-                  borderColor: colors.pageBg,
                   marginLeft: i > 0 ? -6 : 0,
                   zIndex: participants.length - i,
+                  position: 'relative',
                 }}
               >
-                <Text style={{ color: '#fff', fontSize: 8, fontWeight: '700' }}>
-                  {getInitials(name)[0]}
-                </Text>
+                <View
+                  style={{
+                    width: 20,
+                    height: 20,
+                    borderRadius: 10,
+                    backgroundColor: avatarBgColor(seed),
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderWidth: 1.5,
+                    borderColor: colors.pageBg,
+                  }}
+                >
+                  <Text style={{ color: '#fff', fontSize: 8, fontWeight: '700' }}>
+                    {getInitials(name)[0]}
+                  </Text>
+                </View>
+                <RoleAvatarBadge
+                  role={avatarProfile.kind}
+                  size={10}
+                  style={{ top: -2 }}
+                />
               </View>
             );
           })}
@@ -505,40 +629,94 @@ function ThreadPill({
   );
 }
 
+function findInlineUnreadStartIndex(input: {
+  replies: MessageVM[];
+  lastReadMessageId?: string;
+  unreadCount?: number;
+  currentUserId?: string;
+}): number {
+  const { replies, lastReadMessageId, unreadCount, currentUserId } = input;
+  const normalizedUnreadCount = Math.max(0, unreadCount ?? 0);
+  if (replies.length === 0) return -1;
+
+  const findIncomingIndex = (startIndex: number): number => {
+    for (let index = startIndex; index < replies.length; index += 1) {
+      const reply = replies[index];
+      if (!currentUserId || reply.core.sender.ids.id !== currentUserId) {
+        return index;
+      }
+    }
+    return -1;
+  };
+
+  if (lastReadMessageId) {
+    const lastReadIndex = replies.findIndex(
+      (reply) => reply.ids.id === lastReadMessageId,
+    );
+    if (lastReadIndex >= 0) {
+      return findIncomingIndex(lastReadIndex + 1);
+    }
+  }
+
+  if (normalizedUnreadCount <= 0) return -1;
+  return findIncomingIndex(Math.max(0, replies.length - normalizedUnreadCount));
+}
+
+function InlineUnreadDivider({ count, colors }: { count?: number; colors: AppColors }) {
+  const label = count && count > 0 ? `New messages (${count})` : 'New messages';
+  return (
+    <View
+      style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 8, gap: 8 }}
+    >
+      <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+      <View
+        style={{
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+          backgroundColor: colors.inputBg,
+          borderRadius: 999,
+          paddingHorizontal: 10,
+          paddingVertical: 4,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 10,
+            fontWeight: '700',
+            textTransform: 'uppercase',
+            letterSpacing: 0.8,
+            color: colors.textMuted,
+          }}
+        >
+          {label}
+        </Text>
+      </View>
+      <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+    </View>
+  );
+}
+
 // ─── Inline thread reply (compact) ────────────────────────────────────────────
 
 function InlineReply({ message, colors }: { message: MessageVM; colors: AppColors }) {
   const senderName = message.core.sender.profile.displayName;
   const time = formatTime(message.core.createdAt);
   const { url: src, seed } = getAvatarInfo(message);
+  const senderRole = message.core.sender.kind;
   const text = (message as { content?: { text?: string } }).content?.text ?? '';
   const mentions = (message as { content?: { mentions?: MessageMentionVM[] } }).content
     ?.mentions;
 
   return (
     <View style={{ flexDirection: 'row', gap: 8, paddingVertical: 4 }}>
-      {src ? (
-        <Image
-          source={{ uri: src }}
-          style={{ width: 28, height: 28, borderRadius: 14 }}
-          accessibilityLabel={senderName}
-        />
-      ) : (
-        <View
-          style={{
-            width: 28,
-            height: 28,
-            borderRadius: 14,
-            backgroundColor: avatarBgColor(seed),
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>
-            {getInitials(senderName)}
-          </Text>
-        </View>
-      )}
+      <MessageAvatar
+        name={senderName}
+        src={src}
+        seed={seed}
+        role={senderRole}
+        size={28}
+        badgeSizeOverride={12}
+      />
       <View style={{ flex: 1 }}>
         <View
           style={{
@@ -548,11 +726,16 @@ function InlineReply({ message, colors }: { message: MessageVM; colors: AppColor
             marginBottom: 2,
           }}
         >
-          <Text
-            style={{ fontSize: 13, fontWeight: '700', color: senderColor(senderName) }}
-          >
-            {senderName}
-          </Text>
+          <RoleNameIndicator
+            name={senderName}
+            role={senderRole}
+            iconSize={12}
+            textStyle={{
+              fontSize: 13,
+              fontWeight: '700',
+              color: senderColor(senderName),
+            }}
+          />
           <Text style={{ fontSize: 11, color: colors.textFaint }}>{time}</Text>
         </View>
         <FormattedText
@@ -565,16 +748,56 @@ function InlineReply({ message, colors }: { message: MessageVM; colors: AppColor
   );
 }
 
+function ThreadReplyButton({
+  colors,
+  onPress,
+  disabled,
+  inline = false,
+}: {
+  colors: AppColors;
+  onPress?: () => void;
+  disabled?: boolean;
+  inline?: boolean;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={disabled ? undefined : onPress}
+      activeOpacity={disabled ? 1 : 0.75}
+      accessibilityLabel="Reply to thread"
+      accessibilityState={{ disabled: disabled ?? false }}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: inline ? 'auto' : 'flex-start',
+        gap: 6,
+        marginTop: inline ? 0 : 8,
+        paddingHorizontal: 10,
+        paddingVertical: inline ? 6 : 7,
+        borderRadius: 18,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: colors.border,
+        backgroundColor: colors.card,
+        opacity: disabled ? 0.45 : 1,
+      }}
+    >
+      <CornerUpLeft size={14} color={colors.textMuted} />
+      <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textMuted }}>
+        Reply
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
 // ─── Card sub-renderers ───────────────────────────────────────────────────────
 
 function CardHeader({
-  emoji,
+  icon: Icon,
   label,
   tag,
   colors,
   s,
 }: {
-  emoji: string;
+  icon: React.ComponentType<{ size?: number; color?: string }>;
   label: string;
   tag?: string;
   colors: AppColors;
@@ -582,7 +805,7 @@ function CardHeader({
 }) {
   return (
     <View style={s.cardHeader}>
-      <Text style={{ fontSize: 16 }}>{emoji}</Text>
+      <Icon size={16} color={colors.teal} />
       <Text style={[s.cardHeaderLabel, { color: colors.teal }]}>{label}</Text>
       {!!tag && (
         <View style={[s.subjectTag, { backgroundColor: colors.tealBg }]}>
@@ -610,7 +833,7 @@ function AssignmentCard({
   return (
     <View style={[s.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
       <CardHeader
-        emoji="📚"
+        icon={BookOpenCheck}
         label="Assignment"
         tag={assignment.subject}
         colors={colors}
@@ -622,11 +845,11 @@ function AssignmentCard({
       </Text>
       <View style={s.cardMeta}>
         <Text style={[s.metaChip, { color: colors.textMuted }]}>
-          📅 Due {formatDate(assignment.dueAt)}
+          Due {formatDate(assignment.dueAt)}
         </Text>
         {!!assignment.estimatedDuration && (
           <Text style={[s.metaChip, { color: colors.textMuted }]}>
-            ⏱ {assignment.estimatedDuration} min
+            {assignment.estimatedDuration} min
           </Text>
         )}
         {!!assignment.difficulty && (
@@ -637,7 +860,7 @@ function AssignmentCard({
       </View>
       {assignment.attachments?.map((att, i) => (
         <View key={i} style={[s.attachRow, { borderColor: colors.border }]}>
-          <Text style={{ fontSize: 14 }}>📎</Text>
+          <FileText size={14} color={colors.textMuted} />
           <Text style={[s.attachName, { color: colors.text }]} numberOfLines={1}>
             {att.name}
           </Text>
@@ -659,7 +882,7 @@ function SessionSummaryCard({
   const { session } = message;
   return (
     <View style={[s.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
-      <CardHeader emoji="📋" label="Session Summary" colors={colors} s={s} />
+      <CardHeader icon={ClipboardList} label="Session Summary" colors={colors} s={s} />
       <Text style={[s.cardTitle, { color: colors.text }]}>{session.title}</Text>
       <Text style={[s.metaChip, { color: colors.textMuted, marginBottom: 4 }]}>
         {formatDate(session.startAt)}
@@ -705,7 +928,7 @@ function ProgressCard({
   return (
     <View style={[s.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
       <CardHeader
-        emoji="📈"
+        icon={TrendingUp}
         label="Progress Update"
         tag={progress.subject}
         colors={colors}
@@ -768,14 +991,17 @@ function EventCard({
   const { event } = message;
   return (
     <View style={[s.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
-      <CardHeader emoji="📅" label="Event Reminder" colors={colors} s={s} />
+      <CardHeader icon={CalendarDays} label="Event Reminder" colors={colors} s={s} />
       <Text style={[s.cardTitle, { color: colors.text }]}>{event.title}</Text>
       <Text style={[s.metaChip, { color: colors.textMuted }]}>
         {formatDate(event.startAt)} · {formatTime(event.startAt)}
         {event.endAt ? ` – ${formatTime(event.endAt)}` : ''}
       </Text>
       {!!event.location && (
-        <Text style={[s.metaChip, { color: colors.textMuted }]}>📍 {event.location}</Text>
+        <View style={s.metaRow}>
+          <LocateFixed size={13} color={colors.textMuted} />
+          <Text style={[s.metaChip, { color: colors.textMuted }]}>{event.location}</Text>
+        </View>
       )}
       {!!event.meetingLink && (
         <TouchableOpacity
@@ -808,13 +1034,13 @@ function HomeworkCard({
         ? '#f59e0b'
         : colors.teal;
   const statusLabel = {
-    submitted: '✓ Submitted',
-    graded: '✓ Graded',
-    'needs-revision': '⚠ Needs Revision',
+    submitted: 'Submitted',
+    graded: 'Graded',
+    'needs-revision': 'Needs Revision',
   }[homework.status];
   return (
     <View style={[s.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
-      <CardHeader emoji="📝" label="Homework Submitted" colors={colors} s={s} />
+      <CardHeader icon={NotebookPen} label="Homework Submitted" colors={colors} s={s} />
       <Text style={[s.cardTitle, { color: colors.text }]}>
         {homework.assignmentTitle}
       </Text>
@@ -825,7 +1051,11 @@ function HomeworkCard({
       </View>
       {homework.attachments.map((att, i) => (
         <View key={i} style={[s.attachRow, { borderColor: colors.border }]}>
-          <Text style={{ fontSize: 14 }}>{att.type === 'image' ? '🖼' : '📎'}</Text>
+          {att.type === 'image' ? (
+            <ImageIcon size={14} color={colors.textMuted} />
+          ) : (
+            <FileText size={14} color={colors.textMuted} />
+          )}
           <Text style={[s.attachName, { color: colors.text }]} numberOfLines={1}>
             {att.name}
           </Text>
@@ -858,7 +1088,7 @@ function FeedbackRequestCard({
   return (
     <View style={[s.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
       <CardHeader
-        emoji="💬"
+        icon={MessageSquareText}
         label="Feedback Request"
         tag={message.feedback?.sessionTitle ?? undefined}
         colors={colors}
@@ -900,15 +1130,15 @@ function SessionBookingCard({
       completed: colors.teal,
     }[session.status] ?? colors.textMuted;
   const statusLabel = {
-    scheduled: '📅 Scheduled',
-    confirmed: '✓ Confirmed',
-    cancelled: '✗ Cancelled',
-    completed: '✓ Completed',
+    scheduled: 'Scheduled',
+    confirmed: 'Confirmed',
+    cancelled: 'Cancelled',
+    completed: 'Completed',
   }[session.status];
   return (
     <View style={[s.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
       <CardHeader
-        emoji="🗓"
+        icon={GraduationCap}
         label="Session Booked"
         tag={session.subject}
         colors={colors}
@@ -951,12 +1181,12 @@ function PaymentReminderCard({
   const statusColor =
     { pending: '#f59e0b', paid: '#22c55e', overdue: '#ef4444' }[payment.status] ??
     colors.textMuted;
-  const statusLabel = { pending: '⏳ Pending', paid: '✓ Paid', overdue: '⚠ Overdue' }[
+  const statusLabel = { pending: 'Pending', paid: 'Paid', overdue: 'Overdue' }[
     payment.status
   ];
   return (
     <View style={[s.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
-      <CardHeader emoji="💳" label="Payment Reminder" colors={colors} s={s} />
+      <CardHeader icon={CreditCard} label="Payment Reminder" colors={colors} s={s} />
       <Text style={[s.cardTitle, { color: colors.text }]}>
         {payment.currency} {payment.amount.toLocaleString()}
       </Text>
@@ -996,7 +1226,7 @@ function SessionCompleteBar({
             { backgroundColor: colors.tealBg, borderColor: colors.teal },
           ]}
         >
-          <Text style={{ color: colors.teal, fontSize: 14 }}>✓</Text>
+          <Check size={14} color={colors.teal} />
         </View>
         <Text
           style={[s.sessionCompleteTitle, { color: colors.textMuted }]}
@@ -1303,6 +1533,7 @@ function makeStyles(colors: AppColors) {
     cardTitle: { fontSize: 16, fontWeight: '700', marginBottom: 2 },
     cardDesc: { fontSize: 13, lineHeight: 19 },
     cardMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
+    metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
     metaChip: { fontSize: 12 },
     sectionLabel: { fontSize: 12, fontWeight: '700', marginBottom: 4 },
     listItem: { fontSize: 13, lineHeight: 20 },
@@ -1424,6 +1655,9 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   const [threadExpanded, setThreadExpanded] = useState(false);
   const [threadReplies, setThreadReplies] = useState<MessageVM[]>([]);
   const [threadLoading, setThreadLoading] = useState(false);
+  const [threadUnreadCount, setThreadUnreadCount] = useState(
+    message.social?.thread?.readState?.unreadCount ?? 0,
+  );
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [audioLoading, setAudioLoading] = useState(false);
   const [audioPositionMs, setAudioPositionMs] = useState(0);
@@ -1503,6 +1737,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 
   const senderDisplayName = message.core.sender.profile.displayName;
   const { url: avatarUrl, seed: avatarSeed } = getAvatarInfo(message);
+  const senderRole = message.core.sender.kind;
   const time = formatTime(message.core.createdAt);
   const reactions = message.social?.reactions ?? [];
   const thread = message.social?.thread ?? null;
@@ -1513,6 +1748,16 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     type === 'audio-recording'
       ? ((message as AudioRecordingMessageVM).audio?.mimeType ?? '')
       : '';
+  const inlineUnreadStartIndex = findInlineUnreadStartIndex({
+    replies: threadReplies,
+    lastReadMessageId: thread?.readState?.lastReadMessageId,
+    unreadCount: threadUnreadCount,
+    currentUserId: currentProfileId,
+  });
+
+  useEffect(() => {
+    setThreadUnreadCount(thread?.readState?.unreadCount ?? 0);
+  }, [thread?.ids.id, thread?.readState?.unreadCount]);
 
   const handleAudioPress = useCallback(
     async (url: string) => {
@@ -1612,6 +1857,23 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           currentAccountId ?? '',
         );
         setThreadReplies(replies);
+        const channelId = thread.readState?.channelId;
+        const lastReplyId = replies[replies.length - 1]?.ids.id ?? null;
+        if (channelId && currentProfileId && currentAccountId) {
+          try {
+            const unreadCount = await markThreadReadState({
+              orgId: message.ids.orgId,
+              accountId: currentAccountId,
+              profileId: currentProfileId,
+              channelId,
+              threadId: thread.ids.id,
+              lastReadMessageId: lastReplyId,
+            });
+            setThreadUnreadCount(unreadCount);
+          } catch (readErr) {
+            console.warn('[MessageItem] markThreadReadState error:', readErr);
+          }
+        }
       } catch (err) {
         console.warn('[MessageItem] fetchThreadMessages error:', err);
       } finally {
@@ -1619,6 +1881,10 @@ export const MessageItem: React.FC<MessageItemProps> = ({
       }
     }
   }, [thread, threadExpanded, message, onThreadOpen, currentProfileId, currentAccountId]);
+
+  const handleThreadReplyPress = useCallback(() => {
+    onThreadOpen?.(message);
+  }, [message, onThreadOpen]);
 
   // session-complete: full-width centred divider, no bubble
   if (type === 'session-complete') {
@@ -2079,16 +2345,23 @@ export const MessageItem: React.FC<MessageItemProps> = ({
       >
         <View style={s.avatarSlot}>
           {isGroupStart && (
-            <MessageAvatar name={senderDisplayName} src={avatarUrl} seed={avatarSeed} />
+            <MessageAvatar
+              name={senderDisplayName}
+              src={avatarUrl}
+              seed={avatarSeed}
+              role={senderRole}
+            />
           )}
         </View>
         <View style={[s.contentCol, isOwn && s.contentColOwn]}>
           {isGroupStart && (
             <View style={s.nameRow}>
               {!isOwn && (
-                <Text style={[s.senderName, { color: senderColor(senderDisplayName) }]}>
-                  {senderDisplayName}
-                </Text>
+                <RoleNameIndicator
+                  name={senderDisplayName}
+                  role={senderRole}
+                  textStyle={[s.senderName, { color: senderColor(senderDisplayName) }]}
+                />
               )}
               <Text style={s.msgTime}>{time}</Text>
             </View>
@@ -2159,6 +2432,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           <SocialBar
             reactions={reactions}
             thread={thread}
+            threadUnreadCount={threadUnreadCount}
             messageId={message.ids.id}
             colors={colors}
             onReactionToggle={isReadOnly ? undefined : onReactionToggle}
@@ -2176,9 +2450,24 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                     <ActivityIndicator size="small" color={colors.teal} />
                   </View>
                 ) : (
-                  threadReplies.map((reply) => (
-                    <InlineReply key={reply.ids.id} message={reply} colors={colors} />
-                  ))
+                  <>
+                    {threadReplies.map((reply, replyIndex) => (
+                      <React.Fragment key={reply.ids.id}>
+                        {inlineUnreadStartIndex === replyIndex && (
+                          <InlineUnreadDivider
+                            count={threadUnreadCount}
+                            colors={colors}
+                          />
+                        )}
+                        <InlineReply message={reply} colors={colors} />
+                      </React.Fragment>
+                    ))}
+                    <ThreadReplyButton
+                      colors={colors}
+                      onPress={handleThreadReplyPress}
+                      disabled={isReadOnly ?? false}
+                    />
+                  </>
                 )}
               </View>
             </View>
@@ -2199,7 +2488,12 @@ export const MessageItem: React.FC<MessageItemProps> = ({
       {/* Avatar slot */}
       <View style={s.avatarSlot}>
         {isGroupStart && (
-          <MessageAvatar name={senderDisplayName} src={avatarUrl} seed={avatarSeed} />
+          <MessageAvatar
+            name={senderDisplayName}
+            src={avatarUrl}
+            seed={avatarSeed}
+            role={senderRole}
+          />
         )}
       </View>
 
@@ -2209,9 +2503,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         {isGroupStart && (
           <View style={s.nameRow}>
             {!isOwn && (
-              <Text style={[s.senderName, { color: senderColor(senderDisplayName) }]}>
-                {senderDisplayName}
-              </Text>
+              <RoleNameIndicator
+                name={senderDisplayName}
+                role={senderRole}
+                textStyle={[s.senderName, { color: senderColor(senderDisplayName) }]}
+              />
             )}
             <Text style={s.msgTime}>{time}</Text>
           </View>
@@ -2235,6 +2531,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         <SocialBar
           reactions={reactions}
           thread={thread}
+          threadUnreadCount={threadUnreadCount}
           messageId={message.ids.id}
           colors={colors}
           onReactionToggle={isReadOnly ? undefined : onReactionToggle}
@@ -2254,9 +2551,21 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                   <ActivityIndicator size="small" color={colors.teal} />
                 </View>
               ) : (
-                threadReplies.map((reply) => (
-                  <InlineReply key={reply.ids.id} message={reply} colors={colors} />
-                ))
+                <>
+                  {threadReplies.map((reply, replyIndex) => (
+                    <React.Fragment key={reply.ids.id}>
+                      {inlineUnreadStartIndex === replyIndex && (
+                        <InlineUnreadDivider count={threadUnreadCount} colors={colors} />
+                      )}
+                      <InlineReply message={reply} colors={colors} />
+                    </React.Fragment>
+                  ))}
+                  <ThreadReplyButton
+                    colors={colors}
+                    onPress={handleThreadReplyPress}
+                    disabled={isReadOnly ?? false}
+                  />
+                </>
               )}
             </View>
           </View>

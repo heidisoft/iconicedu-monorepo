@@ -5,26 +5,42 @@ import {
   Image,
   ScrollView,
   TouchableOpacity,
+  Modal,
+  Pressable,
   StyleSheet,
   RefreshControl,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Bell, MessageCircle, BookOpen } from 'lucide-react-native';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  CalendarClock,
+  CalendarCheck,
+  CalendarDays,
+  BookOpenCheck,
+  Users,
+  LayoutGrid,
+  LifeBuoy,
+  ArrowRightLeft,
+  Check,
+} from 'lucide-react-native';
+import { SiteLogo } from '@iconicedu/ui-native';
 import { useAuth } from '@/providers/auth-provider';
+import { useAccount } from '@/hooks/use-account';
 import { useProfile } from '@/hooks/use-profile';
-import { useActivityFeed, useMarkActivityFeedRead } from '@/hooks/use-activity-feed';
 import { useUpcomingSessions } from '@/hooks/use-upcoming-sessions';
+import { useFamilyLinks } from '@/hooks/use-family-links';
+import { useLearningSpaces } from '@/hooks/use-learning-spaces';
+import { useSupportChannel } from '@/hooks/use-support-channel';
 import { useTheme } from '@/providers/theme-provider';
-import { ActivityFeedSkeleton } from '@/components/skeletons';
+import { useFamilyView } from '@/providers/family-view-provider';
 import { PulseBox } from '@/components/skeletons/pulse-box';
 import { SessionCard } from '@/components/sessions/session-card';
-import {
-  ActivityItem,
-  makeActivityItemStyles,
-} from '@/components/activity/activity-item';
+import { AppSupportFooter } from '@/components/support/app-support-footer';
+import { buildHomeMetricSummary } from '@/lib/home-metrics';
+import { fetchOrgSessions, queryKeys } from '@/lib/api/queries';
 import type { AppColors } from '@/lib/theme';
-import type { ActivityFeedItemVM } from '@iconicedu/shared-types';
 
 // ---------------------------------------------------------------------------
 // Avatar color helpers — ui_theme_key → hex, fallback to seed palette
@@ -80,14 +96,6 @@ function resolveAvatarColor(
   return { bg, fg: '#ffffff' };
 }
 
-function getRecentItems(
-  sections: ActivityFeedItemVM[][] | undefined,
-  n: number,
-): ActivityFeedItemVM[] {
-  if (!sections) return [];
-  return sections.flat().slice(0, n);
-}
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -99,33 +107,67 @@ function getGreeting() {
   return 'Good evening';
 }
 
-const quickNav: Array<{
-  label: string;
-  Icon: React.ComponentType<{ size: number; color: string }>;
-  pathname: string;
-  params?: Record<string, string>;
-  desc: string;
-}> = [
-  {
-    label: 'Messages',
-    Icon: MessageCircle,
-    pathname: '/(app)/(tabs)/messages',
-    params: { tab: 'all' },
-    desc: 'Your conversations',
-  },
-  {
-    label: 'Classrooms',
-    Icon: BookOpen,
-    pathname: '/(app)/(tabs)/messages',
-    params: { tab: 'channels' },
-    desc: 'Your classes',
-  },
-];
+function getSupportPalette(C: AppColors) {
+  const isDark = C.bg === C.pageBg && C.text === '#FFFFFF';
+  return {
+    bg: isDark ? '#f59e0b22' : '#fff7ed',
+    border: isDark ? '#f59e0b55' : '#fdba74',
+    text: isDark ? '#fbbf24' : '#c2410c',
+  };
+}
+
+function getInitials(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) return 'U';
+  const words = trimmed.split(/\s+/);
+  if (words.length >= 2) {
+    return `${words[0]?.[0] ?? ''}${words[1]?.[0] ?? ''}`.toUpperCase();
+  }
+  return trimmed[0]?.toUpperCase() ?? 'U';
+}
+
+function startOfDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function startOfWeekMonday(date: Date): Date {
+  const day = startOfDay(date);
+  const weekday = day.getDay();
+  const diff = weekday === 0 ? -6 : 1 - weekday;
+  return new Date(day.getTime() + diff * 86_400_000);
+}
+
+function addDays(date: Date, days: number): Date {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
 
 function makeStyles(C: AppColors) {
+  const supportPalette = getSupportPalette(C);
+
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: C.pageBg },
     scroll: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 32, gap: 22 },
+    topBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    topBarLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      flexShrink: 1,
+      minWidth: 0,
+    },
+    profileTrigger: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      flexShrink: 1,
+      minWidth: 0,
+    },
     avatar: {
       width: 44,
       height: 44,
@@ -134,21 +176,135 @@ function makeStyles(C: AppColors) {
       justifyContent: 'center',
     },
     avatarTxt: { color: '#ffffff', fontWeight: '800', fontSize: 18 },
-    bellBtn: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
+    profileTextWrap: {
+      gap: 2,
+      flexShrink: 1,
+      minWidth: 0,
+    },
+    profileName: { fontSize: 15, color: C.text, fontWeight: '700' },
+    profileEmail: { fontSize: 12, color: C.textMuted },
+    familyViewButton: {
+      alignItems: 'center',
+      height: 32,
+      width: 32,
+      justifyContent: 'center',
+      borderRadius: 999,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: C.border,
+      backgroundColor: C.card,
+      flexShrink: 0,
+    },
+    modalBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(15, 23, 42, 0.45)',
+      justifyContent: 'flex-end',
+    },
+    sheetSafeArea: {
+      paddingHorizontal: 16,
+      paddingBottom: 18,
+    },
+    sheetCard: {
+      borderRadius: 20,
+      backgroundColor: C.card,
+      borderWidth: 1,
+      borderColor: C.border,
+      padding: 18,
+      gap: 12,
+    },
+    sheetHeader: {
+      gap: 4,
+    },
+    sheetTitle: {
+      fontSize: 18,
+      fontWeight: '800',
+      color: C.text,
+    },
+    sheetSubtitle: {
+      fontSize: 13,
+      color: C.textMuted,
+      lineHeight: 18,
+    },
+    switchOption: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.bg,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+    },
+    switchOptionActive: {
+      borderColor: C.teal,
       backgroundColor: C.tealBg,
+    },
+    switchOptionText: {
+      flex: 1,
+      minWidth: 0,
+      gap: 2,
+    },
+    switchOptionAvatar: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
       alignItems: 'center',
       justifyContent: 'center',
+      overflow: 'hidden',
+    },
+    switchOptionAvatarText: {
+      color: '#ffffff',
+      fontSize: 14,
+      fontWeight: '800',
+    },
+    switchOptionLabel: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: C.text,
+    },
+    switchOptionSubtext: {
+      fontSize: 12,
+      color: C.textMuted,
     },
     greetingLine: { fontSize: 15, color: C.textMuted, fontWeight: '500' },
+    headlineRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
     headline: {
       fontSize: 28,
       fontWeight: '800',
       color: C.text,
       letterSpacing: -0.5,
       lineHeight: 34,
+      flex: 1,
+    },
+    supportBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 5,
+      paddingHorizontal: 10,
+      height: 32,
+      borderRadius: 999,
+      backgroundColor: supportPalette.bg,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: supportPalette.border,
+      position: 'relative',
+    },
+    supportBtnText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: supportPalette.text,
+    },
+    supportIconWrap: {
+      width: 14,
+      height: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      position: 'relative',
     },
     sectionLabel: {
       fontSize: 12,
@@ -157,26 +313,84 @@ function makeStyles(C: AppColors) {
       textTransform: 'uppercase',
       letterSpacing: 0.8,
     },
-    grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-    gridItem: {
-      width: '47%',
+    metricsRow: { gap: 12, paddingRight: 20 },
+    metricCard: {
+      minHeight: 148,
       backgroundColor: C.card,
       borderRadius: 14,
       borderWidth: 1,
       borderColor: C.border,
-      padding: 16,
-      gap: 6,
+      padding: 14,
+      justifyContent: 'space-between',
     },
-    gridTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    gridLabel: { fontSize: 14, fontWeight: '700', color: C.text },
-    gridDesc: { fontSize: 12, color: C.textMuted, lineHeight: 17 },
+    metricHeader: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      gap: 8,
+    },
+    metricTitle: {
+      flex: 1,
+      fontSize: 14,
+      fontWeight: '700',
+      color: C.text,
+      lineHeight: 18,
+    },
+    metricIconWrap: {
+      width: 36,
+      height: 36,
+      borderRadius: 12,
+      backgroundColor: C.tealBg,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    metricValue: {
+      fontSize: 32,
+      fontWeight: '800',
+      color: C.text,
+      letterSpacing: -0.8,
+      lineHeight: 36,
+    },
+    metricLabel: { fontSize: 12, color: C.textMuted, lineHeight: 16 },
     activityHeader: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
     },
-    activitySeeAll: { fontSize: 13, fontWeight: '600', color: C.teal },
-    activityList: { gap: 8 },
+    emptyWrap: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 12,
+      paddingVertical: 18,
+    },
+    emptyStateCard: {
+      borderRadius: 16,
+      borderWidth: 1,
+      borderStyle: 'dashed',
+      borderColor: C.border,
+      backgroundColor: C.card,
+      paddingHorizontal: 8,
+      overflow: 'hidden',
+    },
+    emptyIcon: {
+      width: 72,
+      height: 72,
+      borderRadius: 36,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    emptyTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: C.text,
+    },
+    emptyDesc: {
+      fontSize: 14,
+      color: C.textMuted,
+      textAlign: 'center',
+      paddingHorizontal: 40,
+      lineHeight: 21,
+    },
   });
 }
 
@@ -186,29 +400,74 @@ function makeStyles(C: AppColors) {
 
 export default function HomeScreen() {
   const { user } = useAuth();
-  const { data: profile } = useProfile();
-  const { data: feed, isPending: feedLoading, refetch: refetchFeed } = useActivityFeed();
-  const { mutate: markRead } = useMarkActivityFeedRead();
+  const queryClient = useQueryClient();
+  const { familySwitchOptions, switchFamilyView, isViewingAsChild } = useFamilyView();
+  const {
+    data: profile,
+    isPending: profileLoading,
+    refetch: refetchProfile,
+  } = useProfile();
   const {
     sessions,
     isPending: sessionsLoading,
     refetch: refetchSessions,
   } = useUpcomingSessions();
-  const { colors, isDark } = useTheme();
+  const {
+    data: account,
+    isPending: accountLoading,
+    refetch: refetchAccount,
+  } = useAccount();
+  const { width: windowWidth } = useWindowDimensions();
+  const orgId = (account as Record<string, unknown> | undefined)?.org_id as
+    | string
+    | undefined;
+  const primaryRole = (account as Record<string, unknown> | undefined)?.primary_role as
+    | string
+    | null
+    | undefined;
+  const { childProfiles } = useFamilyLinks();
+  const {
+    data: learningSpaces = [],
+    isPending: learningSpacesLoading,
+    refetch: refetchLearningSpaces,
+  } = useLearningSpaces(orgId ?? '');
+  const {
+    data: supportChannel,
+    isPending: supportLoading,
+    refetch: refetchSupportChannel,
+  } = useSupportChannel(orgId ?? '');
+  const {
+    data: orgSchedules = [],
+    isPending: schedulesSummaryLoading,
+    refetch: refetchOrgSchedules,
+  } = useQuery({
+    queryKey: queryKeys.orgSessions(orgId ?? ''),
+    queryFn: () => fetchOrgSessions(orgId!),
+    enabled: !!orgId,
+    staleTime: 5 * 60 * 1000,
+  });
+  const { colors } = useTheme();
   const router = useRouter();
   const s = React.useMemo(() => makeStyles(colors), [colors]);
-  const activityS = React.useMemo(
-    () => ({ ...makeActivityItemStyles(colors), itemOuter: { marginHorizontal: 0 } }),
-    [colors],
-  );
+  const supportPalette = React.useMemo(() => getSupportPalette(colors), [colors]);
 
   const profileData = profile as {
+    id?: string | null;
+    kind?: string | null;
     first_name?: string | null;
+    last_name?: string | null;
     display_name?: string | null;
     avatar_url?: string | null;
     avatar_seed?: string | null;
     ui_theme_key?: string | null;
   } | null;
+  const fullName =
+    [profileData?.first_name?.trim(), profileData?.last_name?.trim()]
+      .filter((value): value is string => Boolean(value))
+      .join(' ') ||
+    profileData?.display_name?.trim() ||
+    user?.email?.split('@')[0] ||
+    'User';
   const firstName =
     profileData?.first_name?.trim() ||
     profileData?.display_name?.trim()?.split(' ')[0] ||
@@ -220,35 +479,165 @@ export default function HomeScreen() {
     profileData?.ui_theme_key,
     profileData?.avatar_seed ?? user?.id ?? user?.email,
   );
+  const secondaryHeaderText = isViewingAsChild
+    ? 'Viewing as student'
+    : (user?.email ?? '');
 
-  const recentItems = React.useMemo(
+  const topMetrics = React.useMemo(
     () =>
-      getRecentItems(
-        feed?.sections.map((sec) => sec.items),
-        5,
-      ),
-    [feed],
+      buildHomeMetricSummary({
+        schedules: orgSchedules,
+        learningSpaces: learningSpaces.map((space) => ({
+          id: String((space as Record<string, unknown>).id),
+          status: ((space as Record<string, unknown>).status as string | null) ?? null,
+          subject: ((space as Record<string, unknown>).subject as string | null) ?? null,
+          title: ((space as Record<string, unknown>).title as string | null) ?? null,
+        })),
+        profileKind: profileData?.kind ?? null,
+        primaryRole: primaryRole ?? null,
+        profileId: profileData?.id ?? null,
+        childProfileIds: (childProfiles as Record<string, unknown>[]).map(
+          (child) => child.id as string,
+        ),
+      }),
+    [
+      childProfiles,
+      learningSpaces,
+      orgSchedules,
+      primaryRole,
+      profileData?.id,
+      profileData?.kind,
+    ],
   );
-
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const onToggle = useCallback((id: string) => {
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-  const onMarkRead = useCallback((id: string) => markRead([id]), [markRead]);
+  const metricCardWidth = Math.max(160, (windowWidth - 40 - 12) / 2);
+  const ThirdMetricIcon =
+    topMetrics.thirdMetricTitle === 'Active Subjects'
+      ? BookOpenCheck
+      : topMetrics.thirdMetricTitle === 'Active Students'
+        ? Users
+        : LayoutGrid;
 
   const [refreshing, setRefreshing] = useState(false);
+  const [familySwitchOpen, setFamilySwitchOpen] = useState(false);
+  const [switchingProfileId, setSwitchingProfileId] = useState<string | null>(null);
+  const weekAnchor = new Date();
+  const thisWeekStartMs = startOfWeekMonday(weekAnchor).getTime();
+  const nextWeekStartMs = addDays(startOfWeekMonday(weekAnchor), 7).getTime();
+  const weekAfterNextStartMs = addDays(startOfWeekMonday(weekAnchor), 14).getTime();
+  const thisWeekSessions = React.useMemo(
+    () =>
+      sessions.filter((session) => {
+        const startAt = new Date(session.startAt).getTime();
+        return startAt >= thisWeekStartMs && startAt < nextWeekStartMs;
+      }),
+    [nextWeekStartMs, sessions, thisWeekStartMs],
+  );
+  const nextWeekSessions = React.useMemo(
+    () =>
+      sessions.filter((session) => {
+        const startAt = new Date(session.startAt).getTime();
+        return startAt >= nextWeekStartMs && startAt < weekAfterNextStartMs;
+      }),
+    [nextWeekStartMs, sessions, weekAfterNextStartMs],
+  );
+  const homeHeaderLoading =
+    refreshing || accountLoading || profileLoading || supportLoading;
+  const overviewLoading =
+    refreshing ||
+    accountLoading ||
+    profileLoading ||
+    schedulesSummaryLoading ||
+    learningSpacesLoading;
+  const supportFooterLoading = refreshing || accountLoading || supportLoading;
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    Promise.all([refetchFeed(), refetchSessions()]).finally(() => setRefreshing(false));
-  }, [refetchFeed, refetchSessions]);
+    Promise.all([
+      refetchAccount(),
+      refetchProfile(),
+      refetchSessions(),
+      refetchLearningSpaces(),
+      refetchSupportChannel(),
+      refetchOrgSchedules(),
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.familyLinks(
+          orgId ?? '',
+          ((account as Record<string, unknown> | undefined)?.id as string) ?? '',
+        ),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.childProfiles(
+          orgId ?? '',
+          (childProfiles as Record<string, unknown>[]).map((child) => child.id as string),
+        ),
+      }),
+    ]).finally(() => setRefreshing(false));
+  }, [
+    account,
+    childProfiles,
+    orgId,
+    queryClient,
+    refetchAccount,
+    refetchLearningSpaces,
+    refetchOrgSchedules,
+    refetchProfile,
+    refetchSessions,
+    refetchSupportChannel,
+  ]);
+  const canShowFamilySwitcher =
+    familySwitchOptions.length > 1 &&
+    profileData?.kind &&
+    ['guardian', 'child'].includes(profileData.kind);
+  const handleFamilySwitch = useCallback(
+    async (childProfileId: string | null) => {
+      setSwitchingProfileId(childProfileId ?? '__parent__');
+      setRefreshing(true);
+      try {
+        await switchFamilyView(childProfileId);
+        await Promise.all([
+          refetchAccount(),
+          refetchProfile(),
+          refetchSessions(),
+          refetchLearningSpaces(),
+          refetchSupportChannel(),
+          refetchOrgSchedules(),
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.familyLinks(
+              orgId ?? '',
+              ((account as Record<string, unknown> | undefined)?.id as string) ?? '',
+            ),
+          }),
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.childProfiles(
+              orgId ?? '',
+              (childProfiles as Record<string, unknown>[]).map(
+                (child) => child.id as string,
+              ),
+            ),
+          }),
+        ]);
+        setFamilySwitchOpen(false);
+      } finally {
+        setSwitchingProfileId(null);
+        setRefreshing(false);
+      }
+    },
+    [
+      account,
+      childProfiles,
+      orgId,
+      queryClient,
+      refetchAccount,
+      refetchLearningSpaces,
+      refetchOrgSchedules,
+      refetchProfile,
+      refetchSessions,
+      refetchSupportChannel,
+      switchFamilyView,
+    ],
+  );
 
   return (
-    <SafeAreaView style={s.safe}>
+    <SafeAreaView style={s.safe} edges={['top']}>
       <ScrollView
         contentContainerStyle={s.scroll}
         showsVerticalScrollIndicator={false}
@@ -261,148 +650,376 @@ export default function HomeScreen() {
         }
       >
         {/* Top bar */}
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <TouchableOpacity
-            style={[
-              s.avatar,
-              {
-                backgroundColor: avatarUrl ? 'transparent' : avatarBg,
-                overflow: 'hidden',
-              },
-            ]}
-            onPress={() => router.push('/(app)/(tabs)/account')}
-            activeOpacity={0.8}
-            accessibilityLabel="Open account"
-          >
-            {avatarUrl ? (
-              <Image source={{ uri: avatarUrl }} style={{ width: 44, height: 44 }} />
-            ) : (
-              <Text style={[s.avatarTxt, { color: avatarFg }]}>{initial}</Text>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={s.bellBtn}
-            onPress={() => router.push('/(app)/(tabs)/inbox')}
-            activeOpacity={0.8}
-            accessibilityLabel="Open inbox"
-          >
-            <Bell size={20} color={colors.text} />
-          </TouchableOpacity>
-        </View>
+        {homeHeaderLoading ? (
+          <View style={s.topBar}>
+            <View style={s.topBarLeft}>
+              <View style={s.profileTrigger}>
+                <PulseBox width={44} height={44} radius={22} />
+                <View style={s.profileTextWrap}>
+                  <PulseBox width={132} height={14} radius={4} />
+                  <PulseBox width={168} height={12} radius={4} />
+                </View>
+              </View>
+              <PulseBox width={112} height={32} radius={16} />
+            </View>
+            <PulseBox width={42} height={42} radius={12} />
+          </View>
+        ) : (
+          <View style={s.topBar}>
+            <View style={s.topBarLeft}>
+              <TouchableOpacity
+                style={s.profileTrigger}
+                onPress={() => router.push('/(app)/(tabs)/account')}
+                activeOpacity={0.8}
+                accessibilityLabel="Open account"
+              >
+                <View
+                  style={[
+                    s.avatar,
+                    {
+                      backgroundColor: avatarUrl ? 'transparent' : avatarBg,
+                      overflow: 'hidden',
+                    },
+                  ]}
+                >
+                  {avatarUrl ? (
+                    <Image
+                      source={{ uri: avatarUrl }}
+                      style={{ width: 44, height: 44 }}
+                    />
+                  ) : (
+                    <Text style={[s.avatarTxt, { color: avatarFg }]}>{initial}</Text>
+                  )}
+                </View>
+                <View style={s.profileTextWrap}>
+                  <Text numberOfLines={1} style={s.profileName}>
+                    {fullName}
+                  </Text>
+                  {!!secondaryHeaderText && (
+                    <Text numberOfLines={1} style={s.profileEmail}>
+                      {secondaryHeaderText}
+                    </Text>
+                  )}
+                </View>
+              </TouchableOpacity>
+              {canShowFamilySwitcher ? (
+                <TouchableOpacity
+                  style={s.familyViewButton}
+                  onPress={() => setFamilySwitchOpen(true)}
+                  activeOpacity={0.85}
+                  accessibilityLabel="Switch family view"
+                >
+                  <ArrowRightLeft
+                    size={16}
+                    color={isViewingAsChild ? colors.teal : colors.textMuted}
+                  />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            <SiteLogo height={32} color={colors.text} />
+          </View>
+        )}
 
         {/* Greeting */}
-        <View style={{ gap: 6 }}>
-          <Text style={s.greetingLine}>
-            {getGreeting()}, {firstName} 👋
-          </Text>
-          <Text style={s.headline}>Welcome back</Text>
-        </View>
-
-        {/* Quick nav */}
-        <View style={{ gap: 10 }}>
-          <Text style={s.sectionLabel}>Quick access</Text>
-          <View style={s.grid}>
-            {quickNav.map((item) => (
-              <TouchableOpacity
-                key={item.label}
-                style={s.gridItem}
-                onPress={() =>
-                  router.push({ pathname: item.pathname, params: item.params } as never)
-                }
-                activeOpacity={0.75}
-                accessibilityLabel={item.label}
-              >
-                <View style={s.gridTitleRow}>
-                  <item.Icon size={20} color={colors.text} />
-                  <Text style={s.gridLabel}>{item.label}</Text>
-                </View>
-                <Text style={s.gridDesc}>{item.desc}</Text>
-              </TouchableOpacity>
-            ))}
+        {homeHeaderLoading ? (
+          <View style={{ gap: 8 }}>
+            <PulseBox width={160} height={16} radius={4} />
+            <View style={s.headlineRow}>
+              <PulseBox width={220} height={30} radius={6} />
+              <PulseBox width={96} height={32} radius={16} />
+            </View>
           </View>
+        ) : (
+          <View style={{ gap: 6 }}>
+            <Text style={s.greetingLine}>
+              {getGreeting()}, {firstName}
+            </Text>
+            <View style={s.headlineRow}>
+              <Text style={s.headline}>Welcome back</Text>
+              {supportChannel?.id ? (
+                <TouchableOpacity
+                  style={s.supportBtn}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/(app)/channel/[channelId]',
+                      params: {
+                        channelId: supportChannel.id,
+                        topic: supportChannel.topic ?? 'Live Support',
+                        isLearningSpace: '0',
+                      },
+                    })
+                  }
+                  activeOpacity={0.8}
+                  accessibilityLabel="Open live support"
+                >
+                  <View style={s.supportIconWrap}>
+                    <LifeBuoy size={14} color={supportPalette.text} />
+                  </View>
+                  <Text style={s.supportBtnText}>Support</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          </View>
+        )}
+
+        <View style={{ gap: 10 }}>
+          <Text style={s.sectionLabel}>Overview</Text>
+          {overviewLoading ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={s.metricsRow}
+            >
+              {[0, 1, 2].map((index) => (
+                <View
+                  key={index}
+                  style={[s.metricCard, { width: metricCardWidth, gap: 18 }]}
+                >
+                  <View style={s.metricHeader}>
+                    <PulseBox width={110} height={16} radius={4} />
+                    <PulseBox width={36} height={36} radius={12} />
+                  </View>
+                  <View style={{ gap: 8 }}>
+                    <PulseBox width={index === 1 ? 42 : 34} height={34} radius={6} />
+                    <PulseBox width={90} height={12} radius={4} />
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+          ) : (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={s.metricsRow}
+            >
+              <View style={[s.metricCard, { width: metricCardWidth }]}>
+                <View style={s.metricHeader}>
+                  <Text style={s.metricTitle}>Upcoming Sessions</Text>
+                  <View style={s.metricIconWrap}>
+                    <CalendarClock size={18} color={colors.teal} />
+                  </View>
+                </View>
+                <View>
+                  <Text style={s.metricValue}>{thisWeekSessions.length}</Text>
+                  <Text style={s.metricLabel}>This week</Text>
+                </View>
+              </View>
+
+              <View style={[s.metricCard, { width: metricCardWidth }]}>
+                <View style={s.metricHeader}>
+                  <Text style={s.metricTitle}>Completed Classes</Text>
+                  <View style={s.metricIconWrap}>
+                    <CalendarCheck size={18} color={colors.teal} />
+                  </View>
+                </View>
+                <View>
+                  <Text style={s.metricValue}>
+                    {topMetrics.completedClassesThisMonth}
+                  </Text>
+                  <Text style={s.metricLabel}>This month</Text>
+                </View>
+              </View>
+
+              <View style={[s.metricCard, { width: metricCardWidth }]}>
+                <View style={s.metricHeader}>
+                  <Text style={s.metricTitle}>{topMetrics.thirdMetricTitle}</Text>
+                  <View style={s.metricIconWrap}>
+                    <ThirdMetricIcon size={18} color={colors.teal} />
+                  </View>
+                </View>
+                <View>
+                  <Text style={s.metricValue}>{topMetrics.thirdMetricValue}</Text>
+                  <Text style={s.metricLabel}>{topMetrics.thirdMetricLabel}</Text>
+                </View>
+              </View>
+            </ScrollView>
+          )}
         </View>
 
         {/* Upcoming sessions */}
-        {(sessionsLoading || sessions.length > 0) && (
-          <View style={{ gap: 10 }}>
-            <View style={s.activityHeader}>
-              <Text style={s.sectionLabel}>Upcoming sessions</Text>
-            </View>
-            {sessionsLoading || refreshing ? (
-              <View style={{ gap: 6 }}>
-                {[0, 1].map((i) => (
-                  <View
-                    key={i}
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 10,
-                      paddingHorizontal: 14,
-                      paddingVertical: 10,
-                      borderRadius: 12,
-                      borderWidth: StyleSheet.hairlineWidth,
-                      borderColor: colors.border,
-                      backgroundColor: colors.card,
-                    }}
-                  >
-                    <PulseBox width={44} height={60} radius={10} />
-                    <View style={{ flex: 1, gap: 6 }}>
-                      <PulseBox width={i === 0 ? 140 : 120} height={13} radius={4} />
-                      <PulseBox width={80} height={11} radius={4} />
-                    </View>
-                    <PulseBox width={50} height={26} radius={20} />
+        <View style={{ gap: 10 }}>
+          <View style={s.activityHeader}>
+            <Text style={s.sectionLabel}>Upcoming sessions</Text>
+          </View>
+          {sessionsLoading || refreshing ? (
+            <View style={{ gap: 6 }}>
+              {[0, 1].map((i) => (
+                <View
+                  key={i}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 10,
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    borderRadius: 12,
+                    borderWidth: StyleSheet.hairlineWidth,
+                    borderColor: colors.border,
+                    backgroundColor: colors.card,
+                  }}
+                >
+                  <PulseBox width={44} height={60} radius={10} />
+                  <View style={{ flex: 1, gap: 6 }}>
+                    <PulseBox width={i === 0 ? 140 : 120} height={13} radius={4} />
+                    <PulseBox width={80} height={11} radius={4} />
                   </View>
-                ))}
+                  <PulseBox width={50} height={26} radius={20} />
+                </View>
+              ))}
+            </View>
+          ) : thisWeekSessions.length > 0 ? (
+            <View style={{ gap: 6 }}>
+              {thisWeekSessions.map((session) => (
+                <SessionCard key={session.id} session={session} pressTarget="messages" />
+              ))}
+            </View>
+          ) : (
+            <View style={s.emptyStateCard}>
+              <View style={s.emptyWrap}>
+                <View style={[s.emptyIcon, { backgroundColor: colors.inputBg }]}>
+                  <CalendarDays size={32} color={colors.textMuted} />
+                </View>
+                <Text style={s.emptyTitle}>No upcoming sessions this week</Text>
+                <Text style={s.emptyDesc}>
+                  Sessions scheduled for this week will appear here.
+                </Text>
               </View>
-            ) : (
-              <View style={{ gap: 6 }}>
-                {sessions.map((session) => (
-                  <SessionCard key={session.id} session={session} />
-                ))}
-              </View>
-            )}
-          </View>
-        )}
+            </View>
+          )}
+        </View>
 
-        {/* Recent activity */}
-        {(feedLoading || refreshing || recentItems.length > 0) && (
-          <View style={{ gap: 10 }}>
-            <View style={s.activityHeader}>
-              <Text style={s.sectionLabel}>Recent activity</Text>
-              <TouchableOpacity
-                onPress={() => router.push('/(app)/(tabs)/inbox')}
-                hitSlop={8}
-              >
-                <Text style={s.activitySeeAll}>See all</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={s.activityList}>
-              {feedLoading || refreshing ? (
-                <ActivityFeedSkeleton count={3} />
-              ) : (
-                recentItems.map((item) => (
-                  <ActivityItem
-                    key={item.ids.id}
-                    item={item}
-                    colors={colors}
-                    isDark={isDark}
-                    s={activityS}
-                    onMarkRead={onMarkRead}
-                    expandedIds={expandedIds}
-                    onToggle={onToggle}
-                  />
-                ))
-              )}
-            </View>
+        <View style={{ gap: 10 }}>
+          <View style={s.activityHeader}>
+            <Text style={s.sectionLabel}>Next week</Text>
           </View>
-        )}
+          {sessionsLoading || refreshing ? (
+            <View style={{ gap: 6 }}>
+              {[0, 1].map((i) => (
+                <View
+                  key={`next-week-skeleton-${i}`}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 10,
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    borderRadius: 12,
+                    borderWidth: StyleSheet.hairlineWidth,
+                    borderColor: colors.border,
+                    backgroundColor: colors.card,
+                  }}
+                >
+                  <PulseBox width={44} height={60} radius={10} />
+                  <View style={{ flex: 1, gap: 6 }}>
+                    <PulseBox width={i === 0 ? 140 : 120} height={13} radius={4} />
+                    <PulseBox width={80} height={11} radius={4} />
+                  </View>
+                  <PulseBox width={50} height={26} radius={20} />
+                </View>
+              ))}
+            </View>
+          ) : nextWeekSessions.length > 0 ? (
+            <View style={{ gap: 6 }}>
+              {nextWeekSessions.map((session) => (
+                <SessionCard key={session.id} session={session} pressTarget="messages" />
+              ))}
+            </View>
+          ) : (
+            <View style={s.emptyStateCard}>
+              <View style={s.emptyWrap}>
+                <View style={[s.emptyIcon, { backgroundColor: colors.inputBg }]}>
+                  <CalendarDays size={32} color={colors.textMuted} />
+                </View>
+                <Text style={s.emptyTitle}>No sessions next week</Text>
+                <Text style={s.emptyDesc}>
+                  Sessions scheduled for next week will appear here.
+                </Text>
+              </View>
+            </View>
+          )}
+        </View>
+
+        <AppSupportFooter isLoading={supportFooterLoading} />
       </ScrollView>
+      <Modal
+        visible={familySwitchOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setFamilySwitchOpen(false)}
+      >
+        <Pressable style={s.modalBackdrop} onPress={() => setFamilySwitchOpen(false)}>
+          <Pressable style={s.sheetSafeArea} onPress={(event) => event.stopPropagation()}>
+            <View style={s.sheetCard}>
+              <View style={s.sheetHeader}>
+                <Text style={s.sheetTitle}>View as</Text>
+                <Text style={s.sheetSubtitle}>
+                  Switch between your parent view and linked student accounts.
+                </Text>
+              </View>
+              {familySwitchOptions.map((option) => {
+                const optionTitle = option.displayName?.trim() || option.label;
+                const optionSubtitle = option.isParentOption ? 'Parent' : 'Student';
+                const isSwitching =
+                  switchingProfileId ===
+                  (option.isParentOption ? '__parent__' : option.profileId);
+                const optionSeed = option.avatarSeed ?? option.profileId;
+                const { bg: optionAvatarBg, fg: optionAvatarFg } = resolveAvatarColor(
+                  option.themeKey ?? null,
+                  optionSeed,
+                );
+
+                return (
+                  <TouchableOpacity
+                    key={option.profileId}
+                    style={[
+                      s.switchOption,
+                      option.isActive ? s.switchOptionActive : null,
+                    ]}
+                    activeOpacity={0.85}
+                    disabled={option.isActive || Boolean(switchingProfileId)}
+                    onPress={() =>
+                      handleFamilySwitch(option.isParentOption ? null : option.profileId)
+                    }
+                  >
+                    <View
+                      style={[
+                        s.switchOptionAvatar,
+                        {
+                          backgroundColor: option.avatarUrl
+                            ? 'transparent'
+                            : optionAvatarBg,
+                        },
+                      ]}
+                    >
+                      {option.avatarUrl ? (
+                        <Image
+                          source={{ uri: option.avatarUrl }}
+                          style={{ width: 36, height: 36 }}
+                        />
+                      ) : (
+                        <Text
+                          style={[s.switchOptionAvatarText, { color: optionAvatarFg }]}
+                        >
+                          {getInitials(optionTitle)}
+                        </Text>
+                      )}
+                    </View>
+                    <View style={s.switchOptionText}>
+                      <Text numberOfLines={1} style={s.switchOptionLabel}>
+                        {optionTitle}
+                      </Text>
+                      <Text numberOfLines={1} style={s.switchOptionSubtext}>
+                        {isSwitching ? 'Switching...' : optionSubtitle}
+                      </Text>
+                    </View>
+                    {option.isActive ? <Check size={18} color={colors.teal} /> : null}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }

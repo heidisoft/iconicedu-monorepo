@@ -249,7 +249,7 @@ export function ClassRequestAction({
     <>
       {trigger}
       <Dialog open={isRequestDialogOpen} onOpenChange={handleRequestDialogOpenChange}>
-        <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-[63rem]">
           <DialogHeader>
             <DialogTitle>Explore Classes</DialogTitle>
             <DialogDescription>

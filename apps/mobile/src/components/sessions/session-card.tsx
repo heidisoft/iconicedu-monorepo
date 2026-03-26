@@ -1,15 +1,19 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   Linking,
+  Modal,
+  Pressable,
+  Share,
   type ViewStyle,
 } from 'react-native';
-import { Video, Clock3 } from 'lucide-react-native';
+import { Video, Clock3, MessageSquare, Share2, X } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/providers/theme-provider';
+import { fetchSpaceChannelMetaByChannelId } from '@/lib/api/queries';
 import type { ClassScheduleVM } from '@iconicedu/shared-types';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -18,6 +22,8 @@ export type ClassSession = {
   id: string;
   label: string;
   time: string;
+  participantLabel?: string | null;
+  participants?: { name: string; themeKey?: string | null }[];
   dayName: string;
   dayNum: string;
   isToday: boolean;
@@ -43,7 +49,9 @@ export type ClassSession = {
 
 export function formatWeekTitle(startAt: string): string {
   const start = new Date(startAt);
-  const weekNumber = Math.min(5, Math.floor((start.getDate() - 1) / 7) + 1);
+  const firstDayOfMonth = new Date(start.getFullYear(), start.getMonth(), 1);
+  const firstWeekdayOffset = firstDayOfMonth.getDay();
+  const weekNumber = Math.floor((start.getDate() + firstWeekdayOffset - 1) / 7) + 1;
   const month = start.toLocaleDateString('en-US', { month: 'short' });
   return `${month} · Week ${weekNumber}`;
 }
@@ -99,6 +107,42 @@ function themeKeyColor(themeKey?: string | null, fallback?: string): string {
   return (themeKey && THEME_COLORS[themeKey]) || fallback || '#64748b';
 }
 
+function isExternalJoinHref(joinHref?: string | null): boolean {
+  return Boolean(joinHref && /^https?:\/\//i.test(joinHref));
+}
+
+function resolveExternalJoinProviderLabel(joinHref?: string | null) {
+  if (!joinHref || !isExternalJoinHref(joinHref)) {
+    return null;
+  }
+
+  try {
+    const hostname = new URL(joinHref).hostname.toLowerCase();
+    if (hostname.includes('zoom')) return 'Zoom';
+    if (hostname.includes('jitsi')) return 'Jitsi';
+    if (hostname.includes('meet.google')) return 'Google Meet';
+    if (hostname.includes('teams.microsoft')) return 'Microsoft Teams';
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+function resolveJoinHrefForMobile(joinHref: string): string {
+  if (isExternalJoinHref(joinHref)) {
+    return joinHref;
+  }
+
+  const apiBaseUrl = process.env.EXPO_PUBLIC_API_URL?.trim() || 'http://localhost:3000';
+
+  try {
+    return new URL(joinHref, apiBaseUrl).toString();
+  } catch {
+    return joinHref;
+  }
+}
+
 // ─── SessionCard ────────────────────────────────────────────────────────────────
 
 const hairline = StyleSheet.hairlineWidth;
@@ -106,188 +150,407 @@ const hairline = StyleSheet.hairlineWidth;
 export function SessionCard({
   session,
   style,
+  showJoinButton = true,
+  joinEnabled = true,
+  pressTarget = 'sessions',
+  enableCardPress = true,
 }: {
   session: ClassSession;
   style?: ViewStyle;
+  showJoinButton?: boolean;
+  joinEnabled?: boolean;
+  pressTarget?: 'sessions' | 'messages';
+  enableCardPress?: boolean;
 }) {
   const { colors } = useTheme();
   const router = useRouter();
+  const [externalJoinTarget, setExternalJoinTarget] = useState<{
+    joinHref: string;
+    providerLabel: string | null;
+  } | null>(null);
+  const [isResolvingJoin, setIsResolvingJoin] = useState(false);
 
   const { isLive, isPast } = session;
   const isDisabled = session.disabled;
+  const participantLabel = session.participantLabel?.trim() || null;
+  const participants =
+    session.participants?.filter((participant) => participant.name.trim()) ?? [];
 
-  const badgeBg = isDisabled
-    ? colors.inputBg
-    : isLive
-      ? colors.teal
-      : isPast
-        ? colors.inputBg
-        : colors.card;
+  const badgeBg = isLive ? colors.teal : colors.pageBg;
   const badgeTxt = isLive
     ? '#fff'
     : isPast || isDisabled
       ? colors.textMuted
       : colors.text;
+  const badgeBorderColor = isLive ? colors.teal : colors.border;
 
   const cardBorderColor = isLive ? colors.teal : colors.border;
   const cardBorderWidth = isLive ? 1.5 : hairline;
   const cardBg = isLive ? colors.tealBg : isPast ? colors.inputBg : colors.card;
 
-  const handlePress = session.channelId
+  const handlePress =
+    session.channelId && enableCardPress
+      ? () =>
+          router.push({
+            pathname: '/(app)/spaces/[channelId]',
+            params: { channelId: session.channelId!, tab: pressTarget },
+          } as never)
+      : undefined;
+  const handleOpenChat = session.channelId
     ? () =>
         router.push({
           pathname: '/(app)/spaces/[channelId]',
-          params: { channelId: session.channelId!, tab: 'sessions' },
+          params: { channelId: session.channelId!, tab: 'messages' },
         } as never)
     : undefined;
+  const handleOpenJoinHref = useCallback((joinHref: string) => {
+    void Linking.openURL(resolveJoinHrefForMobile(joinHref));
+  }, []);
+  const handleShareJoinHref = useCallback(async () => {
+    if (!externalJoinTarget?.joinHref) return;
+    try {
+      await Share.share({
+        message: externalJoinTarget.joinHref,
+        url: externalJoinTarget.joinHref,
+      });
+    } catch {
+      // best effort share
+    }
+  }, [externalJoinTarget?.joinHref]);
+  const handleJoin =
+    !isPast && !isDisabled
+      ? async () => {
+          if (isResolvingJoin) {
+            return;
+          }
+
+          if (session.meetingLink) {
+            if (isExternalJoinHref(session.meetingLink)) {
+              setExternalJoinTarget({
+                joinHref: session.meetingLink,
+                providerLabel: resolveExternalJoinProviderLabel(session.meetingLink),
+              });
+              return;
+            }
+            handleOpenJoinHref(session.meetingLink);
+            return;
+          }
+
+          if (session.channelId) {
+            setIsResolvingJoin(true);
+            try {
+              const channelMeta = await fetchSpaceChannelMetaByChannelId(
+                session.channelId,
+              );
+              const joinHref = channelMeta?.liveSession?.joinUrl?.trim() || null;
+
+              if (joinHref) {
+                if (isExternalJoinHref(joinHref)) {
+                  setExternalJoinTarget({
+                    joinHref,
+                    providerLabel: resolveExternalJoinProviderLabel(joinHref),
+                  });
+                  return;
+                }
+
+                handleOpenJoinHref(joinHref);
+                return;
+              }
+            } catch {
+              // Best effort join resolution. Fall back to the classroom if the lookup fails.
+            } finally {
+              setIsResolvingJoin(false);
+            }
+
+            router.push({
+              pathname: '/(app)/spaces/[channelId]',
+              params: { channelId: session.channelId, tab: 'sessions' },
+            } as never);
+          }
+        }
+      : undefined;
+  const canJoin =
+    !isPast && !isDisabled && (!!session.meetingLink || !!session.channelId);
+  const joinIsActive = canJoin && joinEnabled && !isResolvingJoin;
+  const canChat = !!session.channelId;
 
   return (
-    <TouchableOpacity
-      style={[
-        s.sessionCard,
-        {
-          backgroundColor: cardBg,
-          borderColor: cardBorderColor,
-          borderWidth: cardBorderWidth,
-        },
-        isPast && s.sessionCardPast,
-        style,
-      ]}
-      onPress={handlePress}
-      disabled={!session.channelId}
-      activeOpacity={0.75}
-    >
-      {/* Day badge */}
-      <View style={[s.sessionDayBadge, { backgroundColor: badgeBg }]}>
-        {isLive && <Text style={[s.sessionDayExtra, { color: '#fff' }]}>Today</Text>}
-        <Text style={[s.sessionDayName, { color: badgeTxt }]}>{session.dayName}</Text>
-        <Text style={[s.sessionDayNum, { color: badgeTxt }]}>{session.dayNum}</Text>
-      </View>
+    <>
+      <TouchableOpacity
+        style={[
+          s.sessionCard,
+          {
+            backgroundColor: cardBg,
+            borderColor: cardBorderColor,
+            borderWidth: cardBorderWidth,
+          },
+          isPast && s.sessionCardPast,
+          style,
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel="Open session details"
+        onPress={handlePress}
+        disabled={!session.channelId || !enableCardPress}
+        activeOpacity={0.75}
+      >
+        {/* Day badge */}
+        <View
+          style={[
+            s.sessionDayBadge,
+            {
+              backgroundColor: badgeBg,
+              borderColor: badgeBorderColor,
+            },
+          ]}
+        >
+          {isLive && <Text style={[s.sessionDayExtra, { color: '#fff' }]}>Today</Text>}
+          <Text style={[s.sessionDayName, { color: badgeTxt }]}>{session.dayName}</Text>
+          <Text style={[s.sessionDayNum, { color: badgeTxt }]}>{session.dayNum}</Text>
+        </View>
 
-      {/* Info */}
-      <View style={s.sessionInfo}>
-        <View style={s.sessionTitleRow}>
-          <Text
-            style={[
-              s.sessionLabel,
-              { color: colors.text },
-              (isDisabled || isPast) && { color: colors.textMuted },
-            ]}
-            numberOfLines={1}
-          >
-            {session.label}
-          </Text>
-          {isLive && (
-            <View style={[s.liveBadge, { backgroundColor: colors.teal }]}>
-              <Text style={s.liveBadgeText}>LIVE</Text>
-            </View>
-          )}
-          {session.variant === 'exception' && (
-            <View style={[s.variantBadge, { backgroundColor: colors.inputBg }]}>
-              <Text style={[s.variantBadgeText, { color: colors.textMuted }]}>
-                Skipped
-              </Text>
-            </View>
-          )}
-          {session.variant === 'override' && (
-            <View
+        {/* Info */}
+        <View style={s.sessionInfo}>
+          <View style={s.sessionTitleRow}>
+            <Text
               style={[
-                s.variantBadge,
-                s.variantBadgeOutline,
-                { borderColor: colors.border },
+                s.sessionLabel,
+                { color: colors.text },
+                (isDisabled || isPast) && { color: colors.textMuted },
               ]}
+              numberOfLines={1}
             >
-              <Text style={[s.variantBadgeText, { color: colors.textMuted }]}>
-                Changed
-              </Text>
-            </View>
-          )}
-          {isPast && session.variant !== 'exception' && (
-            <View style={[s.variantBadge, { backgroundColor: colors.inputBg }]}>
-              <Text style={[s.variantBadgeText, { color: colors.textMuted }]}>
-                Completed
-              </Text>
-            </View>
-          )}
-        </View>
-
-        <View style={s.sessionTimeRow}>
-          <Clock3 size={11} color={colors.textMuted} />
-          <Text style={[s.sessionTimeTxt, { color: colors.textMuted }]}>
-            {session.time}
-          </Text>
-          {session.students && session.students.length > 0 && (
-            <>
-              <Text style={[s.sessionTimeTxt, { color: colors.textFaint }]}>·</Text>
-              <Text style={s.sessionTimeTxt} numberOfLines={1}>
-                {session.students.map((student, i) => (
-                  <Text key={student.name + i}>
-                    {i > 0 && <Text style={{ color: colors.textFaint }}>, </Text>}
-                    <Text
-                      style={{ color: themeKeyColor(student.themeKey, colors.textMuted) }}
-                    >
-                      {student.name}
-                    </Text>
-                  </Text>
-                ))}
-              </Text>
-            </>
-          )}
-        </View>
-
-        {session.variant === 'override' && session.originalTime && (
-          <Text style={[s.sessionOriginalTimeTxt, { color: colors.textMuted }]}>
-            Was {session.originalDate ? `${session.originalDate} ` : ''}
-            <Text style={s.sessionOriginalTimeStrike}>{session.originalTime}</Text>
-          </Text>
-        )}
-
-        {session.variant === 'exception' && session.reason && (
-          <Text style={[s.sessionReasonTxt, { color: colors.textMuted }]}>
-            {session.reason}
-          </Text>
-        )}
-      </View>
-
-      {/* Action buttons */}
-      <View style={s.sessionActions}>
-        {!isPast && !isDisabled ? (
-          <TouchableOpacity
-            style={[
-              s.joinBtn,
-              isLive
-                ? { backgroundColor: colors.teal }
-                : { backgroundColor: colors.tealBg },
-            ]}
-            onPress={
-              session.meetingLink
-                ? () => void Linking.openURL(session.meetingLink!)
-                : undefined
-            }
-            disabled={!session.meetingLink}
-            activeOpacity={0.7}
-          >
-            <Video size={11} color={isLive ? '#fff' : colors.teal} />
-            <Text style={[s.joinBtnTxt, { color: isLive ? '#fff' : colors.teal }]}>
-              {isLive ? 'Join Now' : 'Join'}
+              {session.label}
             </Text>
-          </TouchableOpacity>
-        ) : isDisabled ? (
-          <View style={[s.joinBtn, { backgroundColor: colors.inputBg, opacity: 0.5 }]}>
-            <Video size={11} color={colors.textMuted} />
-            <Text style={[s.joinBtnTxt, { color: colors.textMuted }]}>Unavailable</Text>
+            {isLive && (
+              <View style={[s.liveBadge, { backgroundColor: colors.teal }]}>
+                <Text style={s.liveBadgeText}>LIVE</Text>
+              </View>
+            )}
+            {(session.status === 'cancelled' || session.variant === 'exception') && (
+              <View style={[s.variantBadge, { backgroundColor: colors.inputBg }]}>
+                <Text style={[s.variantBadgeText, { color: colors.textMuted }]}>
+                  Canceled
+                </Text>
+              </View>
+            )}
+            {(session.status === 'rescheduled' || session.variant === 'override') && (
+              <View
+                style={[
+                  s.variantBadge,
+                  s.variantBadgeOutline,
+                  { borderColor: colors.border },
+                ]}
+              >
+                <Text style={[s.variantBadgeText, { color: colors.textMuted }]}>
+                  Rescheduled
+                </Text>
+              </View>
+            )}
           </View>
-        ) : (
-          <TouchableOpacity
-            style={[s.joinBtn, { backgroundColor: colors.inputBg }]}
-            activeOpacity={0.7}
-          >
-            <Video size={11} color={colors.textMuted} />
-            <Text style={[s.joinBtnTxt, { color: colors.textMuted }]}>Recording</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    </TouchableOpacity>
+
+          <View style={s.sessionTimeRow}>
+            <Clock3 size={11} color={colors.textMuted} />
+            <Text style={[s.sessionTimeTxt, { color: colors.textMuted }]}>
+              {session.time}
+            </Text>
+            {participants.length > 0 ? (
+              <>
+                <Text style={[s.sessionTimeTxt, { color: colors.textFaint }]}>·</Text>
+                <Text style={s.sessionTimeTxt} numberOfLines={1}>
+                  {participants.map((participant, i) => (
+                    <Text key={participant.name + i}>
+                      {i > 0 && <Text style={{ color: colors.textFaint }}>, </Text>}
+                      <Text
+                        style={{
+                          color: themeKeyColor(participant.themeKey, colors.textMuted),
+                        }}
+                      >
+                        {participant.name}
+                      </Text>
+                    </Text>
+                  ))}
+                </Text>
+              </>
+            ) : participantLabel ? (
+              <>
+                <Text style={[s.sessionTimeTxt, { color: colors.textFaint }]}>·</Text>
+                <Text
+                  style={[s.sessionTimeTxt, { color: colors.textMuted }]}
+                  numberOfLines={1}
+                >
+                  {participantLabel}
+                </Text>
+              </>
+            ) : session.students && session.students.length > 0 ? (
+              <>
+                <Text style={[s.sessionTimeTxt, { color: colors.textFaint }]}>·</Text>
+                <Text style={s.sessionTimeTxt} numberOfLines={1}>
+                  {session.students.map((student, i) => (
+                    <Text key={student.name + i}>
+                      {i > 0 && <Text style={{ color: colors.textFaint }}>, </Text>}
+                      <Text
+                        style={{
+                          color: themeKeyColor(student.themeKey, colors.textMuted),
+                        }}
+                      >
+                        {student.name}
+                      </Text>
+                    </Text>
+                  ))}
+                </Text>
+              </>
+            ) : null}
+          </View>
+
+          {session.variant === 'override' && session.originalTime && (
+            <Text style={[s.sessionOriginalTimeTxt, { color: colors.textMuted }]}>
+              Was {session.originalDate ? `${session.originalDate} ` : ''}
+              <Text style={s.sessionOriginalTimeStrike}>{session.originalTime}</Text>
+            </Text>
+          )}
+
+          {session.variant === 'exception' && session.reason && (
+            <Text style={[s.sessionReasonTxt, { color: colors.textMuted }]}>
+              {session.reason}
+            </Text>
+          )}
+        </View>
+
+        {/* Action buttons */}
+        <View style={s.sessionActions}>
+          {showJoinButton && !isPast && !isDisabled ? (
+            <TouchableOpacity
+              style={[
+                s.joinBtn,
+                {
+                  backgroundColor: joinIsActive
+                    ? isLive
+                      ? colors.teal
+                      : colors.tealBg
+                    : colors.inputBg,
+                  opacity: joinIsActive ? 1 : 0.6,
+                },
+              ]}
+              onPress={handleJoin}
+              disabled={!joinIsActive}
+              activeOpacity={0.7}
+              accessibilityLabel={isLive ? 'Join live session' : 'Join session'}
+            >
+              <Video
+                size={11}
+                color={joinIsActive ? (isLive ? '#fff' : colors.teal) : colors.textMuted}
+              />
+              <Text
+                style={[
+                  s.joinBtnTxt,
+                  {
+                    color: joinIsActive
+                      ? isLive
+                        ? '#fff'
+                        : colors.teal
+                      : colors.textMuted,
+                  },
+                ]}
+              >
+                {isLive ? 'Join Now' : 'Join'}
+              </Text>
+            </TouchableOpacity>
+          ) : showJoinButton && isDisabled ? (
+            <View style={[s.joinBtn, { backgroundColor: colors.inputBg, opacity: 0.5 }]}>
+              <Video size={11} color={colors.textMuted} />
+              <Text style={[s.joinBtnTxt, { color: colors.textMuted }]}>Unavailable</Text>
+            </View>
+          ) : showJoinButton ? (
+            <TouchableOpacity
+              style={[s.joinBtn, { backgroundColor: colors.inputBg }]}
+              activeOpacity={0.7}
+            >
+              <Video size={11} color={colors.textMuted} />
+              <Text style={[s.joinBtnTxt, { color: colors.textMuted }]}>Recording</Text>
+            </TouchableOpacity>
+          ) : null}
+          {canChat ? (
+            <TouchableOpacity
+              style={[
+                s.iconBtn,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
+                },
+              ]}
+              onPress={handleOpenChat}
+              activeOpacity={0.7}
+              accessibilityLabel="Open classroom chat"
+            >
+              <MessageSquare size={13} color={colors.textMuted} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      </TouchableOpacity>
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={Boolean(externalJoinTarget)}
+        onRequestClose={() => setExternalJoinTarget(null)}
+      >
+        <Pressable style={s.modalBackdrop} onPress={() => setExternalJoinTarget(null)}>
+          <Pressable style={s.modalCard} onPress={(event) => event.stopPropagation()}>
+            <View style={s.modalHeading}>
+              <Text style={s.modalTitle}>Session ready to join</Text>
+              <Text style={s.modalDescription}>
+                This session opens in an external provider. Stay here until you are ready,
+                then use the link below to join.
+              </Text>
+            </View>
+            <View style={s.modalLinkBox}>
+              <Text style={s.modalLinkLabel}>Join link</Text>
+              <Text style={s.modalLinkValue}>{externalJoinTarget?.joinHref}</Text>
+            </View>
+            <View style={s.modalFooter}>
+              <TouchableOpacity
+                style={[s.modalButton, s.modalButtonSecondary]}
+                onPress={() => void handleShareJoinHref()}
+                activeOpacity={0.85}
+                accessibilityLabel="Share join link"
+              >
+                <Share2 size={16} color="#0f172a" />
+                <Text style={s.modalButtonSecondaryText}>Share</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.modalButton, s.modalButtonPrimary]}
+                onPress={() => {
+                  if (externalJoinTarget?.joinHref) {
+                    handleOpenJoinHref(externalJoinTarget.joinHref);
+                  }
+                  setExternalJoinTarget(null);
+                }}
+                activeOpacity={0.85}
+                accessibilityLabel={
+                  externalJoinTarget?.providerLabel
+                    ? `Open ${externalJoinTarget.providerLabel}`
+                    : 'Open session'
+                }
+              >
+                <Video size={16} color="#ffffff" />
+                <Text style={s.modalButtonPrimaryText}>
+                  {externalJoinTarget?.providerLabel
+                    ? `Join ${externalJoinTarget.providerLabel}`
+                    : 'Join session'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={s.modalCloseIconButton}
+                onPress={() => setExternalJoinTarget(null)}
+                activeOpacity={0.85}
+                accessibilityLabel="Close join dialog"
+              >
+                <X size={16} color="#0f172a" />
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </>
   );
 }
 
@@ -308,6 +571,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 6,
     borderRadius: 10,
+    borderWidth: hairline,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -389,6 +653,14 @@ const s = StyleSheet.create({
     gap: 6,
     flexShrink: 0,
   },
+  iconBtn: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
   joinBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -401,11 +673,93 @@ const s = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
   },
-  calBtn: {
-    width: 26,
-    height: 26,
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    backgroundColor: 'rgba(15, 23, 42, 0.42)',
+  },
+  modalCard: {
+    gap: 16,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#ffffff',
+    padding: 20,
+  },
+  modalHeading: { gap: 8 },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  modalDescription: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#64748b',
+  },
+  modalLinkBox: {
+    gap: 6,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#f1f5f9',
+    padding: 14,
+  },
+  modalLinkLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    color: '#64748b',
+  },
+  modalLinkValue: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: '#0f172a',
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  modalButton: {
+    minWidth: 104,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 13,
+    flexDirection: 'row',
+    gap: 8,
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  modalButtonSecondary: {
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#f1f5f9',
+  },
+  modalButtonPrimary: {
+    backgroundColor: '#14b8a6',
+  },
+  modalButtonSecondaryText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0f172a',
+  },
+  modalButtonPrimaryText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  modalCloseIconButton: {
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 21,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#f1f5f9',
   },
 });

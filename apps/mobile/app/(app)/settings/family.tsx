@@ -10,7 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, CirclePlus, Mail } from 'lucide-react-native';
+import { ChevronLeft, CirclePlus, Mail, Users } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { SettingsRow } from '@iconicedu/ui-native';
 import { useFamilyLinks } from '@/hooks/use-family-links';
@@ -59,7 +59,14 @@ function makeStyles(C: AppColors) {
     valueText: { fontSize: 13, color: C.textMuted, maxWidth: 140, textAlign: 'right' },
     loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     emptyCard: { padding: 28, alignItems: 'center', gap: 10 },
-    emptyEmoji: { fontSize: 40 },
+    emptyIconWrap: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: C.inputBg,
+    },
     emptyTitle: { fontSize: 16, fontWeight: '700', color: C.text },
     emptyDesc: { fontSize: 13, color: C.textMuted, textAlign: 'center', lineHeight: 20 },
     childAvatar: {
@@ -124,7 +131,9 @@ export default function FamilyScreen() {
 
         {links.length === 0 ? (
           <View style={[s.card, s.emptyCard]}>
-            <Text style={s.emptyEmoji}>👨‍👩‍👧</Text>
+            <View style={s.emptyIconWrap}>
+              <Users size={30} color={colors.textMuted} />
+            </View>
             <Text style={s.emptyTitle}>No family links yet</Text>
             <Text style={s.emptyDesc}>
               Invite a child using their email or phone number to link them to your

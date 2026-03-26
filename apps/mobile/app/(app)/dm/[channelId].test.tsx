@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react-native';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────────
 
@@ -27,6 +28,16 @@ jest.mock('@/hooks/use-account', () => ({
   }),
 }));
 
+jest.mock('@/hooks/use-profile', () => ({
+  useProfile: () => ({
+    data: {
+      id: 'prof-1',
+      display_name: 'Me',
+      first_name: 'Me',
+    },
+  }),
+}));
+
 jest.mock('@/hooks/use-messages', () => ({
   useMessages: () => ({
     data: [],
@@ -42,6 +53,18 @@ jest.mock('@/hooks/use-messages', () => ({
 }));
 
 jest.mock('@/lib/api/queries', () => ({
+  queryKeys: {
+    channelReadState: (channelId: string, accountId: string) => [
+      'channelReadState',
+      channelId,
+      accountId,
+    ],
+  },
+  fetchChannelReadState: jest.fn(async () => ({
+    lastReadMessageId: null,
+    unreadCount: 0,
+  })),
+  markChannelReadState: jest.fn(),
   sendTextMessage: jest.fn(),
   deleteMessage: jest.fn(),
 }));
@@ -99,6 +122,22 @@ jest.mock('react-native-safe-area-context', () => ({
 
 import DmConversationScreen from './[channelId]';
 
+function renderScreen() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <DmConversationScreen />
+    </QueryClientProvider>,
+  );
+}
+
 describe('DmConversationScreen — supervised read-only mode', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -110,7 +149,7 @@ describe('DmConversationScreen — supervised read-only mode', () => {
       topic: 'Alice',
     });
 
-    render(<DmConversationScreen />);
+    renderScreen();
 
     expect(screen.getByText('MessageInput')).toBeTruthy();
     expect(screen.queryByText(/read-only mode/i)).toBeNull();
@@ -123,7 +162,7 @@ describe('DmConversationScreen — supervised read-only mode', () => {
       isSupervisedReadOnly: '1',
     });
 
-    render(<DmConversationScreen />);
+    renderScreen();
 
     expect(screen.getByText(/read-only mode/i)).toBeTruthy();
     expect(screen.queryByText('MessageInput')).toBeNull();
@@ -134,7 +173,7 @@ describe('DmConversationScreen — supervised read-only mode', () => {
       channelId: 'ch-1',
     });
 
-    render(<DmConversationScreen />);
+    renderScreen();
 
     expect(screen.getByText('MessageInput')).toBeTruthy();
   });
@@ -142,7 +181,7 @@ describe('DmConversationScreen — supervised read-only mode', () => {
   it('returns null when channelId is missing', () => {
     mockUseLocalSearchParams.mockReturnValue({});
 
-    const { toJSON } = render(<DmConversationScreen />);
+    const { toJSON } = renderScreen();
 
     expect(toJSON()).toBeNull();
   });
@@ -155,7 +194,7 @@ describe('DmConversationScreen — supervised read-only mode', () => {
       supervisedChildName: 'Alice',
     });
 
-    render(<DmConversationScreen />);
+    renderScreen();
 
     expect(mockConversationHeader).toHaveBeenCalledWith(
       expect.objectContaining({ isReadOnly: true }),
@@ -170,7 +209,7 @@ describe('DmConversationScreen — supervised read-only mode', () => {
       supervisedChildName: 'Senya',
     });
 
-    render(<DmConversationScreen />);
+    renderScreen();
 
     expect(mockConversationHeader).toHaveBeenCalledWith(
       expect.objectContaining({ subtitle: "Supervising Senya's conversation" }),
@@ -185,7 +224,7 @@ describe('DmConversationScreen — supervised read-only mode', () => {
       supervisedChildName: 'Senya',
     });
 
-    render(<DmConversationScreen />);
+    renderScreen();
 
     expect(mockConversationHeader).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'Peter' }),
@@ -200,7 +239,7 @@ describe('DmConversationScreen — supervised read-only mode', () => {
       supervisedChildName: 'Senya',
     });
 
-    render(<DmConversationScreen />);
+    renderScreen();
 
     expect(mockConversationHeader).toHaveBeenCalledWith(
       expect.objectContaining({ secondaryAvatarSeed: 'Senya' }),
@@ -214,7 +253,7 @@ describe('DmConversationScreen — supervised read-only mode', () => {
       isSupervisedReadOnly: '1',
     });
 
-    render(<DmConversationScreen />);
+    renderScreen();
 
     expect(mockConversationHeader).toHaveBeenCalledWith(
       expect.objectContaining({ subtitle: 'Supervised Inbox' }),
@@ -227,7 +266,7 @@ describe('DmConversationScreen — supervised read-only mode', () => {
       topic: 'Alice',
     });
 
-    render(<DmConversationScreen />);
+    renderScreen();
 
     expect(mockConversationHeader).toHaveBeenCalledWith(
       expect.objectContaining({ isReadOnly: false }),

@@ -120,7 +120,9 @@ export default function ProfileSettingsScreen() {
         {/* Avatar section */}
         <View style={s.avatarSection}>
           {avatarUrl ? (
-            <Image source={{ uri: avatarUrl }} style={s.avatar} />
+            <View style={s.avatar}>
+              <Image source={{ uri: avatarUrl }} style={s.avatar} />
+            </View>
           ) : (
             <View style={s.avatar}>
               <Text style={s.avatarTxt}>{initial}</Text>

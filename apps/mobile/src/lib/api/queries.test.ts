@@ -2,6 +2,7 @@ import {
   fetchSpaceSchedulesByChannelId,
   fetchActivityFeed,
   fetchSupervisedDirectMessages,
+  filterVisibleMessageRows,
   toggleReaction,
   queryKeys,
 } from './queries';
@@ -170,6 +171,7 @@ describe('fetchSpaceSchedulesByChannelId', () => {
         {
           id: 'p-1',
           org_id: ORG_ID,
+          profile_id: 'profile-teacher-1',
           role: 'teacher',
           status: 'accepted',
           display_name: 'Ms Smith',
@@ -179,6 +181,7 @@ describe('fetchSpaceSchedulesByChannelId', () => {
         {
           id: 'p-2',
           org_id: ORG_ID,
+          profile_id: 'profile-student-1',
           role: 'student',
           status: 'pending',
           display_name: 'Jane',
@@ -194,12 +197,12 @@ describe('fetchSpaceSchedulesByChannelId', () => {
 
     expect(result[0]!.participants).toHaveLength(2);
     expect(result[0]!.participants[0]).toMatchObject({
-      ids: { id: 'p-1' },
+      ids: { id: 'profile-teacher-1' },
       role: 'teacher',
       displayName: 'Ms Smith',
     });
     expect(result[0]!.participants[1]).toMatchObject({
-      ids: { id: 'p-2' },
+      ids: { id: 'profile-student-1' },
       role: 'student',
       avatarUrl: 'https://img/a.png',
       themeKey: 'teal',
@@ -725,6 +728,13 @@ describe('fetchSupervisedDirectMessages', () => {
         error: null,
       }),
     );
+    // child read state
+    mockFrom.mockReturnValueOnce(
+      createIsChain({
+        data: [{ channel_id: SUPERVISED_CH, unread_count: 0 }],
+        error: null,
+      }),
+    );
     // member rows for participant display
     mockFrom.mockReturnValueOnce(
       createIsChain({
@@ -867,6 +877,89 @@ describe('fetchSupervisedDirectMessages', () => {
     // Should appear only once despite being found via two children
     expect(result).toHaveLength(1);
     expect(result[0]!.id).toBe(SUPERVISED_CH);
+  });
+});
+
+describe('filterVisibleMessageRows', () => {
+  it('keeps public rows visible to everyone', () => {
+    const rows = [
+      {
+        id: 'msg-public-1',
+        org_id: ORG_ID,
+        channel_id: CHANNEL_ID,
+        sender_profile_id: 'profile-staff-1',
+        visibility_type: 'all' as const,
+        visibility_user_ids: null,
+        type: 'text',
+        created_at: '2026-03-01T10:00:00Z',
+        updated_at: '2026-03-01T10:00:00Z',
+        sender: {
+          id: 'profile-staff-1',
+          display_name: 'Support',
+          first_name: null,
+          last_name: null,
+          avatar_url: null,
+          avatar_seed: null,
+          kind: 'staff',
+        },
+      },
+    ];
+
+    expect(filterVisibleMessageRows(rows, 'profile-child-1')).toEqual(rows);
+  });
+
+  it('hides specific-users rows when the effective profile is not allowed', () => {
+    const rows = [
+      {
+        id: 'msg-private-1',
+        org_id: ORG_ID,
+        channel_id: CHANNEL_ID,
+        sender_profile_id: 'profile-other-child-1',
+        visibility_type: 'specific-users' as const,
+        visibility_user_ids: ['profile-other-child-1', 'profile-staff-1'],
+        type: 'text',
+        created_at: '2026-03-01T10:00:00Z',
+        updated_at: '2026-03-01T10:00:00Z',
+        sender: {
+          id: 'profile-other-child-1',
+          display_name: 'Other Child',
+          first_name: null,
+          last_name: null,
+          avatar_url: null,
+          avatar_seed: null,
+          kind: 'child',
+        },
+      },
+    ];
+
+    expect(filterVisibleMessageRows(rows, 'profile-child-1')).toEqual([]);
+  });
+
+  it('keeps specific-users rows when the effective profile is allowed', () => {
+    const rows = [
+      {
+        id: 'msg-private-1',
+        org_id: ORG_ID,
+        channel_id: CHANNEL_ID,
+        sender_profile_id: 'profile-child-1',
+        visibility_type: 'specific-users' as const,
+        visibility_user_ids: ['profile-child-1', 'profile-staff-1'],
+        type: 'text',
+        created_at: '2026-03-01T10:00:00Z',
+        updated_at: '2026-03-01T10:00:00Z',
+        sender: {
+          id: 'profile-child-1',
+          display_name: 'My Child',
+          first_name: null,
+          last_name: null,
+          avatar_url: null,
+          avatar_seed: null,
+          kind: 'child',
+        },
+      },
+    ];
+
+    expect(filterVisibleMessageRows(rows, 'profile-child-1')).toEqual(rows);
   });
 });
 

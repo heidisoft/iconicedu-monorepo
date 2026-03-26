@@ -18,7 +18,6 @@ import {
   listActiveOrgSubjectCatalog,
   mapOrgSubjectRowsToOptions,
 } from '@iconicedu/web/lib/subjects/queries/org-subject-catalog.query';
-import { enablePersonaAdd, enablePersonaSwitch } from '@iconicedu/web/flags';
 
 export const metadata: Metadata = {
   title: {
@@ -92,18 +91,6 @@ export default async function Layout({
     isViewingAsChild: familyViewResolution.isViewingAsChild,
     viewingAsProfileId: familyViewResolution.viewingAsProfileId,
   });
-  const [isPersonaSwitchEnabled, isPersonaAddEnabled] = await Promise.all([
-    enablePersonaSwitch.run({
-      identify: {
-        profileId: sidebarData.user.profile.ids.id,
-      },
-    }),
-    enablePersonaAdd.run({
-      identify: {
-        profileId: sidebarData.user.profile.ids.id,
-      },
-    }),
-  ]);
   const subjectCatalogResponse = await listActiveOrgSubjectCatalog(
     supabase,
     account.org_id,
@@ -115,8 +102,8 @@ export default async function Layout({
       <SidebarShell
         data={sidebarData}
         initialOnboardingStatus={onboardingStatus}
-        isPersonaSwitchEnabled={isPersonaSwitchEnabled}
-        isPersonaAddEnabled={isPersonaAddEnabled}
+        isPersonaSwitchEnabled
+        isPersonaAddEnabled
         adminSections={buildAdminMenuSections(`/${orgSlug}`)}
         subjectOptions={subjectOptions}
       >

@@ -57,4 +57,15 @@ describe('MessageInput', () => {
     render(<MessageInput onSend={jest.fn()} placeholder="Write something..." />);
     expect(screen.getByPlaceholderText('Write something...')).toBeTruthy();
   });
+
+  it('truncates long placeholder text after 25 characters', () => {
+    render(
+      <MessageInput
+        onSend={jest.fn()}
+        placeholder="This placeholder should truncate after twenty five characters"
+      />,
+    );
+
+    expect(screen.getByPlaceholderText('This placeholder should t...')).toBeTruthy();
+  });
 });

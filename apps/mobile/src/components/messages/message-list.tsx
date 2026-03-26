@@ -7,6 +7,7 @@ import {
   StyleSheet,
   AppState,
 } from 'react-native';
+import { MessageSquare } from 'lucide-react-native';
 import type { MessageVM } from '@iconicedu/shared-types';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
@@ -40,13 +41,55 @@ function formatDateHeader(iso: string): string {
 // ─── List item types ──────────────────────────────────────────────────────────
 
 type DateSeparatorItem = { _type: 'date-separator'; dateKey: string; label: string };
-type MessageListItem = MessageVM | DateSeparatorItem;
+type UnreadSeparatorItem = { _type: 'unread-separator'; count?: number };
+type MessageListItem = MessageVM | DateSeparatorItem | UnreadSeparatorItem;
 
-export function buildListData(messages: MessageVM[]): MessageListItem[] {
+function findUnreadStartMessageId(input: {
+  messages: MessageVM[];
+  lastReadMessageId?: string | null;
+  unreadCount?: number;
+  currentProfileId?: string;
+}): string | null {
+  const { messages, lastReadMessageId, unreadCount, currentProfileId } = input;
+  const normalizedUnreadCount = Math.max(0, unreadCount ?? 0);
+  if (messages.length === 0) return null;
+
+  const findIncomingId = (startIndex: number): string | null => {
+    for (let index = startIndex; index < messages.length; index += 1) {
+      const message = messages[index];
+      if (!currentProfileId || message.core.sender.ids.id !== currentProfileId) {
+        return message.ids.id;
+      }
+    }
+    return null;
+  };
+
+  if (lastReadMessageId) {
+    const lastReadIndex = messages.findIndex(
+      (message) => message.ids.id === lastReadMessageId,
+    );
+    if (lastReadIndex >= 0) {
+      return findIncomingId(lastReadIndex + 1);
+    }
+  }
+
+  if (normalizedUnreadCount <= 0) return null;
+  const fallbackStartIndex = Math.max(0, messages.length - normalizedUnreadCount);
+  return findIncomingId(fallbackStartIndex);
+}
+
+export function buildListData(
+  messages: MessageVM[],
+  options?: {
+    unreadAnchorMessageId?: string | null;
+    unreadCount?: number;
+  },
+): MessageListItem[] {
   // Messages arrive oldest-first; the FlatList is inverted so it renders
   // newest at the bottom. We insert date separators between groups.
   const items: MessageListItem[] = [];
   let lastDateKey = '';
+  const unreadAnchorMessageId = options?.unreadAnchorMessageId ?? null;
 
   for (const msg of messages) {
     const key = getDateKey(msg.core.createdAt);
@@ -58,6 +101,12 @@ export function buildListData(messages: MessageVM[]): MessageListItem[] {
       });
       lastDateKey = key;
     }
+    if (unreadAnchorMessageId && msg.ids.id === unreadAnchorMessageId) {
+      items.push({
+        _type: 'unread-separator',
+        count: options?.unreadCount,
+      });
+    }
     items.push(msg);
   }
 
@@ -66,6 +115,10 @@ export function buildListData(messages: MessageVM[]): MessageListItem[] {
 
 function isDateSeparator(item: MessageListItem): item is DateSeparatorItem {
   return '_type' in item && item._type === 'date-separator';
+}
+
+function isUnreadSeparator(item: MessageListItem): item is UnreadSeparatorItem {
+  return '_type' in item && item._type === 'unread-separator';
 }
 
 // ─── Date Separator ───────────────────────────────────────────────────────────
@@ -99,6 +152,50 @@ const sepStyles = StyleSheet.create({
   label: { fontSize: 12, fontWeight: '600', paddingHorizontal: 8 },
 });
 
+function UnreadSeparator({ count, colors }: { count?: number; colors: AppColors }) {
+  const label = count && count > 0 ? `New messages (${count})` : 'New messages';
+  return (
+    <View style={unreadStyles.row}>
+      <View style={[unreadStyles.line, { backgroundColor: colors.border }]} />
+      <View
+        style={[
+          unreadStyles.badge,
+          {
+            borderColor: colors.border,
+            backgroundColor: colors.inputBg,
+          },
+        ]}
+      >
+        <Text style={[unreadStyles.label, { color: colors.textMuted }]}>{label}</Text>
+      </View>
+      <View style={[unreadStyles.line, { backgroundColor: colors.border }]} />
+    </View>
+  );
+}
+
+const unreadStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 12,
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  line: { flex: 1, height: 1 },
+  badge: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  label: {
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+});
+
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 type MessageListProps = {
@@ -119,6 +216,10 @@ type MessageListProps = {
   isReadOnly?: boolean;
   onUnreadViewed?: (lastReadMessageId: string) => void;
   isScreenActive?: boolean;
+  emptyTitle?: string;
+  emptyDescription?: string;
+  lastReadMessageId?: string | null;
+  unreadCount?: number;
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -139,6 +240,10 @@ export const MessageList: React.FC<MessageListProps> = ({
   isReadOnly,
   onUnreadViewed,
   isScreenActive = true,
+  emptyTitle,
+  emptyDescription,
+  lastReadMessageId,
+  unreadCount,
 }) => {
   const flatListRef = useRef<FlatList>(null);
   const { colors } = useTheme();
@@ -146,7 +251,26 @@ export const MessageList: React.FC<MessageListProps> = ({
   const lastNotifiedReadIdRef = useRef<string | null>(null);
 
   // Build items newest-first so inverted FlatList renders newest at the bottom
-  const listData = useMemo(() => [...buildListData(messages)].reverse(), [messages]);
+  const unreadAnchorMessageId = useMemo(
+    () =>
+      findUnreadStartMessageId({
+        messages,
+        lastReadMessageId,
+        unreadCount,
+        currentProfileId,
+      }),
+    [messages, lastReadMessageId, unreadCount, currentProfileId],
+  );
+  const listData = useMemo(
+    () =>
+      [
+        ...buildListData(messages, {
+          unreadAnchorMessageId,
+          unreadCount,
+        }),
+      ].reverse(),
+    [messages, unreadAnchorMessageId, unreadCount],
+  );
   const latestIncomingMessageId = useMemo(() => {
     for (let index = messages.length - 1; index >= 0; index -= 1) {
       const message = messages[index];
@@ -198,6 +322,9 @@ export const MessageList: React.FC<MessageListProps> = ({
       if (isDateSeparator(item)) {
         return <DateSeparator label={item.label} colors={colors} />;
       }
+      if (isUnreadSeparator(item)) {
+        return <UnreadSeparator count={item.count} colors={colors} />;
+      }
 
       // For inverted FlatList, index 0 = newest. We need to find the prev message
       // (which is index-1, i.e. the next-newer message) to check sender continuity.
@@ -205,7 +332,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       let prevMsg: MessageVM | null = null;
       for (let i = index + 1; i < listData.length; i++) {
         const candidate = listData[i];
-        if (!isDateSeparator(candidate)) {
+        if (!isDateSeparator(candidate) && !isUnreadSeparator(candidate)) {
           prevMsg = candidate;
           break;
         }
@@ -253,8 +380,29 @@ export const MessageList: React.FC<MessageListProps> = ({
 
   const keyExtractor = useCallback((item: MessageListItem) => {
     if (isDateSeparator(item)) return `sep-${item.dateKey}`;
+    if (isUnreadSeparator(item)) return `unread-${item.count ?? 'marker'}`;
     return item.ids.id;
   }, []);
+
+  const isEmpty =
+    !loading && listData.length === 0 && !(pendingUploads && pendingUploads.length);
+
+  if (isEmpty) {
+    return (
+      <View style={emptyStyles.wrap}>
+        <View style={[emptyStyles.iconWrap, { backgroundColor: colors.inputBg }]}>
+          <MessageSquare size={28} color={colors.teal} />
+        </View>
+        <Text style={[emptyStyles.title, { color: colors.text }]}>
+          {emptyTitle ?? 'Start the conversation'}
+        </Text>
+        <Text style={[emptyStyles.description, { color: colors.textMuted }]}>
+          {emptyDescription ??
+            'Share a welcome message, lesson update, or question to begin the discussion.'}
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <FlatList
@@ -300,3 +448,30 @@ export const MessageList: React.FC<MessageListProps> = ({
     />
   );
 };
+
+const emptyStyles = StyleSheet.create({
+  wrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    gap: 12,
+  },
+  iconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  description: {
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: 'center',
+  },
+});

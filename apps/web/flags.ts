@@ -1,4 +1,5 @@
 import { flag, getProviderData as getCodeProviderData } from 'flags/next';
+import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
 
 function resolveDistinctId(profileId?: string | null) {
   const resolved = profileId?.trim();
@@ -53,49 +54,23 @@ export const enableMessageTypeComposer = flag<boolean, { profileId?: string | nu
   },
 });
 
-export const enablePersonaSwitch = flag<boolean, { profileId?: string | null }>({
-  key: 'enable-persona-switch',
-  description: 'Enables persona switching from the user menu and active profile updates.',
-  options: [
-    { label: 'Off', value: false },
-    { label: 'On', value: true },
-  ],
-  defaultValue: false,
-  async decide({ entities }) {
-    return evaluateWebBooleanFlag({
-      flagKey: 'enable-persona-switch',
-      profileId: entities?.profileId,
-    });
-  },
-});
-
-export const enablePersonaAdd = flag<boolean, { profileId?: string | null }>({
-  key: 'enable-persona-add',
-  description:
-    'Enables adding additional personas to the same org account from the user menu.',
-  options: [
-    { label: 'Off', value: false },
-    { label: 'On', value: true },
-  ],
-  defaultValue: false,
-  async decide({ entities }) {
-    return evaluateWebBooleanFlag({
-      flagKey: 'enable-persona-add',
-      profileId: entities?.profileId,
-    });
-  },
-});
-
 export const webFlags = {
   enableChannelCommunications,
   enableMessageTypeComposer,
-  enablePersonaSwitch,
-  enablePersonaAdd,
 } as const;
 
 export type WebFlagKey = keyof typeof webFlags;
 
 export function isVercelFlagsSdkConfigured() {
+  const appUrl = resolveAppUrl();
+  const hostname = new URL(appUrl).hostname;
+  const isLocalHost =
+    process.env.NODE_ENV === 'development' &&
+    (hostname === 'localhost' || hostname === '127.0.0.1');
+  if (isLocalHost) {
+    return false;
+  }
+
   const posthogKey =
     process.env.POSTHOG_KEY?.trim() ?? process.env.NEXT_PUBLIC_POSTHOG_KEY?.trim() ?? '';
   const posthogHost =

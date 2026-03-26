@@ -9,8 +9,6 @@ const {
   buildSidebarBaseDataMock,
   loadSidebarContextMock,
   resolveEffectiveProfileForAccountInOrgMock,
-  enablePersonaSwitchRunMock,
-  enablePersonaAddRunMock,
   listActiveOrgSubjectCatalogMock,
   mapOrgSubjectRowsToOptionsMock,
   buildAdminMenuSectionsMock,
@@ -27,8 +25,6 @@ const {
   buildSidebarBaseDataMock: vi.fn(),
   loadSidebarContextMock: vi.fn(),
   resolveEffectiveProfileForAccountInOrgMock: vi.fn(),
-  enablePersonaSwitchRunMock: vi.fn(),
-  enablePersonaAddRunMock: vi.fn(),
   listActiveOrgSubjectCatalogMock: vi.fn(),
   mapOrgSubjectRowsToOptionsMock: vi.fn(),
   buildAdminMenuSectionsMock: vi.fn(),
@@ -76,15 +72,6 @@ vi.mock('@iconicedu/web/lib/family-view/effective-profile', () => ({
     resolveEffectiveProfileForAccountInOrgMock(...args),
 }));
 
-vi.mock('@iconicedu/web/flags', () => ({
-  enablePersonaSwitch: {
-    run: (...args: unknown[]) => enablePersonaSwitchRunMock(...args),
-  },
-  enablePersonaAdd: {
-    run: (...args: unknown[]) => enablePersonaAddRunMock(...args),
-  },
-}));
-
 vi.mock('@iconicedu/web/lib/subjects/queries/org-subject-catalog.query', () => ({
   listActiveOrgSubjectCatalog: (...args: unknown[]) =>
     listActiveOrgSubjectCatalogMock(...args),
@@ -125,8 +112,6 @@ describe('org layout persona flags', () => {
     buildSidebarBaseDataMock.mockReset();
     loadSidebarContextMock.mockReset();
     resolveEffectiveProfileForAccountInOrgMock.mockReset();
-    enablePersonaSwitchRunMock.mockReset();
-    enablePersonaAddRunMock.mockReset();
     listActiveOrgSubjectCatalogMock.mockReset();
     mapOrgSubjectRowsToOptionsMock.mockReset();
     buildAdminMenuSectionsMock.mockReset();
@@ -165,15 +150,13 @@ describe('org layout persona flags', () => {
       },
       onboardingStatus: null,
     });
-    enablePersonaSwitchRunMock.mockResolvedValue(true);
-    enablePersonaAddRunMock.mockResolvedValue(false);
     listActiveOrgSubjectCatalogMock.mockResolvedValue({ data: [], error: null });
     mapOrgSubjectRowsToOptionsMock.mockReturnValue([]);
     buildAdminMenuSectionsMock.mockReturnValue([]);
     resolveOrgDashboardPathMock.mockResolvedValue('/iconic-academy');
   });
 
-  it('passes evaluated persona flags into SidebarShell unchanged', async () => {
+  it('passes persona availability into SidebarShell as enabled by default', async () => {
     const element = await Layout({
       children: null,
       params: Promise.resolve({ orgSlug: 'iconic-academy' }),
@@ -182,7 +165,7 @@ describe('org layout persona flags', () => {
     const sidebarShellElement = (element as { props?: { children?: unknown } }).props
       ?.children as { props?: Record<string, unknown> } | undefined;
     expect(sidebarShellElement?.props?.isPersonaSwitchEnabled).toBe(true);
-    expect(sidebarShellElement?.props?.isPersonaAddEnabled).toBe(false);
+    expect(sidebarShellElement?.props?.isPersonaAddEnabled).toBe(true);
   });
 
   it('does not emit layout debug logs', async () => {
