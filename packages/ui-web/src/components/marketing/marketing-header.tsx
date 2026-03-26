@@ -12,11 +12,15 @@ const NAV_ITEMS = [
 
 type MarketingHeaderProps = {
   isAuthenticated?: boolean;
+  loginHref?: string;
 };
 
-export function MarketingHeader({ isAuthenticated = false }: MarketingHeaderProps) {
+export function MarketingHeader({
+  isAuthenticated = false,
+  loginHref = '/iconic-academy/login',
+}: MarketingHeaderProps) {
   const ctaLabel = isAuthenticated ? 'Dashboard' : 'Log In';
-  const ctaHref = isAuthenticated ? '/get-started' : '/iconic-academy/login';
+  const ctaHref = isAuthenticated ? '/get-started' : loginHref;
 
   return (
     <header className="sticky top-0 z-50 border-b border-emerald-100/70 bg-emerald-50/70 backdrop-blur dark:border-emerald-800/55 dark:bg-emerald-950/30">

@@ -14,7 +14,7 @@ vi.mock('next-themes', () => ({
 
 describe('marketing components', () => {
   it('renders marketing header navigation and cta', () => {
-    const { container } = render(<MarketingHeader />);
+    const { container } = render(<MarketingHeader loginHref="/acme/login" />);
 
     expect(container.querySelector('header')).toHaveClass('bg-emerald-50/70');
     expect(container.querySelector('svg')?.getAttribute('viewBox')).toBe(
@@ -26,7 +26,7 @@ describe('marketing components', () => {
     expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '#home');
     expect(screen.getByRole('link', { name: 'Log In' })).toHaveAttribute(
       'href',
-      '/iconic-academy/login',
+      '/acme/login',
     );
   });
 
@@ -40,15 +40,19 @@ describe('marketing components', () => {
   });
 
   it('renders marketing home page with primary cta and footer links', () => {
-    render(<MarketingHomePage />);
+    render(<MarketingHomePage loginHref="/acme/login" />);
 
     expect(
       screen.getByRole('heading', { name: /It's time to unlock your .* potential/i }),
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Start your journey now' })).toHaveAttribute(
       'href',
-      '/iconic-academy/login',
+      '/acme/login',
     );
+    expect(screen.getAllByRole('link', { name: 'Become a Tutor' })).toHaveLength(2);
+    for (const link of screen.getAllByRole('link', { name: 'Become a Tutor' })) {
+      expect(link).toHaveAttribute('href', '/acme/login');
+    }
     expect(screen.getByRole('link', { name: 'Privacy' })).toHaveAttribute(
       'href',
       '/privacy',

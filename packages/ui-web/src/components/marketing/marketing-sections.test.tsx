@@ -9,7 +9,7 @@ import { MarketingTrustStatsSection } from './marketing-trust-stats-section';
 
 describe('marketing sections', () => {
   it('renders hero section CTAs', () => {
-    const { container } = render(<MarketingHeroSection />);
+    const { container } = render(<MarketingHeroSection loginHref="/acme/login" />);
 
     expect(
       screen.getByRole('heading', { name: /It's time to unlock your .* potential/i }),
@@ -19,7 +19,7 @@ describe('marketing sections', () => {
     expect(screen.getByTestId('hero-pattern-cluster')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Start your journey now' })).toHaveAttribute(
       'href',
-      '/iconic-academy/login',
+      '/acme/login',
     );
   });
 
@@ -45,14 +45,14 @@ describe('marketing sections', () => {
   });
 
   it('renders how-it-works section content', () => {
-    render(<MarketingHowItWorksSection />);
+    render(<MarketingHowItWorksSection loginHref="/acme/login" />);
 
     expect(
       screen.getByText('One platform for students, parents, and educators'),
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Explore and sign up' })).toHaveAttribute(
       'href',
-      '/iconic-academy/login',
+      '/acme/login',
     );
   });
 
