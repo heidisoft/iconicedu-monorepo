@@ -39,6 +39,7 @@ export function AppSupportFooter({ isLoading = false }: { isLoading?: boolean })
           params: {
             channelId: supportChannel.id,
             topic: supportChannel.topic ?? 'Live Support',
+            isLearningSpace: '0',
           },
         })
       }

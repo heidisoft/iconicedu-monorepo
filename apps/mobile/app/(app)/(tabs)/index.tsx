@@ -745,6 +745,7 @@ export default function HomeScreen() {
                       params: {
                         channelId: supportChannel.id,
                         topic: supportChannel.topic ?? 'Live Support',
+                        isLearningSpace: '0',
                       },
                     })
                   }

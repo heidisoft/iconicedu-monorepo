@@ -31,6 +31,10 @@ jest.mock('lucide-react-native', () => ({
     const { View } = require('react-native');
     return <View testID={testID ?? 'more-icon'} />;
   },
+  IdCardLanyard: ({ testID }: { testID?: string }) => {
+    const { View } = require('react-native');
+    return <View testID={testID ?? 'staff-name-indicator'} />;
+  },
 }));
 
 // ─── Tests ──────────────────────────────────────────────────────────────────────
@@ -51,9 +55,31 @@ describe('ConversationHeader', () => {
     expect(screen.getByText('Alice')).toBeTruthy();
   });
 
+  it('renders the staff indicator next to staff titles', () => {
+    render(<ConversationHeader {...baseProps} avatarRole="staff" />);
+    expect(screen.getByText('Alice')).toBeTruthy();
+    expect(screen.getByTestId('staff-name-indicator')).toBeTruthy();
+  });
+
   it('renders subtitle when provided', () => {
     render(<ConversationHeader {...baseProps} subtitle="Direct Message" />);
     expect(screen.getByText('Direct Message')).toBeTruthy();
+  });
+
+  it('renders themed student names after the subtitle', () => {
+    render(
+      <ConversationHeader
+        {...baseProps}
+        subtitle="Mathematics"
+        studentProfiles={[
+          { name: 'Ava Lee', themeKey: 'blue' },
+          { name: 'Noah Cruz', themeKey: 'green' },
+        ]}
+      />,
+    );
+    expect(screen.getByText('Mathematics')).toBeTruthy();
+    expect(screen.getByText('Ava Lee')).toBeTruthy();
+    expect(screen.getByText(/Noah Cruz/)).toBeTruthy();
   });
 
   it('renders supervised subtitle when isReadOnly is true', () => {

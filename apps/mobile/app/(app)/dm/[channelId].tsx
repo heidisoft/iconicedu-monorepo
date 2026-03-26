@@ -319,11 +319,13 @@ export default function DmConversationScreen() {
       {/* Info sheet */}
       <ChannelInfoSheet
         visible={infoVisible}
+        channelId={channelId ?? ''}
         title={topic ?? 'Direct Message'}
         subtitle={subtitle}
         kind="dm"
         avatarSeed={avatarSeed}
         avatarRole={avatarRole}
+        messages={messages ?? []}
         onClose={() => setInfoVisible(false)}
       />
 

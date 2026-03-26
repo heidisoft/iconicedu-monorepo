@@ -14,7 +14,6 @@ import type { ClassScheduleVM } from '@iconicedu/shared-types';
 import {
   ClassSession,
   SessionCard,
-  formatWeekTitle,
   formatTimeBadge,
   formatOriginalTime,
   formatOriginalDate,
@@ -32,6 +31,11 @@ type MonthGroup = {
   completedCount: number;
   isCurrentMonth: boolean;
   sessions: ClassSession[];
+};
+
+type MonthProgressStats = {
+  scheduledCount: number;
+  completedCount: number;
 };
 
 export type DisplaySchedule = ClassScheduleVM & {
@@ -68,6 +72,12 @@ function addDays(date: Date, days: number): Date {
 
 function occurrenceDayKey(iso: string): string {
   return iso.slice(0, 10);
+}
+
+function getCalendarWeekOfMonth(date: Date): number {
+  const firstDayOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+  const firstWeekdayOffset = firstDayOfMonth.getDay();
+  return Math.floor((date.getDate() + firstWeekdayOffset - 1) / 7) + 1;
 }
 
 export function expandRecurringSchedules(
@@ -227,6 +237,7 @@ export function expandRecurringSchedules(
 function splitAndGroupSessions(schedules: ClassScheduleVM[]): {
   upcoming: MonthGroup[];
   past: MonthGroup[];
+  monthProgressStatsByKey: Map<string, MonthProgressStats>;
 } {
   const now = new Date();
   const nowMs = now.getTime();
@@ -250,6 +261,29 @@ function splitAndGroupSessions(schedules: ClassScheduleVM[]): {
   upcoming.sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
   past.sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime());
 
+  const monthProgressStatsByKey = new Map<string, MonthProgressStats>();
+  for (const schedule of expanded) {
+    const date = new Date(schedule.startAt);
+    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    const current = monthProgressStatsByKey.get(monthKey) ?? {
+      scheduledCount: 0,
+      completedCount: 0,
+    };
+
+    if (schedule.status !== 'cancelled') {
+      current.scheduledCount += 1;
+    }
+
+    if (
+      schedule.status === 'completed' ||
+      (schedule.status !== 'cancelled' && new Date(schedule.endAt).getTime() < nowMs)
+    ) {
+      current.completedCount += 1;
+    }
+
+    monthProgressStatsByKey.set(monthKey, current);
+  }
+
   function groupByMonth(displaySchedules: DisplaySchedule[]): MonthGroup[] {
     const map = new Map<string, DisplaySchedule[]>();
     for (const s of displaySchedules) {
@@ -261,18 +295,23 @@ function splitAndGroupSessions(schedules: ClassScheduleVM[]): {
     return [...map.entries()].map(([key, list]) => {
       const [y, m] = key.split('-').map(Number);
       const monthDate = new Date(y!, m! - 1, 1);
+      const sessionCountByWeekNumber = new Map<number, number>();
       const sessions: ClassSession[] = list.map((s) => {
         const start = new Date(s.startAt);
         const end = new Date(s.endAt);
         const startMs = start.getTime();
         const endMs = end.getTime();
         const startDay = startOfDay(start).getTime();
+        const weekNumber = getCalendarWeekOfMonth(start);
+        const nextSessionNumber = (sessionCountByWeekNumber.get(weekNumber) ?? 0) + 1;
+        sessionCountByWeekNumber.set(weekNumber, nextSessionNumber);
+        const monthLabel = start.toLocaleDateString('en-US', { month: 'short' });
         // Mirrors web isEventLive: now >= startAt && now <= endAt
         const isLive = startMs <= nowMs && endMs >= nowMs;
         const isPast = endMs < nowMs;
         return {
           id: s.ids.id,
-          label: formatWeekTitle(s.startAt),
+          label: `${monthLabel} · Week ${weekNumber} · Session ${nextSessionNumber}`,
           time: formatTimeBadge(s.startAt),
           dayName: start.toLocaleDateString('en-US', { weekday: 'short' }),
           dayNum: String(start.getDate()),
@@ -308,7 +347,11 @@ function splitAndGroupSessions(schedules: ClassScheduleVM[]): {
     });
   }
 
-  return { upcoming: groupByMonth(upcoming), past: groupByMonth(past) };
+  return {
+    upcoming: groupByMonth(upcoming),
+    past: groupByMonth(past),
+    monthProgressStatsByKey,
+  };
 }
 
 // ─── Main component ─────────────────────────────────────────────────────────────
@@ -329,7 +372,10 @@ export function SpaceSessionsTab({
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
   const autoSwitchedRef = useRef(false);
 
-  const { upcoming, past } = useMemo(() => splitAndGroupSessions(schedules), [schedules]);
+  const { upcoming, past, monthProgressStatsByKey } = useMemo(
+    () => splitAndGroupSessions(schedules),
+    [schedules],
+  );
   const activeJoinSessionId = useMemo(() => {
     for (const group of upcoming) {
       const joinable = group.sessions.find(
@@ -440,12 +486,14 @@ export function SpaceSessionsTab({
         >
           {groups.map((group) => {
             const isOpen = expandedMonths.has(group.monthKey);
+            const progressStats = monthProgressStatsByKey.get(group.monthKey);
+            const scheduledCount = progressStats?.scheduledCount ?? group.totalCount;
+            const completedCount = progressStats?.completedCount ?? group.completedCount;
             const progressPercent =
-              group.totalCount > 0
-                ? Math.round((group.completedCount / group.totalCount) * 100)
+              scheduledCount > 0
+                ? Math.round((completedCount / scheduledCount) * 100)
                 : 0;
-            const allComplete =
-              group.completedCount === group.totalCount && group.totalCount > 0;
+            const allComplete = completedCount === scheduledCount && scheduledCount > 0;
             return (
               <View
                 key={group.monthKey}
@@ -470,10 +518,8 @@ export function SpaceSessionsTab({
                       {allComplete && <CheckCircle2 size={14} color={colors.teal} />}
                     </View>
                     <Text style={s.monthMeta}>
-                      {group.totalCount} {group.totalCount === 1 ? 'session' : 'sessions'}
-                      {group.completedCount > 0
-                        ? ` · ${group.completedCount} completed`
-                        : ''}
+                      {scheduledCount} {scheduledCount === 1 ? 'session' : 'sessions'}
+                      {completedCount > 0 ? ` · ${completedCount} completed` : ''}
                     </Text>
                   </View>
 

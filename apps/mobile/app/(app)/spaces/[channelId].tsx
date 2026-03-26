@@ -26,10 +26,11 @@ import { SpaceSessionsTab } from '@/components/messages/space-sessions-tab';
 type SpaceTab = 'messages' | 'sessions';
 
 export default function SpaceDetailScreen() {
-  const { channelId, topic, iconKey, subtitle, tab } = useLocalSearchParams<{
+  const { channelId, topic, iconKey, themeKey, subtitle, tab } = useLocalSearchParams<{
     channelId: string;
     topic?: string;
     iconKey?: string;
+    themeKey?: string;
     subtitle?: string;
     tab?: string;
   }>();
@@ -117,8 +118,10 @@ export default function SpaceDetailScreen() {
   if (!channelId) return null;
 
   const resolvedTitle = spaceMeta?.title ?? topic ?? 'Class';
-  const resolvedSubtitle = spaceMeta?.subtitle ?? subtitle ?? null;
+  const resolvedSubtitle = (spaceMeta?.subtitle ?? subtitle ?? '').trim() || null;
+  const resolvedStudentProfiles = spaceMeta?.studentProfiles ?? [];
   const resolvedIconKey = spaceMeta?.iconKey ?? iconKey ?? null;
+  const resolvedThemeKey = spaceMeta?.themeKey ?? themeKey ?? null;
 
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: colors.pageBg }]} edges={['top']}>
@@ -126,7 +129,9 @@ export default function SpaceDetailScreen() {
         title={resolvedTitle}
         kind="space"
         subtitle={resolvedSubtitle}
+        studentProfiles={resolvedStudentProfiles}
         iconKey={resolvedIconKey}
+        themeKey={resolvedThemeKey}
         loading={isLoadingMeta && !spaceMeta && !topic}
         onBack={() => router.back()}
         onMore={() => setInfoVisible(true)}
@@ -193,6 +198,7 @@ export default function SpaceDetailScreen() {
         subtitle={resolvedSubtitle}
         kind="space"
         iconKey={resolvedIconKey}
+        themeKey={resolvedThemeKey}
         messages={messages ?? []}
         onClose={() => setInfoVisible(false)}
       />

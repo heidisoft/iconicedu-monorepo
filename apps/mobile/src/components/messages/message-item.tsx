@@ -64,6 +64,7 @@ import type { AudioStatus } from 'expo-audio';
 import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '@/lib/supabase/client';
 import { RoleAvatarBadge } from '@/components/profile/role-avatar-badge';
+import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
 
 const CHANNEL_FILES_BUCKET = 'channel-files';
 
@@ -600,11 +601,16 @@ function InlineReply({ message, colors }: { message: MessageVM; colors: AppColor
             marginBottom: 2,
           }}
         >
-          <Text
-            style={{ fontSize: 13, fontWeight: '700', color: senderColor(senderName) }}
-          >
-            {senderName}
-          </Text>
+          <RoleNameIndicator
+            name={senderName}
+            role={senderRole}
+            iconSize={12}
+            textStyle={{
+              fontSize: 13,
+              fontWeight: '700',
+              color: senderColor(senderName),
+            }}
+          />
           <Text style={{ fontSize: 11, color: colors.textFaint }}>{time}</Text>
         </View>
         <FormattedText
@@ -2196,9 +2202,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           {isGroupStart && (
             <View style={s.nameRow}>
               {!isOwn && (
-                <Text style={[s.senderName, { color: senderColor(senderDisplayName) }]}>
-                  {senderDisplayName}
-                </Text>
+                <RoleNameIndicator
+                  name={senderDisplayName}
+                  role={senderRole}
+                  textStyle={[s.senderName, { color: senderColor(senderDisplayName) }]}
+                />
               )}
               <Text style={s.msgTime}>{time}</Text>
             </View>
@@ -2331,9 +2339,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         {isGroupStart && (
           <View style={s.nameRow}>
             {!isOwn && (
-              <Text style={[s.senderName, { color: senderColor(senderDisplayName) }]}>
-                {senderDisplayName}
-              </Text>
+              <RoleNameIndicator
+                name={senderDisplayName}
+                role={senderRole}
+                textStyle={[s.senderName, { color: senderColor(senderDisplayName) }]}
+              />
             )}
             <Text style={s.msgTime}>{time}</Text>
           </View>

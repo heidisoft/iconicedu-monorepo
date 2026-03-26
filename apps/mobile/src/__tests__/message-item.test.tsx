@@ -33,6 +33,21 @@ const baseMessage: MessageVM = {
   content: { text: 'Hello world' },
 } as unknown as MessageVM;
 
+const staffMessage: MessageVM = {
+  ...baseMessage,
+  core: {
+    ...baseMessage.core,
+    sender: {
+      ...sender,
+      kind: 'staff',
+      profile: {
+        ...sender.profile,
+        displayName: 'Staff Member',
+      },
+    } as MessageVM['core']['sender'],
+  },
+} as unknown as MessageVM;
+
 const colors = LIGHT;
 
 describe('MessageItem', () => {
@@ -48,6 +63,15 @@ describe('MessageItem', () => {
       <MessageItem message={baseMessage} isOwn={false} isGroupStart colors={colors} />,
     );
     expect(screen.getByText('John Doe')).toBeTruthy();
+  });
+
+  it('renders the staff indicator next to staff sender names', () => {
+    render(
+      <MessageItem message={staffMessage} isOwn={false} isGroupStart colors={colors} />,
+    );
+
+    expect(screen.getByText('Staff Member')).toBeTruthy();
+    expect(screen.getAllByTestId('staff-name-indicator').length).toBeGreaterThan(0);
   });
 
   it('hides sender name when isGroupStart is false', () => {

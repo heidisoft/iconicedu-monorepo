@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { BookOpenCheck, ChevronRight, MessageSquare } from 'lucide-react-native';
+import { BookOpenCheck, MessageSquare } from 'lucide-react-native';
 import { useAccount } from '@/hooks/use-account';
 import { useProfile } from '@/hooks/use-profile';
 import { useDirectMessages } from '@/hooks/use-direct-messages';
@@ -29,6 +29,7 @@ import { createHeaderSurface } from '@/lib/header-surface';
 import type { ChannelListItem, DmParticipant } from '@/lib/api/queries';
 import { ChannelListSkeleton } from '@/components/skeletons';
 import { RoleAvatarBadge } from '@/components/profile/role-avatar-badge';
+import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
 
 type Tab = 'all' | 'dms' | 'channels';
 type ClassroomStudentTab = 'all' | string;
@@ -105,8 +106,46 @@ const THEME_TEXT_COLORS: Record<string, string> = {
   rose: '#e11d48',
 };
 
+const THEME_AVATAR_COLORS: Record<string, { bg: string; fg: string }> = {
+  slate: { bg: '#64748b', fg: '#ffffff' },
+  gray: { bg: '#6b7280', fg: '#ffffff' },
+  zinc: { bg: '#71717a', fg: '#ffffff' },
+  neutral: { bg: '#737373', fg: '#ffffff' },
+  stone: { bg: '#78716c', fg: '#ffffff' },
+  red: { bg: '#ef4444', fg: '#ffffff' },
+  orange: { bg: '#f97316', fg: '#ffffff' },
+  amber: { bg: '#f59e0b', fg: '#1f2937' },
+  yellow: { bg: '#eab308', fg: '#1f2937' },
+  lime: { bg: '#84cc16', fg: '#1f2937' },
+  green: { bg: '#22c55e', fg: '#ffffff' },
+  emerald: { bg: '#10b981', fg: '#ffffff' },
+  teal: { bg: '#14b8a6', fg: '#ffffff' },
+  cyan: { bg: '#06b6d4', fg: '#ffffff' },
+  sky: { bg: '#0ea5e9', fg: '#ffffff' },
+  blue: { bg: '#3b82f6', fg: '#ffffff' },
+  indigo: { bg: '#6366f1', fg: '#ffffff' },
+  violet: { bg: '#8b5cf6', fg: '#ffffff' },
+  purple: { bg: '#a855f7', fg: '#ffffff' },
+  fuchsia: { bg: '#d946ef', fg: '#ffffff' },
+  pink: { bg: '#ec4899', fg: '#ffffff' },
+  rose: { bg: '#f43f5e', fg: '#ffffff' },
+};
+
 function themeTextColor(themeKey?: string | null, fallback?: string): string {
   return (themeKey && THEME_TEXT_COLORS[themeKey]) || fallback || '#64748b';
+}
+
+function themeAvatarColor(
+  themeKey?: string | null,
+  fallbackBg?: string,
+  fallbackFg?: string,
+): { bg: string; fg: string } {
+  return (
+    (themeKey && THEME_AVATAR_COLORS[themeKey]) || {
+      bg: fallbackBg || '#f8fafc',
+      fg: fallbackFg || '#0f172a',
+    }
+  );
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
@@ -166,23 +205,19 @@ function makeStyles(C: AppColors) {
     subTabText: { fontSize: 13, fontWeight: '600', color: C.textMuted },
     subTabTextActive: { color: C.teal },
 
-    itemOuter: { marginHorizontal: 16 },
+    itemOuter: {
+      marginHorizontal: 16,
+      marginBottom: 16,
+    },
     itemWrap: {
-      borderRadius: 14,
-      backgroundColor: C.card,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: C.border,
-      paddingHorizontal: 18,
-      paddingVertical: 16,
+      backgroundColor: 'transparent',
+      paddingHorizontal: 16,
+      paddingVertical: 18,
       overflow: 'hidden',
     },
-    itemWrapUnread: {
-      backgroundColor: C.tealBg,
-      borderColor: C.teal,
-    },
-    itemRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-    rowChevron: { flexShrink: 0, marginLeft: 8 },
-    separator: { height: 10 },
+    itemWrapUnread: {},
+    itemRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    separator: { height: 0 },
 
     // ── DM avatar — single person ──────────────────────────────────────────────
     avatarWrap: { position: 'relative', width: 44, height: 44, flexShrink: 0 },
@@ -196,26 +231,26 @@ function makeStyles(C: AppColors) {
     avatarTxt: { color: '#fff', fontWeight: '700', fontSize: 16, letterSpacing: 0.3 },
     onlineDot: {
       position: 'absolute',
-      bottom: 1,
-      right: 1,
+      bottom: 2,
+      right: 2,
       width: 13,
       height: 13,
       borderRadius: 7,
       backgroundColor: '#22c55e',
       borderWidth: 2,
-      borderColor: C.card,
+      borderColor: C.bg,
     },
     statusBadge: {
       position: 'absolute',
-      bottom: 1,
-      right: 1,
+      bottom: 2,
+      right: 2,
       width: 13,
       height: 13,
       borderRadius: 7,
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 2,
-      borderColor: C.card,
+      borderColor: C.bg,
     },
 
     // ── DM avatar — group (stacked) ────────────────────────────────────────────
@@ -230,7 +265,7 @@ function makeStyles(C: AppColors) {
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 2,
-      borderColor: C.card,
+      borderColor: C.bg,
     },
     groupFront: {
       position: 'absolute',
@@ -242,48 +277,41 @@ function makeStyles(C: AppColors) {
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 2,
-      borderColor: C.card,
+      borderColor: C.bg,
     },
     groupTxt: { color: '#fff', fontWeight: '700', fontSize: 12 },
-    groupBadgeFront: { top: -3 },
-    groupBadgeBack: { top: -3 },
+    groupBadgeFront: {},
+    groupBadgeBack: {},
 
     // ── Class avatar ──────────────────────────────────────────────────
     channelAvatar: {
       width: 44,
       height: 44,
-      borderRadius: 14,
+      borderRadius: 22,
       alignItems: 'center',
       justifyContent: 'center',
       flexShrink: 0,
-      backgroundColor: C.tealBg,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: C.border,
+      borderWidth: 0,
     },
     channelEmoji: { fontSize: 24 },
 
-    content: { flex: 1, gap: 4 },
+    content: { flex: 1, minWidth: 0, justifyContent: 'center', gap: 2 },
     topRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    rowName: {
-      flex: 1,
-      minWidth: 0,
-      fontSize: 15,
-      fontWeight: '700',
-      color: C.text,
-    },
+    rowNameWrap: { flex: 1, minWidth: 0 },
+    rowName: { fontSize: 15, fontWeight: '700', color: C.text },
     rowNameUnread: { fontWeight: '800' },
-    rowMetaRight: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'flex-end',
-      gap: 6,
+    rowTail: {
+      width: 64,
+      alignItems: 'flex-end',
+      justifyContent: 'space-between',
       flexShrink: 0,
-      marginLeft: 'auto',
+      alignSelf: 'stretch',
+      paddingVertical: 2,
     },
-    rowTime: { fontSize: 12, color: C.textFaint },
-    rowMeta: { fontSize: 12, color: C.textFaint, lineHeight: 17 },
+    rowTime: { fontSize: 12, color: C.textMuted, fontWeight: '500' },
+    rowMeta: { fontSize: 12, color: C.textMuted, lineHeight: 18 },
     rowMetaName: { fontWeight: '600' },
-    rowPreview: { fontSize: 13, color: C.textMuted, lineHeight: 18 },
+    rowPreview: { fontSize: 12, color: C.textMuted, lineHeight: 18 },
     badge: {
       minWidth: 20,
       height: 20,
@@ -291,9 +319,9 @@ function makeStyles(C: AppColors) {
       backgroundColor: C.teal,
       alignItems: 'center',
       justifyContent: 'center',
-      paddingHorizontal: 5,
+      paddingHorizontal: 6,
     },
-    badgeTxt: { color: C.tealFg, fontSize: 11, fontWeight: '700' },
+    badgeTxt: { color: '#ffffff', fontSize: 11, fontWeight: '700' },
 
     emptyWrap: {
       flex: 1,
@@ -489,6 +517,10 @@ function ChannelRow({
         ? participants.map(participantName).join(', ')
         : (item.topic ?? 'Direct Message')
     : (item.topic ?? 'Channel');
+  const displayRole =
+    isDm && participants.some((participant) => participant.kind === 'staff')
+      ? 'staff'
+      : null;
 
   // For supervised DMs, build a two-person participant list: child first, then partner
   const avatarParticipants: DmParticipant[] =
@@ -516,6 +548,8 @@ function ChannelRow({
   const unread = item.unread_count ?? 0;
   const hasUnread = unread > 0;
   const studentProfiles = !isDm ? (item.student_profiles ?? []) : [];
+  const classThemeKey = !isDm ? (item.themeKey ?? null) : null;
+  const classAvatarColors = themeAvatarColor(classThemeKey, colors.inputBg, colors.text);
   const hasChannelMeta =
     !isDm && (Boolean(item.description) || studentProfiles.length > 0);
   const dmPreviewText =
@@ -549,11 +583,11 @@ function ChannelRow({
           ) : (
             <LearningSpaceIconBadge
               iconKey={item.icon_key}
-              size={40}
+              size={44}
               iconSize={20}
-              borderRadius={14}
-              backgroundColor={colors.inputBg}
-              color={colors.text}
+              borderRadius={22}
+              backgroundColor={classAvatarColors.bg}
+              color={classAvatarColors.fg}
               style={s.channelAvatar}
             />
           )}
@@ -561,22 +595,19 @@ function ChannelRow({
           {/* Content */}
           <View style={s.content}>
             <View style={s.topRow}>
-              <Text style={[s.rowName, hasUnread && s.rowNameUnread]} numberOfLines={1}>
-                {name}
-              </Text>
+              <RoleNameIndicator
+                name={name}
+                role={displayRole}
+                containerStyle={s.rowNameWrap}
+                textStyle={[s.rowName, hasUnread && s.rowNameUnread]}
+                numberOfLines={1}
+                iconSize={13}
+              />
               {item.is_supervised && (
                 <View style={s.supervisedBadge}>
                   <Text style={s.supervisedBadgeTxt}>Supervised</Text>
                 </View>
               )}
-              <View style={s.rowMetaRight}>
-                <Text style={s.rowTime}>{time}</Text>
-                {hasUnread && (
-                  <View style={s.badge}>
-                    <Text style={s.badgeTxt}>{unread > 99 ? '99+' : unread}</Text>
-                  </View>
-                )}
-              </View>
             </View>
             {!isDm && hasChannelMeta ? (
               <Text style={s.rowMeta} numberOfLines={1}>
@@ -602,7 +633,18 @@ function ChannelRow({
               </Text>
             ) : null}
           </View>
-          <ChevronRight size={18} color={colors.textFaint} style={s.rowChevron} />
+          <View style={s.rowTail}>
+            <Text style={s.rowTime} numberOfLines={1}>
+              {time}
+            </Text>
+            {hasUnread ? (
+              <View style={s.badge}>
+                <Text style={s.badgeTxt}>{unread > 99 ? '99+' : unread}</Text>
+              </View>
+            ) : (
+              <View />
+            )}
+          </View>
         </View>
       </Pressable>
     </View>
@@ -818,7 +860,10 @@ export default function MessagesScreen() {
       const avatarRole = isDm ? (participants[0]?.kind ?? '') : '';
       const avatarTimezone = isDm ? (participants[0]?.timezone ?? '') : '';
       const iconKey = !isDm ? (channel.icon_key ?? '') : '';
+      const themeKey = !isDm ? (channel.themeKey ?? '') : '';
       const subtitle = isDm ? 'Direct Message' : (channel.description ?? '');
+      const studentProfiles = !isDm ? JSON.stringify(channel.student_profiles ?? []) : '';
+      const isLearningSpace = !isDm && !channel.is_support ? '1' : '0';
       return (
         <ChannelRow
           item={channel}
@@ -836,7 +881,10 @@ export default function MessagesScreen() {
                 avatarRole,
                 avatarTimezone,
                 iconKey,
+                themeKey,
                 subtitle,
+                studentProfiles,
+                isLearningSpace,
                 ...(channel.is_supervised
                   ? {
                       isSupervisedReadOnly: '1',

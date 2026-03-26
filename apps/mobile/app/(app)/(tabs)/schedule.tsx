@@ -1,33 +1,44 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Typography, EmptyState, NAV_THEME } from '@iconicedu/ui-native';
+import { View, StyleSheet, Text } from 'react-native';
+import { EmptyState } from '@iconicedu/ui-native';
 import { CalendarDays } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { createHeaderSurface } from '@/lib/header-surface';
+import { useTheme } from '@/providers/theme-provider';
+import type { AppColors } from '@/lib/theme';
+
+function makeStyles(C: AppColors) {
+  return StyleSheet.create({
+    safe: { flex: 1, backgroundColor: C.pageBg },
+    header: {
+      ...createHeaderSurface(C.pageBg, C.border),
+      paddingHorizontal: 20,
+      paddingTop: 18,
+      paddingBottom: 12,
+    },
+    title: {
+      fontSize: 28,
+      fontWeight: '800',
+      color: C.text,
+      letterSpacing: -0.5,
+    },
+  });
+}
 
 export default function ScheduleScreen() {
+  const { colors } = useTheme();
+  const s = React.useMemo(() => makeStyles(colors), [colors]);
+
   return (
-    <SafeAreaView
-      style={{ flex: 1, backgroundColor: NAV_THEME.dark.background }}
-      edges={['top']}
-    >
+    <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.header}>
-        <Typography variant="h3">Schedule</Typography>
+        <Text style={s.title}>Schedule</Text>
       </View>
       <EmptyState
-        icon={<CalendarDays size={32} color={NAV_THEME.dark.primary} />}
+        icon={<CalendarDays size={32} color={colors.teal} />}
         title="No upcoming classes"
         description="Your class schedule will appear here when sessions are booked."
       />
     </SafeAreaView>
   );
 }
-
-const s = StyleSheet.create({
-  header: {
-    ...createHeaderSurface(NAV_THEME.dark.background, '#38383A'),
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 12,
-  },
-});

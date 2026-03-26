@@ -45,7 +45,9 @@ export type ClassSession = {
 
 export function formatWeekTitle(startAt: string): string {
   const start = new Date(startAt);
-  const weekNumber = Math.min(5, Math.floor((start.getDate() - 1) / 7) + 1);
+  const firstDayOfMonth = new Date(start.getFullYear(), start.getMonth(), 1);
+  const firstWeekdayOffset = firstDayOfMonth.getDay();
+  const weekNumber = Math.floor((start.getDate() + firstWeekdayOffset - 1) / 7) + 1;
   const month = start.toLocaleDateString('en-US', { month: 'short' });
   return `${month} · Week ${weekNumber}`;
 }
@@ -127,7 +129,7 @@ export function SessionCard({
   const participants =
     session.participants?.filter((participant) => participant.name.trim()) ?? [];
 
-  const badgeBg = isLive ? colors.teal : colors.inputBg;
+  const badgeBg = isLive ? colors.teal : colors.pageBg;
   const badgeTxt = isLive
     ? '#fff'
     : isPast || isDisabled

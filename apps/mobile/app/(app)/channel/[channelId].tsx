@@ -38,12 +38,25 @@ import { SpaceSessionsTab } from '@/components/messages/space-sessions-tab';
 
 type ChannelTab = 'messages' | 'sessions';
 
+type HeaderStudentProfile = { name: string; themeKey?: string | null };
+
 export default function ChannelConversationScreen() {
-  const { channelId, topic, iconKey, subtitle } = useLocalSearchParams<{
+  const {
+    channelId,
+    topic,
+    iconKey,
+    themeKey,
+    subtitle,
+    studentProfiles,
+    isLearningSpace,
+  } = useLocalSearchParams<{
     channelId: string;
     topic?: string;
     iconKey?: string;
+    themeKey?: string;
     subtitle?: string;
+    studentProfiles?: string;
+    isLearningSpace?: string;
   }>();
   const router = useRouter();
   const isFocused = useIsFocused();
@@ -308,19 +321,40 @@ export default function ChannelConversationScreen() {
     },
     [accountId, channelId, orgId, profileId],
   );
-  if (!channelId) return null;
-
+  const headerStudentProfiles = useMemo(() => {
+    if (!studentProfiles) return [] as HeaderStudentProfile[];
+    try {
+      const parsed = JSON.parse(studentProfiles) as unknown;
+      if (!Array.isArray(parsed)) return [];
+      return parsed.flatMap((student) => {
+        if (!student || typeof student !== 'object') return [];
+        const { name, themeKey } = student as {
+          name?: unknown;
+          themeKey?: unknown;
+        };
+        return typeof name === 'string' && name.trim()
+          ? [{ name, themeKey: typeof themeKey === 'string' ? themeKey : null }]
+          : [];
+      });
+    } catch {
+      return [];
+    }
+  }, [studentProfiles]);
+  const resolvedSubtitle = subtitle?.trim() || null;
+  const isSpaceChannel = isLearningSpace === '1';
   const isOwnMessage = (msg: MessageVM) => msg.core.sender.ids.id === profileId;
-  // Show the Sessions tab only for class channels (identified by having a learning-space icon)
-  const isSpaceChannel = Boolean(iconKey);
+
+  if (!channelId) return null;
 
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: colors.pageBg }]} edges={['top']}>
       <ConversationHeader
         title={topic ?? 'Channel'}
-        subtitle={subtitle}
+        subtitle={resolvedSubtitle}
+        studentProfiles={headerStudentProfiles}
         kind={isSpaceChannel ? 'space' : 'channel'}
         iconKey={iconKey}
+        themeKey={themeKey ?? null}
         onBack={() => router.back()}
         onMore={() => setInfoVisible(true)}
       />
@@ -404,9 +438,10 @@ export default function ChannelConversationScreen() {
         visible={infoVisible}
         channelId={channelId ?? ''}
         title={topic ?? 'Channel'}
-        subtitle={subtitle}
+        subtitle={resolvedSubtitle}
         kind={isSpaceChannel ? 'space' : 'channel'}
         iconKey={iconKey}
+        themeKey={themeKey ?? null}
         messages={messages ?? []}
         onClose={() => setInfoVisible(false)}
       />

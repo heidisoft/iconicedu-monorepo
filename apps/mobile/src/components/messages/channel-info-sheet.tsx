@@ -12,8 +12,10 @@ import {
   Dimensions,
   Pressable,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
+import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase/client';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -23,12 +25,16 @@ import {
   Image as ImageIcon,
   Download,
   File,
+  MessageCircle,
 } from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 import type { MessageVM, TextMessageVM, UserProfileVM } from '@iconicedu/shared-types';
-import { getLearningSpaceIcon } from '@/lib/learning-space-icons';
-import { RoleAvatarBadge } from '@/components/profile/role-avatar-badge';
+import { LearningSpaceIconBadge } from '@/lib/learning-space-icons';
+import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
+import { useAccount } from '@/hooks/use-account';
+import { useProfile } from '@/hooks/use-profile';
+import { findDirectMessageChannelForProfiles } from '@/lib/api/queries';
 
 const CHANNEL_FILES_BUCKET = 'channel-files';
 
@@ -51,6 +57,31 @@ const AVATAR_COLORS = [
   '#E06C8A',
 ];
 
+const THEME_AVATAR_COLORS: Record<string, { bg: string; fg: string }> = {
+  slate: { bg: '#64748b', fg: '#ffffff' },
+  gray: { bg: '#6b7280', fg: '#ffffff' },
+  zinc: { bg: '#71717a', fg: '#ffffff' },
+  neutral: { bg: '#737373', fg: '#ffffff' },
+  stone: { bg: '#78716c', fg: '#ffffff' },
+  red: { bg: '#ef4444', fg: '#ffffff' },
+  orange: { bg: '#f97316', fg: '#ffffff' },
+  amber: { bg: '#f59e0b', fg: '#1f2937' },
+  yellow: { bg: '#eab308', fg: '#1f2937' },
+  lime: { bg: '#84cc16', fg: '#1f2937' },
+  green: { bg: '#22c55e', fg: '#ffffff' },
+  emerald: { bg: '#10b981', fg: '#ffffff' },
+  teal: { bg: '#14b8a6', fg: '#ffffff' },
+  cyan: { bg: '#06b6d4', fg: '#ffffff' },
+  sky: { bg: '#0ea5e9', fg: '#ffffff' },
+  blue: { bg: '#3b82f6', fg: '#ffffff' },
+  indigo: { bg: '#6366f1', fg: '#ffffff' },
+  violet: { bg: '#8b5cf6', fg: '#ffffff' },
+  purple: { bg: '#a855f7', fg: '#ffffff' },
+  fuchsia: { bg: '#d946ef', fg: '#ffffff' },
+  pink: { bg: '#ec4899', fg: '#ffffff' },
+  rose: { bg: '#f43f5e', fg: '#ffffff' },
+};
+
 function avatarColor(seed: string): string {
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
@@ -61,6 +92,19 @@ function getInitials(name: string): string {
   const words = name.trim().split(/\s+/);
   if (words.length >= 2) return (words[0]![0]! + words[1]![0]!).toUpperCase();
   return name[0]?.toUpperCase() ?? '?';
+}
+
+function themeAvatarColor(
+  themeKey?: string | null,
+  fallbackBg?: string,
+  fallbackFg?: string,
+): { bg: string; fg: string } {
+  return (
+    (themeKey && THEME_AVATAR_COLORS[themeKey]) || {
+      bg: fallbackBg || '#f8fafc',
+      fg: fallbackFg || '#0f172a',
+    }
+  );
 }
 
 // ─── Sender name helper ────────────────────────────────────────────────────────
@@ -183,6 +227,7 @@ export type ChannelInfoSheetProps = {
   avatarSeed?: string | null;
   avatarRole?: string | null;
   iconKey?: string | null;
+  themeKey?: string | null;
   memberCount?: number | null;
   description?: string | null;
   members?: Array<{
@@ -210,6 +255,28 @@ function TabIcon({ tabKey, color }: { tabKey: ChannelTab; color: string }) {
   if (tabKey === 'files') return <FileText size={size} color={color} />;
   if (tabKey === 'saved') return <Bookmark size={size} color={color} />;
   return <Users size={size} color={color} />;
+}
+
+function EmptyTabState({
+  icon,
+  title,
+  description,
+  colors,
+  s,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  colors: AppColors;
+  s: ReturnType<typeof makeStyles>;
+}) {
+  return (
+    <View style={s.emptyState}>
+      <View style={[s.emptyIconBadge, { backgroundColor: colors.inputBg }]}>{icon}</View>
+      <Text style={s.emptyTitle}>{title}</Text>
+      <Text style={s.emptySubtitle}>{description}</Text>
+    </View>
+  );
 }
 
 // ─── File item row (images + documents) ────────────────────────────────────────
@@ -288,6 +355,7 @@ type TabContentProps = {
   activeTab: ChannelTab;
   fileItems: FileItem[];
   filesLoading: boolean;
+  membersLoading: boolean;
   savedItems: Array<{
     id: string;
     senderName: string;
@@ -300,18 +368,23 @@ type TabContentProps = {
   s: ReturnType<typeof makeStyles>;
   memberCount?: number | null;
   isFullScreen: boolean;
+  currentProfileId?: string | null;
+  onMemberMessage?: (memberId: string, memberName: string) => void;
 };
 
 function TabContent({
   activeTab,
   fileItems,
   filesLoading,
+  membersLoading,
   savedItems,
   memberItems,
   colors,
   s,
   memberCount,
   isFullScreen,
+  currentProfileId,
+  onMemberMessage,
 }: TabContentProps) {
   if (activeTab === 'files') {
     if (filesLoading) {
@@ -323,11 +396,13 @@ function TabContent({
     }
     if (fileItems.length === 0) {
       return (
-        <View style={s.emptyState}>
-          <FileText size={44} color={colors.textMuted} style={{ opacity: 0.4 }} />
-          <Text style={s.emptyTitle}>No files yet</Text>
-          <Text style={s.emptySubtitle}>Shared photos and files will appear here</Text>
-        </View>
+        <EmptyTabState
+          icon={<FileText size={22} color={colors.textMuted} />}
+          title="No shared files"
+          description="Files shared in this channel will appear here."
+          colors={colors}
+          s={s}
+        />
       );
     }
     return (
@@ -342,13 +417,13 @@ function TabContent({
   if (activeTab === 'saved') {
     if (savedItems.length === 0) {
       return (
-        <View style={s.emptyState}>
-          <Bookmark size={44} color={colors.textMuted} style={{ opacity: 0.4 }} />
-          <Text style={s.emptyTitle}>No saved messages</Text>
-          <Text style={s.emptySubtitle}>
-            {'Long-press any message and tap "Save" to find it here'}
-          </Text>
-        </View>
+        <EmptyTabState
+          icon={<Bookmark size={22} color={colors.textMuted} />}
+          title="No saved messages"
+          description="Save important messages by clicking the bookmark icon"
+          colors={colors}
+          s={s}
+        />
       );
     }
     return (
@@ -361,11 +436,15 @@ function TabContent({
                 <View style={[s.savedAvatar, { backgroundColor: color }]}>
                   <Text style={s.savedAvatarTxt}>{getInitials(item.senderName)}</Text>
                 </View>
-                <RoleAvatarBadge role={item.senderRole} size={14} />
               </View>
               <View style={s.savedBody}>
                 <View style={s.savedSenderRow}>
-                  <Text style={s.savedSenderName}>{item.senderName}</Text>
+                  <RoleNameIndicator
+                    name={item.senderName}
+                    role={item.senderRole}
+                    textStyle={s.savedSenderName}
+                    iconSize={12}
+                  />
                   <Text style={s.savedDate}>{formatRelativeDate(item.createdAt)}</Text>
                 </View>
                 <Text style={s.savedPreview} numberOfLines={2}>
@@ -381,6 +460,13 @@ function TabContent({
 
   // Members tab
   const displayCount = memberItems.length > 0 ? memberItems.length : (memberCount ?? 0);
+  if (membersLoading) {
+    return (
+      <View style={s.emptyState}>
+        <ActivityIndicator size="large" color={colors.teal} />
+      </View>
+    );
+  }
   if (memberItems.length === 0) {
     return (
       <View style={s.emptyState}>
@@ -402,9 +488,30 @@ function TabContent({
             <View style={[s.memberAvatar, { backgroundColor: avatarColor(member.seed) }]}>
               <Text style={s.memberAvatarTxt}>{getInitials(member.name)}</Text>
             </View>
-            <RoleAvatarBadge role={member.role} size={14} />
           </View>
-          <Text style={s.memberName}>{member.name}</Text>
+          <View style={s.memberInfo}>
+            <RoleNameIndicator
+              name={member.name}
+              role={member.role}
+              textStyle={s.memberName}
+              iconSize={12}
+            />
+          </View>
+          {currentProfileId && member.id === currentProfileId ? (
+            <View style={s.memberSelfBadge}>
+              <Text style={s.memberSelfBadgeText}>You</Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={s.memberActionBtn}
+              onPress={() => onMemberMessage?.(member.id, member.name)}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={`Message ${member.name}`}
+            >
+              <MessageCircle size={16} color={colors.textMuted} />
+            </TouchableOpacity>
+          )}
         </View>
       ))}
     </ScrollView>
@@ -599,6 +706,14 @@ function makeStyles(C: AppColors) {
       gap: 8,
       paddingBottom: 60,
     },
+    emptyIconBadge: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 4,
+    },
     emptyTitle: {
       fontSize: 16,
       fontWeight: '600',
@@ -732,7 +847,33 @@ function makeStyles(C: AppColors) {
     memberName: {
       fontSize: 15,
       color: C.text,
+    },
+    memberInfo: {
       flex: 1,
+      minWidth: 0,
+    },
+    memberActionBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: C.inputBg,
+      borderWidth: hairline,
+      borderColor: C.border,
+    },
+    memberSelfBadge: {
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 999,
+      backgroundColor: C.inputBg,
+      borderWidth: hairline,
+      borderColor: C.border,
+    },
+    memberSelfBadgeText: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: C.textMuted,
     },
   });
 }
@@ -748,6 +889,7 @@ export function ChannelInfoSheet({
   avatarSeed,
   avatarRole,
   iconKey,
+  themeKey,
   memberCount,
   description,
   members,
@@ -755,8 +897,14 @@ export function ChannelInfoSheet({
   onClose,
 }: ChannelInfoSheetProps) {
   const { colors } = useTheme();
+  const router = useRouter();
+  const { data: account } = useAccount();
+  const { data: profile } = useProfile();
   const s = useMemo(() => makeStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
+  const orgId = account?.org_id ?? '';
+  const currentProfileId =
+    ((profile as Record<string, unknown> | undefined)?.id as string | undefined) ?? '';
 
   const [activeTab, setActiveTab] = useState<ChannelTab>('files');
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -770,13 +918,19 @@ export function ChannelInfoSheet({
   const isDm = kind === 'dm';
   const seed = avatarSeed ?? title;
   const typeLabel = isDm ? 'Direct Message' : kind === 'space' ? 'Class' : 'Channel';
-  const LearningSpaceIcon = !isDm ? getLearningSpaceIcon(iconKey) : null;
+  const iconTheme = !isDm
+    ? themeAvatarColor(themeKey, colors.inputBg, colors.text)
+    : { bg: colors.inputBg, fg: colors.text };
 
   // ── Files: fetch directly from channel_files + channel_media tables ─────────
   // Messages are paginated (last ~40), so we can't extract files from them reliably.
   // The url column in these tables stores the storage path, not a public URL.
   const [fileItems, setFileItems] = useState<FileItem[]>([]);
   const [filesLoading, setFilesLoading] = useState(false);
+  const [loadedMembers, setLoadedMembers] = useState<
+    Array<{ id: string; name: string; avatarSeed?: string | null; role?: string | null }>
+  >([]);
+  const [membersLoading, setMembersLoading] = useState(false);
 
   useEffect(() => {
     if (!visible || !channelId) return;
@@ -791,7 +945,6 @@ export function ChannelInfoSheet({
             .select('id, url, name, mime_type, size, created_at')
             .eq('channel_id', channelId)
             .is('deleted_at', null)
-            .not('mime_type', 'like', 'audio/%')
             .order('created_at', { ascending: false })
             .limit(100),
           supabase
@@ -841,11 +994,59 @@ export function ChannelInfoSheet({
     })();
   }, [visible, channelId]);
 
+  useEffect(() => {
+    if (!visible || !channelId) return;
+    setLoadedMembers([]);
+    setMembersLoading(true);
+
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('channel_members')
+          .select(
+            `
+            profile_id,
+            profile:profiles!profile_id(display_name, first_name, last_name, avatar_seed, kind)
+          `,
+          )
+          .eq('channel_id', channelId)
+          .is('deleted_at', null);
+
+        if (error) throw error;
+
+        const nextMembers = (data ?? [])
+          .flatMap((row) => {
+            const profile = Array.isArray(row.profile) ? row.profile[0] : row.profile;
+            if (!profile) return [];
+            const name =
+              profile.display_name?.trim() ||
+              [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim();
+            if (!name) return [];
+            return [
+              {
+                id: String(row.profile_id),
+                name,
+                avatarSeed: profile.avatar_seed ? String(profile.avatar_seed) : name,
+                role: profile.kind ? String(profile.kind) : null,
+              },
+            ];
+          })
+          .sort((a, b) => a.name.localeCompare(b.name));
+
+        setLoadedMembers(nextMembers);
+      } catch {
+        // silently fail — empty members tab
+      } finally {
+        setMembersLoading(false);
+      }
+    })();
+  }, [visible, channelId]);
+
   // Derived data for saved/members tabs (from messages prop)
   const savedItems = useMemo(() => extractSaved(messages), [messages]);
   const memberItems = useMemo(
-    () => extractMembers(messages, members),
-    [messages, members],
+    () => extractMembers(messages, loadedMembers.length > 0 ? loadedMembers : members),
+    [loadedMembers, messages, members],
   );
 
   // ── Open animation ──────────────────────────────────────────────────────────
@@ -876,6 +1077,45 @@ export function ChannelInfoSheet({
       onClose();
     });
   }, [onClose, sheetTranslateY]);
+
+  const handleMemberMessage = useCallback(
+    async (memberId: string, memberName: string) => {
+      if (!orgId || !currentProfileId || !memberId || memberId === currentProfileId) {
+        return;
+      }
+
+      try {
+        const dm = await findDirectMessageChannelForProfiles(
+          orgId,
+          currentProfileId,
+          memberId,
+        );
+        if (!dm) {
+          Alert.alert(
+            'No direct message',
+            `No direct message exists with ${memberName} yet.`,
+          );
+          return;
+        }
+
+        handleClose();
+        router.push({
+          pathname: '/(app)/dm/[channelId]',
+          params: {
+            channelId: dm.channelId,
+            topic: dm.topic,
+            avatarSeed: dm.avatarSeed ?? '',
+            avatarUrl: dm.avatarUrl ?? '',
+            avatarRole: dm.avatarRole ?? '',
+            avatarTimezone: dm.avatarTimezone ?? '',
+          },
+        } as never);
+      } catch {
+        Alert.alert('Unable to open direct message', 'Please try again.');
+      }
+    },
+    [currentProfileId, handleClose, orgId, router],
+  );
 
   // ── Expand to full screen ───────────────────────────────────────────────────
   const expandToFull = useCallback(() => {
@@ -1036,9 +1276,13 @@ export function ChannelInfoSheet({
                 <View style={[s.avatarCircle, { backgroundColor: avatarColor(seed) }]}>
                   <Text style={s.avatarTxt}>{getInitials(title)}</Text>
                 </View>
-                <RoleAvatarBadge role={avatarRole} size={18} />
               </View>
-              <Text style={s.heroName}>{title}</Text>
+              <RoleNameIndicator
+                name={title}
+                role={avatarRole}
+                textStyle={s.heroName}
+                iconSize={14}
+              />
               {!!subtitle && <Text style={s.heroSub}>{subtitle}</Text>}
             </View>
 
@@ -1089,11 +1333,15 @@ export function ChannelInfoSheet({
               style={s.heroCompact}
               {...(isFullScreen ? panResponder.panHandlers : {})}
             >
-              <View style={[s.iconBoxCompact, { backgroundColor: colors.tealBg }]}>
-                {LearningSpaceIcon ? (
-                  <LearningSpaceIcon size={28} color={colors.teal} />
-                ) : null}
-              </View>
+              <LearningSpaceIconBadge
+                iconKey={iconKey}
+                size={56}
+                iconSize={28}
+                borderRadius={28}
+                backgroundColor={iconTheme.bg}
+                color={iconTheme.fg}
+                style={s.avatarCircleCompact}
+              />
               <Text style={s.heroNameCompact}>{title}</Text>
               {!!subtitle && <Text style={s.heroSub}>{subtitle}</Text>}
             </View>
@@ -1125,12 +1373,15 @@ export function ChannelInfoSheet({
                 activeTab={activeTab}
                 fileItems={fileItems}
                 filesLoading={filesLoading}
+                membersLoading={membersLoading}
                 savedItems={savedItems}
                 memberItems={memberItems}
                 colors={colors}
                 s={s}
                 memberCount={memberCount}
                 isFullScreen={isFullScreen}
+                currentProfileId={currentProfileId}
+                onMemberMessage={handleMemberMessage}
               />
             </View>
 

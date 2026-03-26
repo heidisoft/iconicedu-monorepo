@@ -11,9 +11,10 @@ import {
 import { ChevronLeft, Video, MoreVertical } from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
-import { getLearningSpaceIcon } from '@/lib/learning-space-icons';
+import { LearningSpaceIconBadge } from '@/lib/learning-space-icons';
 import { PulseBox } from '@/components/skeletons/pulse-box';
 import { RoleAvatarBadge } from '@/components/profile/role-avatar-badge';
+import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
 import type { PresenceDisplayStatus } from '@/hooks/use-online-profile-ids';
 
 // ─── Avatar color helpers (same palette as messages list) ────────────────────
@@ -27,6 +28,31 @@ const AVATAR_COLORS = [
   '#54B8C4',
   '#E06C8A',
 ];
+
+const THEME_KEY_COLORS: Record<string, { bg: string; fg: string }> = {
+  slate: { bg: '#64748b', fg: '#ffffff' },
+  gray: { bg: '#6b7280', fg: '#ffffff' },
+  zinc: { bg: '#71717a', fg: '#ffffff' },
+  neutral: { bg: '#737373', fg: '#ffffff' },
+  stone: { bg: '#78716c', fg: '#ffffff' },
+  red: { bg: '#ef4444', fg: '#ffffff' },
+  orange: { bg: '#f97316', fg: '#ffffff' },
+  amber: { bg: '#f59e0b', fg: '#1f2937' },
+  yellow: { bg: '#eab308', fg: '#1f2937' },
+  lime: { bg: '#84cc16', fg: '#1f2937' },
+  green: { bg: '#22c55e', fg: '#ffffff' },
+  emerald: { bg: '#10b981', fg: '#ffffff' },
+  teal: { bg: '#14b8a6', fg: '#ffffff' },
+  cyan: { bg: '#06b6d4', fg: '#ffffff' },
+  sky: { bg: '#0ea5e9', fg: '#ffffff' },
+  blue: { bg: '#3b82f6', fg: '#ffffff' },
+  indigo: { bg: '#6366f1', fg: '#ffffff' },
+  violet: { bg: '#8b5cf6', fg: '#ffffff' },
+  purple: { bg: '#a855f7', fg: '#ffffff' },
+  fuchsia: { bg: '#d946ef', fg: '#ffffff' },
+  pink: { bg: '#ec4899', fg: '#ffffff' },
+  rose: { bg: '#f43f5e', fg: '#ffffff' },
+};
 
 function avatarColor(seed: string): string {
   let h = 0;
@@ -46,6 +72,7 @@ export type ConversationHeaderProps = {
   title: string;
   /** Subtitle — e.g. "Direct Message" or space subject */
   subtitle?: string | null;
+  studentProfiles?: Array<{ name: string; themeKey?: string | null }> | null;
   onSubtitlePress?: (() => void) | null;
   localTimeLabel?: string | null;
   kind: 'dm' | 'channel' | 'space';
@@ -57,6 +84,8 @@ export type ConversationHeaderProps = {
   avatarRole?: string | null;
   /** Channel/space: learning-space icon key */
   iconKey?: string | null;
+  /** Channel/space: UI theme key */
+  themeKey?: string | null;
   onBack: () => void;
   onCall?: () => void;
   onVideo?: () => void;
@@ -172,17 +201,11 @@ function makeStyles(C: AppColors) {
       borderColor: C.pageBg,
     },
     groupTxt: { color: '#fff', fontWeight: '700', fontSize: 13 },
-    groupBadgeFront: { top: -3 },
-    groupBadgeBack: { top: -3 },
+    groupBadgeFront: {},
+    groupBadgeBack: {},
 
     // ── Channel/space icon ─────────────────────────────────────────────────────
     iconBox: {
-      width: 42,
-      height: 42,
-      borderRadius: 12,
-      backgroundColor: C.tealBg,
-      alignItems: 'center',
-      justifyContent: 'center',
       flexShrink: 0,
     },
     // ── Title block ────────────────────────────────────────────────────────────
@@ -236,11 +259,40 @@ function makeStyles(C: AppColors) {
   });
 }
 
+function themeTextColor(themeKey: string | null | undefined, fallback: string): string {
+  const palette: Record<string, string> = {
+    slate: '#64748b',
+    gray: '#6b7280',
+    zinc: '#71717a',
+    neutral: '#737373',
+    stone: '#78716c',
+    red: '#ef4444',
+    orange: '#f97316',
+    amber: '#f59e0b',
+    yellow: '#ca8a04',
+    lime: '#65a30d',
+    green: '#16a34a',
+    emerald: '#059669',
+    teal: '#0f766e',
+    cyan: '#0891b2',
+    sky: '#0284c7',
+    blue: '#2563eb',
+    indigo: '#4f46e5',
+    violet: '#7c3aed',
+    purple: '#9333ea',
+    fuchsia: '#c026d3',
+    pink: '#db2777',
+    rose: '#e11d48',
+  };
+  return (themeKey && palette[themeKey]) || fallback;
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function ConversationHeader({
   title,
   subtitle,
+  studentProfiles,
   onSubtitlePress,
   localTimeLabel,
   kind,
@@ -248,6 +300,7 @@ export function ConversationHeader({
   avatarUrl,
   avatarRole,
   iconKey,
+  themeKey,
   onBack,
   onCall: _onCall,
   onVideo,
@@ -263,8 +316,12 @@ export function ConversationHeader({
   const s = useMemo(() => makeStyles(colors), [colors]);
 
   const isDm = kind === 'dm';
+  const useElevatedHeader = kind !== 'space';
   const seed = avatarSeed ?? title;
-  const LearningSpaceIcon = !isDm ? getLearningSpaceIcon(iconKey) : null;
+  const iconTheme =
+    !isDm && themeKey && THEME_KEY_COLORS[themeKey]
+      ? THEME_KEY_COLORS[themeKey]
+      : { bg: colors.inputBg, fg: colors.text };
 
   const presenceBadge = useMemo(() => {
     if (!presenceStatus || isReadOnly) return null;
@@ -279,9 +336,49 @@ export function ConversationHeader({
     }
     return <View style={[s.statusBadge, { backgroundColor: '#4b5563' }]} />;
   }, [isReadOnly, presenceStatus, s]);
+  const subtitleStudents =
+    studentProfiles?.filter((student) => student.name.trim().length > 0) ?? [];
+  const hasSubtitleStudents = subtitleStudents.length > 0;
+  const subtitleContent = (
+    <View style={s.subtitleRow}>
+      {!!subtitle && (
+        <Text style={s.subtitleText} numberOfLines={1} ellipsizeMode="tail">
+          {subtitle}
+        </Text>
+      )}
+      {!!subtitle && hasSubtitleStudents && (
+        <Text style={s.subtitleSeparator}>{'\u00b7'}</Text>
+      )}
+      {hasSubtitleStudents && (
+        <Text style={s.localTimeText} numberOfLines={1} ellipsizeMode="tail">
+          {subtitleStudents.map((student, index) => (
+            <Text
+              key={`${student.name}-${index}`}
+              style={{
+                color: themeTextColor(student.themeKey, colors.textMuted),
+              }}
+            >
+              {index > 0 ? ', ' : ''}
+              {student.name}
+            </Text>
+          ))}
+        </Text>
+      )}
+      {!!(subtitle || hasSubtitleStudents) && !!localTimeLabel && (
+        <Text style={s.subtitleSeparator}>{'\u00b7'}</Text>
+      )}
+      {!!localTimeLabel && (
+        <View style={s.localTimeWrap}>
+          <Text style={s.localTimeText} numberOfLines={1} ellipsizeMode="tail">
+            {localTimeLabel}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
 
   return (
-    <View style={[s.container, isDm ? s.containerElevated : null]}>
+    <View style={[s.container, useElevatedHeader ? s.containerElevated : null]}>
       {/* Back */}
       <TouchableOpacity style={s.backBtn} onPress={onBack} hitSlop={8}>
         <ChevronLeft size={28} color={colors.text} />
@@ -324,9 +421,15 @@ export function ConversationHeader({
           <RoleAvatarBadge role={avatarRole} size={16} />
         </View>
       ) : (
-        <View style={s.iconBox}>
-          {LearningSpaceIcon ? <LearningSpaceIcon size={22} color={colors.teal} /> : null}
-        </View>
+        <LearningSpaceIconBadge
+          iconKey={iconKey}
+          size={42}
+          iconSize={22}
+          borderRadius={21}
+          backgroundColor={iconTheme.bg}
+          color={iconTheme.fg}
+          style={s.iconBox}
+        />
       )}
 
       {/* Title + subtitle */}
@@ -338,10 +441,14 @@ export function ConversationHeader({
           </View>
         ) : (
           <>
-            <Text style={s.title} numberOfLines={1} ellipsizeMode="tail">
-              {secondaryAvatarSeed ? `${secondaryAvatarSeed} <> ${title}` : title}
-            </Text>
-            {!!(subtitle || localTimeLabel) &&
+            <RoleNameIndicator
+              name={secondaryAvatarSeed ? `${secondaryAvatarSeed} <> ${title}` : title}
+              role={avatarRole}
+              iconSize={14}
+              textStyle={s.title}
+              numberOfLines={1}
+            />
+            {!!(subtitle || hasSubtitleStudents || localTimeLabel) &&
               (onSubtitlePress ? (
                 <TouchableOpacity
                   style={s.subtitleButton}
@@ -350,50 +457,10 @@ export function ConversationHeader({
                   accessibilityRole="button"
                   accessibilityLabel="Explain local time"
                 >
-                  <View style={s.subtitleRow}>
-                    {!!subtitle && (
-                      <Text style={s.subtitleText} numberOfLines={1} ellipsizeMode="tail">
-                        {subtitle}
-                      </Text>
-                    )}
-                    {!!subtitle && !!localTimeLabel && (
-                      <Text style={s.subtitleSeparator}>{'\u00b7'}</Text>
-                    )}
-                    {!!localTimeLabel && (
-                      <View style={s.localTimeWrap}>
-                        <Text
-                          style={s.localTimeText}
-                          numberOfLines={1}
-                          ellipsizeMode="tail"
-                        >
-                          {localTimeLabel}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
+                  {subtitleContent}
                 </TouchableOpacity>
               ) : (
-                <View style={s.subtitleRow}>
-                  {!!subtitle && (
-                    <Text style={s.subtitleText} numberOfLines={1} ellipsizeMode="tail">
-                      {subtitle}
-                    </Text>
-                  )}
-                  {!!subtitle && !!localTimeLabel && (
-                    <Text style={s.subtitleSeparator}>{'\u00b7'}</Text>
-                  )}
-                  {!!localTimeLabel && (
-                    <View style={s.localTimeWrap}>
-                      <Text
-                        style={s.localTimeText}
-                        numberOfLines={1}
-                        ellipsizeMode="tail"
-                      >
-                        {localTimeLabel}
-                      </Text>
-                    </View>
-                  )}
-                </View>
+                subtitleContent
               ))}
           </>
         )}

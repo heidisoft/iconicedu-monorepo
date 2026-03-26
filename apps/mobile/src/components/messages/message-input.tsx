@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AudioPlayer, createAudioPlayer } from 'expo-audio';
 import type { AudioStatus } from 'expo-audio';
 import { useTheme } from '@/providers/theme-provider';
+import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
 import type { AppColors } from '@/lib/theme';
 import type { MessageVM } from '@iconicedu/shared-types';
 import { EmojiPicker } from './emoji-picker';
@@ -37,6 +38,12 @@ function fmtDuration(s: number): string {
   const m = Math.floor(s / 60);
   const sec = Math.floor(s % 60);
   return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+}
+
+function truncatePlaceholder(value?: string, maxLength = 25): string {
+  const text = value?.trim() || 'Type your message';
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength).trimEnd()}...`;
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -419,6 +426,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   }, []);
 
   const canSend = (text.trim().length > 0 || pendingAttachments.length > 0) && !disabled;
+  const resolvedPlaceholder = truncatePlaceholder(placeholder);
 
   return (
     <>
@@ -427,9 +435,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         <View style={s.replyPreview}>
           <View style={s.replyAccent} />
           <View style={s.replyInfo}>
-            <Text style={s.replySender} numberOfLines={1}>
-              {replyTo.core.sender.profile.displayName}
-            </Text>
+            <RoleNameIndicator
+              name={replyTo.core.sender.profile.displayName}
+              role={replyTo.core.sender.kind}
+              textStyle={s.replySender}
+              numberOfLines={1}
+              iconSize={12}
+            />
             <Text style={s.replyText} numberOfLines={1}>
               {getMessagePreviewText(replyTo)}
             </Text>
@@ -558,7 +570,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             value={text}
             onChangeText={handleChangeText}
             onContentSizeChange={handleContentSizeChange}
-            placeholder={placeholder ?? 'Type your message'}
+            placeholder={resolvedPlaceholder}
             placeholderTextColor={colors.textFaint}
             multiline
             scrollEnabled={inputHeight > MAX_INPUT_HEIGHT}

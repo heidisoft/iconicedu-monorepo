@@ -239,6 +239,8 @@ export type ChannelListItem = {
   last_message_sender: string | null;
   /** Learning-space icon key shared with web. */
   icon_key?: string | null;
+  /** Channel/space UI theme key from settings. */
+  themeKey?: string | null;
   /** Primary student name this space is for. */
   student_name?: string | null;
   /** Student participants for classroom channels. */
@@ -498,6 +500,105 @@ export async function fetchSupervisedDirectMessages(
     seen.add(r.id);
     return true;
   });
+}
+
+export async function findDirectMessageChannelForProfiles(
+  orgId: string,
+  currentProfileId: string,
+  targetProfileId: string,
+): Promise<{
+  channelId: string;
+  topic: string;
+  avatarSeed: string | null;
+  avatarUrl: string | null;
+  avatarRole: string | null;
+  avatarTimezone: string | null;
+} | null> {
+  if (
+    !orgId ||
+    !currentProfileId ||
+    !targetProfileId ||
+    currentProfileId === targetProfileId
+  ) {
+    return null;
+  }
+
+  const [
+    { data: currentMemberships, error: currentError },
+    { data: targetMemberships, error: targetError },
+  ] = await Promise.all([
+    supabase
+      .from('channel_members')
+      .select('channel_id')
+      .eq('org_id', orgId)
+      .eq('profile_id', currentProfileId)
+      .is('deleted_at', null),
+    supabase
+      .from('channel_members')
+      .select('channel_id')
+      .eq('org_id', orgId)
+      .eq('profile_id', targetProfileId)
+      .is('deleted_at', null),
+  ]);
+
+  if (currentError) throw currentError;
+  if (targetError) throw targetError;
+
+  const currentChannelIds = new Set(
+    (currentMemberships ?? []).map((row) => row.channel_id as string),
+  );
+  const sharedChannelIds = (targetMemberships ?? [])
+    .map((row) => row.channel_id as string)
+    .filter((channelId) => currentChannelIds.has(channelId));
+
+  if (sharedChannelIds.length === 0) return null;
+
+  const [
+    { data: channels, error: channelsError },
+    { data: targetProfile, error: profileError },
+  ] = await Promise.all([
+    supabase
+      .from('channels')
+      .select('id, updated_at')
+      .eq('org_id', orgId)
+      .eq('kind', 'dm')
+      .eq('status', 'active')
+      .in('id', sharedChannelIds)
+      .is('deleted_at', null)
+      .order('updated_at', { ascending: false })
+      .limit(1),
+    supabase
+      .from('profiles')
+      .select(
+        'id, display_name, first_name, last_name, avatar_url, avatar_seed, timezone, kind',
+      )
+      .eq('id', targetProfileId)
+      .is('deleted_at', null)
+      .maybeSingle(),
+  ]);
+
+  if (channelsError) throw channelsError;
+  if (profileError) throw profileError;
+
+  const channel = channels?.[0];
+  if (!channel || !targetProfile) return null;
+
+  const topic =
+    targetProfile.display_name?.trim() ||
+    [targetProfile.first_name, targetProfile.last_name]
+      .filter(Boolean)
+      .join(' ')
+      .trim() ||
+    'Direct Message';
+
+  return {
+    channelId: channel.id,
+    topic,
+    avatarSeed: (targetProfile.avatar_seed as string | null) ?? targetProfile.id,
+    avatarUrl: (targetProfile.avatar_url as string | null) ?? null,
+    avatarRole: (targetProfile.kind as string | null) ?? null,
+    avatarTimezone: (targetProfile.timezone as string | null) ?? null,
+  };
 }
 
 // ─── Shared preview helper ────────────────────────────────────────────────────
@@ -1071,7 +1172,9 @@ export async function fetchSpaceChannelMetaByChannelId(channelId: string): Promi
   title: string | null;
   subtitle: string | null;
   iconKey: string | null;
+  themeKey: string | null;
   description: string | null;
+  studentProfiles: Array<{ name: string; themeKey?: string | null }>;
 } | null> {
   if (!channelId) return null;
 
@@ -1080,12 +1183,14 @@ export async function fetchSpaceChannelMetaByChannelId(channelId: string): Promi
     .select(
       `
       space:learning_spaces!learning_space_id(
+        id,
         title,
         subject,
         icon_key,
         description,
         deleted_at
-      )
+      ),
+      channel:channels!channel_id(ui_theme_key)
     `,
     )
     .eq('channel_id', channelId)
@@ -1097,6 +1202,7 @@ export async function fetchSpaceChannelMetaByChannelId(channelId: string): Promi
 
   const space = data?.space as
     | {
+        id: string;
         title: string | null;
         subject: string | null;
         icon_key: string | null;
@@ -1105,14 +1211,44 @@ export async function fetchSpaceChannelMetaByChannelId(channelId: string): Promi
       }
     | null
     | undefined;
+  const channel = data?.channel as { ui_theme_key: string | null } | null | undefined;
 
   if (!space || space.deleted_at) return null;
+
+  const { data: participantRows, error: participantError } = await supabase
+    .from('learning_space_participants')
+    .select(
+      `
+      profile:profiles!profile_id(display_name, first_name, last_name, kind, ui_theme_key)
+    `,
+    )
+    .eq('learning_space_id', space.id)
+    .is('deleted_at', null);
+
+  if (participantError) throw participantError;
+
+  const studentProfiles: Array<{ name: string; themeKey?: string | null }> = [];
+  for (const row of participantRows ?? []) {
+    const profile = Array.isArray(row.profile) ? row.profile[0] : row.profile;
+    if (!profile || profile.kind !== 'child') continue;
+    const displayName =
+      profile.display_name?.trim() ||
+      [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim();
+    if (displayName && !studentProfiles.some((student) => student.name === displayName)) {
+      studentProfiles.push({
+        name: displayName,
+        themeKey: profile.ui_theme_key ?? null,
+      });
+    }
+  }
 
   return {
     title: space.title ?? null,
     subtitle: space.subject ?? null,
     iconKey: space.icon_key ?? null,
+    themeKey: channel?.ui_theme_key ?? null,
     description: space.description ?? null,
+    studentProfiles,
   };
 }
 
@@ -1121,11 +1257,12 @@ export async function fetchSupportChannel(orgId: string): Promise<{
   topic: string | null;
   description: string | null;
   icon_key?: string | null;
+  themeKey?: string | null;
   updated_at?: string | null;
 } | null> {
   const { data, error } = await supabase
     .from('channels')
-    .select('id, topic, description, icon_key, updated_at')
+    .select('id, topic, description, icon_key, ui_theme_key, updated_at')
     .eq('org_id', orgId)
     .eq('purpose', 'support')
     .eq('status', 'active')
@@ -1170,7 +1307,7 @@ export async function fetchLearningSpaceChannels(
       `
       channel_id,
       space:learning_spaces!learning_space_id(id, title, icon_key, subject, status, deleted_at),
-      channel:channels!channel_id(id, org_id, updated_at)
+      channel:channels!channel_id(id, org_id, ui_theme_key, updated_at)
       `,
     )
     .eq('org_id', orgId)
@@ -1191,7 +1328,12 @@ export async function fetchLearningSpaceChannels(
       deleted_at: string | null;
     } | null;
   const toChannel = (r: Row) =>
-    r.channel as unknown as { id: string; org_id: string; updated_at: string } | null;
+    r.channel as unknown as {
+      id: string;
+      org_id: string;
+      ui_theme_key: string | null;
+      updated_at: string;
+    } | null;
 
   const channelIds = (data ?? [])
     .map((row) => {
@@ -1285,6 +1427,7 @@ export async function fetchLearningSpaceChannels(
         last_message_at: null as string | null,
         last_message_sender: null as string | null,
         icon_key: sp.icon_key ?? null,
+        themeKey: ch.ui_theme_key ?? null,
         student_name: null,
         student_profiles: studentProfilesBySpaceId.get(sp.id) ?? [],
         is_support: false,
@@ -1307,6 +1450,7 @@ export async function fetchLearningSpaceChannels(
           last_message_at: null,
           last_message_sender: null,
           icon_key: supportChannel.icon_key ?? 'support',
+          themeKey: supportChannel.themeKey ?? null,
           student_name: null,
           student_profiles: [],
           is_support: true,
