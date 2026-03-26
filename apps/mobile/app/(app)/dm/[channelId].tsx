@@ -10,11 +10,18 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useQuery } from '@tanstack/react-query';
 import type { MessageVM } from '@iconicedu/shared-types';
 import { useAccount } from '@/hooks/use-account';
 import { useProfile } from '@/hooks/use-profile';
 import { useMessages } from '@/hooks/use-messages';
-import { sendTextMessage, deleteMessage, markChannelReadState } from '@/lib/api/queries';
+import {
+  sendTextMessage,
+  deleteMessage,
+  markChannelReadState,
+  fetchChannelReadState,
+  queryKeys,
+} from '@/lib/api/queries';
 import { useTheme } from '@/providers/theme-provider';
 import {
   useOnlineProfileIds,
@@ -152,6 +159,12 @@ export default function DmConversationScreen() {
     broadcastTyping,
     broadcastTypingStop,
   } = useMessages(channelId ?? '', profileId, accountId, senderName, orgId);
+  const { data: channelReadState } = useQuery({
+    queryKey: queryKeys.channelReadState(channelId ?? '', accountId),
+    queryFn: () => fetchChannelReadState(channelId ?? '', accountId),
+    enabled: !!channelId && !!accountId,
+    staleTime: 30_000,
+  });
 
   // ── Info sheet state ──
   const [infoVisible, setInfoVisible] = useState(false);
@@ -273,6 +286,8 @@ export default function DmConversationScreen() {
             messages={messages ?? []}
             currentProfileId={profileId}
             currentAccountId={accountId}
+            lastReadMessageId={channelReadState?.lastReadMessageId ?? null}
+            unreadCount={channelReadState?.unreadCount ?? 0}
             onLoadMore={loadMore}
             loading={false}
             refreshing={isRefetching}

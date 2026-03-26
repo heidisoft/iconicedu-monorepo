@@ -48,6 +48,28 @@ const staffMessage: MessageVM = {
   },
 } as unknown as MessageVM;
 
+const threadedUnreadMessage: MessageVM = {
+  ...baseMessage,
+  social: {
+    reactions: [],
+    thread: {
+      ids: { id: 'thread-1', orgId: 'org-1' },
+      parent: {
+        messageId: 'msg-1',
+      },
+      stats: {
+        messageCount: 3,
+        lastReplyAt: '2025-01-15T11:00:00Z',
+      },
+      participants: [sender],
+      readState: {
+        threadId: 'thread-1',
+        unreadCount: 2,
+      },
+    },
+  },
+} as unknown as MessageVM;
+
 const colors = LIGHT;
 
 describe('MessageItem', () => {
@@ -100,5 +122,20 @@ describe('MessageItem', () => {
     render(<MessageItem message={audioMsg} isOwn={false} isGroupStart colors={colors} />);
     // Duration should show 1:05
     expect(screen.getByText('1:05')).toBeTruthy();
+  });
+
+  it('renders unread thread indicators when a thread has unread replies', () => {
+    render(
+      <MessageItem
+        message={threadedUnreadMessage}
+        isOwn={false}
+        isGroupStart
+        colors={colors}
+      />,
+    );
+
+    expect(screen.getByTestId('thread-unread-new-badge')).toBeTruthy();
+    expect(screen.getByTestId('thread-unread-count-badge')).toBeTruthy();
+    expect(screen.getByText('2')).toBeTruthy();
   });
 });

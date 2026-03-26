@@ -13,6 +13,7 @@ import {
   sendTextMessage,
   markChannelReadState,
   fetchSpaceChannelMetaByChannelId,
+  fetchChannelReadState,
   queryKeys,
 } from '@/lib/api/queries';
 import { useTheme } from '@/providers/theme-provider';
@@ -52,6 +53,12 @@ export default function SpaceDetailScreen() {
     queryFn: () => fetchSpaceChannelMetaByChannelId(channelId ?? ''),
     enabled: !!channelId,
     staleTime: 5 * 60 * 1000,
+  });
+  const { data: channelReadState } = useQuery({
+    queryKey: queryKeys.channelReadState(channelId ?? '', accountId),
+    queryFn: () => fetchChannelReadState(channelId ?? '', accountId),
+    enabled: !!channelId && !!accountId,
+    staleTime: 30_000,
   });
 
   const {
@@ -170,6 +177,8 @@ export default function SpaceDetailScreen() {
             messages={messages ?? []}
             currentProfileId={profileId}
             currentAccountId={accountId}
+            lastReadMessageId={channelReadState?.lastReadMessageId ?? null}
+            unreadCount={channelReadState?.unreadCount ?? 0}
             onLoadMore={loadMore}
             loading={isLoading}
             onUnreadViewed={handleUnreadViewed}

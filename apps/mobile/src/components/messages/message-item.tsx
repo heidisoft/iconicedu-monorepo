@@ -35,7 +35,7 @@ import type {
   ReactionVM,
 } from '@iconicedu/shared-types';
 import type { AppColors } from '@/lib/theme';
-import { fetchThreadMessages } from '@/lib/api/queries';
+import { fetchThreadMessages, markThreadReadState } from '@/lib/api/queries';
 import { EmojiPicker } from './emoji-picker';
 import {
   SmilePlus,
@@ -309,6 +309,7 @@ function FormattedText({
 type SocialBarProps = {
   reactions: ReactionVM[];
   thread: ThreadVM | null;
+  threadUnreadCount?: number;
   messageId: string;
   colors: AppColors;
   onReactionToggle?: (messageId: string, emoji: string) => void;
@@ -322,6 +323,7 @@ type SocialBarProps = {
 function SocialBar({
   reactions,
   thread,
+  threadUnreadCount,
   messageId,
   colors,
   onReactionToggle,
@@ -406,6 +408,7 @@ function SocialBar({
                 colors={colors}
                 onPress={disabledActions ? () => {} : (onThreadPress ?? (() => {}))}
                 expanded={threadExpanded}
+                unreadCount={threadUnreadCount}
               />
             ) : (
               <ThreadReplyButton
@@ -425,6 +428,7 @@ function SocialBar({
             colors={colors}
             onPress={onThreadPress ?? (() => {})}
             expanded={threadExpanded}
+            unreadCount={threadUnreadCount}
           />
         )}
       </View>
@@ -447,14 +451,18 @@ function ThreadPill({
   colors,
   onPress,
   expanded,
+  unreadCount,
 }: {
   thread: ThreadVM;
   colors: AppColors;
   onPress: () => void;
   expanded?: boolean;
+  unreadCount?: number;
 }) {
   const count = thread.stats.messageCount;
   const participants = thread.participants.slice(0, 3);
+  const resolvedUnreadCount = unreadCount ?? thread.readState?.unreadCount ?? 0;
+  const hasUnread = resolvedUnreadCount > 0;
 
   return (
     <TouchableOpacity
@@ -485,6 +493,56 @@ function ThreadPill({
       >
         {count} {count === 1 ? 'reply' : 'replies'}
       </Text>
+
+      {hasUnread && (
+        <View
+          testID="thread-unread-new-badge"
+          style={{
+            borderRadius: 999,
+            paddingHorizontal: 6,
+            paddingVertical: 2,
+            backgroundColor: colors.tealBg,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 10,
+              lineHeight: 12,
+              fontWeight: '700',
+              color: colors.teal,
+              textTransform: 'uppercase',
+            }}
+          >
+            New
+          </Text>
+        </View>
+      )}
+
+      {hasUnread && (
+        <View
+          testID="thread-unread-count-badge"
+          style={{
+            minWidth: 20,
+            height: 20,
+            borderRadius: 10,
+            paddingHorizontal: 6,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: colors.teal,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 11,
+              lineHeight: 13,
+              fontWeight: '700',
+              color: colors.tealFg,
+            }}
+          >
+            {resolvedUnreadCount}
+          </Text>
+        </View>
+      )}
 
       {/* Overlapping participant initials/avatars */}
       {participants.length > 0 && (
@@ -568,6 +626,73 @@ function ThreadPill({
         </View>
       )}
     </TouchableOpacity>
+  );
+}
+
+function findInlineUnreadStartIndex(input: {
+  replies: MessageVM[];
+  lastReadMessageId?: string;
+  unreadCount?: number;
+  currentUserId?: string;
+}): number {
+  const { replies, lastReadMessageId, unreadCount, currentUserId } = input;
+  const normalizedUnreadCount = Math.max(0, unreadCount ?? 0);
+  if (replies.length === 0) return -1;
+
+  const findIncomingIndex = (startIndex: number): number => {
+    for (let index = startIndex; index < replies.length; index += 1) {
+      const reply = replies[index];
+      if (!currentUserId || reply.core.sender.ids.id !== currentUserId) {
+        return index;
+      }
+    }
+    return -1;
+  };
+
+  if (lastReadMessageId) {
+    const lastReadIndex = replies.findIndex(
+      (reply) => reply.ids.id === lastReadMessageId,
+    );
+    if (lastReadIndex >= 0) {
+      return findIncomingIndex(lastReadIndex + 1);
+    }
+  }
+
+  if (normalizedUnreadCount <= 0) return -1;
+  return findIncomingIndex(Math.max(0, replies.length - normalizedUnreadCount));
+}
+
+function InlineUnreadDivider({ count, colors }: { count?: number; colors: AppColors }) {
+  const label = count && count > 0 ? `New messages (${count})` : 'New messages';
+  return (
+    <View
+      style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 8, gap: 8 }}
+    >
+      <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+      <View
+        style={{
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+          backgroundColor: colors.inputBg,
+          borderRadius: 999,
+          paddingHorizontal: 10,
+          paddingVertical: 4,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 10,
+            fontWeight: '700',
+            textTransform: 'uppercase',
+            letterSpacing: 0.8,
+            color: colors.textMuted,
+          }}
+        >
+          {label}
+        </Text>
+      </View>
+      <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+    </View>
   );
 }
 
@@ -1530,6 +1655,9 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   const [threadExpanded, setThreadExpanded] = useState(false);
   const [threadReplies, setThreadReplies] = useState<MessageVM[]>([]);
   const [threadLoading, setThreadLoading] = useState(false);
+  const [threadUnreadCount, setThreadUnreadCount] = useState(
+    message.social?.thread?.readState?.unreadCount ?? 0,
+  );
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [audioLoading, setAudioLoading] = useState(false);
   const [audioPositionMs, setAudioPositionMs] = useState(0);
@@ -1620,6 +1748,16 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     type === 'audio-recording'
       ? ((message as AudioRecordingMessageVM).audio?.mimeType ?? '')
       : '';
+  const inlineUnreadStartIndex = findInlineUnreadStartIndex({
+    replies: threadReplies,
+    lastReadMessageId: thread?.readState?.lastReadMessageId,
+    unreadCount: threadUnreadCount,
+    currentUserId: currentProfileId,
+  });
+
+  useEffect(() => {
+    setThreadUnreadCount(thread?.readState?.unreadCount ?? 0);
+  }, [thread?.ids.id, thread?.readState?.unreadCount]);
 
   const handleAudioPress = useCallback(
     async (url: string) => {
@@ -1719,6 +1857,23 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           currentAccountId ?? '',
         );
         setThreadReplies(replies);
+        const channelId = thread.readState?.channelId;
+        const lastReplyId = replies[replies.length - 1]?.ids.id ?? null;
+        if (channelId && currentProfileId && currentAccountId) {
+          try {
+            const unreadCount = await markThreadReadState({
+              orgId: message.ids.orgId,
+              accountId: currentAccountId,
+              profileId: currentProfileId,
+              channelId,
+              threadId: thread.ids.id,
+              lastReadMessageId: lastReplyId,
+            });
+            setThreadUnreadCount(unreadCount);
+          } catch (readErr) {
+            console.warn('[MessageItem] markThreadReadState error:', readErr);
+          }
+        }
       } catch (err) {
         console.warn('[MessageItem] fetchThreadMessages error:', err);
       } finally {
@@ -2277,6 +2432,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           <SocialBar
             reactions={reactions}
             thread={thread}
+            threadUnreadCount={threadUnreadCount}
             messageId={message.ids.id}
             colors={colors}
             onReactionToggle={isReadOnly ? undefined : onReactionToggle}
@@ -2295,8 +2451,16 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                   </View>
                 ) : (
                   <>
-                    {threadReplies.map((reply) => (
-                      <InlineReply key={reply.ids.id} message={reply} colors={colors} />
+                    {threadReplies.map((reply, replyIndex) => (
+                      <React.Fragment key={reply.ids.id}>
+                        {inlineUnreadStartIndex === replyIndex && (
+                          <InlineUnreadDivider
+                            count={threadUnreadCount}
+                            colors={colors}
+                          />
+                        )}
+                        <InlineReply message={reply} colors={colors} />
+                      </React.Fragment>
                     ))}
                     <ThreadReplyButton
                       colors={colors}
@@ -2367,6 +2531,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         <SocialBar
           reactions={reactions}
           thread={thread}
+          threadUnreadCount={threadUnreadCount}
           messageId={message.ids.id}
           colors={colors}
           onReactionToggle={isReadOnly ? undefined : onReactionToggle}
@@ -2387,8 +2552,13 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                 </View>
               ) : (
                 <>
-                  {threadReplies.map((reply) => (
-                    <InlineReply key={reply.ids.id} message={reply} colors={colors} />
+                  {threadReplies.map((reply, replyIndex) => (
+                    <React.Fragment key={reply.ids.id}>
+                      {inlineUnreadStartIndex === replyIndex && (
+                        <InlineUnreadDivider count={threadUnreadCount} colors={colors} />
+                      )}
+                      <InlineReply message={reply} colors={colors} />
+                    </React.Fragment>
                   ))}
                   <ThreadReplyButton
                     colors={colors}

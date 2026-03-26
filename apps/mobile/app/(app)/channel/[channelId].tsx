@@ -11,6 +11,7 @@ import { MessageCircle, CalendarDays } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useQuery } from '@tanstack/react-query';
 import type { MessageVM } from '@iconicedu/shared-types';
 import { useAccount } from '@/hooks/use-account';
 import { useProfile } from '@/hooks/use-profile';
@@ -24,6 +25,8 @@ import {
   buildMessageStoragePath,
   deleteMessage,
   markChannelReadState,
+  fetchChannelReadState,
+  queryKeys,
 } from '@/lib/api/queries';
 import type { AttachmentPayload } from '@/components/messages/attachment-sheet';
 import type { PendingUpload } from '@/components/messages/pending-message-row';
@@ -91,6 +94,12 @@ export default function ChannelConversationScreen() {
     isLoading: isLoadingSessions,
     error: sessionsError,
   } = useSpaceSessions(channelId ?? '', orgId);
+  const { data: channelReadState } = useQuery({
+    queryKey: queryKeys.channelReadState(channelId ?? '', accountId),
+    queryFn: () => fetchChannelReadState(channelId ?? '', accountId),
+    enabled: !!channelId && !!accountId,
+    staleTime: 30_000,
+  });
 
   // ── Tab state ──
   const [activeTab, setActiveTab] = useState<ChannelTab>('messages');
@@ -405,6 +414,8 @@ export default function ChannelConversationScreen() {
             messages={messages ?? []}
             currentProfileId={profileId}
             currentAccountId={accountId}
+            lastReadMessageId={channelReadState?.lastReadMessageId ?? null}
+            unreadCount={channelReadState?.unreadCount ?? 0}
             onLoadMore={loadMore}
             loading={isLoading}
             refreshing={isRefetching}

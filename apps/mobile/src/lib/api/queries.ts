@@ -46,6 +46,8 @@ export const queryKeys = {
   spaceChannelMeta: (channelId: string) => ['spaceChannelMeta', channelId] as const,
   messages: (channelId: string, profileId = '') =>
     ['messages', channelId, profileId] as const,
+  channelReadState: (channelId: string, accountId: string) =>
+    ['channelReadState', channelId, accountId] as const,
   learningSpaces: (orgId: string) => ['learningSpaces', orgId] as const,
   learningSpace: (spaceId: string) => ['learningSpace', spaceId] as const,
   supportChannel: (orgId: string) => ['supportChannel', orgId] as const,
@@ -198,6 +200,33 @@ export async function fetchProfilesForAccount(accountId: string, orgId?: string)
   const { data, error } = await query;
   if (error) throw error;
   return data ?? [];
+}
+
+export async function fetchChannelReadState(channelId: string, accountId: string) {
+  if (!channelId || !accountId) return null;
+
+  const { data, error } = await supabase
+    .from('channel_read_state')
+    .select('channel_id, last_read_message_id, last_read_at, unread_count')
+    .eq('channel_id', channelId)
+    .eq('account_id', accountId)
+    .is('deleted_at', null)
+    .maybeSingle<{
+      channel_id: string;
+      last_read_message_id: string | null;
+      last_read_at: string | null;
+      unread_count: number | null;
+    }>();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  return {
+    channelId: data.channel_id,
+    lastReadMessageId: data.last_read_message_id ?? null,
+    lastReadAt: data.last_read_at ?? null,
+    unreadCount: data.unread_count ?? 0,
+  };
 }
 
 export async function fetchAccountsByIds(accountIds: string[]) {
@@ -891,11 +920,22 @@ type RawThreadParticipantRow = {
   profile: RawSenderProfile | null;
 };
 
+type RawThreadReadStateRow = {
+  thread_id: string;
+  channel_id: string | null;
+  last_read_message_id: string | null;
+  last_read_at: string | null;
+  unread_count: number | null;
+};
+
 /**
  * Fetch threads from the canonical `threads` table (mirrors web's buildThreadsByChannelId).
  * Returns a map of parent_message_id → ThreadVM.
  */
-async function loadThreads(parentMessageIds: string[]): Promise<Map<string, ThreadVM>> {
+async function loadThreads(
+  parentMessageIds: string[],
+  currentAccountId?: string,
+): Promise<Map<string, ThreadVM>> {
   if (!parentMessageIds.length) return new Map();
 
   const { data: threadRows, error: threadError } = await supabase
@@ -914,13 +954,26 @@ async function loadThreads(parentMessageIds: string[]): Promise<Map<string, Thre
   const typedThreadRows = threadRows as RawThreadRow[];
   const threadIds = typedThreadRows.map((t) => t.id);
 
-  const { data: participantRows, error: participantError } = await supabase
-    .from('thread_participants')
-    .select(
-      'thread_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed, kind)',
-    )
-    .in('thread_id', threadIds)
-    .is('deleted_at', null);
+  const [{ data: participantRows, error: participantError }, { data: readStateRows }] =
+    await Promise.all([
+      supabase
+        .from('thread_participants')
+        .select(
+          'thread_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed, kind)',
+        )
+        .in('thread_id', threadIds)
+        .is('deleted_at', null),
+      currentAccountId
+        ? supabase
+            .from('thread_read_state')
+            .select(
+              'thread_id, channel_id, last_read_message_id, last_read_at, unread_count',
+            )
+            .eq('account_id', currentAccountId)
+            .in('thread_id', threadIds)
+            .is('deleted_at', null)
+        : Promise.resolve({ data: [] as RawThreadReadStateRow[] }),
+    ]);
 
   if (participantError) {
     console.warn('[loadThreads] participants query failed:', participantError.message);
@@ -934,6 +987,19 @@ async function loadThreads(parentMessageIds: string[]): Promise<Map<string, Thre
     list.push(p.profile);
     participantsByThread.set(p.thread_id, list);
   }
+
+  const readStateByThread = new Map(
+    ((readStateRows ?? []) as RawThreadReadStateRow[]).map((row) => [
+      row.thread_id,
+      {
+        threadId: row.thread_id,
+        channelId: row.channel_id ?? undefined,
+        lastReadMessageId: row.last_read_message_id ?? undefined,
+        lastReadAt: row.last_read_at ?? undefined,
+        unreadCount: row.unread_count ?? undefined,
+      },
+    ]),
+  );
 
   const result = new Map<string, ThreadVM>();
   for (const t of typedThreadRows) {
@@ -954,6 +1020,12 @@ async function loadThreads(parentMessageIds: string[]): Promise<Map<string, Thre
         lastReplyAt: t.last_reply_at ?? t.created_at, // fallback = thread created_at
       },
       participants,
+      readState:
+        readStateByThread.get(t.id) ??
+        ({
+          threadId: t.id,
+          channelId: t.channel_id,
+        } as ThreadVM['readState']),
     });
   }
 
@@ -994,7 +1066,7 @@ export async function fetchChannelMessages(
   const [payloadMap, reactionMap, threadsMap] = await Promise.all([
     loadPayloads(typedRows),
     loadReactions(messageIds, currentAccountId),
-    loadThreads(messageIds),
+    loadThreads(messageIds, currentAccountId),
   ]);
 
   // Reverse a copy (oldest→newest) without mutating the typed rows array.
@@ -2624,6 +2696,123 @@ export async function markChannelReadState(input: {
     p_channel_id: input.channelId,
     p_account_id: input.accountId,
     p_last_read_message_id: input.lastReadMessageId,
+    p_last_read_at: new Date().toISOString(),
+    p_actor_profile_id: input.profileId,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return typeof data === 'number' ? data : 0;
+}
+
+export async function markChannelsReadByIds(input: {
+  orgId: string;
+  accountId: string;
+  profileId: string;
+  channelIds: string[];
+}): Promise<void> {
+  const uniqueChannelIds = [...new Set(input.channelIds.filter(Boolean))];
+  if (uniqueChannelIds.length === 0) return;
+
+  await Promise.all(
+    uniqueChannelIds.map(async (channelId) => {
+      const latestMessageLookup = await supabase
+        .from('messages')
+        .select('id')
+        .eq('org_id', input.orgId)
+        .eq('channel_id', channelId)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle<{ id: string }>();
+
+      if (latestMessageLookup.error) {
+        throw latestMessageLookup.error;
+      }
+
+      const lastReadMessageId = latestMessageLookup.data?.id;
+      if (!lastReadMessageId) {
+        return;
+      }
+
+      await markChannelReadState({
+        orgId: input.orgId,
+        accountId: input.accountId,
+        profileId: input.profileId,
+        channelId,
+        lastReadMessageId,
+      });
+    }),
+  );
+}
+
+export async function markThreadReadState(input: {
+  orgId: string;
+  accountId: string;
+  profileId: string;
+  channelId: string;
+  threadId: string;
+  lastReadMessageId?: string | null;
+}): Promise<number> {
+  const threadLookup = await supabase
+    .from('threads')
+    .select('id')
+    .eq('org_id', input.orgId)
+    .eq('id', input.threadId)
+    .eq('channel_id', input.channelId)
+    .is('deleted_at', null)
+    .maybeSingle<{ id: string }>();
+
+  if (threadLookup.error) {
+    throw threadLookup.error;
+  }
+  if (!threadLookup.data) {
+    throw new Error('Thread not found or access denied');
+  }
+
+  const participantLookup = await supabase
+    .from('thread_participants')
+    .select('id')
+    .eq('org_id', input.orgId)
+    .eq('thread_id', input.threadId)
+    .eq('profile_id', input.profileId)
+    .is('deleted_at', null)
+    .maybeSingle<{ id: string }>();
+
+  if (participantLookup.error) {
+    throw participantLookup.error;
+  }
+  if (!participantLookup.data) {
+    throw new Error('Thread not found or access denied');
+  }
+
+  if (input.lastReadMessageId) {
+    const messageLookup = await supabase
+      .from('messages')
+      .select('id')
+      .eq('org_id', input.orgId)
+      .eq('channel_id', input.channelId)
+      .eq('thread_id', input.threadId)
+      .eq('id', input.lastReadMessageId)
+      .is('deleted_at', null)
+      .maybeSingle<{ id: string }>();
+
+    if (messageLookup.error) {
+      throw messageLookup.error;
+    }
+    if (!messageLookup.data) {
+      throw new Error('Invalid lastReadMessageId for thread');
+    }
+  }
+
+  const { data, error } = await supabase.rpc('recompute_unread_for_account_thread', {
+    p_org_id: input.orgId,
+    p_channel_id: input.channelId,
+    p_thread_id: input.threadId,
+    p_account_id: input.accountId,
+    p_last_read_message_id: input.lastReadMessageId ?? null,
     p_last_read_at: new Date().toISOString(),
     p_actor_profile_id: input.profileId,
   });

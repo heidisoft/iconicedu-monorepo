@@ -9,6 +9,7 @@ import {
   StyleSheet,
   Pressable,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -26,7 +27,11 @@ import { useTheme } from '@/providers/theme-provider';
 import { LearningSpaceIconBadge } from '@/lib/learning-space-icons';
 import type { AppColors } from '@/lib/theme';
 import { createHeaderSurface } from '@/lib/header-surface';
-import type { ChannelListItem, DmParticipant } from '@/lib/api/queries';
+import {
+  markChannelsReadByIds,
+  type ChannelListItem,
+  type DmParticipant,
+} from '@/lib/api/queries';
 import { ChannelListSkeleton } from '@/components/skeletons';
 import { RoleAvatarBadge } from '@/components/profile/role-avatar-badge';
 import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
@@ -161,7 +166,29 @@ function makeStyles(C: AppColors) {
       paddingTop: 18,
       paddingBottom: 12,
     },
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
     title: { fontSize: 30, fontWeight: '800', color: C.text, letterSpacing: -0.5 },
+    headerAction: {
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 999,
+      backgroundColor: C.inputBg,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: C.border,
+    },
+    headerActionDisabled: {
+      opacity: 0.45,
+    },
+    headerActionText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: C.teal,
+    },
 
     tabBar: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: C.border },
     tab: {
@@ -819,6 +846,58 @@ export default function MessagesScreen() {
   ];
 
   const isLoading = accountLoading || dmsLoading || channelsLoading || supervisedLoading;
+  const [markingAllRead, setMarkingAllRead] = useState(false);
+  const visibleUnreadChannelIds = useMemo(
+    () =>
+      data
+        .filter((item): item is ChannelListItem => !('_type' in item))
+        .filter((item) => (item.unread_count ?? 0) > 0)
+        .map((item) => item.id),
+    [data],
+  );
+  const hasVisibleUnread = visibleUnreadChannelIds.length > 0;
+
+  const handleMarkAllRead = useCallback(() => {
+    if (!orgId || !accountId || !myProfileId || !hasVisibleUnread || markingAllRead) {
+      return;
+    }
+
+    Alert.alert(
+      'Mark all as read',
+      'Mark all visible conversations as read?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Mark all read',
+          onPress: async () => {
+            try {
+              setMarkingAllRead(true);
+              await markChannelsReadByIds({
+                orgId,
+                accountId,
+                profileId: myProfileId,
+                channelIds: visibleUnreadChannelIds,
+              });
+              await Promise.all([refetchDms(), refetchChannels(), refetchSupervised()]);
+            } finally {
+              setMarkingAllRead(false);
+            }
+          },
+        },
+      ],
+      { cancelable: true },
+    );
+  }, [
+    accountId,
+    hasVisibleUnread,
+    markingAllRead,
+    myProfileId,
+    orgId,
+    refetchChannels,
+    refetchDms,
+    refetchSupervised,
+    visibleUnreadChannelIds,
+  ]);
 
   const emptyConfig = {
     all: {
@@ -904,7 +983,24 @@ export default function MessagesScreen() {
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.header}>
-        <Text style={s.title}>Messages</Text>
+        <View style={s.headerRow}>
+          <Text style={s.title}>Messages</Text>
+          <TouchableOpacity
+            style={[
+              s.headerAction,
+              (!hasVisibleUnread || markingAllRead) && s.headerActionDisabled,
+            ]}
+            onPress={handleMarkAllRead}
+            disabled={!hasVisibleUnread || markingAllRead}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Mark all visible conversations as read"
+          >
+            <Text style={s.headerActionText}>
+              {markingAllRead ? 'Marking…' : 'Mark all read'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={s.tabBar}>
