@@ -82,7 +82,7 @@ export function RoleOnboardingModal({ open, onSubmit }: RoleOnboardingModalProps
 
   return (
     <Dialog open={open}>
-      <DialogContent showCloseButton={false} className="max-w-lg">
+      <DialogContent showCloseButton={false} className="sm:max-w-[48rem]">
         <DialogHeader>
           <DialogTitle>Choose your role to continue</DialogTitle>
           <DialogDescription>

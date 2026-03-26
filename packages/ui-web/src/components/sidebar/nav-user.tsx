@@ -624,7 +624,7 @@ export function NavUser({
           childHasAuthAccount={childHasAuthAccount}
         />
         <Dialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="sm:max-w-[48rem]">
             <DialogHeader>
               <DialogTitle>Set a status</DialogTitle>
             </DialogHeader>

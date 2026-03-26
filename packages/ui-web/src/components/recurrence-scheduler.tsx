@@ -119,7 +119,7 @@ export function RecurrenceScheduler({
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="sm:max-w-[48rem]">
           <DialogHeader>
             <DialogTitle>
               {editingSchedule ? 'Edit Schedule' : 'Create Schedule'}

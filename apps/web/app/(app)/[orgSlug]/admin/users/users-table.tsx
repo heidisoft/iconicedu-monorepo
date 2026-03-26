@@ -678,7 +678,7 @@ export function UsersTable({ rows }: UsersTableProps) {
         </div>
       </div>
       <Dialog open={linkDialogOpen} onOpenChange={(open) => setLinkDialogOpen(open)}>
-        <DialogContent className="max-w-md space-y-4">
+        <DialogContent className="space-y-4 sm:max-w-[42rem]">
           <DialogHeader>
             <DialogTitle>Generated login link</DialogTitle>
             <DialogDescription>
@@ -726,7 +726,7 @@ export function UsersTable({ rows }: UsersTableProps) {
           }
         }}
       >
-        <DialogContent className="max-w-md space-y-4">
+        <DialogContent className="space-y-4 sm:max-w-[42rem]">
           <DialogHeader>
             <DialogTitle>Edit profile</DialogTitle>
             <DialogDescription>

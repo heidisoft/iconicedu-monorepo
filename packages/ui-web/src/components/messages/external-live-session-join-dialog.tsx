@@ -61,7 +61,7 @@ export function ExternalLiveSessionJoinDialog({
 
   return (
     <Dialog open={Boolean(target)} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg space-y-4">
+      <DialogContent className="space-y-4 sm:max-w-[48rem]">
         <DialogHeader>
           <DialogTitle>Session ready to join</DialogTitle>
           <DialogDescription>
