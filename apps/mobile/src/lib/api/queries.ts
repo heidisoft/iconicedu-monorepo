@@ -1246,6 +1246,12 @@ export async function fetchSpaceChannelMetaByChannelId(channelId: string): Promi
   iconKey: string | null;
   themeKey: string | null;
   description: string | null;
+  liveSession: {
+    enabled: boolean;
+    provider: 'daily' | 'zoom' | 'jitsi' | 'custom';
+    mode: 'video' | 'audio' | null;
+    joinUrl: string | null;
+  } | null;
   studentProfiles: Array<{ name: string; themeKey?: string | null }>;
 } | null> {
   if (!channelId) return null;
@@ -1262,7 +1268,7 @@ export async function fetchSpaceChannelMetaByChannelId(channelId: string): Promi
         description,
         deleted_at
       ),
-      channel:channels!channel_id(ui_theme_key)
+      channel:channels!channel_id(ui_theme_key, live_session_config)
     `,
     )
     .eq('channel_id', channelId)
@@ -1283,7 +1289,10 @@ export async function fetchSpaceChannelMetaByChannelId(channelId: string): Promi
       }
     | null
     | undefined;
-  const channel = data?.channel as { ui_theme_key: string | null } | null | undefined;
+  const channel = data?.channel as
+    | { ui_theme_key: string | null; live_session_config?: unknown }
+    | null
+    | undefined;
 
   if (!space || space.deleted_at) return null;
 
@@ -1314,12 +1323,45 @@ export async function fetchSpaceChannelMetaByChannelId(channelId: string): Promi
     }
   }
 
+  const liveSessionConfig = (() => {
+    const value = channel?.live_session_config;
+    if (!value || typeof value !== 'object') return null;
+    const candidate = value as Record<string, unknown>;
+    if (candidate.enabled !== true || typeof candidate.provider !== 'string') {
+      return null;
+    }
+    if (
+      candidate.provider !== 'daily' &&
+      candidate.provider !== 'zoom' &&
+      candidate.provider !== 'jitsi' &&
+      candidate.provider !== 'custom'
+    ) {
+      return null;
+    }
+    const mode =
+      candidate.mode === 'video' || candidate.mode === 'audio'
+        ? (candidate.mode as 'video' | 'audio')
+        : null;
+    const joinUrl =
+      typeof candidate.joinUrl === 'string' && candidate.joinUrl.trim().length > 0
+        ? candidate.joinUrl.trim()
+        : null;
+    const provider = candidate.provider as 'daily' | 'zoom' | 'jitsi' | 'custom';
+    return {
+      enabled: true,
+      provider,
+      mode,
+      joinUrl,
+    };
+  })();
+
   return {
     title: space.title ?? null,
     subtitle: space.subject ?? null,
     iconKey: space.icon_key ?? null,
     themeKey: channel?.ui_theme_key ?? null,
     description: space.description ?? null,
+    liveSession: liveSessionConfig,
     studentProfiles,
   };
 }

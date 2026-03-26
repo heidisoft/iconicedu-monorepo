@@ -129,6 +129,9 @@ export default function SpaceDetailScreen() {
   const resolvedStudentProfiles = spaceMeta?.studentProfiles ?? [];
   const resolvedIconKey = spaceMeta?.iconKey ?? iconKey ?? null;
   const resolvedThemeKey = spaceMeta?.themeKey ?? themeKey ?? null;
+  const resolvedLiveJoinUrl =
+    spaceMeta?.liveSession?.joinUrl ??
+    (spaceMeta?.liveSession?.enabled ? (liveSession?.meetingLink ?? null) : null);
 
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: colors.pageBg }]} edges={['top']}>
@@ -142,7 +145,7 @@ export default function SpaceDetailScreen() {
         loading={isLoadingMeta && !spaceMeta && !topic}
         onBack={() => router.back()}
         onMore={() => setInfoVisible(true)}
-        liveJoinUrl={liveSession?.meetingLink ?? null}
+        liveJoinUrl={resolvedLiveJoinUrl}
       />
 
       {/* Tab bar: Messages | Sessions */}

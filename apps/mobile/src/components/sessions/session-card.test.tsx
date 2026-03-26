@@ -1,5 +1,5 @@
 import React from 'react';
-import { Linking } from 'react-native';
+import { Linking, Share } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { SessionCard, type ClassSession } from './session-card';
 
@@ -23,6 +23,7 @@ jest.mock('@/providers/theme-provider', () => ({
 
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
 jest.spyOn(Linking, 'openURL').mockImplementation(mockOpenURL);
+jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' } as never);
 
 const baseSession: ClassSession = {
   id: 'test-1',
@@ -86,16 +87,31 @@ describe('SessionCard', () => {
     expect(screen.queryByText('Join Now')).toBeNull();
   });
 
-  it('opens the meeting link from the join button', () => {
+  it('shows the external join dialog from the join button', () => {
     render(
-      <SessionCard
-        session={{ ...baseSession, meetingLink: 'https://meet.example.com/abc' }}
-      />,
+      <SessionCard session={{ ...baseSession, meetingLink: 'https://zoom.us/j/abc' }} />,
     );
 
     fireEvent.press(screen.getByLabelText('Join session'));
 
-    expect(mockOpenURL).toHaveBeenCalledWith('https://meet.example.com/abc');
+    expect(screen.getByText('Session ready to join')).toBeTruthy();
+    expect(screen.getByText('https://zoom.us/j/abc')).toBeTruthy();
+    expect(screen.getByText('Share')).toBeTruthy();
+    expect(screen.getByText('Join Zoom')).toBeTruthy();
+    expect(screen.getByLabelText('Share join link')).toBeTruthy();
+    expect(screen.getByLabelText('Open Zoom')).toBeTruthy();
+    expect(screen.getByLabelText('Close join dialog')).toBeTruthy();
+    expect(mockOpenURL).not.toHaveBeenCalled();
+  });
+
+  it('opens internal meeting links directly from the join button', () => {
+    render(
+      <SessionCard session={{ ...baseSession, meetingLink: '/live-sessions/abc' }} />,
+    );
+
+    fireEvent.press(screen.getByLabelText('Join session'));
+
+    expect(mockOpenURL).toHaveBeenCalledWith('/live-sessions/abc');
   });
 
   it('falls back to the classroom sessions tab when no meeting link is present', () => {

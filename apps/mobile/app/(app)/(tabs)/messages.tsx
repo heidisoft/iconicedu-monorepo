@@ -943,6 +943,11 @@ export default function MessagesScreen() {
       const subtitle = isDm ? 'Direct Message' : (channel.description ?? '');
       const studentProfiles = !isDm ? JSON.stringify(channel.student_profiles ?? []) : '';
       const isLearningSpace = !isDm && !channel.is_support ? '1' : '0';
+      const pathname = isDm
+        ? '/(app)/dm/[channelId]'
+        : isLearningSpace === '1'
+          ? '/(app)/spaces/[channelId]'
+          : '/(app)/channel/[channelId]';
       return (
         <ChannelRow
           item={channel}
@@ -951,7 +956,7 @@ export default function MessagesScreen() {
           colors={colors}
           onPress={() => {
             router.push({
-              pathname: isDm ? '/(app)/dm/[channelId]' : '/(app)/channel/[channelId]',
+              pathname,
               params: {
                 channelId: channel.id,
                 topic: displayTitle,
