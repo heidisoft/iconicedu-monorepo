@@ -13,6 +13,7 @@ import {
 import { Video, Clock3, MessageSquare, Share2, X } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/providers/theme-provider';
+import { fetchSpaceChannelMetaByChannelId } from '@/lib/api/queries';
 import type { ClassScheduleVM } from '@iconicedu/shared-types';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -128,6 +129,20 @@ function resolveExternalJoinProviderLabel(joinHref?: string | null) {
   return null;
 }
 
+function resolveJoinHrefForMobile(joinHref: string): string {
+  if (isExternalJoinHref(joinHref)) {
+    return joinHref;
+  }
+
+  const apiBaseUrl = process.env.EXPO_PUBLIC_API_URL?.trim() || 'http://localhost:3000';
+
+  try {
+    return new URL(joinHref, apiBaseUrl).toString();
+  } catch {
+    return joinHref;
+  }
+}
+
 // ─── SessionCard ────────────────────────────────────────────────────────────────
 
 const hairline = StyleSheet.hairlineWidth;
@@ -138,12 +153,14 @@ export function SessionCard({
   showJoinButton = true,
   joinEnabled = true,
   pressTarget = 'sessions',
+  enableCardPress = true,
 }: {
   session: ClassSession;
   style?: ViewStyle;
   showJoinButton?: boolean;
   joinEnabled?: boolean;
   pressTarget?: 'sessions' | 'messages';
+  enableCardPress?: boolean;
 }) {
   const { colors } = useTheme();
   const router = useRouter();
@@ -151,6 +168,7 @@ export function SessionCard({
     joinHref: string;
     providerLabel: string | null;
   } | null>(null);
+  const [isResolvingJoin, setIsResolvingJoin] = useState(false);
 
   const { isLive, isPast } = session;
   const isDisabled = session.disabled;
@@ -170,13 +188,14 @@ export function SessionCard({
   const cardBorderWidth = isLive ? 1.5 : hairline;
   const cardBg = isLive ? colors.tealBg : isPast ? colors.inputBg : colors.card;
 
-  const handlePress = session.channelId
-    ? () =>
-        router.push({
-          pathname: '/(app)/spaces/[channelId]',
-          params: { channelId: session.channelId!, tab: pressTarget },
-        } as never)
-    : undefined;
+  const handlePress =
+    session.channelId && enableCardPress
+      ? () =>
+          router.push({
+            pathname: '/(app)/spaces/[channelId]',
+            params: { channelId: session.channelId!, tab: pressTarget },
+          } as never)
+      : undefined;
   const handleOpenChat = session.channelId
     ? () =>
         router.push({
@@ -185,7 +204,7 @@ export function SessionCard({
         } as never)
     : undefined;
   const handleOpenJoinHref = useCallback((joinHref: string) => {
-    void Linking.openURL(joinHref);
+    void Linking.openURL(resolveJoinHrefForMobile(joinHref));
   }, []);
   const handleShareJoinHref = useCallback(async () => {
     if (!externalJoinTarget?.joinHref) return;
@@ -200,7 +219,11 @@ export function SessionCard({
   }, [externalJoinTarget?.joinHref]);
   const handleJoin =
     !isPast && !isDisabled
-      ? () => {
+      ? async () => {
+          if (isResolvingJoin) {
+            return;
+          }
+
           if (session.meetingLink) {
             if (isExternalJoinHref(session.meetingLink)) {
               setExternalJoinTarget({
@@ -212,7 +235,33 @@ export function SessionCard({
             handleOpenJoinHref(session.meetingLink);
             return;
           }
+
           if (session.channelId) {
+            setIsResolvingJoin(true);
+            try {
+              const channelMeta = await fetchSpaceChannelMetaByChannelId(
+                session.channelId,
+              );
+              const joinHref = channelMeta?.liveSession?.joinUrl?.trim() || null;
+
+              if (joinHref) {
+                if (isExternalJoinHref(joinHref)) {
+                  setExternalJoinTarget({
+                    joinHref,
+                    providerLabel: resolveExternalJoinProviderLabel(joinHref),
+                  });
+                  return;
+                }
+
+                handleOpenJoinHref(joinHref);
+                return;
+              }
+            } catch {
+              // Best effort join resolution. Fall back to the classroom if the lookup fails.
+            } finally {
+              setIsResolvingJoin(false);
+            }
+
             router.push({
               pathname: '/(app)/spaces/[channelId]',
               params: { channelId: session.channelId, tab: 'sessions' },
@@ -222,7 +271,7 @@ export function SessionCard({
       : undefined;
   const canJoin =
     !isPast && !isDisabled && (!!session.meetingLink || !!session.channelId);
-  const joinIsActive = canJoin && joinEnabled;
+  const joinIsActive = canJoin && joinEnabled && !isResolvingJoin;
   const canChat = !!session.channelId;
 
   return (
@@ -241,7 +290,7 @@ export function SessionCard({
         accessibilityRole="button"
         accessibilityLabel="Open session details"
         onPress={handlePress}
-        disabled={!session.channelId}
+        disabled={!session.channelId || !enableCardPress}
         activeOpacity={0.75}
       >
         {/* Day badge */}

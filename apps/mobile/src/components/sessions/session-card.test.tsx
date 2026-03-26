@@ -5,6 +5,7 @@ import { SessionCard, type ClassSession } from './session-card';
 
 const mockPush = jest.fn();
 const mockOpenURL = jest.fn();
+const mockFetchSpaceChannelMetaByChannelId = jest.fn();
 
 jest.mock('@/providers/theme-provider', () => ({
   useTheme: () => ({
@@ -22,6 +23,10 @@ jest.mock('@/providers/theme-provider', () => ({
 }));
 
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
+jest.mock('@/lib/api/queries', () => ({
+  fetchSpaceChannelMetaByChannelId: (...args: unknown[]) =>
+    mockFetchSpaceChannelMetaByChannelId(...args),
+}));
 jest.spyOn(Linking, 'openURL').mockImplementation(mockOpenURL);
 jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' } as never);
 
@@ -47,6 +52,7 @@ describe('SessionCard', () => {
   beforeEach(() => {
     mockPush.mockClear();
     mockOpenURL.mockClear();
+    mockFetchSpaceChannelMetaByChannelId.mockReset();
   });
 
   it('renders without crashing', () => {
@@ -111,14 +117,57 @@ describe('SessionCard', () => {
 
     fireEvent.press(screen.getByLabelText('Join session'));
 
-    expect(mockOpenURL).toHaveBeenCalledWith('/live-sessions/abc');
+    expect(mockOpenURL).toHaveBeenCalledWith('http://localhost:3000/live-sessions/abc');
   });
 
-  it('falls back to the classroom sessions tab when no meeting link is present', () => {
+  it('shows the external join dialog from channel live session config', async () => {
+    mockFetchSpaceChannelMetaByChannelId.mockResolvedValue({
+      liveSession: {
+        enabled: true,
+        provider: 'zoom',
+        mode: 'video',
+        joinUrl: 'https://zoom.us/j/from-channel',
+      },
+    });
+
     render(<SessionCard session={baseSession} />);
 
     fireEvent.press(screen.getByLabelText('Join session'));
 
+    expect(await screen.findByText('https://zoom.us/j/from-channel')).toBeTruthy();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('opens internal channel join urls directly from the join button', async () => {
+    mockFetchSpaceChannelMetaByChannelId.mockResolvedValue({
+      liveSession: {
+        enabled: true,
+        provider: 'daily',
+        mode: 'video',
+        joinUrl: '/acme/live-sessions/abc',
+      },
+    });
+
+    render(<SessionCard session={baseSession} />);
+
+    fireEvent.press(screen.getByLabelText('Join session'));
+
+    await screen.findByText('Mar · Week 2');
+    expect(mockOpenURL).toHaveBeenCalledWith(
+      'http://localhost:3000/acme/live-sessions/abc',
+    );
+  });
+
+  it('falls back to the classroom sessions tab when no meeting link is present', async () => {
+    mockFetchSpaceChannelMetaByChannelId.mockResolvedValue({
+      liveSession: null,
+    });
+
+    render(<SessionCard session={baseSession} />);
+
+    fireEvent.press(screen.getByLabelText('Join session'));
+
+    expect(await screen.findByText('Mar · Week 2')).toBeTruthy();
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/spaces/[channelId]',
       params: { channelId: 'channel-1', tab: 'sessions' },
@@ -160,6 +209,14 @@ describe('SessionCard', () => {
       pathname: '/(app)/spaces/[channelId]',
       params: { channelId: 'channel-1', tab: 'messages' },
     });
+  });
+
+  it('does not navigate from the card when card press is disabled', () => {
+    render(<SessionCard session={baseSession} enableCardPress={false} />);
+
+    fireEvent.press(screen.getByLabelText('Open session details'));
+
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it('shows student names next to the time', () => {

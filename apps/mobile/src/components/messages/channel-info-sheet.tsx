@@ -29,7 +29,12 @@ import {
 } from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
-import type { MessageVM, TextMessageVM, UserProfileVM } from '@iconicedu/shared-types';
+import type {
+  ChannelUiTabKeyVM,
+  MessageVM,
+  TextMessageVM,
+  UserProfileVM,
+} from '@iconicedu/shared-types';
 import { LearningSpaceIconBadge } from '@/lib/learning-space-icons';
 import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
 import { useAccount } from '@/hooks/use-account';
@@ -218,6 +223,10 @@ function extractMembers(
 
 type ChannelTab = 'files' | 'saved' | 'members';
 
+type ParsedMobileChannelUiDefaults = {
+  disabledTabs: ChannelUiTabKeyVM[];
+};
+
 export type ChannelInfoSheetProps = {
   visible: boolean;
   channelId?: string;
@@ -247,6 +256,36 @@ const TABS: Array<{ key: ChannelTab; label: string }> = [
   { key: 'saved', label: 'Saved' },
   { key: 'members', label: 'Members' },
 ];
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function parseChannelUiDefaults(value: unknown): ParsedMobileChannelUiDefaults {
+  if (!isRecord(value)) {
+    return { disabledTabs: [] };
+  }
+
+  const disabledTabs = Array.isArray(value.disabledTabs)
+    ? value.disabledTabs.filter(
+        (tab): tab is ChannelUiTabKeyVM =>
+          tab === 'messages' ||
+          tab === 'files' ||
+          tab === 'schedule' ||
+          tab === 'saved' ||
+          tab === 'members',
+      )
+    : [];
+
+  return {
+    disabledTabs: Array.from(new Set(disabledTabs)),
+  };
+}
+
+export function getVisibleChannelInfoTabs(input?: ParsedMobileChannelUiDefaults | null) {
+  const disabledTabs = new Set(input?.disabledTabs ?? []);
+  return TABS.filter((tab) => !disabledTabs.has(tab.key));
+}
 
 // ─── Tab icon renderer ─────────────────────────────────────────────────────────
 
@@ -908,6 +947,8 @@ export function ChannelInfoSheet({
 
   const [activeTab, setActiveTab] = useState<ChannelTab>('files');
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [channelUiDefaults, setChannelUiDefaults] =
+    useState<ParsedMobileChannelUiDefaults | null>(null);
 
   // translateY: 0 = full screen top, SCREEN_HEIGHT - PARTIAL_HEIGHT = partial, SCREEN_HEIGHT = hidden
   const sheetTranslateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
@@ -921,6 +962,10 @@ export function ChannelInfoSheet({
   const iconTheme = !isDm
     ? themeAvatarColor(themeKey, colors.inputBg, colors.text)
     : { bg: colors.inputBg, fg: colors.text };
+  const visibleTabs = useMemo(
+    () => (isDm ? [] : getVisibleChannelInfoTabs(channelUiDefaults)),
+    [channelUiDefaults, isDm],
+  );
 
   // ── Files: fetch directly from channel_files + channel_media tables ─────────
   // Messages are paginated (last ~40), so we can't extract files from them reliably.
@@ -1042,6 +1087,32 @@ export function ChannelInfoSheet({
     })();
   }, [visible, channelId]);
 
+  useEffect(() => {
+    if (!visible || !channelId || isDm) {
+      setChannelUiDefaults(null);
+      return;
+    }
+
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('channels')
+          .select('ui_defaults')
+          .eq('id', channelId)
+          .is('deleted_at', null)
+          .maybeSingle();
+
+        if (error) {
+          throw error;
+        }
+
+        setChannelUiDefaults(parseChannelUiDefaults(data?.ui_defaults));
+      } catch {
+        setChannelUiDefaults({ disabledTabs: [] });
+      }
+    })();
+  }, [channelId, isDm, visible]);
+
   // Derived data for saved/members tabs (from messages prop)
   const savedItems = useMemo(() => extractSaved(messages), [messages]);
   const memberItems = useMemo(
@@ -1054,7 +1125,7 @@ export function ChannelInfoSheet({
     if (visible) {
       isFullScreenRef.current = false;
       setIsFullScreen(false);
-      setActiveTab('files');
+      setActiveTab(visibleTabs[0]?.key ?? 'files');
       sheetTranslateY.setValue(SCREEN_HEIGHT);
       Animated.spring(sheetTranslateY, {
         toValue: SCREEN_HEIGHT - PARTIAL_HEIGHT,
@@ -1063,7 +1134,17 @@ export function ChannelInfoSheet({
         friction: 12,
       }).start();
     }
-  }, [visible, sheetTranslateY]);
+  }, [sheetTranslateY, visible, visibleTabs]);
+
+  useEffect(() => {
+    if (!visibleTabs.length) {
+      return;
+    }
+
+    if (!visibleTabs.some((tab) => tab.key === activeTab)) {
+      setActiveTab(visibleTabs[0]!.key);
+    }
+  }, [activeTab, visibleTabs]);
 
   // ── Internal close (animate out then notify parent) ─────────────────────────
   const handleClose = useCallback(() => {
@@ -1347,42 +1428,54 @@ export function ChannelInfoSheet({
             </View>
 
             {/* Fixed tab bar */}
-            <View style={s.tabBar}>
-              {TABS.map((tab) => {
-                const isActive = activeTab === tab.key;
-                const tabColor = isActive ? colors.teal : colors.textMuted;
-                return (
-                  <TouchableOpacity
-                    key={tab.key}
-                    style={[s.tabItem, isActive && s.tabItemActive]}
-                    onPress={() => setActiveTab(tab.key)}
-                    activeOpacity={0.7}
-                  >
-                    <TabIcon tabKey={tab.key} color={tabColor} />
-                    <Text style={[s.tabLabel, isActive && s.tabLabelActive]}>
-                      {tab.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+            {visibleTabs.length > 1 ? (
+              <View style={s.tabBar}>
+                {visibleTabs.map((tab) => {
+                  const isActive = activeTab === tab.key;
+                  const tabColor = isActive ? colors.teal : colors.textMuted;
+                  return (
+                    <TouchableOpacity
+                      key={tab.key}
+                      style={[s.tabItem, isActive && s.tabItemActive]}
+                      onPress={() => setActiveTab(tab.key)}
+                      activeOpacity={0.7}
+                    >
+                      <TabIcon tabKey={tab.key} color={tabColor} />
+                      <Text style={[s.tabLabel, isActive && s.tabLabelActive]}>
+                        {tab.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ) : null}
 
             {/* Tab content — flex: 1 so it fills remaining space */}
             <View style={{ flex: 1 }}>
-              <TabContent
-                activeTab={activeTab}
-                fileItems={fileItems}
-                filesLoading={filesLoading}
-                membersLoading={membersLoading}
-                savedItems={savedItems}
-                memberItems={memberItems}
-                colors={colors}
-                s={s}
-                memberCount={memberCount}
-                isFullScreen={isFullScreen}
-                currentProfileId={currentProfileId}
-                onMemberMessage={handleMemberMessage}
-              />
+              {visibleTabs.length > 0 ? (
+                <TabContent
+                  activeTab={activeTab}
+                  fileItems={fileItems}
+                  filesLoading={filesLoading}
+                  membersLoading={membersLoading}
+                  savedItems={savedItems}
+                  memberItems={memberItems}
+                  colors={colors}
+                  s={s}
+                  memberCount={memberCount}
+                  isFullScreen={isFullScreen}
+                  currentProfileId={currentProfileId}
+                  onMemberMessage={handleMemberMessage}
+                />
+              ) : (
+                <EmptyTabState
+                  icon={<FileText size={22} color={colors.textMuted} />}
+                  title="Nothing to show"
+                  description="This panel is hidden by the channel settings."
+                  colors={colors}
+                  s={s}
+                />
+              )}
             </View>
 
             {/* Partial overlay — swipe down closes, tap expands */}
@@ -1398,3 +1491,8 @@ export function ChannelInfoSheet({
     </Modal>
   );
 }
+
+export const __test__ = {
+  getVisibleChannelInfoTabs,
+  parseChannelUiDefaults,
+};

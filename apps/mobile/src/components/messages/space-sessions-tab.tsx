@@ -550,6 +550,7 @@ export function SpaceSessionsTab({
                       key={session.id}
                       session={session}
                       style={s.sessionCardItem}
+                      enableCardPress={false}
                       joinEnabled={
                         activeSubTab !== 'upcoming'
                           ? false
