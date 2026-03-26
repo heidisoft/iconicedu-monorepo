@@ -31,11 +31,11 @@ describe('marketing components', () => {
   });
 
   it('renders dashboard cta when user is authenticated', () => {
-    render(<MarketingHeader isAuthenticated />);
+    render(<MarketingHeader isAuthenticated dashboardHref="/acme" />);
 
     expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute(
       'href',
-      '/get-started',
+      '/acme',
     );
   });
 
