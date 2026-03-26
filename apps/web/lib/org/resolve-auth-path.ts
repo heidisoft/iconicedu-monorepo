@@ -5,7 +5,7 @@ import { resolveOrgDashboardPath } from '@iconicedu/web/lib/org/resolve-dashboar
 
 export async function resolveDefaultOrgLoginPath(
   supabase: SupabaseClient,
-  fallbackPath = '/get-started',
+  fallbackPath = '/i',
 ): Promise<string> {
   const defaultOrgResponse = await getDefaultOrg(supabase);
   if (defaultOrgResponse.data?.slug) {

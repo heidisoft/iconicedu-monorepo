@@ -28,6 +28,11 @@ describe('resolveDefaultOrgLoginPath', () => {
     mockGetDefaultOrg.mockResolvedValueOnce({ data: null });
     await expect(resolveDefaultOrgLoginPath({} as never, '/')).resolves.toBe('/');
   });
+
+  it('defaults to the /i entry path when no org exists', async () => {
+    mockGetDefaultOrg.mockResolvedValueOnce({ data: null });
+    await expect(resolveDefaultOrgLoginPath({} as never)).resolves.toBe('/i');
+  });
 });
 
 describe('resolveOrgLoginPath', () => {
