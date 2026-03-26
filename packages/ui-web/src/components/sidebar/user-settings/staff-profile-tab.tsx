@@ -40,12 +40,6 @@ const createDefaultAvailability = (): DayAvailability => {
   }, {} as DayAvailability);
 };
 
-const formatHourLabel = (hour: number) => {
-  const period = hour >= 12 ? 'PM' : 'AM';
-  const displayHour = hour % 12 === 0 ? 12 : hour % 12;
-  return `${displayHour.toString().padStart(2, '0')}:00 ${period}`;
-};
-
 type StaffProfileTabProps = {
   staffProfile: StaffProfileVM;
   isStaffOnboarding?: boolean;

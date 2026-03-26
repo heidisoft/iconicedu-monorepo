@@ -265,7 +265,7 @@ export function isInRolloverProposalWindow(
   now: Date,
   policy: AcademicYearPolicy,
 ): boolean {
-  const { start, end } = academicYearStartEndDates(now, policy);
+  const { end } = academicYearStartEndDates(now, policy);
   const endMs = end.getTime();
   const nowMs = now.getTime();
   const msPerDay = 24 * 60 * 60 * 1000;

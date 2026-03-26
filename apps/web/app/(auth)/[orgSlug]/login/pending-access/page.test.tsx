@@ -1,5 +1,3 @@
-import React from 'react';
-
 import PendingAccessPage, {
   metadata,
 } from '@iconicedu/web/app/(auth)/[orgSlug]/login/pending-access/page';
