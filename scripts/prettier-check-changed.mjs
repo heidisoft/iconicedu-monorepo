@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { existsSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
 const SUPPORTED_EXTENSIONS = new Set([
@@ -69,7 +70,8 @@ const files = diff.stdout
   .split('\n')
   .map((line) => line.trim())
   .filter((line) => line.length > 0)
-  .filter(isSupported);
+  .filter(isSupported)
+  .filter((file) => existsSync(file));
 
 if (files.length === 0) {
   console.log('No changed files matched Prettier-supported extensions.');
