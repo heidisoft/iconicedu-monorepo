@@ -193,7 +193,7 @@ describe('DashboardHomeInfographicSection', () => {
     );
 
     expect(screen.getByText('Today')).toBeInTheDocument();
-    expect(screen.getByText('This week')).toBeInTheDocument();
+    expect(screen.getAllByText('This week').length).toBeGreaterThan(1);
     expect(screen.queryByText('Next week')).not.toBeInTheDocument();
     expect(screen.getByText('Math 101')).toBeInTheDocument();
     expect(screen.getByText('ELA 201')).toBeInTheDocument();
@@ -326,6 +326,7 @@ describe('DashboardHomeInfographicSection', () => {
           activeSubjectsLabel: 'Math, Science',
         }}
         upcomingSessionsPage={{
+          today: { items: [], total: 0, pageSize: 3, totalPages: 1 },
           thisWeek: { items: [], total: 0, pageSize: 3, totalPages: 1 },
           nextWeek: { items: [], total: 0, pageSize: 3, totalPages: 1 },
         }}
@@ -352,6 +353,7 @@ describe('DashboardHomeInfographicSection', () => {
           activeSubjectsLabel: 'No active subjects yet',
         }}
         upcomingSessionsPage={{
+          today: { items: [], total: 0, pageSize: 3, totalPages: 1 },
           thisWeek: { items: [], total: 0, pageSize: 3, totalPages: 1 },
           nextWeek: { items: [], total: 0, pageSize: 3, totalPages: 1 },
         }}
@@ -378,6 +380,7 @@ describe('DashboardHomeInfographicSection', () => {
           activeSubjectsLabel: 'Math, Science',
         }}
         upcomingSessionsPage={{
+          today: { items: [], total: 0, pageSize: 3, totalPages: 1 },
           thisWeek: { items: [], total: 0, pageSize: 3, totalPages: 1 },
           nextWeek: { items: [], total: 0, pageSize: 3, totalPages: 1 },
         }}
@@ -419,6 +422,7 @@ describe('DashboardHomeInfographicSection', () => {
           activeSubjectsLabel: 'Math, Science',
         }}
         upcomingSessionsPage={{
+          today: { items: [], total: 0, pageSize: 3, totalPages: 1 },
           thisWeek: { items: [], total: 0, pageSize: 3, totalPages: 1 },
           nextWeek: { items: [], total: 0, pageSize: 3, totalPages: 1 },
         }}
@@ -471,6 +475,7 @@ describe('DashboardHomeInfographicSection', () => {
           activeSubjectsLabel: 'Math, Science',
         }}
         upcomingSessionsPage={{
+          today: { items: [], total: 0, pageSize: 3, totalPages: 1 },
           thisWeek: { items: [], total: 0, pageSize: 3, totalPages: 1 },
           nextWeek: { items: [], total: 0, pageSize: 3, totalPages: 1 },
         }}

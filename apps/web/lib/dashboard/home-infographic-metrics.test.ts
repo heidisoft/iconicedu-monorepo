@@ -455,10 +455,10 @@ describe('buildDashboardHomeInfographicMetrics', () => {
       } as never,
     });
 
-    expect(result.upcomingSessionsPage.today.items[0]?.session.time).toContain(
+    expect(result.upcomingSessionsPage.thisWeek.items[0]?.session.time).toContain(
       'Sat 1:30am Sri Lanka time',
     );
-    expect(result.upcomingSessionsPage.today.items[0]?.session.time).not.toContain(
+    expect(result.upcomingSessionsPage.thisWeek.items[0]?.session.time).not.toContain(
       '4:00pm New York time',
     );
   });
