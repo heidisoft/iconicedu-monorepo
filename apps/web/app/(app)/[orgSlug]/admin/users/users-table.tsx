@@ -40,6 +40,10 @@ import {
 import { toast } from '@iconicedu/ui-web';
 import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import {
+  getAvatarLocationLabel,
+  getAvatarRoleLabel,
+} from '@iconicedu/ui-web/components/shared/avatar-with-status';
+import {
   Briefcase,
   Copy,
   ChevronRight,
@@ -69,7 +73,7 @@ import type {
 
 export type UserRow = AdminUserRow;
 
-type SortKey = 'name' | 'status' | 'joined';
+type SortKey = 'name' | 'status' | 'updated' | 'lastSeen';
 
 type UsersTableProps = {
   rows: AdminUserRow[];
@@ -120,6 +124,20 @@ const ROLE_STATUS_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'blocked', label: 'Blocked' },
 ];
 
+function compareNullableDate(left?: string | null, right?: string | null): number {
+  if (!left && !right) {
+    return 0;
+  }
+  if (!left) {
+    return 1;
+  }
+  if (!right) {
+    return -1;
+  }
+
+  return left.localeCompare(right);
+}
+
 function getUserDisplayName(row: AdminUserRow): string {
   const firstName = row.firstName?.trim() ?? '';
   const lastName = row.lastName?.trim() ?? '';
@@ -168,8 +186,8 @@ export function UsersTable({ rows }: UsersTableProps) {
 
   const [search, setSearch] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState<'all' | string>('all');
-  const [sortKey, setSortKey] = React.useState<SortKey>('name');
-  const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('asc');
+  const [sortKey, setSortKey] = React.useState<SortKey>('updated');
+  const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('desc');
   const [pageIndex, setPageIndex] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(PAGE_SIZES[0]);
 
@@ -212,8 +230,10 @@ export function UsersTable({ rows }: UsersTableProps) {
         compare = collator.compare(getUserDisplayName(a), getUserDisplayName(b));
       } else if (sortKey === 'status') {
         compare = collator.compare(a.status, b.status);
+      } else if (sortKey === 'lastSeen') {
+        compare = compareNullableDate(a.lastSeenAt, b.lastSeenAt);
       } else {
-        compare = collator.compare(a.createdAt ?? '', b.createdAt ?? '');
+        compare = compareNullableDate(a.updatedAt, b.updatedAt);
       }
       return sortDirection === 'asc' ? compare : -compare;
     });
@@ -234,7 +254,7 @@ export function UsersTable({ rows }: UsersTableProps) {
       return;
     }
     setSortKey(key);
-    setSortDirection('asc');
+    setSortDirection(key === 'name' || key === 'status' ? 'asc' : 'desc');
   };
 
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
@@ -489,8 +509,13 @@ export function UsersTable({ rows }: UsersTableProps) {
               }}
               themeKey={resolveThemeKey(row.themeKey)}
               email={row.email ?? null}
-              roleLabel={row.profileKind ?? null}
+              roleLabel={getAvatarRoleLabel(row.profileKind ?? null)}
               timezone={row.timezone ?? null}
+              locationLabel={getAvatarLocationLabel({
+                city: null,
+                region: null,
+                countryName: row.countryName ?? null,
+              })}
               showStatus={false}
               sizeClassName="size-8"
               initialsLength={1}
@@ -544,15 +569,15 @@ export function UsersTable({ rows }: UsersTableProps) {
           </Badge>
         </TableCell>
         <TableCell>
-          {row.createdAt ? (
-            <p className="text-sm">{new Date(row.createdAt).toLocaleDateString()}</p>
+          {row.updatedAt ? (
+            <p className="text-sm">{new Date(row.updatedAt).toLocaleDateString()}</p>
           ) : (
             <span className="text-sm text-muted-foreground">—</span>
           )}
         </TableCell>
         <TableCell>
-          {row.lastSignInAt ? (
-            <p className="text-sm">{new Date(row.lastSignInAt).toLocaleDateString()}</p>
+          {row.lastSeenAt ? (
+            <p className="text-sm">{new Date(row.lastSeenAt).toLocaleDateString()}</p>
           ) : (
             <span className="text-sm text-muted-foreground">n/a</span>
           )}
@@ -651,8 +676,13 @@ export function UsersTable({ rows }: UsersTableProps) {
                         }}
                         themeKey={resolveThemeKey(child.themeKey)}
                         email={child.email ?? null}
-                        roleLabel={child.profileKind ?? null}
+                        roleLabel={getAvatarRoleLabel(child.profileKind ?? null)}
                         timezone={child.timezone ?? null}
+                        locationLabel={getAvatarLocationLabel({
+                          city: null,
+                          region: null,
+                          countryName: child.countryName ?? null,
+                        })}
                         showStatus={false}
                         sizeClassName="size-8"
                         initialsLength={1}
@@ -843,12 +873,20 @@ export function UsersTable({ rows }: UsersTableProps) {
                 <button
                   type="button"
                   className="flex items-center"
-                  onClick={() => handleSort('joined')}
+                  onClick={() => handleSort('updated')}
                 >
-                  Joined {renderSortIndicator('joined')}
+                  Updated {renderSortIndicator('updated')}
                 </button>
               </TableHead>
-              <TableHead>Last seen</TableHead>
+              <TableHead>
+                <button
+                  type="button"
+                  className="flex items-center"
+                  onClick={() => handleSort('lastSeen')}
+                >
+                  Last seen {renderSortIndicator('lastSeen')}
+                </button>
+              </TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>

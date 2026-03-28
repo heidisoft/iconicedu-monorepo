@@ -39,6 +39,7 @@ import {
 } from '@iconicedu/ui-web';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@iconicedu/ui-web/ui/tooltip';
 import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
+import { getAvatarRoleLabel } from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import { getLearningSpaceIcon } from '@iconicedu/ui-web/lib/icons';
 import type { ThemeKey } from '@iconicedu/shared-types';
 
@@ -204,6 +205,7 @@ export function LearningSpacesTable({ rows, onEdit }: LearningSpacesTableProps) 
                                           null
                                         }
                                         showStatus={false}
+                                        roleLabel={getAvatarRoleLabel(participant.kind)}
                                         sizeClassName="size-5"
                                         initialsLength={1}
                                       />

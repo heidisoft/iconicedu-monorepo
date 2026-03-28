@@ -87,6 +87,7 @@ export function NavLearningSpaces({
           <SidebarGroupLabel className="flex cursor-pointer items-center gap-2 rounded-md rounded-b-none px-2 py-1 uppercase">
             <AvatarWithStatus
               name={getProfileDisplayName(participant.profile)}
+              avatar={participant.profile.avatar}
               showStatus={false}
               themeKey={participant.ui?.themeKey ?? null}
               sizeClassName="size-5"

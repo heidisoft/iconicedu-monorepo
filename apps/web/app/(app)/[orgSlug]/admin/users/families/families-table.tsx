@@ -7,7 +7,10 @@ import {
   TableHeader,
   TableRow,
 } from '@iconicedu/ui-web';
-import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
+import {
+  AvatarWithStatus,
+  getAvatarRoleLabel,
+} from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import type { AvatarSource, ThemeKey } from '@iconicedu/shared-types';
 
 import type { AdminFamilyRow } from '@iconicedu/web/lib/admin/families';
@@ -73,6 +76,7 @@ export function FamiliesTable({ rows }: FamiliesTableProps) {
                               }}
                               themeKey={resolveThemeKey(guardian.themeKey)}
                               showStatus={false}
+                              roleLabel={getAvatarRoleLabel('guardian')}
                               sizeClassName="size-7"
                               initialsLength={1}
                             />
@@ -107,6 +111,7 @@ export function FamiliesTable({ rows }: FamiliesTableProps) {
                             }}
                             themeKey={resolveThemeKey(child.themeKey)}
                             showStatus={false}
+                            roleLabel={getAvatarRoleLabel('child')}
                             sizeClassName="size-7"
                             initialsLength={1}
                           />

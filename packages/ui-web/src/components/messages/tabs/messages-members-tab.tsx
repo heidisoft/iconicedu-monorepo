@@ -1,7 +1,11 @@
 'use client';
 
 import type { UserProfileVM } from '@iconicedu/shared-types';
-import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
+import {
+  AvatarWithStatus,
+  getAvatarLocationLabel,
+  getAvatarRoleLabel,
+} from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
 import { resolveDashboardBasePathFromWindow } from '@iconicedu/ui-web/lib/dashboard-base-path';
 import { Button } from '@iconicedu/ui-web/ui/button';
@@ -27,35 +31,6 @@ export function canOpenMemberProfile(
   onProfileClick?: ((userId: string) => void) | undefined,
 ): boolean {
   return typeof onProfileClick === 'function';
-}
-
-function getRoleLabel(kind: UserProfileVM['kind']): string {
-  switch (kind) {
-    case 'educator':
-      return 'Educator';
-    case 'guardian':
-      return 'Parent';
-    case 'child':
-      return 'Student';
-    case 'staff':
-      return 'Staff';
-    case 'system':
-      return 'System';
-    default:
-      return 'Member';
-  }
-}
-
-function getLocationLabel(member: UserProfileVM): string | null {
-  const parts = [
-    member.location?.city,
-    member.location?.region,
-    member.location?.countryName,
-  ]
-    .map((value) => value?.trim() ?? '')
-    .filter(Boolean);
-
-  return parts.length ? parts.join(', ') : null;
 }
 
 export function MessagesMembersTab({
@@ -87,9 +62,9 @@ export function MessagesMembersTab({
                 presence={member.presence}
                 showStatus
                 themeKey={member.ui?.themeKey}
-                roleLabel={getRoleLabel(member.kind)}
+                roleLabel={getAvatarRoleLabel(member.kind)}
                 timezone={member.prefs.timezone ?? null}
-                locationLabel={getLocationLabel(member)}
+                locationLabel={getAvatarLocationLabel(member.location)}
                 about={member.profile.bio ?? null}
                 messageHref={dmTargetId ? `${dashboardBasePath}/dm/${dmTargetId}` : null}
                 sizeClassName="h-9 w-9"

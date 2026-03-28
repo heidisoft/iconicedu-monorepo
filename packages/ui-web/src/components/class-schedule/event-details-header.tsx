@@ -2,7 +2,10 @@ import type { ClassScheduleVM } from '@iconicedu/shared-types';
 import { CalendarDays } from 'lucide-react';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import { AvatarGroup, AvatarGroupCount } from '@iconicedu/ui-web/ui/avatar';
-import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
+import {
+  AvatarWithStatus,
+  getAvatarRoleLabel,
+} from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import {
   formatEventTimeForSchedule,
   getDisplayEventState,
@@ -77,6 +80,7 @@ export function EventDetailsHeader({ event }: EventDetailsHeaderProps) {
               avatar={{ source: 'external', url: participant.avatarUrl ?? '' }}
               themeKey={participant.themeKey ?? null}
               showStatus={false}
+              roleLabel={getAvatarRoleLabel(participant.role ?? null)}
               sizeClassName={cn('border-2 border-background')}
             />
           ))}

@@ -2,7 +2,11 @@
 
 import type { ReactNode } from 'react';
 import { useState, useCallback, memo } from 'react';
-import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
+import {
+  AvatarWithStatus,
+  getAvatarLocationLabel,
+  getAvatarRoleLabel,
+} from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import {
   Tooltip,
   TooltipContent,
@@ -231,7 +235,12 @@ export const MessageBase = memo(function MessageBase({
             <AvatarWithStatus
               name={senderName}
               avatar={message.core.sender.profile.avatar}
+              presence={message.core.sender.presence}
               themeKey={message.core.sender.ui?.themeKey}
+              roleLabel={getAvatarRoleLabel(message.core.sender.kind)}
+              timezone={message.core.sender.prefs.timezone ?? null}
+              locationLabel={getAvatarLocationLabel(message.core.sender.location)}
+              about={message.core.sender.profile.bio ?? null}
               sizeClassName="h-9 w-9"
               initialsLength={1}
             />
@@ -312,7 +321,12 @@ export const MessageBase = memo(function MessageBase({
           <AvatarWithStatus
             name={senderName}
             avatar={message.core.sender.profile.avatar}
+            presence={message.core.sender.presence}
             themeKey={message.core.sender.ui?.themeKey}
+            roleLabel={getAvatarRoleLabel(message.core.sender.kind)}
+            timezone={message.core.sender.prefs.timezone ?? null}
+            locationLabel={getAvatarLocationLabel(message.core.sender.location)}
+            about={message.core.sender.profile.bio ?? null}
             sizeClassName="h-9 w-9"
             initialsLength={1}
           />

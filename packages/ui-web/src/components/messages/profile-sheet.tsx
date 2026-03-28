@@ -17,7 +17,10 @@ import {
   MessageCircle,
   type LucideIcon,
 } from 'lucide-react';
-import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
+import {
+  AvatarWithStatus,
+  getAvatarLocationLabel,
+} from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
 import { Button } from '@iconicedu/ui-web/ui/button';
@@ -237,7 +240,11 @@ export function ProfileContent({
           avatar={user.profile.avatar}
           presence={user.presence}
           themeKey={user.ui?.themeKey}
-          showStatus={false}
+          roleLabel={roleLabel}
+          timezone={user.prefs.timezone ?? null}
+          locationLabel={getAvatarLocationLabel(user.location)}
+          about={user.profile.bio ?? null}
+          onMessageClick={onDmClick}
           sizeClassName="h-20 w-20"
           statusClassName="bottom-1 right-1 h-4 w-4"
           fallbackClassName="text-2xl"

@@ -6,12 +6,14 @@ const {
   getAccountsByOrgIdMock,
   getFamilyLinksByOrgMock,
   getProfileSummariesByAccountIdsMock,
+  getPresenceByProfileIdsMock,
 } = vi.hoisted(() => ({
   createSupabaseServiceClientMock: vi.fn(),
   requireAdminOrgContextMock: vi.fn(),
   getAccountsByOrgIdMock: vi.fn(),
   getFamilyLinksByOrgMock: vi.fn(),
   getProfileSummariesByAccountIdsMock: vi.fn(),
+  getPresenceByProfileIdsMock: vi.fn(),
 }));
 
 vi.mock('@iconicedu/web/lib/supabase/service', () => ({
@@ -32,6 +34,10 @@ vi.mock('@iconicedu/web/lib/family/queries/families.query', () => ({
 
 vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
   getProfileSummariesByAccountIds: getProfileSummariesByAccountIdsMock,
+}));
+
+vi.mock('@iconicedu/web/lib/profile/queries/presence.query', () => ({
+  getPresenceByProfileIds: getPresenceByProfileIdsMock,
 }));
 
 import { getAdminUserRows } from '@iconicedu/web/lib/admin/users';
@@ -98,6 +104,14 @@ describe('getAdminUserRows', () => {
         },
       ],
     });
+    getPresenceByProfileIdsMock.mockResolvedValue({
+      data: [
+        {
+          profile_id: 'profile-1',
+          last_seen_at: '2026-02-01T00:00:00.000Z',
+        },
+      ],
+    });
     getFamilyLinksByOrgMock.mockResolvedValue({
       data: [
         {
@@ -120,12 +134,17 @@ describe('getAdminUserRows', () => {
     expect(getProfileSummariesByAccountIdsMock).toHaveBeenCalledWith(supabase, 'org-1', [
       'account-1',
     ]);
+    expect(getPresenceByProfileIdsMock).toHaveBeenCalledWith(supabase, 'org-1', [
+      'profile-1',
+    ]);
     expect(getFamilyLinksByOrgMock).toHaveBeenCalledWith(supabase, 'org-1');
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       id: 'account-1',
       orgId: 'org-1',
       email: 'person@example.com',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      lastSeenAt: '2026-02-01T00:00:00.000Z',
       profileKind: 'guardian',
       displayName: 'Jamie M',
       countryName: 'United States',
@@ -133,5 +152,48 @@ describe('getAdminUserRows', () => {
       linkedChildAccountIds: ['account-child-1'],
       linkedGuardianAccountIds: [],
     });
+  });
+
+  it('returns rows ordered by most recently updated first', async () => {
+    const supabase = {};
+    requireAdminOrgContextMock.mockResolvedValue({
+      ok: true,
+      orgId: 'org-1',
+      actorProfileId: 'profile-actor-1',
+    });
+    createSupabaseServiceClientMock.mockReturnValue(supabase);
+    getAccountsByOrgIdMock.mockResolvedValue({
+      data: [
+        {
+          id: 'account-older',
+          org_id: 'org-1',
+          email: 'older@example.com',
+          phone_e164: null,
+          status: 'active',
+          created_at: '2026-01-01T00:00:00.000Z',
+          updated_at: '2026-01-05T00:00:00.000Z',
+        },
+        {
+          id: 'account-newer',
+          org_id: 'org-1',
+          email: 'newer@example.com',
+          phone_e164: null,
+          status: 'active',
+          created_at: '2026-01-02T00:00:00.000Z',
+          updated_at: '2026-01-10T00:00:00.000Z',
+        },
+      ],
+    });
+    getProfileSummariesByAccountIdsMock.mockResolvedValue({ data: [] });
+    getPresenceByProfileIdsMock.mockResolvedValue({ data: [] });
+    getFamilyLinksByOrgMock.mockResolvedValue({ data: [] });
+
+    const rows = await getAdminUserRows('org-1');
+
+    expect(rows.map((row) => row.id)).toEqual(['account-newer', 'account-older']);
+    expect(getProfileSummariesByAccountIdsMock).toHaveBeenCalledWith(supabase, 'org-1', [
+      'account-newer',
+      'account-older',
+    ]);
   });
 });

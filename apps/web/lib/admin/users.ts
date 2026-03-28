@@ -4,6 +4,7 @@ import { requireAdminOrgContext } from '@iconicedu/web/lib/admin/require-admin-o
 import { getAccountsByOrgId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { getFamilyLinksByOrg } from '@iconicedu/web/lib/family/queries/families.query';
 import { getProfileSummariesByAccountIds } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import { getPresenceByProfileIds } from '@iconicedu/web/lib/profile/queries/presence.query';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 
 export type AdminUserRow = {
@@ -13,7 +14,8 @@ export type AdminUserRow = {
   phone?: string | null;
   status: 'active' | 'invited' | 'archived' | string;
   createdAt: string;
-  lastSignInAt: string;
+  updatedAt: string;
+  lastSeenAt?: string | null;
   profileId?: string | null;
   displayName?: string | null;
   firstName?: string | null;
@@ -33,6 +35,7 @@ export type AdminUserRow = {
 function mapAccountToRow(
   account: AccountRow,
   profile?: ProfileRow | null,
+  presence?: { lastSeenAt?: string | null } | null,
   relationships?: {
     linkedChildAccountIds?: string[];
     linkedGuardianAccountIds?: string[];
@@ -59,7 +62,8 @@ function mapAccountToRow(
     phone: account.phone_e164 ?? null,
     status,
     createdAt: account.created_at,
-    lastSignInAt: account.updated_at,
+    updatedAt: account.updated_at,
+    lastSeenAt: presence?.lastSeenAt ?? null,
     profileId: profile?.id ?? null,
     displayName: profileName ?? account.email,
     firstName: profile?.first_name ?? null,
@@ -95,7 +99,7 @@ export async function getAdminUserRows(orgId: string): Promise<AdminUserRow[]> {
   }
 
   const sortedAccounts = [...accounts].sort((a, b) =>
-    b.created_at.localeCompare(a.created_at),
+    b.updated_at.localeCompare(a.updated_at),
   );
   const accountIds = sortedAccounts.map((account) => account.id);
   const { data: profiles } = await getProfileSummariesByAccountIds(
@@ -111,6 +115,20 @@ export async function getAdminUserRows(orgId: string): Promise<AdminUserRow[]> {
       return;
     }
     profileByAccountId.set(profile.account_id, profile);
+  });
+
+  const profileIds =
+    profiles
+      ?.map((profile) => profile.id)
+      .filter((profileId): profileId is string => Boolean(profileId)) ?? [];
+  const { data: presenceRows } = await getPresenceByProfileIds(
+    supabase,
+    orgId,
+    profileIds,
+  );
+  const lastSeenByProfileId = new Map<string, string | null>();
+  presenceRows?.forEach((presenceRow) => {
+    lastSeenByProfileId.set(presenceRow.profile_id, presenceRow.last_seen_at ?? null);
   });
 
   const linkedChildAccountIdsByGuardianId = new Map<string, Set<string>>();
@@ -129,14 +147,21 @@ export async function getAdminUserRows(orgId: string): Promise<AdminUserRow[]> {
     linkedGuardianAccountIdsByChildId.set(link.child_account_id, childGuardians);
   });
 
-  return sortedAccounts.map((account) =>
-    mapAccountToRow(account, profileByAccountId.get(account.id) ?? null, {
-      linkedChildAccountIds: Array.from(
-        linkedChildAccountIdsByGuardianId.get(account.id) ?? [],
-      ),
-      linkedGuardianAccountIds: Array.from(
-        linkedGuardianAccountIdsByChildId.get(account.id) ?? [],
-      ),
-    }),
-  );
+  return sortedAccounts.map((account) => {
+    const profile = profileByAccountId.get(account.id) ?? null;
+
+    return mapAccountToRow(
+      account,
+      profile,
+      profile?.id ? { lastSeenAt: lastSeenByProfileId.get(profile.id) ?? null } : null,
+      {
+        linkedChildAccountIds: Array.from(
+          linkedChildAccountIdsByGuardianId.get(account.id) ?? [],
+        ),
+        linkedGuardianAccountIds: Array.from(
+          linkedGuardianAccountIdsByChildId.get(account.id) ?? [],
+        ),
+      },
+    );
+  });
 }

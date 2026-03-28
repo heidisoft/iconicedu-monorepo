@@ -1,6 +1,10 @@
 'use client';
 
-import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
+import {
+  AvatarWithStatus,
+  getAvatarLocationLabel,
+  getAvatarRoleLabel,
+} from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import { AvatarGroup, AvatarGroupCount } from '@iconicedu/ui-web/ui/avatar';
 import type { ActivityFeedItemVM } from '@iconicedu/shared-types';
@@ -63,8 +67,12 @@ export function ActivityBadge({ activity, className }: ActivityBadgeProps) {
     <AvatarWithStatus
       name={actorName}
       avatar={actorAvatar}
+      presence={actor.presence}
       themeKey={actor.ui?.themeKey}
-      showStatus={false}
+      roleLabel={getAvatarRoleLabel(actor.kind)}
+      timezone={actor.prefs.timezone ?? null}
+      locationLabel={getAvatarLocationLabel(actor.location)}
+      about={actor.profile.bio ?? null}
       sizeClassName={cn(ACTIVITY_AVATAR_SIZE_CLASS, 'shrink-0', className)}
       fallbackClassName="text-[10px]"
       fallbackText={initials}

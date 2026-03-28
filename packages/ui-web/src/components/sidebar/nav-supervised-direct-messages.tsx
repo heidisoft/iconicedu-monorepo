@@ -4,7 +4,11 @@ import * as React from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 
 import type { ChannelVM, ChildProfileVM } from '@iconicedu/shared-types';
-import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
+import {
+  AvatarWithStatus,
+  getAvatarLocationLabel,
+  getAvatarRoleLabel,
+} from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
 import {
   Collapsible,
@@ -41,6 +45,7 @@ export function NavSupervisedDirectMessages({
           <SidebarGroupLabel className="flex cursor-pointer items-center gap-2 rounded-md rounded-b-none px-2 py-1 uppercase">
             <AvatarWithStatus
               name={getProfileDisplayName(child.profile)}
+              avatar={child.profile.avatar}
               showStatus={false}
               themeKey={child.ui?.themeKey ?? null}
               sizeClassName="size-5"
@@ -81,6 +86,10 @@ export function NavSupervisedDirectMessages({
                         avatar={otherParticipant?.profile.avatar}
                         presence={otherParticipant?.presence}
                         themeKey={otherParticipant?.ui?.themeKey}
+                        roleLabel={getAvatarRoleLabel(otherParticipant?.kind)}
+                        timezone={otherParticipant?.prefs.timezone ?? null}
+                        locationLabel={getAvatarLocationLabel(otherParticipant?.location)}
+                        about={otherParticipant?.profile.bio ?? null}
                         sizeClassName="size-7"
                         statusClassName="bottom-0 right-0 h-2 w-2 border border-background"
                         fallbackClassName="text-xs font-medium"

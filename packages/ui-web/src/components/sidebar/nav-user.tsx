@@ -18,7 +18,11 @@ import {
   Users,
 } from 'lucide-react';
 
-import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
+import {
+  AvatarWithStatus,
+  getAvatarLocationLabel,
+  getAvatarRoleLabel,
+} from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import type {
   ChildProfileSaveInput,
   ChildProfileVM,
@@ -84,35 +88,6 @@ import {
   STATUS_PRESETS,
   type StatusClearAfterOption,
 } from '@iconicedu/ui-web/components/sidebar/nav-user-status.utils';
-
-function getProfileRoleLabel(kind: UserProfileVM['kind']) {
-  switch (kind) {
-    case 'guardian':
-      return 'Parent';
-    case 'child':
-      return 'Student';
-    case 'educator':
-      return 'Educator';
-    case 'staff':
-      return 'Staff';
-    case 'system':
-      return 'System';
-    default:
-      return 'Member';
-  }
-}
-
-function getProfileLocationLabel(profile: UserProfileVM) {
-  const parts = [
-    profile.location?.city,
-    profile.location?.region,
-    profile.location?.countryName,
-  ]
-    .map((value) => value?.trim() ?? '')
-    .filter(Boolean);
-
-  return parts.length ? parts.join(', ') : null;
-}
 
 export function NavUser({
   profile,
@@ -258,8 +233,8 @@ export function NavUser({
   childHasAuthAccount?: boolean;
 }) {
   const profileDisplayName = getProfileFullName(profile.profile);
-  const profileRoleLabel = getProfileRoleLabel(profile.kind);
-  const profileLocationLabel = getProfileLocationLabel(profile);
+  const profileRoleLabel = getAvatarRoleLabel(profile.kind);
+  const profileLocationLabel = getAvatarLocationLabel(profile.location);
   const localeLabel =
     profile.prefs.locale === 'en-US' ? '' : (profile.prefs.locale ?? '');
   const fallbackSecondaryLabel = localeLabel || '';
@@ -479,7 +454,7 @@ export function NavUser({
                   timezone={profile.prefs.timezone ?? null}
                   locationLabel={profileLocationLabel}
                   about={profile.profile.bio ?? null}
-                  sizeClassName="h-8 w-8 rounded-full"
+                  sizeClassName="h-10 w-10 rounded-full"
                   fallbackClassName="rounded-full"
                   initialsLength={1}
                 />

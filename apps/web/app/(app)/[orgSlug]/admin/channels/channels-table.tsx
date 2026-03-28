@@ -36,6 +36,7 @@ import {
 import { getLearningSpaceIcon } from '@iconicedu/ui-web/lib/icons';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@iconicedu/ui-web/ui/tooltip';
 import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
+import { getAvatarRoleLabel } from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import type { ThemeKey } from '@iconicedu/shared-types';
 
 import type { AdminChannelRow } from '@iconicedu/web/lib/admin/channels';
@@ -226,6 +227,7 @@ export function ChannelsTable({ rows, onEdit }: ChannelsTableProps) {
                                     (participant.themeKey as ThemeKey | null) ?? null
                                   }
                                   showStatus={false}
+                                  roleLabel={getAvatarRoleLabel(participant.kind)}
                                   sizeClassName="size-8"
                                   initialsLength={1}
                                 />

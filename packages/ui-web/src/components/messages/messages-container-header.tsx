@@ -37,7 +37,11 @@ import {
   TooltipTrigger,
 } from '@iconicedu/ui-web/ui/tooltip';
 import { cn } from '@iconicedu/ui-web/lib/utils';
-import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
+import {
+  AvatarWithStatus,
+  getAvatarLocationLabel,
+  getAvatarRoleLabel,
+} from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
 import { ThemedIconBadge } from '@iconicedu/ui-web/components/shared/themed-icon';
 import type { ChannelVM, UserProfileVM } from '@iconicedu/shared-types';
@@ -272,6 +276,10 @@ export const MessagesContainerHeader = memo(function MessagesContainerHeader({
             avatar={otherParticipant.profile.avatar}
             presence={otherParticipant.presence}
             themeKey={otherParticipant.ui?.themeKey}
+            roleLabel={getAvatarRoleLabel(otherParticipant.kind)}
+            timezone={otherParticipant.prefs.timezone ?? null}
+            locationLabel={getAvatarLocationLabel(otherParticipant.location)}
+            about={otherParticipant.profile.bio ?? null}
             sizeClassName="h-8 w-8"
             initialsLength={1}
           />

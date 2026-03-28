@@ -19,7 +19,11 @@ import {
   useSidebar,
 } from '@iconicedu/ui-web/ui/sidebar';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
-import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
+import {
+  AvatarWithStatus,
+  getAvatarLocationLabel,
+  getAvatarRoleLabel,
+} from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import type { ChannelVM } from '@iconicedu/shared-types';
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
 import {
@@ -162,6 +166,10 @@ export function NavDirectMessages({
                     avatar={otherParticipant?.profile.avatar}
                     presence={otherParticipant?.presence}
                     themeKey={otherParticipant?.ui?.themeKey}
+                    roleLabel={getAvatarRoleLabel(otherParticipant?.kind)}
+                    timezone={otherParticipant?.prefs.timezone ?? null}
+                    locationLabel={getAvatarLocationLabel(otherParticipant?.location)}
+                    about={otherParticipant?.profile.bio ?? null}
                     sizeClassName="size-7"
                     statusClassName="bottom-0 right-0 h-2 w-2 border border-background"
                     fallbackClassName="text-xs font-medium"

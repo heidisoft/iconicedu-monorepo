@@ -17,3 +17,21 @@ export async function getPresence(
     .is('deleted_at', null)
     .maybeSingle<ProfilePresenceRow>();
 }
+
+export async function getPresenceByProfileIds(
+  supabase: SupabaseClient,
+  orgId: string,
+  profileIds: string[],
+) {
+  if (!profileIds.length) {
+    return { data: [] as ProfilePresenceRow[] };
+  }
+
+  return supabase
+    .from('profile_presence')
+    .select(PRESENCE_SELECT)
+    .in('profile_id', profileIds)
+    .eq('org_id', orgId)
+    .is('deleted_at', null)
+    .returns<ProfilePresenceRow[]>();
+}

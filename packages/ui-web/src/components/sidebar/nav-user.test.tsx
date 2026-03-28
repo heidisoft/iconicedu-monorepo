@@ -7,6 +7,8 @@ import { NavUser } from './nav-user';
 
 vi.mock('@iconicedu/ui-web/components/shared/avatar-with-status', () => ({
   AvatarWithStatus: () => <div data-testid="avatar">avatar</div>,
+  getAvatarRoleLabel: (kind: string | null | undefined) => kind ?? null,
+  getAvatarLocationLabel: () => null,
 }));
 
 vi.mock('@iconicedu/ui-web/ui/dropdown-menu', () => {

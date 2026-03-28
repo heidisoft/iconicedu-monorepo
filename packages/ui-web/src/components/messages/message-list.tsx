@@ -17,7 +17,11 @@ import {
   findLatestUnreadIncomingMessageId,
   findUnreadAnchorMessageId,
 } from '@iconicedu/ui-web/components/messages/unread-indicator.utils';
-import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
+import {
+  AvatarWithStatus,
+  getAvatarLocationLabel,
+  getAvatarRoleLabel,
+} from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import { Button } from '@iconicedu/ui-web/ui/button';
@@ -562,8 +566,14 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                 <AvatarWithStatus
                                   name={senderName}
                                   avatar={reply.core.sender.profile.avatar}
+                                  presence={reply.core.sender.presence}
                                   themeKey={reply.core.sender.ui?.themeKey}
-                                  showStatus={false}
+                                  roleLabel={getAvatarRoleLabel(reply.core.sender.kind)}
+                                  timezone={reply.core.sender.prefs.timezone ?? null}
+                                  locationLabel={getAvatarLocationLabel(
+                                    reply.core.sender.location,
+                                  )}
+                                  about={reply.core.sender.profile.bio ?? null}
                                   sizeClassName="h-8 w-8"
                                   fallbackClassName="text-xs"
                                   initialsLength={1}

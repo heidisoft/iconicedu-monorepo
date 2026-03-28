@@ -7,6 +7,8 @@ import type {
   PresenceDisplayStatusVM,
   PresenceVM,
   ThemeKey,
+  UserLocationVM,
+  UserProfileVM,
 } from '@iconicedu/shared-types';
 import { BriefcaseBusiness, Clock3, MapPin, MessageCircle } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@iconicedu/ui-web/ui/avatar';
@@ -66,6 +68,35 @@ const getInitials = (name?: string | null, maxLength = 1) =>
     .join('')
     .slice(0, Math.max(1, maxLength))
     .toUpperCase();
+
+export function getAvatarRoleLabel(kind?: UserProfileVM['kind'] | string | null) {
+  switch (kind) {
+    case 'guardian':
+      return 'Parent';
+    case 'child':
+      return 'Student';
+    case 'educator':
+      return 'Educator';
+    case 'staff':
+      return 'Staff';
+    case 'system':
+      return 'System';
+    case null:
+    case undefined:
+    case '':
+      return null;
+    default:
+      return kind;
+  }
+}
+
+export function getAvatarLocationLabel(location?: UserLocationVM | null) {
+  const parts = [location?.city, location?.region, location?.countryName]
+    .map((value) => value?.trim() ?? '')
+    .filter(Boolean);
+
+  return parts.length ? parts.join(', ') : null;
+}
 
 export function AvatarWithStatus({
   name,

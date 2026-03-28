@@ -1,7 +1,11 @@
 import { memo } from 'react';
 import { Calendar, Clock, MapPin, Video, Users } from 'lucide-react';
 import { Button } from '@iconicedu/ui-web/ui/button';
-import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
+import {
+  AvatarWithStatus,
+  getAvatarLocationLabel,
+  getAvatarRoleLabel,
+} from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import type { EventReminderMessageVM as EventReminderMessageType } from '@iconicedu/shared-types';
 import {
   MessageBase,
@@ -133,8 +137,12 @@ export const EventReminderMessage = memo(function EventReminderMessage(
                       key={attendee.ids.id}
                       name={attendeeName}
                       avatar={attendee.profile.avatar}
+                      presence={attendee.presence}
                       themeKey={attendee.ui?.themeKey}
-                      showStatus={false}
+                      roleLabel={getAvatarRoleLabel(attendee.kind)}
+                      timezone={attendee.prefs.timezone ?? null}
+                      locationLabel={getAvatarLocationLabel(attendee.location)}
+                      about={attendee.profile.bio ?? null}
                       sizeClassName="h-5 w-5 border-2 border-background"
                       fallbackClassName="text-[8px]"
                       initialsLength={1}
