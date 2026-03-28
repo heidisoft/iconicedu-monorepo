@@ -2,6 +2,7 @@ import type { AccountRow, ProfileRow } from '@iconicedu/shared-types';
 
 import { requireAdminOrgContext } from '@iconicedu/web/lib/admin/require-admin-org-context';
 import { getAccountsByOrgId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
+import { getFamilyLinksByOrg } from '@iconicedu/web/lib/family/queries/families.query';
 import { getProfileSummariesByAccountIds } from '@iconicedu/web/lib/profile/queries/profiles.query';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 
@@ -25,9 +26,18 @@ export type AdminUserRow = {
   timezone?: string | null;
   primaryRole?: AccountRow['primary_role'] | null;
   roleStatus?: AccountRow['role_status'] | null;
+  linkedChildAccountIds?: string[];
+  linkedGuardianAccountIds?: string[];
 };
 
-function mapAccountToRow(account: AccountRow, profile?: ProfileRow | null): AdminUserRow {
+function mapAccountToRow(
+  account: AccountRow,
+  profile?: ProfileRow | null,
+  relationships?: {
+    linkedChildAccountIds?: string[];
+    linkedGuardianAccountIds?: string[];
+  },
+): AdminUserRow {
   const normalizedStatus = account.status?.toLowerCase() ?? '';
   const status =
     normalizedStatus === 'deleted'
@@ -62,6 +72,8 @@ function mapAccountToRow(account: AccountRow, profile?: ProfileRow | null): Admi
     timezone: profile?.timezone ?? null,
     primaryRole: account.primary_role ?? null,
     roleStatus: account.role_status ?? null,
+    linkedChildAccountIds: relationships?.linkedChildAccountIds ?? [],
+    linkedGuardianAccountIds: relationships?.linkedGuardianAccountIds ?? [],
   };
 }
 
@@ -91,6 +103,7 @@ export async function getAdminUserRows(orgId: string): Promise<AdminUserRow[]> {
     orgId,
     accountIds,
   );
+  const { data: familyLinks } = await getFamilyLinksByOrg(supabase, orgId);
 
   const profileByAccountId = new Map<string, ProfileRow>();
   profiles?.forEach((profile) => {
@@ -100,7 +113,30 @@ export async function getAdminUserRows(orgId: string): Promise<AdminUserRow[]> {
     profileByAccountId.set(profile.account_id, profile);
   });
 
+  const linkedChildAccountIdsByGuardianId = new Map<string, Set<string>>();
+  const linkedGuardianAccountIdsByChildId = new Map<string, Set<string>>();
+
+  familyLinks?.forEach((link) => {
+    const guardianChildren =
+      linkedChildAccountIdsByGuardianId.get(link.guardian_account_id) ??
+      new Set<string>();
+    guardianChildren.add(link.child_account_id);
+    linkedChildAccountIdsByGuardianId.set(link.guardian_account_id, guardianChildren);
+
+    const childGuardians =
+      linkedGuardianAccountIdsByChildId.get(link.child_account_id) ?? new Set<string>();
+    childGuardians.add(link.guardian_account_id);
+    linkedGuardianAccountIdsByChildId.set(link.child_account_id, childGuardians);
+  });
+
   return sortedAccounts.map((account) =>
-    mapAccountToRow(account, profileByAccountId.get(account.id) ?? null),
+    mapAccountToRow(account, profileByAccountId.get(account.id) ?? null, {
+      linkedChildAccountIds: Array.from(
+        linkedChildAccountIdsByGuardianId.get(account.id) ?? [],
+      ),
+      linkedGuardianAccountIds: Array.from(
+        linkedGuardianAccountIdsByChildId.get(account.id) ?? [],
+      ),
+    }),
   );
 }

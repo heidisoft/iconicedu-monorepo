@@ -35,12 +35,14 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  AdminUserProfilePreviewDialog,
 } from '@iconicedu/ui-web';
 import { toast } from '@iconicedu/ui-web';
 import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import {
   Briefcase,
   Copy,
+  ChevronRight,
   GraduationCap,
   Shield,
   User,
@@ -53,16 +55,29 @@ import {
 } from '@iconicedu/ui-web';
 
 import { InviteUserDialog } from '@iconicedu/web/app/(app)/[orgSlug]/admin/users/invite-dialog';
-import { buildAdminUserDmPath } from '@iconicedu/web/app/(app)/[orgSlug]/admin/users/users-table.utils';
+import {
+  buildAdminUserDmPath,
+  groupUsersByFamily,
+} from '@iconicedu/web/app/(app)/[orgSlug]/admin/users/users-table.utils';
 import type { AdminUserRow } from '@iconicedu/web/lib/admin/users';
-import type { AvatarSource, ThemeKey } from '@iconicedu/shared-types';
+import type {
+  AvatarSource,
+  ThemeKey,
+  UserAccountVM,
+  UserProfileVM,
+} from '@iconicedu/shared-types';
 
 export type UserRow = AdminUserRow;
 
-type SortKey = 'name' | 'email' | 'status' | 'joined';
+type SortKey = 'name' | 'status' | 'joined';
 
 type UsersTableProps = {
   rows: AdminUserRow[];
+};
+
+type AdminUserProfilePreviewPayload = {
+  account: UserAccountVM | null;
+  profile: UserProfileVM | null;
 };
 
 type BadgeVariant =
@@ -105,6 +120,18 @@ const ROLE_STATUS_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'blocked', label: 'Blocked' },
 ];
 
+function getUserDisplayName(row: AdminUserRow): string {
+  const firstName = row.firstName?.trim() ?? '';
+  const lastName = row.lastName?.trim() ?? '';
+  const fullName = [firstName, lastName].filter(Boolean).join(' ').trim();
+
+  if (fullName) {
+    return fullName;
+  }
+
+  return row.displayName?.trim() || row.email || 'Unnamed';
+}
+
 export function UsersTable({ rows }: UsersTableProps) {
   const router = useRouter();
   const params = useParams<{ orgSlug?: string | string[] }>();
@@ -124,6 +151,13 @@ export function UsersTable({ rows }: UsersTableProps) {
     roleStatus: 'unassigned',
   });
   const [editSaving, setEditSaving] = React.useState(false);
+  const [expandedParentIds, setExpandedParentIds] = React.useState<string[]>([]);
+  const [previewOpen, setPreviewOpen] = React.useState(false);
+  const [previewLoading, setPreviewLoading] = React.useState(false);
+  const [previewError, setPreviewError] = React.useState<string | null>(null);
+  const [previewPayload, setPreviewPayload] =
+    React.useState<AdminUserProfilePreviewPayload | null>(null);
+  const [previewUser, setPreviewUser] = React.useState<UserRow | null>(null);
   const refreshing = isPending;
 
   const handleRefresh = () => {
@@ -153,7 +187,7 @@ export function UsersTable({ rows }: UsersTableProps) {
       if (!normalizedSearch) {
         return true;
       }
-      const title = (row.displayName ?? row.email ?? row.profileKind ?? '').toLowerCase();
+      const title = getUserDisplayName(row).toLowerCase();
       if (title.includes(normalizedSearch)) {
         return true;
       }
@@ -175,9 +209,7 @@ export function UsersTable({ rows }: UsersTableProps) {
     return [...filteredRows].sort((a, b) => {
       let compare = 0;
       if (sortKey === 'name') {
-        compare = collator.compare(a.displayName ?? '', b.displayName ?? '');
-      } else if (sortKey === 'email') {
-        compare = collator.compare(a.email ?? '', b.email ?? '');
+        compare = collator.compare(getUserDisplayName(a), getUserDisplayName(b));
       } else if (sortKey === 'status') {
         compare = collator.compare(a.status, b.status);
       } else {
@@ -187,9 +219,14 @@ export function UsersTable({ rows }: UsersTableProps) {
     });
   }, [filteredRows, sortDirection, sortKey]);
 
-  const totalRows = sortedRows.length;
+  const groupedRows = React.useMemo(() => groupUsersByFamily(sortedRows), [sortedRows]);
+
+  const totalRows = groupedRows.length;
   const pageCount = Math.max(1, Math.ceil(totalRows / pageSize));
-  const visibleRows = sortedRows.slice((pageIndex - 1) * pageSize, pageIndex * pageSize);
+  const visibleGroups = groupedRows.slice(
+    (pageIndex - 1) * pageSize,
+    pageIndex * pageSize,
+  );
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -232,6 +269,38 @@ export function UsersTable({ rows }: UsersTableProps) {
       return;
     }
     router.push(buildAdminUserDmPath(orgSlug, row.profileId));
+  };
+
+  const handleOpenProfilePreview = async (row: UserRow) => {
+    setPreviewOpen(true);
+    setPreviewUser(row);
+    setPreviewLoading(true);
+    setPreviewError(null);
+    setPreviewPayload(null);
+
+    try {
+      const params = new URLSearchParams({ accountId: row.id });
+      const response = await fetch(
+        `/api/admin/users/profile-preview?${params.toString()}`,
+      );
+      const result = (await response.json()) as {
+        success?: boolean;
+        message?: string;
+        payload?: AdminUserProfilePreviewPayload;
+      };
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message ?? 'Unable to load profile preview');
+      }
+
+      setPreviewPayload(result.payload ?? null);
+    } catch (error) {
+      setPreviewError(
+        error instanceof Error ? error.message : 'Unable to load profile preview',
+      );
+    } finally {
+      setPreviewLoading(false);
+    }
   };
 
   const handleEditSave = async () => {
@@ -368,6 +437,327 @@ export function UsersTable({ rows }: UsersTableProps) {
     }
   };
 
+  const toggleExpandedParent = (parentId: string) => {
+    setExpandedParentIds((current) =>
+      current.includes(parentId)
+        ? current.filter((id) => id !== parentId)
+        : [...current, parentId],
+    );
+  };
+
+  const renderUserRow = (
+    row: UserRow,
+    options?: { childrenCount?: number; expanded?: boolean },
+  ) => {
+    const displayName = getUserDisplayName(row);
+    const Icon =
+      PROFILE_ICON_MAP[row.profileKind ?? 'default'] ?? PROFILE_ICON_MAP.default;
+    const childrenCount = options?.childrenCount ?? 0;
+    const expanded = options?.expanded ?? false;
+    const isExpandable = childrenCount > 0;
+
+    return (
+      <TableRow key={row.id} data-deleting={deletingId === row.id ? 'true' : 'false'}>
+        <TableCell>
+          <div className="flex items-center gap-3">
+            {isExpandable ? (
+              <button
+                type="button"
+                onClick={() => toggleExpandedParent(row.id)}
+                className="flex size-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted"
+                aria-label={
+                  expanded ? 'Collapse child accounts' : 'Expand child accounts'
+                }
+                aria-expanded={expanded}
+              >
+                <ChevronRight
+                  className={`size-4 transition-transform ${expanded ? 'rotate-90' : ''}`}
+                />
+              </button>
+            ) : (
+              <div className="size-7 shrink-0" aria-hidden="true" />
+            )}
+            <AvatarWithStatus
+              name={displayName}
+              avatar={{
+                source: resolveAvatarSource(row.avatarSource),
+                url: row.avatarUrl ?? null,
+                seed:
+                  resolveAvatarSource(row.avatarSource) === 'seed'
+                    ? (row.email ?? undefined)
+                    : undefined,
+              }}
+              themeKey={resolveThemeKey(row.themeKey)}
+              showStatus={false}
+              sizeClassName="size-8"
+              initialsLength={1}
+            />
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="text-left text-sm font-semibold capitalize underline-offset-4 hover:underline"
+                  onClick={() => void handleOpenProfilePreview(row)}
+                >
+                  {displayName}
+                </button>
+                {isExpandable ? (
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] uppercase tracking-wide"
+                  >
+                    {childrenCount} child{childrenCount === 1 ? '' : 'ren'}
+                  </Badge>
+                ) : null}
+              </div>
+              {row.email ? (
+                <p className="text-xs text-muted-foreground">{row.email}</p>
+              ) : null}
+              {row.phone ? (
+                <p className="text-xs text-muted-foreground">{row.phone}</p>
+              ) : null}
+              {!row.email && !row.phone ? (
+                <p className="text-xs text-muted-foreground">—</p>
+              ) : null}
+            </div>
+          </div>
+        </TableCell>
+        <TableCell>
+          <div className="inline-flex items-center gap-2 text-sm capitalize">
+            <Icon className="size-4 text-muted-foreground" aria-hidden />
+            {row.profileKind ?? 'account'}
+          </div>
+        </TableCell>
+        <TableCell>
+          <p className="text-sm">{row.countryName ?? '—'}</p>
+          <p className="text-xs text-muted-foreground">{row.timezone ?? '—'}</p>
+        </TableCell>
+        <TableCell>
+          <Badge
+            variant={STATUS_BADGE_VARIANTS[row.status] ?? 'ghost'}
+            className="text-xs capitalize"
+          >
+            {row.status}
+          </Badge>
+        </TableCell>
+        <TableCell>
+          {row.createdAt ? (
+            <p className="text-sm">{new Date(row.createdAt).toLocaleDateString()}</p>
+          ) : (
+            <span className="text-sm text-muted-foreground">—</span>
+          )}
+        </TableCell>
+        <TableCell>
+          {row.lastSignInAt ? (
+            <p className="text-sm">{new Date(row.lastSignInAt).toLocaleDateString()}</p>
+          ) : (
+            <span className="text-sm text-muted-foreground">n/a</span>
+          )}
+        </TableCell>
+        <TableCell>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="px-2"
+                aria-label={`Actions for ${displayName}`}
+                disabled={deletingId === row.id}
+              >
+                <MoreHorizontal className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={() => openEditDialog(row)}
+                disabled={Boolean(rowActionLoading) || deletingId === row.id}
+              >
+                <User className="size-3 mr-2" /> Edit profile
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => handleStartDirectMessage(row)}
+                disabled={
+                  Boolean(rowActionLoading) || deletingId === row.id || !row.profileId
+                }
+              >
+                <MessageCircle className="size-3 mr-2" /> Send message
+              </DropdownMenuItem>
+              {row.status === 'invited' && (
+                <DropdownMenuItem
+                  onClick={() => handleRowInviteAction(row, 'invite')}
+                  disabled={Boolean(rowActionLoading) || deletingId === row.id}
+                >
+                  <Copy className="size-3 mr-2" /> Resend invite
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem
+                onClick={() => handleRowInviteAction(row, 'link')}
+                disabled={Boolean(rowActionLoading) || deletingId === row.id}
+              >
+                <Copy className="size-3 mr-2" /> Generate a login link
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => openDeleteDialog(row)}
+                disabled={deletingId === row.id}
+              >
+                <Trash2 className="size-3 mr-2" />
+                {deletingId === row.id ? 'Deleting…' : 'Delete'}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </TableCell>
+      </TableRow>
+    );
+  };
+
+  const renderChildPanelRow = (parent: UserRow, children: UserRow[]) => {
+    return (
+      <TableRow key={`${parent.id}:children`} className="bg-muted/20">
+        <TableCell colSpan={7} className="py-0">
+          <div className="ml-10 mr-3 my-3 rounded-xl border border-border/60 bg-background p-3">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium">Linked child accounts</p>
+                <p className="text-xs text-muted-foreground">
+                  Accounts connected to {getUserDisplayName(parent)}.
+                </p>
+              </div>
+              <Badge variant="secondary">{children.length}</Badge>
+            </div>
+            <div className="space-y-2">
+              {children.map((child) => {
+                const displayName = getUserDisplayName(child);
+                const Icon =
+                  PROFILE_ICON_MAP[child.profileKind ?? 'default'] ??
+                  PROFILE_ICON_MAP.default;
+                return (
+                  <div
+                    key={`${parent.id}:${child.id}`}
+                    className="flex flex-col gap-3 rounded-lg border border-border/60 bg-card px-3 py-3 md:flex-row md:items-center md:justify-between"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <AvatarWithStatus
+                        name={displayName}
+                        avatar={{
+                          source: resolveAvatarSource(child.avatarSource),
+                          url: child.avatarUrl ?? null,
+                          seed:
+                            resolveAvatarSource(child.avatarSource) === 'seed'
+                              ? (child.email ?? undefined)
+                              : undefined,
+                        }}
+                        themeKey={resolveThemeKey(child.themeKey)}
+                        showStatus={false}
+                        sizeClassName="size-8"
+                        initialsLength={1}
+                      />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            className="text-left text-sm font-semibold capitalize underline-offset-4 hover:underline"
+                            onClick={() => void handleOpenProfilePreview(child)}
+                          >
+                            {displayName}
+                          </button>
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] uppercase tracking-wide"
+                          >
+                            Child
+                          </Badge>
+                        </div>
+                        {child.email ? (
+                          <p className="text-xs text-muted-foreground">{child.email}</p>
+                        ) : null}
+                        {child.phone ? (
+                          <p className="text-xs text-muted-foreground">{child.phone}</p>
+                        ) : null}
+                        {!child.email && !child.phone ? (
+                          <p className="text-xs text-muted-foreground">—</p>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3 md:justify-end">
+                      <div className="inline-flex items-center gap-2 text-sm capitalize">
+                        <Icon className="size-4 text-muted-foreground" aria-hidden />
+                        {child.profileKind ?? 'account'}
+                      </div>
+                      <Badge
+                        variant={STATUS_BADGE_VARIANTS[child.status] ?? 'ghost'}
+                        className="text-xs capitalize"
+                      >
+                        {child.status}
+                      </Badge>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="px-2"
+                            aria-label={`Actions for ${displayName}`}
+                            disabled={deletingId === child.id}
+                          >
+                            <MoreHorizontal className="size-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => openEditDialog(child)}
+                            disabled={
+                              Boolean(rowActionLoading) || deletingId === child.id
+                            }
+                          >
+                            <User className="size-3 mr-2" /> Edit profile
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleStartDirectMessage(child)}
+                            disabled={
+                              Boolean(rowActionLoading) ||
+                              deletingId === child.id ||
+                              !child.profileId
+                            }
+                          >
+                            <MessageCircle className="size-3 mr-2" /> Send message
+                          </DropdownMenuItem>
+                          {child.status === 'invited' && (
+                            <DropdownMenuItem
+                              onClick={() => handleRowInviteAction(child, 'invite')}
+                              disabled={
+                                Boolean(rowActionLoading) || deletingId === child.id
+                              }
+                            >
+                              <Copy className="size-3 mr-2" /> Resend invite
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem
+                            onClick={() => handleRowInviteAction(child, 'link')}
+                            disabled={
+                              Boolean(rowActionLoading) || deletingId === child.id
+                            }
+                          >
+                            <Copy className="size-3 mr-2" /> Generate a login link
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => openDeleteDialog(child)}
+                            disabled={deletingId === child.id}
+                          >
+                            <Trash2 className="size-3 mr-2" />
+                            {deletingId === child.id ? 'Deleting…' : 'Delete'}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </TableCell>
+      </TableRow>
+    );
+  };
+
   return (
     <div className="w-full space-y-4 rounded-2xl border border-border bg-card p-4">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -432,15 +822,6 @@ export function UsersTable({ rows }: UsersTableProps) {
                   Name {renderSortIndicator('name')}
                 </button>
               </TableHead>
-              <TableHead>
-                <button
-                  type="button"
-                  className="flex items-center"
-                  onClick={() => handleSort('email')}
-                >
-                  Email {renderSortIndicator('email')}
-                </button>
-              </TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Country / timezone</TableHead>
               <TableHead>
@@ -466,137 +847,17 @@ export function UsersTable({ rows }: UsersTableProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {visibleRows.map((row) => {
-              const displayName = row.displayName || row.email || 'Unnamed';
-              const Icon =
-                PROFILE_ICON_MAP[row.profileKind ?? 'default'] ??
-                PROFILE_ICON_MAP.default;
-              return (
-                <TableRow
-                  key={row.id}
-                  data-deleting={deletingId === row.id ? 'true' : 'false'}
-                >
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <AvatarWithStatus
-                        name={displayName}
-                        avatar={{
-                          source: resolveAvatarSource(row.avatarSource),
-                          url: row.avatarUrl ?? null,
-                          seed:
-                            resolveAvatarSource(row.avatarSource) === 'seed'
-                              ? (row.email ?? undefined)
-                              : undefined,
-                        }}
-                        themeKey={resolveThemeKey(row.themeKey)}
-                        showStatus={false}
-                        sizeClassName="size-8"
-                        initialsLength={1}
-                      />
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold capitalize">{displayName}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {row.phone ?? row.email ?? '—'}
-                        </p>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <p className="text-sm">{row.email ?? '—'}</p>
-                    <p className="text-xs text-muted-foreground">{row.phone ?? '—'}</p>
-                  </TableCell>
-                  <TableCell>
-                    <div className="inline-flex items-center gap-2 text-sm capitalize">
-                      <Icon className="size-4 text-muted-foreground" aria-hidden />
-                      {row.profileKind ?? 'account'}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <p className="text-sm">{row.countryName ?? '—'}</p>
-                    <p className="text-xs text-muted-foreground">{row.timezone ?? '—'}</p>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={STATUS_BADGE_VARIANTS[row.status] ?? 'ghost'}
-                      className="text-xs capitalize"
-                    >
-                      {row.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {row.createdAt ? (
-                      <p className="text-sm">
-                        {new Date(row.createdAt).toLocaleDateString()}
-                      </p>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {row.lastSignInAt ? (
-                      <p className="text-sm">
-                        {new Date(row.lastSignInAt).toLocaleDateString()}
-                      </p>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">n/a</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="px-2"
-                          aria-label={`Actions for ${displayName}`}
-                          disabled={deletingId === row.id}
-                        >
-                          <MoreHorizontal className="size-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => openEditDialog(row)}
-                          disabled={Boolean(rowActionLoading) || deletingId === row.id}
-                        >
-                          <User className="size-3 mr-2" /> Edit profile
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleStartDirectMessage(row)}
-                          disabled={
-                            Boolean(rowActionLoading) ||
-                            deletingId === row.id ||
-                            !row.profileId
-                          }
-                        >
-                          <MessageCircle className="size-3 mr-2" /> Send message
-                        </DropdownMenuItem>
-                        {row.status === 'invited' && (
-                          <DropdownMenuItem
-                            onClick={() => handleRowInviteAction(row, 'invite')}
-                            disabled={Boolean(rowActionLoading) || deletingId === row.id}
-                          >
-                            <Copy className="size-3 mr-2" /> Resend invite
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuItem
-                          onClick={() => handleRowInviteAction(row, 'link')}
-                          disabled={Boolean(rowActionLoading) || deletingId === row.id}
-                        >
-                          <Copy className="size-3 mr-2" /> Generate a login link
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => openDeleteDialog(row)}
-                          disabled={deletingId === row.id}
-                        >
-                          <Trash2 className="size-3 mr-2" />
-                          {deletingId === row.id ? 'Deleting…' : 'Delete'}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              );
+            {visibleGroups.flatMap((group) => {
+              const expanded = expandedParentIds.includes(group.row.id);
+              return [
+                renderUserRow(group.row, {
+                  childrenCount: group.children.length,
+                  expanded,
+                }),
+                ...(expanded && group.children.length
+                  ? [renderChildPanelRow(group.row, group.children)]
+                  : []),
+              ];
             })}
           </TableBody>
         </Table>
@@ -718,6 +979,25 @@ export function UsersTable({ rows }: UsersTableProps) {
           </div>
         </DialogContent>
       </Dialog>
+      <AdminUserProfilePreviewDialog
+        open={previewOpen}
+        onOpenChange={(open) => {
+          setPreviewOpen(open);
+          if (!open) {
+            setPreviewUser(null);
+            setPreviewPayload(null);
+            setPreviewError(null);
+            setPreviewLoading(false);
+          }
+        }}
+        account={previewPayload?.account ?? null}
+        profile={previewPayload?.profile ?? null}
+        isLoading={previewLoading}
+        error={previewError}
+        onDmClick={
+          previewUser?.profileId ? () => handleStartDirectMessage(previewUser) : undefined
+        }
+      />
       <Dialog
         open={Boolean(editUser)}
         onOpenChange={(open) => {

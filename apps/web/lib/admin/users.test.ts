@@ -4,11 +4,13 @@ const {
   createSupabaseServiceClientMock,
   requireAdminOrgContextMock,
   getAccountsByOrgIdMock,
+  getFamilyLinksByOrgMock,
   getProfileSummariesByAccountIdsMock,
 } = vi.hoisted(() => ({
   createSupabaseServiceClientMock: vi.fn(),
   requireAdminOrgContextMock: vi.fn(),
   getAccountsByOrgIdMock: vi.fn(),
+  getFamilyLinksByOrgMock: vi.fn(),
   getProfileSummariesByAccountIdsMock: vi.fn(),
 }));
 
@@ -22,6 +24,10 @@ vi.mock('@iconicedu/web/lib/admin/require-admin-org-context', () => ({
 
 vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
   getAccountsByOrgId: getAccountsByOrgIdMock,
+}));
+
+vi.mock('@iconicedu/web/lib/family/queries/families.query', () => ({
+  getFamilyLinksByOrg: getFamilyLinksByOrgMock,
 }));
 
 vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
@@ -92,6 +98,18 @@ describe('getAdminUserRows', () => {
         },
       ],
     });
+    getFamilyLinksByOrgMock.mockResolvedValue({
+      data: [
+        {
+          id: 'family-link-1',
+          org_id: 'org-1',
+          family_id: 'family-1',
+          guardian_account_id: 'account-1',
+          child_account_id: 'account-child-1',
+          relation: 'parent',
+        },
+      ],
+    });
 
     const rows = await getAdminUserRows('org-1');
 
@@ -102,6 +120,7 @@ describe('getAdminUserRows', () => {
     expect(getProfileSummariesByAccountIdsMock).toHaveBeenCalledWith(supabase, 'org-1', [
       'account-1',
     ]);
+    expect(getFamilyLinksByOrgMock).toHaveBeenCalledWith(supabase, 'org-1');
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       id: 'account-1',
@@ -111,6 +130,8 @@ describe('getAdminUserRows', () => {
       displayName: 'Jamie M',
       countryName: 'United States',
       timezone: 'America/New_York',
+      linkedChildAccountIds: ['account-child-1'],
+      linkedGuardianAccountIds: [],
     });
   });
 });
