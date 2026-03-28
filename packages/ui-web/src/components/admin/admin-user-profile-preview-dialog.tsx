@@ -184,6 +184,8 @@ export function AdminUserProfilePreviewDialog({
               <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div className="flex min-w-0 items-center gap-4">
                   <AvatarWithStatus
+                    accountId={profile?.ids.accountId ?? account?.ids.id ?? null}
+                    profileId={profile?.ids.id ?? null}
                     name={previewTitle}
                     avatar={
                       profile?.profile.avatar ?? { source: 'seed', seed: previewTitle }
@@ -193,8 +195,7 @@ export function AdminUserProfilePreviewDialog({
                     email={account?.contacts.email ?? null}
                     roleLabel={roleLabel}
                     timezone={profile?.prefs?.timezone ?? null}
-                    enableProfilePreview={false}
-                    showStatus={false}
+                    onMessageClick={onDmClick ?? undefined}
                     sizeClassName="size-14"
                     initialsLength={2}
                   />

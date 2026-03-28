@@ -564,6 +564,8 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                               )}
                               <div className="flex w-full items-start gap-3">
                                 <AvatarWithStatus
+                                  accountId={reply.core.sender.ids.accountId}
+                                  profileId={reply.core.sender.ids.id}
                                   name={senderName}
                                   avatar={reply.core.sender.profile.avatar}
                                   presence={reply.core.sender.presence}
@@ -576,7 +578,6 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                   about={reply.core.sender.profile.bio ?? null}
                                   sizeClassName="h-8 w-8"
                                   fallbackClassName="text-xs"
-                                  initialsLength={1}
                                 />
                                 <div className="min-w-0">
                                   <div className="flex items-center gap-2">

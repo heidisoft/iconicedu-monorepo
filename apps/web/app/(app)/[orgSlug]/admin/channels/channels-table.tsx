@@ -218,6 +218,7 @@ export function ChannelsTable({ rows, onEdit }: ChannelsTableProps) {
                             <TooltipTrigger asChild>
                               <span className="inline-flex">
                                 <AvatarWithStatus
+                                  profileId={participant.id}
                                   name={participant.displayName}
                                   avatar={{
                                     source: participant.avatarUrl ? 'upload' : 'seed',
@@ -226,10 +227,8 @@ export function ChannelsTable({ rows, onEdit }: ChannelsTableProps) {
                                   themeKey={
                                     (participant.themeKey as ThemeKey | null) ?? null
                                   }
-                                  showStatus={false}
                                   roleLabel={getAvatarRoleLabel(participant.kind)}
                                   sizeClassName="size-8"
-                                  initialsLength={1}
                                 />
                               </span>
                             </TooltipTrigger>

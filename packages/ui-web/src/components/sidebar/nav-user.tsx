@@ -18,11 +18,7 @@ import {
   Users,
 } from 'lucide-react';
 
-import {
-  AvatarWithStatus,
-  getAvatarLocationLabel,
-  getAvatarRoleLabel,
-} from '@iconicedu/ui-web/components/shared/avatar-with-status';
+import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import type {
   ChildProfileSaveInput,
   ChildProfileVM,
@@ -233,8 +229,6 @@ export function NavUser({
   childHasAuthAccount?: boolean;
 }) {
   const profileDisplayName = getProfileFullName(profile.profile);
-  const profileRoleLabel = getAvatarRoleLabel(profile.kind);
-  const profileLocationLabel = getAvatarLocationLabel(profile.location);
   const localeLabel =
     profile.prefs.locale === 'en-US' ? '' : (profile.prefs.locale ?? '');
   const fallbackSecondaryLabel = localeLabel || '';
@@ -416,13 +410,8 @@ export function NavUser({
                 presence={profile.presence}
                 themeKey={profile.ui?.themeKey}
                 enableProfilePreview={false}
-                roleLabel={profileRoleLabel}
-                timezone={profile.prefs?.timezone ?? null}
-                locationLabel={profileLocationLabel}
-                about={profile.profile.bio ?? null}
                 sizeClassName="h-8 w-8 rounded-full"
                 fallbackClassName="rounded-full"
-                initialsLength={1}
               />
               <div className="grid min-w-0 flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
                 <span className="truncate font-medium">{profileDisplayName}</span>
@@ -452,13 +441,8 @@ export function NavUser({
                   presence={profile.presence}
                   themeKey={profile.ui?.themeKey}
                   enableProfilePreview={false}
-                  roleLabel={profileRoleLabel}
-                  timezone={profile.prefs?.timezone ?? null}
-                  locationLabel={profileLocationLabel}
-                  about={profile.profile.bio ?? null}
                   sizeClassName="h-10 w-10 rounded-full"
                   fallbackClassName="rounded-full"
-                  initialsLength={1}
                 />
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">{profileDisplayName}</span>

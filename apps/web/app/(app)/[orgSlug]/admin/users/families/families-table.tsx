@@ -65,6 +65,7 @@ export function FamiliesTable({ rows }: FamiliesTableProps) {
                         <div key={guardian.id} className="min-w-0">
                           <div className="flex items-center gap-2 text-sm">
                             <AvatarWithStatus
+                              accountId={guardian.id}
                               name={guardian.name ?? guardian.label}
                               avatar={{
                                 source: resolveAvatarSource(guardian.avatarSource),
@@ -75,10 +76,8 @@ export function FamiliesTable({ rows }: FamiliesTableProps) {
                                     : undefined,
                               }}
                               themeKey={resolveThemeKey(guardian.themeKey)}
-                              showStatus={false}
                               roleLabel={getAvatarRoleLabel('guardian')}
                               sizeClassName="size-7"
-                              initialsLength={1}
                             />
                             <span className="truncate">
                               {guardian.name ?? guardian.label}
@@ -100,6 +99,7 @@ export function FamiliesTable({ rows }: FamiliesTableProps) {
                       {row.children.map((child) => (
                         <div key={child.id} className="flex items-center gap-2 text-sm">
                           <AvatarWithStatus
+                            accountId={child.id}
                             name={child.label}
                             avatar={{
                               source: resolveAvatarSource(child.avatarSource),
@@ -110,10 +110,8 @@ export function FamiliesTable({ rows }: FamiliesTableProps) {
                                   : undefined,
                             }}
                             themeKey={resolveThemeKey(child.themeKey)}
-                            showStatus={false}
                             roleLabel={getAvatarRoleLabel('child')}
                             sizeClassName="size-7"
-                            initialsLength={1}
                           />
                           <span>{child.label}</span>
                         </div>

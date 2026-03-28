@@ -57,6 +57,8 @@ export function MessagesMembersTab({
               className="flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-2"
             >
               <AvatarWithStatus
+                accountId={member.ids.accountId}
+                profileId={member.ids.id}
                 name={memberName}
                 avatar={member.profile.avatar}
                 presence={member.presence}
@@ -68,7 +70,6 @@ export function MessagesMembersTab({
                 about={member.profile.bio ?? null}
                 messageHref={dmTargetId ? `${dashboardBasePath}/dm/${dmTargetId}` : null}
                 sizeClassName="h-9 w-9"
-                initialsLength={1}
               />
               <div className="min-w-0 flex-1">
                 {profileActionEnabled ? (

@@ -62,7 +62,7 @@ function expectBefore(labelA: string, labelB: string) {
 }
 
 describe('UsersTable', () => {
-  it('defaults to most recently updated first and allows sorting by last seen', () => {
+  it('defaults to most recently seen first and toggles last seen sorting', () => {
     render(
       <UsersTable
         rows={[
@@ -85,10 +85,10 @@ describe('UsersTable', () => {
     expect(screen.getByRole('button', { name: /Updated/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Last seen/i })).toBeInTheDocument();
 
-    expectBefore('Older User', 'Newer Seen User');
+    expectBefore('Newer Seen User', 'Older User');
 
     fireEvent.click(screen.getByRole('button', { name: /Last seen/i }));
 
-    expectBefore('Newer Seen User', 'Older User');
+    expectBefore('Older User', 'Newer Seen User');
   });
 });

@@ -3,8 +3,8 @@
 import * as React from 'react';
 import { UserPlus, X } from 'lucide-react';
 
+import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import { cn } from '@iconicedu/ui-web/lib/utils';
-import { Avatar, AvatarFallback, AvatarImage } from '@iconicedu/ui-web/ui/avatar';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import {
@@ -73,10 +73,6 @@ const ROLE_ORDER: UserProfileVM['kind'][] = [
   'system',
 ];
 
-function getInitials(name: string) {
-  return name.trim().charAt(0).toUpperCase();
-}
-
 function getDisplayName(user: UserProfileVM) {
   return getProfileDisplayName(user.profile, 'Unknown');
 }
@@ -128,7 +124,6 @@ export function ParticipantSelector({
                 <CommandGroup key={group.kind} heading={ROLE_LABELS[group.kind]}>
                   {group.users.map((user) => {
                     const displayName = getDisplayName(user);
-                    const avatarUrl = user.profile.avatar?.url ?? undefined;
                     const emailText = getEmail(user);
                     const secondaryText = getSecondaryText(user);
                     return (
@@ -141,12 +136,19 @@ export function ParticipantSelector({
                         }}
                         className="flex items-center gap-3 my-2 rounded-full hover:bg-muted"
                       >
-                        <Avatar className="size-10">
-                          <AvatarImage src={avatarUrl} alt={displayName} />
-                          <AvatarFallback className="text-sm">
-                            {getInitials(displayName)}
-                          </AvatarFallback>
-                        </Avatar>
+                        <AvatarWithStatus
+                          accountId={user.ids.accountId}
+                          profileId={user.ids.id}
+                          name={displayName}
+                          avatar={user.profile.avatar}
+                          presence={user.presence}
+                          themeKey={user.ui?.themeKey ?? null}
+                          timezone={user.prefs?.timezone ?? null}
+                          locationLabel={user.location?.countryName ?? null}
+                          about={user.profile.bio ?? null}
+                          sizeClassName="size-10"
+                          fallbackClassName="text-sm"
+                        />
                         <div className="flex min-w-0 flex-1 flex-col">
                           <span className="truncate font-medium text-foreground">
                             {displayName}
@@ -179,7 +181,6 @@ export function ParticipantSelector({
           <div className="rounded-lg border bg-card">
             {selectedUsers.map((user, index) => {
               const displayName = getDisplayName(user);
-              const avatarUrl = user.profile.avatar?.url ?? undefined;
               const secondaryText = getSecondaryText(user);
               return (
                 <div
@@ -189,12 +190,19 @@ export function ParticipantSelector({
                     index !== selectedUsers.length - 1 && 'border-b',
                   )}
                 >
-                  <Avatar className="size-10">
-                    <AvatarImage src={avatarUrl} alt={displayName} />
-                    <AvatarFallback className="text-sm">
-                      {getInitials(displayName)}
-                    </AvatarFallback>
-                  </Avatar>
+                  <AvatarWithStatus
+                    accountId={user.ids.accountId}
+                    profileId={user.ids.id}
+                    name={displayName}
+                    avatar={user.profile.avatar}
+                    presence={user.presence}
+                    themeKey={user.ui?.themeKey ?? null}
+                    timezone={user.prefs?.timezone ?? null}
+                    locationLabel={user.location?.countryName ?? null}
+                    about={user.profile.bio ?? null}
+                    sizeClassName="size-10"
+                    fallbackClassName="text-sm"
+                  />
                   <div className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate font-medium text-foreground">
                       {displayName}

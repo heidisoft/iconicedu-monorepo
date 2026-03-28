@@ -272,6 +272,8 @@ export const MessagesContainerHeader = memo(function MessagesContainerHeader({
           aria-label={`View ${otherParticipantName} profile`}
         >
           <AvatarWithStatus
+            accountId={otherParticipant.ids.accountId}
+            profileId={otherParticipant.ids.id}
             name={otherParticipantName}
             avatar={otherParticipant.profile.avatar}
             presence={otherParticipant.presence}
@@ -281,7 +283,6 @@ export const MessagesContainerHeader = memo(function MessagesContainerHeader({
             locationLabel={getAvatarLocationLabel(otherParticipant.location)}
             about={otherParticipant.profile.bio ?? null}
             sizeClassName="h-8 w-8"
-            initialsLength={1}
           />
         </button>
       );

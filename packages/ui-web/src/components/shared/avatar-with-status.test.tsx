@@ -7,7 +7,18 @@ import { describe, expect, it, vi } from 'vitest';
 import { AvatarWithStatus } from './avatar-with-status';
 
 vi.mock('@iconicedu/ui-web/ui/hover-card', () => ({
-  HoverCard: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  HoverCard: ({
+    children,
+    onOpenChange,
+  }: {
+    children?: React.ReactNode;
+    onOpenChange?: (open: boolean) => void;
+  }) => {
+    React.useEffect(() => {
+      onOpenChange?.(true);
+    }, [onOpenChange]);
+    return <div>{children}</div>;
+  },
   HoverCardTrigger: ({ children }: { children?: React.ReactNode }) => (
     <div>{children}</div>
   ),
@@ -17,9 +28,10 @@ vi.mock('@iconicedu/ui-web/ui/hover-card', () => ({
 }));
 
 describe('AvatarWithStatus', () => {
-  it('renders the richer profile preview fields when provided', () => {
+  it('renders the shared avatar preview shell with direct message action', () => {
     render(
       <AvatarWithStatus
+        profileId="profile-2"
         name="Priya Shah"
         avatar={{ source: 'seed', seed: 'priya' }}
         presence={{
@@ -27,27 +39,14 @@ describe('AvatarWithStatus', () => {
           displayStatus: 'online',
           state: {},
         }}
-        roleLabel="Educator"
-        locationLabel="Los Angeles, California, United States"
-        timezone="America/Los_Angeles"
-        about="Math mentor focused on building confidence and fluency."
         messageHref="/dm/profile-2"
       />,
     );
 
-    expect(screen.getByText('Priya Shah')).toBeInTheDocument();
-    expect(screen.getAllByText('Educator').length).toBeGreaterThan(0);
-    expect(
-      screen.getByText('Los Angeles, California, United States'),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText('Math mentor focused on building confidence and fluency.'),
-    ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /send direct message/i })).toHaveAttribute(
       'href',
       '/dm/profile-2',
     );
-    expect(screen.getByText(/local time/i)).toBeInTheDocument();
     expect(screen.getByTestId('avatar-preview-header')).toBeInTheDocument();
     expect(screen.getByTestId('avatar-preview-avatar-anchor')).toBeInTheDocument();
   });

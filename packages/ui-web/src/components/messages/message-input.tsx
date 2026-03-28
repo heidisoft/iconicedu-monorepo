@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import type { MessageMentionVM, UserProfileVM } from '@iconicedu/shared-types';
+import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import {
   Dialog,
@@ -22,7 +23,6 @@ import {
 import { Input } from '@iconicedu/ui-web/ui/input';
 import { Label } from '@iconicedu/ui-web/ui/label';
 import { Textarea } from '@iconicedu/ui-web/ui/textarea';
-import { Avatar, AvatarFallback, AvatarImage } from '@iconicedu/ui-web/ui/avatar';
 import {
   Tooltip,
   TooltipContent,
@@ -1402,15 +1402,18 @@ export function MessageInput({
                     }}
                     onMouseEnter={() => setActiveMentionIndex(index)}
                   >
-                    <Avatar size="sm">
-                      <AvatarImage
-                        src={candidate.avatarUrl}
-                        alt={candidate.displayName}
-                      />
-                      <AvatarFallback>
-                        {candidate.displayName.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
+                    <AvatarWithStatus
+                      profileId={candidate.id}
+                      name={candidate.displayName}
+                      avatar={{
+                        source: candidate.avatarUrl ? 'upload' : 'seed',
+                        url: candidate.avatarUrl ?? null,
+                        seed: candidate.avatarUrl ? null : candidate.displayName,
+                      }}
+                      showStatus={false}
+                      sizeClassName="size-8"
+                      fallbackClassName="text-sm"
+                    />
                     <div className="min-w-0 flex-1">
                       <div className="truncate font-medium">{candidate.displayName}</div>
                       {candidate.email ? (

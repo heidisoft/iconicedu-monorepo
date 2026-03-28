@@ -74,6 +74,8 @@ export function SavedMessagePreview({ message, onClick }: SavedMessagePreviewPro
       )}
     >
       <AvatarWithStatus
+        accountId={message.core.sender.ids.accountId}
+        profileId={message.core.sender.ids.id}
         name={senderName}
         avatar={message.core.sender.profile.avatar}
         presence={message.core.sender.presence}
@@ -83,7 +85,6 @@ export function SavedMessagePreview({ message, onClick }: SavedMessagePreviewPro
         locationLabel={getAvatarLocationLabel(message.core.sender.location)}
         about={message.core.sender.profile.bio ?? null}
         sizeClassName="h-10 w-10 flex-shrink-0"
-        initialsLength={1}
       />
 
       <div className="flex-1 min-w-0">

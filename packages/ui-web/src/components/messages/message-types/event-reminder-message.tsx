@@ -134,6 +134,8 @@ export const EventReminderMessage = memo(function EventReminderMessage(
                   const attendeeName = getProfileDisplayName(attendee.profile);
                   return (
                     <AvatarWithStatus
+                      accountId={attendee.ids.accountId}
+                      profileId={attendee.ids.id}
                       key={attendee.ids.id}
                       name={attendeeName}
                       avatar={attendee.profile.avatar}
@@ -145,7 +147,6 @@ export const EventReminderMessage = memo(function EventReminderMessage(
                       about={attendee.profile.bio ?? null}
                       sizeClassName="h-5 w-5 border-2 border-background"
                       fallbackClassName="text-[8px]"
-                      initialsLength={1}
                     />
                   );
                 })}

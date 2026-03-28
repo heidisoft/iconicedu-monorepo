@@ -124,7 +124,11 @@ const ROLE_STATUS_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'blocked', label: 'Blocked' },
 ];
 
-function compareNullableDate(left?: string | null, right?: string | null): number {
+function compareNullableDate(
+  left?: string | null,
+  right?: string | null,
+  direction: 'asc' | 'desc' = 'asc',
+): number {
   if (!left && !right) {
     return 0;
   }
@@ -135,7 +139,41 @@ function compareNullableDate(left?: string | null, right?: string | null): numbe
     return -1;
   }
 
-  return left.localeCompare(right);
+  const compare = left.localeCompare(right);
+  return direction === 'asc' ? compare : -compare;
+}
+
+function formatRelativeLastSeen(value?: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const timestamp = new Date(value).getTime();
+  if (Number.isNaN(timestamp)) {
+    return null;
+  }
+
+  const diffMs = Math.max(0, Date.now() - timestamp);
+  const minutes = Math.floor(diffMs / 60000);
+
+  if (minutes < 1) return 'just now';
+  if (minutes < 5) return 'few mins ago';
+  if (minutes < 60) return `${minutes} mins ago`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} ${hours === 1 ? 'hr' : 'hrs'} ago`;
+
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days} ${days === 1 ? 'day' : 'days'} ago`;
+
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return `${weeks} ${weeks === 1 ? 'week' : 'weeks'} ago`;
+
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months} ${months === 1 ? 'month' : 'months'} ago`;
+
+  const years = Math.floor(days / 365);
+  return `${years} ${years === 1 ? 'year' : 'years'} ago`;
 }
 
 function getUserDisplayName(row: AdminUserRow): string {
@@ -186,7 +224,7 @@ export function UsersTable({ rows }: UsersTableProps) {
 
   const [search, setSearch] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState<'all' | string>('all');
-  const [sortKey, setSortKey] = React.useState<SortKey>('updated');
+  const [sortKey, setSortKey] = React.useState<SortKey>('lastSeen');
   const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('desc');
   const [pageIndex, setPageIndex] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(PAGE_SIZES[0]);
@@ -231,9 +269,12 @@ export function UsersTable({ rows }: UsersTableProps) {
       } else if (sortKey === 'status') {
         compare = collator.compare(a.status, b.status);
       } else if (sortKey === 'lastSeen') {
-        compare = compareNullableDate(a.lastSeenAt, b.lastSeenAt);
+        compare = compareNullableDate(a.lastSeenAt, b.lastSeenAt, sortDirection);
       } else {
-        compare = compareNullableDate(a.updatedAt, b.updatedAt);
+        compare = compareNullableDate(a.updatedAt, b.updatedAt, sortDirection);
+      }
+      if (sortKey === 'lastSeen' || sortKey === 'updated') {
+        return compare;
       }
       return sortDirection === 'asc' ? compare : -compare;
     });
@@ -470,6 +511,7 @@ export function UsersTable({ rows }: UsersTableProps) {
     options?: { childrenCount?: number; expanded?: boolean },
   ) => {
     const displayName = getUserDisplayName(row);
+    const relativeLastSeen = formatRelativeLastSeen(row.lastSeenAt);
     const Icon =
       PROFILE_ICON_MAP[row.profileKind ?? 'default'] ?? PROFILE_ICON_MAP.default;
     const childrenCount = options?.childrenCount ?? 0;
@@ -498,6 +540,8 @@ export function UsersTable({ rows }: UsersTableProps) {
               <div className="size-7 shrink-0" aria-hidden="true" />
             )}
             <AvatarWithStatus
+              accountId={row.id}
+              profileId={row.profileId ?? null}
               name={displayName}
               avatar={{
                 source: resolveAvatarSource(row.avatarSource),
@@ -516,9 +560,10 @@ export function UsersTable({ rows }: UsersTableProps) {
                 region: null,
                 countryName: row.countryName ?? null,
               })}
-              showStatus={false}
+              onMessageClick={
+                row.profileId ? () => handleStartDirectMessage(row) : undefined
+              }
               sizeClassName="size-8"
-              initialsLength={1}
             />
             <div className="min-w-0">
               <div className="flex items-center gap-2">
@@ -576,8 +621,8 @@ export function UsersTable({ rows }: UsersTableProps) {
           )}
         </TableCell>
         <TableCell>
-          {row.lastSeenAt ? (
-            <p className="text-sm">{new Date(row.lastSeenAt).toLocaleDateString()}</p>
+          {relativeLastSeen ? (
+            <p className="text-sm">{relativeLastSeen}</p>
           ) : (
             <span className="text-sm text-muted-foreground">n/a</span>
           )}
@@ -665,6 +710,8 @@ export function UsersTable({ rows }: UsersTableProps) {
                   >
                     <div className="flex min-w-0 items-center gap-3">
                       <AvatarWithStatus
+                        accountId={child.id}
+                        profileId={child.profileId ?? null}
                         name={displayName}
                         avatar={{
                           source: resolveAvatarSource(child.avatarSource),
@@ -683,9 +730,12 @@ export function UsersTable({ rows }: UsersTableProps) {
                           region: null,
                           countryName: child.countryName ?? null,
                         })}
-                        showStatus={false}
+                        onMessageClick={
+                          child.profileId
+                            ? () => handleStartDirectMessage(child)
+                            : undefined
+                        }
                         sizeClassName="size-8"
-                        initialsLength={1}
                       />
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">

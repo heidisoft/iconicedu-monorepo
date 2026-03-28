@@ -2,7 +2,7 @@ import * as React from 'react';
 import { Info, User } from 'lucide-react';
 
 import type { StaffProfileVM, UserProfileVM } from '@iconicedu/shared-types';
-import { Avatar, AvatarFallback, AvatarImage } from '@iconicedu/ui-web/ui/avatar';
+import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import { BorderBeam } from '@iconicedu/ui-web/ui/border-beam';
 import {
   AlertDialog,
@@ -334,12 +334,6 @@ export function ProfileTab({
     : (avatarPreview ?? profileBlock.avatar.url ?? null);
   const hasAvatar = Boolean(profileBlock.avatar.url ?? avatarPreview) && !avatarRemoved;
   const fallbackName = getProfileFullName(profileBlock);
-  const avatarInitials = fallbackName
-    .split(' ')
-    .map((part) => part[0])
-    .join('')
-    .slice(0, 1)
-    .toUpperCase();
   const avatarThemeKey = profile.ui?.themeKey ?? 'teal';
 
   return (
@@ -367,15 +361,27 @@ export function ProfileTab({
           >
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="sm:col-span-2 flex items-center gap-3">
-                <Avatar
+                <AvatarWithStatus
                   key={`${avatarUrl ?? 'fallback'}-${avatarRemoved ? 'removed' : 'active'}`}
-                  className={cn('size-12 border theme-border', `theme-${avatarThemeKey}`)}
-                >
-                  {avatarUrl ? <AvatarImage src={avatarUrl} /> : null}
-                  <AvatarFallback className="theme-bg theme-fg font-semibold">
-                    {avatarInitials}
-                  </AvatarFallback>
-                </Avatar>
+                  accountId={profile.ids.accountId}
+                  profileId={profile.ids.id}
+                  name={fallbackName}
+                  avatar={{
+                    source: avatarUrl ? 'upload' : 'seed',
+                    url: avatarUrl,
+                    seed: avatarUrl ? null : fallbackName,
+                  }}
+                  presence={profile.presence}
+                  themeKey={avatarThemeKey}
+                  timezone={profile.prefs?.timezone ?? null}
+                  locationLabel={profile.location?.countryName ?? null}
+                  about={profileBlock.bio ?? null}
+                  sizeClassName={cn(
+                    'size-12 border theme-border',
+                    `theme-${avatarThemeKey}`,
+                  )}
+                  fallbackClassName="theme-bg theme-fg font-semibold"
+                />
                 <div>
                   <div className="text-sm font-medium">Profile photo</div>
                   <div className="text-xs text-muted-foreground">JPG, PNG up to 5MB.</div>

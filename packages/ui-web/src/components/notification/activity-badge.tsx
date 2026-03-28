@@ -18,15 +18,6 @@ type ActivityBadgeProps = {
 const ACTIVITY_AVATAR_SIZE_CLASS = 'size-6';
 const MAX_VISIBLE_ACTIVITY_AVATARS = 3;
 
-const getInitials = (name: string) =>
-  name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 1)
-    .map((part) => part[0])
-    .join('')
-    .toUpperCase();
-
 export function ActivityBadge({ activity, className }: ActivityBadgeProps) {
   const leading = activity.content.leading;
 
@@ -46,7 +37,6 @@ export function ActivityBadge({ activity, className }: ActivityBadgeProps) {
             showStatus={false}
             sizeClassName={ACTIVITY_AVATAR_SIZE_CLASS}
             fallbackClassName="text-[10px]"
-            initialsLength={1}
           />
         ))}
         {overflowCount > 0 && (
@@ -61,10 +51,11 @@ export function ActivityBadge({ activity, className }: ActivityBadgeProps) {
   const actor = activity.refs.actor;
   const actorName = getProfileDisplayName(actor.profile);
   const actorAvatar = actor.profile.avatar;
-  const initials = getInitials(actorName);
 
   return (
     <AvatarWithStatus
+      accountId={actor.ids.accountId}
+      profileId={actor.ids.id}
       name={actorName}
       avatar={actorAvatar}
       presence={actor.presence}
@@ -75,8 +66,6 @@ export function ActivityBadge({ activity, className }: ActivityBadgeProps) {
       about={actor.profile.bio ?? null}
       sizeClassName={cn(ACTIVITY_AVATAR_SIZE_CLASS, 'shrink-0', className)}
       fallbackClassName="text-[10px]"
-      fallbackText={initials}
-      initialsLength={1}
     />
   );
 }

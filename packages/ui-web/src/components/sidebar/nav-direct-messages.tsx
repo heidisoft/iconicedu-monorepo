@@ -162,6 +162,8 @@ export function NavDirectMessages({
               >
                 <a href={`${dashboardBasePath}/dm/${item.ids.id}`}>
                   <AvatarWithStatus
+                    accountId={otherParticipant?.ids.accountId}
+                    profileId={otherParticipant?.ids.id}
                     name={name}
                     avatar={otherParticipant?.profile.avatar}
                     presence={otherParticipant?.presence}
@@ -173,7 +175,6 @@ export function NavDirectMessages({
                     sizeClassName="size-7"
                     statusClassName="bottom-0 right-0 h-2 w-2 border border-background"
                     fallbackClassName="text-xs font-medium"
-                    initialsLength={1}
                   />
                   <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
                     <div className="truncate text-sm font-medium">{name}</div>

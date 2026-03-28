@@ -6,6 +6,7 @@ import { Clock3, MapPin, MessageCircle } from 'lucide-react';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { HoverCardContent } from '@iconicedu/ui-web/ui/hover-card';
 import { Separator } from '@iconicedu/ui-web/ui/separator';
+import { Skeleton } from '@iconicedu/ui-web/ui/skeleton';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 
 type AvatarProfileHoverCardContentProps = {
@@ -19,8 +20,11 @@ type AvatarProfileHoverCardContentProps = {
   previewAbout?: string | null;
   roleLabel?: string | null;
   safeName: string;
+  statusSummary?: string | null;
   statusEmoji?: string | null;
   lastSeenLabel?: string | null;
+  loading?: boolean;
+  error?: string | null;
   themeClass?: string;
   previewHeaderStyle?: React.CSSProperties;
 };
@@ -36,8 +40,11 @@ export function AvatarProfileHoverCardContent({
   previewAbout,
   roleLabel,
   safeName,
+  statusSummary,
   statusEmoji,
   lastSeenLabel,
+  loading = false,
+  error,
   themeClass,
   previewHeaderStyle,
 }: AvatarProfileHoverCardContentProps) {
@@ -88,54 +95,92 @@ export function AvatarProfileHoverCardContent({
       </div>
 
       <div className="bg-background px-5 pb-5 pt-16">
-        <div className="mb-5 min-w-0 space-y-1.5">
-          <p className="text-xl font-semibold leading-tight text-foreground">
-            {safeName}
-          </p>
-          {roleLabel ? (
-            <p className="text-sm font-semibold leading-none text-foreground/80">
-              {roleLabel}
-            </p>
-          ) : null}
-          {email ? (
-            <p className="truncate pt-1 text-sm leading-none text-muted-foreground">
-              {email}
-            </p>
-          ) : null}
-        </div>
-
-        <div className="mb-5 flex flex-col gap-2.5 text-sm text-foreground/80">
-          {locationLabel ? (
-            <div className="flex items-start gap-2 text-sm text-foreground/70">
-              <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-foreground/60" />
-              <span>{locationLabel}</span>
+        {loading ? (
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <Skeleton className="h-6 w-40 rounded-md" />
+              <div className="flex gap-2">
+                <Skeleton className="h-5 w-20 rounded-full" />
+                <Skeleton className="h-5 w-16 rounded-full" />
+              </div>
+              <Skeleton className="h-4 w-24 rounded-md" />
+              <Skeleton className="h-4 w-56 rounded-md" />
             </div>
-          ) : null}
-          {localTimeLabel ? (
-            <div className="flex items-center gap-2">
-              <Clock3 className="h-4 w-4 shrink-0 text-foreground/60" />
-              <span>Local time {localTimeLabel}</span>
+            <div className="space-y-2.5">
+              <Skeleton className="h-4 w-44 rounded-md" />
+              <Skeleton className="h-4 w-36 rounded-md" />
             </div>
-          ) : null}
-        </div>
+            <Skeleton className="h-16 w-full rounded-xl" />
+            <Separator />
+            <Skeleton className="h-3 w-24 rounded-md" />
+          </div>
+        ) : error ? (
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-foreground">Unable to load profile</p>
+            <p className="text-sm text-muted-foreground">{error}</p>
+          </div>
+        ) : (
+          <>
+            <div className="mb-5 min-w-0 space-y-1.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-xl font-semibold leading-tight text-foreground">
+                  {safeName}
+                </p>
+              </div>
+              {roleLabel ? (
+                <p className="text-sm font-semibold leading-none text-foreground/80">
+                  {roleLabel}
+                </p>
+              ) : null}
+              {email ? (
+                <p className="truncate pt-1 text-sm leading-none text-muted-foreground">
+                  {email}
+                </p>
+              ) : null}
+            </div>
 
-        {previewAbout ? (
-          <p className="mb-5 text-sm leading-relaxed text-foreground/70">
-            {statusEmoji ? `${statusEmoji} ` : ''}
-            {previewAbout}
-          </p>
-        ) : null}
+            <div className="mb-5 flex flex-col gap-2.5 text-sm text-foreground/80">
+              {statusSummary ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-foreground/70">
+                    {statusEmoji ? `${statusEmoji} ` : ''}
+                    {statusSummary}
+                  </span>
+                </div>
+              ) : null}
+              {locationLabel ? (
+                <div className="flex items-start gap-2 text-sm text-foreground/70">
+                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-foreground/60" />
+                  <span>{locationLabel}</span>
+                </div>
+              ) : null}
+              {localTimeLabel ? (
+                <div className="flex items-center gap-2">
+                  <Clock3 className="h-4 w-4 shrink-0 text-foreground/60" />
+                  <span>Local time {localTimeLabel}</span>
+                </div>
+              ) : null}
+            </div>
 
-        <Separator className="mb-4" />
+            {previewAbout ? (
+              <p className="mb-5 text-sm leading-relaxed text-foreground/70">
+                {statusEmoji ? `${statusEmoji} ` : ''}
+                {previewAbout}
+              </p>
+            ) : null}
 
-        <div className="flex items-center justify-between gap-3">
-          {lastSeenLabel ? (
-            <p className="text-xs text-foreground/50">{lastSeenLabel}</p>
-          ) : (
-            <div />
-          )}
-          <div />
-        </div>
+            <Separator className="mb-4" />
+
+            <div className="flex items-center justify-between gap-3">
+              {lastSeenLabel ? (
+                <p className="text-xs text-foreground/50">{lastSeenLabel}</p>
+              ) : (
+                <div />
+              )}
+              <div />
+            </div>
+          </>
+        )}
       </div>
     </HoverCardContent>
   );

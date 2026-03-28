@@ -86,13 +86,14 @@ export function NavLearningSpaces({
         <CollapsibleTrigger asChild>
           <SidebarGroupLabel className="flex cursor-pointer items-center gap-2 rounded-md rounded-b-none px-2 py-1 uppercase">
             <AvatarWithStatus
+              accountId={participant.ids.accountId}
+              profileId={participant.ids.id}
               name={getProfileDisplayName(participant.profile)}
               avatar={participant.profile.avatar}
               showStatus={false}
               themeKey={participant.ui?.themeKey ?? null}
               sizeClassName="size-5"
               fallbackClassName={cn('text-[10px] font-semibold leading-none uppercase')}
-              initialsLength={1}
             />
             <span className="flex-1">{title.split(' ')[0]}</span>
             {isOpen ? (

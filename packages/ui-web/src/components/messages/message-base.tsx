@@ -233,6 +233,8 @@ export const MessageBase = memo(function MessageBase({
             aria-label={`View ${senderName}'s profile`}
           >
             <AvatarWithStatus
+              accountId={message.core.sender.ids.accountId}
+              profileId={message.core.sender.ids.id}
               name={senderName}
               avatar={message.core.sender.profile.avatar}
               presence={message.core.sender.presence}
@@ -242,7 +244,6 @@ export const MessageBase = memo(function MessageBase({
               locationLabel={getAvatarLocationLabel(message.core.sender.location)}
               about={message.core.sender.profile.bio ?? null}
               sizeClassName="h-9 w-9"
-              initialsLength={1}
             />
           </button>
           <div className="flex-1 min-w-0">
@@ -319,6 +320,8 @@ export const MessageBase = memo(function MessageBase({
           aria-label={`View ${senderName}'s profile`}
         >
           <AvatarWithStatus
+            accountId={message.core.sender.ids.accountId}
+            profileId={message.core.sender.ids.id}
             name={senderName}
             avatar={message.core.sender.profile.avatar}
             presence={message.core.sender.presence}
@@ -328,7 +331,6 @@ export const MessageBase = memo(function MessageBase({
             locationLabel={getAvatarLocationLabel(message.core.sender.location)}
             about={message.core.sender.profile.bio ?? null}
             sizeClassName="h-9 w-9"
-            initialsLength={1}
           />
         </button>
 

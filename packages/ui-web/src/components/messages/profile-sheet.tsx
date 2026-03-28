@@ -236,6 +236,8 @@ export function ProfileContent({
     <div className="flex-1 overflow-y-auto">
       <div className="flex flex-col items-center gap-3 p-6 min-w-0">
         <AvatarWithStatus
+          accountId={user.ids.accountId}
+          profileId={user.ids.id}
           name={profileDisplayName}
           avatar={user.profile.avatar}
           presence={user.presence}
@@ -249,7 +251,6 @@ export function ProfileContent({
           sizeClassName="h-20 w-20"
           statusClassName="bottom-1 right-1 h-4 w-4"
           fallbackClassName="text-2xl"
-          initialsLength={1}
         />
         <div className="text-center min-w-0">
           <h2 className="text-lg font-semibold text-foreground break-words">

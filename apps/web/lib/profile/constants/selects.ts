@@ -42,6 +42,7 @@ export const NOTIFICATION_SCOPED_DEFAULTS_SELECT =
   'scope_kind, scope_id, pref_key, channels, muted';
 
 export const PRESENCE_SELECT = [
+  'profile_id',
   'state_text',
   'state_emoji',
   'state_expires_at',

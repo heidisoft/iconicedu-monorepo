@@ -54,6 +54,8 @@ export const ThreadIndicator = memo(function ThreadIndicator({
           const participantName = getProfileDisplayName(participant.profile);
           return (
             <AvatarWithStatus
+              accountId={participant.ids.accountId}
+              profileId={participant.ids.id}
               key={participant.ids.id}
               name={participantName}
               avatar={participant.profile.avatar}
@@ -65,7 +67,6 @@ export const ThreadIndicator = memo(function ThreadIndicator({
               about={participant.profile.bio ?? null}
               sizeClassName="h-5 w-5 border-2 border-background"
               fallbackClassName="text-[11px]"
-              initialsLength={1}
             />
           );
         })}

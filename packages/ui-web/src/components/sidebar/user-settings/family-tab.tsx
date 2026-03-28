@@ -5,7 +5,8 @@ import { Plus, ShieldAlert, UserPlus } from 'lucide-react';
 
 import type { ChildProfileVM, ThemeKey, UserProfileVM } from '@iconicedu/shared-types';
 import { normalizeCountryCode, optionsForCountry } from '@iconicedu/shared-types';
-import { Avatar, AvatarFallback, AvatarImage } from '@iconicedu/ui-web/ui/avatar';
+import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
+import { Avatar, AvatarFallback } from '@iconicedu/ui-web/ui/avatar';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
 import { BorderBeam } from '@iconicedu/ui-web/ui/border-beam';
 import { Button } from '@iconicedu/ui-web/ui/button';
@@ -975,12 +976,6 @@ export function FamilyTab({
         <div className="space-y-1">
           {familyMembers.length ? (
             familyMembers.map((member, index) => {
-              const initials = member.name
-                .split(' ')
-                .map((part) => part[0])
-                .join('')
-                .slice(0, 1)
-                .toUpperCase();
               const isSelf = !member.canRemove;
               const editable = editableChildData[member.id];
               const themeValue =
@@ -990,12 +985,17 @@ export function FamilyTab({
                 'teal';
               const themeClass = `theme-${themeValue}`;
               const avatarIcon = (
-                <Avatar className={`size-10 border theme-border ${themeClass}`}>
-                  <AvatarImage src={member.avatar?.url ?? undefined} />
-                  <AvatarFallback className="theme-bg theme-fg">
-                    {initials}
-                  </AvatarFallback>
-                </Avatar>
+                <AvatarWithStatus
+                  accountId={member.accountId ?? null}
+                  profileId={member.profileId}
+                  name={member.name}
+                  avatar={member.avatar}
+                  themeKey={themeValue}
+                  about={member.bio ?? null}
+                  sizeClassName={`size-10 border theme-border ${themeClass}`}
+                  fallbackClassName="theme-bg theme-fg"
+                  showStatus={false}
+                />
               );
               const memberNameParts = [member.firstName, member.lastName]
                 .filter(Boolean)

@@ -257,16 +257,15 @@ export function LearningSpacesTable({ rows, onEdit }: LearningSpacesTableProps) 
                     {row.participantDetails.slice(0, 3).map((participant) => (
                       <span key={participant.id} className="inline-flex">
                         <AvatarWithStatus
+                          profileId={participant.id}
                           name={participant.displayName}
                           avatar={{
                             source: participant.avatarUrl ? 'upload' : 'seed',
                             url: participant.avatarUrl ?? null,
                           }}
                           themeKey={(participant.themeKey as ThemeKey | null) ?? null}
-                          showStatus={false}
                           roleLabel={getAvatarRoleLabel(participant.kind)}
                           sizeClassName="size-8"
-                          initialsLength={1}
                         />
                       </span>
                     ))}

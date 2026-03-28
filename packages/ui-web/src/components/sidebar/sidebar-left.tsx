@@ -26,6 +26,7 @@ import { ClassRequestAction } from '../class-request/class-request-action';
 import { NavLearningSpaces } from '@iconicedu/ui-web/components/sidebar/nav-learning-spaces';
 import { NavSecondary } from '@iconicedu/ui-web/components/sidebar/nav-secondary';
 import { NavUser } from '@iconicedu/ui-web/components/sidebar/nav-user';
+import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import type {
   ProfileAvatarInput,
   ProfileAvatarRemoveInput,
@@ -47,7 +48,6 @@ import {
   useSidebar,
 } from '@iconicedu/ui-web/ui/sidebar';
 import { Button } from '@iconicedu/ui-web/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@iconicedu/ui-web/ui/avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -236,14 +236,6 @@ function resolveFamilyPersonaOptionSubtitle(persona: {
     return email;
   }
   return persona.kind === 'guardian' ? 'Parent account' : 'Student profile';
-}
-
-function resolveInitials(label: string): string {
-  const words = label.trim().split(/\s+/).filter(Boolean);
-  if (words.length === 0) {
-    return '?';
-  }
-  return (words[0][0] ?? '?').toUpperCase();
 }
 
 export function SidebarLeft({
@@ -801,7 +793,6 @@ export function SidebarLeft({
                         });
                         const optionAvatarUrl = matchedProfile?.profile?.avatar?.url;
                         const optionThemeKey = matchedProfile?.ui?.themeKey ?? null;
-                        const optionInitials = resolveInitials(optionLabel);
                         const isPending =
                           isSwitchingClassroomPersona &&
                           switchingClassroomProfileId === option.profileId;
@@ -842,28 +833,19 @@ export function SidebarLeft({
                               </>
                             ) : (
                               <span className="flex w-full items-center gap-3 rounded-lg border px-3 py-2.5">
-                                <Avatar
-                                  size="default"
-                                  className={
-                                    optionThemeKey
-                                      ? `theme-${optionThemeKey} border theme-border`
-                                      : undefined
-                                  }
-                                >
-                                  {optionAvatarUrl ? (
-                                    <AvatarImage
-                                      src={optionAvatarUrl}
-                                      alt={optionLabel}
-                                    />
-                                  ) : null}
-                                  <AvatarFallback
-                                    className={
-                                      optionThemeKey ? 'theme-bg theme-fg' : undefined
-                                    }
-                                  >
-                                    {optionInitials}
-                                  </AvatarFallback>
-                                </Avatar>
+                                <AvatarWithStatus
+                                  accountId={matchedProfile?.ids.accountId ?? null}
+                                  profileId={option.profileId}
+                                  name={optionLabel}
+                                  avatar={{
+                                    source: optionAvatarUrl ? 'upload' : 'seed',
+                                    url: optionAvatarUrl ?? null,
+                                    seed: optionAvatarUrl ? null : optionLabel,
+                                  }}
+                                  themeKey={optionThemeKey ?? null}
+                                  showStatus={false}
+                                  sizeClassName="size-10"
+                                />
                                 <span className="min-w-0 flex-1">
                                   <span className="block truncate text-sm font-medium text-foreground">
                                     {optionLabel}

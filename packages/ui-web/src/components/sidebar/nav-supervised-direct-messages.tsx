@@ -44,13 +44,14 @@ export function NavSupervisedDirectMessages({
         <CollapsibleTrigger asChild>
           <SidebarGroupLabel className="flex cursor-pointer items-center gap-2 rounded-md rounded-b-none px-2 py-1 uppercase">
             <AvatarWithStatus
+              accountId={child.ids.accountId}
+              profileId={child.ids.id}
               name={getProfileDisplayName(child.profile)}
               avatar={child.profile.avatar}
               showStatus={false}
               themeKey={child.ui?.themeKey ?? null}
               sizeClassName="size-5"
               fallbackClassName="text-[10px] font-semibold leading-none uppercase"
-              initialsLength={1}
             />
             <span className="flex-1">
               {getProfileDisplayName(child.profile).split(' ')[0]}
@@ -82,6 +83,8 @@ export function NavSupervisedDirectMessages({
                   >
                     <a href={`${dashboardBasePath}/dm/${item.ids.id}`}>
                       <AvatarWithStatus
+                        accountId={otherParticipant?.ids.accountId}
+                        profileId={otherParticipant?.ids.id}
                         name={name}
                         avatar={otherParticipant?.profile.avatar}
                         presence={otherParticipant?.presence}
@@ -93,7 +96,6 @@ export function NavSupervisedDirectMessages({
                         sizeClassName="size-7"
                         statusClassName="bottom-0 right-0 h-2 w-2 border border-background"
                         fallbackClassName="text-xs font-medium"
-                        initialsLength={1}
                       />
                       <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
                         <div className="truncate text-sm font-medium">{name}</div>
