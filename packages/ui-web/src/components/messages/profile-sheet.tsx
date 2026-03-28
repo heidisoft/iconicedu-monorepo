@@ -129,7 +129,7 @@ export function buildAboutFields(user: ProfileDetailsUser): AboutField[] {
   pushField('bio', 'Bio', user.profile.bio, FileText);
   pushField('email', 'Email', user.profile.email ?? user.accountEmail ?? null, Mail);
   pushField('location', 'Location', buildLocationLabel(user), MapPin);
-  pushField('timezone', 'Timezone', user.prefs.timezone, Globe);
+  pushField('timezone', 'Timezone', user.prefs?.timezone, Globe);
   pushField(
     'languagesSpoken',
     'Languages',
@@ -241,7 +241,8 @@ export function ProfileContent({
           presence={user.presence}
           themeKey={user.ui?.themeKey}
           roleLabel={roleLabel}
-          timezone={user.prefs.timezone ?? null}
+          timezone={user.prefs?.timezone ?? null}
+          showStatus={false}
           locationLabel={getAvatarLocationLabel(user.location)}
           about={user.profile.bio ?? null}
           onMessageClick={onDmClick}

@@ -32,7 +32,6 @@ import {
   Plus,
   ChannelUiDefaultsSettingsSection,
   toast,
-  ResourceLinksEditor,
   ParticipantSelector,
   RecurrenceScheduler,
 } from '@iconicedu/ui-web';
@@ -48,7 +47,6 @@ import type {
   ChannelLiveSessionConfigVM,
   ChannelUiDefaultsVM,
   LearningSpaceCreatePayload,
-  LearningSpaceLinkVM,
   ThemeKey,
   UserProfileVM,
 } from '@iconicedu/shared-types';
@@ -67,15 +65,6 @@ const KIND_OPTIONS = [
   { value: 'small_group', label: 'Small group' },
   { value: 'large_class', label: 'Large class' },
 ];
-
-const mapLinksToPayload = (links: LearningSpaceLinkVM[]) =>
-  links.map((resource) => ({
-    label: resource.label,
-    iconKey: resource.iconKey ?? null,
-    url: resource.url ?? null,
-    status: resource.status ?? null,
-    hidden: resource.hidden ?? null,
-  }));
 
 const mapParticipantsToPayload = (selected: UserProfileVM[]) =>
   selected.map((participant) => ({
@@ -107,7 +96,6 @@ type LearningSpaceFormDialogProps = {
       uiDefaults?: ChannelUiDefaultsVM | null;
     } | null;
     participants: UserProfileVM[];
-    resources: LearningSpaceLinkVM[];
     schedules: RecurrenceFormData[];
     liveSession?: ChannelLiveSessionConfigVM | null;
   } | null;
@@ -122,7 +110,6 @@ type LearningSpaceFormState = {
   iconKey: LearningSpaceIconKey;
   uiDefaults: ChannelUiDefaultsVM;
   participants: UserProfileVM[];
-  resources: LearningSpaceLinkVM[];
   schedules: RecurrenceFormData[];
   liveSession: ChannelLiveSessionConfigVM;
 };
@@ -176,7 +163,6 @@ export function LearningSpaceFormDialog({
       iconKey: DEFAULT_LEARNING_SPACE_ICON_KEY,
       uiDefaults: createDefaultChannelUiDefaults(),
       participants: [],
-      resources: [],
       schedules: [],
       liveSession: { ...DEFAULT_ADMIN_LIVE_SESSION_CONFIG },
     }),
@@ -226,7 +212,6 @@ export function LearningSpaceFormDialog({
           themeKey: (initialData.settings?.themeKey ?? 'teal') as ThemeKey,
         },
         participants: initialData.participants ?? [],
-        resources: initialData.resources ?? [],
         schedules: normalizeSchedules(initialData.schedules ?? []),
         liveSession: initialData.liveSession ?? { ...DEFAULT_ADMIN_LIVE_SESSION_CONFIG },
       });
@@ -277,7 +262,6 @@ export function LearningSpaceFormDialog({
       },
       participants: mapParticipantsToPayload(formState.participants),
       liveSession: formState.liveSession.enabled ? formState.liveSession : null,
-      resources: mapLinksToPayload(formState.resources),
       schedules: mapSchedulesToPayload(formState.schedules),
     };
 
@@ -351,8 +335,8 @@ export function LearningSpaceFormDialog({
               </DialogTitle>
               <DialogDescription>
                 {mode === 'edit'
-                  ? 'Update the basics, participants, and resources for the classroom.'
-                  : 'Configure the basics, invite participants, and attach resources for the classroom.'}
+                  ? 'Update the basics and participants for the classroom.'
+                  : 'Configure the basics and invite participants for the classroom.'}
               </DialogDescription>
             </DialogHeader>
           </div>
@@ -486,15 +470,6 @@ export function LearningSpaceFormDialog({
                       rows={3}
                     />
                   </Field>
-                </FieldSet>
-                <FieldSeparator />
-                <FieldSet>
-                  <ResourceLinksEditor
-                    links={formState.resources}
-                    onLinksChange={(nextLinks) =>
-                      updateFormState({ resources: nextLinks })
-                    }
-                  />
                 </FieldSet>
                 <FieldSeparator />
                 <LiveSessionSettingsSection

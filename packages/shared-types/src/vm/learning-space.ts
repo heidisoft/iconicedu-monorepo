@@ -6,17 +6,6 @@ import type { UserProfileVM } from '@iconicedu/shared-types/vm/profile';
 export type LearningSpaceKindVM = 'one_on_one' | 'small_group' | 'large_class';
 export type LearningSpaceStatusVM = 'active' | 'archived' | 'completed' | 'paused';
 
-export type LearningSpaceLinkStatusVM = 'active' | 'inactive';
-
-export interface LearningSpaceLinkVM {
-  label: string;
-  iconKey: string | null;
-  url?: string | null;
-
-  status?: LearningSpaceLinkStatusVM | null;
-  hidden?: boolean | null;
-}
-
 export interface LearningSpaceBasicsVM {
   kind: LearningSpaceKindVM;
   status: LearningSpaceStatusVM;
@@ -37,10 +26,6 @@ export interface LearningSpaceScheduleVM {
   scheduleSeries?: ClassScheduleVM | null;
 }
 
-export interface LearningSpaceResourcesVM {
-  links?: LearningSpaceLinkVM[] | null;
-}
-
 export interface LearningSpaceLifecycleVM {
   createdAt: ISODateTime;
   createdBy: UUID;
@@ -54,8 +39,6 @@ export interface LearningSpaceVM {
   channels: LearningSpaceChannelsVM;
 
   schedule?: LearningSpaceScheduleVM;
-
-  resources?: LearningSpaceResourcesVM;
 
   lifecycle: LearningSpaceLifecycleVM;
 

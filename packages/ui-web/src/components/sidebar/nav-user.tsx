@@ -417,7 +417,7 @@ export function NavUser({
                 themeKey={profile.ui?.themeKey}
                 enableProfilePreview={false}
                 roleLabel={profileRoleLabel}
-                timezone={profile.prefs.timezone ?? null}
+                timezone={profile.prefs?.timezone ?? null}
                 locationLabel={profileLocationLabel}
                 about={profile.profile.bio ?? null}
                 sizeClassName="h-8 w-8 rounded-full"
@@ -453,7 +453,7 @@ export function NavUser({
                   themeKey={profile.ui?.themeKey}
                   enableProfilePreview={false}
                   roleLabel={profileRoleLabel}
-                  timezone={profile.prefs.timezone ?? null}
+                  timezone={profile.prefs?.timezone ?? null}
                   locationLabel={profileLocationLabel}
                   about={profile.profile.bio ?? null}
                   sizeClassName="h-10 w-10 rounded-full"

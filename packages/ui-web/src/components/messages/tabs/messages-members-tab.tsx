@@ -63,7 +63,7 @@ export function MessagesMembersTab({
                 showStatus
                 themeKey={member.ui?.themeKey}
                 roleLabel={getAvatarRoleLabel(member.kind)}
-                timezone={member.prefs.timezone ?? null}
+                timezone={member.prefs?.timezone ?? null}
                 locationLabel={getAvatarLocationLabel(member.location)}
                 about={member.profile.bio ?? null}
                 messageHref={dmTargetId ? `${dashboardBasePath}/dm/${dmTargetId}` : null}

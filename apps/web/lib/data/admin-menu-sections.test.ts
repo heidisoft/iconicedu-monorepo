@@ -36,10 +36,6 @@ describe('buildAdminMenuSections', () => {
           title: 'All',
           url: '/iconic-academy/admin/classrooms',
         }),
-        expect.objectContaining({
-          title: 'Resources',
-          url: '/iconic-academy/admin/classrooms/resources',
-        }),
       ]),
     );
   });

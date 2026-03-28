@@ -934,14 +934,6 @@ INSERT INTO "public"."learning_space_channels" ("id", "org_id", "learning_space_
 ON CONFLICT DO NOTHING;
 
 
-
---
--- Data for Name: learning_space_links; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-
-
-
 --
 -- Data for Name: learning_space_participants; Type: TABLE DATA; Schema: public; Owner: postgres
 --

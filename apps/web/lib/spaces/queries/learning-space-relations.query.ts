@@ -2,13 +2,11 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
   LearningSpaceChannelRow,
   LearningSpaceParticipantRow,
-  LearningSpaceLinkRow,
 } from '@iconicedu/shared-types';
 
 import {
   LEARNING_SPACE_CHANNEL_SELECT,
   LEARNING_SPACE_PARTICIPANT_SELECT,
-  LEARNING_SPACE_LINK_SELECT,
 } from '@iconicedu/web/lib/spaces/constants/selects';
 
 export async function getLearningSpaceChannelsByLearningSpaceIds(
@@ -59,22 +57,4 @@ export async function getLearningSpaceParticipantsByLearningSpaceIds(
     .in('learning_space_id', learningSpaceIds)
     .is('deleted_at', null)
     .returns<LearningSpaceParticipantRow[]>();
-}
-
-export async function getLearningSpaceLinksByLearningSpaceIds(
-  supabase: SupabaseClient,
-  orgId: string,
-  learningSpaceIds: string[],
-) {
-  if (!learningSpaceIds.length) {
-    return { data: [] as LearningSpaceLinkRow[] };
-  }
-
-  return supabase
-    .from('learning_space_links')
-    .select(LEARNING_SPACE_LINK_SELECT)
-    .eq('org_id', orgId)
-    .in('learning_space_id', learningSpaceIds)
-    .is('deleted_at', null)
-    .returns<LearningSpaceLinkRow[]>();
 }

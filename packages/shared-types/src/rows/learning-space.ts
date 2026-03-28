@@ -44,20 +44,3 @@ export interface LearningSpaceParticipantRow {
   deleted_at?: ISODateTime | null;
   deleted_by?: UUID | null;
 }
-
-export interface LearningSpaceLinkRow {
-  id: UUID;
-  org_id: UUID;
-  learning_space_id: UUID;
-  label: string;
-  icon_key?: string | null;
-  url?: string | null;
-  status?: string | null;
-  hidden?: boolean | null;
-  created_at: ISODateTime;
-  created_by?: UUID | null;
-  updated_at: ISODateTime;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
-}

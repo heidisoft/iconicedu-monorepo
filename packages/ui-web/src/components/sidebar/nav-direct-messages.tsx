@@ -167,7 +167,7 @@ export function NavDirectMessages({
                     presence={otherParticipant?.presence}
                     themeKey={otherParticipant?.ui?.themeKey}
                     roleLabel={getAvatarRoleLabel(otherParticipant?.kind)}
-                    timezone={otherParticipant?.prefs.timezone ?? null}
+                    timezone={otherParticipant?.prefs?.timezone ?? null}
                     locationLabel={getAvatarLocationLabel(otherParticipant?.location)}
                     about={otherParticipant?.profile.bio ?? null}
                     sizeClassName="size-7"

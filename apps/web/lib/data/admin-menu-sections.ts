@@ -15,7 +15,6 @@ export function buildAdminMenuSections(basePath: string): AdminMenuSectionVM[] {
       iconKey: 'learning_spaces',
       links: [
         { title: 'All', url: `${basePath}/admin/classrooms` },
-        { title: 'Resources', url: `${basePath}/admin/classrooms/resources` },
         { title: 'Session attendance', url: `${basePath}/admin/attendance/sessions` },
       ],
     },

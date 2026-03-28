@@ -184,14 +184,6 @@ async function deleteLearningSpaceRelations(
 
   await ensureDeleted(
     supabase
-      .from('learning_space_links')
-      .delete()
-      .eq('org_id', orgId)
-      .eq('learning_space_id', learningSpaceId),
-  );
-
-  await ensureDeleted(
-    supabase
       .from('learning_spaces')
       .delete()
       .eq('org_id', orgId)
