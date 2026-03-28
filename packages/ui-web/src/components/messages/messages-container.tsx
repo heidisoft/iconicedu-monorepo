@@ -1812,7 +1812,7 @@ export function MessagesContainer({
           schedules={loadedSchedules ?? []}
           isLoading={isLoadingSchedules}
           error={schedulesLoadError}
-          timezone={currentUserProfile?.prefs.timezone ?? null}
+          timezone={currentUserProfile?.prefs?.timezone ?? null}
         />
       );
     }
@@ -1828,7 +1828,7 @@ export function MessagesContainer({
 
   return (
     <ScheduleDisplayTimeZoneProvider
-      timezone={currentUserProfile?.prefs.timezone ?? null}
+      timezone={currentUserProfile?.prefs?.timezone ?? null}
     >
       <div className="relative flex h-full min-h-0 flex-1 min-w-0 flex-col">
         <div className="border-b border-border bg-muted/40 px-4">

@@ -192,7 +192,7 @@ export function AdminUserProfilePreviewDialog({
                     themeKey={profile?.ui?.themeKey}
                     email={account?.contacts.email ?? null}
                     roleLabel={roleLabel}
-                    timezone={profile?.prefs.timezone ?? null}
+                    timezone={profile?.prefs?.timezone ?? null}
                     enableProfilePreview={false}
                     showStatus={false}
                     sizeClassName="size-14"
@@ -323,7 +323,7 @@ export function AdminUserProfilePreviewDialog({
                         items={[
                           {
                             label: 'Timezone',
-                            value: profile.prefs.timezone ?? '—',
+                            value: profile.prefs?.timezone ?? '—',
                             icon: <Globe className="size-3.5" />,
                           },
                           {

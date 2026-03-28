@@ -17,6 +17,8 @@ vi.mock('@iconicedu/web/app/(app)/[orgSlug]/admin/users/invite-dialog', () => ({
 
 vi.mock('@iconicedu/ui-web/components/shared/avatar-with-status', () => ({
   AvatarWithStatus: ({ name }: { name: string }) => <div>{name}</div>,
+  getAvatarRoleLabel: (kind: string | null | undefined) => kind ?? null,
+  getAvatarLocationLabel: () => null,
 }));
 
 function buildRow(

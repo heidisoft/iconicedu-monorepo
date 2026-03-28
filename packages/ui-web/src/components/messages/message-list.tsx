@@ -569,7 +569,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                   presence={reply.core.sender.presence}
                                   themeKey={reply.core.sender.ui?.themeKey}
                                   roleLabel={getAvatarRoleLabel(reply.core.sender.kind)}
-                                  timezone={reply.core.sender.prefs.timezone ?? null}
+                                  timezone={reply.core.sender.prefs?.timezone ?? null}
                                   locationLabel={getAvatarLocationLabel(
                                     reply.core.sender.location,
                                   )}

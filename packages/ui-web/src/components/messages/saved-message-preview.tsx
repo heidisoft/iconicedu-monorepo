@@ -79,7 +79,7 @@ export function SavedMessagePreview({ message, onClick }: SavedMessagePreviewPro
         presence={message.core.sender.presence}
         themeKey={message.core.sender.ui?.themeKey}
         roleLabel={getAvatarRoleLabel(message.core.sender.kind)}
-        timezone={message.core.sender.prefs.timezone ?? null}
+        timezone={message.core.sender.prefs?.timezone ?? null}
         locationLabel={getAvatarLocationLabel(message.core.sender.location)}
         about={message.core.sender.profile.bio ?? null}
         sizeClassName="h-10 w-10 flex-shrink-0"
