@@ -22,7 +22,7 @@ const sessionItems = [
     channelId: 'channel-1',
     joinHref: '/iconic-academy/s/channel-1',
     chatHref: '/iconic-academy/s/channel-1',
-    weekBucket: 'this-week',
+    weekBucket: 'today',
   },
   {
     session: {
@@ -63,11 +63,17 @@ const sessionItems = [
 ];
 
 const sessionPage = {
+  today: {
+    items: sessionItems.filter((item) => item.weekBucket === 'today'),
+    total: 1,
+    pageSize: 1,
+    totalPages: 1,
+  },
   thisWeek: {
     items: sessionItems.filter((item) => item.weekBucket === 'this-week'),
-    total: 2,
+    total: 1,
     pageSize: 1,
-    totalPages: 2,
+    totalPages: 1,
   },
   nextWeek: {
     items: sessionItems.filter((item) => item.weekBucket === 'next-week'),
@@ -78,9 +84,15 @@ const sessionPage = {
 } as const;
 
 const combinedPaginationSessionPage = {
+  today: {
+    items: sessionItems.filter((item) => item.weekBucket === 'today'),
+    total: 1,
+    pageSize: 2,
+    totalPages: 1,
+  },
   thisWeek: {
     items: sessionItems.filter((item) => item.weekBucket === 'this-week'),
-    total: 2,
+    total: 1,
     pageSize: 2,
     totalPages: 1,
   },
@@ -93,9 +105,15 @@ const combinedPaginationSessionPage = {
 } as const;
 
 const singlePageSessionPage = {
+  today: {
+    items: sessionItems.filter((item) => item.weekBucket === 'today'),
+    total: 1,
+    pageSize: 3,
+    totalPages: 1,
+  },
   thisWeek: {
     items: sessionItems.filter((item) => item.weekBucket === 'this-week'),
-    total: 2,
+    total: 1,
     pageSize: 3,
     totalPages: 1,
   },
@@ -157,7 +175,7 @@ describe('DashboardHomeInfographicSection', () => {
     expect(screen.getByText('Page 2 of 3')).toBeInTheDocument();
   });
 
-  it('separates visible upcoming sessions into this week and next week sections', () => {
+  it('separates visible upcoming sessions into today and this week sections', () => {
     render(
       <DashboardHomeInfographicSection
         orgSlug="iconic-academy"
@@ -174,9 +192,11 @@ describe('DashboardHomeInfographicSection', () => {
       />,
     );
 
-    expect(screen.getAllByText('This week').length).toBeGreaterThan(1);
+    expect(screen.getByText('Today')).toBeInTheDocument();
+    expect(screen.getByText('This week')).toBeInTheDocument();
     expect(screen.queryByText('Next week')).not.toBeInTheDocument();
     expect(screen.getByText('Math 101')).toBeInTheDocument();
+    expect(screen.getByText('ELA 201')).toBeInTheDocument();
     expect(screen.queryByText('Science 301')).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /Join/i })).toHaveLength(2);
   });

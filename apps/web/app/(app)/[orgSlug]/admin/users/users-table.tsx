@@ -488,6 +488,9 @@ export function UsersTable({ rows }: UsersTableProps) {
                     : undefined,
               }}
               themeKey={resolveThemeKey(row.themeKey)}
+              email={row.email ?? null}
+              roleLabel={row.profileKind ?? null}
+              timezone={row.timezone ?? null}
               showStatus={false}
               sizeClassName="size-8"
               initialsLength={1}
@@ -647,6 +650,9 @@ export function UsersTable({ rows }: UsersTableProps) {
                               : undefined,
                         }}
                         themeKey={resolveThemeKey(child.themeKey)}
+                        email={child.email ?? null}
+                        roleLabel={child.profileKind ?? null}
+                        timezone={child.timezone ?? null}
                         showStatus={false}
                         sizeClassName="size-8"
                         initialsLength={1}

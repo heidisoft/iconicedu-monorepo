@@ -29,7 +29,7 @@ export interface DashboardUpcomingSessionListItem {
   channelId?: string | null;
   joinHref: string;
   chatHref: string;
-  weekBucket: 'this-week' | 'next-week';
+  weekBucket: 'today' | 'this-week' | 'next-week';
 }
 
 export interface DashboardUpcomingSessionsSectionPage {
@@ -40,6 +40,7 @@ export interface DashboardUpcomingSessionsSectionPage {
 }
 
 export interface DashboardUpcomingSessionsPage {
+  today: DashboardUpcomingSessionsSectionPage;
   thisWeek: DashboardUpcomingSessionsSectionPage;
   nextWeek: DashboardUpcomingSessionsSectionPage;
 }
@@ -94,6 +95,7 @@ export function DashboardHomeInfographicSection({
     useExternalLiveSessionJoinDialog();
   const pageSize = Math.max(
     1,
+    upcomingSessionsPage.today.pageSize,
     upcomingSessionsPage.thisWeek.pageSize,
     upcomingSessionsPage.nextWeek.pageSize,
   );
@@ -101,28 +103,39 @@ export function DashboardHomeInfographicSection({
   useEffect(() => {
     setCurrentPage(1);
   }, [
+    upcomingSessionsPage.today.items,
     upcomingSessionsPage.thisWeek.items,
     upcomingSessionsPage.nextWeek.items,
     pageSize,
   ]);
 
   const totalUpcomingSessions =
-    upcomingSessionsPage.thisWeek.total + upcomingSessionsPage.nextWeek.total;
+    upcomingSessionsPage.today.total +
+    upcomingSessionsPage.thisWeek.total +
+    upcomingSessionsPage.nextWeek.total;
   const totalPages = Math.max(1, Math.ceil(totalUpcomingSessions / pageSize));
   const visibleItems = useMemo(() => {
     const allItems = [
+      ...upcomingSessionsPage.today.items,
       ...upcomingSessionsPage.thisWeek.items,
       ...upcomingSessionsPage.nextWeek.items,
     ];
     const startIndex = (currentPage - 1) * pageSize;
     return allItems.slice(startIndex, startIndex + pageSize);
   }, [
+    upcomingSessionsPage.today.items,
     upcomingSessionsPage.thisWeek.items,
     upcomingSessionsPage.nextWeek.items,
     currentPage,
     pageSize,
   ]);
   const visibleSessionSections = [
+    {
+      key: 'today' as const,
+      label: 'Today',
+      items: visibleItems.filter((item) => item.weekBucket === 'today'),
+      total: upcomingSessionsPage.today.total,
+    },
     {
       key: 'this-week' as const,
       label: 'This week',
@@ -285,12 +298,12 @@ export function DashboardHomeInfographicSection({
                       key={item.session.id}
                       session={item.session}
                       index={index}
-                      canJoin={item.weekBucket === 'this-week'}
-                      showJoinButton={item.weekBucket === 'this-week'}
+                      canJoin={item.weekBucket !== 'next-week'}
+                      showJoinButton={item.weekBucket !== 'next-week'}
                       actionOrder="join-first"
                       classroomChatHref={item.chatHref}
                       joinLiveSession={
-                        item.weekBucket === 'this-week'
+                        item.weekBucket !== 'next-week'
                           ? async () => {
                               if (onJoinSession) {
                                 await onJoinSession(item);

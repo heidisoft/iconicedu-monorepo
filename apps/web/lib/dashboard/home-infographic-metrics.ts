@@ -28,7 +28,7 @@ export interface DashboardUpcomingSessionListItem {
   channelId?: string | null;
   joinHref: string;
   chatHref: string;
-  weekBucket: 'this-week' | 'next-week';
+  weekBucket: 'today' | 'this-week' | 'next-week';
 }
 
 export interface DashboardUpcomingSessionsSectionPage {
@@ -39,6 +39,7 @@ export interface DashboardUpcomingSessionsSectionPage {
 }
 
 export interface DashboardUpcomingSessionsPage {
+  today: DashboardUpcomingSessionsSectionPage;
   thisWeek: DashboardUpcomingSessionsSectionPage;
   nextWeek: DashboardUpcomingSessionsSectionPage;
 }
@@ -265,7 +266,11 @@ function buildUpcomingSessionPage(input: {
       joinHref:
         joinHrefByScheduleId.get(session.id) ?? `/${input.orgSlug}/class-schedule`,
       chatHref: chatHrefByScheduleId.get(session.id) ?? `/${input.orgSlug}/s`,
-      weekBucket: sessionWeekStart === currentWeekStart ? 'this-week' : 'next-week',
+      weekBucket: session.isToday
+        ? 'today'
+        : sessionWeekStart === currentWeekStart
+          ? 'this-week'
+          : 'next-week',
     } satisfies DashboardUpcomingSessionListItem;
   });
 
@@ -279,6 +284,7 @@ function buildUpcomingSessionPage(input: {
   });
 
   return {
+    today: buildSectionPage(items.filter((item) => item.weekBucket === 'today')),
     thisWeek: buildSectionPage(items.filter((item) => item.weekBucket === 'this-week')),
     nextWeek: buildSectionPage(items.filter((item) => item.weekBucket === 'next-week')),
   };
@@ -302,6 +308,12 @@ async function buildActiveRoleMetrics(input: {
     return {
       metrics: cloneZeroMetrics(),
       upcomingSessionsPage: {
+        today: {
+          items: [],
+          total: 0,
+          pageSize: input.pageSize,
+          totalPages: 1,
+        },
         thisWeek: {
           items: [],
           total: 0,
@@ -335,6 +347,12 @@ async function buildActiveRoleMetrics(input: {
     return {
       metrics: cloneZeroMetrics(),
       upcomingSessionsPage: {
+        today: {
+          items: [],
+          total: 0,
+          pageSize: input.pageSize,
+          totalPages: 1,
+        },
         thisWeek: {
           items: [],
           total: 0,

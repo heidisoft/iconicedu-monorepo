@@ -85,6 +85,35 @@ import {
   type StatusClearAfterOption,
 } from '@iconicedu/ui-web/components/sidebar/nav-user-status.utils';
 
+function getProfileRoleLabel(kind: UserProfileVM['kind']) {
+  switch (kind) {
+    case 'guardian':
+      return 'Parent';
+    case 'child':
+      return 'Student';
+    case 'educator':
+      return 'Educator';
+    case 'staff':
+      return 'Staff';
+    case 'system':
+      return 'System';
+    default:
+      return 'Member';
+  }
+}
+
+function getProfileLocationLabel(profile: UserProfileVM) {
+  const parts = [
+    profile.location?.city,
+    profile.location?.region,
+    profile.location?.countryName,
+  ]
+    .map((value) => value?.trim() ?? '')
+    .filter(Boolean);
+
+  return parts.length ? parts.join(', ') : null;
+}
+
 export function NavUser({
   profile,
   account,
@@ -229,6 +258,8 @@ export function NavUser({
   childHasAuthAccount?: boolean;
 }) {
   const profileDisplayName = getProfileFullName(profile.profile);
+  const profileRoleLabel = getProfileRoleLabel(profile.kind);
+  const profileLocationLabel = getProfileLocationLabel(profile);
   const localeLabel =
     profile.prefs.locale === 'en-US' ? '' : (profile.prefs.locale ?? '');
   const fallbackSecondaryLabel = localeLabel || '';
@@ -409,6 +440,10 @@ export function NavUser({
                 avatar={profile.profile.avatar}
                 presence={profile.presence}
                 themeKey={profile.ui?.themeKey}
+                roleLabel={profileRoleLabel}
+                timezone={profile.prefs.timezone ?? null}
+                locationLabel={profileLocationLabel}
+                about={profile.profile.bio ?? null}
                 sizeClassName="h-8 w-8 rounded-full"
                 fallbackClassName="rounded-full"
                 initialsLength={1}
@@ -440,6 +475,10 @@ export function NavUser({
                   avatar={profile.profile.avatar}
                   presence={profile.presence}
                   themeKey={profile.ui?.themeKey}
+                  roleLabel={profileRoleLabel}
+                  timezone={profile.prefs.timezone ?? null}
+                  locationLabel={profileLocationLabel}
+                  about={profile.profile.bio ?? null}
                   sizeClassName="h-8 w-8 rounded-full"
                   fallbackClassName="rounded-full"
                   initialsLength={1}

@@ -190,6 +190,10 @@ export function AdminUserProfilePreviewDialog({
                     }
                     presence={profile?.presence ?? undefined}
                     themeKey={profile?.ui?.themeKey}
+                    email={account?.contacts.email ?? null}
+                    roleLabel={roleLabel}
+                    timezone={profile?.prefs.timezone ?? null}
+                    enableProfilePreview={false}
                     showStatus={false}
                     sizeClassName="size-14"
                     initialsLength={2}

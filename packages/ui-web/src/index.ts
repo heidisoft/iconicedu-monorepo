@@ -20,6 +20,7 @@ export * from '@iconicedu/ui-web/ui/checkbox';
 export * from '@iconicedu/ui-web/ui/dialog';
 export * from '@iconicedu/ui-web/ui/calendar';
 export * from '@iconicedu/ui-web/ui/popover';
+export * from '@iconicedu/ui-web/ui/hover-card';
 export * from '@iconicedu/ui-web/ui/sidebar';
 export * from '@iconicedu/ui-web/ui/separator';
 export * from '@iconicedu/ui-web/ui/typography';

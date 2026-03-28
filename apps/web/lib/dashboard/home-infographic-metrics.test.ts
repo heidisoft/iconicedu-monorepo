@@ -123,20 +123,22 @@ describe('buildDashboardHomeInfographicMetrics', () => {
       activeSubjectsCount: 2,
       activeSubjectsLabel: 'Math, Science',
     });
-    expect(result.upcomingSessionsPage.thisWeek.items).toHaveLength(3);
+    expect(result.upcomingSessionsPage.today.items).toHaveLength(1);
+    expect(result.upcomingSessionsPage.thisWeek.items).toHaveLength(2);
     expect(result.upcomingSessionsPage.nextWeek.items).toHaveLength(5);
-    expect(result.upcomingSessionsPage.thisWeek.items[0]).toMatchObject({
+    expect(result.upcomingSessionsPage.today.items[0]).toMatchObject({
       session: { label: 'Algebra Daily' },
       joinHref: '/iconic-academy/s/channel-1',
-      weekBucket: 'this-week',
+      weekBucket: 'today',
     });
-    expect(result.upcomingSessionsPage.thisWeek.items[0]?.session.time).toContain(
+    expect(result.upcomingSessionsPage.today.items[0]?.session.time).toContain(
       'Student One',
     );
-    expect(result.upcomingSessionsPage.thisWeek.items[0]?.session.time).toContain(
+    expect(result.upcomingSessionsPage.today.items[0]?.session.time).toContain(
       'Tutor Jane',
     );
-    expect(result.upcomingSessionsPage.thisWeek.total).toBe(3);
+    expect(result.upcomingSessionsPage.today.total).toBe(1);
+    expect(result.upcomingSessionsPage.thisWeek.total).toBe(2);
     expect(result.upcomingSessionsPage.nextWeek.total).toBe(5);
     expect(result.metricsByRole.students).toEqual({
       upcomingSessionsThisWeek: 0,
@@ -182,12 +184,13 @@ describe('buildDashboardHomeInfographicMetrics', () => {
     expect(result.metricsByRole.students.upcomingSessionsThisWeek).toBe(3);
     expect(result.metricsByRole.students.completedClassesThisMonth).toBe(3);
     expect(result.metricsByRole.students.activeSubjectsCount).toBe(1);
-    expect(result.upcomingSessionsPage.thisWeek.items).toHaveLength(3);
+    expect(result.upcomingSessionsPage.today.items).toHaveLength(1);
+    expect(result.upcomingSessionsPage.thisWeek.items).toHaveLength(2);
     expect(result.upcomingSessionsPage.nextWeek.items).toHaveLength(5);
-    expect(result.upcomingSessionsPage.thisWeek.items[0]?.session.time).toContain(
+    expect(result.upcomingSessionsPage.today.items[0]?.session.time).toContain(
       'Tutor Jane',
     );
-    expect(result.upcomingSessionsPage.thisWeek.items[0]?.session.time).not.toContain(
+    expect(result.upcomingSessionsPage.today.items[0]?.session.time).not.toContain(
       'Student One',
     );
     expect(result.metricsByRole.parents.upcomingSessionsThisWeek).toBe(0);
@@ -244,12 +247,13 @@ describe('buildDashboardHomeInfographicMetrics', () => {
       activeSubjectsCount: 1,
       activeSubjectsLabel: '1 active student',
     });
-    expect(result.upcomingSessionsPage.thisWeek.items).toHaveLength(3);
+    expect(result.upcomingSessionsPage.today.items).toHaveLength(1);
+    expect(result.upcomingSessionsPage.thisWeek.items).toHaveLength(2);
     expect(result.upcomingSessionsPage.nextWeek.items).toHaveLength(5);
-    expect(result.upcomingSessionsPage.thisWeek.items[0]?.session.time).toContain(
+    expect(result.upcomingSessionsPage.today.items[0]?.session.time).toContain(
       'Student Nine',
     );
-    expect(result.upcomingSessionsPage.thisWeek.items[0]?.session.time).not.toContain(
+    expect(result.upcomingSessionsPage.today.items[0]?.session.time).not.toContain(
       'Tutor Jane',
     );
     expect(result.metricsByRole.parents.activeSubjectsCount).toBe(0);
@@ -321,10 +325,10 @@ describe('buildDashboardHomeInfographicMetrics', () => {
     expect(result.calendarHref).toBe('/iconic-academy/admin/attendance/sessions');
     expect(result.notificationsHref).toBe('/iconic-academy/notifications');
     expect(result.browseHref).toBe('/iconic-academy/admin/channels');
-    expect(result.upcomingSessionsPage.thisWeek.items[0]?.session.time).toContain(
+    expect(result.upcomingSessionsPage.today.items[0]?.session.time).toContain(
       'Staff Student One',
     );
-    expect(result.upcomingSessionsPage.thisWeek.items[0]?.session.time).toContain(
+    expect(result.upcomingSessionsPage.today.items[0]?.session.time).toContain(
       'Staff Tutor One',
     );
   });
@@ -350,10 +354,14 @@ describe('buildDashboardHomeInfographicMetrics', () => {
       } as never,
     });
 
-    expect(result.upcomingSessionsPage.thisWeek.total).toBe(3);
-    expect(result.upcomingSessionsPage.thisWeek.totalPages).toBe(2);
+    expect(result.upcomingSessionsPage.today.total).toBe(1);
+    expect(result.upcomingSessionsPage.today.totalPages).toBe(1);
+    expect(result.upcomingSessionsPage.today.pageSize).toBe(2);
+    expect(result.upcomingSessionsPage.today.items).toHaveLength(1);
+    expect(result.upcomingSessionsPage.thisWeek.total).toBe(2);
+    expect(result.upcomingSessionsPage.thisWeek.totalPages).toBe(1);
     expect(result.upcomingSessionsPage.thisWeek.pageSize).toBe(2);
-    expect(result.upcomingSessionsPage.thisWeek.items).toHaveLength(3);
+    expect(result.upcomingSessionsPage.thisWeek.items).toHaveLength(2);
     expect(result.upcomingSessionsPage.nextWeek.total).toBe(5);
     expect(result.upcomingSessionsPage.nextWeek.totalPages).toBe(3);
     expect(result.upcomingSessionsPage.nextWeek.pageSize).toBe(2);
@@ -395,10 +403,10 @@ describe('buildDashboardHomeInfographicMetrics', () => {
       } as never,
     });
 
-    expect(result.upcomingSessionsPage.thisWeek.items[0]?.session.time).toContain(
+    expect(result.upcomingSessionsPage.today.items[0]?.session.time).toContain(
       'Fri 11:00am New York time',
     );
-    expect(result.upcomingSessionsPage.thisWeek.items[0]?.session.time).not.toContain(
+    expect(result.upcomingSessionsPage.today.items[0]?.session.time).not.toContain(
       '3:00pm UTC',
     );
   });
@@ -447,10 +455,10 @@ describe('buildDashboardHomeInfographicMetrics', () => {
       } as never,
     });
 
-    expect(result.upcomingSessionsPage.thisWeek.items[0]?.session.time).toContain(
+    expect(result.upcomingSessionsPage.today.items[0]?.session.time).toContain(
       'Sat 1:30am Sri Lanka time',
     );
-    expect(result.upcomingSessionsPage.thisWeek.items[0]?.session.time).not.toContain(
+    expect(result.upcomingSessionsPage.today.items[0]?.session.time).not.toContain(
       '4:00pm New York time',
     );
   });
@@ -475,7 +483,7 @@ describe('buildDashboardHomeInfographicMetrics', () => {
       } as never,
     });
 
-    expect(result.upcomingSessionsPage.thisWeek.items[0]?.weekBucket).toBe('this-week');
+    expect(result.upcomingSessionsPage.today.items[0]?.weekBucket).toBe('today');
     expect(result.upcomingSessionsPage.nextWeek.items.at(-1)?.weekBucket).toBe(
       'next-week',
     );
@@ -511,10 +519,11 @@ describe('buildDashboardHomeInfographicMetrics', () => {
     });
 
     expect(result.metricsByRole.students.upcomingSessionsThisWeek).toBe(1);
-    expect(result.upcomingSessionsPage.thisWeek.items).toHaveLength(1);
-    expect(result.upcomingSessionsPage.thisWeek.items[0]?.weekBucket).toBe('this-week');
+    expect(result.upcomingSessionsPage.today.items).toHaveLength(1);
+    expect(result.upcomingSessionsPage.today.items[0]?.weekBucket).toBe('today');
+    expect(result.upcomingSessionsPage.thisWeek.items).toHaveLength(0);
     expect(result.upcomingSessionsPage.nextWeek.items).toHaveLength(0);
-    expect(result.upcomingSessionsPage.thisWeek.items[0]?.session.time).toContain(
+    expect(result.upcomingSessionsPage.today.items[0]?.session.time).toContain(
       'Sun 5:30pm Los Angeles time',
     );
   });

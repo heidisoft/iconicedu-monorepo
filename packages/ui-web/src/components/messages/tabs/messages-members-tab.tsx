@@ -29,6 +29,35 @@ export function canOpenMemberProfile(
   return typeof onProfileClick === 'function';
 }
 
+function getRoleLabel(kind: UserProfileVM['kind']): string {
+  switch (kind) {
+    case 'educator':
+      return 'Educator';
+    case 'guardian':
+      return 'Parent';
+    case 'child':
+      return 'Student';
+    case 'staff':
+      return 'Staff';
+    case 'system':
+      return 'System';
+    default:
+      return 'Member';
+  }
+}
+
+function getLocationLabel(member: UserProfileVM): string | null {
+  const parts = [
+    member.location?.city,
+    member.location?.region,
+    member.location?.countryName,
+  ]
+    .map((value) => value?.trim() ?? '')
+    .filter(Boolean);
+
+  return parts.length ? parts.join(', ') : null;
+}
+
 export function MessagesMembersTab({
   participants,
   currentUserId,
@@ -58,6 +87,11 @@ export function MessagesMembersTab({
                 presence={member.presence}
                 showStatus
                 themeKey={member.ui?.themeKey}
+                roleLabel={getRoleLabel(member.kind)}
+                timezone={member.prefs.timezone ?? null}
+                locationLabel={getLocationLabel(member)}
+                about={member.profile.bio ?? null}
+                messageHref={dmTargetId ? `${dashboardBasePath}/dm/${dmTargetId}` : null}
                 sizeClassName="h-9 w-9"
                 initialsLength={1}
               />
