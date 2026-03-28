@@ -25,4 +25,22 @@ describe('buildAdminMenuSections', () => {
     const settingsSection = sections.find((section) => section.title === 'Settings');
     expect(settingsSection?.links.map((link) => link.title)).toContain('Subjects');
   });
+
+  it('links classrooms admin routes with the classrooms path', () => {
+    const sections = buildAdminMenuSections('/iconic-academy');
+    const classroomsSection = sections.find((section) => section.title === 'Classrooms');
+
+    expect(classroomsSection?.links).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          title: 'All',
+          url: '/iconic-academy/admin/classrooms',
+        }),
+        expect.objectContaining({
+          title: 'Resources',
+          url: '/iconic-academy/admin/classrooms/resources',
+        }),
+      ]),
+    );
+  });
 });

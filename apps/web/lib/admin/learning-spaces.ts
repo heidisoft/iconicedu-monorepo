@@ -1,5 +1,6 @@
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import type {
+  ChannelRow,
   ClassScheduleRow,
   ClassScheduleRecurrenceRow,
   LearningSpaceChannelRow,
@@ -7,6 +8,7 @@ import type {
   LearningSpaceRow,
   ProfileRow,
 } from '@iconicedu/shared-types';
+import { resolveThemeKey } from '@iconicedu/web/lib/profile/derive';
 import { getLearningSpacesByOrg } from '@iconicedu/web/lib/spaces/queries/learning-spaces.query';
 import {
   getLearningSpaceChannelsByLearningSpaceIds,
@@ -15,6 +17,7 @@ import {
 import { getProfilesByIds } from '@iconicedu/web/lib/profile/queries/profiles.query';
 
 export type AdminLearningSpaceRow = LearningSpaceRow & {
+  themeKey?: string | null;
   participantNames: string[];
   participantDetails: {
     id: string;
@@ -77,6 +80,18 @@ export async function getAdminLearningSpaceRows(
   const participants = participantsResponse.data ?? [];
   const channels = channelsResponse.data ?? [];
   const schedules = schedulesResponse.data ?? [];
+  const channelIds = Array.from(
+    new Set(channels.map((row) => row.channel_id).filter(Boolean)),
+  );
+  const { data: channelRows } = channelIds.length
+    ? await supabase
+        .from('channels')
+        .select('id, ui_theme_key')
+        .eq('org_id', orgId)
+        .in('id', channelIds)
+        .is('deleted_at', null)
+        .returns<Pick<ChannelRow, 'id' | 'ui_theme_key'>[]>()
+    : { data: [] as Pick<ChannelRow, 'id' | 'ui_theme_key'>[] };
 
   const scheduleIds = schedules.map((row) => row.id).filter(Boolean);
   const { data: recurrences, error: recurrenceError } = scheduleIds.length
@@ -108,6 +123,9 @@ export async function getAdminLearningSpaceRows(
     bucket.push(row);
     channelsBySpace.set(row.learning_space_id, bucket);
   });
+  const channelThemeById = new Map(
+    (channelRows ?? []).map((row) => [row.id, resolveThemeKey(row.ui_theme_key ?? null)]),
+  );
 
   const schedulesBySpace = new Map<string, ClassScheduleRow[]>();
   schedules.forEach((row) => {
@@ -134,6 +152,12 @@ export async function getAdminLearningSpaceRows(
     const updatedByProfile = row.updated_by ? profilesById.get(row.updated_by) : null;
     return {
       ...row,
+      themeKey: (() => {
+        const primaryChannelId =
+          (channelsBySpace.get(row.id) ?? []).find((item) => item.is_primary)
+            ?.channel_id ?? null;
+        return primaryChannelId ? (channelThemeById.get(primaryChannelId) ?? null) : null;
+      })(),
       participantNames: (participantsBySpace.get(row.id) ?? [])
         .map((participant) => profilesById.get(participant.profile_id))
         .filter((profile): profile is ProfileRow => Boolean(profile))

@@ -5,7 +5,7 @@ import {
   buildSchedulesHashKeyFromFormSchedules,
   mapSchedulesToPayload,
   normalizeSchedules,
-} from '@iconicedu/web/app/(app)/[orgSlug]/admin/spaces/learning-space-form-dialog.utils';
+} from '@iconicedu/web/app/(app)/[orgSlug]/admin/classrooms/learning-space-form-dialog.utils';
 
 describe('learning-space-form-dialog schedule utils', () => {
   it('preserves exceptions and overrides in payload mapping', () => {

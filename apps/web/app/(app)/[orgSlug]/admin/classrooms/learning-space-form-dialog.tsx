@@ -57,7 +57,7 @@ import {
   buildSchedulesHashKeyFromFormSchedules,
   mapSchedulesToPayload,
   normalizeSchedules,
-} from '@iconicedu/web/app/(app)/[orgSlug]/admin/spaces/learning-space-form-dialog.utils';
+} from '@iconicedu/web/app/(app)/[orgSlug]/admin/classrooms/learning-space-form-dialog.utils';
 import { LiveSessionSettingsSection } from '@iconicedu/web/components/admin/live-session-settings-section';
 import { DEFAULT_ADMIN_LIVE_SESSION_CONFIG } from '@iconicedu/web/lib/admin/live-session-config';
 import { mergeSubjectOptions } from '@iconicedu/web/lib/subjects/utils';

@@ -1,53 +1,11 @@
-import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { redirect } from 'next/navigation';
 
-import { DashboardHeader } from '@iconicedu/ui-web';
-
-import {
-  getDashboardAccountContext,
-  getDashboardProfileContext,
-} from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
-import { getAdminLearningSpaceRows } from '@iconicedu/web/lib/admin/learning-spaces';
-import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
-import { LearningSpacesDashboard } from '@iconicedu/web/app/(app)/[orgSlug]/admin/spaces/learning-spaces-dashboard';
-import {
-  listActiveOrgSubjectCatalog,
-  mapOrgSubjectRowsToOptions,
-} from '@iconicedu/web/lib/subjects/queries/org-subject-catalog.query';
-
-export const metadata: Metadata = {
-  title: 'Admin · Classrooms',
-  description: 'Review and manage classrooms, subjects, and visibility settings.',
-};
-
-export default async function AdminLearningSpacesPage({
+export default async function AdminLearningSpacesRedirectPage({
   params,
 }: {
   params: Promise<{ orgSlug: string }>;
 }) {
   const { orgSlug } = await params;
-  const { supabase, account } = await getDashboardAccountContext(orgSlug);
-  const org = await buildOrgBySlug(supabase, orgSlug);
 
-  if (!org) {
-    notFound();
-  }
-
-  const { currentUserProfile } = await getDashboardProfileContext(supabase, account.id);
-  const rows = await getAdminLearningSpaceRows(org.id);
-  const subjectCatalogResponse = await listActiveOrgSubjectCatalog(supabase, org.id);
-  const subjectOptions = mapOrgSubjectRowsToOptions(subjectCatalogResponse.data);
-
-  return (
-    <div className="flex flex-1 flex-col">
-      <DashboardHeader title="Classrooms" />
-      <div className="flex flex-1 flex-col gap-4 p-4">
-        <LearningSpacesDashboard
-          rows={rows}
-          currentUserTimezone={currentUserProfile?.prefs.timezone ?? null}
-          subjectOptions={subjectOptions}
-        />
-      </div>
-    </div>
-  );
+  redirect(`/${orgSlug}/admin/classrooms`);
 }

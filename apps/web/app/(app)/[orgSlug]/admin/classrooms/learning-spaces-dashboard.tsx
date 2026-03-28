@@ -15,8 +15,8 @@ import {
 import { Loader2, RotateCw } from '@iconicedu/ui-web';
 
 import type { AdminLearningSpaceRow } from '@iconicedu/web/lib/admin/learning-spaces';
-import { LearningSpacesTable } from '@iconicedu/web/app/(app)/[orgSlug]/admin/spaces/learning-spaces-table';
-import { LearningSpaceFormDialog } from '@iconicedu/web/app/(app)/[orgSlug]/admin/spaces/learning-space-form-dialog';
+import { LearningSpacesTable } from '@iconicedu/web/app/(app)/[orgSlug]/admin/classrooms/learning-spaces-table';
+import { LearningSpaceFormDialog } from '@iconicedu/web/app/(app)/[orgSlug]/admin/classrooms/learning-space-form-dialog';
 import type { UserProfileVM } from '@iconicedu/shared-types';
 import type { LearningSpaceDetail } from '@iconicedu/web/lib/admin/learning-space-detail';
 
