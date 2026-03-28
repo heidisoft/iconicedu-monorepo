@@ -26,7 +26,6 @@ import type {
   ChannelUiDefaultsVM,
   LearningSpaceCreatePayload,
   LearningSpaceParticipantPayload,
-  LearningSpaceResourcePayload,
   LearningSpaceSchedulePayload,
 } from '@iconicedu/shared-types';
 
@@ -35,14 +34,6 @@ type ParticipantProfileSnapshotRow = {
   display_name?: string | null;
   avatar_url?: string | null;
   ui_theme_key?: string | null;
-};
-
-type LearningSpaceLinkSnapshotRow = {
-  label: string;
-  icon_key?: string | null;
-  url?: string | null;
-  status?: string | null;
-  hidden?: boolean | null;
 };
 
 type ExistingScheduleSnapshot = {
@@ -372,34 +363,6 @@ function normalizeForCompare(value: unknown): unknown {
   }
 
   return value;
-}
-
-function normalizeLinksForCompare(links: Array<LearningSpaceLinkSnapshotRow>) {
-  return [...links]
-    .map((link) => ({
-      label: link.label?.trim() ?? '',
-      iconKey: link.icon_key ?? null,
-      url: link.url ?? null,
-      status: link.status ?? 'active',
-      hidden: link.hidden ?? null,
-    }))
-    .filter((link) => link.label.length > 0)
-    .sort((a, b) => canonicalJson(a).localeCompare(canonicalJson(b)));
-}
-
-function normalizeIncomingLinksForCompare(
-  links: LearningSpaceResourcePayload[] | null | undefined,
-) {
-  return [...(links ?? [])]
-    .map((link) => ({
-      label: link.label?.trim() ?? '',
-      iconKey: link.iconKey ?? null,
-      url: link.url ?? null,
-      status: link.status ?? 'active',
-      hidden: link.hidden ?? null,
-    }))
-    .filter((link) => link.label.length > 0)
-    .sort((a, b) => canonicalJson(a).localeCompare(canonicalJson(b)));
 }
 
 function normalizeParticipantIds(ids: string[]) {
@@ -1290,7 +1253,6 @@ export async function updateLearningSpaceFromPayload(
     existingRecurrenceResponse,
     existingExceptionsResponse,
     existingOverridesResponse,
-    existingLinksResponse,
     channelStateResponse,
   ] = await Promise.all([
     serviceClient
@@ -1326,13 +1288,6 @@ export async function updateLearningSpaceFromPayload(
       .eq('org_id', orgId)
       .returns<ExistingOverrideSnapshot[]>(),
     serviceClient
-      .from('learning_space_links')
-      .select('label, icon_key, url, status, hidden')
-      .eq('org_id', orgId)
-      .eq('learning_space_id', learningSpaceId)
-      .is('deleted_at', null)
-      .returns<LearningSpaceLinkSnapshotRow[]>(),
-    serviceClient
       .from('channels')
       .select(
         'topic, description, icon_key, ui_theme_key, ui_defaults, live_session_config',
@@ -1355,9 +1310,6 @@ export async function updateLearningSpaceFromPayload(
   }
   if (existingSchedulesResponse.error) {
     throw new Error(existingSchedulesResponse.error.message);
-  }
-  if (existingLinksResponse.error) {
-    throw new Error(existingLinksResponse.error.message);
   }
   if (existingRecurrenceResponse.error) {
     throw new Error(existingRecurrenceResponse.error.message);
@@ -1409,10 +1361,6 @@ export async function updateLearningSpaceFromPayload(
       canonicalJson(payload.settings?.uiDefaults ?? null) ||
     canonicalJson(existingChannel.live_session_config ?? null) !==
       canonicalJson(toStoredLiveSessionConfig(payload.liveSession));
-
-  const hasLinkChanges =
-    canonicalJson(normalizeLinksForCompare(existingLinksResponse.data ?? [])) !==
-    canonicalJson(normalizeIncomingLinksForCompare(payload.resources ?? []));
 
   const previousSchedules = existingSchedulesResponse.data ?? [];
   debugScheduleDiff('loaded-raw-rows', {
@@ -1607,9 +1555,8 @@ export async function updateLearningSpaceFromPayload(
     hasBasicsChanges ||
     hasChannelSettingsChanges ||
     hasParticipantChanges ||
-    hasLinkChanges ||
     hasSemanticScheduleChanges;
-  const hasInfoChanges = hasBasicsChanges || hasChannelSettingsChanges || hasLinkChanges;
+  const hasInfoChanges = hasBasicsChanges || hasChannelSettingsChanges;
 
   if (!hasAnyChanges) {
     return;
@@ -1654,14 +1601,6 @@ export async function updateLearningSpaceFromPayload(
     createdBy: actorProfileId,
     createdAt: now,
     participants: payload.participants,
-  });
-
-  await replaceLearningSpaceLinks(supabase, {
-    orgId,
-    learningSpaceId,
-    createdBy: actorProfileId,
-    createdAt: now,
-    links: payload.resources ?? [],
   });
 
   if (hasSemanticScheduleChanges) {
@@ -1729,9 +1668,6 @@ export async function updateLearningSpaceFromPayload(
     canonicalJson(toStoredLiveSessionConfig(payload.liveSession))
   ) {
     infoChangeSummaryParts.push('Updated live session settings');
-  }
-  if (hasLinkChanges) {
-    infoChangeSummaryParts.push('Updated class resources');
   }
   if (scheduleChangeActivities.length > 0) {
     infoChangeSummaryParts.push('Class schedule has been updated');
@@ -2007,69 +1943,6 @@ async function replaceChannelMembers(
   const { error } = await supabase.from('channel_members').insert(rows);
   if (error) {
     throw new Error(error.message);
-  }
-}
-
-type ReplaceLinksPayload = {
-  orgId: string;
-  learningSpaceId: string;
-  links: LearningSpaceResourcePayload[];
-  createdBy: string;
-  createdAt: string;
-};
-
-async function replaceLearningSpaceLinks(
-  supabase: SupabaseClient,
-  payload: ReplaceLinksPayload,
-) {
-  const serviceClient = createSupabaseServiceClient();
-
-  await ensureDeleted(
-    serviceClient
-      .from('learning_space_links')
-      .delete()
-      .eq('org_id', payload.orgId)
-      .eq('learning_space_id', payload.learningSpaceId),
-  );
-
-  const links = payload.links
-    .map((link) => ({
-      label: link.label?.trim(),
-      iconKey: link.iconKey ?? null,
-      url: link.url ?? null,
-      status: link.status ?? 'active',
-      hidden: link.hidden ?? null,
-    }))
-    .filter((link) => Boolean(link.label));
-
-  if (!links.length) {
-    return;
-  }
-
-  const rows = links.map((link) => ({
-    id: randomUUID(),
-    org_id: payload.orgId,
-    learning_space_id: payload.learningSpaceId,
-    label: link.label,
-    icon_key: link.iconKey,
-    url: link.url,
-    status: link.status,
-    hidden: link.hidden,
-    created_at: payload.createdAt,
-    created_by: payload.createdBy,
-    updated_at: payload.createdAt,
-    updated_by: payload.createdBy,
-  }));
-
-  const { data, error } = await serviceClient
-    .from('learning_space_links')
-    .insert(rows)
-    .select('id');
-  if (error) {
-    throw new Error(error.message);
-  }
-  if (!data?.length) {
-    throw new Error('Unable to insert class links.');
   }
 }
 

@@ -1,11 +1,10 @@
 import type {
   ClassScheduleVM,
-  LearningSpaceLinkVM,
   LearningSpaceVM,
   UserProfileVM,
   ChannelVM,
 } from '@iconicedu/shared-types';
-import type { LearningSpaceRow, LearningSpaceLinkRow } from '@iconicedu/shared-types';
+import type { LearningSpaceRow } from '@iconicedu/shared-types';
 
 type LearningSpaceMapperInput = {
   channels: {
@@ -13,19 +12,8 @@ type LearningSpaceMapperInput = {
     relatedChannels?: ChannelVM[];
   };
   participants: UserProfileVM[];
-  links?: LearningSpaceLinkVM[] | null;
   scheduleSeries?: ClassScheduleVM | null;
 };
-
-export function mapLearningSpaceLinkRow(row: LearningSpaceLinkRow): LearningSpaceLinkVM {
-  return {
-    label: row.label,
-    iconKey: row.icon_key ?? null,
-    url: row.url ?? null,
-    status: (row.status as LearningSpaceLinkVM['status']) ?? null,
-    hidden: row.hidden ?? null,
-  };
-}
 
 export function mapLearningSpaceRowToVM(
   row: LearningSpaceRow,
@@ -49,7 +37,6 @@ export function mapLearningSpaceRowToVM(
       relatedChannels: input.channels.relatedChannels ?? undefined,
     },
     schedule: input.scheduleSeries ? { scheduleSeries: input.scheduleSeries } : undefined,
-    resources: input.links ? { links: input.links } : undefined,
     lifecycle: {
       createdAt: row.created_at,
       createdBy: row.created_by ?? row.org_id,

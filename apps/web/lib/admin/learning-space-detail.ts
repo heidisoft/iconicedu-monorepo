@@ -5,8 +5,6 @@ import type {
   ClassScheduleRecurrenceOverrideRow,
   ClassScheduleRecurrenceRow,
   ClassScheduleRow,
-  LearningSpaceLinkRow,
-  LearningSpaceLinkVM,
   LearningSpaceParticipantRow,
   LearningSpaceRow,
   ThemeKey,
@@ -27,7 +25,6 @@ import {
   normalizeScheduleFormDate,
 } from '@iconicedu/web/lib/admin/learning-space-schedule-hash';
 import { buildUserProfileById } from '@iconicedu/web/lib/profile/builders/user-profile.builder';
-import { mapLearningSpaceLinkRow } from '@iconicedu/web/lib/spaces/mappers/learning-space.mapper';
 import { getAdminLiveSessionConfig } from '@iconicedu/web/lib/admin/live-session-config';
 
 export type LearningSpaceDetail = {
@@ -45,7 +42,6 @@ export type LearningSpaceDetail = {
   };
   liveSession: ChannelLiveSessionConfigVM;
   participants: UserProfileVM[];
-  resources: LearningSpaceLinkVM[];
   schedules: RecurrenceFormData[];
 };
 
@@ -172,7 +168,7 @@ export async function getLearningSpaceDetail(learningSpaceId: string) {
     throw new Error('Class not found');
   }
 
-  const [participantsResponse, linksResponse, schedulesResponse, channelLinksResponse] =
+  const [participantsResponse, schedulesResponse, channelLinksResponse] =
     await Promise.all([
       supabase
         .from('learning_space_participants')
@@ -181,13 +177,6 @@ export async function getLearningSpaceDetail(learningSpaceId: string) {
         .eq('learning_space_id', learningSpaceId)
         .is('deleted_at', null)
         .returns<LearningSpaceParticipantRow[]>(),
-      supabase
-        .from('learning_space_links')
-        .select('*')
-        .eq('org_id', orgId)
-        .eq('learning_space_id', learningSpaceId)
-        .is('deleted_at', null)
-        .returns<LearningSpaceLinkRow[]>(),
       supabase
         .from('class_schedules')
         .select('*')
@@ -207,9 +196,6 @@ export async function getLearningSpaceDetail(learningSpaceId: string) {
 
   if (participantsResponse.error) {
     throw new Error(participantsResponse.error.message);
-  }
-  if (linksResponse.error) {
-    throw new Error(linksResponse.error.message);
   }
   if (schedulesResponse.error) {
     throw new Error(schedulesResponse.error.message);
@@ -276,7 +262,6 @@ export async function getLearningSpaceDetail(learningSpaceId: string) {
     },
     liveSession: getAdminLiveSessionConfig(channelLiveSessionConfig),
     participants,
-    resources: (linksResponse.data ?? []).map(mapLearningSpaceLinkRow),
     schedules,
   } satisfies LearningSpaceDetail;
 }

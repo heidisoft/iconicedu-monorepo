@@ -22,7 +22,6 @@ import type {
   ChannelUiDefaultsVM,
   LearningSpaceCreatePayload,
   LearningSpaceParticipantPayload,
-  LearningSpaceResourcePayload,
   LearningSpaceScheduleExceptionPayload,
   LearningSpaceScheduleOverridePayload,
   LearningSpaceSchedulePayload,
@@ -193,14 +192,6 @@ export async function createLearningSpaceFromPayload(
     channelId,
     createdBy: actorProfileId,
     createdAt: now,
-  });
-
-  await insertLearningSpaceLinks(supabase, {
-    orgId,
-    learningSpaceId,
-    createdBy: actorProfileId,
-    createdAt: now,
-    links: payload.resources ?? [],
   });
 
   const scheduleIds = await insertClassSchedules(supabase, {
@@ -500,60 +491,6 @@ async function insertChannelCapabilities(
   const { error } = await supabase.from('channel_capabilities').insert(rows);
   if (error) {
     throw new Error(error.message);
-  }
-}
-
-type LearningSpaceLinksInsertPayload = {
-  orgId: string;
-  learningSpaceId: string;
-  links: LearningSpaceResourcePayload[];
-  createdBy: string;
-  createdAt: string;
-};
-
-async function insertLearningSpaceLinks(
-  supabase: SupabaseClient,
-  payload: LearningSpaceLinksInsertPayload,
-) {
-  const links = payload.links
-    .map((link) => ({
-      label: link.label?.trim(),
-      iconKey: link.iconKey ?? null,
-      url: link.url ?? null,
-      status: link.status ?? 'active',
-      hidden: link.hidden ?? null,
-    }))
-    .filter((link) => Boolean(link.label));
-
-  if (!links.length) {
-    return;
-  }
-
-  const rows = links.map((link) => ({
-    id: randomUUID(),
-    org_id: payload.orgId,
-    learning_space_id: payload.learningSpaceId,
-    label: link.label,
-    icon_key: link.iconKey,
-    url: link.url,
-    status: link.status,
-    hidden: link.hidden,
-    created_at: payload.createdAt,
-    created_by: payload.createdBy,
-    updated_at: payload.createdAt,
-    updated_by: payload.createdBy,
-  }));
-
-  const serviceClient = createSupabaseServiceClient();
-  const { data, error } = await serviceClient
-    .from('learning_space_links')
-    .insert(rows)
-    .select('id');
-  if (error) {
-    throw new Error(error.message);
-  }
-  if (!data?.length) {
-    throw new Error('Unable to insert class links.');
   }
 }
 

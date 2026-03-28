@@ -130,7 +130,6 @@ describe('createLearningSpaceFromPayload', () => {
           themeKey: 'emerald',
         },
       ],
-      resources: [],
       schedules: [
         {
           startDate: '2026-03-14T14:00:00.000Z',

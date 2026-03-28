@@ -62,14 +62,6 @@ export type LearningSpaceParticipantPayload = {
   themeKey?: string | null;
 };
 
-export type LearningSpaceResourcePayload = {
-  label: string;
-  iconKey?: string | null;
-  url?: string | null;
-  status?: string | null;
-  hidden?: boolean | null;
-};
-
 export type LearningSpaceCreatePayload = {
   basics: {
     title: string;
@@ -84,6 +76,5 @@ export type LearningSpaceCreatePayload = {
   } | null;
   liveSession?: ChannelLiveSessionConfigVM | null;
   participants: LearningSpaceParticipantPayload[];
-  resources?: LearningSpaceResourcePayload[] | null;
   schedules?: LearningSpaceSchedulePayload[] | null;
 };

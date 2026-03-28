@@ -2,14 +2,12 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
   ChannelVM,
   ClassScheduleVM,
-  LearningSpaceLinkVM,
   LearningSpaceVM,
   UserProfileVM,
 } from '@iconicedu/shared-types';
 import type {
   LearningSpaceRow,
   LearningSpaceChannelRow,
-  LearningSpaceLinkRow,
   LearningSpaceParticipantRow,
 } from '@iconicedu/shared-types';
 import { groupBy } from '@iconicedu/utils';
@@ -21,13 +19,9 @@ import {
 import {
   getLearningSpaceChannelsByLearningSpaceIds,
   getLearningSpaceChannelByChannelId,
-  getLearningSpaceLinksByLearningSpaceIds,
   getLearningSpaceParticipantsByLearningSpaceIds,
 } from '@iconicedu/web/lib/spaces/queries/learning-space-relations.query';
-import {
-  mapLearningSpaceLinkRow,
-  mapLearningSpaceRowToVM,
-} from '@iconicedu/web/lib/spaces/mappers/learning-space.mapper';
+import { mapLearningSpaceRowToVM } from '@iconicedu/web/lib/spaces/mappers/learning-space.mapper';
 import { buildChannelById } from '@iconicedu/web/lib/channels/builders/channel.builder';
 import { buildUserProfilesByIds } from '@iconicedu/web/lib/profile/builders/user-profile.builder';
 import { buildClassScheduleById } from '@iconicedu/web/lib/schedules/builders/class-schedule.builder';
@@ -35,7 +29,6 @@ import { buildClassScheduleById } from '@iconicedu/web/lib/schedules/builders/cl
 type LearningSpaceRelations = {
   channels: LearningSpaceChannelRow[];
   participants: LearningSpaceParticipantRow[];
-  links: LearningSpaceLinkRow[];
 };
 
 type BuildLearningSpaceOptions = {
@@ -86,10 +79,6 @@ async function resolveParticipants(
     .filter((profile): profile is UserProfileVM => Boolean(profile));
 }
 
-function resolveLinks(rows: LearningSpaceLinkRow[]): LearningSpaceLinkVM[] {
-  return rows.map(mapLearningSpaceLinkRow);
-}
-
 async function resolveSchedule(
   supabase: SupabaseClient,
   orgId: string,
@@ -135,10 +124,11 @@ export async function buildLearningSpaceFromRow(
     return null;
   }
 
-  const [participants, links] = await Promise.all([
-    resolveParticipants(supabase, row.org_id, relations.participants),
-    Promise.resolve(resolveLinks(relations.links)),
-  ]);
+  const participants = await resolveParticipants(
+    supabase,
+    row.org_id,
+    relations.participants,
+  );
 
   const scheduleSeries = await resolveSchedule(supabase, row.org_id, scheduleId);
 
@@ -148,7 +138,6 @@ export async function buildLearningSpaceFromRow(
       relatedChannels: relatedChannels.length ? relatedChannels : undefined,
     },
     participants,
-    links: links.length ? links : undefined,
     scheduleSeries,
   });
 }
@@ -166,10 +155,9 @@ export async function buildLearningSpaceById(
     return null;
   }
 
-  const [channels, participants, links] = await Promise.all([
+  const [channels, participants] = await Promise.all([
     getLearningSpaceChannelsByLearningSpaceIds(supabase, orgId, [learningSpaceId]),
     getLearningSpaceParticipantsByLearningSpaceIds(supabase, orgId, [learningSpaceId]),
-    getLearningSpaceLinksByLearningSpaceIds(supabase, orgId, [learningSpaceId]),
   ]);
 
   return buildLearningSpaceFromRow(
@@ -178,7 +166,6 @@ export async function buildLearningSpaceById(
     {
       channels: channels.data ?? [],
       participants: participants.data ?? [],
-      links: links.data ?? [],
     },
     scheduleId,
     options,
@@ -197,10 +184,9 @@ export async function buildLearningSpacesByOrg(
 
   const learningSpaceIds = learningSpaces.map((space) => space.id);
 
-  const [channels, participants, links] = await Promise.all([
+  const [channels, participants] = await Promise.all([
     getLearningSpaceChannelsByLearningSpaceIds(supabase, orgId, learningSpaceIds),
     getLearningSpaceParticipantsByLearningSpaceIds(supabase, orgId, learningSpaceIds),
-    getLearningSpaceLinksByLearningSpaceIds(supabase, orgId, learningSpaceIds),
   ]);
 
   const channelsBySpace = groupBy(channels.data ?? [], (row) => row.learning_space_id);
@@ -208,7 +194,6 @@ export async function buildLearningSpacesByOrg(
     participants.data ?? [],
     (row) => row.learning_space_id,
   );
-  const linksBySpace = groupBy(links.data ?? [], (row) => row.learning_space_id);
 
   const results = await Promise.all(
     learningSpaces.map((space) =>
@@ -218,7 +203,6 @@ export async function buildLearningSpacesByOrg(
         {
           channels: channelsBySpace.get(space.id) ?? [],
           participants: participantsBySpace.get(space.id) ?? [],
-          links: linksBySpace.get(space.id) ?? [],
         },
         undefined,
         options,

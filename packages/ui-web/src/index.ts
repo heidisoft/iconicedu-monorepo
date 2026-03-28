@@ -44,7 +44,6 @@ export * from '@iconicedu/ui-web/components/admin/channel-ui-defaults-settings-s
 export * from '@iconicedu/ui-web/components/admin/admin-user-profile-preview-dialog';
 export * from '@iconicedu/ui-web/components/recurrence-form';
 export * from '@iconicedu/ui-web/components/recurrence-scheduler';
-export * from '@iconicedu/ui-web/components/resource-links-editor';
 export { GalleryVerticalEnd } from 'lucide-react';
 export { FingerprintIcon } from 'lucide-react';
 export * from '@iconicedu/ui-web/components/branding';
