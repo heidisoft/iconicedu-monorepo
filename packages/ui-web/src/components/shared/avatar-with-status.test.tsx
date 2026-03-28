@@ -36,18 +36,19 @@ describe('AvatarWithStatus', () => {
     );
 
     expect(screen.getByText('Priya Shah')).toBeInTheDocument();
-    expect(screen.getByText('Educator')).toBeInTheDocument();
+    expect(screen.getAllByText('Educator').length).toBeGreaterThan(0);
     expect(
       screen.getByText('Los Angeles, California, United States'),
     ).toBeInTheDocument();
-    expect(screen.getByText('About')).toBeInTheDocument();
     expect(
       screen.getByText('Math mentor focused on building confidence and fluency.'),
     ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /message/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /send direct message/i })).toHaveAttribute(
       'href',
       '/dm/profile-2',
     );
     expect(screen.getByText(/local time/i)).toBeInTheDocument();
+    expect(screen.getByTestId('avatar-preview-header')).toBeInTheDocument();
+    expect(screen.getByTestId('avatar-preview-avatar-anchor')).toBeInTheDocument();
   });
 });

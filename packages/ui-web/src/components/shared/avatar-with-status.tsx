@@ -10,15 +10,9 @@ import type {
   UserLocationVM,
   UserProfileVM,
 } from '@iconicedu/shared-types';
-import { BriefcaseBusiness, Clock3, MapPin, MessageCircle } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@iconicedu/ui-web/ui/avatar';
-import { Badge } from '@iconicedu/ui-web/ui/badge';
-import { Button } from '@iconicedu/ui-web/ui/button';
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from '@iconicedu/ui-web/ui/hover-card';
+import { HoverCard, HoverCardTrigger } from '@iconicedu/ui-web/ui/hover-card';
+import { AvatarProfileHoverCardContent } from '@iconicedu/ui-web/components/shared/avatar-profile-hover-card-content';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 
 const STATUS_COLORS: Record<PresenceDisplayStatusVM, string> = {
@@ -130,6 +124,11 @@ export function AvatarWithStatus({
   const canMessage = Boolean(messageHref || onMessageClick);
 
   const themeClass = themeKey ? `theme-${themeKey}` : '';
+  const previewHeaderStyle = themeKey
+    ? {
+        backgroundColor: 'color-mix(in oklab, var(--theme-bg) 18%, var(--muted) 82%)',
+      }
+    : undefined;
   const safeName = name?.trim() ? name.trim() : 'User';
   const renderAvatar = React.useCallback(
     ({
@@ -143,7 +142,7 @@ export function AvatarWithStatus({
       fallbackExtraClassName?: string;
       statusExtraClassName?: string;
     }) => (
-      <div className="relative">
+      <div className="relative z-10">
         <Avatar
           className={cn(
             avatarSizeClassName,
@@ -165,7 +164,7 @@ export function AvatarWithStatus({
         {shouldShowStatus && (
           <span
             className={cn(
-              'absolute rounded-full border-2 border-card',
+              'absolute z-20 rounded-full border-2 border-card',
               STATUS_COLORS[derivedDisplayStatus],
               statusClassName ?? 'bottom-0 right-0 h-2.5 w-2.5',
               statusExtraClassName,
@@ -190,22 +189,12 @@ export function AvatarWithStatus({
   const avatarNode = renderAvatar({
     sizeClassName: sizeClassName ?? '',
   });
-
-  const messageButton = canMessage ? (
-    messageHref ? (
-      <Button asChild className="w-full sm:w-auto">
-        <a href={messageHref}>
-          <MessageCircle className="size-4" />
-          Message
-        </a>
-      </Button>
-    ) : (
-      <Button className="w-full sm:w-auto" onClick={onMessageClick ?? undefined}>
-        <MessageCircle className="size-4" />
-        Message
-      </Button>
-    )
-  ) : null;
+  const previewAvatarNode = renderAvatar({
+    sizeClassName: 'size-24 border-4 border-background shadow-lg',
+    initials: 2,
+    fallbackExtraClassName: 'text-xl font-semibold',
+    statusExtraClassName: 'bottom-1 right-1 size-5 border-[3px] border-background',
+  });
 
   if (!shouldShowPreview) {
     return avatarNode;
@@ -214,80 +203,24 @@ export function AvatarWithStatus({
   return (
     <HoverCard>
       <HoverCardTrigger asChild>{avatarNode}</HoverCardTrigger>
-      <HoverCardContent className="w-[22rem] overflow-hidden p-0 sm:w-[26rem]">
-        <div className="bg-sky-100 px-5 pb-5 dark:bg-sky-950/40">
-          <div className="h-24 rounded-t-2xl" />
-          <div className="-mt-10">
-            {renderAvatar({
-              sizeClassName: 'size-20 border-4 border-background shadow-sm',
-              initials: 2,
-              fallbackExtraClassName: 'text-xl font-semibold',
-              statusExtraClassName:
-                'bottom-1 right-1 size-5 border-[3px] border-background',
-            })}
-          </div>
-        </div>
-
-        <div className="space-y-4 px-5 pb-5 pt-4">
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0 space-y-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="truncate text-xl font-semibold text-foreground">
-                    {safeName}
-                  </p>
-                  <Badge variant="outline" className="capitalize">
-                    {derivedDisplayStatus}
-                  </Badge>
-                </div>
-                {email ? (
-                  <p className="truncate text-sm text-muted-foreground">{email}</p>
-                ) : null}
-              </div>
-              {messageButton}
-            </div>
-
-            <div className="grid gap-2 text-sm text-muted-foreground">
-              {roleLabel ? (
-                <div className="flex items-start gap-2">
-                  <BriefcaseBusiness className="mt-0.5 size-4 shrink-0" />
-                  <span>{roleLabel}</span>
-                </div>
-              ) : null}
-              {locationLabel ? (
-                <div className="flex items-start gap-2">
-                  <MapPin className="mt-0.5 size-4 shrink-0" />
-                  <span>{locationLabel}</span>
-                </div>
-              ) : null}
-              {localTimeLabel ? (
-                <div className="flex items-start gap-2">
-                  <Clock3 className="mt-0.5 size-4 shrink-0" />
-                  <span>Local time {localTimeLabel}</span>
-                </div>
-              ) : null}
-            </div>
-          </div>
-
-          {previewAbout ? (
-            <div className="space-y-2 border-t border-border/60 pt-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                About
-              </p>
-              <p className="text-sm leading-6 text-foreground/90">
-                {statusEmoji ? `${statusEmoji} ` : ''}
-                {previewAbout}
-              </p>
-            </div>
-          ) : null}
-
-          {presence?.lastSeenAt ? (
-            <p className="text-xs text-muted-foreground">
-              Last seen {formatLastSeen(presence.lastSeenAt)}
-            </p>
-          ) : null}
-        </div>
-      </HoverCardContent>
+      <AvatarProfileHoverCardContent
+        avatarNode={previewAvatarNode}
+        canMessage={canMessage}
+        email={email}
+        lastSeenLabel={
+          presence?.lastSeenAt ? `Last seen ${formatLastSeen(presence.lastSeenAt)}` : null
+        }
+        localTimeLabel={localTimeLabel}
+        locationLabel={locationLabel}
+        messageHref={messageHref}
+        onMessageClick={onMessageClick}
+        previewAbout={previewAbout}
+        previewHeaderStyle={previewHeaderStyle}
+        roleLabel={roleLabel}
+        safeName={safeName}
+        statusEmoji={statusEmoji}
+        themeClass={themeClass}
+      />
     </HoverCard>
   );
 }

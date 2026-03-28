@@ -415,6 +415,7 @@ export function NavUser({
                 avatar={profile.profile.avatar}
                 presence={profile.presence}
                 themeKey={profile.ui?.themeKey}
+                enableProfilePreview={false}
                 roleLabel={profileRoleLabel}
                 timezone={profile.prefs.timezone ?? null}
                 locationLabel={profileLocationLabel}
@@ -450,6 +451,7 @@ export function NavUser({
                   avatar={profile.profile.avatar}
                   presence={profile.presence}
                   themeKey={profile.ui?.themeKey}
+                  enableProfilePreview={false}
                   roleLabel={profileRoleLabel}
                   timezone={profile.prefs.timezone ?? null}
                   locationLabel={profileLocationLabel}

@@ -117,8 +117,16 @@ export function LearningSpacesDashboard({
   );
 
   const sortedRows = React.useMemo(() => {
-    const collator = new Intl.Collator('en', { sensitivity: 'base', numeric: true });
-    return [...filteredRows].sort((a, b) => collator.compare(a.title, b.title));
+    return [...filteredRows].sort((a, b) => {
+      const updatedAtA = new Date(a.updated_at ?? a.created_at).getTime();
+      const updatedAtB = new Date(b.updated_at ?? b.created_at).getTime();
+
+      if (updatedAtA !== updatedAtB) {
+        return updatedAtB - updatedAtA;
+      }
+
+      return a.title.localeCompare(b.title, 'en', { sensitivity: 'base', numeric: true });
+    });
   }, [filteredRows]);
 
   const totalRows = sortedRows.length;
