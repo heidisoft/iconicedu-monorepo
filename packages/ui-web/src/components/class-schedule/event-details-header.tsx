@@ -76,6 +76,7 @@ export function EventDetailsHeader({ event }: EventDetailsHeaderProps) {
           {visibleGuests.map((participant, index) => (
             <AvatarWithStatus
               key={index}
+              profileId={participant.ids.id}
               name={participant.displayName ?? `Guest ${index + 1}`}
               avatar={{ source: 'external', url: participant.avatarUrl ?? '' }}
               themeKey={participant.themeKey ?? null}

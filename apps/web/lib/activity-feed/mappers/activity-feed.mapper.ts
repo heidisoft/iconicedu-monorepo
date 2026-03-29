@@ -32,8 +32,10 @@ function applyActorAvatarLeading(
     kind: 'avatars',
     avatars: [
       {
+        accountId: actor.ids.accountId ?? null,
         name: actorName,
         avatar: actorAvatar,
+        profileId: actor.ids.id ?? null,
         themeKey: actor.ui?.themeKey ?? null,
       },
     ],

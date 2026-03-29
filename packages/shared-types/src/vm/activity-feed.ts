@@ -146,8 +146,10 @@ export type InboxLeadingVM =
   | {
       kind: 'avatars';
       avatars: Array<{
+        accountId?: UUID | null;
         name: string;
         avatar: AvatarVM;
+        profileId?: UUID | null;
         themeKey?: ThemeKey | null;
       }>;
       overflowCount?: number;
