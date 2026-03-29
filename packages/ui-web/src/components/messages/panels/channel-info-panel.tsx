@@ -1,38 +1,11 @@
 'use client';
 
 import { memo } from 'react';
-import {
-  Calculator,
-  BookOpen,
-  ChefHat,
-  CalendarDays,
-  ChessKnight,
-  ClipboardCheck,
-  Earth,
-  Eye,
-  GraduationCap,
-  Languages,
-  Landmark,
-  LifeBuoy,
-  Map,
-  NotebookPen,
-  NotebookText,
-  Paintbrush,
-  Palette,
-  PenTool,
-  Ruler,
-  Scissors,
-  Sparkles,
-  SquarePi,
-  Tag,
-  User,
-  Users,
-  Shield,
-  CircleDot,
-} from 'lucide-react';
+import { CalendarDays, Eye, Sparkles, Tag, Shield, CircleDot } from 'lucide-react';
 import type { MessagesRightPanelIntent } from '@iconicedu/shared-types';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
 import { Separator } from '@iconicedu/ui-web/ui/separator';
+import { getChannelTopicIcon } from '@iconicedu/ui-web/lib/icons';
 import { ThemedIconBadge } from '@iconicedu/ui-web/components/shared/themed-icon';
 import { useMessagesState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
 
@@ -40,37 +13,10 @@ interface ChannelInfoPanelProps {
   intent: MessagesRightPanelIntent;
 }
 
-const CHANNEL_ICON_MAP = {
-  sparkles: Sparkles,
-  book: BookOpen,
-  user: User,
-  users: Users,
-  languages: Languages,
-  'square-pi': SquarePi,
-  'chef-hat': ChefHat,
-  earth: Earth,
-  'chess-knight': ChessKnight,
-  palette: Palette,
-  paintbrush: Paintbrush,
-  scissors: Scissors,
-  calculator: Calculator,
-  ruler: Ruler,
-  'pen-tool': PenTool,
-  'notebook-pen': NotebookPen,
-  'notebook-text': NotebookText,
-  'clipboard-check': ClipboardCheck,
-  'graduation-cap': GraduationCap,
-  landmark: Landmark,
-  map: Map,
-  'life-buoy': LifeBuoy,
-  support: LifeBuoy,
-} as const;
-
 const ChannelInfoPanelContent = memo(function ChannelInfoPanelContent() {
   const { channel } = useMessagesState();
   const iconKey = channel.basics.iconKey ?? 'sparkles';
-  const TopicIcon =
-    CHANNEL_ICON_MAP[iconKey as keyof typeof CHANNEL_ICON_MAP] ?? Sparkles;
+  const TopicIcon = getChannelTopicIcon(iconKey, Sparkles);
   const metadata = getChannelMetadata(channel);
   return (
     <div className="flex-1 min-w-0">

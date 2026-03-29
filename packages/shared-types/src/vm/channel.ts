@@ -6,6 +6,7 @@ import type {
   UUID,
   IdsBaseVM,
 } from '@iconicedu/shared-types/shared/shared';
+import type { KnownChannelTopicIconKey } from '@iconicedu/shared-types/shared/channel-icons';
 import type { UserProfileVM } from '@iconicedu/shared-types/vm/profile';
 import type { ChannelReadStateVM, MessageVM } from '@iconicedu/shared-types/vm/message';
 import type { MessagesRightPanelIntentKey } from '@iconicedu/shared-types/vm/message';
@@ -20,7 +21,7 @@ export type ChannelPurpose =
 export type ChannelVisibility = 'private' | 'public';
 export type ChannelStatus = 'active' | 'archived';
 
-export type ChannelTopicIconKey = string;
+export type ChannelTopicIconKey = KnownChannelTopicIconKey | (string & {});
 
 export type ChannelHeaderIconKey =
   | 'saved'

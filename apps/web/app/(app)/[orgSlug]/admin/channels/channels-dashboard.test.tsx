@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 
@@ -8,8 +8,24 @@ import type { AdminChannelRow } from '@iconicedu/web/lib/admin/channels';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/iconic-academy/admin/channels',
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
+
+if (!Element.prototype.hasPointerCapture) {
+  Element.prototype.hasPointerCapture = () => false;
+}
+
+if (!Element.prototype.setPointerCapture) {
+  Element.prototype.setPointerCapture = () => undefined;
+}
+
+if (!Element.prototype.releasePointerCapture) {
+  Element.prototype.releasePointerCapture = () => undefined;
+}
+
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => undefined;
+}
 
 const makeRow = (overrides: Partial<AdminChannelRow>): AdminChannelRow => ({
   id: 'channel-1',
@@ -85,5 +101,48 @@ describe('ChannelsDashboard', () => {
     await user.clear(screen.getByPlaceholderText('Search name or type'));
     expect(screen.getByText('General')).toBeInTheDocument();
     expect(screen.getByText('Algebra')).toBeInTheDocument();
+  });
+
+  it('submits the selected channel icon in the payload', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ data: [] }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true }),
+      } as Response);
+    const user = userEvent.setup();
+
+    render(<ChannelsDashboard rows={[makeRow({ topic: 'General' })]} />);
+
+    await user.click(screen.getByRole('button', { name: 'Create channel' }));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText('Name *'), 'Parent Lounge');
+    await user.click(within(dialog).getByLabelText('Icon'));
+    await user.click(screen.getByRole('option', { name: 'Support' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Create channel' }));
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      '/api/admin/channels/create',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: expect.any(String),
+      }),
+    );
+
+    const createCallBody = fetchMock.mock.calls[1]?.[1];
+    expect(createCallBody).toBeDefined();
+    expect(JSON.parse(String(createCallBody?.body))).toMatchObject({
+      basics: {
+        topic: 'Parent Lounge',
+        iconKey: 'life-buoy',
+      },
+    });
   });
 });

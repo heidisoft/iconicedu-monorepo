@@ -3,31 +3,11 @@
 import { memo, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import {
-  BookOpen,
   Bookmark,
-  Calculator,
-  ChefHat,
-  ChessKnight,
   Clock,
   ClipboardCheck,
-  Earth,
   FileText,
-  GraduationCap,
-  Languages,
-  Landmark,
-  LifeBuoy,
-  Map,
-  NotebookPen,
-  NotebookText,
-  Paintbrush,
-  Palette,
-  PenTool,
-  Ruler,
-  Scissors,
   Sparkles,
-  SquarePi,
-  User,
-  Users,
   type LucideIcon,
 } from 'lucide-react';
 import {
@@ -43,6 +23,7 @@ import {
   getAvatarRoleLabel,
 } from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
+import { getChannelTopicIcon } from '@iconicedu/ui-web/lib/icons';
 import { ThemedIconBadge } from '@iconicedu/ui-web/components/shared/themed-icon';
 import type { ChannelVM, UserProfileVM } from '@iconicedu/shared-types';
 import { useMessagesState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
@@ -170,31 +151,6 @@ const HeaderSubtitleRow = memo(function HeaderSubtitleRow({
   );
 });
 
-const CHANNEL_ICON_MAP: Record<string, LucideIcon> = {
-  sparkles: Sparkles,
-  book: BookOpen,
-  user: User,
-  users: Users,
-  languages: Languages,
-  'square-pi': SquarePi,
-  'chef-hat': ChefHat,
-  earth: Earth,
-  'chess-knight': ChessKnight,
-  palette: Palette,
-  paintbrush: Paintbrush,
-  scissors: Scissors,
-  calculator: Calculator,
-  ruler: Ruler,
-  'pen-tool': PenTool,
-  'notebook-pen': NotebookPen,
-  'notebook-text': NotebookText,
-  'clipboard-check': ClipboardCheck,
-  'graduation-cap': GraduationCap,
-  landmark: Landmark,
-  map: Map,
-  support: LifeBuoy,
-};
-
 const HEADER_ICON_MAP: Record<string, LucideIcon> = {
   saved: Bookmark,
   'next-session': Clock,
@@ -287,7 +243,7 @@ export const MessagesContainerHeader = memo(function MessagesContainerHeader({
         </button>
       );
     }
-    const Icon = CHANNEL_ICON_MAP[channel.basics.iconKey ?? ''] ?? Sparkles;
+    const Icon = getChannelTopicIcon(channel.basics.iconKey, Sparkles);
     return (
       <ThemedIconBadge icon={Icon} themeKey={channel.ui?.themeKey ?? null} size="sm" />
     );

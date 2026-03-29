@@ -29,7 +29,9 @@ import {
   Checkbox,
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
   ChannelUiDefaultsSettingsSection,
@@ -40,6 +42,7 @@ import type {
   ChannelCapabilityVM,
   ChannelKind,
   ChannelLiveSessionConfigVM,
+  ChannelTopicIconKey,
   ChannelPurpose,
   ChannelStatus,
   ChannelVisibility,
@@ -48,6 +51,8 @@ import type {
   ChannelUiDefaultsVM,
   UserProfileVM,
 } from '@iconicedu/shared-types';
+import { CHANNEL_TOPIC_ICON_GROUPS } from '@iconicedu/shared-types';
+import { CHANNEL_TOPIC_ICON_MAP } from '@iconicedu/ui-web/lib/icons';
 import { ChannelsTable } from '@iconicedu/web/app/(app)/[orgSlug]/admin/channels/channels-table';
 import { LiveSessionSettingsSection } from '@iconicedu/web/components/admin/live-session-settings-section';
 import type { ChannelDetail } from '@iconicedu/web/lib/admin/channel-detail';
@@ -55,6 +60,7 @@ import { withInfoPanelDisabled } from '@iconicedu/web/lib/channels/ui-defaults';
 import { DEFAULT_ADMIN_LIVE_SESSION_CONFIG } from '@iconicedu/web/lib/admin/live-session-config';
 
 const PAGE_SIZES = [10, 25, 50];
+const NO_CHANNEL_ICON_VALUE = '__none__';
 
 type ChannelsDashboardProps = {
   rows: AdminChannelRow[];
@@ -62,6 +68,7 @@ type ChannelsDashboardProps = {
 
 type CreateChannelFormState = {
   topic: string;
+  iconKey: ChannelTopicIconKey | typeof NO_CHANNEL_ICON_VALUE;
   description: string;
   kind: string;
   purpose: string;
@@ -99,6 +106,7 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
   const [isSubmitted, setIsSubmitted] = React.useState(false);
   const [formState, setFormState] = React.useState<CreateChannelFormState>({
     topic: '',
+    iconKey: NO_CHANNEL_ICON_VALUE,
     description: '',
     kind: 'channel',
     purpose: 'general',
@@ -182,6 +190,7 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
   const resetCreateForm = () => {
     setFormState({
       topic: '',
+      iconKey: NO_CHANNEL_ICON_VALUE,
       description: '',
       kind: 'channel',
       purpose: 'general',
@@ -203,6 +212,7 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
   const applyDetailToForm = (detail: ChannelDetail) => {
     setFormState({
       topic: detail.basics.topic ?? '',
+      iconKey: detail.basics.iconKey ?? NO_CHANNEL_ICON_VALUE,
       description: detail.basics.description ?? '',
       kind: detail.basics.kind,
       purpose: detail.basics.purpose,
@@ -260,7 +270,7 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
         basics: {
           kind: formState.kind as ChannelKind,
           topic: formState.topic.trim(),
-          iconKey: null,
+          iconKey: formState.iconKey === NO_CHANNEL_ICON_VALUE ? null : formState.iconKey,
           description: formState.description.trim() || null,
           visibility: formState.visibility as ChannelVisibility,
           purpose: formState.purpose as ChannelPurpose,
@@ -424,6 +434,46 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
                           <SelectItem value="public">Public</SelectItem>
                         </SelectContent>
                       </Select>
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="channel-icon">Icon</FieldLabel>
+                      <Select
+                        value={formState.iconKey}
+                        onValueChange={(value) =>
+                          updateFormState({
+                            iconKey: value as
+                              | ChannelTopicIconKey
+                              | typeof NO_CHANNEL_ICON_VALUE,
+                          })
+                        }
+                      >
+                        <SelectTrigger id="channel-icon">
+                          <SelectValue placeholder="No icon" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={NO_CHANNEL_ICON_VALUE}>No icon</SelectItem>
+                          {CHANNEL_TOPIC_ICON_GROUPS.map((group) => (
+                            <SelectGroup key={group.label}>
+                              <SelectLabel>{group.label}</SelectLabel>
+                              {group.options.map((option) => {
+                                const Icon = CHANNEL_TOPIC_ICON_MAP[option.value];
+                                return (
+                                  <SelectItem key={option.value} value={option.value}>
+                                    <div className="flex items-center gap-2">
+                                      <Icon className="size-4" aria-hidden />
+                                      <span>{option.label}</span>
+                                    </div>
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectGroup>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FieldDescription>
+                        Optional. Useful for support, public, private, parent, or other
+                        group channels.
+                      </FieldDescription>
                     </Field>
                     <Field>
                       <FieldLabel htmlFor="channel-description">Description</FieldLabel>
