@@ -149,11 +149,13 @@ export function AvatarWithStatus({
       initials = initialsLength,
       fallbackExtraClassName,
       statusExtraClassName,
+      displayStatus = derivedDisplayStatus,
     }: {
       sizeClassName: string;
       initials?: number;
       fallbackExtraClassName?: string;
       statusExtraClassName?: string;
+      displayStatus?: PresenceDisplayStatusVM;
     }) => (
       <div className="relative z-10">
         <Avatar
@@ -178,11 +180,11 @@ export function AvatarWithStatus({
           <span
             className={cn(
               'absolute z-20 rounded-full border-2 border-card',
-              STATUS_COLORS[derivedDisplayStatus],
+              STATUS_COLORS[displayStatus],
               statusClassName ?? 'bottom-0 right-0 h-2.5 w-2.5',
               statusExtraClassName,
             )}
-            aria-label={`Status: ${derivedDisplayStatus}`}
+            aria-label={`Status: ${displayStatus}`}
           />
         )}
       </div>
@@ -202,12 +204,6 @@ export function AvatarWithStatus({
   const avatarNode = renderAvatar({
     sizeClassName: sizeClassName ?? '',
   });
-  const previewAvatarNode = renderAvatar({
-    sizeClassName: 'size-24 border-4 border-background shadow-lg',
-    initials: 2,
-    fallbackExtraClassName: 'text-xl font-semibold',
-    statusExtraClassName: 'bottom-1 right-1 size-5 border-[3px] border-background',
-  });
   const resolvedPreviewName = resolvedPreviewProfile
     ? getProfileDisplayName(resolvedPreviewProfile.profile, 'User')
     : safeName;
@@ -224,6 +220,18 @@ export function AvatarWithStatus({
     resolvedPreviewProfile?.presence?.state?.text?.trim() ?? statusText;
   const resolvedPreviewStatusEmoji =
     resolvedPreviewProfile?.presence?.state?.emoji?.trim() ?? statusEmoji;
+  const resolvedPreviewPresenceTone =
+    resolvedPreviewProfile?.presence?.displayStatus ??
+    (resolvedPreviewProfile?.presence?.liveStatus
+      ? LIVE_STATUS_TO_DISPLAY[resolvedPreviewProfile.presence.liveStatus]
+      : derivedDisplayStatus);
+  const previewAvatarNode = renderAvatar({
+    sizeClassName: 'size-24 border-4 border-background shadow-lg',
+    initials: 2,
+    fallbackExtraClassName: 'text-xl font-semibold',
+    statusExtraClassName: 'bottom-1 right-1 size-5 border-[3px] border-background',
+    displayStatus: resolvedPreviewPresenceTone,
+  });
   const resolvedPreviewAbout =
     resolvedPreviewProfile?.profile.bio?.trim() || resolvedPreviewStatusText || null;
   const resolvedPreviewEmail =
