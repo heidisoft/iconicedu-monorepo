@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import type { ClassScheduleVM } from '@iconicedu/shared-types';
 import { useScheduleDisplayTimeZone } from '@iconicedu/ui-web/components/shared/schedule-display-timezone-context';
+import { EmptyMessagesState } from '@iconicedu/ui-web/components/messages/empty-state';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { ScrollArea } from '@iconicedu/ui-web/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@iconicedu/ui-web/ui/tabs';
@@ -137,11 +138,12 @@ export function MessagesScheduleTab({
           <ScrollArea className="h-full min-h-0 flex-1 pr-1">
             <div className="space-y-2">
               {upcomingGroups.length === 0 ? (
-                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-12 text-center">
-                  <CalendarDays className="mb-3 size-10 text-muted-foreground/40" />
-                  <p className="text-sm font-medium text-muted-foreground">
-                    No upcoming sessions
-                  </p>
+                <div className="flex min-h-[70vh] w-full items-center justify-center">
+                  <EmptyMessagesState
+                    title="No upcoming sessions"
+                    description="Upcoming sessions scheduled for this channel will appear here."
+                    icon={<CalendarDays className="size-5" />}
+                  />
                 </div>
               ) : (
                 upcomingGroups.map((group, index) => (
@@ -179,11 +181,12 @@ export function MessagesScheduleTab({
           <ScrollArea className="h-full min-h-0 flex-1 pr-1">
             <div className="space-y-2">
               {pastGroups.length === 0 ? (
-                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-12 text-center">
-                  <CalendarDays className="mb-3 size-10 text-muted-foreground/40" />
-                  <p className="text-sm font-medium text-muted-foreground">
-                    No past sessions yet
-                  </p>
+                <div className="flex min-h-[70vh] w-full items-center justify-center">
+                  <EmptyMessagesState
+                    title="No past sessions yet"
+                    description="Completed and past sessions for this channel will appear here."
+                    icon={<CalendarDays className="size-5" />}
+                  />
                 </div>
               ) : (
                 pastGroups.map((group, index) => (

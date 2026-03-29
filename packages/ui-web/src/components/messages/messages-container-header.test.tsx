@@ -121,4 +121,111 @@ describe('MessagesContainerHeader', () => {
     expect(statusText).toBeInTheDocument();
     expect(statusText).toHaveClass('text-xs');
   });
+
+  it('shows all non-viewer classroom participants under the header title', () => {
+    render(
+      <MessagesContainerHeader
+        channel={
+          {
+            basics: {
+              kind: 'channel',
+              topic: 'Math Foundations',
+              purpose: 'learning-space',
+            },
+            collections: {
+              participants: [
+                makeParticipant('profile-self', {
+                  kind: 'guardian',
+                  profile: {
+                    displayName: 'Riley Johnson',
+                    avatar: { source: 'seed', url: null },
+                  },
+                }),
+                makeParticipant('educator-1', {
+                  kind: 'educator',
+                  profile: {
+                    displayName: 'Priya Patel',
+                    avatar: { source: 'seed', url: null },
+                  },
+                }),
+                makeParticipant('student-1', {
+                  kind: 'child',
+                  profile: {
+                    displayName: 'Maya Johnson',
+                    avatar: { source: 'seed', url: null },
+                  },
+                }),
+              ],
+            },
+            ui: { headerQuickMetaActions: [] },
+          } as any
+        }
+      />,
+    );
+
+    expect(screen.getByText('Priya Patel')).toBeInTheDocument();
+    expect(screen.getByText('Maya Johnson')).toBeInTheDocument();
+    expect(screen.queryByText('Riley Johnson')).not.toBeInTheDocument();
+  });
+
+  it('groups classroom students under a single role icon label', () => {
+    render(
+      <MessagesContainerHeader
+        channel={
+          {
+            basics: {
+              kind: 'channel',
+              topic: 'Science Lab Explorers',
+              purpose: 'learning-space',
+            },
+            collections: {
+              participants: [
+                makeParticipant('profile-self', {
+                  kind: 'guardian',
+                  profile: {
+                    displayName: 'Riley Johnson',
+                    avatar: { source: 'seed', url: null },
+                  },
+                }),
+                makeParticipant('student-1', {
+                  kind: 'child',
+                  profile: {
+                    displayName: 'Maya Johnson',
+                    avatar: { source: 'seed', url: null },
+                  },
+                }),
+                makeParticipant('student-2', {
+                  kind: 'child',
+                  profile: {
+                    displayName: 'Tevin Brooks',
+                    avatar: { source: 'seed', url: null },
+                  },
+                }),
+                makeParticipant('student-3', {
+                  kind: 'child',
+                  profile: {
+                    displayName: 'Tehara Singh',
+                    avatar: { source: 'seed', url: null },
+                  },
+                }),
+                makeParticipant('educator-1', {
+                  kind: 'educator',
+                  profile: {
+                    displayName: 'Priya Patel',
+                    avatar: { source: 'seed', url: null },
+                  },
+                }),
+              ],
+            },
+            ui: { headerQuickMetaActions: [] },
+          } as any
+        }
+      />,
+    );
+
+    expect(screen.getByText('Priya Patel')).toBeInTheDocument();
+    expect(
+      screen.getByText('Maya Johnson, Tevin Brooks, Tehara Singh'),
+    ).toBeInTheDocument();
+  });
 });

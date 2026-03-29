@@ -4,10 +4,14 @@ import { memo, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import {
   Bookmark,
+  BriefcaseBusiness,
   Clock,
   ClipboardCheck,
   FileText,
+  Presentation,
   Sparkles,
+  ShieldUser,
+  User,
   type LucideIcon,
 } from 'lucide-react';
 import {
@@ -90,7 +94,7 @@ const HeaderTitle = memo(function HeaderTitle({
   ariaLabel,
 }: {
   title: string;
-  inlineStatusLabel?: string | null;
+  inlineStatusLabel?: ReactNode;
   leading: ReactNode;
   onClick?: () => void;
   ariaLabel?: string;
@@ -107,7 +111,7 @@ const HeaderTitle = memo(function HeaderTitle({
         >
           <span className="truncate">{title}</span>
           {inlineStatusLabel ? (
-            <span className="truncate text-xs font-normal text-muted-foreground">
+            <span className="min-w-0 text-xs font-normal text-muted-foreground">
               {inlineStatusLabel}
             </span>
           ) : null}
@@ -116,7 +120,7 @@ const HeaderTitle = memo(function HeaderTitle({
         <span className="flex min-w-0 flex-col items-start">
           <span className="truncate text-sm font-semibold text-foreground">{title}</span>
           {inlineStatusLabel ? (
-            <span className="truncate text-xs font-normal text-muted-foreground">
+            <span className="min-w-0 text-xs font-normal text-muted-foreground">
               {inlineStatusLabel}
             </span>
           ) : null}
@@ -162,6 +166,68 @@ const HEADER_ICON_MAP: Record<string, LucideIcon> = {
 const getOtherParticipant = (participants: UserProfileVM[], currentUserId: string) =>
   participants.find((participant) => participant.ids.id !== currentUserId) ??
   participants[0];
+
+const PARTICIPANT_ROLE_ICON_MAP: Record<UserProfileVM['kind'], LucideIcon> = {
+  educator: Presentation,
+  guardian: ShieldUser,
+  child: User,
+  staff: BriefcaseBusiness,
+  system: Sparkles,
+};
+
+const CLASSROOM_PARTICIPANT_GROUP_ORDER: UserProfileVM['kind'][] = [
+  'educator',
+  'guardian',
+  'child',
+  'staff',
+  'system',
+];
+
+function buildClassroomParticipantSubtitle(
+  participants: UserProfileVM[],
+  currentUserId: string,
+): ReactNode | null {
+  const visibleParticipants = participants.filter(
+    (participant) => participant.ids.id !== currentUserId,
+  );
+
+  if (visibleParticipants.length === 0) {
+    return null;
+  }
+
+  const groupedParticipants = CLASSROOM_PARTICIPANT_GROUP_ORDER.map((kind) => ({
+    kind,
+    participants: visibleParticipants.filter((participant) => participant.kind === kind),
+  })).filter((group) => group.participants.length > 0);
+
+  return (
+    <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+      {groupedParticipants.map((group) => {
+        const Icon = PARTICIPANT_ROLE_ICON_MAP[group.kind];
+        const displayNames = group.participants
+          .map((participant) =>
+            getProfileDisplayName(
+              participant.profile,
+              participant.kind === 'child' ? 'Student' : 'Participant',
+            ),
+          )
+          .filter(Boolean)
+          .join(', ');
+
+        return (
+          <span
+            key={group.kind}
+            className="inline-flex min-w-0 items-center gap-1 text-muted-foreground"
+          >
+            <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <span className="sr-only">{getAvatarRoleLabel(group.kind)}:</span>
+            <span className="truncate">{displayNames}</span>
+          </span>
+        );
+      })}
+    </span>
+  );
+}
 
 function formatRelativeLastSeen(iso: string | null | undefined): string | null {
   if (!iso) return null;
@@ -293,25 +359,36 @@ export const MessagesContainerHeader = memo(function MessagesContainerHeader({
     messageFilter,
   ]);
   const inlineStatusLabel = useMemo(() => {
-    if (channel.basics.kind !== 'dm') {
-      return null;
+    if (channel.basics.kind === 'dm') {
+      const summary =
+        otherParticipant?.presence?.displayStatus === 'online'
+          ? 'Available'
+          : (() => {
+              const relative = formatRelativeLastSeen(
+                otherParticipant?.presence?.lastSeenAt,
+              );
+              return relative ? `Last seen ${relative}` : null;
+            })();
+      const localTime = formatLocalTime(otherParticipant?.prefs?.timezone);
+      if (summary && localTime) {
+        return `${summary} · ${localTime} (Local time)`;
+      }
+      return summary ?? (localTime ? `${localTime} (Local time)` : null);
     }
-    const summary =
-      otherParticipant?.presence?.displayStatus === 'online'
-        ? 'Available'
-        : (() => {
-            const relative = formatRelativeLastSeen(
-              otherParticipant?.presence?.lastSeenAt,
-            );
-            return relative ? `Last seen ${relative}` : null;
-          })();
-    const localTime = formatLocalTime(otherParticipant?.prefs?.timezone);
-    if (summary && localTime) {
-      return `${summary} · ${localTime} (Local time)`;
+
+    if (channel.basics.purpose === 'learning-space') {
+      return buildClassroomParticipantSubtitle(
+        channel.collections.participants,
+        currentUserId,
+      );
     }
-    return summary ?? (localTime ? `${localTime} (Local time)` : null);
+
+    return null;
   }, [
     channel.basics.kind,
+    channel.basics.purpose,
+    channel.collections.participants,
+    currentUserId,
     otherParticipant?.presence?.displayStatus,
     otherParticipant?.presence?.lastSeenAt,
     otherParticipant?.prefs?.timezone,

@@ -56,6 +56,13 @@ import { UnreadDivider } from '@iconicedu/ui-web/components/messages/shared/unre
 
 interface MessageListProps {
   messages: MessageVM[];
+  emptyStateTitle?: string;
+  emptyStateDescription?: React.ReactNode;
+  emptyStateIcon?: React.ReactNode;
+  emptyStateStarterAction?: {
+    label: string;
+    onClick: () => void;
+  };
   threadMessagesSource?: MessageVM[];
   onOpenThread: (thread: ThreadVM, parentMessage: MessageVM) => void | Promise<void>;
   onSendThreadReply?: (
@@ -132,6 +139,10 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
   (
     {
       messages,
+      emptyStateTitle = 'No messages yet',
+      emptyStateDescription = 'Looks like you have not started a conversation yet.',
+      emptyStateIcon,
+      emptyStateStarterAction,
       threadMessagesSource,
       onOpenThread,
       onSendThreadReply,
@@ -454,8 +465,10 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
         {messages.length === 0 ? (
           <div className="flex min-h-[70vh] w-full items-center justify-center">
             <EmptyMessagesState
-              title="No messages yet"
-              description="Looks like you have not started a conversation yet."
+              title={emptyStateTitle}
+              description={emptyStateDescription}
+              icon={emptyStateIcon}
+              starterAction={emptyStateStarterAction}
             />
           </div>
         ) : null}

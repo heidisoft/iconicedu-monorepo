@@ -8,9 +8,10 @@ import {
 } from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
 import { resolveDashboardBasePathFromWindow } from '@iconicedu/ui-web/lib/dashboard-base-path';
+import { EmptyMessagesState } from '@iconicedu/ui-web/components/messages/empty-state';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { ScrollArea } from '@iconicedu/ui-web/ui/scroll-area';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, Users } from 'lucide-react';
 
 interface MessagesMembersTabProps {
   participants: UserProfileVM[];
@@ -45,7 +46,13 @@ export function MessagesMembersTab({
     <ScrollArea className="min-h-0 flex-1">
       <div className="space-y-2 p-3">
         {participants.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No members yet.</p>
+          <div className="flex min-h-[70vh] w-full items-center justify-center">
+            <EmptyMessagesState
+              title="No members yet"
+              description="People added to this conversation will appear here."
+              icon={<Users className="size-5" />}
+            />
+          </div>
         ) : null}
         {participants.map((member) => {
           const memberName = getProfileDisplayName(member.profile);

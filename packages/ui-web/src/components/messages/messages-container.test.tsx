@@ -20,6 +20,7 @@ const toggleReaction = vi.fn();
 const toggleSaved = vi.fn();
 const toggleHidden = vi.fn();
 const prependMessages = vi.fn();
+const latestMessageInputProps: { current: any | null } = { current: null };
 
 vi.mock('../../hooks/use-messages', () => ({
   useMessages: (initialMessages: any[]) => ({
@@ -60,10 +61,12 @@ vi.mock('./message-list', () => ({
     onUnreadViewed,
     onOpenThread,
     messages,
+    emptyStateStarterAction,
   }: {
     onUnreadViewed?: (lastReadMessageId: string) => void;
     onOpenThread?: (thread: any, parentMessage: any) => void | Promise<void>;
     messages?: any[];
+    emptyStateStarterAction?: { label: string; onClick: () => void };
   }) => (
     <div>
       <button type="button" onClick={() => onUnreadViewed?.('message-2')}>
@@ -81,12 +84,20 @@ vi.mock('./message-list', () => ({
       >
         open-thread
       </button>
+      {emptyStateStarterAction ? (
+        <button type="button" onClick={() => emptyStateStarterAction.onClick()}>
+          {emptyStateStarterAction.label}
+        </button>
+      ) : null}
     </div>
   ),
 }));
 
 vi.mock('./message-input', () => ({
-  MessageInput: () => null,
+  MessageInput: (props: any) => {
+    latestMessageInputProps.current = props;
+    return null;
+  },
 }));
 
 const makeParticipant = (id: string, kind: UserProfileVM['kind']): UserProfileVM =>
@@ -136,6 +147,7 @@ const channel: ChannelVM = {
 
 describe('MessagesContainer', () => {
   beforeEach(() => {
+    latestMessageInputProps.current = null;
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => ({
@@ -521,5 +533,77 @@ describe('MessagesContainer', () => {
     expect(
       screen.getByText('Files shared in this channel will appear here.'),
     ).toBeInTheDocument();
+  });
+
+  it('prefills the composer from the dm empty-state starter', async () => {
+    const dmChannel: ChannelVM = {
+      ...channel,
+      basics: {
+        ...channel.basics,
+        kind: 'dm',
+        topic: 'Direct message',
+      },
+      collections: {
+        ...channel.collections,
+        participants: [
+          makeParticipant('profile-1', 'guardian'),
+          makeParticipant('profile-2', 'educator'),
+        ],
+      },
+    };
+
+    render(<MessagesContainer channel={dmChannel} currentUserId="profile-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Say hello' }));
+
+    await waitFor(() => {
+      expect(latestMessageInputProps.current?.prefillRequest?.value).toBe(
+        'Hi User profile-2, I wanted to reach out here.',
+      );
+    });
+  });
+
+  it('prefills the composer from the classroom guardian starter', async () => {
+    const learningSpaceChannel: ChannelVM = {
+      ...channel,
+      basics: {
+        ...channel.basics,
+        purpose: 'learning-space',
+        topic: 'Algebra 1',
+      },
+    };
+
+    render(
+      <MessagesContainer channel={learningSpaceChannel} currentUserId="profile-1" />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Message teacher' }));
+
+    await waitFor(() => {
+      expect(latestMessageInputProps.current?.prefillRequest?.value).toBe(
+        'Hi User, I’m reaching out about Algebra 1.',
+      );
+    });
+  });
+
+  it('prefills the composer from the support starter', async () => {
+    const supportChannel: ChannelVM = {
+      ...channel,
+      basics: {
+        ...channel.basics,
+        purpose: 'support',
+        topic: 'Support',
+      },
+    };
+
+    render(<MessagesContainer channel={supportChannel} currentUserId="profile-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ask support for help' }));
+
+    await waitFor(() => {
+      expect(latestMessageInputProps.current?.prefillRequest?.value).toBe(
+        'Hi support team, I need help with ',
+      );
+    });
   });
 });

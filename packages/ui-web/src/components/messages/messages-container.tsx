@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   MessageList,
   type MessageListRef,
@@ -27,14 +27,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from '@iconicedu/ui-web/ui/tabs';
 import { ScrollArea } from '@iconicedu/ui-web/ui/scroll-area';
 import { Button } from '@iconicedu/ui-web/ui/button';
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from '@iconicedu/ui-web/ui/empty';
+import { EmptyMessagesState } from '@iconicedu/ui-web/components/messages/empty-state';
 import {
   createChannelFileItems,
   formatChannelFileUploadedDate,
@@ -70,6 +63,8 @@ import {
   FileSpreadsheet,
   FileText,
   FileType2,
+  GraduationCap,
+  LifeBuoy,
   Loader2,
   Presentation,
 } from 'lucide-react';
@@ -123,6 +118,142 @@ const isGuardianProfile = (profile: UserProfileVM): profile is GuardianProfileVM
 const isEducatorProfile = (profile: UserProfileVM): profile is EducatorProfileVM =>
   profile.kind === 'educator';
 
+function getParticipantShortName(
+  profile?: UserProfileVM | null,
+  fallback = 'Someone',
+): string {
+  const firstName = profile?.profile.firstName?.trim();
+  if (firstName) {
+    return firstName;
+  }
+
+  const displayName = getProfileDisplayName(profile?.profile, fallback).trim();
+  const [firstToken] = displayName.split(/\s+/);
+  return firstToken || fallback;
+}
+
+function formatCompactNames(names: string[]): string {
+  const uniqueNames = Array.from(new Set(names.filter(Boolean)));
+  if (uniqueNames.length === 0) return '';
+  if (uniqueNames.length === 1) return uniqueNames[0]!;
+  return `${uniqueNames[0]} +${uniqueNames.length - 1} more`;
+}
+
+function buildChannelEmptyStateCopy(input: {
+  channel: ChannelVM;
+  currentUserProfile: UserProfileVM | null;
+  participants: UserProfileVM[];
+}): EmptyStateCopy {
+  const { channel, currentUserProfile, participants } = input;
+
+  if (channel.basics.kind === 'dm') {
+    const otherParticipant = participants.find(
+      (participant) => participant.ids.id !== currentUserProfile?.ids.id,
+    );
+    const otherParticipantName = otherParticipant
+      ? getProfileDisplayName(otherParticipant.profile, 'there')
+      : 'there';
+
+    return {
+      title: `Say hello to ${otherParticipantName}!`,
+      description:
+        'This is a direct message conversation. Chat here whenever you want, keep replies respectful, and keep the conversation in one place.',
+      starterAction: {
+        label: 'Say hello',
+        prefillText: `Hi ${otherParticipantName}, I wanted to reach out here.`,
+      },
+    };
+  }
+
+  if (channel.basics.purpose === 'support') {
+    return {
+      title: 'Talk to support here',
+      description:
+        'Use this support channel for payment questions, class scheduling issues, teacher, parent, or student concerns, and any other operational help. Our support staff will help you resolve the issue.',
+      icon: <LifeBuoy className="size-5" />,
+      starterAction: {
+        label: 'Ask support for help',
+        prefillText: 'Hi support team, I need help with ',
+      },
+    };
+  }
+
+  if (channel.basics.purpose === 'learning-space') {
+    const educators = participants.filter(
+      (participant) => participant.kind === 'educator',
+    );
+    const guardians = participants.filter(
+      (participant) => participant.kind === 'guardian',
+    );
+    const students = participants.filter((participant) => participant.kind === 'child');
+
+    const educatorName = educators[0]
+      ? getParticipantShortName(educators[0], 'your teacher')
+      : 'your teacher';
+    const guardianNames = formatCompactNames(
+      guardians.map((participant) => getParticipantShortName(participant, 'Parent')),
+    );
+    const studentNames = formatCompactNames(
+      students.map((participant) => getParticipantShortName(participant, 'Student')),
+    );
+
+    if (currentUserProfile?.kind === 'educator') {
+      const familyLabel =
+        guardianNames && studentNames
+          ? `${guardianNames} about ${studentNames}`
+          : guardianNames || studentNames || 'families in this class';
+
+      return {
+        title: `Start the class conversation with ${familyLabel}`,
+        description: `Use this class channel to communicate with ${familyLabel}. Share class updates, discuss reschedules or cancellations, and send homework or learning resources in one place.`,
+        icon: <GraduationCap className="size-5" />,
+        starterAction: {
+          label: 'Start class update',
+          prefillText: 'Hi everyone, sharing a quick update about class today.',
+        },
+      };
+    }
+
+    if (currentUserProfile?.kind === 'guardian') {
+      return {
+        title: `Say hello to ${educatorName}!`,
+        description:
+          'This class channel is for communicating with your teacher about the class, reschedules or cancellations, homework, and shared learning resources.',
+        icon: <GraduationCap className="size-5" />,
+        starterAction: {
+          label: 'Message teacher',
+          prefillText: `Hi ${educatorName}, I’m reaching out about ${channel.basics.topic}.`,
+        },
+      };
+    }
+
+    if (currentUserProfile?.kind === 'child') {
+      return {
+        title: `Say hello to ${educatorName}!`,
+        description:
+          'This class channel is for communicating with your teacher about class updates, schedule changes, homework, and shared learning resources.',
+        icon: <GraduationCap className="size-5" />,
+        starterAction: {
+          label: 'Ask teacher',
+          prefillText: `Hi ${educatorName}, I have a question about class.`,
+        },
+      };
+    }
+
+    return {
+      title: 'Start the class conversation',
+      description:
+        'Use this class channel to communicate about the class, schedule changes, cancellations, homework, and shared learning resources.',
+      icon: <GraduationCap className="size-5" />,
+    };
+  }
+
+  return {
+    title: 'No messages yet',
+    description: 'Looks like you have not started a conversation yet.',
+  };
+}
+
 const MESSAGES_PAGE_SIZE = 40;
 const READ_STATE_PERSIST_DEBOUNCE_MS = 220;
 const TYPING_REMOTE_TIMEOUT_MS = 4000;
@@ -134,6 +265,18 @@ type AssignmentSendInput = {
   dueAt: string;
   subject?: string;
 } | null;
+
+type EmptyStateStarterAction = {
+  label: string;
+  prefillText: string;
+};
+
+type EmptyStateCopy = {
+  title: string;
+  description: string;
+  icon?: ReactNode;
+  starterAction?: EmptyStateStarterAction;
+};
 
 function formatFileSize(size?: number | null): string {
   if (!size || size <= 0) return 'Unknown size';
@@ -260,6 +403,10 @@ export function MessagesContainer({
   const persistReadStateTimerRef = useRef<number | null>(null);
   const typingTimeoutsRef = useRef(new Map<string, number>());
   const [typingIds, setTypingIds] = useState<Set<string>>(new Set());
+  const [composerPrefillRequest, setComposerPrefillRequest] = useState<{
+    value: string;
+    nonce: number;
+  } | null>(null);
   const {
     toggle,
     setSavedCount,
@@ -1572,9 +1719,28 @@ export function MessagesContainer({
     };
   }, [activeTab, channel.ids.id, loadedSchedules, runWithNetworkActivity]);
 
-  const messageListProps = useMemo(
-    () => ({
+  const messageListProps = useMemo(() => {
+    const emptyStateCopy = buildChannelEmptyStateCopy({
+      channel,
+      currentUserProfile: resolvedCurrentUserProfile,
+      participants: channel.collections.participants,
+    });
+
+    return {
       messages: filteredMessages,
+      emptyStateTitle: emptyStateCopy.title,
+      emptyStateDescription: emptyStateCopy.description,
+      emptyStateIcon: emptyStateCopy.icon,
+      emptyStateStarterAction: emptyStateCopy.starterAction
+        ? {
+            label: emptyStateCopy.starterAction.label,
+            onClick: () =>
+              setComposerPrefillRequest({
+                value: emptyStateCopy.starterAction?.prefillText ?? '',
+                nonce: Date.now(),
+              }),
+          }
+        : undefined,
       threadMessagesSource: messages,
       onOpenThread: handleOpenThread,
       onProfileClick: handleProfileClick,
@@ -1594,29 +1760,31 @@ export function MessagesContainer({
       onLoadMore: handleLoadOlderMessages,
       initialScrollToBottom: true,
       onUnreadViewed: markChannelRead,
-    }),
-    [
-      filteredMessages,
-      messages,
-      handleOpenThread,
-      handleProfileClick,
-      handleToggleReaction,
-      handleToggleSaved,
-      handleToggleHidden,
-      handleDeleteMessage,
-      getMessageActionState,
-      currentUserId,
-      currentUserProfile?.kind,
-      readOnly,
-      handleSendThreadReply,
-      lastReadMessageId,
-      lastReadAt,
-      hasMoreOlderMessages,
-      isLoadingOlder,
-      handleLoadOlderMessages,
-      markChannelRead,
-    ],
-  );
+    };
+  }, [
+    channel,
+    filteredMessages,
+    messages,
+    handleOpenThread,
+    handleProfileClick,
+    handleToggleReaction,
+    handleToggleSaved,
+    handleToggleHidden,
+    handleDeleteMessage,
+    getMessageActionState,
+    currentUserId,
+    currentUserProfile?.kind,
+    resolvedCurrentUserProfile,
+    readOnly,
+    handleSendThreadReply,
+    lastReadMessageId,
+    lastReadAt,
+    hasMoreOlderMessages,
+    isLoadingOlder,
+    handleLoadOlderMessages,
+    markChannelRead,
+    setComposerPrefillRequest,
+  ]);
 
   const renderActiveTabContent = () => {
     if (activeTab === 'messages') {
@@ -1695,6 +1863,7 @@ export function MessagesContainer({
               participants={participants}
               currentUserId={resolvedCurrentUserId}
               showCreateMessageTypeButton={showCreateMessageTypeButton}
+              prefillRequest={composerPrefillRequest}
               onTypingStart={handleTypingStart}
               onTypingStop={handleTypingStop}
             />
@@ -1726,18 +1895,13 @@ export function MessagesContainer({
               <p className="text-sm text-muted-foreground">{filesLoadError}</p>
             ) : null}
             {!isLoadingFiles && !filesLoadError && filesForDisplay.length === 0 ? (
-              <Empty className="min-h-[280px] border-none p-0">
-                <EmptyHeader>
-                  <EmptyMedia variant="icon">
-                    <FileText className="size-5" />
-                  </EmptyMedia>
-                  <EmptyTitle className="text-sm">No shared files</EmptyTitle>
-                  <EmptyDescription>
-                    Files shared in this channel will appear here.
-                  </EmptyDescription>
-                </EmptyHeader>
-                <EmptyContent />
-              </Empty>
+              <div className="flex min-h-[70vh] w-full items-center justify-center">
+                <EmptyMessagesState
+                  title="No shared files"
+                  description="Files shared in this channel will appear here."
+                  icon={<FileText className="size-5" />}
+                />
+              </div>
             ) : null}
             {!isLoadingFiles && !filesLoadError
               ? filesForDisplay.map((item) =>

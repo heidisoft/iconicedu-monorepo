@@ -114,6 +114,10 @@ interface MessageInputProps {
   onFocus?: () => void;
   onInputKeyDown?: () => void;
   showCreateMessageTypeButton?: boolean;
+  prefillRequest?: {
+    value: string;
+    nonce: number;
+  } | null;
 }
 
 type PendingAttachment = {
@@ -229,6 +233,7 @@ export function MessageInput({
   onFocus,
   onInputKeyDown,
   showCreateMessageTypeButton = true,
+  prefillRequest = null,
 }: MessageInputProps) {
   const [content, setContent] = React.useState('');
   const [isSendingText, setIsSendingText] = React.useState(false);
@@ -722,6 +727,28 @@ export function MessageInput({
     },
     [insertAtCursor],
   );
+
+  React.useEffect(() => {
+    if (!prefillRequest) {
+      return;
+    }
+
+    setContent(prefillRequest.value);
+    handleTyping(prefillRequest.value);
+    setMentionState(null);
+    setMentionPopupPosition(null);
+    setActiveMentionIndex(0);
+
+    window.setTimeout(() => {
+      const textarea = textareaRef.current;
+      if (!textarea) {
+        return;
+      }
+      textarea.focus();
+      const nextCaret = prefillRequest.value.length;
+      textarea.setSelectionRange(nextCaret, nextCaret);
+    }, 0);
+  }, [handleTyping, prefillRequest]);
 
   React.useEffect(() => {
     return () => {

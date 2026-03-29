@@ -5,6 +5,7 @@ import type { MessageVM } from '@iconicedu/shared-types';
 import { ScrollArea } from '@iconicedu/ui-web/ui/scroll-area';
 import { Bookmark } from 'lucide-react';
 import { SavedMessagePreview } from '@iconicedu/ui-web/components/messages/saved-message-preview';
+import { EmptyMessagesState } from '@iconicedu/ui-web/components/messages/empty-state';
 
 interface MessagesSavedTabProps {
   messages: MessageVM[];
@@ -22,16 +23,12 @@ export function getSavedMessages(messages: MessageVM[]): MessageVM[] {
 
 const EmptyState = memo(function EmptyState() {
   return (
-    <div className="flex flex-1 items-center justify-center p-6">
-      <div className="text-center">
-        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-          <Bookmark className="h-6 w-6 text-muted-foreground" />
-        </div>
-        <h3 className="mb-1 text-sm font-semibold text-foreground">No saved messages</h3>
-        <p className="text-xs text-muted-foreground">
-          Save important messages by clicking the bookmark icon
-        </p>
-      </div>
+    <div className="flex min-h-[70vh] w-full items-center justify-center">
+      <EmptyMessagesState
+        title="No saved messages"
+        description="Save important messages by clicking the bookmark icon."
+        icon={<Bookmark className="size-5" />}
+      />
     </div>
   );
 });
