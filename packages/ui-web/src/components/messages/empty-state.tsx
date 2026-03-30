@@ -73,7 +73,7 @@ export function EmptyMessagesState({
 
           {starterAction ? (
             <Button
-              variant="secondary"
+              variant="default"
               className="px-6"
               onClick={starterAction.onClick}
               asChild={Boolean(starterAction.href)}

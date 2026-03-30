@@ -554,7 +554,7 @@ describe('MessagesContainer', () => {
 
     render(<MessagesContainer channel={dmChannel} currentUserId="profile-1" />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Say hello' }));
+    fireEvent.click(screen.getByRole('button', { name: /Say hello/i }));
 
     await waitFor(() => {
       expect(latestMessageInputProps.current?.prefillRequest?.value).toBe(
@@ -577,7 +577,7 @@ describe('MessagesContainer', () => {
       <MessagesContainer channel={learningSpaceChannel} currentUserId="profile-1" />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Message teacher' }));
+    fireEvent.click(screen.getByRole('button', { name: /Message teacher/i }));
 
     await waitFor(() => {
       expect(latestMessageInputProps.current?.prefillRequest?.value).toBe(
@@ -598,7 +598,7 @@ describe('MessagesContainer', () => {
 
     render(<MessagesContainer channel={supportChannel} currentUserId="profile-1" />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Ask support for help' }));
+    fireEvent.click(screen.getByRole('button', { name: /Ask support for help/i }));
 
     await waitFor(() => {
       expect(latestMessageInputProps.current?.prefillRequest?.value).toBe(

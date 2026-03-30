@@ -159,7 +159,7 @@ function buildChannelEmptyStateCopy(input: {
       description:
         'This is a direct message conversation. Chat here whenever you want, keep replies respectful, and keep the conversation in one place.',
       starterAction: {
-        label: 'Say hello',
+        label: '👋 Say hello',
         prefillText: `Hi ${otherParticipantName}, I wanted to reach out here.`,
       },
     };
@@ -172,7 +172,7 @@ function buildChannelEmptyStateCopy(input: {
         'Use this support channel for payment questions, class scheduling issues, teacher, parent, or student concerns, and any other operational help. Our support staff will help you resolve the issue.',
       icon: <LifeBuoy className="size-5" />,
       starterAction: {
-        label: 'Ask support for help',
+        label: '🛟 Ask support for help',
         prefillText: 'Hi support team, I need help with ',
       },
     };
@@ -208,7 +208,7 @@ function buildChannelEmptyStateCopy(input: {
         description: `Use this class channel to communicate with ${familyLabel}. Share class updates, discuss reschedules or cancellations, and send homework or learning resources in one place.`,
         icon: <GraduationCap className="size-5" />,
         starterAction: {
-          label: 'Start class update',
+          label: '📣 Start class update',
           prefillText: 'Hi everyone, sharing a quick update about class today.',
         },
       };
@@ -221,7 +221,7 @@ function buildChannelEmptyStateCopy(input: {
           'This class channel is for communicating with your teacher about the class, reschedules or cancellations, homework, and shared learning resources.',
         icon: <GraduationCap className="size-5" />,
         starterAction: {
-          label: 'Message teacher',
+          label: '✉️ Message teacher',
           prefillText: `Hi ${educatorName}, I’m reaching out about ${channel.basics.topic}.`,
         },
       };
@@ -234,7 +234,7 @@ function buildChannelEmptyStateCopy(input: {
           'This class channel is for communicating with your teacher about class updates, schedule changes, homework, and shared learning resources.',
         icon: <GraduationCap className="size-5" />,
         starterAction: {
-          label: 'Ask teacher',
+          label: '🙋 Ask teacher',
           prefillText: `Hi ${educatorName}, I have a question about class.`,
         },
       };
