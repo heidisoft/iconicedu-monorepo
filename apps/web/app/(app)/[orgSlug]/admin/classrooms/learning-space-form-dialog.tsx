@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  Checkbox,
   Field,
   FieldDescription,
   FieldGroup,
@@ -20,6 +21,7 @@ import {
   FieldSet,
   FieldSeparator,
   Input,
+  Label,
   Select,
   SelectContent,
   SelectGroup,
@@ -112,6 +114,7 @@ type LearningSpaceFormState = {
   participants: UserProfileVM[];
   schedules: RecurrenceFormData[];
   liveSession: ChannelLiveSessionConfigVM;
+  sendActivityNotifications: boolean;
 };
 
 function createDefaultChannelUiDefaults(): ChannelUiDefaultsVM {
@@ -165,6 +168,7 @@ export function LearningSpaceFormDialog({
       participants: [],
       schedules: [],
       liveSession: { ...DEFAULT_ADMIN_LIVE_SESSION_CONFIG },
+      sendActivityNotifications: true,
     }),
     [],
   );
@@ -214,6 +218,7 @@ export function LearningSpaceFormDialog({
         participants: initialData.participants ?? [],
         schedules: normalizeSchedules(initialData.schedules ?? []),
         liveSession: initialData.liveSession ?? { ...DEFAULT_ADMIN_LIVE_SESSION_CONFIG },
+        sendActivityNotifications: true,
       });
       setIsSubmitted(false);
       return;
@@ -274,6 +279,7 @@ export function LearningSpaceFormDialog({
           ? JSON.stringify({
               learningSpaceId: editingId,
               payload,
+              sendActivityNotifications: formState.sendActivityNotifications,
               initialScheduleHashKey,
               scheduleHashKey: currentScheduleHashKey,
               hasScheduleChanges: initialScheduleHashKey !== currentScheduleHashKey,
@@ -533,7 +539,6 @@ export function LearningSpaceFormDialog({
                     }
                   />
                 </FieldSet>
-                <FieldSeparator />
                 <ChannelUiDefaultsSettingsSection
                   legend="Settings"
                   themeSelectId="ls-theme-key"
@@ -552,6 +557,33 @@ export function LearningSpaceFormDialog({
                     })
                   }
                 />
+                {mode === 'edit' && (
+                  <>
+                    <FieldSeparator />
+                    <FieldSet>
+                      <FieldLegend>Notifications</FieldLegend>
+                      <FieldGroup>
+                        <Label className="flex items-start gap-3 text-sm">
+                          <Checkbox
+                            checked={formState.sendActivityNotifications}
+                            onCheckedChange={(checked) =>
+                              updateFormState({
+                                sendActivityNotifications: checked === true,
+                              })
+                            }
+                          />
+                          <div className="space-y-1">
+                            <span>Send activity notifications for this update</span>
+                            <FieldDescription>
+                              Leave this on to notify participants about classroom
+                              changes. Turn it off to save the update silently.
+                            </FieldDescription>
+                          </div>
+                        </Label>
+                      </FieldGroup>
+                    </FieldSet>
+                  </>
+                )}
               </form>
               <ScrollBar orientation="vertical" className="right-2" />
             </ScrollArea>

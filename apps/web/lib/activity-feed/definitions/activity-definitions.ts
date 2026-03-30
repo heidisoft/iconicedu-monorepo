@@ -1558,6 +1558,30 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => renderLearningSpaceUpdatedLeaf(event),
   },
+  'channel.updated': {
+    eventType: 'channel.updated',
+    tabKey: 'all',
+    importance: 'normal',
+    group: null,
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => {
+      const payload = asRecord(event.payload);
+      return {
+        verb: 'channel.updated',
+        leading: buildSystemLeadingAvatar(),
+        headline: {
+          primary: 'Channel updated',
+          secondary: asString(payload.channelTopic, 'Channel'),
+        },
+        summary:
+          asOptionalString(payload.changeSummary) ?? 'Channel settings were updated.',
+        actionButton: sourceAction(event, payload, 'outline', 'Open channel'),
+        metadata: {
+          channelId: payload.channelId,
+        },
+      };
+    },
+  },
   'class.archived': {
     eventType: 'class.archived',
     tabKey: 'classes',

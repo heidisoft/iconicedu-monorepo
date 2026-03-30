@@ -126,6 +126,7 @@ export type NotificationKey =
   | 'file.uploaded'
   | 'class.created'
   | 'class.updated'
+  | 'channel.updated'
   | 'class.archived'
   | 'member.invited'
   | 'members.invited'

@@ -2,13 +2,19 @@ import { randomUUID } from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { ChannelCreatePayload, ChannelCapabilityVM } from '@iconicedu/shared-types';
+import { publishActivityEvent } from '@iconicedu/web/lib/activity-feed/publisher/activity-publisher';
+import { ensureSystemProfileId } from '@iconicedu/web/lib/automation/system-profile';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
+import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { requireParentActorContext } from '@iconicedu/web/lib/family-view/actor-context';
 import { toStoredLiveSessionConfig } from '@iconicedu/web/lib/admin/live-session-config';
 
 export async function updateChannelFromPayload(
   channelId: string,
   payload: ChannelCreatePayload,
+  options?: {
+    sendActivityNotifications?: boolean;
+  },
 ) {
   const supabase = await createSupabaseServerClient();
   const {
@@ -23,6 +29,144 @@ export async function updateChannelFromPayload(
 
   const orgId = actor.account.org_id;
   const now = new Date().toISOString();
+  const shouldSendActivityNotifications = options?.sendActivityNotifications ?? true;
+  const { data: existingChannel, error: existingChannelError } = await supabase
+    .from('channels')
+    .select(
+      'topic, description, icon_key, visibility, purpose, kind, ui_theme_key, ui_defaults, live_session_config, status, posting_policy_kind, allow_threads, allow_reactions',
+    )
+    .eq('org_id', orgId)
+    .eq('id', channelId)
+    .is('deleted_at', null)
+    .maybeSingle<{
+      topic?: string | null;
+      description?: string | null;
+      icon_key?: string | null;
+      visibility?: string | null;
+      purpose?: string | null;
+      kind?: string | null;
+      ui_theme_key?: string | null;
+      ui_defaults?: unknown;
+      live_session_config?: unknown;
+      status?: string | null;
+      posting_policy_kind?: string | null;
+      allow_threads?: boolean | null;
+      allow_reactions?: boolean | null;
+    }>();
+
+  if (existingChannelError) {
+    throw new Error(existingChannelError.message);
+  }
+
+  if (!existingChannel) {
+    throw new Error('Channel not found');
+  }
+
+  const [existingMembersResponse, existingCapabilitiesResponse] = await Promise.all([
+    supabase
+      .from('channel_members')
+      .select('profile_id')
+      .eq('org_id', orgId)
+      .eq('channel_id', channelId)
+      .returns<Array<{ profile_id: string }>>(),
+    supabase
+      .from('channel_capabilities')
+      .select('capability')
+      .eq('org_id', orgId)
+      .eq('channel_id', channelId)
+      .returns<Array<{ capability: ChannelCapabilityVM }>>(),
+  ]);
+
+  if (existingMembersResponse.error) {
+    throw new Error(existingMembersResponse.error.message);
+  }
+  if (existingCapabilitiesResponse.error) {
+    throw new Error(existingCapabilitiesResponse.error.message);
+  }
+
+  const nextParticipantIds = [
+    ...new Set(payload.participants.map((participant) => participant.profileId)),
+  ].sort();
+  const existingParticipantIds = [
+    ...new Set((existingMembersResponse.data ?? []).map((row) => row.profile_id)),
+  ].sort();
+  const nextCapabilities = [...new Set(payload.capabilities ?? [])].sort();
+  const existingCapabilities = [
+    ...new Set((existingCapabilitiesResponse.data ?? []).map((row) => row.capability)),
+  ].sort();
+
+  const changeSummaryParts: string[] = [];
+  if ((existingChannel.topic ?? null) !== payload.basics.topic) {
+    changeSummaryParts.push(`Renamed channel to ${payload.basics.topic}`);
+  }
+  if ((existingChannel.description ?? null) !== (payload.basics.description ?? null)) {
+    changeSummaryParts.push(
+      payload.basics.description
+        ? 'Updated channel description'
+        : 'Removed channel description',
+    );
+  }
+  if ((existingChannel.icon_key ?? null) !== (payload.basics.iconKey ?? null)) {
+    changeSummaryParts.push(
+      payload.basics.iconKey ? 'Updated channel icon' : 'Removed channel icon',
+    );
+  }
+  if ((existingChannel.visibility ?? null) !== payload.basics.visibility) {
+    changeSummaryParts.push(`Changed visibility to ${payload.basics.visibility}`);
+  }
+  if ((existingChannel.purpose ?? null) !== payload.basics.purpose) {
+    changeSummaryParts.push(`Changed purpose to ${payload.basics.purpose}`);
+  }
+  if ((existingChannel.kind ?? null) !== payload.basics.kind) {
+    changeSummaryParts.push('Changed channel kind');
+  }
+  if ((existingChannel.ui_theme_key ?? null) !== (payload.ui?.themeKey ?? 'teal')) {
+    changeSummaryParts.push('Updated channel theme');
+  }
+  if (
+    JSON.stringify(existingChannel.ui_defaults ?? null) !==
+    JSON.stringify(payload.ui ?? null)
+  ) {
+    changeSummaryParts.push('Updated channel defaults');
+  }
+  if (
+    JSON.stringify(existingChannel.live_session_config ?? null) !==
+    JSON.stringify(toStoredLiveSessionConfig(payload.liveSession))
+  ) {
+    changeSummaryParts.push('Updated live session settings');
+  }
+  if ((existingChannel.status ?? null) !== (payload.lifecycle?.status ?? 'active')) {
+    changeSummaryParts.push(`Changed status to ${payload.lifecycle?.status ?? 'active'}`);
+  }
+  if ((existingChannel.posting_policy_kind ?? null) !== payload.postingPolicy.kind) {
+    changeSummaryParts.push('Updated posting policy');
+  }
+  if (
+    (existingChannel.allow_threads ?? true) !==
+    (payload.postingPolicy.allowThreads ?? true)
+  ) {
+    changeSummaryParts.push(
+      payload.postingPolicy.allowThreads === false
+        ? 'Disabled threads'
+        : 'Enabled threads',
+    );
+  }
+  if (
+    (existingChannel.allow_reactions ?? true) !==
+    (payload.postingPolicy.allowReactions ?? true)
+  ) {
+    changeSummaryParts.push(
+      payload.postingPolicy.allowReactions === false
+        ? 'Disabled reactions'
+        : 'Enabled reactions',
+    );
+  }
+  if (JSON.stringify(existingParticipantIds) !== JSON.stringify(nextParticipantIds)) {
+    changeSummaryParts.push('Updated channel members');
+  }
+  if (JSON.stringify(existingCapabilities) !== JSON.stringify(nextCapabilities)) {
+    changeSummaryParts.push('Updated channel capabilities');
+  }
 
   await updateChannel(supabase, {
     id: channelId,
@@ -59,6 +203,29 @@ export async function updateChannelFromPayload(
     createdAt: now,
     capabilities: payload.capabilities ?? [],
   });
+
+  if (shouldSendActivityNotifications && changeSummaryParts.length > 0) {
+    const serviceClient = createSupabaseServiceClient();
+    const systemProfileId = await ensureSystemProfileId(serviceClient, orgId);
+
+    await publishActivityEvent({
+      supabase: serviceClient,
+      orgId,
+      eventType: 'channel.updated',
+      occurredAt: now,
+      sourceKind: 'system',
+      actorProfileId: systemProfileId,
+      scope: { kind: 'channel', channelId },
+      payload: {
+        channelId,
+        channelTopic: payload.basics.topic,
+        channelRouteKind: 'channel',
+        changeSummary: changeSummaryParts.join(', '),
+      },
+      dedupeKey: `channel.updated:${channelId}:${now}`,
+      createdBy: systemProfileId,
+    });
+  }
 }
 
 type UpdateChannelPayload = {

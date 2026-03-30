@@ -8,8 +8,7 @@ const updateChannelFromPayload = vi.fn();
 const APP_URL = resolveAppUrl();
 
 vi.mock('@iconicedu/web/lib/admin/channel-update', () => ({
-  updateChannelFromPayload: (id: string, payload: ChannelCreatePayload) =>
-    updateChannelFromPayload(id, payload),
+  updateChannelFromPayload: (...args: unknown[]) => updateChannelFromPayload(...args),
 }));
 
 describe('POST /api/admin/channels/update', () => {
@@ -57,11 +56,17 @@ describe('POST /api/admin/channels/update', () => {
     const response = await POST(
       new Request(`${APP_URL}/api/admin/channels/update`, {
         method: 'POST',
-        body: JSON.stringify({ channelId: 'channel-1', payload }),
+        body: JSON.stringify({
+          channelId: 'channel-1',
+          payload,
+          sendActivityNotifications: false,
+        }),
       }),
     );
 
-    expect(updateChannelFromPayload).toHaveBeenCalledWith('channel-1', payload);
+    expect(updateChannelFromPayload).toHaveBeenCalledWith('channel-1', payload, {
+      sendActivityNotifications: false,
+    });
     expect(response.status).toBe(200);
     const responsePayload = await response.json();
     expect(responsePayload).toEqual({ success: true });

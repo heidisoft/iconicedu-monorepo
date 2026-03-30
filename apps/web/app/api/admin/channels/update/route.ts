@@ -6,6 +6,7 @@ import { updateChannelFromPayload } from '@iconicedu/web/lib/admin/channel-updat
 type UpdateChannelRequest = {
   channelId?: string;
   payload?: ChannelCreatePayload;
+  sendActivityNotifications?: boolean;
 };
 
 function isValidPayload(payload?: ChannelCreatePayload) {
@@ -19,7 +20,8 @@ function isValidPayload(payload?: ChannelCreatePayload) {
 }
 
 export async function POST(request: Request) {
-  const { channelId, payload } = (await request.json()) as UpdateChannelRequest;
+  const { channelId, payload, sendActivityNotifications } =
+    (await request.json()) as UpdateChannelRequest;
 
   if (!channelId || !isValidPayload(payload)) {
     return NextResponse.json(
@@ -29,7 +31,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    await updateChannelFromPayload(channelId, payload!);
+    await updateChannelFromPayload(channelId, payload!, {
+      sendActivityNotifications,
+    });
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json(

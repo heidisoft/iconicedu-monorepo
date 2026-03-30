@@ -24,6 +24,7 @@ export type ActivityVerbVM =
   | 'class.created'
   | 'classes.created'
   | 'class.updated'
+  | 'channel.updated'
   | 'classes.updated'
   | 'class.archived'
   | 'classes.archived'
