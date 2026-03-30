@@ -11,6 +11,7 @@ interface MessagesTopSurfaceProps {
   className?: string;
   showBottomBorder?: boolean;
   showPattern?: boolean;
+  useMutedBackground?: boolean;
   'data-testid'?: string;
 }
 
@@ -20,10 +21,14 @@ export function MessagesTopSurface({
   className,
   showBottomBorder = false,
   showPattern = true,
+  useMutedBackground = false,
   'data-testid': dataTestId,
 }: MessagesTopSurfaceProps) {
   const themeClass = channel.ui?.themeKey ? `theme-${channel.ui.themeKey}` : '';
-  const style = buildMessagesTopSurfaceStyle(Boolean(channel.ui?.themeKey));
+  const style = buildMessagesTopSurfaceStyle(
+    Boolean(channel.ui?.themeKey),
+    useMutedBackground,
+  );
 
   return (
     <div
@@ -73,7 +78,35 @@ export function MessagesTopSurface({
   );
 }
 
-function buildMessagesTopSurfaceStyle(hasTheme: boolean): CSSProperties {
+function buildMessagesTopSurfaceStyle(
+  hasTheme: boolean,
+  useMutedBackground: boolean,
+): CSSProperties {
+  if (useMutedBackground) {
+    return {
+      borderColor: 'var(--messages-top-border)',
+      ['--messages-top-surface-bg' as string]:
+        'color-mix(in oklab, var(--muted) 60%, var(--background) 40%)',
+      ['--messages-top-border' as string]:
+        'color-mix(in oklab, var(--border) 82%, var(--muted) 18%)',
+      ['--messages-top-pattern-stroke' as string]:
+        'color-mix(in oklab, var(--muted-foreground) 10%, transparent)',
+      ['--messages-top-pattern-fill' as string]:
+        'color-mix(in oklab, var(--muted-foreground) 4%, transparent)',
+      ['--messages-top-indicator' as string]: 'var(--foreground)',
+      ['--messages-top-tab-hover' as string]:
+        'color-mix(in oklab, var(--foreground) 5%, transparent)',
+      ['--messages-top-tabs-bg' as string]:
+        'color-mix(in oklab, var(--background) 48%, transparent)',
+      ['--messages-top-tabs-border' as string]:
+        'color-mix(in oklab, var(--muted-foreground) 8%, transparent)',
+      ['--messages-top-tab-active-bg' as string]:
+        'color-mix(in oklab, var(--background) 70%, transparent)',
+      ['--messages-top-tab-active-border' as string]:
+        'color-mix(in oklab, var(--muted-foreground) 8%, transparent)',
+    };
+  }
+
   if (hasTheme) {
     return {
       borderColor: 'var(--messages-top-border)',

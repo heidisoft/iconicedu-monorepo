@@ -2001,13 +2001,12 @@ export function MessagesContainer({
           showBottomBorder
           className="overflow-visible"
           showPattern={false}
+          useMutedBackground
         >
           <div
             className="border-t px-4"
             style={{
-              borderColor: channel.ui?.themeKey
-                ? 'color-mix(in oklab, var(--theme-bg) 18%, var(--border) 82%)'
-                : 'color-mix(in oklab, var(--border) 82%, var(--muted) 18%)',
+              borderColor: 'color-mix(in oklab, var(--border) 82%, var(--muted) 18%)',
             }}
           >
             <Tabs

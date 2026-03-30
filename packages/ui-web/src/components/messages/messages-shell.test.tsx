@@ -18,8 +18,11 @@ describe('MessagesShell', () => {
   });
 
   it('wraps the header row in the shared top surface', () => {
-    expect(source).toContain(
-      '<MessagesTopSurface channel={props.channel} data-testid="messages-top-surface-header">',
-    );
+    expect(source).toContain('<MessagesTopSurface');
+    expect(source).toContain('data-testid="messages-top-surface-header"');
+  });
+
+  it('uses the muted background mode for the header surface', () => {
+    expect(source).toContain('useMutedBackground');
   });
 });

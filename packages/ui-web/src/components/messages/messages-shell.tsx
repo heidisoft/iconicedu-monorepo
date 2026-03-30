@@ -94,7 +94,11 @@ const MessagesShellLayout = memo(function MessagesShellLayout({
   ]);
 
   const messagesHeader = (
-    <MessagesTopSurface channel={props.channel} data-testid="messages-top-surface-header">
+    <MessagesTopSurface
+      channel={props.channel}
+      data-testid="messages-top-surface-header"
+      useMutedBackground
+    >
       <header className="flex min-h-16 items-center justify-between gap-3 px-4 py-3">
         <MessagesContainerHeader channel={props.channel} />
         <MessagesContainerHeaderActions />
