@@ -35,7 +35,7 @@ import type {
   TextMessageVM,
   UserProfileVM,
 } from '@iconicedu/shared-types';
-import { LearningSpaceIconBadge } from '@/lib/learning-space-icons';
+import { ChannelTopicIconBadge } from '@/lib/learning-space-icons';
 import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
 import { useAccount } from '@/hooks/use-account';
 import { useProfile } from '@/hooks/use-profile';
@@ -1414,7 +1414,7 @@ export function ChannelInfoSheet({
               style={s.heroCompact}
               {...(isFullScreen ? panResponder.panHandlers : {})}
             >
-              <LearningSpaceIconBadge
+              <ChannelTopicIconBadge
                 iconKey={iconKey}
                 size={56}
                 iconSize={28}

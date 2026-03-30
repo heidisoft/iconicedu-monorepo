@@ -14,7 +14,7 @@ import {
 import { ChevronLeft, Video, MoreVertical, Share2, X } from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
-import { LearningSpaceIconBadge } from '@/lib/learning-space-icons';
+import { ChannelTopicIconBadge } from '@/lib/learning-space-icons';
 import { PulseBox } from '@/components/skeletons/pulse-box';
 import { RoleAvatarBadge } from '@/components/profile/role-avatar-badge';
 import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
@@ -523,7 +523,7 @@ export function ConversationHeader({
             <RoleAvatarBadge role={avatarRole} size={16} />
           </View>
         ) : (
-          <LearningSpaceIconBadge
+          <ChannelTopicIconBadge
             iconKey={iconKey}
             size={42}
             iconSize={22}

@@ -1,5 +1,12 @@
 import type { ClassScheduleVM } from '@iconicedu/shared-types';
 import { expandRecurringSchedules } from '@/components/messages/space-sessions-tab';
+import {
+  formatOriginalDate,
+  formatOriginalTime,
+  formatTimeBadge,
+  type ClassSession,
+} from '@/components/sessions/session-card';
+import type { ParticipantRoleVM } from '@iconicedu/shared-types';
 
 type HomeRole = 'guardian' | 'child' | 'educator' | 'staff' | 'system' | 'other';
 
@@ -16,6 +23,22 @@ export type LearningSpaceSummary = {
   status?: string | null;
   subject?: string | null;
   title?: string | null;
+};
+
+export type HomeSessionBuckets = {
+  today: ClassSession[];
+  thisWeek: ClassSession[];
+  nextWeek: ClassSession[];
+};
+
+type ScopedDisplaySchedule = ClassScheduleVM & {
+  uiState?: {
+    kind?: 'default' | 'exception' | 'override';
+    disabled?: boolean;
+    reason?: string | null;
+    originalStartAt?: string;
+    originalEndAt?: string;
+  };
 };
 
 function startOfDay(date: Date): Date {
@@ -35,6 +58,133 @@ function endOfWeekSunday(date: Date): Date {
 
 function endOfMonth(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
+}
+
+function normalizeTimezone(timezone?: string | null): string | null {
+  const value = timezone?.trim();
+  if (!value) {
+    return null;
+  }
+
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value }).format(new Date());
+    return value;
+  } catch {
+    return null;
+  }
+}
+
+function getScheduleDisplayTimezone(
+  schedule: Pick<ClassScheduleVM, 'timezone' | 'recurrence'>,
+  viewerTimezone?: string | null,
+): string {
+  return (
+    normalizeTimezone(viewerTimezone) ??
+    normalizeTimezone(schedule.timezone ?? schedule.recurrence?.rule.timezone ?? null) ??
+    'UTC'
+  );
+}
+
+function getDisplayDateParts(
+  input: Date | string,
+  timezone: string,
+): {
+  year: number;
+  month: number;
+  day: number;
+} | null {
+  const date = input instanceof Date ? input : new Date(input);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+
+  const lookup = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value ?? NaN);
+
+  const year = lookup('year');
+  const month = lookup('month');
+  const day = lookup('day');
+
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+    return null;
+  }
+
+  return { year, month, day };
+}
+
+function getScheduleDisplayStartOfDay(input: Date | string, timezone: string): Date {
+  const parts = getDisplayDateParts(input, timezone);
+  if (!parts) {
+    return startOfDay(input instanceof Date ? input : new Date(input));
+  }
+
+  return new Date(parts.year, parts.month - 1, parts.day);
+}
+
+function getScheduleDisplayStartOfWeek(input: Date | string, timezone: string): Date {
+  return startOfWeekMonday(getScheduleDisplayStartOfDay(input, timezone));
+}
+
+function getResolvedScheduleDisplayMonthKey(
+  input: Date | string,
+  timezone: string,
+): string {
+  const parts = getDisplayDateParts(input, timezone);
+  if (!parts) {
+    return '1970-01';
+  }
+
+  return `${parts.year}-${String(parts.month).padStart(2, '0')}`;
+}
+
+function getParticipantLabel(input: {
+  schedule: ScopedDisplaySchedule;
+  profileKind?: string | null;
+}): string | null {
+  const items = getRelevantParticipants(input).map((participant) => participant.name);
+  return items.length ? items.join(', ') : null;
+}
+
+function getRelevantParticipants(input: {
+  schedule: ScopedDisplaySchedule;
+  profileKind?: string | null;
+}): { name: string; themeKey?: string | null }[] {
+  const targetRoles: Set<ParticipantRoleVM> | null =
+    input.profileKind === 'guardian'
+      ? new Set<ParticipantRoleVM>(['child', 'educator'])
+      : input.profileKind === 'educator'
+        ? new Set<ParticipantRoleVM>(['child'])
+        : input.profileKind === 'child'
+          ? new Set<ParticipantRoleVM>(['educator'])
+          : input.profileKind === 'staff' || input.profileKind === 'system'
+            ? null
+            : null;
+
+  const seen = new Set<string>();
+  const participants: { name: string; themeKey?: string | null }[] = [];
+
+  input.schedule.participants.forEach((participant) => {
+    if (targetRoles && !targetRoles.has(participant.role)) {
+      return;
+    }
+
+    const name = participant.displayName?.trim();
+    if (!name || seen.has(name)) {
+      return;
+    }
+
+    seen.add(name);
+    participants.push({ name, themeKey: participant.themeKey ?? null });
+  });
+
+  return participants;
 }
 
 function resolveHomeRole(kind?: string | null): HomeRole {
@@ -102,6 +252,217 @@ function toActiveSubjectsLabel(subjects: string[]): string {
   return `${subjects.slice(0, 3).join(', ')} +${subjects.length - 3} more`;
 }
 
+export function splitHomeSessionsByTimeline(input: {
+  sessions: ClassSession[];
+  now?: Date;
+  timezone?: string | null;
+}): HomeSessionBuckets {
+  const now = input.now ?? new Date();
+  const viewerTimezone = normalizeTimezone(input.timezone) ?? 'UTC';
+  const thisWeekStart = getScheduleDisplayStartOfWeek(now, viewerTimezone).getTime();
+  const nextWeekStart = new Date(thisWeekStart + 7 * 86_400_000).getTime();
+  const weekAfterNextStart = new Date(nextWeekStart + 7 * 86_400_000).getTime();
+
+  return input.sessions.reduce<HomeSessionBuckets>(
+    (buckets, session) => {
+      const startAt = getScheduleDisplayStartOfDay(
+        session.startAt,
+        viewerTimezone,
+      ).getTime();
+      const isToday =
+        getScheduleDisplayStartOfDay(session.startAt, viewerTimezone).getTime() ===
+        getScheduleDisplayStartOfDay(now, viewerTimezone).getTime();
+
+      if (isToday) {
+        buckets.today.push(session);
+        return buckets;
+      }
+
+      if (startAt >= thisWeekStart && startAt < nextWeekStart) {
+        buckets.thisWeek.push(session);
+        return buckets;
+      }
+
+      if (startAt >= nextWeekStart && startAt < weekAfterNextStart) {
+        buckets.nextWeek.push(session);
+      }
+
+      return buckets;
+    },
+    { today: [], thisWeek: [], nextWeek: [] },
+  );
+}
+
+function buildHomeScopedSchedules(input: {
+  schedules: ClassScheduleVM[];
+  profileKind?: string | null;
+  primaryRole?: string | null;
+  profileId?: string | null;
+  childProfileIds?: string[];
+  now?: Date;
+  timezone?: string | null;
+}): {
+  role: HomeRole;
+  scopedSchedules: ScopedDisplaySchedule[];
+  upcomingSessionsPage: HomeSessionBuckets;
+  completedClassesThisMonth: number;
+} {
+  const role = resolveHomeRole(input.profileKind ?? input.primaryRole);
+  const scopedProfileIds = getScopedProfileIds({
+    role,
+    profileId: input.profileId,
+    childProfileIds: input.childProfileIds,
+  });
+  const now = input.now ?? new Date();
+  const viewerTimezone = normalizeTimezone(input.timezone) ?? 'UTC';
+  const displayNow = getScheduleDisplayStartOfDay(now, viewerTimezone);
+  const weekStartDate = getScheduleDisplayStartOfWeek(displayNow, viewerTimezone);
+  const weekStartMs = weekStartDate.getTime();
+  const nextWeekEndMs = (() => {
+    const nextWeekEnd = endOfWeekSunday(weekStartDate);
+    nextWeekEnd.setDate(nextWeekEnd.getDate() + 7);
+    return nextWeekEnd.getTime();
+  })();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const rangeStart = monthStart < now ? monthStart : now;
+  const rangeEnd = new Date(Math.max(endOfMonth(now).getTime(), nextWeekEndMs));
+
+  const expandedSchedules = expandRecurringSchedules(
+    input.schedules,
+    rangeStart,
+    rangeEnd,
+  ) as ScopedDisplaySchedule[];
+  const scopedSchedules = expandedSchedules.filter((schedule) =>
+    isScopedSchedule(schedule, role, scopedProfileIds),
+  );
+
+  const upcomingSchedules = scopedSchedules
+    .filter((schedule) => new Date(schedule.endAt).getTime() >= now.getTime())
+    .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
+  const upcomingThisAndNextWeek = upcomingSchedules.filter((schedule) => {
+    const scheduleDayMs = getScheduleDisplayStartOfDay(
+      schedule.startAt,
+      getScheduleDisplayTimezone(schedule, viewerTimezone),
+    ).getTime();
+    return scheduleDayMs >= weekStartMs && scheduleDayMs <= nextWeekEndMs;
+  });
+
+  const currentMonthKey = getResolvedScheduleDisplayMonthKey(now, viewerTimezone);
+  const completedClassesThisMonth = scopedSchedules.reduce((count, schedule) => {
+    const monthKey = getResolvedScheduleDisplayMonthKey(
+      schedule.startAt,
+      getScheduleDisplayTimezone(schedule, viewerTimezone),
+    );
+    if (monthKey !== currentMonthKey) {
+      return count;
+    }
+    if (schedule.status === 'cancelled') {
+      return count;
+    }
+    if (
+      schedule.status === 'completed' ||
+      new Date(schedule.endAt).getTime() < now.getTime()
+    ) {
+      return count + 1;
+    }
+    return count;
+  }, 0);
+
+  const currentWeekStart = getScheduleDisplayStartOfWeek(now, viewerTimezone).getTime();
+  const todayStart = getScheduleDisplayStartOfDay(now, viewerTimezone).getTime();
+
+  const sessions = upcomingThisAndNextWeek.map((schedule) => {
+    const scheduleTimezone = getScheduleDisplayTimezone(schedule, viewerTimezone);
+    const startDisplayDate = getScheduleDisplayStartOfDay(
+      schedule.startAt,
+      scheduleTimezone,
+    );
+    const startMs = new Date(schedule.startAt).getTime();
+    const endMs = new Date(schedule.endAt).getTime();
+
+    return {
+      id: schedule.ids.id,
+      label: schedule.title,
+      time: formatTimeBadge(schedule.startAt),
+      participantLabel: getParticipantLabel({ schedule, profileKind: input.profileKind }),
+      participants: getRelevantParticipants({ schedule, profileKind: input.profileKind }),
+      dayName: startDisplayDate.toLocaleDateString('en-US', { weekday: 'short' }),
+      dayNum: String(startDisplayDate.getDate()),
+      isToday: startDisplayDate.getTime() === todayStart,
+      isLive: startMs <= now.getTime() && now.getTime() <= endMs,
+      isPast: endMs < now.getTime(),
+      status: schedule.status,
+      meetingLink: schedule.meetingLink ?? null,
+      channelId:
+        schedule.source.kind === 'class_session'
+          ? (schedule.source.channelId ?? null)
+          : null,
+      students: schedule.participants
+        .filter((participant) => participant.role === 'child' && participant.displayName)
+        .map((participant) => ({
+          name: participant.displayName as string,
+          themeKey: participant.themeKey ?? null,
+        })),
+      variant: schedule.uiState?.kind ?? 'default',
+      disabled: schedule.uiState?.disabled ?? false,
+      reason: schedule.uiState?.reason ?? null,
+      originalTime: schedule.uiState?.originalStartAt
+        ? formatOriginalTime(schedule.uiState.originalStartAt)
+        : null,
+      originalDate: schedule.uiState?.originalStartAt
+        ? formatOriginalDate(schedule.uiState.originalStartAt)
+        : null,
+      startAt: schedule.startAt,
+      endAt: schedule.endAt,
+    } satisfies ClassSession;
+  });
+
+  const upcomingSessionsPage = sessions.reduce<HomeSessionBuckets>(
+    (buckets, session) => {
+      const sessionWeekStart = getScheduleDisplayStartOfWeek(
+        session.startAt,
+        viewerTimezone,
+      ).getTime();
+
+      if (session.isToday) {
+        buckets.today.push(session);
+      } else if (sessionWeekStart === currentWeekStart) {
+        buckets.thisWeek.push(session);
+      } else {
+        buckets.nextWeek.push(session);
+      }
+
+      return buckets;
+    },
+    { today: [], thisWeek: [], nextWeek: [] },
+  );
+
+  return {
+    role,
+    scopedSchedules,
+    upcomingSessionsPage,
+    completedClassesThisMonth,
+  };
+}
+
+export function buildHomeUpcomingSessions(input: {
+  schedules: ClassScheduleVM[];
+  profileKind?: string | null;
+  primaryRole?: string | null;
+  profileId?: string | null;
+  childProfileIds?: string[];
+  now?: Date;
+  timezone?: string | null;
+}): ClassSession[] {
+  const { upcomingSessionsPage } = buildHomeScopedSchedules(input);
+
+  return [
+    ...upcomingSessionsPage.today,
+    ...upcomingSessionsPage.thisWeek,
+    ...upcomingSessionsPage.nextWeek,
+  ];
+}
+
 export function buildHomeMetricSummary(input: {
   schedules: ClassScheduleVM[];
   learningSpaces: LearningSpaceSummary[];
@@ -110,50 +471,15 @@ export function buildHomeMetricSummary(input: {
   profileId?: string | null;
   childProfileIds?: string[];
   now?: Date;
+  timezone?: string | null;
 }): HomeMetricSummary {
-  const role = resolveHomeRole(input.profileKind ?? input.primaryRole);
-  const scopedProfileIds = getScopedProfileIds({
-    role,
-    profileId: input.profileId,
-    childProfileIds: input.childProfileIds,
-  });
+  const { role, scopedSchedules, upcomingSessionsPage, completedClassesThisMonth } =
+    buildHomeScopedSchedules(input);
 
-  const now = input.now ?? new Date();
-  const weekStart = startOfWeekMonday(now);
-  const weekEnd = endOfWeekSunday(weekStart);
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthEnd = endOfMonth(now);
-
-  const expandedSchedules = expandRecurringSchedules(
-    input.schedules,
-    monthStart,
-    weekEnd,
-  );
-  const scopedSchedules = expandedSchedules.filter((schedule) =>
-    isScopedSchedule(schedule, role, scopedProfileIds),
-  );
-
-  const upcomingSessionsThisWeek = scopedSchedules.filter((schedule) => {
-    if (schedule.status === 'cancelled') return false;
-    const startAt = new Date(schedule.startAt).getTime();
-    const endAt = new Date(schedule.endAt).getTime();
-    return (
-      endAt >= now.getTime() &&
-      startAt >= weekStart.getTime() &&
-      startAt <= weekEnd.getTime()
-    );
-  }).length;
-
-  const completedClassesThisMonth = scopedSchedules.filter((schedule) => {
-    if (schedule.status === 'cancelled') return false;
-    if (schedule.uiState?.kind === 'exception') return false;
-    const endAt = new Date(schedule.endAt).getTime();
-    return (
-      endAt < now.getTime() &&
-      endAt >= monthStart.getTime() &&
-      endAt <= monthEnd.getTime()
-    );
-  }).length;
+  const upcomingSessionsThisWeek = [
+    ...upcomingSessionsPage.today,
+    ...upcomingSessionsPage.thisWeek,
+  ].filter((session) => session.status !== 'cancelled').length;
 
   const activeLearningSpaces = input.learningSpaces.filter(
     (space) => space.status === 'active',

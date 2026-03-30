@@ -1,15 +1,23 @@
 import React from 'react';
 import { View, type StyleProp, type ViewStyle } from 'react-native';
 import {
+  BookOpen,
+  Briefcase,
   Calculator,
   ChefHat,
   ChessKnight,
   ClipboardCheck,
   Earth,
+  Globe,
   GraduationCap,
+  House,
   Languages,
   Landmark,
+  LifeBuoy,
+  Lock,
   Map,
+  Megaphone,
+  MessageSquare,
   NotebookPen,
   NotebookText,
   Paintbrush,
@@ -19,11 +27,16 @@ import {
   Scissors,
   Sparkles,
   SquarePi,
+  UserCheck,
+  Users,
   type LucideIcon,
 } from 'lucide-react-native';
 import {
+  DEFAULT_CHANNEL_TOPIC_ICON_KEY,
   DEFAULT_LEARNING_SPACE_ICON_KEY,
+  isKnownChannelTopicIconKey,
   isLearningSpaceIconKey,
+  type KnownChannelTopicIconKey,
   type LearningSpaceIconKey,
 } from '@iconicedu/shared-types';
 
@@ -48,6 +61,21 @@ export const MOBILE_LEARNING_SPACE_ICON_MAP: Record<LearningSpaceIconKey, Lucide
   map: Map,
 };
 
+export const MOBILE_CHANNEL_TOPIC_ICON_MAP: Record<KnownChannelTopicIconKey, LucideIcon> =
+  {
+    ...MOBILE_LEARNING_SPACE_ICON_MAP,
+    megaphone: Megaphone,
+    'life-buoy': LifeBuoy,
+    users: Users,
+    'message-square': MessageSquare,
+    globe: Globe,
+    lock: Lock,
+    house: House,
+    briefcase: Briefcase,
+    'user-check': UserCheck,
+    'book-open': BookOpen,
+  };
+
 export function resolveLearningSpaceIconKey(
   iconKey?: string | null,
 ): LearningSpaceIconKey {
@@ -60,6 +88,24 @@ export function resolveLearningSpaceIconKey(
 
 export function getLearningSpaceIcon(iconKey?: string | null): LucideIcon {
   return MOBILE_LEARNING_SPACE_ICON_MAP[resolveLearningSpaceIconKey(iconKey)];
+}
+
+export function resolveChannelTopicIconKey(
+  iconKey?: string | null,
+): KnownChannelTopicIconKey {
+  if (iconKey === 'support') {
+    return 'life-buoy';
+  }
+
+  if (iconKey && isKnownChannelTopicIconKey(iconKey)) {
+    return iconKey;
+  }
+
+  return DEFAULT_CHANNEL_TOPIC_ICON_KEY;
+}
+
+export function getChannelTopicIcon(iconKey?: string | null): LucideIcon {
+  return MOBILE_CHANNEL_TOPIC_ICON_MAP[resolveChannelTopicIconKey(iconKey)];
 }
 
 type LearningSpaceIconBadgeProps = {
@@ -82,6 +128,38 @@ export function LearningSpaceIconBadge({
   style,
 }: LearningSpaceIconBadgeProps) {
   const Icon = getLearningSpaceIcon(iconKey);
+
+  return (
+    <View
+      style={[
+        {
+          width: size,
+          height: size,
+          borderRadius,
+          backgroundColor,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        style,
+      ]}
+    >
+      <Icon size={iconSize} color={color} />
+    </View>
+  );
+}
+
+type ChannelTopicIconBadgeProps = LearningSpaceIconBadgeProps;
+
+export function ChannelTopicIconBadge({
+  iconKey,
+  color,
+  backgroundColor,
+  size = 40,
+  iconSize = 20,
+  borderRadius = 12,
+  style,
+}: ChannelTopicIconBadgeProps) {
+  const Icon = getChannelTopicIcon(iconKey);
 
   return (
     <View

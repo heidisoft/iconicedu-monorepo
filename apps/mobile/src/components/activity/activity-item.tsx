@@ -157,14 +157,14 @@ export function makeActivityItemStyles(C: AppColors) {
       overflow: 'hidden',
       minHeight: 80,
     },
-    itemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+    itemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
 
     // Avatar
-    avatarWrap: { width: 40, height: 40, flexShrink: 0 },
+    avatarWrap: { width: 28, height: 28, flexShrink: 0, marginTop: 2 },
     avatar: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
+      width: 28,
+      height: 28,
+      borderRadius: 14,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -173,7 +173,7 @@ export function makeActivityItemStyles(C: AppColors) {
     unreadDot: { width: 9, height: 9, borderRadius: 5, flexShrink: 0, marginTop: 8 },
 
     // Content
-    content: { flex: 1, paddingTop: 2 },
+    content: { flex: 1 },
     headlineRow: {
       flexDirection: 'row',
       flexWrap: 'wrap',
@@ -203,7 +203,7 @@ export function makeActivityItemStyles(C: AppColors) {
     // Preview card (summary / expanded content)
     previewCard: {
       marginTop: 10,
-      marginLeft: 64,
+      marginLeft: 42,
       borderRadius: 12,
       borderWidth: 1,
       padding: 14,
@@ -211,14 +211,14 @@ export function makeActivityItemStyles(C: AppColors) {
     previewText: { fontSize: 14, lineHeight: 22 },
 
     // Read more
-    readMoreBtn: { marginTop: 8, marginLeft: 64 },
+    readMoreBtn: { marginTop: 8, marginLeft: 42 },
     readMoreText: { fontSize: 13, fontWeight: '600' },
 
     // Action button
     actionBtn: {
       alignSelf: 'flex-start',
       marginTop: 10,
-      marginLeft: 64,
+      marginLeft: 42,
       borderRadius: 20,
       borderWidth: 1,
       paddingHorizontal: 14,
@@ -227,30 +227,30 @@ export function makeActivityItemStyles(C: AppColors) {
     actionBtnText: { fontSize: 13, fontWeight: '600' },
 
     // Sub-items container
-    subItemsWrap: { marginTop: 10, marginLeft: 64, borderLeftWidth: 2, paddingLeft: 12 },
+    subItemsWrap: { marginTop: 10, marginLeft: 42, borderLeftWidth: 2, paddingLeft: 12 },
 
     // Sub-activity: full leaf view
     subItemInner: { paddingVertical: 10 },
-    subAvatarWrap: { width: 36, height: 36, flexShrink: 0 },
+    subAvatarWrap: { width: 24, height: 24, flexShrink: 0, marginTop: 2 },
     subAvatar: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
+      width: 24,
+      height: 24,
+      borderRadius: 12,
       alignItems: 'center',
       justifyContent: 'center',
     },
     subPreviewCard: {
       marginTop: 8,
-      marginLeft: 48,
+      marginLeft: 34,
       borderRadius: 10,
       borderWidth: 1,
       padding: 12,
     },
-    subReadMoreBtn: { marginTop: 6, marginLeft: 48 },
+    subReadMoreBtn: { marginTop: 6, marginLeft: 34 },
     subActionBtn: {
       alignSelf: 'flex-start',
       marginTop: 8,
-      marginLeft: 48,
+      marginLeft: 34,
       borderRadius: 16,
       borderWidth: 1,
       paddingHorizontal: 12,
@@ -322,7 +322,7 @@ export function ActivityItem({
         <View style={s.itemRow}>
           <View style={s.subAvatarWrap}>
             <View style={[s.subAvatar, { backgroundColor: iconBg }]}>
-              <IconComponent size={16} color={iconFg} />
+              <IconComponent size={10} color={iconFg} />
             </View>
           </View>
 
@@ -403,7 +403,7 @@ export function ActivityItem({
         <View style={s.itemRow}>
           <View style={s.avatarWrap}>
             <View style={[s.avatar, { backgroundColor: iconBg }]}>
-              <IconComponent size={18} color={iconFg} />
+              <IconComponent size={11} color={iconFg} />
             </View>
           </View>
 
@@ -415,7 +415,7 @@ export function ActivityItem({
               </Text>
               {!!emphasis && (
                 <View style={[s.badge, { backgroundColor: iconBg }]}>
-                  <IconComponent size={14} color={iconFg} />
+                  <IconComponent size={9} color={iconFg} />
                   <Text style={[s.badgeText, { color: iconFg }]}>{emphasis}</Text>
                 </View>
               )}

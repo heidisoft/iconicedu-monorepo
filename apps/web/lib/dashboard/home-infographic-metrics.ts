@@ -290,6 +290,12 @@ function buildUpcomingSessionPage(input: {
   };
 }
 
+function countActiveUpcomingSessions(
+  section: DashboardUpcomingSessionsSectionPage,
+): number {
+  return section.items.filter((item) => item.session.status !== 'cancelled').length;
+}
+
 async function buildActiveRoleMetrics(input: {
   supabase: SupabaseClient;
   orgId: string;
@@ -468,7 +474,8 @@ async function buildActiveRoleMetrics(input: {
   return {
     metrics: {
       upcomingSessionsThisWeek:
-        upcomingSessionsPage.today.total + upcomingSessionsPage.thisWeek.total,
+        countActiveUpcomingSessions(upcomingSessionsPage.today) +
+        countActiveUpcomingSessions(upcomingSessionsPage.thisWeek),
       completedClassesThisMonth,
       activeSubjectsCount:
         input.activeRole === 'tutors' ? activeStudentsCount : activeSubjects.length,

@@ -1384,7 +1384,16 @@ export async function fetchSupportChannel(orgId: string): Promise<{
     .maybeSingle();
 
   if (error) throw error;
-  return data ?? null;
+  if (!data) return null;
+
+  return {
+    id: data.id,
+    topic: data.topic ?? null,
+    description: data.description ?? null,
+    icon_key: data.icon_key ?? null,
+    themeKey: data.ui_theme_key ?? null,
+    updated_at: data.updated_at ?? null,
+  };
 }
 
 /**
@@ -1563,7 +1572,7 @@ export async function fetchLearningSpaceChannels(
           last_message_text: null,
           last_message_at: null,
           last_message_sender: null,
-          icon_key: supportChannel.icon_key ?? 'support',
+          icon_key: supportChannel.icon_key ?? 'life-buoy',
           themeKey: supportChannel.themeKey ?? null,
           student_name: null,
           student_profiles: [],

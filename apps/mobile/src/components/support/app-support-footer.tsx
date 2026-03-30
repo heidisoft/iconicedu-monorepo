@@ -39,7 +39,10 @@ export function AppSupportFooter({ isLoading = false }: { isLoading?: boolean })
           params: {
             channelId: supportChannel.id,
             topic: supportChannel.topic ?? 'Live Support',
+            iconKey: supportChannel.icon_key ?? 'life-buoy',
+            themeKey: supportChannel.themeKey ?? '',
             isLearningSpace: '0',
+            purpose: 'support',
           },
         })
       }

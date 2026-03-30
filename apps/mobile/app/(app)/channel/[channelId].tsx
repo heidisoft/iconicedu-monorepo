@@ -38,6 +38,8 @@ import { ConversationHeader } from '@/components/messages/conversation-header';
 import { MessageActionsSheet } from '@/components/messages/message-actions-sheet';
 import { ChannelInfoSheet } from '@/components/messages/channel-info-sheet';
 import { SpaceSessionsTab } from '@/components/messages/space-sessions-tab';
+import { resolveChannelTopicIconKey } from '@/lib/learning-space-icons';
+import { buildMobileChannelEmptyStateCopy } from '@/lib/message-empty-state';
 
 type ChannelTab = 'messages' | 'sessions';
 
@@ -52,6 +54,7 @@ export default function ChannelConversationScreen() {
     subtitle,
     studentProfiles,
     isLearningSpace,
+    purpose,
   } = useLocalSearchParams<{
     channelId: string;
     topic?: string;
@@ -60,6 +63,7 @@ export default function ChannelConversationScreen() {
     subtitle?: string;
     studentProfiles?: string;
     isLearningSpace?: string;
+    purpose?: string;
   }>();
   const router = useRouter();
   const isFocused = useIsFocused();
@@ -351,6 +355,19 @@ export default function ChannelConversationScreen() {
   }, [studentProfiles]);
   const resolvedSubtitle = subtitle?.trim() || null;
   const isSpaceChannel = isLearningSpace === '1';
+  const resolvedIconKey =
+    purpose === 'support'
+      ? resolveChannelTopicIconKey(iconKey ?? 'life-buoy')
+      : (iconKey ?? null);
+  const emptyStateCopy = buildMobileChannelEmptyStateCopy({
+    channelKind: isSpaceChannel
+      ? 'learning-space'
+      : purpose === 'support'
+        ? 'support'
+        : 'generic',
+    currentUserKind: (profileRecord?.kind as string | null | undefined) ?? null,
+    studentNames: headerStudentProfiles.map((student) => student.name),
+  });
   const isOwnMessage = (msg: MessageVM) => msg.core.sender.ids.id === profileId;
 
   if (!channelId) return null;
@@ -362,7 +379,7 @@ export default function ChannelConversationScreen() {
         subtitle={resolvedSubtitle}
         studentProfiles={headerStudentProfiles}
         kind={isSpaceChannel ? 'space' : 'channel'}
-        iconKey={iconKey}
+        iconKey={resolvedIconKey}
         themeKey={themeKey ?? null}
         onBack={() => router.back()}
         onMore={() => setInfoVisible(true)}
@@ -427,8 +444,9 @@ export default function ChannelConversationScreen() {
             onRetryUpload={handleRetryUpload}
             onUnreadViewed={handleUnreadViewed}
             isScreenActive={isFocused && activeTab === 'messages'}
-            emptyTitle="Start the conversation"
-            emptyDescription="Share a welcome message, lesson update, or question to begin the class discussion."
+            emptyTitle={emptyStateCopy.title}
+            emptyDescription={emptyStateCopy.description}
+            emptyIcon={emptyStateCopy.icon}
           />
           <TypingIndicator typingUsers={typingUsers} />
           <MessageInput
@@ -451,7 +469,7 @@ export default function ChannelConversationScreen() {
         title={topic ?? 'Channel'}
         subtitle={resolvedSubtitle}
         kind={isSpaceChannel ? 'space' : 'channel'}
-        iconKey={iconKey}
+        iconKey={resolvedIconKey}
         themeKey={themeKey ?? null}
         messages={messages ?? []}
         onClose={() => setInfoVisible(false)}

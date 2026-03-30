@@ -1,6 +1,12 @@
 import type { ClassScheduleVM } from '@iconicedu/shared-types';
+import type { ClassSession } from '@/components/sessions/session-card';
 
-import { buildHomeMetricSummary, type LearningSpaceSummary } from './home-metrics';
+import {
+  buildHomeUpcomingSessions,
+  buildHomeMetricSummary,
+  splitHomeSessionsByTimeline,
+  type LearningSpaceSummary,
+} from './home-metrics';
 
 const BASE_NOW = new Date('2026-03-23T12:00:00Z');
 
@@ -46,6 +52,37 @@ const LEARNING_SPACES: LearningSpaceSummary[] = [
   { id: 'space-science', status: 'active', subject: 'Science', title: 'Science' },
 ];
 
+function makeSession(input: {
+  id: string;
+  startAt: string;
+  endAt: string;
+  isToday?: boolean;
+}): ClassSession {
+  return {
+    id: input.id,
+    label: input.id,
+    time: '9:00 AM',
+    participantLabel: null,
+    participants: [],
+    dayName: 'Mon',
+    dayNum: '23',
+    isToday: input.isToday ?? false,
+    isLive: false,
+    isPast: false,
+    status: 'scheduled',
+    meetingLink: null,
+    channelId: null,
+    students: [],
+    variant: 'default',
+    disabled: false,
+    reason: null,
+    originalTime: null,
+    originalDate: null,
+    startAt: input.startAt,
+    endAt: input.endAt,
+  };
+}
+
 describe('buildHomeMetricSummary', () => {
   it('builds child metrics with active subjects', () => {
     const result = buildHomeMetricSummary({
@@ -86,6 +123,40 @@ describe('buildHomeMetricSummary', () => {
     });
   });
 
+  it('excludes cancelled upcoming sessions from the weekly homepage metric', () => {
+    const result = buildHomeMetricSummary({
+      schedules: [
+        makeSchedule({
+          id: 'scheduled-upcoming',
+          learningSpaceId: 'space-math',
+          startAt: '2026-03-24T14:00:00Z',
+          endAt: '2026-03-24T15:00:00Z',
+          participants: [
+            { id: 'child-1', role: 'child' },
+            { id: 'teacher-1', role: 'educator' },
+          ],
+        }),
+        makeSchedule({
+          id: 'cancelled-upcoming',
+          learningSpaceId: 'space-math',
+          startAt: '2026-03-25T14:00:00Z',
+          endAt: '2026-03-25T15:00:00Z',
+          participants: [
+            { id: 'child-1', role: 'child' },
+            { id: 'teacher-1', role: 'educator' },
+          ],
+          status: 'cancelled',
+        }),
+      ],
+      learningSpaces: LEARNING_SPACES,
+      profileKind: 'child',
+      profileId: 'child-1',
+      now: BASE_NOW,
+    });
+
+    expect(result.upcomingSessionsThisWeek).toBe(1);
+  });
+
   it('builds educator metrics with active students', () => {
     const result = buildHomeMetricSummary({
       schedules: [
@@ -123,5 +194,76 @@ describe('buildHomeMetricSummary', () => {
     expect(result.thirdMetricTitle).toBe('Manage Classrooms');
     expect(result.thirdMetricValue).toBe(2);
     expect(result.thirdMetricLabel).toBe('Manage classrooms');
+  });
+
+  it('splits upcoming sessions into today, this week, and next week buckets', () => {
+    const result = splitHomeSessionsByTimeline({
+      now: BASE_NOW,
+      sessions: [
+        makeSession({
+          id: 'today-session',
+          startAt: '2026-03-23T16:00:00Z',
+          endAt: '2026-03-23T17:00:00Z',
+          isToday: true,
+        }),
+        makeSession({
+          id: 'this-week-session',
+          startAt: '2026-03-25T16:00:00Z',
+          endAt: '2026-03-25T17:00:00Z',
+        }),
+        makeSession({
+          id: 'next-week-session',
+          startAt: '2026-03-31T16:00:00Z',
+          endAt: '2026-03-31T17:00:00Z',
+        }),
+      ],
+    });
+
+    expect(result.today.map((session) => session.id)).toEqual(['today-session']);
+    expect(result.thisWeek.map((session) => session.id)).toEqual(['this-week-session']);
+    expect(result.nextWeek.map((session) => session.id)).toEqual(['next-week-session']);
+  });
+
+  it('uses monday-based week buckets like the web homepage', () => {
+    const result = splitHomeSessionsByTimeline({
+      now: new Date('2026-03-08T23:30:00.000Z'),
+      timezone: 'America/Los_Angeles',
+      sessions: [
+        makeSession({
+          id: 'today-session',
+          startAt: '2026-03-09T00:30:00.000Z',
+          endAt: '2026-03-09T01:30:00.000Z',
+          isToday: true,
+        }),
+      ],
+    });
+
+    expect(result.today.map((session) => session.id)).toEqual(['today-session']);
+    expect(result.thisWeek).toHaveLength(0);
+    expect(result.nextWeek).toHaveLength(0);
+  });
+
+  it('builds upcoming homepage sessions with the same timezone-aware weekly boundaries as web', () => {
+    const result = buildHomeUpcomingSessions({
+      schedules: [
+        makeSchedule({
+          id: 'metric-alignment',
+          learningSpaceId: 'space-math',
+          startAt: '2026-03-09T00:30:00.000Z',
+          endAt: '2026-03-09T01:30:00.000Z',
+          participants: [
+            { id: 'child-1', role: 'child' },
+            { id: 'teacher-1', role: 'educator' },
+          ],
+        }),
+      ],
+      profileKind: 'child',
+      profileId: 'child-1',
+      now: new Date('2026-03-08T23:30:00.000Z'),
+      timezone: 'America/Los_Angeles',
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.isToday).toBe(true);
   });
 });

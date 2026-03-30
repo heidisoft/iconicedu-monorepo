@@ -34,6 +34,7 @@ import { ConversationHeader } from '@/components/messages/conversation-header';
 import { MessageActionsSheet } from '@/components/messages/message-actions-sheet';
 import { ChannelInfoSheet } from '@/components/messages/channel-info-sheet';
 import { MessageBubblesSkeleton } from '@/components/skeletons';
+import { buildMobileChannelEmptyStateCopy } from '@/lib/message-empty-state';
 
 export default function DmConversationScreen() {
   const {
@@ -250,6 +251,10 @@ export default function DmConversationScreen() {
   if (!channelId) return null;
 
   const isOwnMessage = (msg: MessageVM) => msg.core.sender.ids.id === profileId;
+  const emptyStateCopy = buildMobileChannelEmptyStateCopy({
+    channelKind: 'dm',
+    title: topic ?? 'there',
+  });
 
   return (
     <SafeAreaView
@@ -298,6 +303,9 @@ export default function DmConversationScreen() {
             isReadOnly={isSupervised}
             onUnreadViewed={handleUnreadViewed}
             isScreenActive={isFocused}
+            emptyTitle={emptyStateCopy.title}
+            emptyDescription={emptyStateCopy.description}
+            emptyIcon={emptyStateCopy.icon}
           />
         )}
         <TypingIndicator typingUsers={typingUsers} />

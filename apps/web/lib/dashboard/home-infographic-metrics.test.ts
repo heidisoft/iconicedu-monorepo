@@ -605,6 +605,54 @@ describe('buildDashboardHomeInfographicMetrics', () => {
     expect(result.metricsByRole.students.upcomingSessionsThisWeek).toBe(1);
   });
 
+  it('excludes cancelled upcoming sessions from the homepage tile metric', async () => {
+    buildClassSchedulesByOrgMock.mockResolvedValue([
+      buildSchedule({
+        ids: { id: 'scheduled-session', orgId: 'org-1' },
+      }),
+      buildSchedule({
+        ids: { id: 'cancelled-session', orgId: 'org-1' },
+        startAt: '2026-03-12T15:00:00.000Z',
+        endAt: '2026-03-12T16:00:00.000Z',
+        status: 'cancelled',
+      }),
+    ]);
+    getLearningSpacesByOrgMock.mockResolvedValue({
+      data: [{ id: 'space-1', status: 'active', subject: 'Math' }],
+    });
+    getLearningSpaceParticipantsByLearningSpaceIdsMock.mockResolvedValue({
+      data: [{ learning_space_id: 'space-1', profile_id: 'child-1' }],
+    });
+
+    const result = await buildDashboardHomeInfographicMetrics({
+      supabase: {} as never,
+      orgId: 'org-1',
+      orgSlug: 'iconic-academy',
+      now: NOW,
+      currentUserProfile: {
+        kind: 'child',
+        ids: { id: 'child-1', orgId: 'org-1', accountId: 'account-c1' },
+      } as never,
+    });
+
+    const visibleThisWeekTotal =
+      result.upcomingSessionsPage.today.total +
+      result.upcomingSessionsPage.thisWeek.total;
+
+    expect(
+      result.upcomingSessionsPage.today.items.some(
+        (item) => item.session.status === 'cancelled',
+      ),
+    ).toBe(true);
+    expect(
+      result.upcomingSessionsPage.thisWeek.items.some(
+        (item) => item.session.status === 'cancelled',
+      ),
+    ).toBe(true);
+    expect(visibleThisWeekTotal).toBe(6);
+    expect(result.metricsByRole.students.upcomingSessionsThisWeek).toBe(3);
+  });
+
   it('counts recurring multi-day sessions separately while excluding cancelled and moved-out occurrences', async () => {
     buildClassSchedulesByOrgMock.mockResolvedValue([buildWeeklyRecurringSchedule()]);
     getLearningSpacesByOrgMock.mockResolvedValue({

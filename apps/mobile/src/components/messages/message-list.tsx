@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,7 @@ import {
   StyleSheet,
   AppState,
 } from 'react-native';
-import { MessageSquare } from 'lucide-react-native';
+import { GraduationCap, LifeBuoy, MessageSquare } from 'lucide-react-native';
 import type { MessageVM } from '@iconicedu/shared-types';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
@@ -218,6 +218,7 @@ type MessageListProps = {
   isScreenActive?: boolean;
   emptyTitle?: string;
   emptyDescription?: string;
+  emptyIcon?: 'message-square' | 'life-buoy' | 'graduation-cap';
   lastReadMessageId?: string | null;
   unreadCount?: number;
 };
@@ -242,6 +243,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   isScreenActive = true,
   emptyTitle,
   emptyDescription,
+  emptyIcon,
   lastReadMessageId,
   unreadCount,
 }) => {
@@ -387,11 +389,20 @@ export const MessageList: React.FC<MessageListProps> = ({
   const isEmpty =
     !loading && listData.length === 0 && !(pendingUploads && pendingUploads.length);
 
+  const emptyIconNode: ReactNode =
+    emptyIcon === 'life-buoy' ? (
+      <LifeBuoy size={28} color={colors.teal} />
+    ) : emptyIcon === 'graduation-cap' ? (
+      <GraduationCap size={28} color={colors.teal} />
+    ) : (
+      <MessageSquare size={28} color={colors.teal} />
+    );
+
   if (isEmpty) {
     return (
       <View style={emptyStyles.wrap}>
         <View style={[emptyStyles.iconWrap, { backgroundColor: colors.inputBg }]}>
-          <MessageSquare size={28} color={colors.teal} />
+          {emptyIconNode}
         </View>
         <Text style={[emptyStyles.title, { color: colors.text }]}>
           {emptyTitle ?? 'Start the conversation'}

@@ -47,7 +47,7 @@ jest.mock('lucide-react-native', () => ({
 }));
 
 jest.mock('@/lib/learning-space-icons', () => ({
-  LearningSpaceIconBadge: ({ testID }: { testID?: string }) => {
+  ChannelTopicIconBadge: ({ testID }: { testID?: string }) => {
     const { View } = require('react-native');
     return <View testID={testID ?? 'learning-space-icon-badge'} />;
   },

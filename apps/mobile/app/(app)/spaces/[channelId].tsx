@@ -23,6 +23,7 @@ import { TypingIndicator } from '@/components/messages/typing-indicator';
 import { ConversationHeader } from '@/components/messages/conversation-header';
 import { ChannelInfoSheet } from '@/components/messages/channel-info-sheet';
 import { SpaceSessionsTab } from '@/components/messages/space-sessions-tab';
+import { buildMobileChannelEmptyStateCopy } from '@/lib/message-empty-state';
 
 type SpaceTab = 'messages' | 'sessions';
 
@@ -132,6 +133,15 @@ export default function SpaceDetailScreen() {
   const resolvedLiveJoinUrl =
     spaceMeta?.liveSession?.joinUrl ??
     (spaceMeta?.liveSession?.enabled ? (liveSession?.meetingLink ?? null) : null);
+  const emptyStateCopy = buildMobileChannelEmptyStateCopy({
+    channelKind: 'learning-space',
+    currentUserKind:
+      ((profile as Record<string, unknown> | undefined)?.kind as
+        | string
+        | null
+        | undefined) ?? null,
+    studentNames: resolvedStudentProfiles.map((student) => student.name),
+  });
 
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: colors.pageBg }]} edges={['top']}>
@@ -186,8 +196,9 @@ export default function SpaceDetailScreen() {
             loading={isLoading}
             onUnreadViewed={handleUnreadViewed}
             isScreenActive={isFocused && activeTab === 'messages'}
-            emptyTitle="Start the conversation"
-            emptyDescription="Share a welcome message, lesson update, or question to begin the class discussion."
+            emptyTitle={emptyStateCopy.title}
+            emptyDescription={emptyStateCopy.description}
+            emptyIcon={emptyStateCopy.icon}
           />
           <TypingIndicator typingUsers={[]} />
           <MessageInput onSend={handleSend} placeholder={`Message ${resolvedTitle}…`} />

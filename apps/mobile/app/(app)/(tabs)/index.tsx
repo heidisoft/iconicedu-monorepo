@@ -38,7 +38,7 @@ import { useFamilyView } from '@/providers/family-view-provider';
 import { PulseBox } from '@/components/skeletons/pulse-box';
 import { SessionCard } from '@/components/sessions/session-card';
 import { AppSupportFooter } from '@/components/support/app-support-footer';
-import { buildHomeMetricSummary } from '@/lib/home-metrics';
+import { buildHomeMetricSummary, splitHomeSessionsByTimeline } from '@/lib/home-metrics';
 import { fetchOrgSessions, queryKeys } from '@/lib/api/queries';
 import type { AppColors } from '@/lib/theme';
 
@@ -124,23 +124,6 @@ function getInitials(name: string): string {
     return `${words[0]?.[0] ?? ''}${words[1]?.[0] ?? ''}`.toUpperCase();
   }
   return trimmed[0]?.toUpperCase() ?? 'U';
-}
-
-function startOfDay(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-}
-
-function startOfWeekMonday(date: Date): Date {
-  const day = startOfDay(date);
-  const weekday = day.getDay();
-  const diff = weekday === 0 ? -6 : 1 - weekday;
-  return new Date(day.getTime() + diff * 86_400_000);
-}
-
-function addDays(date: Date, days: number): Date {
-  const next = new Date(date);
-  next.setDate(next.getDate() + days);
-  return next;
 }
 
 function makeStyles(C: AppColors) {
@@ -459,6 +442,7 @@ export default function HomeScreen() {
     display_name?: string | null;
     avatar_url?: string | null;
     avatar_seed?: string | null;
+    timezone?: string | null;
     ui_theme_key?: string | null;
   } | null;
   const fullName =
@@ -499,6 +483,7 @@ export default function HomeScreen() {
         childProfileIds: (childProfiles as Record<string, unknown>[]).map(
           (child) => child.id as string,
         ),
+        timezone: profileData?.timezone ?? null,
       }),
     [
       childProfiles,
@@ -507,6 +492,7 @@ export default function HomeScreen() {
       primaryRole,
       profileData?.id,
       profileData?.kind,
+      profileData?.timezone,
     ],
   );
   const metricCardWidth = Math.max(160, (windowWidth - 40 - 12) / 2);
@@ -520,26 +506,17 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [familySwitchOpen, setFamilySwitchOpen] = useState(false);
   const [switchingProfileId, setSwitchingProfileId] = useState<string | null>(null);
-  const weekAnchor = new Date();
-  const thisWeekStartMs = startOfWeekMonday(weekAnchor).getTime();
-  const nextWeekStartMs = addDays(startOfWeekMonday(weekAnchor), 7).getTime();
-  const weekAfterNextStartMs = addDays(startOfWeekMonday(weekAnchor), 14).getTime();
-  const thisWeekSessions = React.useMemo(
+  const sessionBuckets = React.useMemo(
     () =>
-      sessions.filter((session) => {
-        const startAt = new Date(session.startAt).getTime();
-        return startAt >= thisWeekStartMs && startAt < nextWeekStartMs;
+      splitHomeSessionsByTimeline({
+        sessions,
+        timezone: profileData?.timezone ?? null,
       }),
-    [nextWeekStartMs, sessions, thisWeekStartMs],
+    [profileData?.timezone, sessions],
   );
-  const nextWeekSessions = React.useMemo(
-    () =>
-      sessions.filter((session) => {
-        const startAt = new Date(session.startAt).getTime();
-        return startAt >= nextWeekStartMs && startAt < weekAfterNextStartMs;
-      }),
-    [nextWeekStartMs, sessions, weekAfterNextStartMs],
-  );
+  const todaySessions = sessionBuckets.today;
+  const thisWeekSessions = sessionBuckets.thisWeek;
+  const nextWeekSessions = sessionBuckets.nextWeek;
   const homeHeaderLoading =
     refreshing || accountLoading || profileLoading || supportLoading;
   const overviewLoading =
@@ -745,7 +722,10 @@ export default function HomeScreen() {
                       params: {
                         channelId: supportChannel.id,
                         topic: supportChannel.topic ?? 'Live Support',
+                        iconKey: supportChannel.icon_key ?? 'life-buoy',
+                        themeKey: supportChannel.themeKey ?? '',
                         isLearningSpace: '0',
+                        purpose: 'support',
                       },
                     })
                   }
@@ -800,7 +780,7 @@ export default function HomeScreen() {
                   </View>
                 </View>
                 <View>
-                  <Text style={s.metricValue}>{thisWeekSessions.length}</Text>
+                  <Text style={s.metricValue}>{topMetrics.upcomingSessionsThisWeek}</Text>
                   <Text style={s.metricLabel}>This week</Text>
                 </View>
               </View>
@@ -837,9 +817,54 @@ export default function HomeScreen() {
         </View>
 
         {/* Upcoming sessions */}
+        {(sessionsLoading || refreshing || todaySessions.length > 0) && (
+          <View style={{ gap: 10 }}>
+            <View style={s.activityHeader}>
+              <Text style={s.sectionLabel}>Today</Text>
+            </View>
+            {sessionsLoading || refreshing ? (
+              <View style={{ gap: 6 }}>
+                {[0, 1].map((i) => (
+                  <View
+                    key={`today-skeleton-${i}`}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 10,
+                      paddingHorizontal: 14,
+                      paddingVertical: 10,
+                      borderRadius: 12,
+                      borderWidth: StyleSheet.hairlineWidth,
+                      borderColor: colors.border,
+                      backgroundColor: colors.card,
+                    }}
+                  >
+                    <PulseBox width={44} height={60} radius={10} />
+                    <View style={{ flex: 1, gap: 6 }}>
+                      <PulseBox width={i === 0 ? 140 : 120} height={13} radius={4} />
+                      <PulseBox width={80} height={11} radius={4} />
+                    </View>
+                    <PulseBox width={50} height={26} radius={20} />
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <View style={{ gap: 6 }}>
+                {todaySessions.map((session) => (
+                  <SessionCard
+                    key={session.id}
+                    session={session}
+                    pressTarget="messages"
+                  />
+                ))}
+              </View>
+            )}
+          </View>
+        )}
+
         <View style={{ gap: 10 }}>
           <View style={s.activityHeader}>
-            <Text style={s.sectionLabel}>Upcoming sessions</Text>
+            <Text style={s.sectionLabel}>This week</Text>
           </View>
           {sessionsLoading || refreshing ? (
             <View style={{ gap: 6 }}>
@@ -879,9 +904,9 @@ export default function HomeScreen() {
                 <View style={[s.emptyIcon, { backgroundColor: colors.inputBg }]}>
                   <CalendarDays size={32} color={colors.textMuted} />
                 </View>
-                <Text style={s.emptyTitle}>No upcoming sessions this week</Text>
+                <Text style={s.emptyTitle}>No more sessions this week</Text>
                 <Text style={s.emptyDesc}>
-                  Sessions scheduled for this week will appear here.
+                  Sessions later this week will appear here.
                 </Text>
               </View>
             </View>
@@ -921,7 +946,12 @@ export default function HomeScreen() {
           ) : nextWeekSessions.length > 0 ? (
             <View style={{ gap: 6 }}>
               {nextWeekSessions.map((session) => (
-                <SessionCard key={session.id} session={session} pressTarget="messages" />
+                <SessionCard
+                  key={session.id}
+                  session={session}
+                  pressTarget="messages"
+                  showJoinButton={false}
+                />
               ))}
             </View>
           ) : (

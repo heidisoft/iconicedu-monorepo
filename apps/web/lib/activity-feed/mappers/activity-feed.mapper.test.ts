@@ -44,8 +44,10 @@ describe('mapActivityFeedItemRow', () => {
       kind: 'avatars',
       avatars: [
         {
+          accountId: 'account-1',
           name: 'Priya Shah',
           avatar: { source: 'upload', url: 'https://cdn.test/priya.png' },
+          profileId: 'actor-1',
           themeKey: 'emerald',
         },
       ],

@@ -479,8 +479,10 @@ describe('buildActivityFeedForProfile', () => {
       kind: 'avatars',
       avatars: [
         {
+          accountId: 'account-1',
           name: 'Educator',
           avatar: { source: 'generated', seed: 'actor-1' },
+          profileId: 'actor-1',
           themeKey: null,
         },
       ],

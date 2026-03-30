@@ -24,7 +24,7 @@ import {
 } from '@/hooks/use-online-profile-ids';
 import { useSupervisedDirectMessages } from '@/hooks/use-supervised-direct-messages';
 import { useTheme } from '@/providers/theme-provider';
-import { LearningSpaceIconBadge } from '@/lib/learning-space-icons';
+import { ChannelTopicIconBadge } from '@/lib/learning-space-icons';
 import type { AppColors } from '@/lib/theme';
 import { createHeaderSurface } from '@/lib/header-surface';
 import {
@@ -608,7 +608,7 @@ function ChannelRow({
               s={s}
             />
           ) : (
-            <LearningSpaceIconBadge
+            <ChannelTopicIconBadge
               iconKey={item.icon_key}
               size={44}
               iconSize={20}
@@ -969,6 +969,7 @@ export default function MessagesScreen() {
                 subtitle,
                 studentProfiles,
                 isLearningSpace,
+                purpose: channel.is_support ? 'support' : '',
                 ...(channel.is_supervised
                   ? {
                       isSupervisedReadOnly: '1',
