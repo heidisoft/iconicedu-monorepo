@@ -74,6 +74,23 @@ function occurrenceDayKey(iso: string): string {
   return iso.slice(0, 10);
 }
 
+function occurrenceIdentity(schedule: DisplaySchedule): string {
+  const baseId = schedule.ids.id.includes('__')
+    ? schedule.ids.id.slice(0, schedule.ids.id.indexOf('__'))
+    : schedule.ids.id;
+
+  if (schedule.uiState?.originalStartAt) {
+    return `${baseId}|${schedule.uiState.originalStartAt}`;
+  }
+
+  if (schedule.ids.id.includes('__')) {
+    const [, occurrenceKey = schedule.startAt] = schedule.ids.id.split('__');
+    return `${baseId}|${occurrenceKey}`;
+  }
+
+  return `${baseId}|${schedule.startAt}`;
+}
+
 function getCalendarWeekOfMonth(date: Date): number {
   const firstDayOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
   const firstWeekdayOffset = firstDayOfMonth.getDay();
@@ -217,10 +234,7 @@ export function expandRecurringSchedules(
   // Deduplicate: higher priority wins per base-id + day
   const deduped = new Map<string, DisplaySchedule>();
   for (const s of expanded) {
-    const baseId = s.ids.id.includes('__')
-      ? s.ids.id.slice(0, s.ids.id.indexOf('__'))
-      : s.ids.id;
-    const key = `${baseId}|${s.startAt.slice(0, 10)}`;
+    const key = occurrenceIdentity(s);
     const existing = deduped.get(key);
     const priority = (ds: DisplaySchedule) =>
       ds.uiState?.kind === 'exception' ? 3 : ds.uiState?.kind === 'override' ? 2 : 1;

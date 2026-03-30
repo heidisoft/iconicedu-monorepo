@@ -75,6 +75,47 @@ function buildSchedule(overrides?: Record<string, unknown>) {
   };
 }
 
+function buildWeeklyRecurringSchedule(overrides?: Record<string, unknown>) {
+  return buildSchedule({
+    ids: { id: 'schedule-weekly', orgId: 'org-1' },
+    startAt: '2026-03-02T15:00:00.000Z',
+    endAt: '2026-03-02T16:00:00.000Z',
+    recurrence: {
+      ids: { id: 'rec-weekly-1', orgId: 'org-1' },
+      rule: {
+        frequency: 'weekly',
+        interval: 1,
+        until: '2026-03-31T23:59:59.000Z',
+        timezone: 'UTC',
+        byWeekday: ['MO', 'WE'],
+      },
+      exceptions: [
+        {
+          occurrenceKey: '2026-03-04T15:00:00.000Z',
+          reason: 'Cancelled',
+        },
+      ],
+      overrides: [
+        {
+          occurrenceKey: '2026-03-09T15:00:00.000Z',
+          patch: {
+            startAt: '2026-03-11T17:00:00.000Z',
+            endAt: '2026-03-11T18:00:00.000Z',
+          },
+        },
+        {
+          occurrenceKey: '2026-03-16T15:00:00.000Z',
+          patch: {
+            startAt: '2026-04-01T15:00:00.000Z',
+            endAt: '2026-04-01T16:00:00.000Z',
+          },
+        },
+      ],
+    },
+    ...overrides,
+  });
+}
+
 describe('buildDashboardHomeInfographicMetrics', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -562,5 +603,36 @@ describe('buildDashboardHomeInfographicMetrics', () => {
         result.upcomingSessionsPage.thisWeek.total,
     );
     expect(result.metricsByRole.students.upcomingSessionsThisWeek).toBe(1);
+  });
+
+  it('counts recurring multi-day sessions separately while excluding cancelled and moved-out occurrences', async () => {
+    buildClassSchedulesByOrgMock.mockResolvedValue([buildWeeklyRecurringSchedule()]);
+    getLearningSpacesByOrgMock.mockResolvedValue({
+      data: [{ id: 'space-1', status: 'active', subject: 'Math' }],
+    });
+    getLearningSpaceParticipantsByLearningSpaceIdsMock.mockResolvedValue({
+      data: [{ learning_space_id: 'space-1', profile_id: 'child-1' }],
+    });
+
+    const result = await buildDashboardHomeInfographicMetrics({
+      supabase: {} as never,
+      orgId: 'org-1',
+      orgSlug: 'iconic-academy',
+      now: new Date('2026-03-10T12:00:00.000Z'),
+      currentUserProfile: {
+        kind: 'child',
+        ids: { id: 'child-1', orgId: 'org-1', accountId: 'account-c1' },
+      } as never,
+    });
+
+    expect(result.metricsByRole.students.upcomingSessionsThisWeek).toBe(2);
+    expect(result.metricsByRole.students.completedClassesThisMonth).toBe(1);
+    expect(result.upcomingSessionsPage.thisWeek.total).toBe(2);
+    expect(result.upcomingSessionsPage.thisWeek.items).toHaveLength(2);
+    expect(
+      result.upcomingSessionsPage.thisWeek.items.every(
+        (item) => item.session.dayNum === '11',
+      ),
+    ).toBe(true);
   });
 });

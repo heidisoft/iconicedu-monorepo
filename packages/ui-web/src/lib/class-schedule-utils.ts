@@ -313,14 +313,28 @@ const getDisplayScheduleBaseId = (schedule: DisplayClassScheduleVM) => {
     : schedule.ids.id.slice(0, separatorIndex);
 };
 
+const getDisplayScheduleOccurrenceIdentity = (schedule: DisplayClassScheduleVM) => {
+  const baseId = getDisplayScheduleBaseId(schedule);
+  const originalStartAt = schedule.uiState?.originalStartAt;
+
+  if (originalStartAt) {
+    return `${baseId}|${originalStartAt}`;
+  }
+
+  const separatorIndex = schedule.ids.id.indexOf('__');
+  if (separatorIndex !== -1) {
+    const [, occurrenceKey = schedule.startAt] = schedule.ids.id.split('__');
+    return `${baseId}|${occurrenceKey}`;
+  }
+
+  return `${baseId}|${schedule.startAt}`;
+};
+
 const dedupeExpandedEvents = (schedules: DisplayClassScheduleVM[]) => {
   const deduped = new Map<string, DisplayClassScheduleVM>();
 
   schedules.forEach((schedule) => {
-    const key = `${getDisplayScheduleBaseId(schedule)}|${getScheduleLocalDayKey(
-      schedule.startAt,
-      schedule,
-    )}`;
+    const key = getDisplayScheduleOccurrenceIdentity(schedule);
     const existing = deduped.get(key);
 
     if (

@@ -91,16 +91,27 @@ function getDisplayScheduleBaseId(schedule: DisplaySchedule) {
     : schedule.ids.id.slice(0, separatorIndex);
 }
 
-function getDisplayScheduleDayKey(schedule: DisplaySchedule) {
-  const timezone = schedule.timezone ?? schedule.recurrence?.rule.timezone ?? 'UTC';
-  return getLocalDate(schedule.startAt, timezone) ?? schedule.startAt.slice(0, 10);
+function getDisplayScheduleOccurrenceIdentity(schedule: DisplaySchedule) {
+  const baseId = getDisplayScheduleBaseId(schedule);
+
+  if (schedule.uiState?.originalStartAt) {
+    return `${baseId}|${schedule.uiState.originalStartAt}`;
+  }
+
+  const separatorIndex = schedule.ids.id.indexOf('__');
+  if (separatorIndex !== -1) {
+    const [, occurrenceKey = schedule.startAt] = schedule.ids.id.split('__');
+    return `${baseId}|${occurrenceKey}`;
+  }
+
+  return `${baseId}|${schedule.startAt}`;
 }
 
 function dedupeDisplaySchedules(schedules: DisplaySchedule[]) {
   const deduped = new Map<string, DisplaySchedule>();
 
   schedules.forEach((schedule) => {
-    const key = `${getDisplayScheduleBaseId(schedule)}|${getDisplayScheduleDayKey(schedule)}`;
+    const key = getDisplayScheduleOccurrenceIdentity(schedule);
     const existing = deduped.get(key);
 
     if (

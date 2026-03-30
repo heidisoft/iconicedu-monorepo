@@ -92,15 +92,16 @@ describe('class-schedule-utils', () => {
     expect(displayState.originalEndAt).toBe('2026-03-02T16:00:00.000Z');
   });
 
-  it('dedupes day collisions so an override replaces the default occurrence on that day', () => {
+  it('keeps both logical occurrences when one recurrence is moved onto another scheduled day', () => {
     const schedule: ClassScheduleVM = {
       ...buildRecurringSchedule(),
       recurrence: {
         ...buildRecurringSchedule().recurrence!,
         rule: {
-          frequency: 'daily',
+          frequency: 'weekly',
           interval: 1,
-          count: 3,
+          count: 4,
+          byWeekday: ['SU', 'MO'],
         },
         overrides: [
           {
@@ -122,7 +123,7 @@ describe('class-schedule-utils', () => {
 
     expect(expanded.map((item) => item.startAt)).toEqual([
       '2026-03-02T17:00:00.000Z',
-      '2026-03-03T15:00:00.000Z',
+      '2026-03-02T15:00:00.000Z',
     ]);
   });
 
