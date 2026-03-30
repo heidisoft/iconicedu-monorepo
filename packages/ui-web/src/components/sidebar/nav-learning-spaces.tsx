@@ -91,6 +91,7 @@ export function NavLearningSpaces({
               name={getProfileDisplayName(participant.profile)}
               avatar={participant.profile.avatar}
               showStatus={false}
+              enableProfilePreview={false}
               themeKey={participant.ui?.themeKey ?? null}
               sizeClassName="size-5"
               fallbackClassName={cn('text-[10px] font-semibold leading-none uppercase')}

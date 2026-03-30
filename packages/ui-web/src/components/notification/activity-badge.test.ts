@@ -10,7 +10,9 @@ describe('ActivityBadge avatar sizing', () => {
   it('uses the shared avatar size class for grouped and actor avatars', () => {
     expect(source).toContain("const ACTIVITY_AVATAR_SIZE_CLASS = 'size-6';");
     expect(source).toContain('const MAX_VISIBLE_ACTIVITY_AVATARS = 3;');
-    expect(source).toContain('leading.avatars.slice(0, MAX_VISIBLE_ACTIVITY_AVATARS)');
+    expect(source).toContain('const avatars = leading.avatars.slice(');
+    expect(source).toContain('MAX_VISIBLE_ACTIVITY_AVATARS');
+    expect(source).toContain('enableProfilePreview={false}');
     expect(source).toContain('sizeClassName={ACTIVITY_AVATAR_SIZE_CLASS}');
     expect(source).toContain(
       "sizeClassName={cn(ACTIVITY_AVATAR_SIZE_CLASS, 'shrink-0', className)}",

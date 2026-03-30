@@ -54,6 +54,7 @@ export function ActivityBadge({ activity, className }: ActivityBadgeProps) {
             avatar={avatarItem.avatar}
             themeKey={avatarItem.themeKey}
             showStatus={false}
+            enableProfilePreview={false}
             sizeClassName={ACTIVITY_AVATAR_SIZE_CLASS}
             fallbackClassName="text-[10px]"
           />
@@ -83,6 +84,7 @@ export function ActivityBadge({ activity, className }: ActivityBadgeProps) {
       timezone={actor.prefs?.timezone ?? null}
       locationLabel={getAvatarLocationLabel(actor.location)}
       about={actor.profile.bio ?? null}
+      enableProfilePreview={false}
       sizeClassName={cn(ACTIVITY_AVATAR_SIZE_CLASS, 'shrink-0', className)}
       fallbackClassName="text-[10px]"
     />
