@@ -3,6 +3,7 @@
 import type * as React from 'react';
 import { Clock3, MapPin, MessageCircle } from 'lucide-react';
 
+import { Badge } from '@iconicedu/ui-web/ui/badge';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { HoverCardContent } from '@iconicedu/ui-web/ui/hover-card';
 import { Separator } from '@iconicedu/ui-web/ui/separator';
@@ -28,6 +29,46 @@ type AvatarProfileHoverCardContentProps = {
   themeClass?: string;
   previewHeaderStyle?: React.CSSProperties;
 };
+
+function AvatarProfileHoverCardLoadingState() {
+  return (
+    <>
+      <div className="mb-5 min-w-0 space-y-1.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <Skeleton className="h-7 w-40 rounded-md" />
+        </div>
+        <Badge
+          variant="secondary"
+          className="w-fit rounded-full bg-secondary/60 px-2.5 py-0.5"
+          aria-hidden="true"
+        >
+          <Skeleton className="h-3 w-16 rounded-sm" />
+        </Badge>
+        <Skeleton className="h-4 w-32 rounded-md" />
+      </div>
+
+      <div className="mb-5 flex flex-col gap-2.5">
+        <div className="flex items-center gap-2">
+          <Skeleton className="size-4 rounded-full" />
+          <Skeleton className="h-4 w-44 rounded-md" />
+        </div>
+        <div className="flex items-start gap-2">
+          <Skeleton className="mt-0.5 size-4 rounded-full" />
+          <Skeleton className="h-4 w-36 rounded-md" />
+        </div>
+      </div>
+
+      <Skeleton className="mb-5 h-16 w-full rounded-xl" />
+
+      <Separator className="mb-4" />
+
+      <div className="flex items-center justify-between gap-3">
+        <Skeleton className="h-3 w-24 rounded-md" />
+        <div />
+      </div>
+    </>
+  );
+}
 
 export function AvatarProfileHoverCardContent({
   avatarNode,
@@ -96,24 +137,7 @@ export function AvatarProfileHoverCardContent({
 
       <div className="bg-background px-5 pb-5 pt-16">
         {loading ? (
-          <div className="space-y-5">
-            <div className="space-y-2">
-              <Skeleton className="h-6 w-40 rounded-md" />
-              <div className="flex gap-2">
-                <Skeleton className="h-5 w-20 rounded-full" />
-                <Skeleton className="h-5 w-16 rounded-full" />
-              </div>
-              <Skeleton className="h-4 w-24 rounded-md" />
-              <Skeleton className="h-4 w-56 rounded-md" />
-            </div>
-            <div className="space-y-2.5">
-              <Skeleton className="h-4 w-44 rounded-md" />
-              <Skeleton className="h-4 w-36 rounded-md" />
-            </div>
-            <Skeleton className="h-16 w-full rounded-xl" />
-            <Separator />
-            <Skeleton className="h-3 w-24 rounded-md" />
-          </div>
+          <AvatarProfileHoverCardLoadingState />
         ) : error ? (
           <div className="space-y-3">
             <p className="text-sm font-medium text-foreground">Unable to load profile</p>
