@@ -917,6 +917,19 @@ function buildSessionParticipantsLeading(payload: Record<string, unknown>) {
   } satisfies InboxLeadingVM;
 }
 
+function buildSessionParticipantNamesLabel(payload: Record<string, unknown>) {
+  const names = extractActivityMembers(payload)
+    .map((participant) => participant.name)
+    .filter(Boolean);
+  if (!names.length) {
+    return undefined;
+  }
+
+  const listed = names.slice(0, 3).join(', ');
+  const remaining = names.length - 3;
+  return remaining > 0 ? `${listed} +${remaining} more` : listed;
+}
+
 function buildSessionStartedLeading() {
   return { kind: 'icon', iconKey: 'Video', tone: 'info' } satisfies InboxLeadingVM;
 }
@@ -994,11 +1007,24 @@ function resolveReminderOffsetMinutes(payload: Record<string, unknown>) {
   return parsed;
 }
 
+function sessionReminderAction(
+  event: ActivityEventRow,
+  payload: Record<string, unknown>,
+  reminderOffsetMinutes?: number,
+) {
+  if (reminderOffsetMinutes === 5 || reminderOffsetMinutes === 30) {
+    return undefined;
+  }
+
+  return sourceAction(event, payload, 'default', 'Join class');
+}
+
 function renderSessionTimelineGroup(event: ActivityEventRow) {
   const payload = asRecord(event.payload);
   const occurrenceStart =
     asOptionalString(payload.occurrenceStart) ??
     asOptionalString(payload.scheduledStartAt);
+  const participantNamesLabel = buildSessionParticipantNamesLabel(payload);
   const startedByDisplayName = asOptionalString(payload.startedByDisplayName);
   const starterLabel = startedByDisplayName
     ? resolveActorLabelForViewer(payload, startedByDisplayName)
@@ -1017,11 +1043,15 @@ function renderSessionTimelineGroup(event: ActivityEventRow) {
       primary: starterLabel
         ? isScheduledLearningSpaceWindow
           ? occurrenceStart
-            ? `Class session ${occurrenceStart}`
+            ? `Class session${
+                participantNamesLabel ? ` for ${participantNamesLabel}` : ''
+              } ${occurrenceStart}`
             : 'Class session'
           : `${starterLabel} started ${formatSessionHuddleLabel(resolveSessionMode(payload))}`
         : occurrenceStart
-          ? `Class session ${occurrenceStart}`
+          ? `Class session${
+              participantNamesLabel ? ` for ${participantNamesLabel}` : ''
+            } ${occurrenceStart}`
           : `Started ${formatSessionHuddleLabel(resolveSessionMode(payload))}`,
       secondary: contextTitle,
       secondaryHref: buildInboxSourceHref(event, payload),
@@ -1033,6 +1063,7 @@ function renderSessionTimelineGroup(event: ActivityEventRow) {
     metadata: {
       sessionGroupLocalTime: true,
       occurrenceStart,
+      participantNamesLabel,
     },
   } satisfies ActivityRenderResult;
 }
@@ -2154,7 +2185,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
         summary: sessionTimelineLabel
           ? `Your session for ${classNameLabel} will start on ${sessionTimelineLabel}`
           : asOptionalString(payload.summary),
-        actionButton: sourceAction(event, payload, 'default', 'Join class'),
+        actionButton: sessionReminderAction(event, payload, reminderOffsetMinutes),
       };
     },
   },

@@ -517,12 +517,13 @@ describe('InboxContainer rendering behavior', () => {
       metadata: {
         sessionGroupLocalTime: true,
         occurrenceStart: '2026-03-04T12:40:00.000Z',
+        participantNamesLabel: 'Riley Morgan',
       },
       subActivities: { items: [] },
     };
 
     const next = applySessionParentLocalHeadline(activity);
-    expect(next.content.headline.primary).toContain('Class session ');
+    expect(next.content.headline.primary).toContain('Class session for Riley Morgan ');
     expect(next.content.headline.primary).not.toBe('Class session');
   });
 

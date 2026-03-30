@@ -279,13 +279,21 @@ export function applySessionParentLocalHeadline(
     return activity;
   }
 
+  const participantNamesLabel =
+    typeof metadata.participantNamesLabel === 'string' &&
+    metadata.participantNamesLabel.length > 0
+      ? metadata.participantNamesLabel
+      : undefined;
+
   return {
     ...activity,
     content: {
       ...activity.content,
       headline: {
         ...activity.content.headline,
-        primary: `Class session ${localLabel}`,
+        primary: `Class session${
+          participantNamesLabel ? ` for ${participantNamesLabel}` : ''
+        } ${localLabel}`,
       },
     },
   };

@@ -1350,6 +1350,7 @@ describe('activity event definitions', () => {
         timezone: 'UTC',
         summary: 'Class starts in 10 minutes',
         channelRouteKind: 'space',
+        members: [{ profileId: 'student-1', displayName: 'Riley Morgan', role: 'child' }],
       },
       audience_rules: [],
       dedupe_key: 'session.reminder:org-1:schedule-1:2026-03-03T12:40:00.000Z:activity',
@@ -1374,21 +1375,16 @@ describe('activity event definitions', () => {
         primary: 'Your class session will start in 5 minutes',
       },
       summary: 'Your session for Algebra will start on Mar 3 at 12:40 PM',
-      actionButton: {
-        label: 'Join class',
-        href: '../s/channel-1',
-      },
       leading: {
-        kind: 'icon',
-        iconKey: 'Video',
-        tone: 'info',
+        kind: 'avatars',
       },
     });
+    expect(renderedReminder.actionButton).toBeUndefined();
     expect(renderedReminder).not.toHaveProperty('expandedContent');
 
     expect(definition.group.renderGroup?.(event)).toMatchObject({
       headline: {
-        primary: 'Class session 2026-03-03T12:40:00.000Z',
+        primary: 'Class session for Riley Morgan 2026-03-03T12:40:00.000Z',
         secondary: 'Algebra',
       },
       actionButton: {
@@ -1398,6 +1394,7 @@ describe('activity event definitions', () => {
       },
       metadata: {
         sessionGroupLocalTime: true,
+        participantNamesLabel: 'Riley Morgan',
       },
     });
   });
@@ -1925,6 +1922,7 @@ describe('activity event definitions', () => {
         viewerTimezone: 'America/New_York',
         summary: 'Class starts in 10 minutes',
         channelRouteKind: 'space',
+        members: [{ profileId: 'student-1', displayName: 'Riley Morgan', role: 'child' }],
       },
       audience_rules: [],
       dedupe_key: 'session.reminder:org-1:schedule-1:2026-03-03T12:40:00.000Z:activity',
@@ -1937,6 +1935,66 @@ describe('activity event definitions', () => {
     expect(rendered.summary).toBe(
       'Your session for Algebra will start on Mar 3 at 7:40 AM',
     );
+    expect(rendered.actionButton).toBeUndefined();
+  });
+
+  it('keeps Join class hidden for 30 minute reminder leaves but not other reminder offsets', () => {
+    const definition = getActivityEventDefinition('session.reminder.sent');
+    if (!definition) {
+      throw new Error('Missing session.reminder.sent definition');
+    }
+
+    const baseEvent = {
+      id: 'event-reminder-offset-check',
+      org_id: 'org-1',
+      event_type: 'session.reminder.sent' as const,
+      occurred_at: '2026-03-03T12:10:00.000Z',
+      source_kind: 'system' as const,
+      actor_profile_id: 'profile-system',
+      scope: { kind: 'learning_space' as const, learningSpaceId: 'space-1' },
+      object_ref: { kind: 'message' as const, id: 'message-6' },
+      target_ref: { kind: 'learning_space' as const, id: 'space-1' },
+      audience_rules: [],
+      dedupe_key: 'session.reminder:org-1:schedule-1:2026-03-03T12:40:00.000Z:activity',
+      projection_status: 'pending' as const,
+      projection_attempts: 0,
+      created_at: '2026-03-03T12:10:00.000Z',
+      updated_at: '2026-03-03T12:10:00.000Z',
+    };
+
+    const thirtyMinuteRendered = definition.render({
+      ...baseEvent,
+      payload: {
+        channelId: 'channel-1',
+        learningSpaceId: 'space-1',
+        title: 'Algebra',
+        occurrenceStart: '2026-03-03T12:40:00.000Z',
+        reminderOffsetMinutes: 30,
+        timezone: 'UTC',
+        channelRouteKind: 'space',
+      },
+    });
+
+    expect(thirtyMinuteRendered.actionButton).toBeUndefined();
+
+    const tenMinuteRendered = definition.render({
+      ...baseEvent,
+      id: 'event-reminder-offset-check-10',
+      payload: {
+        channelId: 'channel-1',
+        learningSpaceId: 'space-1',
+        title: 'Algebra',
+        occurrenceStart: '2026-03-03T12:40:00.000Z',
+        reminderOffsetMinutes: 10,
+        timezone: 'UTC',
+        channelRouteKind: 'space',
+      },
+    });
+
+    expect(tenMinuteRendered.actionButton).toMatchObject({
+      label: 'Join class',
+      href: '../s/channel-1',
+    });
   });
 
   it('renders child feedback request copy with the class name', () => {
