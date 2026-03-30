@@ -4,6 +4,7 @@ import { render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { MessagesContainerHeader } from './messages-container-header';
+import { MessagesTopSurface } from './messages-top-surface';
 
 vi.mock('./context/messages-state-provider', () => ({
   useMessagesState: () => ({
@@ -53,6 +54,66 @@ describe('MessagesContainerHeader', () => {
 
     expect(screen.getByLabelText('Status: online')).toBeInTheDocument();
     expect(container.querySelector('.h-8.w-8')).toBeInTheDocument();
+  });
+
+  it('exposes the themed top-surface hook when wrapped for a themed channel', () => {
+    render(
+      <MessagesTopSurface
+        channel={
+          {
+            basics: { kind: 'channel', topic: 'Science', purpose: 'general' },
+            collections: { participants: [] },
+            ui: { themeKey: 'cyan', headerQuickMetaActions: [] },
+          } as any
+        }
+        data-testid="messages-top-surface-header"
+      >
+        <MessagesContainerHeader
+          channel={
+            {
+              basics: { kind: 'channel', topic: 'Science', purpose: 'general' },
+              collections: { participants: [] },
+              ui: { themeKey: 'cyan', headerQuickMetaActions: [] },
+            } as any
+          }
+        />
+      </MessagesTopSurface>,
+    );
+
+    expect(screen.getByTestId('messages-top-surface-header')).toHaveAttribute(
+      'data-channel-theme',
+      'cyan',
+    );
+  });
+
+  it('uses the fallback top-surface hook when the channel has no theme', () => {
+    render(
+      <MessagesTopSurface
+        channel={
+          {
+            basics: { kind: 'channel', topic: 'General', purpose: 'general' },
+            collections: { participants: [] },
+            ui: { headerQuickMetaActions: [] },
+          } as any
+        }
+        data-testid="messages-top-surface-header"
+      >
+        <MessagesContainerHeader
+          channel={
+            {
+              basics: { kind: 'channel', topic: 'General', purpose: 'general' },
+              collections: { participants: [] },
+              ui: { headerQuickMetaActions: [] },
+            } as any
+          }
+        />
+      </MessagesTopSurface>,
+    );
+
+    expect(screen.getByTestId('messages-top-surface-header')).toHaveAttribute(
+      'data-channel-theme',
+      'fallback',
+    );
   });
 
   it('shows last seen and local time directly under the header name for offline DMs', () => {

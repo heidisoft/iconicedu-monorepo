@@ -16,4 +16,10 @@ describe('MessagesShell', () => {
   it('passes container props through to MessagesContainer', () => {
     expect(source).toContain('<MessagesContainer {...props} />');
   });
+
+  it('wraps the header row in the shared top surface', () => {
+    expect(source).toContain(
+      '<MessagesTopSurface channel={props.channel} data-testid="messages-top-surface-header">',
+    );
+  });
 });

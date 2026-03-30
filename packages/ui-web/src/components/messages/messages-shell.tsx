@@ -6,6 +6,7 @@ import type { MessagesContainerProps } from './messages-container';
 import { MessagesContainer } from './messages-container';
 import { MessagesContainerHeader } from './messages-container-header';
 import { MessagesContainerHeaderActions } from './messages-container-header-actions';
+import { MessagesTopSurface } from './messages-top-surface';
 import {
   MessagesStateProvider,
   useMessagesState,
@@ -93,10 +94,12 @@ const MessagesShellLayout = memo(function MessagesShellLayout({
   ]);
 
   const messagesHeader = (
-    <header className="flex min-h-16 items-center justify-between gap-3 border-b border-border px-4 py-3">
-      <MessagesContainerHeader channel={props.channel} />
-      <MessagesContainerHeaderActions />
-    </header>
+    <MessagesTopSurface channel={props.channel} data-testid="messages-top-surface-header">
+      <header className="flex min-h-16 items-center justify-between gap-3 px-4 py-3">
+        <MessagesContainerHeader channel={props.channel} />
+        <MessagesContainerHeaderActions />
+      </header>
+    </MessagesTopSurface>
   );
 
   const mainContent = (

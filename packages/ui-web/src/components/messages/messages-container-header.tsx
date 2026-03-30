@@ -106,7 +106,7 @@ const HeaderTitle = memo(function HeaderTitle({
         <button
           type="button"
           onClick={onClick}
-          className="flex min-w-0 flex-col items-start text-sm font-semibold text-foreground hover:underline"
+          className="flex min-w-0 cursor-pointer flex-col items-start text-sm font-semibold text-foreground"
           aria-label={ariaLabel ?? title}
         >
           <span className="truncate">{title}</span>

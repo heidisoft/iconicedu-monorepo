@@ -148,6 +148,7 @@ const channel: ChannelVM = {
 describe('MessagesContainer', () => {
   beforeEach(() => {
     latestMessageInputProps.current = null;
+    window.history.replaceState(null, '', window.location.pathname);
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => ({
@@ -161,6 +162,7 @@ describe('MessagesContainer', () => {
     vi.useRealTimers();
     vi.clearAllMocks();
     vi.unstubAllGlobals();
+    window.history.replaceState(null, '', window.location.pathname);
   });
 
   it('uses the provided currentUserId', async () => {
