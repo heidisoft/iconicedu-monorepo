@@ -373,7 +373,6 @@ async function buildActiveRoleMetrics(input: {
   const displayNow = getScheduleDisplayStartOfDay(input.now, input.timezone ?? null);
   const weekStartDate = getScheduleDisplayStartOfWeek(displayNow, input.timezone ?? null);
   const weekStartMs = weekStartDate.getTime();
-  const weekEndMs = endOfWeekSunday(weekStartDate).getTime();
   const nextWeekEndMs = (() => {
     const nextWeekEnd = endOfWeekSunday(weekStartDate);
     nextWeekEnd.setDate(nextWeekEnd.getDate() + 7);
@@ -386,14 +385,6 @@ async function buildActiveRoleMetrics(input: {
     ).getTime();
     return scheduleDayMs >= weekStartMs && scheduleDayMs <= nextWeekEndMs;
   });
-  const upcomingSessionsThisWeek = timelineBuckets.upcoming.filter((schedule) => {
-    const scheduleDayMs = getScheduleDisplayStartOfDay(
-      schedule.startAt,
-      input.timezone ?? null,
-    ).getTime();
-    return scheduleDayMs >= weekStartMs && scheduleDayMs <= weekEndMs;
-  }).length;
-
   const monthProgressStatsByKey = getMonthProgressStatsByKey(
     [...timelineBuckets.past, ...timelineBuckets.upcoming],
     input.now,
@@ -464,9 +455,20 @@ async function buildActiveRoleMetrics(input: {
         })()
       : 0;
 
+  const upcomingSessionsPage = buildUpcomingSessionPage({
+    upcomingSchedules: upcomingSchedulesThisAndNextWeek,
+    orgSlug: input.orgSlug,
+    pageSize: input.pageSize,
+    now: input.now,
+    activeRole: input.activeRole,
+    isStaffView: input.isStaffView,
+    timezone: input.timezone,
+  });
+
   return {
     metrics: {
-      upcomingSessionsThisWeek,
+      upcomingSessionsThisWeek:
+        upcomingSessionsPage.today.total + upcomingSessionsPage.thisWeek.total,
       completedClassesThisMonth,
       activeSubjectsCount:
         input.activeRole === 'tutors' ? activeStudentsCount : activeSubjects.length,
@@ -476,15 +478,7 @@ async function buildActiveRoleMetrics(input: {
           ? toActiveStudentsLabel(activeStudentsCount)
           : toActiveSubjectsLabel(activeSubjects),
     },
-    upcomingSessionsPage: buildUpcomingSessionPage({
-      upcomingSchedules: upcomingSchedulesThisAndNextWeek,
-      orgSlug: input.orgSlug,
-      pageSize: input.pageSize,
-      now: input.now,
-      activeRole: input.activeRole,
-      isStaffView: input.isStaffView,
-      timezone: input.timezone,
-    }),
+    upcomingSessionsPage,
   };
 }
 
