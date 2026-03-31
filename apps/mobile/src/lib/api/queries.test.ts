@@ -3,6 +3,7 @@ import {
   fetchActivityFeed,
   fetchSupervisedDirectMessages,
   filterVisibleMessageRows,
+  sendTextMessage,
   toggleReaction,
   queryKeys,
 } from './queries';
@@ -14,6 +15,11 @@ const mockFrom = jest.fn();
 jest.mock('@/lib/supabase/client', () => ({
   supabase: {
     from: (...args: unknown[]) => mockFrom(...args),
+    auth: {
+      getSession: jest.fn(async () => ({
+        data: { session: { access_token: 'token-123' } },
+      })),
+    },
   },
 }));
 
@@ -26,6 +32,52 @@ function createQueryChain(resolvedValue: { data: unknown; error: unknown }) {
   chain.is = jest.fn(returnChain);
   chain.order = jest.fn().mockResolvedValue(resolvedValue);
   return chain;
+}
+
+function createSelectMaybeSingleChain(resolvedValue: { data: unknown; error: unknown }) {
+  const chain: Record<string, jest.Mock> = {};
+  const returnChain = () => chain;
+  chain.select = jest.fn(returnChain);
+  chain.eq = jest.fn(returnChain);
+  chain.maybeSingle = jest.fn().mockResolvedValue(resolvedValue);
+  return chain;
+}
+
+function createInsertSingleChain(resolvedValue: { data: unknown; error: unknown }) {
+  const chain: Record<string, jest.Mock> = {};
+  const returnChain = () => chain;
+  chain.insert = jest.fn(returnChain);
+  chain.select = jest.fn(returnChain);
+  chain.single = jest.fn().mockResolvedValue(resolvedValue);
+  return chain;
+}
+
+function createInsertChain(resolvedValue: { error: unknown }) {
+  return {
+    insert: jest.fn().mockResolvedValue(resolvedValue),
+  };
+}
+
+function createUpdateChain(resolvedValue: { error: unknown }) {
+  const chain: Record<string, jest.Mock> = {};
+  const returnChain = () => chain;
+  chain.update = jest.fn(returnChain);
+  chain.eq = jest.fn().mockResolvedValue(resolvedValue);
+  return chain;
+}
+
+function createDeleteChain(resolvedValue: { error: unknown }) {
+  const chain: Record<string, jest.Mock> = {};
+  const returnChain = () => chain;
+  chain.delete = jest.fn(returnChain);
+  chain.eq = jest.fn().mockResolvedValue(resolvedValue);
+  return chain;
+}
+
+function createUpsertChain(resolvedValue: { error: unknown }) {
+  return {
+    upsert: jest.fn().mockResolvedValue(resolvedValue),
+  };
 }
 
 // ─── Test data ──────────────────────────────────────────────────────────────────
@@ -226,6 +278,83 @@ describe('fetchSpaceSchedulesByChannelId', () => {
     await expect(fetchSpaceSchedulesByChannelId(CHANNEL_ID, ORG_ID)).rejects.toThrow(
       'Connection refused',
     );
+  });
+});
+
+describe('sendTextMessage', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    global.fetch = jest.fn();
+  });
+
+  it('posts text messages through the authenticated messages API', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 'msg-1' }),
+    });
+
+    const result = await sendTextMessage('channel-1', 'profile-1', 'org-1', 'Hello mobile');
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      'http://localhost:3000/messages/text',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer token-123',
+        }),
+        body: JSON.stringify({
+          orgId: 'org-1',
+          channelId: 'channel-1',
+          senderProfileId: 'profile-1',
+          content: 'Hello mobile',
+          threadParentId: null,
+          threadId: null,
+        }),
+      }),
+    );
+    expect(result).toEqual({ id: 'msg-1' });
+  });
+
+  it('includes thread metadata when posting replies', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 'reply-1' }),
+    });
+
+    await sendTextMessage(
+      'channel-1',
+      'profile-1',
+      'org-1',
+      'Reply text',
+      'parent-1',
+      'thread-123',
+    );
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      'http://localhost:3000/messages/text',
+      expect.objectContaining({
+        body: JSON.stringify({
+          orgId: 'org-1',
+          channelId: 'channel-1',
+          senderProfileId: 'profile-1',
+          content: 'Reply text',
+          threadParentId: 'parent-1',
+          threadId: 'thread-123',
+        }),
+      }),
+    );
+  });
+
+  it('surfaces API errors when the server rejects the send', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: false,
+      json: async () => ({ message: 'Channel not found or access denied' }),
+    });
+
+    await expect(
+      sendTextMessage('channel-1', 'profile-1', 'org-1', 'First reply', 'parent-1'),
+    ).rejects.toThrow('Channel not found or access denied');
   });
 });
 
