@@ -38,11 +38,29 @@ import {
   getAdminUserPreviewTabs,
 } from '@iconicedu/ui-web/components/admin/admin-user-profile-preview.utils';
 
+type AdminUserProfilePreviewMetadata = {
+  accountId: string | null;
+  accountOrgId: string | null;
+  profileId: string | null;
+  profileOrgId: string | null;
+  profileAccountId: string | null;
+  authUserId: string | null;
+  managerStaffId: string | null;
+  childProfileIds: string[];
+  childAccountIds: string[];
+  notificationScopeIds: string[];
+  familyInviteIds: string[];
+  familyInviteFamilyIds: string[];
+  familyInviteAcceptedByAccountIds: string[];
+  familyInviteCreatedByAccountIds: string[];
+};
+
 type AdminUserProfilePreviewDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   account?: UserAccountVM | null;
   profile?: UserProfileVM | null;
+  metadata?: AdminUserProfilePreviewMetadata | null;
   isLoading?: boolean;
   error?: string | null;
   onDmClick?: () => void;
@@ -55,6 +73,7 @@ const TAB_LABELS: Record<AdminUserPreviewTab, string> = {
   location: 'Location',
   notifications: 'Notifications',
   family: 'Family',
+  metadata: 'Metadata',
   'student-profile': 'Student Profile',
   'educator-profile': 'Educator Profile',
   'educator-availability': 'Availability',
@@ -87,6 +106,14 @@ function formatNotificationDefaults(profile?: UserProfileVM | null) {
         ? value.channels.join(', ')
         : 'Enabled',
   }));
+}
+
+function formatId(value?: string | null) {
+  return value?.trim() || '—';
+}
+
+function formatIdList(values?: string[] | null) {
+  return values?.length ? values.join(', ') : '—';
 }
 
 function getPreviewTitle(profile?: UserProfileVM | null, account?: UserAccountVM | null) {
@@ -145,6 +172,7 @@ export function AdminUserProfilePreviewDialog({
   onOpenChange,
   account,
   profile,
+  metadata,
   isLoading = false,
   error,
   onDmClick,
@@ -274,6 +302,93 @@ export function AdminUserProfilePreviewDialog({
                             account?.access?.userRoles?.map((role) => role.roleKey),
                           ),
                           icon: <Shield className="size-3.5" />,
+                        },
+                      ]}
+                    />
+                  </TabsContent>
+
+                  <TabsContent value="metadata" className="m-0 space-y-4">
+                    <FieldGrid
+                      items={[
+                        {
+                          label: 'Account UUID',
+                          value: formatId(metadata?.accountId ?? account?.ids.id ?? null),
+                          icon: <Shield className="size-3.5" />,
+                        },
+                        {
+                          label: 'Account org UUID',
+                          value: formatId(
+                            metadata?.accountOrgId ?? account?.ids.orgId ?? null,
+                          ),
+                          icon: <Shield className="size-3.5" />,
+                        },
+                        {
+                          label: 'Profile UUID',
+                          value: formatId(metadata?.profileId ?? profile?.ids.id ?? null),
+                          icon: <User className="size-3.5" />,
+                        },
+                        {
+                          label: 'Profile org UUID',
+                          value: formatId(
+                            metadata?.profileOrgId ?? profile?.ids.orgId ?? null,
+                          ),
+                          icon: <User className="size-3.5" />,
+                        },
+                        {
+                          label: 'Profile account UUID',
+                          value: formatId(
+                            metadata?.profileAccountId ?? profile?.ids.accountId ?? null,
+                          ),
+                          icon: <Users className="size-3.5" />,
+                        },
+                        {
+                          label: 'Auth user UUID',
+                          value: formatId(metadata?.authUserId ?? null),
+                          icon: <BadgeCheck className="size-3.5" />,
+                        },
+                        {
+                          label: 'Manager staff UUID',
+                          value: formatId(metadata?.managerStaffId ?? null),
+                          icon: <Briefcase className="size-3.5" />,
+                        },
+                        {
+                          label: 'Child profile UUIDs',
+                          value: formatIdList(metadata?.childProfileIds ?? []),
+                          icon: <Users className="size-3.5" />,
+                        },
+                        {
+                          label: 'Child account UUIDs',
+                          value: formatIdList(metadata?.childAccountIds ?? []),
+                          icon: <Users className="size-3.5" />,
+                        },
+                        {
+                          label: 'Notification scope UUIDs',
+                          value: formatIdList(metadata?.notificationScopeIds ?? []),
+                          icon: <Bell className="size-3.5" />,
+                        },
+                        {
+                          label: 'Family invite UUIDs',
+                          value: formatIdList(metadata?.familyInviteIds ?? []),
+                          icon: <Users className="size-3.5" />,
+                        },
+                        {
+                          label: 'Family UUIDs',
+                          value: formatIdList(metadata?.familyInviteFamilyIds ?? []),
+                          icon: <Users className="size-3.5" />,
+                        },
+                        {
+                          label: 'Invite accepted-by account UUIDs',
+                          value: formatIdList(
+                            metadata?.familyInviteAcceptedByAccountIds ?? [],
+                          ),
+                          icon: <BadgeCheck className="size-3.5" />,
+                        },
+                        {
+                          label: 'Invite created-by account UUIDs',
+                          value: formatIdList(
+                            metadata?.familyInviteCreatedByAccountIds ?? [],
+                          ),
+                          icon: <BadgeCheck className="size-3.5" />,
                         },
                       ]}
                     />

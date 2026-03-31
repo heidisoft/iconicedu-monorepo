@@ -82,6 +82,21 @@ describe('getAdminUserProfilePreview', () => {
         avatar: { source: 'seed' },
       },
       prefs: {},
+      children: {
+        items: [
+          {
+            ids: { id: 'child-profile-1', orgId: 'org-1', accountId: 'child-account-1' },
+          },
+        ],
+      },
+      familyInvites: [
+        {
+          id: 'invite-1',
+          familyId: 'family-1',
+          acceptedByAccountId: 'accepted-account-1',
+          createdByAccountId: 'account-admin-1',
+        },
+      ],
       meta: {
         createdAt: '2026-01-01T00:00:00.000Z',
         updatedAt: '2026-01-01T00:00:00.000Z',
@@ -91,6 +106,19 @@ describe('getAdminUserProfilePreview', () => {
     await expect(getAdminUserProfilePreview('account-1')).resolves.toMatchObject({
       account: { ids: { id: 'account-1', orgId: 'org-1' } },
       profile: { ids: { id: 'profile-1', orgId: 'org-1', accountId: 'account-1' } },
+      metadata: {
+        accountId: 'account-1',
+        accountOrgId: 'org-1',
+        profileId: 'profile-1',
+        profileOrgId: 'org-1',
+        profileAccountId: 'account-1',
+        childProfileIds: ['child-profile-1'],
+        childAccountIds: ['child-account-1'],
+        familyInviteIds: ['invite-1'],
+        familyInviteFamilyIds: ['family-1'],
+        familyInviteAcceptedByAccountIds: ['accepted-account-1'],
+        familyInviteCreatedByAccountIds: ['account-admin-1'],
+      },
     });
 
     expect(requireAdminOrgContextMock).toHaveBeenCalledWith('org-1', {

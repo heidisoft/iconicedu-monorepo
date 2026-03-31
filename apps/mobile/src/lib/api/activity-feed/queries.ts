@@ -133,7 +133,9 @@ function attachFeedGroupMembers(
     const memberIds = membersByGroup.get(item.ids.id) ?? [];
     const members = memberIds
       .map((id) => itemMap.get(id))
-      .filter((member): member is ActivityFeedLeafItemVM => !!member && member.kind === 'leaf');
+      .filter(
+        (member): member is ActivityFeedLeafItemVM => !!member && member.kind === 'leaf',
+      );
 
     memberIds.forEach((id) => groupedMemberIds.add(id));
 

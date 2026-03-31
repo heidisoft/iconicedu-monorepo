@@ -2,6 +2,7 @@ import type { UserProfileVM } from '@iconicedu/shared-types';
 
 export type AdminUserPreviewTab =
   | 'account'
+  | 'metadata'
   | 'profile'
   | 'preferences'
   | 'location'
@@ -16,6 +17,8 @@ export function getAdminUserPreviewTabs(
   profile?: UserProfileVM | null,
 ): AdminUserPreviewTab[] {
   const tabs: AdminUserPreviewTab[] = ['account'];
+
+  tabs.push('metadata');
 
   if (!profile) {
     return tabs;

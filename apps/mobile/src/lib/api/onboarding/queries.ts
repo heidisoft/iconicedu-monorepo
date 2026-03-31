@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase/client';
-import type { DayAvailability, OnboardingStatus } from '../types';
+import type { DayAvailability, OnboardingStatus } from '@/lib/api/types';
 
 const MOBILE_ALLOWED_ROLES = new Set([
   'educator',

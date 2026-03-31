@@ -134,10 +134,10 @@ function resolveJoinHrefForMobile(joinHref: string): string {
     return joinHref;
   }
 
-  const apiBaseUrl = process.env.EXPO_PUBLIC_API_URL?.trim() || 'http://localhost:3000';
+  const webBaseUrl = process.env.EXPO_PUBLIC_WEB_URL?.trim() || 'http://localhost:3000';
 
   try {
-    return new URL(joinHref, apiBaseUrl).toString();
+    return new URL(joinHref, webBaseUrl).toString();
   } catch {
     return joinHref;
   }

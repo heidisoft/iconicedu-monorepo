@@ -82,6 +82,22 @@ type UsersTableProps = {
 type AdminUserProfilePreviewPayload = {
   account: UserAccountVM | null;
   profile: UserProfileVM | null;
+  metadata: {
+    accountId: string | null;
+    accountOrgId: string | null;
+    profileId: string | null;
+    profileOrgId: string | null;
+    profileAccountId: string | null;
+    authUserId: string | null;
+    managerStaffId: string | null;
+    childProfileIds: string[];
+    childAccountIds: string[];
+    notificationScopeIds: string[];
+    familyInviteIds: string[];
+    familyInviteFamilyIds: string[];
+    familyInviteAcceptedByAccountIds: string[];
+    familyInviteCreatedByAccountIds: string[];
+  };
 };
 
 type BadgeVariant =
@@ -1086,6 +1102,7 @@ export function UsersTable({ rows }: UsersTableProps) {
         }}
         account={previewPayload?.account ?? null}
         profile={previewPayload?.profile ?? null}
+        metadata={previewPayload?.metadata ?? null}
         isLoading={previewLoading}
         error={previewError}
         onDmClick={

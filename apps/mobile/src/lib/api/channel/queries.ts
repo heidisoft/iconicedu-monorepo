@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase/client';
-import type { ChannelListItem, DmParticipant } from '../types';
+import type { ChannelListItem, DmParticipant } from '@/lib/api/types';
 
 type LastMessageInfo = { text: string | null; at: string | null; sender: string | null };
 
@@ -214,7 +214,9 @@ export async function fetchSupervisedDirectMessages(
     .is('deleted_at', null);
 
   const guardianChannelIds = new Set(
-    (guardianMemberships ?? []).map((membership: { channel_id: string }) => membership.channel_id),
+    (guardianMemberships ?? []).map(
+      (membership: { channel_id: string }) => membership.channel_id,
+    ),
   );
 
   const results: ChannelListItem[] = [];
@@ -267,7 +269,10 @@ export async function fetchSupervisedDirectMessages(
       .is('deleted_at', null);
 
     const readStateByChannelId = new Map(
-      (readStateRows ?? []).map((row) => [row.channel_id as string, row.unread_count ?? 0]),
+      (readStateRows ?? []).map((row) => [
+        row.channel_id as string,
+        row.unread_count ?? 0,
+      ]),
     );
 
     const { data: memberRows } = await supabase
@@ -413,7 +418,10 @@ export async function findDirectMessageChannelForProfiles(
 
   const topic =
     targetProfile.display_name?.trim() ||
-    [targetProfile.first_name, targetProfile.last_name].filter(Boolean).join(' ').trim() ||
+    [targetProfile.first_name, targetProfile.last_name]
+      .filter(Boolean)
+      .join(' ')
+      .trim() ||
     'Direct Message';
 
   return {

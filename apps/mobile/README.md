@@ -1,0 +1,122 @@
+# Mobile Development Workflow
+
+This app should be developed with native Expo builds, not Expo Go.
+
+## Two-lane workflow
+
+### Lane 1: local native iteration
+
+Use this for the default day-to-day loop when you are working on screens, navigation, React logic, styling, and most API changes.
+
+1. Start Metro:
+
+```sh
+pnpm --filter mobile dev
+```
+
+2. Run a local native build:
+
+```sh
+pnpm --filter mobile dev:android
+pnpm --filter mobile dev:ios
+```
+
+You can also use the existing aliases:
+
+```sh
+pnpm --filter mobile android
+pnpm --filter mobile ios
+```
+
+Use Android as the fastest local loop when speed matters. Use iOS for parity checks and final device validation on a Mac.
+
+### Lane 2: EAS development builds
+
+Use this for full real-device testing when Expo Go is too limited, when native modules matter, or when you need to validate the app on a physical device end to end.
+
+1. Build a dev client:
+
+```sh
+pnpm --filter mobile eas:build:dev
+```
+
+Or per platform:
+
+```sh
+pnpm --filter mobile eas:build:dev:android
+pnpm --filter mobile eas:build:dev:ios
+```
+
+2. Install the build on the device.
+3. Start Metro for the dev client:
+
+```sh
+pnpm --filter mobile dev:device
+```
+
+4. Open the installed development build and connect it to the local Metro server.
+
+This is the standard path for testing auth, notifications, storage, deep linking, file uploads, audio, and other native-dependent behavior.
+
+## QA and stakeholder builds
+
+Use the `preview` EAS profile for internal builds that should feel closer to release behavior and should not depend on a local Metro server.
+
+```sh
+pnpm --filter mobile eas:build:preview
+```
+
+Use `development` for engineer iteration and `preview` for installable QA builds.
+
+## Rebuild rules
+
+Rebuild the native app or dev client when any of these change:
+
+- Expo plugins in `app.json`
+- Native package dependencies
+- Notification, deep link, scheme, bundle identifier, package name, permission, splash, or icon config
+- Anything that requires `expo prebuild`
+- Generated native code in `ios/` or `android/`
+
+Do not rebuild for normal JS-only work such as:
+
+- Screen code
+- React logic
+- Styling
+- Most API changes
+- Most routing changes
+
+## Prebuild guidance
+
+Use `expo prebuild` only when native configuration has changed.
+
+```sh
+pnpm --filter mobile prebuild
+```
+
+Use a clean prebuild only when you need to fully regenerate native projects:
+
+```sh
+pnpm --filter mobile prebuild:clean
+```
+
+Do not clean or prebuild on every run. It slows iteration down and creates unnecessary native churn.
+
+## Environment expectations
+
+The `development` EAS profile is configured as a dev client and includes:
+
+- `EXPO_PUBLIC_SUPABASE_URL`
+- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+- `EXPO_PUBLIC_APP_ENV=development`
+- `EXPO_PUBLIC_API_URL` for the NestJS API (`apps/api`, default local dev `http://localhost:3001`)
+- `EXPO_PUBLIC_WEB_URL` for web-hosted pages opened from mobile (`apps/web`, default local dev `http://localhost:3000`)
+
+The `preview` profile is for installable internal QA builds. The `production` profile is reserved for release builds.
+
+## Working assumptions
+
+- Use Expo managed plus prebuild rather than ejecting unless the app repeatedly hits hard plugin or prebuild limits.
+- Keep Expo Go out of the primary development workflow for this app.
+- Rebuild dev clients only for native changes. Use Metro refresh for JS-only changes.
+- Mobile must not depend on `apps/web` API routes. If a server endpoint is required, route it through `apps/api`.

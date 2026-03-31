@@ -49,8 +49,3 @@ using (public.can_self_join_channel(org_id, channel_id, profile_id))
 with check (((deleted_at IS NULL) AND public.can_self_join_channel(org_id, channel_id, profile_id)));
 
 
-CREATE TRIGGER protect_buckets_delete BEFORE DELETE ON storage.buckets FOR EACH STATEMENT EXECUTE FUNCTION storage.protect_delete();
-
-CREATE TRIGGER protect_objects_delete BEFORE DELETE ON storage.objects FOR EACH STATEMENT EXECUTE FUNCTION storage.protect_delete();
-
-

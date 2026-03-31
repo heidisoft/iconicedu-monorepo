@@ -43,14 +43,15 @@ AI coding agents and engineers maintaining agent-facing repo guidance.
 - `packages/shared-types` owns VM and shared types; no app-specific logic.
 - `packages/ui-web` owns reusable UI components and shadcn wrappers.
 - Do not bypass ownership by importing across boundaries (e.g., UI into API).
+- `apps/mobile` must not depend on `apps/web` API routes. When mobile needs an HTTP endpoint, add or use it in `apps/api`.
 
 ## 4. Data Access & Security Rules
 
-- All writes and business logic must go through NestJS API.
+- Server-side business logic, validation, and privileged writes must go through `apps/api`.
 - Supabase RLS must remain enabled for all tables.
 - Never use service role keys in client apps.
 - Realtime is allowed only via Supabase channels with RLS policies in place.
-- Avoid client-side direct DB mutations; use API contracts.
+- Prefer direct Supabase SDK access in mobile only when the operation is RLS-safe, does not require service-role access, and does not depend on shared server-side business logic. Otherwise use `apps/api`.
 - When data must be fetched or mutated during onboarding or user settings flows, prefer server actions (e.g., `app/actions/*`) so the browser never talks directly to Supabase and we keep auth/cleanup logic centralized.
 - All user/auth-related interactions—retrieval, invites, role/status changes, MFA factors, OAuth client administration, etc.—should first be routed through the shared admin actions under `apps/web/lib/auth/admin-actions.ts`. Review that file before adding new user-facing mutations and only branch outside it when the existing helpers cannot be reused.
 - Admin pages should rely on curated `apps/web/lib/<domain>` helpers for data fetching, mapping and status normalization instead of embedding Supabase queries directly inside layouts. This keeps the UI layer agnostic of Supabase and lets future data source changes (e.g., migrating from Supabase to another provider) happen inside the shared lib boundary.

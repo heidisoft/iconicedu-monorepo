@@ -19,6 +19,9 @@ jest.mock('@/lib/supabase/client', () => ({
       getSession: jest.fn(async () => ({
         data: { session: { access_token: 'token-123' } },
       })),
+      getUser: jest.fn(async () => ({
+        data: { user: { id: 'auth-user-1' } },
+      })),
     },
   },
 }));
@@ -39,6 +42,7 @@ function createSelectMaybeSingleChain(resolvedValue: { data: unknown; error: unk
   const returnChain = () => chain;
   chain.select = jest.fn(returnChain);
   chain.eq = jest.fn(returnChain);
+  chain.is = jest.fn(returnChain);
   chain.maybeSingle = jest.fn().mockResolvedValue(resolvedValue);
   return chain;
 }
@@ -62,14 +66,6 @@ function createUpdateChain(resolvedValue: { error: unknown }) {
   const chain: Record<string, jest.Mock> = {};
   const returnChain = () => chain;
   chain.update = jest.fn(returnChain);
-  chain.eq = jest.fn().mockResolvedValue(resolvedValue);
-  return chain;
-}
-
-function createDeleteChain(resolvedValue: { error: unknown }) {
-  const chain: Record<string, jest.Mock> = {};
-  const returnChain = () => chain;
-  chain.delete = jest.fn(returnChain);
   chain.eq = jest.fn().mockResolvedValue(resolvedValue);
   return chain;
 }
@@ -284,43 +280,106 @@ describe('fetchSpaceSchedulesByChannelId', () => {
 describe('sendTextMessage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    global.fetch = jest.fn();
   });
 
-  it('posts text messages through the authenticated messages API', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: async () => ({ id: 'msg-1' }),
+  it('inserts text messages directly through Supabase', async () => {
+    const accountLookupChain = createSelectMaybeSingleChain({
+      data: { id: 'account-1', org_id: 'org-1', active_profile_id: 'profile-1' },
+      error: null,
     });
+    const requestedProfileLookupChain = createSelectMaybeSingleChain({
+      data: { id: 'profile-1', account_id: 'account-1', org_id: 'org-1' },
+      error: null,
+    });
+    const channelLookupChain = createSelectMaybeSingleChain({
+      data: { id: 'channel-1', kind: 'support' },
+      error: null,
+    });
+    const insertMessageChain = createInsertChain({ error: null });
+    const insertPayloadChain = createInsertChain({ error: null });
 
-    const result = await sendTextMessage('channel-1', 'profile-1', 'org-1', 'Hello mobile');
+    mockFrom
+      .mockReturnValueOnce(accountLookupChain)
+      .mockReturnValueOnce(requestedProfileLookupChain)
+      .mockReturnValueOnce(channelLookupChain)
+      .mockReturnValueOnce(insertMessageChain)
+      .mockReturnValueOnce(insertPayloadChain);
 
-    expect(global.fetch).toHaveBeenCalledWith(
-      'http://localhost:3000/messages/text',
+    const result = await sendTextMessage(
+      'channel-1',
+      'profile-1',
+      'org-1',
+      'Hello mobile',
+    );
+
+    expect(mockFrom).toHaveBeenNthCalledWith(1, 'accounts');
+    expect(mockFrom).toHaveBeenNthCalledWith(2, 'profiles');
+    expect(mockFrom).toHaveBeenNthCalledWith(3, 'channels');
+    expect(mockFrom).toHaveBeenNthCalledWith(4, 'messages');
+    expect(insertMessageChain.insert).toHaveBeenCalledWith(
       expect.objectContaining({
-        method: 'POST',
-        headers: expect.objectContaining({
-          'Content-Type': 'application/json',
-          Authorization: 'Bearer token-123',
-        }),
-        body: JSON.stringify({
-          orgId: 'org-1',
-          channelId: 'channel-1',
-          senderProfileId: 'profile-1',
-          content: 'Hello mobile',
-          threadParentId: null,
-          threadId: null,
-        }),
+        channel_id: 'channel-1',
+        sender_profile_id: 'profile-1',
+        org_id: 'org-1',
+        type: 'text',
+        thread_parent_id: null,
       }),
     );
-    expect(result).toEqual({ id: 'msg-1' });
+    expect(mockFrom).toHaveBeenNthCalledWith(5, 'message_text');
+    expect(insertPayloadChain.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        org_id: 'org-1',
+        payload: { text: 'Hello mobile' },
+      }),
+    );
+    expect(result.id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    );
   });
 
-  it('includes thread metadata when posting replies', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: async () => ({ id: 'reply-1' }),
+  it('resolves thread state and bumps reply count for replies', async () => {
+    const accountLookupChain = createSelectMaybeSingleChain({
+      data: { id: 'account-1', org_id: 'org-1', active_profile_id: 'profile-1' },
+      error: null,
     });
+    const requestedProfileLookupChain = createSelectMaybeSingleChain({
+      data: { id: 'profile-1', account_id: 'account-1', org_id: 'org-1' },
+      error: null,
+    });
+    const channelLookupChain = createSelectMaybeSingleChain({
+      data: { id: 'channel-1', kind: 'support' },
+      error: null,
+    });
+    const parentLookupChain = createSelectMaybeSingleChain({
+      data: {
+        id: 'parent-1',
+        org_id: 'org-1',
+        channel_id: 'channel-1',
+        sender_profile_id: 'profile-parent',
+        thread_id: 'thread-123',
+        type: 'text',
+      },
+      error: null,
+    });
+    const upsertParticipantsChain = createUpsertChain({ error: null });
+    const insertMessageChain = createInsertChain({ error: null });
+    const insertPayloadChain = createInsertChain({ error: null });
+    const threadLookupChain = createSelectMaybeSingleChain({
+      data: { id: 'thread-123', message_count: 3 },
+      error: null,
+    });
+    const updateThreadChain = createUpdateChain({ error: null });
+
+    mockFrom
+      .mockReturnValueOnce(accountLookupChain)
+      .mockReturnValueOnce(requestedProfileLookupChain)
+      .mockReturnValueOnce(channelLookupChain)
+      .mockReturnValueOnce(parentLookupChain)
+      .mockReturnValueOnce(upsertParticipantsChain)
+      .mockReturnValueOnce(insertMessageChain)
+      .mockReturnValueOnce(insertPayloadChain)
+      .mockReturnValueOnce(threadLookupChain)
+      .mockReturnValueOnce(updateThreadChain);
 
     await sendTextMessage(
       'channel-1',
@@ -331,30 +390,246 @@ describe('sendTextMessage', () => {
       'thread-123',
     );
 
-    expect(global.fetch).toHaveBeenCalledWith(
-      'http://localhost:3000/messages/text',
-      expect.objectContaining({
-        body: JSON.stringify({
-          orgId: 'org-1',
-          channelId: 'channel-1',
-          senderProfileId: 'profile-1',
-          content: 'Reply text',
-          threadParentId: 'parent-1',
-          threadId: 'thread-123',
+    expect(mockFrom).toHaveBeenNthCalledWith(1, 'accounts');
+    expect(mockFrom).toHaveBeenNthCalledWith(2, 'profiles');
+    expect(mockFrom).toHaveBeenNthCalledWith(3, 'channels');
+    expect(mockFrom).toHaveBeenNthCalledWith(4, 'messages');
+    expect(mockFrom).toHaveBeenNthCalledWith(5, 'thread_participants');
+    expect(upsertParticipantsChain.upsert).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          org_id: 'org-1',
+          thread_id: 'thread-123',
+          profile_id: 'profile-parent',
         }),
+        expect.objectContaining({
+          org_id: 'org-1',
+          thread_id: 'thread-123',
+          profile_id: 'profile-1',
+        }),
+      ]),
+      { onConflict: 'org_id,thread_id,profile_id' },
+    );
+    expect(mockFrom).toHaveBeenNthCalledWith(6, 'messages');
+    expect(insertMessageChain.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel_id: 'channel-1',
+        sender_profile_id: 'profile-1',
+        org_id: 'org-1',
+        type: 'text',
+        thread_parent_id: 'parent-1',
+        thread_id: 'thread-123',
+      }),
+    );
+    expect(mockFrom).toHaveBeenNthCalledWith(8, 'threads');
+    expect(mockFrom).toHaveBeenNthCalledWith(9, 'threads');
+    expect(updateThreadChain.update).toHaveBeenCalledWith(
+      expect.objectContaining({ message_count: 4 }),
+    );
+  });
+
+  it('creates a thread when replying to a parent without one', async () => {
+    const accountLookupChain = createSelectMaybeSingleChain({
+      data: { id: 'account-1', org_id: 'org-1', active_profile_id: 'profile-1' },
+      error: null,
+    });
+    const requestedProfileLookupChain = createSelectMaybeSingleChain({
+      data: { id: 'profile-1', account_id: 'account-1', org_id: 'org-1' },
+      error: null,
+    });
+    const channelLookupChain = createSelectMaybeSingleChain({
+      data: { id: 'channel-1', kind: 'support' },
+      error: null,
+    });
+    const parentLookupChain = createSelectMaybeSingleChain({
+      data: {
+        id: 'parent-1',
+        org_id: 'org-1',
+        channel_id: 'channel-1',
+        sender_profile_id: 'profile-parent',
+        thread_id: null,
+        type: 'text',
+      },
+      error: null,
+    });
+    const snippetLookupChain = createSelectMaybeSingleChain({
+      data: { payload: { text: 'Parent message body' } },
+      error: null,
+    });
+    const profileLookupChain = createSelectMaybeSingleChain({
+      data: {
+        display_name: 'Parent User',
+        first_name: 'Parent',
+        last_name: 'User',
+      },
+      error: null,
+    });
+    const insertThreadChain = createInsertSingleChain({
+      data: { id: 'thread-new' },
+      error: null,
+    });
+    const updateParentChain = createUpdateChain({ error: null });
+    const upsertParticipantsChain = createUpsertChain({ error: null });
+    const insertMessageChain = createInsertChain({ error: null });
+    const insertPayloadChain = createInsertChain({ error: null });
+
+    mockFrom
+      .mockReturnValueOnce(accountLookupChain)
+      .mockReturnValueOnce(requestedProfileLookupChain)
+      .mockReturnValueOnce(channelLookupChain)
+      .mockReturnValueOnce(parentLookupChain)
+      .mockReturnValueOnce(snippetLookupChain)
+      .mockReturnValueOnce(profileLookupChain)
+      .mockReturnValueOnce(insertThreadChain)
+      .mockReturnValueOnce(updateParentChain)
+      .mockReturnValueOnce(upsertParticipantsChain)
+      .mockReturnValueOnce(insertMessageChain)
+      .mockReturnValueOnce(insertPayloadChain);
+
+    await sendTextMessage('channel-1', 'profile-1', 'org-1', 'First reply', 'parent-1');
+
+    expect(mockFrom).toHaveBeenNthCalledWith(7, 'threads');
+    expect(insertThreadChain.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        org_id: 'org-1',
+        channel_id: 'channel-1',
+        parent_message_id: 'parent-1',
+        snippet: 'Parent message body',
+        author_id: 'profile-parent',
+        author_name: 'Parent User',
+        message_count: 1,
+      }),
+    );
+    expect(mockFrom).toHaveBeenNthCalledWith(8, 'messages');
+    expect(updateParentChain.update).toHaveBeenCalledWith(
+      expect.objectContaining({ thread_id: 'thread-new' }),
+    );
+    expect(mockFrom).toHaveBeenNthCalledWith(10, 'messages');
+    expect(insertMessageChain.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel_id: 'channel-1',
+        sender_profile_id: 'profile-1',
+        org_id: 'org-1',
+        type: 'text',
+        thread_parent_id: 'parent-1',
+        thread_id: 'thread-new',
       }),
     );
   });
 
-  it('surfaces API errors when the server rejects the send', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: false,
-      json: async () => ({ message: 'Channel not found or access denied' }),
-    });
-
+  it('rejects blank messages before writing to Supabase', async () => {
     await expect(
-      sendTextMessage('channel-1', 'profile-1', 'org-1', 'First reply', 'parent-1'),
-    ).rejects.toThrow('Channel not found or access denied');
+      sendTextMessage('channel-1', 'profile-1', 'org-1', '   '),
+    ).rejects.toThrow('Message text is required');
+
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the current account active profile when the requested sender is not writable', async () => {
+    const accountLookupChain = createSelectMaybeSingleChain({
+      data: { id: 'account-1', org_id: 'org-1', active_profile_id: 'profile-owned' },
+      error: null,
+    });
+    const requestedProfileLookupChain = createSelectMaybeSingleChain({
+      data: { id: 'profile-foreign', account_id: 'account-2', org_id: 'org-1' },
+      error: null,
+    });
+    const familyLinkLookupChain = createSelectMaybeSingleChain({
+      data: null,
+      error: null,
+    });
+    const activeProfileLookupChain = createSelectMaybeSingleChain({
+      data: { id: 'profile-owned' },
+      error: null,
+    });
+    const channelLookupChain = createSelectMaybeSingleChain({
+      data: { id: 'channel-1', kind: 'support' },
+      error: null,
+    });
+    const insertMessageChain = createInsertChain({ error: null });
+    const insertPayloadChain = createInsertChain({ error: null });
+
+    mockFrom
+      .mockReturnValueOnce(accountLookupChain)
+      .mockReturnValueOnce(requestedProfileLookupChain)
+      .mockReturnValueOnce(familyLinkLookupChain)
+      .mockReturnValueOnce(activeProfileLookupChain)
+      .mockReturnValueOnce(channelLookupChain)
+      .mockReturnValueOnce(insertMessageChain)
+      .mockReturnValueOnce(insertPayloadChain);
+
+    await sendTextMessage('channel-1', 'profile-foreign', 'org-1', 'Hi');
+
+    expect(insertMessageChain.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel_id: 'channel-1',
+        sender_profile_id: 'profile-owned',
+        org_id: 'org-1',
+        type: 'text',
+        thread_parent_id: null,
+      }),
+    );
+  });
+
+  it('falls back to a writable DM member when the selected profile is not in the DM', async () => {
+    const accountLookupChain = createSelectMaybeSingleChain({
+      data: { id: 'account-1', org_id: 'org-1', active_profile_id: 'profile-owned' },
+      error: null,
+    });
+    const requestedProfileLookupChain = createSelectMaybeSingleChain({
+      data: { id: 'profile-child', account_id: 'account-child', org_id: 'org-1' },
+      error: null,
+    });
+    const familyLinkLookupChain = createSelectMaybeSingleChain({
+      data: { id: 'family-link-1' },
+      error: null,
+    });
+    const channelLookupChain = createSelectMaybeSingleChain({
+      data: { id: 'channel-1', kind: 'dm' },
+      error: null,
+    });
+    const dmAccountLookupChain = createSelectMaybeSingleChain({
+      data: { id: 'account-1', org_id: 'org-1', active_profile_id: 'profile-owned' },
+      error: null,
+    });
+    const channelMembersChain = createIsChain({
+      data: [{ profile_id: 'profile-owned' }, { profile_id: 'profile-peer' }],
+      error: null,
+    });
+    const dmFamilyLinksChain = createIsChain({
+      data: [{ child_account_id: 'account-child' }],
+      error: null,
+    });
+    const writableDmProfilesChain = createIsChain({
+      data: [{ id: 'profile-owned', account_id: 'account-1', org_id: 'org-1' }],
+      error: null,
+    });
+    const insertMessageChain = createInsertChain({ error: null });
+    const insertPayloadChain = createInsertChain({ error: null });
+
+    mockFrom
+      .mockReturnValueOnce(accountLookupChain)
+      .mockReturnValueOnce(requestedProfileLookupChain)
+      .mockReturnValueOnce(familyLinkLookupChain)
+      .mockReturnValueOnce(channelLookupChain)
+      .mockReturnValueOnce(dmAccountLookupChain)
+      .mockReturnValueOnce(channelMembersChain)
+      .mockReturnValueOnce(dmFamilyLinksChain)
+      .mockReturnValueOnce(writableDmProfilesChain)
+      .mockReturnValueOnce(insertMessageChain)
+      .mockReturnValueOnce(insertPayloadChain);
+
+    await sendTextMessage('channel-1', 'profile-child', 'org-1', 'Hi');
+
+    expect(insertMessageChain.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel_id: 'channel-1',
+        sender_profile_id: 'profile-owned',
+        org_id: 'org-1',
+        type: 'text',
+        thread_parent_id: null,
+      }),
+    );
   });
 });
 

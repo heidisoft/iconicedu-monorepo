@@ -18,3 +18,5 @@ Use these companion documents:
 - Prefer vendor-isolated adapters and keep feature code vendor-agnostic where practical.
 - Follow existing ownership boundaries between `apps/*` and `packages/*`.
 - Run relevant tests for the area you change.
+- Mobile must not depend on `apps/web` API routes. If mobile needs a server endpoint, add or use it in `apps/api`.
+- Prefer direct Supabase SDK access from mobile only for RLS-safe reads and narrowly-scoped writes that do not require server-side business logic, service-role access, or shared validation.

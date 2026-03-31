@@ -1,16 +1,12 @@
 import { File as ExpoFile } from 'expo-file-system';
-import type {
-  MessageVM,
-  ReactionVM,
-  ThreadVM,
-} from '@iconicedu/shared-types';
+import type { MessageVM, ReactionVM, ThreadVM } from '@iconicedu/shared-types';
 import { supabase } from '@/lib/supabase/client';
 import {
   mapRowToMessageVM,
   buildSenderProfile,
   type RawMessageRow,
   type RawSenderProfile,
-} from '../map-row-to-vm';
+} from '@/lib/api/map-row-to-vm';
 
 const BASE_MESSAGE_SELECT = `
   id, org_id, channel_id, sender_profile_id, visibility_type, visibility_user_ids, type, created_at, updated_at, thread_parent_id,
@@ -32,6 +28,44 @@ const TYPE_TABLE: Record<string, string> = {
   'session-booking': 'message_session_booking',
   'payment-reminder': 'message_payment_reminder',
   'feedback-request': 'message_feedback_request',
+};
+
+function logMessageMutation(
+  event: string,
+  detail: Record<string, unknown>,
+  level: 'debug' | 'error' = 'debug',
+) {
+  const logger = level === 'error' ? console.error : console.debug;
+  logger(`[messages] ${event}`, detail);
+}
+
+function createClientUuid(): string {
+  const nativeRandomUuid = globalThis.crypto?.randomUUID;
+  if (typeof nativeRandomUuid === 'function') {
+    return nativeRandomUuid.call(globalThis.crypto);
+  }
+
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
+    const random = Math.floor(Math.random() * 16);
+    const value = char === 'x' ? random : (random & 0x3) | 0x8;
+    return value.toString(16);
+  });
+}
+
+type MessageWriteDebugContext = {
+  authUserId: string | null;
+  currentAccountId: string | null;
+  currentAccountOrgId: string | null;
+  currentAccountActiveProfileId: string | null;
+  requestedProfileAccountId: string | null;
+  requestedProfileOrgId: string | null;
+  requestedProfileKind: string | null;
+  resolvedProfileAccountId: string | null;
+  resolvedProfileOrgId: string | null;
+  resolvedProfileKind: string | null;
+  channelKind: string | null;
+  channelPurpose: string | null;
+  channelMemberProfileIds: string[];
 };
 
 type RawThreadRow = {
@@ -60,6 +94,41 @@ type RawThreadReadStateRow = {
   unread_count: number | null;
 };
 
+type ParentMessageLookupRow = {
+  id: string;
+  org_id: string;
+  channel_id: string;
+  sender_profile_id: string;
+  thread_id: string | null;
+  type: string;
+};
+
+type ThreadLookupRow = {
+  id: string;
+  parent_message_id: string | null;
+  channel_id: string;
+  org_id: string;
+  message_count?: number | null;
+};
+
+type CurrentAccountLookupRow = {
+  id: string;
+  org_id: string | null;
+  active_profile_id: string | null;
+};
+
+type ProfileOwnershipLookupRow = {
+  id: string;
+  account_id: string;
+  org_id: string;
+};
+
+type ChannelKindLookupRow = {
+  id: string;
+  kind: string;
+  purpose?: string | null;
+};
+
 export function filterVisibleMessageRows<T extends RawMessageRow>(
   rows: T[],
   currentProfileId = '',
@@ -69,6 +138,102 @@ export function filterVisibleMessageRows<T extends RawMessageRow>(
     if (!currentProfileId) return false;
     return (row.visibility_user_ids ?? []).includes(currentProfileId);
   });
+}
+
+async function collectMessageWriteDebugContext(input: {
+  orgId: string;
+  channelId: string;
+  requestedSenderProfileId: string;
+  resolvedSenderProfileId: string;
+}): Promise<MessageWriteDebugContext> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const authUserId = user?.id ?? null;
+
+  const currentAccountLookup = authUserId
+    ? await supabase
+        .from('accounts')
+        .select('id, org_id, active_profile_id')
+        .eq('auth_user_id', authUserId)
+        .is('deleted_at', null)
+        .maybeSingle<CurrentAccountLookupRow>()
+    : { data: null, error: null };
+
+  if (currentAccountLookup.error) throw currentAccountLookup.error;
+
+  const currentAccount = currentAccountLookup.data;
+  const profileIds = Array.from(
+    new Set(
+      [input.requestedSenderProfileId, input.resolvedSenderProfileId].filter(Boolean),
+    ),
+  );
+
+  const profileLookup = profileIds.length
+    ? await supabase
+        .from('profiles')
+        .select('id, account_id, org_id, kind')
+        .in('id', profileIds)
+        .is('deleted_at', null)
+    : { data: [], error: null };
+
+  if (profileLookup.error) throw profileLookup.error;
+
+  const profilesById = new Map(
+    (
+      (profileLookup.data ?? []) as Array<{
+        id: string;
+        account_id: string;
+        org_id: string;
+        kind: string | null;
+      }>
+    ).map((profile) => [profile.id, profile]),
+  );
+
+  const channelLookup = await supabase
+    .from('channels')
+    .select('id, kind, purpose')
+    .eq('id', input.channelId)
+    .eq('org_id', input.orgId)
+    .is('deleted_at', null)
+    .maybeSingle<ChannelKindLookupRow>();
+
+  if (channelLookup.error) throw channelLookup.error;
+
+  const channelMembersLookup = await supabase
+    .from('channel_members')
+    .select('profile_id')
+    .eq('org_id', input.orgId)
+    .eq('channel_id', input.channelId)
+    .is('deleted_at', null);
+
+  if (channelMembersLookup.error) throw channelMembersLookup.error;
+
+  const requestedProfile = profilesById.get(input.requestedSenderProfileId);
+  const resolvedProfile = profilesById.get(input.resolvedSenderProfileId);
+
+  return {
+    authUserId,
+    currentAccountId: currentAccount?.id ?? null,
+    currentAccountOrgId: currentAccount?.org_id ?? null,
+    currentAccountActiveProfileId: currentAccount?.active_profile_id ?? null,
+    requestedProfileAccountId: requestedProfile?.account_id ?? null,
+    requestedProfileOrgId: requestedProfile?.org_id ?? null,
+    requestedProfileKind: requestedProfile?.kind ?? null,
+    resolvedProfileAccountId: resolvedProfile?.account_id ?? null,
+    resolvedProfileOrgId: resolvedProfile?.org_id ?? null,
+    resolvedProfileKind: resolvedProfile?.kind ?? null,
+    channelKind: channelLookup.data?.kind ?? null,
+    channelPurpose: channelLookup.data?.purpose ?? null,
+    channelMemberProfileIds: Array.from(
+      new Set(
+        (channelMembersLookup.data ?? [])
+          .map((member) => (member.profile_id as string | undefined) ?? '')
+          .filter(Boolean),
+      ),
+    ),
+  };
 }
 
 async function loadPayloads(
@@ -204,7 +369,8 @@ async function loadThreads(
   }
 
   const participantsByThread = new Map<string, RawSenderProfile[]>();
-  for (const participant of (participantRows ?? []) as unknown as RawThreadParticipantRow[]) {
+  for (const participant of (participantRows ??
+    []) as unknown as RawThreadParticipantRow[]) {
     if (!participant.profile) continue;
     const list = participantsByThread.get(participant.thread_id) ?? [];
     list.push(participant.profile);
@@ -596,6 +762,416 @@ export async function markThreadReadState(input: {
   return typeof data === 'number' ? data : 0;
 }
 
+async function loadMessageSnippet(messageId: string, type: string): Promise<string> {
+  const table = TYPE_TABLE[type];
+  if (!table) return type;
+
+  const { data, error } = await supabase
+    .from(table)
+    .select('payload')
+    .eq('message_id', messageId)
+    .maybeSingle<{ payload: Record<string, unknown> | null }>();
+
+  if (error) throw error;
+
+  const text = data?.payload?.text;
+  return typeof text === 'string' && text.trim().length > 0 ? text.trim() : type;
+}
+
+async function loadProfileDisplayName(profileId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('display_name, first_name, last_name')
+    .eq('id', profileId)
+    .is('deleted_at', null)
+    .maybeSingle<{
+      display_name: string | null;
+      first_name: string | null;
+      last_name: string | null;
+    }>();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  const fallbackName = [data.first_name, data.last_name].filter(Boolean).join(' ').trim();
+  if (data.display_name) return data.display_name;
+  return fallbackName || null;
+}
+
+async function resolveWritableSenderProfileId(
+  orgId: string,
+  requestedSenderProfileId: string,
+): Promise<string> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user?.id) return requestedSenderProfileId;
+
+  const { data: currentAccount, error: accountError } = await supabase
+    .from('accounts')
+    .select('id, org_id, active_profile_id')
+    .eq('auth_user_id', user.id)
+    .is('deleted_at', null)
+    .maybeSingle<CurrentAccountLookupRow>();
+
+  if (accountError) throw accountError;
+  if (!currentAccount?.id) return requestedSenderProfileId;
+
+  const { data: requestedProfile, error: requestedProfileError } = await supabase
+    .from('profiles')
+    .select('id, account_id, org_id')
+    .eq('id', requestedSenderProfileId)
+    .is('deleted_at', null)
+    .maybeSingle<ProfileOwnershipLookupRow>();
+
+  if (requestedProfileError) throw requestedProfileError;
+  if (!requestedProfile) return requestedSenderProfileId;
+
+  const ownsRequestedProfile =
+    requestedProfile.org_id === orgId &&
+    requestedProfile.account_id === currentAccount.id;
+  if (ownsRequestedProfile) return requestedSenderProfileId;
+
+  const { data: familyLink, error: familyLinkError } = await supabase
+    .from('family_links')
+    .select('id')
+    .eq('org_id', orgId)
+    .eq('guardian_account_id', currentAccount.id)
+    .eq('child_account_id', requestedProfile.account_id)
+    .is('deleted_at', null)
+    .maybeSingle<{ id: string }>();
+
+  if (familyLinkError) throw familyLinkError;
+  if (familyLink?.id) return requestedSenderProfileId;
+
+  let fallbackProfileId = currentAccount.active_profile_id;
+  if (fallbackProfileId) {
+    const { data: fallbackProfile, error: fallbackProfileError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', fallbackProfileId)
+      .eq('account_id', currentAccount.id)
+      .eq('org_id', orgId)
+      .is('deleted_at', null)
+      .maybeSingle<{ id: string }>();
+
+    if (fallbackProfileError) throw fallbackProfileError;
+    if (fallbackProfile?.id) {
+      logMessageMutation('senderProfile:fallback', {
+        orgId,
+        requestedSenderProfileId,
+        resolvedSenderProfileId: fallbackProfile.id,
+        currentAccountId: currentAccount.id,
+      });
+      return fallbackProfile.id;
+    }
+  }
+
+  const { data: firstOwnedProfile, error: firstOwnedProfileError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('account_id', currentAccount.id)
+    .eq('org_id', orgId)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle<{ id: string }>();
+
+  if (firstOwnedProfileError) throw firstOwnedProfileError;
+  if (firstOwnedProfile?.id) {
+    logMessageMutation('senderProfile:fallback', {
+      orgId,
+      requestedSenderProfileId,
+      resolvedSenderProfileId: firstOwnedProfile.id,
+      currentAccountId: currentAccount.id,
+    });
+    return firstOwnedProfile.id;
+  }
+
+  return requestedSenderProfileId;
+}
+
+async function resolveDmSenderProfileId(
+  orgId: string,
+  channelId: string,
+  requestedSenderProfileId: string,
+  writableSenderProfileId: string,
+): Promise<string> {
+  const { data: channel, error: channelError } = await supabase
+    .from('channels')
+    .select('id, kind')
+    .eq('id', channelId)
+    .eq('org_id', orgId)
+    .is('deleted_at', null)
+    .maybeSingle<ChannelKindLookupRow>();
+
+  if (channelError) throw channelError;
+  if (!channel || channel.kind !== 'dm') return writableSenderProfileId;
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user?.id) return writableSenderProfileId;
+
+  const { data: currentAccount, error: accountError } = await supabase
+    .from('accounts')
+    .select('id, org_id, active_profile_id')
+    .eq('auth_user_id', user.id)
+    .is('deleted_at', null)
+    .maybeSingle<CurrentAccountLookupRow>();
+
+  if (accountError) throw accountError;
+  if (!currentAccount?.id) return writableSenderProfileId;
+
+  const { data: channelMembers, error: membersError } = await supabase
+    .from('channel_members')
+    .select('profile_id')
+    .eq('org_id', orgId)
+    .eq('channel_id', channelId)
+    .is('deleted_at', null);
+
+  if (membersError) throw membersError;
+
+  const memberProfileIds = Array.from(
+    new Set(
+      (channelMembers ?? [])
+        .map((member) => (member.profile_id as string | undefined) ?? '')
+        .filter(Boolean),
+    ),
+  );
+
+  if (!memberProfileIds.length) return writableSenderProfileId;
+  if (memberProfileIds.includes(writableSenderProfileId)) return writableSenderProfileId;
+
+  const { data: familyLinks, error: familyLinksError } = await supabase
+    .from('family_links')
+    .select('child_account_id')
+    .eq('org_id', orgId)
+    .eq('guardian_account_id', currentAccount.id)
+    .is('deleted_at', null);
+
+  if (familyLinksError) throw familyLinksError;
+
+  const candidateAccountIds = Array.from(
+    new Set([
+      currentAccount.id,
+      ...(familyLinks ?? [])
+        .map((link) => (link.child_account_id as string | undefined) ?? '')
+        .filter(Boolean),
+    ]),
+  );
+
+  const { data: writableMemberProfiles, error: writableProfilesError } = await supabase
+    .from('profiles')
+    .select('id, account_id, org_id')
+    .eq('org_id', orgId)
+    .in('id', memberProfileIds)
+    .in('account_id', candidateAccountIds)
+    .is('deleted_at', null);
+
+  if (writableProfilesError) throw writableProfilesError;
+
+  const typedProfiles = (writableMemberProfiles ?? []) as ProfileOwnershipLookupRow[];
+  if (!typedProfiles.length) return writableSenderProfileId;
+
+  const requestedWritableMember = typedProfiles.find(
+    (profile) => profile.id === requestedSenderProfileId,
+  );
+  if (requestedWritableMember) return requestedWritableMember.id;
+
+  if (currentAccount.active_profile_id) {
+    const activeWritableMember = typedProfiles.find(
+      (profile) => profile.id === currentAccount.active_profile_id,
+    );
+    if (activeWritableMember) {
+      logMessageMutation('senderProfile:dm-fallback', {
+        orgId,
+        channelId,
+        requestedSenderProfileId,
+        writableSenderProfileId,
+        resolvedSenderProfileId: activeWritableMember.id,
+        currentAccountId: currentAccount.id,
+      });
+      return activeWritableMember.id;
+    }
+  }
+
+  const ownedWritableMember = typedProfiles.find(
+    (profile) => profile.account_id === currentAccount.id,
+  );
+  if (ownedWritableMember) {
+    logMessageMutation('senderProfile:dm-fallback', {
+      orgId,
+      channelId,
+      requestedSenderProfileId,
+      writableSenderProfileId,
+      resolvedSenderProfileId: ownedWritableMember.id,
+      currentAccountId: currentAccount.id,
+    });
+    return ownedWritableMember.id;
+  }
+
+  const linkedWritableMember = typedProfiles[0];
+  if (linkedWritableMember) {
+    logMessageMutation('senderProfile:dm-fallback', {
+      orgId,
+      channelId,
+      requestedSenderProfileId,
+      writableSenderProfileId,
+      resolvedSenderProfileId: linkedWritableMember.id,
+      currentAccountId: currentAccount.id,
+    });
+    return linkedWritableMember.id;
+  }
+
+  return writableSenderProfileId;
+}
+
+async function resolveThreadContextForSend(input: {
+  orgId: string;
+  channelId: string;
+  senderProfileId: string;
+  requestedThreadId?: string;
+  threadParentId?: string;
+  now: string;
+}): Promise<{ threadId: string | null; threadCreated: boolean }> {
+  if (!input.threadParentId) {
+    return { threadId: input.requestedThreadId ?? null, threadCreated: false };
+  }
+
+  let threadId = input.requestedThreadId ?? null;
+  let threadCreated = false;
+
+  const { data: parentMessage, error: parentError } = await supabase
+    .from('messages')
+    .select('id, org_id, channel_id, sender_profile_id, thread_id, type')
+    .eq('id', input.threadParentId)
+    .maybeSingle<ParentMessageLookupRow>();
+
+  if (parentError) throw parentError;
+  if (
+    !parentMessage ||
+    parentMessage.org_id !== input.orgId ||
+    parentMessage.channel_id !== input.channelId
+  ) {
+    throw new Error('Parent message not found');
+  }
+
+  if (parentMessage.thread_id) {
+    threadId = parentMessage.thread_id;
+  } else if (threadId) {
+    const { data: existingThread, error: threadLookupError } = await supabase
+      .from('threads')
+      .select('id, parent_message_id, channel_id, org_id')
+      .eq('id', threadId)
+      .maybeSingle<ThreadLookupRow>();
+
+    if (threadLookupError) throw threadLookupError;
+    if (
+      !existingThread ||
+      existingThread.parent_message_id !== parentMessage.id ||
+      existingThread.channel_id !== input.channelId ||
+      existingThread.org_id !== input.orgId
+    ) {
+      threadId = null;
+    }
+  }
+
+  if (!threadId) {
+    const [snippet, authorName] = await Promise.all([
+      loadMessageSnippet(parentMessage.id, parentMessage.type),
+      loadProfileDisplayName(parentMessage.sender_profile_id),
+    ]);
+
+    const { data: insertedThread, error: threadInsertError } = await supabase
+      .from('threads')
+      .insert({
+        org_id: input.orgId,
+        channel_id: input.channelId,
+        parent_message_id: parentMessage.id,
+        snippet: snippet.slice(0, 140),
+        author_id: parentMessage.sender_profile_id,
+        author_name: authorName,
+        message_count: 1,
+        last_reply_at: input.now,
+        created_at: input.now,
+        created_by: input.senderProfileId,
+        updated_at: input.now,
+        updated_by: input.senderProfileId,
+      })
+      .select('id')
+      .single<{ id: string }>();
+
+    if (threadInsertError || !insertedThread) {
+      throw threadInsertError ?? new Error('Unable to create thread.');
+    }
+
+    threadId = insertedThread.id;
+    threadCreated = true;
+
+    const { error: parentUpdateError } = await supabase
+      .from('messages')
+      .update({
+        thread_id: threadId,
+        updated_at: input.now,
+        updated_by: input.senderProfileId,
+      })
+      .eq('id', parentMessage.id);
+
+    if (parentUpdateError) throw parentUpdateError;
+  }
+
+  const participantRows = Array.from(
+    new Set([parentMessage.sender_profile_id, input.senderProfileId]),
+  ).map((profileId) => ({
+    org_id: input.orgId,
+    thread_id: threadId as string,
+    profile_id: profileId,
+    created_at: input.now,
+    created_by: input.senderProfileId,
+    updated_at: input.now,
+    updated_by: input.senderProfileId,
+  }));
+
+  const { error: participantsError } = await supabase
+    .from('thread_participants')
+    .upsert(participantRows, { onConflict: 'org_id,thread_id,profile_id' });
+
+  if (participantsError) throw participantsError;
+
+  return { threadId, threadCreated };
+}
+
+async function bumpThreadReplyCount(input: {
+  threadId: string | null;
+  threadCreated: boolean;
+  now: string;
+  senderProfileId: string;
+}): Promise<void> {
+  if (!input.threadId || input.threadCreated) return;
+
+  const { data: threadRow, error: threadLookupError } = await supabase
+    .from('threads')
+    .select('id, message_count')
+    .eq('id', input.threadId)
+    .maybeSingle<ThreadLookupRow>();
+
+  if (threadLookupError) throw threadLookupError;
+  if (!threadRow) return;
+
+  const { error: threadUpdateError } = await supabase
+    .from('threads')
+    .update({
+      message_count: (threadRow.message_count ?? 0) + 1,
+      last_reply_at: input.now,
+      updated_at: input.now,
+      updated_by: input.senderProfileId,
+    })
+    .eq('id', input.threadId);
+
+  if (threadUpdateError) throw threadUpdateError;
+}
+
 export async function sendTextMessage(
   channelId: string,
   senderProfileId: string,
@@ -604,41 +1180,125 @@ export async function sendTextMessage(
   threadParentId?: string,
   threadId?: string,
 ) {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  const accessToken = session?.access_token?.trim();
-  if (!accessToken) {
-    throw new Error('Not authenticated');
-  }
+  const content = text.trim();
+  if (!content) throw new Error('Message text is required');
+  const writableSenderProfileId = await resolveWritableSenderProfileId(
+    orgId,
+    senderProfileId,
+  );
+  const resolvedSenderProfileId = await resolveDmSenderProfileId(
+    orgId,
+    channelId,
+    senderProfileId,
+    writableSenderProfileId,
+  );
 
-  const apiBaseUrl = process.env.EXPO_PUBLIC_API_URL?.trim() || 'http://localhost:3000';
-  const response = await fetch(`${apiBaseUrl.replace(/\/+$/g, '')}/messages/text`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify({
+  logMessageMutation('sendTextMessage:start', {
+    orgId,
+    channelId,
+    senderProfileId,
+    resolvedSenderProfileId,
+    threadParentId: threadParentId ?? null,
+    threadId: threadId ?? null,
+    contentLength: content.length,
+  });
+
+  try {
+    const now = new Date().toISOString();
+    const messageId = createClientUuid();
+    const { threadId: resolvedThreadId, threadCreated } =
+      await resolveThreadContextForSend({
+        orgId,
+        channelId,
+        senderProfileId: resolvedSenderProfileId,
+        requestedThreadId: threadId,
+        threadParentId,
+        now,
+      });
+
+    const { error: msgError } = await supabase.from('messages').insert({
+      id: messageId,
+      channel_id: channelId,
+      sender_profile_id: resolvedSenderProfileId,
+      org_id: orgId,
+      type: 'text',
+      thread_parent_id: threadParentId ?? null,
+      ...(resolvedThreadId ? { thread_id: resolvedThreadId } : {}),
+    });
+
+    if (msgError) throw msgError;
+
+    const { error: payloadError } = await supabase
+      .from('message_text')
+      .insert({ message_id: messageId, org_id: orgId, payload: { text: content } });
+
+    if (payloadError) throw payloadError;
+
+    await bumpThreadReplyCount({
+      threadId: resolvedThreadId,
+      threadCreated,
+      now,
+      senderProfileId: resolvedSenderProfileId,
+    });
+
+    logMessageMutation('sendTextMessage:success', {
       orgId,
       channelId,
       senderProfileId,
-      content: text,
-      threadParentId: threadParentId ?? null,
-      threadId: threadId ?? null,
-    }),
-  });
+      resolvedSenderProfileId,
+      messageId,
+      threadId: resolvedThreadId ?? null,
+    });
 
-  const body = (await response.json().catch(() => null)) as {
-    message?: string;
-    id?: string;
-  } | null;
+    return { id: messageId };
+  } catch (error) {
+    const typedError = error as { code?: string; message?: string };
+    let debugContext: MessageWriteDebugContext | null = null;
 
-  if (!response.ok) {
-    throw new Error(body?.message ?? 'Unable to send message.');
+    try {
+      debugContext = await collectMessageWriteDebugContext({
+        orgId,
+        channelId,
+        requestedSenderProfileId: senderProfileId,
+        resolvedSenderProfileId,
+      });
+    } catch (debugError) {
+      const typedDebugError = debugError as { message?: string };
+      debugContext = {
+        authUserId: null,
+        currentAccountId: null,
+        currentAccountOrgId: null,
+        currentAccountActiveProfileId: null,
+        requestedProfileAccountId: null,
+        requestedProfileOrgId: null,
+        requestedProfileKind: null,
+        resolvedProfileAccountId: null,
+        resolvedProfileOrgId: null,
+        resolvedProfileKind: null,
+        channelKind: null,
+        channelPurpose: null,
+        channelMemberProfileIds: [],
+        debugCollectionError: typedDebugError.message ?? String(debugError),
+      } as MessageWriteDebugContext & { debugCollectionError: string };
+    }
+
+    logMessageMutation(
+      'sendTextMessage:error',
+      {
+        orgId,
+        channelId,
+        senderProfileId,
+        resolvedSenderProfileId,
+        threadParentId: threadParentId ?? null,
+        threadId: threadId ?? null,
+        errorCode: typedError.code ?? null,
+        errorMessage: typedError.message ?? String(error),
+        debugContext,
+      },
+      'error',
+    );
+    throw error;
   }
-
-  return body;
 }
 
 const CHANNEL_FILES_BUCKET = 'channel-files';
@@ -722,46 +1382,96 @@ export async function sendFileMessage(
   threadParentId?: string,
   threadId?: string,
 ) {
+  const resolvedSenderProfileId = await resolveWritableSenderProfileId(
+    orgId,
+    senderProfileId,
+  );
   const isImage = file.mimeType.startsWith('image/');
   const isAudio = file.mimeType.startsWith('audio/');
   const type = isImage ? 'image' : isAudio ? 'audio-recording' : 'file';
-
-  const { data: msg, error: msgError } = await supabase
-    .from('messages')
-    .insert({
-      channel_id: channelId,
-      sender_profile_id: senderProfileId,
-      org_id: orgId,
-      type,
-      thread_parent_id: threadParentId ?? null,
-      ...(threadId ? { thread_id: threadId } : {}),
-    })
-    .select('id')
-    .single();
-
-  if (msgError) throw msgError;
-
-  const payload: Record<string, unknown> = {
-    url: file.storagePath,
-    storagePath: file.storagePath,
-    name: file.name,
-    ...(file.size !== undefined ? { size: file.size } : {}),
+  logMessageMutation('sendFileMessage:start', {
+    orgId,
+    channelId,
+    senderProfileId,
+    resolvedSenderProfileId,
+    threadParentId: threadParentId ?? null,
+    threadId: threadId ?? null,
+    type,
+    fileName: file.name,
     mimeType: file.mimeType,
-    ...(isAudio ? { durationSeconds: file.durationSeconds ?? 0 } : {}),
-    ...(content?.trim() ? { text: content.trim() } : {}),
-  };
+    storagePath: file.storagePath,
+  });
 
-  const table = isImage
-    ? 'message_image'
-    : isAudio
-      ? 'message_audio_recording'
-      : 'message_file';
-  const { error: payloadError } = await supabase
-    .from(table)
-    .insert({ message_id: msg.id, org_id: orgId, payload });
+  try {
+    const { data: msg, error: msgError } = await supabase
+      .from('messages')
+      .insert({
+        channel_id: channelId,
+        sender_profile_id: resolvedSenderProfileId,
+        org_id: orgId,
+        type,
+        thread_parent_id: threadParentId ?? null,
+        ...(threadId ? { thread_id: threadId } : {}),
+      })
+      .select('id')
+      .single();
 
-  if (payloadError) throw payloadError;
-  return msg;
+    if (msgError) throw msgError;
+
+    const payload: Record<string, unknown> = {
+      url: file.storagePath,
+      storagePath: file.storagePath,
+      name: file.name,
+      ...(file.size !== undefined ? { size: file.size } : {}),
+      mimeType: file.mimeType,
+      ...(isAudio ? { durationSeconds: file.durationSeconds ?? 0 } : {}),
+      ...(content?.trim() ? { text: content.trim() } : {}),
+    };
+
+    const table = isImage
+      ? 'message_image'
+      : isAudio
+        ? 'message_audio_recording'
+        : 'message_file';
+    const { error: payloadError } = await supabase
+      .from(table)
+      .insert({ message_id: msg.id, org_id: orgId, payload });
+
+    if (payloadError) throw payloadError;
+
+    logMessageMutation('sendFileMessage:success', {
+      orgId,
+      channelId,
+      senderProfileId,
+      resolvedSenderProfileId,
+      messageId: msg.id,
+      table,
+      type,
+    });
+
+    return msg;
+  } catch (error) {
+    const typedError = error as { code?: string; message?: string };
+    logMessageMutation(
+      'sendFileMessage:error',
+      {
+        orgId,
+        channelId,
+        senderProfileId,
+        resolvedSenderProfileId,
+        threadParentId: threadParentId ?? null,
+        threadId: threadId ?? null,
+        type,
+        fileName: file.name,
+        mimeType: file.mimeType,
+        storagePath: file.storagePath,
+        errorCode: typedError.code ?? null,
+        errorMessage: typedError.message ?? String(error),
+      },
+      'error',
+    );
+    throw error;
+  }
 }
 
 export async function sendFilesMessage(
@@ -774,43 +1484,96 @@ export async function sendFilesMessage(
   threadId?: string,
 ) {
   if (!files.length) throw new Error('No files provided');
+  const resolvedSenderProfileId = await resolveWritableSenderProfileId(
+    orgId,
+    senderProfileId,
+  );
   const allImages = files.every((file) => file.mimeType.startsWith('image/'));
   const type = allImages ? 'image' : 'file';
+  logMessageMutation('sendFilesMessage:start', {
+    orgId,
+    channelId,
+    senderProfileId,
+    resolvedSenderProfileId,
+    threadParentId: threadParentId ?? null,
+    threadId: threadId ?? null,
+    type,
+    fileCount: files.length,
+    files: files.map((file) => ({
+      name: file.name,
+      mimeType: file.mimeType,
+      storagePath: file.storagePath,
+      size: file.size ?? null,
+    })),
+  });
 
-  const { data: msg, error: msgError } = await supabase
-    .from('messages')
-    .insert({
-      channel_id: channelId,
-      sender_profile_id: senderProfileId,
-      org_id: orgId,
+  try {
+    const { data: msg, error: msgError } = await supabase
+      .from('messages')
+      .insert({
+        channel_id: channelId,
+        sender_profile_id: resolvedSenderProfileId,
+        org_id: orgId,
+        type,
+        thread_parent_id: threadParentId ?? null,
+        ...(threadId ? { thread_id: threadId } : {}),
+      })
+      .select('id')
+      .single();
+
+    if (msgError) throw msgError;
+
+    const attachmentsPayload = files.map((file) => ({
+      url: file.storagePath,
+      storagePath: file.storagePath,
+      name: file.name,
+      ...(file.size !== undefined ? { size: file.size } : {}),
+      mimeType: file.mimeType,
+    }));
+
+    const payload: Record<string, unknown> = {
+      ...attachmentsPayload[0],
+      attachments: attachmentsPayload,
+      ...(content?.trim() ? { text: content.trim() } : {}),
+    };
+
+    const table = allImages ? 'message_image' : 'message_file';
+    const { error: payloadError } = await supabase
+      .from(table)
+      .insert({ message_id: msg.id, org_id: orgId, payload });
+
+    if (payloadError) throw payloadError;
+
+    logMessageMutation('sendFilesMessage:success', {
+      orgId,
+      channelId,
+      senderProfileId,
+      resolvedSenderProfileId,
+      messageId: msg.id,
+      table,
       type,
-      thread_parent_id: threadParentId ?? null,
-      ...(threadId ? { thread_id: threadId } : {}),
-    })
-    .select('id')
-    .single();
+      fileCount: files.length,
+    });
 
-  if (msgError) throw msgError;
-
-  const attachmentsPayload = files.map((file) => ({
-    url: file.storagePath,
-    storagePath: file.storagePath,
-    name: file.name,
-    ...(file.size !== undefined ? { size: file.size } : {}),
-    mimeType: file.mimeType,
-  }));
-
-  const payload: Record<string, unknown> = {
-    ...attachmentsPayload[0],
-    attachments: attachmentsPayload,
-    ...(content?.trim() ? { text: content.trim() } : {}),
-  };
-
-  const table = allImages ? 'message_image' : 'message_file';
-  const { error: payloadError } = await supabase
-    .from(table)
-    .insert({ message_id: msg.id, org_id: orgId, payload });
-
-  if (payloadError) throw payloadError;
-  return msg;
+    return msg;
+  } catch (error) {
+    const typedError = error as { code?: string; message?: string };
+    logMessageMutation(
+      'sendFilesMessage:error',
+      {
+        orgId,
+        channelId,
+        senderProfileId,
+        resolvedSenderProfileId,
+        threadParentId: threadParentId ?? null,
+        threadId: threadId ?? null,
+        type,
+        fileCount: files.length,
+        errorCode: typedError.code ?? null,
+        errorMessage: typedError.message ?? String(error),
+      },
+      'error',
+    );
+    throw error;
+  }
 }

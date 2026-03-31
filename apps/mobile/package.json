@@ -6,6 +6,9 @@
   "scripts": {
     "build": "pnpm run typecheck",
     "dev": "expo start --clear",
+    "dev:device": "expo start --dev-client --clear",
+    "dev:ios": "expo run:ios",
+    "dev:android": "expo run:android",
     "start": "expo start",
     "ios": "expo run:ios",
     "android": "expo run:android",
@@ -19,6 +22,8 @@
     "prebuild": "expo prebuild",
     "prebuild:clean": "expo prebuild --clean",
     "eas:build:dev": "eas build --profile development --platform all",
+    "eas:build:dev:ios": "eas build --profile development --platform ios",
+    "eas:build:dev:android": "eas build --profile development --platform android",
     "eas:build:preview": "eas build --profile preview --platform all",
     "eas:build:prod": "eas build --profile production --platform all",
     "eas:build:ios": "eas build --profile production --platform ios",

@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase/client';
-import { fetchLastMessages } from '../channel/queries';
-import type { ChannelListItem } from '../types';
+import { fetchLastMessages } from '@/lib/api/channel/queries';
+import type { ChannelListItem } from '@/lib/api/types';
 
 export async function fetchLearningSpaces(orgId: string) {
   const { data, error } = await supabase

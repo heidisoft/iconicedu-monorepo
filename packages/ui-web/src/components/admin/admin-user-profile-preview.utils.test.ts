@@ -4,7 +4,7 @@ import { getAdminUserPreviewTabs } from './admin-user-profile-preview.utils';
 
 describe('getAdminUserPreviewTabs', () => {
   it('returns account only when no profile is present', () => {
-    expect(getAdminUserPreviewTabs(null)).toEqual(['account']);
+    expect(getAdminUserPreviewTabs(null)).toEqual(['account', 'metadata']);
   });
 
   it('returns guardian tabs', () => {
@@ -22,6 +22,7 @@ describe('getAdminUserPreviewTabs', () => {
       }),
     ).toEqual([
       'account',
+      'metadata',
       'profile',
       'preferences',
       'location',
@@ -50,6 +51,7 @@ describe('getAdminUserPreviewTabs', () => {
       }),
     ).toEqual([
       'account',
+      'metadata',
       'profile',
       'preferences',
       'location',
