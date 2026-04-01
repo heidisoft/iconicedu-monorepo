@@ -392,12 +392,12 @@ print_status_summary() {
 
 print_seed_credentials() {
   echo -e "${BOLD}Seed credentials${RESET} (password: ${BOLD}Seed123!${RESET} for all)"
-  echo "  heshanmw@gmail.com    — Owner (Marc F)"
-  echo "  heshanmw+1@gmail.com  — Guardian (Lura H)"
-  echo "  heshanmw+3@gmail.com  — Educator (Denise R)"
-  echo "  heshanmw+4@gmail.com  — Educator (Barbara Y)"
-  echo "  heshanmw+5@gmail.com  — Staff (Harold B)"
-  echo "  heshanmw+6@gmail.com  — Guardian (Jessica K)"
+  echo "  owner.marc@example.com       — Owner (Marc F)"
+  echo "  guardian.lura@example.com    — Guardian (Lura H)"
+  echo "  educator.denise@example.com  — Educator (Denise R)"
+  echo "  educator.barbara@example.com — Educator (Barbara Y)"
+  echo "  staff.harold@example.com     — Staff (Harold B)"
+  echo "  guardian.jessica@example.com — Guardian (Jessica K)"
   echo ""
 }
 

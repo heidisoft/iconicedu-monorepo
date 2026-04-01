@@ -1,5 +1,7 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
+  Easing,
   View,
   Text,
   TouchableOpacity,
@@ -10,6 +12,7 @@ import {
   Modal,
   Pressable,
   Share,
+  type LayoutChangeEvent,
 } from 'react-native';
 import { ChevronLeft, Video, MoreVertical, Share2, X } from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
@@ -113,6 +116,14 @@ export type ConversationHeaderProps = {
   loading?: boolean;
 };
 
+type AutoScrollingInlineTextProps = {
+  children: React.ReactNode;
+  style: object;
+  viewportStyle: object;
+  trackStyle: object;
+  testIDPrefix?: string;
+};
+
 function makeStyles(C: AppColors) {
   return StyleSheet.create({
     container: {
@@ -213,17 +224,23 @@ function makeStyles(C: AppColors) {
     },
     title: { fontSize: 16, fontWeight: '700', color: C.text, letterSpacing: -0.2 },
     subtitleRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
       flexShrink: 1,
       minWidth: 0,
     },
-    subtitleText: { fontSize: 12, color: C.textMuted, flexShrink: 0 },
+    subtitleText: { fontSize: 12, color: C.textMuted },
     subtitleSeparator: { fontSize: 12, color: C.textMuted },
-    localTimeWrap: { flexShrink: 1, minWidth: 0 },
-    localTimeText: { fontSize: 12, color: C.textMuted, flexShrink: 1 },
+    localTimeText: { fontSize: 12, color: C.textMuted },
     subtitleButton: { alignSelf: 'stretch', minWidth: 0 },
+    subtitleViewport: {
+      overflow: 'hidden',
+      flexShrink: 1,
+      minWidth: 0,
+    },
+    subtitleTrack: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+    },
     titleSkeletonWrap: { gap: 6, paddingTop: 2 },
     actions: { flexDirection: 'row', alignItems: 'center', flexShrink: 0 },
     actionBtn: {
@@ -363,6 +380,82 @@ function themeTextColor(themeKey: string | null | undefined, fallback: string): 
   return (themeKey && palette[themeKey]) || fallback;
 }
 
+function AutoScrollingInlineText({
+  children,
+  style,
+  viewportStyle,
+  trackStyle,
+  testIDPrefix,
+}: AutoScrollingInlineTextProps) {
+  const translateX = useRef(new Animated.Value(0)).current;
+  const animationRef = useRef<Animated.CompositeAnimation | null>(null);
+  const [viewportWidth, setViewportWidth] = useState(0);
+  const [contentWidth, setContentWidth] = useState(0);
+
+  const overflow = Math.max(0, contentWidth - viewportWidth);
+  const shouldAnimate = overflow > 12;
+
+  useEffect(() => {
+    animationRef.current?.stop();
+    translateX.stopAnimation();
+    translateX.setValue(0);
+
+    if (!shouldAnimate) {
+      return;
+    }
+
+    const duration = Math.max(5000, overflow * 30);
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.delay(1200),
+        Animated.timing(translateX, {
+          toValue: -overflow,
+          duration,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }),
+        Animated.delay(900),
+        Animated.timing(translateX, {
+          toValue: 0,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    animationRef.current = animation;
+    animation.start();
+
+    return () => {
+      animation.stop();
+    };
+  }, [overflow, shouldAnimate, translateX]);
+
+  const handleViewportLayout = useCallback((event: LayoutChangeEvent) => {
+    setViewportWidth(event.nativeEvent.layout.width);
+  }, []);
+
+  const handleTrackLayout = useCallback((event: LayoutChangeEvent) => {
+    setContentWidth(event.nativeEvent.layout.width);
+  }, []);
+
+  return (
+    <View
+      testID={testIDPrefix ? `${testIDPrefix}-viewport` : undefined}
+      style={viewportStyle}
+      onLayout={handleViewportLayout}
+    >
+      <Animated.View
+        testID={testIDPrefix ? `${testIDPrefix}-track` : undefined}
+        style={[trackStyle, { transform: [{ translateX }] }]}
+        onLayout={handleTrackLayout}
+      >
+        <Text style={style}>{children}</Text>
+      </Animated.View>
+    </View>
+  );
+}
+
 export function ConversationHeader({
   title,
   subtitle,
@@ -418,6 +511,7 @@ export function ConversationHeader({
   const subtitleStudents =
     studentProfiles?.filter((student) => student.name.trim().length > 0) ?? [];
   const hasSubtitleStudents = subtitleStudents.length > 0;
+  const hasSubtitleMeta = Boolean(subtitle || hasSubtitleStudents || localTimeLabel);
 
   const handleOpenJoinHref = useCallback((joinHref: string) => {
     Linking.openURL(joinHref).catch(() => null);
@@ -448,37 +542,33 @@ export function ConversationHeader({
 
   const subtitleContent = (
     <View style={s.subtitleRow}>
-      {!!subtitle && (
-        <Text style={s.subtitleText} numberOfLines={1} ellipsizeMode="tail">
-          {subtitle}
-        </Text>
-      )}
-      {!!subtitle && hasSubtitleStudents && (
-        <Text style={s.subtitleSeparator}>{'\u00b7'}</Text>
-      )}
-      {hasSubtitleStudents && (
-        <Text style={s.localTimeText} numberOfLines={1} ellipsizeMode="tail">
-          {subtitleStudents.map((student, index) => (
+      <AutoScrollingInlineText
+        style={s.subtitleText}
+        viewportStyle={s.subtitleViewport}
+        trackStyle={s.subtitleTrack}
+        testIDPrefix="conversation-subtitle"
+      >
+        {!!subtitle && <Text style={s.subtitleText}>{subtitle}</Text>}
+        {!!subtitle && hasSubtitleStudents && (
+          <Text style={s.subtitleSeparator}>{' \u00b7 '}</Text>
+        )}
+        {hasSubtitleStudents &&
+          subtitleStudents.map((student, index) => (
             <Text
               key={`${student.name}-${index}`}
-              style={{ color: themeTextColor(student.themeKey, colors.textMuted) }}
+              style={{
+                color: themeTextColor(student.themeKey, colors.textMuted),
+              }}
             >
               {index > 0 ? ', ' : ''}
               {student.name}
             </Text>
           ))}
-        </Text>
-      )}
-      {!!(subtitle || hasSubtitleStudents) && !!localTimeLabel && (
-        <Text style={s.subtitleSeparator}>{'\u00b7'}</Text>
-      )}
-      {!!localTimeLabel && (
-        <View style={s.localTimeWrap}>
-          <Text style={s.localTimeText} numberOfLines={1} ellipsizeMode="tail">
-            {localTimeLabel}
-          </Text>
-        </View>
-      )}
+        {!!(subtitle || hasSubtitleStudents) && !!localTimeLabel && (
+          <Text style={s.subtitleSeparator}>{' \u00b7 '}</Text>
+        )}
+        {!!localTimeLabel && <Text style={s.localTimeText}>{localTimeLabel}</Text>}
+      </AutoScrollingInlineText>
     </View>
   );
 
@@ -549,7 +639,7 @@ export function ConversationHeader({
                 textStyle={s.title}
                 numberOfLines={1}
               />
-              {!!(subtitle || hasSubtitleStudents || localTimeLabel) &&
+              {hasSubtitleMeta &&
                 (onSubtitlePress ? (
                   <TouchableOpacity
                     style={s.subtitleButton}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { Linking, Share } from 'react-native';
+import { Animated, Linking, Share } from 'react-native';
 import { ConversationHeader } from './conversation-header';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────────
@@ -109,6 +109,39 @@ describe('ConversationHeader', () => {
       />,
     );
     expect(screen.getByText("Supervising Alice's conversation")).toBeTruthy();
+  });
+
+  it('starts auto-scrolling subtitle metadata when it overflows', () => {
+    const loopStart = jest.fn();
+    const loopStop = jest.fn();
+    jest.spyOn(Animated, 'loop').mockReturnValue({
+      start: loopStart,
+      stop: loopStop,
+      reset: jest.fn(),
+      _startNativeLoop: jest.fn(),
+      _isUsingNativeDriver: () => true,
+    } as unknown as Animated.CompositeAnimation);
+
+    render(
+      <ConversationHeader
+        {...baseProps}
+        subtitle="Advanced mathematics with collaborative problem solving"
+        studentProfiles={[
+          { name: 'Ava Lee', themeKey: 'blue' },
+          { name: 'Noah Cruz', themeKey: 'green' },
+        ]}
+        localTimeLabel="9:41 AM local time"
+      />,
+    );
+
+    fireEvent(screen.getByTestId('conversation-subtitle-viewport'), 'layout', {
+      nativeEvent: { layout: { width: 120, height: 14, x: 0, y: 0 } },
+    });
+    fireEvent(screen.getByTestId('conversation-subtitle-track'), 'layout', {
+      nativeEvent: { layout: { width: 280, height: 14, x: 0, y: 0 } },
+    });
+
+    expect(loopStart).toHaveBeenCalled();
   });
 
   it('shows media and more actions when video is enabled', () => {

@@ -50,14 +50,14 @@ pnpm build:packages
 
 All seed accounts share the password `Seed123!`:
 
-| Email                  | Role     | Profile   |
-| ---------------------- | -------- | --------- |
-| `heshanmw@gmail.com`   | Owner    | Marc F    |
-| `heshanmw+1@gmail.com` | Guardian | Lura H    |
-| `heshanmw+3@gmail.com` | Educator | Denise R  |
-| `heshanmw+4@gmail.com` | Educator | Barbara Y |
-| `heshanmw+5@gmail.com` | Staff    | Harold B  |
-| `heshanmw+6@gmail.com` | Guardian | Jessica K |
+| Email                          | Role     | Profile   |
+| ------------------------------ | -------- | --------- |
+| `owner.marc@example.com`       | Owner    | Marc F    |
+| `guardian.lura@example.com`    | Guardian | Lura H    |
+| `educator.denise@example.com`  | Educator | Denise R  |
+| `educator.barbara@example.com` | Educator | Barbara Y |
+| `staff.harold@example.com`     | Staff    | Harold B  |
+| `guardian.jessica@example.com` | Guardian | Jessica K |
 
 ## Database Workflow
 
