@@ -11,6 +11,10 @@ import { useMessages } from '@/hooks/use-messages';
 import { useSpaceSessions } from '@/hooks/use-space-sessions';
 import {
   sendTextMessage,
+  sendFileMessage,
+  sendFilesMessage,
+  uploadChannelFile,
+  buildMessageStoragePath,
   markChannelReadState,
   fetchSpaceChannelMetaByChannelId,
   fetchChannelReadState,
@@ -23,7 +27,18 @@ import { TypingIndicator } from '@/components/messages/typing-indicator';
 import { ConversationHeader } from '@/components/messages/conversation-header';
 import { ChannelInfoSheet } from '@/components/messages/channel-info-sheet';
 import { SpaceSessionsTab } from '@/components/messages/space-sessions-tab';
+import type { AttachmentPayload } from '@/components/messages/attachment-sheet';
 import { buildMobileChannelEmptyStateCopy } from '@/lib/message-empty-state';
+
+type PendingUpload = {
+  id: string;
+  type: 'image' | 'file' | 'audio';
+  attachments: AttachmentPayload[];
+  senderName: string;
+  createdAt: string;
+  caption?: string;
+  failed?: boolean;
+};
 
 type SpaceTab = 'messages' | 'sessions';
 
@@ -47,6 +62,14 @@ export default function SpaceDetailScreen() {
     ((account as Record<string, unknown> | undefined)?.id as string) ?? '';
   const profileId =
     ((profile as Record<string, unknown> | undefined)?.id as string) ?? '';
+  const senderName =
+    ((
+      (profile as Record<string, unknown> | undefined)?.display_name as string | undefined
+    )?.trim() ||
+      (
+        (profile as Record<string, unknown> | undefined)?.first_name as string | undefined
+      )?.trim()) ??
+    'Me';
 
   const { data: messages, isLoading, loadMore } = useMessages(channelId ?? '');
   const { data: spaceMeta, isLoading: isLoadingMeta } = useQuery({
@@ -88,6 +111,7 @@ export default function SpaceDetailScreen() {
 
   // ── Info sheet state ──
   const [infoVisible, setInfoVisible] = useState(false);
+  const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
 
   const handleSend = useCallback(
     async (text: string) => {
@@ -95,6 +119,93 @@ export default function SpaceDetailScreen() {
       await sendTextMessage(channelId, profileId, orgId, text);
     },
     [channelId, profileId, orgId],
+  );
+
+  const handleSendAttachment = useCallback(
+    async (attachments: AttachmentPayload[], caption?: string) => {
+      if (!channelId || !profileId || !orgId || !attachments.length) return;
+
+      const type: PendingUpload['type'] =
+        attachments[0].mimeType === 'audio/mp4'
+          ? 'audio'
+          : attachments[0].mimeType.startsWith('image/')
+            ? 'image'
+            : 'file';
+
+      const pendingId = `pending-${Date.now()}`;
+
+      setPendingUploads((prev) => [
+        ...prev,
+        {
+          id: pendingId,
+          type,
+          attachments,
+          senderName,
+          createdAt: new Date().toISOString(),
+          caption,
+        },
+      ]);
+
+      try {
+        if (type === 'audio') {
+          const attachment = attachments[0];
+          const storagePath = buildMessageStoragePath(
+            orgId,
+            channelId,
+            profileId,
+            attachment.mimeType,
+            attachment.name,
+          );
+          await uploadChannelFile(
+            attachment.uri,
+            storagePath,
+            attachment.mimeType,
+            attachment.base64,
+          );
+          await sendFileMessage(
+            channelId,
+            profileId,
+            orgId,
+            { ...attachment, storagePath },
+            caption,
+          );
+        } else {
+          const uploaded = await Promise.all(
+            attachments.map(async (attachment) => {
+              const storagePath = buildMessageStoragePath(
+                orgId,
+                channelId,
+                profileId,
+                attachment.mimeType,
+                attachment.name,
+              );
+              await uploadChannelFile(
+                attachment.uri,
+                storagePath,
+                attachment.mimeType,
+                attachment.base64,
+              );
+              return { ...attachment, storagePath };
+            }),
+          );
+
+          if (uploaded.length === 1) {
+            await sendFileMessage(channelId, profileId, orgId, uploaded[0], caption);
+          } else {
+            await sendFilesMessage(channelId, profileId, orgId, uploaded, caption);
+          }
+        }
+
+        setPendingUploads((prev) => prev.filter((upload) => upload.id !== pendingId));
+      } catch {
+        setPendingUploads((prev) =>
+          prev.map((upload) =>
+            upload.id === pendingId ? { ...upload, failed: true } : upload,
+          ),
+        );
+      }
+    },
+    [channelId, profileId, orgId, senderName],
   );
 
   const s = useMemo(() => makeStyles(colors), [colors]);
@@ -194,6 +305,7 @@ export default function SpaceDetailScreen() {
             unreadCount={channelReadState?.unreadCount ?? 0}
             onLoadMore={loadMore}
             loading={isLoading}
+            pendingUploads={pendingUploads}
             onUnreadViewed={handleUnreadViewed}
             isScreenActive={isFocused && activeTab === 'messages'}
             emptyTitle={emptyStateCopy.title}
@@ -201,7 +313,12 @@ export default function SpaceDetailScreen() {
             emptyIcon={emptyStateCopy.icon}
           />
           <TypingIndicator typingUsers={[]} />
-          <MessageInput onSend={handleSend} placeholder={`Message ${resolvedTitle}…`} />
+          <MessageInput
+            onSend={handleSend}
+            onSendAttachment={handleSendAttachment}
+            placeholder={`Message ${resolvedTitle}…`}
+            uploading={pendingUploads.some((upload) => !upload.failed)}
+          />
         </View>
       ) : (
         <View style={[s.flex, { backgroundColor: colors.pageBg }]}>

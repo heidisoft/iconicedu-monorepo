@@ -187,6 +187,23 @@ export default function ChannelConversationScreen() {
       ]);
 
       try {
+        console.debug('[messages] handleSendAttachment:start', {
+          channelId,
+          orgId,
+          profileId,
+          pendingId,
+          type,
+          attachmentCount: attachments.length,
+          attachments: attachments.map((attachment) => ({
+            name: attachment.name,
+            mimeType: attachment.mimeType,
+            size: attachment.size ?? null,
+            uri: attachment.uri,
+            hasBase64: Boolean(attachment.base64),
+          })),
+          captionLength: caption?.length ?? 0,
+        });
+
         if (type === 'audio') {
           const a = attachments[0];
           const storagePath = buildMessageStoragePath(
@@ -225,9 +242,29 @@ export default function ChannelConversationScreen() {
           }
         }
 
+        console.debug('[messages] handleSendAttachment:success', {
+          channelId,
+          orgId,
+          profileId,
+          pendingId,
+          type,
+          attachmentCount: attachments.length,
+        });
+
         // 2. Remove pending entry — the realtime subscription will add the real message
         setPendingUploads((prev) => prev.filter((p) => p.id !== pendingId));
-      } catch {
+      } catch (error) {
+        const typedError = error as { code?: string; message?: string };
+        console.error('[messages] handleSendAttachment:error', {
+          channelId,
+          orgId,
+          profileId,
+          pendingId,
+          type,
+          attachmentCount: attachments.length,
+          errorCode: typedError.code ?? null,
+          errorMessage: typedError.message ?? String(error),
+        });
         // 3. Mark as failed — user sees a red error state on the pending item
         setPendingUploads((prev) =>
           prev.map((p) => (p.id === pendingId ? { ...p, failed: true } : p)),
@@ -254,6 +291,16 @@ export default function ChannelConversationScreen() {
       );
 
       try {
+        console.debug('[messages] handleRetryUpload:start', {
+          channelId,
+          orgId,
+          profileId,
+          pendingId,
+          type: pending.type,
+          attachmentCount: pending.attachments.length,
+          captionLength: pending.caption?.length ?? 0,
+        });
+
         const { caption } = pending;
         if (pending.type === 'audio') {
           const a = pending.attachments[0];
@@ -292,8 +339,27 @@ export default function ChannelConversationScreen() {
             await sendFilesMessage(channelId!, profileId, orgId, uploaded, caption);
           }
         }
+        console.debug('[messages] handleRetryUpload:success', {
+          channelId,
+          orgId,
+          profileId,
+          pendingId,
+          type: pending.type,
+          attachmentCount: pending.attachments.length,
+        });
         setPendingUploads((prev) => prev.filter((p) => p.id !== pendingId));
-      } catch {
+      } catch (error) {
+        const typedError = error as { code?: string; message?: string };
+        console.error('[messages] handleRetryUpload:error', {
+          channelId,
+          orgId,
+          profileId,
+          pendingId,
+          type: pending.type,
+          attachmentCount: pending.attachments.length,
+          errorCode: typedError.code ?? null,
+          errorMessage: typedError.message ?? String(error),
+        });
         setPendingUploads((prev) =>
           prev.map((p) => (p.id === pendingId ? { ...p, failed: true } : p)),
         );

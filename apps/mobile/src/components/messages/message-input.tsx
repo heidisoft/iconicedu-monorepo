@@ -375,24 +375,52 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   );
 
   const handleSend = useCallback(async () => {
+    console.debug('[MessageInput] handleSend:start', {
+      textLength: text.trim().length,
+      pendingAttachmentCount: pendingAttachments.length,
+      disabled,
+      hasOnSendAttachment: Boolean(onSendAttachment),
+    });
     if (pendingAttachments.length > 0) {
       const attachments = pendingAttachments;
       const caption = text.trim() || undefined;
+      console.debug('[MessageInput] handleSend:attachments', {
+        attachmentCount: attachments.length,
+        captionLength: caption?.length ?? 0,
+        attachments: attachments.map((attachment) => ({
+          name: attachment.name,
+          mimeType: attachment.mimeType,
+          size: attachment.size ?? null,
+          uri: attachment.uri,
+          hasBase64: Boolean(attachment.base64),
+          durationSeconds: attachment.durationSeconds ?? null,
+        })),
+      });
       setPendingAttachments([]);
       setText('');
       setInputHeight(20);
       onTypingStop?.();
       await clearPendingAudio();
       await onSendAttachment?.(attachments, caption);
+      console.debug('[MessageInput] handleSend:attachments:dispatched', {
+        attachmentCount: attachments.length,
+      });
       return;
     }
     const trimmed = text.trim();
-    if (!trimmed) return;
+    if (!trimmed) {
+      console.debug('[MessageInput] handleSend:skipped-empty');
+      return;
+    }
     setText('');
     setInputHeight(20);
     onTypingStop?.();
     await onSend(trimmed);
+    console.debug('[MessageInput] handleSend:text:dispatched', {
+      textLength: trimmed.length,
+    });
   }, [
+    disabled,
     text,
     pendingAttachments,
     onSend,
@@ -426,6 +454,14 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   }, []);
 
   const canSend = (text.trim().length > 0 || pendingAttachments.length > 0) && !disabled;
+  useEffect(() => {
+    console.debug('[MessageInput] canSend', {
+      canSend,
+      disabled,
+      textLength: text.trim().length,
+      pendingAttachmentCount: pendingAttachments.length,
+    });
+  }, [canSend, disabled, text, pendingAttachments.length]);
   const resolvedPlaceholder = truncatePlaceholder(placeholder);
 
   return (
@@ -592,7 +628,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         {canSend && (
           <TouchableOpacity
             style={s.sendBtn}
-            onPress={handleSend}
+            onPress={() => {
+              console.debug('[MessageInput] sendButton:press', {
+                textLength: text.trim().length,
+                pendingAttachmentCount: pendingAttachments.length,
+              });
+              void handleSend();
+            }}
             activeOpacity={0.8}
             accessibilityLabel="Send message"
           >
@@ -611,6 +653,17 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         visible={attachmentSheetVisible}
         onClose={() => setAttachmentSheetVisible(false)}
         onAttach={(attachments) => {
+          console.debug('[MessageInput] onAttach', {
+            attachmentCount: attachments.length,
+            attachments: attachments.map((attachment) => ({
+              name: attachment.name,
+              mimeType: attachment.mimeType,
+              size: attachment.size ?? null,
+              uri: attachment.uri,
+              hasBase64: Boolean(attachment.base64),
+              durationSeconds: attachment.durationSeconds ?? null,
+            })),
+          });
           setPendingAttachments(attachments);
         }}
         disabled={disabled}

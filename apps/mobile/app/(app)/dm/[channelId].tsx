@@ -17,6 +17,10 @@ import { useProfile } from '@/hooks/use-profile';
 import { useMessages } from '@/hooks/use-messages';
 import {
   sendTextMessage,
+  sendFileMessage,
+  sendFilesMessage,
+  uploadChannelFile,
+  buildMessageStoragePath,
   deleteMessage,
   markChannelReadState,
   fetchChannelReadState,
@@ -35,6 +39,8 @@ import { MessageActionsSheet } from '@/components/messages/message-actions-sheet
 import { ChannelInfoSheet } from '@/components/messages/channel-info-sheet';
 import { MessageBubblesSkeleton } from '@/components/skeletons';
 import { buildMobileChannelEmptyStateCopy } from '@/lib/message-empty-state';
+import type { AttachmentPayload } from '@/components/messages/attachment-sheet';
+import type { PendingUpload } from '@/components/messages/pending-message-row';
 
 export default function DmConversationScreen() {
   const {
@@ -169,6 +175,7 @@ export default function DmConversationScreen() {
 
   // ── Info sheet state ──
   const [infoVisible, setInfoVisible] = useState(false);
+  const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
 
   // ── Long-press actions sheet state ──
   const [actionsMessage, setActionsMessage] = useState<MessageVM | null>(null);
@@ -209,6 +216,178 @@ export default function DmConversationScreen() {
       }
     },
     [channelId, profileId, orgId, threadReplyTarget, refetch],
+  );
+
+  const handleSendAttachment = useCallback(
+    async (attachments: AttachmentPayload[], caption?: string) => {
+      if (!channelId || !profileId || !orgId || !attachments.length) return;
+
+      const type: PendingUpload['type'] =
+        attachments[0].mimeType === 'audio/mp4'
+          ? 'audio'
+          : attachments[0].mimeType.startsWith('image/')
+            ? 'image'
+            : 'file';
+
+      const pendingId = `pending-${Date.now()}`;
+
+      setPendingUploads((prev) => [
+        ...prev,
+        {
+          id: pendingId,
+          type,
+          attachments,
+          senderName,
+          createdAt: new Date().toISOString(),
+          caption,
+        },
+      ]);
+
+      try {
+        if (type === 'audio') {
+          const attachment = attachments[0];
+          const storagePath = buildMessageStoragePath(
+            orgId,
+            channelId,
+            profileId,
+            attachment.mimeType,
+            attachment.name,
+          );
+          await uploadChannelFile(
+            attachment.uri,
+            storagePath,
+            attachment.mimeType,
+            attachment.base64,
+          );
+          await sendFileMessage(
+            channelId,
+            profileId,
+            orgId,
+            { ...attachment, storagePath },
+            caption,
+          );
+        } else {
+          const uploaded = await Promise.all(
+            attachments.map(async (attachment) => {
+              const storagePath = buildMessageStoragePath(
+                orgId,
+                channelId,
+                profileId,
+                attachment.mimeType,
+                attachment.name,
+              );
+              await uploadChannelFile(
+                attachment.uri,
+                storagePath,
+                attachment.mimeType,
+                attachment.base64,
+              );
+              return { ...attachment, storagePath };
+            }),
+          );
+
+          if (uploaded.length === 1) {
+            await sendFileMessage(channelId, profileId, orgId, uploaded[0], caption);
+          } else {
+            await sendFilesMessage(channelId, profileId, orgId, uploaded, caption);
+          }
+        }
+
+        setPendingUploads((prev) => prev.filter((upload) => upload.id !== pendingId));
+      } catch {
+        setPendingUploads((prev) =>
+          prev.map((upload) =>
+            upload.id === pendingId ? { ...upload, failed: true } : upload,
+          ),
+        );
+      }
+    },
+    [channelId, profileId, orgId, senderName],
+  );
+
+  const handleRetryUpload = useCallback(
+    async (pendingId: string) => {
+      const pending = pendingUploads.find((upload) => upload.id === pendingId);
+      if (!pending || !channelId || !profileId || !orgId) return;
+
+      setPendingUploads((prev) =>
+        prev.map((upload) =>
+          upload.id === pendingId ? { ...upload, failed: false } : upload,
+        ),
+      );
+
+      try {
+        if (pending.type === 'audio') {
+          const attachment = pending.attachments[0];
+          const storagePath = buildMessageStoragePath(
+            orgId,
+            channelId,
+            profileId,
+            attachment.mimeType,
+            attachment.name,
+          );
+          await uploadChannelFile(
+            attachment.uri,
+            storagePath,
+            attachment.mimeType,
+            attachment.base64,
+          );
+          await sendFileMessage(
+            channelId,
+            profileId,
+            orgId,
+            { ...attachment, storagePath },
+            pending.caption,
+          );
+        } else {
+          const uploaded = await Promise.all(
+            pending.attachments.map(async (attachment) => {
+              const storagePath = buildMessageStoragePath(
+                orgId,
+                channelId,
+                profileId,
+                attachment.mimeType,
+                attachment.name,
+              );
+              await uploadChannelFile(
+                attachment.uri,
+                storagePath,
+                attachment.mimeType,
+                attachment.base64,
+              );
+              return { ...attachment, storagePath };
+            }),
+          );
+
+          if (uploaded.length === 1) {
+            await sendFileMessage(
+              channelId,
+              profileId,
+              orgId,
+              uploaded[0],
+              pending.caption,
+            );
+          } else {
+            await sendFilesMessage(
+              channelId,
+              profileId,
+              orgId,
+              uploaded,
+              pending.caption,
+            );
+          }
+        }
+
+        setPendingUploads((prev) => prev.filter((upload) => upload.id !== pendingId));
+      } catch {
+        setPendingUploads((prev) =>
+          prev.map((upload) =>
+            upload.id === pendingId ? { ...upload, failed: true } : upload,
+          ),
+        );
+      }
+    },
+    [pendingUploads, channelId, profileId, orgId],
   );
 
   // ── Delete message ──
@@ -291,6 +470,8 @@ export default function DmConversationScreen() {
             messages={messages ?? []}
             currentProfileId={profileId}
             currentAccountId={accountId}
+            pendingUploads={pendingUploads}
+            onRetryUpload={handleRetryUpload}
             lastReadMessageId={channelReadState?.lastReadMessageId ?? null}
             unreadCount={channelReadState?.unreadCount ?? 0}
             onLoadMore={loadMore}
@@ -330,7 +511,9 @@ export default function DmConversationScreen() {
         ) : (
           <MessageInput
             onSend={handleSend}
+            onSendAttachment={handleSendAttachment}
             placeholder={`Message ${topic ?? ''}…`}
+            uploading={pendingUploads.some((upload) => !upload.failed)}
             onTypingChange={broadcastTyping}
             onTypingStop={broadcastTypingStop}
             replyTo={threadReplyTarget}

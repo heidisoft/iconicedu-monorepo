@@ -85,3 +85,66 @@ jest.mock('react-native-safe-area-context', () => {
     useSafeAreaFrame: () => ({ x: 0, y: 0, width: 390, height: 844 }),
   };
 });
+
+jest.mock('react-native-reanimated', () => {
+  const React = require('react');
+  const { Image, View } = require('react-native');
+
+  const AnimatedComponent = React.forwardRef((props, ref) =>
+    React.createElement(View, { ...props, ref }, props.children),
+  );
+  const AnimatedImage = React.forwardRef((props, ref) =>
+    React.createElement(Image, { ...props, ref }),
+  );
+
+  return {
+    __esModule: true,
+    default: {
+      View: AnimatedComponent,
+      Image: AnimatedImage,
+      createAnimatedComponent: () => AnimatedComponent,
+    },
+    View: AnimatedComponent,
+    Image: AnimatedImage,
+    createAnimatedComponent: () => AnimatedComponent,
+    clamp: (value, lowerBound, upperBound) =>
+      Math.min(Math.max(value, lowerBound), upperBound),
+    useSharedValue: (initialValue) => ({ value: initialValue }),
+    useAnimatedStyle: (updater) => updater(),
+  };
+});
+
+jest.mock('react-native-gesture-handler', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+
+  const chainableGesture = {
+    onUpdate: jest.fn().mockReturnThis(),
+    onEnd: jest.fn().mockReturnThis(),
+    onStart: jest.fn().mockReturnThis(),
+    enabled: jest.fn().mockReturnThis(),
+  };
+
+  return {
+    GestureHandlerRootView: ({ children, ...props }) =>
+      React.createElement(View, props, children),
+    GestureDetector: ({ children }) => children,
+    Gesture: {
+      Pinch: jest.fn(() => ({ ...chainableGesture })),
+      Pan: jest.fn(() => ({ ...chainableGesture })),
+      Tap: jest.fn(() => ({ ...chainableGesture })),
+      Race: jest.fn((...gestures) => gestures[0]),
+      Simultaneous: jest.fn((...gestures) => gestures[0]),
+      Exclusive: jest.fn((...gestures) => gestures[0]),
+    },
+  };
+});
+
+jest.mock('react-native-webview', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+
+  return {
+    WebView: ({ children, ...props }) => React.createElement(View, props, children),
+  };
+});

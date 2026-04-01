@@ -65,6 +65,8 @@ import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '@/lib/supabase/client';
 import { RoleAvatarBadge } from '@/components/profile/role-avatar-badge';
 import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
+import { ChatImageViewer, type ChatImageViewerItem } from './chat-image-viewer';
+import { ChatPdfViewer } from './chat-pdf-viewer';
 
 const CHANNEL_FILES_BUCKET = 'channel-files';
 
@@ -82,6 +84,15 @@ function formatFileSize(bytes?: number): string {
   if (!bytes) return '';
   if (bytes < 1_048_576) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / 1_048_576).toFixed(1)} MB`;
+}
+
+function isPdfAttachment(input: {
+  name?: string | null;
+  mimeType?: string | null;
+}): boolean {
+  const mimeType = input.mimeType?.toLowerCase() ?? '';
+  const name = input.name?.toLowerCase() ?? '';
+  return mimeType === 'application/pdf' || name.endsWith('.pdf');
 }
 
 type AvatarInfo = { url: string | null; seed: string };
@@ -1667,6 +1678,13 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   const [openingFile, setOpeningFile] = useState<string | null>(null);
   const [imageSignedUrls, setImageSignedUrls] = useState<Record<string, string>>({});
   const [audioSignedUrl, setAudioSignedUrl] = useState<string | null>(null);
+  const [imageViewerVisible, setImageViewerVisible] = useState(false);
+  const [imageViewerIndex, setImageViewerIndex] = useState(0);
+  const [pdfViewerDocument, setPdfViewerDocument] = useState<{
+    url: string;
+    storagePath?: string | null;
+    filename?: string | null;
+  } | null>(null);
 
   // Release sound when the message item unmounts
   useEffect(() => {
@@ -1839,6 +1857,28 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     [openingFile],
   );
 
+  const imageViewerItems = useMemo<ChatImageViewerItem[]>(() => {
+    if (type !== 'image') return [];
+    const im = message as ImageMessageVM;
+    const attachments: ImageAttachmentVM[] = im.attachments?.length
+      ? im.attachments
+      : im.attachment
+        ? [im.attachment]
+        : [];
+    return attachments.map((att, index) => ({
+      key: att.storagePath ?? `${message.ids.id}-${index}`,
+      originalUrl: att.url,
+      previewUrl: att.storagePath ? imageSignedUrls[att.storagePath] : att.url,
+      storagePath: att.storagePath,
+      filename: att.name ?? null,
+    }));
+  }, [type, message, imageSignedUrls]);
+
+  const openImageViewer = useCallback((index: number) => {
+    setImageViewerIndex(index);
+    setImageViewerVisible(true);
+  }, []);
+
   const handleThreadPress = useCallback(async () => {
     if (!thread) {
       onThreadOpen?.(message);
@@ -1927,38 +1967,18 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           /* Gallery: 2-column grid with gap, each item gets its own border+radius */
           <View style={s.imageGalleryWrapper}>
             {attachments.map((att, i) => {
-              const fileKey = att.storagePath ?? att.url;
-              const isOpening = openingFile === fileKey;
               return (
                 <TouchableOpacity
                   key={`${att.url}-${i}`}
                   style={s.galleryItem}
                   activeOpacity={0.9}
-                  onPress={() => handleFileOpen(att.url, att.storagePath)}
-                  disabled={isOpening}
+                  onPress={() => openImageViewer(i)}
                 >
                   <Image
                     source={{ uri: displayUrl(att) }}
                     style={s.galleryItemImg}
                     resizeMode="cover"
                   />
-                  <View style={s.imageDownloadBtn} pointerEvents="none">
-                    <Download size={14} color="#fff" />
-                  </View>
-                  {isOpening && (
-                    <View
-                      style={[
-                        StyleSheet.absoluteFill,
-                        {
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          backgroundColor: 'rgba(0,0,0,0.35)',
-                        },
-                      ]}
-                    >
-                      <ActivityIndicator color="#fff" />
-                    </View>
-                  )}
                 </TouchableOpacity>
               );
             })}
@@ -1966,33 +1986,12 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         ) : (
           /* Single image: rounded card with border, download btn overlay */
           <View style={[s.imageWrapper, { backgroundColor: colors.card }]}>
-            <TouchableOpacity
-              activeOpacity={0.9}
-              onPress={() => handleFileOpen(first.url, first.storagePath)}
-              disabled={openingFile === (first.storagePath ?? first.url)}
-            >
+            <TouchableOpacity activeOpacity={0.9} onPress={() => openImageViewer(0)}>
               <Image
                 source={{ uri: displayUrl(first) }}
                 style={[s.imagePreview, { aspectRatio: singleAspect }]}
                 resizeMode="cover"
               />
-              <View style={s.imageDownloadBtn} pointerEvents="none">
-                <Download size={14} color="#fff" />
-              </View>
-              {openingFile === (first.storagePath ?? first.url) && (
-                <View
-                  style={[
-                    StyleSheet.absoluteFill,
-                    {
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      backgroundColor: 'rgba(0,0,0,0.35)',
-                    },
-                  ]}
-                >
-                  <ActivityIndicator color="#fff" />
-                </View>
-              )}
             </TouchableOpacity>
           </View>
         )}
@@ -2040,7 +2039,15 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                     borderTopColor: colors.border,
                   },
                 ]}
-                onPress={() => handleFileOpen(att.url, att.storagePath)}
+                onPress={() =>
+                  isPdfAttachment(att)
+                    ? setPdfViewerDocument({
+                        url: att.url,
+                        storagePath: att.storagePath,
+                        filename: att.name,
+                      })
+                    : handleFileOpen(att.url, att.storagePath)
+                }
                 disabled={isOpening}
                 accessibilityLabel={`Open ${att.name}`}
               >
@@ -2480,97 +2487,121 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   // ── Bubble messages (text, file, audio, image) ────────────────────────────
 
   return (
-    <Pressable
-      onLongPress={() => onLongPress?.(message)}
-      delayLongPress={350}
-      style={[s.row, isOwn && s.rowOwn, isGroupStart && s.rowGroupStart]}
-    >
-      {/* Avatar slot */}
-      <View style={s.avatarSlot}>
-        {isGroupStart && (
-          <MessageAvatar
-            name={senderDisplayName}
-            src={avatarUrl}
-            seed={avatarSeed}
-            role={senderRole}
-          />
-        )}
-      </View>
+    <>
+      <Pressable
+        onLongPress={() => onLongPress?.(message)}
+        delayLongPress={350}
+        style={[s.row, isOwn && s.rowOwn, isGroupStart && s.rowGroupStart]}
+      >
+        {/* Avatar slot */}
+        <View style={s.avatarSlot}>
+          {isGroupStart && (
+            <MessageAvatar
+              name={senderDisplayName}
+              src={avatarUrl}
+              seed={avatarSeed}
+              role={senderRole}
+            />
+          )}
+        </View>
 
-      {/* Content column */}
-      <View style={[s.contentCol, isOwn && s.contentColOwn]}>
-        {/* Name + time above bubble */}
-        {isGroupStart && (
-          <View style={s.nameRow}>
-            {!isOwn && (
-              <RoleNameIndicator
-                name={senderDisplayName}
-                role={senderRole}
-                textStyle={[s.senderName, { color: senderColor(senderDisplayName) }]}
-              />
-            )}
-            <Text style={s.msgTime}>{time}</Text>
-          </View>
-        )}
-        {/* Dedicated layouts for rich message types; text/cards use bubble */}
-        {type === 'image' ? (
-          renderImageContent()
-        ) : type === 'file' ? (
-          renderFileContent()
-        ) : type === 'audio-recording' ? (
-          renderAudioSection()
-        ) : type === 'link-preview' ? (
-          renderLinkContent()
-        ) : (
-          <View style={[s.bubble, isOwn ? s.bubbleOwn : s.bubbleOther]}>
-            {renderBubbleContent()}
-          </View>
-        )}
-
-        {/* Reactions + thread pill in one row */}
-        <SocialBar
-          reactions={reactions}
-          thread={thread}
-          threadUnreadCount={threadUnreadCount}
-          messageId={message.ids.id}
-          colors={colors}
-          onReactionToggle={isReadOnly ? undefined : onReactionToggle}
-          onThreadPress={handleThreadPress}
-          threadExpanded={threadExpanded}
-          hideActions={hideActions}
-          disabledActions={isReadOnly ?? false}
-        />
-
-        {/* Inline thread replies */}
-        {threadExpanded && (
-          <View style={[s.inlineThread, isOwn && s.inlineThreadOwn]}>
-            <View style={[s.threadLine, { backgroundColor: colors.border }]} />
-            <View style={s.inlineReplies}>
-              {threadLoading ? (
-                <View style={{ paddingVertical: 8, alignItems: 'center' }}>
-                  <ActivityIndicator size="small" color={colors.teal} />
-                </View>
-              ) : (
-                <>
-                  {threadReplies.map((reply, replyIndex) => (
-                    <React.Fragment key={reply.ids.id}>
-                      {inlineUnreadStartIndex === replyIndex && (
-                        <InlineUnreadDivider count={threadUnreadCount} colors={colors} />
-                      )}
-                      <InlineReply message={reply} colors={colors} />
-                    </React.Fragment>
-                  ))}
-                  <ThreadReplyButton
-                    colors={colors}
-                    onPress={handleThreadReplyPress}
-                    disabled={isReadOnly ?? false}
-                  />
-                </>
+        {/* Content column */}
+        <View style={[s.contentCol, isOwn && s.contentColOwn]}>
+          {/* Name + time above bubble */}
+          {isGroupStart && (
+            <View style={s.nameRow}>
+              {!isOwn && (
+                <RoleNameIndicator
+                  name={senderDisplayName}
+                  role={senderRole}
+                  textStyle={[s.senderName, { color: senderColor(senderDisplayName) }]}
+                />
               )}
+              <Text style={s.msgTime}>{time}</Text>
             </View>
-          </View>
-        )}
-      </View>
-    </Pressable>
+          )}
+          {/* Dedicated layouts for rich message types; text/cards use bubble */}
+          {type === 'image' ? (
+            renderImageContent()
+          ) : type === 'file' ? (
+            renderFileContent()
+          ) : type === 'audio-recording' ? (
+            renderAudioSection()
+          ) : type === 'link-preview' ? (
+            renderLinkContent()
+          ) : (
+            <View style={[s.bubble, isOwn ? s.bubbleOwn : s.bubbleOther]}>
+              {renderBubbleContent()}
+            </View>
+          )}
+
+          {/* Reactions + thread pill in one row */}
+          <SocialBar
+            reactions={reactions}
+            thread={thread}
+            threadUnreadCount={threadUnreadCount}
+            messageId={message.ids.id}
+            colors={colors}
+            onReactionToggle={isReadOnly ? undefined : onReactionToggle}
+            onThreadPress={handleThreadPress}
+            threadExpanded={threadExpanded}
+            hideActions={hideActions}
+            disabledActions={isReadOnly ?? false}
+          />
+
+          {/* Inline thread replies */}
+          {threadExpanded && (
+            <View style={[s.inlineThread, isOwn && s.inlineThreadOwn]}>
+              <View style={[s.threadLine, { backgroundColor: colors.border }]} />
+              <View style={s.inlineReplies}>
+                {threadLoading ? (
+                  <View style={{ paddingVertical: 8, alignItems: 'center' }}>
+                    <ActivityIndicator size="small" color={colors.teal} />
+                  </View>
+                ) : (
+                  <>
+                    {threadReplies.map((reply, replyIndex) => (
+                      <React.Fragment key={reply.ids.id}>
+                        {inlineUnreadStartIndex === replyIndex && (
+                          <InlineUnreadDivider
+                            count={threadUnreadCount}
+                            colors={colors}
+                          />
+                        )}
+                        <InlineReply message={reply} colors={colors} />
+                      </React.Fragment>
+                    ))}
+                    <ThreadReplyButton
+                      colors={colors}
+                      onPress={handleThreadReplyPress}
+                      disabled={isReadOnly ?? false}
+                    />
+                  </>
+                )}
+              </View>
+            </View>
+          )}
+        </View>
+      </Pressable>
+      {type === 'image' && (
+        <ChatImageViewer
+          visible={imageViewerVisible}
+          items={imageViewerItems}
+          initialIndex={imageViewerIndex}
+          colors={colors}
+          onClose={() => setImageViewerVisible(false)}
+        />
+      )}
+      {!!pdfViewerDocument && (
+        <ChatPdfViewer
+          visible={!!pdfViewerDocument}
+          url={pdfViewerDocument.url}
+          storagePath={pdfViewerDocument.storagePath}
+          filename={pdfViewerDocument.filename}
+          colors={colors}
+          onClose={() => setPdfViewerDocument(null)}
+        />
+      )}
+    </>
   );
 };

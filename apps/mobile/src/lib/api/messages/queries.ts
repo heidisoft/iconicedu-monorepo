@@ -1354,15 +1354,54 @@ export async function uploadChannelFile(
   mimeType: string,
   prereadBase64?: string,
 ): Promise<void> {
-  const data: Uint8Array = prereadBase64
-    ? base64ToUint8Array(prereadBase64)
-    : await new ExpoFile(localUri).bytes();
+  const segments = storagePath.split('/');
+  logMessageMutation('uploadChannelFile:start', {
+    bucket: CHANNEL_FILES_BUCKET,
+    storagePath,
+    mimeType,
+    localUri,
+    hasBase64: Boolean(prereadBase64),
+    pathOrgId: segments[0] ?? null,
+    pathChannelId: segments[1] ?? null,
+    pathKind: segments[2] ?? null,
+    pathProfileId: segments[3] ?? null,
+    pathFileKey: segments.slice(4).join('/') || null,
+  });
 
-  const { error } = await supabase.storage
-    .from(CHANNEL_FILES_BUCKET)
-    .upload(storagePath, data, { contentType: mimeType, upsert: false });
+  try {
+    const data: Uint8Array = prereadBase64
+      ? base64ToUint8Array(prereadBase64)
+      : await new ExpoFile(localUri).bytes();
 
-  if (error) throw error;
+    const { error } = await supabase.storage
+      .from(CHANNEL_FILES_BUCKET)
+      .upload(storagePath, data, { contentType: mimeType, upsert: false });
+
+    if (error) throw error;
+
+    logMessageMutation('uploadChannelFile:success', {
+      bucket: CHANNEL_FILES_BUCKET,
+      storagePath,
+      mimeType,
+      byteLength: data.byteLength,
+    });
+  } catch (error) {
+    const typedError = error as { code?: string; message?: string; statusCode?: string };
+    logMessageMutation(
+      'uploadChannelFile:error',
+      {
+        bucket: CHANNEL_FILES_BUCKET,
+        storagePath,
+        mimeType,
+        localUri,
+        errorCode: typedError.code ?? null,
+        errorStatusCode: typedError.statusCode ?? null,
+        errorMessage: typedError.message ?? String(error),
+      },
+      'error',
+    );
+    throw error;
+  }
 }
 
 export type FileAttachmentInput = {
@@ -1382,9 +1421,15 @@ export async function sendFileMessage(
   threadParentId?: string,
   threadId?: string,
 ) {
-  const resolvedSenderProfileId = await resolveWritableSenderProfileId(
+  const writableSenderProfileId = await resolveWritableSenderProfileId(
     orgId,
     senderProfileId,
+  );
+  const resolvedSenderProfileId = await resolveDmSenderProfileId(
+    orgId,
+    channelId,
+    senderProfileId,
+    writableSenderProfileId,
   );
   const isImage = file.mimeType.startsWith('image/');
   const isAudio = file.mimeType.startsWith('audio/');
@@ -1403,18 +1448,16 @@ export async function sendFileMessage(
   });
 
   try {
-    const { data: msg, error: msgError } = await supabase
-      .from('messages')
-      .insert({
-        channel_id: channelId,
-        sender_profile_id: resolvedSenderProfileId,
-        org_id: orgId,
-        type,
-        thread_parent_id: threadParentId ?? null,
-        ...(threadId ? { thread_id: threadId } : {}),
-      })
-      .select('id')
-      .single();
+    const messageId = createClientUuid();
+    const { error: msgError } = await supabase.from('messages').insert({
+      id: messageId,
+      channel_id: channelId,
+      sender_profile_id: resolvedSenderProfileId,
+      org_id: orgId,
+      type,
+      thread_parent_id: threadParentId ?? null,
+      ...(threadId ? { thread_id: threadId } : {}),
+    });
 
     if (msgError) throw msgError;
 
@@ -1435,7 +1478,7 @@ export async function sendFileMessage(
         : 'message_file';
     const { error: payloadError } = await supabase
       .from(table)
-      .insert({ message_id: msg.id, org_id: orgId, payload });
+      .insert({ message_id: messageId, org_id: orgId, payload });
 
     if (payloadError) throw payloadError;
 
@@ -1444,12 +1487,12 @@ export async function sendFileMessage(
       channelId,
       senderProfileId,
       resolvedSenderProfileId,
-      messageId: msg.id,
+      messageId,
       table,
       type,
     });
 
-    return msg;
+    return { id: messageId };
   } catch (error) {
     const typedError = error as { code?: string; message?: string };
     logMessageMutation(
@@ -1484,9 +1527,15 @@ export async function sendFilesMessage(
   threadId?: string,
 ) {
   if (!files.length) throw new Error('No files provided');
-  const resolvedSenderProfileId = await resolveWritableSenderProfileId(
+  const writableSenderProfileId = await resolveWritableSenderProfileId(
     orgId,
     senderProfileId,
+  );
+  const resolvedSenderProfileId = await resolveDmSenderProfileId(
+    orgId,
+    channelId,
+    senderProfileId,
+    writableSenderProfileId,
   );
   const allImages = files.every((file) => file.mimeType.startsWith('image/'));
   const type = allImages ? 'image' : 'file';
@@ -1508,18 +1557,16 @@ export async function sendFilesMessage(
   });
 
   try {
-    const { data: msg, error: msgError } = await supabase
-      .from('messages')
-      .insert({
-        channel_id: channelId,
-        sender_profile_id: resolvedSenderProfileId,
-        org_id: orgId,
-        type,
-        thread_parent_id: threadParentId ?? null,
-        ...(threadId ? { thread_id: threadId } : {}),
-      })
-      .select('id')
-      .single();
+    const messageId = createClientUuid();
+    const { error: msgError } = await supabase.from('messages').insert({
+      id: messageId,
+      channel_id: channelId,
+      sender_profile_id: resolvedSenderProfileId,
+      org_id: orgId,
+      type,
+      thread_parent_id: threadParentId ?? null,
+      ...(threadId ? { thread_id: threadId } : {}),
+    });
 
     if (msgError) throw msgError;
 
@@ -1540,7 +1587,7 @@ export async function sendFilesMessage(
     const table = allImages ? 'message_image' : 'message_file';
     const { error: payloadError } = await supabase
       .from(table)
-      .insert({ message_id: msg.id, org_id: orgId, payload });
+      .insert({ message_id: messageId, org_id: orgId, payload });
 
     if (payloadError) throw payloadError;
 
@@ -1549,13 +1596,13 @@ export async function sendFilesMessage(
       channelId,
       senderProfileId,
       resolvedSenderProfileId,
-      messageId: msg.id,
+      messageId,
       table,
       type,
       fileCount: files.length,
     });
 
-    return msg;
+    return { id: messageId };
   } catch (error) {
     const typedError = error as { code?: string; message?: string };
     logMessageMutation(
