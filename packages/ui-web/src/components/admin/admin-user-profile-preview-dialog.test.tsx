@@ -62,4 +62,29 @@ describe('AdminUserProfilePreviewDialog', () => {
     expect(screen.getByText('child-profile-1')).toBeInTheDocument();
     expect(screen.getByText('family-1')).toBeInTheDocument();
   });
+
+  it('uses a constrained scrollable tab panel layout', () => {
+    render(
+      <AdminUserProfilePreviewDialog
+        open
+        onOpenChange={() => undefined}
+        account={{
+          ids: { id: 'account-1', orgId: 'org-1' },
+          contacts: { email: 'jamie@example.com' },
+          lifecycle: {
+            status: 'active',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-02T00:00:00.000Z',
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByRole('dialog')).toHaveClass('max-h-[90vh]', 'overflow-hidden');
+    expect(screen.getByTestId('scroll-shell-account')).toHaveClass(
+      'min-h-0',
+      'overflow-y-auto',
+      'flex-1',
+    );
+  });
 });
