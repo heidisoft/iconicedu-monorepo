@@ -474,6 +474,26 @@ export async function fetchChannels(orgId: string): Promise<ChannelListItem[]> {
   });
 }
 
+export async function fetchIsChannelMember(
+  orgId: string,
+  channelId: string,
+  profileId: string,
+): Promise<boolean> {
+  if (!orgId || !channelId || !profileId) return false;
+
+  const { data, error } = await supabase
+    .from('channel_members')
+    .select('channel_id')
+    .eq('org_id', orgId)
+    .eq('channel_id', channelId)
+    .eq('profile_id', profileId)
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  if (error) throw error;
+  return Boolean(data);
+}
+
 export async function fetchNotificationPreferences(orgId: string, profileId: string) {
   const { data, error } = await supabase
     .from('notification_preferences')

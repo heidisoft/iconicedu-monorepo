@@ -8,9 +8,9 @@
   },
   "scripts": {
     "----------- DEVELOPMENT -----------": "",
-    "dev": "turbo run dev",
+    "dev": "node scripts/dev.mjs",
     "dev:web": "turbo run dev --filter=web --filter=@iconicedu/ui-web",
-    "dev:mobile": "turbo run dev --filter=mobile --filter=@iconicedu/ui-native",
+    "dev:mobile": "pnpm run mobile:start",
     "dev:api": "turbo run dev --filter=api",
     "----------- BUILD -----------": "",
     "build": "turbo run build",

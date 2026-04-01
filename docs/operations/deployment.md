@@ -104,7 +104,7 @@ pnpm mobile:eas:build:dev
 Install the resulting build on your device, then start the dev server:
 
 ```bash
-pnpm dev:mobile
+pnpm mobile:start
 ```
 
 ### Preview build

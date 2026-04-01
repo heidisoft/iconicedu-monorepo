@@ -107,22 +107,65 @@ function getDisplayScheduleOccurrenceIdentity(schedule: DisplaySchedule) {
   return `${baseId}|${schedule.startAt}`;
 }
 
-function dedupeDisplaySchedules(schedules: DisplaySchedule[]) {
-  const deduped = new Map<string, DisplaySchedule>();
+function dedupeDisplaySchedules(
+  schedules: DisplaySchedule[],
+  recurringById?: Map<string, ClassScheduleVM>,
+) {
+  const dedupedByOccurrence = new Map<string, DisplaySchedule>();
 
   schedules.forEach((schedule) => {
     const key = getDisplayScheduleOccurrenceIdentity(schedule);
-    const existing = deduped.get(key);
+    const existing = dedupedByOccurrence.get(key);
 
     if (
       !existing ||
       getDisplaySchedulePriority(schedule) > getDisplaySchedulePriority(existing)
     ) {
-      deduped.set(key, schedule);
+      dedupedByOccurrence.set(key, schedule);
     }
   });
 
-  return Array.from(deduped.values());
+  if (!recurringById) {
+    return Array.from(dedupedByOccurrence.values());
+  }
+
+  const dedupedByDay = new Map<string, DisplaySchedule>();
+
+  dedupedByOccurrence.forEach((schedule) => {
+    const baseId = getDisplayScheduleBaseId(schedule);
+    const baseSchedule = recurringById.get(baseId);
+    const shouldDedupeByDay = baseSchedule?.recurrence?.rule.frequency === 'daily';
+
+    if (!shouldDedupeByDay) {
+      dedupedByDay.set(getDisplayScheduleOccurrenceIdentity(schedule), schedule);
+      return;
+    }
+
+    const key = `${baseId}|${getOccurrenceDayKey(schedule.startAt, baseSchedule)}`;
+    const existing = dedupedByDay.get(key);
+
+    if (!existing) {
+      dedupedByDay.set(key, schedule);
+      return;
+    }
+
+    const schedulePriority = getDisplaySchedulePriority(schedule);
+    const existingPriority = getDisplaySchedulePriority(existing);
+
+    if (schedulePriority > existingPriority) {
+      dedupedByDay.set(key, schedule);
+      return;
+    }
+
+    if (
+      schedulePriority === existingPriority &&
+      new Date(schedule.startAt).getTime() < new Date(existing.startAt).getTime()
+    ) {
+      dedupedByDay.set(key, schedule);
+    }
+  });
+
+  return Array.from(dedupedByDay.values());
 }
 
 export interface ClassSession {
@@ -273,7 +316,10 @@ export function expandSchedulesForDisplay(
     };
   });
 
-  return dedupeDisplaySchedules([...normalizedNonRecurring, ...normalizedRecurring]);
+  return dedupeDisplaySchedules(
+    [...normalizedNonRecurring, ...normalizedRecurring],
+    recurringById,
+  );
 }
 
 export function splitSchedulesByTimeline(

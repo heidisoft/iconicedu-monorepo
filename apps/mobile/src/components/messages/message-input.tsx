@@ -79,7 +79,7 @@ function makeStyles(C: AppColors, bottomInset: number, keyboardVisible: boolean)
       paddingHorizontal: 16,
       paddingVertical: 8,
       backgroundColor: C.bg,
-      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopWidth: 1,
       borderTopColor: C.border,
       gap: 10,
     },
@@ -105,7 +105,7 @@ function makeStyles(C: AppColors, bottomInset: number, keyboardVisible: boolean)
     // Attachment preview strip (sits above the bar, same pattern as reply preview)
     attachPreview: {
       backgroundColor: C.bg,
-      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopWidth: 1,
       borderTopColor: C.border,
       paddingVertical: 10,
     },

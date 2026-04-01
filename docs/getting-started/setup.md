@@ -385,6 +385,8 @@ This builds `shared-types`, `ui-web`, `ui-native`, and `utils` in dependency ord
 pnpm dev
 ```
 
+This starts web, API, shared package watchers, and mobile together. The mobile process uses the same direct Expo startup path as `pnpm mobile:start`, so Expo terminal shortcuts like `i` and `a` still work.
+
 ### Web only (recommended during web development)
 
 ```bash
@@ -429,9 +431,9 @@ supabase status
 ```
 
 3. Open the Mailpit URL shown in the output.
-   The default local URL is usually `http://127.0.0.1:54324`.
+   Use the `supabase status` output as the source of truth for local Supabase URLs such as Studio and Mailpit instead of assuming default ports.
 
-4. Trigger the auth flow in the local web app:
+4. Trigger the auth flow in the local web app with one of the seeded test emails:
    sign in, request an OTP, create an account, or start a password reset.
 
 5. Find the captured email in Mailpit and open it.
@@ -455,7 +457,7 @@ supabase status --output json
 3. Install simulators: Xcode → Settings → Platforms → iOS
 
 ```bash
-pnpm dev:mobile
+pnpm mobile:start
 # then press 'i'
 ```
 
@@ -466,7 +468,7 @@ pnpm dev:mobile
 3. Create a device with API level 33+
 
 ```bash
-pnpm dev:mobile
+pnpm mobile:start
 # then press 'a'
 ```
 
@@ -551,7 +553,7 @@ Shared packages haven't been built yet:
 pnpm build:packages
 ```
 
-Then restart the Metro bundler with `pnpm dev:mobile`.
+Then restart the Metro bundler with `pnpm mobile:start`.
 
 ### Metro starts but the app crashes on device
 

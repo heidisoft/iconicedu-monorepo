@@ -406,7 +406,7 @@ print_next_steps() {
   echo "  1. Review optional unset env vars above if you need those integrations locally"
   echo "  2. pnpm dev:api    — start NestJS API"
   echo "  3. pnpm dev:web    — start Next.js web app"
-  echo "  4. pnpm dev:mobile — start Expo mobile app"
+  echo "  4. pnpm mobile:start — start Expo mobile app"
   echo "  OR: pnpm dev       — start all three in parallel"
   echo ""
 }

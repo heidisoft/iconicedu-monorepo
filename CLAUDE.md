@@ -9,7 +9,7 @@ The canonical project-specific AI guidance now lives at [docs/internal/ai/agents
 ```bash
 pnpm dev
 pnpm dev:web
-pnpm dev:mobile
+pnpm mobile:start
 pnpm dev:api
 pnpm build:packages
 pnpm lint

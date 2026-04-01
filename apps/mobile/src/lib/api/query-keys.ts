@@ -9,6 +9,8 @@ export const queryKeys = {
     ['messages', channelId, profileId] as const,
   channelReadState: (channelId: string, accountId: string) =>
     ['channelReadState', channelId, accountId] as const,
+  channelMembership: (orgId: string, channelId: string, profileId: string) =>
+    ['channelMembership', orgId, channelId, profileId] as const,
   learningSpaces: (orgId: string) => ['learningSpaces', orgId] as const,
   learningSpace: (spaceId: string) => ['learningSpace', spaceId] as const,
   supportChannel: (orgId: string) => ['supportChannel', orgId] as const,

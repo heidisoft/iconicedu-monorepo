@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
+import { File as ExpoFile } from 'expo-file-system';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import {
   AudioModule,
   RecordingPresets,
@@ -56,6 +58,100 @@ const ALLOWED_DOC_TYPES = [
   'text/csv',
   'application/rtf',
 ];
+
+const WEB_SAFE_IMAGE_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+]);
+
+function inferImageExtension(input: {
+  mimeType?: string | null;
+  name?: string | null;
+  uri?: string | null;
+}) {
+  const mimeType = input.mimeType?.trim().toLowerCase();
+  if (mimeType?.includes('/')) {
+    return mimeType.split('/')[1] ?? null;
+  }
+
+  const source = input.name?.trim() || input.uri?.trim() || '';
+  const match = source.match(/\.([a-z0-9]+)(?:\?|$)/i);
+  return match?.[1]?.toLowerCase() ?? null;
+}
+
+export function shouldNormalizeImageToJpeg(input: {
+  mimeType?: string | null;
+  name?: string | null;
+  uri?: string | null;
+}) {
+  const mimeType = input.mimeType?.trim().toLowerCase();
+  if (mimeType && WEB_SAFE_IMAGE_MIME_TYPES.has(mimeType)) {
+    return false;
+  }
+
+  const extension = inferImageExtension(input);
+  if (!extension) {
+    return true;
+  }
+
+  return !['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(extension);
+}
+
+export function buildJpegAttachmentName(name?: string | null) {
+  const trimmed = name?.trim();
+  if (!trimmed) {
+    return `photo_${Date.now()}.jpg`;
+  }
+
+  return trimmed.replace(/\.[^.]+$/, '') + '.jpg';
+}
+
+async function normalizePickedImage(
+  asset: ImagePicker.ImagePickerAsset,
+  index: number,
+): Promise<AttachmentPayload> {
+  const needsNormalization = shouldNormalizeImageToJpeg({
+    mimeType: asset.mimeType,
+    name: asset.fileName,
+    uri: asset.uri,
+  });
+
+  if (!needsNormalization) {
+    const mimeType = asset.mimeType ?? 'image/jpeg';
+    const ext =
+      inferImageExtension({
+        mimeType,
+        name: asset.fileName,
+        uri: asset.uri,
+      }) ?? 'jpg';
+    const name = asset.fileName ?? `photo_${Date.now()}_${index}.${ext}`;
+
+    return {
+      uri: asset.uri,
+      name,
+      mimeType,
+      size: asset.fileSize,
+      base64: asset.base64 ?? undefined,
+    };
+  }
+
+  const normalized = await manipulateAsync(asset.uri, [], {
+    compress: 0.85,
+    format: SaveFormat.JPEG,
+  });
+  const normalizedFile = new ExpoFile(normalized.uri);
+  const normalizedInfo = normalizedFile.info();
+
+  return {
+    uri: normalized.uri,
+    name: buildJpegAttachmentName(asset.fileName ?? `photo_${Date.now()}_${index}`),
+    mimeType: 'image/jpeg',
+    size: normalizedInfo.size ?? asset.fileSize,
+  };
+}
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
@@ -220,18 +316,9 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
         assetCount: result.assets?.length ?? 0,
       });
       if (result.canceled || !result.assets.length) return;
-      const payloads: AttachmentPayload[] = result.assets.map((asset, i) => {
-        const mimeType = asset.mimeType ?? 'image/jpeg';
-        const ext = mimeType.split('/')[1] ?? 'jpg';
-        const name = asset.fileName ?? `photo_${Date.now()}_${i}.${ext}`;
-        return {
-          uri: asset.uri,
-          name,
-          mimeType,
-          size: asset.fileSize,
-          base64: asset.base64 ?? undefined,
-        };
-      });
+      const payloads = await Promise.all(
+        result.assets.map((asset, i) => normalizePickedImage(asset, i)),
+      );
       console.debug('[AttachmentSheet] pickImage:payloads', {
         attachmentCount: payloads.length,
         attachments: payloads.map((payload) => ({

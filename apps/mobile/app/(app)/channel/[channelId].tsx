@@ -26,6 +26,7 @@ import {
   deleteMessage,
   markChannelReadState,
   fetchChannelReadState,
+  fetchIsChannelMember,
   queryKeys,
 } from '@/lib/api/queries';
 import type { AttachmentPayload } from '@/components/messages/attachment-sheet';
@@ -37,6 +38,7 @@ import { TypingIndicator } from '@/components/messages/typing-indicator';
 import { ConversationHeader } from '@/components/messages/conversation-header';
 import { MessageActionsSheet } from '@/components/messages/message-actions-sheet';
 import { ChannelInfoSheet } from '@/components/messages/channel-info-sheet';
+import { ReadOnlyNotice } from '@/components/messages/read-only-notice';
 import { SpaceSessionsTab } from '@/components/messages/space-sessions-tab';
 import { resolveChannelTopicIconKey } from '@/lib/learning-space-icons';
 import { buildMobileChannelEmptyStateCopy } from '@/lib/message-empty-state';
@@ -55,6 +57,7 @@ export default function ChannelConversationScreen() {
     studentProfiles,
     isLearningSpace,
     purpose,
+    isStaffObserverReadOnly,
   } = useLocalSearchParams<{
     channelId: string;
     topic?: string;
@@ -64,6 +67,7 @@ export default function ChannelConversationScreen() {
     studentProfiles?: string;
     isLearningSpace?: string;
     purpose?: string;
+    isStaffObserverReadOnly?: string;
   }>();
   const router = useRouter();
   const isFocused = useIsFocused();
@@ -80,6 +84,14 @@ export default function ChannelConversationScreen() {
     (profileRecord?.display_name as string | undefined)?.trim() ||
     (profileRecord?.first_name as string | undefined)?.trim() ||
     'Me';
+  const profileKind = (profileRecord?.kind as string | undefined) ?? null;
+  const shouldCheckStaffReadOnly =
+    profileKind === 'staff' &&
+    purpose !== 'support' &&
+    !!channelId &&
+    !!profileId &&
+    !!orgId;
+  const initialStaffReadOnly = isStaffObserverReadOnly === '1';
 
   const {
     data: messages,
@@ -104,6 +116,17 @@ export default function ChannelConversationScreen() {
     enabled: !!channelId && !!accountId,
     staleTime: 30_000,
   });
+  const { data: isChannelMember = true } = useQuery({
+    queryKey: queryKeys.channelMembership(orgId, channelId ?? '', profileId),
+    queryFn: () => fetchIsChannelMember(orgId, channelId ?? '', profileId),
+    enabled: shouldCheckStaffReadOnly,
+    initialData: initialStaffReadOnly ? false : undefined,
+    staleTime: 30_000,
+  });
+  const isStaffReadOnly =
+    profileKind === 'staff' &&
+    purpose !== 'support' &&
+    (initialStaffReadOnly || !isChannelMember);
 
   // ── Tab state ──
   const [activeTab, setActiveTab] = useState<ChannelTab>('messages');
@@ -447,6 +470,7 @@ export default function ChannelConversationScreen() {
         kind={isSpaceChannel ? 'space' : 'channel'}
         iconKey={resolvedIconKey}
         themeKey={themeKey ?? null}
+        isReadOnly={isStaffReadOnly}
         onBack={() => router.back()}
         onMore={() => setInfoVisible(true)}
       />
@@ -503,11 +527,12 @@ export default function ChannelConversationScreen() {
             loading={isLoading}
             refreshing={isRefetching}
             onRefresh={refetch}
-            onMessageLongPress={handleLongPress}
-            onReactionToggle={handleReactionToggle}
-            onThreadOpen={handleThreadOpen}
+            onMessageLongPress={isStaffReadOnly ? undefined : handleLongPress}
+            onReactionToggle={isStaffReadOnly ? undefined : handleReactionToggle}
+            onThreadOpen={isStaffReadOnly ? undefined : handleThreadOpen}
             pendingUploads={pendingUploads}
             onRetryUpload={handleRetryUpload}
+            isReadOnly={isStaffReadOnly}
             onUnreadViewed={handleUnreadViewed}
             isScreenActive={isFocused && activeTab === 'messages'}
             emptyTitle={emptyStateCopy.title}
@@ -515,16 +540,20 @@ export default function ChannelConversationScreen() {
             emptyIcon={emptyStateCopy.icon}
           />
           <TypingIndicator typingUsers={typingUsers} />
-          <MessageInput
-            onSend={handleSend}
-            onSendAttachment={handleSendAttachment}
-            placeholder={`Message ${isSpaceChannel ? (topic ?? 'Space') : `#${topic ?? ''}`}…`}
-            onTypingChange={broadcastTyping}
-            onTypingStop={broadcastTypingStop}
-            replyTo={threadReplyTarget}
-            onCancelReply={() => setThreadReplyTarget(null)}
-            uploading={pendingUploads.some((p) => !p.failed)}
-          />
+          {isStaffReadOnly ? (
+            <ReadOnlyNotice />
+          ) : (
+            <MessageInput
+              onSend={handleSend}
+              onSendAttachment={handleSendAttachment}
+              placeholder={`Message ${isSpaceChannel ? (topic ?? 'Space') : `#${topic ?? ''}`}…`}
+              onTypingChange={broadcastTyping}
+              onTypingStop={broadcastTypingStop}
+              replyTo={threadReplyTarget}
+              onCancelReply={() => setThreadReplyTarget(null)}
+              uploading={pendingUploads.some((p) => !p.failed)}
+            />
+          )}
         </KeyboardAvoidingView>
       )}
 
@@ -546,6 +575,7 @@ export default function ChannelConversationScreen() {
         visible={actionsVisible}
         message={actionsMessage}
         isOwn={actionsMessage ? isOwnMessage(actionsMessage) : false}
+        isReadOnly={isStaffReadOnly}
         onClose={() => setActionsVisible(false)}
         onReact={handleReactionToggle}
         onThread={handleThreadOpen}

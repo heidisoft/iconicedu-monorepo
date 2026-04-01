@@ -57,7 +57,7 @@ For full environment setup, Supabase configuration, and troubleshooting, use [do
 ```bash
 pnpm dev
 pnpm dev:web
-pnpm dev:mobile
+pnpm mobile:start
 pnpm dev:api
 pnpm lint
 pnpm typecheck

@@ -16,6 +16,7 @@ import {
   uploadChannelFile,
   buildMessageStoragePath,
   markChannelReadState,
+  fetchIsChannelMember,
   fetchSpaceChannelMetaByChannelId,
   fetchChannelReadState,
   queryKeys,
@@ -26,6 +27,7 @@ import { MessageInput } from '@/components/messages/message-input';
 import { TypingIndicator } from '@/components/messages/typing-indicator';
 import { ConversationHeader } from '@/components/messages/conversation-header';
 import { ChannelInfoSheet } from '@/components/messages/channel-info-sheet';
+import { ReadOnlyNotice } from '@/components/messages/read-only-notice';
 import { SpaceSessionsTab } from '@/components/messages/space-sessions-tab';
 import type { AttachmentPayload } from '@/components/messages/attachment-sheet';
 import { buildMobileChannelEmptyStateCopy } from '@/lib/message-empty-state';
@@ -43,14 +45,16 @@ type PendingUpload = {
 type SpaceTab = 'messages' | 'sessions';
 
 export default function SpaceDetailScreen() {
-  const { channelId, topic, iconKey, themeKey, subtitle, tab } = useLocalSearchParams<{
-    channelId: string;
-    topic?: string;
-    iconKey?: string;
-    themeKey?: string;
-    subtitle?: string;
-    tab?: string;
-  }>();
+  const { channelId, topic, iconKey, themeKey, subtitle, tab, isStaffObserverReadOnly } =
+    useLocalSearchParams<{
+      channelId: string;
+      topic?: string;
+      iconKey?: string;
+      themeKey?: string;
+      subtitle?: string;
+      tab?: string;
+      isStaffObserverReadOnly?: string;
+    }>();
   const router = useRouter();
   const isFocused = useIsFocused();
   const { data: account } = useAccount();
@@ -62,6 +66,9 @@ export default function SpaceDetailScreen() {
     ((account as Record<string, unknown> | undefined)?.id as string) ?? '';
   const profileId =
     ((profile as Record<string, unknown> | undefined)?.id as string) ?? '';
+  const profileKind =
+    ((profile as Record<string, unknown> | undefined)?.kind as string | undefined) ??
+    null;
   const senderName =
     ((
       (profile as Record<string, unknown> | undefined)?.display_name as string | undefined
@@ -70,6 +77,9 @@ export default function SpaceDetailScreen() {
         (profile as Record<string, unknown> | undefined)?.first_name as string | undefined
       )?.trim()) ??
     'Me';
+  const shouldCheckStaffReadOnly =
+    profileKind === 'staff' && !!channelId && !!profileId && !!orgId;
+  const initialStaffReadOnly = isStaffObserverReadOnly === '1';
 
   const { data: messages, isLoading, loadMore } = useMessages(channelId ?? '');
   const { data: spaceMeta, isLoading: isLoadingMeta } = useQuery({
@@ -84,6 +94,15 @@ export default function SpaceDetailScreen() {
     enabled: !!channelId && !!accountId,
     staleTime: 30_000,
   });
+  const { data: isChannelMember = true } = useQuery({
+    queryKey: queryKeys.channelMembership(orgId, channelId ?? '', profileId),
+    queryFn: () => fetchIsChannelMember(orgId, channelId ?? '', profileId),
+    enabled: shouldCheckStaffReadOnly,
+    initialData: initialStaffReadOnly ? false : undefined,
+    staleTime: 30_000,
+  });
+  const isStaffReadOnly =
+    profileKind === 'staff' && (initialStaffReadOnly || !isChannelMember);
 
   const {
     schedules,
@@ -263,6 +282,7 @@ export default function SpaceDetailScreen() {
         studentProfiles={resolvedStudentProfiles}
         iconKey={resolvedIconKey}
         themeKey={resolvedThemeKey}
+        isReadOnly={isStaffReadOnly}
         loading={isLoadingMeta && !spaceMeta && !topic}
         onBack={() => router.back()}
         onMore={() => setInfoVisible(true)}
@@ -306,6 +326,7 @@ export default function SpaceDetailScreen() {
             onLoadMore={loadMore}
             loading={isLoading}
             pendingUploads={pendingUploads}
+            isReadOnly={isStaffReadOnly}
             onUnreadViewed={handleUnreadViewed}
             isScreenActive={isFocused && activeTab === 'messages'}
             emptyTitle={emptyStateCopy.title}
@@ -313,12 +334,16 @@ export default function SpaceDetailScreen() {
             emptyIcon={emptyStateCopy.icon}
           />
           <TypingIndicator typingUsers={[]} />
-          <MessageInput
-            onSend={handleSend}
-            onSendAttachment={handleSendAttachment}
-            placeholder={`Message ${resolvedTitle}…`}
-            uploading={pendingUploads.some((upload) => !upload.failed)}
-          />
+          {isStaffReadOnly ? (
+            <ReadOnlyNotice />
+          ) : (
+            <MessageInput
+              onSend={handleSend}
+              onSendAttachment={handleSendAttachment}
+              placeholder={`Message ${resolvedTitle}…`}
+              uploading={pendingUploads.some((upload) => !upload.failed)}
+            />
+          )}
         </View>
       ) : (
         <View style={[s.flex, { backgroundColor: colors.pageBg }]}>

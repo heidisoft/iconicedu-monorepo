@@ -10,7 +10,7 @@ Internal engineers working day to day in the monorepo.
 
 ## Last Updated
 
-2026-03-23
+2026-04-01
 
 ## Related Docs
 
@@ -26,9 +26,11 @@ Run the full stack or individual applications from the repo root:
 ```bash
 pnpm dev
 pnpm dev:web
-pnpm dev:mobile
+pnpm mobile:start
 pnpm dev:api
 ```
+
+`pnpm mobile:start` is the preferred mobile workflow because it preserves Expo's interactive terminal controls such as `i` for the iOS Simulator and `a` for the Android Emulator. `pnpm dev` also starts mobile with the same direct Expo path while keeping the rest of the stack running in parallel.
 
 Shared packages should be built before first app startup or after structural package changes:
 
@@ -38,17 +40,36 @@ pnpm build:packages
 
 ## Local Service URLs
 
-| Service         | URL                    |
-| --------------- | ---------------------- |
-| Web app         | http://localhost:3000  |
-| API             | http://localhost:3001  |
-| Supabase Studio | http://127.0.0.1:54323 |
-| Supabase API    | http://127.0.0.1:54321 |
-| Email testing   | http://127.0.0.1:54324 |
+App URLs are stable:
+
+| Service | URL                        |
+| ------- | -------------------------- |
+| Web app | http://localhost:3000      |
+| API     | http://localhost:3001      |
+| Swagger | http://localhost:3001/docs |
+
+Supabase local service URLs should be read from the running stack instead of assumed from memory:
+
+```bash
+supabase status
+```
+
+Use that output to open the current local endpoints for:
+
+- Supabase Studio
+- Mailpit
+- Supabase API
+- Database
+
+If you need machine-readable values for scripts or env syncing, use:
+
+```bash
+supabase status --output json
+```
 
 ## Seed Credentials
 
-All seed accounts share the password `Seed123!`:
+Use these seeded test emails for local auth flows:
 
 | Email                          | Role     | Profile   |
 | ------------------------------ | -------- | --------- |
@@ -58,6 +79,16 @@ All seed accounts share the password `Seed123!`:
 | `educator.barbara@example.com` | Educator | Barbara Y |
 | `staff.harold@example.com`     | Staff    | Harold B  |
 | `guardian.jessica@example.com` | Guardian | Jessica K |
+
+For local email OTP or magic-link login:
+
+1. Run `supabase start` if the local stack is not already running.
+2. Run `supabase status` and open the Mailpit URL from the output.
+3. Start the app and enter one of the seeded test emails in the login flow.
+4. Open the captured email in Mailpit.
+5. Copy the OTP code or use the magic link from the email to complete sign-in.
+
+If you are exercising password-based auth instead of OTP, the seeded password is `Seed123!`.
 
 ## Database Workflow
 

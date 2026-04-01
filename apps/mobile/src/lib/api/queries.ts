@@ -17,6 +17,7 @@ export {
   fetchChannels,
   fetchDirectMessages,
   fetchFamilyLinks,
+  fetchIsChannelMember,
   fetchNotificationPreferences,
   fetchProfilesByAccountIds,
   fetchSupervisedDirectMessages,

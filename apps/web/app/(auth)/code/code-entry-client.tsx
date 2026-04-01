@@ -40,19 +40,24 @@ export default function CodeEntryClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
+  const isVerifyingRef = React.useRef(false);
 
   const email = searchParams.get('email')?.trim() ?? '';
   const orgSlug = searchParams.get('org')?.trim() ?? '';
   const intent = resolveIntent(searchParams.get('intent'));
   const backHref = buildAuthEntryPath(intent, orgSlug || null);
-  const callbackParams = new URLSearchParams({ intent });
-  if (intent === 'get-started') {
-    callbackParams.set('source', 'self-signup');
-  }
+  const callbackParams = React.useMemo(() => {
+    const params = new URLSearchParams({ intent });
+    if (intent === 'get-started') {
+      params.set('source', 'self-signup');
+    }
 
-  if (orgSlug) {
-    callbackParams.set('org', orgSlug);
-  }
+    if (orgSlug) {
+      params.set('org', orgSlug);
+    }
+
+    return params;
+  }, [intent, orgSlug]);
 
   const [otp, setOtp] = React.useState('');
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
@@ -73,6 +78,51 @@ export default function CodeEntryClient() {
     return () => window.clearTimeout(timer);
   }, [resendCooldown]);
 
+  const verifyCode = React.useCallback(
+    async (nextOtp: string) => {
+      if (!email || nextOtp.length !== 6) {
+        setErrorMessage('Enter the 6-digit verification code to continue.');
+        return;
+      }
+
+      if (isVerifyingRef.current) {
+        return;
+      }
+
+      isVerifyingRef.current = true;
+      setIsVerifying(true);
+      setErrorMessage(null);
+      setStatusMessage(null);
+
+      const { error } = await supabase.auth.verifyOtp({
+        email,
+        token: nextOtp,
+        type: getEmailOtpType(intent),
+      });
+
+      if (error) {
+        setErrorMessage(error.message);
+        setIsVerifying(false);
+        isVerifyingRef.current = false;
+        return;
+      }
+
+      await trackAuthTelemetry('auth_success', {
+        method: 'email-otp-code',
+        intent,
+        orgSlug: orgSlug || null,
+      });
+      router.replace(`/auth/callback?${callbackParams.toString()}`);
+    },
+    [callbackParams, email, intent, orgSlug, router, supabase],
+  );
+
+  React.useEffect(() => {
+    if (otp.length === 6) {
+      void verifyCode(otp);
+    }
+  }, [otp, verifyCode]);
+
   const handleVerify = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -80,29 +130,7 @@ export default function CodeEntryClient() {
       setErrorMessage('Enter the 6-digit verification code to continue.');
       return;
     }
-
-    setIsVerifying(true);
-    setErrorMessage(null);
-    setStatusMessage(null);
-
-    const { error } = await supabase.auth.verifyOtp({
-      email,
-      token: otp,
-      type: getEmailOtpType(intent),
-    });
-
-    if (error) {
-      setErrorMessage(error.message);
-      setIsVerifying(false);
-      return;
-    }
-
-    await trackAuthTelemetry('auth_success', {
-      method: 'email-otp-code',
-      intent,
-      orgSlug: orgSlug || null,
-    });
-    router.replace(`/auth/callback?${callbackParams.toString()}`);
+    await verifyCode(otp);
   };
 
   const handleResend = async () => {
@@ -172,7 +200,15 @@ export default function CodeEntryClient() {
             <InputOTP
               id="otp"
               value={otp}
-              onChange={setOtp}
+              onChange={(value) => {
+                setOtp(value);
+                if (errorMessage) {
+                  setErrorMessage(null);
+                }
+                if (statusMessage) {
+                  setStatusMessage(null);
+                }
+              }}
               maxLength={6}
               autoComplete="one-time-code"
               required

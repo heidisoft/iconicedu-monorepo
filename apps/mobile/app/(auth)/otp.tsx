@@ -76,6 +76,7 @@ export default function OtpScreen() {
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isVerifyingRef = React.useRef(false);
   const { verifyOtp, signInWithOtp } = useAuth();
   const router = useRouter();
   const { colors } = useTheme();
@@ -86,38 +87,62 @@ export default function OtpScreen() {
     analytics.screen('OTP Verification', { screen_name: 'otp' });
   }, [analytics]);
 
+  const verifyCode = useCallback(
+    async (nextCode: string) => {
+      if (nextCode.length !== OTP_LENGTH) {
+        setError('Please enter the full 6-digit code');
+        return;
+      }
+
+      if (isVerifyingRef.current) {
+        return;
+      }
+
+      isVerifyingRef.current = true;
+      setLoading(true);
+      setError(null);
+
+      const { error: verifyError } = await verifyOtp(email ?? '', nextCode);
+      if (verifyError) {
+        analytics.capture(AnalyticsEvent.OTP_VERIFICATION_FAILED, { error: verifyError });
+        setError(verifyError);
+        setLoading(false);
+        isVerifyingRef.current = false;
+        return;
+      }
+
+      analytics.capture(AnalyticsEvent.OTP_VERIFIED);
+
+      // Session is now stored in SecureStore. fetchOnboardingStatus uses getSession()
+      // (local read, no network hang) to determine where to send the user.
+      try {
+        const status = await fetchOnboardingStatus();
+        if (!status.isComplete) {
+          router.replace('/(auth)/profile-setup');
+        } else {
+          router.replace('/(app)/(tabs)');
+        }
+      } catch {
+        // On error, fall through to app — (app)/_layout will re-check on mount.
+        router.replace('/(app)/(tabs)');
+      }
+    },
+    [analytics, email, router, verifyOtp],
+  );
+
+  React.useEffect(() => {
+    if (code.length === OTP_LENGTH) {
+      void verifyCode(code);
+    }
+  }, [code, verifyCode]);
+
   const handleVerify = useCallback(async () => {
     if (code.length !== OTP_LENGTH) {
       setError('Please enter the full 6-digit code');
       return;
     }
-    setLoading(true);
-    setError(null);
-
-    const { error: verifyError } = await verifyOtp(email ?? '', code);
-    if (verifyError) {
-      analytics.capture(AnalyticsEvent.OTP_VERIFICATION_FAILED, { error: verifyError });
-      setError(verifyError);
-      setLoading(false);
-      return;
-    }
-
-    analytics.capture(AnalyticsEvent.OTP_VERIFIED);
-
-    // Session is now stored in SecureStore. fetchOnboardingStatus uses getSession()
-    // (local read, no network hang) to determine where to send the user.
-    try {
-      const status = await fetchOnboardingStatus();
-      if (!status.isComplete) {
-        router.replace('/(auth)/profile-setup');
-      } else {
-        router.replace('/(app)/(tabs)');
-      }
-    } catch {
-      // On error, fall through to app — (app)/_layout will re-check on mount.
-      router.replace('/(app)/(tabs)');
-    }
-  }, [code, email, verifyOtp, router, analytics]);
+    await verifyCode(code);
+  }, [code, verifyCode]);
 
   const handleResend = useCallback(async () => {
     if (!email) return;
