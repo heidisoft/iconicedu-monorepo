@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import Page from '@iconicedu/web/app/(auth)/[orgSlug]/login/page';
+import Page, {
+  resolveOrgLoginReason,
+} from '@iconicedu/web/app/(auth)/[orgSlug]/login/page';
 
 const redirectMock = vi.fn();
 const notFoundMock = vi.fn();
@@ -48,6 +50,11 @@ vi.mock('@iconicedu/web/app/(auth)/[orgSlug]/login/org-login-client', () => ({
 }));
 
 describe('org login page', () => {
+  it('resolves the session-expired login reason', () => {
+    expect(resolveOrgLoginReason('session-expired')).toBe('session-expired');
+    expect(resolveOrgLoginReason('other')).toBeNull();
+  });
+
   it('redirects authenticated users without org account to org get-started', async () => {
     buildOrgBySlugMock.mockResolvedValueOnce({
       id: 'org-1',

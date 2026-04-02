@@ -8,7 +8,7 @@ import { useNotificationHandler } from '@/hooks/use-notification-handler';
 import { usePushRegistration } from '@/hooks/use-push-registration';
 
 export default function AppLayout() {
-  const { session, loading } = useAuth();
+  const { session, loading, setOnboardingCompletionStatus } = useAuth();
   const { colors } = useTheme();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -38,6 +38,7 @@ export default function AppLayout() {
         staleTime: 5 * 60 * 1000,
       })
       .then((status) => {
+        setOnboardingCompletionStatus(status.isComplete);
         if (!status.isComplete) {
           router.replace('/(auth)/profile-setup');
         }
@@ -47,8 +48,14 @@ export default function AppLayout() {
         // They can complete their profile later from account settings.
       });
     // Re-run only when the authenticated user changes (login/logout).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.user.id]);
+  }, [
+    loading,
+    queryClient,
+    router,
+    session,
+    session?.user.id,
+    setOnboardingCompletionStatus,
+  ]);
 
   if (loading || !session) return null;
 

@@ -15,6 +15,7 @@ import {
 type OrgLoginClientProps = {
   orgSlug: string;
   orgName: string;
+  loginReason?: 'session-expired' | null;
 };
 
 export function resolveOrgLoginCallbackUrl(orgSlug: string): string {
@@ -37,11 +38,20 @@ export function shouldPromptOrgSignUp(
   );
 }
 
-export default function OrgLoginClient({ orgSlug, orgName }: OrgLoginClientProps) {
+export default function OrgLoginClient({
+  orgSlug,
+  orgName,
+  loginReason = null,
+}: OrgLoginClientProps) {
   const router = useRouter();
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
   const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
   const [errorMessage, setErrorMessage] = React.useState<React.ReactNode | null>(null);
+
+  React.useEffect(() => {
+    document.cookie =
+      'web_incomplete_onboarding_reauth=; path=/; max-age=0; SameSite=Lax;';
+  }, []);
 
   const handleEmailLogin = async (email: string) => {
     setErrorMessage(null);
@@ -135,7 +145,11 @@ export default function OrgLoginClient({ orgSlug, orgName }: OrgLoginClientProps
       statusMessage={statusMessage}
       errorMessage={errorMessage}
       title={`Sign in to ${orgName}`}
-      subtitle="Use your existing organization account to access your dashboard."
+      subtitle={
+        loginReason === 'session-expired'
+          ? 'Your session expired because onboarding was not completed. Sign in again to continue setup.'
+          : 'Use your existing organization account to access your dashboard.'
+      }
       introText=""
       trustLine="Secure login. No password required. Organization access only."
       submitLabel="Send verification code"

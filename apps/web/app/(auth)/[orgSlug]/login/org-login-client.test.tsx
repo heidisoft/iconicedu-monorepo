@@ -92,4 +92,21 @@ describe('OrgLoginClient', () => {
       }),
     );
   });
+
+  it('renders the session expiry guidance when provided', () => {
+    render(
+      <OrgLoginClient
+        orgSlug="iconic-academy"
+        orgName="ICONIC Academy"
+        loginReason="session-expired"
+      />,
+    );
+
+    expect(authEntryFormPropsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subtitle:
+          'Your session expired because onboarding was not completed. Sign in again to continue setup.',
+      }),
+    );
+  });
 });

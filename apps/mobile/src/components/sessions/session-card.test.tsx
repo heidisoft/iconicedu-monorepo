@@ -177,13 +177,20 @@ describe('SessionCard', () => {
 
     render(<SessionCard session={baseSession} />);
 
-    fireEvent.press(screen.getByLabelText('Join session'));
-
-    expect(await screen.findByText('Mar · Week 2')).toBeTruthy();
-    expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(app)/spaces/[channelId]',
-      params: { channelId: 'channel-1', tab: 'sessions' },
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Join session'));
     });
+
+    expect(screen.getByText('Mar · Week 2')).toBeTruthy();
+    await waitFor(() =>
+      expect(mockFetchSpaceChannelMetaByChannelId).toHaveBeenCalledWith('channel-1'),
+    );
+    await waitFor(() =>
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(app)/spaces/[channelId]',
+        params: { channelId: 'channel-1', tab: 'sessions' },
+      }),
+    );
   });
 
   it('opens classroom chat from the chat button', () => {

@@ -10,7 +10,6 @@ import {
   Sparkle,
 } from 'lucide-react';
 
-// eslint-disable-next-line no-restricted-imports
 import {
   ClassRequestAction,
   type ClassRequestRole as DashboardRequestRole,

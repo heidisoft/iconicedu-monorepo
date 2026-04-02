@@ -152,7 +152,86 @@ jobs:
           retention-days: 14
 
   # ──────────────────────────────────────────────────────────────
-  # Job 3: Build apps — only runs after quality + test both pass
+  # Job 3a: Web bundle size — runs parallel to quality + test
+  # preactjs/compressed-size-action checks out both the base branch
+  # and the PR branch, builds each, and posts a PR comment with
+  # per-file gzip size deltas. Informational only — not a gate.
+  # ──────────────────────────────────────────────────────────────
+  bundle-size-web:
+    name: Bundle Size (Web)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+          cache: pnpm
+
+      - name: Analyze web bundle size
+        uses: preactjs/compressed-size-action@v2
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          install-script: pnpm install --frozen-lockfile
+          build-script: ci:bundle:web
+          pattern: |
+            apps/web/.next/static/**/*.js
+            apps/web/.next/static/**/*.css
+          exclude: "**/*.map"
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-service-role-key' }}
+          TURBO_TELEMETRY_DISABLED: 1
+
+  # ──────────────────────────────────────────────────────────────
+  # Job 3b: Mobile bundle size — runs parallel to quality + test
+  # Uses expo export --platform android to produce the React Native
+  # JS bundle (no native compilation needed on Linux), then posts a
+  # PR comment with the gzip size delta vs the base branch.
+  # Informational only — not a gate.
+  # ──────────────────────────────────────────────────────────────
+  bundle-size-mobile:
+    name: Bundle Size (Mobile)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+          cache: pnpm
+
+      - name: Analyze mobile bundle size
+        uses: preactjs/compressed-size-action@v2
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          install-script: pnpm install --frozen-lockfile
+          build-script: ci:bundle:mobile
+          pattern: apps/mobile/.expo/dist/_expo/static/js/**/*.js
+          exclude: "**/*.map"
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
+          EXPO_NO_TELEMETRY: 1
+          TURBO_TELEMETRY_DISABLED: 1
+
+  # ──────────────────────────────────────────────────────────────
+  # Job 4: Build apps — only runs after quality + test both pass
   # ──────────────────────────────────────────────────────────────
   build:
     # Branch protection depends on this exact job name.

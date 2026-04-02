@@ -1,6 +1,8 @@
 import React from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
 import { renderHook, act, waitFor } from '@testing-library/react-native';
 import { AuthProvider, useAuth } from '@/providers/auth-provider';
+import { AnalyticsEvent } from '@iconicedu/utils';
 
 // Mock Supabase client
 const mockGetSession = jest.fn().mockResolvedValue({
@@ -21,9 +23,21 @@ const mockEq = jest.fn(() => ({ maybeSingle: mockMaybeSingle }));
 const mockSelect = jest.fn(() => ({ eq: mockEq }));
 const mockFrom = jest.fn(() => ({ select: mockSelect }));
 const mockActivateAccount = jest.fn().mockResolvedValue(undefined);
+const mockCapture = jest.fn();
+let appStateChangeListener: ((state: AppStateStatus) => void) | null = null;
+const mockAnalyticsClient = {
+  identify: jest.fn(),
+  capture: mockCapture,
+  reset: jest.fn(),
+  flush: jest.fn(),
+};
 
 jest.mock('@/lib/api/queries', () => ({
   activateAccount: () => mockActivateAccount(),
+}));
+
+jest.mock('@/providers/analytics-provider', () => ({
+  useAnalytics: () => mockAnalyticsClient,
 }));
 
 jest.mock('../lib/supabase/client', () => ({
@@ -47,6 +61,17 @@ function wrapper({ children }: { children: React.ReactNode }) {
 describe('AuthProvider', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    appStateChangeListener = null;
+    jest
+      .spyOn(AppState, 'addEventListener')
+      .mockImplementation((_event: string, listener: (state: AppStateStatus) => void) => {
+        appStateChangeListener = listener;
+        return { remove: jest.fn() };
+      });
+    Object.defineProperty(AppState, 'currentState', {
+      configurable: true,
+      value: 'active',
+    });
     mockVerifyOtp.mockResolvedValue({
       data: { session: null, user: null },
       error: null,
@@ -133,5 +158,95 @@ describe('AuthProvider', () => {
     });
 
     expect(response.error).toBe('Rate limit exceeded');
+  });
+
+  it('signs out on app return after the incomplete onboarding threshold', async () => {
+    mockGetSession.mockResolvedValueOnce({
+      data: { session: { user: { id: 'user-1', email: 'test@example.com' } } },
+    });
+
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    act(() => {
+      result.current.setOnboardingCompletionStatus(false);
+    });
+
+    const nowSpy = jest.spyOn(Date, 'now');
+    nowSpy.mockReturnValue(1000);
+    act(() => {
+      appStateChangeListener?.('background');
+    });
+    nowSpy.mockReturnValue(1000 + 15 * 60 * 1000);
+    await act(async () => {
+      appStateChangeListener?.('active');
+    });
+
+    await waitFor(() => {
+      expect(mockSignOut).toHaveBeenCalled();
+    });
+    expect(mockCapture).toHaveBeenCalledWith(
+      AnalyticsEvent.INCOMPLETE_ONBOARDING_REAUTH_TRIGGERED,
+      expect.objectContaining({ source: 'mobile-appstate-return' }),
+    );
+    nowSpy.mockRestore();
+  });
+
+  it('does not sign out on app return under the incomplete onboarding threshold', async () => {
+    mockGetSession.mockResolvedValueOnce({
+      data: { session: { user: { id: 'user-1', email: 'test@example.com' } } },
+    });
+
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    act(() => {
+      result.current.setOnboardingCompletionStatus(false);
+    });
+
+    const nowSpy = jest.spyOn(Date, 'now');
+    nowSpy.mockReturnValue(1000);
+    act(() => {
+      appStateChangeListener?.('background');
+    });
+    nowSpy.mockReturnValue(1000 + 60_000);
+    await act(async () => {
+      appStateChangeListener?.('active');
+    });
+
+    expect(mockSignOut).not.toHaveBeenCalled();
+    nowSpy.mockRestore();
+  });
+
+  it('does not sign out completed users on app return', async () => {
+    mockGetSession.mockResolvedValueOnce({
+      data: { session: { user: { id: 'user-1', email: 'test@example.com' } } },
+    });
+
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    act(() => {
+      result.current.setOnboardingCompletionStatus(true);
+    });
+
+    const nowSpy = jest.spyOn(Date, 'now');
+    nowSpy.mockReturnValue(1000);
+    act(() => {
+      appStateChangeListener?.('background');
+    });
+    nowSpy.mockReturnValue(1000 + 15 * 60 * 1000 + 1);
+    await act(async () => {
+      appStateChangeListener?.('active');
+    });
+
+    expect(mockSignOut).not.toHaveBeenCalled();
+    nowSpy.mockRestore();
   });
 });

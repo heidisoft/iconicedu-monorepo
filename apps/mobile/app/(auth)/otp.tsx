@@ -77,7 +77,7 @@ export default function OtpScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isVerifyingRef = React.useRef(false);
-  const { verifyOtp, signInWithOtp } = useAuth();
+  const { verifyOtp, signInWithOtp, setOnboardingCompletionStatus } = useAuth();
   const router = useRouter();
   const { colors } = useTheme();
   const analytics = useAnalytics();
@@ -117,6 +117,7 @@ export default function OtpScreen() {
       // (local read, no network hang) to determine where to send the user.
       try {
         const status = await fetchOnboardingStatus();
+        setOnboardingCompletionStatus(status.isComplete);
         if (!status.isComplete) {
           router.replace('/(auth)/profile-setup');
         } else {
@@ -127,7 +128,7 @@ export default function OtpScreen() {
         router.replace('/(app)/(tabs)');
       }
     },
-    [analytics, email, router, verifyOtp],
+    [analytics, email, router, setOnboardingCompletionStatus, verifyOtp],
   );
 
   React.useEffect(() => {

@@ -23,6 +23,7 @@ import type {
 import { SidebarLeft, SidebarInset } from '@iconicedu/ui-web';
 import { toast } from '@iconicedu/ui-web';
 import { createSupabaseBrowserClient } from '@iconicedu/web/lib/supabase/client';
+import { initPostHog, posthog } from '@iconicedu/web/lib/analytics/posthog-browser';
 import {
   revokeFamilyInviteAction,
   sendFamilyInviteAction,
@@ -72,10 +73,22 @@ import {
 import { shouldPublishPresence } from '@iconicedu/web/lib/presence/publish-policy';
 import { buildAvatarStoragePath } from '@iconicedu/web/lib/profile/avatar-storage-path';
 import { getAvatarBucket } from '@iconicedu/web/lib/storage/storage-paths';
+import {
+  WEB_INCOMPLETE_ONBOARDING_LOGIN_REASON,
+  WEB_INCOMPLETE_ONBOARDING_REAUTH_COOKIE,
+} from '@iconicedu/web/app/(app)/[orgSlug]/layout-auth-gate';
+import { reportWebObservedError } from '@iconicedu/web/lib/analytics/report-error';
+import {
+  AnalyticsEvent,
+  INCOMPLETE_ONBOARDING_REAUTH_AFTER_MS,
+  markLastActiveAt,
+  shouldRequireReauthOnReturn,
+} from '@iconicedu/utils';
 
 const AVATAR_SIGNED_URL_TTL = 60 * 60;
 const PRESENCE_HEARTBEAT_MS = 90 * 1000;
 const PRESENCE_STATUS_EVALUATION_MS = 30 * 1000;
+const WEB_INCOMPLETE_ONBOARDING_LAST_ACTIVE_KEY = 'web_incomplete_onboarding_last_active';
 
 const getToastMessageFromError = (error: unknown) =>
   error instanceof Error ? error.message : 'Something went wrong.';
@@ -207,6 +220,117 @@ export function SidebarShell({
     }
     return `/${firstSegment}`;
   }, [pathname]);
+
+  React.useEffect(() => {
+    const isOnboardingComplete = onboardingStatus?.completed ?? true;
+    if (typeof window === 'undefined' || isOnboardingComplete) {
+      return;
+    }
+
+    let isHandlingExpiredSession = false;
+    const persistLastActiveAt = () => {
+      window.sessionStorage.setItem(
+        WEB_INCOMPLETE_ONBOARDING_LAST_ACTIVE_KEY,
+        String(markLastActiveAt()),
+      );
+    };
+    const getLastActiveAt = () => {
+      const rawValue = window.sessionStorage.getItem(
+        WEB_INCOMPLETE_ONBOARDING_LAST_ACTIVE_KEY,
+      );
+      if (!rawValue) {
+        return null;
+      }
+      const parsed = Number(rawValue);
+      return Number.isFinite(parsed) ? parsed : null;
+    };
+
+    const clearExpiredState = () => {
+      window.sessionStorage.removeItem(WEB_INCOMPLETE_ONBOARDING_LAST_ACTIVE_KEY);
+      document.cookie = `${WEB_INCOMPLETE_ONBOARDING_REAUTH_COOKIE}=; path=/; max-age=0; SameSite=Lax;`;
+    };
+
+    const redirectToLogin = async () => {
+      if (isHandlingExpiredSession) {
+        return;
+      }
+      isHandlingExpiredSession = true;
+      initPostHog();
+      posthog.capture(AnalyticsEvent.INCOMPLETE_ONBOARDING_REAUTH_TRIGGERED, {
+        org_slug: dashboardBasePath.replace(/^\//, ''),
+        source: 'web-return-focus',
+      });
+      document.cookie = `${WEB_INCOMPLETE_ONBOARDING_REAUTH_COOKIE}=1; path=/; max-age=5; SameSite=Lax;`;
+      try {
+        await supabase.auth.signOut();
+      } catch (error) {
+        reportWebObservedError({
+          error,
+          source: 'web.sidebar.incomplete_onboarding_reauth.sign_out',
+          message: 'Failed to sign out during incomplete onboarding reauth',
+          context: {
+            orgSlug: dashboardBasePath.replace(/^\//, ''),
+          },
+        });
+        posthog.capture(AnalyticsEvent.INCOMPLETE_ONBOARDING_REAUTH_FAILED, {
+          org_slug: dashboardBasePath.replace(/^\//, ''),
+          source: 'web-return-focus',
+          stage: 'sign_out',
+        });
+      }
+      clearExpiredState();
+      window.location.assign(
+        `${dashboardBasePath}/login?reason=${WEB_INCOMPLETE_ONBOARDING_LOGIN_REASON}`,
+      );
+    };
+
+    const maybeExpireOnReturn = () => {
+      if (document.hidden) {
+        return;
+      }
+      const lastActiveAt = getLastActiveAt();
+      if (
+        shouldRequireReauthOnReturn({
+          isOnboardingComplete,
+          lastActiveAt,
+          now: Date.now(),
+          reauthAfterMs: INCOMPLETE_ONBOARDING_REAUTH_AFTER_MS,
+        })
+      ) {
+        void redirectToLogin();
+        return;
+      }
+      persistLastActiveAt();
+    };
+
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        persistLastActiveAt();
+        return;
+      }
+      maybeExpireOnReturn();
+    };
+    const onFocus = () => {
+      maybeExpireOnReturn();
+    };
+    const onBeforeUnload = () => {
+      persistLastActiveAt();
+    };
+
+    persistLastActiveAt();
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('beforeunload', onBeforeUnload);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('beforeunload', onBeforeUnload);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      if (!isHandlingExpiredSession) {
+        persistLastActiveAt();
+      }
+    };
+  }, [dashboardBasePath, onboardingStatus?.completed, supabase]);
 
   const handleOnboardingComplete = React.useCallback(() => {
     void router.push(dashboardBasePath);

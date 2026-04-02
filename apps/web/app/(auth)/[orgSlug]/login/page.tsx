@@ -17,12 +17,19 @@ export const metadata: Metadata = {
   },
 };
 
+export function resolveOrgLoginReason(value?: string): 'session-expired' | null {
+  return value === 'session-expired' ? 'session-expired' : null;
+}
+
 export default async function OrgLoginPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ orgSlug: string }>;
+  searchParams?: Promise<{ reason?: string }>;
 }) {
   const { orgSlug } = await params;
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const serviceSupabase = createSupabaseServiceClient();
   const org = await buildOrgBySlug(serviceSupabase, orgSlug);
 
@@ -52,7 +59,11 @@ export default async function OrgLoginPage({
   return (
     <div className="bg-background flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
       <div className="w-full max-w-sm">
-        <OrgLoginClient orgSlug={org.slug} orgName={org.name} />
+        <OrgLoginClient
+          orgSlug={org.slug}
+          orgName={org.name}
+          loginReason={resolveOrgLoginReason(resolvedSearchParams?.reason)}
+        />
       </div>
     </div>
   );

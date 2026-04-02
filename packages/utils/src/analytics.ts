@@ -43,6 +43,9 @@ export const AnalyticsEvent = {
   OTP_VERIFICATION_FAILED: 'otp verification failed',
   OTP_RESENT: 'otp resent',
   ONBOARDING_COMPLETED: 'onboarding completed',
+  INCOMPLETE_ONBOARDING_REAUTH_TRIGGERED: 'incomplete onboarding reauth triggered',
+  INCOMPLETE_ONBOARDING_REAUTH_FAILED: 'incomplete onboarding reauth failed',
+  INCOMPLETE_ONBOARDING_STATUS_UNKNOWN: 'incomplete onboarding status unknown',
   SIGNED_OUT: 'signed out',
 
   // ── Navigation / Screen ────────────────────────────────────────────────────

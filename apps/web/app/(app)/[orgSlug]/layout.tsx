@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
 import { SidebarProvider } from '@iconicedu/ui-web';
 
 import { SidebarShell } from '@iconicedu/web/app/(app)/[orgSlug]/sidebar-shell';
@@ -13,7 +14,11 @@ import { buildSidebarBaseData } from '@iconicedu/web/lib/sidebar/buildSidebarBas
 import { resolveEffectiveProfileForAccountInOrg } from '@iconicedu/web/lib/family-view/effective-profile';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
 import { resolveOrgDashboardPath } from '@iconicedu/web/lib/org/resolve-dashboard-path';
-import { shouldRedirectToAuthResume } from '@iconicedu/web/app/(app)/[orgSlug]/layout-auth-gate';
+import {
+  shouldRedirectToAuthResume,
+  WEB_INCOMPLETE_ONBOARDING_LOGIN_REASON,
+  WEB_INCOMPLETE_ONBOARDING_REAUTH_COOKIE,
+} from '@iconicedu/web/app/(app)/[orgSlug]/layout-auth-gate';
 import {
   listActiveOrgSubjectCatalog,
   mapOrgSubjectRowsToOptions,
@@ -43,6 +48,7 @@ export default async function Layout({
   const { orgSlug } = await params;
   const supabase = await createSupabaseServerClient();
   const authUser = await requireAuthedUser(supabase);
+  const cookieStore = await cookies();
   const requestedOrg = await buildOrgBySlug(supabase, orgSlug);
 
   if (!requestedOrg) {
@@ -60,8 +66,14 @@ export default async function Layout({
     redirect(destination);
   }
 
-  if (shouldRedirectToAuthResume(account)) {
-    redirect('/auth/callback?resume=1');
+  if (
+    shouldRedirectToAuthResume({
+      account,
+      reauthCookieValue:
+        cookieStore.get(WEB_INCOMPLETE_ONBOARDING_REAUTH_COOKIE)?.value ?? null,
+    })
+  ) {
+    redirect(`/${orgSlug}/login?reason=${WEB_INCOMPLETE_ONBOARDING_LOGIN_REASON}`);
   }
 
   if (account.role_status === 'pending' || account.role_status === 'blocked') {

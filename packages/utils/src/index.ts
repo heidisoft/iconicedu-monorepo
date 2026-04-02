@@ -53,6 +53,13 @@ export {
   countryCodeToEmoji,
 } from './timezones';
 
+export {
+  INCOMPLETE_ONBOARDING_REAUTH_AFTER_MS,
+  type SessionReauthPolicyInput,
+  markLastActiveAt,
+  shouldRequireReauthOnReturn,
+} from './session-reauth';
+
 export function groupBy<T, K extends string>(
   rows: T[],
   getKey: (row: T) => K,

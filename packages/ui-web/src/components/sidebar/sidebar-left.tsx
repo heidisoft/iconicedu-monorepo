@@ -21,7 +21,6 @@ import {
   Loader2,
 } from 'lucide-react';
 
-// eslint-disable-next-line no-restricted-imports
 import { ClassRequestAction } from '../class-request/class-request-action';
 import { NavLearningSpaces } from '@iconicedu/ui-web/components/sidebar/nav-learning-spaces';
 import { NavSecondary } from '@iconicedu/ui-web/components/sidebar/nav-secondary';

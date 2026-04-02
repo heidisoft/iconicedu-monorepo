@@ -307,7 +307,12 @@ export default function LoginScreen() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [googleError, setGoogleError] = useState<string | null>(null);
-  const { signInWithOtp, signInWithGoogle } = useAuth();
+  const {
+    signInWithOtp,
+    signInWithGoogle,
+    sessionExpiryMessage,
+    clearSessionExpiryMessage,
+  } = useAuth();
   const router = useRouter();
   const { colors, isDark } = useTheme();
   const analytics = useAnalytics();
@@ -324,6 +329,7 @@ export default function LoginScreen() {
     }
     setLoading(true);
     setError(null);
+    clearSessionExpiryMessage();
     analytics.capture(AnalyticsEvent.LOGIN_OTP_REQUESTED, { method: 'email' });
     const { error: signInError } = await signInWithOtp(email.trim());
     if (signInError) {
@@ -337,11 +343,12 @@ export default function LoginScreen() {
     }
     setLoading(false);
     router.push({ pathname: '/(auth)/otp', params: { email: email.trim() } });
-  }, [email, signInWithOtp, router, analytics]);
+  }, [analytics, clearSessionExpiryMessage, email, router, signInWithOtp]);
 
   const handleGoogle = useCallback(async () => {
     setGoogleLoading(true);
     setGoogleError(null);
+    clearSessionExpiryMessage();
     analytics.capture(AnalyticsEvent.LOGIN_GOOGLE_STARTED);
     const { error: googleErr } = await signInWithGoogle();
     if (googleErr) {
@@ -352,7 +359,7 @@ export default function LoginScreen() {
       setGoogleError(googleErr);
     }
     setGoogleLoading(false);
-  }, [signInWithGoogle, analytics]);
+  }, [analytics, clearSessionExpiryMessage, signInWithGoogle]);
 
   return (
     <SafeAreaView style={s.safe}>
@@ -390,6 +397,7 @@ export default function LoginScreen() {
                 value={email}
                 onChangeText={(t) => {
                   setEmail(t);
+                  if (sessionExpiryMessage) clearSessionExpiryMessage();
                   if (error) setError(null);
                 }}
                 keyboardType="email-address"
@@ -413,6 +421,9 @@ export default function LoginScreen() {
               )}
             </View>
             {error && <Text style={s.errorTxt}>{error}</Text>}
+            {!error && sessionExpiryMessage ? (
+              <Text style={s.errorTxt}>{sessionExpiryMessage}</Text>
+            ) : null}
           </View>
 
           {/* CTA */}
