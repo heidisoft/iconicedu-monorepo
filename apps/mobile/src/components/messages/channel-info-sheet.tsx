@@ -1,18 +1,14 @@
-import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import {
-  Modal,
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
   Linking,
-  Animated,
-  PanResponder,
-  Dimensions,
-  Pressable,
   ActivityIndicator,
   Alert,
+  Dimensions,
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { useRouter } from 'expo-router';
@@ -40,15 +36,12 @@ import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
 import { useAccount } from '@/hooks/use-account';
 import { useProfile } from '@/hooks/use-profile';
 import { findDirectMessageChannelForProfiles } from '@/lib/api/queries';
+import { BottomSheet } from '@iconicedu/ui-native';
 
 const CHANNEL_FILES_BUCKET = 'channel-files';
 
 // ─── Screen dimensions ─────────────────────────────────────────────────────────
-// Use 'screen' (not 'window') so the full display height is captured on Android,
-// including the system navigation bar area when navigationBarTranslucent is set.
-
-const SCREEN_HEIGHT = Dimensions.get('screen').height;
-const PARTIAL_HEIGHT = SCREEN_HEIGHT * 0.58;
+const PARTIAL_HEIGHT_RATIO = 0.58;
 
 // ─── Avatar helpers ────────────────────────────────────────────────────────────
 
@@ -562,40 +555,8 @@ function TabContent({
 function makeStyles(C: AppColors) {
   const hairline = StyleSheet.hairlineWidth;
   return StyleSheet.create({
-    // ── Backdrop ──────────────────────────────────────────────────────────────
-    backdrop: {
-      ...StyleSheet.absoluteFillObject,
-      backgroundColor: 'rgba(0,0,0,0.45)',
-    },
-
-    // ── Animated sheet ────────────────────────────────────────────────────────
     sheet: {
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      top: 0,
-      height: SCREEN_HEIGHT,
       backgroundColor: C.bg,
-      borderTopLeftRadius: 20,
-      borderTopRightRadius: 20,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: -2 },
-      shadowOpacity: 0.15,
-      shadowRadius: 8,
-      elevation: 16,
-    },
-
-    // ── Drag handle ───────────────────────────────────────────────────────────
-    dragArea: {
-      width: '100%',
-      paddingVertical: 12,
-      alignItems: 'center',
-    },
-    dragHandle: {
-      width: 40,
-      height: 4,
-      borderRadius: 2,
-      backgroundColor: C.border,
     },
 
     // ── Header ────────────────────────────────────────────────────────────────
@@ -946,15 +907,8 @@ export function ChannelInfoSheet({
     ((profile as Record<string, unknown> | undefined)?.id as string | undefined) ?? '';
 
   const [activeTab, setActiveTab] = useState<ChannelTab>('files');
-  const [isFullScreen, setIsFullScreen] = useState(false);
   const [channelUiDefaults, setChannelUiDefaults] =
     useState<ParsedMobileChannelUiDefaults | null>(null);
-
-  // translateY: 0 = full screen top, SCREEN_HEIGHT - PARTIAL_HEIGHT = partial, SCREEN_HEIGHT = hidden
-  const sheetTranslateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
-  const isFullScreenRef = useRef(false);
-  // Tracks translateY value at gesture start to avoid stale closure
-  const panRef = useRef<number>(SCREEN_HEIGHT - PARTIAL_HEIGHT);
 
   const isDm = kind === 'dm';
   const seed = avatarSeed ?? title;
@@ -1123,18 +1077,9 @@ export function ChannelInfoSheet({
   // ── Open animation ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (visible) {
-      isFullScreenRef.current = false;
-      setIsFullScreen(false);
       setActiveTab(visibleTabs[0]?.key ?? 'files');
-      sheetTranslateY.setValue(SCREEN_HEIGHT);
-      Animated.spring(sheetTranslateY, {
-        toValue: SCREEN_HEIGHT - PARTIAL_HEIGHT,
-        useNativeDriver: true,
-        tension: 80,
-        friction: 12,
-      }).start();
     }
-  }, [sheetTranslateY, visible, visibleTabs]);
+  }, [visible, visibleTabs]);
 
   useEffect(() => {
     if (!visibleTabs.length) {
@@ -1145,19 +1090,6 @@ export function ChannelInfoSheet({
       setActiveTab(visibleTabs[0]!.key);
     }
   }, [activeTab, visibleTabs]);
-
-  // ── Internal close (animate out then notify parent) ─────────────────────────
-  const handleClose = useCallback(() => {
-    Animated.timing(sheetTranslateY, {
-      toValue: SCREEN_HEIGHT,
-      useNativeDriver: true,
-      duration: 220,
-    }).start(() => {
-      isFullScreenRef.current = false;
-      setIsFullScreen(false);
-      onClose();
-    });
-  }, [onClose, sheetTranslateY]);
 
   const handleMemberMessage = useCallback(
     async (memberId: string, memberName: string) => {
@@ -1179,7 +1111,7 @@ export function ChannelInfoSheet({
           return;
         }
 
-        handleClose();
+        onClose();
         router.push({
           pathname: '/(app)/dm/[channelId]',
           params: {
@@ -1195,162 +1127,24 @@ export function ChannelInfoSheet({
         Alert.alert('Unable to open direct message', 'Please try again.');
       }
     },
-    [currentProfileId, handleClose, orgId, router],
+    [currentProfileId, onClose, orgId, router],
   );
 
-  // ── Expand to full screen ───────────────────────────────────────────────────
-  const expandToFull = useCallback(() => {
-    isFullScreenRef.current = true;
-    setIsFullScreen(true);
-    Animated.spring(sheetTranslateY, {
-      toValue: 0,
-      useNativeDriver: true,
-      tension: 85,
-      friction: 12,
-    }).start();
-  }, [sheetTranslateY]);
-
-  // ── Stable refs for partial overlay pan responder ──────────────────────────
-  const expandToFullRef = useRef<() => void>(() => {});
-  const handleCloseRef = useRef<() => void>(() => {});
-  useEffect(() => {
-    expandToFullRef.current = expandToFull;
-  }, [expandToFull]);
-  useEffect(() => {
-    handleCloseRef.current = handleClose;
-  }, [handleClose]);
-
-  // ── Partial overlay PanResponder — swipe down closes, tap/swipe-up expands ─
-  const partialOverlayPanResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      // Only steal the gesture once there's clear vertical movement
-      onMoveShouldSetPanResponder: (_, { dy, dx }) =>
-        Math.abs(dy) > 6 && Math.abs(dy) > Math.abs(dx),
-      onPanResponderGrant: () => {
-        sheetTranslateY.stopAnimation((val) => {
-          panRef.current = val;
-        });
-      },
-      onPanResponderMove: (_, { dy }) => {
-        // Only allow dragging downward from partial mode
-        if (dy > 0) {
-          sheetTranslateY.setValue(Math.min(SCREEN_HEIGHT, panRef.current + dy));
-        }
-      },
-      onPanResponderRelease: (_, { dy, vy }) => {
-        if (Math.abs(dy) < 8) {
-          // Tap — expand to full
-          expandToFullRef.current();
-        } else if (dy > 60 || vy > 0.5) {
-          // Swipe down — close the sheet
-          handleCloseRef.current();
-        } else if (dy < -30 || vy < -0.5) {
-          // Swipe up — expand to full
-          expandToFullRef.current();
-        } else {
-          // Small movement — snap back to partial
-          Animated.spring(sheetTranslateY, {
-            toValue: SCREEN_HEIGHT - PARTIAL_HEIGHT,
-            useNativeDriver: true,
-            tension: 80,
-            friction: 12,
-          }).start();
-        }
-      },
-    }),
-  ).current;
-
-  // ── PanResponder (drag handle) ──────────────────────────────────────────────
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, { dy }) => Math.abs(dy) > 8,
-      onPanResponderGrant: () => {
-        sheetTranslateY.stopAnimation((val) => {
-          panRef.current = val;
-        });
-      },
-      onPanResponderMove: (_, { dy }) => {
-        const next = Math.max(0, Math.min(SCREEN_HEIGHT, panRef.current + dy));
-        sheetTranslateY.setValue(next);
-      },
-      onPanResponderRelease: (_, { dy, vy }) => {
-        const isCurrentlyFull = isFullScreenRef.current;
-        if (dy < -50 || vy < -0.5) {
-          // Swipe up → expand to full screen
-          isFullScreenRef.current = true;
-          setIsFullScreen(true);
-          Animated.spring(sheetTranslateY, {
-            toValue: 0,
-            useNativeDriver: true,
-            tension: 85,
-            friction: 12,
-          }).start();
-        } else if (dy > 80 || vy > 0.6) {
-          if (isCurrentlyFull) {
-            // Swipe down from full → collapse to partial
-            isFullScreenRef.current = false;
-            setIsFullScreen(false);
-            Animated.spring(sheetTranslateY, {
-              toValue: SCREEN_HEIGHT - PARTIAL_HEIGHT,
-              useNativeDriver: true,
-              tension: 80,
-              friction: 12,
-            }).start();
-          } else {
-            // Swipe down from partial → close
-            Animated.timing(sheetTranslateY, {
-              toValue: SCREEN_HEIGHT,
-              useNativeDriver: true,
-              duration: 220,
-            }).start(() => {
-              isFullScreenRef.current = false;
-              setIsFullScreen(false);
-              onClose();
-            });
-          }
-        } else {
-          // Snap back to current state
-          Animated.spring(sheetTranslateY, {
-            toValue: isCurrentlyFull ? 0 : SCREEN_HEIGHT - PARTIAL_HEIGHT,
-            useNativeDriver: true,
-            tension: 80,
-            friction: 12,
-          }).start();
-        }
-      },
-    }),
-  ).current;
-
   return (
-    <Modal
+    <BottomSheet
       visible={visible}
-      transparent
-      animationType="none"
-      onRequestClose={handleClose}
-      statusBarTranslucent
-      navigationBarTranslucent
+      onClose={onClose}
+      allowExpand
+      enablePartialOverlay
+      topInset={insets.top}
+      bottomInset={insets.bottom}
+      partialHeight={Dimensions.get('screen').height * PARTIAL_HEIGHT_RATIO}
+      sheetStyle={s.sheet}
     >
-      {/* Backdrop — tapping closes sheet when in partial mode */}
-      <Pressable style={s.backdrop} onPress={!isFullScreen ? handleClose : undefined} />
-
-      {/* Animated sheet — full height container, translated to show partial */}
-      <Animated.View
-        style={[
-          s.sheet,
-          { transform: [{ translateY: sheetTranslateY }] },
-          isFullScreen && { paddingTop: insets.top, paddingBottom: insets.bottom },
-        ]}
-      >
-        {/* Drag handle — always visible, handles gesture for expand/collapse/close */}
-        <View style={s.dragArea} {...panResponder.panHandlers}>
-          <View style={s.dragHandle} />
-        </View>
-
-        {isDm ? (
+      {({ isExpanded }) =>
+        isDm ? (
           /* ── DM: hero + static info rows ── */
-          <ScrollView showsVerticalScrollIndicator={false} scrollEnabled={isFullScreen}>
+          <ScrollView showsVerticalScrollIndicator={false} scrollEnabled={isExpanded}>
             {/* Hero */}
             <View style={s.hero}>
               <View style={{ width: 72, height: 72, position: 'relative' }}>
@@ -1397,23 +1191,11 @@ export function ChannelInfoSheet({
                 </>
               )}
             </View>
-
-            {/* Partial overlay — swipe down closes, tap expands */}
-            {!isFullScreen && (
-              <View
-                style={StyleSheet.absoluteFill}
-                {...partialOverlayPanResponder.panHandlers}
-              />
-            )}
           </ScrollView>
         ) : (
           /* ── Channel / Space: compact hero + fixed tabs + scrollable content ── */
           <>
-            {/* Compact hero — also handles swipe-down when fully open */}
-            <View
-              style={s.heroCompact}
-              {...(isFullScreen ? panResponder.panHandlers : {})}
-            >
+            <View style={s.heroCompact}>
               <ChannelTopicIconBadge
                 iconKey={iconKey}
                 size={56}
@@ -1463,7 +1245,7 @@ export function ChannelInfoSheet({
                   colors={colors}
                   s={s}
                   memberCount={memberCount}
-                  isFullScreen={isFullScreen}
+                  isFullScreen={isExpanded}
                   currentProfileId={currentProfileId}
                   onMemberMessage={handleMemberMessage}
                 />
@@ -1477,18 +1259,10 @@ export function ChannelInfoSheet({
                 />
               )}
             </View>
-
-            {/* Partial overlay — swipe down closes, tap expands */}
-            {!isFullScreen && (
-              <View
-                style={StyleSheet.absoluteFill}
-                {...partialOverlayPanResponder.panHandlers}
-              />
-            )}
           </>
-        )}
-      </Animated.View>
-    </Modal>
+        )
+      }
+    </BottomSheet>
   );
 }
 
