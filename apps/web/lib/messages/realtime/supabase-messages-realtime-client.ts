@@ -74,16 +74,7 @@ export function createSupabaseMessagesRealtimeClient(): MessagesRealtimeClient {
                   type: currentType === 'added' ? 'message-added' : 'message-updated',
                   message: payload.message,
                 });
-              } else {
-                console.warn(
-                  `[Realtime] Invalid message payload for ${messageId}`,
-                  payload,
-                );
               }
-            } else {
-              console.error(
-                `[Realtime] Failed to fetch message ${messageId}: ${response.status}`,
-              );
             }
 
             const queuedType = queued.get(messageId);
@@ -217,10 +208,6 @@ export function createSupabaseMessagesRealtimeClient(): MessagesRealtimeClient {
           if (status === 'SUBSCRIBED') {
             retryCount = 0; // Reset on success
           } else if (status === 'CHANNEL_ERROR') {
-            console.error(
-              `[Realtime] Failed to subscribe to messages:${channelId}`,
-              status,
-            );
             if (retryCount < maxRetries) {
               retryCount++;
 
@@ -228,11 +215,8 @@ export function createSupabaseMessagesRealtimeClient(): MessagesRealtimeClient {
                 void channel.unsubscribe();
                 attemptSubscribe();
               }, 1000 * retryCount); // Exponential backoff
-            } else {
-              console.error(`[Realtime] Max retries reached for messages:${channelId}`);
             }
           } else if (status === 'TIMED_OUT') {
-            console.error(`[Realtime] Subscription timed out for messages:${channelId}`);
             if (retryCount < maxRetries) {
               retryCount++;
 

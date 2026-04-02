@@ -35,6 +35,7 @@ import type {
   ReactionVM,
 } from '@iconicedu/shared-types';
 import type { AppColors } from '@/lib/theme';
+import { reportMobileObservedError } from '@/lib/analytics/report-error';
 import { fetchThreadMessages, markThreadReadState } from '@/lib/api/queries';
 import { EmojiPicker } from './emoji-picker';
 import {
@@ -1808,8 +1809,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           soundRef.current = player;
           player.play();
           setIsAudioPlaying(true);
-        } catch (err) {
-          console.warn('[Audio] playback error:', err);
+        } catch {
           // WebM/Opus (recorded by Chrome on web) is not supported by iOS AVFoundation.
           // Show a targeted message so the user understands why it failed.
           if (Platform.OS === 'ios') {
@@ -1910,12 +1910,29 @@ export const MessageItem: React.FC<MessageItemProps> = ({
               lastReadMessageId: lastReplyId,
             });
             setThreadUnreadCount(unreadCount);
-          } catch (readErr) {
-            console.warn('[MessageItem] markThreadReadState error:', readErr);
+          } catch (error) {
+            reportMobileObservedError({
+              error,
+              source: 'mobile.messages.message_item.thread_read_state',
+              message: 'Failed to sync thread read state',
+              context: {
+                channelId,
+                threadId: thread.ids.id,
+                messageId: message.ids.id,
+              },
+            });
           }
         }
-      } catch (err) {
-        console.warn('[MessageItem] fetchThreadMessages error:', err);
+      } catch (error) {
+        reportMobileObservedError({
+          error,
+          source: 'mobile.messages.message_item.thread_expand',
+          message: 'Failed to load thread replies',
+          context: {
+            threadId: thread?.ids.id,
+            messageId: message.ids.id,
+          },
+        });
       } finally {
         setThreadLoading(false);
       }

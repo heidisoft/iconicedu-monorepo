@@ -16,6 +16,7 @@ import { buildChildDisplayName } from '@iconicedu/web/lib/profile/display-name';
 import { requireParentActorContext } from '@iconicedu/web/lib/family-view/actor-context';
 import { seedSignupDefaultNotificationPreferences } from '@iconicedu/web/lib/profile/queries/notification-defaults-seed.query';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
+import { reportWebObservedError } from '@iconicedu/web/lib/analytics/report-error';
 
 const normalizeEmail = (value?: string | null) => value?.trim().toLowerCase() ?? null;
 
@@ -48,11 +49,16 @@ async function cleanupCreatedRecords(context: CreationCleanupContext) {
     familyId,
   } = context;
 
-  const run = async (description: string, fn: () => unknown) => {
+  const run = async (_description: string, fn: () => unknown) => {
     try {
       await fn();
     } catch (error) {
-      console.error(`cleanup failed (${description})`, error);
+      reportWebObservedError({
+        error,
+        source: 'web.actions.create_child_profile.cleanup',
+        message: 'Failed to clean up partially created child profile records',
+        context: { step: _description, orgId },
+      });
     }
   };
 

@@ -22,6 +22,7 @@ import {
   resolveDefaultOrgLoginPath,
   resolveOrgLoginPath,
 } from '@iconicedu/web/lib/org/resolve-auth-path';
+import { reportWebObservedError } from '@iconicedu/web/lib/analytics/report-error';
 
 type ActivationIntent = 'login' | 'get-started' | null;
 
@@ -217,7 +218,16 @@ export async function POST(request: Request) {
       onboarding,
     });
   } catch (error) {
-    console.error('activate-account', error);
+    reportWebObservedError({
+      error,
+      source: 'web.api.accounts.activate',
+      message: 'Failed to activate account',
+      distinctId: data.user.id,
+      context: {
+        orgSlug,
+        intent,
+      },
+    });
     return NextResponse.json({ error: 'Unable to activate account' }, { status: 500 });
   }
 }

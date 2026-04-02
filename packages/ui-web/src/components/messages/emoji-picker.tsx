@@ -1,5 +1,6 @@
 import type React from 'react';
 import { useState, useEffect, useCallback, memo } from 'react';
+import { reportObservedError } from '@iconicedu/utils';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@iconicedu/ui-web/ui/popover';
 import { ScrollArea } from '@iconicedu/ui-web/ui/scroll-area';
@@ -143,7 +144,11 @@ export const EmojiPicker = memo(function EmojiPicker({
         setRecentEmojis(JSON.parse(stored));
       }
     } catch (error) {
-      console.error('Failed to load recent emojis:', error);
+      reportObservedError({
+        error,
+        source: 'web.messages.emoji_picker.load_recent',
+        message: 'Failed to load recent emojis from local storage',
+      });
     }
   }, []);
 
@@ -155,7 +160,11 @@ export const EmojiPicker = memo(function EmojiPicker({
       try {
         globalThis.localStorage?.setItem(RECENT_EMOJIS_KEY, JSON.stringify(updated));
       } catch (error) {
-        console.error('Failed to save recent emojis:', error);
+        reportObservedError({
+          error,
+          source: 'web.messages.emoji_picker.save_recent',
+          message: 'Failed to persist recent emojis',
+        });
       }
 
       return updated;

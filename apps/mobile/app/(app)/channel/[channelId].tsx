@@ -42,6 +42,7 @@ import { ReadOnlyNotice } from '@/components/messages/read-only-notice';
 import { SpaceSessionsTab } from '@/components/messages/space-sessions-tab';
 import { resolveChannelTopicIconKey } from '@/lib/learning-space-icons';
 import { buildMobileChannelEmptyStateCopy } from '@/lib/message-empty-state';
+import { reportMobileObservedError } from '@/lib/analytics/report-error';
 
 type ChannelTab = 'messages' | 'sessions';
 
@@ -210,23 +211,6 @@ export default function ChannelConversationScreen() {
       ]);
 
       try {
-        console.debug('[messages] handleSendAttachment:start', {
-          channelId,
-          orgId,
-          profileId,
-          pendingId,
-          type,
-          attachmentCount: attachments.length,
-          attachments: attachments.map((attachment) => ({
-            name: attachment.name,
-            mimeType: attachment.mimeType,
-            size: attachment.size ?? null,
-            uri: attachment.uri,
-            hasBase64: Boolean(attachment.base64),
-          })),
-          captionLength: caption?.length ?? 0,
-        });
-
         if (type === 'audio') {
           const a = attachments[0];
           const storagePath = buildMessageStoragePath(
@@ -265,28 +249,21 @@ export default function ChannelConversationScreen() {
           }
         }
 
-        console.debug('[messages] handleSendAttachment:success', {
-          channelId,
-          orgId,
-          profileId,
-          pendingId,
-          type,
-          attachmentCount: attachments.length,
-        });
-
         // 2. Remove pending entry — the realtime subscription will add the real message
         setPendingUploads((prev) => prev.filter((p) => p.id !== pendingId));
       } catch (error) {
-        const typedError = error as { code?: string; message?: string };
-        console.error('[messages] handleSendAttachment:error', {
-          channelId,
-          orgId,
-          profileId,
-          pendingId,
-          type,
-          attachmentCount: attachments.length,
-          errorCode: typedError.code ?? null,
-          errorMessage: typedError.message ?? String(error),
+        reportMobileObservedError({
+          error,
+          source: 'mobile.messages.channel.send_attachment',
+          message: 'Failed to send channel attachment',
+          context: {
+            channelId,
+            orgId,
+            profileId,
+            pendingId,
+            type,
+            attachmentCount: attachments.length,
+          },
         });
         // 3. Mark as failed — user sees a red error state on the pending item
         setPendingUploads((prev) =>
@@ -314,16 +291,6 @@ export default function ChannelConversationScreen() {
       );
 
       try {
-        console.debug('[messages] handleRetryUpload:start', {
-          channelId,
-          orgId,
-          profileId,
-          pendingId,
-          type: pending.type,
-          attachmentCount: pending.attachments.length,
-          captionLength: pending.caption?.length ?? 0,
-        });
-
         const { caption } = pending;
         if (pending.type === 'audio') {
           const a = pending.attachments[0];
@@ -362,26 +329,20 @@ export default function ChannelConversationScreen() {
             await sendFilesMessage(channelId!, profileId, orgId, uploaded, caption);
           }
         }
-        console.debug('[messages] handleRetryUpload:success', {
-          channelId,
-          orgId,
-          profileId,
-          pendingId,
-          type: pending.type,
-          attachmentCount: pending.attachments.length,
-        });
         setPendingUploads((prev) => prev.filter((p) => p.id !== pendingId));
       } catch (error) {
-        const typedError = error as { code?: string; message?: string };
-        console.error('[messages] handleRetryUpload:error', {
-          channelId,
-          orgId,
-          profileId,
-          pendingId,
-          type: pending.type,
-          attachmentCount: pending.attachments.length,
-          errorCode: typedError.code ?? null,
-          errorMessage: typedError.message ?? String(error),
+        reportMobileObservedError({
+          error,
+          source: 'mobile.messages.channel.retry_upload',
+          message: 'Failed to retry channel attachment upload',
+          context: {
+            channelId,
+            orgId,
+            profileId,
+            pendingId,
+            type: pending.type,
+            attachmentCount: pending.attachments.length,
+          },
         });
         setPendingUploads((prev) =>
           prev.map((p) => (p.id === pendingId ? { ...p, failed: true } : p)),

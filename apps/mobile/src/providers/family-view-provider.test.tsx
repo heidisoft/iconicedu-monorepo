@@ -188,6 +188,8 @@ describe('FamilyViewProvider', () => {
       expect(screen.getByTestId('is-viewing-as-child').props.children).toBe('false');
     });
 
-    expect(mockDeleteItemAsync).toHaveBeenCalledWith('mobile_family_view_selection');
+    await waitFor(() => {
+      expect(mockDeleteItemAsync).toHaveBeenCalledWith('mobile_family_view_selection');
+    });
   });
 });

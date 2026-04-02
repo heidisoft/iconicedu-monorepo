@@ -171,16 +171,18 @@ export default [
   {
     files: [
       'apps/mobile/src/**/*.{ts,tsx,js,jsx}',
+      'apps/mobile/app/**/*.{ts,tsx,js,jsx}',
+      'apps/web/app/**/*.{ts,tsx,js,jsx}',
+      'apps/web/components/**/*.{ts,tsx,js,jsx}',
+      'apps/web/lib/**/*.{ts,tsx,js,jsx}',
+      'apps/api/src/**/*.{ts,tsx,js,jsx}',
+      'packages/shared-types/src/**/*.{ts,tsx,js,jsx}',
       'packages/ui-web/src/**/*.{ts,tsx,js,jsx}',
       'packages/ui-native/src/**/*.{ts,tsx,js,jsx}',
+      'packages/utils/src/**/*.{ts,tsx,js,jsx}',
     ],
     rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: ['../*', '../../*', '../../../*', '../../../../*'],
-        },
-      ],
+      'no-console': 'error',
     },
   },
 ];

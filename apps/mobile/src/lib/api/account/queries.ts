@@ -11,9 +11,7 @@ export async function activateAccount(): Promise<void> {
     .update({ status: 'active' })
     .eq('auth_user_id', session.user.id);
 
-  if (error) {
-    console.warn('[activateAccount] failed to set status=active:', error.message);
-  }
+  if (error) return;
 }
 
 export async function fetchUserAccount() {
@@ -97,12 +95,7 @@ export async function fetchProfileByAccountId(accountId: string) {
       .eq('id', account.id)
       .is('deleted_at', null);
 
-    if (healError) {
-      console.warn(
-        '[fetchProfileByAccountId] failed to heal active_profile_id:',
-        healError,
-      );
-    }
+    if (healError) return fallbackProfile;
   }
 
   return fallbackProfile ?? null;

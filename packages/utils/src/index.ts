@@ -15,6 +15,15 @@ export {
 } from './analytics';
 
 export {
+  type ErrorReporter,
+  type ObservedErrorInput,
+  buildObservedErrorProperties,
+  normalizeObservedError,
+  reportObservedError,
+  setGlobalErrorReporter,
+} from './error-monitoring';
+
+export {
   type DateStylePreset,
   type DateTimeStylePreset,
   type TimeStylePreset,

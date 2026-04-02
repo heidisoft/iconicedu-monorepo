@@ -12,6 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import type { MessageVM } from '@iconicedu/shared-types';
+import { reportMobileObservedError } from '@/lib/analytics/report-error';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 import { fetchThreadMessages } from '@/lib/api/queries';
@@ -123,8 +124,16 @@ export const ThreadSheet: React.FC<ThreadSheetProps> = ({
         currentAccountId,
       );
       setReplies(data);
-    } catch (err) {
-      console.warn('[ThreadSheet] loadReplies error:', err);
+    } catch (error) {
+      reportMobileObservedError({
+        error,
+        source: 'mobile.messages.thread_sheet.load_replies',
+        message: 'Failed to load thread replies in sheet',
+        context: {
+          threadId: threadId ?? parentMessage?.social?.thread?.ids.id,
+          parentMessageId: parentMessage?.ids.id,
+        },
+      });
     } finally {
       setLoading(false);
     }

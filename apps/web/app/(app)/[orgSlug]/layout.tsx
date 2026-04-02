@@ -20,10 +20,6 @@ import {
 } from '@iconicedu/web/lib/subjects/queries/org-subject-catalog.query';
 import { enableAdminReports } from '@iconicedu/web/flags';
 
-function isPosthogFlagDebugEnabled() {
-  return process.env.DEBUG_POSTHOG_FLAGS === 'true';
-}
-
 export const metadata: Metadata = {
   title: {
     default: 'Dashboard | ICONIC Academy',
@@ -101,20 +97,10 @@ export default async function Layout({
     account.org_id,
   );
   const subjectOptions = mapOrgSubjectRowsToOptions(subjectCatalogResponse.data);
-  const isAdminReportsEnabled = await enableAdminReports.run({
+  await enableAdminReports.run({
     identify: { profileId: familyViewResolution.effectiveProfile.id },
   });
   const includeReports = true;
-
-  if (isPosthogFlagDebugEnabled()) {
-    console.info('[Admin Reports] Sidebar gate evaluated', {
-      flagKey: 'enable-admin-reports',
-      profileId: familyViewResolution.effectiveProfile.id,
-      flagResult: isAdminReportsEnabled,
-      includeReports,
-      orgSlug,
-    });
-  }
 
   return (
     <SidebarProvider>

@@ -1,9 +1,9 @@
-import React, { useContext, createContext, useMemo } from 'react';
+import React, { useContext, createContext, useEffect, useMemo } from 'react';
 import { NativeModules } from 'react-native';
 import Constants from 'expo-constants';
 import { PostHogProvider, usePostHog } from 'posthog-react-native';
 import type { AnalyticsClient } from '@iconicedu/utils';
-import { createNoopAnalytics } from '@iconicedu/utils';
+import { createNoopAnalytics, setGlobalErrorReporter } from '@iconicedu/utils';
 
 const POSTHOG_KEY: string =
   (Constants.expoConfig?.extra?.['posthogKey'] as string | undefined) ??
@@ -57,6 +57,17 @@ function AnalyticsBridge({ children }: { children: React.ReactNode }) {
     }),
     [ph],
   );
+
+  useEffect(() => {
+    setGlobalErrorReporter((event, properties) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ph.capture(event, properties as any);
+    });
+
+    return () => {
+      setGlobalErrorReporter(null);
+    };
+  }, [ph]);
 
   return <AnalyticsContext.Provider value={client}>{children}</AnalyticsContext.Provider>;
 }

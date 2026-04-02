@@ -191,7 +191,7 @@ describe('org layout persona flags', () => {
     expect(infoSpy).not.toHaveBeenCalled();
   });
 
-  it('emits layout debug logs when posthog flag debugging is enabled', async () => {
+  it('does not emit layout debug logs when posthog flag debugging is enabled', async () => {
     process.env.DEBUG_POSTHOG_FLAGS = 'true';
     const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined);
 
@@ -200,12 +200,6 @@ describe('org layout persona flags', () => {
       params: Promise.resolve({ orgSlug: 'iconic-academy' }),
     });
 
-    expect(infoSpy).toHaveBeenCalledWith('[Admin Reports] Sidebar gate evaluated', {
-      flagKey: 'enable-admin-reports',
-      profileId: 'profile-1',
-      flagResult: false,
-      includeReports: true,
-      orgSlug: 'iconic-academy',
-    });
+    expect(infoSpy).not.toHaveBeenCalled();
   });
 });
