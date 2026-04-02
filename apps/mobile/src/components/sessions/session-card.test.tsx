@@ -1,6 +1,6 @@
 import React from 'react';
 import { Linking, Share } from 'react-native';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { SessionCard, type ClassSession } from './session-card';
 
 const mockPush = jest.fn();
@@ -132,8 +132,14 @@ describe('SessionCard', () => {
 
     render(<SessionCard session={baseSession} />);
 
-    fireEvent.press(screen.getByLabelText('Join session'));
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Join session'));
+    });
 
+    await waitFor(() =>
+      expect(mockFetchSpaceChannelMetaByChannelId).toHaveBeenCalledWith('channel-1'),
+    );
+    expect(await screen.findByText('Session ready to join')).toBeTruthy();
     expect(await screen.findByText('https://zoom.us/j/from-channel')).toBeTruthy();
     expect(mockPush).not.toHaveBeenCalled();
   });
