@@ -345,16 +345,76 @@ jobs:
             echo "vercel_url=https://vercel.com/dashboard" >> "$GITHUB_OUTPUT"
           fi
 
-      # 5. Post PR comment
+      # 5. Run Lighthouse CI against the Vercel preview deployment
+      - name: Run Lighthouse CI
+        id: lighthouse
+        # Guard: only run when Vercel produced a real preview URL.
+        # The vercel step has continue-on-error: true so the outcome may be
+        # 'success' even when no deployment was found (fallback URL is returned).
+        if: >-
+          steps.vercel.outputs.vercel_url != '' &&
+          steps.vercel.outputs.vercel_url != 'https://vercel.com/dashboard'
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          urls: ${{ steps.vercel.outputs.vercel_url }}
+          configPath: apps/web/lighthouserc.js
+          uploadArtifacts: true
+          artifactName: lighthouse-results
+          temporaryPublicStorage: true
+
+      # 6. Post / update PR comment with preview URLs and Lighthouse scores
       - name: Post preview environment comment
         uses: actions/github-script@v7
+        env:
+          LH_MANIFEST: ${{ steps.lighthouse.outputs.manifest }}
+          LH_LINKS: ${{ steps.lighthouse.outputs.links }}
         with:
           script: |
-            const prNumber = context.payload.workflow_run.pull_requests[0].number;
-            const webUrl = '${{ steps.vercel.outputs.vercel_url }}';
-            const apiUrl = '${{ steps.railway.outputs.railway_api_url }}';
+            const prNumber  = context.payload.workflow_run.pull_requests[0].number;
+            const webUrl    = '${{ steps.vercel.outputs.vercel_url }}';
+            const apiUrl    = '${{ steps.railway.outputs.railway_api_url }}';
             const branchRef = '${{ steps.branch-creds.outputs.branch_ref }}';
             const studioUrl = `https://supabase.com/dashboard/project/${branchRef}`;
+
+            // Read Lighthouse outputs via process.env to avoid JSON quote-escaping
+            // issues that arise when interpolating the raw JSON string inline.
+            const manifestRaw = process.env.LH_MANIFEST || '';
+            const linksRaw    = process.env.LH_LINKS    || '';
+
+            let lighthouseSection = '';
+            if (manifestRaw) {
+              try {
+                const manifest = JSON.parse(manifestRaw);
+                const links    = linksRaw ? JSON.parse(linksRaw) : {};
+                const result   = manifest.find(r => r.isRepresentativeRun) || manifest[0];
+                const s        = result.summary;
+
+                const scoreIcon = (v) => {
+                  if (v == null) return '—';
+                  const n = Math.round(v * 100);
+                  if (n >= 90) return `${n} ✅`;
+                  if (n >= 50) return `${n} ⚠️`;
+                  return `${n} ❌`;
+                };
+
+                const reportUrl  = links[result.url] || '';
+                const reportLink = reportUrl ? ` ([full report](${reportUrl}))` : '';
+
+                lighthouseSection = [
+                  '',
+                  `### Lighthouse${reportLink}`,
+                  '',
+                  '| Category | Score |',
+                  '|----------|-------|',
+                  `| Performance    | ${scoreIcon(s.performance)} |`,
+                  `| Accessibility  | ${scoreIcon(s.accessibility)} |`,
+                  `| Best Practices | ${scoreIcon(s['best-practices'])} |`,
+                  `| SEO            | ${scoreIcon(s.seo)} |`,
+                ].join('\n');
+              } catch {
+                lighthouseSection = '\n\n> ⚠️ Lighthouse results could not be parsed.';
+              }
+            }
 
             const body = [
               '## Preview Environment Ready',
@@ -366,6 +426,7 @@ jobs:
               `| Supabase Studio | ${studioUrl} |`,
               '',
               `**Mobile build** - [Actions -> EAS Preview Build](../../actions/workflows/eas-preview-build.yml) -> PR number: \`${prNumber}\``,
+              lighthouseSection,
             ].join('\n');
 
             // Find and update existing comment, or create new one

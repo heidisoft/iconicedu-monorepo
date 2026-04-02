@@ -31,7 +31,8 @@
     "eas:submit": "eas submit --platform all",
     "eas:submit:ios": "eas submit --platform ios",
     "eas:submit:android": "eas submit --platform android",
-    "eas:update": "eas update"
+    "eas:update": "eas update",
+    "export:bundle": "EXPO_NO_TELEMETRY=1 npx expo export --platform android --output-dir .expo/dist"
   },
   "dependencies": {
     "@expo/metro-runtime": "^55.0.6",

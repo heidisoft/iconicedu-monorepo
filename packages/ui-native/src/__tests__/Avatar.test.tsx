@@ -41,4 +41,19 @@ describe('Avatar', () => {
     render(<Avatar name="Jane Smith" />);
     expect(screen.getByLabelText('Jane Smith')).toBeTruthy();
   });
+
+  it('uses the muted fallback styling from web', () => {
+    const { UNSAFE_getAllByType } = render(<Avatar name="Jane Smith" />);
+
+    expect(
+      UNSAFE_getAllByType(require('react-native').View).some((node) =>
+        String(node.props.className ?? '').includes('bg-muted'),
+      ),
+    ).toBe(true);
+    expect(
+      UNSAFE_getAllByType(require('react-native').View).some((node) =>
+        String(node.props.className ?? '').includes('border-border'),
+      ),
+    ).toBe(true);
+  });
 });

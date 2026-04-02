@@ -16,6 +16,7 @@ import {
   getFamilyInviteAdminClient,
   mapFamilyLinkInviteRowToVM,
 } from '@iconicedu/web/lib/family/queries/invite.query';
+import { reportWebObservedError } from '@iconicedu/web/lib/analytics/report-error';
 
 type ResolvedGuardianContext = {
   supabase: SupabaseClient;
@@ -120,7 +121,16 @@ export async function revokeFamilyInviteAction(input: { inviteId: string }) {
         await adminClient.auth.admin.deleteUser(accountRow.auth_user_id);
       }
     } catch (error) {
-      console.error('Failed to cleanup invited user', error);
+      reportWebObservedError({
+        error,
+        source: 'web.actions.family_invite.cleanup_invited_user',
+        message: 'Failed to clean up invited user after invite removal',
+        context: {
+          inviteId: input.inviteId,
+          orgId,
+          invitedEmail: inviteRow.invited_email,
+        },
+      });
     }
   }
 }

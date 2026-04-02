@@ -1,7 +1,5 @@
 'use client';
 
-import type React from 'react';
-
 import { Component, type ReactNode } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { Button } from '@iconicedu/ui-web/ui/button';
@@ -32,11 +30,6 @@ export class ErrorBoundary extends Component<Props, State> {
   static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
   }
-
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('[v0] Error caught by boundary:', error, errorInfo);
-  }
-
   render() {
     if (this.state.hasError) {
       if (this.props.fallback) {

@@ -38,10 +38,7 @@ async function doFetchOnboardingStatus(): Promise<OnboardingStatus> {
     .eq('auth_user_id', user.id)
     .maybeSingle();
 
-  if (accountError) {
-    console.error('[onboarding] account fetch error:', accountError);
-    throw accountError;
-  }
+  if (accountError) throw accountError;
 
   let account = accountByAuthId;
 
@@ -75,7 +72,7 @@ async function doFetchOnboardingStatus(): Promise<OnboardingStatus> {
   let postalCode = '';
   let countryCode = '';
 
-  const { data: profile, error: profileError } = await supabase
+  const { data: profile } = await supabase
     .from('profiles')
     .select(
       'id, kind, first_name, last_name, timezone, city, region, postal_code, country_code',
@@ -84,7 +81,6 @@ async function doFetchOnboardingStatus(): Promise<OnboardingStatus> {
     .is('deleted_at', null)
     .maybeSingle();
 
-  if (profileError) console.warn('[onboarding] profile fetch error:', profileError);
   if (profile) {
     profileId = profile.id;
     profileKind = profile.kind ?? null;

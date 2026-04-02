@@ -12,12 +12,14 @@ function Bomb({ shouldThrow }: { shouldThrow: boolean }) {
 }
 
 describe('CrashBoundary', () => {
+  let consoleErrorSpy: jest.SpyInstance;
+
   // Suppress expected console.error output from React during error boundary tests
   beforeEach(() => {
-    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
   });
   afterEach(() => {
-    (console.error as jest.Mock).mockRestore();
+    consoleErrorSpy.mockRestore();
   });
 
   it('renders children when no error', () => {

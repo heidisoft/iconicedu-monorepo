@@ -1,6 +1,6 @@
 import React from 'react';
 import { Linking, Share } from 'react-native';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { SessionCard, type ClassSession } from './session-card';
 
 const mockPush = jest.fn();
@@ -132,8 +132,14 @@ describe('SessionCard', () => {
 
     render(<SessionCard session={baseSession} />);
 
-    fireEvent.press(screen.getByLabelText('Join session'));
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Join session'));
+    });
 
+    await waitFor(() =>
+      expect(mockFetchSpaceChannelMetaByChannelId).toHaveBeenCalledWith('channel-1'),
+    );
+    expect(await screen.findByText('Session ready to join')).toBeTruthy();
     expect(await screen.findByText('https://zoom.us/j/from-channel')).toBeTruthy();
     expect(mockPush).not.toHaveBeenCalled();
   });
@@ -150,11 +156,17 @@ describe('SessionCard', () => {
 
     render(<SessionCard session={baseSession} />);
 
-    fireEvent.press(screen.getByLabelText('Join session'));
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Join session'));
+    });
 
-    await screen.findByText('Mar · Week 2');
-    expect(mockOpenURL).toHaveBeenCalledWith(
-      'http://localhost:3000/acme/live-sessions/abc',
+    await waitFor(() =>
+      expect(mockFetchSpaceChannelMetaByChannelId).toHaveBeenCalledWith('channel-1'),
+    );
+    await waitFor(() =>
+      expect(mockOpenURL).toHaveBeenCalledWith(
+        'http://localhost:3000/acme/live-sessions/abc',
+      ),
     );
   });
 
@@ -165,13 +177,20 @@ describe('SessionCard', () => {
 
     render(<SessionCard session={baseSession} />);
 
-    fireEvent.press(screen.getByLabelText('Join session'));
-
-    expect(await screen.findByText('Mar · Week 2')).toBeTruthy();
-    expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(app)/spaces/[channelId]',
-      params: { channelId: 'channel-1', tab: 'sessions' },
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Join session'));
     });
+
+    expect(screen.getByText('Mar · Week 2')).toBeTruthy();
+    await waitFor(() =>
+      expect(mockFetchSpaceChannelMetaByChannelId).toHaveBeenCalledWith('channel-1'),
+    );
+    await waitFor(() =>
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(app)/spaces/[channelId]',
+        params: { channelId: 'channel-1', tab: 'sessions' },
+      }),
+    );
   });
 
   it('opens classroom chat from the chat button', () => {

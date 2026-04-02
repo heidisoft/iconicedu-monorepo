@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
 import { SidebarProvider } from '@iconicedu/ui-web';
 
 import { SidebarShell } from '@iconicedu/web/app/(app)/[orgSlug]/sidebar-shell';
@@ -13,16 +14,16 @@ import { buildSidebarBaseData } from '@iconicedu/web/lib/sidebar/buildSidebarBas
 import { resolveEffectiveProfileForAccountInOrg } from '@iconicedu/web/lib/family-view/effective-profile';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
 import { resolveOrgDashboardPath } from '@iconicedu/web/lib/org/resolve-dashboard-path';
-import { shouldRedirectToAuthResume } from '@iconicedu/web/app/(app)/[orgSlug]/layout-auth-gate';
+import {
+  shouldRedirectToAuthResume,
+  WEB_INCOMPLETE_ONBOARDING_LOGIN_REASON,
+  WEB_INCOMPLETE_ONBOARDING_REAUTH_COOKIE,
+} from '@iconicedu/web/app/(app)/[orgSlug]/layout-auth-gate';
 import {
   listActiveOrgSubjectCatalog,
   mapOrgSubjectRowsToOptions,
 } from '@iconicedu/web/lib/subjects/queries/org-subject-catalog.query';
 import { enableAdminReports } from '@iconicedu/web/flags';
-
-function isPosthogFlagDebugEnabled() {
-  return process.env.DEBUG_POSTHOG_FLAGS === 'true';
-}
 
 export const metadata: Metadata = {
   title: {
@@ -47,6 +48,7 @@ export default async function Layout({
   const { orgSlug } = await params;
   const supabase = await createSupabaseServerClient();
   const authUser = await requireAuthedUser(supabase);
+  const cookieStore = await cookies();
   const requestedOrg = await buildOrgBySlug(supabase, orgSlug);
 
   if (!requestedOrg) {
@@ -64,8 +66,14 @@ export default async function Layout({
     redirect(destination);
   }
 
-  if (shouldRedirectToAuthResume(account)) {
-    redirect('/auth/callback?resume=1');
+  if (
+    shouldRedirectToAuthResume({
+      account,
+      reauthCookieValue:
+        cookieStore.get(WEB_INCOMPLETE_ONBOARDING_REAUTH_COOKIE)?.value ?? null,
+    })
+  ) {
+    redirect(`/${orgSlug}/login?reason=${WEB_INCOMPLETE_ONBOARDING_LOGIN_REASON}`);
   }
 
   if (account.role_status === 'pending' || account.role_status === 'blocked') {
@@ -101,20 +109,10 @@ export default async function Layout({
     account.org_id,
   );
   const subjectOptions = mapOrgSubjectRowsToOptions(subjectCatalogResponse.data);
-  const isAdminReportsEnabled = await enableAdminReports.run({
+  await enableAdminReports.run({
     identify: { profileId: familyViewResolution.effectiveProfile.id },
   });
   const includeReports = true;
-
-  if (isPosthogFlagDebugEnabled()) {
-    console.info('[Admin Reports] Sidebar gate evaluated', {
-      flagKey: 'enable-admin-reports',
-      profileId: familyViewResolution.effectiveProfile.id,
-      flagResult: isAdminReportsEnabled,
-      includeReports,
-      orgSlug,
-    });
-  }
 
   return (
     <SidebarProvider>

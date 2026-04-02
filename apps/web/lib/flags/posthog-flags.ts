@@ -11,18 +11,6 @@ type EvaluatePosthogBooleanFlagInput = {
 const DEFAULT_POSTHOG_HOST = 'https://t.iconicedu.lk';
 const DEFAULT_TIMEOUT_MS = 2500;
 
-function isPosthogFlagDebugEnabled() {
-  return process.env.DEBUG_POSTHOG_FLAGS === 'true';
-}
-
-function logPosthogFlagDebug(message: string, details: Record<string, unknown>) {
-  if (!isPosthogFlagDebugEnabled()) {
-    return;
-  }
-
-  console.info(`[PostHog Flags] ${message}`, details);
-}
-
 function getPosthogHost() {
   return (
     process.env.POSTHOG_HOST ??
@@ -70,17 +58,7 @@ export async function evaluatePosthogBooleanFlag(
   const host = getPosthogHost();
   const isLocal = isLocalWebEnvironment();
 
-  if (!distinctId || !flagKey || !apiKey || !host || isLocal) {
-    logPosthogFlagDebug('Skipping flag evaluation', {
-      flagKey,
-      distinctId,
-      hasApiKey: Boolean(apiKey),
-      hasHost: Boolean(host),
-      isLocalWebEnvironment: isLocal,
-      result: false,
-    });
-    return false;
-  }
+  if (!distinctId || !flagKey || !apiKey || !host || isLocal) return false;
 
   const controller = new AbortController();
   const timeoutMs = input.timeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -101,15 +79,7 @@ export async function evaluatePosthogBooleanFlag(
       signal: controller.signal,
     });
 
-    if (!response.ok) {
-      logPosthogFlagDebug('Flag evaluation failed with non-ok response', {
-        flagKey,
-        distinctId,
-        status: response.status,
-        result: false,
-      });
-      return false;
-    }
+    if (!response.ok) return false;
 
     const payload = (await response.json()) as unknown;
     const value = getFeatureFlagValue(payload, flagKey);
@@ -122,20 +92,8 @@ export async function evaluatePosthogBooleanFlag(
             ? value !== 0
             : false;
 
-    logPosthogFlagDebug('Flag evaluated', {
-      flagKey,
-      distinctId,
-      rawValue: value,
-      result,
-    });
-
     return result;
   } catch {
-    logPosthogFlagDebug('Flag evaluation threw', {
-      flagKey,
-      distinctId,
-      result: false,
-    });
     return false;
   } finally {
     clearTimeout(timeout);

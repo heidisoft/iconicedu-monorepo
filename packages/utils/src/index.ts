@@ -15,6 +15,15 @@ export {
 } from './analytics';
 
 export {
+  type ErrorReporter,
+  type ObservedErrorInput,
+  buildObservedErrorProperties,
+  normalizeObservedError,
+  reportObservedError,
+  setGlobalErrorReporter,
+} from './error-monitoring';
+
+export {
   type DateStylePreset,
   type DateTimeStylePreset,
   type TimeStylePreset,
@@ -43,6 +52,13 @@ export {
   normalizeTimezone,
   countryCodeToEmoji,
 } from './timezones';
+
+export {
+  INCOMPLETE_ONBOARDING_REAUTH_AFTER_MS,
+  type SessionReauthPolicyInput,
+  markLastActiveAt,
+  shouldRequireReauthOnReturn,
+} from './session-reauth';
 
 export function groupBy<T, K extends string>(
   rows: T[],

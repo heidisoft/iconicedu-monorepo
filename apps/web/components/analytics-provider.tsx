@@ -3,7 +3,7 @@
 import { useEffect, useCallback } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { initPostHog, posthog } from '@iconicedu/web/lib/analytics/posthog-browser';
-import type { AnalyticsClient } from '@iconicedu/utils';
+import { setGlobalErrorReporter, type AnalyticsClient } from '@iconicedu/utils';
 
 // Initialise once on mount, then track every navigation.
 export function PostHogPageView() {
@@ -12,6 +12,16 @@ export function PostHogPageView() {
 
   useEffect(() => {
     initPostHog();
+    setGlobalErrorReporter((event, properties) => {
+      posthog.capture(
+        event,
+        properties as Record<string, string | number | boolean | null | undefined>,
+      );
+    });
+
+    return () => {
+      setGlobalErrorReporter(null);
+    };
   }, []);
 
   useEffect(() => {
@@ -29,6 +39,12 @@ export function PostHogPageView() {
  */
 export function createWebAnalyticsClient(): AnalyticsClient {
   initPostHog();
+  setGlobalErrorReporter((event, properties) => {
+    posthog.capture(
+      event,
+      properties as Record<string, string | number | boolean | null | undefined>,
+    );
+  });
   return {
     identify(userId, traits) {
       posthog.identify(userId, traits);

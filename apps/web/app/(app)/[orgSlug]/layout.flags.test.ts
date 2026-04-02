@@ -4,6 +4,7 @@ const {
   sidebarShellMock,
   createSupabaseServerClientMock,
   requireAuthedUserMock,
+  cookiesMock,
   buildOrgBySlugMock,
   getOrCreateAccountMock,
   buildSidebarBaseDataMock,
@@ -21,6 +22,7 @@ const {
   sidebarShellMock: vi.fn(() => null),
   createSupabaseServerClientMock: vi.fn(),
   requireAuthedUserMock: vi.fn(),
+  cookiesMock: vi.fn(),
   buildOrgBySlugMock: vi.fn(),
   getOrCreateAccountMock: vi.fn(),
   buildSidebarBaseDataMock: vi.fn(),
@@ -51,6 +53,10 @@ vi.mock('@iconicedu/web/lib/supabase/server', () => ({
 
 vi.mock('@iconicedu/web/lib/auth/requireAuthedUser', () => ({
   requireAuthedUser: (...args: unknown[]) => requireAuthedUserMock(...args),
+}));
+
+vi.mock('next/headers', () => ({
+  cookies: (...args: unknown[]) => cookiesMock(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/org/builders/org.builder', () => ({
@@ -94,6 +100,8 @@ vi.mock('@iconicedu/web/flags', () => ({
 vi.mock('@iconicedu/web/app/(app)/[orgSlug]/layout-auth-gate', () => ({
   shouldRedirectToAuthResume: (...args: unknown[]) =>
     shouldRedirectToAuthResumeMock(...args),
+  WEB_INCOMPLETE_ONBOARDING_LOGIN_REASON: 'incomplete-onboarding',
+  WEB_INCOMPLETE_ONBOARDING_REAUTH_COOKIE: 'iconicedu-incomplete-onboarding-reauth',
 }));
 
 vi.mock('@iconicedu/web/lib/org/resolve-dashboard-path', () => ({
@@ -115,6 +123,7 @@ describe('org layout persona flags', () => {
     sidebarShellMock.mockReset();
     createSupabaseServerClientMock.mockReset();
     requireAuthedUserMock.mockReset();
+    cookiesMock.mockReset();
     buildOrgBySlugMock.mockReset();
     getOrCreateAccountMock.mockReset();
     buildSidebarBaseDataMock.mockReset();
@@ -131,6 +140,9 @@ describe('org layout persona flags', () => {
 
     createSupabaseServerClientMock.mockResolvedValue({} as never);
     requireAuthedUserMock.mockResolvedValue({ id: 'auth-1', email: 'parent@test.com' });
+    cookiesMock.mockResolvedValue({
+      get: vi.fn(() => undefined),
+    });
     buildOrgBySlugMock.mockResolvedValue({ id: 'org-1', slug: 'iconic-academy' });
     getOrCreateAccountMock.mockResolvedValue({
       account: {
@@ -191,7 +203,7 @@ describe('org layout persona flags', () => {
     expect(infoSpy).not.toHaveBeenCalled();
   });
 
-  it('emits layout debug logs when posthog flag debugging is enabled', async () => {
+  it('does not emit layout debug logs when posthog flag debugging is enabled', async () => {
     process.env.DEBUG_POSTHOG_FLAGS = 'true';
     const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined);
 
@@ -200,12 +212,6 @@ describe('org layout persona flags', () => {
       params: Promise.resolve({ orgSlug: 'iconic-academy' }),
     });
 
-    expect(infoSpy).toHaveBeenCalledWith('[Admin Reports] Sidebar gate evaluated', {
-      flagKey: 'enable-admin-reports',
-      profileId: 'profile-1',
-      flagResult: false,
-      includeReports: true,
-      orgSlug: 'iconic-academy',
-    });
+    expect(infoSpy).not.toHaveBeenCalled();
   });
 });

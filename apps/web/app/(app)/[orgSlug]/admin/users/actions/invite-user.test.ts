@@ -19,6 +19,7 @@ const {
   mockGetOrgById,
   mockInviteUserByEmail,
   mockGenerateLink,
+  mockSignInWithOtp,
   mockRequireAdminOrgContext,
 } = vi.hoisted(() => ({
   mockHeaders: vi.fn(),
@@ -37,6 +38,7 @@ const {
   mockGetOrgById: vi.fn(),
   mockInviteUserByEmail: vi.fn(),
   mockGenerateLink: vi.fn(),
+  mockSignInWithOtp: vi.fn(),
   mockRequireAdminOrgContext: vi.fn(),
 }));
 
@@ -212,6 +214,13 @@ describe('inviteAdminUserAction', () => {
     const accountsDelete = vi.fn(() => ({ eq: accountsDeleteEq }));
 
     mockGetFamilyInviteAdminClient.mockReturnValue({
+      auth: {
+        signInWithOtp: mockSignInWithOtp,
+        admin: {
+          inviteUserByEmail: mockInviteUserByEmail,
+          generateLink: mockGenerateLink,
+        },
+      },
       from: (table: string) => {
         if (table !== 'accounts') {
           throw new Error(`unexpected table ${table}`);
@@ -221,13 +230,8 @@ describe('inviteAdminUserAction', () => {
           delete: accountsDelete,
         };
       },
-      auth: {
-        admin: {
-          inviteUserByEmail: mockInviteUserByEmail,
-          generateLink: mockGenerateLink,
-        },
-      },
     });
+    mockSignInWithOtp.mockResolvedValue({ error: null });
   });
 
   it.each([
@@ -321,5 +325,43 @@ describe('inviteAdminUserAction', () => {
     );
     expect(mockInviteUserByEmail).not.toHaveBeenCalled();
     expect(mockGenerateLink).not.toHaveBeenCalled();
+  });
+
+  it('appends auth callback for generated login links when redirect override is a bare origin', async () => {
+    mockGetAccountByEmail.mockResolvedValueOnce({
+      error: null,
+      data: {
+        id: 'account-active-1',
+        org_id: 'org-1',
+        status: 'active',
+      },
+    });
+
+    const formData = new FormData();
+    formData.set('email', 'active@example.com');
+    formData.set('profileKind', 'staff');
+    formData.set('mode', 'link');
+    formData.set('linkType', 'magiclink');
+    formData.set('intent', 'login');
+    formData.set('redirectTo', 'https://app.example.com');
+
+    await inviteAdminUserAction(formData);
+
+    expect(mockSignInWithOtp).toHaveBeenCalledWith({
+      email: 'active@example.com',
+      options: {
+        emailRedirectTo:
+          'https://app.example.com/auth/callback?profileKind=staff&org=iconic-academy&intent=login',
+      },
+    });
+    expect(mockGenerateLink).toHaveBeenCalledWith({
+      type: 'magiclink',
+      email: 'active@example.com',
+      options: {
+        redirectTo:
+          'https://app.example.com/auth/callback?profileKind=staff&org=iconic-academy&intent=login',
+      },
+    });
+    expect(mockInviteUserByEmail).not.toHaveBeenCalled();
   });
 });

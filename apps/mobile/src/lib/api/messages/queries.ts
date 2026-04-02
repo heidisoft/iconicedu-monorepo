@@ -30,15 +30,6 @@ const TYPE_TABLE: Record<string, string> = {
   'feedback-request': 'message_feedback_request',
 };
 
-function logMessageMutation(
-  event: string,
-  detail: Record<string, unknown>,
-  level: 'debug' | 'error' = 'debug',
-) {
-  const logger = level === 'error' ? console.error : console.debug;
-  logger(`[messages] ${event}`, detail);
-}
-
 function createClientUuid(): string {
   const nativeRandomUuid = globalThis.crypto?.randomUUID;
   if (typeof nativeRandomUuid === 'function') {
@@ -51,22 +42,6 @@ function createClientUuid(): string {
     return value.toString(16);
   });
 }
-
-type MessageWriteDebugContext = {
-  authUserId: string | null;
-  currentAccountId: string | null;
-  currentAccountOrgId: string | null;
-  currentAccountActiveProfileId: string | null;
-  requestedProfileAccountId: string | null;
-  requestedProfileOrgId: string | null;
-  requestedProfileKind: string | null;
-  resolvedProfileAccountId: string | null;
-  resolvedProfileOrgId: string | null;
-  resolvedProfileKind: string | null;
-  channelKind: string | null;
-  channelPurpose: string | null;
-  channelMemberProfileIds: string[];
-};
 
 type RawThreadRow = {
   id: string;
@@ -138,102 +113,6 @@ export function filterVisibleMessageRows<T extends RawMessageRow>(
     if (!currentProfileId) return false;
     return (row.visibility_user_ids ?? []).includes(currentProfileId);
   });
-}
-
-async function collectMessageWriteDebugContext(input: {
-  orgId: string;
-  channelId: string;
-  requestedSenderProfileId: string;
-  resolvedSenderProfileId: string;
-}): Promise<MessageWriteDebugContext> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const authUserId = user?.id ?? null;
-
-  const currentAccountLookup = authUserId
-    ? await supabase
-        .from('accounts')
-        .select('id, org_id, active_profile_id')
-        .eq('auth_user_id', authUserId)
-        .is('deleted_at', null)
-        .maybeSingle<CurrentAccountLookupRow>()
-    : { data: null, error: null };
-
-  if (currentAccountLookup.error) throw currentAccountLookup.error;
-
-  const currentAccount = currentAccountLookup.data;
-  const profileIds = Array.from(
-    new Set(
-      [input.requestedSenderProfileId, input.resolvedSenderProfileId].filter(Boolean),
-    ),
-  );
-
-  const profileLookup = profileIds.length
-    ? await supabase
-        .from('profiles')
-        .select('id, account_id, org_id, kind')
-        .in('id', profileIds)
-        .is('deleted_at', null)
-    : { data: [], error: null };
-
-  if (profileLookup.error) throw profileLookup.error;
-
-  const profilesById = new Map(
-    (
-      (profileLookup.data ?? []) as Array<{
-        id: string;
-        account_id: string;
-        org_id: string;
-        kind: string | null;
-      }>
-    ).map((profile) => [profile.id, profile]),
-  );
-
-  const channelLookup = await supabase
-    .from('channels')
-    .select('id, kind, purpose')
-    .eq('id', input.channelId)
-    .eq('org_id', input.orgId)
-    .is('deleted_at', null)
-    .maybeSingle<ChannelKindLookupRow>();
-
-  if (channelLookup.error) throw channelLookup.error;
-
-  const channelMembersLookup = await supabase
-    .from('channel_members')
-    .select('profile_id')
-    .eq('org_id', input.orgId)
-    .eq('channel_id', input.channelId)
-    .is('deleted_at', null);
-
-  if (channelMembersLookup.error) throw channelMembersLookup.error;
-
-  const requestedProfile = profilesById.get(input.requestedSenderProfileId);
-  const resolvedProfile = profilesById.get(input.resolvedSenderProfileId);
-
-  return {
-    authUserId,
-    currentAccountId: currentAccount?.id ?? null,
-    currentAccountOrgId: currentAccount?.org_id ?? null,
-    currentAccountActiveProfileId: currentAccount?.active_profile_id ?? null,
-    requestedProfileAccountId: requestedProfile?.account_id ?? null,
-    requestedProfileOrgId: requestedProfile?.org_id ?? null,
-    requestedProfileKind: requestedProfile?.kind ?? null,
-    resolvedProfileAccountId: resolvedProfile?.account_id ?? null,
-    resolvedProfileOrgId: resolvedProfile?.org_id ?? null,
-    resolvedProfileKind: resolvedProfile?.kind ?? null,
-    channelKind: channelLookup.data?.kind ?? null,
-    channelPurpose: channelLookup.data?.purpose ?? null,
-    channelMemberProfileIds: Array.from(
-      new Set(
-        (channelMembersLookup.data ?? [])
-          .map((member) => (member.profile_id as string | undefined) ?? '')
-          .filter(Boolean),
-      ),
-    ),
-  };
 }
 
 async function loadPayloads(
@@ -334,39 +213,31 @@ async function loadThreads(
     )
     .in('parent_message_id', parentMessageIds);
 
-  if (threadError) {
-    console.warn('[loadThreads] threads query failed:', threadError.message);
-    return new Map();
-  }
+  if (threadError) return new Map();
   if (!threadRows?.length) return new Map();
 
   const typedThreadRows = threadRows as RawThreadRow[];
   const threadIds = typedThreadRows.map((thread) => thread.id);
 
-  const [{ data: participantRows, error: participantError }, { data: readStateRows }] =
-    await Promise.all([
-      supabase
-        .from('thread_participants')
-        .select(
-          'thread_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed, kind)',
-        )
-        .in('thread_id', threadIds)
-        .is('deleted_at', null),
-      currentAccountId
-        ? supabase
-            .from('thread_read_state')
-            .select(
-              'thread_id, channel_id, last_read_message_id, last_read_at, unread_count',
-            )
-            .eq('account_id', currentAccountId)
-            .in('thread_id', threadIds)
-            .is('deleted_at', null)
-        : Promise.resolve({ data: [] as RawThreadReadStateRow[] }),
-    ]);
-
-  if (participantError) {
-    console.warn('[loadThreads] participants query failed:', participantError.message);
-  }
+  const [{ data: participantRows }, { data: readStateRows }] = await Promise.all([
+    supabase
+      .from('thread_participants')
+      .select(
+        'thread_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed, kind)',
+      )
+      .in('thread_id', threadIds)
+      .is('deleted_at', null),
+    currentAccountId
+      ? supabase
+          .from('thread_read_state')
+          .select(
+            'thread_id, channel_id, last_read_message_id, last_read_at, unread_count',
+          )
+          .eq('account_id', currentAccountId)
+          .in('thread_id', threadIds)
+          .is('deleted_at', null)
+      : Promise.resolve({ data: [] as RawThreadReadStateRow[] }),
+  ]);
 
   const participantsByThread = new Map<string, RawSenderProfile[]>();
   for (const participant of (participantRows ??
@@ -856,15 +727,7 @@ async function resolveWritableSenderProfileId(
       .maybeSingle<{ id: string }>();
 
     if (fallbackProfileError) throw fallbackProfileError;
-    if (fallbackProfile?.id) {
-      logMessageMutation('senderProfile:fallback', {
-        orgId,
-        requestedSenderProfileId,
-        resolvedSenderProfileId: fallbackProfile.id,
-        currentAccountId: currentAccount.id,
-      });
-      return fallbackProfile.id;
-    }
+    if (fallbackProfile?.id) return fallbackProfile.id;
   }
 
   const { data: firstOwnedProfile, error: firstOwnedProfileError } = await supabase
@@ -878,15 +741,7 @@ async function resolveWritableSenderProfileId(
     .maybeSingle<{ id: string }>();
 
   if (firstOwnedProfileError) throw firstOwnedProfileError;
-  if (firstOwnedProfile?.id) {
-    logMessageMutation('senderProfile:fallback', {
-      orgId,
-      requestedSenderProfileId,
-      resolvedSenderProfileId: firstOwnedProfile.id,
-      currentAccountId: currentAccount.id,
-    });
-    return firstOwnedProfile.id;
-  }
+  if (firstOwnedProfile?.id) return firstOwnedProfile.id;
 
   return requestedSenderProfileId;
 }
@@ -983,46 +838,16 @@ async function resolveDmSenderProfileId(
     const activeWritableMember = typedProfiles.find(
       (profile) => profile.id === currentAccount.active_profile_id,
     );
-    if (activeWritableMember) {
-      logMessageMutation('senderProfile:dm-fallback', {
-        orgId,
-        channelId,
-        requestedSenderProfileId,
-        writableSenderProfileId,
-        resolvedSenderProfileId: activeWritableMember.id,
-        currentAccountId: currentAccount.id,
-      });
-      return activeWritableMember.id;
-    }
+    if (activeWritableMember) return activeWritableMember.id;
   }
 
   const ownedWritableMember = typedProfiles.find(
     (profile) => profile.account_id === currentAccount.id,
   );
-  if (ownedWritableMember) {
-    logMessageMutation('senderProfile:dm-fallback', {
-      orgId,
-      channelId,
-      requestedSenderProfileId,
-      writableSenderProfileId,
-      resolvedSenderProfileId: ownedWritableMember.id,
-      currentAccountId: currentAccount.id,
-    });
-    return ownedWritableMember.id;
-  }
+  if (ownedWritableMember) return ownedWritableMember.id;
 
   const linkedWritableMember = typedProfiles[0];
-  if (linkedWritableMember) {
-    logMessageMutation('senderProfile:dm-fallback', {
-      orgId,
-      channelId,
-      requestedSenderProfileId,
-      writableSenderProfileId,
-      resolvedSenderProfileId: linkedWritableMember.id,
-      currentAccountId: currentAccount.id,
-    });
-    return linkedWritableMember.id;
-  }
+  if (linkedWritableMember) return linkedWritableMember.id;
 
   return writableSenderProfileId;
 }
@@ -1193,112 +1018,45 @@ export async function sendTextMessage(
     writableSenderProfileId,
   );
 
-  logMessageMutation('sendTextMessage:start', {
-    orgId,
-    channelId,
-    senderProfileId,
-    resolvedSenderProfileId,
-    threadParentId: threadParentId ?? null,
-    threadId: threadId ?? null,
-    contentLength: content.length,
-  });
-
-  try {
-    const now = new Date().toISOString();
-    const messageId = createClientUuid();
-    const { threadId: resolvedThreadId, threadCreated } =
-      await resolveThreadContextForSend({
-        orgId,
-        channelId,
-        senderProfileId: resolvedSenderProfileId,
-        requestedThreadId: threadId,
-        threadParentId,
-        now,
-      });
-
-    const { error: msgError } = await supabase.from('messages').insert({
-      id: messageId,
-      channel_id: channelId,
-      sender_profile_id: resolvedSenderProfileId,
-      org_id: orgId,
-      type: 'text',
-      thread_parent_id: threadParentId ?? null,
-      ...(resolvedThreadId ? { thread_id: resolvedThreadId } : {}),
-    });
-
-    if (msgError) throw msgError;
-
-    const { error: payloadError } = await supabase
-      .from('message_text')
-      .insert({ message_id: messageId, org_id: orgId, payload: { text: content } });
-
-    if (payloadError) throw payloadError;
-
-    await bumpThreadReplyCount({
-      threadId: resolvedThreadId,
-      threadCreated,
-      now,
-      senderProfileId: resolvedSenderProfileId,
-    });
-
-    logMessageMutation('sendTextMessage:success', {
+  const now = new Date().toISOString();
+  const messageId = createClientUuid();
+  const { threadId: resolvedThreadId, threadCreated } = await resolveThreadContextForSend(
+    {
       orgId,
       channelId,
-      senderProfileId,
-      resolvedSenderProfileId,
-      messageId,
-      threadId: resolvedThreadId ?? null,
-    });
+      senderProfileId: resolvedSenderProfileId,
+      requestedThreadId: threadId,
+      threadParentId,
+      now,
+    },
+  );
 
-    return { id: messageId };
-  } catch (error) {
-    const typedError = error as { code?: string; message?: string };
-    let debugContext: MessageWriteDebugContext | null = null;
+  const { error: msgError } = await supabase.from('messages').insert({
+    id: messageId,
+    channel_id: channelId,
+    sender_profile_id: resolvedSenderProfileId,
+    org_id: orgId,
+    type: 'text',
+    thread_parent_id: threadParentId ?? null,
+    ...(resolvedThreadId ? { thread_id: resolvedThreadId } : {}),
+  });
 
-    try {
-      debugContext = await collectMessageWriteDebugContext({
-        orgId,
-        channelId,
-        requestedSenderProfileId: senderProfileId,
-        resolvedSenderProfileId,
-      });
-    } catch (debugError) {
-      const typedDebugError = debugError as { message?: string };
-      debugContext = {
-        authUserId: null,
-        currentAccountId: null,
-        currentAccountOrgId: null,
-        currentAccountActiveProfileId: null,
-        requestedProfileAccountId: null,
-        requestedProfileOrgId: null,
-        requestedProfileKind: null,
-        resolvedProfileAccountId: null,
-        resolvedProfileOrgId: null,
-        resolvedProfileKind: null,
-        channelKind: null,
-        channelPurpose: null,
-        channelMemberProfileIds: [],
-        debugCollectionError: typedDebugError.message ?? String(debugError),
-      } as MessageWriteDebugContext & { debugCollectionError: string };
-    }
+  if (msgError) throw msgError;
 
-    logMessageMutation(
-      'sendTextMessage:error',
-      {
-        orgId,
-        channelId,
-        senderProfileId,
-        resolvedSenderProfileId,
-        threadParentId: threadParentId ?? null,
-        threadId: threadId ?? null,
-        errorCode: typedError.code ?? null,
-        errorMessage: typedError.message ?? String(error),
-        debugContext,
-      },
-      'error',
-    );
-    throw error;
-  }
+  const { error: payloadError } = await supabase
+    .from('message_text')
+    .insert({ message_id: messageId, org_id: orgId, payload: { text: content } });
+
+  if (payloadError) throw payloadError;
+
+  await bumpThreadReplyCount({
+    threadId: resolvedThreadId,
+    threadCreated,
+    now,
+    senderProfileId: resolvedSenderProfileId,
+  });
+
+  return { id: messageId };
 }
 
 const CHANNEL_FILES_BUCKET = 'channel-files';
@@ -1354,54 +1112,15 @@ export async function uploadChannelFile(
   mimeType: string,
   prereadBase64?: string,
 ): Promise<void> {
-  const segments = storagePath.split('/');
-  logMessageMutation('uploadChannelFile:start', {
-    bucket: CHANNEL_FILES_BUCKET,
-    storagePath,
-    mimeType,
-    localUri,
-    hasBase64: Boolean(prereadBase64),
-    pathOrgId: segments[0] ?? null,
-    pathChannelId: segments[1] ?? null,
-    pathKind: segments[2] ?? null,
-    pathProfileId: segments[3] ?? null,
-    pathFileKey: segments.slice(4).join('/') || null,
-  });
+  const data: Uint8Array = prereadBase64
+    ? base64ToUint8Array(prereadBase64)
+    : await new ExpoFile(localUri).bytes();
 
-  try {
-    const data: Uint8Array = prereadBase64
-      ? base64ToUint8Array(prereadBase64)
-      : await new ExpoFile(localUri).bytes();
+  const { error } = await supabase.storage
+    .from(CHANNEL_FILES_BUCKET)
+    .upload(storagePath, data, { contentType: mimeType, upsert: false });
 
-    const { error } = await supabase.storage
-      .from(CHANNEL_FILES_BUCKET)
-      .upload(storagePath, data, { contentType: mimeType, upsert: false });
-
-    if (error) throw error;
-
-    logMessageMutation('uploadChannelFile:success', {
-      bucket: CHANNEL_FILES_BUCKET,
-      storagePath,
-      mimeType,
-      byteLength: data.byteLength,
-    });
-  } catch (error) {
-    const typedError = error as { code?: string; message?: string; statusCode?: string };
-    logMessageMutation(
-      'uploadChannelFile:error',
-      {
-        bucket: CHANNEL_FILES_BUCKET,
-        storagePath,
-        mimeType,
-        localUri,
-        errorCode: typedError.code ?? null,
-        errorStatusCode: typedError.statusCode ?? null,
-        errorMessage: typedError.message ?? String(error),
-      },
-      'error',
-    );
-    throw error;
-  }
+  if (error) throw error;
 }
 
 export type FileAttachmentInput = {
@@ -1434,87 +1153,41 @@ export async function sendFileMessage(
   const isImage = file.mimeType.startsWith('image/');
   const isAudio = file.mimeType.startsWith('audio/');
   const type = isImage ? 'image' : isAudio ? 'audio-recording' : 'file';
-  logMessageMutation('sendFileMessage:start', {
-    orgId,
-    channelId,
-    senderProfileId,
-    resolvedSenderProfileId,
-    threadParentId: threadParentId ?? null,
-    threadId: threadId ?? null,
+  const messageId = createClientUuid();
+  const { error: msgError } = await supabase.from('messages').insert({
+    id: messageId,
+    channel_id: channelId,
+    sender_profile_id: resolvedSenderProfileId,
+    org_id: orgId,
     type,
-    fileName: file.name,
-    mimeType: file.mimeType,
-    storagePath: file.storagePath,
+    thread_parent_id: threadParentId ?? null,
+    ...(threadId ? { thread_id: threadId } : {}),
   });
 
-  try {
-    const messageId = createClientUuid();
-    const { error: msgError } = await supabase.from('messages').insert({
-      id: messageId,
-      channel_id: channelId,
-      sender_profile_id: resolvedSenderProfileId,
-      org_id: orgId,
-      type,
-      thread_parent_id: threadParentId ?? null,
-      ...(threadId ? { thread_id: threadId } : {}),
-    });
+  if (msgError) throw msgError;
 
-    if (msgError) throw msgError;
+  const payload: Record<string, unknown> = {
+    url: file.storagePath,
+    storagePath: file.storagePath,
+    name: file.name,
+    ...(file.size !== undefined ? { size: file.size } : {}),
+    mimeType: file.mimeType,
+    ...(isAudio ? { durationSeconds: file.durationSeconds ?? 0 } : {}),
+    ...(content?.trim() ? { text: content.trim() } : {}),
+  };
 
-    const payload: Record<string, unknown> = {
-      url: file.storagePath,
-      storagePath: file.storagePath,
-      name: file.name,
-      ...(file.size !== undefined ? { size: file.size } : {}),
-      mimeType: file.mimeType,
-      ...(isAudio ? { durationSeconds: file.durationSeconds ?? 0 } : {}),
-      ...(content?.trim() ? { text: content.trim() } : {}),
-    };
+  const table = isImage
+    ? 'message_image'
+    : isAudio
+      ? 'message_audio_recording'
+      : 'message_file';
+  const { error: payloadError } = await supabase
+    .from(table)
+    .insert({ message_id: messageId, org_id: orgId, payload });
 
-    const table = isImage
-      ? 'message_image'
-      : isAudio
-        ? 'message_audio_recording'
-        : 'message_file';
-    const { error: payloadError } = await supabase
-      .from(table)
-      .insert({ message_id: messageId, org_id: orgId, payload });
+  if (payloadError) throw payloadError;
 
-    if (payloadError) throw payloadError;
-
-    logMessageMutation('sendFileMessage:success', {
-      orgId,
-      channelId,
-      senderProfileId,
-      resolvedSenderProfileId,
-      messageId,
-      table,
-      type,
-    });
-
-    return { id: messageId };
-  } catch (error) {
-    const typedError = error as { code?: string; message?: string };
-    logMessageMutation(
-      'sendFileMessage:error',
-      {
-        orgId,
-        channelId,
-        senderProfileId,
-        resolvedSenderProfileId,
-        threadParentId: threadParentId ?? null,
-        threadId: threadId ?? null,
-        type,
-        fileName: file.name,
-        mimeType: file.mimeType,
-        storagePath: file.storagePath,
-        errorCode: typedError.code ?? null,
-        errorMessage: typedError.message ?? String(error),
-      },
-      'error',
-    );
-    throw error;
-  }
+  return { id: messageId };
 }
 
 export async function sendFilesMessage(
@@ -1539,88 +1212,39 @@ export async function sendFilesMessage(
   );
   const allImages = files.every((file) => file.mimeType.startsWith('image/'));
   const type = allImages ? 'image' : 'file';
-  logMessageMutation('sendFilesMessage:start', {
-    orgId,
-    channelId,
-    senderProfileId,
-    resolvedSenderProfileId,
-    threadParentId: threadParentId ?? null,
-    threadId: threadId ?? null,
+  const messageId = createClientUuid();
+  const { error: msgError } = await supabase.from('messages').insert({
+    id: messageId,
+    channel_id: channelId,
+    sender_profile_id: resolvedSenderProfileId,
+    org_id: orgId,
     type,
-    fileCount: files.length,
-    files: files.map((file) => ({
-      name: file.name,
-      mimeType: file.mimeType,
-      storagePath: file.storagePath,
-      size: file.size ?? null,
-    })),
+    thread_parent_id: threadParentId ?? null,
+    ...(threadId ? { thread_id: threadId } : {}),
   });
 
-  try {
-    const messageId = createClientUuid();
-    const { error: msgError } = await supabase.from('messages').insert({
-      id: messageId,
-      channel_id: channelId,
-      sender_profile_id: resolvedSenderProfileId,
-      org_id: orgId,
-      type,
-      thread_parent_id: threadParentId ?? null,
-      ...(threadId ? { thread_id: threadId } : {}),
-    });
+  if (msgError) throw msgError;
 
-    if (msgError) throw msgError;
+  const attachmentsPayload = files.map((file) => ({
+    url: file.storagePath,
+    storagePath: file.storagePath,
+    name: file.name,
+    ...(file.size !== undefined ? { size: file.size } : {}),
+    mimeType: file.mimeType,
+  }));
 
-    const attachmentsPayload = files.map((file) => ({
-      url: file.storagePath,
-      storagePath: file.storagePath,
-      name: file.name,
-      ...(file.size !== undefined ? { size: file.size } : {}),
-      mimeType: file.mimeType,
-    }));
+  const payload: Record<string, unknown> = {
+    ...attachmentsPayload[0],
+    attachments: attachmentsPayload,
+    ...(content?.trim() ? { text: content.trim() } : {}),
+  };
 
-    const payload: Record<string, unknown> = {
-      ...attachmentsPayload[0],
-      attachments: attachmentsPayload,
-      ...(content?.trim() ? { text: content.trim() } : {}),
-    };
+  const table = allImages ? 'message_image' : 'message_file';
+  const { error: payloadError } = await supabase
+    .from(table)
+    .insert({ message_id: messageId, org_id: orgId, payload });
 
-    const table = allImages ? 'message_image' : 'message_file';
-    const { error: payloadError } = await supabase
-      .from(table)
-      .insert({ message_id: messageId, org_id: orgId, payload });
+  if (payloadError) throw payloadError;
 
-    if (payloadError) throw payloadError;
-
-    logMessageMutation('sendFilesMessage:success', {
-      orgId,
-      channelId,
-      senderProfileId,
-      resolvedSenderProfileId,
-      messageId,
-      table,
-      type,
-      fileCount: files.length,
-    });
-
-    return { id: messageId };
-  } catch (error) {
-    const typedError = error as { code?: string; message?: string };
-    logMessageMutation(
-      'sendFilesMessage:error',
-      {
-        orgId,
-        channelId,
-        senderProfileId,
-        resolvedSenderProfileId,
-        threadParentId: threadParentId ?? null,
-        threadId: threadId ?? null,
-        type,
-        fileCount: files.length,
-        errorCode: typedError.code ?? null,
-        errorMessage: typedError.message ?? String(error),
-      },
-      'error',
-    );
-    throw error;
-  }
+  return { id: messageId };
 }

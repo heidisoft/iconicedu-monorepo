@@ -25,6 +25,7 @@ import {
 import { mapUserOnboardingStatusRowToVM } from '@iconicedu/web/lib/onboarding/mappers';
 import { buildDirectMessageChannelsWithMessages } from '@iconicedu/web/lib/channels/builders/channel.builder';
 import { getOrgsByIds } from '@iconicedu/web/lib/org/queries/org.query';
+import { reportWebObservedError } from '@iconicedu/web/lib/analytics/report-error';
 
 export async function loadSidebarContext(
   supabase: SupabaseClient,
@@ -107,7 +108,7 @@ export async function loadSidebarContext(
     (!computedStep && onboardingStatus && !onboardingStatus.completed);
 
   if (shouldSyncOnboardingStatus) {
-    const { data, error } = await upsertUserOnboardingStatus(supabase, {
+    const { data } = await upsertUserOnboardingStatus(supabase, {
       profileId: profileVM.ids.id,
       orgId: profileVM.ids.orgId,
       currentStep: computedStep,
@@ -117,8 +118,6 @@ export async function loadSidebarContext(
 
     if (data) {
       onboardingStatus = mapUserOnboardingStatusRowToVM(data);
-    } else if (error) {
-      console.error('Unable to sync onboarding status', error);
     }
   }
 
@@ -273,7 +272,16 @@ async function autoAcceptPendingInvites(supabase: SupabaseClient, accountId: str
         relation: 'guardian',
       });
     } catch (error) {
-      console.error('Failed to auto-accept family invite', error);
+      reportWebObservedError({
+        error,
+        source: 'web.sidebar.auto_accept_family_invite',
+        message: 'Failed to auto-accept family invite during sidebar load',
+        context: {
+          inviteId: invite.id,
+          accountId,
+          orgId: account.org_id,
+        },
+      });
     }
   }
 }

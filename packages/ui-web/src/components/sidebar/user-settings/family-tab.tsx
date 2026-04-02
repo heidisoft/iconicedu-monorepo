@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { Plus, ShieldAlert, UserPlus } from 'lucide-react';
+import { reportObservedError } from '@iconicedu/utils';
 
 import type { ChildProfileVM, ThemeKey, UserProfileVM } from '@iconicedu/shared-types';
 import { normalizeCountryCode, optionsForCountry } from '@iconicedu/shared-types';
@@ -329,7 +330,6 @@ export function FamilyTab({
       setIsInviteOpen(false);
       toast.success('Invitation sent');
     } catch (error) {
-      console.error(error);
       const message = resolveFamilyInviteErrorMessage(error);
       setInviteError(message);
       toast.error(message);
@@ -375,7 +375,12 @@ export function FamilyTab({
         setInvites((prev) => prev.filter((invite) => invite.id !== id));
         toast.success('Invite removed');
       } catch (error) {
-        console.error(error);
+        reportObservedError({
+          error,
+          source: 'web.user_settings.family.remove_invite',
+          message: 'Failed to remove family invite',
+          context: { inviteId: id },
+        });
         toast.error(INVITE_REMOVE_ERROR);
       } finally {
         setRemovingInviteIds((prev) => {
@@ -487,7 +492,11 @@ export function FamilyTab({
       }
       setIsDialogOpen(false);
     } catch (error) {
-      console.error(error);
+      reportObservedError({
+        error,
+        source: 'web.user_settings.family.create_child_profile',
+        message: 'Failed to create child profile',
+      });
       toast.error('Unable to create child profile');
     } finally {
       setIsCreatingChild(false);
@@ -575,7 +584,12 @@ export function FamilyTab({
         await onFamilyMemberRemove({ childAccountId: member.accountId });
         toast.success('Family member removed');
       } catch (error) {
-        console.error(error);
+        reportObservedError({
+          error,
+          source: 'web.user_settings.family.remove_member',
+          message: 'Failed to remove family member',
+          context: { childAccountId: member.accountId },
+        });
         toast.error('Unable to remove family member');
       } finally {
         setRemovingMemberIds((prev) => {

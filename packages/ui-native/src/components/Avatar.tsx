@@ -1,23 +1,27 @@
 import React, { useMemo } from 'react';
-import { View, Text, Image, type ImageSourcePropType } from 'react-native';
+import { View, Text, Image } from 'react-native';
 import { cva, type VariantProps } from 'class-variance-authority';
+
 import { cn } from '@iconicedu/ui-native/lib/utils';
 import type { PresenceDisplayStatusVM } from '@iconicedu/shared-types';
 
-const avatarVariants = cva('relative rounded-full bg-muted items-center justify-center', {
-  variants: {
-    size: {
-      xs: 'h-6 w-6',
-      sm: 'h-8 w-8',
-      md: 'h-10 w-10',
-      lg: 'h-12 w-12',
-      xl: 'h-16 w-16',
+const avatarFrameVariants = cva(
+  'relative rounded-full items-center justify-center overflow-hidden border border-border',
+  {
+    variants: {
+      size: {
+        xs: 'h-6 w-6',
+        sm: 'h-8 w-8',
+        md: 'h-10 w-10',
+        lg: 'h-12 w-12',
+        xl: 'h-16 w-16',
+      },
+    },
+    defaultVariants: {
+      size: 'md',
     },
   },
-  defaultVariants: {
-    size: 'md',
-  },
-});
+);
 
 const avatarTextVariants = cva('font-semibold text-muted-foreground', {
   variants: {
@@ -57,11 +61,12 @@ function getInitials(name?: string): string {
   return (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase();
 }
 
-type AvatarSize = NonNullable<VariantProps<typeof avatarVariants>['size']>;
+type AvatarSize = NonNullable<VariantProps<typeof avatarFrameVariants>['size']>;
 
-export type AvatarProps = {
+type AvatarProps = {
   src?: string | null;
   name?: string;
+  seed?: string | null;
   size?: AvatarSize;
   status?: PresenceDisplayStatusVM;
   className?: string;
@@ -70,28 +75,25 @@ export type AvatarProps = {
 export const Avatar: React.FC<AvatarProps> = ({
   src,
   name,
+  seed: _seed,
   size = 'md',
   status,
   className,
 }) => {
+  const label = name || 'Avatar';
   const initials = useMemo(() => getInitials(name), [name]);
 
   return (
-    <View className={cn('relative', className)}>
-      {src ? (
-        <Image
-          source={{ uri: src } as ImageSourcePropType}
-          className={cn(avatarVariants({ size }))}
-          accessibilityLabel={name ?? 'Avatar'}
-        />
-      ) : (
-        <View
-          className={cn(avatarVariants({ size }))}
-          accessibilityLabel={name ?? 'Avatar'}
-        >
-          <Text className={cn(avatarTextVariants({ size }))}>{initials}</Text>
-        </View>
-      )}
+    <View className={cn('relative', className)} accessibilityLabel={label}>
+      <View className={cn(avatarFrameVariants({ size }))}>
+        {src ? (
+          <Image source={{ uri: src }} className="h-full w-full rounded-full" />
+        ) : (
+          <View className="h-full w-full items-center justify-center rounded-full bg-muted">
+            <Text className={cn(avatarTextVariants({ size }))}>{initials}</Text>
+          </View>
+        )}
+      </View>
       {status && status !== 'offline' && (
         <View
           className={cn(
@@ -104,3 +106,5 @@ export const Avatar: React.FC<AvatarProps> = ({
     </View>
   );
 };
+
+export type { AvatarProps };

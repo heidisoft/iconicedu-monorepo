@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { Bell, ChevronDown, Megaphone, Wallet } from 'lucide-react';
+import { reportObservedError } from '@iconicedu/utils';
 
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { UserSettingsTabSection } from '@iconicedu/ui-web/components/sidebar/user-settings/components/user-settings-tab-section';
@@ -499,7 +500,16 @@ export function NotificationsTab({
               }));
             })
             .catch((error: unknown) => {
-              console.error(error);
+              reportObservedError({
+                error,
+                source: 'web.user_settings.notifications.save_preference',
+                message: 'Failed to persist notification preference changes',
+                context: {
+                  profileId,
+                  orgId,
+                  itemKey,
+                },
+              });
             });
         }
       }

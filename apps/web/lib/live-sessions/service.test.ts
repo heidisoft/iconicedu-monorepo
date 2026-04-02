@@ -825,7 +825,7 @@ describe('createOrJoinLiveSession', () => {
     expect(eventTypes).toContain('member.joined');
   });
 
-  it('returns successfully even when activity publishing fails', async () => {
+  it('returns successfully even when activity publishing fails without logging', async () => {
     const serviceSupabase = createServiceSupabaseStub();
     const scheduler = createImmediateScheduler();
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -849,15 +849,7 @@ describe('createOrJoinLiveSession', () => {
 
     await scheduler.flush();
 
-    expect(errorSpy).toHaveBeenCalledWith(
-      '[live-sessions] post-join side effects failed',
-      expect.objectContaining({
-        channelId: 'channel-1',
-        sessionId: 'live-session-1',
-        profileId: 'profile-1',
-        error: 'activity failed',
-      }),
-    );
+    expect(errorSpy).not.toHaveBeenCalled();
 
     errorSpy.mockRestore();
   });

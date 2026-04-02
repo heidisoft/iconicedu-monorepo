@@ -1100,7 +1100,7 @@ export default function ProfileSetupScreen() {
   const { colors } = useTheme();
   const s = useMemo(() => makeStyles(colors), [colors]);
   const queryClient = useQueryClient();
-  const { session } = useAuth();
+  const { session, setOnboardingCompletionStatus } = useAuth();
   const analytics = useAnalytics();
 
   useEffect(() => {
@@ -1163,13 +1163,13 @@ export default function ProfileSetupScreen() {
       })
       .then((data) => {
         setOnboarding(data);
+        setOnboardingCompletionStatus(data.isComplete);
         setStatusLoading(false);
       })
       .catch(() => {
         setStatusLoading(false);
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [queryClient, setOnboardingCompletionStatus]);
 
   const kind = onboarding?.profileKind ?? onboarding?.primaryRole ?? null;
 
@@ -1272,6 +1272,7 @@ export default function ProfileSetupScreen() {
       }
       if (isLast) {
         await completeOnboarding(onboarding.accountId);
+        setOnboardingCompletionStatus(true);
         analytics.capture(AnalyticsEvent.ONBOARDING_COMPLETED, { role: kind });
       }
     },

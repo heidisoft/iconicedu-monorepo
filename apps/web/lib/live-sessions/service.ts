@@ -16,6 +16,7 @@ import {
 import { resolveChannelLiveSessionScope } from '@iconicedu/web/lib/live-sessions/scope';
 import type { SupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { publishActivityEvent } from '@iconicedu/web/lib/activity-feed/publisher/activity-publisher';
+import { reportWebObservedError } from '@iconicedu/web/lib/analytics/report-error';
 
 type ChannelLiveSessionConfigRecord = {
   enabled: boolean;
@@ -572,20 +573,6 @@ async function shouldPublishSessionStartedForJoin(input: {
   return !alreadyStarted;
 }
 
-function logPostJoinSideEffectsError(input: {
-  channelId: string;
-  sessionId: string;
-  profileId: string;
-  error: unknown;
-}) {
-  console.error('[live-sessions] post-join side effects failed', {
-    channelId: input.channelId,
-    sessionId: input.sessionId,
-    profileId: input.profileId,
-    error: input.error instanceof Error ? input.error.message : input.error,
-  });
-}
-
 function runPostJoinSideEffects(
   scheduler: PostJoinSideEffectsScheduler | undefined,
   input: {
@@ -604,11 +591,15 @@ function runPostJoinSideEffects(
     try {
       await input.task();
     } catch (error) {
-      logPostJoinSideEffectsError({
-        channelId: input.channelId,
-        sessionId: input.sessionId,
-        profileId: input.profileId,
+      reportWebObservedError({
         error,
+        source: 'web.live_sessions.post_join_side_effects',
+        message: 'Post-join side effects failed',
+        context: {
+          channelId: input.channelId,
+          sessionId: input.sessionId,
+          profileId: input.profileId,
+        },
       });
     }
   });

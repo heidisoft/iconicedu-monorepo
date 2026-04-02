@@ -1,6 +1,7 @@
 'use client';
 
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { reportObservedError } from '@iconicedu/utils';
 import {
   MessageList,
   type MessageListRef,
@@ -1101,7 +1102,12 @@ export function MessagesContainer({
             });
           }
         } catch (error) {
-          console.error('Failed to toggle hidden message:', error);
+          reportObservedError({
+            error,
+            source: 'web.messages.toggle_hidden',
+            message: 'Failed to toggle message hidden state',
+            context: { messageId },
+          });
           return;
         } finally {
           setPendingMessageAction(setHidingMessageIds, messageId, false);
@@ -1145,7 +1151,12 @@ export function MessagesContainer({
             });
           }
         } catch (error) {
-          console.error('Failed to delete message:', error);
+          reportObservedError({
+            error,
+            source: 'web.messages.delete_message',
+            message: 'Failed to delete message',
+            context: { messageId },
+          });
           return;
         } finally {
           setPendingMessageAction(setDeletingMessageIds, messageId, false);

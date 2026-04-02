@@ -21,6 +21,7 @@ import {
 } from 'expo-audio';
 import type { AudioRecorder } from 'expo-audio';
 import { ImageIcon, Paperclip, Mic, Square } from 'lucide-react-native';
+import { reportMobileObservedError } from '@/lib/analytics/report-error';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 
@@ -294,101 +295,51 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
   // ── Image picker ──────────────────────────────────────────────────────────
 
   const handlePickImage = useCallback(async () => {
-    console.debug('[AttachmentSheet] pickImage:start');
-    try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      console.debug('[AttachmentSheet] pickImage:permission', { status });
-      if (status !== 'granted') {
-        Alert.alert(
-          'Permission required',
-          'Please allow access to your photo library in Settings.',
-        );
-        return;
-      }
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsMultipleSelection: true,
-        quality: 0.85,
-        base64: true,
-      });
-      console.debug('[AttachmentSheet] pickImage:result', {
-        canceled: result.canceled,
-        assetCount: result.assets?.length ?? 0,
-      });
-      if (result.canceled || !result.assets.length) return;
-      const payloads = await Promise.all(
-        result.assets.map((asset, i) => normalizePickedImage(asset, i)),
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Permission required',
+        'Please allow access to your photo library in Settings.',
       );
-      console.debug('[AttachmentSheet] pickImage:payloads', {
-        attachmentCount: payloads.length,
-        attachments: payloads.map((payload) => ({
-          name: payload.name,
-          mimeType: payload.mimeType,
-          size: payload.size ?? null,
-          uri: payload.uri,
-          hasBase64: Boolean(payload.base64),
-        })),
-      });
-      onClose();
-      onAttach(payloads);
-    } catch (error) {
-      const typedError = error as { message?: string };
-      console.error('[AttachmentSheet] pickImage:error', {
-        errorMessage: typedError.message ?? String(error),
-      });
-      throw error;
+      return;
     }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: true,
+      quality: 0.85,
+      base64: true,
+    });
+    if (result.canceled || !result.assets.length) return;
+    const payloads = await Promise.all(
+      result.assets.map((asset, i) => normalizePickedImage(asset, i)),
+    );
+    onClose();
+    onAttach(payloads);
   }, [onClose, onAttach]);
 
   // ── Document picker ───────────────────────────────────────────────────────
 
   const handlePickFile = useCallback(async () => {
-    console.debug('[AttachmentSheet] pickFile:start');
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        copyToCacheDirectory: true,
-        multiple: true,
-        type: ALLOWED_DOC_TYPES,
-      });
-      console.debug('[AttachmentSheet] pickFile:result', {
-        canceled: result.canceled,
-        assetCount: result.assets?.length ?? 0,
-      });
-      if (result.canceled || !result.assets.length) return;
-      const payloads: AttachmentPayload[] = result.assets.map((asset) => ({
-        uri: asset.uri,
-        name: asset.name,
-        mimeType: asset.mimeType ?? 'application/octet-stream',
-        size: asset.size,
-      }));
-      console.debug('[AttachmentSheet] pickFile:payloads', {
-        attachmentCount: payloads.length,
-        attachments: payloads.map((payload) => ({
-          name: payload.name,
-          mimeType: payload.mimeType,
-          size: payload.size ?? null,
-          uri: payload.uri,
-        })),
-      });
-      onClose();
-      onAttach(payloads);
-    } catch (error) {
-      const typedError = error as { message?: string };
-      console.error('[AttachmentSheet] pickFile:error', {
-        errorMessage: typedError.message ?? String(error),
-      });
-      throw error;
-    }
+    const result = await DocumentPicker.getDocumentAsync({
+      copyToCacheDirectory: true,
+      multiple: true,
+      type: ALLOWED_DOC_TYPES,
+    });
+    if (result.canceled || !result.assets.length) return;
+    const payloads: AttachmentPayload[] = result.assets.map((asset) => ({
+      uri: asset.uri,
+      name: asset.name,
+      mimeType: asset.mimeType ?? 'application/octet-stream',
+      size: asset.size,
+    }));
+    onClose();
+    onAttach(payloads);
   }, [onClose, onAttach]);
 
   // ── Audio recording ───────────────────────────────────────────────────────
 
   const handleStartRecording = useCallback(async () => {
-    console.debug('[AttachmentSheet] startRecording:start');
     const permission = await requestRecordingPermissionsAsync();
-    console.debug('[AttachmentSheet] startRecording:permission', {
-      granted: permission.granted,
-    });
     if (!permission.granted) {
       Alert.alert('Permission required', 'Please allow microphone access in Settings.');
       return;
@@ -409,8 +360,12 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
       setTimeout(() => {
         if (recordingRef.current) handleStopRecording();
       }, 60_000);
-    } catch (err) {
-      console.warn('[AttachmentSheet] recording start error:', err);
+    } catch (error) {
+      reportMobileObservedError({
+        error,
+        source: 'mobile.messages.attachment_sheet.recording_start',
+        message: 'Failed to start voice recording',
+      });
       Alert.alert('Error', 'Could not start recording. Please try again.');
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -426,10 +381,6 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
       recordingRef.current = null;
       await setAudioModeAsync({ allowsRecording: false });
       if (uri) {
-        console.debug('[AttachmentSheet] stopRecording:payload', {
-          uri,
-          durationSeconds: Math.max(1, durationSeconds),
-        });
         onClose();
         onAttach([
           {
@@ -442,8 +393,12 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
       } else {
         setMode('menu');
       }
-    } catch (err) {
-      console.warn('[AttachmentSheet] recording stop error:', err);
+    } catch (error) {
+      reportMobileObservedError({
+        error,
+        source: 'mobile.messages.attachment_sheet.recording_stop',
+        message: 'Failed to stop voice recording cleanly',
+      });
       setMode('menu');
     } finally {
       setIsStopping(false);

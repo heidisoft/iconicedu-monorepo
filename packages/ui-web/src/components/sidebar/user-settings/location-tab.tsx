@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { MapPin } from 'lucide-react';
+import { reportObservedError } from '@iconicedu/utils';
 
 import { Country, State } from 'country-state-city';
 import type { UserProfileVM } from '@iconicedu/shared-types';
@@ -224,7 +225,11 @@ export function LocationTab({
             );
           }
         } catch (error) {
-          console.error(error);
+          reportObservedError({
+            error,
+            source: 'web.user_settings.location.reverse_geocode',
+            message: 'Failed to reverse geocode the selected location',
+          });
           setLocationError('Unable to determine your location.');
         } finally {
           setIsSaving(false);

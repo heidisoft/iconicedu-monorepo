@@ -753,6 +753,47 @@ describe('fetchActivityFeed', () => {
     });
   });
 
+  it('hydrates refs.actor from actor_profile_id when profile data is available', async () => {
+    const actorRow = {
+      ...leafRow,
+      actor_profile_id: 'actor-1',
+      refs: {},
+    };
+    const itemsChain = createReturnsChain({ data: [actorRow], error: null });
+    const profilesChain = createReturnsChain({
+      data: [
+        {
+          id: 'actor-1',
+          display_name: 'Denise Richards',
+          first_name: 'Denise',
+          last_name: 'Richards',
+          avatar_url: null,
+          avatar_seed: 'seed-denise',
+          kind: 'educator',
+        },
+      ],
+      error: null,
+    });
+    mockFrom.mockReturnValueOnce(itemsChain).mockReturnValueOnce(profilesChain);
+
+    const result = await fetchActivityFeed(ORG_ID_FEED, PROFILE_ID);
+    const item = result.sections[0]?.items[0];
+
+    expect(mockFrom).toHaveBeenNthCalledWith(1, 'activity_feed_items');
+    expect(mockFrom).toHaveBeenNthCalledWith(2, 'profiles');
+    expect(profilesChain.eq).toHaveBeenCalledWith('org_id', ORG_ID_FEED);
+    expect(profilesChain.in).toHaveBeenCalledWith('id', ['actor-1']);
+    expect(profilesChain.is).toHaveBeenCalledWith('deleted_at', null);
+    expect(item?.refs.actor).toMatchObject({
+      ids: { id: 'actor-1', orgId: ORG_ID_FEED },
+      kind: 'educator',
+      profile: {
+        displayName: 'Denise Richards',
+        avatar: { source: 'seed', seed: 'seed-denise' },
+      },
+    });
+  });
+
   it('counts unread items correctly', async () => {
     const chain = createReturnsChain({ data: [leafRow], error: null });
     mockFrom.mockReturnValue(chain);

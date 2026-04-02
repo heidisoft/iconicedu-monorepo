@@ -7,6 +7,7 @@ import { shouldSkipCallbackRun } from '@iconicedu/web/app/(auth)/auth/callback/c
 import { shouldShowRoleOnboardingDialog } from '@iconicedu/web/app/(auth)/auth/callback/page.utils';
 import { RoleOnboardingModal } from '@iconicedu/web/app/(auth)/auth/callback/role-onboarding-modal';
 import { createSupabaseBrowserClient } from '@iconicedu/web/lib/supabase/client';
+import { reportWebObservedError } from '@iconicedu/web/lib/analytics/report-error';
 import { trackAuthTelemetry } from '@iconicedu/web/lib/telemetry/auth-events';
 
 type SupportedOtpType = 'email' | 'invite';
@@ -86,7 +87,15 @@ export default function CallbackPage() {
         } | null;
         return body?.onboarding ?? null;
       } catch (error) {
-        console.error('Failed to activate account after auth callback', error);
+        reportWebObservedError({
+          error,
+          source: 'web.auth.callback.activate_account',
+          message: 'Failed to activate account after auth callback',
+          context: {
+            requestedOrgSlug,
+            authIntent,
+          },
+        });
         return null;
       }
     };
@@ -182,7 +191,16 @@ export default function CallbackPage() {
         const onboarding = await activateAccount();
         await applyOnboardingState(onboarding);
       } catch (error) {
-        console.error('Failed to complete auth callback', error);
+        reportWebObservedError({
+          error,
+          source: 'web.auth.callback.finish',
+          message: 'Failed to complete auth callback',
+          context: {
+            requestedOrgSlug,
+            authIntent,
+            callbackSource,
+          },
+        });
         setPageError('Unable to complete login. Please try again.');
       }
     };
@@ -267,7 +285,15 @@ export default function CallbackPage() {
               router.replace(nextDestination);
               return { success: true };
             } catch (error) {
-              console.error('Failed to complete role onboarding', error);
+              reportWebObservedError({
+                error,
+                source: 'web.auth.callback.role_onboarding',
+                message: 'Failed to complete role onboarding',
+                context: {
+                  role,
+                  orgSlug: roleOnboardingState.orgSlug,
+                },
+              });
               return {
                 success: false,
                 message: 'Unable to complete onboarding. Please try again.',

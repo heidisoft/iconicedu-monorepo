@@ -11,7 +11,6 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import type { LearningSpaceVM, UserProfileVM } from '@iconicedu/shared-types';
 
-// eslint-disable-next-line no-restricted-imports
 import { ClassRequestAction } from '../class-request/class-request-action';
 import {
   Collapsible,
