@@ -161,7 +161,26 @@ describe('admin reports', () => {
             endAt: '2026-04-01T15:00:00.000Z',
             status: 'scheduled',
             visibility: 'org',
-            participants: [],
+            participants: [
+              {
+                ids: {
+                  id: 'profile-child-1',
+                  orgId: 'org-1',
+                  accountId: 'account-child-1',
+                },
+                role: 'child',
+                displayName: 'Nia Stone',
+              },
+              {
+                ids: {
+                  id: 'profile-educator-1',
+                  orgId: 'org-1',
+                  accountId: 'account-educator-1',
+                },
+                role: 'educator',
+                displayName: 'Taylor Reed',
+              },
+            ],
             source: 'manual',
             audit: {
               createdAt: '2026-03-28T10:00:00.000Z',
@@ -178,7 +197,26 @@ describe('admin reports', () => {
             endAt: '2026-04-03T15:00:00.000Z',
             status: 'scheduled',
             visibility: 'org',
-            participants: [],
+            participants: [
+              {
+                ids: {
+                  id: 'profile-child-1',
+                  orgId: 'org-1',
+                  accountId: 'account-child-1',
+                },
+                role: 'child',
+                displayName: 'Nia Stone',
+              },
+              {
+                ids: {
+                  id: 'profile-educator-1',
+                  orgId: 'org-1',
+                  accountId: 'account-educator-1',
+                },
+                role: 'educator',
+                displayName: 'Taylor Reed',
+              },
+            ],
             source: 'manual',
             audit: {
               createdAt: '2026-03-28T10:00:00.000Z',
@@ -195,7 +233,26 @@ describe('admin reports', () => {
             endAt: '2026-04-08T15:00:00.000Z',
             status: 'scheduled',
             visibility: 'org',
-            participants: [],
+            participants: [
+              {
+                ids: {
+                  id: 'profile-child-1',
+                  orgId: 'org-1',
+                  accountId: 'account-child-1',
+                },
+                role: 'child',
+                displayName: 'Nia Stone',
+              },
+              {
+                ids: {
+                  id: 'profile-educator-1',
+                  orgId: 'org-1',
+                  accountId: 'account-educator-1',
+                },
+                role: 'educator',
+                displayName: 'Taylor Reed',
+              },
+            ],
             source: 'manual',
             audit: {
               createdAt: '2026-03-28T10:00:00.000Z',
@@ -409,10 +466,10 @@ describe('admin reports', () => {
       )?.value,
     ).toBe(1);
 
-    const marchCompletions = dashboard.monthlyCompletedSessions.find(
-      (point) => point.label === 'Mar 2026',
+    const aprilCompletions = dashboard.monthlyCompletedSessions.find(
+      (point) => point.label === 'Apr 2026',
     );
-    expect(marchCompletions?.value).toBe(2);
+    expect(aprilCompletions?.value).toBe(1);
 
     const marchAttendance = dashboard.monthlyAttendance.find(
       (point) => point.label === 'Mar 2026',
@@ -421,11 +478,11 @@ describe('admin reports', () => {
 
     expect(dashboard.completedSessionsByTeacher[0]).toMatchObject({
       label: 'Taylor Reed',
-      value: 2,
+      value: 1,
     });
     expect(dashboard.completedSessionsByFamily[0]).toMatchObject({
       label: 'Stone Family',
-      value: 2,
+      value: 1,
     });
     expect(dashboard.channelUsage[0]).toMatchObject({
       label: 'Math support',
@@ -451,7 +508,7 @@ describe('admin reports', () => {
     expect(
       dashboard.classroomSummary.find((metric) => metric.key === 'scheduled-this-week')
         ?.value,
-    ).toBe(2);
+    ).toBe(1);
     expect(
       dashboard.classroomSummary.find((metric) => metric.key === 'upcoming-next-7-days')
         ?.value,
@@ -461,7 +518,7 @@ describe('admin reports', () => {
     ).toBe(true);
   });
 
-  it('counts past sessions as completed even when status is not ended', () => {
+  it('keeps completed-session charts aligned with homepage schedule progress logic', () => {
     const dashboard = buildAdminReportsDashboardVM(
       {
         accounts: [] as never,
@@ -505,7 +562,35 @@ describe('admin reports', () => {
           },
         ] as never,
         learningSpaces: [] as never,
-        schedules: [] as never,
+        schedules: [
+          {
+            ids: {
+              id: 'schedule-1',
+              parentId: 'space-1',
+            },
+            title: 'Math support',
+            startAt: '2026-03-14T10:00:00.000Z',
+            endAt: '2026-03-14T11:00:00.000Z',
+            status: 'scheduled',
+            visibility: 'org',
+            participants: [
+              {
+                ids: {
+                  id: 'profile-educator-1',
+                  orgId: 'org-1',
+                  accountId: 'account-educator-1',
+                },
+                role: 'educator',
+                displayName: 'Taylor Reed',
+              },
+            ],
+            source: 'manual',
+            audit: {
+              createdAt: '2026-03-01T10:00:00.000Z',
+              updatedAt: '2026-03-01T10:00:00.000Z',
+            },
+          },
+        ] as never,
         messages: [] as never,
         activityFeedItems: [] as never,
         notificationDispatchJobs: [] as never,
@@ -545,5 +630,59 @@ describe('admin reports', () => {
       label: 'Taylor Reed',
       value: 1,
     });
+  });
+
+  it('counts recurring schedule occurrences in sessions this week', () => {
+    const dashboard = buildAdminReportsDashboardVM(
+      {
+        accounts: [] as never,
+        profiles: [] as never,
+        families: [] as never,
+        familyLinks: [] as never,
+        channels: [] as never,
+        channelMembers: [] as never,
+        learningSpaces: [] as never,
+        schedules: [
+          {
+            ids: {
+              id: 'schedule-recurring-1',
+              parentId: 'space-1',
+            },
+            title: 'Recurring algebra',
+            startAt: '2026-03-30T14:00:00.000Z',
+            endAt: '2026-03-30T15:00:00.000Z',
+            status: 'scheduled',
+            visibility: 'org',
+            participants: [],
+            source: 'manual',
+            recurrence: {
+              ids: { id: 'recurring-1', orgId: 'org-1' },
+              rule: {
+                frequency: 'weekly',
+                interval: 1,
+                until: '2026-04-30T23:59:59.000Z',
+                timezone: 'UTC',
+                byWeekday: ['MO', 'WE'],
+              },
+            },
+            audit: {
+              createdAt: '2026-03-01T10:00:00.000Z',
+              updatedAt: '2026-03-01T10:00:00.000Z',
+            },
+          },
+        ] as never,
+        messages: [] as never,
+        activityFeedItems: [] as never,
+        notificationDispatchJobs: [] as never,
+        liveSessions: [] as never,
+        liveSessionParticipants: [] as never,
+      },
+      { now },
+    );
+
+    expect(
+      dashboard.classroomSummary.find((metric) => metric.key === 'scheduled-this-week')
+        ?.value,
+    ).toBe(0);
   });
 });

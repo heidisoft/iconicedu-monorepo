@@ -281,9 +281,8 @@ function MonthlyCompletedSessionsChart({
   return (
     <AdminReportChartCard
       title="Monthly completed sessions"
-      description="Completed live sessions in each full month."
+      description="Completed schedule occurrences in each month, excluding cancellations."
       isEmpty={!data.some((point) => point.value > 0)}
-      className="xl:col-span-2"
     >
       <ChartContainer
         config={{
@@ -885,11 +884,13 @@ export function AdminClassroomReportsSection({
   return (
     <div className="flex flex-col gap-4">
       <AdminClassroomSummary dashboard={dashboard} />
-      <div className="grid gap-4 xl:grid-cols-2 [&>*:last-child:nth-child(odd)]:xl:col-span-2">
-        <UpcomingScheduledSessionsChart dashboard={dashboard} />
+      <UpcomingScheduledSessionsChart dashboard={dashboard} />
+      <div className="grid gap-4 xl:grid-cols-2">
         <MonthlyAttendanceChart dashboard={dashboard} />
         <MonthlyCompletedSessionsChart dashboard={dashboard} />
-        <WeeklyCompletedSessionsChart dashboard={dashboard} />
+      </div>
+      <WeeklyCompletedSessionsChart dashboard={dashboard} />
+      <div className="grid gap-4 xl:grid-cols-2">
         <TeacherRankingChart dashboard={dashboard} />
         <FamilyRankingChart dashboard={dashboard} />
       </div>
@@ -939,8 +940,10 @@ export function AdminReportsOverview({
   return (
     <div className="flex flex-col gap-6">
       <AdminReportsSummary dashboard={dashboard} />
-      <MonthlyAttendanceChart dashboard={dashboard} />
-      <MonthlyCompletedSessionsChart dashboard={dashboard} />
+      <div className="grid gap-4 xl:grid-cols-2">
+        <MonthlyAttendanceChart dashboard={dashboard} />
+        <MonthlyCompletedSessionsChart dashboard={dashboard} />
+      </div>
       <div className="grid gap-4 xl:grid-cols-2 [&>*:last-child:nth-child(odd)]:xl:col-span-2">
         <MonthlyUserGrowthChart dashboard={dashboard} />
         <ChannelUsageChart dashboard={dashboard} />
