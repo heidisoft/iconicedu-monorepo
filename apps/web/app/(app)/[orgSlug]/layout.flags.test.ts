@@ -12,6 +12,7 @@ const {
   listActiveOrgSubjectCatalogMock,
   mapOrgSubjectRowsToOptionsMock,
   buildAdminMenuSectionsMock,
+  enableAdminReportsRunMock,
   shouldRedirectToAuthResumeMock,
   resolveOrgDashboardPathMock,
   redirectMock,
@@ -28,6 +29,7 @@ const {
   listActiveOrgSubjectCatalogMock: vi.fn(),
   mapOrgSubjectRowsToOptionsMock: vi.fn(),
   buildAdminMenuSectionsMock: vi.fn(),
+  enableAdminReportsRunMock: vi.fn(),
   shouldRedirectToAuthResumeMock: vi.fn(),
   resolveOrgDashboardPathMock: vi.fn(),
   redirectMock: vi.fn(),
@@ -83,6 +85,12 @@ vi.mock('@iconicedu/web/lib/data/admin-menu-sections', () => ({
   buildAdminMenuSections: (...args: unknown[]) => buildAdminMenuSectionsMock(...args),
 }));
 
+vi.mock('@iconicedu/web/flags', () => ({
+  enableAdminReports: {
+    run: (...args: unknown[]) => enableAdminReportsRunMock(...args),
+  },
+}));
+
 vi.mock('@iconicedu/web/app/(app)/[orgSlug]/layout-auth-gate', () => ({
   shouldRedirectToAuthResume: (...args: unknown[]) =>
     shouldRedirectToAuthResumeMock(...args),
@@ -115,6 +123,7 @@ describe('org layout persona flags', () => {
     listActiveOrgSubjectCatalogMock.mockReset();
     mapOrgSubjectRowsToOptionsMock.mockReset();
     buildAdminMenuSectionsMock.mockReset();
+    enableAdminReportsRunMock.mockReset();
     shouldRedirectToAuthResumeMock.mockReset();
     resolveOrgDashboardPathMock.mockReset();
     redirectMock.mockReset();
@@ -153,6 +162,7 @@ describe('org layout persona flags', () => {
     listActiveOrgSubjectCatalogMock.mockResolvedValue({ data: [], error: null });
     mapOrgSubjectRowsToOptionsMock.mockReturnValue([]);
     buildAdminMenuSectionsMock.mockReturnValue([]);
+    enableAdminReportsRunMock.mockResolvedValue(false);
     resolveOrgDashboardPathMock.mockResolvedValue('/iconic-academy');
   });
 
@@ -166,6 +176,9 @@ describe('org layout persona flags', () => {
       ?.children as { props?: Record<string, unknown> } | undefined;
     expect(sidebarShellElement?.props?.isPersonaSwitchEnabled).toBe(true);
     expect(sidebarShellElement?.props?.isPersonaAddEnabled).toBe(true);
+    expect(buildAdminMenuSectionsMock).toHaveBeenCalledWith('/iconic-academy', {
+      includeReports: true,
+    });
   });
 
   it('does not emit layout debug logs', async () => {
@@ -176,5 +189,23 @@ describe('org layout persona flags', () => {
       params: Promise.resolve({ orgSlug: 'iconic-academy' }),
     });
     expect(infoSpy).not.toHaveBeenCalled();
+  });
+
+  it('emits layout debug logs when posthog flag debugging is enabled', async () => {
+    process.env.DEBUG_POSTHOG_FLAGS = 'true';
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+
+    await Layout({
+      children: null,
+      params: Promise.resolve({ orgSlug: 'iconic-academy' }),
+    });
+
+    expect(infoSpy).toHaveBeenCalledWith('[Admin Reports] Sidebar gate evaluated', {
+      flagKey: 'enable-admin-reports',
+      profileId: 'profile-1',
+      flagResult: false,
+      includeReports: true,
+      orgSlug: 'iconic-academy',
+    });
   });
 });

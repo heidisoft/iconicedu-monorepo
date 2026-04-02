@@ -1,7 +1,10 @@
 import type { AdminMenuSectionVM } from '@iconicedu/shared-types';
 
-export function buildAdminMenuSections(basePath: string): AdminMenuSectionVM[] {
-  return [
+export function buildAdminMenuSections(
+  basePath: string,
+  options: { includeReports?: boolean } = {},
+): AdminMenuSectionVM[] {
+  const sections: AdminMenuSectionVM[] = [
     {
       title: 'Users',
       iconKey: 'users',
@@ -47,6 +50,17 @@ export function buildAdminMenuSections(basePath: string): AdminMenuSectionVM[] {
       ],
     },
     {
+      title: 'Reports',
+      iconKey: 'reports',
+      links: [
+        { title: 'Overview', url: `${basePath}/admin/reports` },
+        { title: 'Users', url: `${basePath}/admin/reports/users` },
+        { title: 'Classrooms & sessions', url: `${basePath}/admin/reports/classrooms` },
+        { title: 'Channels', url: `${basePath}/admin/reports/channels` },
+        { title: 'Activity', url: `${basePath}/admin/reports/activity` },
+      ],
+    },
+    {
       title: 'Settings',
       iconKey: 'system',
       links: [
@@ -57,4 +71,8 @@ export function buildAdminMenuSections(basePath: string): AdminMenuSectionVM[] {
       ],
     },
   ];
+
+  return options.includeReports === false
+    ? sections.filter((section) => section.title !== 'Reports')
+    : sections;
 }

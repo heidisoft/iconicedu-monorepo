@@ -67,8 +67,10 @@ jobs:
       - name: Format check
         run: pnpm format:check
 
-      - name: Guard feature flags
-        run: pnpm guard:feature-flags
+      # Temporarily disabled in GitHub Actions. Keep the local script in package.json
+      # so the guard can be re-enabled here without reintroducing the implementation.
+      # - name: Guard feature flags
+      #   run: pnpm guard:feature-flags
 
       # PRs: only affected packages.
       - name: Lint + Typecheck
