@@ -60,6 +60,16 @@ async function resolveBaseUrl() {
   return resolveAppUrl();
 }
 
+function shouldAppendAuthCallbackForLoginLink(redirectTo: string) {
+  const trimmed = redirectTo.trim();
+  if (!trimmed) {
+    return false;
+  }
+
+  const parsed = new URL(trimmed, 'http://localhost');
+  return parsed.pathname === '/' || parsed.pathname === '';
+}
+
 export async function inviteAdminUserAction(
   formData: FormData,
 ): Promise<InviteUserResult> {
@@ -259,10 +269,20 @@ export async function inviteAdminUserAction(
     orgSlug,
     intent: 'get-started',
   });
-  const redirectTo =
-    redirectOverride && redirectOverride.trim()
-      ? ensureOrgCallbackRedirect(redirectOverride, orgSlug, intent)
-      : defaultRedirectTo;
+  let redirectTo = defaultRedirectTo;
+  if (redirectOverride && redirectOverride.trim()) {
+    if (mode === 'link' && shouldAppendAuthCallbackForLoginLink(redirectOverride)) {
+      const parsedRedirect = new URL(redirectOverride.trim(), baseUrl);
+      redirectTo = buildOrgInviteRedirectUrl({
+        baseUrl: parsedRedirect.origin,
+        profileKind: parsed.profileKind,
+        orgSlug,
+        intent,
+      });
+    } else {
+      redirectTo = ensureOrgCallbackRedirect(redirectOverride, orgSlug, intent);
+    }
+  }
 
   if (mode === 'invite') {
     const { error: inviteEmailError } = await adminClient.auth.admin.inviteUserByEmail(

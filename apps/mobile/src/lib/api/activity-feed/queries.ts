@@ -13,8 +13,10 @@ import type {
   ActivityItemGroupingVM,
   ActivityFeedItemRow,
   ActivityFeedGroupMemberRow,
+  UserProfileVM,
 } from '@iconicedu/shared-types';
 import { supabase } from '@/lib/supabase/client';
+import { buildSenderProfile } from '@/lib/api/map-row-to-vm';
 
 const ACTIVITY_FEED_ITEM_SELECT = [
   'id',
@@ -56,6 +58,16 @@ const FEED_TABS: Array<{ key: InboxTabKeyVM; label: string }> = [
   { key: 'payment', label: 'Payment' },
   { key: 'system', label: 'System' },
 ];
+
+type RawActivityActorProfile = {
+  id: string;
+  display_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  avatar_url: string | null;
+  avatar_seed: string | null;
+  kind?: string | null;
+};
 
 function mapFeedRow(row: ActivityFeedItemRow): ActivityFeedItemVM {
   const contentBase = (row.content ?? {}) as Partial<ActivityItemContentVM>;
@@ -110,6 +122,33 @@ function mapFeedRow(row: ActivityFeedItemRow): ActivityFeedItemVM {
     subActivityCount: row.sub_activity_count ?? undefined,
     isCollapsed: row.is_collapsed ?? undefined,
   } as ActivityFeedItemVM;
+}
+
+async function loadActivityFeedActors(
+  orgId: string,
+  rows: ActivityFeedItemRow[],
+): Promise<Map<string, UserProfileVM>> {
+  const actorIds = Array.from(
+    new Set(rows.map((row) => row.actor_profile_id).filter(Boolean)),
+  );
+
+  if (!actorIds.length) {
+    return new Map();
+  }
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, display_name, first_name, last_name, avatar_url, avatar_seed, kind')
+    .eq('org_id', orgId)
+    .in('id', actorIds)
+    .is('deleted_at', null)
+    .returns<RawActivityActorProfile[]>();
+
+  if (error) throw error;
+
+  return new Map(
+    (data ?? []).map((profile) => [profile.id, buildSenderProfile(profile, orgId)]),
+  );
 }
 
 function attachFeedGroupMembers(
@@ -225,6 +264,7 @@ export async function fetchActivityFeed(
 
   if (itemsError) throw itemsError;
   const rows = itemRows ?? [];
+  const actorProfiles = await loadActivityFeedActors(orgId, rows);
 
   const groupIds = rows.filter((row) => row.kind === 'group').map((row) => row.id);
   let groupMembers: ActivityFeedGroupMemberRow[] = [];
@@ -240,7 +280,21 @@ export async function fetchActivityFeed(
     groupMembers = members ?? [];
   }
 
-  const mappedItems = rows.map(mapFeedRow);
+  const mappedItems = rows.map((row) => {
+    const item = mapFeedRow(row);
+    const hydratedActor = row.actor_profile_id
+      ? actorProfiles.get(row.actor_profile_id)
+      : null;
+    if (!hydratedActor) return item;
+
+    return {
+      ...item,
+      refs: {
+        ...item.refs,
+        actor: hydratedActor,
+      },
+    } as ActivityFeedItemVM;
+  });
   const groupedItems = attachFeedGroupMembers(mappedItems, groupMembers);
   const sections = buildFeedSections(groupedItems);
   const tabs = buildFeedTabs(mappedItems);
