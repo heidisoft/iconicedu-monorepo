@@ -91,6 +91,20 @@ function createMonthBuckets(now: Date): TimeBucket[] {
   });
 }
 
+function createCurrentInclusiveMonthBuckets(now: Date): TimeBucket[] {
+  const anchor = startOfMonth(now);
+
+  return Array.from({ length: MONTH_BUCKET_COUNT }, (_, index) => {
+    const start = startOfMonth(subMonths(anchor, MONTH_BUCKET_COUNT - 1 - index));
+    return {
+      key: format(start, 'yyyy-MM'),
+      label: format(start, 'MMM yyyy'),
+      start,
+      end: endOfMonth(start),
+    };
+  });
+}
+
 function createWeekBuckets(now: Date): TimeBucket[] {
   const anchor = startOfWeek(subWeeks(now, 1), { weekStartsOn: 1 });
 
@@ -240,42 +254,20 @@ function sortRankedMetrics(metrics: AdminRankedMetricVM[]) {
   });
 }
 
-function isCompletedSession(session: ChannelLiveSessionRow, now: Date) {
-  if (session.status === 'failed') {
-    return false;
-  }
-
-  if (session.status === 'ended') {
+function isCompletedScheduleForReports(schedule: ClassScheduleVM, now: Date) {
+  if (schedule.status === 'completed') {
     return true;
   }
 
-  const effectiveEnd = toTimestamp(session.ended_at ?? session.started_at);
-  return Number.isFinite(effectiveEnd) && effectiveEnd < now.getTime();
+  if (schedule.status === 'cancelled') {
+    return false;
+  }
+
+  return new Date(schedule.endAt).getTime() < now.getTime();
 }
 
 function getCompletedSessionTimestamp(session: ChannelLiveSessionRow) {
   return toTimestamp(session.ended_at ?? session.started_at);
-}
-
-function resolveTeacherProfileId(input: {
-  session: ChannelLiveSessionRow;
-  profileById: Map<string, ProfileRow>;
-  participants: ChannelLiveSessionParticipantRow[];
-  channelEducatorIds: Map<string, string[]>;
-}) {
-  const startedByProfile = input.profileById.get(input.session.started_by_profile_id);
-  if (startedByProfile?.kind === 'educator') {
-    return startedByProfile.id;
-  }
-
-  const educatorParticipant = input.participants.find(
-    (participant) => input.profileById.get(participant.profile_id)?.kind === 'educator',
-  );
-  if (educatorParticipant) {
-    return educatorParticipant.profile_id;
-  }
-
-  return input.channelEducatorIds.get(input.session.channel_id)?.[0] ?? null;
 }
 
 function buildSummary(input: {
@@ -371,8 +363,9 @@ function buildClassroomSummary(input: {
 }): AdminReportsDashboardVM['classroomSummary'] {
   const currentMonthKey = getResolvedScheduleDisplayMonthKey(input.now, null);
   const timelineBuckets = splitSchedulesByTimeline(input.schedules, input.now);
+  const expandedSchedules = [...timelineBuckets.past, ...timelineBuckets.upcoming];
   const monthProgressStatsByKey = getMonthProgressStatsByKey(
-    [...timelineBuckets.past, ...timelineBuckets.upcoming],
+    expandedSchedules,
     input.now,
     null,
   );
@@ -380,18 +373,6 @@ function buildClassroomSummary(input: {
   const upcomingNext7DaysMs = new Date(input.now);
   upcomingNext7DaysMs.setDate(upcomingNext7DaysMs.getDate() + 7);
   const upcomingLimitMs = upcomingNext7DaysMs.getTime();
-
-  const scheduledThisWeek = input.schedules.filter((schedule) => {
-    if (schedule.status === 'cancelled') {
-      return false;
-    }
-
-    const scheduleWeekStart = getScheduleDisplayStartOfWeek(
-      schedule.startAt,
-      null,
-    ).getTime();
-    return scheduleWeekStart === currentWeekStart;
-  }).length;
 
   const upcomingNext7Days = timelineBuckets.upcoming.filter((schedule) => {
     if (schedule.status === 'cancelled') {
@@ -419,8 +400,8 @@ function buildClassroomSummary(input: {
     {
       key: 'scheduled-this-week',
       label: 'Sessions this week',
-      value: scheduledThisWeek,
-      description: 'Scheduled classroom sessions in the current week.',
+      value: upcomingThisWeek,
+      description: 'Remaining scheduled classroom sessions in the current week.',
     },
     {
       key: 'upcoming-next-7-days',
@@ -694,19 +675,41 @@ function buildMonthlyAttendance(input: {
   });
 }
 
-function buildSessionCounts(
-  sessions: ChannelLiveSessionRow[],
-  buckets: TimeBucket[],
-  now: Date,
-): AdminTimeSeriesPointVM[] {
-  const counts = new Map<string, number>();
+function buildMonthlyCompletedScheduleCounts(input: {
+  schedules: ClassScheduleVM[];
+  buckets: TimeBucket[];
+  now: Date;
+}): AdminTimeSeriesPointVM[] {
+  const timelineBuckets = splitSchedulesByTimeline(input.schedules, input.now);
+  const monthProgressStatsByKey = getMonthProgressStatsByKey(
+    [...timelineBuckets.past, ...timelineBuckets.upcoming],
+    input.now,
+    null,
+  );
 
-  sessions.forEach((session) => {
-    if (!isCompletedSession(session, now)) {
+  return input.buckets.map((bucket) => ({
+    bucketStart: bucket.start.toISOString(),
+    label: bucket.label,
+    value: monthProgressStatsByKey.get(bucket.key)?.completedCount ?? 0,
+    series: 'completed_sessions',
+  }));
+}
+
+function buildWeeklyCompletedScheduleCounts(input: {
+  schedules: ClassScheduleVM[];
+  buckets: TimeBucket[];
+  now: Date;
+}): AdminTimeSeriesPointVM[] {
+  const counts = new Map<string, number>();
+  const timelineBuckets = splitSchedulesByTimeline(input.schedules, input.now);
+  const expandedSchedules = [...timelineBuckets.past, ...timelineBuckets.upcoming];
+
+  expandedSchedules.forEach((schedule) => {
+    if (!isCompletedScheduleForReports(schedule, input.now)) {
       return;
     }
 
-    const bucket = findBucketByTime(buckets, getCompletedSessionTimestamp(session));
+    const bucket = findBucketByTime(input.buckets, toTimestamp(schedule.startAt));
     if (!bucket) {
       return;
     }
@@ -714,7 +717,7 @@ function buildSessionCounts(
     counts.set(bucket.key, (counts.get(bucket.key) ?? 0) + 1);
   });
 
-  return buckets.map((bucket) => ({
+  return input.buckets.map((bucket) => ({
     bucketStart: bucket.start.toISOString(),
     label: bucket.label,
     value: counts.get(bucket.key) ?? 0,
@@ -890,30 +893,28 @@ function buildInboxActivityByVerb(input: {
 }
 
 function buildTeacherRanking(input: {
-  liveSessions: ChannelLiveSessionRow[];
-  participantsBySessionId: Map<string, ChannelLiveSessionParticipantRow[]>;
+  schedules: ClassScheduleVM[];
   profileById: Map<string, ProfileRow>;
-  channelEducatorIds: Map<string, string[]>;
   now: Date;
 }): AdminRankedMetricVM[] {
   const counts = new Map<string, number>();
+  const timelineBuckets = splitSchedulesByTimeline(input.schedules, input.now);
+  const expandedSchedules = [...timelineBuckets.past, ...timelineBuckets.upcoming];
 
-  input.liveSessions.forEach((session) => {
-    if (!isCompletedSession(session, input.now)) {
+  expandedSchedules.forEach((schedule) => {
+    if (!isCompletedScheduleForReports(schedule, input.now)) {
       return;
     }
 
-    const teacherProfileId = resolveTeacherProfileId({
-      session,
-      profileById: input.profileById,
-      participants: input.participantsBySessionId.get(session.id) ?? [],
-      channelEducatorIds: input.channelEducatorIds,
+    const educatorIds = new Set(
+      schedule.participants
+        .filter((participant) => participant.role === 'educator')
+        .map((participant) => participant.ids.id),
+    );
+
+    educatorIds.forEach((teacherProfileId) => {
+      counts.set(teacherProfileId, (counts.get(teacherProfileId) ?? 0) + 1);
     });
-    if (!teacherProfileId) {
-      return;
-    }
-
-    counts.set(teacherProfileId, (counts.get(teacherProfileId) ?? 0) + 1);
   });
 
   return sortRankedMetrics(
@@ -926,23 +927,24 @@ function buildTeacherRanking(input: {
 }
 
 function buildFamilyRanking(input: {
-  liveSessions: ChannelLiveSessionRow[];
-  participantsBySessionId: Map<string, ChannelLiveSessionParticipantRow[]>;
+  schedules: ClassScheduleVM[];
   profileById: Map<string, ProfileRow>;
   familyLinksByChildAccountId: Map<string, Set<string>>;
   familyById: Map<string, FamilyRow>;
   now: Date;
 }): AdminRankedMetricVM[] {
   const counts = new Map<string, number>();
+  const timelineBuckets = splitSchedulesByTimeline(input.schedules, input.now);
+  const expandedSchedules = [...timelineBuckets.past, ...timelineBuckets.upcoming];
 
-  input.liveSessions.forEach((session) => {
-    if (!isCompletedSession(session, input.now)) {
+  expandedSchedules.forEach((schedule) => {
+    if (!isCompletedScheduleForReports(schedule, input.now)) {
       return;
     }
 
     const familyIds = new Set<string>();
-    (input.participantsBySessionId.get(session.id) ?? []).forEach((participant) => {
-      const profile = input.profileById.get(participant.profile_id);
+    schedule.participants.forEach((participant) => {
+      const profile = input.profileById.get(participant.ids.id);
       if (profile?.kind !== 'child') {
         return;
       }
@@ -1019,12 +1021,12 @@ export function buildAdminReportsDashboardVM(
 ): AdminReportsDashboardVM {
   const now = options.now ?? new Date();
   const monthlyBuckets = createMonthBuckets(now);
+  const monthlyCompletedSessionBuckets = createCurrentInclusiveMonthBuckets(now);
   const weeklyBuckets = createWeekBuckets(now);
   const profileById = new Map(snapshot.profiles.map((profile) => [profile.id, profile]));
   const familyById = new Map(snapshot.families.map((family) => [family.id, family]));
   const channelById = new Map(snapshot.channels.map((channel) => [channel.id, channel]));
   const participantCountByChannelId = new Map<string, number>();
-  const channelEducatorIds = new Map<string, string[]>();
   const familyLinksByChildAccountId = new Map<string, Set<string>>();
   const participantsBySessionId = new Map<string, ChannelLiveSessionParticipantRow[]>();
 
@@ -1033,17 +1035,6 @@ export function buildAdminReportsDashboardVM(
       member.channel_id,
       (participantCountByChannelId.get(member.channel_id) ?? 0) + 1,
     );
-
-    const profile = profileById.get(member.profile_id);
-    if (profile?.kind !== 'educator') {
-      return;
-    }
-
-    const educatorIds = channelEducatorIds.get(member.channel_id) ?? [];
-    if (!educatorIds.includes(member.profile_id)) {
-      educatorIds.push(member.profile_id);
-      channelEducatorIds.set(member.channel_id, educatorIds);
-    }
   });
 
   snapshot.familyLinks.forEach((link) => {
@@ -1101,16 +1092,16 @@ export function buildAdminReportsDashboardVM(
       liveSessions: snapshot.liveSessions,
       participantsBySessionId,
     }),
-    monthlyCompletedSessions: buildSessionCounts(
-      snapshot.liveSessions,
-      monthlyBuckets,
+    monthlyCompletedSessions: buildMonthlyCompletedScheduleCounts({
+      schedules: snapshot.schedules,
+      buckets: monthlyCompletedSessionBuckets,
       now,
-    ),
-    weeklyCompletedSessions: buildSessionCounts(
-      snapshot.liveSessions,
-      weeklyBuckets,
+    }),
+    weeklyCompletedSessions: buildWeeklyCompletedScheduleCounts({
+      schedules: snapshot.schedules,
+      buckets: weeklyBuckets,
       now,
-    ),
+    }),
     upcomingScheduledSessionsByWeek: buildUpcomingScheduledSessionsByWeek({
       schedules: snapshot.schedules,
       now,
@@ -1131,15 +1122,12 @@ export function buildAdminReportsDashboardVM(
       learningSpaces: snapshot.learningSpaces,
     }),
     completedSessionsByTeacher: buildTeacherRanking({
-      liveSessions: snapshot.liveSessions,
-      participantsBySessionId,
+      schedules: snapshot.schedules,
       profileById,
-      channelEducatorIds,
       now,
     }),
     completedSessionsByFamily: buildFamilyRanking({
-      liveSessions: snapshot.liveSessions,
-      participantsBySessionId,
+      schedules: snapshot.schedules,
       profileById,
       familyLinksByChildAccountId,
       familyById,
