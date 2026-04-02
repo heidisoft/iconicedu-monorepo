@@ -184,7 +184,7 @@ jobs:
           pattern: |
             apps/web/.next/static/**/*.js
             apps/web/.next/static/**/*.css
-          exclude: "**/*.map"
+          exclude: '**/*.map'
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
@@ -223,7 +223,7 @@ jobs:
           install-script: pnpm install --frozen-lockfile
           build-script: ci:bundle:mobile
           pattern: apps/mobile/.expo/dist/_expo/static/js/**/*.js
-          exclude: "**/*.map"
+          exclude: '**/*.map'
         env:
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
