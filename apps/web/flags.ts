@@ -54,7 +54,24 @@ export const enableMessageTypeComposer = flag<boolean, { profileId?: string | nu
   },
 });
 
+export const enableAdminReports = flag<boolean, { profileId?: string | null }>({
+  key: 'enable-admin-reports',
+  description: 'Enables the admin reporting dashboard and navigation entry.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: true,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: 'enable-admin-reports',
+      profileId: entities?.profileId,
+    });
+  },
+});
+
 export const webFlags = {
+  enableAdminReports,
   enableChannelCommunications,
   enableMessageTypeComposer,
 } as const;

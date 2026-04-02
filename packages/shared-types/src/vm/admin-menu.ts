@@ -5,6 +5,7 @@ export type AdminMenuIconKey =
   | 'learning_spaces'
   | 'class_schedules'
   | 'channels'
+  | 'reports'
   | 'activity'
   | 'moderation'
   | 'system';

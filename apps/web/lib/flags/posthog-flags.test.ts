@@ -157,7 +157,7 @@ describe('evaluatePosthogBooleanFlag', () => {
     expect(infoSpy).not.toHaveBeenCalled();
   });
 
-  it('does not emit debug logs when debug mode is enabled', async () => {
+  it('emits debug logs when debug mode is enabled', async () => {
     process.env.POSTHOG_KEY = 'phc_test';
     process.env.POSTHOG_HOST = 'https://posthog.example.com';
     process.env.DEBUG_POSTHOG_FLAGS = 'true';
@@ -181,6 +181,11 @@ describe('evaluatePosthogBooleanFlag', () => {
       }),
     ).resolves.toBe(true);
 
-    expect(infoSpy).not.toHaveBeenCalled();
+    expect(infoSpy).toHaveBeenCalledWith('[PostHog Flags] Flag evaluated', {
+      flagKey: 'enable-message-type-composer',
+      distinctId: 'profile-1',
+      rawValue: 'variant-a',
+      result: true,
+    });
   });
 });

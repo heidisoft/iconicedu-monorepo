@@ -14,6 +14,7 @@ import {
 } from '@iconicedu/ui-web/ui/sidebar';
 import {
   Activity,
+  BarChart3,
   CalendarCheck,
   Layers,
   Shield,
@@ -38,6 +39,7 @@ const ADMIN_MENU_ICON_MAP: Record<
   learning_spaces: Layers,
   class_schedules: CalendarCheck,
   channels: Shield,
+  reports: BarChart3,
   activity: Activity,
   moderation: ShieldCheck,
   system: Sliders,
