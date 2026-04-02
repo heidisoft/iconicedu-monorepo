@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
 import { act, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { NavDirectMessages } from '@iconicedu/ui-web/components/sidebar/nav-direct-messages';
@@ -189,6 +190,47 @@ describe('NavDirectMessages', () => {
       'href',
       '/iconic-academy/dm/dm-1',
     );
+  });
+
+  it('shows the staff indicator for staff direct message participants', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <SidebarProvider>
+        <NavDirectMessages
+          dms={[
+            {
+              ...makeDm('dm-staff', 'account-self', 0),
+              collections: {
+                ...makeDm('dm-staff', 'account-self', 0).collections,
+                participants: [
+                  makeDm('dm-staff', 'account-self', 0).collections.participants[0],
+                  {
+                    ...makeDm('dm-staff', 'account-self', 0).collections.participants[1],
+                    kind: 'staff',
+                    profile: {
+                      displayName: 'ICONIC Support',
+                      firstName: 'ICONIC',
+                      lastName: 'Support',
+                      avatar: { source: 'seed', seed: 'support' },
+                    },
+                  },
+                ],
+              },
+            } as any,
+          ]}
+          currentUserId="account-self"
+        />
+      </SidebarProvider>,
+    );
+
+    const trigger = screen.getByLabelText('Staff member');
+    expect(screen.getByText('ICONIC Support')).toBeInTheDocument();
+    expect(screen.getByTestId('staff-name-indicator')).toBeInTheDocument();
+
+    await user.hover(trigger);
+
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Staff member');
   });
 });
 

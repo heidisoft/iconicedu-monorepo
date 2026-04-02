@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { MessagesContainerHeader } from './messages-container-header';
@@ -229,6 +230,84 @@ describe('MessagesContainerHeader', () => {
     expect(screen.queryByText('Riley Johnson')).not.toBeInTheDocument();
   });
 
+  it('shows a staff indicator next to the DM title for staff participants', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <MessagesContainerHeader
+        channel={
+          {
+            basics: { kind: 'dm', topic: 'Support' },
+            collections: {
+              participants: [
+                makeParticipant('profile-self'),
+                makeParticipant('profile-staff', {
+                  kind: 'staff',
+                  profile: {
+                    displayName: 'ICONIC Support',
+                    avatar: { source: 'seed', url: null },
+                  },
+                }),
+              ],
+            },
+            ui: { headerQuickMetaActions: [] },
+          } as any
+        }
+      />,
+    );
+
+    const trigger = screen.getByLabelText('Staff member');
+    expect(screen.getByTestId('staff-name-indicator')).toBeInTheDocument();
+
+    await user.hover(trigger);
+
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Staff member');
+  });
+
+  it('shows a staff indicator next to classroom staff participant names', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <MessagesContainerHeader
+        channel={
+          {
+            basics: {
+              kind: 'channel',
+              topic: 'Math Foundations',
+              purpose: 'learning-space',
+            },
+            collections: {
+              participants: [
+                makeParticipant('profile-self', {
+                  kind: 'guardian',
+                  profile: {
+                    displayName: 'Riley Johnson',
+                    avatar: { source: 'seed', url: null },
+                  },
+                }),
+                makeParticipant('staff-1', {
+                  kind: 'staff',
+                  profile: {
+                    displayName: 'ICONIC Support',
+                    avatar: { source: 'seed', url: null },
+                  },
+                }),
+              ],
+            },
+            ui: { headerQuickMetaActions: [] },
+          } as any
+        }
+      />,
+    );
+
+    const trigger = screen.getByLabelText('Staff member');
+    expect(screen.getByText('ICONIC Support')).toBeInTheDocument();
+
+    await user.hover(trigger);
+
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Staff member');
+  });
+
   it('groups classroom students under a single role icon label', () => {
     render(
       <MessagesContainerHeader
@@ -285,8 +364,8 @@ describe('MessagesContainerHeader', () => {
     );
 
     expect(screen.getByText('Priya Patel')).toBeInTheDocument();
-    expect(
-      screen.getByText('Maya Johnson, Tevin Brooks, Tehara Singh'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Maya Johnson')).toBeInTheDocument();
+    expect(screen.getByText('Tevin Brooks')).toBeInTheDocument();
+    expect(screen.getByText('Tehara Singh')).toBeInTheDocument();
   });
 });

@@ -28,6 +28,7 @@ import {
 } from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
 import { getChannelTopicIcon } from '@iconicedu/ui-web/lib/icons';
+import { RoleNameIndicator } from '@iconicedu/ui-web/components/shared/role-name-indicator';
 import { ThemedIconBadge } from '@iconicedu/ui-web/components/shared/themed-icon';
 import type { ChannelVM, UserProfileVM } from '@iconicedu/shared-types';
 import { useMessagesState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
@@ -93,7 +94,7 @@ const HeaderTitle = memo(function HeaderTitle({
   onClick,
   ariaLabel,
 }: {
-  title: string;
+  title: ReactNode;
   inlineStatusLabel?: ReactNode;
   leading: ReactNode;
   onClick?: () => void;
@@ -107,7 +108,7 @@ const HeaderTitle = memo(function HeaderTitle({
           type="button"
           onClick={onClick}
           className="flex min-w-0 cursor-pointer flex-col items-start text-sm font-semibold text-foreground"
-          aria-label={ariaLabel ?? title}
+          aria-label={ariaLabel}
         >
           <span className="truncate">{title}</span>
           {inlineStatusLabel ? (
@@ -204,15 +205,6 @@ function buildClassroomParticipantSubtitle(
     <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
       {groupedParticipants.map((group) => {
         const Icon = PARTICIPANT_ROLE_ICON_MAP[group.kind];
-        const displayNames = group.participants
-          .map((participant) =>
-            getProfileDisplayName(
-              participant.profile,
-              participant.kind === 'child' ? 'Student' : 'Participant',
-            ),
-          )
-          .filter(Boolean)
-          .join(', ');
 
         return (
           <span
@@ -221,7 +213,24 @@ function buildClassroomParticipantSubtitle(
           >
             <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             <span className="sr-only">{getAvatarRoleLabel(group.kind)}:</span>
-            <span className="truncate">{displayNames}</span>
+            <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
+              {group.participants.map((participant, index) => (
+                <span
+                  key={participant.ids.id}
+                  className="inline-flex min-w-0 items-center"
+                >
+                  {index > 0 ? <span className="mr-1">,</span> : null}
+                  <RoleNameIndicator
+                    name={getProfileDisplayName(
+                      participant.profile,
+                      participant.kind === 'child' ? 'Student' : 'Participant',
+                    )}
+                    role={participant.kind}
+                    textClassName="truncate"
+                  />
+                </span>
+              ))}
+            </span>
           </span>
         );
       })}
@@ -282,7 +291,15 @@ export const MessagesContainerHeader = memo(function MessagesContainerHeader({
         ? getProfileDisplayName(otherParticipant.profile)
         : channel.basics.topic;
   const title =
-    channel.basics.kind === 'dm' ? otherParticipantName : channel.basics.topic;
+    channel.basics.kind === 'dm' ? (
+      <RoleNameIndicator
+        name={otherParticipantName}
+        role={otherParticipant?.kind}
+        textClassName="truncate"
+      />
+    ) : (
+      channel.basics.topic
+    );
   const leading = useMemo(() => {
     if (channel.basics.kind === 'dm') {
       if (!otherParticipant) return null;

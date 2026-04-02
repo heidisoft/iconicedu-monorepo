@@ -24,6 +24,7 @@ import {
   getAvatarLocationLabel,
   getAvatarRoleLabel,
 } from '@iconicedu/ui-web/components/shared/avatar-with-status';
+import { RoleNameIndicator } from '@iconicedu/ui-web/components/shared/role-name-indicator';
 import type { ChannelVM } from '@iconicedu/shared-types';
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
 import {
@@ -177,7 +178,13 @@ export function NavDirectMessages({
                     fallbackClassName="text-xs font-medium"
                   />
                   <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-                    <div className="truncate text-sm font-medium">{name}</div>
+                    <div className="truncate text-sm font-medium">
+                      <RoleNameIndicator
+                        name={name}
+                        role={otherParticipant?.kind}
+                        textClassName="truncate"
+                      />
+                    </div>
                     {(otherParticipant?.presence?.state?.emoji ||
                       otherParticipant?.presence?.state?.text) && (
                       <div className="truncate text-xs text-muted-foreground">

@@ -20,6 +20,7 @@ import { ReactionBar } from '@iconicedu/ui-web/components/messages/shared/reacti
 import { ThreadIndicator } from '@iconicedu/ui-web/components/messages/shared/thread-indicator';
 import { VisibilityBadge } from '@iconicedu/ui-web/components/messages/shared/visibility-badge';
 import { HiddenMessagePlaceholder } from '@iconicedu/ui-web/components/messages/shared/hidden-message-placeholder';
+import { RoleNameIndicator } from '@iconicedu/ui-web/components/shared/role-name-indicator';
 import { shouldHideMessageQuickActions } from '@iconicedu/ui-web/components/messages/message-action-visibility.utils';
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
 import { Button } from '@iconicedu/ui-web/ui/button';
@@ -93,6 +94,13 @@ export const MessageBase = memo(function MessageBase({
   const senderName = getProfileDisplayName(message.core.sender.profile);
   const isOwnMessage = currentUserId === message.core.sender.ids.id;
   const senderLabel = isOwnMessage ? 'You' : senderName;
+  const senderNameWithRole = (
+    <RoleNameIndicator
+      name={senderLabel}
+      role={message.core.sender.kind}
+      textClassName="truncate"
+    />
+  );
   const isInteractionDisabled = Boolean(isReadOnly);
   const shouldHideQuickActions = shouldHideMessageQuickActions(message);
   const pendingReactionEmojis = actionState?.pendingReactionEmojis ?? [];
@@ -262,7 +270,7 @@ export const MessageBase = memo(function MessageBase({
                     onClick={handleProfileClick}
                     className="text-sm font-semibold text-primary hover:underline"
                   >
-                    {senderLabel}
+                    {senderNameWithRole}
                   </button>
                 </>
               ) : (
@@ -271,7 +279,7 @@ export const MessageBase = memo(function MessageBase({
                     onClick={handleProfileClick}
                     className="text-sm font-semibold text-primary hover:underline"
                   >
-                    {senderLabel}
+                    {senderNameWithRole}
                   </button>
                   <span className="text-xs text-muted-foreground cursor-default">
                     {formatTime(message.core.createdAt)}
@@ -379,7 +387,7 @@ export const MessageBase = memo(function MessageBase({
                   onClick={handleProfileClick}
                   className="text-sm font-semibold text-muted-foreground/80 hover:underline"
                 >
-                  {senderLabel}
+                  {senderNameWithRole}
                 </button>
               </>
             ) : (
@@ -388,7 +396,7 @@ export const MessageBase = memo(function MessageBase({
                   onClick={handleProfileClick}
                   className="text-sm font-semibold text-primary hover:underline"
                 >
-                  {senderLabel}
+                  {senderNameWithRole}
                 </button>
                 <TooltipProvider>
                   <Tooltip>
