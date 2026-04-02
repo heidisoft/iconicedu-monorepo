@@ -156,11 +156,17 @@ describe('SessionCard', () => {
 
     render(<SessionCard session={baseSession} />);
 
-    fireEvent.press(screen.getByLabelText('Join session'));
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Join session'));
+    });
 
-    await screen.findByText('Mar · Week 2');
-    expect(mockOpenURL).toHaveBeenCalledWith(
-      'http://localhost:3000/acme/live-sessions/abc',
+    await waitFor(() =>
+      expect(mockFetchSpaceChannelMetaByChannelId).toHaveBeenCalledWith('channel-1'),
+    );
+    await waitFor(() =>
+      expect(mockOpenURL).toHaveBeenCalledWith(
+        'http://localhost:3000/acme/live-sessions/abc',
+      ),
     );
   });
 
