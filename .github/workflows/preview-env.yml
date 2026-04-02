@@ -36,6 +36,29 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
+      # Download bundle-sizes artifact produced by the CI bundle-size job.
+      # If the job was skipped or failed, this step is a no-op (continue-on-error).
+      - name: Download bundle sizes artifact
+        id: bundle-artifact
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: bundle-sizes
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: /tmp/artifacts
+
+      # Download the main-branch Lighthouse baseline stored by lighthouse-baseline.yml.
+      # Used to show score drift vs main in the PR comment.
+      - name: Download Lighthouse baseline
+        id: lh-baseline-artifact
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: lighthouse-baseline
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: /tmp/artifacts
+
       - uses: supabase/setup-cli@v1
         with:
           version: latest
@@ -362,7 +385,10 @@ jobs:
           artifactName: lighthouse-results
           temporaryPublicStorage: true
 
-      # 6. Post / update PR comment with preview URLs and Lighthouse scores
+      # 6. Post / update the single unified PR comment with:
+      #    - Preview environment URLs
+      #    - Bundle sizes (web JS+CSS, mobile JS, API JS) vs base branch
+      #    - Lighthouse scores vs main-branch baseline
       - name: Post preview environment comment
         uses: actions/github-script@v7
         env:
@@ -370,18 +396,73 @@ jobs:
           LH_LINKS: ${{ steps.lighthouse.outputs.links }}
         with:
           script: |
+            const fs = require('fs');
             const prNumber  = context.payload.workflow_run.pull_requests[0].number;
             const webUrl    = '${{ steps.vercel.outputs.vercel_url }}';
             const apiUrl    = '${{ steps.railway.outputs.railway_api_url }}';
             const branchRef = '${{ steps.branch-creds.outputs.branch_ref }}';
             const studioUrl = `https://supabase.com/dashboard/project/${branchRef}`;
 
-            // Read Lighthouse outputs via process.env to avoid JSON quote-escaping
-            // issues that arise when interpolating the raw JSON string inline.
+            // ── Helpers ────────────────────────────────────────────────────────
+            const fmt = (bytes) => {
+              if (bytes == null) return '—';
+              if (bytes < 1024) return `${bytes} B`;
+              if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} kB`;
+              return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+            };
+            const delta = (pr, base) => {
+              if (pr == null || base == null) return '';
+              const d = pr - base;
+              if (d === 0) return ' *(no change)*';
+              const sign = d > 0 ? '+' : '';
+              return ` *(${sign}${fmt(d)})*`;
+            };
+            const scoreIcon = (v) => {
+              if (v == null) return '—';
+              const n = Math.round(v * 100);
+              if (n >= 90) return `${n} ✅`;
+              if (n >= 50) return `${n} ⚠️`;
+              return `${n} ❌`;
+            };
+            const scoreDelta = (pr, base) => {
+              if (pr == null || base == null) return '';
+              const d = Math.round((pr - base) * 100);
+              if (d === 0) return '';
+              return d > 0 ? ` *(+${d})*` : ` *(${d})*`;
+            };
+
+            // ── Bundle sizes ───────────────────────────────────────────────────
+            let bundleSection = '';
+            const bundlePath = '/tmp/artifacts/bundle-sizes.json';
+            if (fs.existsSync(bundlePath)) {
+              try {
+                const { pr, base } = JSON.parse(fs.readFileSync(bundlePath, 'utf8'));
+                const rows = [
+                  ['Web JS',    pr.web?.js?.gz,     base.web?.js?.gz,     pr.web?.js?.count],
+                  ['Web CSS',   pr.web?.css?.gz,     base.web?.css?.gz,    pr.web?.css?.count],
+                  ['Mobile JS', pr.mobile?.js?.gz,   base.mobile?.js?.gz,  pr.mobile?.js?.count],
+                  ['API JS',    pr.api?.js?.gz,      base.api?.js?.gz,     pr.api?.js?.count],
+                ];
+                const tableRows = rows.map(([label, prGz, baseGz, count]) =>
+                  `| ${label} | ${fmt(prGz)}${delta(prGz, baseGz)} | ${fmt(baseGz)} | ${count ?? '—'} |`
+                );
+                bundleSection = [
+                  '',
+                  '### Bundle Sizes (gzip)',
+                  '',
+                  '| App | This PR | Base branch | Files |',
+                  '|-----|---------|-------------|-------|',
+                  ...tableRows,
+                ].join('\n');
+              } catch {
+                bundleSection = '\n\n> ⚠️ Bundle size data could not be parsed.';
+              }
+            }
+
+            // ── Lighthouse scores ──────────────────────────────────────────────
+            let lighthouseSection = '';
             const manifestRaw = process.env.LH_MANIFEST || '';
             const linksRaw    = process.env.LH_LINKS    || '';
-
-            let lighthouseSection = '';
             if (manifestRaw) {
               try {
                 const manifest = JSON.parse(manifestRaw);
@@ -389,33 +470,33 @@ jobs:
                 const result   = manifest.find(r => r.isRepresentativeRun) || manifest[0];
                 const s        = result.summary;
 
-                const scoreIcon = (v) => {
-                  if (v == null) return '—';
-                  const n = Math.round(v * 100);
-                  if (n >= 90) return `${n} ✅`;
-                  if (n >= 50) return `${n} ⚠️`;
-                  return `${n} ❌`;
-                };
+                // Load main-branch baseline for drift comparison
+                let base = null;
+                const baselinePath = '/tmp/artifacts/lighthouse-baseline.json';
+                if (fs.existsSync(baselinePath)) {
+                  try { base = JSON.parse(fs.readFileSync(baselinePath, 'utf8')); } catch {}
+                }
 
                 const reportUrl  = links[result.url] || '';
                 const reportLink = reportUrl ? ` ([full report](${reportUrl}))` : '';
 
                 lighthouseSection = [
                   '',
-                  `### Lighthouse${reportLink}`,
+                  `### Lighthouse (vs \`main\`)${reportLink}`,
                   '',
-                  '| Category | Score |',
-                  '|----------|-------|',
-                  `| Performance    | ${scoreIcon(s.performance)} |`,
-                  `| Accessibility  | ${scoreIcon(s.accessibility)} |`,
-                  `| Best Practices | ${scoreIcon(s['best-practices'])} |`,
-                  `| SEO            | ${scoreIcon(s.seo)} |`,
+                  '| Category | Score | vs main |',
+                  '|----------|-------|---------|',
+                  `| Performance    | ${scoreIcon(s.performance)}    | ${scoreDelta(s.performance,    base?.performance)}    |`,
+                  `| Accessibility  | ${scoreIcon(s.accessibility)}  | ${scoreDelta(s.accessibility,  base?.accessibility)}  |`,
+                  `| Best Practices | ${scoreIcon(s['best-practices'])} | ${scoreDelta(s['best-practices'], base?.['best-practices'])} |`,
+                  `| SEO            | ${scoreIcon(s.seo)}            | ${scoreDelta(s.seo,            base?.seo)}            |`,
                 ].join('\n');
               } catch {
                 lighthouseSection = '\n\n> ⚠️ Lighthouse results could not be parsed.';
               }
             }
 
+            // ── Assemble full comment ──────────────────────────────────────────
             const body = [
               '## Preview Environment Ready',
               '',
@@ -425,11 +506,12 @@ jobs:
               `| API (Railway) | ${apiUrl}/healthz |`,
               `| Supabase Studio | ${studioUrl} |`,
               '',
-              `**Mobile build** - [Actions -> EAS Preview Build](../../actions/workflows/eas-preview-build.yml) -> PR number: \`${prNumber}\``,
+              `**Mobile build** — [Actions → EAS Preview Build](../../actions/workflows/eas-preview-build.yml) → PR number: \`${prNumber}\``,
+              bundleSection,
               lighthouseSection,
             ].join('\n');
 
-            // Find and update existing comment, or create new one
+            // Upsert — find existing bot comment and update, or create new
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,

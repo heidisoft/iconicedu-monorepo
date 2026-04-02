@@ -130,7 +130,7 @@ export default [
     },
   },
   {
-    files: ['**/vitest.config.ts', '**/vite.config.ts'],
+    files: ['**/vitest.config.ts', '**/vite.config.ts', '**/lighthouserc.js'],
     languageOptions: {
       parser: tsParser,
       parserOptions: {
