@@ -7,6 +7,7 @@ import { resolveOrgDashboardPath } from '@iconicedu/web/lib/org/resolve-dashboar
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
+import { resolveOrgLoginReason } from '@iconicedu/web/app/(auth)/[orgSlug]/login/login-reason';
 
 export const metadata: Metadata = {
   title: 'Organization Login | ICONIC Academy',
@@ -16,10 +17,6 @@ export const metadata: Metadata = {
     follow: false,
   },
 };
-
-export function resolveOrgLoginReason(value?: string): 'session-expired' | null {
-  return value === 'session-expired' ? 'session-expired' : null;
-}
 
 export default async function OrgLoginPage({
   params,

@@ -1,8 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import Page, {
-  resolveOrgLoginReason,
-} from '@iconicedu/web/app/(auth)/[orgSlug]/login/page';
+import Page from '@iconicedu/web/app/(auth)/[orgSlug]/login/page';
+import { resolveOrgLoginReason } from '@iconicedu/web/app/(auth)/[orgSlug]/login/login-reason';
 
 const redirectMock = vi.fn();
 const notFoundMock = vi.fn();
