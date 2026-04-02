@@ -246,34 +246,93 @@ jobs:
           DEPLOY_RESP=$(api "{\"query\":\"mutation { serviceInstanceDeploy(serviceId: \\\"$SERVICE_ID\\\", environmentId: \\\"$ENV_ID\\\") }\"}")
           echo "Deploy response: $(echo "$DEPLOY_RESP" | jq '.errors // .data')"
 
-          # ── 4. Poll for deployment health (3 attempts) ──────────────────────
-          # Note: latestDeployment.url is masked by GitHub Actions (contains Railway IDs).
-          # We use serviceDomains instead — the stable service URL doesn't contain UUIDs.
-          echo "Waiting for Railway API to become healthy..."
-          RAILWAY_API_URL=""
-          for i in $(seq 1 3); do
-            DEPLOY_INFO=$(api "{\"query\":\"query { serviceInstance(serviceId: \\\"$SERVICE_ID\\\", environmentId: \\\"$ENV_ID\\\") { latestDeployment { status } domains { serviceDomains { domain } } } }\"}")
-            DEPLOY_STATUS=$(echo "$DEPLOY_INFO" | jq -r '.data.serviceInstance.latestDeployment.status // empty')
-            DEPLOY_DOMAIN=$(echo "$DEPLOY_INFO" | jq -r '.data.serviceInstance.domains.serviceDomains[0].domain // empty')
-            echo "  Status: ${DEPLOY_STATUS:-(pending)}, Domain: ${DEPLOY_DOMAIN:-(none)} (attempt $i)"
+          service_instance_info() {
+            api "{\"query\":\"query { serviceInstance(serviceId: \\\"$SERVICE_ID\\\", environmentId: \\\"$ENV_ID\\\") { latestDeployment { status } domains { serviceDomains { id domain targetPort } } } }\"}"
+          }
 
-            if [[ -n "$DEPLOY_DOMAIN" ]]; then
-              RAILWAY_API_URL="$DEPLOY_DOMAIN"
-              HEALTH_STATUS=$(curl -sf -o /dev/null -w "%{http_code}" \
-                "https://${DEPLOY_DOMAIN}/healthz" 2>/dev/null || echo "000")
-              echo "  Health: $HEALTH_STATUS"
-              if [[ "$HEALTH_STATUS" == "200" ]]; then
-                echo "railway_api_url=https://${DEPLOY_DOMAIN}" >> "$GITHUB_OUTPUT"
+          get_service_domain() {
+            local info
+            info=$(service_instance_info)
+            echo "$info" | jq -r '.data.serviceInstance.domains.serviceDomains[]? | select((.targetPort // 3000) == 3000) | .domain' | head -n 1
+          }
+
+          # ── 4. Wait for deployment to reach a terminal/healthy state ───────
+          echo "Waiting for Railway deployment to stabilize..."
+          DEPLOY_STATUS=""
+          for i in $(seq 1 12); do
+            DEPLOY_INFO=$(service_instance_info)
+            DEPLOY_STATUS=$(echo "$DEPLOY_INFO" | jq -r '.data.serviceInstance.latestDeployment.status // empty')
+            EXISTING_DOMAIN=$(echo "$DEPLOY_INFO" | jq -r '.data.serviceInstance.domains.serviceDomains[]? | select((.targetPort // 3000) == 3000) | .domain' | head -n 1)
+            echo "  Status: ${DEPLOY_STATUS:-(pending)}, Domain: ${EXISTING_DOMAIN:-(none)} (attempt $i)"
+
+            case "$DEPLOY_STATUS" in
+              SUCCESS|FAILED|CRASHED|REMOVED)
+                break
+                ;;
+            esac
+
+            sleep 10
+          done
+
+          if [[ "$DEPLOY_STATUS" == "FAILED" || "$DEPLOY_STATUS" == "CRASHED" ]]; then
+            echo "::warning::Railway deployment ended with status $DEPLOY_STATUS"
+          fi
+
+          # ── 5. Ensure a public Railway service domain exists for port 3000 ─
+          RAILWAY_DOMAIN="$(get_service_domain)"
+          if [[ -n "$RAILWAY_DOMAIN" ]]; then
+            echo "Using existing Railway domain: $RAILWAY_DOMAIN"
+          else
+            echo "No Railway service domain found for port 3000 — creating one"
+            DOMAIN_CREATE_RESP=$(api "$(jq -n \
+              --arg eid "$ENV_ID" \
+              --arg sid "$SERVICE_ID" \
+              '{query:"mutation serviceDomainCreate($input: ServiceDomainCreateInput!) { serviceDomainCreate(input: $input) { id domain targetPort } }", variables:{input:{environmentId:$eid, serviceId:$sid, targetPort:3000}}}')")
+            echo "Domain create response: $(echo "$DOMAIN_CREATE_RESP" | jq '.errors // .data')"
+
+            RAILWAY_DOMAIN=$(echo "$DOMAIN_CREATE_RESP" | jq -r '.data.serviceDomainCreate.domain // empty')
+
+            if [[ -z "$RAILWAY_DOMAIN" ]]; then
+              echo "Domain create did not return a domain immediately — re-querying existing domains"
+              RAILWAY_DOMAIN="$(get_service_domain)"
+            fi
+          fi
+
+          # ── 6. Poll for domain visibility and /healthz readiness ───────────
+          if [[ -z "$RAILWAY_DOMAIN" ]]; then
+            for i in $(seq 1 12); do
+              RAILWAY_DOMAIN="$(get_service_domain)"
+              echo "  Domain lookup attempt $i: ${RAILWAY_DOMAIN:-(none)}"
+              if [[ -n "$RAILWAY_DOMAIN" ]]; then
                 break
               fi
-            fi
+              sleep 10
+            done
+          fi
 
-            if [[ $i -eq 3 ]]; then
-              echo "::warning::Railway health check timed out — deployment may still be starting"
-              echo "railway_api_url=https://${RAILWAY_API_URL:-pending}" >> "$GITHUB_OUTPUT"
+          if [[ -n "$RAILWAY_DOMAIN" ]]; then
+            HEALTHY_URL=""
+            for i in $(seq 1 12); do
+              HEALTH_STATUS=$(curl -sf -o /dev/null -w "%{http_code}" \
+                "https://${RAILWAY_DOMAIN}/healthz" 2>/dev/null || echo "000")
+              echo "  Health check attempt $i: $HEALTH_STATUS"
+              if [[ "$HEALTH_STATUS" == "200" ]]; then
+                HEALTHY_URL="https://${RAILWAY_DOMAIN}"
+                break
+              fi
+              sleep 10
+            done
+
+            if [[ -n "$HEALTHY_URL" ]]; then
+              echo "railway_api_url=${HEALTHY_URL}" >> "$GITHUB_OUTPUT"
+            else
+              echo "::warning::Railway domain exists but /healthz did not return 200 within the retry window"
+              echo "railway_api_url=https://${RAILWAY_DOMAIN}" >> "$GITHUB_OUTPUT"
             fi
-            sleep 20
-          done
+          else
+            echo "::warning::Railway domain was not available after the retry window"
+            echo "railway_api_url=pending" >> "$GITHUB_OUTPUT"
+          fi
 
       # 4. Set Vercel branch env vars
       - name: Configure Vercel preview env vars
