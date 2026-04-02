@@ -152,83 +152,141 @@ jobs:
           retention-days: 14
 
   # ──────────────────────────────────────────────────────────────
-  # Job 3a: Web bundle size — runs parallel to quality + test
-  # preactjs/compressed-size-action checks out both the base branch
-  # and the PR branch, builds each, and posts a PR comment with
-  # per-file gzip size deltas. Informational only — not a gate.
+  # Job 3: Bundle sizes — builds all three apps on both the PR
+  # branch and the base branch, measures raw + gzip sizes, and
+  # uploads a JSON artifact consumed by preview-env.yml when it
+  # assembles the unified "Preview Environment Ready" PR comment.
+  # No PR comment is posted here. Informational only — not a gate.
   # ──────────────────────────────────────────────────────────────
-  bundle-size-web:
-    name: Bundle Size (Web)
+  bundle-size:
+    name: Bundle Size
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     permissions:
       contents: read
-      pull-requests: write
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
         with:
           version: 9.12.0
-      - uses: actions/setup-node@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 20.19.0
           cache: pnpm
 
-      - name: Analyze web bundle size
-        uses: preactjs/compressed-size-action@v2
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          install-script: pnpm install --frozen-lockfile
-          build-script: ci:bundle:web
-          pattern: |
-            apps/web/.next/static/**/*.js
-            apps/web/.next/static/**/*.css
-          exclude: '**/*.map'
+      # Write the measurement script once — reused for both PR and base builds.
+      - name: Write measurement script
+        run: |
+          cat > /tmp/measure.js << 'EOF'
+          const fs = require('fs'), path = require('path'), zlib = require('zlib');
+          function walk(dir, exts) {
+            if (!fs.existsSync(dir)) return [];
+            const out = [];
+            for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+              const full = path.join(dir, e.name);
+              if (e.isDirectory()) out.push(...walk(full, exts));
+              else if (exts.some(x => e.name.endsWith(x)) && !e.name.endsWith('.map')) out.push(full);
+            }
+            return out;
+          }
+          function measure(dir, exts) {
+            const files = walk(dir, exts);
+            let raw = 0, gz = 0;
+            const top = [];
+            for (const f of files) {
+              const buf = fs.readFileSync(f);
+              const gzLen = zlib.gzipSync(buf).length;
+              raw += buf.length; gz += gzLen;
+              top.push({ name: path.basename(f), gz: gzLen });
+            }
+            top.sort((a, b) => b.gz - a.gz);
+            return { raw, gz, count: files.length, top: top.slice(0, 5) };
+          }
+          const out = {
+            web:    { js: measure('apps/web/.next/static', ['.js']), css: measure('apps/web/.next/static', ['.css']) },
+            mobile: { js: measure('apps/mobile/.expo/dist/_expo/static/js', ['.js']) },
+            api:    { js: measure('apps/api/dist', ['.js']) },
+          };
+          process.stdout.write(JSON.stringify(out));
+          EOF
+
+      # ── PR branch build ────────────────────────────────────────
+      # Secrets can't use || fallback inside ${{}} — use bash :- via GITHUB_ENV.
+      - name: Set build env vars
+        run: |
+          echo "NEXT_PUBLIC_SUPABASE_URL=${_URL:-https://placeholder.supabase.co}" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=${_ANON:-placeholder-anon-key}" >> "$GITHUB_ENV"
+          echo "SUPABASE_SERVICE_ROLE_KEY=${_SRK:-placeholder-service-role-key}" >> "$GITHUB_ENV"
+          echo "EXPO_PUBLIC_SUPABASE_URL=${_URL:-https://placeholder.supabase.co}" >> "$GITHUB_ENV"
+          echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=${_ANON:-placeholder-anon-key}" >> "$GITHUB_ENV"
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-service-role-key' }}
-          TURBO_TELEMETRY_DISABLED: 1
+          _URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          _ANON: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          _SRK: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
-  # ──────────────────────────────────────────────────────────────
-  # Job 3b: Mobile bundle size — runs parallel to quality + test
-  # Uses expo export --platform android to produce the React Native
-  # JS bundle (no native compilation needed on Linux), then posts a
-  # PR comment with the gzip size delta vs the base branch.
-  # Informational only — not a gate.
-  # ──────────────────────────────────────────────────────────────
-  bundle-size-mobile:
-    name: Bundle Size (Mobile)
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    permissions:
-      contents: read
-      pull-requests: write
+      - name: Install dependencies (PR)
+        run: pnpm install --frozen-lockfile
 
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.12.0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20.19.0
-          cache: pnpm
-
-      - name: Analyze mobile bundle size
-        uses: preactjs/compressed-size-action@v2
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          install-script: pnpm install --frozen-lockfile
-          build-script: ci:bundle:mobile
-          pattern: apps/mobile/.expo/dist/_expo/static/js/**/*.js
-          exclude: '**/*.map'
+      - name: Build all apps (PR branch)
+        run: |
+          pnpm --filter api db:generate
+          pnpm build:packages
+          pnpm --filter web build
+          (cd apps/mobile && npx expo export --platform android --output-dir .expo/dist)
+          pnpm --filter api build
         env:
-          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
-          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
           EXPO_NO_TELEMETRY: 1
           TURBO_TELEMETRY_DISABLED: 1
+
+      - name: Measure PR branch sizes
+        run: node /tmp/measure.js > /tmp/pr-sizes.json
+
+      # ── Base branch build ──────────────────────────────────────
+      - name: Checkout base branch
+        run: git checkout origin/${{ github.base_ref }}
+
+      - name: Install dependencies (base)
+        run: pnpm install --frozen-lockfile
+
+      # continue-on-error: base may differ enough to fail a sub-build;
+      # missing data renders as "—" in the comment rather than blocking.
+      - name: Build all apps (base branch)
+        continue-on-error: true
+        run: |
+          pnpm --filter api db:generate || true
+          pnpm build:packages
+          pnpm --filter web build
+          (cd apps/mobile && npx expo export --platform android --output-dir .expo/dist) || true
+          pnpm --filter api build || true
+        env:
+          EXPO_NO_TELEMETRY: 1
+          TURBO_TELEMETRY_DISABLED: 1
+
+      - name: Measure base branch sizes
+        run: node /tmp/measure.js > /tmp/base-sizes.json
+
+      - name: Combine into bundle-sizes artifact
+        run: |
+          node -e "
+            const pr   = JSON.parse(require('fs').readFileSync('/tmp/pr-sizes.json', 'utf8'));
+            const base = JSON.parse(require('fs').readFileSync('/tmp/base-sizes.json', 'utf8'));
+            require('fs').writeFileSync('/tmp/bundle-sizes.json', JSON.stringify({ pr, base }));
+          "
+
+      - name: Upload bundle sizes artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle-sizes
+          path: /tmp/bundle-sizes.json
+          retention-days: 7
 
   # ──────────────────────────────────────────────────────────────
   # Job 4: Build apps — only runs after quality + test both pass
