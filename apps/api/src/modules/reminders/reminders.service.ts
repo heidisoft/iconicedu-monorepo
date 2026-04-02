@@ -41,17 +41,24 @@ type ReminderJobPayload = {
 
 @Injectable()
 export class RemindersService {
-  private readonly supabase = createSupabaseServiceClient();
+  /**
+   * Keep Supabase env validation out of Nest bootstrap so the API can expose
+   * health and startup errors cleanly before reminder jobs are invoked.
+   */
+  private getSupabase(): SupabaseServiceClient {
+    return createSupabaseServiceClient();
+  }
 
   async dispatchDueReminderJobs(input: {
     leaseOwner: string;
     limit?: number;
     leaseSeconds?: number;
   }) {
+    const supabase = this.getSupabase();
     const runId = randomUUID();
     const startedAt = Date.now();
 
-    const claimResponse = await this.supabase.rpc('claim_due_reminder_jobs', {
+    const claimResponse = await supabase.rpc('claim_due_reminder_jobs', {
       p_limit: input.limit ?? DEFAULT_JOB_LIMIT,
       p_lease_owner: input.leaseOwner,
       p_lease_seconds: input.leaseSeconds ?? DEFAULT_LEASE_SECONDS,
@@ -68,7 +75,7 @@ export class RemindersService {
 
     for (const job of claimed) {
       try {
-        await this.processReminderJob(job);
+        await this.processReminderJob(job, supabase);
         succeeded += 1;
       } catch (error) {
         const now = new Date();
@@ -80,7 +87,7 @@ export class RemindersService {
         const nextStatus = retryable ? 'failed' : 'dead_letter';
         const message = error instanceof Error ? error.message : String(error);
 
-        const response = await this.supabase
+        const response = await supabase
           .from('reminder_jobs')
           .update({
             status: nextStatus,
@@ -99,7 +106,7 @@ export class RemindersService {
         }
 
         await this.logDispatch({
-          supabase: this.supabase,
+          supabase,
           orgId: job.org_id,
           jobId: job.id,
           result: retryable ? 'retryable_failure' : 'fatal_failure',
@@ -170,8 +177,11 @@ export class RemindersService {
     return !/invalid|unauthorized|forbidden|not found|missing/i.test(message);
   }
 
-  private async ensureSystemProfileId(orgId: string): Promise<string> {
-    const existing = await this.supabase
+  private async ensureSystemProfileId(
+    supabase: SupabaseServiceClient,
+    orgId: string,
+  ): Promise<string> {
+    const existing = await supabase
       .from('profiles')
       .select('id')
       .eq('org_id', orgId)
@@ -189,7 +199,7 @@ export class RemindersService {
     }
 
     const now = new Date().toISOString();
-    const accountResponse = await this.supabase
+    const accountResponse = await supabase
       .from('accounts')
       .insert({
         org_id: orgId,
@@ -204,7 +214,7 @@ export class RemindersService {
       throw new Error(accountResponse.error.message);
     }
 
-    const profileResponse = await this.supabase
+    const profileResponse = await supabase
       .from('profiles')
       .insert({
         org_id: orgId,
@@ -256,11 +266,11 @@ export class RemindersService {
     }
   }
 
-  private async processReminderJob(job: ReminderJobRow) {
+  private async processReminderJob(job: ReminderJobRow, supabase: SupabaseServiceClient) {
     const payload = (job.payload ?? {}) as ReminderJobPayload;
     const now = new Date().toISOString();
 
-    const systemProfileId = await this.ensureSystemProfileId(job.org_id);
+    const systemProfileId = await this.ensureSystemProfileId(supabase, job.org_id);
     const messageType =
       job.job_type === 'payment.reminder'
         ? 'payment-reminder'
@@ -268,7 +278,7 @@ export class RemindersService {
           ? 'feedback-request'
           : 'event-reminder';
 
-    const messageInsert = await this.supabase
+    const messageInsert = await supabase
       .from('messages')
       .insert({
         org_id: job.org_id,
@@ -327,7 +337,7 @@ export class RemindersService {
               meetingLink: payload.meetingLink ?? null,
             };
 
-    const payloadInsert = await this.supabase.from(payloadTable).insert({
+    const payloadInsert = await supabase.from(payloadTable).insert({
       message_id: messageId,
       org_id: job.org_id,
       payload: payloadBody,
@@ -353,7 +363,7 @@ export class RemindersService {
       : { kind: 'channel', channelId: payload.channelId };
 
     const activityEvent = await publishActivityEvent({
-      supabase: this.supabase as never,
+      supabase: supabase as never,
       orgId: job.org_id,
       eventType,
       emitterLabel: 'api:reminders',
@@ -382,7 +392,7 @@ export class RemindersService {
       dedupeKey: `${job.dedupe_key}:activity`,
     });
 
-    await this.supabase
+    await supabase
       .from('reminder_jobs')
       .update({
         status: 'succeeded',
@@ -397,7 +407,7 @@ export class RemindersService {
       .eq('org_id', job.org_id);
 
     await this.logDispatch({
-      supabase: this.supabase,
+      supabase,
       orgId: job.org_id,
       jobId: job.id,
       messageId,
