@@ -13,8 +13,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AvatarGroup,
-  AvatarGroupCount,
   Button,
   Badge,
   DropdownMenu,
@@ -34,11 +32,9 @@ import {
   Trash2,
   toast,
 } from '@iconicedu/ui-web';
-import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
-import { getAvatarRoleLabel } from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import { ThemedIconBadge } from '@iconicedu/ui-web/components/shared/themed-icon';
 import { getLearningSpaceIcon } from '@iconicedu/ui-web/lib/icons';
-import type { ThemeKey } from '@iconicedu/shared-types';
+import { cn } from '@iconicedu/ui-web/lib/utils';
 
 import type { AdminLearningSpaceRow } from '@iconicedu/web/lib/admin/learning-spaces';
 
@@ -196,14 +192,38 @@ export function LearningSpacesTable({ rows, onEdit }: LearningSpacesTableProps) 
     return <Badge className={`text-xs capitalize ${className}`}>{status}</Badge>;
   };
 
+  const renderParticipantNames = (row: AdminLearningSpaceRow) => {
+    if (!row.participantDetails.length) {
+      return null;
+    }
+
+    return (
+      <p className="line-clamp-2 text-xs text-muted-foreground">
+        {row.participantDetails.map((participant, index) => {
+          const hasTheme = Boolean(participant.themeKey);
+          return (
+            <React.Fragment key={participant.id}>
+              {index > 0 ? <span className="text-muted-foreground">, </span> : null}
+              <span
+                className={cn(hasTheme ? `theme-${participant.themeKey}` : '')}
+                style={hasTheme ? { color: 'var(--theme-bg)' } : undefined}
+              >
+                {participant.displayName}
+              </span>
+            </React.Fragment>
+          );
+        })}
+      </p>
+    );
+  };
+
   return (
     <div className="w-full overflow-x-auto rounded-2xl border border-border bg-card">
       <Table className="min-w-[860px] table-fixed lg:min-w-full">
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[34%] px-3 sm:px-4 lg:px-6">Title</TableHead>
+            <TableHead className="w-[50%] px-3 sm:px-4 lg:px-6">Title</TableHead>
             <TableHead className="w-[26%] px-3 sm:px-4 lg:px-6">Schedule</TableHead>
-            <TableHead className="w-[16%] px-3 sm:px-4 lg:px-6">Participants</TableHead>
             <TableHead className="w-[10%] px-3 sm:px-4 lg:px-6">Updated</TableHead>
             <TableHead className="w-[8%] px-3 sm:px-4 lg:px-6">Status</TableHead>
             <TableHead className="w-[6%] px-3 text-right sm:px-4 lg:px-6">
@@ -221,7 +241,7 @@ export function LearningSpacesTable({ rows, onEdit }: LearningSpacesTableProps) 
                     <div className="flex items-start gap-3 sm:gap-4">
                       <ThemedIconBadge
                         icon={TitleIcon}
-                        themeKey={(row.themeKey as ThemeKey | null) ?? null}
+                        themeKey={row.themeKey ?? null}
                         size="md"
                         className="shrink-0"
                       />
@@ -238,10 +258,17 @@ export function LearningSpacesTable({ rows, onEdit }: LearningSpacesTableProps) 
                             {row.title}
                           </p>
                         )}
-                        {(row.subject || row.description) && (
-                          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                            {row.subject ?? row.description}
-                          </p>
+                        {(row.subject ||
+                          row.description ||
+                          row.participantDetails.length > 0) && (
+                          <div className="mt-1 space-y-1">
+                            {row.subject || row.description ? (
+                              <p className="line-clamp-2 text-xs text-muted-foreground">
+                                {row.subject ?? row.description}
+                              </p>
+                            ) : null}
+                            {renderParticipantNames(row)}
+                          </div>
                         )}
                       </div>
                     </div>
@@ -252,40 +279,12 @@ export function LearningSpacesTable({ rows, onEdit }: LearningSpacesTableProps) 
                 <div className="min-w-0">{renderScheduleItems(row)}</div>
               </TableCell>
               <TableCell className="px-3 py-4 align-middle sm:px-4 sm:py-5 lg:px-6 lg:py-6">
-                {row.participantDetails.length ? (
-                  <AvatarGroup className="justify-start">
-                    {row.participantDetails.slice(0, 3).map((participant) => (
-                      <span key={participant.id} className="inline-flex">
-                        <AvatarWithStatus
-                          profileId={participant.id}
-                          name={participant.displayName}
-                          avatar={{
-                            source: participant.avatarUrl ? 'upload' : 'seed',
-                            url: participant.avatarUrl ?? null,
-                          }}
-                          themeKey={(participant.themeKey as ThemeKey | null) ?? null}
-                          roleLabel={getAvatarRoleLabel(participant.kind)}
-                          sizeClassName="size-8"
-                        />
-                      </span>
-                    ))}
-                    {row.participantDetails.length > 3 ? (
-                      <AvatarGroupCount>
-                        +{row.participantDetails.length - 3}
-                      </AvatarGroupCount>
-                    ) : null}
-                  </AvatarGroup>
-                ) : (
-                  <span className="text-sm text-muted-foreground">—</span>
-                )}
-              </TableCell>
-              <TableCell className="px-3 py-4 align-middle sm:px-4 sm:py-5 lg:px-6 lg:py-6">
                 <div className="space-y-1">
                   <p className="text-sm text-foreground">
                     {new Date(row.updated_at ?? row.created_at).toLocaleDateString()}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    by {row.updatedByDisplayName ?? 'Unknown'}
+                    Updated by {row.updatedByDisplayName ?? 'Unknown'}
                   </p>
                 </div>
               </TableCell>
