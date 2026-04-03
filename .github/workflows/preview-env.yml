@@ -30,6 +30,7 @@ jobs:
       contents: read
       pull-requests: write
       deployments: write
+      actions: read # required for cross-workflow artifact downloads
 
     steps:
       - uses: actions/checkout@v4
@@ -48,14 +49,36 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: /tmp/artifacts
 
+      # Find the latest successful Lighthouse Baseline workflow run on main so we
+      # can supply a run-id to download-artifact (cross-workflow artifact downloads
+      # require an explicit run-id — without it the action looks in the current run).
+      - name: Find latest Lighthouse Baseline run
+        id: lh-run
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          result-encoding: string
+          script: |
+            const { data } = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'lighthouse-baseline.yml',
+              branch: 'main',
+              status: 'success',
+              per_page: 1,
+            });
+            return data.workflow_runs[0]?.id?.toString() ?? '';
+
       # Download the main-branch Lighthouse baseline stored by lighthouse-baseline.yml.
       # Used to show score drift vs main in the PR comment.
       - name: Download Lighthouse baseline
         id: lh-baseline-artifact
         continue-on-error: true
+        if: steps.lh-run.outputs.result != ''
         uses: actions/download-artifact@v4
         with:
           name: lighthouse-baseline
+          run-id: ${{ steps.lh-run.outputs.result }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: /tmp/artifacts
 

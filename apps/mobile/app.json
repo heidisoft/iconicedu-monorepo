@@ -26,7 +26,13 @@
       },
       "package": "com.iconicedu.mobile",
       "userInterfaceStyle": "automatic",
-      "resizeableActivity": true
+      "resizeableActivity": true,
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+      ]
     },
     "plugins": [
       "react-native-edge-to-edge",
@@ -43,6 +49,13 @@
           "color": "#0f172a"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "82adc837-03b9-4b58-93d5-93759e99417a"
+      }
+    },
+    "owner": "iconic-academy"
   }
 }
