@@ -5,8 +5,6 @@ import {
   Image,
   ScrollView,
   TouchableOpacity,
-  Modal,
-  Pressable,
   StyleSheet,
   RefreshControl,
   useWindowDimensions,
@@ -25,7 +23,7 @@ import {
   ArrowRightLeft,
   Check,
 } from 'lucide-react-native';
-import { SiteLogo } from '@iconicedu/ui-native';
+import { BottomSheet, Card, IconButton, SiteLogo } from '@iconicedu/ui-native';
 import { useAuth } from '@/providers/auth-provider';
 import { useAccount } from '@/hooks/use-account';
 import { useProfile } from '@/hooks/use-profile';
@@ -126,6 +124,13 @@ function getInitials(name: string): string {
   return trimmed[0]?.toUpperCase() ?? 'U';
 }
 
+const FAMILY_SWITCH_HANDLE_HEIGHT = 28;
+const FAMILY_SWITCH_HEADER_HEIGHT = 76;
+const FAMILY_SWITCH_CARD_PADDING = 36;
+const FAMILY_SWITCH_ROW_HEIGHT = 62;
+const FAMILY_SWITCH_ROW_GAP = 12;
+const FAMILY_SWITCH_BOTTOM_PADDING = 18;
+
 function makeStyles(C: AppColors) {
   const supportPalette = getSupportPalette(C);
 
@@ -166,46 +171,41 @@ function makeStyles(C: AppColors) {
     },
     profileName: { fontSize: 15, color: C.text, fontWeight: '700' },
     profileEmail: { fontSize: 12, color: C.textMuted },
-    familyViewButton: {
-      alignItems: 'center',
-      height: 32,
-      width: 32,
-      justifyContent: 'center',
-      borderRadius: 999,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: C.border,
-      backgroundColor: C.card,
-      flexShrink: 0,
+    familySwitchSheetContent: {
+      paddingBottom: FAMILY_SWITCH_BOTTOM_PADDING,
     },
-    modalBackdrop: {
-      flex: 1,
-      backgroundColor: 'rgba(15, 23, 42, 0.45)',
-      justifyContent: 'flex-end',
-    },
-    sheetSafeArea: {
-      paddingHorizontal: 16,
-      paddingBottom: 18,
-    },
-    sheetCard: {
-      borderRadius: 20,
-      backgroundColor: C.card,
-      borderWidth: 1,
-      borderColor: C.border,
+    familySwitchCard: {
       padding: 18,
       gap: 12,
     },
-    sheetHeader: {
+    familySwitchHeader: {
       gap: 4,
     },
-    sheetTitle: {
+    familySwitchTitle: {
       fontSize: 18,
       fontWeight: '800',
       color: C.text,
     },
-    sheetSubtitle: {
+    familySwitchSubtitle: {
       fontSize: 13,
       color: C.textMuted,
       lineHeight: 18,
+    },
+    familySwitchList: {
+      gap: 12,
+    },
+    familySwitchAvatar: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+    },
+    familySwitchAvatarText: {
+      color: '#ffffff',
+      fontSize: 14,
+      fontWeight: '800',
     },
     switchOption: {
       flexDirection: 'row',
@@ -226,19 +226,6 @@ function makeStyles(C: AppColors) {
       flex: 1,
       minWidth: 0,
       gap: 2,
-    },
-    switchOptionAvatar: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      alignItems: 'center',
-      justifyContent: 'center',
-      overflow: 'hidden',
-    },
-    switchOptionAvatarText: {
-      color: '#ffffff',
-      fontSize: 14,
-      fontWeight: '800',
     },
     switchOptionLabel: {
       fontSize: 14,
@@ -400,7 +387,7 @@ export default function HomeScreen() {
     isPending: accountLoading,
     refetch: refetchAccount,
   } = useAccount();
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const orgId = (account as Record<string, unknown> | undefined)?.org_id as
     | string
     | undefined;
@@ -526,6 +513,17 @@ export default function HomeScreen() {
     schedulesSummaryLoading ||
     learningSpacesLoading;
   const supportFooterLoading = refreshing || accountLoading || supportLoading;
+  const familySwitchRowsHeight =
+    familySwitchOptions.length * FAMILY_SWITCH_ROW_HEIGHT +
+    Math.max(familySwitchOptions.length - 1, 0) * FAMILY_SWITCH_ROW_GAP;
+  const familySwitchSheetHeight = Math.min(
+    FAMILY_SWITCH_HANDLE_HEIGHT +
+      FAMILY_SWITCH_HEADER_HEIGHT +
+      FAMILY_SWITCH_CARD_PADDING +
+      familySwitchRowsHeight +
+      FAMILY_SWITCH_BOTTOM_PADDING,
+    windowHeight * 0.78,
+  );
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     Promise.all([
@@ -680,17 +678,19 @@ export default function HomeScreen() {
                 </View>
               </TouchableOpacity>
               {canShowFamilySwitcher ? (
-                <TouchableOpacity
-                  style={s.familyViewButton}
+                <IconButton
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 rounded-full"
                   onPress={() => setFamilySwitchOpen(true)}
-                  activeOpacity={0.85}
-                  accessibilityLabel="Switch family view"
-                >
-                  <ArrowRightLeft
-                    size={16}
-                    color={isViewingAsChild ? colors.teal : colors.textMuted}
-                  />
-                </TouchableOpacity>
+                  label="Switch family view"
+                  icon={
+                    <ArrowRightLeft
+                      size={16}
+                      color={isViewingAsChild ? colors.teal : colors.textMuted}
+                    />
+                  }
+                />
               ) : null}
             </View>
             <SiteLogo height={32} color={colors.text} />
@@ -971,21 +971,21 @@ export default function HomeScreen() {
 
         <AppSupportFooter isLoading={supportFooterLoading} />
       </ScrollView>
-      <Modal
+      <BottomSheet
         visible={familySwitchOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setFamilySwitchOpen(false)}
+        onClose={() => setFamilySwitchOpen(false)}
+        partialHeight={familySwitchSheetHeight}
+        sheetStyle={{ backgroundColor: colors.pageBg }}
       >
-        <Pressable style={s.modalBackdrop} onPress={() => setFamilySwitchOpen(false)}>
-          <Pressable style={s.sheetSafeArea} onPress={(event) => event.stopPropagation()}>
-            <View style={s.sheetCard}>
-              <View style={s.sheetHeader}>
-                <Text style={s.sheetTitle}>View as</Text>
-                <Text style={s.sheetSubtitle}>
-                  Switch between your parent view and linked student accounts.
-                </Text>
-              </View>
+        <View style={s.familySwitchSheetContent}>
+          <Card style={s.familySwitchCard}>
+            <View style={s.familySwitchHeader}>
+              <Text style={s.familySwitchTitle}>View as</Text>
+              <Text style={s.familySwitchSubtitle}>
+                Switch between your parent view and linked student accounts.
+              </Text>
+            </View>
+            <View style={s.familySwitchList}>
               {familySwitchOptions.map((option) => {
                 const optionTitle = option.displayName?.trim() || option.label;
                 const optionSubtitle = option.isParentOption ? 'Parent' : 'Student';
@@ -1005,15 +1005,15 @@ export default function HomeScreen() {
                       s.switchOption,
                       option.isActive ? s.switchOptionActive : null,
                     ]}
-                    activeOpacity={0.85}
                     disabled={option.isActive || Boolean(switchingProfileId)}
                     onPress={() =>
                       handleFamilySwitch(option.isParentOption ? null : option.profileId)
                     }
+                    activeOpacity={0.85}
                   >
                     <View
                       style={[
-                        s.switchOptionAvatar,
+                        s.familySwitchAvatar,
                         {
                           backgroundColor: option.avatarUrl
                             ? 'transparent'
@@ -1028,7 +1028,7 @@ export default function HomeScreen() {
                         />
                       ) : (
                         <Text
-                          style={[s.switchOptionAvatarText, { color: optionAvatarFg }]}
+                          style={[s.familySwitchAvatarText, { color: optionAvatarFg }]}
                         >
                           {getInitials(optionTitle)}
                         </Text>
@@ -1047,9 +1047,9 @@ export default function HomeScreen() {
                 );
               })}
             </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+          </Card>
+        </View>
+      </BottomSheet>
     </SafeAreaView>
   );
 }

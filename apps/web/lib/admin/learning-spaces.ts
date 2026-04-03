@@ -7,6 +7,7 @@ import type {
   LearningSpaceParticipantRow,
   LearningSpaceRow,
   ProfileRow,
+  ThemeKey,
 } from '@iconicedu/shared-types';
 import { resolveThemeKey } from '@iconicedu/web/lib/profile/derive';
 import { getLearningSpacesByOrg } from '@iconicedu/web/lib/spaces/queries/learning-spaces.query';
@@ -17,14 +18,14 @@ import {
 import { getProfilesByIds } from '@iconicedu/web/lib/profile/queries/profiles.query';
 
 export type AdminLearningSpaceRow = LearningSpaceRow & {
-  themeKey?: string | null;
+  themeKey?: ThemeKey | null;
   participantNames: string[];
   participantDetails: {
     id: string;
     displayName: string;
     kind: string;
     avatarUrl?: string | null;
-    themeKey?: string | null;
+    themeKey?: ThemeKey | null;
   }[];
   primaryChannelId?: string | null;
   scheduleSummary?: string | null;
@@ -170,7 +171,7 @@ export async function getAdminLearningSpaceRows(
           displayName: getProfileDisplayName(profile),
           kind: profile.kind,
           avatarUrl: profile.avatar_url ?? null,
-          themeKey: profile.ui_theme_key ?? null,
+          themeKey: resolveThemeKey(profile.ui_theme_key ?? null),
         })),
       primaryChannelId:
         (channelsBySpace.get(row.id) ?? []).find((item) => item.is_primary)?.channel_id ??

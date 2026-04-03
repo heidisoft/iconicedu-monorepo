@@ -5,14 +5,24 @@ import { useRouter } from 'next/navigation';
 
 import {
   Button,
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
   Input,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
 } from '@iconicedu/ui-web';
 import { Loader2, RotateCw } from '@iconicedu/ui-web';
+import { Check, ChevronsUpDown } from 'lucide-react';
 
 import type { AdminLearningSpaceRow } from '@iconicedu/web/lib/admin/learning-spaces';
 import { LearningSpacesTable } from '@iconicedu/web/app/(app)/[orgSlug]/admin/classrooms/learning-spaces-table';
@@ -37,6 +47,7 @@ export function LearningSpacesDashboard({
   const [search, setSearch] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState<'all' | string>('all');
   const [participantFilter, setParticipantFilter] = React.useState<'all' | string>('all');
+  const [participantFilterOpen, setParticipantFilterOpen] = React.useState(false);
   const [pageIndex, setPageIndex] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(PAGE_SIZES[0]);
   const [isPending, startTransition] = React.useTransition();
@@ -115,6 +126,15 @@ export function LearningSpacesDashboard({
         })),
     [participantOptions],
   );
+  const selectedParticipantFilterLabel = React.useMemo(() => {
+    if (participantFilter === 'all') {
+      return 'All';
+    }
+    return (
+      participantFilterOptions.find((participant) => participant.id === participantFilter)
+        ?.name ?? 'All'
+    );
+  }, [participantFilter, participantFilterOptions]);
 
   const sortedRows = React.useMemo(() => {
     return [...filteredRows].sort((a, b) => {
@@ -213,22 +233,68 @@ export function LearningSpacesDashboard({
           </div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span>Participant:</span>
-            <Select
-              value={participantFilter}
-              onValueChange={(value) => setParticipantFilter(value as 'all' | string)}
-            >
-              <SelectTrigger size="sm" className="w-44">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                {participantFilterOptions.map((participant) => (
-                  <SelectItem key={participant.id} value={participant.id}>
-                    {participant.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={participantFilterOpen} onOpenChange={setParticipantFilterOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={participantFilterOpen}
+                  aria-label="Filter by participant"
+                  className="w-56 justify-between"
+                >
+                  <span className="truncate">{selectedParticipantFilterLabel}</span>
+                  <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-56 p-0" align="start">
+                <Command>
+                  <CommandInput
+                    aria-label="Search participants"
+                    placeholder="Search participants..."
+                  />
+                  <CommandList>
+                    <CommandEmpty>No participants found.</CommandEmpty>
+                    <CommandGroup>
+                      <CommandItem
+                        value="all"
+                        onSelect={() => {
+                          setParticipantFilter('all');
+                          setParticipantFilterOpen(false);
+                        }}
+                      >
+                        All
+                        <Check
+                          className={
+                            participantFilter === 'all'
+                              ? 'ml-auto size-4 opacity-100'
+                              : 'ml-auto size-4 opacity-0'
+                          }
+                        />
+                      </CommandItem>
+                      {participantFilterOptions.map((participant) => (
+                        <CommandItem
+                          key={participant.id}
+                          value={`${participant.name} ${participant.id}`}
+                          onSelect={() => {
+                            setParticipantFilter(participant.id);
+                            setParticipantFilterOpen(false);
+                          }}
+                        >
+                          {participant.name}
+                          <Check
+                            className={
+                              participantFilter === participant.id
+                                ? 'ml-auto size-4 opacity-100'
+                                : 'ml-auto size-4 opacity-0'
+                            }
+                          />
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
           <Button
             variant="ghost"
