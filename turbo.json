@@ -52,7 +52,12 @@
     "test": {
       "dependsOn": ["^build"],
       "outputs": ["coverage/**"],
-      "env": ["CI", "VITEST_COVERAGE"]
+      "env": ["CI"]
+    },
+    "test:coverage": {
+      "dependsOn": ["^build"],
+      "outputs": ["coverage/**"],
+      "env": ["CI"]
     },
     "test:watch": {
       "dependsOn": ["^build"],

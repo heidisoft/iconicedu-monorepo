@@ -13,6 +13,7 @@
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
     "test": "jest --passWithNoTests --watchman=false",
+    "test:coverage": "jest --coverage --passWithNoTests --watchman=false",
     "test:watch": "jest --watch",
     "test:e2e": "jest --config ./test/jest-e2e.json --passWithNoTests",
     "clean": "rm -rf dist",
