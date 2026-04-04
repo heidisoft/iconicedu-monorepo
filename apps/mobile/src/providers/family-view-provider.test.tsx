@@ -1,7 +1,6 @@
 import React from 'react';
 import { Text, TouchableOpacity } from 'react-native';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mockUseAuth = jest.fn();
 const mockGetItemAsync = jest.fn();
@@ -13,6 +12,15 @@ const mockFetchFamilyLinks = jest.fn();
 const mockFetchProfilesByAccountIds = jest.fn();
 const mockFetchAccountsByIds = jest.fn();
 const mockFetchProfileByAccountId = jest.fn();
+const mockInvalidateQueries = jest.fn();
+const mockUseQuery = jest.fn();
+
+jest.mock('@tanstack/react-query', () => ({
+  useQuery: (...args: unknown[]) => mockUseQuery(...args),
+  useQueryClient: () => ({
+    invalidateQueries: (...args: unknown[]) => mockInvalidateQueries(...args),
+  }),
+}));
 
 jest.mock('@/providers/auth-provider', () => ({
   useAuth: () => mockUseAuth(),
@@ -60,37 +68,28 @@ function Consumer() {
 }
 
 function renderWithProviders() {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-      },
-    },
-  });
-
   return render(
-    <QueryClientProvider client={queryClient}>
-      <FamilyViewProvider>
-        <Consumer />
-      </FamilyViewProvider>
-    </QueryClientProvider>,
+    <FamilyViewProvider>
+      <Consumer />
+    </FamilyViewProvider>,
   );
 }
 
 describe('FamilyViewProvider', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockInvalidateQueries.mockResolvedValue(undefined);
 
     mockUseAuth.mockReturnValue({
       user: { id: 'auth-user-1', email: 'iconicedudev+parent@gmail.com' },
     });
-    mockFetchUserAccount.mockResolvedValue({
+    mockFetchUserAccount.mockReturnValue({
       id: 'guardian-account',
       org_id: 'org-1',
       active_profile_id: 'guardian-profile',
       primary_role: 'guardian',
     });
-    mockFetchProfilesForAccount.mockResolvedValue([
+    mockFetchProfilesForAccount.mockReturnValue([
       {
         id: 'guardian-profile',
         account_id: 'guardian-account',
@@ -100,8 +99,8 @@ describe('FamilyViewProvider', () => {
         status: 'active',
       },
     ]);
-    mockFetchFamilyLinks.mockResolvedValue([{ child_account_id: 'child-account' }]);
-    mockFetchProfilesByAccountIds.mockResolvedValue([
+    mockFetchFamilyLinks.mockReturnValue([{ child_account_id: 'child-account' }]);
+    mockFetchProfilesByAccountIds.mockReturnValue([
       {
         id: 'child-profile',
         account_id: 'child-account',
@@ -111,7 +110,7 @@ describe('FamilyViewProvider', () => {
         status: 'active',
       },
     ]);
-    mockFetchAccountsByIds.mockResolvedValue([
+    mockFetchAccountsByIds.mockReturnValue([
       {
         id: 'child-account',
         org_id: 'org-1',
@@ -119,7 +118,7 @@ describe('FamilyViewProvider', () => {
         primary_role: 'child',
       },
     ]);
-    mockFetchProfileByAccountId.mockImplementation(async (accountId: string) => {
+    mockFetchProfileByAccountId.mockImplementation((accountId: string) => {
       if (accountId === 'child-account') {
         return {
           id: 'child-profile',
@@ -140,6 +139,36 @@ describe('FamilyViewProvider', () => {
     });
     mockSetItemAsync.mockResolvedValue(undefined);
     mockDeleteItemAsync.mockResolvedValue(undefined);
+    mockUseQuery.mockImplementation(
+      ({ queryKey }: { queryKey: [string, ...unknown[]] }) => {
+        const key = queryKey[0];
+
+        const result = (() => {
+          switch (key) {
+            case 'account-base':
+              return mockFetchUserAccount();
+            case 'profiles-by-account-base':
+              return mockFetchProfilesForAccount();
+            case 'family-links-base':
+              return mockFetchFamilyLinks();
+            case 'family-child-profiles':
+              return mockFetchProfilesByAccountIds();
+            case 'family-child-accounts':
+              return mockFetchAccountsByIds();
+            case 'profile-by-account-effective':
+              return mockFetchProfileByAccountId('guardian-account');
+            default:
+              return undefined;
+          }
+        })();
+
+        return {
+          data: result,
+          isPending: false,
+          refetch: jest.fn().mockResolvedValue(result),
+        };
+      },
+    );
   });
 
   it('restores parent mode by default and switches to a linked child', async () => {

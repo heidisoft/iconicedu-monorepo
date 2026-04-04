@@ -1,11 +1,14 @@
-import React from 'react';
-import { renderHook, waitFor } from '@testing-library/react-native';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { renderHook } from '@testing-library/react-native';
 import { useSupervisedDirectMessages } from './use-supervised-direct-messages';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────────
 
 const mockFetch = jest.fn();
+const mockUseQuery = jest.fn();
+
+jest.mock('@tanstack/react-query', () => ({
+  useQuery: (...args: unknown[]) => mockUseQuery(...args),
+}));
 
 jest.mock('@/lib/api/queries', () => ({
   fetchSupervisedDirectMessages: (...args) => mockFetch(...args),
@@ -17,21 +20,6 @@ jest.mock('@/lib/api/queries', () => ({
     ],
   },
 }));
-
-// ─── Helpers ────────────────────────────────────────────────────────────────────
-
-function createWrapper() {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 } },
-  });
-  // eslint-disable-next-line react/prop-types
-  function TestWrapper({ children }) {
-    return React.createElement(QueryClientProvider, { client: queryClient }, children);
-  }
-  const Wrapper = TestWrapper;
-  Wrapper.displayName = 'TestWrapper';
-  return { Wrapper, queryClient };
-}
 
 const fakeSupervisedChannel = {
   id: 'ch-sup-1',
@@ -53,67 +41,64 @@ const fakeSupervisedChannel = {
 describe('useSupervisedDirectMessages', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseQuery.mockImplementation(
+      ({ queryFn, enabled }: { queryFn: () => unknown; enabled: boolean }) => {
+        if (!enabled) {
+          return {
+            data: undefined,
+            isLoading: false,
+          };
+        }
+
+        return {
+          data: queryFn(),
+          isLoading: false,
+        };
+      },
+    );
   });
 
   it('does not fetch when orgId is empty', () => {
-    const { Wrapper, queryClient } = createWrapper();
-    const { result } = renderHook(
-      () => useSupervisedDirectMessages('', 'acct-1', 'prof-1'),
-      { wrapper: Wrapper },
+    const { result } = renderHook(() =>
+      useSupervisedDirectMessages('', 'acct-1', 'prof-1'),
     );
     expect(result.current.isLoading).toBe(false);
     expect(mockFetch).not.toHaveBeenCalled();
-    queryClient.clear();
   });
 
   it('does not fetch when guardianAccountId is empty', () => {
-    const { Wrapper, queryClient } = createWrapper();
-    const { result } = renderHook(
-      () => useSupervisedDirectMessages('org-1', '', 'prof-1'),
-      { wrapper: Wrapper },
+    const { result } = renderHook(() =>
+      useSupervisedDirectMessages('org-1', '', 'prof-1'),
     );
     expect(result.current.isLoading).toBe(false);
     expect(mockFetch).not.toHaveBeenCalled();
-    queryClient.clear();
   });
 
   it('does not fetch when guardianProfileId is empty', () => {
-    const { Wrapper, queryClient } = createWrapper();
-    const { result } = renderHook(
-      () => useSupervisedDirectMessages('org-1', 'acct-1', ''),
-      { wrapper: Wrapper },
+    const { result } = renderHook(() =>
+      useSupervisedDirectMessages('org-1', 'acct-1', ''),
     );
     expect(result.current.isLoading).toBe(false);
     expect(mockFetch).not.toHaveBeenCalled();
-    queryClient.clear();
   });
 
-  it('returns supervised channels on success', async () => {
-    mockFetch.mockResolvedValue([fakeSupervisedChannel]);
+  it('returns supervised channels on success', () => {
+    mockFetch.mockReturnValue([fakeSupervisedChannel]);
 
-    const { Wrapper, queryClient } = createWrapper();
-    const { result } = renderHook(
-      () => useSupervisedDirectMessages('org-1', 'acct-1', 'prof-1'),
-      { wrapper: Wrapper },
+    const { result } = renderHook(() =>
+      useSupervisedDirectMessages('org-1', 'acct-1', 'prof-1'),
     );
-
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     expect(result.current.data).toEqual([fakeSupervisedChannel]);
-    queryClient.clear();
   });
 
-  it('calls fetch with correct arguments', async () => {
-    mockFetch.mockResolvedValue([]);
+  it('calls fetch with correct arguments', () => {
+    mockFetch.mockReturnValue([]);
 
-    const { Wrapper, queryClient } = createWrapper();
-    renderHook(
-      () => useSupervisedDirectMessages('org-1', 'acct-guardian', 'prof-guardian'),
-      { wrapper: Wrapper },
+    renderHook(() =>
+      useSupervisedDirectMessages('org-1', 'acct-guardian', 'prof-guardian'),
     );
 
-    await waitFor(() => expect(mockFetch).toHaveBeenCalled());
     expect(mockFetch).toHaveBeenCalledWith('org-1', 'acct-guardian', 'prof-guardian');
-    queryClient.clear();
   });
 });
