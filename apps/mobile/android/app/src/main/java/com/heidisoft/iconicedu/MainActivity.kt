@@ -1,4 +1,4 @@
-package com.iconicedu.mobile
+package com.heidisoft.iconicedu
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

@@ -88,9 +88,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.iconicedu.mobile'
+    namespace 'com.heidisoft.iconicedu'
     defaultConfig {
-        applicationId 'com.iconicedu.mobile'
+        applicationId 'com.heidisoft.iconicedu'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

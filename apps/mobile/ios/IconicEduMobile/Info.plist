@@ -28,7 +28,7 @@
         <key>CFBundleURLSchemes</key>
         <array>
           <string>iconicedu</string>
-          <string>com.iconicedu.mobile</string>
+          <string>com.heidisoft.iconicedu</string>
         </array>
       </dict>
     </array>

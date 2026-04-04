@@ -1,4 +1,4 @@
-package com.iconicedu.mobile
+package com.heidisoft.iconicedu
 
 import android.app.Application
 import android.content.res.Configuration
