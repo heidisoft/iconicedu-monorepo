@@ -64,12 +64,7 @@ export default defineConfig({
     setupFiles: ['./src/vitest.setup.ts'],
     globals: true,
     css: false,
-    pool: 'threads',
-    poolOptions: {
-      threads: {
-        singleThread: true,
-      },
-    },
+    pool: 'vmThreads',
     server: {
       deps: {
         inline: [/.*/],
