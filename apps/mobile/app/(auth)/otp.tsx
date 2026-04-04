@@ -134,12 +134,6 @@ export default function OtpScreen() {
     [analytics, email, router, setOnboardingCompletionStatus, verifyOtp],
   );
 
-  React.useEffect(() => {
-    if (code.length === OTP_LENGTH) {
-      void verifyCode(code);
-    }
-  }, [code, verifyCode]);
-
   const handleVerify = useCallback(async () => {
     if (code.length !== OTP_LENGTH) {
       setError('Please enter the full 6-digit code');
@@ -185,6 +179,9 @@ export default function OtpScreen() {
                 const cleaned = text.replace(/\D/g, '').slice(0, OTP_LENGTH);
                 setCode(cleaned);
                 if (error) setError(null);
+                if (cleaned.length === OTP_LENGTH) {
+                  void verifyCode(cleaned);
+                }
               }}
               keyboardType="number-pad"
               maxLength={OTP_LENGTH}
