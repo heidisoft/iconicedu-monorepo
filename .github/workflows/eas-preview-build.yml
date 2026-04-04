@@ -1,12 +1,8 @@
-name: 'EAS Preview Build'
+name: 'Create EAS Build'
 
 on:
   workflow_dispatch:
     inputs:
-      pr_number:
-        description: 'PR number to build against (e.g. 42)'
-        required: true
-        type: string
       platform:
         description: 'Platform to build'
         required: true
@@ -19,7 +15,7 @@ on:
 
 jobs:
   eas-build:
-    name: 'EAS Preview Build (PR #${{ github.event.inputs.pr_number }})'
+    name: 'Create EAS Build'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -27,37 +23,78 @@ jobs:
       pull-requests: read
 
     steps:
+      - name: Resolve build context
+        id: context
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          BRANCH_NAME="${GITHUB_REF_NAME}"
+          echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
+
+          if [[ "$BRANCH_NAME" == "main" ]]; then
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+            echo "build_profile=production" >> "$GITHUB_OUTPUT"
+            echo "build_kind=production" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          PR_DATA=$(gh api "repos/${{ github.repository }}/pulls" \
+            --raw-field state=open \
+            --raw-field base=main \
+            --raw-field head="${{ github.repository_owner }}:${BRANCH_NAME}" \
+            --jq '.[0] // empty')
+
+          if [[ -z "$PR_DATA" ]]; then
+            echo "No open PR from '$BRANCH_NAME' to 'main'. Skipping EAS build."
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+            echo "build_profile=preview" >> "$GITHUB_OUTPUT"
+            echo "build_kind=preview" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          PR_NUMBER=$(echo "$PR_DATA" | jq -r '.number')
+          echo "Found open PR #$PR_NUMBER for branch '$BRANCH_NAME'."
+          echo "should_build=true" >> "$GITHUB_OUTPUT"
+          echo "build_profile=preview" >> "$GITHUB_OUTPUT"
+          echo "build_kind=preview" >> "$GITHUB_OUTPUT"
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v4
+        if: steps.context.outputs.should_build == 'true'
         with:
-          ref: 'refs/pull/${{ github.event.inputs.pr_number }}/head'
+          ref: ${{ github.ref }}
 
       - uses: actions/setup-node@v4
+        if: steps.context.outputs.should_build == 'true'
         with:
           node-version: '20.19.0'
 
       - uses: pnpm/action-setup@v4
+        if: steps.context.outputs.should_build == 'true'
         with:
           version: '9.12.0'
 
       - name: Install dependencies
+        if: steps.context.outputs.should_build == 'true'
         run: pnpm install
 
       - uses: supabase/setup-cli@v1
+        if: steps.context.outputs.build_kind == 'preview'
         with:
           version: latest
 
       # 1. Fetch Supabase branch credentials
       - name: Fetch Supabase branch credentials
         id: branch-creds
+        if: steps.context.outputs.build_kind == 'preview'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
 
-          # Resolve PR number → head branch name (preview-env names Supabase branches
-          # after the git branch, not the PR number, so we must look it up).
-          BRANCH_NAME=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.inputs.pr_number }}" --jq '.head.ref')
+          BRANCH_NAME="${{ steps.context.outputs.branch_name }}"
           echo "Looking for Supabase branch: $BRANCH_NAME"
 
           BRANCH_DATA=$(supabase branches list \
@@ -111,8 +148,9 @@ jobs:
       #     fi
 
       # 3. Trigger EAS build
-      - name: Trigger EAS preview build
+      - name: Trigger EAS build
         id: eas-build
+        if: steps.context.outputs.should_build == 'true'
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
@@ -121,15 +159,29 @@ jobs:
 
           cd apps/mobile
 
-          BUILD_OUTPUT=$(eas build \
-            --profile preview \
+          if [[ "${{ steps.context.outputs.build_kind }}" == "preview" ]]; then
+            tmp_eas_json=$(mktemp)
+            jq \
+              --arg supabase_url "${{ steps.branch-creds.outputs.branch_api_url }}" \
+              --arg anon_key "${{ steps.branch-creds.outputs.anon_key }}" \
+              '.build.preview.env = ((.build.preview.env // {}) + {
+                EXPO_PUBLIC_SUPABASE_URL: $supabase_url,
+                EXPO_PUBLIC_SUPABASE_ANON_KEY: $anon_key,
+                EXPO_PUBLIC_APP_ENV: "preview"
+              })' \
+              eas.json > "$tmp_eas_json"
+            mv "$tmp_eas_json" eas.json
+          fi
+
+          if ! BUILD_OUTPUT=$(eas build \
+            --profile "${{ steps.context.outputs.build_profile }}" \
             --platform "${{ github.event.inputs.platform }}" \
             --non-interactive \
             --no-wait \
-            -e EXPO_PUBLIC_SUPABASE_URL="${{ steps.branch-creds.outputs.branch_api_url }}" \
-            -e EXPO_PUBLIC_SUPABASE_ANON_KEY="${{ steps.branch-creds.outputs.anon_key }}" \
-            -e EXPO_PUBLIC_APP_ENV="preview" \
-            2>&1)
+            2>&1); then
+            echo "$BUILD_OUTPUT"
+            exit 1
+          fi
 
           echo "$BUILD_OUTPUT"
 
@@ -139,10 +191,11 @@ jobs:
 
       # 4. Post comment on PR
       - name: Post build comment on PR
+        if: steps.context.outputs.build_kind == 'preview'
         uses: actions/github-script@v7
         with:
           script: |
-            const prNumber = parseInt('${{ github.event.inputs.pr_number }}');
+            const prNumber = parseInt('${{ steps.context.outputs.pr_number }}');
             const platform = '${{ github.event.inputs.platform }}';
             const buildUrl = '${{ steps.eas-build.outputs.build_url }}';
             const supabaseUrl = '${{ steps.branch-creds.outputs.branch_api_url }}';
@@ -168,3 +221,8 @@ jobs:
               issue_number: prNumber,
               body,
             });
+
+      - name: Report skipped build
+        if: steps.context.outputs.should_build != 'true'
+        run: |
+          echo "Skipped EAS build for branch '${{ steps.context.outputs.branch_name }}' because there is no open PR to main."
