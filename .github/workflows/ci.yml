@@ -3,6 +3,7 @@ name: CI
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, closed]
 
 # Cancel in-progress runs for the same branch/PR when a new push comes in
 concurrency:
@@ -22,6 +23,7 @@ jobs:
     # If you rename it, update .github/branch-protection/main.json and
     # scripts/github/apply-branch-protection.sh in the same change.
     name: Quality (format · lint · typecheck)
+    if: github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -80,7 +82,7 @@ jobs:
           TURBO_SCM_HEAD: ${{ github.sha }}
 
   # ──────────────────────────────────────────────────────────────
-  # Job 2: Tests + coverage
+  # Job 2: Tests plus explicit coverage collection.
   # PRs: affected packages only. Push to main: all packages.
   # ──────────────────────────────────────────────────────────────
   test:
@@ -88,6 +90,7 @@ jobs:
     # If you rename it, update .github/branch-protection/main.json and
     # scripts/github/apply-branch-protection.sh in the same change.
     name: Test
+    if: github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -131,7 +134,13 @@ jobs:
         run: pnpm exec turbo run test ${{ github.event_name == 'pull_request' && '--affected' || '' }}
         env:
           CI: true
-          VITEST_COVERAGE: true
+          TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha }}
+          TURBO_SCM_HEAD: ${{ github.sha }}
+
+      - name: Collect coverage
+        run: pnpm exec turbo run test:coverage ${{ github.event_name == 'pull_request' && '--affected' || '' }}
+        env:
+          CI: true
           TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha }}
           TURBO_SCM_HEAD: ${{ github.sha }}
 
@@ -160,6 +169,7 @@ jobs:
   # ──────────────────────────────────────────────────────────────
   bundle-size:
     name: Bundle Size
+    if: github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -296,6 +306,7 @@ jobs:
     # If you rename it, update .github/branch-protection/main.json and
     # scripts/github/apply-branch-protection.sh in the same change.
     name: Build
+    if: github.event.action != 'closed'
     needs: [quality, test]
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -352,6 +363,7 @@ jobs:
   # ──────────────────────────────────────────────────────────────
   preview-environment:
     name: Provision Preview Environment
+    if: github.event.action != 'closed'
     needs: [build, bundle-size]
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -701,9 +713,40 @@ jobs:
             echo "vercel_url=https://vercel.com/dashboard" >> "$GITHUB_OUTPUT"
           fi
 
-      # 5. Post / update the single unified PR comment
+      # 6a. Run Lighthouse against the PR preview deployment
+      - name: Run Lighthouse CI (PR)
+        id: lighthouse-pr
+        # Only run when Vercel produced a real preview URL.
+        if: >-
+          steps.vercel.outputs.vercel_url != '' &&
+          steps.vercel.outputs.vercel_url != 'https://vercel.com/dashboard'
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          urls: ${{ steps.vercel.outputs.vercel_url }}
+          configPath: apps/web/lighthouserc.js
+          uploadArtifacts: true
+          artifactName: lighthouse-results-pr
+          temporaryPublicStorage: true
+
+      # 6b. Run Lighthouse against production (main) for drift comparison.
+      # Skipped when LHCI_PRODUCTION_URL repo variable is not set.
+      - name: Run Lighthouse CI (main / production)
+        id: lighthouse-main
+        if: vars.LHCI_PRODUCTION_URL != ''
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          urls: ${{ vars.LHCI_PRODUCTION_URL }}
+          configPath: apps/web/lighthouserc.js
+          uploadArtifacts: false
+          temporaryPublicStorage: false
+
+      # 7. Post / update the single unified PR comment
       - name: Post preview environment comment
         uses: actions/github-script@v7
+        env:
+          LH_PR_MANIFEST: ${{ steps.lighthouse-pr.outputs.manifest }}
+          LH_PR_LINKS: ${{ steps.lighthouse-pr.outputs.links }}
+          LH_MAIN_MANIFEST: ${{ steps.lighthouse-main.outputs.manifest }}
         with:
           script: |
             const fs = require('fs');
@@ -713,29 +756,44 @@ jobs:
             const branchRef = '${{ steps.branch-creds.outputs.branch_ref }}';
             const studioUrl = `https://supabase.com/dashboard/project/${branchRef}`;
 
+            // ── Helpers ────────────────────────────────────────────────────────
             const fmt = (bytes) => {
               if (bytes == null) return '—';
               if (bytes < 1024) return `${bytes} B`;
               if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} kB`;
               return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
             };
-            const delta = (pr, base) => {
+            const sizeDelta = (pr, base) => {
               if (pr == null || base == null) return '';
               const d = pr - base;
               if (d === 0) return ' *(no change)*';
               return ` *(${d > 0 ? '+' : ''}${fmt(d)})*`;
             };
+            const scoreIcon = (v) => {
+              if (v == null) return '—';
+              const n = Math.round(v * 100);
+              if (n >= 90) return `${n} ✅`;
+              if (n >= 50) return `${n} ⚠️`;
+              return `${n} ❌`;
+            };
+            const scoreDelta = (pr, base) => {
+              if (pr == null || base == null) return '—';
+              const d = Math.round((pr - base) * 100);
+              if (d === 0) return '=';
+              return d > 0 ? `+${d}` : `${d}`;
+            };
 
-            let bundleSection = '';
+            // ── Bundle sizes ───────────────────────────────────────────────────
+            let bundleSection = '\n\n> ⚠️ Bundle sizes unavailable — the bundle-size job may have timed out or failed.';
             const bundlePath = '/tmp/artifacts/bundle-sizes.json';
             if (fs.existsSync(bundlePath)) {
               try {
                 const { pr, base } = JSON.parse(fs.readFileSync(bundlePath, 'utf8'));
                 const rows = [
-                  ['Web JS',    pr.web?.js?.gz,   base.web?.js?.gz,   pr.web?.js?.count],
-                  ['Web CSS',   pr.web?.css?.gz,  base.web?.css?.gz,  pr.web?.css?.count],
+                  ['Web JS',    pr.web?.js?.gz,    base.web?.js?.gz,    pr.web?.js?.count],
+                  ['Web CSS',   pr.web?.css?.gz,   base.web?.css?.gz,   pr.web?.css?.count],
                   ['Mobile JS', pr.mobile?.js?.gz, base.mobile?.js?.gz, pr.mobile?.js?.count],
-                  ['API JS',    pr.api?.js?.gz,   base.api?.js?.gz,   pr.api?.js?.count],
+                  ['API JS',    pr.api?.js?.gz,    base.api?.js?.gz,    pr.api?.js?.count],
                 ];
                 bundleSection = [
                   '',
@@ -744,14 +802,56 @@ jobs:
                   '| App | This PR | Base branch | Files |',
                   '|-----|---------|-------------|-------|',
                   ...rows.map(([label, prGz, baseGz, count]) =>
-                    `| ${label} | ${fmt(prGz)}${delta(prGz, baseGz)} | ${fmt(baseGz)} | ${count ?? '—'} |`
+                    `| ${label} | ${fmt(prGz)}${sizeDelta(prGz, baseGz)} | ${fmt(baseGz)} | ${count ?? '—'} |`
                   ),
                 ].join('\n');
-              } catch {
-                bundleSection = '\n\n> ⚠️ Bundle size data could not be parsed.';
+              } catch (e) {
+                bundleSection = `\n\n> ⚠️ Bundle size data could not be parsed: ${e.message}`;
               }
             }
 
+            // ── Lighthouse ─────────────────────────────────────────────────────
+            let lighthouseSection = '';
+            const prManifestRaw   = process.env.LH_PR_MANIFEST   || '';
+            const prLinksRaw      = process.env.LH_PR_LINKS       || '';
+            const mainManifestRaw = process.env.LH_MAIN_MANIFEST  || '';
+            if (prManifestRaw) {
+              try {
+                const prManifest   = JSON.parse(prManifestRaw);
+                const links        = prLinksRaw ? JSON.parse(prLinksRaw) : {};
+                const prResult     = prManifest.find(r => r.isRepresentativeRun) || prManifest[0];
+                const s            = prResult.summary;
+
+                let base = null;
+                if (mainManifestRaw) {
+                  try {
+                    const mainManifest = JSON.parse(mainManifestRaw);
+                    const mainResult   = mainManifest.find(r => r.isRepresentativeRun) || mainManifest[0];
+                    base = mainResult.summary;
+                  } catch {}
+                }
+
+                const reportUrl  = links[prResult.url] || '';
+                const reportLink = reportUrl ? ` ([full report](${reportUrl}))` : '';
+                const baseNote   = base ? '' : ' *(add `LHCI_PRODUCTION_URL` repo variable to enable vs main)*';
+
+                lighthouseSection = [
+                  '',
+                  `### Lighthouse (vs \`main\`)${reportLink}${baseNote}`,
+                  '',
+                  '| Category | Score | vs main |',
+                  '|----------|:-----:|:-------:|',
+                  `| Performance    | ${scoreIcon(s.performance)}    | ${scoreDelta(s.performance,    base?.performance)} |`,
+                  `| Accessibility  | ${scoreIcon(s.accessibility)}  | ${scoreDelta(s.accessibility,  base?.accessibility)} |`,
+                  `| Best Practices | ${scoreIcon(s['best-practices'])} | ${scoreDelta(s['best-practices'], base?.['best-practices'])} |`,
+                  `| SEO            | ${scoreIcon(s.seo)}            | ${scoreDelta(s.seo,            base?.seo)} |`,
+                ].join('\n');
+              } catch (e) {
+                lighthouseSection = `\n\n> ⚠️ Lighthouse results could not be parsed: ${e.message}`;
+              }
+            }
+
+            // ── Assemble comment ───────────────────────────────────────────────
             const body = [
               '## Preview Environment Ready',
               '',
@@ -763,6 +863,7 @@ jobs:
               '',
               `**Mobile build** — [Actions → EAS Preview Build](../../actions/workflows/eas-preview-build.yml) → PR number: \`${prNumber}\``,
               bundleSection,
+              lighthouseSection,
             ].join('\n');
 
             const { data: comments } = await github.rest.issues.listComments({
@@ -790,3 +891,130 @@ jobs:
                 body,
               });
             }
+
+  # ──────────────────────────────────────────────────────────────
+  # Job 6: Cleanup — runs only when a PR is closed (merged or not)
+  # Deletes the Supabase preview branch, Railway environment, and
+  # Vercel branch-scoped env vars for this PR.
+  # ──────────────────────────────────────────────────────────────
+  cleanup:
+    name: Delete Preview Environment
+    if: github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+
+    env:
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      BRANCH_NAME: ${{ github.head_ref }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # ── 1. Delete Supabase preview branch ──────────────────────
+      - name: Delete Supabase branch
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          BRANCH_ID=$(supabase branches list \
+            --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}" \
+            --output json \
+            | jq -r --arg name "$BRANCH_NAME" '.[] | select(.name==$name) | .id // ""')
+
+          if [[ -n "$BRANCH_ID" ]]; then
+            supabase branches delete "$BRANCH_ID" \
+              --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}"
+            echo "Deleted Supabase branch: $BRANCH_NAME ($BRANCH_ID)"
+          else
+            echo "No Supabase branch found for $BRANCH_NAME — skipping"
+          fi
+
+      # ── 2. Delete Railway preview environment ──────────────────
+      - name: Delete Railway environment
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
+        run: |
+          ENV_NAME="${BRANCH_NAME//\//-}"
+          GQL="https://backboard.railway.app/graphql/v2"
+
+          ENV_ID=$(curl -sf \
+            -H "Authorization: Bearer $RAILWAY_TOKEN" \
+            -H "Content-Type: application/json" "$GQL" \
+            -d "{\"query\":\"query { project(id: \\\"${{ secrets.RAILWAY_PROJECT_ID }}\\\") { environments { edges { node { id name } } } } }\"}" \
+            | jq -r ".data.project.environments.edges[]? | select(.node.name==\"$ENV_NAME\") | .node.id // empty")
+
+          if [[ -n "$ENV_ID" ]]; then
+            curl -sf \
+              -H "Authorization: Bearer $RAILWAY_TOKEN" \
+              -H "Content-Type: application/json" "$GQL" \
+              -d "{\"query\":\"mutation { environmentDelete(id: \\\"$ENV_ID\\\") }\"}"
+            echo "Deleted Railway environment: $ENV_NAME ($ENV_ID)"
+          else
+            echo "No Railway environment found for $ENV_NAME — skipping"
+          fi
+
+      # ── 3. Remove Vercel branch-scoped env vars ─────────────────
+      - name: Remove Vercel branch env vars
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+        run: |
+          set -euo pipefail
+          BRANCH="${{ env.BRANCH_NAME }}"
+          PROJECT_ID="${VERCEL_PROJECT_ID:-}"
+          ORG_ID="${VERCEL_ORG_ID:-}"
+          TEAM_AMP=""
+          TEAM_Q=""
+
+          fail_vercel_config() { echo "::error::$1"; exit 1; }
+
+          [[ -z "$PROJECT_ID" ]] && fail_vercel_config "Missing VERCEL_PROJECT_ID."
+          [[ -z "$ORG_ID" ]] && fail_vercel_config "Missing VERCEL_ORG_ID."
+
+          case "$ORG_ID" in
+            team_*) TEAM_AMP="&teamId=${ORG_ID}"; TEAM_Q="?teamId=${ORG_ID}" ;;
+            user_*) ;;
+            *) fail_vercel_config "VERCEL_ORG_ID must start with team_ or user_." ;;
+          esac
+
+          PROJECT_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v9/projects/${PROJECT_ID}${TEAM_Q}")
+          if [[ "$PROJECT_STATUS" != "200" ]]; then
+            fail_vercel_config "Vercel project preflight failed (HTTP ${PROJECT_STATUS})."
+          fi
+
+          ENV_IDS=$(curl -sf \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v10/projects/${PROJECT_ID}/env?gitBranch=${BRANCH}${TEAM_AMP}" \
+            | jq -r '.envs[].id' 2>/dev/null || echo "")
+
+          if [[ -n "$ENV_IDS" ]]; then
+            while IFS= read -r ENV_ID; do
+              curl -sf -X DELETE \
+                -H "Authorization: Bearer $VERCEL_TOKEN" \
+                "https://api.vercel.com/v10/projects/${PROJECT_ID}/env/${ENV_ID}${TEAM_Q}" > /dev/null \
+                && echo "Deleted Vercel env var: $ENV_ID"
+            done <<< "$ENV_IDS"
+          else
+            echo "No Vercel branch env vars found for $BRANCH — skipping"
+          fi
+
+      # ── 4. Post cleanup comment ─────────────────────────────────
+      - name: Post cleanup comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: '🧹 Preview environment cleaned up (Supabase branch, Railway environment, and Vercel env vars removed).',
+            });
