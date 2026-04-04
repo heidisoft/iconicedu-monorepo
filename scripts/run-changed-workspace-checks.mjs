@@ -41,40 +41,68 @@ function parseArgs(argv) {
   return { mode, tasks };
 }
 
-function resolveBaseRef() {
-  const upstream = capture('git', ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}']);
-  if (upstream.status === 0) {
-    const upstreamRef = upstream.stdout.trim();
-    if (upstreamRef) {
-      const mergeBase = capture('git', ['merge-base', 'HEAD', upstreamRef]);
-      if (mergeBase.status === 0) {
-        const sha = mergeBase.stdout.trim();
-        if (sha) return sha;
-      }
-    }
-  }
+function resolveMergeBase(ref) {
+  const mergeBase = capture('git', ['merge-base', 'HEAD', ref]);
+  if (mergeBase.status !== 0) return null;
 
-  const baseRef = process.env.GITHUB_BASE_REF;
-  if (baseRef) {
-    const mergeBase = capture('git', ['merge-base', 'HEAD', `origin/${baseRef}`]);
-    if (mergeBase.status === 0) {
-      const sha = mergeBase.stdout.trim();
+  const sha = mergeBase.stdout.trim();
+  return sha || null;
+}
+
+function resolveDefaultBranchBase() {
+  const originHead = capture('git', [
+    'symbolic-ref',
+    '--quiet',
+    'refs/remotes/origin/HEAD',
+  ]);
+  if (originHead.status === 0) {
+    const originHeadRef = originHead.stdout.trim().replace(/^refs\/remotes\//, '');
+    if (originHeadRef) {
+      const sha = resolveMergeBase(originHeadRef);
       if (sha) return sha;
     }
   }
 
-  const previousCommit = capture('git', ['rev-parse', 'HEAD~1']);
-  if (previousCommit.status === 0) {
-    const sha = previousCommit.stdout.trim();
+  for (const ref of ['origin/main', 'main', 'origin/master', 'master']) {
+    const sha = resolveMergeBase(ref);
     if (sha) return sha;
   }
 
   return null;
 }
 
+function resolveBaseRef() {
+  const upstream = capture('git', [
+    'rev-parse',
+    '--abbrev-ref',
+    '--symbolic-full-name',
+    '@{upstream}',
+  ]);
+  if (upstream.status === 0) {
+    const upstreamRef = upstream.stdout.trim();
+    if (upstreamRef) {
+      const sha = resolveMergeBase(upstreamRef);
+      if (sha) return sha;
+    }
+  }
+
+  const baseRef = process.env.GITHUB_BASE_REF;
+  if (baseRef) {
+    const sha = resolveMergeBase(`origin/${baseRef}`);
+    if (sha) return sha;
+  }
+
+  return resolveDefaultBranchBase();
+}
+
 function getChangedFiles(mode) {
   if (mode === 'staged') {
-    const result = capture('git', ['diff', '--name-only', '--cached', '--diff-filter=ACMR']);
+    const result = capture('git', [
+      'diff',
+      '--name-only',
+      '--cached',
+      '--diff-filter=ACMRD',
+    ]);
     if (result.status !== 0) {
       process.stderr.write(result.stderr || 'Unable to read staged files.\n');
       process.exit(result.status);
@@ -92,7 +120,12 @@ function getChangedFiles(mode) {
     process.exit(0);
   }
 
-  const result = capture('git', ['diff', '--name-only', '--diff-filter=ACMR', `${base}...HEAD`]);
+  const result = capture('git', [
+    'diff',
+    '--name-only',
+    '--diff-filter=ACMRD',
+    `${base}...HEAD`,
+  ]);
   if (result.status !== 0) {
     process.stderr.write(result.stderr || 'Unable to read changed files.\n');
     process.exit(result.status);
@@ -171,7 +204,9 @@ function main() {
   const changedFiles = getChangedFiles(mode);
 
   if (!changedFiles.length) {
-    console.log(`No ${mode === 'staged' ? 'staged' : 'branch'} files detected. Skipping checks.`);
+    console.log(
+      `No ${mode === 'staged' ? 'staged' : 'branch'} files detected. Skipping checks.`,
+    );
     process.exit(0);
   }
 

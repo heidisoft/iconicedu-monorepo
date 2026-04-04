@@ -70,17 +70,21 @@ jobs:
             exit 1
           fi
 
-          BRANCH_ID=$(echo "$BRANCH_DATA" | jq -r '.id')
-
-          BRANCH_REF=$(curl -sf \
-            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
-            "https://api.supabase.com/v1/branches/${BRANCH_ID}" \
-            | jq -r '.project_ref')
+          BRANCH_REF=$(echo "$BRANCH_DATA" | jq -r '.project_ref // .ref // ""')
+          if [[ -z "$BRANCH_REF" || "$BRANCH_REF" == "null" ]]; then
+            echo "::error::Supabase branch '$BRANCH_NAME' is missing project_ref in branches list output."
+            exit 1
+          fi
+          echo "Resolved branch project ref: $BRANCH_REF"
 
           ANON_KEY=$(curl -sf \
             -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
             "https://api.supabase.com/v1/projects/${BRANCH_REF}/api-keys" \
             | jq -r '.[] | select(.name=="anon") | .api_key')
+          if [[ -z "$ANON_KEY" || "$ANON_KEY" == "null" ]]; then
+            echo "::error::Could not resolve anon API key for Supabase branch ref '$BRANCH_REF'."
+            exit 1
+          fi
           echo "::add-mask::$ANON_KEY"
 
           echo "branch_ref=$BRANCH_REF" >> "$GITHUB_OUTPUT"

@@ -2,6 +2,20 @@
 
 This app should be developed with native Expo builds, not Expo Go.
 
+## Environment matrix
+
+| Mode                 | Command                         | What it runs/builds                     | Distribution           | Intended use                                      |
+| -------------------- | ------------------------------- | --------------------------------------- | ---------------------- | ------------------------------------------------- |
+| Local Metro          | `pnpm mobile:start`             | Expo dev server                         | Local only             | Day-to-day JS work and simulator/emulator startup |
+| Local native iOS     | `pnpm mobile:ios`               | Local native app via `expo run:ios`     | Local only             | iOS simulator and native parity checks            |
+| Local native Android | `pnpm mobile:android`           | Local native app via `expo run:android` | Local only             | Fast Android-native iteration                     |
+| EAS development      | `pnpm mobile:eas:build:dev`     | Dev client build                        | Internal install       | Real-device native testing against local Metro    |
+| EAS preview          | `pnpm mobile:eas:build:preview` | Internal release-like build             | Internal distribution  | QA and stakeholder testing without Metro          |
+| EAS production       | `pnpm mobile:eas:build:prod`    | Store build                             | App Store / Play Store | Release artifacts                                 |
+| Submit               | `pnpm mobile:eas:submit`        | Submits built artifacts                 | Store submission flow  | Publish previously built production artifacts     |
+
+`development` is an internal dev client build that connects to local Metro. `preview` is an internal installable QA or stakeholder build. `production` is the store-release build path defined by the current EAS profiles in `apps/mobile/eas.json`.
+
 ## Two-lane workflow
 
 ### Lane 1: local native iteration
