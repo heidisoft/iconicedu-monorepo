@@ -1,18 +1,33 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { ClassScheduleContainer, DashboardHeader } from '@iconicedu/ui-web';
+import { startTransition, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { ClassScheduleContainer, DashboardHeader, toast } from '@iconicedu/ui-web';
 import type { ClassScheduleViewVM, ClassScheduleVM } from '@iconicedu/shared-types';
 import { ScheduleDisplayTimeZoneProvider } from '@iconicedu/ui-web/components/shared/schedule-display-timezone-context';
+import type { DisplayClassScheduleVM } from '@iconicedu/ui-web/lib/class-schedule-utils';
 import { toScheduleDisplayDate } from '@iconicedu/ui-web/lib/schedule-display-timezone';
+import { cancelClassScheduleSessionAction } from '@iconicedu/web/app/actions/cancel-class-schedule-session';
+import {
+  applyCancelledSessionToSchedules,
+  getBaseScheduleId,
+  getEventOccurrenceKey,
+} from '@iconicedu/web/app/(app)/[orgSlug]/class-schedule/class-schedule-client.utils';
 
 type ClassScheduleClientProps = {
   events: ClassScheduleVM[];
+  orgSlug: string;
+  canCancelSessions: boolean;
   timezone?: string | null;
 };
 
-export function ClassScheduleClient({ events, timezone }: ClassScheduleClientProps) {
+export function ClassScheduleClient({
+  events,
+  orgSlug,
+  canCancelSessions,
+  timezone,
+}: ClassScheduleClientProps) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const dateParam = searchParams.get('date');
   const viewParam = searchParams.get('view');
@@ -33,6 +48,7 @@ export function ClassScheduleClient({ events, timezone }: ClassScheduleClientPro
 
   const [currentDate, setCurrentDate] = useState(initialDate);
   const [view, setView] = useState<ClassScheduleViewVM>(initialView);
+  const [scheduleEvents, setScheduleEvents] = useState(events);
 
   useEffect(() => {
     setCurrentDate(initialDate);
@@ -41,6 +57,35 @@ export function ClassScheduleClient({ events, timezone }: ClassScheduleClientPro
   useEffect(() => {
     setView(initialView);
   }, [initialView]);
+
+  useEffect(() => {
+    setScheduleEvents(events);
+  }, [events]);
+
+  const handleCancelSession = async (
+    event: DisplayClassScheduleVM,
+    reason?: string | null,
+  ) => {
+    try {
+      const result = await cancelClassScheduleSessionAction({
+        orgSlug,
+        scheduleId: getBaseScheduleId(event.ids.id),
+        occurrenceKey: getEventOccurrenceKey(event),
+        reason,
+      });
+
+      setScheduleEvents((currentEvents) =>
+        applyCancelledSessionToSchedules(currentEvents, result),
+      );
+      toast.success('Session cancelled.');
+      startTransition(() => router.refresh());
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'Unable to cancel this session.',
+      );
+      throw error;
+    }
+  };
 
   return (
     <ScheduleDisplayTimeZoneProvider timezone={timezone}>
@@ -51,7 +96,9 @@ export function ClassScheduleClient({ events, timezone }: ClassScheduleClientPro
           view={view}
           onViewChange={setView}
           onDateSelect={setCurrentDate}
-          events={events}
+          events={scheduleEvents}
+          canCancelSessions={canCancelSessions}
+          onCancelSession={handleCancelSession}
         />
       </div>
     </ScheduleDisplayTimeZoneProvider>

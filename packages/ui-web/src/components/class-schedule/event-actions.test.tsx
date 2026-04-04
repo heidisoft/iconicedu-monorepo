@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import type { ClassScheduleVM } from '@iconicedu/shared-types';
 
@@ -57,5 +57,50 @@ describe('EventActions', () => {
     );
 
     expect(screen.getByRole('button', { name: 'View full schedule' })).toBeDisabled();
+  });
+
+  it('shows a cancel session action for staff-enabled events and submits the optional reason', async () => {
+    const onCancelSession = vi.fn(async () => undefined);
+    const onClose = vi.fn();
+
+    render(
+      <EventActions
+        event={buildEvent()}
+        onClose={onClose}
+        canCancelSession
+        onCancelSession={onCancelSession}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel session' }));
+    fireEvent.change(screen.getByLabelText('Reason (optional)'), {
+      target: { value: 'Tutor unavailable' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm cancel' }));
+
+    await waitFor(() => {
+      expect(onCancelSession).toHaveBeenCalledWith(
+        expect.objectContaining({ ids: expect.objectContaining({ id: 'schedule-1' }) }),
+        'Tutor unavailable',
+      );
+    });
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalled();
+    });
+  });
+
+  it('hides the cancel session action for already cancelled events', () => {
+    render(
+      <EventActions
+        event={buildEvent({ status: 'cancelled' })}
+        onClose={vi.fn()}
+        canCancelSession
+        onCancelSession={vi.fn(async () => undefined)}
+      />,
+    );
+
+    expect(
+      screen.queryByRole('button', { name: 'Cancel session' }),
+    ).not.toBeInTheDocument();
   });
 });

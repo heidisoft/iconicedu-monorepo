@@ -11,6 +11,7 @@ const buildClassSchedulesByOrgMock = vi.fn();
 const getDashboardAccountContextMock = vi.fn();
 const getDashboardProfileContextMock = vi.fn();
 const classScheduleClientMock = vi.fn(() => null);
+const enableClassScheduleStaffCancelRunMock = vi.fn(async () => false);
 
 vi.mock('@iconicedu/web/lib/schedules/builders/class-schedule.builder', () => ({
   buildClassSchedulesByOrg: (...args: unknown[]) => buildClassSchedulesByOrgMock(...args),
@@ -29,6 +30,12 @@ vi.mock(
     ClassScheduleClient: (props: unknown) => classScheduleClientMock(props),
   }),
 );
+
+vi.mock('@iconicedu/web/flags', () => ({
+  enableClassScheduleStaffCancel: {
+    run: (...args: unknown[]) => enableClassScheduleStaffCancelRunMock(...args),
+  },
+}));
 
 function createSchedule(input: {
   id: string;
@@ -63,11 +70,13 @@ describe('class schedule page viewer scoping', () => {
     getDashboardAccountContextMock.mockReset();
     getDashboardProfileContextMock.mockReset();
     classScheduleClientMock.mockReset();
+    enableClassScheduleStaffCancelRunMock.mockReset();
 
     getDashboardAccountContextMock.mockResolvedValue({
       supabase: {},
       account: { id: 'account-1', org_id: 'org-1' },
     });
+    enableClassScheduleStaffCancelRunMock.mockResolvedValue(false);
   });
 
   it('passes only child schedules when viewing as a child profile', async () => {
@@ -104,6 +113,8 @@ describe('class schedule page viewer scoping', () => {
 
     expect(classScheduleClientMock).toHaveBeenCalledWith(
       expect.objectContaining({
+        canCancelSessions: false,
+        orgSlug: 'iconic-academy',
         timezone: 'America/New_York',
         events: [
           expect.objectContaining({
@@ -151,6 +162,8 @@ describe('class schedule page viewer scoping', () => {
 
     expect(classScheduleClientMock).toHaveBeenCalledWith(
       expect.objectContaining({
+        canCancelSessions: false,
+        orgSlug: 'iconic-academy',
         events: [
           expect.objectContaining({
             ids: expect.objectContaining({ id: 'schedule-child-allowed' }),
@@ -159,6 +172,42 @@ describe('class schedule page viewer scoping', () => {
             ids: expect.objectContaining({ id: 'schedule-guardian-allowed' }),
           }),
         ],
+      }),
+    );
+  });
+
+  it('enables session cancellation only for staff when the flag is on', async () => {
+    buildClassSchedulesByOrgMock.mockResolvedValue([
+      createSchedule({
+        id: 'schedule-staff-visible',
+        participants: [{ profileId: 'child-1', role: 'child' }],
+      }),
+    ]);
+    getDashboardProfileContextMock.mockResolvedValue({
+      currentUserProfile: {
+        kind: 'staff',
+        ids: { id: 'staff-1', orgId: 'org-1', accountId: 'account-staff-1' },
+        prefs: { timezone: 'America/New_York' },
+      },
+    });
+    enableClassScheduleStaffCancelRunMock.mockResolvedValue(true);
+
+    const element = await ClassSchedulePage({
+      params: Promise.resolve({ orgSlug: 'iconic-academy' }),
+    });
+    render(element as React.ReactElement);
+
+    await waitFor(() => {
+      expect(classScheduleClientMock).toHaveBeenCalled();
+    });
+
+    expect(enableClassScheduleStaffCancelRunMock).toHaveBeenCalledWith({
+      identify: { profileId: 'staff-1' },
+    });
+    expect(classScheduleClientMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        canCancelSessions: true,
+        orgSlug: 'iconic-academy',
       }),
     );
   });

@@ -77,6 +77,26 @@ describe('class-schedule-utils', () => {
     expect(getDisplayEventState(exception!).reason).toBe('Spring holiday');
   });
 
+  it('treats cancelled non-recurring sessions as disabled skipped entries', () => {
+    const schedule: ClassScheduleVM = {
+      ...buildRecurringSchedule(),
+      recurrence: undefined,
+      status: 'cancelled',
+      description: 'Tutor unavailable',
+    };
+
+    const expanded = expandRecurringEvents(
+      [schedule],
+      new Date('2026-03-01T00:00:00.000Z'),
+      new Date('2026-03-02T00:00:00.000Z'),
+    );
+
+    expect(expanded).toHaveLength(1);
+    expect(expanded[0]?.uiState?.kind).toBe('exception');
+    expect(getDisplayEventState(expanded[0]!).disabled).toBe(true);
+    expect(getDisplayEventState(expanded[0]!).reason).toBe('Tutor unavailable');
+  });
+
   it('marks override occurrences as changed and preserves original timing metadata', () => {
     const expanded = expandRecurringEvents(
       [buildRecurringSchedule()],

@@ -7,6 +7,7 @@ import { WeekView } from '@iconicedu/ui-web/components/class-schedule/week-view'
 import { DayView } from '@iconicedu/ui-web/components/class-schedule/day-view';
 import { useScheduleDisplayTimeZone } from '@iconicedu/ui-web/components/shared/schedule-display-timezone-context';
 import {
+  type DisplayClassScheduleVM,
   eventTimeToMinutes,
   getClassScheduleEventsForMonthRange,
   getClassScheduleEventsForView,
@@ -20,6 +21,11 @@ interface ClassScheduleContainerProps {
   onDateSelect: (date: Date) => void;
   events: ClassScheduleVM[];
   childrenCount?: number;
+  canCancelSessions?: boolean;
+  onCancelSession?: (
+    event: DisplayClassScheduleVM,
+    reason?: string | null,
+  ) => Promise<void>;
 }
 
 export function ClassScheduleContainer({
@@ -29,6 +35,8 @@ export function ClassScheduleContainer({
   onDateSelect,
   events,
   childrenCount,
+  canCancelSessions = false,
+  onCancelSession,
 }: ClassScheduleContainerProps) {
   const timezone = useScheduleDisplayTimeZone();
   const [classScheduleMonthAnchor, setClassScheduleMonthAnchor] = useState(
@@ -87,6 +95,8 @@ export function ClassScheduleContainer({
           events={classScheduleEventsForView}
           onDateSelect={onDateSelect}
           onSwitchToDay={() => onViewChange('day')}
+          canCancelSessions={canCancelSessions}
+          onCancelSession={onCancelSession}
         />
       ) : (
         <DayView
@@ -98,6 +108,8 @@ export function ClassScheduleContainer({
           childrenCount={childrenCount}
           onDateSelect={onDateSelect}
           onMonthChange={setClassScheduleMonthAnchor}
+          canCancelSessions={canCancelSessions}
+          onCancelSession={onCancelSession}
         />
       )}
     </>
