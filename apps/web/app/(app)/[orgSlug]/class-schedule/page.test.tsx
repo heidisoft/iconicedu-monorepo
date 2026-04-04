@@ -11,7 +11,6 @@ const buildClassSchedulesByOrgMock = vi.fn();
 const getDashboardAccountContextMock = vi.fn();
 const getDashboardProfileContextMock = vi.fn();
 const classScheduleClientMock = vi.fn(() => null);
-const enableClassScheduleStaffCancelRunMock = vi.fn(async () => false);
 
 vi.mock('@iconicedu/web/lib/schedules/builders/class-schedule.builder', () => ({
   buildClassSchedulesByOrg: (...args: unknown[]) => buildClassSchedulesByOrgMock(...args),
@@ -30,12 +29,6 @@ vi.mock(
     ClassScheduleClient: (props: unknown) => classScheduleClientMock(props),
   }),
 );
-
-vi.mock('@iconicedu/web/flags', () => ({
-  enableClassScheduleStaffCancel: {
-    run: (...args: unknown[]) => enableClassScheduleStaffCancelRunMock(...args),
-  },
-}));
 
 function createSchedule(input: {
   id: string;
@@ -70,13 +63,11 @@ describe('class schedule page viewer scoping', () => {
     getDashboardAccountContextMock.mockReset();
     getDashboardProfileContextMock.mockReset();
     classScheduleClientMock.mockReset();
-    enableClassScheduleStaffCancelRunMock.mockReset();
 
     getDashboardAccountContextMock.mockResolvedValue({
       supabase: {},
       account: { id: 'account-1', org_id: 'org-1', primary_role: 'guardian' },
     });
-    enableClassScheduleStaffCancelRunMock.mockResolvedValue(false);
   });
 
   it('passes only child schedules when viewing as a child profile', async () => {
@@ -176,7 +167,7 @@ describe('class schedule page viewer scoping', () => {
     );
   });
 
-  it('enables session cancellation for owners when the flag is on', async () => {
+  it('enables session cancellation for owners by role only', async () => {
     getDashboardAccountContextMock.mockResolvedValue({
       supabase: {},
       account: { id: 'account-1', org_id: 'org-1', primary_role: 'owner' },
@@ -194,7 +185,6 @@ describe('class schedule page viewer scoping', () => {
         prefs: { timezone: 'America/New_York' },
       },
     });
-    enableClassScheduleStaffCancelRunMock.mockResolvedValue(true);
 
     const element = await ClassSchedulePage({
       params: Promise.resolve({ orgSlug: 'iconic-academy' }),
@@ -205,9 +195,6 @@ describe('class schedule page viewer scoping', () => {
       expect(classScheduleClientMock).toHaveBeenCalled();
     });
 
-    expect(enableClassScheduleStaffCancelRunMock).toHaveBeenCalledWith({
-      identify: { profileId: 'staff-1' },
-    });
     expect(classScheduleClientMock).toHaveBeenCalledWith(
       expect.objectContaining({
         canCancelSessions: true,

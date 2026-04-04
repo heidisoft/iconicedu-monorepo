@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import type { ClassScheduleVM, UserProfileVM } from '@iconicedu/shared-types';
 import { buildClassSchedulesByOrg } from '@iconicedu/web/lib/schedules/builders/class-schedule.builder';
 import { ClassScheduleClient } from '@iconicedu/web/app/(app)/[orgSlug]/class-schedule/class-schedule-client';
-import { enableClassScheduleStaffCancel } from '@iconicedu/web/flags';
 import {
   getDashboardAccountContext,
   getDashboardProfileContext,
@@ -68,13 +67,8 @@ export default async function ClassSchedulePage({
   const { currentUserProfile } = await getDashboardProfileContext(supabase, account.id);
   const allEvents = await buildClassSchedulesByOrg(supabase, account.org_id);
   const events = filterSchedulesForViewerProfile(allEvents, currentUserProfile);
-  const canManageSessions =
+  const canCancelSessions =
     account.primary_role === 'staff' || account.primary_role === 'owner';
-  const canCancelSessions = canManageSessions
-    ? await enableClassScheduleStaffCancel.run({
-        identify: { profileId: currentUserProfile?.ids.id ?? null },
-      })
-    : false;
 
   return (
     <ClassScheduleClient

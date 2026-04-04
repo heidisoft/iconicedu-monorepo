@@ -6,8 +6,6 @@ import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
 import { getAccountByAuthUserIdInOrg } from '@iconicedu/web/lib/accounts/queries/accounts.query';
-import { getDashboardProfileContext } from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
-import { enableClassScheduleStaffCancel } from '@iconicedu/web/flags';
 
 export type CancelClassScheduleSessionActionInput = {
   orgSlug: string;
@@ -46,18 +44,10 @@ export async function cancelClassScheduleSessionAction(
     throw new Error('Account record not found');
   }
 
-  const { currentUserProfile } = await getDashboardProfileContext(supabase, account.id);
   const canManageSessions =
     account.primary_role === 'staff' || account.primary_role === 'owner';
   if (!canManageSessions) {
     throw new Error('Only staff or owner users can cancel sessions.');
-  }
-
-  const isEnabled = await enableClassScheduleStaffCancel.run({
-    identify: { profileId: currentUserProfile?.ids.id ?? null },
-  });
-  if (!isEnabled) {
-    throw new Error('Session cancellation is not enabled.');
   }
 
   const serviceSupabase = createSupabaseServiceClient();

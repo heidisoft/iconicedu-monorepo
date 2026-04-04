@@ -4,8 +4,6 @@ const createSupabaseServerClientMock = vi.fn();
 const createSupabaseServiceClientMock = vi.fn();
 const buildOrgBySlugMock = vi.fn();
 const getAccountByAuthUserIdInOrgMock = vi.fn();
-const getDashboardProfileContextMock = vi.fn();
-const enableClassScheduleStaffCancelRunMock = vi.fn();
 const revalidatePathMock = vi.fn();
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
@@ -25,17 +23,6 @@ vi.mock('@iconicedu/web/lib/org/builders/org.builder', () => ({
 vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
   getAccountByAuthUserIdInOrg: (...args: unknown[]) =>
     getAccountByAuthUserIdInOrgMock(...args),
-}));
-
-vi.mock('@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth', () => ({
-  getDashboardProfileContext: (...args: unknown[]) =>
-    getDashboardProfileContextMock(...args),
-}));
-
-vi.mock('@iconicedu/web/flags', () => ({
-  enableClassScheduleStaffCancel: {
-    run: (...args: unknown[]) => enableClassScheduleStaffCancelRunMock(...args),
-  },
 }));
 
 vi.mock('next/cache', () => ({
@@ -191,8 +178,6 @@ describe('cancelClassScheduleSessionAction', () => {
     createSupabaseServiceClientMock.mockReset();
     buildOrgBySlugMock.mockReset();
     getAccountByAuthUserIdInOrgMock.mockReset();
-    getDashboardProfileContextMock.mockReset();
-    enableClassScheduleStaffCancelRunMock.mockReset();
     revalidatePathMock.mockReset();
 
     createSupabaseServerClientMock.mockResolvedValue(createServerSupabase());
@@ -200,13 +185,6 @@ describe('cancelClassScheduleSessionAction', () => {
     getAccountByAuthUserIdInOrgMock.mockResolvedValue({
       data: { id: 'account-1', org_id: 'org-1', primary_role: 'owner' },
     });
-    getDashboardProfileContextMock.mockResolvedValue({
-      currentUserProfile: {
-        kind: 'staff',
-        ids: { id: 'staff-1', orgId: 'org-1', accountId: 'account-1' },
-      },
-    });
-    enableClassScheduleStaffCancelRunMock.mockResolvedValue(true);
   });
 
   it('creates a recurrence exception and removes any matching override for recurring sessions', async () => {

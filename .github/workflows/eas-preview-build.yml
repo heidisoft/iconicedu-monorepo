@@ -24,6 +24,7 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
+      issues: write
 
     steps:
       - name: Resolve build context
