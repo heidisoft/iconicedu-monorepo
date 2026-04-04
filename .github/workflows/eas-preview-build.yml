@@ -81,52 +81,62 @@ jobs:
         run: pnpm install
 
       - uses: supabase/setup-cli@v1
-        if: steps.context.outputs.build_kind == 'preview'
+        if: steps.context.outputs.should_build == 'true'
         with:
           version: latest
 
-      # 1. Fetch Supabase branch credentials
-      - name: Fetch Supabase branch credentials
-        id: branch-creds
-        if: steps.context.outputs.build_kind == 'preview'
+      # 1. Fetch Supabase credentials for the selected build target
+      - name: Fetch Supabase credentials
+        id: supabase-creds
+        if: steps.context.outputs.should_build == 'true'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           set -euo pipefail
 
-          BRANCH_NAME="${{ steps.context.outputs.branch_name }}"
-          echo "Looking for Supabase branch: $BRANCH_NAME"
+          if [[ "${{ steps.context.outputs.build_kind }}" == "preview" ]]; then
+            BRANCH_NAME="${{ steps.context.outputs.branch_name }}"
+            echo "Looking for Supabase branch: $BRANCH_NAME"
 
-          BRANCH_DATA=$(supabase branches list \
-            --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}" \
-            --output json \
-            | jq --arg name "$BRANCH_NAME" '.[] | select(.name==$name)')
+            BRANCH_DATA=$(supabase branches list \
+              --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}" \
+              --output json \
+              | jq --arg name "$BRANCH_NAME" '.[] | select(.name==$name)')
 
-          if [[ -z "$BRANCH_DATA" ]]; then
-            echo "::error::No Supabase branch found for '$BRANCH_NAME'. Make sure the PR is open and the preview-env workflow has completed."
-            exit 1
+            if [[ -z "$BRANCH_DATA" ]]; then
+              echo "::error::No Supabase branch found for '$BRANCH_NAME'. Make sure the PR is open and the preview-env workflow has completed."
+              exit 1
+            fi
+
+            PROJECT_REF=$(echo "$BRANCH_DATA" | jq -r '.project_ref // .ref // ""')
+            if [[ -z "$PROJECT_REF" || "$PROJECT_REF" == "null" ]]; then
+              echo "::error::Supabase branch '$BRANCH_NAME' is missing project_ref in branches list output."
+              exit 1
+            fi
+          else
+            PROJECT_REF="${{ secrets.SUPABASE_PROJECT_ID }}"
+            if [[ -z "$PROJECT_REF" || "$PROJECT_REF" == "null" ]]; then
+              echo "::error::SUPABASE_PROJECT_ID is not configured."
+              exit 1
+            fi
+            echo "Using default production Supabase project ref from SUPABASE_PROJECT_ID."
           fi
 
-          BRANCH_REF=$(echo "$BRANCH_DATA" | jq -r '.project_ref // .ref // ""')
-          if [[ -z "$BRANCH_REF" || "$BRANCH_REF" == "null" ]]; then
-            echo "::error::Supabase branch '$BRANCH_NAME' is missing project_ref in branches list output."
-            exit 1
-          fi
-          echo "Resolved branch project ref: $BRANCH_REF"
+          echo "Resolved project ref: $PROJECT_REF"
 
           ANON_KEY=$(curl -sf \
             -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
-            "https://api.supabase.com/v1/projects/${BRANCH_REF}/api-keys" \
+            "https://api.supabase.com/v1/projects/${PROJECT_REF}/api-keys" \
             | jq -r '.[] | select(.name=="anon") | .api_key')
           if [[ -z "$ANON_KEY" || "$ANON_KEY" == "null" ]]; then
-            echo "::error::Could not resolve anon API key for Supabase branch ref '$BRANCH_REF'."
+            echo "::error::Could not resolve anon API key for Supabase project ref '$PROJECT_REF'."
             exit 1
           fi
           echo "::add-mask::$ANON_KEY"
 
-          echo "branch_ref=$BRANCH_REF" >> "$GITHUB_OUTPUT"
+          echo "project_ref=$PROJECT_REF" >> "$GITHUB_OUTPUT"
           echo "anon_key=$ANON_KEY" >> "$GITHUB_OUTPUT"
-          echo "branch_api_url=https://${BRANCH_REF}.supabase.co" >> "$GITHUB_OUTPUT"
+          echo "api_url=https://${PROJECT_REF}.supabase.co" >> "$GITHUB_OUTPUT"
 
       # 2. Fetch Railway preview API URL — disabled until Railway is configured
       # - name: Fetch Railway preview API URL
@@ -159,19 +169,29 @@ jobs:
 
           cd apps/mobile
 
+          tmp_eas_json=$(mktemp)
           if [[ "${{ steps.context.outputs.build_kind }}" == "preview" ]]; then
-            tmp_eas_json=$(mktemp)
             jq \
-              --arg supabase_url "${{ steps.branch-creds.outputs.branch_api_url }}" \
-              --arg anon_key "${{ steps.branch-creds.outputs.anon_key }}" \
+              --arg supabase_url "${{ steps.supabase-creds.outputs.api_url }}" \
+              --arg anon_key "${{ steps.supabase-creds.outputs.anon_key }}" \
               '.build.preview.env = ((.build.preview.env // {}) + {
                 EXPO_PUBLIC_SUPABASE_URL: $supabase_url,
                 EXPO_PUBLIC_SUPABASE_ANON_KEY: $anon_key,
                 EXPO_PUBLIC_APP_ENV: "preview"
               })' \
               eas.json > "$tmp_eas_json"
-            mv "$tmp_eas_json" eas.json
+          else
+            jq \
+              --arg supabase_url "${{ steps.supabase-creds.outputs.api_url }}" \
+              --arg anon_key "${{ steps.supabase-creds.outputs.anon_key }}" \
+              '.build.production.env = ((.build.production.env // {}) + {
+                EXPO_PUBLIC_SUPABASE_URL: $supabase_url,
+                EXPO_PUBLIC_SUPABASE_ANON_KEY: $anon_key,
+                EXPO_PUBLIC_APP_ENV: "production"
+              })' \
+              eas.json > "$tmp_eas_json"
           fi
+          mv "$tmp_eas_json" eas.json
 
           if ! BUILD_OUTPUT=$(eas build \
             --profile "${{ steps.context.outputs.build_profile }}" \
@@ -198,7 +218,7 @@ jobs:
             const prNumber = parseInt('${{ steps.context.outputs.pr_number }}');
             const platform = '${{ github.event.inputs.platform }}';
             const buildUrl = '${{ steps.eas-build.outputs.build_url }}';
-            const supabaseUrl = '${{ steps.branch-creds.outputs.branch_api_url }}';
+            const supabaseUrl = '${{ steps.supabase-creds.outputs.api_url }}';
 
             const platformLabel =
               platform === 'all'
