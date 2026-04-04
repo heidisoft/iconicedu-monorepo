@@ -217,7 +217,6 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const core = require('@actions/core');
             const prNumber = parseInt('${{ steps.context.outputs.pr_number }}');
             const platform = '${{ github.event.inputs.platform }}';
             const buildUrl = '${{ steps.eas-build.outputs.build_url }}';
