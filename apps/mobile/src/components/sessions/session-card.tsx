@@ -20,6 +20,10 @@ import type { ClassScheduleVM } from '@iconicedu/shared-types';
 
 export type ClassSession = {
   id: string;
+  scheduleId?: string;
+  recurrenceId?: string | null;
+  occurrenceKey?: string | null;
+  canCancel?: boolean;
   label: string;
   time: string;
   participantLabel?: string | null;
@@ -154,6 +158,7 @@ export function SessionCard({
   joinEnabled = true,
   pressTarget = 'sessions',
   enableCardPress = true,
+  cancelAction,
 }: {
   session: ClassSession;
   style?: ViewStyle;
@@ -161,6 +166,12 @@ export function SessionCard({
   joinEnabled?: boolean;
   pressTarget?: 'sessions' | 'messages';
   enableCardPress?: boolean;
+  cancelAction?: {
+    label?: string;
+    onPress: () => void;
+    disabled?: boolean;
+    accessibilityLabel?: string;
+  } | null;
 }) {
   const { colors } = useTheme();
   const router = useRouter();
@@ -485,6 +496,26 @@ export function SessionCard({
               <MessageSquare size={13} color={colors.textMuted} />
             </TouchableOpacity>
           ) : null}
+          {cancelAction ? (
+            <TouchableOpacity
+              style={[
+                s.cancelBtn,
+                {
+                  backgroundColor: cancelAction.disabled ? colors.inputBg : colors.card,
+                  borderColor: colors.red,
+                  opacity: cancelAction.disabled ? 0.6 : 1,
+                },
+              ]}
+              onPress={cancelAction.onPress}
+              disabled={cancelAction.disabled}
+              activeOpacity={0.7}
+              accessibilityLabel={cancelAction.accessibilityLabel ?? 'Cancel session'}
+            >
+              <Text style={[s.cancelBtnTxt, { color: colors.red }]}>
+                {cancelAction.label ?? 'Cancel'}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       </TouchableOpacity>
       <Modal
@@ -660,6 +691,18 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
+  },
+  cancelBtn: {
+    minHeight: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 10,
+  },
+  cancelBtnTxt: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   joinBtn: {
     flexDirection: 'row',

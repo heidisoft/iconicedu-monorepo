@@ -12,6 +12,10 @@ on:
           - 'all'
           - 'ios'
           - 'android'
+      pr_number:
+        description: 'PR number for preview builds on non-main branches'
+        required: false
+        type: string
 
 jobs:
   eas-build:
@@ -20,17 +24,16 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
-      pull-requests: read
+      issues: write
 
     steps:
       - name: Resolve build context
         id: context
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
 
           BRANCH_NAME="${GITHUB_REF_NAME}"
+          PR_NUMBER_INPUT="${{ github.event.inputs.pr_number }}"
           echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
 
           if [[ "$BRANCH_NAME" == "main" ]]; then
@@ -40,26 +43,16 @@ jobs:
             exit 0
           fi
 
-          PR_DATA=$(gh api "repos/${{ github.repository }}/pulls" \
-            --raw-field state=open \
-            --raw-field base=main \
-            --raw-field head="${{ github.repository_owner }}:${BRANCH_NAME}" \
-            --jq '.[0] // empty')
-
-          if [[ -z "$PR_DATA" ]]; then
-            echo "No open PR from '$BRANCH_NAME' to 'main'. Skipping EAS build."
-            echo "should_build=false" >> "$GITHUB_OUTPUT"
-            echo "build_profile=preview" >> "$GITHUB_OUTPUT"
-            echo "build_kind=preview" >> "$GITHUB_OUTPUT"
-            exit 0
+          if [[ -n "$PR_NUMBER_INPUT" ]]; then
+            echo "Using PR #$PR_NUMBER_INPUT for branch '$BRANCH_NAME'."
+            echo "pr_number=$PR_NUMBER_INPUT" >> "$GITHUB_OUTPUT"
+          else
+            echo "No PR number provided for branch '$BRANCH_NAME'. Preview build will run without posting a PR comment."
           fi
 
-          PR_NUMBER=$(echo "$PR_DATA" | jq -r '.number')
-          echo "Found open PR #$PR_NUMBER for branch '$BRANCH_NAME'."
           echo "should_build=true" >> "$GITHUB_OUTPUT"
           echo "build_profile=preview" >> "$GITHUB_OUTPUT"
           echo "build_kind=preview" >> "$GITHUB_OUTPUT"
-          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@v4
         if: steps.context.outputs.should_build == 'true'
@@ -211,7 +204,7 @@ jobs:
 
       # 4. Post comment on PR
       - name: Post build comment on PR
-        if: steps.context.outputs.build_kind == 'preview'
+        if: steps.context.outputs.build_kind == 'preview' && steps.context.outputs.pr_number != ''
         uses: actions/github-script@v7
         with:
           script: |

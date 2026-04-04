@@ -2,6 +2,7 @@
 
 import type { ClassScheduleVM } from '@iconicedu/shared-types';
 import {
+  type DisplayClassScheduleVM,
   eventTimeToMinutes,
   isSameDay,
   getEventDate,
@@ -28,13 +29,18 @@ import { formatScheduleDisplayValue } from '@iconicedu/ui-web/lib/schedule-displ
 
 interface DayViewProps {
   currentDate: Date;
-  events: ClassScheduleVM[];
-  classScheduleEvents?: ClassScheduleVM[];
+  events: DisplayClassScheduleVM[];
+  classScheduleEvents?: DisplayClassScheduleVM[];
   hasClasses: boolean;
   nextEvent?: ClassScheduleVM;
   childrenCount?: number;
   onDateSelect: (date: Date) => void;
   onMonthChange?: (date: Date) => void;
+  canCancelSessions?: boolean;
+  onCancelSession?: (
+    event: DisplayClassScheduleVM,
+    reason?: string | null,
+  ) => Promise<void>;
 }
 
 export function DayView({
@@ -46,6 +52,8 @@ export function DayView({
   childrenCount,
   onDateSelect,
   onMonthChange,
+  canCancelSessions = false,
+  onCancelSession,
 }: DayViewProps) {
   const timezone = useScheduleDisplayTimeZone();
   const timeSlots = getTimeSlots();
@@ -184,7 +192,12 @@ export function DayView({
                     }}
                   >
                     <div className="pointer-events-auto h-full">
-                      <EventCard event={event} compact={isCompact} />
+                      <EventCard
+                        event={event}
+                        compact={isCompact}
+                        canCancelSession={canCancelSessions}
+                        onCancelSession={onCancelSession}
+                      />
                     </div>
                   </div>
                 );
@@ -223,7 +236,11 @@ export function DayView({
                         <div className="max-h-48 overflow-auto">
                           {info.hiddenEvents.map((hidden) => (
                             <div key={hidden.ids.id} className="pointer-events-auto">
-                              <EventCard event={hidden} />
+                              <EventCard
+                                event={hidden}
+                                canCancelSession={canCancelSessions}
+                                onCancelSession={onCancelSession}
+                              />
                             </div>
                           ))}
                         </div>

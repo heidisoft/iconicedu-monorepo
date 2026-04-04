@@ -66,7 +66,7 @@ describe('class schedule page viewer scoping', () => {
 
     getDashboardAccountContextMock.mockResolvedValue({
       supabase: {},
-      account: { id: 'account-1', org_id: 'org-1' },
+      account: { id: 'account-1', org_id: 'org-1', primary_role: 'guardian' },
     });
   });
 
@@ -104,6 +104,8 @@ describe('class schedule page viewer scoping', () => {
 
     expect(classScheduleClientMock).toHaveBeenCalledWith(
       expect.objectContaining({
+        canCancelSessions: false,
+        orgSlug: 'iconic-academy',
         timezone: 'America/New_York',
         events: [
           expect.objectContaining({
@@ -151,6 +153,8 @@ describe('class schedule page viewer scoping', () => {
 
     expect(classScheduleClientMock).toHaveBeenCalledWith(
       expect.objectContaining({
+        canCancelSessions: false,
+        orgSlug: 'iconic-academy',
         events: [
           expect.objectContaining({
             ids: expect.objectContaining({ id: 'schedule-child-allowed' }),
@@ -159,6 +163,42 @@ describe('class schedule page viewer scoping', () => {
             ids: expect.objectContaining({ id: 'schedule-guardian-allowed' }),
           }),
         ],
+      }),
+    );
+  });
+
+  it('enables session cancellation for owners by role only', async () => {
+    getDashboardAccountContextMock.mockResolvedValue({
+      supabase: {},
+      account: { id: 'account-1', org_id: 'org-1', primary_role: 'owner' },
+    });
+    buildClassSchedulesByOrgMock.mockResolvedValue([
+      createSchedule({
+        id: 'schedule-staff-visible',
+        participants: [{ profileId: 'child-1', role: 'child' }],
+      }),
+    ]);
+    getDashboardProfileContextMock.mockResolvedValue({
+      currentUserProfile: {
+        kind: 'system',
+        ids: { id: 'staff-1', orgId: 'org-1', accountId: 'account-staff-1' },
+        prefs: { timezone: 'America/New_York' },
+      },
+    });
+
+    const element = await ClassSchedulePage({
+      params: Promise.resolve({ orgSlug: 'iconic-academy' }),
+    });
+    render(element as React.ReactElement);
+
+    await waitFor(() => {
+      expect(classScheduleClientMock).toHaveBeenCalled();
+    });
+
+    expect(classScheduleClientMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        canCancelSessions: true,
+        orgSlug: 'iconic-academy',
       }),
     );
   });

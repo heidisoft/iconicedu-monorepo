@@ -67,11 +67,15 @@ export default async function ClassSchedulePage({
   const { currentUserProfile } = await getDashboardProfileContext(supabase, account.id);
   const allEvents = await buildClassSchedulesByOrg(supabase, account.org_id);
   const events = filterSchedulesForViewerProfile(allEvents, currentUserProfile);
+  const canCancelSessions =
+    account.primary_role === 'staff' || account.primary_role === 'owner';
 
   return (
     <ClassScheduleClient
       events={events}
       timezone={currentUserProfile?.prefs.timezone ?? null}
+      orgSlug={orgSlug}
+      canCancelSessions={canCancelSessions}
     />
   );
 }

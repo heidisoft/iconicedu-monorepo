@@ -386,9 +386,19 @@ export const expandRecurringEvents = (
     if (!event.recurrence) {
       const eventDate = startOfDay(new Date(event.startAt));
       if (isWithinRange(eventDate, rangeStartDay, rangeEndDay)) {
+        const isCancelled = event.status === 'cancelled';
         expanded.push({
           ...event,
-          uiState: { kind: 'default' },
+          meetingLink: isCancelled ? null : event.meetingLink,
+          uiState: isCancelled
+            ? {
+                kind: 'exception',
+                disabled: true,
+                reason: event.description ?? null,
+                originalStartAt: event.startAt,
+                originalEndAt: event.endAt,
+              }
+            : { kind: 'default' },
         });
       }
       return;

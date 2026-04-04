@@ -2,6 +2,7 @@
 
 import type { ClassScheduleVM } from '@iconicedu/shared-types';
 import {
+  type DisplayClassScheduleVM,
   eventTimeToMinutes,
   getWeekDays,
   formatDayName,
@@ -18,9 +19,14 @@ import { useScheduleDisplayTimeZone } from '@iconicedu/ui-web/components/shared/
 
 interface WeekViewProps {
   currentDate: Date;
-  events: ClassScheduleVM[];
+  events: DisplayClassScheduleVM[];
   onDateSelect?: (date: Date) => void;
   onSwitchToDay?: () => void;
+  canCancelSessions?: boolean;
+  onCancelSession?: (
+    event: DisplayClassScheduleVM,
+    reason?: string | null,
+  ) => Promise<void>;
 }
 
 export function WeekView({
@@ -28,6 +34,8 @@ export function WeekView({
   events,
   onDateSelect,
   onSwitchToDay,
+  canCancelSessions = false,
+  onCancelSession,
 }: WeekViewProps) {
   const timezone = useScheduleDisplayTimeZone();
   const weekDays = getWeekDays(currentDate);
@@ -232,7 +240,12 @@ export function WeekView({
                         }}
                       >
                         <div className="pointer-events-auto h-full">
-                          <EventCard event={event} compact={isCompact} />
+                          <EventCard
+                            event={event}
+                            compact={isCompact}
+                            canCancelSession={canCancelSessions}
+                            onCancelSession={onCancelSession}
+                          />
                         </div>
                       </div>
                     );
@@ -271,7 +284,11 @@ export function WeekView({
                             <div className="max-h-48 overflow-auto">
                               {info.hiddenEvents.map((hidden) => (
                                 <div key={hidden.ids.id} className="pointer-events-auto">
-                                  <EventCard event={hidden} />
+                                  <EventCard
+                                    event={hidden}
+                                    canCancelSession={canCancelSessions}
+                                    onCancelSession={onCancelSession}
+                                  />
                                 </div>
                               ))}
                             </div>

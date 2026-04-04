@@ -3,20 +3,32 @@
 import type React from 'react';
 
 import { Separator } from '@iconicedu/ui-web/ui/separator';
-import type { ClassScheduleVM } from '@iconicedu/shared-types';
 import { EventDetailsHeader } from '@iconicedu/ui-web/components/class-schedule/event-details-header';
 import { EventDetailsInfo } from '@iconicedu/ui-web/components/class-schedule/event-details-info';
 import { EventActions } from '@iconicedu/ui-web/components/class-schedule/event-actions';
 import { ResponsiveDialog } from '@iconicedu/ui-web/components/shared/responsive-dialog';
+import type { DisplayClassScheduleVM } from '@iconicedu/ui-web/lib/class-schedule-utils';
 
 interface EventDialogProps {
-  event: ClassScheduleVM;
+  event: DisplayClassScheduleVM;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   children: React.ReactNode;
+  canCancelSession?: boolean;
+  onCancelSession?: (
+    event: DisplayClassScheduleVM,
+    reason?: string | null,
+  ) => Promise<void>;
 }
 
-export function EventDialog({ event, open, onOpenChange, children }: EventDialogProps) {
+export function EventDialog({
+  event,
+  open,
+  onOpenChange,
+  children,
+  canCancelSession = false,
+  onCancelSession,
+}: EventDialogProps) {
   const content = (
     // <ScrollArea className="max-h-[85vh]">
     <div className="p-4">
@@ -25,7 +37,12 @@ export function EventDialog({ event, open, onOpenChange, children }: EventDialog
         <div className="px-4 space-y-3">
           <EventDetailsInfo event={event} />
           <Separator />
-          <EventActions event={event} onClose={() => onOpenChange(false)} />
+          <EventActions
+            event={event}
+            onClose={() => onOpenChange(false)}
+            canCancelSession={canCancelSession}
+            onCancelSession={onCancelSession}
+          />
         </div>
       </div>
     </div>

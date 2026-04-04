@@ -70,9 +70,30 @@ export const enableAdminReports = flag<boolean, { profileId?: string | null }>({
   },
 });
 
+export const enableClassScheduleStaffCancel = flag<
+  boolean,
+  { profileId?: string | null }
+>({
+  key: 'enable-class-schedule-staff-cancel',
+  description:
+    'Allows staff users to cancel class schedule sessions from the calendar surface.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: true,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: 'enable-class-schedule-staff-cancel',
+      profileId: entities?.profileId,
+    });
+  },
+});
+
 export const webFlags = {
   enableAdminReports,
   enableChannelCommunications,
+  enableClassScheduleStaffCancel,
   enableMessageTypeComposer,
 } as const;
 

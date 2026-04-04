@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import type { ClassScheduleVM } from '@iconicedu/shared-types';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import {
+  type DisplayClassScheduleVM,
   formatEventTimeForSchedule,
   getDisplayEventState,
   isEventLive,
@@ -13,11 +13,21 @@ import { EventDialog } from '@iconicedu/ui-web/components/class-schedule/event-d
 import { EventLiveIndicator } from '@iconicedu/ui-web/components/class-schedule/event-live-indicator';
 
 interface EventCardProps {
-  event: ClassScheduleVM;
+  event: DisplayClassScheduleVM;
   compact?: boolean;
+  canCancelSession?: boolean;
+  onCancelSession?: (
+    event: DisplayClassScheduleVM,
+    reason?: string | null,
+  ) => Promise<void>;
 }
 
-export function EventCard({ event, compact = false }: EventCardProps) {
+export function EventCard({
+  event,
+  compact = false,
+  canCancelSession = false,
+  onCancelSession,
+}: EventCardProps) {
   const timezone = useScheduleDisplayTimeZone();
   const isLive = isEventLive(event);
   const [open, setOpen] = useState(false);
@@ -90,7 +100,13 @@ export function EventCard({ event, compact = false }: EventCardProps) {
   );
 
   return (
-    <EventDialog event={event} open={open} onOpenChange={setOpen}>
+    <EventDialog
+      event={event}
+      open={open}
+      onOpenChange={setOpen}
+      canCancelSession={canCancelSession}
+      onCancelSession={onCancelSession}
+    >
       {eventButton}
     </EventDialog>
   );

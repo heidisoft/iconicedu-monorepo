@@ -209,6 +209,25 @@ describe('SessionCard', () => {
     expect(screen.getByText('Recording')).toBeTruthy();
   });
 
+  it('renders a cancel button when a cancel action is provided', () => {
+    render(
+      <SessionCard
+        session={baseSession}
+        cancelAction={{ onPress: jest.fn(), accessibilityLabel: 'Cancel class session' }}
+      />,
+    );
+
+    expect(screen.getByText('Cancel')).toBeTruthy();
+    expect(screen.getByLabelText('Cancel class session')).toBeTruthy();
+  });
+
+  it('fires the provided cancel callback', () => {
+    const onCancel = jest.fn();
+    render(<SessionCard session={baseSession} cancelAction={{ onPress: onCancel }} />);
+    fireEvent.press(screen.getByLabelText('Cancel session'));
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
   it('shows Canceled badge for exception variant', () => {
     render(<SessionCard session={{ ...baseSession, variant: 'exception' }} />);
     expect(screen.getByText('Canceled')).toBeTruthy();

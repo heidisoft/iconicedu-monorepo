@@ -13,6 +13,18 @@ import type {
 } from '@iconicedu/shared-types';
 import { supabase } from '@/lib/supabase/client';
 
+export type CancelRecurringSessionOccurrenceInput = {
+  orgId: string;
+  recurrenceId: string;
+  occurrenceKey: string;
+  reason?: string | null;
+};
+
+export type CancelRecurringSessionOccurrenceResult = {
+  occurrenceKey: string;
+  reason?: string;
+};
+
 function mapClassScheduleRow(row: Record<string, unknown>): ClassScheduleVM {
   const orgId = row.org_id as string;
   const recurrenceRows = row.recurrence as Record<string, unknown>[] | null;
@@ -150,4 +162,26 @@ export async function fetchOrgSessions(orgId: string): Promise<ClassScheduleVM[]
 
   if (error) throw error;
   return (data ?? []).map((row) => mapClassScheduleRow(row as Record<string, unknown>));
+}
+
+export async function cancelRecurringSessionOccurrence(
+  input: CancelRecurringSessionOccurrenceInput,
+): Promise<CancelRecurringSessionOccurrenceResult> {
+  const { data, error } = await supabase
+    .from('class_schedule_recurrence_exceptions')
+    .insert({
+      org_id: input.orgId,
+      recurrence_id: input.recurrenceId,
+      occurrence_key: input.occurrenceKey,
+      reason: input.reason?.trim() || null,
+    })
+    .select('occurrence_key, reason')
+    .single();
+
+  if (error) throw error;
+
+  return {
+    occurrenceKey: (data?.occurrence_key as string) ?? input.occurrenceKey,
+    reason: ((data?.reason as string | null) ?? input.reason?.trim()) || undefined,
+  };
 }

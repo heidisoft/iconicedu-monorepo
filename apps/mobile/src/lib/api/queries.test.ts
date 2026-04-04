@@ -1,4 +1,5 @@
 import {
+  cancelRecurringSessionOccurrence,
   fetchSpaceSchedulesByChannelId,
   fetchActivityFeed,
   fetchSupervisedDirectMessages,
@@ -274,6 +275,42 @@ describe('fetchSpaceSchedulesByChannelId', () => {
     await expect(fetchSpaceSchedulesByChannelId(CHANNEL_ID, ORG_ID)).rejects.toThrow(
       'Connection refused',
     );
+  });
+});
+
+describe('cancelRecurringSessionOccurrence', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('inserts a recurrence exception row and returns the inserted occurrence info', async () => {
+    const chain = createInsertSingleChain({
+      data: {
+        occurrence_key: '2026-03-10T14:30:00.000Z',
+        reason: 'Staffing conflict',
+      },
+      error: null,
+    });
+    mockFrom.mockReturnValue(chain);
+
+    const result = await cancelRecurringSessionOccurrence({
+      orgId: ORG_ID,
+      recurrenceId: 'rec-1',
+      occurrenceKey: '2026-03-10T14:30:00.000Z',
+      reason: 'Staffing conflict',
+    });
+
+    expect(mockFrom).toHaveBeenCalledWith('class_schedule_recurrence_exceptions');
+    expect(chain.insert).toHaveBeenCalledWith({
+      org_id: ORG_ID,
+      recurrence_id: 'rec-1',
+      occurrence_key: '2026-03-10T14:30:00.000Z',
+      reason: 'Staffing conflict',
+    });
+    expect(result).toEqual({
+      occurrenceKey: '2026-03-10T14:30:00.000Z',
+      reason: 'Staffing conflict',
+    });
   });
 });
 
