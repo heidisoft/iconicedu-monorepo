@@ -167,20 +167,28 @@ jobs:
             jq \
               --arg supabase_url "${{ steps.supabase-creds.outputs.api_url }}" \
               --arg anon_key "${{ steps.supabase-creds.outputs.anon_key }}" \
+              --arg posthog_key "${{ secrets.POSTHOG_KEY }}" \
+              --arg posthog_host "${{ secrets.NEXT_PUBLIC_POSTHOG_HOST }}" \
               '.build.preview.env = ((.build.preview.env // {}) + {
                 EXPO_PUBLIC_SUPABASE_URL: $supabase_url,
                 EXPO_PUBLIC_SUPABASE_ANON_KEY: $anon_key,
-                EXPO_PUBLIC_APP_ENV: "preview"
+                EXPO_PUBLIC_APP_ENV: "preview",
+                EXPO_PUBLIC_POSTHOG_KEY: $posthog_key,
+                EXPO_PUBLIC_POSTHOG_HOST: $posthog_host
               })' \
               eas.json > "$tmp_eas_json"
           else
             jq \
               --arg supabase_url "${{ steps.supabase-creds.outputs.api_url }}" \
               --arg anon_key "${{ steps.supabase-creds.outputs.anon_key }}" \
+              --arg posthog_key "${{ secrets.POSTHOG_KEY }}" \
+              --arg posthog_host "${{ secrets.NEXT_PUBLIC_POSTHOG_HOST }}" \
               '.build.production.env = ((.build.production.env // {}) + {
                 EXPO_PUBLIC_SUPABASE_URL: $supabase_url,
                 EXPO_PUBLIC_SUPABASE_ANON_KEY: $anon_key,
-                EXPO_PUBLIC_APP_ENV: "production"
+                EXPO_PUBLIC_APP_ENV: "production",
+                EXPO_PUBLIC_POSTHOG_KEY: $posthog_key,
+                EXPO_PUBLIC_POSTHOG_HOST: $posthog_host
               })' \
               eas.json > "$tmp_eas_json"
           fi
