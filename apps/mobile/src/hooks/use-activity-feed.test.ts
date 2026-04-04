@@ -1,12 +1,15 @@
-import React from 'react';
-import { renderHook, waitFor } from '@testing-library/react-native';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { renderHook } from '@testing-library/react-native';
 import { useActivityFeed } from './use-activity-feed';
 import type { ActivityFeedVM } from '@iconicedu/shared-types';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────────
 
 const mockFetchActivityFeed = jest.fn();
+const mockUseQuery = jest.fn();
+
+jest.mock('@tanstack/react-query', () => ({
+  useQuery: (...args: unknown[]) => mockUseQuery(...args),
+}));
 
 jest.mock('@/lib/api/queries', () => ({
   fetchActivityFeed: (...args: unknown[]) => mockFetchActivityFeed(...args),
@@ -25,19 +28,6 @@ jest.mock('./use-account', () => ({
 jest.mock('./use-profile', () => ({
   useProfile: () => ({ data: mockProfileData }),
 }));
-
-// ─── Helpers ────────────────────────────────────────────────────────────────────
-
-function createWrapper() {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 } },
-  });
-  function Wrapper({ children }: { children: React.ReactNode }) {
-    return React.createElement(QueryClientProvider, { client: queryClient }, children);
-  }
-  Wrapper.displayName = 'QueryClientWrapper';
-  return { Wrapper, queryClient };
-}
 
 const fakeFeed: ActivityFeedVM = {
   activeTab: 'all',
@@ -80,68 +70,70 @@ const fakeFeed: ActivityFeedVM = {
 describe('useActivityFeed', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseQuery.mockImplementation(
+      ({ queryFn, enabled }: { queryFn: () => unknown; enabled: boolean }) => {
+        if (!enabled) {
+          return {
+            data: undefined,
+            isLoading: false,
+          };
+        }
+
+        const data = queryFn();
+        return {
+          data: data instanceof Promise ? undefined : data,
+          isLoading: data instanceof Promise,
+        };
+      },
+    );
   });
 
   it('returns loading state while fetching', () => {
     mockFetchActivityFeed.mockReturnValue(new Promise(() => {}));
 
-    const { Wrapper, queryClient } = createWrapper();
-    const { result } = renderHook(() => useActivityFeed(), { wrapper: Wrapper });
+    const { result } = renderHook(() => useActivityFeed());
 
     expect(result.current.isLoading).toBe(true);
     expect(result.current.data).toBeUndefined();
-    queryClient.clear();
   });
 
-  it('returns feed data on successful fetch', async () => {
-    mockFetchActivityFeed.mockResolvedValue(fakeFeed);
+  it('returns feed data on successful fetch', () => {
+    mockFetchActivityFeed.mockReturnValue(fakeFeed);
 
-    const { Wrapper, queryClient } = createWrapper();
-    const { result } = renderHook(() => useActivityFeed(), { wrapper: Wrapper });
-
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    const { result } = renderHook(() => useActivityFeed());
 
     expect(result.current.data).toEqual(fakeFeed);
-    queryClient.clear();
   });
 
-  it('calls fetchActivityFeed with orgId and profileId', async () => {
-    mockFetchActivityFeed.mockResolvedValue(fakeFeed);
+  it('calls fetchActivityFeed with orgId and profileId', () => {
+    mockFetchActivityFeed.mockReturnValue(fakeFeed);
 
-    const { Wrapper, queryClient } = createWrapper();
-    renderHook(() => useActivityFeed(), { wrapper: Wrapper });
-
-    await waitFor(() => expect(mockFetchActivityFeed).toHaveBeenCalled());
+    renderHook(() => useActivityFeed());
 
     expect(mockFetchActivityFeed).toHaveBeenCalledWith('org-1', 'profile-1');
-    queryClient.clear();
   });
 
   it('does not fetch when orgId is missing', () => {
     const originalOrgId = mockAccountData.org_id;
     mockAccountData.org_id = undefined;
 
-    const { Wrapper, queryClient } = createWrapper();
-    const { result } = renderHook(() => useActivityFeed(), { wrapper: Wrapper });
+    const { result } = renderHook(() => useActivityFeed());
 
     expect(result.current.isLoading).toBe(false);
     expect(mockFetchActivityFeed).not.toHaveBeenCalled();
 
     mockAccountData.org_id = originalOrgId;
-    queryClient.clear();
   });
 
   it('does not fetch when profileId is missing', () => {
     const originalProfileId = mockProfileData.id;
     mockProfileData.id = undefined;
 
-    const { Wrapper, queryClient } = createWrapper();
-    const { result } = renderHook(() => useActivityFeed(), { wrapper: Wrapper });
+    const { result } = renderHook(() => useActivityFeed());
 
     expect(result.current.isLoading).toBe(false);
     expect(mockFetchActivityFeed).not.toHaveBeenCalled();
 
     mockProfileData.id = originalProfileId;
-    queryClient.clear();
   });
 });

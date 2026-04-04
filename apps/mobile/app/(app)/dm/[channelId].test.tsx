@@ -1,12 +1,12 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react-native';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────────
 
 const mockUseLocalSearchParams = jest.fn();
 const mockUseRouter = jest.fn(() => ({ back: jest.fn() }));
 const mockUseIsFocused = jest.fn(() => true);
+const mockUseQuery = jest.fn();
 
 jest.mock('expo-router', () => ({
   useLocalSearchParams: (...args: unknown[]) => mockUseLocalSearchParams(...args),
@@ -16,6 +16,10 @@ jest.mock('expo-router', () => ({
 jest.mock('@react-navigation/native', () => ({
   ...jest.requireActual('@react-navigation/native'),
   useIsFocused: (...args: unknown[]) => mockUseIsFocused(...args),
+}));
+
+jest.mock('@tanstack/react-query', () => ({
+  useQuery: (...args: unknown[]) => mockUseQuery(...args),
 }));
 
 jest.mock('@/hooks/use-account', () => ({
@@ -123,24 +127,19 @@ jest.mock('react-native-safe-area-context', () => ({
 import DmConversationScreen from './[channelId]';
 
 function renderScreen() {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-      },
-    },
-  });
-
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <DmConversationScreen />
-    </QueryClientProvider>,
-  );
+  return render(<DmConversationScreen />);
 }
 
 describe('DmConversationScreen — supervised read-only mode', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseQuery.mockReturnValue({
+      data: {
+        lastReadMessageId: null,
+        unreadCount: 0,
+      },
+      isLoading: false,
+    });
   });
 
   it('renders MessageInput when not supervised', () => {
