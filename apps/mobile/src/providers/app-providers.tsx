@@ -7,6 +7,7 @@ import { FamilyViewProvider } from '@/providers/family-view-provider';
 import { QueryProvider } from '@/providers/query-provider';
 import { ThemeProvider } from '@/providers/theme-provider';
 import { AnalyticsProvider, useAnalytics } from '@/providers/analytics-provider';
+import { ToastProvider } from '@/providers/toast-provider';
 import { CrashBoundary } from '@/components/analytics/crash-boundary';
 
 /**
@@ -47,7 +48,9 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
           <UiTrackingBridge>
             <QueryProvider>
               <AuthProvider>
-                <FamilyViewProvider>{children}</FamilyViewProvider>
+                <FamilyViewProvider>
+                  <ToastProvider>{children}</ToastProvider>
+                </FamilyViewProvider>
               </AuthProvider>
             </QueryProvider>
           </UiTrackingBridge>

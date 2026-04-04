@@ -57,5 +57,13 @@ export {
   saveStudentStep,
   saveTimezoneStep,
 } from './onboarding/queries';
-export { fetchOrgSessions, fetchSpaceSchedulesByChannelId } from './schedules/queries';
+export {
+  cancelRecurringSessionOccurrence,
+  fetchOrgSessions,
+  fetchSpaceSchedulesByChannelId,
+} from './schedules/queries';
+export type {
+  CancelRecurringSessionOccurrenceInput,
+  CancelRecurringSessionOccurrenceResult,
+} from './schedules/queries';
 export { fetchActivityFeed, markActivityFeedRead } from './activity-feed/queries';
