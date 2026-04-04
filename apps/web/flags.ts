@@ -81,7 +81,7 @@ export const enableClassScheduleStaffCancel = flag<
     { label: 'Off', value: false },
     { label: 'On', value: true },
   ],
-  defaultValue: false,
+  defaultValue: true,
   async decide({ entities }) {
     return evaluateWebBooleanFlag({
       flagKey: 'enable-class-schedule-staff-cancel',

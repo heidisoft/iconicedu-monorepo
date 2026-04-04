@@ -198,7 +198,7 @@ describe('cancelClassScheduleSessionAction', () => {
     createSupabaseServerClientMock.mockResolvedValue(createServerSupabase());
     buildOrgBySlugMock.mockResolvedValue({ id: 'org-1', slug: 'iconic-academy' });
     getAccountByAuthUserIdInOrgMock.mockResolvedValue({
-      data: { id: 'account-1', org_id: 'org-1' },
+      data: { id: 'account-1', org_id: 'org-1', primary_role: 'owner' },
     });
     getDashboardProfileContextMock.mockResolvedValue({
       currentUserProfile: {
@@ -264,13 +264,10 @@ describe('cancelClassScheduleSessionAction', () => {
     });
   });
 
-  it('rejects non-staff profiles', async () => {
+  it('rejects non-staff non-owner profiles', async () => {
     createSupabaseServiceClientMock.mockReturnValue(createSingleServiceSupabase());
-    getDashboardProfileContextMock.mockResolvedValue({
-      currentUserProfile: {
-        kind: 'guardian',
-        ids: { id: 'guardian-1', orgId: 'org-1', accountId: 'account-1' },
-      },
+    getAccountByAuthUserIdInOrgMock.mockResolvedValue({
+      data: { id: 'account-1', org_id: 'org-1', primary_role: 'guardian' },
     });
 
     await expect(
@@ -279,6 +276,6 @@ describe('cancelClassScheduleSessionAction', () => {
         scheduleId: 'schedule-1',
         occurrenceKey: '2026-03-21T10:00:00.000Z',
       }),
-    ).rejects.toThrow('Only staff users can cancel sessions.');
+    ).rejects.toThrow('Only staff or owner users can cancel sessions.');
   });
 });

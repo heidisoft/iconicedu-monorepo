@@ -74,7 +74,7 @@ describe('class schedule page viewer scoping', () => {
 
     getDashboardAccountContextMock.mockResolvedValue({
       supabase: {},
-      account: { id: 'account-1', org_id: 'org-1' },
+      account: { id: 'account-1', org_id: 'org-1', primary_role: 'guardian' },
     });
     enableClassScheduleStaffCancelRunMock.mockResolvedValue(false);
   });
@@ -176,7 +176,11 @@ describe('class schedule page viewer scoping', () => {
     );
   });
 
-  it('enables session cancellation only for staff when the flag is on', async () => {
+  it('enables session cancellation for owners when the flag is on', async () => {
+    getDashboardAccountContextMock.mockResolvedValue({
+      supabase: {},
+      account: { id: 'account-1', org_id: 'org-1', primary_role: 'owner' },
+    });
     buildClassSchedulesByOrgMock.mockResolvedValue([
       createSchedule({
         id: 'schedule-staff-visible',
@@ -185,7 +189,7 @@ describe('class schedule page viewer scoping', () => {
     ]);
     getDashboardProfileContextMock.mockResolvedValue({
       currentUserProfile: {
-        kind: 'staff',
+        kind: 'system',
         ids: { id: 'staff-1', orgId: 'org-1', accountId: 'account-staff-1' },
         prefs: { timezone: 'America/New_York' },
       },

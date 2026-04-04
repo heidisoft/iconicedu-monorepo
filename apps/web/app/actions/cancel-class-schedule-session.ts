@@ -47,12 +47,14 @@ export async function cancelClassScheduleSessionAction(
   }
 
   const { currentUserProfile } = await getDashboardProfileContext(supabase, account.id);
-  if (currentUserProfile?.kind !== 'staff') {
-    throw new Error('Only staff users can cancel sessions.');
+  const canManageSessions =
+    account.primary_role === 'staff' || account.primary_role === 'owner';
+  if (!canManageSessions) {
+    throw new Error('Only staff or owner users can cancel sessions.');
   }
 
   const isEnabled = await enableClassScheduleStaffCancel.run({
-    identify: { profileId: currentUserProfile.ids.id },
+    identify: { profileId: currentUserProfile?.ids.id ?? null },
   });
   if (!isEnabled) {
     throw new Error('Session cancellation is not enabled.');
