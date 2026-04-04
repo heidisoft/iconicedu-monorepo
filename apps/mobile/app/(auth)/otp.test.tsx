@@ -7,6 +7,7 @@ const mockUseLocalSearchParams = jest.fn(() => ({
 }));
 const mockVerifyOtp = jest.fn();
 const mockSignInWithOtp = jest.fn();
+const mockSetOnboardingCompletionStatus = jest.fn();
 const mockScreen = jest.fn();
 const mockCapture = jest.fn();
 const mockFetchOnboardingStatus = jest.fn();
@@ -27,6 +28,7 @@ jest.mock('@/providers/auth-provider', () => ({
   useAuth: () => ({
     verifyOtp: mockVerifyOtp,
     signInWithOtp: mockSignInWithOtp,
+    setOnboardingCompletionStatus: mockSetOnboardingCompletionStatus,
   }),
 }));
 
@@ -80,6 +82,7 @@ describe('OtpScreen', () => {
     });
 
     await waitFor(() => {
+      expect(mockSetOnboardingCompletionStatus).toHaveBeenCalledWith(true);
       expect(mockReplace).toHaveBeenCalledWith('/(app)/(tabs)');
     });
   });
