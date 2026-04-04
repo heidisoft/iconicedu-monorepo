@@ -25,6 +25,7 @@ jobs:
     permissions:
       contents: read
       issues: write
+      pull-requests: write
 
     steps:
       - name: Resolve build context
@@ -216,6 +217,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
+            const core = require('@actions/core');
             const prNumber = parseInt('${{ steps.context.outputs.pr_number }}');
             const platform = '${{ github.event.inputs.platform }}';
             const buildUrl = '${{ steps.eas-build.outputs.build_url }}';
@@ -236,12 +238,24 @@ jobs:
               `${buildLink} - install via internal distribution once the build completes.`,
             ].join('\n');
 
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: prNumber,
-              body,
-            });
+            try {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body,
+              });
+            } catch (error) {
+              if (error.status === 403) {
+                core.warning(
+                  `Skipping PR comment for #${prNumber}: GitHub Actions token cannot write issue comments in this run context. ` +
+                  'This commonly happens for restricted workflow tokens, forked contexts, or org policies that force read-only tokens.'
+                );
+                return;
+              }
+
+              throw error;
+            }
 
       - name: Report skipped build
         if: steps.context.outputs.should_build != 'true'
