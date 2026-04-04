@@ -30,7 +30,7 @@ function createWrapper() {
   }
   const Wrapper = TestWrapper;
   Wrapper.displayName = 'TestWrapper';
-  return Wrapper;
+  return { Wrapper, queryClient };
 }
 
 const fakeSupervisedChannel = {
@@ -56,54 +56,64 @@ describe('useSupervisedDirectMessages', () => {
   });
 
   it('does not fetch when orgId is empty', () => {
+    const { Wrapper, queryClient } = createWrapper();
     const { result } = renderHook(
       () => useSupervisedDirectMessages('', 'acct-1', 'prof-1'),
-      { wrapper: createWrapper() },
+      { wrapper: Wrapper },
     );
     expect(result.current.isLoading).toBe(false);
     expect(mockFetch).not.toHaveBeenCalled();
+    queryClient.clear();
   });
 
   it('does not fetch when guardianAccountId is empty', () => {
+    const { Wrapper, queryClient } = createWrapper();
     const { result } = renderHook(
       () => useSupervisedDirectMessages('org-1', '', 'prof-1'),
-      { wrapper: createWrapper() },
+      { wrapper: Wrapper },
     );
     expect(result.current.isLoading).toBe(false);
     expect(mockFetch).not.toHaveBeenCalled();
+    queryClient.clear();
   });
 
   it('does not fetch when guardianProfileId is empty', () => {
+    const { Wrapper, queryClient } = createWrapper();
     const { result } = renderHook(
       () => useSupervisedDirectMessages('org-1', 'acct-1', ''),
-      { wrapper: createWrapper() },
+      { wrapper: Wrapper },
     );
     expect(result.current.isLoading).toBe(false);
     expect(mockFetch).not.toHaveBeenCalled();
+    queryClient.clear();
   });
 
   it('returns supervised channels on success', async () => {
     mockFetch.mockResolvedValue([fakeSupervisedChannel]);
 
+    const { Wrapper, queryClient } = createWrapper();
     const { result } = renderHook(
       () => useSupervisedDirectMessages('org-1', 'acct-1', 'prof-1'),
-      { wrapper: createWrapper() },
+      { wrapper: Wrapper },
     );
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     expect(result.current.data).toEqual([fakeSupervisedChannel]);
+    queryClient.clear();
   });
 
   it('calls fetch with correct arguments', async () => {
     mockFetch.mockResolvedValue([]);
 
+    const { Wrapper, queryClient } = createWrapper();
     renderHook(
       () => useSupervisedDirectMessages('org-1', 'acct-guardian', 'prof-guardian'),
-      { wrapper: createWrapper() },
+      { wrapper: Wrapper },
     );
 
     await waitFor(() => expect(mockFetch).toHaveBeenCalled());
     expect(mockFetch).toHaveBeenCalledWith('org-1', 'acct-guardian', 'prof-guardian');
+    queryClient.clear();
   });
 });

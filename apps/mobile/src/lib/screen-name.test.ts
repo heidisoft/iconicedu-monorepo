@@ -9,7 +9,6 @@ describe('getScreenName', () => {
       ['/(auth)/profile-setup', 'Profile Setup'],
       ['/(app)/(tabs)', 'Home'],
       ['/(app)/(tabs)/index', 'Home'],
-      ['/(app)/(tabs)/schedule', 'Schedule'],
       ['/(app)/(tabs)/inbox', 'Notifications'],
       ['/(app)/(tabs)/messages', 'Messages'],
       ['/(app)/(tabs)/account', 'Account'],

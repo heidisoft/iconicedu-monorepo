@@ -93,12 +93,12 @@ describe('UiTrackingBridge', () => {
   });
 
   it('injects human-readable screen_name into captured UI events', () => {
-    mockPathname.mockReturnValue('/(app)/(tabs)/schedule');
+    mockPathname.mockReturnValue('/(app)/(tabs)/messages');
     renderWithProviders(<TrackingConsumer onCapture={jest.fn()} />);
     fireEvent.press(screen.getByTestId('trigger'));
     expect(mockPh.capture).toHaveBeenCalledWith(
       'button clicked',
-      expect.objectContaining({ screen_name: 'Schedule', button_name: 'Submit' }),
+      expect.objectContaining({ screen_name: 'Messages', button_name: 'Submit' }),
     );
   });
 

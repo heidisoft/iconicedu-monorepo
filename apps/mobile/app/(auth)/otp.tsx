@@ -126,6 +126,9 @@ export default function OtpScreen() {
       } catch {
         // On error, fall through to app — (app)/_layout will re-check on mount.
         router.replace('/(app)/(tabs)');
+      } finally {
+        setLoading(false);
+        isVerifyingRef.current = false;
       }
     },
     [analytics, email, router, setOnboardingCompletionStatus, verifyOtp],

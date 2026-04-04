@@ -36,7 +36,7 @@ function createWrapper() {
     return React.createElement(QueryClientProvider, { client: queryClient }, children);
   }
   Wrapper.displayName = 'QueryClientWrapper';
-  return Wrapper;
+  return { Wrapper, queryClient };
 }
 
 const fakeFeed: ActivityFeedVM = {
@@ -85,53 +85,63 @@ describe('useActivityFeed', () => {
   it('returns loading state while fetching', () => {
     mockFetchActivityFeed.mockReturnValue(new Promise(() => {}));
 
-    const { result } = renderHook(() => useActivityFeed(), { wrapper: createWrapper() });
+    const { Wrapper, queryClient } = createWrapper();
+    const { result } = renderHook(() => useActivityFeed(), { wrapper: Wrapper });
 
     expect(result.current.isLoading).toBe(true);
     expect(result.current.data).toBeUndefined();
+    queryClient.clear();
   });
 
   it('returns feed data on successful fetch', async () => {
     mockFetchActivityFeed.mockResolvedValue(fakeFeed);
 
-    const { result } = renderHook(() => useActivityFeed(), { wrapper: createWrapper() });
+    const { Wrapper, queryClient } = createWrapper();
+    const { result } = renderHook(() => useActivityFeed(), { wrapper: Wrapper });
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     expect(result.current.data).toEqual(fakeFeed);
+    queryClient.clear();
   });
 
   it('calls fetchActivityFeed with orgId and profileId', async () => {
     mockFetchActivityFeed.mockResolvedValue(fakeFeed);
 
-    renderHook(() => useActivityFeed(), { wrapper: createWrapper() });
+    const { Wrapper, queryClient } = createWrapper();
+    renderHook(() => useActivityFeed(), { wrapper: Wrapper });
 
     await waitFor(() => expect(mockFetchActivityFeed).toHaveBeenCalled());
 
     expect(mockFetchActivityFeed).toHaveBeenCalledWith('org-1', 'profile-1');
+    queryClient.clear();
   });
 
   it('does not fetch when orgId is missing', () => {
     const originalOrgId = mockAccountData.org_id;
     mockAccountData.org_id = undefined;
 
-    const { result } = renderHook(() => useActivityFeed(), { wrapper: createWrapper() });
+    const { Wrapper, queryClient } = createWrapper();
+    const { result } = renderHook(() => useActivityFeed(), { wrapper: Wrapper });
 
     expect(result.current.isLoading).toBe(false);
     expect(mockFetchActivityFeed).not.toHaveBeenCalled();
 
     mockAccountData.org_id = originalOrgId;
+    queryClient.clear();
   });
 
   it('does not fetch when profileId is missing', () => {
     const originalProfileId = mockProfileData.id;
     mockProfileData.id = undefined;
 
-    const { result } = renderHook(() => useActivityFeed(), { wrapper: createWrapper() });
+    const { Wrapper, queryClient } = createWrapper();
+    const { result } = renderHook(() => useActivityFeed(), { wrapper: Wrapper });
 
     expect(result.current.isLoading).toBe(false);
     expect(mockFetchActivityFeed).not.toHaveBeenCalled();
 
     mockProfileData.id = originalProfileId;
+    queryClient.clear();
   });
 });

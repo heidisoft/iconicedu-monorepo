@@ -56,12 +56,12 @@ describe('ScreenTracker', () => {
   });
 
   it('maps Expo Router paths to readable names', () => {
-    mockPathname = '/(app)/(tabs)/schedule';
+    mockPathname = '/(app)/(tabs)/messages';
     render(<ScreenTracker />);
-    expect(mockScreen).toHaveBeenCalledWith('Schedule');
+    expect(mockScreen).toHaveBeenCalledWith('Messages');
     expect(mockCapture).toHaveBeenCalledWith(AnalyticsEvent.SCREEN_VIEWED, {
-      screen_name: 'Schedule',
-      screen_path: '/(app)/(tabs)/schedule',
+      screen_name: 'Messages',
+      screen_path: '/(app)/(tabs)/messages',
     });
   });
 
@@ -69,12 +69,12 @@ describe('ScreenTracker', () => {
     const { rerender } = render(<ScreenTracker />);
     jest.clearAllMocks();
 
-    mockPathname = '/(app)/(tabs)/schedule';
+    mockPathname = '/(app)/(tabs)/messages';
     rerender(<ScreenTracker />);
 
     expect(mockCapture).toHaveBeenCalledWith(AnalyticsEvent.SCREEN_VIEWED, {
-      screen_name: 'Schedule',
-      screen_path: '/(app)/(tabs)/schedule',
+      screen_name: 'Messages',
+      screen_path: '/(app)/(tabs)/messages',
       previous_screen: 'Home',
     });
   });

@@ -22,7 +22,6 @@ const ROUTE_NAMES: Record<string, string> = {
   // Tabs
   '/(app)/(tabs)': 'Home',
   '/(app)/(tabs)/index': 'Home',
-  '/(app)/(tabs)/schedule': 'Schedule',
   '/(app)/(tabs)/inbox': 'Notifications',
   '/(app)/(tabs)/messages': 'Messages',
   '/(app)/(tabs)/account': 'Account',
@@ -54,7 +53,7 @@ const DYNAMIC_PREFIXES: Array<[RegExp, string]> = [
  * Returns a human-readable screen name for the given Expo Router pathname.
  *
  * @example
- * getScreenName('/(app)/(tabs)/schedule') // → 'Schedule'
+ * getScreenName('/(app)/(tabs)/messages') // → 'Messages'
  * getScreenName('/(app)/dm/some-id')      // → 'Direct Message'
  * getScreenName('/(app)/spaces/abc')      // → 'Space'
  */

@@ -1,12 +1,12 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react-native';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mockUseLocalSearchParams = jest.fn();
 const mockUseRouter = jest.fn(() => ({ back: jest.fn() }));
 const mockUseIsFocused = jest.fn(() => true);
 const mockFetchIsChannelMember = jest.fn();
 const mockConversationHeader = jest.fn(() => null);
+const mockUseQuery = jest.fn();
 
 jest.mock('expo-router', () => ({
   useLocalSearchParams: (...args: unknown[]) => mockUseLocalSearchParams(...args),
@@ -16,6 +16,10 @@ jest.mock('expo-router', () => ({
 jest.mock('@react-navigation/native', () => ({
   ...jest.requireActual('@react-navigation/native'),
   useIsFocused: (...args: unknown[]) => mockUseIsFocused(...args),
+}));
+
+jest.mock('@tanstack/react-query', () => ({
+  useQuery: (...args: unknown[]) => mockUseQuery(...args),
 }));
 
 jest.mock('@/hooks/use-account', () => ({
@@ -144,24 +148,29 @@ jest.mock('react-native-safe-area-context', () => ({
 import ChannelConversationScreen from './[channelId]';
 
 function renderScreen() {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-      },
-    },
-  });
-
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <ChannelConversationScreen />
-    </QueryClientProvider>,
-  );
+  return render(<ChannelConversationScreen />);
 }
 
 describe('ChannelConversationScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseQuery.mockImplementation(
+      ({ queryKey }: { queryKey: [string, ...string[]] }) => {
+        switch (queryKey[0]) {
+          case 'channelReadState':
+            return {
+              data: {
+                lastReadMessageId: null,
+                unreadCount: 0,
+              },
+            };
+          case 'channelMembership':
+            return { data: mockFetchIsChannelMember(), isLoading: false };
+          default:
+            return { data: undefined, isLoading: false };
+        }
+      },
+    );
   });
 
   it('renders read-only notice for staff observers who are not channel members', async () => {
@@ -170,7 +179,7 @@ describe('ChannelConversationScreen', () => {
       topic: 'Biology',
       isLearningSpace: '0',
     });
-    mockFetchIsChannelMember.mockResolvedValue(false);
+    mockFetchIsChannelMember.mockReturnValue(false);
 
     renderScreen();
 
@@ -190,7 +199,7 @@ describe('ChannelConversationScreen', () => {
       purpose: 'support',
       isLearningSpace: '0',
     });
-    mockFetchIsChannelMember.mockResolvedValue(false);
+    mockFetchIsChannelMember.mockReturnValue(false);
 
     renderScreen();
 
