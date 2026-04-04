@@ -147,7 +147,7 @@ describe('POST /api/accounts/activate', () => {
     });
     mockResolveOrgDashboardPath.mockResolvedValueOnce('/iconic-academy');
     mockSessionGetUser.mockResolvedValueOnce({
-      data: { user: { id: 'auth-1', email: 'user@example.com' } },
+      data: { user: { id: 'auth-1', email: 'iconicedudev+user@gmail.com' } },
     });
     mockUpdateAccountStatus.mockResolvedValueOnce({
       data: {
@@ -185,7 +185,7 @@ describe('POST /api/accounts/activate', () => {
 
   it('returns org setup requirement when account is missing', async () => {
     mockSessionGetUser.mockResolvedValueOnce({
-      data: { user: { id: 'auth-1', email: 'user@example.com' } },
+      data: { user: { id: 'auth-1', email: 'iconicedudev+user@gmail.com' } },
     });
     mockGetAccountByAuthUserId.mockResolvedValueOnce({ data: null });
 
@@ -201,7 +201,7 @@ describe('POST /api/accounts/activate', () => {
 
   it('returns org-scoped get-started destination for org login intent', async () => {
     mockSessionGetUser.mockResolvedValueOnce({
-      data: { user: { id: 'auth-1', email: 'user@example.com' } },
+      data: { user: { id: 'auth-1', email: 'iconicedudev+user@gmail.com' } },
     });
     mockGetOrgBySlug.mockResolvedValueOnce({
       data: { id: 'org-9', slug: 'iconic-academy' },
@@ -222,7 +222,7 @@ describe('POST /api/accounts/activate', () => {
 
   it('creates org-scoped account and requires role selection for org get-started', async () => {
     mockSessionGetUser.mockResolvedValueOnce({
-      data: { user: { id: 'auth-1', email: 'new@example.com' } },
+      data: { user: { id: 'auth-1', email: 'iconicedudev+new@gmail.com' } },
     });
     mockGetOrgBySlug.mockResolvedValueOnce({
       data: { id: 'org-1', slug: 'iconic-academy' },
@@ -271,7 +271,7 @@ describe('POST /api/accounts/activate', () => {
       expect.objectContaining({
         orgId: 'org-1',
         authUserId: 'auth-1',
-        email: 'new@example.com',
+        email: 'iconicedudev+new@gmail.com',
       }),
     );
     expect(mockInsertProfileForAccount).toHaveBeenCalledWith(
@@ -286,7 +286,7 @@ describe('POST /api/accounts/activate', () => {
   it('links invited account with preassigned role and skips role selection', async () => {
     const now = new Date().toISOString();
     mockSessionGetUser.mockResolvedValueOnce({
-      data: { user: { id: 'auth-1', email: 'invited@example.com' } },
+      data: { user: { id: 'auth-1', email: 'iconicedudev+invited@gmail.com' } },
     });
     mockGetOrgBySlug.mockResolvedValueOnce({
       data: { id: 'org-1', slug: 'iconic-academy' },

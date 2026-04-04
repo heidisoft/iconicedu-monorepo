@@ -2,7 +2,9 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 const mockReplace = jest.fn();
-const mockUseLocalSearchParams = jest.fn(() => ({ email: 'student@example.com' }));
+const mockUseLocalSearchParams = jest.fn(() => ({
+  email: 'iconicedudev+student@gmail.com',
+}));
 const mockVerifyOtp = jest.fn();
 const mockSignInWithOtp = jest.fn();
 const mockScreen = jest.fn();
@@ -71,7 +73,10 @@ describe('OtpScreen', () => {
     fireEvent.changeText(screen.getByLabelText('Verification code'), '123456');
 
     await waitFor(() => {
-      expect(mockVerifyOtp).toHaveBeenCalledWith('student@example.com', '123456');
+      expect(mockVerifyOtp).toHaveBeenCalledWith(
+        'iconicedudev+student@gmail.com',
+        '123456',
+      );
     });
 
     await waitFor(() => {

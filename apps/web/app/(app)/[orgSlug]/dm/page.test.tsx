@@ -34,7 +34,10 @@ vi.mock('@iconicedu/web/lib/supabase/server', () => ({
 }));
 
 vi.mock('@iconicedu/web/lib/auth/requireAuthedUser', () => ({
-  requireAuthedUser: vi.fn(async () => ({ id: 'auth-user', email: 'test@example.com' })),
+  requireAuthedUser: vi.fn(async () => ({
+    id: 'auth-user',
+    email: 'iconicedudev+test@gmail.com',
+  })),
 }));
 
 vi.mock('@iconicedu/web/lib/accounts/getOrCreateAccount', () => ({

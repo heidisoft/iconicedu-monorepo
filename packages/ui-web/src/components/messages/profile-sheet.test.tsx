@@ -49,7 +49,7 @@ describe('ProfileContent', () => {
       ...makeUser(),
       profile: {
         ...makeUser().profile,
-        email: 'sara@example.com',
+        email: 'iconicedudev+sara@gmail.com',
         bio: 'Math educator',
       },
       headline: 'Senior tutor',
@@ -69,7 +69,7 @@ describe('ProfileContent', () => {
       expect.arrayContaining([
         expect.objectContaining({ label: 'Headline', value: 'Senior tutor' }),
         expect.objectContaining({ label: 'Role', value: 'Teacher' }),
-        expect.objectContaining({ label: 'Email', value: 'sara@example.com' }),
+        expect.objectContaining({ label: 'Email', value: 'iconicedudev+sara@gmail.com' }),
         expect.objectContaining({
           label: 'Location',
           value: 'New York, NY, United States',

@@ -11,10 +11,10 @@ import {
 describe('dedupeChildMembersByEmail', () => {
   it('keeps unique child emails and leaves non-child rows', () => {
     const input = [
-      { id: 'self', isChild: false, email: 'guardian@example.com' },
-      { id: 'c1', isChild: true, email: 'child@example.com' },
-      { id: 'c2', isChild: true, email: 'CHILD@example.com' },
-      { id: 'c3', isChild: true, email: 'other@example.com' },
+      { id: 'self', isChild: false, email: 'iconicedudev+guardian@gmail.com' },
+      { id: 'c1', isChild: true, email: 'iconicedudev+child@gmail.com' },
+      { id: 'c2', isChild: true, email: 'ICONICEDUDEV+CHILD@gmail.com' },
+      { id: 'c3', isChild: true, email: 'iconicedudev+other@gmail.com' },
     ] as any[];
 
     const result = dedupeChildMembersByEmail(input);
@@ -26,12 +26,12 @@ describe('dedupeChildMembersByEmail', () => {
 describe('filterInvitesWithExistingAccounts', () => {
   it('removes invites for child emails that already have auth accounts', () => {
     const invites = [
-      { id: 'i1', invitedEmail: 'child@example.com' },
-      { id: 'i2', invitedEmail: 'new@example.com' },
+      { id: 'i1', invitedEmail: 'iconicedudev+child@gmail.com' },
+      { id: 'i2', invitedEmail: 'iconicedudev+new@gmail.com' },
     ] as any[];
     const members = [
-      { isChild: true, hasAuthAccount: false, email: 'CHILD@example.com' },
-      { isChild: true, hasAuthAccount: false, email: 'another@example.com' },
+      { isChild: true, hasAuthAccount: false, email: 'ICONICEDUDEV+CHILD@gmail.com' },
+      { isChild: true, hasAuthAccount: false, email: 'iconicedudev+another@gmail.com' },
     ] as any[];
 
     const result = filterInvitesWithExistingAccounts(invites, members);

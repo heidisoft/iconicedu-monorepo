@@ -35,7 +35,7 @@ function createServiceClientMock() {
                   data: [
                     {
                       id: 'account-1',
-                      email: 'parent@example.com',
+                      email: 'iconicedudev+parent@gmail.com',
                       created_at: '2026-03-10T00:00:00.000Z',
                     },
                   ],
@@ -137,7 +137,7 @@ describe('admin settings roles route', () => {
     expect(payload.data.users).toEqual([
       {
         accountId: 'account-1',
-        email: 'parent@example.com',
+        email: 'iconicedudev+parent@gmail.com',
         displayName: 'Taylor Parent',
         profileKind: 'guardian',
         roles: ['guardian'],

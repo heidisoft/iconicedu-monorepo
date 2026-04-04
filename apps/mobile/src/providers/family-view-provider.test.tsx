@@ -82,7 +82,7 @@ describe('FamilyViewProvider', () => {
     jest.clearAllMocks();
 
     mockUseAuth.mockReturnValue({
-      user: { id: 'auth-user-1', email: 'parent@example.com' },
+      user: { id: 'auth-user-1', email: 'iconicedudev+parent@gmail.com' },
     });
     mockFetchUserAccount.mockResolvedValue({
       id: 'guardian-account',

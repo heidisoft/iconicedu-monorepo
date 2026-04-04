@@ -104,7 +104,7 @@ describe('UsersTable', () => {
         payload: {
           account: {
             ids: { id: 'user-1', orgId: 'org-1' },
-            contacts: { email: 'user-1@example.com' },
+            contacts: { email: 'iconicedudev+user-1@gmail.com' },
             lifecycle: {
               status: 'active',
               createdAt: '2026-01-01T00:00:00.000Z',

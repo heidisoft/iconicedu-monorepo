@@ -63,7 +63,7 @@ describe('getAdminUserProfilePreview', () => {
       data: {
         id: 'account-1',
         org_id: 'org-1',
-        email: 'person@example.com',
+        email: 'iconicedudev+person@gmail.com',
       },
     });
     requireAdminOrgContextMock.mockResolvedValue({
@@ -128,10 +128,10 @@ describe('getAdminUserProfilePreview', () => {
       supabase,
       'account-1',
       'org-1',
-      'person@example.com',
+      'iconicedudev+person@gmail.com',
     );
     expect(buildUserProfileByAccountIdMock).toHaveBeenCalledWith(supabase, 'account-1', {
-      accountEmail: 'person@example.com',
+      accountEmail: 'iconicedudev+person@gmail.com',
       includeFamilyInvites: true,
     });
   });

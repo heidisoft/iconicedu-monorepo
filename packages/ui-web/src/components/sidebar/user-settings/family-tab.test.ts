@@ -26,9 +26,9 @@ describe('buildCollapsedChildSectionState', () => {
 
 describe('buildChildInviteDraft', () => {
   it('returns child role with trimmed email', () => {
-    expect(buildChildInviteDraft(' child@example.com ')).toEqual({
+    expect(buildChildInviteDraft(' iconicedudev+child@gmail.com ')).toEqual({
       role: 'child',
-      email: 'child@example.com',
+      email: 'iconicedudev+child@gmail.com',
     });
   });
 

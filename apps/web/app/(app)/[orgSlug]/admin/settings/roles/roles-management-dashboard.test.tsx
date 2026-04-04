@@ -19,14 +19,14 @@ describe('RolesManagementDashboard', () => {
           users: [
             {
               accountId: 'account-1',
-              email: 'taylor@example.com',
+              email: 'iconicedudev+taylor@gmail.com',
               displayName: 'Taylor Parent',
               profileKind: 'guardian',
               roles: ['guardian'],
             },
             {
               accountId: 'account-2',
-              email: 'sam@example.com',
+              email: 'iconicedudev+sam@gmail.com',
               displayName: 'Sam Tutor',
               profileKind: 'educator',
               roles: ['educator'],
@@ -67,7 +67,7 @@ describe('RolesManagementDashboard', () => {
             users: [
               {
                 accountId: 'account-1',
-                email: 'taylor@example.com',
+                email: 'iconicedudev+taylor@gmail.com',
                 displayName: 'Taylor Parent',
                 profileKind: 'guardian',
                 roles: ['guardian'],
@@ -88,7 +88,7 @@ describe('RolesManagementDashboard', () => {
             users: [
               {
                 accountId: 'account-1',
-                email: 'taylor@example.com',
+                email: 'iconicedudev+taylor@gmail.com',
                 displayName: 'Taylor Parent',
                 profileKind: 'guardian',
                 roles: ['guardian', 'educator'],
@@ -130,7 +130,7 @@ describe('RolesManagementDashboard', () => {
           users: [
             {
               accountId: 'account-1',
-              email: 'admin@example.com',
+              email: 'iconicedudev+admin@gmail.com',
               displayName: 'Org Admin',
               profileKind: 'staff',
               roles: ['admin', 'staff'],

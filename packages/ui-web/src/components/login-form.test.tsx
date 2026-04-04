@@ -45,7 +45,7 @@ describe('LoginForm', () => {
     const user = userEvent.setup();
     render(<LoginForm onEmailLogin={onEmailLogin} />);
 
-    await user.type(screen.getByLabelText('Email'), 'parent@example.com');
+    await user.type(screen.getByLabelText('Email'), 'iconicedudev+parent@gmail.com');
     await user.click(screen.getByRole('button', { name: 'Send secure link' }));
 
     expect(screen.getByRole('button', { name: /Sending secure link/i })).toBeDisabled();

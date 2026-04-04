@@ -14,7 +14,7 @@ describe('AdminUserProfilePreviewDialog', () => {
         onOpenChange={() => undefined}
         account={{
           ids: { id: 'account-1', orgId: 'org-1' },
-          contacts: { email: 'jamie@example.com' },
+          contacts: { email: 'iconicedudev+jamie@gmail.com' },
           lifecycle: {
             status: 'active',
             createdAt: '2026-01-01T00:00:00.000Z',
@@ -70,7 +70,7 @@ describe('AdminUserProfilePreviewDialog', () => {
         onOpenChange={() => undefined}
         account={{
           ids: { id: 'account-1', orgId: 'org-1' },
-          contacts: { email: 'jamie@example.com' },
+          contacts: { email: 'iconicedudev+jamie@gmail.com' },
           lifecycle: {
             status: 'active',
             createdAt: '2026-01-01T00:00:00.000Z',

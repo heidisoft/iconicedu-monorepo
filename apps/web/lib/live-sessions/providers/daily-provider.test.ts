@@ -65,7 +65,7 @@ describe('daily live session provider', () => {
             id: 'provider-participant-1',
             user_id: 'profile-1',
             user_name: 'Taylor Reed',
-            user_email: 'taylor@example.com',
+            user_email: 'iconicedudev+taylor@gmail.com',
             session_id: 'session-correlation-1',
           },
         },
@@ -79,7 +79,7 @@ describe('daily live session provider', () => {
         providerParticipantId: 'provider-participant-1',
         profileId: 'profile-1',
         participantDisplayName: 'Taylor Reed',
-        participantEmail: 'taylor@example.com',
+        participantEmail: 'iconicedudev+taylor@gmail.com',
         correlationKey: 'session-correlation-1',
       }),
     ]);

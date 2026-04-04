@@ -93,7 +93,7 @@ describe('POST /api/onboarding/student', () => {
 
   it('returns 400 when invite code is invalid', async () => {
     mockGetUser.mockResolvedValueOnce({
-      data: { user: { id: 'auth-1', email: 'student@example.com' } },
+      data: { user: { id: 'auth-1', email: 'iconicedudev+student@gmail.com' } },
     });
     mockGetAccountByAuthUserId.mockResolvedValueOnce({
       data: { id: 'account-1', org_id: 'org-1' },
@@ -135,7 +135,7 @@ describe('POST /api/onboarding/student', () => {
     const inviteHash = createHash('sha256').update(inviteCode).digest('hex');
     mockResolveOrgDashboardPath.mockResolvedValueOnce('/iconic-academy');
     mockGetUser.mockResolvedValueOnce({
-      data: { user: { id: 'auth-1', email: 'student@example.com' } },
+      data: { user: { id: 'auth-1', email: 'iconicedudev+student@gmail.com' } },
     });
     mockGetAccountByAuthUserId.mockResolvedValueOnce({
       data: { id: 'account-1', org_id: 'org-1' },

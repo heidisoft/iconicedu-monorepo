@@ -25,7 +25,7 @@ function createParticipant(
       displayName: 'Alex Johnson',
       firstName: 'Alex',
       lastName: 'Johnson',
-      email: 'alex@example.com',
+      email: 'iconicedudev+alex@gmail.com',
       avatar: null,
       ...(overrides.profile ?? {}),
     },
@@ -34,7 +34,7 @@ function createParticipant(
       createdAt: '2026-01-01T00:00:00.000Z',
       updatedAt: '2026-01-01T00:00:00.000Z',
     },
-    accountEmail: 'alex@example.com',
+    accountEmail: 'iconicedudev+alex@gmail.com',
     ...(overrides as Omit<UserProfileVM, 'ids' | 'profile'>),
   } as UserProfileVM;
 }
@@ -68,9 +68,9 @@ describe('message-input mention helpers', () => {
         displayName: 'Myself',
         firstName: 'My',
         lastName: 'Self',
-        email: 'me@example.com',
+        email: 'iconicedudev+me@gmail.com',
       },
-      accountEmail: 'me@example.com',
+      accountEmail: 'iconicedudev+me@gmail.com',
     });
     const other = createParticipant({
       ids: { id: 'other' },
@@ -78,9 +78,9 @@ describe('message-input mention helpers', () => {
         displayName: 'Taylor Reed',
         firstName: 'Taylor',
         lastName: 'Reed',
-        email: 'taylor@example.com',
+        email: 'iconicedudev+taylor@gmail.com',
       },
-      accountEmail: 'taylor@example.com',
+      accountEmail: 'iconicedudev+taylor@gmail.com',
     });
 
     expect(getMentionCandidates([self, other], 'self')).toEqual([
@@ -88,7 +88,7 @@ describe('message-input mention helpers', () => {
         id: 'other',
         displayName: 'Taylor Reed',
         fullName: 'Taylor Reed',
-        email: 'taylor@example.com',
+        email: 'iconicedudev+taylor@gmail.com',
         avatarUrl: undefined,
       },
     ]);
@@ -103,9 +103,9 @@ describe('message-input mention helpers', () => {
             displayName: 'Taylor Reed',
             firstName: 'Taylor',
             lastName: 'Reed',
-            email: 'taylor@example.com',
+            email: 'iconicedudev+taylor@gmail.com',
           },
-          accountEmail: 'taylor@example.com',
+          accountEmail: 'iconicedudev+taylor@gmail.com',
         }),
       ],
       'self',
@@ -113,7 +113,7 @@ describe('message-input mention helpers', () => {
 
     expect(matchesMentionQuery(candidate, 'tay')).toBe(true);
     expect(matchesMentionQuery(candidate, 'reed')).toBe(true);
-    expect(matchesMentionQuery(candidate, 'example')).toBe(true);
+    expect(matchesMentionQuery(candidate, 'gmail')).toBe(true);
     expect(matchesMentionQuery(candidate, 'alex')).toBe(false);
   });
 
