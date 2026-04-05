@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import type { ClassScheduleVM } from '@iconicedu/shared-types';
 
@@ -111,24 +111,25 @@ describe('EventActions', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit schedule' }));
+    const dialog = screen.getByRole('dialog', { name: 'Edit this session' });
     expect(
-      screen.getByRole('checkbox', {
+      within(dialog).getByRole('checkbox', {
         name: /Send activity notifications for this update/i,
       }),
     ).toBeChecked();
-    fireEvent.change(screen.getByLabelText('Date'), {
+    fireEvent.change(within(dialog).getByLabelText('Date'), {
       target: { value: '2026-03-22' },
     });
-    fireEvent.change(screen.getByLabelText('Start time'), {
+    fireEvent.change(within(dialog).getByLabelText('Start time'), {
       target: { value: '11:00' },
     });
-    fireEvent.change(screen.getByLabelText('End time'), {
+    fireEvent.change(within(dialog).getByLabelText('End time'), {
       target: { value: '12:30' },
     });
-    fireEvent.change(screen.getByLabelText('Reason (optional)'), {
+    fireEvent.change(within(dialog).getByLabelText('Reason (optional)'), {
       target: { value: 'Family requested a change' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save changes' }));
 
     await waitFor(() => {
       expect(onEditSession).toHaveBeenCalledWith(
