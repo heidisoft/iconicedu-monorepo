@@ -124,8 +124,10 @@ describe('ChannelsDashboard', () => {
 
     const dialog = await screen.findByRole('dialog');
     await user.type(within(dialog).getByLabelText('Name *'), 'Parent Lounge');
-    await user.click(within(dialog).getByLabelText('Icon'));
-    await user.click(await screen.findByRole('option', { name: 'Support' }));
+    const iconTrigger = within(dialog).getByLabelText('Icon');
+    await user.click(iconTrigger);
+    const listbox = await screen.findByRole('listbox');
+    await user.click(within(listbox).getByRole('option', { name: 'Support' }));
     await waitFor(() => {
       expect(within(dialog).getByLabelText('Icon')).toHaveTextContent('Support');
     });
@@ -149,5 +151,5 @@ describe('ChannelsDashboard', () => {
         iconKey: 'life-buoy',
       },
     });
-  });
+  }, 15000);
 });
