@@ -89,6 +89,12 @@ jest.mock('react-native-safe-area-context', () => {
 jest.mock('react-native-reanimated', () => {
   const React = require('react');
   const { Image, View } = require('react-native');
+  const passthroughBuilder = {
+    withInitialValues: () => ({
+      duration: () => undefined,
+    }),
+    duration: () => undefined,
+  };
 
   const AnimatedComponent = React.forwardRef((props, ref) =>
     React.createElement(View, { ...props, ref }, props.children),
@@ -96,6 +102,7 @@ jest.mock('react-native-reanimated', () => {
   const AnimatedImage = React.forwardRef((props, ref) =>
     React.createElement(Image, { ...props, ref }),
   );
+  const LayoutAnimationConfig = ({ children }) => children;
 
   return {
     __esModule: true,
@@ -106,11 +113,22 @@ jest.mock('react-native-reanimated', () => {
     },
     View: AnimatedComponent,
     Image: AnimatedImage,
+    LayoutAnimationConfig,
     createAnimatedComponent: () => AnimatedComponent,
+    FadeIn: passthroughBuilder,
+    FadeInDown: passthroughBuilder,
+    FadeInUp: passthroughBuilder,
+    FadeOut: passthroughBuilder,
+    FadeOutUp: passthroughBuilder,
+    LinearTransition: {
+      duration: () => undefined,
+    },
     clamp: (value, lowerBound, upperBound) =>
       Math.min(Math.max(value, lowerBound), upperBound),
     useSharedValue: (initialValue) => ({ value: initialValue }),
+    useDerivedValue: (updater) => ({ value: updater() }),
     useAnimatedStyle: (updater) => updater(),
+    withTiming: (value) => value,
   };
 });
 
