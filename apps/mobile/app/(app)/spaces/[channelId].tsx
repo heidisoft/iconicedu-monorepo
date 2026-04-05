@@ -1,5 +1,12 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import { MessageCircle, CalendarDays } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
@@ -316,7 +323,11 @@ export default function SpaceDetailScreen() {
 
       {/* Content */}
       {activeTab === 'messages' ? (
-        <View style={[s.flex, { backgroundColor: colors.pageBg }]}>
+        <KeyboardAvoidingView
+          style={[s.flex, { backgroundColor: colors.pageBg }]}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={0}
+        >
           <MessageList
             messages={messages ?? []}
             currentProfileId={profileId}
@@ -344,7 +355,7 @@ export default function SpaceDetailScreen() {
               uploading={pendingUploads.some((upload) => !upload.failed)}
             />
           )}
-        </View>
+        </KeyboardAvoidingView>
       ) : (
         <View style={[s.flex, { backgroundColor: colors.pageBg }]}>
           <SpaceSessionsTab

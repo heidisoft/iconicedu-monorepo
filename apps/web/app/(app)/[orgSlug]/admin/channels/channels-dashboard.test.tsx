@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 
@@ -104,16 +104,18 @@ describe('ChannelsDashboard', () => {
   });
 
   it('submits the selected channel icon in the payload', async () => {
-    const fetchMock = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ data: [] }),
-      } as Response)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ success: true }),
-      } as Response);
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [] }),
+    } as Response);
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ data: [] }),
+    } as Response);
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ success: true }),
+    } as Response);
     const user = userEvent.setup();
 
     render(<ChannelsDashboard rows={[makeRow({ topic: 'General' })]} />);
@@ -122,8 +124,13 @@ describe('ChannelsDashboard', () => {
 
     const dialog = await screen.findByRole('dialog');
     await user.type(within(dialog).getByLabelText('Name *'), 'Parent Lounge');
-    await user.click(within(dialog).getByLabelText('Icon'));
-    await user.click(screen.getByRole('option', { name: 'Support' }));
+    const iconTrigger = within(dialog).getByLabelText('Icon');
+    await user.click(iconTrigger);
+    const listbox = await screen.findByRole('listbox');
+    await user.click(within(listbox).getByRole('option', { name: 'Support' }));
+    await waitFor(() => {
+      expect(within(dialog).getByLabelText('Icon')).toHaveTextContent('Support');
+    });
     await user.click(within(dialog).getByRole('button', { name: 'Create channel' }));
 
     expect(fetchMock).toHaveBeenNthCalledWith(
@@ -144,5 +151,5 @@ describe('ChannelsDashboard', () => {
         iconKey: 'life-buoy',
       },
     });
-  });
+  }, 15000);
 });

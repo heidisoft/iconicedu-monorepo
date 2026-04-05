@@ -730,6 +730,12 @@ export function buildCanonicalLearningSpaceScheduleFromPayload(
 ): CanonicalLearningSpaceSchedule {
   const expanded = buildScheduleStart(schedule);
   const recurrence = buildCanonicalRecurrenceFromPayload(schedule);
+  const baseDurationMs =
+    new Date(expanded.endAt).getTime() - new Date(expanded.startAt).getTime();
+  const baseDurationMinutes =
+    Number.isFinite(baseDurationMs) && baseDurationMs > 0
+      ? Math.round(baseDurationMs / 60000)
+      : DEFAULT_DURATION_MINUTES;
 
   return {
     id: null,
@@ -752,13 +758,22 @@ export function buildCanonicalLearningSpaceScheduleFromPayload(
     overrides: [...(schedule.overrides ?? [])]
       .map((entry) => {
         const explicitNewTime = normalizeNullableText(entry.newTime);
+        const explicitNewEndTime = normalizeNullableText(entry.newEndTime);
         const nextTime =
           explicitNewTime !== null ? normalizeTimeLabel(explicitNewTime) : expanded.time;
+        const nextEndTime =
+          explicitNewEndTime !== null
+            ? normalizeTimeLabel(explicitNewEndTime)
+            : normalizeTimeLabel(schedule.endTime ?? expanded.time);
         const startAt = toOccurrenceKeyInTimezone(
           entry.newDate,
           nextTime,
           recurrence.timezone,
         );
+        const endAt =
+          explicitNewEndTime !== null
+            ? toOccurrenceKeyInTimezone(entry.newDate, nextEndTime, recurrence.timezone)
+            : addMinutesToIso(startAt, baseDurationMinutes);
         return {
           occurrenceKey: toOccurrenceKeyInTimezone(
             entry.originalDate,
@@ -766,7 +781,7 @@ export function buildCanonicalLearningSpaceScheduleFromPayload(
             recurrence.timezone,
           ),
           startAt,
-          endAt: addMinutesToIso(startAt, DEFAULT_DURATION_MINUTES),
+          endAt,
           reason: normalizeNullableText(entry.reason),
         };
       })

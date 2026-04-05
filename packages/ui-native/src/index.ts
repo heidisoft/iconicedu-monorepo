@@ -19,6 +19,7 @@ export * from '@iconicedu/ui-native/components/Tabs';
 export * from '@iconicedu/ui-native/components/SectionCard';
 export * from '@iconicedu/ui-native/components/SettingsRow';
 export * from '@iconicedu/ui-native/components/BottomSheet';
+export * from '@iconicedu/ui-native/components/ui/tooltip';
 
 // Utilities
 export { cn, TextClassContext } from '@iconicedu/ui-native/lib/utils';

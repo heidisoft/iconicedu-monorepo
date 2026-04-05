@@ -5,6 +5,10 @@ import type { ClassScheduleVM, ClassScheduleViewVM } from '@iconicedu/shared-typ
 import { ClassScheduleHeader } from '@iconicedu/ui-web/components/class-schedule/class-schedule-header';
 import { WeekView } from '@iconicedu/ui-web/components/class-schedule/week-view';
 import { DayView } from '@iconicedu/ui-web/components/class-schedule/day-view';
+import type {
+  CancelSessionActionInput,
+  EditSessionActionInput,
+} from '@iconicedu/ui-web/components/class-schedule/session-action-types';
 import { useScheduleDisplayTimeZone } from '@iconicedu/ui-web/components/shared/schedule-display-timezone-context';
 import {
   type DisplayClassScheduleVM,
@@ -22,9 +26,14 @@ interface ClassScheduleContainerProps {
   events: ClassScheduleVM[];
   childrenCount?: number;
   canCancelSessions?: boolean;
+  canEditSessions?: boolean;
   onCancelSession?: (
     event: DisplayClassScheduleVM,
-    reason?: string | null,
+    input: CancelSessionActionInput,
+  ) => Promise<void>;
+  onEditSession?: (
+    event: DisplayClassScheduleVM,
+    input: EditSessionActionInput,
   ) => Promise<void>;
 }
 
@@ -36,7 +45,9 @@ export function ClassScheduleContainer({
   events,
   childrenCount,
   canCancelSessions = false,
+  canEditSessions = false,
   onCancelSession,
+  onEditSession,
 }: ClassScheduleContainerProps) {
   const timezone = useScheduleDisplayTimeZone();
   const [classScheduleMonthAnchor, setClassScheduleMonthAnchor] = useState(
@@ -96,7 +107,9 @@ export function ClassScheduleContainer({
           onDateSelect={onDateSelect}
           onSwitchToDay={() => onViewChange('day')}
           canCancelSessions={canCancelSessions}
+          canEditSessions={canEditSessions}
           onCancelSession={onCancelSession}
+          onEditSession={onEditSession}
         />
       ) : (
         <DayView
@@ -109,7 +122,9 @@ export function ClassScheduleContainer({
           onDateSelect={onDateSelect}
           onMonthChange={setClassScheduleMonthAnchor}
           canCancelSessions={canCancelSessions}
+          canEditSessions={canEditSessions}
           onCancelSession={onCancelSession}
+          onEditSession={onEditSession}
         />
       )}
     </>

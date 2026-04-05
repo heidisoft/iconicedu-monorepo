@@ -6,6 +6,7 @@ import { dirname, resolve } from 'node:path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const isCI = Boolean(process.env.CI);
 
 export default defineConfig({
   plugins: [react(), tsconfigPaths()],
@@ -34,6 +35,14 @@ export default defineConfig({
     setupFiles: ['./vitest.setup.ts'],
     globals: true,
     css: false,
+    pool: 'vmThreads',
+    // vmThreads is required for v8 coverage: the forks pool (vitest 3.x default) disconnects
+    // the V8 inspector in each worker, causing ERR_INSPECTOR_NOT_CONNECTED on coverage collection.
+    poolOptions: {
+      vmThreads: isCI
+        ? { singleThread: true, minThreads: 1, maxThreads: 1, memoryLimit: '512MB' }
+        : undefined,
+    },
     server: {
       deps: {
         inline: [/.*/],

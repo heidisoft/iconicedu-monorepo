@@ -11,14 +11,23 @@ import {
 import { useScheduleDisplayTimeZone } from '@iconicedu/ui-web/components/shared/schedule-display-timezone-context';
 import { EventDialog } from '@iconicedu/ui-web/components/class-schedule/event-dialog';
 import { EventLiveIndicator } from '@iconicedu/ui-web/components/class-schedule/event-live-indicator';
+import type {
+  CancelSessionActionInput,
+  EditSessionActionInput,
+} from '@iconicedu/ui-web/components/class-schedule/session-action-types';
 
 interface EventCardProps {
   event: DisplayClassScheduleVM;
   compact?: boolean;
   canCancelSession?: boolean;
+  canEditSession?: boolean;
   onCancelSession?: (
     event: DisplayClassScheduleVM,
-    reason?: string | null,
+    input: CancelSessionActionInput,
+  ) => Promise<void>;
+  onEditSession?: (
+    event: DisplayClassScheduleVM,
+    input: EditSessionActionInput,
   ) => Promise<void>;
 }
 
@@ -26,7 +35,9 @@ export function EventCard({
   event,
   compact = false,
   canCancelSession = false,
+  canEditSession = false,
   onCancelSession,
+  onEditSession,
 }: EventCardProps) {
   const timezone = useScheduleDisplayTimeZone();
   const isLive = isEventLive(event);
@@ -105,7 +116,9 @@ export function EventCard({
       open={open}
       onOpenChange={setOpen}
       canCancelSession={canCancelSession}
+      canEditSession={canEditSession}
       onCancelSession={onCancelSession}
+      onEditSession={onEditSession}
     >
       {eventButton}
     </EventDialog>

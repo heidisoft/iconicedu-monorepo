@@ -59,6 +59,7 @@ import {
   NotebookPen,
   TrendingUp,
   Check,
+  EyeOff,
 } from 'lucide-react-native';
 import { AudioPlayer, createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import type { AudioStatus } from 'expo-audio';
@@ -708,6 +709,54 @@ function InlineUnreadDivider({ count, colors }: { count?: number; colors: AppCol
   );
 }
 
+function getVisibilityLabel(message: MessageVM): string | null {
+  const visibility = message.core.visibility;
+  if (visibility.type === 'all') return null;
+  if (visibility.type === 'sender-only') return 'Only visible to you';
+  if (visibility.type === 'recipient-only') return 'Only visible to recipient';
+  if (visibility.type === 'specific-users') return 'Visible to specific users';
+  return 'Private';
+}
+
+function VisibilityBadge({ message, colors }: { message: MessageVM; colors: AppColors }) {
+  const label = getVisibilityLabel(message);
+  if (!label) return null;
+
+  return (
+    <View
+      testID="message-visibility-badge"
+      style={[
+        visibilityBadgeStyles.badge,
+        {
+          backgroundColor: colors.inputBg,
+          borderColor: colors.border,
+        },
+      ]}
+    >
+      <EyeOff size={10} color={colors.textMuted} />
+      <Text style={[visibilityBadgeStyles.text, { color: colors.textMuted }]}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+const visibilityBadgeStyles = StyleSheet.create({
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 999,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  text: {
+    fontSize: 10,
+    fontWeight: '500',
+  },
+});
+
 // ─── Inline thread reply (compact) ────────────────────────────────────────────
 
 function InlineReply({ message, colors }: { message: MessageVM; colors: AppColors }) {
@@ -748,6 +797,7 @@ function InlineReply({ message, colors }: { message: MessageVM; colors: AppColor
               color: senderColor(senderName),
             }}
           />
+          <VisibilityBadge message={message} colors={colors} />
           <Text style={{ fontSize: 11, color: colors.textFaint }}>{time}</Text>
         </View>
         <FormattedText
@@ -2387,6 +2437,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                   textStyle={[s.senderName, { color: senderColor(senderDisplayName) }]}
                 />
               )}
+              <VisibilityBadge message={message} colors={colors} />
               <Text style={s.msgTime}>{time}</Text>
             </View>
           )}
@@ -2534,6 +2585,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                   textStyle={[s.senderName, { color: senderColor(senderDisplayName) }]}
                 />
               )}
+              <VisibilityBadge message={message} colors={colors} />
               <Text style={s.msgTime}>{time}</Text>
             </View>
           )}

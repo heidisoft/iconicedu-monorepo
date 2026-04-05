@@ -4,12 +4,18 @@ import { startTransition, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ClassScheduleContainer, DashboardHeader, toast } from '@iconicedu/ui-web';
 import type { ClassScheduleViewVM, ClassScheduleVM } from '@iconicedu/shared-types';
+import type {
+  CancelSessionActionInput,
+  EditSessionActionInput,
+} from '@iconicedu/ui-web/components/class-schedule/session-action-types';
 import { ScheduleDisplayTimeZoneProvider } from '@iconicedu/ui-web/components/shared/schedule-display-timezone-context';
 import type { DisplayClassScheduleVM } from '@iconicedu/ui-web/lib/class-schedule-utils';
 import { toScheduleDisplayDate } from '@iconicedu/ui-web/lib/schedule-display-timezone';
 import { cancelClassScheduleSessionAction } from '@iconicedu/web/app/actions/cancel-class-schedule-session';
+import { updateClassScheduleSessionAction } from '@iconicedu/web/app/actions/update-class-schedule-session';
 import {
   applyCancelledSessionToSchedules,
+  applyUpdatedSessionToSchedules,
   getBaseScheduleId,
   getEventOccurrenceKey,
 } from '@iconicedu/web/app/(app)/[orgSlug]/class-schedule/class-schedule-client.utils';
@@ -18,6 +24,7 @@ type ClassScheduleClientProps = {
   events: ClassScheduleVM[];
   orgSlug: string;
   canCancelSessions: boolean;
+  canEditSessions: boolean;
   timezone?: string | null;
 };
 
@@ -25,6 +32,7 @@ export function ClassScheduleClient({
   events,
   orgSlug,
   canCancelSessions,
+  canEditSessions,
   timezone,
 }: ClassScheduleClientProps) {
   const router = useRouter();
@@ -64,14 +72,15 @@ export function ClassScheduleClient({
 
   const handleCancelSession = async (
     event: DisplayClassScheduleVM,
-    reason?: string | null,
+    input: CancelSessionActionInput,
   ) => {
     try {
       const result = await cancelClassScheduleSessionAction({
         orgSlug,
         scheduleId: getBaseScheduleId(event.ids.id),
         occurrenceKey: getEventOccurrenceKey(event),
-        reason,
+        reason: input.reason,
+        sendActivityNotifications: input.sendActivityNotifications,
       });
 
       setScheduleEvents((currentEvents) =>
@@ -82,6 +91,36 @@ export function ClassScheduleClient({
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : 'Unable to cancel this session.',
+      );
+      throw error;
+    }
+  };
+
+  const handleEditSession = async (
+    event: DisplayClassScheduleVM,
+    input: EditSessionActionInput,
+  ) => {
+    try {
+      const result = await updateClassScheduleSessionAction({
+        orgSlug,
+        scheduleId: getBaseScheduleId(event.ids.id),
+        occurrenceKey: getEventOccurrenceKey(event),
+        date: input.date,
+        startTime: input.startTime,
+        endTime: input.endTime,
+        timezone: input.timezone,
+        reason: input.reason,
+        sendActivityNotifications: input.sendActivityNotifications,
+      });
+
+      setScheduleEvents((currentEvents) =>
+        applyUpdatedSessionToSchedules(currentEvents, result),
+      );
+      toast.success('Session updated.');
+      startTransition(() => router.refresh());
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'Unable to update this session.',
       );
       throw error;
     }
@@ -98,7 +137,9 @@ export function ClassScheduleClient({
           onDateSelect={setCurrentDate}
           events={scheduleEvents}
           canCancelSessions={canCancelSessions}
+          canEditSessions={canEditSessions}
           onCancelSession={handleCancelSession}
+          onEditSession={handleEditSession}
         />
       </div>
     </ScheduleDisplayTimeZoneProvider>

@@ -1,10 +1,24 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import type { ClassScheduleVM } from '@iconicedu/shared-types';
 
 import { EventActions } from './event-actions';
+
+// The real getTimezoneOptions returns 400+ entries. Rendering that many SelectItems
+// in jsdom on CI (single-threaded, 512 MB) pushes the test past the 5 s timeout.
+vi.mock('@iconicedu/utils', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@iconicedu/utils')>();
+  return {
+    ...actual,
+    getTimezoneOptions: () => [
+      { name: 'UTC', countryCode: null, label: 'UTC' },
+      { name: 'America/New_York', countryCode: 'US', label: 'America/New_York' },
+      { name: 'Europe/London', countryCode: 'GB', label: 'Europe/London' },
+    ],
+  };
+});
 
 function buildEvent(overrides?: Partial<ClassScheduleVM>): ClassScheduleVM {
   return {
@@ -73,6 +87,11 @@ describe('EventActions', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Cancel session' }));
+    expect(
+      screen.getByRole('checkbox', {
+        name: /Send activity notifications for this update/i,
+      }),
+    ).toBeChecked();
     fireEvent.change(screen.getByLabelText('Reason (optional)'), {
       target: { value: 'Tutor unavailable' },
     });
@@ -81,7 +100,62 @@ describe('EventActions', () => {
     await waitFor(() => {
       expect(onCancelSession).toHaveBeenCalledWith(
         expect.objectContaining({ ids: expect.objectContaining({ id: 'schedule-1' }) }),
-        'Tutor unavailable',
+        {
+          reason: 'Tutor unavailable',
+          sendActivityNotifications: true,
+        },
+      );
+    });
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalled();
+    });
+  });
+
+  it('shows an edit schedule action and submits the notification flag with the update', async () => {
+    const onEditSession = vi.fn(async () => undefined);
+    const onClose = vi.fn();
+
+    render(
+      <EventActions
+        event={buildEvent({ timezone: 'America/New_York' })}
+        onClose={onClose}
+        canEditSession
+        onEditSession={onEditSession}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit schedule' }));
+    const dialog = screen.getByRole('dialog', { name: 'Edit this session' });
+    expect(
+      within(dialog).getByRole('checkbox', {
+        name: /Send activity notifications for this update/i,
+      }),
+    ).toBeChecked();
+    fireEvent.change(within(dialog).getByLabelText('Date'), {
+      target: { value: '2026-03-22' },
+    });
+    fireEvent.change(within(dialog).getByLabelText('Start time'), {
+      target: { value: '11:00' },
+    });
+    fireEvent.change(within(dialog).getByLabelText('End time'), {
+      target: { value: '12:30' },
+    });
+    fireEvent.change(within(dialog).getByLabelText('Reason (optional)'), {
+      target: { value: 'Family requested a change' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() => {
+      expect(onEditSession).toHaveBeenCalledWith(
+        expect.objectContaining({ ids: expect.objectContaining({ id: 'schedule-1' }) }),
+        {
+          date: '2026-03-22',
+          startTime: '11:00',
+          endTime: '12:30',
+          timezone: 'America/New_York',
+          reason: 'Family requested a change',
+          sendActivityNotifications: true,
+        },
       );
     });
     await waitFor(() => {

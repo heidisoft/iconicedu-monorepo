@@ -26,6 +26,7 @@ export interface RecurrenceOverride {
   originalDate: ISODate;
   newDate: ISODate;
   newTime?: TimeString;
+  newEndTime?: TimeString;
   reason?: string;
 }
 

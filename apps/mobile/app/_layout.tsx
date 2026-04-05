@@ -2,6 +2,7 @@ import '../global.css';
 import React from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { Slot } from 'expo-router';
+import { PortalHost } from '@rn-primitives/portal';
 import { SystemBars } from 'react-native-edge-to-edge';
 import { AppProviders } from '@/providers/app-providers';
 import { useTheme } from '@/providers/theme-provider';
@@ -47,6 +48,7 @@ function RootContent() {
       <AppLifecycleTracker />
       <PresenceTracker />
       <Slot />
+      <PortalHost />
     </>
   );
 }

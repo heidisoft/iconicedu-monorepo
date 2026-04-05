@@ -12,6 +12,7 @@ const base = {
   ignores: [
     '**/node_modules/**',
     '**/dist/**',
+    '**/coverage/**',
     '**/.next/**',
     'apps/web/next-env.d.ts',
     'apps/web/lighthouserc.js',
@@ -80,6 +81,7 @@ export default [
       '**/node_modules/**',
       '**/.next/**',
       '**/dist/**',
+      '**/coverage/**',
       'apps/web/next-env.d.ts',
       'apps/web/lighthouserc.js',
       'apps/web/playwright.config.js',

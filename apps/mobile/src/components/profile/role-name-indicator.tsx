@@ -3,13 +3,13 @@ import {
   View,
   Text,
   StyleSheet,
-  Pressable,
   type StyleProp,
   type TextStyle,
   type ViewStyle,
   type TextProps,
 } from 'react-native';
 import { IdCardLanyard } from 'lucide-react-native';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@iconicedu/ui-native';
 
 import { useTheme } from '@/providers/theme-provider';
 
@@ -28,6 +28,9 @@ function isStaffRole(role?: string | null) {
   return role === 'staff';
 }
 
+const STAFF_LABEL = 'STAFF';
+const STAFF_TOOLTIP_TEXT_COLOR = '#f8fafc';
+
 export function RoleNameIndicator({
   name,
   role,
@@ -40,35 +43,6 @@ export function RoleNameIndicator({
 }: RoleNameIndicatorProps) {
   const { colors } = useTheme();
   const showStaffIcon = isStaffRole(role);
-  const [showTooltip, setShowTooltip] = React.useState(false);
-  const hideTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const hideTooltip = React.useCallback(() => {
-    setShowTooltip(false);
-    if (hideTimerRef.current) {
-      clearTimeout(hideTimerRef.current);
-      hideTimerRef.current = null;
-    }
-  }, []);
-
-  const handleStaffPress = React.useCallback(() => {
-    setShowTooltip(true);
-    if (hideTimerRef.current) {
-      clearTimeout(hideTimerRef.current);
-    }
-    hideTimerRef.current = setTimeout(() => {
-      setShowTooltip(false);
-      hideTimerRef.current = null;
-    }, 1600);
-  }, []);
-
-  React.useEffect(() => {
-    return () => {
-      if (hideTimerRef.current) {
-        clearTimeout(hideTimerRef.current);
-      }
-    };
-  }, []);
 
   return (
     <View style={[s.row, containerStyle]}>
@@ -82,39 +56,29 @@ export function RoleNameIndicator({
       </Text>
       {showStaffIcon ? (
         <View style={s.iconWrap}>
-          {showTooltip ? (
-            <Pressable
-              style={s.tooltipOverlay}
-              onPress={hideTooltip}
-              testID="staff-tooltip"
+          <Tooltip delayDuration={0}>
+            <TooltipTrigger
+              accessibilityRole="button"
+              accessibilityLabel={STAFF_LABEL}
+              hitSlop={8}
             >
-              <View
-                style={[
-                  s.tooltipBubble,
-                  {
-                    backgroundColor: colors.text,
-                  },
-                ]}
-              >
-                <Text style={[s.tooltipText, { color: colors.pageBg }]}>
-                  Staff member
-                </Text>
-              </View>
-            </Pressable>
-          ) : null}
-          <Pressable
-            onPress={handleStaffPress}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Staff member"
-          >
-            <IdCardLanyard
-              testID="staff-name-indicator"
-              size={iconSize}
-              color={colors.textMuted}
-              strokeWidth={2}
-            />
-          </Pressable>
+              <IdCardLanyard
+                testID="staff-name-indicator"
+                size={iconSize}
+                color={colors.textMuted}
+                strokeWidth={2}
+              />
+            </TooltipTrigger>
+            <TooltipContent
+              testID="staff-tooltip"
+              sideOffset={6}
+              className="rounded-full px-2.5 py-1"
+            >
+              <Text style={[s.tooltipText, { color: STAFF_TOOLTIP_TEXT_COLOR }]}>
+                {STAFF_LABEL}
+              </Text>
+            </TooltipContent>
+          </Tooltip>
         </View>
       ) : null}
     </View>
@@ -135,27 +99,8 @@ const s = StyleSheet.create({
     minWidth: 0,
   },
   iconWrap: {
-    position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  tooltipOverlay: {
-    position: 'absolute',
-    bottom: '100%',
-    marginBottom: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 10,
-  },
-  tooltipBubble: {
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 3,
   },
   tooltipText: {
     fontSize: 11,

@@ -1,2 +1,3 @@
 pnpm lint-staged
-pnpm precommit:check
+pnpm format:check:changed
+pnpm exec turbo run lint typecheck --affected

@@ -4,6 +4,20 @@ import { MessageItem } from '@/components/messages/message-item';
 import type { MessageVM } from '@iconicedu/shared-types';
 import { lightColors as LIGHT } from '@/lib/theme';
 
+jest.mock('@/components/profile/role-name-indicator', () => {
+  const React = require('react');
+  const { Text, View } = require('react-native');
+
+  return {
+    RoleNameIndicator: ({ name, role }: { name: string; role?: string | null }) => (
+      <View>
+        <Text>{name}</Text>
+        {role === 'staff' ? <View testID="staff-name-indicator" /> : null}
+      </View>
+    ),
+  };
+});
+
 const sender = {
   kind: 'educator',
   ids: { id: 'user-1', orgId: 'org-1', accountId: 'acc-1' },
@@ -67,6 +81,22 @@ const threadedUnreadMessage: MessageVM = {
         unreadCount: 2,
       },
     },
+  },
+} as unknown as MessageVM;
+
+const senderOnlyMessage: MessageVM = {
+  ...baseMessage,
+  core: {
+    ...baseMessage.core,
+    visibility: { type: 'sender-only' },
+  },
+} as unknown as MessageVM;
+
+const specificUsersMessage: MessageVM = {
+  ...baseMessage,
+  core: {
+    ...baseMessage.core,
+    visibility: { type: 'specific-users', userIds: ['user-1', 'user-2'] },
   },
 } as unknown as MessageVM;
 
@@ -137,5 +167,33 @@ describe('MessageItem', () => {
     expect(screen.getByTestId('thread-unread-new-badge')).toBeTruthy();
     expect(screen.getByTestId('thread-unread-count-badge')).toBeTruthy();
     expect(screen.getByText('2')).toBeTruthy();
+  });
+
+  it('renders the visibility badge for sender-only messages', () => {
+    render(
+      <MessageItem
+        message={senderOnlyMessage}
+        isOwn={false}
+        isGroupStart
+        colors={colors}
+      />,
+    );
+
+    expect(screen.getByTestId('message-visibility-badge')).toBeTruthy();
+    expect(screen.getByText('Only visible to you')).toBeTruthy();
+  });
+
+  it('renders the visibility badge for specific-users messages', () => {
+    render(
+      <MessageItem
+        message={specificUsersMessage}
+        isOwn={false}
+        isGroupStart
+        colors={colors}
+      />,
+    );
+
+    expect(screen.getByTestId('message-visibility-badge')).toBeTruthy();
+    expect(screen.getByText('Visible to specific users')).toBeTruthy();
   });
 });

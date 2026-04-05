@@ -487,12 +487,26 @@ async function buildSchedulesForForm(
           );
           return resolvedStart.time ?? canonical.displayTime;
         })();
+        const newEndTime = (() => {
+          if (!override.endAt) {
+            return (
+              getTimeFromISOInTimezone(canonical.endAt, timezone) ?? canonical.displayTime
+            );
+          }
+          const resolvedEnd = resolveStoredScheduleDateTimeForForm(
+            override.endAt,
+            timezone,
+            canonical.displayTime,
+          );
+          return resolvedEnd.time ?? canonical.displayTime;
+        })();
 
         return {
           id: `${schedule.id}:override:${index}`,
           originalDate,
           newDate,
           newTime,
+          newEndTime,
           reason: override.reason ?? undefined,
         };
       }),

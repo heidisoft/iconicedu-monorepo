@@ -3,6 +3,7 @@ import type { ClassScheduleVM } from '@iconicedu/shared-types';
 
 import {
   applyCancelledSessionToSchedules,
+  applyUpdatedSessionToSchedules,
   getBaseScheduleId,
   getEventOccurrenceKey,
 } from './class-schedule-client.utils';
@@ -92,5 +93,75 @@ describe('class-schedule-client utils', () => {
     });
 
     expect(result[0]?.status).toBe('cancelled');
+  });
+
+  it('upserts a recurrence override after a recurring session edit', () => {
+    const schedules = [buildSchedule()];
+
+    const result = applyUpdatedSessionToSchedules(schedules, {
+      scheduleId: 'schedule-1',
+      occurrenceKey: '2026-03-21T10:00:00.000Z',
+      mode: 'recurring',
+      status: 'rescheduled',
+      startAt: '2026-03-22T14:00:00.000Z',
+      endAt: '2026-03-22T15:30:00.000Z',
+      timezone: 'America/New_York',
+      reason: 'Moved to Sunday',
+    });
+
+    expect(result[0]?.recurrence?.exceptions).toEqual([
+      { occurrenceKey: '2026-03-14T10:00:00.000Z', reason: 'Holiday' },
+    ]);
+    expect(result[0]?.recurrence?.overrides).toEqual([
+      {
+        occurrenceKey: '2026-03-21T10:00:00.000Z',
+        patch: {
+          startAt: '2026-03-22T14:00:00.000Z',
+          endAt: '2026-03-22T15:30:00.000Z',
+          reason: 'Moved to Sunday',
+        },
+      },
+    ]);
+  });
+
+  it('removes a recurrence override when a recurring session is restored to its base timing', () => {
+    const schedules = [buildSchedule()];
+
+    const result = applyUpdatedSessionToSchedules(schedules, {
+      scheduleId: 'schedule-1',
+      occurrenceKey: '2026-03-21T10:00:00.000Z',
+      mode: 'recurring',
+      status: 'scheduled',
+      startAt: '2026-03-21T10:00:00.000Z',
+      endAt: '2026-03-21T11:00:00.000Z',
+      timezone: 'America/New_York',
+      reason: null,
+    });
+
+    expect(result[0]?.recurrence?.overrides).toBeUndefined();
+  });
+
+  it('updates single schedules after an edit', () => {
+    const schedules = [buildSchedule({ recurrence: undefined, timezone: 'UTC' })];
+
+    const result = applyUpdatedSessionToSchedules(schedules, {
+      scheduleId: 'schedule-1',
+      occurrenceKey: '2026-03-21T10:00:00.000Z',
+      mode: 'single',
+      status: 'scheduled',
+      startAt: '2026-03-21T12:00:00.000Z',
+      endAt: '2026-03-21T13:30:00.000Z',
+      timezone: 'America/Chicago',
+      reason: 'Updated',
+    });
+
+    expect(result[0]).toEqual(
+      expect.objectContaining({
+        startAt: '2026-03-21T12:00:00.000Z',
+        endAt: '2026-03-21T13:30:00.000Z',
+        timezone: 'America/Chicago',
+        status: 'scheduled',
+      }),
+    );
   });
 });

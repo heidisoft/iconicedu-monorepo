@@ -6,6 +6,10 @@ import { Separator } from '@iconicedu/ui-web/ui/separator';
 import { EventDetailsHeader } from '@iconicedu/ui-web/components/class-schedule/event-details-header';
 import { EventDetailsInfo } from '@iconicedu/ui-web/components/class-schedule/event-details-info';
 import { EventActions } from '@iconicedu/ui-web/components/class-schedule/event-actions';
+import type {
+  CancelSessionActionInput,
+  EditSessionActionInput,
+} from '@iconicedu/ui-web/components/class-schedule/session-action-types';
 import { ResponsiveDialog } from '@iconicedu/ui-web/components/shared/responsive-dialog';
 import type { DisplayClassScheduleVM } from '@iconicedu/ui-web/lib/class-schedule-utils';
 
@@ -15,9 +19,14 @@ interface EventDialogProps {
   onOpenChange: (open: boolean) => void;
   children: React.ReactNode;
   canCancelSession?: boolean;
+  canEditSession?: boolean;
   onCancelSession?: (
     event: DisplayClassScheduleVM,
-    reason?: string | null,
+    input: CancelSessionActionInput,
+  ) => Promise<void>;
+  onEditSession?: (
+    event: DisplayClassScheduleVM,
+    input: EditSessionActionInput,
   ) => Promise<void>;
 }
 
@@ -27,7 +36,9 @@ export function EventDialog({
   onOpenChange,
   children,
   canCancelSession = false,
+  canEditSession = false,
   onCancelSession,
+  onEditSession,
 }: EventDialogProps) {
   const content = (
     // <ScrollArea className="max-h-[85vh]">
@@ -41,7 +52,9 @@ export function EventDialog({
             event={event}
             onClose={() => onOpenChange(false)}
             canCancelSession={canCancelSession}
+            canEditSession={canEditSession}
             onCancelSession={onCancelSession}
+            onEditSession={onEditSession}
           />
         </div>
       </div>

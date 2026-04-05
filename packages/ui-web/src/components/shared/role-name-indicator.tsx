@@ -18,6 +18,8 @@ function isStaffRole(role?: string | null) {
   return role === 'staff';
 }
 
+const STAFF_LABEL = 'STAFF';
+
 export function RoleNameIndicator({
   name,
   role,
@@ -35,7 +37,7 @@ export function RoleNameIndicator({
           <TooltipTrigger asChild>
             <span
               className="inline-flex items-center text-muted-foreground"
-              aria-label="Staff member"
+              aria-label={STAFF_LABEL}
             >
               <IdCardLanyard
                 className={cn('h-3.5 w-3.5 shrink-0', iconClassName)}
@@ -44,7 +46,7 @@ export function RoleNameIndicator({
               />
             </span>
           </TooltipTrigger>
-          <TooltipContent>Staff member</TooltipContent>
+          <TooltipContent>{STAFF_LABEL}</TooltipContent>
         </Tooltip>
       ) : null}
     </span>
