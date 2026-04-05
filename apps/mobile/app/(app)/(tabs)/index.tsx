@@ -982,13 +982,13 @@ export default function HomeScreen() {
             <View style={s.familySwitchHeader}>
               <Text style={s.familySwitchTitle}>View as</Text>
               <Text style={s.familySwitchSubtitle}>
-                Switch between your parent view and linked student accounts.
+                Switch between your parent view and linked child accounts.
               </Text>
             </View>
             <View style={s.familySwitchList}>
               {familySwitchOptions.map((option) => {
                 const optionTitle = option.displayName?.trim() || option.label;
-                const optionSubtitle = option.isParentOption ? 'Parent' : 'Student';
+                const optionSubtitle = option.isParentOption ? 'Parent' : 'Child';
                 const isSwitching =
                   switchingProfileId ===
                   (option.isParentOption ? '__parent__' : option.profileId);

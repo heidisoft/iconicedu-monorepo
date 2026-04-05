@@ -256,12 +256,12 @@ describe('MessagesContainerHeader', () => {
       />,
     );
 
-    const trigger = screen.getByLabelText('Staff member');
+    const trigger = screen.getByLabelText('STAFF');
     expect(screen.getByTestId('staff-name-indicator')).toBeInTheDocument();
 
     await user.hover(trigger);
 
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('Staff member');
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('STAFF');
   });
 
   it('shows a staff indicator next to classroom staff participant names', async () => {
@@ -300,12 +300,12 @@ describe('MessagesContainerHeader', () => {
       />,
     );
 
-    const trigger = screen.getByLabelText('Staff member');
+    const trigger = screen.getByLabelText('STAFF');
     expect(screen.getByText('ICONIC Support')).toBeInTheDocument();
 
     await user.hover(trigger);
 
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('Staff member');
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('STAFF');
   });
 
   it('groups classroom students under a single role icon label', () => {

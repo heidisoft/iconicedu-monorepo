@@ -1,0 +1,19 @@
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": false,
+  "tsx": true,
+  "tailwind": {
+    "config": "tailwind.config.js",
+    "css": "../../apps/mobile/global.css",
+    "baseColor": "neutral",
+    "cssVariables": true
+  },
+  "aliases": {
+    "components": "@iconicedu/ui-native/components",
+    "utils": "@iconicedu/ui-native/lib/utils",
+    "ui": "@iconicedu/ui-native/components/ui",
+    "lib": "@iconicedu/ui-native/lib",
+    "hooks": "@iconicedu/ui-native/hooks"
+  }
+}

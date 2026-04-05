@@ -7,6 +7,8 @@ import {
   StyleSheet,
   Alert,
   RefreshControl,
+  TouchableOpacity,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -18,10 +20,13 @@ import {
   Users,
   Shield,
   LogOut,
+  ArrowRightLeft,
+  Check,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import { SettingsRow } from '@iconicedu/ui-native';
+import { BottomSheet, Card, SettingsRow } from '@iconicedu/ui-native';
 import { useAuth } from '@/providers/auth-provider';
+import { useFamilyView } from '@/providers/family-view-provider';
 import { useTheme } from '@/providers/theme-provider';
 import { useAccount } from '@/hooks/use-account';
 import { useProfile } from '@/hooks/use-profile';
@@ -86,6 +91,23 @@ const ROLE_LABELS: Record<string, string> = {
   owner: 'Owner',
 };
 
+const FAMILY_SWITCH_HANDLE_HEIGHT = 28;
+const FAMILY_SWITCH_HEADER_HEIGHT = 76;
+const FAMILY_SWITCH_CARD_PADDING = 36;
+const FAMILY_SWITCH_ROW_HEIGHT = 62;
+const FAMILY_SWITCH_ROW_GAP = 12;
+const FAMILY_SWITCH_BOTTOM_PADDING = 18;
+
+function getInitials(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) return 'U';
+  const words = trimmed.split(/\s+/);
+  if (words.length >= 2) {
+    return `${words[0]?.[0] ?? ''}${words[1]?.[0] ?? ''}`.toUpperCase();
+  }
+  return trimmed[0]?.toUpperCase() ?? 'U';
+}
+
 function makeStyles(C: AppColors) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: C.pageBg },
@@ -138,6 +160,77 @@ function makeStyles(C: AppColors) {
       overflow: 'hidden',
     },
     divider: { height: 1, backgroundColor: C.border, marginLeft: 60 },
+    rowTrailingText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: C.textMuted,
+      maxWidth: 160,
+    },
+    familySwitchSheetContent: {
+      paddingBottom: FAMILY_SWITCH_BOTTOM_PADDING,
+    },
+    familySwitchCard: {
+      padding: 18,
+      gap: 12,
+    },
+    familySwitchHeader: {
+      gap: 4,
+    },
+    familySwitchTitle: {
+      fontSize: 18,
+      fontWeight: '800',
+      color: C.text,
+    },
+    familySwitchSubtitle: {
+      fontSize: 13,
+      color: C.textMuted,
+      lineHeight: 18,
+    },
+    familySwitchList: {
+      gap: 12,
+    },
+    familySwitchAvatar: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+    },
+    familySwitchAvatarText: {
+      color: '#ffffff',
+      fontSize: 14,
+      fontWeight: '800',
+    },
+    switchOption: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.bg,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+    },
+    switchOptionActive: {
+      borderColor: C.teal,
+      backgroundColor: C.tealBg,
+    },
+    switchOptionText: {
+      flex: 1,
+      minWidth: 0,
+      gap: 2,
+    },
+    switchOptionLabel: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: C.text,
+    },
+    switchOptionSubtext: {
+      fontSize: 12,
+      color: C.textMuted,
+    },
     version: { textAlign: 'center', fontSize: 12, color: C.textFaint, marginTop: 4 },
   });
 }
@@ -146,7 +239,9 @@ function makeStyles(C: AppColors) {
 
 export default function AccountScreen() {
   const { user, signOut } = useAuth();
+  const { familySwitchOptions, switchFamilyView, isViewingAsChild } = useFamilyView();
   const { colors } = useTheme();
+  const { height: windowHeight } = useWindowDimensions();
   const {
     data: account,
     isPending: accountLoading,
@@ -162,6 +257,8 @@ export default function AccountScreen() {
   const s = useMemo(() => makeStyles(colors), [colors]);
 
   const [refreshing, setRefreshing] = useState(false);
+  const [familySwitchOpen, setFamilySwitchOpen] = useState(false);
+  const [switchingProfileId, setSwitchingProfileId] = useState<string | null>(null);
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     Promise.all([refetchAccount(), refetchProfile()]).finally(() => setRefreshing(false));
@@ -183,6 +280,28 @@ export default function AccountScreen() {
   );
   const profileKind = (prof?.kind as string) ?? (acc?.primary_role as string);
   const isGuardian = profileKind === 'guardian';
+  const activeFamilySwitchOption =
+    familySwitchOptions.find((option) => option.isActive) ?? null;
+  const canSwitchFamilyView = familySwitchOptions.length > 1;
+  const handleFamilySwitch = useCallback(
+    async (childProfileId: string | null) => {
+      const nextId = childProfileId ?? '__parent__';
+      setSwitchingProfileId(nextId);
+      try {
+        await switchFamilyView(childProfileId);
+        await Promise.all([refetchAccount(), refetchProfile()]);
+        setFamilySwitchOpen(false);
+      } catch (error) {
+        Alert.alert(
+          'Unable to switch profile',
+          error instanceof Error ? error.message : 'Please try again.',
+        );
+      } finally {
+        setSwitchingProfileId(null);
+      }
+    },
+    [refetchAccount, refetchProfile, switchFamilyView],
+  );
 
   if (accountLoading || profileLoading || refreshing) {
     return (
@@ -201,6 +320,17 @@ export default function AccountScreen() {
       { text: 'Sign out', style: 'destructive', onPress: signOut },
     ]);
   };
+  const familySwitchRowsHeight =
+    familySwitchOptions.length * FAMILY_SWITCH_ROW_HEIGHT +
+    Math.max(familySwitchOptions.length - 1, 0) * FAMILY_SWITCH_ROW_GAP;
+  const familySwitchSheetHeight = Math.min(
+    FAMILY_SWITCH_HANDLE_HEIGHT +
+      FAMILY_SWITCH_HEADER_HEIGHT +
+      FAMILY_SWITCH_CARD_PADDING +
+      familySwitchRowsHeight +
+      FAMILY_SWITCH_BOTTOM_PADDING,
+    windowHeight * 0.78,
+  );
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -242,6 +372,30 @@ export default function AccountScreen() {
             </View>
           </View>
         </View>
+
+        {/* Personal */}
+        {canSwitchFamilyView ? (
+          <>
+            <Text style={s.sectionLabel}>Family View</Text>
+            <View style={s.card}>
+              <SettingsRow
+                icon={<ArrowRightLeft size={20} color={colors.textMuted} />}
+                label={isViewingAsChild ? 'Switch child account' : 'Switch to child account'}
+                labelColor={colors.text}
+                chevronColor={colors.textFaint}
+                trailing={
+                  activeFamilySwitchOption ? (
+                    <Text style={s.rowTrailingText} numberOfLines={1}>
+                      {activeFamilySwitchOption.displayName?.trim() ||
+                        activeFamilySwitchOption.label}
+                    </Text>
+                  ) : undefined
+                }
+                onPress={() => setFamilySwitchOpen(true)}
+              />
+            </View>
+          </>
+        ) : null}
 
         {/* Personal */}
         <Text style={s.sectionLabel}>Personal</Text>
@@ -327,6 +481,85 @@ export default function AccountScreen() {
         </View>
         <Text style={s.version}>IconicEdu v0.1.0</Text>
       </ScrollView>
+      <BottomSheet
+        visible={familySwitchOpen}
+        onClose={() => setFamilySwitchOpen(false)}
+        partialHeight={familySwitchSheetHeight}
+        sheetStyle={{ backgroundColor: colors.pageBg }}
+      >
+        <View style={s.familySwitchSheetContent}>
+          <Card style={s.familySwitchCard}>
+            <View style={s.familySwitchHeader}>
+              <Text style={s.familySwitchTitle}>View as</Text>
+              <Text style={s.familySwitchSubtitle}>
+                Switch between your parent view and linked child accounts.
+              </Text>
+            </View>
+            <View style={s.familySwitchList}>
+              {familySwitchOptions.map((option) => {
+                const optionTitle = option.displayName?.trim() || option.label;
+                const optionSubtitle = option.isParentOption ? 'Parent' : 'Child';
+                const isSwitching =
+                  switchingProfileId ===
+                  (option.isParentOption ? '__parent__' : option.profileId);
+                const optionSeed = option.avatarSeed ?? option.profileId;
+                const { bg: optionAvatarBg, fg: optionAvatarFg } = resolveAvatarColor(
+                  option.themeKey ?? null,
+                  optionSeed,
+                );
+
+                return (
+                  <TouchableOpacity
+                    key={option.profileId}
+                    style={[
+                      s.switchOption,
+                      option.isActive ? s.switchOptionActive : null,
+                    ]}
+                    disabled={option.isActive || Boolean(switchingProfileId)}
+                    onPress={() =>
+                      void handleFamilySwitch(option.isParentOption ? null : option.profileId)
+                    }
+                    activeOpacity={0.85}
+                  >
+                    <View
+                      style={[
+                        s.familySwitchAvatar,
+                        {
+                          backgroundColor: option.avatarUrl
+                            ? 'transparent'
+                            : optionAvatarBg,
+                        },
+                      ]}
+                    >
+                      {option.avatarUrl ? (
+                        <Image
+                          source={{ uri: option.avatarUrl }}
+                          style={{ width: 36, height: 36 }}
+                        />
+                      ) : (
+                        <Text
+                          style={[s.familySwitchAvatarText, { color: optionAvatarFg }]}
+                        >
+                          {getInitials(optionTitle)}
+                        </Text>
+                      )}
+                    </View>
+                    <View style={s.switchOptionText}>
+                      <Text numberOfLines={1} style={s.switchOptionLabel}>
+                        {optionTitle}
+                      </Text>
+                      <Text numberOfLines={1} style={s.switchOptionSubtext}>
+                        {isSwitching ? 'Switching...' : optionSubtitle}
+                      </Text>
+                    </View>
+                    {option.isActive ? <Check size={18} color={colors.teal} /> : null}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </Card>
+        </View>
+      </BottomSheet>
     </SafeAreaView>
   );
 }

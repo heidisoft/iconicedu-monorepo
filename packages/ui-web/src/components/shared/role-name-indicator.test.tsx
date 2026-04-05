@@ -11,12 +11,12 @@ describe('RoleNameIndicator', () => {
 
     render(<RoleNameIndicator name="ICONIC Support" role="staff" />);
 
-    const trigger = screen.getByLabelText('Staff member');
+    const trigger = screen.getByLabelText('STAFF');
     expect(screen.getByTestId('staff-name-indicator')).toBeInTheDocument();
 
     await user.hover(trigger);
 
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('Staff member');
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('STAFF');
   });
 
   it('does not render the staff indicator for non-staff roles', () => {
