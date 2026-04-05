@@ -89,7 +89,7 @@ describe('OtpScreen', () => {
   it('automatically verifies once all 6 digits are entered', async () => {
     render(<OtpScreen />);
 
-    act(() => {
+    await act(async () => {
       fireEvent.changeText(screen.getByLabelText('Verification code'), '123456');
     });
 
@@ -101,6 +101,7 @@ describe('OtpScreen', () => {
     });
 
     await waitFor(() => {
+      expect(mockFetchOnboardingStatus).toHaveBeenCalledTimes(1);
       expect(mockSetOnboardingCompletionStatus).toHaveBeenCalledWith(true);
       expect(mockReplace).toHaveBeenCalledWith('/(app)/(tabs)');
     });
