@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, render, screen } from '@testing-library/react-native';
+import { act, render, screen, waitFor } from '@testing-library/react-native';
 
 const mockUseLocalSearchParams = jest.fn(() => ({
   email: 'iconicedudev+student@gmail.com',
@@ -9,6 +9,7 @@ const mockSignInWithOtp = jest.fn();
 const mockSetOnboardingCompletionStatus = jest.fn();
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
+const mockFetchOnboardingStatus = jest.fn();
 let consoleErrorSpy: jest.SpyInstance | undefined;
 
 jest.mock('expo-router', () => ({
@@ -54,6 +55,10 @@ jest.mock('@/providers/analytics-provider', () => ({
   }),
 }));
 
+jest.mock('@/lib/api/queries', () => ({
+  fetchOnboardingStatus: () => mockFetchOnboardingStatus(),
+}));
+
 import OtpScreen from './otp';
 
 describe('OtpScreen', () => {
@@ -77,20 +82,26 @@ describe('OtpScreen', () => {
     jest.clearAllMocks();
     mockVerifyOtp.mockResolvedValue({ error: null });
     mockSignInWithOtp.mockResolvedValue({ error: null });
+    mockFetchOnboardingStatus.mockResolvedValue({ isComplete: true });
   });
 
   it('automatically verifies once all 6 digits are entered', async () => {
     render(<OtpScreen />);
     const input = screen.getByLabelText('Verification code');
 
-    act(() => {
+    await act(async () => {
       input.props.onChangeText('123456');
     });
 
-    expect(mockVerifyOtp).toHaveBeenCalledTimes(1);
-    expect(mockVerifyOtp).toHaveBeenCalledWith(
-      'iconicedudev+student@gmail.com',
-      '123456',
-    );
+    await waitFor(() => {
+      expect(mockVerifyOtp).toHaveBeenCalledTimes(1);
+      expect(mockVerifyOtp).toHaveBeenCalledWith(
+        'iconicedudev+student@gmail.com',
+        '123456',
+      );
+      expect(mockFetchOnboardingStatus).toHaveBeenCalledTimes(1);
+      expect(mockSetOnboardingCompletionStatus).toHaveBeenCalledWith(true);
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/(tabs)');
+    });
   });
 });

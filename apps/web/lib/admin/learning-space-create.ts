@@ -14,7 +14,6 @@ import {
   buildLearningSpaceSchedulesHashKeyFromPayload,
   buildRRuleFields,
   buildScheduleStart as sharedBuildScheduleStart,
-  DEFAULT_DURATION_MINUTES,
   type RRuleFields,
   toOccurrenceKeyInTimezone,
 } from '@iconicedu/web/lib/admin/learning-space-schedule-hash';
@@ -594,6 +593,7 @@ export async function insertClassSchedules(
         createdAt: payload.createdAt,
         overrides: schedule.overrides ?? [],
         time: expanded.time,
+        endTime: schedule.endTime,
         timezone: schedule.timezone ?? schedule.rule.timezone ?? null,
       });
     }
@@ -745,6 +745,7 @@ type ClassScheduleRecurrenceOverridesInsertPayload = {
   recurrenceId: string;
   overrides: LearningSpaceScheduleOverridePayload[];
   time: string;
+  endTime: string;
   timezone: string | null;
   createdBy: string;
   createdAt: string;
@@ -758,10 +759,30 @@ async function insertClassScheduleRecurrenceOverrides(
     return;
   }
 
+  const [baseStartHour, baseStartMinute] = payload.time
+    .split(':')
+    .map((value) => Number(value));
+  const [baseEndHour, baseEndMinute] = payload.endTime
+    .split(':')
+    .map((value) => Number(value));
+  const baseStartMinutes = (baseStartHour ?? 0) * 60 + (baseStartMinute ?? 0);
+  let baseEndMinutes = (baseEndHour ?? 0) * 60 + (baseEndMinute ?? 0);
+  if (baseEndMinutes <= baseStartMinutes) {
+    baseEndMinutes += 24 * 60;
+  }
+  const baseDurationMinutes = Math.max(1, baseEndMinutes - baseStartMinutes);
+
   const rows = payload.overrides.map((override) => {
     const time = override.newTime ?? payload.time;
     const startAt = toOccurrenceKeyInTimezone(override.newDate, time, payload.timezone);
-    const endAt = addMinutesToIso(startAt, DEFAULT_DURATION_MINUTES);
+    const endAt =
+      override.newEndTime != null
+        ? toOccurrenceKeyInTimezone(
+            override.newDate,
+            override.newEndTime,
+            payload.timezone,
+          )
+        : addMinutesToIso(startAt, baseDurationMinutes);
     const patch: Record<string, unknown> = { startAt, endAt };
 
     if (override.reason) {

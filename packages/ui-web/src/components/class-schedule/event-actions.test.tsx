@@ -73,6 +73,11 @@ describe('EventActions', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Cancel session' }));
+    expect(
+      screen.getByRole('checkbox', {
+        name: /Send activity notifications for this update/i,
+      }),
+    ).toBeChecked();
     fireEvent.change(screen.getByLabelText('Reason (optional)'), {
       target: { value: 'Tutor unavailable' },
     });
@@ -81,7 +86,61 @@ describe('EventActions', () => {
     await waitFor(() => {
       expect(onCancelSession).toHaveBeenCalledWith(
         expect.objectContaining({ ids: expect.objectContaining({ id: 'schedule-1' }) }),
-        'Tutor unavailable',
+        {
+          reason: 'Tutor unavailable',
+          sendActivityNotifications: true,
+        },
+      );
+    });
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalled();
+    });
+  });
+
+  it('shows an edit schedule action and submits the notification flag with the update', async () => {
+    const onEditSession = vi.fn(async () => undefined);
+    const onClose = vi.fn();
+
+    render(
+      <EventActions
+        event={buildEvent({ timezone: 'America/New_York' })}
+        onClose={onClose}
+        canEditSession
+        onEditSession={onEditSession}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit schedule' }));
+    expect(
+      screen.getByRole('checkbox', {
+        name: /Send activity notifications for this update/i,
+      }),
+    ).toBeChecked();
+    fireEvent.change(screen.getByLabelText('Date'), {
+      target: { value: '2026-03-22' },
+    });
+    fireEvent.change(screen.getByLabelText('Start time'), {
+      target: { value: '11:00' },
+    });
+    fireEvent.change(screen.getByLabelText('End time'), {
+      target: { value: '12:30' },
+    });
+    fireEvent.change(screen.getByLabelText('Reason (optional)'), {
+      target: { value: 'Family requested a change' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() => {
+      expect(onEditSession).toHaveBeenCalledWith(
+        expect.objectContaining({ ids: expect.objectContaining({ id: 'schedule-1' }) }),
+        {
+          date: '2026-03-22',
+          startTime: '11:00',
+          endTime: '12:30',
+          timezone: 'America/New_York',
+          reason: 'Family requested a change',
+          sendActivityNotifications: true,
+        },
       );
     });
     await waitFor(() => {

@@ -4,6 +4,7 @@ const createSupabaseServerClientMock = vi.fn();
 const createSupabaseServiceClientMock = vi.fn();
 const buildOrgBySlugMock = vi.fn();
 const getAccountByAuthUserIdInOrgMock = vi.fn();
+const publishCancelledClassSessionActivityMock = vi.fn();
 const revalidatePathMock = vi.fn();
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
@@ -23,6 +24,11 @@ vi.mock('@iconicedu/web/lib/org/builders/org.builder', () => ({
 vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
   getAccountByAuthUserIdInOrg: (...args: unknown[]) =>
     getAccountByAuthUserIdInOrgMock(...args),
+}));
+
+vi.mock('@iconicedu/web/lib/class-schedule/session-activities', () => ({
+  publishCancelledClassSessionActivity: (...args: unknown[]) =>
+    publishCancelledClassSessionActivityMock(...args),
 }));
 
 vi.mock('next/cache', () => ({
@@ -58,7 +64,15 @@ function createRecurringServiceSupabase() {
               eq: vi.fn(() => ({
                 is: vi.fn(() => ({
                   maybeSingle: vi.fn(async () => ({
-                    data: { id: 'schedule-1', org_id: 'org-1' },
+                    data: {
+                      id: 'schedule-1',
+                      org_id: 'org-1',
+                      source_learning_space_id: 'space-1',
+                      source_channel_id: 'channel-1',
+                      timezone: 'America/New_York',
+                      title: 'Algebra',
+                      start_at: '2026-03-21T10:00:00.000Z',
+                    },
                     error: null,
                   })),
                 })),
@@ -133,7 +147,15 @@ function createSingleServiceSupabase() {
               eq: vi.fn(() => ({
                 is: vi.fn(() => ({
                   maybeSingle: vi.fn(async () => ({
-                    data: { id: 'schedule-1', org_id: 'org-1' },
+                    data: {
+                      id: 'schedule-1',
+                      org_id: 'org-1',
+                      source_learning_space_id: 'space-1',
+                      source_channel_id: 'channel-1',
+                      timezone: 'America/New_York',
+                      title: 'Algebra',
+                      start_at: '2026-03-21T10:00:00.000Z',
+                    },
                     error: null,
                   })),
                 })),
@@ -178,6 +200,7 @@ describe('cancelClassScheduleSessionAction', () => {
     createSupabaseServiceClientMock.mockReset();
     buildOrgBySlugMock.mockReset();
     getAccountByAuthUserIdInOrgMock.mockReset();
+    publishCancelledClassSessionActivityMock.mockReset();
     revalidatePathMock.mockReset();
 
     createSupabaseServerClientMock.mockResolvedValue(createServerSupabase());
@@ -212,6 +235,17 @@ describe('cancelClassScheduleSessionAction', () => {
         updated_by: 'account-1',
       }),
     );
+    expect(publishCancelledClassSessionActivityMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        supabase: serviceSupabase,
+        orgId: 'org-1',
+        learningSpaceId: 'space-1',
+        channelId: 'channel-1',
+        scheduleId: 'schedule-1',
+        canceledStartAt: '2026-03-21T10:00:00.000Z',
+        canceledReason: 'Tutor unavailable',
+      }),
+    );
     expect(revalidatePathMock).toHaveBeenCalledWith('/iconic-academy/class-schedule');
     expect(result).toEqual({
       scheduleId: 'schedule-1',
@@ -233,6 +267,17 @@ describe('cancelClassScheduleSessionAction', () => {
     });
 
     expect(serviceSupabase.updateSchedule).toHaveBeenCalled();
+    expect(publishCancelledClassSessionActivityMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        supabase: serviceSupabase,
+        orgId: 'org-1',
+        learningSpaceId: 'space-1',
+        channelId: 'channel-1',
+        scheduleId: 'schedule-1',
+        canceledStartAt: '2026-03-21T10:00:00.000Z',
+        canceledReason: null,
+      }),
+    );
     expect(revalidatePathMock).toHaveBeenCalledWith('/iconic-academy/class-schedule');
     expect(result).toEqual({
       scheduleId: 'schedule-1',
@@ -240,6 +285,21 @@ describe('cancelClassScheduleSessionAction', () => {
       reason: null,
       mode: 'single',
     });
+  });
+
+  it('skips activity publishing when notifications are disabled', async () => {
+    const serviceSupabase = createSingleServiceSupabase();
+    createSupabaseServiceClientMock.mockReturnValue(serviceSupabase);
+
+    await cancelClassScheduleSessionAction({
+      orgSlug: 'iconic-academy',
+      scheduleId: 'schedule-1',
+      occurrenceKey: '2026-03-21T10:00:00.000Z',
+      sendActivityNotifications: false,
+    });
+
+    expect(serviceSupabase.updateSchedule).toHaveBeenCalled();
+    expect(publishCancelledClassSessionActivityMock).not.toHaveBeenCalled();
   });
 
   it('rejects non-staff non-owner profiles', async () => {

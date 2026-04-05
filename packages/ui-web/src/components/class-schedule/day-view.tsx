@@ -26,6 +26,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '@iconicedu/ui-web/ui/po
 import { useEffect, useRef } from 'react';
 import { useScheduleDisplayTimeZone } from '@iconicedu/ui-web/components/shared/schedule-display-timezone-context';
 import { formatScheduleDisplayValue } from '@iconicedu/ui-web/lib/schedule-display-timezone';
+import type {
+  CancelSessionActionInput,
+  EditSessionActionInput,
+} from '@iconicedu/ui-web/components/class-schedule/session-action-types';
 
 interface DayViewProps {
   currentDate: Date;
@@ -37,9 +41,14 @@ interface DayViewProps {
   onDateSelect: (date: Date) => void;
   onMonthChange?: (date: Date) => void;
   canCancelSessions?: boolean;
+  canEditSessions?: boolean;
   onCancelSession?: (
     event: DisplayClassScheduleVM,
-    reason?: string | null,
+    input: CancelSessionActionInput,
+  ) => Promise<void>;
+  onEditSession?: (
+    event: DisplayClassScheduleVM,
+    input: EditSessionActionInput,
   ) => Promise<void>;
 }
 
@@ -53,7 +62,9 @@ export function DayView({
   onDateSelect,
   onMonthChange,
   canCancelSessions = false,
+  canEditSessions = false,
   onCancelSession,
+  onEditSession,
 }: DayViewProps) {
   const timezone = useScheduleDisplayTimeZone();
   const timeSlots = getTimeSlots();
@@ -196,7 +207,9 @@ export function DayView({
                         event={event}
                         compact={isCompact}
                         canCancelSession={canCancelSessions}
+                        canEditSession={canEditSessions}
                         onCancelSession={onCancelSession}
+                        onEditSession={onEditSession}
                       />
                     </div>
                   </div>
@@ -239,7 +252,9 @@ export function DayView({
                               <EventCard
                                 event={hidden}
                                 canCancelSession={canCancelSessions}
+                                canEditSession={canEditSessions}
                                 onCancelSession={onCancelSession}
+                                onEditSession={onEditSession}
                               />
                             </div>
                           ))}

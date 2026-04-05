@@ -3,6 +3,14 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import { RoleNameIndicator } from './role-name-indicator';
 
+const mockUseTheme = jest.fn(() => ({
+  colors: {
+    pageBg: '#ffffff',
+    text: '#0f172a',
+    textMuted: '#94a3b8',
+  },
+}));
+
 jest.mock('@iconicedu/ui-native', () => {
   const React = require('react');
   const { Pressable, View } = require('react-native');
@@ -56,13 +64,7 @@ jest.mock('@iconicedu/ui-native', () => {
 });
 
 jest.mock('@/providers/theme-provider', () => ({
-  useTheme: () => ({
-    colors: {
-      pageBg: '#ffffff',
-      text: '#0f172a',
-      textMuted: '#94a3b8',
-    },
-  }),
+  useTheme: () => mockUseTheme(),
 }));
 
 jest.mock('lucide-react-native', () => ({
@@ -75,6 +77,13 @@ jest.mock('lucide-react-native', () => ({
 describe('RoleNameIndicator', () => {
   beforeEach(() => {
     jest.useFakeTimers();
+    mockUseTheme.mockReturnValue({
+      colors: {
+        pageBg: '#ffffff',
+        text: '#0f172a',
+        textMuted: '#94a3b8',
+      },
+    });
   });
 
   afterEach(() => {
@@ -91,6 +100,22 @@ describe('RoleNameIndicator', () => {
 
     expect(screen.getByText('STAFF')).toBeTruthy();
     expect(screen.getByTestId('staff-tooltip')).toBeTruthy();
+  });
+
+  it('uses a readable tooltip text color in dark mode', () => {
+    mockUseTheme.mockReturnValue({
+      colors: {
+        pageBg: '#121212',
+        text: '#ffffff',
+        textMuted: '#8E8E93',
+      },
+    });
+
+    render(<RoleNameIndicator name="ICONIC Support" role="staff" />);
+
+    fireEvent.press(screen.getByLabelText('STAFF'));
+
+    expect(screen.getByText('STAFF')).toHaveStyle({ color: '#f8fafc' });
   });
 
   it('does not render a staff indicator for non-staff roles', () => {

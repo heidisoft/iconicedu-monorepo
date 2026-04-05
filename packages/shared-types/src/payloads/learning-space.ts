@@ -41,6 +41,7 @@ export type LearningSpaceScheduleOverridePayload = {
   originalDate: string;
   newDate: string;
   newTime?: string | null;
+  newEndTime?: string | null;
   reason?: string | null;
 };
 

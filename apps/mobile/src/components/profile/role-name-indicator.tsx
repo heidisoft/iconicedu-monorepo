@@ -29,6 +29,7 @@ function isStaffRole(role?: string | null) {
 }
 
 const STAFF_LABEL = 'STAFF';
+const STAFF_TOOLTIP_TEXT_COLOR = '#f8fafc';
 
 export function RoleNameIndicator({
   name,
@@ -73,7 +74,9 @@ export function RoleNameIndicator({
               sideOffset={6}
               className="rounded-full px-2.5 py-1"
             >
-              <Text style={[s.tooltipText, { color: colors.pageBg }]}>{STAFF_LABEL}</Text>
+              <Text style={[s.tooltipText, { color: STAFF_TOOLTIP_TEXT_COLOR }]}>
+                {STAFF_LABEL}
+              </Text>
             </TooltipContent>
           </Tooltip>
         </View>

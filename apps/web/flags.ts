@@ -90,10 +90,28 @@ export const enableClassScheduleStaffCancel = flag<
   },
 });
 
+export const enableClassScheduleStaffEdit = flag<boolean, { profileId?: string | null }>({
+  key: 'enable-class-schedule-staff-edit',
+  description:
+    'Allows staff users to edit class schedule sessions from the calendar surface.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: 'enable-class-schedule-staff-edit',
+      profileId: entities?.profileId,
+    });
+  },
+});
+
 export const webFlags = {
   enableAdminReports,
   enableChannelCommunications,
   enableClassScheduleStaffCancel,
+  enableClassScheduleStaffEdit,
   enableMessageTypeComposer,
 } as const;
 

@@ -472,14 +472,15 @@ describe('sendTextMessage', () => {
       .mockReturnValueOnce(accountLookupChain)
       .mockReturnValueOnce(requestedProfileLookupChain)
       .mockReturnValueOnce(channelLookupChain)
-      .mockReturnValueOnce(parentLookupChain)
-      .mockReturnValueOnce(upsertParticipantsChain)
       .mockReturnValueOnce(channelLookupChain)
       .mockReturnValueOnce(senderKindLookupChain)
+      .mockReturnValueOnce(parentLookupChain)
       .mockReturnValueOnce(staffProfilesChain)
       .mockReturnValueOnce(privilegedRoleAccountsChain)
       .mockReturnValueOnce(privilegedPrimaryRoleAccountsChain)
       .mockReturnValueOnce(privilegedProfilesChain)
+      .mockReturnValueOnce(parentLookupChain)
+      .mockReturnValueOnce(upsertParticipantsChain)
       .mockReturnValueOnce(insertMessageChain)
       .mockReturnValueOnce(insertPayloadChain)
       .mockReturnValueOnce(threadLookupChain)
@@ -599,24 +600,24 @@ describe('sendTextMessage', () => {
       .mockReturnValueOnce(accountLookupChain)
       .mockReturnValueOnce(requestedProfileLookupChain)
       .mockReturnValueOnce(channelLookupChain)
+      .mockReturnValueOnce(supportChannelLookupChain)
+      .mockReturnValueOnce(senderKindLookupChain)
+      .mockReturnValueOnce(parentLookupChain)
+      .mockReturnValueOnce(staffProfilesChain)
+      .mockReturnValueOnce(privilegedRoleAccountsChain)
+      .mockReturnValueOnce(privilegedPrimaryRoleAccountsChain)
+      .mockReturnValueOnce(privilegedProfilesChain)
       .mockReturnValueOnce(parentLookupChain)
       .mockReturnValueOnce(snippetLookupChain)
       .mockReturnValueOnce(profileLookupChain)
       .mockReturnValueOnce(insertThreadChain)
       .mockReturnValueOnce(updateParentChain)
       .mockReturnValueOnce(upsertParticipantsChain)
-      .mockReturnValueOnce(supportChannelLookupChain)
-      .mockReturnValueOnce(senderKindLookupChain)
-      .mockReturnValueOnce(staffProfilesChain)
-      .mockReturnValueOnce(privilegedRoleAccountsChain)
-      .mockReturnValueOnce(privilegedPrimaryRoleAccountsChain)
-      .mockReturnValueOnce(privilegedProfilesChain)
       .mockReturnValueOnce(insertMessageChain)
       .mockReturnValueOnce(insertPayloadChain);
 
     await sendTextMessage('channel-1', 'profile-1', 'org-1', 'First reply', 'parent-1');
 
-    expect(mockFrom).toHaveBeenNthCalledWith(7, 'threads');
     expect(insertThreadChain.insert).toHaveBeenCalledWith(
       expect.objectContaining({
         org_id: 'org-1',
@@ -628,7 +629,6 @@ describe('sendTextMessage', () => {
         message_count: 1,
       }),
     );
-    expect(mockFrom).toHaveBeenNthCalledWith(8, 'messages');
     expect(updateParentChain.update).toHaveBeenCalledWith(
       expect.objectContaining({ thread_id: 'thread-new' }),
     );
@@ -644,6 +644,87 @@ describe('sendTextMessage', () => {
         visibility_user_ids: ['profile-parent', 'profile-staff-1', 'profile-owner-1'],
       }),
     );
+  });
+
+  it('rejects unauthorized support replies before thread mutations', async () => {
+    const accountLookupChain = createSelectMaybeSingleChain({
+      data: { id: 'account-1', org_id: 'org-1', active_profile_id: 'profile-1' },
+      error: null,
+    });
+    const requestedProfileLookupChain = createSelectMaybeSingleChain({
+      data: { id: 'profile-1', account_id: 'account-1', org_id: 'org-1' },
+      error: null,
+    });
+    const channelLookupChain = createSelectMaybeSingleChain({
+      data: { id: 'channel-1', kind: 'support' },
+      error: null,
+    });
+    const senderKindLookupChain = createSelectMaybeSingleChain({
+      data: { id: 'profile-1', kind: 'guardian' },
+      error: null,
+    });
+    const currentAccountInOrgChain = createSelectMaybeSingleChain({
+      data: { id: 'account-1', org_id: 'org-1', active_profile_id: 'profile-1' },
+      error: null,
+    });
+    const staffRoleLookupChain = createSelectMaybeSingleChain({
+      data: null,
+      error: null,
+    });
+    const parentLookupChain = createSelectMaybeSingleChain({
+      data: {
+        id: 'parent-1',
+        sender_profile_id: 'profile-owner',
+        org_id: 'org-1',
+        channel_id: 'channel-1',
+      },
+      error: null,
+    });
+    const staffProfilesChain = createIsChain({
+      data: [{ id: 'profile-staff-1' }],
+      error: null,
+    });
+    const privilegedRoleAccountsChain = createIsChain({
+      data: [],
+      error: null,
+    });
+    const privilegedPrimaryRoleAccountsChain = createIsChain({
+      data: [{ id: 'account-owner-1' }],
+      error: null,
+    });
+    const privilegedProfilesChain = createIsChain({
+      data: [{ id: 'profile-owner-1' }],
+      error: null,
+    });
+
+    mockFrom
+      .mockReturnValueOnce(accountLookupChain)
+      .mockReturnValueOnce(requestedProfileLookupChain)
+      .mockReturnValueOnce(channelLookupChain)
+      .mockReturnValueOnce(channelLookupChain)
+      .mockReturnValueOnce(senderKindLookupChain)
+      .mockReturnValueOnce(currentAccountInOrgChain)
+      .mockReturnValueOnce(staffRoleLookupChain)
+      .mockReturnValueOnce(parentLookupChain)
+      .mockReturnValueOnce(staffProfilesChain)
+      .mockReturnValueOnce(privilegedRoleAccountsChain)
+      .mockReturnValueOnce(privilegedPrimaryRoleAccountsChain)
+      .mockReturnValueOnce(privilegedProfilesChain);
+
+    await expect(
+      sendTextMessage(
+        'channel-1',
+        'profile-1',
+        'org-1',
+        'Unauthorized reply',
+        'parent-1',
+      ),
+    ).rejects.toThrow(
+      'Only support staff or the question owner can reply in this thread.',
+    );
+
+    expect(mockFrom).not.toHaveBeenCalledWith('threads');
+    expect(mockFrom).not.toHaveBeenCalledWith('thread_participants');
   });
 
   it('rejects blank messages before writing to Supabase', async () => {

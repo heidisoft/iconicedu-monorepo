@@ -1309,27 +1309,24 @@ export async function sendTextMessage(
 
   const now = new Date().toISOString();
   const messageId = createClientUuid();
-  const {
-    threadId: resolvedThreadId,
-    threadCreated,
-    parentSenderProfileId,
-  } = await resolveThreadContextForSend({
-    orgId,
-    channelId,
-    senderProfileId: resolvedSenderProfileId,
-    requestedThreadId: threadId,
-    threadParentId,
-    now,
-  });
   const supportVisibility = await resolveSupportVisibilityForSend({
     orgId,
     channelId,
     currentProfileId: resolvedSenderProfileId,
     senderProfileId: resolvedSenderProfileId,
     threadParentId,
-    threadId: resolvedThreadId,
-    parentSenderProfileId,
+    threadId,
   });
+  const { threadId: resolvedThreadId, threadCreated } = await resolveThreadContextForSend(
+    {
+      orgId,
+      channelId,
+      senderProfileId: resolvedSenderProfileId,
+      requestedThreadId: threadId,
+      threadParentId,
+      now,
+    },
+  );
 
   const { error: msgError } = await supabase.from('messages').insert({
     id: messageId,

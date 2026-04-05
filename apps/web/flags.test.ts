@@ -9,6 +9,8 @@ vi.mock('@iconicedu/web/lib/flags/posthog-flags', () => ({
 import {
   enableAdminReports,
   enableChannelCommunications,
+  enableClassScheduleStaffCancel,
+  enableClassScheduleStaffEdit,
   enableMessageTypeComposer,
   getFlagsProviderData,
   isVercelFlagsSdkConfigured,
@@ -40,6 +42,18 @@ describe('web flags', () => {
     expect(enableMessageTypeComposer.key).toBe('enable-message-type-composer');
     expect(enableMessageTypeComposer.defaultValue).toBe(false);
     expect(webFlags.enableMessageTypeComposer).toBe(enableMessageTypeComposer);
+  });
+
+  it('declares the class schedule cancel flag with stable metadata', () => {
+    expect(enableClassScheduleStaffCancel.key).toBe('enable-class-schedule-staff-cancel');
+    expect(enableClassScheduleStaffCancel.defaultValue).toBe(true);
+    expect(webFlags.enableClassScheduleStaffCancel).toBe(enableClassScheduleStaffCancel);
+  });
+
+  it('declares the class schedule edit flag with stable metadata', () => {
+    expect(enableClassScheduleStaffEdit.key).toBe('enable-class-schedule-staff-edit');
+    expect(enableClassScheduleStaffEdit.defaultValue).toBe(false);
+    expect(webFlags.enableClassScheduleStaffEdit).toBe(enableClassScheduleStaffEdit);
   });
 
   it('does not require FLAGS env to load the catalog', () => {
@@ -77,6 +91,8 @@ describe('web flags', () => {
     expect(providerData).toBeTruthy();
     expect(JSON.stringify(providerData)).toContain('enable-admin-reports');
     expect(JSON.stringify(providerData)).toContain('enable-channel-communications');
+    expect(JSON.stringify(providerData)).toContain('enable-class-schedule-staff-cancel');
+    expect(JSON.stringify(providerData)).toContain('enable-class-schedule-staff-edit');
     expect(JSON.stringify(providerData)).toContain('enable-message-type-composer');
   });
 });

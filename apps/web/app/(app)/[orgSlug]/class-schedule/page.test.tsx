@@ -11,6 +11,7 @@ const buildClassSchedulesByOrgMock = vi.fn();
 const getDashboardAccountContextMock = vi.fn();
 const getDashboardProfileContextMock = vi.fn();
 const classScheduleClientMock = vi.fn(() => null);
+const enableClassScheduleStaffEditRunMock = vi.fn(async () => false);
 
 vi.mock('@iconicedu/web/lib/schedules/builders/class-schedule.builder', () => ({
   buildClassSchedulesByOrg: (...args: unknown[]) => buildClassSchedulesByOrgMock(...args),
@@ -29,6 +30,12 @@ vi.mock(
     ClassScheduleClient: (props: unknown) => classScheduleClientMock(props),
   }),
 );
+
+vi.mock('@iconicedu/web/flags', () => ({
+  enableClassScheduleStaffEdit: {
+    run: (...args: unknown[]) => enableClassScheduleStaffEditRunMock(...args),
+  },
+}));
 
 function createSchedule(input: {
   id: string;
@@ -63,6 +70,8 @@ describe('class schedule page viewer scoping', () => {
     getDashboardAccountContextMock.mockReset();
     getDashboardProfileContextMock.mockReset();
     classScheduleClientMock.mockReset();
+    enableClassScheduleStaffEditRunMock.mockReset();
+    enableClassScheduleStaffEditRunMock.mockResolvedValue(false);
 
     getDashboardAccountContextMock.mockResolvedValue({
       supabase: {},
@@ -105,6 +114,7 @@ describe('class schedule page viewer scoping', () => {
     expect(classScheduleClientMock).toHaveBeenCalledWith(
       expect.objectContaining({
         canCancelSessions: false,
+        canEditSessions: false,
         orgSlug: 'iconic-academy',
         timezone: 'America/New_York',
         events: [
@@ -154,6 +164,7 @@ describe('class schedule page viewer scoping', () => {
     expect(classScheduleClientMock).toHaveBeenCalledWith(
       expect.objectContaining({
         canCancelSessions: false,
+        canEditSessions: false,
         orgSlug: 'iconic-academy',
         events: [
           expect.objectContaining({
@@ -198,6 +209,48 @@ describe('class schedule page viewer scoping', () => {
     expect(classScheduleClientMock).toHaveBeenCalledWith(
       expect.objectContaining({
         canCancelSessions: true,
+        canEditSessions: false,
+        orgSlug: 'iconic-academy',
+      }),
+    );
+  });
+
+  it('enables session editing for owners only when the edit flag is on', async () => {
+    getDashboardAccountContextMock.mockResolvedValue({
+      supabase: {},
+      account: { id: 'account-1', org_id: 'org-1', primary_role: 'owner' },
+    });
+    enableClassScheduleStaffEditRunMock.mockResolvedValue(true);
+    buildClassSchedulesByOrgMock.mockResolvedValue([
+      createSchedule({
+        id: 'schedule-staff-visible',
+        participants: [{ profileId: 'child-1', role: 'child' }],
+      }),
+    ]);
+    getDashboardProfileContextMock.mockResolvedValue({
+      currentUserProfile: {
+        kind: 'system',
+        ids: { id: 'staff-1', orgId: 'org-1', accountId: 'account-staff-1' },
+        prefs: { timezone: 'America/New_York' },
+      },
+    });
+
+    const element = await ClassSchedulePage({
+      params: Promise.resolve({ orgSlug: 'iconic-academy' }),
+    });
+    render(element as React.ReactElement);
+
+    await waitFor(() => {
+      expect(classScheduleClientMock).toHaveBeenCalled();
+    });
+
+    expect(enableClassScheduleStaffEditRunMock).toHaveBeenCalledWith({
+      identify: { profileId: 'staff-1' },
+    });
+    expect(classScheduleClientMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        canCancelSessions: true,
+        canEditSessions: true,
         orgSlug: 'iconic-academy',
       }),
     );
