@@ -9,13 +9,7 @@ jest.mock('@/components/profile/role-name-indicator', () => {
   const { Text, View } = require('react-native');
 
   return {
-    RoleNameIndicator: ({
-      name,
-      role,
-    }: {
-      name: string;
-      role?: string | null;
-    }) => (
+    RoleNameIndicator: ({ name, role }: { name: string; role?: string | null }) => (
       <View>
         <Text>{name}</Text>
         {role === 'staff' ? <View testID="staff-name-indicator" /> : null}

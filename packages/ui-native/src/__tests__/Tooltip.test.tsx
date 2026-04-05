@@ -2,11 +2,7 @@ import React from 'react';
 import { Pressable, Text } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '../components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip';
 
 jest.mock('../components/ui/native-only-animated-view', () => {
   const { View } = require('react-native');
@@ -53,12 +49,7 @@ jest.mock('@rn-primitives/tooltip', () => {
         </TooltipContext.Provider>
       );
     },
-    Trigger: ({
-      children,
-    }: {
-      asChild?: boolean;
-      children: React.ReactElement;
-    }) => {
+    Trigger: ({ children }: { asChild?: boolean; children: React.ReactElement }) => {
       const context = React.useContext(TooltipContext);
       return React.cloneElement(children, {
         onPress: () => context?.setVisible(true),
@@ -66,13 +57,7 @@ jest.mock('@rn-primitives/tooltip', () => {
     },
     Portal: ({ children }: { children: React.ReactNode }) => <>{children}</>,
     Overlay: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-    Content: ({
-      children,
-      testID,
-    }: {
-      children: React.ReactNode;
-      testID?: string;
-    }) => {
+    Content: ({ children, testID }: { children: React.ReactNode; testID?: string }) => {
       const context = React.useContext(TooltipContext);
       if (!context?.visible) return null;
       return <View testID={testID}>{children}</View>;

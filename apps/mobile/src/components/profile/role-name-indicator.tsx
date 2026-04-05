@@ -56,7 +56,11 @@ export function RoleNameIndicator({
       {showStaffIcon ? (
         <View style={s.iconWrap}>
           <Tooltip delayDuration={0}>
-            <TooltipTrigger accessibilityRole="button" accessibilityLabel={STAFF_LABEL} hitSlop={8}>
+            <TooltipTrigger
+              accessibilityRole="button"
+              accessibilityLabel={STAFF_LABEL}
+              hitSlop={8}
+            >
               <IdCardLanyard
                 testID="staff-name-indicator"
                 size={iconSize}

@@ -105,8 +105,8 @@ jest.mock('@iconicedu/ui-native', () => ({
     const { TouchableOpacity, Text } = require('react-native');
     return (
       <TouchableOpacity onPress={onPress} accessibilityRole="button">
-      <Text>{label}</Text>
-      {trailing}
+        <Text>{label}</Text>
+        {trailing}
       </TouchableOpacity>
     );
   },
@@ -154,7 +154,7 @@ describe('AccountScreen', () => {
   it('renders the family switch row above personal and opens the same switch drawer as home', () => {
     render(<AccountScreen />);
 
-    expect(screen.getByText('Family View')).toBeTruthy();
+    expect(screen.queryByText('Family View')).toBeNull();
     expect(screen.getByText('Switch to child account')).toBeTruthy();
     expect(screen.getByText('Personal')).toBeTruthy();
 

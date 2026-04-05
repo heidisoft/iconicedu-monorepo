@@ -375,26 +375,25 @@ export default function AccountScreen() {
 
         {/* Personal */}
         {canSwitchFamilyView ? (
-          <>
-            <Text style={s.sectionLabel}>Family View</Text>
-            <View style={s.card}>
-              <SettingsRow
-                icon={<ArrowRightLeft size={20} color={colors.textMuted} />}
-                label={isViewingAsChild ? 'Switch child account' : 'Switch to child account'}
-                labelColor={colors.text}
-                chevronColor={colors.textFaint}
-                trailing={
-                  activeFamilySwitchOption ? (
-                    <Text style={s.rowTrailingText} numberOfLines={1}>
-                      {activeFamilySwitchOption.displayName?.trim() ||
-                        activeFamilySwitchOption.label}
-                    </Text>
-                  ) : undefined
-                }
-                onPress={() => setFamilySwitchOpen(true)}
-              />
-            </View>
-          </>
+          <View style={s.card}>
+            <SettingsRow
+              icon={<ArrowRightLeft size={20} color={colors.textMuted} />}
+              label={
+                isViewingAsChild ? 'Switch child account' : 'Switch to child account'
+              }
+              labelColor={colors.text}
+              chevronColor={colors.textFaint}
+              trailing={
+                activeFamilySwitchOption ? (
+                  <Text style={s.rowTrailingText} numberOfLines={1}>
+                    {activeFamilySwitchOption.displayName?.trim() ||
+                      activeFamilySwitchOption.label}
+                  </Text>
+                ) : undefined
+              }
+              onPress={() => setFamilySwitchOpen(true)}
+            />
+          </View>
         ) : null}
 
         {/* Personal */}
@@ -517,7 +516,9 @@ export default function AccountScreen() {
                     ]}
                     disabled={option.isActive || Boolean(switchingProfileId)}
                     onPress={() =>
-                      void handleFamilySwitch(option.isParentOption ? null : option.profileId)
+                      void handleFamilySwitch(
+                        option.isParentOption ? null : option.profileId,
+                      )
                     }
                     activeOpacity={0.85}
                   >

@@ -718,13 +718,7 @@ function getVisibilityLabel(message: MessageVM): string | null {
   return 'Private';
 }
 
-function VisibilityBadge({
-  message,
-  colors,
-}: {
-  message: MessageVM;
-  colors: AppColors;
-}) {
+function VisibilityBadge({ message, colors }: { message: MessageVM; colors: AppColors }) {
   const label = getVisibilityLabel(message);
   if (!label) return null;
 
@@ -740,7 +734,9 @@ function VisibilityBadge({
       ]}
     >
       <EyeOff size={10} color={colors.textMuted} />
-      <Text style={[visibilityBadgeStyles.text, { color: colors.textMuted }]}>{label}</Text>
+      <Text style={[visibilityBadgeStyles.text, { color: colors.textMuted }]}>
+        {label}
+      </Text>
     </View>
   );
 }
