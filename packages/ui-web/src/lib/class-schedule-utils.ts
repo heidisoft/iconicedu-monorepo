@@ -1,6 +1,7 @@
 import type {
   ClassScheduleVM,
   ClassScheduleViewVM,
+  RecurrenceVM,
   WeekdayVM,
 } from '@iconicedu/shared-types';
 import { getLocalDate, getLocalTime, toUtcFromLocal } from '@iconicedu/utils';
@@ -11,6 +12,7 @@ import {
   getScheduleDisplayMinutes,
   type ScheduleDisplayTimeZoneInput,
 } from '@iconicedu/ui-web/lib/schedule-display-timezone';
+import { WEEKDAYS } from '@iconicedu/ui-web/lib/recurrence-types';
 
 export interface DisplayClassScheduleVM extends ClassScheduleVM {
   uiState?: {
@@ -97,6 +99,64 @@ export function formatEventTimeForSchedule(
       },
     ) ?? ''
   );
+}
+
+/**
+ * Returns a compact time range string like "9:00 – 9:45am" or "9:00am – 1:00pm".
+ * The period (am/pm) is omitted from the start when both times share the same period.
+ */
+export function formatEventTimeRange(
+  event: Pick<ClassScheduleVM, 'startAt' | 'endAt' | 'timezone' | 'recurrence'>,
+  timezone?: string | null,
+): string {
+  const start = formatEventTimeForSchedule(event, 'startAt', timezone);
+  const end = formatEventTimeForSchedule(event, 'endAt', timezone);
+
+  // formatEventTimeForSchedule returns values like "9:00 AM" or "12:30 PM"
+  const startMatch = start.match(/^(.+?)\s*(AM|PM)$/i);
+  const endMatch = end.match(/^(.+?)\s*(AM|PM)$/i);
+
+  if (!startMatch || !endMatch) return `${start} – ${end}`;
+
+  const [, startTime, startPeriod] = startMatch;
+  const [, endTime, endPeriod] = endMatch;
+
+  const samePeriod = startPeriod.toUpperCase() === endPeriod.toUpperCase();
+  if (samePeriod) {
+    return `${startTime} – ${endTime}${endPeriod.toLowerCase()}`;
+  }
+  return `${startTime}${startPeriod.toLowerCase()} – ${endTime}${endPeriod.toLowerCase()}`;
+}
+
+/**
+ * Returns a human-readable recurrence label like "Weekly on Saturday", "Daily",
+ * "Every 2 weeks on Monday, Wednesday", etc. Returns null for non-recurring events.
+ */
+export function formatEventRecurrenceLabel(
+  recurrence?: RecurrenceVM | null,
+): string | null {
+  if (!recurrence) return null;
+  const { rule } = recurrence;
+  const interval = rule.interval ?? 1;
+
+  if (rule.frequency === 'daily') {
+    return interval > 1 ? `Every ${interval} days` : 'Daily';
+  }
+
+  if (rule.frequency === 'weekly') {
+    const dayLabels = (rule.byWeekday ?? [])
+      .map((day) => WEEKDAYS.find((w) => w.value === day)?.label)
+      .filter((l): l is string => Boolean(l))
+      .join(', ');
+    const prefix = interval > 1 ? `Every ${interval} weeks` : 'Weekly';
+    return dayLabels ? `${prefix} on ${dayLabels}` : prefix;
+  }
+
+  if (rule.frequency === 'monthly') {
+    return interval > 1 ? `Every ${interval} months` : 'Monthly';
+  }
+
+  return interval > 1 ? `Every ${interval} years` : 'Yearly';
 }
 
 export function getEventDate(event: ClassScheduleVM, timezone?: string | null): Date {
@@ -567,7 +627,10 @@ export const expandRecurringEvents = (
         startAt: override?.startAt ?? occurrenceStart.toISOString(),
         endAt: override?.endAt ?? occurrenceEnd.toISOString(),
         status: override?.status ?? (hasOverride ? 'rescheduled' : event.status),
-        recurrence: undefined,
+        // Keep the parent recurrence so the header can show the recurrence label and
+        // resolve the schedule timezone. Exceptions strip it (see above) because they
+        // are cancelled/skipped one-off slots where the series label is misleading.
+        recurrence: event.recurrence,
         uiState: hasOverride
           ? {
               kind: 'override',
