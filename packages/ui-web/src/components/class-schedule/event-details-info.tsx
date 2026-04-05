@@ -1,6 +1,6 @@
 import type { ClassScheduleVM } from '@iconicedu/shared-types';
 import { Separator } from '@iconicedu/ui-web/ui/separator';
-import { User, MapPin, Globe } from 'lucide-react';
+import { Users, MapPin, Globe } from 'lucide-react';
 import {
   formatEventTimeForSchedule,
   getDisplayEventState,
@@ -19,10 +19,11 @@ export function EventDetailsInfo({ event }: EventDetailsInfoProps) {
     scheduleTimezone: event.timezone ?? event.recurrence?.rule.timezone ?? null,
   };
   const displayState = getDisplayEventState(event);
-  const organizer =
-    event.participants.find(
-      (participant) => participant.role === 'educator' || participant.role === 'staff',
-    )?.displayName ?? 'Organizer';
+  const participantNames = event.participants
+    .map((participant) => participant.displayName?.trim() ?? '')
+    .filter((name) => name.length > 0);
+  const participantsLabel =
+    participantNames.length > 0 ? participantNames.join(', ') : 'Organizer';
   const visibilityLabel = event.visibility.replace('-', ' ');
   const originalStart =
     displayState.kind === 'override' && displayState.originalStartAt
@@ -33,11 +34,9 @@ export function EventDetailsInfo({ event }: EventDetailsInfoProps) {
     <>
       <div className="flex items-center gap-2">
         <div className="flex items-center justify-center rounded-full bg-muted">
-          <User className="h-4 w-4" />
+          <Users className="h-4 w-4" />
         </div>
-        <span className="text-sm">
-          Event by <span className="font-medium">{organizer}</span>
-        </span>
+        <span className="text-sm font-medium">{participantsLabel}</span>
       </div>
 
       <div className="flex items-center gap-2">

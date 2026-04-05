@@ -24,6 +24,8 @@ describe('web flags', () => {
     delete process.env.POSTHOG_HOST;
     delete process.env.NEXT_PUBLIC_POSTHOG_KEY;
     delete process.env.NEXT_PUBLIC_POSTHOG_HOST;
+    delete process.env.VERCEL_ENV;
+    delete process.env.NEXT_PUBLIC_VERCEL_ENV;
   });
 
   it('declares the channel communications flag with stable metadata', () => {
@@ -67,6 +69,14 @@ describe('web flags', () => {
     expect(isVercelFlagsSdkConfigured()).toBe(true);
   });
 
+  it('does not require PostHog when running in preview', () => {
+    process.env.VERCEL_ENV = 'preview';
+    process.env.POSTHOG_KEY = 'phc_test';
+    process.env.POSTHOG_HOST = 'https://posthog.example.com';
+
+    expect(isVercelFlagsSdkConfigured()).toBe(false);
+  });
+
   it('evaluates channel communications via PostHog using anonymous fallback', async () => {
     evaluatePosthogBooleanFlag.mockResolvedValueOnce(true);
 
@@ -83,6 +93,21 @@ describe('web flags', () => {
       flagKey: 'enable-channel-communications',
       distinctId: 'anonymous',
     });
+  });
+
+  it('enables flags by default in preview without calling PostHog', async () => {
+    process.env.VERCEL_ENV = 'preview';
+
+    await expect(
+      (
+        enableChannelCommunications as unknown as {
+          decide: (input: {
+            entities?: { profileId?: string | null };
+          }) => Promise<boolean>;
+        }
+      ).decide({ entities: { profileId: 'profile-1' } }),
+    ).resolves.toBe(true);
+    expect(evaluatePosthogBooleanFlag).not.toHaveBeenCalled();
   });
 
   it('builds provider data for flag discovery', async () => {

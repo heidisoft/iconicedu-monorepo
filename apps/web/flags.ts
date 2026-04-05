@@ -1,6 +1,24 @@
 import { flag, getProviderData as getCodeProviderData } from 'flags/next';
 import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
 
+function isLocalOrPreviewEnvironment() {
+  const vercelEnv = (
+    process.env.VERCEL_ENV?.trim() ??
+    process.env.NEXT_PUBLIC_VERCEL_ENV?.trim() ??
+    ''
+  ).toLowerCase();
+  if (vercelEnv === 'preview') {
+    return true;
+  }
+
+  if (process.env.NODE_ENV !== 'development') {
+    return false;
+  }
+
+  const hostname = new URL(resolveAppUrl()).hostname;
+  return hostname === 'localhost' || hostname === '127.0.0.1';
+}
+
 function resolveDistinctId(profileId?: string | null) {
   const resolved = profileId?.trim();
   if (resolved) {
@@ -13,6 +31,10 @@ async function evaluateWebBooleanFlag(input: {
   flagKey: string;
   profileId?: string | null;
 }) {
+  if (isLocalOrPreviewEnvironment()) {
+    return true;
+  }
+
   const { evaluatePosthogBooleanFlag } =
     await import('@iconicedu/web/lib/flags/posthog-flags');
   return evaluatePosthogBooleanFlag({
@@ -118,12 +140,7 @@ export const webFlags = {
 export type WebFlagKey = keyof typeof webFlags;
 
 export function isVercelFlagsSdkConfigured() {
-  const appUrl = resolveAppUrl();
-  const hostname = new URL(appUrl).hostname;
-  const isLocalHost =
-    process.env.NODE_ENV === 'development' &&
-    (hostname === 'localhost' || hostname === '127.0.0.1');
-  if (isLocalHost) {
+  if (isLocalOrPreviewEnvironment()) {
     return false;
   }
 
