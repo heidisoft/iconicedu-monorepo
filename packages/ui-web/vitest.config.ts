@@ -66,6 +66,7 @@ export default defineConfig({
     globals: true,
     css: false,
     pool: 'vmThreads',
+    testTimeout: 15000,
     // The ui-web suite is jsdom-heavy and can exceed the default worker heap on
     // CI runners. Force a single vmThread worker there and recycle it before
     // it grows large enough to crash with ERR_WORKER_OUT_OF_MEMORY.

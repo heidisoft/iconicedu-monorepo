@@ -8,9 +8,8 @@ import { EventActions } from './event-actions';
 
 // The real getTimezoneOptions returns 400+ entries. Rendering that many SelectItems
 // in jsdom on CI (single-threaded, 512 MB) pushes the test past the 5 s timeout.
-vi.mock('@iconicedu/utils', async () => {
-  const actual =
-    await vi.importActual<typeof import('@iconicedu/utils')>('@iconicedu/utils');
+vi.mock('@iconicedu/utils', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@iconicedu/utils')>();
   return {
     ...actual,
     getTimezoneOptions: () => [
