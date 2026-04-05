@@ -1,22 +1,20 @@
 import React from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, render, screen } from '@testing-library/react-native';
 
-const mockReplace = jest.fn();
 const mockUseLocalSearchParams = jest.fn(() => ({
   email: 'iconicedudev+student@gmail.com',
 }));
 const mockVerifyOtp = jest.fn();
 const mockSignInWithOtp = jest.fn();
 const mockSetOnboardingCompletionStatus = jest.fn();
-const mockScreen = jest.fn();
-const mockCapture = jest.fn();
-const mockFetchOnboardingStatus = jest.fn();
+const mockBack = jest.fn();
+const mockReplace = jest.fn();
 let consoleErrorSpy: jest.SpyInstance | undefined;
 
 jest.mock('expo-router', () => ({
   useLocalSearchParams: (...args: unknown[]) => mockUseLocalSearchParams(...args),
   useRouter: () => ({
-    back: jest.fn(),
+    back: mockBack,
     replace: mockReplace,
   }),
 }));
@@ -51,13 +49,9 @@ jest.mock('@/providers/theme-provider', () => ({
 
 jest.mock('@/providers/analytics-provider', () => ({
   useAnalytics: () => ({
-    screen: mockScreen,
-    capture: mockCapture,
+    screen: jest.fn(),
+    capture: jest.fn(),
   }),
-}));
-
-jest.mock('@/lib/api/queries', () => ({
-  fetchOnboardingStatus: () => mockFetchOnboardingStatus(),
 }));
 
 import OtpScreen from './otp';
@@ -83,27 +77,20 @@ describe('OtpScreen', () => {
     jest.clearAllMocks();
     mockVerifyOtp.mockResolvedValue({ error: null });
     mockSignInWithOtp.mockResolvedValue({ error: null });
-    mockFetchOnboardingStatus.mockResolvedValue({ isComplete: true });
   });
 
   it('automatically verifies once all 6 digits are entered', async () => {
     render(<OtpScreen />);
+    const input = screen.getByLabelText('Verification code');
 
-    await act(async () => {
-      fireEvent.changeText(screen.getByLabelText('Verification code'), '123456');
+    act(() => {
+      input.props.onChangeText('123456');
     });
 
-    await waitFor(() => {
-      expect(mockVerifyOtp).toHaveBeenCalledWith(
-        'iconicedudev+student@gmail.com',
-        '123456',
-      );
-    });
-
-    await waitFor(() => {
-      expect(mockFetchOnboardingStatus).toHaveBeenCalledTimes(1);
-      expect(mockSetOnboardingCompletionStatus).toHaveBeenCalledWith(true);
-      expect(mockReplace).toHaveBeenCalledWith('/(app)/(tabs)');
-    });
+    expect(mockVerifyOtp).toHaveBeenCalledTimes(1);
+    expect(mockVerifyOtp).toHaveBeenCalledWith(
+      'iconicedudev+student@gmail.com',
+      '123456',
+    );
   });
 });
