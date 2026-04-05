@@ -222,7 +222,7 @@ jobs:
           }
           const out = {
             web:    { js: measure('apps/web/.next/static', ['.js']), css: measure('apps/web/.next/static', ['.css']) },
-            mobile: { js: measure('apps/mobile/.expo/dist/_expo/static/js', ['.js']) },
+            mobile: { js: measure('apps/mobile/.expo/dist/_expo/static/js', ['.js', '.hbc']) },
             api:    { js: measure('apps/api/dist', ['.js']) },
           };
           process.stdout.write(JSON.stringify(out));
@@ -753,7 +753,7 @@ jobs:
             const prNumber  = context.payload.pull_request.number;
             const webUrl    = '${{ steps.vercel.outputs.vercel_url }}';
             const apiUrl    = '${{ steps.railway.outputs.railway_api_url }}';
-            const branchRef = '${{ steps.branch-creds.outputs.branch_ref }}';
+            const branchRef = '${{ steps.supabase-branch.outputs.branch_ref }}';
             const studioUrl = `https://supabase.com/dashboard/project/${branchRef}`;
 
             // ── Helpers ────────────────────────────────────────────────────────
