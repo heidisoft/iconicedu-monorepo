@@ -6,6 +6,21 @@ import type { ClassScheduleVM } from '@iconicedu/shared-types';
 
 import { EventActions } from './event-actions';
 
+// The real getTimezoneOptions returns 400+ entries. Rendering that many SelectItems
+// in jsdom on CI (single-threaded, 512 MB) pushes the test past the 5 s timeout.
+vi.mock('@iconicedu/utils', async () => {
+  const actual =
+    await vi.importActual<typeof import('@iconicedu/utils')>('@iconicedu/utils');
+  return {
+    ...actual,
+    getTimezoneOptions: () => [
+      { name: 'UTC', countryCode: null, label: 'UTC' },
+      { name: 'America/New_York', countryCode: 'US', label: 'America/New_York' },
+      { name: 'Europe/London', countryCode: 'GB', label: 'Europe/London' },
+    ],
+  };
+});
+
 function buildEvent(overrides?: Partial<ClassScheduleVM>): ClassScheduleVM {
   return {
     ids: { id: 'schedule-1', orgId: 'org-1' },
