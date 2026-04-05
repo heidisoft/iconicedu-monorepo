@@ -102,11 +102,11 @@ describe('AuthProvider', () => {
     });
 
     await act(async () => {
-      await result.current.signInWithOtp('test@example.com');
+      await result.current.signInWithOtp('iconicedudev+test@gmail.com');
     });
 
     expect(mockSignInWithOtp).toHaveBeenCalledWith({
-      email: 'test@example.com',
+      email: 'iconicedudev+test@gmail.com',
       options: { shouldCreateUser: false },
     });
   });
@@ -118,11 +118,11 @@ describe('AuthProvider', () => {
     });
 
     await act(async () => {
-      await result.current.verifyOtp('test@example.com', '123456');
+      await result.current.verifyOtp('iconicedudev+test@gmail.com', '123456');
     });
 
     expect(mockVerifyOtp).toHaveBeenCalledWith({
-      email: 'test@example.com',
+      email: 'iconicedudev+test@gmail.com',
       token: '123456',
       type: 'email',
     });
@@ -154,7 +154,7 @@ describe('AuthProvider', () => {
 
     let response: { error: string | null } = { error: null };
     await act(async () => {
-      response = await result.current.signInWithOtp('test@example.com');
+      response = await result.current.signInWithOtp('iconicedudev+test@gmail.com');
     });
 
     expect(response.error).toBe('Rate limit exceeded');
@@ -162,7 +162,7 @@ describe('AuthProvider', () => {
 
   it('signs out on app return after the incomplete onboarding threshold', async () => {
     mockGetSession.mockResolvedValueOnce({
-      data: { session: { user: { id: 'user-1', email: 'test@example.com' } } },
+      data: { session: { user: { id: 'user-1', email: 'iconicedudev+test@gmail.com' } } },
     });
 
     const { result } = renderHook(() => useAuth(), { wrapper });
@@ -196,7 +196,7 @@ describe('AuthProvider', () => {
 
   it('does not sign out on app return under the incomplete onboarding threshold', async () => {
     mockGetSession.mockResolvedValueOnce({
-      data: { session: { user: { id: 'user-1', email: 'test@example.com' } } },
+      data: { session: { user: { id: 'user-1', email: 'iconicedudev+test@gmail.com' } } },
     });
 
     const { result } = renderHook(() => useAuth(), { wrapper });
@@ -224,7 +224,7 @@ describe('AuthProvider', () => {
 
   it('does not sign out completed users on app return', async () => {
     mockGetSession.mockResolvedValueOnce({
-      data: { session: { user: { id: 'user-1', email: 'test@example.com' } } },
+      data: { session: { user: { id: 'user-1', email: 'iconicedudev+test@gmail.com' } } },
     });
 
     const { result } = renderHook(() => useAuth(), { wrapper });

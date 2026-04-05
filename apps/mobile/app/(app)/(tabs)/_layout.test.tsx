@@ -69,7 +69,6 @@ jest.mock('@/hooks/use-supervised-direct-messages', () => ({
 
 jest.mock('lucide-react-native', () => ({
   Home: () => null,
-  CalendarDays: () => null,
   MessageCircle: () => null,
   Bell: () => null,
   User: () => null,
@@ -114,7 +113,6 @@ const mockTabBarProps = {
       { name: 'messages', key: 'messages' },
       { name: 'inbox', key: 'inbox' },
       { name: 'account', key: 'account' },
-      { name: 'schedule', key: 'schedule' },
     ],
     index: 0,
   },
@@ -177,7 +175,7 @@ describe('TabsLayout', () => {
       const { getAllByRole } = render(
         capturedTabBar!(mockTabBarProps) as React.ReactElement,
       );
-      expect(getAllByRole('tab')).toHaveLength(5);
+      expect(getAllByRole('tab')).toHaveLength(4);
     });
 
     it('SideRail highlights the focused tab', () => {
@@ -201,7 +199,7 @@ describe('TabsLayout', () => {
         }) as React.ReactElement,
       );
       const tabs = getAllByRole('tab');
-      fireEvent.press(tabs[2]!); // messages tab
+      fireEvent.press(tabs[1]!); // messages tab
       expect(navigate).toHaveBeenCalledWith('messages');
     });
   });

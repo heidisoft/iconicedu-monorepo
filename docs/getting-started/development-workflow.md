@@ -71,14 +71,14 @@ supabase status --output json
 
 Use these seeded test emails for local auth flows:
 
-| Email                          | Role     | Profile   |
-| ------------------------------ | -------- | --------- |
-| `owner.marc@example.com`       | Owner    | Marc F    |
-| `guardian.lura@example.com`    | Guardian | Lura H    |
-| `educator.denise@example.com`  | Educator | Denise R  |
-| `educator.barbara@example.com` | Educator | Barbara Y |
-| `staff.harold@example.com`     | Staff    | Harold B  |
-| `guardian.jessica@example.com` | Guardian | Jessica K |
+| Email                              | Role     | Profile   |
+| ---------------------------------- | -------- | --------- |
+| `iconicedudev@gmail.com`           | Owner    | Marc F    |
+| `iconicedudev+guardian1@gmail.com` | Guardian | Lura H    |
+| `iconicedudev+educator1@gmail.com` | Educator | Denise R  |
+| `iconicedudev+educator2@gmail.com` | Educator | Barbara Y |
+| `iconicedudev+staff1@gmail.com`    | Staff    | Harold B  |
+| `iconicedudev+guardian2@gmail.com` | Guardian | Jessica K |
 
 For local email OTP or magic-link login:
 
@@ -157,7 +157,7 @@ Every PR can provision an isolated preview stack:
 - Vercel web preview
 - Optional EAS preview build for mobile
 
-The workflow is defined in [`.github/workflows/preview-env.yml`](../../.github/workflows/preview-env.yml).
+The preview stack is provisioned by the `preview-environment` job in [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml). Mobile preview binaries are created separately by [`.github/workflows/eas-preview-build.yml`](../../.github/workflows/eas-preview-build.yml).
 
 Preview environment behavior:
 
@@ -169,6 +169,78 @@ Preview environment behavior:
 6. Comment on the PR with URLs and seed credentials.
 
 Cleanup runs automatically when the PR closes or merges.
+
+### Preview Testing Credentials
+
+For shared stage or preview testing, use:
+
+- Email: `iconicedudev@gmail.com`
+- Password: `Iconic@2026`
+
+If the preview environment is seeded with the standard test dataset, these additional aliases are useful for role-based testing:
+
+| Email                              | Role     | Use for                                               |
+| ---------------------------------- | -------- | ----------------------------------------------------- |
+| `iconicedudev@gmail.com`           | Owner    | Admin settings, org bootstrap, cross-role smoke tests |
+| `iconicedudev+guardian1@gmail.com` | Guardian | Parent and family flows                               |
+| `iconicedudev+educator1@gmail.com` | Educator | Teacher/classroom flows                               |
+| `iconicedudev+educator2@gmail.com` | Educator | Multi-educator and secondary class scenarios          |
+| `iconicedudev+staff1@gmail.com`    | Staff    | Staff-only tooling such as schedule management        |
+| `iconicedudev+guardian2@gmail.com` | Guardian | Second-family and multi-household scenarios           |
+
+Notes:
+
+- Local Supabase resets use the same Gmail aliases from [`supabase/seed.sql`](../../supabase/seed.sql), but the local seed password remains `Seed123!`.
+- Hosted preview or stage environments may expose only the shared login unless the branch/project has been seeded with the full dataset.
+- When a PR preview comment includes explicit environment details, treat that comment as the source of truth for that PR.
+
+### How To Use A PR Preview
+
+1. Open the PR and wait for `CI` to finish successfully.
+2. Wait for the PR comment titled `Preview Environment Ready`.
+3. Open the `Web (Vercel)` URL from that comment to test the preview web app.
+4. Use the `API (Railway)` URL from that comment for backend checks. Appending `/healthz` is the fastest smoke test.
+5. Open the `Supabase Studio` link from that comment to inspect the preview database branch.
+6. If you need a mobile binary, run the `Create EAS Build` workflow from GitHub Actions after the preview environment is ready.
+
+### How To Create A Mobile Preview Build
+
+There are two supported paths:
+
+1. Local/terminal build
+
+```bash
+pnpm mobile:eas:build:preview
+```
+
+2. GitHub Actions build for a PR preview
+
+- Open `Actions` in GitHub.
+- Run `Create EAS Build`.
+- Set `pr_number` to the PR number when building a non-`main` branch.
+- Choose `ios`, `android`, or `all`.
+- Wait for the workflow to post the Expo build link back to the PR.
+
+### Preview Mobile Environment Notes
+
+The preview EAS workflow currently injects these values automatically for PR-based builds:
+
+- `EXPO_PUBLIC_SUPABASE_URL`
+- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+- `EXPO_PUBLIC_APP_ENV=preview`
+
+The preview web and API URLs are posted in the PR comment, but they are not currently auto-injected into the mobile EAS preview workflow as `EXPO_PUBLIC_WEB_URL` and `EXPO_PUBLIC_API_URL`.
+
+If a preview build must point at a specific preview API or preview web host, set these before triggering the build:
+
+- `EXPO_PUBLIC_API_URL`
+- `EXPO_PUBLIC_WEB_URL`
+
+Use:
+
+- The Vercel preview URL for web-hosted flows opened from mobile
+- The Railway preview API URL for NestJS-backed server calls
+- The Supabase preview branch URL and anon key for auth, RLS-safe reads, and narrowly-scoped mobile writes
 
 ## Mobile Native Builds
 

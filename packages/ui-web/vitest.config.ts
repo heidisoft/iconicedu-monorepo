@@ -6,6 +6,7 @@ import { dirname, resolve } from 'node:path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const isCI = Boolean(process.env.CI);
 
 export default defineConfig({
   plugins: [react(), tsconfigPaths()],
@@ -65,6 +66,19 @@ export default defineConfig({
     globals: true,
     css: false,
     pool: 'vmThreads',
+    // The ui-web suite is jsdom-heavy and can exceed the default worker heap on
+    // CI runners. Force a single vmThread worker there and recycle it before
+    // it grows large enough to crash with ERR_WORKER_OUT_OF_MEMORY.
+    poolOptions: {
+      vmThreads: isCI
+        ? {
+            singleThread: true,
+            minThreads: 1,
+            maxThreads: 1,
+            memoryLimit: '512MB',
+          }
+        : undefined,
+    },
     server: {
       deps: {
         inline: [/.*/],

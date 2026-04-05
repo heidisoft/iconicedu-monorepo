@@ -126,16 +126,13 @@ export default function OtpScreen() {
       } catch {
         // On error, fall through to app — (app)/_layout will re-check on mount.
         router.replace('/(app)/(tabs)');
+      } finally {
+        setLoading(false);
+        isVerifyingRef.current = false;
       }
     },
     [analytics, email, router, setOnboardingCompletionStatus, verifyOtp],
   );
-
-  React.useEffect(() => {
-    if (code.length === OTP_LENGTH) {
-      void verifyCode(code);
-    }
-  }, [code, verifyCode]);
 
   const handleVerify = useCallback(async () => {
     if (code.length !== OTP_LENGTH) {
@@ -182,6 +179,9 @@ export default function OtpScreen() {
                 const cleaned = text.replace(/\D/g, '').slice(0, OTP_LENGTH);
                 setCode(cleaned);
                 if (error) setError(null);
+                if (cleaned.length === OTP_LENGTH) {
+                  void verifyCode(cleaned);
+                }
               }}
               keyboardType="number-pad"
               maxLength={OTP_LENGTH}

@@ -88,7 +88,7 @@ describe('POST /api/onboarding/role', () => {
 
   it('returns 403 when staff validation fails', async () => {
     mockGetUser.mockResolvedValueOnce({
-      data: { user: { id: 'auth-1', email: 'user@example.com' } },
+      data: { user: { id: 'auth-1', email: 'iconicedudev+user@gmail.com' } },
     });
     mockGetAccountByAuthUserId.mockResolvedValueOnce({
       data: { id: 'account-1', org_id: 'org-1' },
@@ -115,7 +115,7 @@ describe('POST /api/onboarding/role', () => {
     const now = new Date().toISOString();
     mockResolveOrgDashboardPath.mockResolvedValueOnce('/iconic-academy');
     mockGetUser.mockResolvedValueOnce({
-      data: { user: { id: 'auth-1', email: 'parent@example.com' } },
+      data: { user: { id: 'auth-1', email: 'iconicedudev+parent@gmail.com' } },
     });
     mockGetAccountByAuthUserId.mockResolvedValueOnce({
       data: { id: 'account-1', org_id: 'org-1' },

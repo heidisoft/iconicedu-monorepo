@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, TouchableOpacity, Text } from 'react-native';
 import { Tabs } from 'expo-router';
-import { Home, MessageCircle, Bell, User, CalendarDays } from 'lucide-react-native';
+import { Home, MessageCircle, Bell, User } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/providers/theme-provider';
 import { useTablet } from '@/hooks/use-tablet';
@@ -25,7 +25,6 @@ const SIDE_RAIL_WIDTH = 72;
 // Visible tabs in the order they appear in both the bottom bar and side rail.
 const VISIBLE_TABS = [
   { name: 'index', title: 'Home', Icon: Home },
-  { name: 'schedule', title: 'Schedule', Icon: CalendarDays },
   { name: 'messages', title: 'Messages', Icon: MessageCircle },
   { name: 'inbox', title: 'Notifications', Icon: Bell },
   { name: 'account', title: 'Account', Icon: User },
@@ -255,13 +254,6 @@ export default function TabsLayout() {
         options={{
           title: 'Account',
           tabBarIcon: ({ color }) => <User size={22} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="schedule"
-        options={{
-          title: 'Schedule',
-          tabBarIcon: ({ color }) => <CalendarDays size={22} color={color} />,
         }}
       />
     </Tabs>

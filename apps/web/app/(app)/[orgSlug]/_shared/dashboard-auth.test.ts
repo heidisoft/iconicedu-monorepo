@@ -9,7 +9,7 @@ import {
 const createSupabaseServerClientMock = vi.fn(async () => ({ client: 'supabase' }));
 const requireAuthedUserMock = vi.fn(async () => ({
   id: 'auth-user-1',
-  email: 'user@example.com',
+  email: 'iconicedudev+user@gmail.com',
 }));
 const getOrCreateAccountMock = vi.fn(async () => ({
   account: { id: 'account-1', org_id: 'org-1' },
@@ -80,7 +80,7 @@ describe('dashboard-auth helpers', () => {
     expect(resolveOrgDashboardPathMock).toHaveBeenCalledTimes(1);
     expect(result).toEqual({
       supabase: { client: 'supabase' },
-      authUser: { id: 'auth-user-1', email: 'user@example.com' },
+      authUser: { id: 'auth-user-1', email: 'iconicedudev+user@gmail.com' },
       account: { id: 'account-1', org_id: 'org-1' },
       dashboardPath: '/iconic-academy',
     });

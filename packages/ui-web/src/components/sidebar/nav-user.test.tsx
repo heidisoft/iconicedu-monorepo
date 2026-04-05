@@ -143,7 +143,7 @@ const account: UserAccountVM = {
     orgId: 'org-1',
   },
   contacts: {
-    email: 'educator@example.com',
+    email: 'iconicedudev+educator@gmail.com',
   },
   lifecycle: {
     status: 'active',
@@ -240,7 +240,7 @@ describe('NavUser', () => {
     );
 
     expect(screen.getAllByText('Viewing as Aiden One').length).toBeGreaterThan(0);
-    expect(screen.queryByText('educator@example.com')).not.toBeInTheDocument();
+    expect(screen.queryByText('iconicedudev+educator@gmail.com')).not.toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Account (child login required)' }),
     ).toBeDisabled();

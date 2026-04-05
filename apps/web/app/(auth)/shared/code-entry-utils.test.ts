@@ -11,20 +11,22 @@ describe('buildCodeEntryPath', () => {
   it('builds org-scoped code path', () => {
     expect(
       buildCodeEntryPath({
-        email: 'parent@example.com',
+        email: 'iconicedudev+parent@gmail.com',
         intent: 'login',
         orgSlug: 'iconic-academy',
       }),
-    ).toBe('/code?email=parent%40example.com&intent=login&org=iconic-academy');
+    ).toBe(
+      '/code?email=iconicedudev%2Bparent%40gmail.com&intent=login&org=iconic-academy',
+    );
   });
 
   it('builds global code path', () => {
     expect(
       buildCodeEntryPath({
-        email: 'admin@example.com',
+        email: 'iconicedudev+admin@gmail.com',
         intent: 'get-started',
       }),
-    ).toBe('/code?email=admin%40example.com&intent=get-started');
+    ).toBe('/code?email=iconicedudev%2Badmin%40gmail.com&intent=get-started');
   });
 });
 

@@ -122,7 +122,7 @@ describe('POST /api/orgs/bootstrap', () => {
   it('creates org, account owner role, and returns destination', async () => {
     const now = new Date().toISOString();
     mockGetUser.mockResolvedValueOnce({
-      data: { user: { id: 'auth-1', email: 'owner@example.com' } },
+      data: { user: { id: 'auth-1', email: 'iconicedudev+owner@gmail.com' } },
     });
     mockGetAccountByAuthUserId.mockResolvedValueOnce({ data: null, error: null });
     mockResolveOrgDashboardPath.mockResolvedValueOnce('/iconic-academy');
@@ -224,7 +224,7 @@ describe('POST /api/orgs/bootstrap', () => {
   it('allows an authenticated user to create another organization', async () => {
     const now = new Date().toISOString();
     mockGetUser.mockResolvedValueOnce({
-      data: { user: { id: 'auth-1', email: 'owner@example.com' } },
+      data: { user: { id: 'auth-1', email: 'iconicedudev+owner@gmail.com' } },
     });
     mockResolveOrgDashboardPath.mockResolvedValueOnce('/second-org');
     mockGetOrCreateAccount.mockResolvedValueOnce({
@@ -303,7 +303,7 @@ describe('POST /api/orgs/bootstrap', () => {
       expect.objectContaining({
         orgId: 'org-2',
         authUserId: 'auth-1',
-        authEmail: 'owner@example.com',
+        authEmail: 'iconicedudev+owner@gmail.com',
       }),
     );
   });

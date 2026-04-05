@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mockReplace = vi.fn();
 const mockVerifyOtp = vi.fn();
 const mockSearchParams = new URLSearchParams({
-  email: 'parent@example.com',
+  email: 'iconicedudev+parent@gmail.com',
   intent: 'login',
 });
 
@@ -97,7 +97,7 @@ describe('CodeEntryClient', () => {
 
     await waitFor(() => {
       expect(mockVerifyOtp).toHaveBeenCalledWith({
-        email: 'parent@example.com',
+        email: 'iconicedudev+parent@gmail.com',
         token: '123456',
         type: 'email',
       });

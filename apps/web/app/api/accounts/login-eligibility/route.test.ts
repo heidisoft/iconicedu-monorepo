@@ -51,7 +51,10 @@ describe('POST /api/accounts/login-eligibility', () => {
     const response = await POST(
       new Request(`${APP_URL}/api/accounts/login-eligibility`, {
         method: 'POST',
-        body: JSON.stringify({ orgSlug: 'iconic-academy', email: 'parent@example.com' }),
+        body: JSON.stringify({
+          orgSlug: 'iconic-academy',
+          email: 'iconicedudev+parent@gmail.com',
+        }),
       }),
     );
 
@@ -77,7 +80,10 @@ describe('POST /api/accounts/login-eligibility', () => {
     const response = await POST(
       new Request(`${APP_URL}/api/accounts/login-eligibility`, {
         method: 'POST',
-        body: JSON.stringify({ orgSlug: 'iconic-academy', email: 'parent@example.com' }),
+        body: JSON.stringify({
+          orgSlug: 'iconic-academy',
+          email: 'iconicedudev+parent@gmail.com',
+        }),
       }),
     );
 
@@ -98,7 +104,10 @@ describe('POST /api/accounts/login-eligibility', () => {
     const response = await POST(
       new Request(`${APP_URL}/api/accounts/login-eligibility`, {
         method: 'POST',
-        body: JSON.stringify({ orgSlug: 'iconic-academy', email: 'parent@example.com' }),
+        body: JSON.stringify({
+          orgSlug: 'iconic-academy',
+          email: 'iconicedudev+parent@gmail.com',
+        }),
       }),
     );
 

@@ -25,6 +25,7 @@ jobs:
     permissions:
       contents: read
       issues: write
+      pull-requests: write
 
     steps:
       - name: Resolve build context
@@ -167,20 +168,28 @@ jobs:
             jq \
               --arg supabase_url "${{ steps.supabase-creds.outputs.api_url }}" \
               --arg anon_key "${{ steps.supabase-creds.outputs.anon_key }}" \
+              --arg posthog_key "${{ secrets.POSTHOG_KEY }}" \
+              --arg posthog_host "${{ secrets.NEXT_PUBLIC_POSTHOG_HOST }}" \
               '.build.preview.env = ((.build.preview.env // {}) + {
                 EXPO_PUBLIC_SUPABASE_URL: $supabase_url,
                 EXPO_PUBLIC_SUPABASE_ANON_KEY: $anon_key,
-                EXPO_PUBLIC_APP_ENV: "preview"
+                EXPO_PUBLIC_APP_ENV: "preview",
+                EXPO_PUBLIC_POSTHOG_KEY: $posthog_key,
+                EXPO_PUBLIC_POSTHOG_HOST: $posthog_host
               })' \
               eas.json > "$tmp_eas_json"
           else
             jq \
               --arg supabase_url "${{ steps.supabase-creds.outputs.api_url }}" \
               --arg anon_key "${{ steps.supabase-creds.outputs.anon_key }}" \
+              --arg posthog_key "${{ secrets.POSTHOG_KEY }}" \
+              --arg posthog_host "${{ secrets.NEXT_PUBLIC_POSTHOG_HOST }}" \
               '.build.production.env = ((.build.production.env // {}) + {
                 EXPO_PUBLIC_SUPABASE_URL: $supabase_url,
                 EXPO_PUBLIC_SUPABASE_ANON_KEY: $anon_key,
-                EXPO_PUBLIC_APP_ENV: "production"
+                EXPO_PUBLIC_APP_ENV: "production",
+                EXPO_PUBLIC_POSTHOG_KEY: $posthog_key,
+                EXPO_PUBLIC_POSTHOG_HOST: $posthog_host
               })' \
               eas.json > "$tmp_eas_json"
           fi
@@ -228,12 +237,24 @@ jobs:
               `${buildLink} - install via internal distribution once the build completes.`,
             ].join('\n');
 
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: prNumber,
-              body,
-            });
+            try {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body,
+              });
+            } catch (error) {
+              if (error.status === 403) {
+                core.warning(
+                  `Skipping PR comment for #${prNumber}: GitHub Actions token cannot write issue comments in this run context. ` +
+                  'This commonly happens for restricted workflow tokens, forked contexts, or org policies that force read-only tokens.'
+                );
+                return;
+              }
+
+              throw error;
+            }
 
       - name: Report skipped build
         if: steps.context.outputs.should_build != 'true'

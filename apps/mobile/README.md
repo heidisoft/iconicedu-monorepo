@@ -82,6 +82,59 @@ pnpm --filter mobile eas:build:preview
 
 Use `development` for engineer iteration and `preview` for installable QA builds.
 
+### Preview build testing accounts
+
+For shared preview or stage testing, use:
+
+- `iconicedudev@gmail.com`
+- Password: `Iconic@2026`
+
+If the target preview environment includes the seeded role data, these aliases are available for role-specific testing:
+
+- `iconicedudev@gmail.com` — owner coverage
+- `iconicedudev+guardian1@gmail.com` — guardian flows
+- `iconicedudev+educator1@gmail.com` — educator flows
+- `iconicedudev+educator2@gmail.com` — secondary educator scenarios
+- `iconicedudev+staff1@gmail.com` — staff-only flows
+- `iconicedudev+guardian2@gmail.com` — second guardian household coverage
+
+For local Supabase resets, the same aliases come from `supabase/seed.sql`, but the local password is `Seed123!`, not `Iconic@2026`.
+
+### Creating preview builds
+
+Local:
+
+```sh
+pnpm mobile:eas:build:preview
+```
+
+GitHub Actions for PR previews:
+
+1. Wait for the PR preview environment to finish provisioning.
+2. Open `Actions` and run `Create EAS Build`.
+3. Enter the PR number for non-`main` branches.
+4. Choose `ios`, `android`, or `all`.
+5. Install the build from the Expo link posted back to the PR.
+
+### Preview environment wiring
+
+PR-based preview EAS builds currently inject:
+
+- `EXPO_PUBLIC_SUPABASE_URL`
+- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+- `EXPO_PUBLIC_APP_ENV=preview`
+
+If the build also needs to point at preview web or preview API hosts, provide these before the build:
+
+- `EXPO_PUBLIC_WEB_URL`
+- `EXPO_PUBLIC_API_URL`
+
+Use the PR preview comment as the source of truth for:
+
+- Vercel preview web URL
+- Railway preview API URL
+- Supabase preview branch / Studio link
+
 ## Rebuild rules
 
 Rebuild the native app or dev client when any of these change:

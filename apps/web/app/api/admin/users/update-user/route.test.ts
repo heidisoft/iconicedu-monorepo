@@ -36,7 +36,7 @@ describe('POST /api/admin/users/update-user', () => {
     const response = await POST(
       new Request(`${APP_URL}/api/admin/users/update-user`, {
         method: 'POST',
-        body: JSON.stringify({ email: 'user@example.com' }),
+        body: JSON.stringify({ email: 'iconicedudev+user@gmail.com' }),
       }),
     );
 
@@ -84,7 +84,7 @@ describe('POST /api/admin/users/update-user', () => {
         id: 'account-1',
         org_id: 'org-1',
         auth_user_id: 'auth-1',
-        email: 'old@example.com',
+        email: 'iconicedudev+old@gmail.com',
       },
       error: null,
     }));
@@ -125,7 +125,7 @@ describe('POST /api/admin/users/update-user', () => {
         method: 'POST',
         body: JSON.stringify({
           accountId: 'account-1',
-          email: 'new@example.com',
+          email: 'iconicedudev+new@gmail.com',
           displayName: 'New Name',
           firstName: 'New',
           lastName: 'Name',
@@ -136,11 +136,13 @@ describe('POST /api/admin/users/update-user', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ success: true });
     expect(accountsUpdate).toHaveBeenCalledWith({
-      email: 'new@example.com',
+      email: 'iconicedudev+new@gmail.com',
       primary_role: null,
       role_status: 'unassigned',
     });
-    expect(updateUserById).toHaveBeenCalledWith('auth-1', { email: 'new@example.com' });
+    expect(updateUserById).toHaveBeenCalledWith('auth-1', {
+      email: 'iconicedudev+new@gmail.com',
+    });
     expect(profilesUpdate).toHaveBeenCalledWith({
       display_name: 'New Name',
       first_name: 'New',
@@ -170,7 +172,7 @@ describe('POST /api/admin/users/update-user', () => {
         id: 'account-1',
         org_id: 'org-1',
         auth_user_id: 'auth-1',
-        email: 'old@example.com',
+        email: 'iconicedudev+old@gmail.com',
       },
       error: null,
     }));
@@ -212,7 +214,7 @@ describe('POST /api/admin/users/update-user', () => {
         method: 'POST',
         body: JSON.stringify({
           accountId: 'account-1',
-          email: 'new@example.com',
+          email: 'iconicedudev+new@gmail.com',
           primaryRole: 'educator',
           roleStatus: 'active',
         }),
@@ -221,7 +223,7 @@ describe('POST /api/admin/users/update-user', () => {
 
     expect(response.status).toBe(200);
     expect(accountsUpdate).toHaveBeenCalledWith({
-      email: 'new@example.com',
+      email: 'iconicedudev+new@gmail.com',
       primary_role: 'educator',
       role_status: 'active',
     });
@@ -239,7 +241,7 @@ describe('POST /api/admin/users/update-user', () => {
         id: 'account-1',
         org_id: 'org-1',
         auth_user_id: null,
-        email: 'old@example.com',
+        email: 'iconicedudev+old@gmail.com',
       },
       error: null,
     }));
@@ -289,7 +291,7 @@ describe('POST /api/admin/users/update-user', () => {
         method: 'POST',
         body: JSON.stringify({
           accountId: 'account-1',
-          email: 'taken@example.com',
+          email: 'iconicedudev+taken@gmail.com',
         }),
       }),
     );
@@ -313,7 +315,7 @@ describe('POST /api/admin/users/update-user', () => {
         id: 'account-1',
         org_id: 'org-1',
         auth_user_id: null,
-        email: 'old@example.com',
+        email: 'iconicedudev+old@gmail.com',
       },
       error: null,
     }));
@@ -346,7 +348,7 @@ describe('POST /api/admin/users/update-user', () => {
         method: 'POST',
         body: JSON.stringify({
           accountId: 'account-1',
-          email: 'user@example.com',
+          email: 'iconicedudev+user@gmail.com',
         }),
       }),
     );

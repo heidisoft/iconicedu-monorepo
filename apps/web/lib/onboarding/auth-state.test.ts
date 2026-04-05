@@ -6,7 +6,7 @@ function makeAccount(overrides?: Partial<AccountRow>): AccountRow {
     id: 'account-1',
     org_id: 'org-1',
     auth_user_id: 'auth-1',
-    email: 'test@example.com',
+    email: 'iconicedudev+test@gmail.com',
     status: 'active',
     role_status: 'unassigned',
     primary_role: null,

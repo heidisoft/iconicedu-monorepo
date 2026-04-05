@@ -253,22 +253,25 @@ describe('inviteAdminUserAction', () => {
       });
 
       const formData = new FormData();
-      formData.set('email', 'invitee@example.com');
+      formData.set('email', 'iconicedudev+invitee@gmail.com');
       formData.set('profileKind', profileKind);
       formData.set('mode', 'invite');
       formData.set('linkType', 'invite');
 
       const result = await inviteAdminUserAction(formData);
 
-      expect(mockInviteUserByEmail).toHaveBeenCalledWith('invitee@example.com', {
-        redirectTo:
-          'http://localhost:3000/auth/callback?profileKind=' +
-          profileKind +
-          '&org=iconic-academy&intent=get-started',
-      });
+      expect(mockInviteUserByEmail).toHaveBeenCalledWith(
+        'iconicedudev+invitee@gmail.com',
+        {
+          redirectTo:
+            'http://localhost:3000/auth/callback?profileKind=' +
+            profileKind +
+            '&org=iconic-academy&intent=get-started',
+        },
+      );
       expect(mockGenerateLink).toHaveBeenCalledWith({
         type: 'invite',
-        email: 'invitee@example.com',
+        email: 'iconicedudev+invitee@gmail.com',
         options: {
           redirectTo:
             'http://localhost:3000/auth/callback?profileKind=' +
@@ -315,7 +318,7 @@ describe('inviteAdminUserAction', () => {
     });
 
     const formData = new FormData();
-    formData.set('email', 'active@example.com');
+    formData.set('email', 'iconicedudev+active@gmail.com');
     formData.set('profileKind', 'guardian');
     formData.set('mode', 'invite');
     formData.set('linkType', 'invite');
@@ -338,7 +341,7 @@ describe('inviteAdminUserAction', () => {
     });
 
     const formData = new FormData();
-    formData.set('email', 'active@example.com');
+    formData.set('email', 'iconicedudev+active@gmail.com');
     formData.set('profileKind', 'staff');
     formData.set('mode', 'link');
     formData.set('linkType', 'magiclink');
@@ -348,7 +351,7 @@ describe('inviteAdminUserAction', () => {
     await inviteAdminUserAction(formData);
 
     expect(mockSignInWithOtp).toHaveBeenCalledWith({
-      email: 'active@example.com',
+      email: 'iconicedudev+active@gmail.com',
       options: {
         emailRedirectTo:
           'https://app.example.com/auth/callback?profileKind=staff&org=iconic-academy&intent=login',
@@ -356,7 +359,7 @@ describe('inviteAdminUserAction', () => {
     });
     expect(mockGenerateLink).toHaveBeenCalledWith({
       type: 'magiclink',
-      email: 'active@example.com',
+      email: 'iconicedudev+active@gmail.com',
       options: {
         redirectTo:
           'https://app.example.com/auth/callback?profileKind=staff&org=iconic-academy&intent=login',

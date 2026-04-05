@@ -78,7 +78,7 @@ describe('getAdminUserRows', () => {
         {
           id: 'account-1',
           org_id: 'org-1',
-          email: 'person@example.com',
+          email: 'iconicedudev+person@gmail.com',
           phone_e164: '+15555550123',
           status: 'active',
           created_at: '2026-01-01T00:00:00.000Z',
@@ -142,7 +142,7 @@ describe('getAdminUserRows', () => {
     expect(rows[0]).toMatchObject({
       id: 'account-1',
       orgId: 'org-1',
-      email: 'person@example.com',
+      email: 'iconicedudev+person@gmail.com',
       updatedAt: '2026-01-01T00:00:00.000Z',
       lastSeenAt: '2026-02-01T00:00:00.000Z',
       profileKind: 'guardian',
@@ -167,7 +167,7 @@ describe('getAdminUserRows', () => {
         {
           id: 'account-older',
           org_id: 'org-1',
-          email: 'older@example.com',
+          email: 'iconicedudev+older@gmail.com',
           phone_e164: null,
           status: 'active',
           created_at: '2026-01-01T00:00:00.000Z',
@@ -176,7 +176,7 @@ describe('getAdminUserRows', () => {
         {
           id: 'account-newer',
           org_id: 'org-1',
-          email: 'newer@example.com',
+          email: 'iconicedudev+newer@gmail.com',
           phone_e164: null,
           status: 'active',
           created_at: '2026-01-02T00:00:00.000Z',
