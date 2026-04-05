@@ -8,6 +8,7 @@ import { getLocalDate, getLocalTime, toUtcFromLocal } from '@iconicedu/utils';
 import {
   formatScheduleDisplayTimeWithZone,
   formatScheduleDisplayValue,
+  getScheduleDisplayDateParts,
   toScheduleDisplayDate,
   getScheduleDisplayMinutes,
   type ScheduleDisplayTimeZoneInput,
@@ -104,28 +105,35 @@ export function formatEventTimeForSchedule(
 /**
  * Returns a compact time range string like "9:00 – 9:45am" or "9:00am – 1:00pm".
  * The period (am/pm) is omitted from the start when both times share the same period.
+ *
+ * Uses raw date parts rather than the formatted string to avoid the timezone suffix
+ * that formatEventTimeForSchedule appends (e.g. "9:00 AM EST"), which would break
+ * the AM/PM regex match.
  */
 export function formatEventTimeRange(
   event: Pick<ClassScheduleVM, 'startAt' | 'endAt' | 'timezone' | 'recurrence'>,
   timezone?: string | null,
 ): string {
-  const start = formatEventTimeForSchedule(event, 'startAt', timezone);
-  const end = formatEventTimeForSchedule(event, 'endAt', timezone);
+  const tzInput = getScheduleDisplayTimezoneInput(event, timezone);
+  const startParts = getScheduleDisplayDateParts(event.startAt, tzInput);
+  const endParts = getScheduleDisplayDateParts(event.endAt, tzInput);
 
-  // formatEventTimeForSchedule returns values like "9:00 AM" or "12:30 PM"
-  const startMatch = start.match(/^(.+?)\s*(AM|PM)$/i);
-  const endMatch = end.match(/^(.+?)\s*(AM|PM)$/i);
-
-  if (!startMatch || !endMatch) return `${start} – ${end}`;
-
-  const [, startTime, startPeriod] = startMatch;
-  const [, endTime, endPeriod] = endMatch;
-
-  const samePeriod = startPeriod.toUpperCase() === endPeriod.toUpperCase();
-  if (samePeriod) {
-    return `${startTime} – ${endTime}${endPeriod.toLowerCase()}`;
+  if (!startParts || !endParts) {
+    return `${formatEventTimeForSchedule(event, 'startAt', timezone)} – ${formatEventTimeForSchedule(event, 'endAt', timezone)}`;
   }
-  return `${startTime}${startPeriod.toLowerCase()} – ${endTime}${endPeriod.toLowerCase()}`;
+
+  const fmt = (hour: number, minute: number) =>
+    `${hour % 12 || 12}:${String(minute).padStart(2, '0')}`;
+
+  const startPeriod = startParts.hour < 12 ? 'am' : 'pm';
+  const endPeriod = endParts.hour < 12 ? 'am' : 'pm';
+  const startTime = fmt(startParts.hour, startParts.minute);
+  const endTime = fmt(endParts.hour, endParts.minute);
+
+  if (startPeriod === endPeriod) {
+    return `${startTime} – ${endTime}${endPeriod}`;
+  }
+  return `${startTime}${startPeriod} – ${endTime}${endPeriod}`;
 }
 
 /**
