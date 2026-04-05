@@ -356,13 +356,13 @@ jobs:
         run: pnpm build
 
   # ──────────────────────────────────────────────────────────────
-  # Job 5: Provision Preview Environment
+  # Job 5: Verify Preview Environment Status
   # Runs after build + bundle-size both complete. Creates a
   # Supabase preview branch, deploys Railway API, configures
   # Vercel env vars, and posts a unified PR comment.
   # ──────────────────────────────────────────────────────────────
   preview-environment:
-    name: Provision Preview Environment
+    name: Verify Preview Environment Status
     if: github.event.action != 'closed'
     needs: [build, bundle-size]
     runs-on: ubuntu-latest
@@ -898,7 +898,7 @@ jobs:
   # Vercel branch-scoped env vars for this PR.
   # ──────────────────────────────────────────────────────────────
   cleanup:
-    name: Delete Preview Environment
+    name: Clean Up Preview Environemnts
     if: github.event.action == 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 10
