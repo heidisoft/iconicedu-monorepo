@@ -6,6 +6,8 @@ const mockGetExpoPushToken = jest.fn();
 const mockStorePushToken = jest.fn();
 const mockGetPermissionsAsync = jest.fn();
 const mockSetNotificationChannelAsync = jest.fn();
+const mockSecureStoreGetItem = jest.fn();
+const mockSecureStoreSetItem = jest.fn();
 
 jest.mock('@/lib/notifications/push-token', () => ({
   getExpoPushToken: (...args: unknown[]) => mockGetExpoPushToken(...args),
@@ -17,6 +19,20 @@ jest.mock('expo-notifications', () => ({
   setNotificationChannelAsync: (...args: unknown[]) =>
     mockSetNotificationChannelAsync(...args),
   AndroidImportance: { MAX: 4 },
+}));
+
+jest.mock('expo-secure-store', () => ({
+  getItemAsync: (...args: unknown[]) => mockSecureStoreGetItem(...args),
+  setItemAsync: (...args: unknown[]) => mockSecureStoreSetItem(...args),
+}));
+
+jest.mock('expo-constants', () => ({
+  default: {
+    isDevice: true,
+    executionEnvironment: 'bareExpo',
+    expoConfig: null,
+    easConfig: null,
+  },
 }));
 
 const mockAccountData: Record<string, unknown> = { id: 'acc-1', org_id: 'org-1' };
@@ -36,6 +52,8 @@ describe('usePushRegistration', () => {
     mockGetPermissionsAsync.mockResolvedValue({ status: 'granted' });
     mockSetNotificationChannelAsync.mockResolvedValue(undefined);
     mockStorePushToken.mockResolvedValue(undefined);
+    mockSecureStoreGetItem.mockResolvedValue('1');
+    mockSecureStoreSetItem.mockResolvedValue(undefined);
   });
 
   it('registers and stores token when account and profile are available', async () => {
