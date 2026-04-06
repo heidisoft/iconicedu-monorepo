@@ -26,6 +26,7 @@ import {
   fetchIsChannelMember,
   fetchSpaceChannelMetaByChannelId,
   fetchChannelReadState,
+  deleteMessage,
   queryKeys,
 } from '@/lib/api/queries';
 import { useTheme } from '@/providers/theme-provider';
@@ -33,11 +34,14 @@ import { MessageList } from '@/components/messages/message-list';
 import { MessageInput } from '@/components/messages/message-input';
 import { TypingIndicator } from '@/components/messages/typing-indicator';
 import { ConversationHeader } from '@/components/messages/conversation-header';
+import { MessageActionsSheet } from '@/components/messages/message-actions-sheet';
 import { ChannelInfoSheet } from '@/components/messages/channel-info-sheet';
 import { ReadOnlyNotice } from '@/components/messages/read-only-notice';
 import { SpaceSessionsTab } from '@/components/messages/space-sessions-tab';
 import type { AttachmentPayload } from '@/components/messages/attachment-sheet';
 import { buildMobileChannelEmptyStateCopy } from '@/lib/message-empty-state';
+import { reportMobileObservedError } from '@/lib/analytics/report-error';
+import type { MessageVM } from '@iconicedu/shared-types';
 
 type PendingUpload = {
   id: string;
@@ -88,7 +92,17 @@ export default function SpaceDetailScreen() {
     profileKind === 'staff' && !!channelId && !!profileId && !!orgId;
   const initialStaffReadOnly = isStaffObserverReadOnly === '1';
 
-  const { data: messages, isLoading, loadMore } = useMessages(channelId ?? '');
+  const {
+    data: messages,
+    isLoading,
+    isRefetching,
+    refetch,
+    loadMore,
+    toggleReaction,
+    typingUsers,
+    broadcastTyping,
+    broadcastTypingStop,
+  } = useMessages(channelId ?? '', profileId, accountId, senderName, orgId);
   const { data: spaceMeta, isLoading: isLoadingMeta } = useQuery({
     queryKey: queryKeys.spaceChannelMeta(channelId ?? ''),
     queryFn: () => fetchSpaceChannelMetaByChannelId(channelId ?? ''),
@@ -137,14 +151,58 @@ export default function SpaceDetailScreen() {
 
   // ── Info sheet state ──
   const [infoVisible, setInfoVisible] = useState(false);
+
+  // ── Long-press actions sheet state ──
+  const [actionsMessage, setActionsMessage] = useState<MessageVM | null>(null);
+  const [actionsVisible, setActionsVisible] = useState(false);
+
+  const handleLongPress = useCallback((msg: MessageVM) => {
+    setActionsMessage(msg);
+    setActionsVisible(true);
+  }, []);
+
+  // ── Thread reply target ──
+  const [threadReplyTarget, setThreadReplyTarget] = useState<MessageVM | null>(null);
+
+  const handleThreadOpen = useCallback((msg: MessageVM) => {
+    setThreadReplyTarget(msg);
+  }, []);
+
+  // ── Reaction toggle ──
+  const handleReactionToggle = useCallback(
+    async (messageId: string, emoji: string) => {
+      await toggleReaction(messageId, emoji);
+    },
+    [toggleReaction],
+  );
+
+  // ── Delete message ──
+  const handleDelete = useCallback(async (messageId: string) => {
+    await deleteMessage(messageId);
+  }, []);
+
   const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
 
   const handleSend = useCallback(
     async (text: string) => {
       if (!channelId || !profileId || !orgId) return;
-      await sendTextMessage(channelId, profileId, orgId, text);
+      if (threadReplyTarget) {
+        const threadId = threadReplyTarget.social?.thread?.ids.id;
+        await sendTextMessage(
+          channelId,
+          profileId,
+          orgId,
+          text,
+          threadReplyTarget.ids.id,
+          threadId,
+        );
+        setThreadReplyTarget(null);
+        void refetch();
+      } else {
+        await sendTextMessage(channelId, profileId, orgId, text);
+      }
     },
-    [channelId, profileId, orgId],
+    [channelId, profileId, orgId, threadReplyTarget, refetch],
   );
 
   const handleSendAttachment = useCallback(
@@ -234,6 +292,78 @@ export default function SpaceDetailScreen() {
     [channelId, profileId, orgId, senderName],
   );
 
+  // ── Retry a failed upload ──
+  const handleRetryUpload = useCallback(
+    async (pendingId: string) => {
+      const pending = pendingUploads.find((p) => p.id === pendingId);
+      if (!pending?.failed) return;
+
+      setPendingUploads((prev) =>
+        prev.map((p) => (p.id === pendingId ? { ...p, failed: false } : p)),
+      );
+
+      try {
+        const { caption } = pending;
+        if (pending.type === 'audio') {
+          const a = pending.attachments[0];
+          const storagePath = buildMessageStoragePath(
+            orgId,
+            channelId!,
+            profileId,
+            a.mimeType,
+            a.name,
+          );
+          await uploadChannelFile(a.uri, storagePath, a.mimeType, a.base64);
+          await sendFileMessage(
+            channelId!,
+            profileId,
+            orgId,
+            { ...a, storagePath },
+            caption,
+          );
+        } else {
+          const uploaded = await Promise.all(
+            pending.attachments.map(async (a) => {
+              const storagePath = buildMessageStoragePath(
+                orgId,
+                channelId!,
+                profileId,
+                a.mimeType,
+                a.name,
+              );
+              await uploadChannelFile(a.uri, storagePath, a.mimeType, a.base64);
+              return { ...a, storagePath };
+            }),
+          );
+          if (uploaded.length === 1) {
+            await sendFileMessage(channelId!, profileId, orgId, uploaded[0], caption);
+          } else {
+            await sendFilesMessage(channelId!, profileId, orgId, uploaded, caption);
+          }
+        }
+        setPendingUploads((prev) => prev.filter((p) => p.id !== pendingId));
+      } catch (error) {
+        reportMobileObservedError({
+          error,
+          source: 'mobile.messages.spaces.retry_upload',
+          message: 'Failed to retry space attachment upload',
+          context: {
+            channelId,
+            orgId,
+            profileId,
+            pendingId,
+            type: pending.type,
+            attachmentCount: pending.attachments.length,
+          },
+        });
+        setPendingUploads((prev) =>
+          prev.map((p) => (p.id === pendingId ? { ...p, failed: true } : p)),
+        );
+      }
+    },
+    [pendingUploads, channelId, profileId, orgId],
+  );
+
   const s = useMemo(() => makeStyles(colors), [colors]);
 
   const lastMarkedReadIdRef = React.useRef<string | null>(null);
@@ -261,6 +391,8 @@ export default function SpaceDetailScreen() {
     [accountId, channelId, orgId, profileId],
   );
   if (!channelId) return null;
+
+  const isOwnMessage = (msg: MessageVM) => msg.core.sender.ids.id === profileId;
 
   const resolvedTitle = spaceMeta?.title ?? topic ?? 'Class';
   const resolvedSubtitle = (spaceMeta?.subtitle ?? subtitle ?? '').trim() || null;
@@ -336,7 +468,13 @@ export default function SpaceDetailScreen() {
             unreadCount={channelReadState?.unreadCount ?? 0}
             onLoadMore={loadMore}
             loading={isLoading}
+            refreshing={isRefetching}
+            onRefresh={refetch}
+            onMessageLongPress={isStaffReadOnly ? undefined : handleLongPress}
+            onReactionToggle={isStaffReadOnly ? undefined : handleReactionToggle}
+            onThreadOpen={isStaffReadOnly ? undefined : handleThreadOpen}
             pendingUploads={pendingUploads}
+            onRetryUpload={handleRetryUpload}
             isReadOnly={isStaffReadOnly}
             onUnreadViewed={handleUnreadViewed}
             isScreenActive={isFocused && activeTab === 'messages'}
@@ -344,7 +482,7 @@ export default function SpaceDetailScreen() {
             emptyDescription={emptyStateCopy.description}
             emptyIcon={emptyStateCopy.icon}
           />
-          <TypingIndicator typingUsers={[]} />
+          <TypingIndicator typingUsers={typingUsers} />
           {isStaffReadOnly ? (
             <ReadOnlyNotice />
           ) : (
@@ -352,6 +490,10 @@ export default function SpaceDetailScreen() {
               onSend={handleSend}
               onSendAttachment={handleSendAttachment}
               placeholder={`Message ${resolvedTitle}…`}
+              onTypingChange={broadcastTyping}
+              onTypingStop={broadcastTypingStop}
+              replyTo={threadReplyTarget}
+              onCancelReply={() => setThreadReplyTarget(null)}
               uploading={pendingUploads.some((upload) => !upload.failed)}
             />
           )}
@@ -377,6 +519,18 @@ export default function SpaceDetailScreen() {
         themeKey={resolvedThemeKey}
         messages={messages ?? []}
         onClose={() => setInfoVisible(false)}
+      />
+
+      {/* Long-press actions sheet */}
+      <MessageActionsSheet
+        visible={actionsVisible}
+        message={actionsMessage}
+        isOwn={actionsMessage ? isOwnMessage(actionsMessage) : false}
+        isReadOnly={isStaffReadOnly}
+        onClose={() => setActionsVisible(false)}
+        onReact={handleReactionToggle}
+        onThread={handleThreadOpen}
+        onDelete={handleDelete}
       />
     </SafeAreaView>
   );

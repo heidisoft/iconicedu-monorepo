@@ -65,6 +65,16 @@ describe('getExpoPushToken', () => {
     expect(token).toBeNull();
     expect(mockGetExpoPushTokenAsync).not.toHaveBeenCalled();
   });
+
+  it('does not request permissions when requestPermissions is false', async () => {
+    mockGetPermissionsAsync.mockResolvedValue({ status: 'denied' });
+
+    const token = await getExpoPushToken({ requestPermissions: false });
+
+    expect(token).toBeNull();
+    expect(mockRequestPermissionsAsync).not.toHaveBeenCalled();
+    expect(mockGetExpoPushTokenAsync).not.toHaveBeenCalled();
+  });
 });
 
 describe('storePushToken', () => {

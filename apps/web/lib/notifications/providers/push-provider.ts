@@ -6,6 +6,8 @@ type PushNotificationPayload = {
   prefKey: string;
   title: string;
   summary?: string | null;
+  scopeKind?: 'channel' | 'learning_space';
+  scopeId?: string;
   metadata?: Record<string, unknown>;
 };
 
@@ -21,6 +23,35 @@ type ExpoPushMessage = {
   data?: Record<string, unknown>;
   sound: 'default';
 };
+
+function asRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+  return value as Record<string, unknown>;
+}
+
+function resolveChannelIdFromMetadata(metadata: Record<string, unknown> | undefined) {
+  const root = asRecord(metadata);
+  if (typeof root.channelId === 'string' && root.channelId.trim().length > 0) {
+    return root.channelId;
+  }
+
+  const rawEventPayload = asRecord(root.rawEventPayload);
+  if (
+    typeof rawEventPayload.channelId === 'string' &&
+    rawEventPayload.channelId.trim().length > 0
+  ) {
+    return rawEventPayload.channelId;
+  }
+
+  const scope = asRecord(rawEventPayload.scope);
+  if (typeof scope.channelId === 'string' && scope.channelId.trim().length > 0) {
+    return scope.channelId;
+  }
+
+  return undefined;
+}
 
 export async function sendPushNotification(payload: PushNotificationPayload) {
   const supabase = createSupabaseServiceClient();
@@ -38,6 +69,8 @@ export async function sendPushNotification(payload: PushNotificationPayload) {
 
   if (!tokens?.length) return;
 
+  const channelId = resolveChannelIdFromMetadata(payload.metadata);
+
   // 2. Build Expo push messages
   const messages: ExpoPushMessage[] = tokens.map(({ token }) => ({
     to: token,
@@ -46,6 +79,9 @@ export async function sendPushNotification(payload: PushNotificationPayload) {
     data: {
       prefKey: payload.prefKey,
       orgId: payload.orgId,
+      scopeKind: payload.scopeKind,
+      scopeId: payload.scopeId,
+      channelId,
     },
     sound: 'default',
   }));

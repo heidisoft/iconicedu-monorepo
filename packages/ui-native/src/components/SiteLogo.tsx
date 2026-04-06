@@ -20,7 +20,12 @@ export const SiteLogo: React.FC<SiteLogoProps> = ({
   const w = width ?? Math.round(h * ASPECT);
 
   return (
-    <Svg viewBox="0 0 52.39 53.84" width={w} height={h} accessibilityLabel="IconicEdu">
+    <Svg
+      viewBox="0 0 52.39 53.84"
+      width={w}
+      height={h}
+      accessibilityLabel="ICONIC Academy"
+    >
       <Defs>
         <LinearGradient
           id="ie-site-logo-gradient"

@@ -389,7 +389,10 @@ function buildHomeScopedSchedules(input: {
       dayName: startDisplayDate.toLocaleDateString('en-US', { weekday: 'short' }),
       dayNum: String(startDisplayDate.getDate()),
       isToday: startDisplayDate.getTime() === todayStart,
-      isLive: startMs <= now.getTime() && now.getTime() <= endMs,
+      isLive:
+        schedule.status !== 'cancelled' &&
+        startMs <= now.getTime() &&
+        now.getTime() <= endMs,
       isPast: endMs < now.getTime(),
       status: schedule.status,
       meetingLink: schedule.meetingLink ?? null,
