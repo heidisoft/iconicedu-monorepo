@@ -13,23 +13,10 @@ import { ChevronLeft, Bell, BellOff } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { SettingsRow } from '@iconicedu/ui-native';
 import { useNotificationPrefs } from '@/hooks/use-notification-prefs';
+import { useUpdateNotificationPref } from '@/hooks/use-update-notification-pref';
+import { NOTIFICATION_REGISTRY } from '@/lib/notifications/notification-config';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
-
-const NOTIF_LABELS: Record<string, string> = {
-  'message.posted': 'New Messages',
-  'homework.assigned': 'Homework Assigned',
-  'homework.submitted': 'Homework Submitted',
-  'homework.reviewed': 'Homework Reviewed',
-  'class.session.scheduled': 'Session Scheduled',
-  'class.session.rescheduled': 'Session Rescheduled',
-  'class.session.canceled': 'Session Cancelled',
-  'class.created': 'New Class',
-  'member.joined': 'Member Joined',
-  'member.invited': 'Invitations',
-  'summary.posted': 'AI Summary',
-  'file.uploaded': 'File Uploaded',
-};
 
 function makeStyles(C: AppColors) {
   return StyleSheet.create({
@@ -82,7 +69,6 @@ function makeStyles(C: AppColors) {
     },
     emptyTitle: { fontSize: 15, fontWeight: '600', color: C.text },
     emptyDesc: { fontSize: 13, color: C.textMuted, textAlign: 'center' },
-    hint: { fontSize: 12, color: C.textFaint, paddingHorizontal: 4 },
   });
 }
 
@@ -90,9 +76,10 @@ export default function NotificationsScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const { data: prefs = [], isLoading } = useNotificationPrefs();
+  const { mutate: updatePref } = useUpdateNotificationPref();
   const s = useMemo(() => makeStyles(colors), [colors]);
 
-  // Local muted state — keyed by pref_key; '__push__' = master push toggle
+  // Local muted state for optimistic UI; '__push__' = master push toggle
   const [mutedMap, setMutedMap] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -105,9 +92,14 @@ export default function NotificationsScreen() {
     }
   }, [prefs]);
 
-  const toggle = useCallback((key: string) => {
-    setMutedMap((prev) => ({ ...prev, [key]: !prev[key] }));
-  }, []);
+  const toggle = useCallback(
+    (key: string) => {
+      const next = !mutedMap[key];
+      setMutedMap((prev) => ({ ...prev, [key]: next }));
+      updatePref({ prefKey: key, muted: next });
+    },
+    [mutedMap, updatePref],
+  );
 
   if (isLoading) {
     return (
@@ -175,7 +167,7 @@ export default function NotificationsScreen() {
             <View style={s.card}>
               {(prefs as Record<string, unknown>[]).map((pref, i) => {
                 const key = pref.pref_key as string;
-                const label = NOTIF_LABELS[key] ?? key;
+                const label = NOTIFICATION_REGISTRY[key]?.label ?? key;
                 const isMuted = mutedMap[key] ?? (pref.muted as boolean) ?? false;
                 const icon = isMuted ? (
                   <BellOff size={20} color={colors.textFaint} />
@@ -203,7 +195,6 @@ export default function NotificationsScreen() {
                 );
               })}
             </View>
-            <Text style={s.hint}>Changes apply to this device only.</Text>
           </>
         )}
       </ScrollView>

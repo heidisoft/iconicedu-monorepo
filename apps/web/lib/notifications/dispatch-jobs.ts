@@ -82,6 +82,8 @@ async function sendNotificationViaChannel(input: {
       prefKey: input.job.pref_key,
       title,
       summary,
+      scopeKind: input.job.scope_kind ?? undefined,
+      scopeId: input.job.scope_id ?? undefined,
       metadata: payload,
     });
   } else if (input.job.delivery_channel === 'email') {

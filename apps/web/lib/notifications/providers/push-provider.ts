@@ -6,6 +6,8 @@ type PushNotificationPayload = {
   prefKey: string;
   title: string;
   summary?: string | null;
+  scopeKind?: 'channel' | 'learning_space';
+  scopeId?: string;
   metadata?: Record<string, unknown>;
 };
 
@@ -46,6 +48,8 @@ export async function sendPushNotification(payload: PushNotificationPayload) {
     data: {
       prefKey: payload.prefKey,
       orgId: payload.orgId,
+      scopeKind: payload.scopeKind,
+      scopeId: payload.scopeId,
     },
     sound: 'default',
   }));

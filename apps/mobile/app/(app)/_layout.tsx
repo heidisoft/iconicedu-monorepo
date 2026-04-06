@@ -6,6 +6,7 @@ import { useTheme } from '@/providers/theme-provider';
 import { fetchOnboardingStatus } from '@/lib/api/queries';
 import { useNotificationHandler } from '@/hooks/use-notification-handler';
 import { usePushRegistration } from '@/hooks/use-push-registration';
+import { PushPermissionSheet } from '@/components/notifications/push-permission-sheet';
 
 export default function AppLayout() {
   const { session, loading, setOnboardingCompletionStatus } = useAuth();
@@ -13,7 +14,7 @@ export default function AppLayout() {
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  usePushRegistration();
+  const { showConsent, onConsentGranted, onConsentDismissed } = usePushRegistration();
   useNotificationHandler();
 
   // Auth guard: redirect to login if not authenticated.
@@ -60,11 +61,18 @@ export default function AppLayout() {
   if (loading || !session) return null;
 
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        contentStyle: { backgroundColor: colors.pageBg },
-      }}
-    />
+    <>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.pageBg },
+        }}
+      />
+      <PushPermissionSheet
+        visible={showConsent}
+        onEnable={onConsentGranted}
+        onDismiss={onConsentDismissed}
+      />
+    </>
   );
 }
