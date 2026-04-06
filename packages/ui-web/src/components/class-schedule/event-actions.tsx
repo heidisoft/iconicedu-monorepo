@@ -60,10 +60,7 @@ function buildEditDefaults(event: DisplayClassScheduleVM, timezone: string) {
     startTime,
     endTime: getLocalTime(event.endAt, timezone) ?? addOneHour(startTime),
     timezone,
-    reason:
-      event.uiState?.reason ??
-      (typeof event.description === 'string' ? event.description : '') ??
-      '',
+    reason: event.uiState?.reason ?? '',
   };
 }
 
@@ -353,7 +350,11 @@ export function EventActions({
                 id={`edit-session-start-time-${event.ids.id}`}
                 type="time"
                 value={editStartTime}
-                onChange={(dialogEvent) => setEditStartTime(dialogEvent.target.value)}
+                onChange={(dialogEvent) => {
+                  const newStart = dialogEvent.target.value;
+                  setEditStartTime(newStart);
+                  if (newStart) setEditEndTime(addOneHour(newStart));
+                }}
                 disabled={isEditingSession}
               />
             </div>
