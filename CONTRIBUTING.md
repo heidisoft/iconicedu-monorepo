@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document defines how engineers contribute changes to the IconicEdu monorepo.
+This document defines how engineers contribute changes to the ICONICEDU monorepo.
 
 ## Intended Audience
 

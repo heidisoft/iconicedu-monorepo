@@ -94,7 +94,7 @@ export async function fetchLinkPreviewMetadata(
     const response = await fetch(normalizedUrl, {
       redirect: 'follow',
       headers: {
-        'user-agent': 'IconicEduLinkPreviewBot/1.0',
+        'user-agent': 'ICONICEDULinkPreviewBot/1.0',
       },
     });
 

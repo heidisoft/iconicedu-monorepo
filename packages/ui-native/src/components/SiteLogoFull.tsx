@@ -25,7 +25,12 @@ export const SiteLogoFull: React.FC<SiteLogoFullProps> = ({
   const w = width ?? Math.round(h * ASPECT);
 
   return (
-    <Svg viewBox="0 0 215.11 77.39" width={w} height={h} accessibilityLabel="IconicEdu">
+    <Svg
+      viewBox="0 0 215.11 77.39"
+      width={w}
+      height={h}
+      accessibilityLabel="ICONIC Academy"
+    >
       <Defs>
         {/* Main gradient used by the chevron mark */}
         <LinearGradient

@@ -23,6 +23,7 @@ import {
   ArrowRightLeft,
   Check,
 } from 'lucide-react-native';
+import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { BottomSheet, Card, SettingsRow } from '@iconicedu/ui-native';
 import { useAuth } from '@/providers/auth-provider';
@@ -478,7 +479,10 @@ export default function AccountScreen() {
             labelColor={colors.red}
           />
         </View>
-        <Text style={s.version}>IconicEdu v0.1.0</Text>
+        <Text style={s.version}>
+          {Constants.expoConfig?.name ?? 'ICONIC Academy'} v
+          {Constants.expoConfig?.version ?? '0.1.0'}
+        </Text>
       </ScrollView>
       <BottomSheet
         visible={familySwitchOpen}

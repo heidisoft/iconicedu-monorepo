@@ -1,6 +1,6 @@
-# IconicEdu Monorepo
+# ICONICEDU Monorepo
 
-IconicEdu is a communication-first education platform spanning web, mobile, and API surfaces for guardians, educators, children, advisors, and staff.
+ICONICEDU is a communication-first education platform spanning web, mobile, and API surfaces for guardians, educators, children, advisors, and staff.
 
 ## Purpose
 
