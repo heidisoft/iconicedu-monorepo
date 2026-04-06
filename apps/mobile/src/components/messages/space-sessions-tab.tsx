@@ -320,8 +320,8 @@ function splitAndGroupSessions(schedules: ClassScheduleVM[]): {
         const nextSessionNumber = (sessionCountByWeekNumber.get(weekNumber) ?? 0) + 1;
         sessionCountByWeekNumber.set(weekNumber, nextSessionNumber);
         const monthLabel = start.toLocaleDateString('en-US', { month: 'short' });
-        // Mirrors web isEventLive: now >= startAt && now <= endAt
-        const isLive = startMs <= nowMs && endMs >= nowMs;
+        // Mirrors web isEventLive: now >= startAt && now <= endAt (cancelled sessions are never live)
+        const isLive = s.status !== 'cancelled' && startMs <= nowMs && endMs >= nowMs;
         const isPast = endMs < nowMs;
         return {
           id: s.ids.id,

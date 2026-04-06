@@ -8,7 +8,11 @@ import { supabase } from '@/lib/supabase/client';
  * Requests push notification permissions and returns an Expo push token.
  * Returns null if the device is a simulator, permissions are denied, or token fetch fails.
  */
-export async function getExpoPushToken(): Promise<string | null> {
+export async function getExpoPushToken(options?: {
+  requestPermissions?: boolean;
+}): Promise<string | null> {
+  const requestPermissions = options?.requestPermissions ?? true;
+
   // Expo push tokens only work on physical devices
   if (!Constants.isDevice) {
     return null;
@@ -18,6 +22,10 @@ export async function getExpoPushToken(): Promise<string | null> {
   let finalStatus = existingStatus;
 
   if (existingStatus !== 'granted') {
+    if (!requestPermissions) {
+      return null;
+    }
+
     const { status } = await Notifications.requestPermissionsAsync();
     finalStatus = status;
   }
