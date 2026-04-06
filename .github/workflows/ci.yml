@@ -566,6 +566,17 @@ jobs:
               variables:{input:{projectId:$pid, environmentId:$eid, serviceId:$sid, variables:$vars}}}')"
           echo "Variables set"
 
+          # Configure the service instance source to the PR branch so Railway
+          # knows what code to build. New environments have no source set.
+          echo "Configuring service source to branch: ${{ github.head_ref }}"
+          api "$(jq -n \
+            --arg sid "$SERVICE_ID" \
+            --arg eid "$ENV_ID" \
+            --arg branch "${{ github.head_ref }}" \
+            '{query:"mutation serviceInstanceUpdate($input: ServiceInstanceUpdateInput!) { serviceInstanceUpdate(input: $input) }",
+              variables:{input:{serviceId:$sid, environmentId:$eid, source:{branch:$branch}}}}')"
+          echo "Source branch configured"
+
           echo "Triggering Railway deployment..."
           DEPLOY_RESP=$(api "{\"query\":\"mutation { serviceInstanceDeploy(serviceId: \\\"$SERVICE_ID\\\", environmentId: \\\"$ENV_ID\\\") }\"}")
           echo "Deploy response: $(echo "$DEPLOY_RESP" | jq '.errors // .data')"
@@ -577,7 +588,7 @@ jobs:
           get_service_domain() {
             local info
             info=$(service_instance_info)
-            echo "$info" | jq -r '.data.serviceInstance.domains.serviceDomains[]? | select((.targetPort // 3000) == 3000) | .domain' | head -n 1
+            echo "$info" | jq -r '.data.serviceInstance.domains.serviceDomains[0]?.domain // empty'
           }
 
           echo "Waiting for Railway deployment to stabilize..."
@@ -603,11 +614,11 @@ jobs:
           if [[ -n "$RAILWAY_DOMAIN" ]]; then
             echo "Using existing Railway domain: $RAILWAY_DOMAIN"
           else
-            echo "No Railway service domain found for port 3000 — creating one"
+            echo "No Railway service domain found — creating one"
             DOMAIN_CREATE_RESP=$(api "$(jq -n \
               --arg eid "$ENV_ID" \
               --arg sid "$SERVICE_ID" \
-              '{query:"mutation serviceDomainCreate($input: ServiceDomainCreateInput!) { serviceDomainCreate(input: $input) { id domain targetPort } }", variables:{input:{environmentId:$eid, serviceId:$sid, targetPort:3000}}}')")
+              '{query:"mutation serviceDomainCreate($input: ServiceDomainCreateInput!) { serviceDomainCreate(input: $input) { id domain } }", variables:{input:{environmentId:$eid, serviceId:$sid}}}')")
             RAILWAY_DOMAIN=$(echo "$DOMAIN_CREATE_RESP" | jq -r '.data.serviceDomainCreate.domain // empty')
             if [[ -z "$RAILWAY_DOMAIN" ]]; then
               RAILWAY_DOMAIN="$(get_service_domain)"
