@@ -855,6 +855,8 @@ jobs:
               }
             }
 
+            const easPreviewWorkflowUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/workflows/eas-preview-build.yml`;
+
             // ── Assemble comment ───────────────────────────────────────────────
             const body = [
               '## Preview Environment Ready',
@@ -865,7 +867,7 @@ jobs:
               `| API (Railway) | ${apiUrl}/healthz |`,
               `| Supabase Studio | ${studioUrl} |`,
               '',
-              `**Mobile build** — [Actions → EAS Preview Build](../../actions/workflows/eas-preview-build.yml) → PR number: \`${prNumber}\``,
+              `**Mobile build** — [Actions → EAS Preview Build](${easPreviewWorkflowUrl}) → PR number: \`${prNumber}\``,
               bundleSection,
               lighthouseSection,
             ].join('\n');
