@@ -498,8 +498,11 @@ jobs:
 
           echo "branch_api_url=https://${BRANCH_REF}.supabase.co" >> "$GITHUB_OUTPUT"
 
-      # 3. Deploy Railway preview environment
-      - name: Deploy Railway preview API
+      # 3. Configure Railway PR environment env vars and redeploy
+      # Railway PR Environments automatically creates the environment and deploys
+      # from the PR branch when a PR is opened. We only need to inject env vars
+      # and trigger a redeploy so the service picks them up.
+      - name: Configure Railway PR environment
         id: railway
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
@@ -508,10 +511,13 @@ jobs:
           set -euo pipefail
 
           if [[ -z "${PR_NUMBER:-}" ]]; then
-            echo "::error::PR_NUMBER is empty; cannot derive Railway preview environment name"
+            echo "::error::PR_NUMBER is empty"
             exit 1
           fi
-          ENV_NAME="preview-${PR_NUMBER}"
+
+          # Railway PR Environments are named: {repo-name}-pr-{number}
+          REPO_NAME="${{ github.event.repository.name }}"
+          ENV_NAME="${REPO_NAME}-pr-${PR_NUMBER}"
           SERVICE_ID="${{ secrets.RAILWAY_SERVICE_ID }}"
           GQL="https://backboard.railway.app/graphql/v2"
 
@@ -523,24 +529,18 @@ jobs:
               -d "$1" || echo "{}"
           }
 
-          echo "Ensuring Railway environment: $ENV_NAME"
-          CREATE_RESP=$(api "{\"query\":\"mutation { environmentCreate(input: {projectId: \\\"$RAILWAY_PROJECT_ID\\\", name: \\\"$ENV_NAME\\\"}) { id } }\"}")
-
-          ENV_ID=$(echo "$CREATE_RESP" | jq -r '.data.environmentCreate.id // empty')
-          echo "Create response: $(echo "$CREATE_RESP" | jq '.errors // "ok"')"
-
-          if [[ -z "$ENV_ID" ]]; then
-            echo "Environment may already exist — fetching by name"
-            LIST_RESP=$(api "{\"query\":\"query { project(id: \\\"$RAILWAY_PROJECT_ID\\\") { environments { edges { node { id name } } } } }\"}")
-            ENV_ID=$(echo "$LIST_RESP" | jq -r ".data.project.environments.edges[]? | select(.node.name==\"$ENV_NAME\") | .node.id // empty")
-          fi
+          # Find the auto-created PR environment by name
+          echo "Looking up Railway PR environment: $ENV_NAME"
+          LIST_RESP=$(api "{\"query\":\"query { project(id: \\\"$RAILWAY_PROJECT_ID\\\") { environments { edges { node { id name } } } } }\"}")
+          ENV_ID=$(echo "$LIST_RESP" | jq -r ".data.project.environments.edges[]? | select(.node.name==\"$ENV_NAME\") | .node.id // empty")
 
           if [[ -z "$ENV_ID" ]]; then
-            echo "::error::Failed to create or find Railway environment $ENV_NAME"
+            echo "::error::Railway PR environment '$ENV_NAME' not found. Ensure PR Environments is enabled in Railway."
             exit 1
           fi
-          echo "Environment ID: $ENV_ID"
+          echo "Found environment: $ENV_NAME ($ENV_ID)"
 
+          # Inject all required env vars into the PR environment
           VARS_JSON=$(jq -n \
             --arg db    "${{ steps.branch-creds.outputs.database_url }}" \
             --arg dir   "${{ steps.branch-creds.outputs.direct_url }}" \
@@ -555,8 +555,7 @@ jobs:
               SUPABASE_SERVICE_ROLE_KEY:$srkey, JWT_SECRET:$jwt,
               INTERNAL_REMINDERS_TOKEN_API:$rem, INTERNAL_NOTIFICATIONS_TOKEN:$not,
               NODE_ENV:"production", NEXT_PUBLIC_APP_ENV:"preview",
-              POSTHOG_KEY:$phk, POSTHOG_HOST:$phh,
-              PORT:"8080"}')
+              POSTHOG_KEY:$phk, POSTHOG_HOST:$phh}')
 
           VARS_RESP=$(api "$(jq -n \
             --arg pid "$RAILWAY_PROJECT_ID" \
@@ -567,30 +566,13 @@ jobs:
               variables:{input:{projectId:$pid, environmentId:$eid, serviceId:$sid, variables:$vars}}}')")
           echo "Variables response: $(echo "$VARS_RESP" | jq '.errors // "ok"')"
 
-          # Configure service source (PR branch), build/start commands, and health check
-          # so the new environment instance knows exactly how to build and run.
-          echo "Configuring service instance for branch: ${{ github.head_ref }}"
-          INSTANCE_RESP=$(api "$(jq -n \
-            --arg sid "$SERVICE_ID" \
-            --arg eid "$ENV_ID" \
-            --arg branch "${{ github.head_ref }}" \
-            '{query:"mutation serviceInstanceUpdate($input: ServiceInstanceUpdateInput!) { serviceInstanceUpdate(input: $input) }",
-              variables:{input:{
-                serviceId:$sid,
-                environmentId:$eid,
-                source:{branch:$branch},
-                buildCommand:"pnpm --filter api... build",
-                startCommand:"pnpm --filter api start:prod",
-                healthcheckPath:"/healthz"
-              }}}')")
-          echo "Instance response: $(echo "$INSTANCE_RESP" | jq '.errors // "ok"')"
-
-          echo "Triggering Railway deployment..."
+          # Trigger a redeploy so the new env vars are applied
+          echo "Triggering redeploy..."
           DEPLOY_RESP=$(api "{\"query\":\"mutation { serviceInstanceDeploy(serviceId: \\\"$SERVICE_ID\\\", environmentId: \\\"$ENV_ID\\\") }\"}")
           echo "Deploy response: $(echo "$DEPLOY_RESP" | jq '.errors // .data')"
 
           service_instance_info() {
-            api "{\"query\":\"query { serviceInstance(serviceId: \\\"$SERVICE_ID\\\", environmentId: \\\"$ENV_ID\\\") { latestDeployment { status } domains { serviceDomains { id domain targetPort } } } }\"}"
+            api "{\"query\":\"query { serviceInstance(serviceId: \\\"$SERVICE_ID\\\", environmentId: \\\"$ENV_ID\\\") { latestDeployment { status } domains { serviceDomains { id domain } } } }\"}"
           }
 
           get_service_domain() {
@@ -599,32 +581,8 @@ jobs:
             echo "$info" | jq -r '.data.serviceInstance.domains.serviceDomains[0]?.domain // empty'
           }
 
-          # Ensure a predictable custom domain exists before the build starts.
-          # Format: iconicedu-api-preview-{PR_NUMBER}.up.railway.app
-          CUSTOM_SUBDOMAIN="iconicedu-api-preview-${PR_NUMBER}"
-          RAILWAY_DOMAIN="${CUSTOM_SUBDOMAIN}.up.railway.app"
-
-          EXISTING_DOMAIN="$(get_service_domain)"
-          if [[ "$EXISTING_DOMAIN" == "$RAILWAY_DOMAIN" ]]; then
-            echo "Predictable domain already exists: $RAILWAY_DOMAIN"
-          else
-            echo "Creating predictable domain: $RAILWAY_DOMAIN"
-            DOMAIN_CREATE_RESP=$(api "$(jq -n \
-              --arg eid "$ENV_ID" \
-              --arg sid "$SERVICE_ID" \
-              --arg sub "$CUSTOM_SUBDOMAIN" \
-              '{query:"mutation serviceDomainCreate($input: ServiceDomainCreateInput!) { serviceDomainCreate(input: $input) { id domain } }",
-                variables:{input:{environmentId:$eid, serviceId:$sid, domain:$sub}}}')")
-            echo "Domain create response: $(echo "$DOMAIN_CREATE_RESP" | jq '.errors // "ok"')"
-            CREATED_DOMAIN=$(echo "$DOMAIN_CREATE_RESP" | jq -r '.data.serviceDomainCreate.domain // empty')
-            if [[ -n "$CREATED_DOMAIN" ]]; then
-              RAILWAY_DOMAIN="$CREATED_DOMAIN"
-            fi
-          fi
-
-          echo "Service domain: $RAILWAY_DOMAIN"
-
-          echo "Waiting for Railway deployment to stabilize..."
+          # Wait for deployment to complete (up to 2 min)
+          echo "Waiting for deployment to stabilize..."
           DEPLOY_STATUS=""
           for i in $(seq 1 12); do
             DEPLOY_INFO=$(service_instance_info)
@@ -640,7 +598,24 @@ jobs:
             echo "::warning::Railway deployment ended with status $DEPLOY_STATUS"
           fi
 
-          # Try up to 3 times to confirm the domain is live via health check
+          # Get the domain Railway auto-assigned for this PR environment
+          RAILWAY_DOMAIN="$(get_service_domain)"
+          if [[ -z "$RAILWAY_DOMAIN" ]]; then
+            for i in $(seq 1 3); do
+              echo "  Domain lookup attempt $i/3..."
+              sleep 5
+              RAILWAY_DOMAIN="$(get_service_domain)"
+              [[ -n "$RAILWAY_DOMAIN" ]] && break
+            done
+          fi
+
+          if [[ -z "$RAILWAY_DOMAIN" ]]; then
+            echo "::warning::No Railway domain found after retries"
+            echo "railway_api_url=pending" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Health check (3 attempts)
           HEALTHY_URL=""
           for i in $(seq 1 3); do
             HEALTH_STATUS=$(curl -sf -o /dev/null -w "%{http_code}" \
@@ -657,10 +632,10 @@ jobs:
           echo "railway_api_url=${FINAL_URL}" >> "$GITHUB_OUTPUT"
 
           if [[ -z "$HEALTHY_URL" ]]; then
-            echo "::warning::Health check did not return 200 after 3 attempts — URL may still be warming up"
+            echo "::warning::Health check did not return 200 — service may still be warming up"
           fi
 
-          # Post a GitHub commit status so the API URL is visible on the PR commits
+          # Post a commit status so the API URL appears on the PR checks tab
           curl -sf -X POST \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             -H "Content-Type: application/json" \
@@ -974,7 +949,7 @@ jobs:
             echo "::error::PR_NUMBER is empty; cannot derive Railway preview environment name"
             exit 1
           fi
-          ENV_NAME="preview-${PR_NUMBER}"
+          ENV_NAME="${{ github.event.repository.name }}-pr-${PR_NUMBER}"
           GQL="https://backboard.railway.app/graphql/v2"
 
           ENV_ID=$(curl -sf \

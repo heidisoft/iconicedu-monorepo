@@ -353,7 +353,29 @@ export function EventActions({
                 onChange={(dialogEvent) => {
                   const newStart = dialogEvent.target.value;
                   setEditStartTime(newStart);
-                  if (newStart) setEditEndTime(addOneHour(newStart));
+                  if (newStart && editStartTime && editEndTime) {
+                    // Calculate duration from current start/end times and apply to new start
+                    const [currentHour, currentMin] = editStartTime
+                      .split(':')
+                      .map(Number);
+                    const [endHour, endMin] = editEndTime.split(':').map(Number);
+                    const [newHour, newMin] = newStart.split(':').map(Number);
+
+                    const durationMinutes =
+                      endHour * 60 + endMin - (currentHour * 60 + currentMin);
+                    const newEndMinutes = newHour * 60 + newMin + durationMinutes;
+                    const newEndHour = Math.floor(newEndMinutes / 60) % 24;
+                    const newEndMin = newEndMinutes % 60;
+
+                    setEditEndTime(
+                      `${newEndHour.toString().padStart(2, '0')}:${newEndMin
+                        .toString()
+                        .padStart(2, '0')}`,
+                    );
+                  } else if (newStart) {
+                    // No previous end time; default to 1 hour
+                    setEditEndTime(addOneHour(newStart));
+                  }
                 }}
                 disabled={isEditingSession}
               />
