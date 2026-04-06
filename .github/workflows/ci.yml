@@ -555,16 +555,35 @@ jobs:
               SUPABASE_SERVICE_ROLE_KEY:$srkey, JWT_SECRET:$jwt,
               INTERNAL_REMINDERS_TOKEN_API:$rem, INTERNAL_NOTIFICATIONS_TOKEN:$not,
               NODE_ENV:"production", NEXT_PUBLIC_APP_ENV:"preview",
-              POSTHOG_KEY:$phk, POSTHOG_HOST:$phh}')
+              POSTHOG_KEY:$phk, POSTHOG_HOST:$phh,
+              PORT:"8080"}')
 
-          api "$(jq -n \
+          VARS_RESP=$(api "$(jq -n \
             --arg pid "$RAILWAY_PROJECT_ID" \
             --arg eid "$ENV_ID" \
             --arg sid "$SERVICE_ID" \
             --argjson vars "$VARS_JSON" \
             '{query:"mutation variableCollectionUpsert($input: VariableCollectionUpsertInput!) { variableCollectionUpsert(input: $input) }",
-              variables:{input:{projectId:$pid, environmentId:$eid, serviceId:$sid, variables:$vars}}}')"
-          echo "Variables set"
+              variables:{input:{projectId:$pid, environmentId:$eid, serviceId:$sid, variables:$vars}}}')")
+          echo "Variables response: $(echo "$VARS_RESP" | jq '.errors // "ok"')"
+
+          # Configure service source (PR branch), build/start commands, and health check
+          # so the new environment instance knows exactly how to build and run.
+          echo "Configuring service instance for branch: ${{ github.head_ref }}"
+          INSTANCE_RESP=$(api "$(jq -n \
+            --arg sid "$SERVICE_ID" \
+            --arg eid "$ENV_ID" \
+            --arg branch "${{ github.head_ref }}" \
+            '{query:"mutation serviceInstanceUpdate($input: ServiceInstanceUpdateInput!) { serviceInstanceUpdate(input: $input) }",
+              variables:{input:{
+                serviceId:$sid,
+                environmentId:$eid,
+                source:{branch:$branch},
+                buildCommand:"pnpm --filter api... build",
+                startCommand:"pnpm --filter api start:prod",
+                healthcheckPath:"/healthz"
+              }}}')")
+          echo "Instance response: $(echo "$INSTANCE_RESP" | jq '.errors // "ok"')"
 
           echo "Triggering Railway deployment..."
           DEPLOY_RESP=$(api "{\"query\":\"mutation { serviceInstanceDeploy(serviceId: \\\"$SERVICE_ID\\\", environmentId: \\\"$ENV_ID\\\") }\"}")
@@ -577,21 +596,43 @@ jobs:
           get_service_domain() {
             local info
             info=$(service_instance_info)
-            echo "$info" | jq -r '.data.serviceInstance.domains.serviceDomains[]? | select((.targetPort // 3000) == 3000) | .domain' | head -n 1
+            echo "$info" | jq -r '.data.serviceInstance.domains.serviceDomains[0]?.domain // empty'
           }
+
+          # Ensure a predictable custom domain exists before the build starts.
+          # Format: iconicedu-api-preview-{PR_NUMBER}.up.railway.app
+          CUSTOM_SUBDOMAIN="iconicedu-api-preview-${PR_NUMBER}"
+          RAILWAY_DOMAIN="${CUSTOM_SUBDOMAIN}.up.railway.app"
+
+          EXISTING_DOMAIN="$(get_service_domain)"
+          if [[ "$EXISTING_DOMAIN" == "$RAILWAY_DOMAIN" ]]; then
+            echo "Predictable domain already exists: $RAILWAY_DOMAIN"
+          else
+            echo "Creating predictable domain: $RAILWAY_DOMAIN"
+            DOMAIN_CREATE_RESP=$(api "$(jq -n \
+              --arg eid "$ENV_ID" \
+              --arg sid "$SERVICE_ID" \
+              --arg sub "$CUSTOM_SUBDOMAIN" \
+              '{query:"mutation serviceDomainCreate($input: ServiceDomainCreateInput!) { serviceDomainCreate(input: $input) { id domain } }",
+                variables:{input:{environmentId:$eid, serviceId:$sid, domain:$sub}}}')")
+            echo "Domain create response: $(echo "$DOMAIN_CREATE_RESP" | jq '.errors // "ok"')"
+            CREATED_DOMAIN=$(echo "$DOMAIN_CREATE_RESP" | jq -r '.data.serviceDomainCreate.domain // empty')
+            if [[ -n "$CREATED_DOMAIN" ]]; then
+              RAILWAY_DOMAIN="$CREATED_DOMAIN"
+            fi
+          fi
+
+          echo "Service domain: $RAILWAY_DOMAIN"
 
           echo "Waiting for Railway deployment to stabilize..."
           DEPLOY_STATUS=""
           for i in $(seq 1 12); do
             DEPLOY_INFO=$(service_instance_info)
             DEPLOY_STATUS=$(echo "$DEPLOY_INFO" | jq -r '.data.serviceInstance.latestDeployment.status // empty')
-            EXISTING_DOMAIN=$(echo "$DEPLOY_INFO" | jq -r '.data.serviceInstance.domains.serviceDomains[]? | select((.targetPort // 3000) == 3000) | .domain' | head -n 1)
-            echo "  Status: ${DEPLOY_STATUS:-(pending)}, Domain: ${EXISTING_DOMAIN:-(none)} (attempt $i)"
-
+            echo "  Status: ${DEPLOY_STATUS:-(pending)} (attempt $i/12)"
             case "$DEPLOY_STATUS" in
               SUCCESS|FAILED|CRASHED|REMOVED) break ;;
             esac
-
             sleep 10
           done
 
@@ -599,52 +640,35 @@ jobs:
             echo "::warning::Railway deployment ended with status $DEPLOY_STATUS"
           fi
 
-          RAILWAY_DOMAIN="$(get_service_domain)"
-          if [[ -n "$RAILWAY_DOMAIN" ]]; then
-            echo "Using existing Railway domain: $RAILWAY_DOMAIN"
-          else
-            echo "No Railway service domain found for port 3000 — creating one"
-            DOMAIN_CREATE_RESP=$(api "$(jq -n \
-              --arg eid "$ENV_ID" \
-              --arg sid "$SERVICE_ID" \
-              '{query:"mutation serviceDomainCreate($input: ServiceDomainCreateInput!) { serviceDomainCreate(input: $input) { id domain targetPort } }", variables:{input:{environmentId:$eid, serviceId:$sid, targetPort:3000}}}')")
-            RAILWAY_DOMAIN=$(echo "$DOMAIN_CREATE_RESP" | jq -r '.data.serviceDomainCreate.domain // empty')
-            if [[ -z "$RAILWAY_DOMAIN" ]]; then
-              RAILWAY_DOMAIN="$(get_service_domain)"
+          # Try up to 3 times to confirm the domain is live via health check
+          HEALTHY_URL=""
+          for i in $(seq 1 3); do
+            HEALTH_STATUS=$(curl -sf -o /dev/null -w "%{http_code}" \
+              "https://${RAILWAY_DOMAIN}/healthz" 2>/dev/null || echo "000")
+            echo "  Health check attempt $i/3: $HEALTH_STATUS"
+            if [[ "$HEALTH_STATUS" == "200" ]]; then
+              HEALTHY_URL="https://${RAILWAY_DOMAIN}"
+              break
             fi
+            sleep 10
+          done
+
+          FINAL_URL="${HEALTHY_URL:-https://${RAILWAY_DOMAIN}}"
+          echo "railway_api_url=${FINAL_URL}" >> "$GITHUB_OUTPUT"
+
+          if [[ -z "$HEALTHY_URL" ]]; then
+            echo "::warning::Health check did not return 200 after 3 attempts — URL may still be warming up"
           fi
 
-          if [[ -z "$RAILWAY_DOMAIN" ]]; then
-            for i in $(seq 1 12); do
-              RAILWAY_DOMAIN="$(get_service_domain)"
-              echo "  Domain lookup attempt $i: ${RAILWAY_DOMAIN:-(none)}"
-              if [[ -n "$RAILWAY_DOMAIN" ]]; then break; fi
-              sleep 10
-            done
-          fi
-
-          if [[ -n "$RAILWAY_DOMAIN" ]]; then
-            HEALTHY_URL=""
-            for i in $(seq 1 12); do
-              HEALTH_STATUS=$(curl -sf -o /dev/null -w "%{http_code}" \
-                "https://${RAILWAY_DOMAIN}/healthz" 2>/dev/null || echo "000")
-              echo "  Health check attempt $i: $HEALTH_STATUS"
-              if [[ "$HEALTH_STATUS" == "200" ]]; then
-                HEALTHY_URL="https://${RAILWAY_DOMAIN}"
-                break
-              fi
-              sleep 10
-            done
-            if [[ -n "$HEALTHY_URL" ]]; then
-              echo "railway_api_url=${HEALTHY_URL}" >> "$GITHUB_OUTPUT"
-            else
-              echo "::warning::Railway domain exists but /healthz did not return 200 within the retry window"
-              echo "railway_api_url=https://${RAILWAY_DOMAIN}" >> "$GITHUB_OUTPUT"
-            fi
-          else
-            echo "::warning::Railway domain was not available after the retry window"
-            echo "railway_api_url=pending" >> "$GITHUB_OUTPUT"
-          fi
+          # Post a GitHub commit status so the API URL is visible on the PR commits
+          curl -sf -X POST \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            "https://api.github.com/repos/${{ github.repository }}/statuses/${{ github.event.pull_request.head.sha }}" \
+            -d "$(jq -n \
+              --arg url "${FINAL_URL}/healthz" \
+              '{"state":"success","target_url":$url,"description":"Railway preview API","context":"railway/preview-api"}')" \
+            || echo "::warning::Failed to post commit status (non-fatal)"
 
       # 4. Configure Vercel preview env vars
       - name: Configure Vercel preview env vars
@@ -855,6 +879,8 @@ jobs:
               }
             }
 
+            const easPreviewWorkflowUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/workflows/eas-preview-build.yml`;
+
             // ── Assemble comment ───────────────────────────────────────────────
             const body = [
               '## Preview Environment Ready',
@@ -865,7 +891,7 @@ jobs:
               `| API (Railway) | ${apiUrl}/healthz |`,
               `| Supabase Studio | ${studioUrl} |`,
               '',
-              `**Mobile build** — [Actions → EAS Preview Build](../../actions/workflows/eas-preview-build.yml) → PR number: \`${prNumber}\``,
+              `**Mobile build** — [Actions → EAS Preview Build](${easPreviewWorkflowUrl}) → PR number: \`${prNumber}\``,
               bundleSection,
               lighthouseSection,
             ].join('\n');
