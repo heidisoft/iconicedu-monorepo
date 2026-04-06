@@ -22,6 +22,7 @@ type NotificationData = {
   prefKey?: string;
   scopeKind?: 'channel' | 'learning_space';
   scopeId?: string;
+  channelId?: string;
   orgId?: string;
 };
 
@@ -39,7 +40,11 @@ export function useNotificationHandler() {
         const data = response.notification.request.content.data as NotificationData;
         const config = data?.prefKey ? NOTIFICATION_REGISTRY[data.prefKey] : undefined;
         const route = config
-          ? config.getRoute({ scopeKind: data.scopeKind, scopeId: data.scopeId })
+          ? config.getRoute({
+              scopeKind: data.scopeKind,
+              scopeId: data.scopeId,
+              channelId: data.channelId,
+            })
           : DEFAULT_NOTIFICATION_ROUTE;
         router.push(route as Parameters<typeof router.push>[0]);
       },

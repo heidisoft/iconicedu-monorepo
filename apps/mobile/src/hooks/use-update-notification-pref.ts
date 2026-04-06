@@ -11,11 +11,29 @@ async function upsertNotificationPreference(
   muted: boolean,
 ) {
   const now = new Date().toISOString();
+
+  const existingPref = await supabase
+    .from('notification_preferences')
+    .select('channels')
+    .eq('org_id', orgId)
+    .eq('profile_id', profileId)
+    .eq('pref_key', prefKey)
+    .is('deleted_at', null)
+    .maybeSingle<{ channels: string[] | null }>();
+
+  if (existingPref.error) throw new Error(existingPref.error.message);
+
+  const channels =
+    Array.isArray(existingPref.data?.channels) && existingPref.data.channels.length > 0
+      ? existingPref.data.channels
+      : ['push'];
+
   const { error } = await supabase.from('notification_preferences').upsert(
     {
       org_id: orgId,
       profile_id: profileId,
       pref_key: prefKey,
+      channels,
       muted,
       updated_at: now,
       updated_by: profileId,

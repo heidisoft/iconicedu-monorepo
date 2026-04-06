@@ -302,7 +302,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     analytics.capture(AnalyticsEvent.SIGNED_OUT);
     analytics.reset();
     try {
-      const token = await getExpoPushToken();
+      const token = await getExpoPushToken({ requestPermissions: false });
       if (token) await revokePushToken(token);
     } catch {
       // Token revocation is best-effort; never block sign-out

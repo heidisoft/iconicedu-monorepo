@@ -96,6 +96,36 @@ describe('sendPushNotification', () => {
     });
   });
 
+  it('includes channelId in push data when metadata has a channel id', async () => {
+    setupSelectChain({
+      data: [{ id: 'tok-1', token: 'ExponentPushToken[aaa]' }],
+      error: null,
+    });
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ status: 'ok' }] }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await sendPushNotification({
+      ...BASE_PAYLOAD,
+      scopeKind: 'learning_space',
+      scopeId: 'space-1',
+      metadata: {
+        rawEventPayload: {
+          channelId: 'channel-42',
+        },
+      },
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as Array<{
+      data?: { channelId?: string };
+    }>;
+    expect(body[0]?.data?.channelId).toBe('channel-42');
+  });
+
   it('throws when the Expo API returns a non-ok status', async () => {
     setupSelectChain({
       data: [{ id: 'tok-1', token: 'ExponentPushToken[aaa]' }],

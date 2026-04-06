@@ -6,7 +6,11 @@ export type NotificationConfig = {
    * `scopeKind` and `scopeId` come from the push payload (Gap 7 web enrichment).
    * When absent, returns the tab-level fallback route.
    */
-  getRoute: (data: { scopeKind?: string; scopeId?: string }) => string;
+  getRoute: (data: {
+    scopeKind?: string;
+    scopeId?: string;
+    channelId?: string;
+  }) => string;
 };
 
 export const NOTIFICATION_REGISTRY: Record<string, NotificationConfig> = {
@@ -52,17 +56,21 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationConfig> = {
   },
   'summary.posted': {
     label: 'AI Summary',
-    getRoute: ({ scopeKind, scopeId }) =>
-      scopeKind === 'learning_space' && scopeId
+    getRoute: ({ scopeKind, scopeId, channelId }) =>
+      scopeKind === 'channel' && scopeId
         ? `/(app)/spaces/${scopeId}`
-        : '/(app)/(tabs)/inbox',
+        : scopeKind === 'learning_space' && channelId
+          ? `/(app)/spaces/${channelId}`
+          : '/(app)/(tabs)/inbox',
   },
   'file.uploaded': {
     label: 'File Uploaded',
-    getRoute: ({ scopeKind, scopeId }) =>
-      scopeKind === 'learning_space' && scopeId
+    getRoute: ({ scopeKind, scopeId, channelId }) =>
+      scopeKind === 'channel' && scopeId
         ? `/(app)/spaces/${scopeId}`
-        : '/(app)/(tabs)/inbox',
+        : scopeKind === 'learning_space' && channelId
+          ? `/(app)/spaces/${channelId}`
+          : '/(app)/(tabs)/inbox',
   },
 };
 

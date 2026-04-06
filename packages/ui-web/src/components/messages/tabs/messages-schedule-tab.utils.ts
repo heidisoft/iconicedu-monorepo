@@ -581,6 +581,7 @@ export function toMonthGroups(
         dayNum: String(startDisplayDate.getDate()),
         isToday: startDay === nowDay,
         isLive:
+          schedule.status !== 'cancelled' &&
           new Date(schedule.startAt).getTime() <= nowMs &&
           nowMs < new Date(schedule.endAt).getTime(),
         isPast: new Date(schedule.endAt).getTime() < nowMs,
