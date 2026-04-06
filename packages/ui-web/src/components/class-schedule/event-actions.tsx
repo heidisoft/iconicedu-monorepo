@@ -60,10 +60,7 @@ function buildEditDefaults(event: DisplayClassScheduleVM, timezone: string) {
     startTime,
     endTime: getLocalTime(event.endAt, timezone) ?? addOneHour(startTime),
     timezone,
-    reason:
-      event.uiState?.reason ??
-      (typeof event.description === 'string' ? event.description : '') ??
-      '',
+    reason: event.uiState?.reason ?? '',
   };
 }
 
@@ -353,7 +350,33 @@ export function EventActions({
                 id={`edit-session-start-time-${event.ids.id}`}
                 type="time"
                 value={editStartTime}
-                onChange={(dialogEvent) => setEditStartTime(dialogEvent.target.value)}
+                onChange={(dialogEvent) => {
+                  const newStart = dialogEvent.target.value;
+                  setEditStartTime(newStart);
+                  if (newStart && editStartTime && editEndTime) {
+                    // Calculate duration from current start/end times and apply to new start
+                    const [currentHour, currentMin] = editStartTime
+                      .split(':')
+                      .map(Number);
+                    const [endHour, endMin] = editEndTime.split(':').map(Number);
+                    const [newHour, newMin] = newStart.split(':').map(Number);
+
+                    const durationMinutes =
+                      endHour * 60 + endMin - (currentHour * 60 + currentMin);
+                    const newEndMinutes = newHour * 60 + newMin + durationMinutes;
+                    const newEndHour = Math.floor(newEndMinutes / 60) % 24;
+                    const newEndMin = newEndMinutes % 60;
+
+                    setEditEndTime(
+                      `${newEndHour.toString().padStart(2, '0')}:${newEndMin
+                        .toString()
+                        .padStart(2, '0')}`,
+                    );
+                  } else if (newStart) {
+                    // No previous end time; default to 1 hour
+                    setEditEndTime(addOneHour(newStart));
+                  }
+                }}
                 disabled={isEditingSession}
               />
             </div>
