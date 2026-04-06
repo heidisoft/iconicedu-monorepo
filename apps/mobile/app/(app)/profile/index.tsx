@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from 'react-native';
+import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Bell, CircleUserRound, HelpCircle, Lock, Palette } from 'lucide-react-native';
@@ -83,7 +84,10 @@ export default function ProfileScreen() {
           <Text style={s.signOutTxt}>Sign out</Text>
         </TouchableOpacity>
 
-        <Text style={s.version}>IconicEdu Mobile v0.1.0</Text>
+        <Text style={s.version}>
+          {Constants.expoConfig?.name ?? 'ICONIC Academy'} v
+          {Constants.expoConfig?.version ?? '0.1.0'}
+        </Text>
         <AppSupportFooter />
       </ScrollView>
     </SafeAreaView>
