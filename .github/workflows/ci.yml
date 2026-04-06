@@ -555,7 +555,8 @@ jobs:
               SUPABASE_SERVICE_ROLE_KEY:$srkey, JWT_SECRET:$jwt,
               INTERNAL_REMINDERS_TOKEN_API:$rem, INTERNAL_NOTIFICATIONS_TOKEN:$not,
               NODE_ENV:"production", NEXT_PUBLIC_APP_ENV:"preview",
-              POSTHOG_KEY:$phk, POSTHOG_HOST:$phh}')
+              POSTHOG_KEY:$phk, POSTHOG_HOST:$phh,
+              PORT:"8080"}')
 
           api "$(jq -n \
             --arg pid "$RAILWAY_PROJECT_ID" \
