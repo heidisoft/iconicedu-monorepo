@@ -20,6 +20,7 @@ type ExpoPushMessage = {
   to: string;
   title: string;
   body?: string;
+  channelId?: string;
   data?: Record<string, unknown>;
   sound: 'default';
 };
@@ -76,6 +77,9 @@ export async function sendPushNotification(payload: PushNotificationPayload) {
     to: token,
     title: payload.title,
     body: payload.summary ?? undefined,
+    // Required for Android 8+ to route the notification to the correct channel.
+    // Must match the channel created by ensureAndroidChannel() in use-push-registration.ts.
+    channelId: 'default',
     data: {
       prefKey: payload.prefKey,
       orgId: payload.orgId,

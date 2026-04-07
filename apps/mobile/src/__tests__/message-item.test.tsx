@@ -180,7 +180,7 @@ describe('MessageItem', () => {
     );
 
     expect(screen.getByTestId('message-visibility-badge')).toBeTruthy();
-    expect(screen.getByText('Only visible to you')).toBeTruthy();
+    expect(screen.getByLabelText('Only visible to you')).toBeTruthy();
   });
 
   it('renders the visibility badge for specific-users messages', () => {
@@ -194,6 +194,6 @@ describe('MessageItem', () => {
     );
 
     expect(screen.getByTestId('message-visibility-badge')).toBeTruthy();
-    expect(screen.getByText('Visible to specific users')).toBeTruthy();
+    expect(screen.getByLabelText('Visible to specific users')).toBeTruthy();
   });
 });
