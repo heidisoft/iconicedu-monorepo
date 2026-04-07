@@ -73,7 +73,14 @@ export function usePushRegistration() {
           return;
         }
 
-        // Consent sheet was already shown; if permission is granted, register token
+        // Consent sheet was already shown, but OS permission may never have been requested
+        // (e.g. user tapped "Not Now", or CONSENT_SHOWN_KEY persisted from a prior install
+        // since SecureStore survives Android reinstalls via EncryptedSharedPreferences).
+        // Re-show the sheet so they get another chance. Only permanently bail on explicit denial.
+        if (status === 'undetermined') {
+          setShowConsent(true);
+          return;
+        }
         if (status !== 'granted') return;
         registered.current = true;
         const token = await getExpoPushToken();
