@@ -229,6 +229,7 @@ export const ThreadSheet: React.FC<ThreadSheetProps> = ({
                     onReactionToggle={onReactionToggle}
                     currentProfileId={currentProfileId}
                     currentAccountId={currentAccountId}
+                    isThreadMessage
                   />
                 )}
                 contentContainerStyle={{ paddingVertical: 8 }}

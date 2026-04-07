@@ -2,7 +2,6 @@ import { memo } from 'react';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import {
   AvatarWithStatus,
-  getAvatarLocationLabel,
   getAvatarRoleLabel,
 } from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
@@ -62,11 +61,9 @@ export const ThreadIndicator = memo(function ThreadIndicator({
               presence={participant.presence}
               themeKey={participant.ui?.themeKey}
               roleLabel={getAvatarRoleLabel(participant.kind)}
-              timezone={participant.prefs?.timezone ?? null}
-              locationLabel={getAvatarLocationLabel(participant.location)}
-              about={participant.profile.bio ?? null}
               sizeClassName="h-5 w-5 border-2 border-background"
               fallbackClassName="text-[11px]"
+              enableProfilePreview={false}
             />
           );
         })}

@@ -525,27 +525,50 @@ export function SessionCard({
         onRequestClose={() => setExternalJoinTarget(null)}
       >
         <Pressable style={s.modalBackdrop} onPress={() => setExternalJoinTarget(null)}>
-          <Pressable style={s.modalCard} onPress={(event) => event.stopPropagation()}>
+          <Pressable
+            style={[
+              s.modalCard,
+              { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
+            onPress={(event) => event.stopPropagation()}
+          >
             <View style={s.modalHeading}>
-              <Text style={s.modalTitle}>Session ready to join</Text>
-              <Text style={s.modalDescription}>
+              <Text style={[s.modalTitle, { color: colors.text }]}>
+                Session ready to join
+              </Text>
+              <Text style={[s.modalDescription, { color: colors.textMuted }]}>
                 This session opens in an external provider. Stay here until you are ready,
                 then use the link below to join.
               </Text>
             </View>
-            <View style={s.modalLinkBox}>
-              <Text style={s.modalLinkLabel}>Join link</Text>
-              <Text style={s.modalLinkValue}>{externalJoinTarget?.joinHref}</Text>
+            <View
+              style={[
+                s.modalLinkBox,
+                { backgroundColor: colors.inputBg, borderColor: colors.border },
+              ]}
+            >
+              <Text style={[s.modalLinkLabel, { color: colors.textMuted }]}>
+                Join link
+              </Text>
+              <Text style={[s.modalLinkValue, { color: colors.text }]}>
+                {externalJoinTarget?.joinHref}
+              </Text>
             </View>
             <View style={s.modalFooter}>
               <TouchableOpacity
-                style={[s.modalButton, s.modalButtonSecondary]}
+                style={[
+                  s.modalButton,
+                  s.modalButtonSecondary,
+                  { backgroundColor: colors.inputBg, borderColor: colors.border },
+                ]}
                 onPress={() => void handleShareJoinHref()}
                 activeOpacity={0.85}
                 accessibilityLabel="Share join link"
               >
-                <Share2 size={16} color="#0f172a" />
-                <Text style={s.modalButtonSecondaryText}>Share</Text>
+                <Share2 size={16} color={colors.text} />
+                <Text style={[s.modalButtonSecondaryText, { color: colors.text }]}>
+                  Share
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[s.modalButton, s.modalButtonPrimary]}
@@ -570,12 +593,15 @@ export function SessionCard({
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={s.modalCloseIconButton}
+                style={[
+                  s.modalCloseIconButton,
+                  { backgroundColor: colors.inputBg, borderColor: colors.border },
+                ]}
                 onPress={() => setExternalJoinTarget(null)}
                 activeOpacity={0.85}
                 accessibilityLabel="Close join dialog"
               >
-                <X size={16} color="#0f172a" />
+                <X size={16} color={colors.text} />
               </TouchableOpacity>
             </View>
           </Pressable>

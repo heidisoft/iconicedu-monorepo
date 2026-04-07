@@ -38,6 +38,7 @@
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="iconicedu"/>
+        <data android:scheme="exp+iconicedu-mobile"/>
       </intent-filter>
     </activity>
   </application>

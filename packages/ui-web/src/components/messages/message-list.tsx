@@ -595,7 +595,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                 <div className="min-w-0">
                                   <div className="flex items-center gap-2">
                                     <span className="text-sm font-semibold leading-none text-foreground">
-                                      {senderName}
+                                      {isOwnReply ? 'You' : senderName}
                                     </span>
                                     <span className="text-xs leading-none text-muted-foreground">
                                       {formatTime(reply.core.createdAt)}

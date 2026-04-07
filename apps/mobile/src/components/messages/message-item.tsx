@@ -74,7 +74,7 @@ const CHANNEL_FILES_BUCKET = 'channel-files';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function formatTime(iso: string): string {
+export function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
@@ -99,7 +99,7 @@ function isPdfAttachment(input: {
 
 type AvatarInfo = { url: string | null; seed: string };
 
-function getAvatarInfo(message: MessageVM): AvatarInfo {
+export function getAvatarInfo(message: MessageVM): AvatarInfo {
   const profile = message.core.sender.profile as {
     avatar?: { source?: string; url?: string | null; seed?: string | null };
   };
@@ -125,19 +125,19 @@ const AVATAR_COLORS = [
   '#E06C8A',
 ];
 
-function avatarBgColor(seed: string): string {
+export function avatarBgColor(seed: string): string {
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
   return AVATAR_COLORS[h % AVATAR_COLORS.length];
 }
 
-function getInitials(name: string): string {
+export function getInitials(name: string): string {
   const words = name.trim().split(/\s+/);
   if (words.length >= 2) return (words[0]![0]! + words[1]![0]!).toUpperCase();
   return name[0]?.toUpperCase() ?? '?';
 }
 
-function MessageAvatar({
+export function MessageAvatar({
   name,
   src,
   seed,
@@ -201,7 +201,7 @@ const avatarStyles = StyleSheet.create({
 
 // Deterministic color per sender name (Slack-style)
 const NAME_COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#ef4444'];
-function senderColor(name: string): string {
+export function senderColor(name: string): string {
   let h = 0;
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
   return NAME_COLORS[h % NAME_COLORS.length];
@@ -331,6 +331,8 @@ type SocialBarProps = {
   hideActions?: boolean;
   /** When true, emoji + reply buttons are shown but grayed-out and non-interactive. */
   disabledActions?: boolean;
+  /** When true, the thread pill and reply button are hidden (used in thread replies). */
+  hideThreadButton?: boolean;
 };
 
 function SocialBar({
@@ -344,6 +346,7 @@ function SocialBar({
   threadExpanded,
   hideActions,
   disabledActions,
+  hideThreadButton,
 }: SocialBarProps) {
   const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
   const hasThread = !!thread && thread.stats.messageCount > 0;
@@ -414,28 +417,29 @@ function SocialBar({
               <SmilePlus size={16} color={colors.textMuted} />
             </TouchableOpacity>
 
-            {/* Thread pill if exists, reply button if not */}
-            {hasThread ? (
-              <ThreadPill
-                thread={thread!}
-                colors={colors}
-                onPress={disabledActions ? () => {} : (onThreadPress ?? (() => {}))}
-                expanded={threadExpanded}
-                unreadCount={threadUnreadCount}
-              />
-            ) : (
-              <ThreadReplyButton
-                colors={colors}
-                onPress={onThreadPress}
-                disabled={disabledActions ?? false}
-                inline
-              />
-            )}
+            {/* Thread pill if exists, reply button if not — hidden inside thread view */}
+            {!hideThreadButton &&
+              (hasThread ? (
+                <ThreadPill
+                  thread={thread!}
+                  colors={colors}
+                  onPress={disabledActions ? () => {} : (onThreadPress ?? (() => {}))}
+                  expanded={threadExpanded}
+                  unreadCount={threadUnreadCount}
+                />
+              ) : (
+                <ThreadReplyButton
+                  colors={colors}
+                  onPress={onThreadPress}
+                  disabled={disabledActions ?? false}
+                  inline
+                />
+              ))}
           </>
         )}
 
-        {/* Thread pill always visible when thread exists (even on emoji-only) */}
-        {hideActions && hasThread && (
+        {/* Thread pill always visible when thread exists (even on emoji-only), unless inside a thread */}
+        {hideActions && hasThread && !hideThreadButton && (
           <ThreadPill
             thread={thread!}
             colors={colors}
@@ -759,8 +763,19 @@ const visibilityBadgeStyles = StyleSheet.create({
 
 // ─── Inline thread reply (compact) ────────────────────────────────────────────
 
-function InlineReply({ message, colors }: { message: MessageVM; colors: AppColors }) {
+function InlineReply({
+  message,
+  colors,
+  currentProfileId,
+}: {
+  message: MessageVM;
+  colors: AppColors;
+  currentProfileId?: string;
+}) {
   const senderName = message.core.sender.profile.displayName;
+  const isOwn = !!currentProfileId && message.core.sender.ids.id === currentProfileId;
+  const displayName = isOwn ? 'You' : senderName;
+  const nameColor = isOwn ? colors.textMuted : senderColor(senderName);
   const time = formatTime(message.core.createdAt);
   const { url: src, seed } = getAvatarInfo(message);
   const senderRole = message.core.sender.kind;
@@ -788,16 +803,15 @@ function InlineReply({ message, colors }: { message: MessageVM; colors: AppColor
           }}
         >
           <RoleNameIndicator
-            name={senderName}
+            name={displayName}
             role={senderRole}
             iconSize={12}
             textStyle={{
               fontSize: 13,
               fontWeight: '700',
-              color: senderColor(senderName),
+              color: nameColor,
             }}
           />
-          <VisibilityBadge message={message} colors={colors} />
           <Text style={{ fontSize: 11, color: colors.textFaint }}>{time}</Text>
         </View>
         <FormattedText
@@ -1452,6 +1466,7 @@ function makeStyles(colors: AppColors) {
 
     // ── Name + time row (inside bubble) ──────────────────────────────────────
     nameRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginBottom: 2 },
+    nameRowOwn: { justifyContent: 'flex-end' },
     senderName: { fontSize: 14, fontWeight: '700' },
     msgTime: { fontSize: 11, color: colors.textFaint },
 
@@ -1699,6 +1714,7 @@ export type MessageItemProps = {
   currentProfileId?: string;
   currentAccountId?: string;
   isReadOnly?: boolean;
+  isThreadMessage?: boolean;
 };
 
 export const MessageItem: React.FC<MessageItemProps> = ({
@@ -1712,6 +1728,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   currentProfileId,
   currentAccountId,
   isReadOnly,
+  isThreadMessage = false,
 }) => {
   const s = useMemo(() => makeStyles(colors), [colors]);
   const [threadExpanded, setThreadExpanded] = useState(false);
@@ -2004,6 +2021,10 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     );
   }
 
+  // Layout is identical in channel and thread (own = right-aligned, "You", teal bubble).
+  // isThreadMessage only controls: visibility badge, thread/reply button, inline expansion.
+  const ownInChannel = isOwn;
+
   // ── Image message (rendered edge-to-edge, no bubble padding) ─────────────
 
   const renderImageContent = () => {
@@ -2021,11 +2042,13 @@ export const MessageItem: React.FC<MessageItemProps> = ({
       <>
         {/* Caption text sits above the image card in its own sender-styled bubble */}
         {!!im.content?.text && (
-          <View style={[s.bubble, isOwn ? s.bubbleOwn : s.bubbleOther, s.imageCaption]}>
+          <View
+            style={[s.bubble, ownInChannel ? s.bubbleOwn : s.bubbleOther, s.imageCaption]}
+          >
             <FormattedText
               text={im.content.text}
-              style={[s.textContent, isOwn && s.textContentOwn]}
-              isOwn={isOwn}
+              style={[s.textContent, ownInChannel && s.textContentOwn]}
+              isOwn={ownInChannel}
             />
           </View>
         )}
@@ -2079,11 +2102,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     return (
       <>
         {!!fm.content?.text && (
-          <View style={[s.bubble, isOwn ? s.bubbleOwn : s.bubbleOther]}>
+          <View style={[s.bubble, ownInChannel ? s.bubbleOwn : s.bubbleOther]}>
             <FormattedText
               text={fm.content.text}
-              style={[s.textContent, isOwn && s.textContentOwn]}
-              isOwn={isOwn}
+              style={[s.textContent, ownInChannel && s.textContentOwn]}
+              isOwn={ownInChannel}
             />
           </View>
         )}
@@ -2262,11 +2285,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     return (
       <>
         {!!captionText && (
-          <View style={[s.bubble, isOwn ? s.bubbleOwn : s.bubbleOther]}>
+          <View style={[s.bubble, ownInChannel ? s.bubbleOwn : s.bubbleOther]}>
             <FormattedText
               text={captionText}
-              style={[s.textContent, isOwn && s.textContentOwn]}
-              isOwn={isOwn}
+              style={[s.textContent, ownInChannel && s.textContentOwn]}
+              isOwn={ownInChannel}
             />
           </View>
         )}
@@ -2285,12 +2308,12 @@ export const MessageItem: React.FC<MessageItemProps> = ({
       const fallback = lp.content?.text ?? '';
       if (!fallback) return null;
       return (
-        <View style={[s.bubble, isOwn ? s.bubbleOwn : s.bubbleOther]}>
+        <View style={[s.bubble, ownInChannel ? s.bubbleOwn : s.bubbleOther]}>
           <FormattedText
             text={fallback}
             mentions={lp.content?.mentions}
-            style={[s.textContent, isOwn && s.textContentOwn]}
-            isOwn={isOwn}
+            style={[s.textContent, ownInChannel && s.textContentOwn]}
+            isOwn={ownInChannel}
           />
         </View>
       );
@@ -2307,12 +2330,12 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     return (
       <>
         {!!caption && (
-          <View style={[s.bubble, isOwn ? s.bubbleOwn : s.bubbleOther]}>
+          <View style={[s.bubble, ownInChannel ? s.bubbleOwn : s.bubbleOther]}>
             <FormattedText
               text={caption}
               mentions={lp.content?.mentions}
-              style={[s.textContent, isOwn && s.textContentOwn]}
-              isOwn={isOwn}
+              style={[s.textContent, ownInChannel && s.textContentOwn]}
+              isOwn={ownInChannel}
             />
           </View>
         )}
@@ -2401,8 +2424,8 @@ export const MessageItem: React.FC<MessageItemProps> = ({
       <FormattedText
         text={text}
         mentions={mentions}
-        style={[s.textContent, isOwn && s.textContentOwn]}
-        isOwn={isOwn}
+        style={[s.textContent, ownInChannel && s.textContentOwn]}
+        isOwn={ownInChannel}
       />
     );
   };
@@ -2415,7 +2438,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
       <Pressable
         onLongPress={() => onLongPress?.(message)}
         delayLongPress={350}
-        style={[s.row, isOwn && s.rowOwn, isGroupStart && s.rowGroupStart]}
+        style={[s.row, ownInChannel && s.rowOwn, isGroupStart && s.rowGroupStart]}
       >
         <View style={s.avatarSlot}>
           {isGroupStart && (
@@ -2427,18 +2450,32 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             />
           )}
         </View>
-        <View style={[s.contentCol, isOwn && s.contentColOwn]}>
+        <View style={[s.contentCol, ownInChannel && s.contentColOwn]}>
           {isGroupStart && (
-            <View style={s.nameRow}>
-              {!isOwn && (
-                <RoleNameIndicator
-                  name={senderDisplayName}
-                  role={senderRole}
-                  textStyle={[s.senderName, { color: senderColor(senderDisplayName) }]}
-                />
+            <View style={[s.nameRow, ownInChannel && s.nameRowOwn]}>
+              {ownInChannel ? (
+                <>
+                  <VisibilityBadge message={message} colors={colors} />
+                  <Text style={s.msgTime}>{time}</Text>
+                  <RoleNameIndicator
+                    name="You"
+                    role={senderRole}
+                    textStyle={[s.senderName, { color: colors.textMuted }]}
+                  />
+                </>
+              ) : (
+                <>
+                  <RoleNameIndicator
+                    name={senderDisplayName}
+                    role={senderRole}
+                    textStyle={[s.senderName, { color: senderColor(senderDisplayName) }]}
+                  />
+                  {!isThreadMessage && (
+                    <VisibilityBadge message={message} colors={colors} />
+                  )}
+                  <Text style={s.msgTime}>{time}</Text>
+                </>
               )}
-              <VisibilityBadge message={message} colors={colors} />
-              <Text style={s.msgTime}>{time}</Text>
             </View>
           )}
           {type === 'lesson-assignment' && (
@@ -2515,8 +2552,9 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             threadExpanded={threadExpanded}
             hideActions={hideActions}
             disabledActions={isReadOnly ?? false}
+            hideThreadButton={isThreadMessage}
           />
-          {threadExpanded && (
+          {!isThreadMessage && threadExpanded && (
             <View style={[s.inlineThread, isOwn && s.inlineThreadOwn]}>
               <View style={[s.threadLine, { backgroundColor: colors.border }]} />
               <View style={s.inlineReplies}>
@@ -2534,7 +2572,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                             colors={colors}
                           />
                         )}
-                        <InlineReply message={reply} colors={colors} />
+                        <InlineReply
+                          message={reply}
+                          colors={colors}
+                          currentProfileId={currentProfileId}
+                        />
                       </React.Fragment>
                     ))}
                     <ThreadReplyButton
@@ -2559,7 +2601,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
       <Pressable
         onLongPress={() => onLongPress?.(message)}
         delayLongPress={350}
-        style={[s.row, isOwn && s.rowOwn, isGroupStart && s.rowGroupStart]}
+        style={[s.row, ownInChannel && s.rowOwn, isGroupStart && s.rowGroupStart]}
       >
         {/* Avatar slot */}
         <View style={s.avatarSlot}>
@@ -2574,19 +2616,33 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         </View>
 
         {/* Content column */}
-        <View style={[s.contentCol, isOwn && s.contentColOwn]}>
+        <View style={[s.contentCol, ownInChannel && s.contentColOwn]}>
           {/* Name + time above bubble */}
           {isGroupStart && (
-            <View style={s.nameRow}>
-              {!isOwn && (
-                <RoleNameIndicator
-                  name={senderDisplayName}
-                  role={senderRole}
-                  textStyle={[s.senderName, { color: senderColor(senderDisplayName) }]}
-                />
+            <View style={[s.nameRow, ownInChannel && s.nameRowOwn]}>
+              {ownInChannel ? (
+                <>
+                  <VisibilityBadge message={message} colors={colors} />
+                  <Text style={s.msgTime}>{time}</Text>
+                  <RoleNameIndicator
+                    name="You"
+                    role={senderRole}
+                    textStyle={[s.senderName, { color: colors.textMuted }]}
+                  />
+                </>
+              ) : (
+                <>
+                  <RoleNameIndicator
+                    name={senderDisplayName}
+                    role={senderRole}
+                    textStyle={[s.senderName, { color: senderColor(senderDisplayName) }]}
+                  />
+                  {!isThreadMessage && (
+                    <VisibilityBadge message={message} colors={colors} />
+                  )}
+                  <Text style={s.msgTime}>{time}</Text>
+                </>
               )}
-              <VisibilityBadge message={message} colors={colors} />
-              <Text style={s.msgTime}>{time}</Text>
             </View>
           )}
           {/* Dedicated layouts for rich message types; text/cards use bubble */}
@@ -2599,7 +2655,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           ) : type === 'link-preview' ? (
             renderLinkContent()
           ) : (
-            <View style={[s.bubble, isOwn ? s.bubbleOwn : s.bubbleOther]}>
+            <View style={[s.bubble, ownInChannel ? s.bubbleOwn : s.bubbleOther]}>
               {renderBubbleContent()}
             </View>
           )}
@@ -2616,10 +2672,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             threadExpanded={threadExpanded}
             hideActions={hideActions}
             disabledActions={isReadOnly ?? false}
+            hideThreadButton={isThreadMessage}
           />
 
-          {/* Inline thread replies */}
-          {threadExpanded && (
+          {/* Inline thread replies (not shown when already inside a thread) */}
+          {!isThreadMessage && threadExpanded && (
             <View style={[s.inlineThread, isOwn && s.inlineThreadOwn]}>
               <View style={[s.threadLine, { backgroundColor: colors.border }]} />
               <View style={s.inlineReplies}>
@@ -2637,7 +2694,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                             colors={colors}
                           />
                         )}
-                        <InlineReply message={reply} colors={colors} />
+                        <InlineReply
+                          message={reply}
+                          colors={colors}
+                          currentProfileId={currentProfileId}
+                        />
                       </React.Fragment>
                     ))}
                     <ThreadReplyButton
