@@ -28,8 +28,8 @@ Step-by-step guide to get the IconicEdu monorepo running on your machine.
 - [Prerequisites](#prerequisites)
 - [Clone and Install](#clone-and-install)
 - [Supabase Setup](#supabase-setup)
-  - [Option A: Supabase Cloud (recommended for most devs)](#option-a-supabase-cloud)
-  - [Option B: Supabase Local (fully offline dev)](#option-b-supabase-local)
+  - [Option A: Supabase Local (fully offline dev)](#option-a-supabase-local)
+  - [Option B: Supabase Cloud (recommended for most devs)](#option-b-supabase-cloud)
 - [Environment Variables](#environment-variables)
 - [Build Shared Packages](#build-shared-packages)
 - [Run the Apps](#run-the-apps)
@@ -114,55 +114,7 @@ pnpm install
 
 The database schema lives in `supabase/migrations/`. All migrations must be applied before running any app.
 
-### Option A: Supabase Cloud
-
-Use this if you want to develop against a real hosted Supabase project. This is the fastest way to get started and avoids running Docker locally.
-
-#### 1. Create a Supabase project
-
-Go to [supabase.com](https://supabase.com), create a new project, and note down:
-
-- **Project URL** — e.g. `https://abcdefgh.supabase.co`
-- **Anon/public key** — from Settings → API → Project API keys
-- **Service role key** — from Settings → API (keep this secret)
-- **Database password** — set during project creation
-- **Project ref** — the short ID in your project URL, e.g. `abcdefgh`
-
-#### 2. Install and authenticate the Supabase CLI
-
-```bash
-brew install supabase/tap/supabase   # macOS
-# or: https://supabase.com/docs/guides/local-development/cli/getting-started
-
-supabase login
-```
-
-#### 3. Link your project
-
-```bash
-supabase link --project-ref <your-project-ref>
-# Enter your database password when prompted
-```
-
-#### 4. Apply all migrations
-
-```bash
-supabase db push
-```
-
-This applies every file in `supabase/migrations/` in order. Run this again whenever new migration files are added.
-
-#### 5. Verify
-
-Check the Supabase dashboard → Table Editor. You should see tables like `profiles`, `accounts`, `channels`, `messages`, etc.
-
-#### 6. Use the tracked email templates
-
-Customized Supabase Auth email templates are already tracked in this repo under `supabase/templates/email/`, and local Supabase uses them through the managed block in `supabase/config.toml`.
-
----
-
-### Option B: Supabase Local
+### Option A: Supabase Local
 
 Use this for fully offline development or to avoid sharing a cloud project between developers.
 
@@ -233,6 +185,54 @@ If you sync or edit local email templates, restart the local stack so GoTrue rel
 supabase stop
 supabase start
 ```
+
+---
+
+### Option B: Supabase Cloud
+
+Use this if you want to develop against a real hosted Supabase project. This is the fastest way to get started and avoids running Docker locally.
+
+#### 1. Create a Supabase project
+
+Go to [supabase.com](https://supabase.com), create a new project, and note down:
+
+- **Project URL** — e.g. `https://abcdefgh.supabase.co`
+- **Anon/public key** — from Settings → API → Project API keys
+- **Service role key** — from Settings → API (keep this secret)
+- **Database password** — set during project creation
+- **Project ref** — the short ID in your project URL, e.g. `abcdefgh`
+
+#### 2. Install and authenticate the Supabase CLI
+
+```bash
+brew install supabase/tap/supabase   # macOS
+# or: https://supabase.com/docs/guides/local-development/cli/getting-started
+
+supabase login
+```
+
+#### 3. Link your project
+
+```bash
+supabase link --project-ref <your-project-ref>
+# Enter your database password when prompted
+```
+
+#### 4. Apply all migrations
+
+```bash
+supabase db push
+```
+
+This applies every file in `supabase/migrations/` in order. Run this again whenever new migration files are added.
+
+#### 5. Verify
+
+Check the Supabase dashboard → Table Editor. You should see tables like `profiles`, `accounts`, `channels`, `messages`, etc.
+
+#### 6. Use the tracked email templates
+
+Customized Supabase Auth email templates are already tracked in this repo under `supabase/templates/email/`, and local Supabase uses them through the managed block in `supabase/config.toml`.
 
 ## Supabase Email Templates
 

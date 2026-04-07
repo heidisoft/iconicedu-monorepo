@@ -37,10 +37,14 @@ export async function getExpoPushToken(options?: {
   const projectId =
     Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
 
-  const tokenData = await Notifications.getExpoPushTokenAsync(
-    projectId ? { projectId } : undefined,
-  );
-  return tokenData.data;
+  try {
+    const tokenData = await Notifications.getExpoPushTokenAsync(
+      projectId ? { projectId } : undefined,
+    );
+    return tokenData.data;
+  } catch {
+    return null;
+  }
 }
 
 /**
