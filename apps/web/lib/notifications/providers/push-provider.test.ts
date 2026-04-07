@@ -93,6 +93,7 @@ describe('sendPushNotification', () => {
       to: 'ExponentPushToken[aaa]',
       title: 'New message',
       body: 'Hello!',
+      channelId: 'default',
     });
   });
 

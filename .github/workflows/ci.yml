@@ -716,40 +716,9 @@ jobs:
             echo "vercel_url=https://vercel.com/dashboard" >> "$GITHUB_OUTPUT"
           fi
 
-      # 6a. Run Lighthouse against the PR preview deployment
-      - name: Run Lighthouse CI (PR)
-        id: lighthouse-pr
-        # Only run when Vercel produced a real preview URL.
-        if: >-
-          steps.vercel.outputs.vercel_url != '' &&
-          steps.vercel.outputs.vercel_url != 'https://vercel.com/dashboard'
-        uses: treosh/lighthouse-ci-action@v12
-        with:
-          urls: ${{ steps.vercel.outputs.vercel_url }}
-          configPath: apps/web/lighthouserc.js
-          uploadArtifacts: true
-          artifactName: lighthouse-results-pr
-          temporaryPublicStorage: true
-
-      # 6b. Run Lighthouse against production (main) for drift comparison.
-      # Skipped when LHCI_PRODUCTION_URL repo variable is not set.
-      - name: Run Lighthouse CI (main / production)
-        id: lighthouse-main
-        if: vars.LHCI_PRODUCTION_URL != ''
-        uses: treosh/lighthouse-ci-action@v12
-        with:
-          urls: ${{ vars.LHCI_PRODUCTION_URL }}
-          configPath: apps/web/lighthouserc.js
-          uploadArtifacts: false
-          temporaryPublicStorage: false
-
       # 7. Post / update the single unified PR comment
       - name: Post preview environment comment
         uses: actions/github-script@v7
-        env:
-          LH_PR_MANIFEST: ${{ steps.lighthouse-pr.outputs.manifest }}
-          LH_PR_LINKS: ${{ steps.lighthouse-pr.outputs.links }}
-          LH_MAIN_MANIFEST: ${{ steps.lighthouse-main.outputs.manifest }}
         with:
           script: |
             const fs = require('fs');
@@ -771,19 +740,6 @@ jobs:
               const d = pr - base;
               if (d === 0) return ' *(no change)*';
               return ` *(${d > 0 ? '+' : ''}${fmt(d)})*`;
-            };
-            const scoreIcon = (v) => {
-              if (v == null) return '—';
-              const n = Math.round(v * 100);
-              if (n >= 90) return `${n} ✅`;
-              if (n >= 50) return `${n} ⚠️`;
-              return `${n} ❌`;
-            };
-            const scoreDelta = (pr, base) => {
-              if (pr == null || base == null) return '—';
-              const d = Math.round((pr - base) * 100);
-              if (d === 0) return '=';
-              return d > 0 ? `+${d}` : `${d}`;
             };
 
             // ── Bundle sizes ───────────────────────────────────────────────────
@@ -813,47 +769,6 @@ jobs:
               }
             }
 
-            // ── Lighthouse ─────────────────────────────────────────────────────
-            let lighthouseSection = '';
-            const prManifestRaw   = process.env.LH_PR_MANIFEST   || '';
-            const prLinksRaw      = process.env.LH_PR_LINKS       || '';
-            const mainManifestRaw = process.env.LH_MAIN_MANIFEST  || '';
-            if (prManifestRaw) {
-              try {
-                const prManifest   = JSON.parse(prManifestRaw);
-                const links        = prLinksRaw ? JSON.parse(prLinksRaw) : {};
-                const prResult     = prManifest.find(r => r.isRepresentativeRun) || prManifest[0];
-                const s            = prResult.summary;
-
-                let base = null;
-                if (mainManifestRaw) {
-                  try {
-                    const mainManifest = JSON.parse(mainManifestRaw);
-                    const mainResult   = mainManifest.find(r => r.isRepresentativeRun) || mainManifest[0];
-                    base = mainResult.summary;
-                  } catch {}
-                }
-
-                const reportUrl  = links[prResult.url] || '';
-                const reportLink = reportUrl ? ` ([full report](${reportUrl}))` : '';
-                const baseNote   = base ? '' : ' *(add `LHCI_PRODUCTION_URL` repo variable to enable vs main)*';
-
-                lighthouseSection = [
-                  '',
-                  `### Lighthouse (vs \`main\`)${reportLink}${baseNote}`,
-                  '',
-                  '| Category | Score | vs main |',
-                  '|----------|:-----:|:-------:|',
-                  `| Performance    | ${scoreIcon(s.performance)}    | ${scoreDelta(s.performance,    base?.performance)} |`,
-                  `| Accessibility  | ${scoreIcon(s.accessibility)}  | ${scoreDelta(s.accessibility,  base?.accessibility)} |`,
-                  `| Best Practices | ${scoreIcon(s['best-practices'])} | ${scoreDelta(s['best-practices'], base?.['best-practices'])} |`,
-                  `| SEO            | ${scoreIcon(s.seo)}            | ${scoreDelta(s.seo,            base?.seo)} |`,
-                ].join('\n');
-              } catch (e) {
-                lighthouseSection = `\n\n> ⚠️ Lighthouse results could not be parsed: ${e.message}`;
-              }
-            }
-
             const easPreviewWorkflowUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/workflows/eas-preview-build.yml`;
 
             // ── Assemble comment ───────────────────────────────────────────────
@@ -868,7 +783,6 @@ jobs:
               '',
               `**Mobile build** — [Actions → EAS Preview Build](${easPreviewWorkflowUrl}) → PR number: \`${prNumber}\``,
               bundleSection,
-              lighthouseSection,
             ].join('\n');
 
             const { data: comments } = await github.rest.issues.listComments({
