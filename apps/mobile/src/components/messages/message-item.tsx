@@ -845,10 +845,9 @@ function ThreadReplyButton({
         flexDirection: 'row',
         alignItems: 'center',
         alignSelf: inline ? 'auto' : 'flex-start',
-        gap: 6,
         marginTop: inline ? 0 : 8,
-        paddingHorizontal: 10,
-        paddingVertical: inline ? 6 : 7,
+        paddingHorizontal: 8,
+        paddingVertical: inline ? 4 : 5,
         borderRadius: 18,
         borderWidth: StyleSheet.hairlineWidth,
         borderColor: colors.border,
@@ -857,9 +856,6 @@ function ThreadReplyButton({
       }}
     >
       <CornerUpLeft size={14} color={colors.textMuted} />
-      <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textMuted }}>
-        Reply
-      </Text>
     </TouchableOpacity>
   );
 }
