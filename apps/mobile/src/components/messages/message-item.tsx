@@ -65,6 +65,7 @@ import { AudioPlayer, createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import type { AudioStatus } from 'expo-audio';
 import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '@/lib/supabase/client';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@iconicedu/ui-native';
 import { RoleAvatarBadge } from '@/components/profile/role-avatar-badge';
 import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
 import { ChatImageViewer, type ChatImageViewerItem } from './chat-image-viewer';
@@ -727,21 +728,25 @@ function VisibilityBadge({ message, colors }: { message: MessageVM; colors: AppC
   if (!label) return null;
 
   return (
-    <View
-      testID="message-visibility-badge"
-      style={[
-        visibilityBadgeStyles.badge,
-        {
-          backgroundColor: colors.inputBg,
-          borderColor: colors.border,
-        },
-      ]}
-    >
-      <EyeOff size={10} color={colors.textMuted} />
-      <Text style={[visibilityBadgeStyles.text, { color: colors.textMuted }]}>
-        {label}
-      </Text>
-    </View>
+    <Tooltip delayDuration={0}>
+      <TooltipTrigger accessibilityRole="button" accessibilityLabel={label} hitSlop={8}>
+        <View
+          testID="message-visibility-badge"
+          style={[
+            visibilityBadgeStyles.badge,
+            {
+              backgroundColor: colors.inputBg,
+              borderColor: colors.border,
+            },
+          ]}
+        >
+          <EyeOff size={10} color={colors.textMuted} />
+        </View>
+      </TooltipTrigger>
+      <TooltipContent sideOffset={6} className="rounded-full px-2.5 py-1">
+        <Text style={{ fontSize: 11, fontWeight: '600', color: '#f8fafc' }}>{label}</Text>
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -749,15 +754,10 @@ const visibilityBadgeStyles = StyleSheet.create({
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 999,
     paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  text: {
-    fontSize: 10,
-    fontWeight: '500',
+    paddingVertical: 4,
   },
 });
 
