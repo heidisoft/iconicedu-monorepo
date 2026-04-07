@@ -33,9 +33,17 @@ export const VisibilityBadge = memo(function VisibilityBadge({
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Badge variant="secondary" className="cursor-default gap-1 px-1.5">
-            <EyeOff className="h-2.5 w-2.5" />
-          </Badge>
+          <button
+            type="button"
+            aria-label={text}
+            className="cursor-default"
+            data-testid="message-visibility-badge"
+          >
+            <Badge variant="secondary" className="gap-1 px-1.5">
+              <EyeOff className="h-2.5 w-2.5" aria-hidden="true" />
+              <span className="text-[11px] font-medium leading-none">{text}</span>
+            </Badge>
+          </button>
         </TooltipTrigger>
         <TooltipContent>{text}</TooltipContent>
       </Tooltip>
