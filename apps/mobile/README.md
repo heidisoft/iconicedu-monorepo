@@ -6,7 +6,7 @@ This app should be developed with native Expo builds, not Expo Go.
 
 | Mode                 | Command                         | What it runs/builds                     | Distribution           | Intended use                                      |
 | -------------------- | ------------------------------- | --------------------------------------- | ---------------------- | ------------------------------------------------- |
-| Local Metro          | `pnpm mobile:start`             | Expo dev server                         | Local only             | Day-to-day JS work and simulator/emulator startup |
+| Local Metro          | `pnpm dev:mobile`               | Expo dev server                         | Local only             | Day-to-day JS work and simulator/emulator startup |
 | Local native iOS     | `pnpm mobile:ios`               | Local native app via `expo run:ios`     | Local only             | iOS simulator and native parity checks            |
 | Local native Android | `pnpm mobile:android`           | Local native app via `expo run:android` | Local only             | Fast Android-native iteration                     |
 | EAS development      | `pnpm mobile:eas:build:dev`     | Dev client build                        | Internal install       | Real-device native testing against local Metro    |
