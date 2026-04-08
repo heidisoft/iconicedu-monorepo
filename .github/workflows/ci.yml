@@ -4,8 +4,6 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, closed]
-  push:
-    branches: [main]
 
 # Cancel in-progress runs for the same branch/PR when a new push comes in
 concurrency:
@@ -235,15 +233,15 @@ jobs:
           process.stdout.write(JSON.stringify(out));
           EOF
 
-      # ── Try to restore cached main branch sizes ─────────────────
-      # If cache hit: skip building base; use the cached sizes (faster)
-      # If cache miss: fall back to building base branch in real-time
+      # ── Try to restore cached base/main branch sizes ────────────
+      # The PR base SHA is the invalidation signal. When main moves,
+      # the key changes and we rebuild the base sizes once.
       - name: Restore main branch sizes from cache
         id: cache-restore
         uses: actions/cache/restore@v4
         with:
-          path: /tmp/main-sizes.json
-          key: bundle-sizes-main-latest-${{ runner.os }}
+          path: /tmp/base-sizes.json
+          key: bundle-sizes-base-${{ runner.os }}-${{ github.event.pull_request.base.sha }}
 
       # ── Base/main branch build (only if cache missed) ───────────
       - name: Checkout base branch
@@ -286,10 +284,17 @@ jobs:
         if: steps.cache-restore.outputs.cache-hit != 'true'
         run: node /tmp/measure.js > /tmp/base-sizes.json
 
-      # If cache hit, /tmp/main-sizes.json already exists from restore step
-      - name: Use cached main sizes
+      - name: Save base branch sizes to cache
+        if: steps.cache-restore.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/base-sizes.json
+          key: bundle-sizes-base-${{ runner.os }}-${{ github.event.pull_request.base.sha }}
+
+      # If cache hit, /tmp/base-sizes.json already exists from restore step
+      - name: Confirm cached base sizes
         if: steps.cache-restore.outputs.cache-hit == 'true'
-        run: cp /tmp/main-sizes.json /tmp/base-sizes.json
+        run: test -f /tmp/base-sizes.json
 
       - name: Combine into bundle-sizes artifact
         run: |
@@ -1048,111 +1053,3 @@ jobs:
               issue_number: context.payload.pull_request.number,
               body: '🧹 Preview environment cleaned up (Supabase branch, Railway environment, and Vercel env vars removed).',
             });
-
-  # ──────────────────────────────────────────────────────────────
-  # Job 7: Cache main branch bundle sizes
-  # This runs only on pushes to main, not on PRs. Measures bundle
-  # sizes for main and caches them so PRs can use them via cache
-  # restore instead of building main in real-time.
-  # ──────────────────────────────────────────────────────────────
-  cache-sizes:
-    name: Cache Main Branch Sizes
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      contents: read
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9.12.0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20.19.0
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Generate Prisma client
-        run: pnpm --filter api db:generate
-
-      - name: Set build env vars
-        run: |
-          echo "NEXT_PUBLIC_SUPABASE_URL=${_URL:-https://placeholder.supabase.co}" >> "$GITHUB_ENV"
-          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=${_ANON:-placeholder-anon-key}" >> "$GITHUB_ENV"
-          echo "SUPABASE_SERVICE_ROLE_KEY=${_SRK:-placeholder-service-role-key}" >> "$GITHUB_ENV"
-          echo "EXPO_PUBLIC_SUPABASE_URL=${_URL:-https://placeholder.supabase.co}" >> "$GITHUB_ENV"
-          echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=${_ANON:-placeholder-anon-key}" >> "$GITHUB_ENV"
-        env:
-          _URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          _ANON: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          _SRK: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-
-      - name: Build all packages
-        run: pnpm build:packages
-
-      - name: Build all apps
-        run: |
-          pnpm --filter web build
-          (cd apps/mobile && npx expo export --platform android --output-dir .expo/dist)
-          pnpm --filter api build
-        env:
-          EXPO_NO_TELEMETRY: 1
-          TURBO_TELEMETRY_DISABLED: 1
-
-      - name: Write measurement script
-        run: |
-          cat > /tmp/measure.js << 'EOF'
-          const fs = require('fs'), path = require('path'), zlib = require('zlib');
-          function walk(dir, exts) {
-            if (!fs.existsSync(dir)) return [];
-            const out = [];
-            for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-              const full = path.join(dir, e.name);
-              if (e.isDirectory()) out.push(...walk(full, exts));
-              else if (exts.some(x => e.name.endsWith(x)) && !e.name.endsWith('.map')) out.push(full);
-            }
-            return out;
-          }
-          function measure(dir, exts) {
-            const files = walk(dir, exts);
-            let raw = 0, gz = 0;
-            const top = [];
-            for (const f of files) {
-              const buf = fs.readFileSync(f);
-              const gzLen = zlib.gzipSync(buf).length;
-              raw += buf.length; gz += gzLen;
-              top.push({ name: path.basename(f), gz: gzLen });
-            }
-            top.sort((a, b) => b.gz - a.gz);
-            return { raw, gz, count: files.length, top: top.slice(0, 5) };
-          }
-          const out = {
-            web:    { js: measure('apps/web/.next/static', ['.js']), css: measure('apps/web/.next/static', ['.css']) },
-            mobile: { js: measure('apps/mobile/.expo/dist/_expo/static/js', ['.js', '.hbc']) },
-            api:    { js: measure('apps/api/dist', ['.js']) },
-          };
-          process.stdout.write(JSON.stringify(out));
-          EOF
-
-      - name: Measure main branch sizes
-        run: node /tmp/measure.js > /tmp/main-sizes.json
-
-      - name: Cache main branch sizes
-        uses: actions/cache/save@v4
-        with:
-          path: /tmp/main-sizes.json
-          key: bundle-sizes-main-latest-${{ runner.os }}
-
-      - name: Cache main branch sizes (commit-specific)
-        uses: actions/cache/save@v4
-        with:
-          path: /tmp/main-sizes.json
-          key: bundle-sizes-main-${{ github.sha }}-${{ runner.os }}
