@@ -529,10 +529,21 @@ jobs:
               -d "$1" || echo "{}"
           }
 
-          # Find the auto-created PR environment by name
+          # Helper: query the latest deployment for this service+environment
+          query_deployment() {
+            api "$(jq -n \
+              --arg pid "$RAILWAY_PROJECT_ID" \
+              --arg sid "$SERVICE_ID" \
+              --arg eid "$ENV_ID" \
+              '{query:"query deployments($input: DeploymentListInput!, $first: Int) { deployments(input: $input, first: $first) { edges { node { id status url staticUrl } } } }", variables:{input:{projectId:$pid, serviceId:$sid, environmentId:$eid}, first:1}}')"
+          }
+
+          # Step 1: Find the auto-created PR environment by name
+          # Ref: https://docs.railway.com/integrations/api/manage-environments
           echo "Looking up Railway PR environment: $ENV_NAME"
-          LIST_RESP=$(api "{\"query\":\"query { project(id: \\\"$RAILWAY_PROJECT_ID\\\") { environments { edges { node { id name } } } } }\"}")
-          ENV_ID=$(echo "$LIST_RESP" | jq -r ".data.project.environments.edges[]? | select(.node.name==\"$ENV_NAME\") | .node.id // empty")
+          LIST_RESP=$(api "$(jq -n --arg pid "$RAILWAY_PROJECT_ID" \
+            '{query:"query environments($projectId: String!) { environments(projectId: $projectId) { edges { node { id name } } } }", variables:{projectId:$pid}}')")
+          ENV_ID=$(echo "$LIST_RESP" | jq -r --arg name "$ENV_NAME" '.data.environments.edges[]? | select(.node.name==$name) | .node.id // empty')
 
           if [[ -z "$ENV_ID" ]]; then
             echo "::error::Railway PR environment '$ENV_NAME' not found. Ensure PR Environments is enabled in Railway."
@@ -540,7 +551,22 @@ jobs:
           fi
           echo "Found environment: $ENV_NAME ($ENV_ID)"
 
-          # Inject all required env vars into the PR environment
+          # Step 2: Wait for the auto-created deployment to exist before touching anything.
+          # Railway's GitHub integration creates a deployment automatically when the PR env
+          # is provisioned, but it may take a moment to appear in the API.
+          echo "Waiting for Railway deployment to appear in PR environment..."
+          DEPLOY_ID=""
+          DEPLOY_STATUS=""
+          for i in $(seq 1 18); do
+            DEPLOY_RESP=$(query_deployment)
+            DEPLOY_ID=$(echo "$DEPLOY_RESP" | jq -r '.data.deployments.edges[0].node.id // empty')
+            DEPLOY_STATUS=$(echo "$DEPLOY_RESP" | jq -r '.data.deployments.edges[0].node.status // empty')
+            echo "  Deployment: ${DEPLOY_STATUS:-(not found)} (attempt $i/18)"
+            [[ -n "$DEPLOY_ID" ]] && break
+            sleep 10
+          done
+
+          # Step 3: Set env vars into the PR environment now that we know it's active
           VARS_JSON=$(jq -n \
             --arg db    "${{ steps.branch-creds.outputs.database_url }}" \
             --arg dir   "${{ steps.branch-creds.outputs.direct_url }}" \
@@ -566,62 +592,31 @@ jobs:
               variables:{input:{projectId:$pid, environmentId:$eid, serviceId:$sid, variables:$vars}}}')")
           echo "Variables response: $(echo "$VARS_RESP" | jq '.errors // "ok"')"
 
-          # Look for an existing deployment from Railway's GitHub auto-deploy.
-          # If one is found, redeploy it with the updated vars.
-          # If none is found (Railway GitHub integration hasn't fired yet), trigger
-          # a deploy directly via serviceInstanceDeploy — same service, same environment.
-          echo "Looking for existing Railway deployment in PR environment..."
-          AUTO_DEPLOY_ID=""
-          AUTO_DEPLOY_STATUS=""
-          for i in $(seq 1 6); do
-            LATEST_DEPLOY_RESP=$(api "$(jq -n \
-              --arg pid "$RAILWAY_PROJECT_ID" \
-              --arg sid "$SERVICE_ID" \
-              --arg eid "$ENV_ID" \
-              '{query:"query deployments($input: DeploymentListInput!, $first: Int) { deployments(input: $input, first: $first) { edges { node { id status createdAt } } } }", variables:{input:{projectId:$pid, serviceId:$sid, environmentId:$eid}, first:1}}')")
-
-            AUTO_DEPLOY_ID=$(echo "$LATEST_DEPLOY_RESP" | jq -r '.data.deployments.edges[0].node.id // empty')
-            AUTO_DEPLOY_STATUS=$(echo "$LATEST_DEPLOY_RESP" | jq -r '.data.deployments.edges[0].node.status // empty')
-
-            echo "  Existing deploy: ${AUTO_DEPLOY_STATUS:-(not found)} (attempt $i/6)"
-
-            [[ -n "$AUTO_DEPLOY_ID" ]] && break
-            sleep 10
-          done
-
-          poll_deployment() {
-            api "$(jq -n \
-              --arg pid "$RAILWAY_PROJECT_ID" \
-              --arg sid "$SERVICE_ID" \
-              --arg eid "$ENV_ID" \
-              '{query:"query deployments($input: DeploymentListInput!, $first: Int) { deployments(input: $input, first: $first) { edges { node { id status url staticUrl } } } }", variables:{input:{projectId:$pid, serviceId:$sid, environmentId:$eid}, first:1}}')"
-          }
-
-          if [[ -n "$AUTO_DEPLOY_ID" ]]; then
-            echo "Redeploying existing deployment $AUTO_DEPLOY_ID with updated variables..."
-            DEPLOY_RESP=$(api "$(jq -n \
-              --arg id "$AUTO_DEPLOY_ID" \
+          # Step 4: Redeploy or trigger depending on whether a deployment was found
+          if [[ -n "$DEPLOY_ID" ]]; then
+            echo "Redeploying existing deployment $DEPLOY_ID (status: $DEPLOY_STATUS) with updated variables..."
+            REDEPLOY_RESP=$(api "$(jq -n \
+              --arg id "$DEPLOY_ID" \
               '{query:"mutation deploymentRedeploy($id: String!) { deploymentRedeploy(id: $id) { id status } }", variables:{id:$id}}')")
-            echo "Redeploy response: $(echo "$DEPLOY_RESP" | jq '.errors // .data')"
+            echo "Redeploy response: $(echo "$REDEPLOY_RESP" | jq '.errors // .data')"
           else
-            echo "No existing deployment found — triggering deploy via environmentTriggersDeploy..."
-            DEPLOY_RESP=$(api "$(jq -n \
+            echo "No deployment found after waiting — triggering via environmentTriggersDeploy..."
+            TRIGGER_RESP=$(api "$(jq -n \
               --arg pid "$RAILWAY_PROJECT_ID" \
               --arg sid "$SERVICE_ID" \
               --arg eid "$ENV_ID" \
               '{query:"mutation environmentTriggersDeploy($input: EnvironmentTriggersDeployInput!) { environmentTriggersDeploy(input: $input) }", variables:{input:{projectId:$pid, serviceId:$sid, environmentId:$eid}}}')")
-            echo "Deploy response: $(echo "$DEPLOY_RESP" | jq '.errors // .data')"
+            echo "Trigger response: $(echo "$TRIGGER_RESP" | jq '.errors // .data')"
           fi
 
-          # Poll the deployments query to find the active/new deployment and wait for it.
-          # This is more reliable than serviceInstance.latestDeployment which has latency.
+          # Step 5: Wait for the deployment to reach a terminal state, tracking its URL
           echo "Waiting for deployment to stabilize..."
           DEPLOY_STATUS=""
           DEPLOY_URL=""
           for i in $(seq 1 18); do
-            DEPLOY_POLL=$(poll_deployment)
-            DEPLOY_STATUS=$(echo "$DEPLOY_POLL" | jq -r '.data.deployments.edges[0].node.status // empty')
-            DEPLOY_URL=$(echo "$DEPLOY_POLL" | jq -r '
+            POLL=$(query_deployment)
+            DEPLOY_STATUS=$(echo "$POLL" | jq -r '.data.deployments.edges[0].node.status // empty')
+            DEPLOY_URL=$(echo "$POLL" | jq -r '
               .data.deployments.edges[0].node.url //
               .data.deployments.edges[0].node.staticUrl //
               empty')
@@ -636,20 +631,24 @@ jobs:
             echo "::warning::Railway deployment ended with status $DEPLOY_STATUS"
           fi
 
-          # Get the domain from the deployment url field; fall back to serviceInstance.domains
+          # Step 6: Extract domain from deployment URL field; fall back to serviceInstance.domains
           RAILWAY_DOMAIN=""
           if [[ -n "$DEPLOY_URL" ]]; then
-            # Strip protocol prefix if present (e.g. https://foo.up.railway.app → foo.up.railway.app)
             RAILWAY_DOMAIN="${DEPLOY_URL#https://}"
             RAILWAY_DOMAIN="${RAILWAY_DOMAIN#http://}"
           fi
 
           if [[ -z "$RAILWAY_DOMAIN" ]]; then
-            echo "Deployment URL not available — querying serviceInstance.domains..."
+            # Ref: https://docs.railway.com/integrations/api/manage-domains
+            echo "Deployment URL not set — querying domains API..."
             for i in $(seq 1 3); do
               echo "  Domain lookup attempt $i/3..."
-              DOMAIN_RESP=$(api "{\"query\":\"query { serviceInstance(serviceId: \\\"$SERVICE_ID\\\", environmentId: \\\"$ENV_ID\\\") { domains { serviceDomains { domain } } } }\"}")
-              RAILWAY_DOMAIN=$(echo "$DOMAIN_RESP" | jq -r '.data.serviceInstance.domains.serviceDomains[0]?.domain // empty')
+              DOMAIN_RESP=$(api "$(jq -n \
+                --arg pid "$RAILWAY_PROJECT_ID" \
+                --arg eid "$ENV_ID" \
+                --arg sid "$SERVICE_ID" \
+                '{query:"query domains($projectId: String!, $environmentId: String!, $serviceId: String!) { domains(projectId: $projectId, environmentId: $environmentId, serviceId: $serviceId) { serviceDomains { domain } customDomains { domain } } }", variables:{projectId:$pid, environmentId:$eid, serviceId:$sid}}')")
+              RAILWAY_DOMAIN=$(echo "$DOMAIN_RESP" | jq -r '.data.domains.serviceDomains[0]?.domain // .data.domains.customDomains[0]?.domain // empty')
               [[ -n "$RAILWAY_DOMAIN" ]] && break
               sleep 5
             done
@@ -912,17 +911,20 @@ jobs:
           ENV_NAME="${{ github.event.repository.name }}-pr-${PR_NUMBER}"
           GQL="https://backboard.railway.app/graphql/v2"
 
+          # Ref: https://docs.railway.com/integrations/api/manage-environments
           ENV_ID=$(curl -sf \
             -H "Authorization: Bearer $RAILWAY_TOKEN" \
             -H "Content-Type: application/json" "$GQL" \
-            -d "{\"query\":\"query { project(id: \\\"${{ secrets.RAILWAY_PROJECT_ID }}\\\") { environments { edges { node { id name } } } } }\"}" \
-            | jq -r ".data.project.environments.edges[]? | select(.node.name==\"$ENV_NAME\") | .node.id // empty")
+            -d "$(jq -n --arg pid "${{ secrets.RAILWAY_PROJECT_ID }}" \
+              '{query:"query environments($projectId: String!) { environments(projectId: $projectId) { edges { node { id name } } } }", variables:{projectId:$pid}}')" \
+            | jq -r --arg name "$ENV_NAME" '.data.environments.edges[]? | select(.node.name==$name) | .node.id // empty')
 
           if [[ -n "$ENV_ID" ]]; then
             curl -sf \
               -H "Authorization: Bearer $RAILWAY_TOKEN" \
               -H "Content-Type: application/json" "$GQL" \
-              -d "{\"query\":\"mutation { environmentDelete(id: \\\"$ENV_ID\\\") }\"}"
+              -d "$(jq -n --arg eid "$ENV_ID" \
+                '{query:"mutation environmentDelete($id: String!) { environmentDelete(id: $id) }", variables:{id:$eid}}')"
             echo "Deleted Railway environment: $ENV_NAME ($ENV_ID)"
           else
             echo "No Railway environment found for $ENV_NAME — skipping"
