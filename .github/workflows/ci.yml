@@ -4,6 +4,8 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, closed]
+  push:
+    branches: [main]
 
 # Cancel in-progress runs for the same branch/PR when a new push comes in
 concurrency:
@@ -259,16 +261,29 @@ jobs:
       - name: Measure PR branch sizes
         run: node /tmp/measure.js > /tmp/pr-sizes.json
 
-      # ── Base branch build ──────────────────────────────────────
+      # ── Try to restore cached main branch sizes ─────────────────
+      # If cache hit: skip building base; use the cached sizes (faster)
+      # If cache miss: fall back to building base branch in real-time
+      - name: Restore main branch sizes from cache
+        id: cache-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/main-sizes.json
+          key: bundle-sizes-main-latest-${{ runner.os }}
+
+      # ── Base/main branch build (only if cache missed) ───────────
       - name: Checkout base branch
+        if: steps.cache-restore.outputs.cache-hit != 'true'
         run: git checkout origin/${{ github.base_ref }}
 
       - name: Install dependencies (base)
+        if: steps.cache-restore.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
 
       # continue-on-error: base may differ enough to fail a sub-build;
       # missing data renders as "—" in the comment rather than blocking.
       - name: Build all apps (base branch)
+        if: steps.cache-restore.outputs.cache-hit != 'true'
         continue-on-error: true
         run: |
           pnpm --filter api db:generate || true
@@ -281,7 +296,13 @@ jobs:
           TURBO_TELEMETRY_DISABLED: 1
 
       - name: Measure base branch sizes
+        if: steps.cache-restore.outputs.cache-hit != 'true'
         run: node /tmp/measure.js > /tmp/base-sizes.json
+
+      # If cache hit, /tmp/main-sizes.json already exists from restore step
+      - name: Use cached main sizes
+        if: steps.cache-restore.outputs.cache-hit == 'true'
+        run: cp /tmp/main-sizes.json /tmp/base-sizes.json
 
       - name: Combine into bundle-sizes artifact
         run: |
@@ -299,7 +320,10 @@ jobs:
           retention-days: 7
 
   # ──────────────────────────────────────────────────────────────
-  # Job 4: Build apps — only runs after quality + test both pass
+  # Job 4: Build verification — lightweight check that apps build
+  # Depends on bundle-size to ensure builds complete before this runs,
+  # and reuses the build outputs that bundle-size already generated.
+  # Turbo caching ensures we don't rebuild what bundle-size did.
   # ──────────────────────────────────────────────────────────────
   build:
     # Branch protection depends on this exact job name.
@@ -307,7 +331,7 @@ jobs:
     # scripts/github/apply-branch-protection.sh in the same change.
     name: Build
     if: github.event.action != 'closed'
-    needs: [quality, test]
+    needs: [quality, test, bundle-size]
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -329,19 +353,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Restore Turbo cache
-        uses: actions/cache@v4
-        with:
-          path: .turbo
-          key: turbo-build-${{ runner.os }}-${{ github.sha }}
-          restore-keys: |
-            turbo-build-${{ runner.os }}-
-
       - name: Generate Prisma client
         run: pnpm --filter api db:generate
 
-      # Set build env vars — use repo secrets when available, fall back to
-      # placeholder values so the Next.js build succeeds in forks / fresh repos.
       - name: Set build env vars
         run: |
           echo "NEXT_PUBLIC_SUPABASE_URL=${_URL:-https://placeholder.supabase.co}" >> "$GITHUB_ENV"
@@ -352,7 +366,7 @@ jobs:
           _ANON: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           _SRK: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
-      - name: Build all
+      - name: Build all (uses Turbo cache from bundle-size)
         run: pnpm build
 
   # ──────────────────────────────────────────────────────────────
@@ -989,3 +1003,111 @@ jobs:
               issue_number: context.payload.pull_request.number,
               body: '🧹 Preview environment cleaned up (Supabase branch, Railway environment, and Vercel env vars removed).',
             });
+
+  # ──────────────────────────────────────────────────────────────
+  # Job 7: Cache main branch bundle sizes
+  # This runs only on pushes to main, not on PRs. Measures bundle
+  # sizes for main and caches them so PRs can use them via cache
+  # restore instead of building main in real-time.
+  # ──────────────────────────────────────────────────────────────
+  cache-sizes:
+    name: Cache Main Branch Sizes
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter api db:generate
+
+      - name: Set build env vars
+        run: |
+          echo "NEXT_PUBLIC_SUPABASE_URL=${_URL:-https://placeholder.supabase.co}" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=${_ANON:-placeholder-anon-key}" >> "$GITHUB_ENV"
+          echo "SUPABASE_SERVICE_ROLE_KEY=${_SRK:-placeholder-service-role-key}" >> "$GITHUB_ENV"
+          echo "EXPO_PUBLIC_SUPABASE_URL=${_URL:-https://placeholder.supabase.co}" >> "$GITHUB_ENV"
+          echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=${_ANON:-placeholder-anon-key}" >> "$GITHUB_ENV"
+        env:
+          _URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          _ANON: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          _SRK: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+      - name: Build all packages
+        run: pnpm build:packages
+
+      - name: Build all apps
+        run: |
+          pnpm --filter web build
+          (cd apps/mobile && npx expo export --platform android --output-dir .expo/dist)
+          pnpm --filter api build
+        env:
+          EXPO_NO_TELEMETRY: 1
+          TURBO_TELEMETRY_DISABLED: 1
+
+      - name: Write measurement script
+        run: |
+          cat > /tmp/measure.js << 'EOF'
+          const fs = require('fs'), path = require('path'), zlib = require('zlib');
+          function walk(dir, exts) {
+            if (!fs.existsSync(dir)) return [];
+            const out = [];
+            for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+              const full = path.join(dir, e.name);
+              if (e.isDirectory()) out.push(...walk(full, exts));
+              else if (exts.some(x => e.name.endsWith(x)) && !e.name.endsWith('.map')) out.push(full);
+            }
+            return out;
+          }
+          function measure(dir, exts) {
+            const files = walk(dir, exts);
+            let raw = 0, gz = 0;
+            const top = [];
+            for (const f of files) {
+              const buf = fs.readFileSync(f);
+              const gzLen = zlib.gzipSync(buf).length;
+              raw += buf.length; gz += gzLen;
+              top.push({ name: path.basename(f), gz: gzLen });
+            }
+            top.sort((a, b) => b.gz - a.gz);
+            return { raw, gz, count: files.length, top: top.slice(0, 5) };
+          }
+          const out = {
+            web:    { js: measure('apps/web/.next/static', ['.js']), css: measure('apps/web/.next/static', ['.css']) },
+            mobile: { js: measure('apps/mobile/.expo/dist/_expo/static/js', ['.js', '.hbc']) },
+            api:    { js: measure('apps/api/dist', ['.js']) },
+          };
+          process.stdout.write(JSON.stringify(out));
+          EOF
+
+      - name: Measure main branch sizes
+        run: node /tmp/measure.js > /tmp/main-sizes.json
+
+      - name: Cache main branch sizes
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/main-sizes.json
+          key: bundle-sizes-main-latest-${{ runner.os }}
+
+      - name: Cache main branch sizes (commit-specific)
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/main-sizes.json
+          key: bundle-sizes-main-${{ github.sha }}-${{ runner.os }}
