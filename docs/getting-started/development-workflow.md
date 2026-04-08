@@ -26,11 +26,11 @@ Run the full stack or individual applications from the repo root:
 ```bash
 pnpm dev
 pnpm dev:web
-pnpm mobile:start
+pnpm dev:mobile
 pnpm dev:api
 ```
 
-`pnpm mobile:start` is the preferred mobile workflow because it preserves Expo's interactive terminal controls such as `i` for the iOS Simulator and `a` for the Android Emulator. `pnpm dev` also starts mobile with the same direct Expo path while keeping the rest of the stack running in parallel.
+`pnpm dev:mobile` is the preferred mobile workflow because it preserves Expo's interactive terminal controls such as `i` for the iOS Simulator and `a` for the Android Emulator. `pnpm dev` also starts mobile with the same direct Expo path while keeping the rest of the stack running in parallel.
 
 Shared packages should be built before first app startup or after structural package changes:
 

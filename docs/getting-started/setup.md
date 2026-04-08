@@ -385,7 +385,7 @@ This builds `shared-types`, `ui-web`, `ui-native`, and `utils` in dependency ord
 pnpm dev
 ```
 
-This starts web, API, shared package watchers, and mobile together. The mobile process uses the same direct Expo startup path as `pnpm mobile:start`, so Expo terminal shortcuts like `i` and `a` still work.
+This starts web, API, shared package watchers, and mobile together. The mobile process uses the same direct Expo startup path as `pnpm dev:mobile`, so Expo terminal shortcuts like `i` and `a` still work.
 
 ### Web only (recommended during web development)
 
@@ -405,7 +405,7 @@ pnpm dev:api
 ### Mobile only
 
 ```bash
-pnpm mobile:start
+pnpm dev:mobile
 ```
 
 Then in the Expo terminal:
@@ -457,7 +457,7 @@ supabase status --output json
 3. Install simulators: Xcode → Settings → Platforms → iOS
 
 ```bash
-pnpm mobile:start
+pnpm dev:mobile
 # then press 'i'
 ```
 
@@ -468,7 +468,7 @@ pnpm mobile:start
 3. Create a device with API level 33+
 
 ```bash
-pnpm mobile:start
+pnpm dev:mobile
 # then press 'a'
 ```
 
@@ -553,7 +553,7 @@ Shared packages haven't been built yet:
 pnpm build:packages
 ```
 
-Then restart the Metro bundler with `pnpm mobile:start`.
+Then restart the Metro bundler with `pnpm dev:mobile`.
 
 ### Metro starts but the app crashes on device
 

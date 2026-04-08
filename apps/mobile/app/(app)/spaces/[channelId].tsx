@@ -36,12 +36,13 @@ import { TypingIndicator } from '@/components/messages/typing-indicator';
 import { ConversationHeader } from '@/components/messages/conversation-header';
 import { MessageActionsSheet } from '@/components/messages/message-actions-sheet';
 import { ChannelInfoSheet } from '@/components/messages/channel-info-sheet';
+import { ProfileSheet } from '@/components/messages/profile-sheet';
 import { ReadOnlyNotice } from '@/components/messages/read-only-notice';
 import { SpaceSessionsTab } from '@/components/messages/space-sessions-tab';
 import type { AttachmentPayload } from '@/components/messages/attachment-sheet';
 import { buildMobileChannelEmptyStateCopy } from '@/lib/message-empty-state';
 import { reportMobileObservedError } from '@/lib/analytics/report-error';
-import type { MessageVM } from '@iconicedu/shared-types';
+import type { MessageVM, UserProfileVM } from '@iconicedu/shared-types';
 
 type PendingUpload = {
   id: string;
@@ -151,6 +152,9 @@ export default function SpaceDetailScreen() {
 
   // ── Info sheet state ──
   const [infoVisible, setInfoVisible] = useState(false);
+
+  // ── Profile sheet state ──
+  const [profileUser, setProfileUser] = useState<UserProfileVM | null>(null);
 
   // ── Long-press actions sheet state ──
   const [actionsMessage, setActionsMessage] = useState<MessageVM | null>(null);
@@ -473,6 +477,7 @@ export default function SpaceDetailScreen() {
             onMessageLongPress={isStaffReadOnly ? undefined : handleLongPress}
             onReactionToggle={isStaffReadOnly ? undefined : handleReactionToggle}
             onThreadOpen={isStaffReadOnly ? undefined : handleThreadOpen}
+            onProfilePress={setProfileUser}
             pendingUploads={pendingUploads}
             onRetryUpload={handleRetryUpload}
             isReadOnly={isStaffReadOnly}
@@ -519,6 +524,13 @@ export default function SpaceDetailScreen() {
         themeKey={resolvedThemeKey}
         messages={messages ?? []}
         onClose={() => setInfoVisible(false)}
+      />
+
+      {/* Profile sheet */}
+      <ProfileSheet
+        visible={!!profileUser}
+        user={profileUser}
+        onClose={() => setProfileUser(null)}
       />
 
       {/* Long-press actions sheet */}
