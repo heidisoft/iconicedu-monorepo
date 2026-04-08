@@ -563,8 +563,7 @@ jobs:
       #   2. Find the service ID dynamically from the project (avoids stale RAILWAY_SERVICE_ID)
       #   3. Set env vars on the service in the PR environment
       #   4. Trigger a deploy
-      #   5. Poll deployments until terminal state
-      #   6. Get domain via the domains API
+      #   5. Fetch the already-assigned service domain for the environment
       - name: Configure Railway PR environment
         id: railway
         env:
@@ -666,83 +665,27 @@ jobs:
             --arg sid "$SERVICE_ID" \
             --arg eid "$ENV_ID" \
             '{query:"mutation environmentTriggersDeploy($input: EnvironmentTriggersDeployInput!) { environmentTriggersDeploy(input: $input) }", variables:{input:{projectId:$pid, serviceId:$sid, environmentId:$eid}}}')" > /dev/null
-          echo "Deploy triggered. Waiting 15s for deployment to register in API..."
-          sleep 15
+          echo "Deploy triggered. Continuing without waiting for build completion."
 
-          # Step 5: Poll deployments until terminal state.
-          # Ref: https://docs.railway.com/integrations/api/manage-deployments
-          echo "Polling deployment status..."
-          DEPLOY_STATUS=""
-          DEPLOY_URL=""
-          for i in $(seq 1 24); do
-            DEPLOY_RESP=$(api "$(jq -n \
-              --arg pid "$RAILWAY_PROJECT_ID" \
-              --arg sid "$SERVICE_ID" \
-              --arg eid "$ENV_ID" \
-              '{query:"query deployments($input: DeploymentListInput!, $first: Int) { deployments(input: $input, first: $first) { edges { node { id status url staticUrl } } } }", variables:{input:{projectId:$pid, serviceId:$sid, environmentId:$eid}, first:1}}')")
-            DEPLOY_STATUS=$(echo "$DEPLOY_RESP" | jq -r '.data.deployments.edges[0].node.status // empty')
-            DEPLOY_URL=$(echo "$DEPLOY_RESP" | jq -r \
-              '.data.deployments.edges[0].node.url // .data.deployments.edges[0].node.staticUrl // empty')
-            echo "  Status: ${DEPLOY_STATUS:-(pending)} (attempt $i/24)"
-            case "$DEPLOY_STATUS" in
-              SUCCESS|FAILED|CRASHED|REMOVED) break ;;
-            esac
-            sleep 10
-          done
-
-          if [[ "$DEPLOY_STATUS" == "FAILED" || "$DEPLOY_STATUS" == "CRASHED" ]]; then
-            echo "::warning::Railway deployment ended with status $DEPLOY_STATUS"
-          fi
-
-          # Step 6: Get domain — try deployment URL first, then domains API.
+          # Step 5: Fetch the environment/service domain that Railway already assigned.
           # Ref: https://docs.railway.com/integrations/api/manage-domains
-          RAILWAY_DOMAIN=""
-          if [[ -n "$DEPLOY_URL" ]]; then
-            RAILWAY_DOMAIN="${DEPLOY_URL#https://}"
-            RAILWAY_DOMAIN="${RAILWAY_DOMAIN#http://}"
-          fi
+          echo "Fetching Railway service domain..."
+          DOMAIN_RESP=$(api "$(jq -n \
+            --arg pid "$RAILWAY_PROJECT_ID" \
+            --arg eid "$ENV_ID" \
+            --arg sid "$SERVICE_ID" \
+            '{query:"query domains($projectId: String!, $environmentId: String!, $serviceId: String!) { domains(projectId: $projectId, environmentId: $environmentId, serviceId: $serviceId) { serviceDomains { domain } customDomains { domain } } }", variables:{projectId:$pid, environmentId:$eid, serviceId:$sid}}')")
+          RAILWAY_DOMAIN=$(echo "$DOMAIN_RESP" | jq -r \
+            '.data.domains.serviceDomains[0]?.domain // .data.domains.customDomains[0]?.domain // empty')
 
           if [[ -z "$RAILWAY_DOMAIN" ]]; then
-            echo "Deployment URL not set — querying domains API..."
-            for i in $(seq 1 3); do
-              echo "  Domain lookup attempt $i/3..."
-              DOMAIN_RESP=$(api "$(jq -n \
-                --arg pid "$RAILWAY_PROJECT_ID" \
-                --arg eid "$ENV_ID" \
-                --arg sid "$SERVICE_ID" \
-                '{query:"query domains($projectId: String!, $environmentId: String!, $serviceId: String!) { domains(projectId: $projectId, environmentId: $environmentId, serviceId: $serviceId) { serviceDomains { domain } customDomains { domain } } }", variables:{projectId:$pid, environmentId:$eid, serviceId:$sid}}')")
-              RAILWAY_DOMAIN=$(echo "$DOMAIN_RESP" | jq -r \
-                '.data.domains.serviceDomains[0]?.domain // .data.domains.customDomains[0]?.domain // empty')
-              [[ -n "$RAILWAY_DOMAIN" ]] && break
-              sleep 5
-            done
-          fi
-
-          if [[ -z "$RAILWAY_DOMAIN" ]]; then
-            echo "::warning::No Railway domain found after retries"
+            echo "::warning::No Railway domain is currently assigned to $SERVICE_NAME in $ENV_NAME"
             echo "railway_api_url=pending" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          # Health check (3 attempts)
-          HEALTHY_URL=""
-          for i in $(seq 1 3); do
-            HEALTH_STATUS=$(curl -sf -o /dev/null -w "%{http_code}" \
-              "https://${RAILWAY_DOMAIN}/healthz" 2>/dev/null || echo "000")
-            echo "  Health check attempt $i/3: $HEALTH_STATUS"
-            if [[ "$HEALTH_STATUS" == "200" ]]; then
-              HEALTHY_URL="https://${RAILWAY_DOMAIN}"
-              break
-            fi
-            sleep 10
-          done
-
-          FINAL_URL="${HEALTHY_URL:-https://${RAILWAY_DOMAIN}}"
+          FINAL_URL="https://${RAILWAY_DOMAIN}"
           echo "railway_api_url=${FINAL_URL}" >> "$GITHUB_OUTPUT"
-
-          if [[ -z "$HEALTHY_URL" ]]; then
-            echo "::warning::Health check did not return 200 — service may still be warming up"
-          fi
 
           # Post a commit status so the API URL appears on the PR checks tab
           curl -sf -X POST \
