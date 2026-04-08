@@ -602,22 +602,16 @@ jobs:
             esac
           done
 
-          if [[ -n "$AUTO_DEPLOY_ID" ]]; then
-            echo "Redeploying latest deployment $AUTO_DEPLOY_ID with updated variables..."
-            DEPLOY_RESP=$(api "$(jq -n \
-              --arg id \"$AUTO_DEPLOY_ID\" \
-              '{query:"mutation deploymentRedeploy($id: String!) { deploymentRedeploy(id: $id) { id status } }", variables:{id:$id}}')")
-            echo "Redeploy response: $(echo "$DEPLOY_RESP" | jq '.errors // .data')"
-          else
-            # Fallback: if no deployment exists yet, trigger the environment service deploy.
-            echo "No existing deployment found; triggering fallback deploy for service/environment..."
-            DEPLOY_RESP=$(api "$(jq -n \
-              --arg pid \"$RAILWAY_PROJECT_ID\" \
-              --arg sid \"$SERVICE_ID\" \
-              --arg eid \"$ENV_ID\" \
-              '{query:"mutation environmentTriggersDeploy($input: EnvironmentTriggersDeployInput!) { environmentTriggersDeploy(input: $input) }", variables:{input:{projectId:$pid, serviceId:$sid, environmentId:$eid}}}')")
-            echo "Fallback deploy response: $(echo "$DEPLOY_RESP" | jq '.errors // .data')"
+          if [[ -z "$AUTO_DEPLOY_ID" ]]; then
+            echo "::error::No existing Railway PR deployment found after waiting. Aborting to avoid creating duplicate deployments."
+            exit 1
           fi
+
+          echo "Redeploying latest deployment $AUTO_DEPLOY_ID with updated variables..."
+          DEPLOY_RESP=$(api "$(jq -n \
+            --arg id \"$AUTO_DEPLOY_ID\" \
+            '{query:"mutation deploymentRedeploy($id: String!) { deploymentRedeploy(id: $id) { id status } }", variables:{id:$id}}')")
+          echo "Redeploy response: $(echo "$DEPLOY_RESP" | jq '.errors // .data')"
 
           service_instance_info() {
             api "{\"query\":\"query { serviceInstance(serviceId: \\\"$SERVICE_ID\\\", environmentId: \\\"$ENV_ID\\\") { latestDeployment { status } domains { serviceDomains { id domain } } } }\"}"
