@@ -163,15 +163,14 @@ jobs:
           retention-days: 14
 
   # ──────────────────────────────────────────────────────────────
-  # Job 3: Bundle sizes — builds all three apps on both the PR
-  # branch and the base branch, measures raw + gzip sizes, and
-  # uploads a JSON artifact consumed by preview-env.yml when it
-  # assembles the unified "Preview Environment Ready" PR comment.
-  # No PR comment is posted here. Informational only — not a gate.
+  # Job 3: Bundle sizes — compares PR sizes (measured in build job)
+  # against main branch sizes (cached or built on-demand).
+  # Depends on build to ensure apps are built before comparison.
   # ──────────────────────────────────────────────────────────────
   bundle-size:
     name: Bundle Size
     if: github.event.action != 'closed'
+    needs: [build]
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -194,7 +193,13 @@ jobs:
           node-version: 20.19.0
           cache: pnpm
 
-      # Write the measurement script once — reused for both PR and base builds.
+      - name: Download PR sizes artifact from build job
+        uses: actions/download-artifact@v4
+        with:
+          name: pr-sizes
+          path: /tmp
+
+      # Write the measurement script once — reused for base build (if cache misses).
       - name: Write measurement script
         run: |
           cat > /tmp/measure.js << 'EOF'
@@ -230,37 +235,6 @@ jobs:
           process.stdout.write(JSON.stringify(out));
           EOF
 
-      # ── PR branch build ────────────────────────────────────────
-      # Secrets can't use || fallback inside ${{}} — use bash :- via GITHUB_ENV.
-      - name: Set build env vars
-        run: |
-          echo "NEXT_PUBLIC_SUPABASE_URL=${_URL:-https://placeholder.supabase.co}" >> "$GITHUB_ENV"
-          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=${_ANON:-placeholder-anon-key}" >> "$GITHUB_ENV"
-          echo "SUPABASE_SERVICE_ROLE_KEY=${_SRK:-placeholder-service-role-key}" >> "$GITHUB_ENV"
-          echo "EXPO_PUBLIC_SUPABASE_URL=${_URL:-https://placeholder.supabase.co}" >> "$GITHUB_ENV"
-          echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=${_ANON:-placeholder-anon-key}" >> "$GITHUB_ENV"
-        env:
-          _URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          _ANON: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          _SRK: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-
-      - name: Install dependencies (PR)
-        run: pnpm install --frozen-lockfile
-
-      - name: Build all apps (PR branch)
-        run: |
-          pnpm --filter api db:generate
-          pnpm build:packages
-          pnpm --filter web build
-          (cd apps/mobile && npx expo export --platform android --output-dir .expo/dist)
-          pnpm --filter api build
-        env:
-          EXPO_NO_TELEMETRY: 1
-          TURBO_TELEMETRY_DISABLED: 1
-
-      - name: Measure PR branch sizes
-        run: node /tmp/measure.js > /tmp/pr-sizes.json
-
       # ── Try to restore cached main branch sizes ─────────────────
       # If cache hit: skip building base; use the cached sizes (faster)
       # If cache miss: fall back to building base branch in real-time
@@ -279,6 +253,19 @@ jobs:
       - name: Install dependencies (base)
         if: steps.cache-restore.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
+
+      - name: Set base build env vars
+        if: steps.cache-restore.outputs.cache-hit != 'true'
+        run: |
+          echo "NEXT_PUBLIC_SUPABASE_URL=${_URL:-https://placeholder.supabase.co}" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=${_ANON:-placeholder-anon-key}" >> "$GITHUB_ENV"
+          echo "SUPABASE_SERVICE_ROLE_KEY=${_SRK:-placeholder-service-role-key}" >> "$GITHUB_ENV"
+          echo "EXPO_PUBLIC_SUPABASE_URL=${_URL:-https://placeholder.supabase.co}" >> "$GITHUB_ENV"
+          echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=${_ANON:-placeholder-anon-key}" >> "$GITHUB_ENV"
+        env:
+          _URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          _ANON: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          _SRK: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
       # continue-on-error: base may differ enough to fail a sub-build;
       # missing data renders as "—" in the comment rather than blocking.
@@ -320,10 +307,9 @@ jobs:
           retention-days: 7
 
   # ──────────────────────────────────────────────────────────────
-  # Job 4: Build verification — lightweight check that apps build
-  # Depends on bundle-size to ensure builds complete before this runs,
-  # and reuses the build outputs that bundle-size already generated.
-  # Turbo caching ensures we don't rebuild what bundle-size did.
+  # Job 4: Build apps + measure PR sizes
+  # Builds all three apps on the PR branch once, measures bundle sizes,
+  # uploads measurement artifact for bundle-size job to use for comparison.
   # ──────────────────────────────────────────────────────────────
   build:
     # Branch protection depends on this exact job name.
@@ -331,9 +317,9 @@ jobs:
     # scripts/github/apply-branch-protection.sh in the same change.
     name: Build
     if: github.event.action != 'closed'
-    needs: [quality, test, bundle-size]
+    needs: [quality, test]
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
@@ -361,13 +347,67 @@ jobs:
           echo "NEXT_PUBLIC_SUPABASE_URL=${_URL:-https://placeholder.supabase.co}" >> "$GITHUB_ENV"
           echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=${_ANON:-placeholder-anon-key}" >> "$GITHUB_ENV"
           echo "SUPABASE_SERVICE_ROLE_KEY=${_SRK:-placeholder-service-role-key}" >> "$GITHUB_ENV"
+          echo "EXPO_PUBLIC_SUPABASE_URL=${_URL:-https://placeholder.supabase.co}" >> "$GITHUB_ENV"
+          echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=${_ANON:-placeholder-anon-key}" >> "$GITHUB_ENV"
         env:
           _URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           _ANON: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           _SRK: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
-      - name: Build all (uses Turbo cache from bundle-size)
-        run: pnpm build
+      - name: Write measurement script
+        run: |
+          cat > /tmp/measure.js << 'EOF'
+          const fs = require('fs'), path = require('path'), zlib = require('zlib');
+          function walk(dir, exts) {
+            if (!fs.existsSync(dir)) return [];
+            const out = [];
+            for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+              const full = path.join(dir, e.name);
+              if (e.isDirectory()) out.push(...walk(full, exts));
+              else if (exts.some(x => e.name.endsWith(x)) && !e.name.endsWith('.map')) out.push(full);
+            }
+            return out;
+          }
+          function measure(dir, exts) {
+            const files = walk(dir, exts);
+            let raw = 0, gz = 0;
+            const top = [];
+            for (const f of files) {
+              const buf = fs.readFileSync(f);
+              const gzLen = zlib.gzipSync(buf).length;
+              raw += buf.length; gz += gzLen;
+              top.push({ name: path.basename(f), gz: gzLen });
+            }
+            top.sort((a, b) => b.gz - a.gz);
+            return { raw, gz, count: files.length, top: top.slice(0, 5) };
+          }
+          const out = {
+            web:    { js: measure('apps/web/.next/static', ['.js']), css: measure('apps/web/.next/static', ['.css']) },
+            mobile: { js: measure('apps/mobile/.expo/dist/_expo/static/js', ['.js', '.hbc']) },
+            api:    { js: measure('apps/api/dist', ['.js']) },
+          };
+          process.stdout.write(JSON.stringify(out));
+          EOF
+
+      - name: Build all apps (PR branch)
+        run: |
+          pnpm build:packages
+          pnpm --filter web build
+          (cd apps/mobile && npx expo export --platform android --output-dir .expo/dist)
+          pnpm --filter api build
+        env:
+          EXPO_NO_TELEMETRY: 1
+          TURBO_TELEMETRY_DISABLED: 1
+
+      - name: Measure PR branch sizes
+        run: node /tmp/measure.js > /tmp/pr-sizes.json
+
+      - name: Upload PR sizes artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-sizes
+          path: /tmp/pr-sizes.json
+          retention-days: 7
 
   # ──────────────────────────────────────────────────────────────
   # Job 5: Verify Preview Environment Status
