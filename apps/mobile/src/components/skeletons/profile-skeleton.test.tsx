@@ -16,9 +16,9 @@ describe('ProfileSkeleton', () => {
     expect(screen.getAllByLabelText('Loading').length).toBeGreaterThan(0);
   });
 
-  it('renders 15 PulseBox + 1 root = 16 loading nodes', () => {
+  it('renders 16 PulseBox + 1 root = 17 loading nodes', () => {
     render(<ProfileSkeleton />);
-    // Profile card: 3 PulseBox; settings rows: 6 × 2 = 12; total = 15 + 1 root
-    expect(screen.getAllByLabelText('Loading').length).toBe(16);
+    // Profile card: 4 PulseBox; settings rows: 6 × 2 = 12; total = 16 + 1 root
+    expect(screen.getAllByLabelText('Loading').length).toBe(17);
   });
 });

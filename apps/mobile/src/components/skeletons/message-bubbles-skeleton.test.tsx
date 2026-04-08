@@ -16,9 +16,9 @@ describe('MessageBubblesSkeleton', () => {
     expect(screen.getAllByLabelText('Loading').length).toBeGreaterThan(0);
   });
 
-  it('renders 8 PulseBox + 1 root = 9 loading nodes', () => {
+  it('renders 11 PulseBox + 1 root = 12 loading nodes', () => {
     render(<MessageBubblesSkeleton />);
-    // 3 "other" (avatar + bubble = 2 each) + 2 "own" (bubble = 1 each) = 8 PulseBox + 1 root
-    expect(screen.getAllByLabelText('Loading').length).toBe(9);
+    // 3 "other" (avatar + name + bubble = 3 each) + 2 "own" (bubble = 1 each) = 11 PulseBox + 1 root
+    expect(screen.getAllByLabelText('Loading').length).toBe(12);
   });
 });

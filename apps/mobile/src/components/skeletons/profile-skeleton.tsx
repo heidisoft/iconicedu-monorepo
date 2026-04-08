@@ -29,8 +29,11 @@ export function ProfileSkeleton() {
         <View style={s.profileRow}>
           <PulseBox width={56} height={56} radius={28} />
           <View style={s.profileInfo}>
-            <PulseBox width={140} height={16} radius={4} />
-            <PulseBox width={180} height={12} radius={4} />
+            <PulseBox width={140} height={18} radius={4} />
+            <PulseBox width={180} height={13} radius={4} />
+            <View style={s.profileKindWrap}>
+              <PulseBox width={56} height={14} radius={4} />
+            </View>
           </View>
         </View>
       </View>
@@ -80,7 +83,8 @@ const s = StyleSheet.create({
     overflow: 'hidden',
   },
   profileRow: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 18 },
-  profileInfo: { flex: 1, gap: 6 },
+  profileInfo: { flex: 1, gap: 3 },
+  profileKindWrap: { marginTop: 2 },
   sectionCard: {
     borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,

@@ -631,11 +631,11 @@ export default function HomeScreen() {
               <View style={s.profileTrigger}>
                 <PulseBox width={44} height={44} radius={22} />
                 <View style={s.profileTextWrap}>
-                  <PulseBox width={132} height={14} radius={4} />
+                  <PulseBox width={132} height={16} radius={4} />
                   <PulseBox width={168} height={12} radius={4} />
                 </View>
               </View>
-              <PulseBox width={112} height={32} radius={16} />
+              <PulseBox width={32} height={32} radius={999} />
             </View>
             <PulseBox width={42} height={42} radius={12} />
           </View>
@@ -702,8 +702,8 @@ export default function HomeScreen() {
           <View style={{ gap: 8 }}>
             <PulseBox width={160} height={16} radius={4} />
             <View style={s.headlineRow}>
-              <PulseBox width={220} height={30} radius={6} />
-              <PulseBox width={96} height={32} radius={16} />
+              <PulseBox width={220} height={34} radius={6} />
+              <PulseBox width={96} height={32} radius={999} />
             </View>
           </View>
         ) : (
