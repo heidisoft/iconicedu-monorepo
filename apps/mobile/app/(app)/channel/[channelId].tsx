@@ -12,7 +12,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
-import type { MessageVM } from '@iconicedu/shared-types';
+import type { MessageVM, UserProfileVM } from '@iconicedu/shared-types';
 import { useAccount } from '@/hooks/use-account';
 import { useProfile } from '@/hooks/use-profile';
 import { useMessages } from '@/hooks/use-messages';
@@ -38,6 +38,7 @@ import { TypingIndicator } from '@/components/messages/typing-indicator';
 import { ConversationHeader } from '@/components/messages/conversation-header';
 import { MessageActionsSheet } from '@/components/messages/message-actions-sheet';
 import { ChannelInfoSheet } from '@/components/messages/channel-info-sheet';
+import { ProfileSheet } from '@/components/messages/profile-sheet';
 import { ReadOnlyNotice } from '@/components/messages/read-only-notice';
 import { SpaceSessionsTab } from '@/components/messages/space-sessions-tab';
 import { resolveChannelTopicIconKey } from '@/lib/learning-space-icons';
@@ -135,6 +136,9 @@ export default function ChannelConversationScreen() {
 
   // ── Info sheet state ──
   const [infoVisible, setInfoVisible] = useState(false);
+
+  // ── Profile sheet state ──
+  const [profileUser, setProfileUser] = useState<UserProfileVM | null>(null);
 
   // ── Long-press actions sheet state ──
   const [actionsMessage, setActionsMessage] = useState<MessageVM | null>(null);
@@ -491,6 +495,7 @@ export default function ChannelConversationScreen() {
             onMessageLongPress={isStaffReadOnly ? undefined : handleLongPress}
             onReactionToggle={isStaffReadOnly ? undefined : handleReactionToggle}
             onThreadOpen={isStaffReadOnly ? undefined : handleThreadOpen}
+            onProfilePress={setProfileUser}
             pendingUploads={pendingUploads}
             onRetryUpload={handleRetryUpload}
             isReadOnly={isStaffReadOnly}
@@ -529,6 +534,13 @@ export default function ChannelConversationScreen() {
         themeKey={themeKey ?? null}
         messages={messages ?? []}
         onClose={() => setInfoVisible(false)}
+      />
+
+      {/* Profile sheet */}
+      <ProfileSheet
+        visible={!!profileUser}
+        user={profileUser}
+        onClose={() => setProfileUser(null)}
       />
 
       {/* Long-press actions sheet */}

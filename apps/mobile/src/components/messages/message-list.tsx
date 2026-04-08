@@ -209,6 +209,7 @@ type MessageListProps = {
   onMessageLongPress?: (message: MessageVM) => void;
   onReactionToggle?: (messageId: string, emoji: string) => void;
   onThreadOpen?: (message: MessageVM) => void;
+  onProfilePress?: (user: MessageVM['core']['sender']) => void;
   /** Optimistic pending uploads — appear at the bottom while upload is in flight. */
   pendingUploads?: PendingUpload[];
   /** Called when the user taps "retry" on a failed upload row. */
@@ -236,6 +237,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   onMessageLongPress,
   onReactionToggle,
   onThreadOpen,
+  onProfilePress,
   pendingUploads,
   onRetryUpload,
   isReadOnly,
@@ -362,6 +364,7 @@ export const MessageList: React.FC<MessageListProps> = ({
           onLongPress={onMessageLongPress}
           onReactionToggle={onReactionToggle}
           onThreadOpen={onThreadOpen}
+          onProfilePress={onProfilePress}
           currentProfileId={currentProfileId}
           currentAccountId={currentAccountId}
           isReadOnly={isReadOnly}
@@ -376,6 +379,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       onMessageLongPress,
       onReactionToggle,
       onThreadOpen,
+      onProfilePress,
       isReadOnly,
     ],
   );

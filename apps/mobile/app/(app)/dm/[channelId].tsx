@@ -11,7 +11,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
-import type { MessageVM } from '@iconicedu/shared-types';
+import type { MessageVM, UserProfileVM } from '@iconicedu/shared-types';
 import { useAccount } from '@/hooks/use-account';
 import { useProfile } from '@/hooks/use-profile';
 import { useMessages } from '@/hooks/use-messages';
@@ -37,6 +37,7 @@ import { TypingIndicator } from '@/components/messages/typing-indicator';
 import { ConversationHeader } from '@/components/messages/conversation-header';
 import { MessageActionsSheet } from '@/components/messages/message-actions-sheet';
 import { ChannelInfoSheet } from '@/components/messages/channel-info-sheet';
+import { ProfileSheet } from '@/components/messages/profile-sheet';
 import { MessageBubblesSkeleton } from '@/components/skeletons';
 import { buildMobileChannelEmptyStateCopy } from '@/lib/message-empty-state';
 import type { AttachmentPayload } from '@/components/messages/attachment-sheet';
@@ -175,6 +176,9 @@ export default function DmConversationScreen() {
 
   // ── Info sheet state ──
   const [infoVisible, setInfoVisible] = useState(false);
+
+  // ── Profile sheet state ──
+  const [profileUser, setProfileUser] = useState<UserProfileVM | null>(null);
   const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
 
   // ── Long-press actions sheet state ──
@@ -481,6 +485,7 @@ export default function DmConversationScreen() {
             onMessageLongPress={isSupervised ? undefined : handleLongPress}
             onReactionToggle={isSupervised ? undefined : handleReactionToggle}
             onThreadOpen={isSupervised ? undefined : handleThreadOpen}
+            onProfilePress={setProfileUser}
             isReadOnly={isSupervised}
             onUnreadViewed={handleUnreadViewed}
             isScreenActive={isFocused}
@@ -533,6 +538,13 @@ export default function DmConversationScreen() {
         avatarRole={avatarRole}
         messages={messages ?? []}
         onClose={() => setInfoVisible(false)}
+      />
+
+      {/* Profile sheet */}
+      <ProfileSheet
+        visible={!!profileUser}
+        user={profileUser}
+        onClose={() => setProfileUser(null)}
       />
 
       {/* Long-press actions sheet */}

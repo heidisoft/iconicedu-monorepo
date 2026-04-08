@@ -1707,6 +1707,7 @@ export type MessageItemProps = {
   onLongPress?: (message: MessageVM) => void;
   onReactionToggle?: (messageId: string, emoji: string) => void;
   onThreadOpen?: (message: MessageVM) => void;
+  onProfilePress?: (user: MessageVM['core']['sender']) => void;
   currentProfileId?: string;
   currentAccountId?: string;
   isReadOnly?: boolean;
@@ -1721,6 +1722,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   onLongPress,
   onReactionToggle,
   onThreadOpen,
+  onProfilePress,
   currentProfileId,
   currentAccountId,
   isReadOnly,
@@ -2438,12 +2440,14 @@ export const MessageItem: React.FC<MessageItemProps> = ({
       >
         <View style={s.avatarSlot}>
           {isGroupStart && (
-            <MessageAvatar
-              name={senderDisplayName}
-              src={avatarUrl}
-              seed={avatarSeed}
-              role={senderRole}
-            />
+            <Pressable onPress={() => onProfilePress?.(message.core.sender)} hitSlop={4}>
+              <MessageAvatar
+                name={senderDisplayName}
+                src={avatarUrl}
+                seed={avatarSeed}
+                role={senderRole}
+              />
+            </Pressable>
           )}
         </View>
         <View style={[s.contentCol, ownInChannel && s.contentColOwn]}>
@@ -2460,18 +2464,21 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                   />
                 </>
               ) : (
-                <>
+                <Pressable
+                  onPress={() => onProfilePress?.(message.core.sender)}
+                  style={s.nameRow}
+                >
                   <RoleNameIndicator
                     name={senderDisplayName}
                     role={senderRole}
                     textStyle={[s.senderName, { color: senderColor(senderDisplayName) }]}
                   />
-                  {!isThreadMessage && (
-                    <VisibilityBadge message={message} colors={colors} />
-                  )}
-                  <Text style={s.msgTime}>{time}</Text>
-                </>
+                </Pressable>
               )}
+              {!ownInChannel && !isThreadMessage && (
+                <VisibilityBadge message={message} colors={colors} />
+              )}
+              {!ownInChannel && <Text style={s.msgTime}>{time}</Text>}
             </View>
           )}
           {type === 'lesson-assignment' && (
@@ -2602,12 +2609,14 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         {/* Avatar slot */}
         <View style={s.avatarSlot}>
           {isGroupStart && (
-            <MessageAvatar
-              name={senderDisplayName}
-              src={avatarUrl}
-              seed={avatarSeed}
-              role={senderRole}
-            />
+            <Pressable onPress={() => onProfilePress?.(message.core.sender)} hitSlop={4}>
+              <MessageAvatar
+                name={senderDisplayName}
+                src={avatarUrl}
+                seed={avatarSeed}
+                role={senderRole}
+              />
+            </Pressable>
           )}
         </View>
 
@@ -2627,18 +2636,21 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                   />
                 </>
               ) : (
-                <>
+                <Pressable
+                  onPress={() => onProfilePress?.(message.core.sender)}
+                  style={s.nameRow}
+                >
                   <RoleNameIndicator
                     name={senderDisplayName}
                     role={senderRole}
                     textStyle={[s.senderName, { color: senderColor(senderDisplayName) }]}
                   />
-                  {!isThreadMessage && (
-                    <VisibilityBadge message={message} colors={colors} />
-                  )}
-                  <Text style={s.msgTime}>{time}</Text>
-                </>
+                </Pressable>
               )}
+              {!ownInChannel && !isThreadMessage && (
+                <VisibilityBadge message={message} colors={colors} />
+              )}
+              {!ownInChannel && <Text style={s.msgTime}>{time}</Text>}
             </View>
           )}
           {/* Dedicated layouts for rich message types; text/cards use bubble */}
