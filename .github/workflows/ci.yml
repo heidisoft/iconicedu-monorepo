@@ -566,52 +566,43 @@ jobs:
               variables:{input:{projectId:$pid, environmentId:$eid, serviceId:$sid, variables:$vars}}}')")
           echo "Variables response: $(echo "$VARS_RESP" | jq '.errors // "ok"')"
 
-          # Reuse the auto-created PR deployment to avoid creating parallel deployments.
-          # Wait for the latest deployment to exist and settle, then redeploy it so
-          # the updated env vars are applied.
-          echo "Waiting for Railway auto-deploy in PR environment..."
+          # Look for an existing deployment from Railway's GitHub auto-deploy.
+          # If one is found, redeploy it with the updated vars.
+          # If none is found (Railway GitHub integration hasn't fired yet), trigger
+          # a deploy directly via serviceInstanceDeploy — same service, same environment.
+          echo "Looking for existing Railway deployment in PR environment..."
           AUTO_DEPLOY_ID=""
           AUTO_DEPLOY_STATUS=""
-          for i in $(seq 1 18); do
+          for i in $(seq 1 6); do
             LATEST_DEPLOY_RESP=$(api "$(jq -n \
-              --arg pid \"$RAILWAY_PROJECT_ID\" \
-              --arg sid \"$SERVICE_ID\" \
-              --arg eid \"$ENV_ID\" \
+              --arg pid "$RAILWAY_PROJECT_ID" \
+              --arg sid "$SERVICE_ID" \
+              --arg eid "$ENV_ID" \
               '{query:"query deployments($input: DeploymentListInput!, $first: Int) { deployments(input: $input, first: $first) { edges { node { id status createdAt } } } }", variables:{input:{projectId:$pid, serviceId:$sid, environmentId:$eid}, first:1}}')")
 
             AUTO_DEPLOY_ID=$(echo "$LATEST_DEPLOY_RESP" | jq -r '.data.deployments.edges[0].node.id // empty')
             AUTO_DEPLOY_STATUS=$(echo "$LATEST_DEPLOY_RESP" | jq -r '.data.deployments.edges[0].node.status // empty')
 
-            echo "  Auto-deploy status: ${AUTO_DEPLOY_STATUS:-(not found)} (attempt $i/18)"
+            echo "  Existing deploy: ${AUTO_DEPLOY_STATUS:-(not found)} (attempt $i/6)"
 
-            if [[ -z "$AUTO_DEPLOY_ID" ]]; then
-              sleep 10
-              continue
-            fi
-
-            case "$AUTO_DEPLOY_STATUS" in
-              BUILDING|DEPLOYING|QUEUED|WAITING|SLEEPING)
-                sleep 10
-                ;;
-              SUCCESS|FAILED|CRASHED|REMOVED|SKIPPED)
-                break
-                ;;
-              *)
-                break
-                ;;
-            esac
+            [[ -n "$AUTO_DEPLOY_ID" ]] && break
+            sleep 10
           done
 
-          if [[ -z "$AUTO_DEPLOY_ID" ]]; then
-            echo "::error::No existing Railway PR deployment found after waiting. Aborting to avoid creating duplicate deployments."
-            exit 1
+          if [[ -n "$AUTO_DEPLOY_ID" ]]; then
+            echo "Redeploying existing deployment $AUTO_DEPLOY_ID with updated variables..."
+            DEPLOY_RESP=$(api "$(jq -n \
+              --arg id "$AUTO_DEPLOY_ID" \
+              '{query:"mutation deploymentRedeploy($id: String!) { deploymentRedeploy(id: $id) { id status } }", variables:{id:$id}}')")
+            echo "Redeploy response: $(echo "$DEPLOY_RESP" | jq '.errors // .data')"
+          else
+            echo "No existing deployment found — triggering deploy via serviceInstanceDeploy..."
+            DEPLOY_RESP=$(api "$(jq -n \
+              --arg sid "$SERVICE_ID" \
+              --arg eid "$ENV_ID" \
+              '{query:"mutation serviceInstanceDeploy($serviceId: String!, $environmentId: String!) { serviceInstanceDeploy(serviceId: $serviceId, environmentId: $environmentId) }", variables:{serviceId:$sid, environmentId:$eid}}')")
+            echo "Deploy response: $(echo "$DEPLOY_RESP" | jq '.errors // .data')"
           fi
-
-          echo "Redeploying latest deployment $AUTO_DEPLOY_ID with updated variables..."
-          DEPLOY_RESP=$(api "$(jq -n \
-            --arg id \"$AUTO_DEPLOY_ID\" \
-            '{query:"mutation deploymentRedeploy($id: String!) { deploymentRedeploy(id: $id) { id status } }", variables:{id:$id}}')")
-          echo "Redeploy response: $(echo "$DEPLOY_RESP" | jq '.errors // .data')"
 
           service_instance_info() {
             api "{\"query\":\"query { serviceInstance(serviceId: \\\"$SERVICE_ID\\\", environmentId: \\\"$ENV_ID\\\") { latestDeployment { status } domains { serviceDomains { id domain } } } }\"}"
