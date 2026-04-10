@@ -274,7 +274,93 @@ type ActivityItemProps = {
   expandedIds: Set<string>;
   onToggle: (id: string) => void;
   isSubActivity?: boolean;
+  viewerTimezone?: string | null;
 };
+
+function normalizeTimezone(timezone?: string | null) {
+  const value = timezone?.trim();
+  return value ? value : null;
+}
+
+function isValidTimezone(timezone?: string | null) {
+  const candidate = normalizeTimezone(timezone);
+  if (!candidate) {
+    return false;
+  }
+
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: candidate }).format(new Date());
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function resolveDisplayTimezone(
+  viewerTimezone?: string | null,
+  scheduleTimezone?: string | null,
+) {
+  if (isValidTimezone(viewerTimezone)) {
+    return viewerTimezone!.trim();
+  }
+
+  if (isValidTimezone(scheduleTimezone)) {
+    return scheduleTimezone!.trim();
+  }
+
+  try {
+    const deviceTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (isValidTimezone(deviceTimezone)) {
+      return deviceTimezone;
+    }
+  } catch {
+    // Fall back to UTC when the runtime cannot resolve a local timezone.
+  }
+
+  return 'UTC';
+}
+
+export function formatActivityPrimaryHeadline(
+  item: ActivityFeedItemVM,
+  viewerTimezone?: string | null,
+) {
+  const metadata = item.metadata as Record<string, unknown> | undefined;
+  if (!metadata?.sessionGroupLocalTime) {
+    return item.content.headline.primary;
+  }
+
+  const occurrenceStart = metadata.occurrenceStart;
+  if (typeof occurrenceStart !== 'string' || occurrenceStart.length === 0) {
+    return item.content.headline.primary;
+  }
+
+  const date = new Date(occurrenceStart);
+  if (Number.isNaN(date.getTime())) {
+    return item.content.headline.primary;
+  }
+
+  const localLabel = new Intl.DateTimeFormat('en-US', {
+    timeZone: resolveDisplayTimezone(
+      viewerTimezone,
+      typeof metadata.timezone === 'string' ? metadata.timezone : null,
+    ),
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })
+    .format(date)
+    .replace(',', ' at');
+
+  const participantNamesLabel =
+    typeof metadata.participantNamesLabel === 'string' &&
+    metadata.participantNamesLabel.length > 0
+      ? metadata.participantNamesLabel
+      : undefined;
+
+  return `Class session${participantNamesLabel ? ` for ${participantNamesLabel}` : ''} ${localLabel}`;
+}
 
 export function ActivityItem({
   item,
@@ -285,6 +371,7 @@ export function ActivityItem({
   expandedIds,
   onToggle,
   isSubActivity = false,
+  viewerTimezone,
 }: ActivityItemProps) {
   const iconKey = getIconKey(item);
   const tone =
@@ -303,7 +390,8 @@ export function ActivityItem({
     : 0;
   const hasExpandedContent = !isGroup && !!item.content.expandedContent;
   const hasActionBtn = !!item.content.actionButton && !isSubActivity;
-  const { primary, secondary, emphasis } = item.content.headline;
+  const primary = formatActivityPrimaryHeadline(item, viewerTimezone);
+  const { secondary, emphasis } = item.content.headline;
   const tabLabel = TAB_LABELS[item.tabKey] ?? item.tabKey;
 
   const handlePress = () => {

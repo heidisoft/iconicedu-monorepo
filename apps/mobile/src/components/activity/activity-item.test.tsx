@@ -4,7 +4,11 @@ import { MessageSquare } from 'lucide-react-native';
 
 import type { ActivityFeedItemVM } from '@iconicedu/shared-types';
 
-import { ActivityItem, makeActivityItemStyles } from './activity-item';
+import {
+  ActivityItem,
+  formatActivityPrimaryHeadline,
+  makeActivityItemStyles,
+} from './activity-item';
 import { lightColors } from '@/lib/theme';
 
 function makeBaseActivity(): ActivityFeedItemVM {
@@ -58,6 +62,7 @@ function renderActivity(item: ActivityFeedItemVM) {
       onMarkRead={jest.fn()}
       expandedIds={new Set()}
       onToggle={jest.fn()}
+      viewerTimezone="America/New_York"
     />,
   );
 }
@@ -69,5 +74,28 @@ describe('ActivityItem', () => {
     expect(UNSAFE_getAllByType(MessageSquare).length).toBeGreaterThan(0);
     expect(screen.getByText('Priya Sharma')).toBeTruthy();
     expect(screen.getByText('Math Foundations')).toBeTruthy();
+  });
+
+  it('formats scheduled class session headlines without the timezone suffix', () => {
+    const item = {
+      ...makeBaseActivity(),
+      kind: 'group',
+      content: {
+        ...makeBaseActivity().content,
+        headline: {
+          primary: 'Class session 2026-03-19T22:00:00.000Z',
+          secondary: 'Math Foundations',
+        },
+      },
+      metadata: {
+        sessionGroupLocalTime: true,
+        occurrenceStart: '2026-03-19T22:00:00.000Z',
+        timezone: 'America/New_York',
+      },
+    } as ActivityFeedItemVM;
+
+    expect(formatActivityPrimaryHeadline(item, 'America/New_York')).toBe(
+      'Class session Mar 19 at 6:00 PM',
+    );
   });
 });

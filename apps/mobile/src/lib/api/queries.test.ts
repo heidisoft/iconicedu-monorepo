@@ -965,6 +965,32 @@ describe('fetchActivityFeed', () => {
     });
   });
 
+  it('preserves activity metadata used by the mobile inbox renderer', async () => {
+    const chain = createReturnsChain({
+      data: [
+        {
+          ...groupRow,
+          metadata: {
+            sessionGroupLocalTime: true,
+            occurrenceStart: '2026-03-19T22:00:00.000Z',
+            timezone: 'America/New_York',
+          },
+        },
+      ],
+      error: null,
+    });
+    mockFrom.mockReturnValue(chain);
+
+    const result = await fetchActivityFeed(ORG_ID_FEED, PROFILE_ID);
+    const item = result.sections[0]?.items[0];
+
+    expect(item?.metadata).toMatchObject({
+      sessionGroupLocalTime: true,
+      occurrenceStart: '2026-03-19T22:00:00.000Z',
+      timezone: 'America/New_York',
+    });
+  });
+
   it('hydrates refs.actor from actor_profile_id when profile data is available', async () => {
     const actorRow = {
       ...leafRow,

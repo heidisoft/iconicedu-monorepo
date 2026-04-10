@@ -121,6 +121,7 @@ function mapFeedRow(row: ActivityFeedItemRow): ActivityFeedItemVM {
     grouping,
     subActivityCount: row.sub_activity_count ?? undefined,
     isCollapsed: row.is_collapsed ?? undefined,
+    metadata: row.metadata ?? undefined,
   } as ActivityFeedItemVM;
 }
 
