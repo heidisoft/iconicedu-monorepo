@@ -965,6 +965,83 @@ describe('fetchActivityFeed', () => {
     });
   });
 
+  it('preserves activity metadata used by the mobile inbox renderer', async () => {
+    const chain = createReturnsChain({
+      data: [
+        {
+          ...groupRow,
+          metadata: {
+            sessionGroupLocalTime: true,
+            occurrenceStart: '2026-03-19T22:00:00.000Z',
+            timezone: 'America/New_York',
+          },
+        },
+      ],
+      error: null,
+    });
+    mockFrom.mockReturnValue(chain);
+
+    const result = await fetchActivityFeed(ORG_ID_FEED, PROFILE_ID);
+    const item = result.sections[0]?.items[0];
+
+    expect(item?.metadata).toMatchObject({
+      sessionGroupLocalTime: true,
+      occurrenceStart: '2026-03-19T22:00:00.000Z',
+      timezone: 'America/New_York',
+    });
+  });
+
+  it('hydrates saved feedback into feedback request activity metadata on load', async () => {
+    const feedbackActivityRow = {
+      ...leafRow,
+      verb: 'session.feedback_request.sent',
+      source_event_id: '11111111-1111-4111-8111-111111111111',
+      metadata: {
+        sourceEventId: '11111111-1111-4111-8111-111111111111',
+        classSessionId: '33333333-3333-4333-8333-333333333333',
+        classroomId: '44444444-4444-4444-8444-444444444444',
+        channelId: '55555555-5555-4555-8555-555555555555',
+        occurrenceStart: '2026-03-16T10:00:00.000Z',
+      },
+    };
+    const itemsChain = createReturnsChain({ data: [feedbackActivityRow], error: null });
+    const feedbackBySessionChain = createReturnsChain({
+      data: [
+        {
+          class_session_id: '33333333-3333-4333-8333-333333333333',
+          source_event_id: '11111111-1111-4111-8111-111111111111',
+          message_id: '22222222-2222-4222-8222-222222222222',
+          rating: 4,
+          comment: 'Helpful session.',
+          submitted_at: '2026-03-16T10:05:00.000Z',
+        },
+      ],
+      error: null,
+    });
+    const feedbackByEventChain = createReturnsChain({ data: [], error: null });
+
+    mockFrom
+      .mockReturnValueOnce(itemsChain)
+      .mockReturnValueOnce(feedbackBySessionChain)
+      .mockReturnValueOnce(feedbackByEventChain);
+
+    const result = await fetchActivityFeed(ORG_ID_FEED, PROFILE_ID);
+    const item = result.sections[0]?.items[0];
+
+    expect(mockFrom).toHaveBeenNthCalledWith(2, 'class_session_feedback');
+    expect(mockFrom).toHaveBeenNthCalledWith(3, 'class_session_feedback');
+    expect(item?.metadata).toMatchObject({
+      feedbackResponse: {
+        sourceEventId: '11111111-1111-4111-8111-111111111111',
+        classSessionId: '33333333-3333-4333-8333-333333333333',
+        messageId: '22222222-2222-4222-8222-222222222222',
+        rating: 4,
+        comment: 'Helpful session.',
+        submittedAt: '2026-03-16T10:05:00.000Z',
+      },
+    });
+  });
+
   it('hydrates refs.actor from actor_profile_id when profile data is available', async () => {
     const actorRow = {
       ...leafRow,

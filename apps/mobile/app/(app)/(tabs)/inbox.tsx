@@ -11,6 +11,7 @@ import { Bell } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/providers/theme-provider';
 import { useActivityFeed, useMarkActivityFeedRead } from '@/hooks/use-activity-feed';
+import { useProfile } from '@/hooks/use-profile';
 import { ActivityFeedSkeleton } from '@/components/skeletons';
 import { createHeaderSurface } from '@/lib/header-surface';
 import {
@@ -142,6 +143,7 @@ export default function InboxScreen() {
   const { colors, isDark } = useTheme();
   const s = React.useMemo(() => makeStyles(colors), [colors]);
   const activityS = React.useMemo(() => makeActivityItemStyles(colors), [colors]);
+  const { data: profile } = useProfile();
 
   const { data: feed, isPending: feedLoading, refetch: refetchFeed } = useActivityFeed();
   const { mutate: markRead } = useMarkActivityFeedRead();
@@ -318,6 +320,8 @@ export default function InboxScreen() {
               onMarkRead={onMarkRead}
               expandedIds={expandedIds}
               onToggle={onToggle}
+              viewerTimezone={profile?.timezone ?? null}
+              currentProfileId={profile?.id ?? null}
             />
           )}
           ItemSeparatorComponent={() => <View style={s.separator} />}

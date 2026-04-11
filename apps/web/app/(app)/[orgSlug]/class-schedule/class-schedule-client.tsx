@@ -51,7 +51,7 @@ export function ClassScheduleClient({
     if (viewParam === 'week' || viewParam === 'day' || viewParam === 'month') {
       return viewParam;
     }
-    return 'day';
+    return 'week';
   }, [viewParam]);
 
   const [currentDate, setCurrentDate] = useState(initialDate);

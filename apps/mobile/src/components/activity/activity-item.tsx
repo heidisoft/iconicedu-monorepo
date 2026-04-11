@@ -21,6 +21,10 @@ import type {
   ActivityFeedLeafItemVM,
   InboxIconKeyVM,
 } from '@iconicedu/shared-types';
+import {
+  ActivityFeedbackRequest,
+  canRenderMobileActivityFeedbackRequest,
+} from './activity-feedback-request';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -274,7 +278,94 @@ type ActivityItemProps = {
   expandedIds: Set<string>;
   onToggle: (id: string) => void;
   isSubActivity?: boolean;
+  viewerTimezone?: string | null;
+  currentProfileId?: string | null;
 };
+
+function normalizeTimezone(timezone?: string | null) {
+  const value = timezone?.trim();
+  return value ? value : null;
+}
+
+function isValidTimezone(timezone?: string | null) {
+  const candidate = normalizeTimezone(timezone);
+  if (!candidate) {
+    return false;
+  }
+
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: candidate }).format(new Date());
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function resolveDisplayTimezone(
+  viewerTimezone?: string | null,
+  scheduleTimezone?: string | null,
+) {
+  if (isValidTimezone(viewerTimezone)) {
+    return viewerTimezone!.trim();
+  }
+
+  if (isValidTimezone(scheduleTimezone)) {
+    return scheduleTimezone!.trim();
+  }
+
+  try {
+    const deviceTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (isValidTimezone(deviceTimezone)) {
+      return deviceTimezone;
+    }
+  } catch {
+    // Fall back to UTC when the runtime cannot resolve a local timezone.
+  }
+
+  return 'UTC';
+}
+
+export function formatActivityPrimaryHeadline(
+  item: ActivityFeedItemVM,
+  viewerTimezone?: string | null,
+) {
+  const metadata = item.metadata as Record<string, unknown> | undefined;
+  if (!metadata?.sessionGroupLocalTime) {
+    return item.content.headline.primary;
+  }
+
+  const occurrenceStart = metadata.occurrenceStart;
+  if (typeof occurrenceStart !== 'string' || occurrenceStart.length === 0) {
+    return item.content.headline.primary;
+  }
+
+  const date = new Date(occurrenceStart);
+  if (Number.isNaN(date.getTime())) {
+    return item.content.headline.primary;
+  }
+
+  const localLabel = new Intl.DateTimeFormat('en-US', {
+    timeZone: resolveDisplayTimezone(
+      viewerTimezone,
+      typeof metadata.timezone === 'string' ? metadata.timezone : null,
+    ),
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })
+    .format(date)
+    .replace(',', ' at');
+
+  const participantNamesLabel =
+    typeof metadata.participantNamesLabel === 'string' &&
+    metadata.participantNamesLabel.length > 0
+      ? metadata.participantNamesLabel
+      : undefined;
+
+  return `Class session${participantNamesLabel ? ` for ${participantNamesLabel}` : ''} ${localLabel}`;
+}
 
 export function ActivityItem({
   item,
@@ -285,6 +376,8 @@ export function ActivityItem({
   expandedIds,
   onToggle,
   isSubActivity = false,
+  viewerTimezone,
+  currentProfileId,
 }: ActivityItemProps) {
   const iconKey = getIconKey(item);
   const tone =
@@ -303,14 +396,74 @@ export function ActivityItem({
     : 0;
   const hasExpandedContent = !isGroup && !!item.content.expandedContent;
   const hasActionBtn = !!item.content.actionButton && !isSubActivity;
-  const { primary, secondary, emphasis } = item.content.headline;
+  const primary = formatActivityPrimaryHeadline(item, viewerTimezone);
+  const { secondary, emphasis } = item.content.headline;
   const tabLabel = TAB_LABELS[item.tabKey] ?? item.tabKey;
+  const shouldRenderFeedbackRequest =
+    item.kind === 'leaf' &&
+    item.verb === 'session.feedback_request.sent' &&
+    canRenderMobileActivityFeedbackRequest(item);
 
   const handlePress = () => {
     if (!isRead) onMarkRead(item.ids.id);
     if (isGroup && subCount > 0) onToggle(item.ids.id);
     else if (hasExpandedContent) onToggle(item.ids.id);
   };
+
+  if (shouldRenderFeedbackRequest) {
+    const headerPressStyle = ({ pressed }: { pressed: boolean }) => [
+      isSubActivity ? s.subItemInner : s.itemWrap,
+      pressed && { opacity: 0.7 },
+    ];
+
+    return (
+      <View style={isSubActivity ? undefined : s.itemOuter}>
+        <Pressable onPress={handlePress} style={headerPressStyle}>
+          <View style={s.itemRow}>
+            <View style={isSubActivity ? s.subAvatarWrap : s.avatarWrap}>
+              <View
+                style={[
+                  isSubActivity ? s.subAvatar : s.avatar,
+                  { backgroundColor: iconBg },
+                ]}
+              >
+                <IconComponent size={isSubActivity ? 10 : 11} color={iconFg} />
+              </View>
+            </View>
+
+            <View style={s.content}>
+              <View style={s.headlineRow}>
+                <Text style={[s.headlineText, { color: colors.text }]}>
+                  <Text style={s.bold}>{primary}</Text>
+                  {!!secondary && ` ${secondary}`}
+                </Text>
+              </View>
+
+              <View style={s.metaRow}>
+                <Text style={[s.metaText, { color: colors.textMuted }]}>{time}</Text>
+                {!isSubActivity && !!tabLabel && tabLabel !== 'All' && (
+                  <>
+                    <View style={[s.metaDot, { backgroundColor: colors.textFaint }]} />
+                    <Text style={[s.metaText, { color: colors.textMuted }]}>
+                      {tabLabel}
+                    </Text>
+                  </>
+                )}
+              </View>
+            </View>
+
+            {!isRead && <View style={[s.unreadDot, { backgroundColor: colors.teal }]} />}
+          </View>
+        </Pressable>
+
+        <ActivityFeedbackRequest
+          activity={item}
+          colors={colors}
+          currentProfileId={currentProfileId}
+        />
+      </View>
+    );
+  }
 
   // Sub-activity: full leaf view matching web
   if (isSubActivity) {
@@ -341,7 +494,7 @@ export function ActivityItem({
           {!isRead && <View style={[s.unreadDot, { backgroundColor: colors.teal }]} />}
         </View>
 
-        {!!item.content.summary && (
+        {!!item.content.summary && !shouldRenderFeedbackRequest && (
           <View
             style={[
               s.subPreviewCard,
@@ -354,7 +507,7 @@ export function ActivityItem({
           </View>
         )}
 
-        {hasExpandedContent && isExpanded && (
+        {hasExpandedContent && isExpanded && !shouldRenderFeedbackRequest && (
           <View
             style={[
               s.subPreviewCard,
@@ -367,7 +520,7 @@ export function ActivityItem({
           </View>
         )}
 
-        {hasExpandedContent && (
+        {hasExpandedContent && !shouldRenderFeedbackRequest && (
           <TouchableOpacity
             onPress={() => onToggle(item.ids.id)}
             hitSlop={8}
@@ -379,7 +532,15 @@ export function ActivityItem({
           </TouchableOpacity>
         )}
 
-        {!!item.content.actionButton && (
+        {shouldRenderFeedbackRequest && (
+          <ActivityFeedbackRequest
+            activity={item}
+            colors={colors}
+            currentProfileId={currentProfileId}
+          />
+        )}
+
+        {!!item.content.actionButton && !shouldRenderFeedbackRequest && (
           <TouchableOpacity style={[s.subActionBtn, { borderColor: colors.border }]}>
             <Text style={[s.actionBtnText, { color: colors.text }]}>
               {item.content.actionButton.label}
@@ -446,7 +607,7 @@ export function ActivityItem({
         </View>
 
         {/* Preview card — summary text */}
-        {!!item.content.summary && (
+        {!!item.content.summary && !shouldRenderFeedbackRequest && (
           <View
             style={[
               s.previewCard,
@@ -460,7 +621,7 @@ export function ActivityItem({
         )}
 
         {/* Expanded detail card */}
-        {hasExpandedContent && isExpanded && (
+        {hasExpandedContent && isExpanded && !shouldRenderFeedbackRequest && (
           <View
             style={[
               s.previewCard,
@@ -474,7 +635,7 @@ export function ActivityItem({
         )}
 
         {/* Read more link */}
-        {hasExpandedContent && (
+        {hasExpandedContent && !shouldRenderFeedbackRequest && (
           <TouchableOpacity
             onPress={() => onToggle(item.ids.id)}
             hitSlop={8}
@@ -487,7 +648,15 @@ export function ActivityItem({
         )}
 
         {/* Action button */}
-        {hasActionBtn && (
+        {shouldRenderFeedbackRequest && (
+          <ActivityFeedbackRequest
+            activity={item}
+            colors={colors}
+            currentProfileId={currentProfileId}
+          />
+        )}
+
+        {hasActionBtn && !shouldRenderFeedbackRequest && (
           <TouchableOpacity style={[s.actionBtn, { borderColor: colors.border }]}>
             <Text style={[s.actionBtnText, { color: colors.text }]}>
               {item.content.actionButton!.label}
@@ -509,6 +678,8 @@ export function ActivityItem({
                 expandedIds={expandedIds}
                 onToggle={onToggle}
                 isSubActivity
+                viewerTimezone={viewerTimezone}
+                currentProfileId={currentProfileId}
               />
             ))}
           </View>
