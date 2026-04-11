@@ -6,12 +6,12 @@ import {
   StyleSheet,
   Switch,
   TouchableOpacity,
-  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Bell, BellOff } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { SettingsRow } from '@iconicedu/ui-native';
+import { NotificationSettingsSkeleton } from '@/components/skeletons';
 import { useNotificationPrefs } from '@/hooks/use-notification-prefs';
 import { useUpdateNotificationPref } from '@/hooks/use-update-notification-pref';
 import { NOTIFICATION_REGISTRY } from '@/lib/notifications/notification-config';
@@ -57,7 +57,6 @@ function makeStyles(C: AppColors) {
       overflow: 'hidden',
     },
     divider: { height: 1, backgroundColor: C.border, marginLeft: 60 },
-    loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     emptyCard: { padding: 24, alignItems: 'center', gap: 8 },
     emptyIconWrap: {
       width: 56,
@@ -110,9 +109,7 @@ export default function NotificationsScreen() {
           </TouchableOpacity>
           <Text style={s.navTitle}>Notifications</Text>
         </View>
-        <View style={s.loading}>
-          <ActivityIndicator color={colors.teal} size="large" />
-        </View>
+        <NotificationSettingsSkeleton />
       </SafeAreaView>
     );
   }

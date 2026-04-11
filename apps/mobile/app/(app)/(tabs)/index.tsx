@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -370,6 +370,7 @@ function makeStyles(C: AppColors) {
 
 export default function HomeScreen() {
   const { user } = useAuth();
+  const scrollRef = useRef<ScrollView>(null);
   const queryClient = useQueryClient();
   const { familySwitchOptions, switchFamilyView, isViewingAsChild } = useFamilyView();
   const {
@@ -493,6 +494,7 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [familySwitchOpen, setFamilySwitchOpen] = useState(false);
   const [switchingProfileId, setSwitchingProfileId] = useState<string | null>(null);
+  const [thisWeekSectionY, setThisWeekSectionY] = useState(0);
   const sessionBuckets = React.useMemo(
     () =>
       splitHomeSessionsByTimeline({
@@ -558,6 +560,12 @@ export default function HomeScreen() {
     refetchSessions,
     refetchSupportChannel,
   ]);
+  const handleUpcomingSessionsPress = useCallback(() => {
+    scrollRef.current?.scrollTo({
+      y: Math.max(thisWeekSectionY - 16, 0),
+      animated: true,
+    });
+  }, [thisWeekSectionY]);
   const canShowFamilySwitcher =
     familySwitchOptions.length > 1 &&
     profileData?.kind &&
@@ -614,6 +622,7 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={s.scroll}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -772,7 +781,12 @@ export default function HomeScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={s.metricsRow}
             >
-              <View style={[s.metricCard, { width: metricCardWidth }]}>
+              <TouchableOpacity
+                style={[s.metricCard, { width: metricCardWidth }]}
+                onPress={handleUpcomingSessionsPress}
+                activeOpacity={0.85}
+                disabled={sessionsLoading || refreshing}
+              >
                 <View style={s.metricHeader}>
                   <Text style={s.metricTitle}>Upcoming Sessions</Text>
                   <View style={s.metricIconWrap}>
@@ -783,7 +797,7 @@ export default function HomeScreen() {
                   <Text style={s.metricValue}>{topMetrics.upcomingSessionsThisWeek}</Text>
                   <Text style={s.metricLabel}>This week</Text>
                 </View>
-              </View>
+              </TouchableOpacity>
 
               <View style={[s.metricCard, { width: metricCardWidth }]}>
                 <View style={s.metricHeader}>
@@ -862,7 +876,10 @@ export default function HomeScreen() {
           </View>
         )}
 
-        <View style={{ gap: 10 }}>
+        <View
+          style={{ gap: 10 }}
+          onLayout={(event) => setThisWeekSectionY(event.nativeEvent.layout.y)}
+        >
           <View style={s.activityHeader}>
             <Text style={s.sectionLabel}>This week</Text>
           </View>

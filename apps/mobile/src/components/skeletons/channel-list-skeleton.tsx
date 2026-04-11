@@ -47,6 +47,7 @@ const s = StyleSheet.create({
     alignItems: 'flex-end',
     justifyContent: 'space-between',
     flexShrink: 0,
+    alignSelf: 'stretch',
     paddingVertical: 2,
   },
 });

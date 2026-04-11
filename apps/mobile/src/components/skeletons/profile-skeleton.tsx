@@ -15,6 +15,14 @@ function SettingRowSkeleton() {
   );
 }
 
+function SectionLabelSkeleton() {
+  return (
+    <View style={s.sectionLabelWrap}>
+      <PulseBox width={72} height={12} radius={4} />
+    </View>
+  );
+}
+
 export function ProfileSkeleton() {
   const { colors } = useTheme();
   return (
@@ -39,6 +47,7 @@ export function ProfileSkeleton() {
       </View>
 
       {/* Personal section card */}
+      <SectionLabelSkeleton />
       <View
         style={[
           s.sectionCard,
@@ -56,6 +65,7 @@ export function ProfileSkeleton() {
       </View>
 
       {/* Account section card */}
+      <SectionLabelSkeleton />
       <View
         style={[
           s.sectionCard,
@@ -71,6 +81,19 @@ export function ProfileSkeleton() {
           </View>
         ))}
       </View>
+
+      <View
+        style={[
+          s.sectionCard,
+          { backgroundColor: colors.card, borderColor: colors.border },
+        ]}
+      >
+        <SettingRowSkeleton />
+      </View>
+
+      <View style={s.versionWrap}>
+        <PulseBox width={132} height={12} radius={4} />
+      </View>
     </View>
   );
 }
@@ -85,6 +108,10 @@ const s = StyleSheet.create({
   profileRow: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 18 },
   profileInfo: { flex: 1, gap: 3 },
   profileKindWrap: { marginTop: 2 },
+  sectionLabelWrap: {
+    paddingHorizontal: 4,
+    marginBottom: -8,
+  },
   sectionCard: {
     borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
@@ -98,4 +125,8 @@ const s = StyleSheet.create({
     paddingHorizontal: 18,
   },
   divider: { height: 1, marginLeft: 60 },
+  versionWrap: {
+    alignItems: 'center',
+    marginTop: 4,
+  },
 });
