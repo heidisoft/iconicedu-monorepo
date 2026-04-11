@@ -321,6 +321,7 @@ export default function InboxScreen() {
               expandedIds={expandedIds}
               onToggle={onToggle}
               viewerTimezone={profile?.timezone ?? null}
+              currentProfileId={profile?.id ?? null}
             />
           )}
           ItemSeparatorComponent={() => <View style={s.separator} />}

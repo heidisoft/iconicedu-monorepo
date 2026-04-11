@@ -8,6 +8,7 @@ import { ClassesModule } from '@iconicedu/api/modules/classes/classes.module';
 import { MessagesModule } from '@iconicedu/api/modules/messages/messages.module';
 import { RemindersModule } from '@iconicedu/api/modules/reminders/reminders.module';
 import { AnalyticsModule } from '@iconicedu/api/analytics/analytics.module';
+import { ActivityFeedModule } from '@iconicedu/api/modules/activity-feed/activity-feed.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { AnalyticsModule } from '@iconicedu/api/analytics/analytics.module';
     ChannelsModule,
     ClassesModule,
     MessagesModule,
+    ActivityFeedModule,
     RemindersModule,
   ],
 })
