@@ -11,6 +11,12 @@ import { useProfile } from './use-profile';
 
 const CONSENT_SHOWN_KEY = 'push_consent_shown';
 
+function supportsPushPermissionPrompt() {
+  if (!Constants.isDevice) return false;
+  if (Constants.executionEnvironment === 'storeClient') return false;
+  return true;
+}
+
 async function ensureAndroidChannel() {
   if (Platform.OS !== 'android') return;
   await Notifications.setNotificationChannelAsync('default', {
@@ -54,8 +60,7 @@ export function usePushRegistration() {
 
     void (async () => {
       try {
-        // Push tokens don't work in Expo Go — skip silently
-        if (Constants.executionEnvironment === 'storeClient') return;
+        if (!supportsPushPermissionPrompt()) return;
 
         await ensureAndroidChannel();
         const { status } = await Notifications.getPermissionsAsync();
@@ -65,10 +70,9 @@ export function usePushRegistration() {
 
         const consentShown = await SecureStore.getItemAsync(CONSENT_SHOWN_KEY);
 
-        if (!consentShown) {
-          // First run on this device — always show our consent sheet before
-          // any OS prompt, regardless of what the OS reports (covers Android < 13
-          // where status is immediately 'granted' without a system prompt)
+        if (!consentShown && status !== 'granted') {
+          // First run on a supported device with notifications not yet granted:
+          // show the explainer sheet before requesting the OS permission prompt.
           setShowConsent(true);
           return;
         }

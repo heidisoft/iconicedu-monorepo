@@ -27,6 +27,7 @@ jest.mock('expo-secure-store', () => ({
 }));
 
 jest.mock('expo-constants', () => ({
+  __esModule: true,
   default: {
     isDevice: true,
     executionEnvironment: 'bareExpo',
@@ -46,9 +47,16 @@ jest.mock('./use-profile', () => ({
   useProfile: () => ({ data: mockProfileData }),
 }));
 
+const mockConstants = jest.requireMock('expo-constants').default as {
+  isDevice: boolean;
+  executionEnvironment: string;
+};
+
 describe('usePushRegistration', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockConstants.isDevice = true;
+    mockConstants.executionEnvironment = 'bareExpo';
     mockGetPermissionsAsync.mockResolvedValue({ status: 'granted' });
     mockSetNotificationChannelAsync.mockResolvedValue(undefined);
     mockStorePushToken.mockResolvedValue(undefined);
@@ -103,5 +111,43 @@ describe('usePushRegistration', () => {
     await waitFor(() => {
       expect(mockGetExpoPushToken).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it('shows the consent sheet when notifications are still undetermined', async () => {
+    mockGetPermissionsAsync.mockResolvedValue({ status: 'undetermined' });
+    mockSecureStoreGetItem.mockResolvedValue(null);
+
+    const { result } = renderHook(() => usePushRegistration());
+
+    await waitFor(() => {
+      expect(result.current.showConsent).toBe(true);
+    });
+    expect(mockGetExpoPushToken).not.toHaveBeenCalled();
+    expect(mockStorePushToken).not.toHaveBeenCalled();
+  });
+
+  it('does not show the consent sheet when notifications are already granted', async () => {
+    mockGetExpoPushToken.mockResolvedValue('ExponentPushToken[test]');
+    mockSecureStoreGetItem.mockResolvedValue(null);
+
+    const { result } = renderHook(() => usePushRegistration());
+
+    await waitFor(() => {
+      expect(mockGetExpoPushToken).toHaveBeenCalled();
+    });
+    expect(result.current.showConsent).toBe(false);
+  });
+
+  it('does not prompt on unsupported devices', async () => {
+    mockConstants.isDevice = false;
+
+    const { result } = renderHook(() => usePushRegistration());
+
+    await waitFor(() => {
+      expect(mockGetPermissionsAsync).not.toHaveBeenCalled();
+    });
+    expect(result.current.showConsent).toBe(false);
+    expect(mockGetExpoPushToken).not.toHaveBeenCalled();
+    expect(mockStorePushToken).not.toHaveBeenCalled();
   });
 });
