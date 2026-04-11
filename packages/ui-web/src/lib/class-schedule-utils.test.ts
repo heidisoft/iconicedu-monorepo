@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import type { ClassScheduleVM } from '@iconicedu/shared-types';
 import { getLocalTime } from '@iconicedu/utils';
 
-import { expandRecurringEvents, getDisplayEventState } from './class-schedule-utils';
+import {
+  expandRecurringEvents,
+  getDisplayEventState,
+  getEventLayout,
+  getHiddenEventOverflowGroups,
+} from './class-schedule-utils';
 
 function buildRecurringSchedule(): ClassScheduleVM {
   return {
@@ -40,6 +45,74 @@ function buildRecurringSchedule(): ClassScheduleVM {
 }
 
 describe('class-schedule-utils', () => {
+  it('groups hidden overflow badges by cluster and hidden start time', () => {
+    const events: ClassScheduleVM[] = [
+      {
+        ...buildRecurringSchedule(),
+        endAt: '2026-03-01T18:00:00.000Z',
+      },
+      {
+        ...buildRecurringSchedule(),
+        ids: { id: 'schedule-2', orgId: 'org-1' },
+        title: 'Session 2',
+        endAt: '2026-03-01T18:00:00.000Z',
+      },
+      {
+        ...buildRecurringSchedule(),
+        ids: { id: 'schedule-3', orgId: 'org-1' },
+        title: 'Session 3',
+        endAt: '2026-03-01T18:00:00.000Z',
+      },
+      {
+        ...buildRecurringSchedule(),
+        ids: { id: 'schedule-4', orgId: 'org-1' },
+        title: 'Session 4',
+        startAt: '2026-03-01T16:00:00.000Z',
+        endAt: '2026-03-01T18:00:00.000Z',
+      },
+      {
+        ...buildRecurringSchedule(),
+        ids: { id: 'schedule-5', orgId: 'org-1' },
+        title: 'Session 5',
+        startAt: '2026-03-01T16:00:00.000Z',
+        endAt: '2026-03-01T18:00:00.000Z',
+      },
+      {
+        ...buildRecurringSchedule(),
+        ids: { id: 'schedule-6', orgId: 'org-1' },
+        title: 'Session 6',
+        startAt: '2026-03-01T17:00:00.000Z',
+        endAt: '2026-03-01T18:00:00.000Z',
+      },
+    ];
+
+    const layout = getEventLayout(events, 'UTC');
+    const overflowGroups = getHiddenEventOverflowGroups(events, layout, 3, 'UTC');
+
+    expect(overflowGroups).toHaveLength(2);
+    expect(overflowGroups.map((group) => group.startMinutes)).toEqual([960, 1020]);
+    expect(
+      overflowGroups.map((group) => group.hiddenEvents.map((event) => event.ids.id)),
+    ).toEqual([['schedule-4', 'schedule-5'], ['schedule-6']]);
+  });
+
+  it('returns no overflow groups when all columns remain visible', () => {
+    const events: ClassScheduleVM[] = [
+      buildRecurringSchedule(),
+      {
+        ...buildRecurringSchedule(),
+        ids: { id: 'schedule-2', orgId: 'org-1' },
+        title: 'Session 2',
+        startAt: '2026-03-01T16:00:00.000Z',
+        endAt: '2026-03-01T17:00:00.000Z',
+      },
+    ];
+
+    const layout = getEventLayout(events, 'UTC');
+
+    expect(getHiddenEventOverflowGroups(events, layout, 3, 'UTC')).toEqual([]);
+  });
+
   it('matches overrides by occurrence day when timestamp keys differ', () => {
     const expanded = expandRecurringEvents(
       [buildRecurringSchedule()],

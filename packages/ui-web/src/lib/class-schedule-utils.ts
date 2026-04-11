@@ -324,6 +324,53 @@ export function getEventLayout(events: ClassScheduleVM[], timezone?: string | nu
   return layout;
 }
 
+export interface HiddenEventOverflowGroup {
+  clusterId: number;
+  startMinutes: number;
+  hiddenEvents: ClassScheduleVM[];
+  columns: number;
+}
+
+export function getHiddenEventOverflowGroups(
+  events: ClassScheduleVM[],
+  layout: Map<string, { column: number; columns: number; clusterId: number }>,
+  maxVisibleColumns: number,
+  timezone?: string | null,
+): HiddenEventOverflowGroup[] {
+  const groups = new Map<string, HiddenEventOverflowGroup>();
+
+  events.forEach((event) => {
+    const eventLayout = layout.get(event.ids.id);
+    if (!eventLayout || eventLayout.column < maxVisibleColumns) {
+      return;
+    }
+
+    const startMinutes = eventTimeToMinutes(event, 'startAt', timezone);
+    const key = `${eventLayout.clusterId}:${startMinutes}`;
+    const group = groups.get(key);
+
+    if (group) {
+      group.hiddenEvents.push(event);
+      return;
+    }
+
+    groups.set(key, {
+      clusterId: eventLayout.clusterId,
+      startMinutes,
+      hiddenEvents: [event],
+      columns: eventLayout.columns,
+    });
+  });
+
+  return [...groups.values()].sort((left, right) => {
+    if (left.startMinutes !== right.startMinutes) {
+      return left.startMinutes - right.startMinutes;
+    }
+
+    return left.clusterId - right.clusterId;
+  });
+}
+
 const startOfDay = (date: Date) =>
   new Date(date.getFullYear(), date.getMonth(), date.getDate());
 

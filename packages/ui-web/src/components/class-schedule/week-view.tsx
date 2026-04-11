@@ -1,6 +1,5 @@
 'use client';
 
-import type { ClassScheduleVM } from '@iconicedu/shared-types';
 import {
   type DisplayClassScheduleVM,
   eventTimeToMinutes,
@@ -10,6 +9,7 @@ import {
   getEventDate,
   getTimeSlots,
   getEventLayout,
+  getHiddenEventOverflowGroups,
 } from '@iconicedu/ui-web/lib/class-schedule-utils';
 import { EventCard } from '@iconicedu/ui-web/components/class-schedule/event-card';
 import { cn } from '@iconicedu/ui-web/lib/utils';
@@ -171,32 +171,14 @@ export function WeekView({
                 isSameDay(getEventDate(event, timezone), day),
               );
               const dayLayout = getEventLayout(dayEvents, timezone);
-              const clusterInfo = new Map<
-                number,
-                { startMinutes: number; hiddenEvents: ClassScheduleVM[]; columns: number }
-              >();
               const isToday = isSameDay(day, today);
               const isSelected = isSameDay(day, currentDate);
-
-              dayEvents.forEach((event) => {
-                const layout = dayLayout.get(event.ids.id);
-                if (!layout) return;
-                const startMinutes = eventTimeToMinutes(event, 'startAt', timezone);
-                const info = clusterInfo.get(layout.clusterId);
-                const nextInfo = {
-                  startMinutes: info
-                    ? Math.min(info.startMinutes, startMinutes)
-                    : startMinutes,
-                  hiddenEvents: info?.hiddenEvents ?? [],
-                  columns: layout.columns,
-                };
-
-                if (layout.column >= maxVisibleColumns) {
-                  nextInfo.hiddenEvents = [...nextInfo.hiddenEvents, event];
-                }
-
-                clusterInfo.set(layout.clusterId, nextInfo);
-              });
+              const overflowGroups = getHiddenEventOverflowGroups(
+                dayEvents,
+                dayLayout,
+                maxVisibleColumns,
+                timezone,
+              );
 
               return (
                 <div
@@ -263,31 +245,31 @@ export function WeekView({
                       </div>
                     );
                   })}
-                  {[...clusterInfo.entries()].map(([clusterId, info]) => {
-                    if (info.hiddenEvents.length === 0) return null;
-                    const visibleColumns = Math.min(info.columns, maxVisibleColumns);
+                  {overflowGroups.map((group) => {
+                    const visibleColumns = Math.min(group.columns, maxVisibleColumns);
                     const sideInset = columnGap;
                     const width = 100 / visibleColumns;
                     const left = (visibleColumns - 1) * width;
-                    const top = (info.startMinutes / 30) * 32;
+                    const top = (group.startMinutes / 30) * 32;
 
                     return (
                       <div
-                        key={`more-${dayIndex}-${clusterId}`}
-                        className="absolute px-1 pointer-events-none"
+                        key={`more-${dayIndex}-${group.clusterId}-${group.startMinutes}`}
+                        className="absolute px-1 py-1 pointer-events-none"
                         style={{
                           top: `${top}px`,
                           left: `calc(${left}% + ${sideInset}px)`,
                           width: `calc(${width}% - ${sideInset * 2}px)`,
+                          zIndex: visibleColumns + 1,
                         }}
                       >
                         <Popover>
                           <PopoverTrigger asChild>
                             <button
                               type="button"
-                              className="pointer-events-auto inline-flex items-center justify-center rounded-md bg-muted/80 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground shadow-sm hover:bg-muted"
+                              className="pointer-events-auto inline-flex min-h-6 max-w-full items-center justify-start rounded-md bg-background/95 px-2 py-1 text-[10px] font-medium text-muted-foreground shadow-sm ring-1 ring-border hover:bg-muted w-full"
                             >
-                              +{info.hiddenEvents.length} more
+                              +{group.hiddenEvents.length} more
                             </button>
                           </PopoverTrigger>
                           <PopoverContent align="start" className="w-64 p-2">
@@ -295,7 +277,7 @@ export function WeekView({
                               More events
                             </div>
                             <div className="max-h-48 overflow-auto">
-                              {info.hiddenEvents.map((hidden) => (
+                              {group.hiddenEvents.map((hidden) => (
                                 <div key={hidden.ids.id} className="pointer-events-auto">
                                   <EventCard
                                     event={hidden}
