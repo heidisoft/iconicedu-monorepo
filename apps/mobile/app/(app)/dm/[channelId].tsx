@@ -48,6 +48,7 @@ export default function DmConversationScreen() {
     channelId,
     topic,
     avatarSeed,
+    presenceProfileId,
     avatarUrl,
     avatarRole,
     avatarTimezone,
@@ -59,6 +60,7 @@ export default function DmConversationScreen() {
     channelId: string;
     topic?: string;
     avatarSeed?: string;
+    presenceProfileId?: string;
     avatarUrl?: string;
     avatarRole?: string;
     avatarTimezone?: string;
@@ -87,12 +89,12 @@ export default function DmConversationScreen() {
   const presenceByProfileId = useOnlineProfileIds(
     orgId,
     profileId,
-    avatarSeed ? [avatarSeed] : [],
+    presenceProfileId ? [presenceProfileId] : [],
   );
-  const headerPresenceStatus = avatarSeed
-    ? (presenceByProfileId.get(avatarSeed) ?? null)
+  const headerPresenceStatus = presenceProfileId
+    ? (presenceByProfileId.get(presenceProfileId) ?? null)
     : null;
-  const headerPresenceSummary = useProfilePresenceSummary(orgId, avatarSeed ?? '');
+  const headerPresenceSummary = useProfilePresenceSummary(orgId, presenceProfileId ?? '');
 
   const formatRelativeLastSeen = useCallback((iso: string | null) => {
     if (!iso) return null;

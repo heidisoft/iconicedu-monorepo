@@ -210,6 +210,9 @@ importers:
       expo-linking:
         specifier: ^55.0.7
         version: 55.0.7(expo@55.0.5)(react-native@0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4))(react@19.2.4)(typescript@5.9.3)
+      expo-media-library:
+        specifier: ~55.0.9
+        version: 55.0.14(expo@55.0.5)(react-native@0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4))
       expo-navigation-bar:
         specifier: ^55.0.8
         version: 55.0.8(expo@55.0.5)(react-native@0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4))(react@19.2.4)
@@ -240,6 +243,9 @@ importers:
       posthog-react-native:
         specifier: ^4.37.1
         version: 4.37.1(@react-navigation/native@7.1.33(react-native@0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4))(react@19.2.4))(expo-application@55.0.9(expo@55.0.5))(expo-file-system@55.0.10(expo@55.0.5)(react-native@0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4)))(posthog-react-native-session-replay@1.5.1(react-native@0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4))(react@19.2.4))(react-native-safe-area-context@5.6.2(react-native@0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4))(react@19.2.4))(react-native-svg@15.15.3(react-native@0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4))(react@19.2.4))
+      posthog-react-native-session-replay:
+        specifier: ^1.5.1
+        version: 1.5.1(react-native@0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4))(react@19.2.4)
       react:
         specifier: 19.2.4
         version: 19.2.4
@@ -6285,6 +6291,12 @@ packages:
     resolution: {integrity: sha512-eLU5PIF9Tg3hHfKK9NgkvCRxwLb3pn8j2W6G/Vt8R6MHSNgaFU7pujvcBDbJCe5t9109zeS5PJY/d+dcagIKNw==}
     peerDependencies:
       expo: '*'
+
+  expo-media-library@55.0.14:
+    resolution: {integrity: sha512-S84myNFYinf6Yu492/hA7BV+mRURUmSkLR9GpZOgJ0SunmG3/7S/R6Bj0yx8TcbLToObciya+BejC8juPuyoBg==}
+    peerDependencies:
+      expo: '*'
+      react-native: '*'
 
   expo-modules-autolinking@55.0.8:
     resolution: {integrity: sha512-nrWB1pkNp7bR8ECUTgYUiJ2Pyh6AvxCBXZ+lyPlfl1TzEIGhwU1Yqr+d78eJDueXaW+9zKeE0HqrTZoLS3ve4A==}
@@ -16460,6 +16472,11 @@ snapshots:
       - supports-color
       - typescript
 
+  expo-media-library@55.0.14(expo@55.0.5)(react-native@0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4)):
+    dependencies:
+      expo: 55.0.5(@babel/core@7.28.5)(@expo/dom-webview@55.0.3)(@expo/metro-runtime@55.0.6)(expo-router@55.0.4)(react-dom@19.2.4(react@19.2.4))(react-native-webview@13.16.1(react-native@0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4))(react@19.2.4))(react-native@0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4))(react@19.2.4)(typescript@5.9.3)
+      react-native: 0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4)
+
   expo-modules-autolinking@55.0.8(typescript@5.9.3):
     dependencies:
       '@expo/require-utils': 55.0.2(typescript@5.9.3)
@@ -19150,7 +19167,6 @@ snapshots:
     dependencies:
       react: 19.2.4
       react-native: 0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4)
-    optional: true
 
   posthog-react-native@4.37.1(@react-navigation/native@7.1.33(react-native@0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4))(react@19.2.4))(expo-application@55.0.9(expo@55.0.5))(expo-file-system@55.0.10(expo@55.0.5)(react-native@0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4)))(posthog-react-native-session-replay@1.5.1(react-native@0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4))(react@19.2.4))(react-native-safe-area-context@5.6.2(react-native@0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4))(react@19.2.4))(react-native-svg@15.15.3(react-native@0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4))(react@19.2.4)):
     dependencies:

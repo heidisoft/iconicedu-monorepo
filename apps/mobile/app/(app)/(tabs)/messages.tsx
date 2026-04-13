@@ -71,6 +71,11 @@ function participantName(p: DmParticipant): string {
   );
 }
 
+function getDmPresenceProfileId(item: ChannelListItem): string | null {
+  const participantId = item.participants?.[0]?.id?.trim();
+  return participantId || null;
+}
+
 const AVATAR_COLORS = [
   '#5B8DEF',
   '#E07B54',
@@ -487,7 +492,6 @@ function DmAvatar({
           <Text style={s.avatarTxt}>{getInitials(name)}</Text>
         </View>
       )}
-      {/* Online dot — presence tracking can be layered on top later */}
       <PresenceBadge status={presenceStatus ?? 'offline'} s={s} />
       <RoleAvatarBadge role={person?.kind} size={16} />
     </View>
@@ -565,8 +569,9 @@ function ChannelRow({
           ...(participants.length > 0 ? [participants[0]!] : []),
         ]
       : participants;
+  const presenceProfileId = isDm ? getDmPresenceProfileId(item) : null;
   const presenceStatus = isDm
-    ? (presenceByProfileId.get(avatarParticipants[0]?.id ?? '') ?? 'offline')
+    ? (presenceByProfileId.get(presenceProfileId ?? '') ?? 'offline')
     : null;
 
   const text = item.last_message_text;
@@ -934,7 +939,10 @@ export default function MessagesScreen() {
           ? participants.map(participantName).join(', ')
           : (channel.topic ?? 'Direct Message');
       const displayTitle = isDm ? partnerTitle : (channel.topic ?? 'Channel');
-      const avatarSeed = isDm ? (participants[0]?.id ?? '') : '';
+      const avatarSeed = isDm
+        ? (participants[0]?.avatar_seed ?? participants[0]?.id ?? '')
+        : '';
+      const presenceProfileId = isDm ? getDmPresenceProfileId(channel) : '';
       const avatarUrl = isDm ? (participants[0]?.avatar_url ?? '') : '';
       const avatarRole = isDm ? (participants[0]?.kind ?? '') : '';
       const avatarTimezone = isDm ? (participants[0]?.timezone ?? '') : '';
@@ -961,6 +969,7 @@ export default function MessagesScreen() {
                 channelId: channel.id,
                 topic: displayTitle,
                 avatarSeed,
+                presenceProfileId,
                 avatarUrl,
                 avatarRole,
                 avatarTimezone,

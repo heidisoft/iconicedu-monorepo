@@ -66,6 +66,21 @@ function getChildrenNames(user: UserProfileVM): string[] {
   return [];
 }
 
+function formatLocalTime(timezone?: string | null): string | null {
+  const value = timezone?.trim();
+  if (!value) return null;
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      weekday: 'short',
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZone: value,
+    }).format(new Date());
+  } catch {
+    return null;
+  }
+}
+
 function buildAboutFields(user: UserProfileVM): AboutField[] {
   const countryCode = normalizeCountryCode(user.location?.countryCode);
   const fields: AboutField[] = [];
@@ -85,6 +100,7 @@ function buildAboutFields(user: UserProfileVM): AboutField[] {
   push('email', 'Email', user.profile.email ?? user.accountEmail ?? null, Mail);
   push('location', 'Location', buildLocationLabel(user), MapPin);
   push('timezone', 'Timezone', user.prefs?.timezone, Globe);
+  push('localTime', 'Current local time', formatLocalTime(user.prefs?.timezone), Clock);
   push('languages', 'Languages', user.prefs?.languagesSpoken?.join(', '), Globe);
 
   if (user.kind === 'educator') {
@@ -121,15 +137,6 @@ function buildAboutFields(user: UserProfileVM): AboutField[] {
     );
     push('curriculum', 'Curriculum', user.curriculumTags?.join(', '), BookOpen);
     push('badges', 'Badges', user.badges?.join(', '), Award);
-    push(
-      'joined',
-      'Member since',
-      new Date(user.joinedDate).toLocaleDateString('en-US', {
-        month: 'long',
-        year: 'numeric',
-      }),
-      Calendar,
-    );
   }
 
   if (user.kind === 'child') {
@@ -150,15 +157,6 @@ function buildAboutFields(user: UserProfileVM): AboutField[] {
   if (user.kind === 'guardian') {
     const names = getChildrenNames(user);
     push('children', 'Children', names.join(', '), Users);
-    push(
-      'joined',
-      'Member since',
-      new Date(user.joinedDate).toLocaleDateString('en-US', {
-        month: 'long',
-        year: 'numeric',
-      }),
-      Calendar,
-    );
   }
 
   if (user.kind === 'staff') {

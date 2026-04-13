@@ -22,6 +22,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Directory, File, Paths } from 'expo-file-system';
+import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
 import { Download, Share2, X } from 'lucide-react-native';
 import type { AppColors } from '@/lib/theme';
@@ -242,16 +243,12 @@ export function ChatImageViewer({
     setActionBusy('save');
     try {
       const localFile = await ensureActiveLocalFile();
-      const destinationDirectory = await Directory.pickDirectoryAsync();
-      const filename = sanitizeFilename(
-        activeItem.filename,
-        currentIndex,
-        activeItem.storagePath ?? activeItem.originalUrl,
-      );
-      const destinationFile = new File(destinationDirectory, filename);
-      if (destinationFile.exists) destinationFile.delete();
-      localFile.copy(destinationFile);
-      Alert.alert('Saved', 'Image saved to the selected Files folder.');
+      const permission = await MediaLibrary.requestPermissionsAsync();
+      if (!permission.granted) {
+        throw new Error('Photo library access is required to save images.');
+      }
+      await MediaLibrary.saveToLibraryAsync(localFile.uri);
+      Alert.alert('Saved', 'Image saved to your photo library.');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Please try again.';
       if (!message.toLowerCase().includes('cancel')) {
@@ -260,7 +257,7 @@ export function ChatImageViewer({
     } finally {
       setActionBusy(null);
     }
-  }, [actionBusy, activeItem, activeResolvedUrl, currentIndex, ensureActiveLocalFile]);
+  }, [actionBusy, activeItem, activeResolvedUrl, ensureActiveLocalFile]);
 
   const handleRetry = useCallback(() => {
     if (!activeItem) return;

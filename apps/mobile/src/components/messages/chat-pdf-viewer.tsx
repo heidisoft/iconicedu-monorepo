@@ -11,8 +11,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Directory, File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import * as WebBrowser from 'expo-web-browser';
 import { Download, Share2, X } from 'lucide-react-native';
-import { WebView } from 'react-native-webview';
 import type { AppColors } from '@/lib/theme';
 import { supabase } from '@/lib/supabase/client';
 
@@ -73,20 +73,31 @@ export function ChatPdfViewer({
   colors,
   onClose,
 }: ChatPdfViewerProps) {
-  const [resolvedUrl, setResolvedUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState<'share' | 'save' | null>(null);
+  const [localFile, setLocalFile] = useState<File | null>(null);
+
+  const normalizedFilename = useMemo(
+    () => sanitizeFilename(filename, storagePath ?? url),
+    [filename, storagePath, url],
+  );
 
   useEffect(() => {
     if (!visible) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
-    setResolvedUrl(null);
+    setLocalFile(null);
     void resolveSignedFileUrl(url, storagePath)
-      .then((nextUrl) => {
-        if (!cancelled) setResolvedUrl(nextUrl);
+      .then(async (resolvedUrl) => {
+        const downloadedFile = await downloadPdfToCache(resolvedUrl, normalizedFilename);
+        if (cancelled) return;
+        setLocalFile(downloadedFile);
+        await WebBrowser.openBrowserAsync(resolvedUrl, {
+          presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
+        });
+        if (!cancelled) onClose();
       })
       .catch((err) => {
         if (cancelled) return;
@@ -99,20 +110,15 @@ export function ChatPdfViewer({
     return () => {
       cancelled = true;
     };
-  }, [visible, url, storagePath]);
-
-  const normalizedFilename = useMemo(
-    () => sanitizeFilename(filename, storagePath ?? url),
-    [filename, storagePath, url],
-  );
+  }, [normalizedFilename, onClose, storagePath, url, visible]);
 
   const ensureLocalFile = useCallback(async () => {
-    if (!resolvedUrl) throw new Error('Document is not ready yet.');
-    return downloadPdfToCache(resolvedUrl, normalizedFilename);
-  }, [resolvedUrl, normalizedFilename]);
+    if (localFile) return localFile;
+    throw new Error('Document is not ready yet.');
+  }, [localFile]);
 
   const handleShare = useCallback(async () => {
-    if (!resolvedUrl || actionBusy) return;
+    if (!localFile || actionBusy) return;
     setActionBusy('share');
     try {
       const localFile = await ensureLocalFile();
@@ -129,10 +135,10 @@ export function ChatPdfViewer({
     } finally {
       setActionBusy(null);
     }
-  }, [actionBusy, ensureLocalFile, resolvedUrl]);
+  }, [actionBusy, ensureLocalFile, localFile]);
 
   const handleSave = useCallback(async () => {
-    if (!resolvedUrl || actionBusy) return;
+    if (!localFile || actionBusy) return;
     setActionBusy('save');
     try {
       const localFile = await ensureLocalFile();
@@ -149,7 +155,7 @@ export function ChatPdfViewer({
     } finally {
       setActionBusy(null);
     }
-  }, [actionBusy, ensureLocalFile, normalizedFilename, resolvedUrl]);
+  }, [actionBusy, ensureLocalFile, localFile, normalizedFilename]);
 
   return (
     <Modal
@@ -164,30 +170,12 @@ export function ChatPdfViewer({
             {loading ? (
               <View style={styles.centerState}>
                 <ActivityIndicator size="large" color="#fff" />
+                <Text style={styles.helperText}>Opening PDF preview…</Text>
               </View>
             ) : error ? (
               <View style={styles.centerState}>
                 <Text style={styles.errorTitle}>Unable to load PDF</Text>
                 <Text style={styles.errorBody}>{error}</Text>
-              </View>
-            ) : resolvedUrl ? (
-              <View style={styles.webviewFrame}>
-                <WebView
-                  source={{ uri: resolvedUrl }}
-                  style={styles.webview}
-                  startInLoadingState
-                  renderLoading={() => (
-                    <View style={styles.centerState}>
-                      <ActivityIndicator size="large" color={colors.teal} />
-                    </View>
-                  )}
-                  onError={() => {
-                    setError('Unable to render this PDF in-app on this device.');
-                  }}
-                  onHttpError={() => {
-                    setError('Unable to render this PDF in-app on this device.');
-                  }}
-                />
               </View>
             ) : null}
           </View>
@@ -207,7 +195,7 @@ export function ChatPdfViewer({
               <View style={styles.bottomBarActions}>
                 <Pressable
                   onPress={handleShare}
-                  disabled={!resolvedUrl || actionBusy !== null}
+                  disabled={!localFile || actionBusy !== null}
                   style={styles.bottomBarButton}
                   accessibilityLabel="Share PDF"
                 >
@@ -215,7 +203,7 @@ export function ChatPdfViewer({
                 </Pressable>
                 <Pressable
                   onPress={handleSave}
-                  disabled={!resolvedUrl || actionBusy !== null}
+                  disabled={!localFile || actionBusy !== null}
                   style={styles.bottomBarButton}
                   accessibilityLabel="Save PDF"
                 >
@@ -255,16 +243,6 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     justifyContent: 'center',
   },
-  webviewFrame: {
-    flex: 1,
-    overflow: 'hidden',
-    borderRadius: 18,
-    backgroundColor: '#fff',
-  },
-  webview: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
   centerState: {
     flex: 1,
     alignItems: 'center',
@@ -278,6 +256,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   errorBody: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  helperText: {
     color: 'rgba(255,255,255,0.75)',
     fontSize: 14,
     textAlign: 'center',
