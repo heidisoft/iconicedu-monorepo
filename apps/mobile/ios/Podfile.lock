@@ -3,9 +3,6 @@ PODS:
     - ExpoModulesCore
   - EXConstants (55.0.7):
     - ExpoModulesCore
-  - EXImageLoader (6.0.0):
-    - ExpoModulesCore
-    - React-Core
   - EXJSONUtils (55.0.2)
   - EXManifests (55.0.13):
     - ExpoModulesCore
@@ -203,8 +200,7 @@ PODS:
     - SDWebImageAVIFCoder (~> 0.11.0)
     - SDWebImageSVGCoder (~> 1.7.0)
     - SDWebImageWebPCoder (~> 0.14.6)
-  - ExpoImageManipulator (14.0.8):
-    - EXImageLoader
+  - ExpoImageManipulator (55.0.15):
     - ExpoModulesCore
     - SDWebImageWebPCoder
   - ExpoImagePicker (55.0.11):
@@ -283,30 +279,6 @@ PODS:
   - libwebp/sharpyuv (1.5.0)
   - libwebp/webp (1.5.0):
     - libwebp/sharpyuv
-  - PostHog (3.42.1)
-  - posthog-react-native-session-replay (1.5.1):
-    - hermes-engine
-    - PostHog (~> 3.42.0)
-    - RCTRequired
-    - RCTTypeSafety
-    - React-Core
-    - React-Core-prebuilt
-    - React-debug
-    - React-Fabric
-    - React-featureflags
-    - React-graphics
-    - React-ImageManager
-    - React-jsi
-    - React-NativeModulesApple
-    - React-RCTFabric
-    - React-renderercss
-    - React-rendererdebug
-    - React-utils
-    - ReactCodegen
-    - ReactCommon/turbomodule/bridging
-    - ReactCommon/turbomodule/core
-    - ReactNativeDependencies
-    - Yoga
   - RCTDeprecation (0.83.2)
   - RCTRequired (0.83.2)
   - RCTSwiftUI (0.83.2)
@@ -2450,7 +2422,6 @@ PODS:
 DEPENDENCIES:
   - EXApplication (from `../../../node_modules/expo-application/ios`)
   - EXConstants (from `../../../node_modules/expo-constants/ios`)
-  - EXImageLoader (from `../../../node_modules/expo-image-manipulator/node_modules/expo-image-loader/ios`)
   - EXJSONUtils (from `../../../node_modules/expo-json-utils/ios`)
   - EXManifests (from `../../../node_modules/expo-manifests/ios`)
   - Expo (from `../../../node_modules/expo`)
@@ -2483,7 +2454,6 @@ DEPENDENCIES:
   - EXUpdatesInterface (from `../../../node_modules/expo-updates-interface/ios`)
   - FBLazyVector (from `../../../node_modules/react-native/Libraries/FBLazyVector`)
   - hermes-engine (from `../../../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
-  - posthog-react-native-session-replay (from `../../../node_modules/posthog-react-native-session-replay`)
   - RCTDeprecation (from `../../../node_modules/react-native/ReactApple/Libraries/RCTFoundation/RCTDeprecation`)
   - RCTRequired (from `../../../node_modules/react-native/Libraries/Required`)
   - RCTSwiftUI (from `../../../node_modules/react-native/ReactApple/RCTSwiftUI`)
@@ -2569,7 +2539,6 @@ SPEC REPOS:
     - libavif
     - libdav1d
     - libwebp
-    - PostHog
     - SDWebImage
     - SDWebImageAVIFCoder
     - SDWebImageSVGCoder
@@ -2580,8 +2549,6 @@ EXTERNAL SOURCES:
     :path: "../../../node_modules/expo-application/ios"
   EXConstants:
     :path: "../../../node_modules/expo-constants/ios"
-  EXImageLoader:
-    :path: "../../../node_modules/expo-image-manipulator/node_modules/expo-image-loader/ios"
   EXJSONUtils:
     :path: "../../../node_modules/expo-json-utils/ios"
   EXManifests:
@@ -2647,8 +2614,6 @@ EXTERNAL SOURCES:
   hermes-engine:
     :podspec: "../../../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec"
     :tag: hermes-v0.14.1
-  posthog-react-native-session-replay:
-    :path: "../../../node_modules/posthog-react-native-session-replay"
   RCTDeprecation:
     :path: "../../../node_modules/react-native/ReactApple/Libraries/RCTFoundation/RCTDeprecation"
   RCTRequired:
@@ -2809,7 +2774,6 @@ EXTERNAL SOURCES:
 SPEC CHECKSUMS:
   EXApplication: 44f202420678bba77f603c373bd3fd033e6c21e9
   EXConstants: b3c63be5f8648e4ab8e6ff5099b62f629247f969
-  EXImageLoader: 189e3476581efe3ad4d1d3fb4735b7179eb26f05
   EXJSONUtils: 04bc3807d351331a5fe154ce1da596ec15d99169
   EXManifests: 529dcd8344c2992013e3c341eab4386a57fb37c7
   Expo: ed1258b36d29c6b5021951ab7933754e765587cb
@@ -2825,7 +2789,7 @@ SPEC CHECKSUMS:
   ExpoFont: 1aa465cf9f8ac6b670405becba8b15473581b2dd
   ExpoGlassEffect: b11cb2bf51bf6d4dc6309c421ca8cec086b4b9db
   ExpoImage: 53ab717157f29bb5139f9f75b259f93f784b6847
-  ExpoImageManipulator: 607a5c8c88085381639458a46cc55fb9d3869148
+  ExpoImageManipulator: ae0a562f2d405de275e011915c811564106baa70
   ExpoImagePicker: cf1756f08bc5b29a31ff6af9b261df57b7a12078
   ExpoKeepAwake: 7f3b28c361c37389b18841bb52a58003b39fcb33
   ExpoLinking: 88ba36a28c83525e564b8229e02d451347accb70
@@ -2845,8 +2809,6 @@ SPEC CHECKSUMS:
   libavif: 5f8e715bea24debec477006f21ef9e95432e254d
   libdav1d: 23581a4d8ec811ff171ed5e2e05cd27bad64c39f
   libwebp: 02b23773aedb6ff1fd38cec7a77b81414c6842a8
-  PostHog: 148d2d62bac68c6da50a2325030b3fb2d6bca95b
-  posthog-react-native-session-replay: 858e7caa8626381a7a5baf8aca7308734448e4fe
   RCTDeprecation: a522c536d2c7be8f518dd834883cf6dce1d4f545
   RCTRequired: 44337def23abb244c025e9e7ab58f9cd3d63ec7d
   RCTSwiftUI: b2f0c2f2761631b8cd605767536cbb1cbf8d020f
