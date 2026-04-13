@@ -1,5 +1,4 @@
 import Constants from 'expo-constants';
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 import { supabase } from '@/lib/supabase/client';
@@ -13,10 +12,18 @@ export async function getExpoPushToken(options?: {
 }): Promise<string | null> {
   const requestPermissions = options?.requestPermissions ?? true;
 
+  // Remote push notifications are not supported in Expo Go on Android (SDK 53+)
+  if (Constants.appOwnership === 'expo') {
+    return null;
+  }
+
   // Expo push tokens only work on physical devices
   if (!Constants.isDevice) {
     return null;
   }
+
+  // Lazy import to avoid module-level crash in Expo Go
+  const Notifications = await import('expo-notifications');
 
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
