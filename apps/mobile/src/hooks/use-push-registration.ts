@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
@@ -11,14 +10,22 @@ import { useProfile } from './use-profile';
 
 const CONSENT_SHOWN_KEY = 'push_consent_shown';
 
+function getNotificationsModule() {
+  // Function-scoped require avoids loading the native module in Expo Go.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, no-undef
+  return require('expo-notifications') as typeof import('expo-notifications');
+}
+
 function supportsPushPermissionPrompt() {
   if (!Constants.isDevice) return false;
   if (Constants.executionEnvironment === 'storeClient') return false;
+  if (Constants.appOwnership === 'expo') return false;
   return true;
 }
 
 async function ensureAndroidChannel() {
   if (Platform.OS !== 'android') return;
+  const Notifications = getNotificationsModule();
   await Notifications.setNotificationChannelAsync('default', {
     name: 'Default',
     importance: Notifications.AndroidImportance.MAX,
@@ -63,6 +70,7 @@ export function usePushRegistration() {
         if (!supportsPushPermissionPrompt()) return;
 
         await ensureAndroidChannel();
+        const Notifications = getNotificationsModule();
         const { status } = await Notifications.getPermissionsAsync();
 
         // If already explicitly denied, nothing to do — user must go to Settings

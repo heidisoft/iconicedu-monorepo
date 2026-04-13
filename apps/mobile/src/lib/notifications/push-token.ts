@@ -3,6 +3,12 @@ import { Platform } from 'react-native';
 
 import { supabase } from '@/lib/supabase/client';
 
+function getNotificationsModule() {
+  // Function-scoped require avoids loading the native module in Expo Go.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, no-undef
+  return require('expo-notifications') as typeof import('expo-notifications');
+}
+
 /**
  * Requests push notification permissions and returns an Expo push token.
  * Returns null if the device is a simulator, permissions are denied, or token fetch fails.
@@ -22,8 +28,7 @@ export async function getExpoPushToken(options?: {
     return null;
   }
 
-  // Lazy import to avoid module-level crash in Expo Go
-  const Notifications = await import('expo-notifications');
+  const Notifications = getNotificationsModule();
 
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
