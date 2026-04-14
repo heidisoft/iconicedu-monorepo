@@ -12,8 +12,17 @@ on:
           - 'all'
           - 'ios'
           - 'android'
+      profile:
+        description: 'EAS profile to build'
+        required: true
+        type: choice
+        default: 'preview'
+        options:
+          - 'development'
+          - 'preview'
+          - 'production'
       pr_number:
-        description: 'PR number for preview builds on non-main branches'
+        description: 'PR number to comment on when building a non-main branch'
         required: false
         type: string
 
@@ -34,26 +43,28 @@ jobs:
           set -euo pipefail
 
           BRANCH_NAME="${GITHUB_REF_NAME}"
+          BUILD_PROFILE="${{ github.event.inputs.profile }}"
           PR_NUMBER_INPUT="${{ github.event.inputs.pr_number }}"
-          echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
 
-          if [[ "$BRANCH_NAME" == "main" ]]; then
-            echo "should_build=true" >> "$GITHUB_OUTPUT"
-            echo "build_profile=production" >> "$GITHUB_OUTPUT"
+          if [[ "$BRANCH_NAME" != "main" && -z "$PR_NUMBER_INPUT" ]]; then
+            echo "::error::PR number is required when building a branch other than main."
+            exit 1
+          fi
+
+          echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
+          echo "build_profile=$BUILD_PROFILE" >> "$GITHUB_OUTPUT"
+          echo "should_build=true" >> "$GITHUB_OUTPUT"
+
+          if [[ "$BUILD_PROFILE" == "production" ]]; then
             echo "build_kind=production" >> "$GITHUB_OUTPUT"
-            exit 0
+          else
+            echo "build_kind=preview" >> "$GITHUB_OUTPUT"
           fi
 
           if [[ -n "$PR_NUMBER_INPUT" ]]; then
             echo "Using PR #$PR_NUMBER_INPUT for branch '$BRANCH_NAME'."
             echo "pr_number=$PR_NUMBER_INPUT" >> "$GITHUB_OUTPUT"
-          else
-            echo "No PR number provided for branch '$BRANCH_NAME'. Preview build will run without posting a PR comment."
           fi
-
-          echo "should_build=true" >> "$GITHUB_OUTPUT"
-          echo "build_profile=preview" >> "$GITHUB_OUTPUT"
-          echo "build_kind=preview" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@v4
         if: steps.context.outputs.should_build == 'true'
@@ -164,35 +175,21 @@ jobs:
           cd apps/mobile
 
           tmp_eas_json=$(mktemp)
-          if [[ "${{ steps.context.outputs.build_kind }}" == "preview" ]]; then
-            jq \
-              --arg supabase_url "${{ steps.supabase-creds.outputs.api_url }}" \
-              --arg anon_key "${{ steps.supabase-creds.outputs.anon_key }}" \
-              --arg posthog_key "${{ secrets.POSTHOG_KEY }}" \
-              --arg posthog_host "${{ secrets.NEXT_PUBLIC_POSTHOG_HOST }}" \
-              '.build.preview.env = ((.build.preview.env // {}) + {
-                EXPO_PUBLIC_SUPABASE_URL: $supabase_url,
-                EXPO_PUBLIC_SUPABASE_ANON_KEY: $anon_key,
-                EXPO_PUBLIC_APP_ENV: "preview",
-                EXPO_PUBLIC_POSTHOG_KEY: $posthog_key,
-                EXPO_PUBLIC_POSTHOG_HOST: $posthog_host
-              })' \
-              eas.json > "$tmp_eas_json"
-          else
-            jq \
-              --arg supabase_url "${{ steps.supabase-creds.outputs.api_url }}" \
-              --arg anon_key "${{ steps.supabase-creds.outputs.anon_key }}" \
-              --arg posthog_key "${{ secrets.POSTHOG_KEY }}" \
-              --arg posthog_host "${{ secrets.NEXT_PUBLIC_POSTHOG_HOST }}" \
-              '.build.production.env = ((.build.production.env // {}) + {
-                EXPO_PUBLIC_SUPABASE_URL: $supabase_url,
-                EXPO_PUBLIC_SUPABASE_ANON_KEY: $anon_key,
-                EXPO_PUBLIC_APP_ENV: "production",
-                EXPO_PUBLIC_POSTHOG_KEY: $posthog_key,
-                EXPO_PUBLIC_POSTHOG_HOST: $posthog_host
-              })' \
-              eas.json > "$tmp_eas_json"
-          fi
+          jq \
+            --arg profile "${{ steps.context.outputs.build_profile }}" \
+            --arg app_env "${{ steps.context.outputs.build_profile }}" \
+            --arg supabase_url "${{ steps.supabase-creds.outputs.api_url }}" \
+            --arg anon_key "${{ steps.supabase-creds.outputs.anon_key }}" \
+            --arg posthog_key "${{ secrets.POSTHOG_KEY }}" \
+            --arg posthog_host "${{ secrets.NEXT_PUBLIC_POSTHOG_HOST }}" \
+            '.build[$profile].env = ((.build[$profile].env // {}) + {
+              EXPO_PUBLIC_SUPABASE_URL: $supabase_url,
+              EXPO_PUBLIC_SUPABASE_ANON_KEY: $anon_key,
+              EXPO_PUBLIC_APP_ENV: $app_env,
+              EXPO_PUBLIC_POSTHOG_KEY: $posthog_key,
+              EXPO_PUBLIC_POSTHOG_HOST: $posthog_host
+            })' \
+            eas.json > "$tmp_eas_json"
           mv "$tmp_eas_json" eas.json
 
           if ! BUILD_OUTPUT=$(eas build \
@@ -213,12 +210,14 @@ jobs:
 
       # 4. Post comment on PR
       - name: Post build comment on PR
-        if: steps.context.outputs.build_kind == 'preview' && steps.context.outputs.pr_number != ''
+        if: steps.context.outputs.pr_number != ''
         uses: actions/github-script@v7
         with:
           script: |
             const prNumber = parseInt('${{ steps.context.outputs.pr_number }}');
+            const branch = '${{ steps.context.outputs.branch_name }}';
             const platform = '${{ github.event.inputs.platform }}';
+            const profile = '${{ steps.context.outputs.build_profile }}';
             const buildUrl = '${{ steps.eas-build.outputs.build_url }}';
             const supabaseUrl = '${{ steps.supabase-creds.outputs.api_url }}';
 
@@ -226,13 +225,16 @@ jobs:
               platform === 'all'
                 ? 'iOS + Android'
                 : platform.charAt(0).toUpperCase() + platform.slice(1);
+            const profileLabel = profile.charAt(0).toUpperCase() + profile.slice(1);
             const buildLink = buildUrl ? `[Track build](${buildUrl})` : 'Check your [Expo dashboard](https://expo.dev)';
 
             const body = [
-              '### EAS Preview Build Triggered',
+              '### EAS Build Triggered',
               '',
+              `**Branch:** \`${branch}\``,
               `**Platform:** ${platformLabel}`,
-              `**Supabase branch:** \`${supabaseUrl}\``,
+              `**Profile:** ${profileLabel}`,
+              `**Supabase URL:** \`${supabaseUrl}\``,
               '',
               `${buildLink} - install via internal distribution once the build completes.`,
             ].join('\n');

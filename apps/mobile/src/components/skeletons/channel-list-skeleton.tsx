@@ -31,7 +31,7 @@ export function ChannelListSkeleton({ count = 5 }: Props) {
 }
 
 const s = StyleSheet.create({
-  wrap: { paddingTop: 16, paddingBottom: 40 },
+  wrap: { paddingBottom: 24 },
   itemOuter: { marginHorizontal: 16, marginBottom: 16 },
   row: {
     flexDirection: 'row',
@@ -41,7 +41,7 @@ const s = StyleSheet.create({
     paddingVertical: 18,
   },
   content: { flex: 1, minWidth: 0, justifyContent: 'center', gap: 2 },
-  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  topRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   rowTail: {
     width: 64,
     alignItems: 'flex-end',

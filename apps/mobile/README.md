@@ -108,13 +108,14 @@ Local:
 pnpm mobile:eas:build:preview
 ```
 
-GitHub Actions for PR previews:
+GitHub Actions builds:
 
 1. Wait for the PR preview environment to finish provisioning.
-2. Open `Actions` and run `Create EAS Build`.
-3. Enter the PR number for non-`main` branches.
-4. Choose `ios`, `android`, or `all`.
-5. Install the build from the Expo link posted back to the PR.
+2. Open `Actions`, choose the branch in `Use workflow from`, and run `Create EAS Build`.
+3. Choose `ios`, `android`, or `all`.
+4. Choose the EAS profile: `development`, `preview`, or `production`.
+5. Enter the PR number when building a branch other than `main`.
+6. Install the build from the Expo link posted back to the PR.
 
 ### Preview environment wiring
 

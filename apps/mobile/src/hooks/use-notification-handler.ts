@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 import { useEffect } from 'react';
 
 import {
@@ -7,16 +7,11 @@ import {
   DEFAULT_NOTIFICATION_ROUTE,
 } from '@/lib/notifications/notification-config';
 
-// Show notifications as banners with sound when the app is in the foreground
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+function getNotificationsModule() {
+  // Function-scoped require avoids loading the native module in Expo Go.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, no-undef
+  return require('expo-notifications') as typeof import('expo-notifications');
+}
 
 type NotificationData = {
   prefKey?: string;
@@ -35,8 +30,32 @@ export function useNotificationHandler() {
   const router = useRouter();
 
   useEffect(() => {
-    const subscription = Notifications.addNotificationResponseReceivedListener(
-      (response) => {
+    if (Constants.appOwnership === 'expo') {
+      return;
+    }
+
+    let isMounted = true;
+    let subscription: { remove: () => void } | null = null;
+
+    void (async () => {
+      const Notifications = getNotificationsModule();
+
+      // Configure foreground behavior only when the native module is available.
+      Notifications.setNotificationHandler({
+        handleNotification: async () => ({
+          shouldShowAlert: true,
+          shouldPlaySound: true,
+          shouldSetBadge: true,
+          shouldShowBanner: true,
+          shouldShowList: true,
+        }),
+      });
+
+      if (!isMounted) {
+        return;
+      }
+
+      subscription = Notifications.addNotificationResponseReceivedListener((response) => {
         const data = response.notification.request.content.data as NotificationData;
         const config = data?.prefKey ? NOTIFICATION_REGISTRY[data.prefKey] : undefined;
         const route = config
@@ -47,9 +66,12 @@ export function useNotificationHandler() {
             })
           : DEFAULT_NOTIFICATION_ROUTE;
         router.push(route as Parameters<typeof router.push>[0]);
-      },
-    );
+      });
+    })();
 
-    return () => subscription.remove();
+    return () => {
+      isMounted = false;
+      subscription?.remove();
+    };
   }, [router]);
 }

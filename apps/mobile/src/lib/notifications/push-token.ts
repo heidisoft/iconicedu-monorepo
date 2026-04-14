@@ -1,7 +1,26 @@
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
+import { reportMobileObservedError } from '@/lib/analytics/report-error';
 import { supabase } from '@/lib/supabase/client';
+
+const IS_DEV =
+  typeof globalThis !== 'undefined' &&
+  '__DEV__' in globalThis &&
+  Boolean((globalThis as { __DEV__?: boolean }).__DEV__);
+const PUSH_DEBUG_ENABLED = IS_DEV || process.env.EXPO_PUBLIC_APP_ENV === 'preview';
+
+function logPushDebug(event: string, context?: Record<string, unknown>) {
+  if (!PUSH_DEBUG_ENABLED) return;
+  // eslint-disable-next-line no-console
+  console.info(`[push-token] ${event}`, context ?? {});
+}
+
+function getNotificationsModule() {
+  // Function-scoped require avoids loading the native module in Expo Go.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, no-undef
+  return require('expo-notifications') as typeof import('expo-notifications');
+}
 
 /**
  * Requests push notification permissions and returns an Expo push token.
@@ -11,45 +30,71 @@ export async function getExpoPushToken(options?: {
   requestPermissions?: boolean;
 }): Promise<string | null> {
   const requestPermissions = options?.requestPermissions ?? true;
+  logPushDebug('start', {
+    requestPermissions,
+    appOwnership: Constants.appOwnership ?? null,
+    executionEnvironment: Constants.executionEnvironment ?? null,
+    isDevice: Constants.isDevice,
+  });
 
   // Remote push notifications are not supported in Expo Go on Android (SDK 53+)
   if (Constants.appOwnership === 'expo') {
+    logPushDebug('skip_expo_go');
     return null;
   }
 
   // Expo push tokens only work on physical devices
   if (!Constants.isDevice) {
+    logPushDebug('skip_non_device');
     return null;
   }
 
-  // Lazy import to avoid module-level crash in Expo Go
-  const Notifications = await import('expo-notifications');
+  const Notifications = getNotificationsModule();
 
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
+  logPushDebug('permissions_existing', { status: existingStatus });
   let finalStatus = existingStatus;
 
   if (existingStatus !== 'granted') {
     if (!requestPermissions) {
+      logPushDebug('skip_permission_request', { status: existingStatus });
       return null;
     }
 
     const { status } = await Notifications.requestPermissionsAsync();
+    logPushDebug('permissions_requested', { status });
     finalStatus = status;
   }
 
   if (finalStatus !== 'granted') {
+    logPushDebug('skip_permissions_not_granted', { status: finalStatus });
     return null;
   }
 
   const projectId =
     Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
+  logPushDebug('project_id_resolved', { projectId: projectId ?? null });
 
   try {
     const tokenData = await Notifications.getExpoPushTokenAsync(
       projectId ? { projectId } : undefined,
     );
+    logPushDebug('token_received', {
+      tokenPreview: tokenData.data ? tokenData.data.slice(0, 24) : null,
+    });
     return tokenData.data;
-  } catch {
+  } catch (error) {
+    reportMobileObservedError({
+      error,
+      source: 'mobile.notifications.get_expo_push_token',
+      message: 'Failed to fetch Expo push token',
+      context: {
+        projectId: projectId ?? null,
+        appOwnership: Constants.appOwnership ?? null,
+        executionEnvironment: Constants.executionEnvironment ?? null,
+        isDevice: Constants.isDevice,
+      },
+    });
     return null;
   }
 }
@@ -81,8 +126,26 @@ export async function storePushToken(
   );
 
   if (error) {
+    reportMobileObservedError({
+      error,
+      source: 'mobile.notifications.store_push_token',
+      message: 'Failed to persist Expo push token',
+      context: {
+        orgId,
+        profileId,
+        platform,
+        tokenPreview: token.slice(0, 24),
+      },
+    });
     throw new Error(error.message);
   }
+
+  logPushDebug('token_stored', {
+    orgId,
+    profileId,
+    platform,
+    tokenPreview: token.slice(0, 24),
+  });
 }
 
 /**
