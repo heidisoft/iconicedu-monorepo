@@ -252,12 +252,18 @@ importers:
       react-native:
         specifier: 0.83.2
         version: 0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4)
+      react-native-blob-util:
+        specifier: ^0.24.7
+        version: 0.24.7(react-native@0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4))(react@19.2.4)
       react-native-edge-to-edge:
         specifier: ^1.8.1
         version: 1.8.1(react-native@0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4))(react@19.2.4)
       react-native-gesture-handler:
         specifier: ~2.30.0
         version: 2.30.0(react-native@0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4))(react@19.2.4)
+      react-native-pdf:
+        specifier: ^7.0.4
+        version: 7.0.4(react-native-blob-util@0.24.7(react-native@0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4))(react@19.2.4))(react-native@0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4))(react@19.2.4)
       react-native-reanimated:
         specifier: ~4.2.1
         version: 4.2.1(react-native-worklets@0.7.2(@babel/core@7.28.5)(react-native@0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4))(react@19.2.4))(react-native@0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4))(react@19.2.4)
@@ -3630,6 +3636,9 @@ packages:
     resolution: {integrity: sha512-dk6fIY2OrKW/2Nk2HydfYNrQau8g6LOtd7NVBrgaqa+lvuRyIML5iimShP5qPqQnx2ofHuzjFw+Ya0b5Q7nDbA==}
     engines: {node: '>= 20.19.4'}
 
+  '@react-native/normalize-color@2.1.0':
+    resolution: {integrity: sha512-Z1jQI2NpdFJCVgpY+8Dq/Bt3d+YUi1928Q+/CZm/oh66fzM0RUl54vvuXlPJKybH4pdCZey1eDTPaLHkMPNgWA==}
+
   '@react-native/normalize-colors@0.83.2':
     resolution: {integrity: sha512-gkZAb9LoVVzNuYzzOviH7DiPTXQoZPHuiTH2+O2+VWNtOkiznjgvqpwYAhg58a5zfRq5GXlbBdf5mzRj5+3Y5Q==}
 
@@ -5165,6 +5174,9 @@ packages:
     resolution: {integrity: sha512-BLrgEcRTwX2o6gGxGOCNyMvGSp35YofuYzw9h1IMTRmKqttAZZVU67bdb9Pr2vUHA8+j3i2tJfjO6C6+4myGTA==}
     engines: {node: 18 || 20 || >=22}
 
+  base-64@0.1.0:
+    resolution: {integrity: sha512-Y5gU45svrR5tI2Vt/X9GPd3L0HNIKzGu202EjxrXMpuc2V2CiKgemAbUUsqYmZJvPtCXoUKjNZwBJzsNScUbXA==}
+
   base64-js@1.5.1:
     resolution: {integrity: sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA==}
 
@@ -5570,6 +5582,9 @@ packages:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
     engines: {node: '>= 8'}
 
+  crypto-js@4.2.0:
+    resolution: {integrity: sha512-KALDyEYgpY+Rlob/iriUtjV6d5Eq+Y191A5g4UqLAi8CyGP9N1+FdVbkc1SxKc2r4YAYqG8JzO2KGL+AizD70Q==}
+
   css-select@5.2.2:
     resolution: {integrity: sha512-TizTzUddG/xYLA3NXodFM0fSbNizXjOKhqiQQwvhlspadZokn1KDy0NZFS0wuEubIYAV5/c1/lAr0TaaFXEXzw==}
 
@@ -5771,6 +5786,9 @@ packages:
   depd@2.0.0:
     resolution: {integrity: sha512-g7nH6P6dyDioJogAAGprGpCtVImJhpPk/roCzdb3fIh61/s/nPsfR6onyMwkCAR/OlC3yBC0lESvUoQEAssIrw==}
     engines: {node: '>= 0.8'}
+
+  deprecated-react-native-prop-types@2.3.0:
+    resolution: {integrity: sha512-pWD0voFtNYxrVqvBMYf5gq3NA2GCpfodS1yNynTPc93AYA/KEMGeWDqqeUB6R2Z9ZofVhks2aeJXiuQqKNpesA==}
 
   dequal@2.0.3:
     resolution: {integrity: sha512-0je+qPKHEMohvfRTCEo3CrPG6cAzAYgmzKyxRiYSSDkS6eGJdyVJm7WaYA5ECaAD9wLB2T4EEeymA5aFVcYXCA==}
@@ -6715,6 +6733,10 @@ packages:
 
   glob@13.0.0:
     resolution: {integrity: sha512-tvZgpqk6fz4BaNZ66ZsRaZnbHvP/jG3uKJvAZOwEVUL4RTA5nJeeLYfyN9/VA8NX/V3IBG+hkeuGpKjvELkVhA==}
+    engines: {node: 20 || >=22}
+
+  glob@13.0.1:
+    resolution: {integrity: sha512-B7U/vJpE3DkJ5WXTgTpTRN63uV42DseiXXKMwG14LQBXmsdeIoHAPbU/MEo6II0k5ED74uc2ZGTC6MwHFQhF6w==}
     engines: {node: 20 || >=22}
 
   glob@7.2.3:
@@ -8685,6 +8707,12 @@ packages:
   react-is@19.2.4:
     resolution: {integrity: sha512-W+EWGn2v0ApPKgKKCy/7s7WHXkboGcsrXE+2joLyVxkbyVQfO3MUEaUQDHoSmb8TFFrSKYa9mw64WZHNHSDzYA==}
 
+  react-native-blob-util@0.24.7:
+    resolution: {integrity: sha512-3vgn3hblfJh0+LIoqEhYRqCtwKh1xID2LtXHdTrUml3rYh4xj69eN+lvWU235AL0FRbX5uKrS1c4lIYexSgtWQ==}
+    peerDependencies:
+      react: 19.2.4
+      react-native: '*'
+
   react-native-css-interop@0.2.1:
     resolution: {integrity: sha512-B88f5rIymJXmy1sNC/MhTkb3xxBej1KkuAt7TiT9iM7oXz3RM8Bn+7GUrfR02TvSgKm4cg2XiSuLEKYfKwNsjA==}
     engines: {node: '>=18'}
@@ -8718,6 +8746,13 @@ packages:
     peerDependencies:
       react: 19.2.4
       react-native: '*'
+
+  react-native-pdf@7.0.4:
+    resolution: {integrity: sha512-Uhxn5SSguMKvbwD50iIZfYPmYeKcX+9I3tc4J3HCbRExAN0uqXTAKx2pvbR2Y62umAj0JS274FcbSldQfoQfyg==}
+    peerDependencies:
+      react: 19.2.4
+      react-native: '*'
+      react-native-blob-util: '>=0.13.7'
 
   react-native-reanimated@4.2.1:
     resolution: {integrity: sha512-/NcHnZMyOvsD/wYXug/YqSKw90P9edN0kEPL5lP4PFf1aQ4F1V7MKe/E0tvfkXKIajy3Qocp5EiEnlcrK/+BZg==}
@@ -13537,6 +13572,8 @@ snapshots:
 
   '@react-native/js-polyfills@0.83.2': {}
 
+  '@react-native/normalize-color@2.1.0': {}
+
   '@react-native/normalize-colors@0.83.2': {}
 
   '@react-native/virtualized-lists@0.83.2(@types/react@19.2.7)(react-native@0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4))(react@19.2.4)':
@@ -15180,6 +15217,8 @@ snapshots:
 
   balanced-match@4.0.4: {}
 
+  base-64@0.1.0: {}
+
   base64-js@1.5.1: {}
 
   baseline-browser-mapping@2.8.32: {}
@@ -15642,6 +15681,8 @@ snapshots:
       shebang-command: 2.0.0
       which: 2.0.2
 
+  crypto-js@4.2.0: {}
+
   css-select@5.2.2:
     dependencies:
       boolbase: 1.0.0
@@ -15806,6 +15847,12 @@ snapshots:
   denque@2.1.0: {}
 
   depd@2.0.0: {}
+
+  deprecated-react-native-prop-types@2.3.0:
+    dependencies:
+      '@react-native/normalize-color': 2.1.0
+      invariant: 2.2.4
+      prop-types: 15.8.1
 
   dequal@2.0.3: {}
 
@@ -16986,6 +17033,12 @@ snapshots:
   glob@13.0.0:
     dependencies:
       minimatch: 10.1.1
+      minipass: 7.1.2
+      path-scurry: 2.0.1
+
+  glob@13.0.1:
+    dependencies:
+      minimatch: 10.2.4
       minipass: 7.1.2
       path-scurry: 2.0.1
 
@@ -19412,6 +19465,13 @@ snapshots:
 
   react-is@19.2.4: {}
 
+  react-native-blob-util@0.24.7(react-native@0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4))(react@19.2.4):
+    dependencies:
+      base-64: 0.1.0
+      glob: 13.0.1
+      react: 19.2.4
+      react-native: 0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4)
+
   react-native-css-interop@0.2.1(react-native-reanimated@4.2.1(react-native-worklets@0.7.2(@babel/core@7.28.5)(react-native@0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4))(react@19.2.4))(react-native@0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4))(react@19.2.4))(react-native-safe-area-context@5.6.2(react-native@0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4))(react@19.2.4))(react-native-svg@15.15.3(react-native@0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4))(react@19.2.4))(react-native@0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4))(react@19.2.4)(tailwindcss@3.4.19(yaml@2.8.2)):
     dependencies:
       '@babel/helper-module-imports': 7.27.1
@@ -19465,6 +19525,14 @@ snapshots:
     dependencies:
       react: 19.2.4
       react-native: 0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4)
+
+  react-native-pdf@7.0.4(react-native-blob-util@0.24.7(react-native@0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4))(react@19.2.4))(react-native@0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4))(react@19.2.4):
+    dependencies:
+      crypto-js: 4.2.0
+      deprecated-react-native-prop-types: 2.3.0
+      react: 19.2.4
+      react-native: 0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4)
+      react-native-blob-util: 0.24.7(react-native@0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4))(react@19.2.4)
 
   react-native-reanimated@4.2.1(react-native-worklets@0.7.2(@babel/core@7.28.5)(react-native@0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4))(react@19.2.4))(react-native@0.83.2(@babel/core@7.28.5)(@types/react@19.2.7)(react@19.2.4))(react@19.2.4):
     dependencies:

@@ -77,10 +77,13 @@ jest.mock('expo-audio', () => {
 });
 
 jest.mock('react-native-safe-area-context', () => {
+  const React = require('react');
+  const { View } = require('react-native');
   const insets = { top: 0, right: 0, bottom: 0, left: 0 };
   return {
     SafeAreaProvider: ({ children }) => children,
     SafeAreaConsumer: ({ children }) => children(insets),
+    SafeAreaView: ({ children, ...props }) => React.createElement(View, props, children),
     useSafeAreaInsets: () => insets,
     useSafeAreaFrame: () => ({ x: 0, y: 0, width: 390, height: 844 }),
   };
@@ -164,5 +167,17 @@ jest.mock('react-native-webview', () => {
 
   return {
     WebView: ({ children, ...props }) => React.createElement(View, props, children),
+  };
+});
+
+jest.mock('react-native-pdf', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  const MockPdf = ({ children, ...props }) =>
+    React.createElement(View, { ...props, testID: props.testID ?? 'mock-pdf-view' }, children);
+
+  return {
+    __esModule: true,
+    default: MockPdf,
   };
 });

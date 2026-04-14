@@ -1,8 +1,19 @@
 import Constants from 'expo-constants';
+import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
 import { reportMobileObservedError } from '@/lib/analytics/report-error';
 import { supabase } from '@/lib/supabase/client';
+
+export const PUSH_TOKEN_STORE_KEY = 'expo_push_token';
+
+/**
+ * Returns the Expo push token stored on this device, or null if none.
+ * Used by usePushToggle to revoke the token when the user disables push notifications.
+ */
+export async function getStoredPushToken(): Promise<string | null> {
+  return SecureStore.getItemAsync(PUSH_TOKEN_STORE_KEY);
+}
 
 const IS_DEV =
   typeof globalThis !== 'undefined' &&
@@ -146,6 +157,8 @@ export async function storePushToken(
     platform,
     tokenPreview: token.slice(0, 24),
   });
+
+  await SecureStore.setItemAsync(PUSH_TOKEN_STORE_KEY, token);
 }
 
 /**

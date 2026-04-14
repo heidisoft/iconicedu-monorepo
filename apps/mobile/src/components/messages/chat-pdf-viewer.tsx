@@ -3,21 +3,36 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
+  NativeModules,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Constants from 'expo-constants';
 import { Directory, File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as WebBrowser from 'expo-web-browser';
-import { Download, Share2, X } from 'lucide-react-native';
+import { Download, RefreshCcw, Share2, X } from 'lucide-react-native';
 import type { AppColors } from '@/lib/theme';
 import { supabase } from '@/lib/supabase/client';
 
 const CHANNEL_FILES_BUCKET = 'channel-files';
 const PDF_CACHE_DIR = 'chat-pdf-viewer';
+
+function supportsNativePdfPreview() {
+  if (Constants.executionEnvironment === 'storeClient') return false;
+  if (Constants.appOwnership === 'expo') return false;
+  return !!NativeModules.RNPDFPdfView;
+}
+
+function getPdfComponent(): typeof import('react-native-pdf').default | null {
+  if (!supportsNativePdfPreview()) return null;
+  // Function-scoped require avoids loading the native module in Expo Go.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, no-undef
+  return require('react-native-pdf').default as typeof import('react-native-pdf').default;
+}
 
 type ChatPdfViewerProps = {
   visible: boolean;
@@ -77,6 +92,11 @@ export function ChatPdfViewer({
   const [error, setError] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState<'share' | 'save' | null>(null);
   const [localFile, setLocalFile] = useState<File | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [pageCount, setPageCount] = useState<number | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PdfComponent = useMemo(() => getPdfComponent(), []);
+  const canRenderInApp = !!PdfComponent;
 
   const normalizedFilename = useMemo(
     () => sanitizeFilename(filename, storagePath ?? url),
@@ -89,15 +109,19 @@ export function ChatPdfViewer({
     setLoading(true);
     setError(null);
     setLocalFile(null);
+    setPageCount(null);
+    setCurrentPage(1);
     void resolveSignedFileUrl(url, storagePath)
       .then(async (resolvedUrl) => {
         const downloadedFile = await downloadPdfToCache(resolvedUrl, normalizedFilename);
         if (cancelled) return;
         setLocalFile(downloadedFile);
-        await WebBrowser.openBrowserAsync(resolvedUrl, {
-          presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
-        });
-        if (!cancelled) onClose();
+        if (!canRenderInApp) {
+          await WebBrowser.openBrowserAsync(resolvedUrl, {
+            presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
+          });
+          if (!cancelled) onClose();
+        }
       })
       .catch((err) => {
         if (cancelled) return;
@@ -110,12 +134,24 @@ export function ChatPdfViewer({
     return () => {
       cancelled = true;
     };
-  }, [normalizedFilename, onClose, storagePath, url, visible]);
+  }, [
+    canRenderInApp,
+    loadAttempt,
+    normalizedFilename,
+    onClose,
+    storagePath,
+    url,
+    visible,
+  ]);
 
   const ensureLocalFile = useCallback(async () => {
     if (localFile) return localFile;
     throw new Error('Document is not ready yet.');
   }, [localFile]);
+
+  const retryLoad = useCallback(() => {
+    setLoadAttempt((attempt) => attempt + 1);
+  }, []);
 
   const handleShare = useCallback(async () => {
     if (!localFile || actionBusy) return;
@@ -160,67 +196,150 @@ export function ChatPdfViewer({
   return (
     <Modal
       visible={visible}
-      animationType="fade"
+      animationType="slide"
       presentationStyle="fullScreen"
       onRequestClose={onClose}
     >
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-        <View style={styles.backdrop}>
-          <View style={styles.documentStage}>
-            {loading ? (
-              <View style={styles.centerState}>
-                <ActivityIndicator size="large" color="#fff" />
-                <Text style={styles.helperText}>Opening PDF preview…</Text>
-              </View>
-            ) : error ? (
-              <View style={styles.centerState}>
-                <Text style={styles.errorTitle}>Unable to load PDF</Text>
-                <Text style={styles.errorBody}>{error}</Text>
-              </View>
-            ) : null}
-          </View>
+        <View style={styles.shell}>
+          <View style={[styles.header, { borderBottomColor: colors.border }]}>
+            <Pressable
+              onPress={onClose}
+              style={styles.headerButton}
+              accessibilityLabel="Close PDF viewer"
+            >
+              <X size={22} color={colors.text} />
+            </Pressable>
 
-          <View style={styles.bottomBar}>
-            <View style={styles.bottomBarTopRow}>
-              <Pressable
-                onPress={onClose}
-                style={styles.bottomBarButton}
-                accessibilityLabel="Close PDF viewer"
+            <View style={styles.headerTitleWrap}>
+              <Text
+                style={[styles.headerTitle, { color: colors.text }]}
+                numberOfLines={1}
               >
-                <X size={22} color="#fff" />
-              </Pressable>
-              <Text style={styles.bottomBarTitle} numberOfLines={1}>
                 {normalizedFilename}
               </Text>
-              <View style={styles.bottomBarActions}>
-                <Pressable
-                  onPress={handleShare}
-                  disabled={!localFile || actionBusy !== null}
-                  style={styles.bottomBarButton}
-                  accessibilityLabel="Share PDF"
-                >
-                  <Share2 size={20} color="#fff" />
-                </Pressable>
-                <Pressable
-                  onPress={handleSave}
-                  disabled={!localFile || actionBusy !== null}
-                  style={styles.bottomBarButton}
-                  accessibilityLabel="Save PDF"
-                >
-                  <Download size={20} color="#fff" />
-                </Pressable>
-              </View>
+              {!!pageCount && !loading && !error && (
+                <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
+                  {currentPage} of {pageCount}
+                </Text>
+              )}
             </View>
 
-            {actionBusy && (
-              <View style={styles.footerNotice}>
-                <ActivityIndicator size="small" color={colors.teal} />
-                <Text style={styles.footerNoticeText}>
-                  {actionBusy === 'share' ? 'Preparing PDF to share…' : 'Saving PDF…'}
-                </Text>
+            <View style={styles.headerActions}>
+              <Pressable
+                onPress={handleShare}
+                disabled={!localFile || actionBusy !== null || loading || !!error}
+                style={[
+                  styles.headerButton,
+                  (!localFile || actionBusy !== null || loading || !!error) &&
+                    styles.headerButtonDisabled,
+                ]}
+                accessibilityLabel="Share PDF"
+                accessibilityState={{
+                  disabled: !localFile || actionBusy !== null || loading || !!error,
+                }}
+              >
+                <Share2 size={18} color={colors.text} />
+              </Pressable>
+              <Pressable
+                onPress={handleSave}
+                disabled={!localFile || actionBusy !== null || loading || !!error}
+                style={[
+                  styles.headerButton,
+                  (!localFile || actionBusy !== null || loading || !!error) &&
+                    styles.headerButtonDisabled,
+                ]}
+                accessibilityLabel="Save PDF"
+                accessibilityState={{
+                  disabled: !localFile || actionBusy !== null || loading || !!error,
+                }}
+              >
+                <Download size={18} color={colors.text} />
+              </Pressable>
+            </View>
+          </View>
+
+          <View style={styles.documentStage}>
+            {localFile && !error && PdfComponent ? (
+              <View style={styles.pdfCard}>
+                <View accessibilityLabel="PDF preview" style={styles.pdf}>
+                  <PdfComponent
+                    source={{ uri: localFile.uri }}
+                    style={styles.pdf}
+                    trustAllCerts={false}
+                    onLoadComplete={(numberOfPages) => {
+                      setPageCount(numberOfPages);
+                      setCurrentPage(1);
+                    }}
+                    onPageChanged={(page) => {
+                      setCurrentPage(page);
+                    }}
+                    onError={(pdfError) => {
+                      setError(
+                        pdfError instanceof Error
+                          ? pdfError.message
+                          : 'Unable to render PDF preview',
+                      );
+                    }}
+                  />
+                </View>
+              </View>
+            ) : (
+              <View style={styles.centerState}>
+                {loading ? (
+                  <>
+                    <ActivityIndicator size="large" color={colors.teal} />
+                    <Text style={[styles.helperText, { color: colors.text }]}>
+                      {canRenderInApp
+                        ? 'Opening PDF preview…'
+                        : 'Opening PDF in browser…'}
+                    </Text>
+                    <Text style={[styles.helperSubtext, { color: colors.textMuted }]}>
+                      {canRenderInApp
+                        ? 'Preparing a local preview for faster paging and sharing.'
+                        : 'Expo Go does not include the native PDF viewer, so this document will open in the browser.'}
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Text style={[styles.errorTitle, { color: colors.text }]}>
+                      Unable to load PDF
+                    </Text>
+                    <Text style={[styles.errorBody, { color: colors.textMuted }]}>
+                      {error}
+                    </Text>
+                    <Pressable
+                      onPress={retryLoad}
+                      style={[styles.retryButton, { backgroundColor: colors.tealBg }]}
+                      accessibilityLabel="Retry PDF preview"
+                    >
+                      <RefreshCcw size={16} color={colors.teal} />
+                      <Text style={[styles.retryButtonText, { color: colors.teal }]}>
+                        Retry
+                      </Text>
+                    </Pressable>
+                  </>
+                )}
               </View>
             )}
           </View>
+
+          {actionBusy && (
+            <View
+              style={[
+                styles.footerNotice,
+                {
+                  backgroundColor: colors.card,
+                  borderTopColor: colors.border,
+                },
+              ]}
+            >
+              <ActivityIndicator size="small" color={colors.teal} />
+              <Text style={[styles.footerNoticeText, { color: colors.text }]}>
+                {actionBusy === 'share' ? 'Preparing PDF to share…' : 'Saving PDF…'}
+              </Text>
+            </View>
+          )}
         </View>
       </SafeAreaView>
     </Modal>
@@ -230,85 +349,114 @@ export function ChatPdfViewer({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.96)',
+    backgroundColor: '#f3f4f6',
   },
-  backdrop: {
+  shell: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.96)',
+    backgroundColor: '#f3f4f6',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 12,
+    paddingTop: 6,
+    paddingBottom: 10,
+    backgroundColor: '#ffffff',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  headerTitleWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  headerTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  headerSubtitle: {
+    marginTop: 2,
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  headerButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f3f4f6',
+  },
+  headerButtonDisabled: {
+    opacity: 0.45,
   },
   documentStage: {
     flex: 1,
     paddingHorizontal: 12,
-    paddingTop: 72,
-    paddingBottom: 24,
-    justifyContent: 'center',
+    paddingVertical: 12,
+  },
+  pdfCard: {
+    flex: 1,
+    overflow: 'hidden',
+    borderRadius: 18,
+    backgroundColor: '#ffffff',
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
+  },
+  pdf: {
+    flex: 1,
+    backgroundColor: '#e5e7eb',
   },
   centerState: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 24,
-    gap: 10,
+    gap: 12,
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
   },
   errorTitle: {
-    color: '#fff',
     fontSize: 18,
     fontWeight: '700',
   },
   errorBody: {
-    color: 'rgba(255,255,255,0.75)',
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,
   },
   helperText: {
-    color: 'rgba(255,255,255,0.75)',
-    fontSize: 14,
+    fontSize: 15,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  helperSubtext: {
+    fontSize: 13,
     textAlign: 'center',
     lineHeight: 20,
   },
-  bottomBar: {
-    marginHorizontal: 12,
-    marginBottom: 16,
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 14,
-    backgroundColor: 'rgba(10,14,20,0.86)',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 24,
-  },
-  bottomBarTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  bottomBarTitle: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'center',
-  },
-  bottomBarActions: {
+  retryButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
-  bottomBarButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.12)',
+  retryButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   footerNotice: {
-    marginTop: 12,
-    borderRadius: 16,
-    backgroundColor: 'rgba(17,24,39,0.9)',
-    paddingHorizontal: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 16,
     paddingVertical: 12,
     flexDirection: 'row',
     alignItems: 'center',
@@ -316,7 +464,6 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   footerNoticeText: {
-    color: '#fff',
     fontSize: 13,
     fontWeight: '500',
   },

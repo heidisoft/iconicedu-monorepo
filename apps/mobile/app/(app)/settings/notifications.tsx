@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Switch,
   TouchableOpacity,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Bell, BellOff } from 'lucide-react-native';
@@ -13,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { SettingsRow } from '@iconicedu/ui-native';
 import { NotificationSettingsSkeleton } from '@/components/skeletons';
 import { useNotificationPrefs } from '@/hooks/use-notification-prefs';
+import { usePushToggle } from '@/hooks/use-push-toggle';
 import { useUpdateNotificationPref } from '@/hooks/use-update-notification-pref';
 import { NOTIFICATION_REGISTRY } from '@/lib/notifications/notification-config';
 import { useTheme } from '@/providers/theme-provider';
@@ -68,6 +70,12 @@ function makeStyles(C: AppColors) {
     },
     emptyTitle: { fontSize: 15, fontWeight: '600', color: C.text },
     emptyDesc: { fontSize: 13, color: C.textMuted, textAlign: 'center' },
+    osBlockedHint: {
+      fontSize: 12,
+      color: C.textMuted,
+      paddingHorizontal: 12,
+      paddingBottom: 4,
+    },
   });
 }
 
@@ -76,6 +84,12 @@ export default function NotificationsScreen() {
   const { colors } = useTheme();
   const { data: prefs = [], isLoading } = useNotificationPrefs();
   const { mutate: updatePref } = useUpdateNotificationPref();
+  const {
+    isPushEnabled,
+    isOsPermissionDenied,
+    isToggling,
+    toggle: togglePush,
+  } = usePushToggle();
   const s = useMemo(() => makeStyles(colors), [colors]);
 
   // Local muted state for optimistic UI; '__push__' = master push toggle
@@ -127,21 +141,47 @@ export default function NotificationsScreen() {
         {/* Push master toggle */}
         <Text style={s.sectionLabel}>Push Notifications</Text>
         <View style={s.card}>
-          <SettingsRow
-            icon={<Bell size={20} color={colors.textMuted} />}
-            label="Allow push notifications"
-            labelColor={colors.text}
-            hideChevron
-            trailing={
-              <Switch
-                value={mutedMap['__push__'] !== true}
-                onValueChange={() => toggle('__push__')}
-                trackColor={{ false: colors.switchTrackOff, true: colors.teal }}
-                thumbColor="#ffffff"
-              />
-            }
-          />
+          {isOsPermissionDenied ? (
+            <SettingsRow
+              icon={<BellOff size={20} color={colors.textFaint} />}
+              label="Allow push notifications"
+              labelColor={colors.textFaint}
+              hideChevron
+              onPress={() => void Linking.openSettings()}
+              trailing={
+                <Switch
+                  value={false}
+                  disabled
+                  trackColor={{ false: colors.switchTrackOff, true: colors.teal }}
+                  thumbColor="#ffffff"
+                />
+              }
+            />
+          ) : (
+            <SettingsRow
+              icon={<Bell size={20} color={colors.textMuted} />}
+              label="Allow push notifications"
+              labelColor={colors.text}
+              hideChevron
+              trailing={
+                <Switch
+                  value={isPushEnabled}
+                  onValueChange={() => {
+                    void togglePush();
+                  }}
+                  disabled={isToggling}
+                  trackColor={{ false: colors.switchTrackOff, true: colors.teal }}
+                  thumbColor="#ffffff"
+                />
+              }
+            />
+          )}
         </View>
+        {isOsPermissionDenied && (
+          <Text style={s.osBlockedHint}>
+            Push notifications are disabled in system Settings. Tap to open Settings.
+          </Text>
+        )}
 
         {/* Per-category preferences */}
         {(prefs as Record<string, unknown>[]).length === 0 ? (

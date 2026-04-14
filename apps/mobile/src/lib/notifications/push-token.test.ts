@@ -1,4 +1,18 @@
-import { getExpoPushToken, revokePushToken, storePushToken } from './push-token';
+import {
+  PUSH_TOKEN_STORE_KEY,
+  getExpoPushToken,
+  getStoredPushToken,
+  revokePushToken,
+  storePushToken,
+} from './push-token';
+
+const mockSecureStoreSetItemAsync = jest.fn();
+const mockSecureStoreGetItemAsync = jest.fn();
+
+jest.mock('expo-secure-store', () => ({
+  setItemAsync: (...args: unknown[]) => mockSecureStoreSetItemAsync(...args),
+  getItemAsync: (...args: unknown[]) => mockSecureStoreGetItemAsync(...args),
+}));
 
 const mockGetPermissionsAsync = jest.fn();
 const mockRequestPermissionsAsync = jest.fn();
@@ -81,6 +95,7 @@ describe('storePushToken', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUpsert.mockResolvedValue({ error: null });
+    mockSecureStoreSetItemAsync.mockResolvedValue(undefined);
   });
 
   it('upserts the token with correct fields', async () => {
@@ -97,11 +112,39 @@ describe('storePushToken', () => {
     );
   });
 
-  it('throws when supabase returns an error', async () => {
+  it('persists token to SecureStore after successful DB upsert', async () => {
+    await storePushToken('org-1', 'profile-1', 'ExponentPushToken[abc]');
+    expect(mockSecureStoreSetItemAsync).toHaveBeenCalledWith(
+      PUSH_TOKEN_STORE_KEY,
+      'ExponentPushToken[abc]',
+    );
+  });
+
+  it('throws when supabase returns an error and does not call SecureStore', async () => {
     mockUpsert.mockResolvedValue({ error: { message: 'DB error' } });
     await expect(storePushToken('org-1', 'profile-1', 'token')).rejects.toThrow(
       'DB error',
     );
+    expect(mockSecureStoreSetItemAsync).not.toHaveBeenCalled();
+  });
+});
+
+describe('getStoredPushToken', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('returns the stored token from SecureStore', async () => {
+    mockSecureStoreGetItemAsync.mockResolvedValue('ExponentPushToken[stored]');
+    const token = await getStoredPushToken();
+    expect(token).toBe('ExponentPushToken[stored]');
+    expect(mockSecureStoreGetItemAsync).toHaveBeenCalledWith(PUSH_TOKEN_STORE_KEY);
+  });
+
+  it('returns null when no token is stored', async () => {
+    mockSecureStoreGetItemAsync.mockResolvedValue(null);
+    const token = await getStoredPushToken();
+    expect(token).toBeNull();
   });
 });
 
