@@ -4,7 +4,11 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
 import { reportMobileObservedError } from '@/lib/analytics/report-error';
-import { getExpoPushToken, storePushToken } from '@/lib/notifications/push-token';
+import {
+  getExpoPushToken,
+  storePushToken,
+  supportsNativePushNotifications,
+} from '@/lib/notifications/push-token';
 
 import { useAccount } from './use-account';
 import { useProfile } from './use-profile';
@@ -26,13 +30,6 @@ function getNotificationsModule() {
   // Function-scoped require avoids loading the native module in Expo Go.
   // eslint-disable-next-line @typescript-eslint/no-require-imports, no-undef
   return require('expo-notifications') as typeof import('expo-notifications');
-}
-
-function supportsPushPermissionPrompt() {
-  if (!Constants.isDevice) return false;
-  if (Constants.executionEnvironment === 'storeClient') return false;
-  if (Constants.appOwnership === 'expo') return false;
-  return true;
 }
 
 async function ensureAndroidChannel() {
@@ -86,7 +83,7 @@ export function usePushRegistration() {
           executionEnvironment: Constants.executionEnvironment ?? null,
           isDevice: Constants.isDevice,
         });
-        if (!supportsPushPermissionPrompt()) {
+        if (!supportsNativePushNotifications()) {
           logPushRegistration('skip_unsupported_environment');
           return;
         }

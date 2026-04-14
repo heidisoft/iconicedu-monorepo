@@ -4,6 +4,7 @@ import { usePushRegistration } from './use-push-registration';
 
 const mockGetExpoPushToken = jest.fn();
 const mockStorePushToken = jest.fn();
+const mockSupportsNativePushNotifications = jest.fn();
 const mockGetPermissionsAsync = jest.fn();
 const mockSetNotificationChannelAsync = jest.fn();
 const mockSecureStoreGetItem = jest.fn();
@@ -12,6 +13,8 @@ const mockSecureStoreSetItem = jest.fn();
 jest.mock('@/lib/notifications/push-token', () => ({
   getExpoPushToken: (...args: unknown[]) => mockGetExpoPushToken(...args),
   storePushToken: (...args: unknown[]) => mockStorePushToken(...args),
+  supportsNativePushNotifications: (...args: unknown[]) =>
+    mockSupportsNativePushNotifications(...args),
 }));
 
 jest.mock('expo-notifications', () => ({
@@ -48,7 +51,7 @@ jest.mock('./use-profile', () => ({
 }));
 
 const mockConstants = jest.requireMock('expo-constants').default as {
-  isDevice: boolean;
+  isDevice: boolean | undefined;
   executionEnvironment: string;
 };
 
@@ -57,6 +60,7 @@ describe('usePushRegistration', () => {
     jest.clearAllMocks();
     mockConstants.isDevice = true;
     mockConstants.executionEnvironment = 'bareExpo';
+    mockSupportsNativePushNotifications.mockReturnValue(true);
     mockGetPermissionsAsync.mockResolvedValue({ status: 'granted' });
     mockSetNotificationChannelAsync.mockResolvedValue(undefined);
     mockStorePushToken.mockResolvedValue(undefined);
@@ -139,7 +143,7 @@ describe('usePushRegistration', () => {
   });
 
   it('does not prompt on unsupported devices', async () => {
-    mockConstants.isDevice = false;
+    mockSupportsNativePushNotifications.mockReturnValue(false);
 
     const { result } = renderHook(() => usePushRegistration());
 
@@ -149,5 +153,22 @@ describe('usePushRegistration', () => {
     expect(result.current.showConsent).toBe(false);
     expect(mockGetExpoPushToken).not.toHaveBeenCalled();
     expect(mockStorePushToken).not.toHaveBeenCalled();
+  });
+
+  it('continues registration in bare builds when Constants.isDevice is undefined', async () => {
+    mockConstants.isDevice = undefined;
+    mockConstants.executionEnvironment = 'bare';
+    mockGetExpoPushToken.mockResolvedValue('ExponentPushToken[test]');
+
+    renderHook(() => usePushRegistration());
+
+    await waitFor(() => {
+      expect(mockGetExpoPushToken).toHaveBeenCalled();
+    });
+    expect(mockStorePushToken).toHaveBeenCalledWith(
+      'org-1',
+      'profile-1',
+      'ExponentPushToken[test]',
+    );
   });
 });

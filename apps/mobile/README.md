@@ -1,76 +1,89 @@
 # Mobile Development Workflow
 
-This app should be developed with native Expo builds, not Expo Go.
+This app is developed with local development builds, not Expo Go. The
+`pnpm dev:mobile` command guides you through the full setup.
+
+## Quick start
+
+```sh
+pnpm dev:mobile
+```
+
+This interactive launcher:
+
+1. Detects whether native projects (`ios/`, `android/`) are already generated.
+2. Asks whether to run `expo prebuild` and build the native app — with guidance
+   on when this is required.
+3. Starts the Metro bundler and displays a QR code for connecting your dev
+   client.
+
+On a fresh clone or new machine, always say **yes** to the native build prompt.
+For normal day-to-day JS work, say no and Metro starts immediately.
 
 ## Environment matrix
 
-| Mode                 | Command                         | What it runs/builds                     | Distribution           | Intended use                                      |
-| -------------------- | ------------------------------- | --------------------------------------- | ---------------------- | ------------------------------------------------- |
-| Local Metro          | `pnpm dev:mobile`               | Expo dev server                         | Local only             | Day-to-day JS work and simulator/emulator startup |
-| Local native iOS     | `pnpm mobile:ios`               | Local native app via `expo run:ios`     | Local only             | iOS simulator and native parity checks            |
-| Local native Android | `pnpm mobile:android`           | Local native app via `expo run:android` | Local only             | Fast Android-native iteration                     |
-| EAS development      | `pnpm mobile:eas:build:dev`     | Dev client build                        | Internal install       | Real-device native testing against local Metro    |
-| EAS preview          | `pnpm mobile:eas:build:preview` | Internal release-like build             | Internal distribution  | QA and stakeholder testing without Metro          |
-| EAS production       | `pnpm mobile:eas:build:prod`    | Store build                             | App Store / Play Store | Release artifacts                                 |
-| Submit               | `pnpm mobile:eas:submit`        | Submits built artifacts                 | Store submission flow  | Publish previously built production artifacts     |
+| Mode                 | Command                         | What it runs/builds                         | Distribution           | Intended use                                         |
+| -------------------- | ------------------------------- | ------------------------------------------- | ---------------------- | ---------------------------------------------------- |
+| Local interactive    | `pnpm dev:mobile`               | Guided: prebuild → run:ios/android → Metro  | Local only             | Default daily driver — first run or after JS changes |
+| Local Metro only     | `pnpm --filter mobile start`    | Metro for dev client (no native build step) | Local only             | Already have the dev client installed, just start JS |
+| Local native iOS     | `pnpm mobile:ios`               | Local native app via `expo run:ios`         | Local only             | iOS simulator and native parity checks               |
+| Local native Android | `pnpm mobile:android`           | Local native app via `expo run:android`     | Local only             | Fast Android-native iteration                        |
+| EAS development      | `pnpm mobile:eas:build:dev`     | Dev client build via EAS                    | Internal install       | Real-device native testing against local Metro       |
+| EAS preview          | `pnpm mobile:eas:build:preview` | Internal release-like build                 | Internal distribution  | QA and stakeholder testing without Metro             |
+| EAS production       | `pnpm mobile:eas:build:prod`    | Store build                                 | App Store / Play Store | Release artifacts                                    |
+| Submit               | `pnpm mobile:eas:submit`        | Submits built artifacts                     | Store submission flow  | Publish previously built production artifacts        |
 
 `development` is an internal dev client build that connects to local Metro. `preview` is an internal installable QA or stakeholder build. `production` is the store-release build path defined by the current EAS profiles in `apps/mobile/eas.json`.
 
-## Two-lane workflow
+## Standard workflow
 
-### Lane 1: local native iteration
-
-Use this for the default day-to-day loop when you are working on screens, navigation, React logic, styling, and most API changes.
-
-1. Start Metro:
+### First run (or after native changes)
 
 ```sh
-pnpm --filter mobile dev
+pnpm dev:mobile
+# → "Rebuild native projects? [y/N]"  — enter y
+# → Select platform: 1 (iOS) or 2 (Android)
+# → expo prebuild runs, then expo run:ios / expo run:android
+# → Metro starts automatically; Simulator/Emulator opens with the dev client
 ```
 
-2. Run a local native build:
+### Subsequent JS-only runs
 
 ```sh
-pnpm --filter mobile dev:android
-pnpm --filter mobile dev:ios
+pnpm dev:mobile
+# → "Rebuild native projects? [y/N]"  — press Enter (defaults to N)
+# → Metro starts immediately; scan QR code or press i / a
 ```
 
-You can also use the existing aliases:
+Or start Metro directly without the prompt:
 
 ```sh
-pnpm --filter mobile android
-pnpm --filter mobile ios
+pnpm --filter mobile start
 ```
 
-Use Android as the fastest local loop when speed matters. Use iOS for parity checks and final device validation on a Mac.
+### EAS development builds (real-device)
 
-### Lane 2: EAS development builds
-
-Use this for full real-device testing when Expo Go is too limited, when native modules matter, or when you need to validate the app on a physical device end to end.
+Use EAS when you need to test on a physical device end-to-end (auth,
+notifications, storage, deep linking, file uploads, audio, and other
+native-dependent behavior).
 
 1. Build a dev client:
 
 ```sh
-pnpm --filter mobile eas:build:dev
-```
-
-Or per platform:
-
-```sh
-pnpm --filter mobile eas:build:dev:android
+pnpm mobile:eas:build:dev
+# Or per platform:
 pnpm --filter mobile eas:build:dev:ios
+pnpm --filter mobile eas:build:dev:android
 ```
 
 2. Install the build on the device.
-3. Start Metro for the dev client:
+3. Start Metro:
 
 ```sh
-pnpm --filter mobile dev:device
+pnpm --filter mobile start
 ```
 
 4. Open the installed development build and connect it to the local Metro server.
-
-This is the standard path for testing auth, notifications, storage, deep linking, file uploads, audio, and other native-dependent behavior.
 
 ## QA and stakeholder builds
 
@@ -169,6 +182,22 @@ pnpm --filter mobile prebuild:clean
 ```
 
 Do not clean or prebuild on every run. It slows iteration down and creates unnecessary native churn.
+
+## Local Supabase URL rewriting
+
+When `EXPO_PUBLIC_APP_ENV=local`, the Supabase client automatically replaces
+the hostname in `EXPO_PUBLIC_SUPABASE_URL` with the Metro bundler's IP at
+runtime. This means you never need to manually change `127.0.0.1`:
+
+| Context          | Metro host  | Effective Supabase URL     |
+| ---------------- | ----------- | -------------------------- |
+| iOS Simulator    | 127.0.0.1   | `http://127.0.0.1:54321`   |
+| Android Emulator | 10.0.2.2    | `http://10.0.2.2:54321`    |
+| Physical device  | 192.168.x.y | `http://192.168.x.y:54321` |
+
+Keep `EXPO_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321` in your local `.env`.
+The rewrite only activates when `EXPO_PUBLIC_APP_ENV=local` — EAS builds and
+cloud Supabase projects are unaffected.
 
 ## Environment expectations
 

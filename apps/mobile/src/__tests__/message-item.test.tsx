@@ -1,8 +1,32 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 import { MessageItem } from '@/components/messages/message-item';
 import type { MessageVM } from '@iconicedu/shared-types';
 import { lightColors as LIGHT } from '@/lib/theme';
+
+const mockOpenBrowserAsync = jest.fn();
+
+jest.mock('expo-web-browser', () => ({
+  openBrowserAsync: (...args: unknown[]) => mockOpenBrowserAsync(...args),
+  WebBrowserPresentationStyle: {
+    PAGE_SHEET: 'pageSheet',
+  },
+}));
+
+jest.mock('@/components/messages/chat-pdf-viewer', () => {
+  const React = require('react');
+  const { Text } = require('react-native');
+
+  return {
+    ChatPdfViewer: ({
+      visible,
+      filename,
+    }: {
+      visible: boolean;
+      filename?: string | null;
+    }) => (visible ? <Text>{`PDF viewer:${filename ?? 'unknown'}`}</Text> : null),
+  };
+});
 
 jest.mock('@/components/profile/role-name-indicator', () => {
   const React = require('react');
@@ -102,7 +126,26 @@ const specificUsersMessage: MessageVM = {
 
 const colors = LIGHT;
 
+const pdfFileMessage: MessageVM = {
+  ...baseMessage,
+  core: {
+    ...baseMessage.core,
+    type: 'file',
+  },
+  attachment: {
+    type: 'file',
+    name: 'Worksheet.pdf',
+    url: 'https://example.com/worksheet.pdf',
+    mimeType: 'application/pdf',
+    size: 120_000,
+  },
+} as unknown as MessageVM;
+
 describe('MessageItem', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   it('renders text message content', () => {
     render(
       <MessageItem message={baseMessage} isOwn={false} isGroupStart colors={colors} />,
@@ -195,5 +238,16 @@ describe('MessageItem', () => {
 
     expect(screen.getByTestId('message-visibility-badge')).toBeTruthy();
     expect(screen.getByLabelText('Visible to specific users')).toBeTruthy();
+  });
+
+  it('opens PDF attachments in the in-app PDF viewer instead of the generic browser flow', () => {
+    render(
+      <MessageItem message={pdfFileMessage} isOwn={false} isGroupStart colors={colors} />,
+    );
+
+    fireEvent.press(screen.getByLabelText('Open Worksheet.pdf'));
+
+    expect(screen.getByText('PDF viewer:Worksheet.pdf')).toBeTruthy();
+    expect(mockOpenBrowserAsync).not.toHaveBeenCalled();
   });
 });

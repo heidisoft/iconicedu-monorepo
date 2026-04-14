@@ -1,4 +1,19 @@
-import { getExpoPushToken, revokePushToken, storePushToken } from './push-token';
+import {
+  PUSH_TOKEN_STORE_KEY,
+  getExpoPushToken,
+  getStoredPushToken,
+  revokePushToken,
+  storePushToken,
+  supportsNativePushNotifications,
+} from './push-token';
+
+const mockSecureStoreSetItemAsync = jest.fn();
+const mockSecureStoreGetItemAsync = jest.fn();
+
+jest.mock('expo-secure-store', () => ({
+  setItemAsync: (...args: unknown[]) => mockSecureStoreSetItemAsync(...args),
+  getItemAsync: (...args: unknown[]) => mockSecureStoreGetItemAsync(...args),
+}));
 
 const mockGetPermissionsAsync = jest.fn();
 const mockRequestPermissionsAsync = jest.fn();
@@ -11,14 +26,25 @@ jest.mock('expo-notifications', () => ({
 }));
 
 jest.mock('expo-constants', () => ({
-  isDevice: true,
-  expoConfig: { extra: { eas: { projectId: 'test-project-id' } } },
-  easConfig: null,
+  __esModule: true,
+  default: {
+    appOwnership: null,
+    isDevice: true,
+    expoConfig: { extra: { eas: { projectId: 'test-project-id' } } },
+    easConfig: null,
+  },
 }));
 
 jest.mock('react-native', () => ({
   Platform: { OS: 'ios' },
 }));
+
+const mockConstants = jest.requireMock('expo-constants').default as {
+  appOwnership: string | null;
+  isDevice: boolean | undefined;
+  expoConfig: { extra: { eas: { projectId: string } } } | null;
+  easConfig: { projectId: string } | null;
+};
 
 const mockUpsert = jest.fn();
 const mockUpdate = jest.fn();
@@ -36,6 +62,8 @@ jest.mock('@/lib/supabase/client', () => ({
 describe('getExpoPushToken', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockConstants.appOwnership = null;
+    mockConstants.isDevice = true;
     mockGetPermissionsAsync.mockResolvedValue({ status: 'granted' });
     mockGetExpoPushTokenAsync.mockResolvedValue({
       data: 'ExponentPushToken[test-token]',
@@ -75,12 +103,48 @@ describe('getExpoPushToken', () => {
     expect(mockRequestPermissionsAsync).not.toHaveBeenCalled();
     expect(mockGetExpoPushTokenAsync).not.toHaveBeenCalled();
   });
+
+  it('continues in bare/dev runtimes when Constants.isDevice is undefined', async () => {
+    mockConstants.isDevice = undefined;
+
+    const token = await getExpoPushToken();
+
+    expect(token).toBe('ExponentPushToken[test-token]');
+    expect(mockGetExpoPushTokenAsync).toHaveBeenCalled();
+  });
+});
+
+describe('supportsNativePushNotifications', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockConstants.appOwnership = null;
+    mockConstants.isDevice = true;
+  });
+
+  it('returns false in Expo Go', () => {
+    mockConstants.appOwnership = 'expo';
+
+    expect(supportsNativePushNotifications()).toBe(false);
+  });
+
+  it('returns false when explicitly running on a non-device', () => {
+    mockConstants.isDevice = false;
+
+    expect(supportsNativePushNotifications()).toBe(false);
+  });
+
+  it('returns true when device detection is undefined outside Expo Go', () => {
+    mockConstants.isDevice = undefined;
+
+    expect(supportsNativePushNotifications()).toBe(true);
+  });
 });
 
 describe('storePushToken', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUpsert.mockResolvedValue({ error: null });
+    mockSecureStoreSetItemAsync.mockResolvedValue(undefined);
   });
 
   it('upserts the token with correct fields', async () => {
@@ -97,11 +161,39 @@ describe('storePushToken', () => {
     );
   });
 
-  it('throws when supabase returns an error', async () => {
+  it('persists token to SecureStore after successful DB upsert', async () => {
+    await storePushToken('org-1', 'profile-1', 'ExponentPushToken[abc]');
+    expect(mockSecureStoreSetItemAsync).toHaveBeenCalledWith(
+      PUSH_TOKEN_STORE_KEY,
+      'ExponentPushToken[abc]',
+    );
+  });
+
+  it('throws when supabase returns an error and does not call SecureStore', async () => {
     mockUpsert.mockResolvedValue({ error: { message: 'DB error' } });
     await expect(storePushToken('org-1', 'profile-1', 'token')).rejects.toThrow(
       'DB error',
     );
+    expect(mockSecureStoreSetItemAsync).not.toHaveBeenCalled();
+  });
+});
+
+describe('getStoredPushToken', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('returns the stored token from SecureStore', async () => {
+    mockSecureStoreGetItemAsync.mockResolvedValue('ExponentPushToken[stored]');
+    const token = await getStoredPushToken();
+    expect(token).toBe('ExponentPushToken[stored]');
+    expect(mockSecureStoreGetItemAsync).toHaveBeenCalledWith(PUSH_TOKEN_STORE_KEY);
+  });
+
+  it('returns null when no token is stored', async () => {
+    mockSecureStoreGetItemAsync.mockResolvedValue(null);
+    const token = await getStoredPushToken();
+    expect(token).toBeNull();
   });
 });
 

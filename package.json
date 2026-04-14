@@ -10,7 +10,7 @@
     "----------- DEVELOPMENT -----------": "",
     "dev": "node scripts/dev.mjs",
     "dev:web": "turbo run dev --filter=web --filter=@iconicedu/ui-web",
-    "dev:mobile": "pnpm run mobile:start",
+    "dev:mobile": "pnpm --filter mobile dev:local",
     "dev:api": "turbo run dev --filter=api",
     "----------- BUILD -----------": "",
     "build": "turbo run build",
