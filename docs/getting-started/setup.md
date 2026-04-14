@@ -327,7 +327,10 @@ When synced from local Supabase, the command writes:
 
 > **Note:** Mobile reads env via `Constants.expoConfig?.extra`, not `process.env`. The `app.config.js` bridges these at build time.
 >
-> For this repo’s local setup, mobile is intentionally pinned to `127.0.0.1`. If you run on a physical device, update that URL manually to a reachable host.
+> When `EXPO_PUBLIC_APP_ENV=local`, the app automatically replaces the
+> `127.0.0.1` hostname in `EXPO_PUBLIC_SUPABASE_URL` with the Metro bundler’s
+> actual IP at runtime. Android emulators (`10.0.2.2`) and physical devices
+> (LAN IP) are handled transparently — no manual URL changes needed.
 
 ### apps/api/.env
 

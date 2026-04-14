@@ -183,6 +183,22 @@ pnpm --filter mobile prebuild:clean
 
 Do not clean or prebuild on every run. It slows iteration down and creates unnecessary native churn.
 
+## Local Supabase URL rewriting
+
+When `EXPO_PUBLIC_APP_ENV=local`, the Supabase client automatically replaces
+the hostname in `EXPO_PUBLIC_SUPABASE_URL` with the Metro bundler's IP at
+runtime. This means you never need to manually change `127.0.0.1`:
+
+| Context          | Metro host  | Effective Supabase URL     |
+| ---------------- | ----------- | -------------------------- |
+| iOS Simulator    | 127.0.0.1   | `http://127.0.0.1:54321`   |
+| Android Emulator | 10.0.2.2    | `http://10.0.2.2:54321`    |
+| Physical device  | 192.168.x.y | `http://192.168.x.y:54321` |
+
+Keep `EXPO_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321` in your local `.env`.
+The rewrite only activates when `EXPO_PUBLIC_APP_ENV=local` — EAS builds and
+cloud Supabase projects are unaffected.
+
 ## Environment expectations
 
 The `development` EAS profile is configured as a dev client and includes:
