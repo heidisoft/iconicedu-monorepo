@@ -61,5 +61,15 @@ target 'ICONICAcademy' do
       :mac_catalyst_enabled => false,
       :ccache_enabled => ccache_enabled?(podfile_properties),
     )
+
+    # PostHog iOS SDK bundles vendor/libwebp which duplicates symbols from the libwebp
+    # CocoaPod already present via SDWebImage. Exclude the vendored copy so only one
+    # definition of each WebP symbol is linked into the binary.
+    installer.pods_project.targets.each do |target|
+      next unless target.name == 'PostHog'
+      target.build_configurations.each do |config|
+        config.build_settings['EXCLUDED_SOURCE_FILE_NAMES'] = '$(inherited) vendor/libwebp/**/*'
+      end
+    end
   end
 end
