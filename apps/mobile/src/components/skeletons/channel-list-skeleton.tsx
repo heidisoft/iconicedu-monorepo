@@ -14,13 +14,13 @@ export function ChannelListSkeleton({ count = 5 }: Props) {
 
             <View style={s.content}>
               <View style={s.topRow}>
-                <PulseBox width={i % 2 === 0 ? 140 : 120} height={16} radius={4} />
+                <PulseBox width={i % 2 === 0 ? 140 : 120} height={18} radius={4} />
               </View>
-              <PulseBox width={i % 3 === 0 ? 220 : 190} height={12} radius={4} />
+              <PulseBox width={i % 3 === 0 ? 220 : 190} height={18} radius={4} />
             </View>
 
             <View style={s.rowTail}>
-              <PulseBox width={36} height={11} radius={4} />
+              <PulseBox width={36} height={14} radius={4} />
               {i % 2 === 0 ? <PulseBox width={20} height={20} radius={10} /> : <View />}
             </View>
           </View>

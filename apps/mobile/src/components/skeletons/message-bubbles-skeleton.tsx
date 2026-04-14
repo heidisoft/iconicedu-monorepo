@@ -57,7 +57,7 @@ function MessageSeparatorSkeleton({ labelWidth }: { labelWidth: number }) {
   return (
     <View style={s.separatorRow} testID="message-skeleton-separator">
       <PulseBox width={88} height={1} radius={1} />
-      <PulseBox width={labelWidth} height={14} radius={7} />
+      <PulseBox width={labelWidth} height={18} radius={7} />
       <PulseBox width={88} height={1} radius={1} />
     </View>
   );
@@ -82,13 +82,13 @@ function MessageBubbleSkeleton({
           <View style={[s.nameRow, own && s.nameRowOwn]}>
             {own ? (
               <>
-                <PulseBox width={28} height={11} radius={5} />
-                <PulseBox width={42} height={14} radius={6} />
+                <PulseBox width={28} height={14} radius={5} />
+                <PulseBox width={42} height={18} radius={6} />
               </>
             ) : (
               <>
-                <PulseBox width={88} height={14} radius={6} />
-                <PulseBox width={36} height={11} radius={5} />
+                <PulseBox width={88} height={18} radius={6} />
+                <PulseBox width={36} height={14} radius={5} />
               </>
             )}
           </View>
@@ -98,7 +98,7 @@ function MessageBubbleSkeleton({
             <PulseBox
               key={`${bubbleWidth}-${lineWidth}-${index}`}
               width={lineWidth}
-              height={14}
+              height={22}
             />
           ))}
         </View>
@@ -182,7 +182,7 @@ const s = StyleSheet.create({
     borderRadius: 18,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    gap: 8,
+    gap: 4,
   },
   bubbleShellOwn: {
     alignItems: 'flex-end',
