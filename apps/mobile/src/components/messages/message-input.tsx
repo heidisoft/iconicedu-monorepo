@@ -46,6 +46,9 @@ function truncatePlaceholder(value?: string, maxLength = 25): string {
   return `${text.slice(0, maxLength).trimEnd()}...`;
 }
 
+const DEFAULT_INPUT_HEIGHT = 20;
+const MAX_INPUT_HEIGHT = 120;
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type MessageInputProps = {
@@ -281,14 +284,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const [text, setText] = useState('');
   const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
   const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
-  const [inputHeight, setInputHeight] = useState(20);
+  const [inputHeight, setInputHeight] = useState(DEFAULT_INPUT_HEIGHT);
   const [pendingAttachments, setPendingAttachments] = useState<AttachmentPayload[]>([]);
   const [loadedImageUris, setLoadedImageUris] = useState<Set<string>>(new Set());
   const [audioPlaying, setAudioPlaying] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const audioSoundRef = useRef<AudioPlayer | null>(null);
   const audioSubRef = useRef<{ remove(): void } | null>(null);
-  const MAX_INPUT_HEIGHT = 120;
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
@@ -380,7 +382,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       const caption = text.trim() || undefined;
       setPendingAttachments([]);
       setText('');
-      setInputHeight(20);
+      setInputHeight(DEFAULT_INPUT_HEIGHT);
       onTypingStop?.();
       await clearPendingAudio();
       await onSendAttachment?.(attachments, caption);
@@ -389,7 +391,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     const trimmed = text.trim();
     if (!trimmed) return;
     setText('');
-    setInputHeight(20);
+    setInputHeight(DEFAULT_INPUT_HEIGHT);
     onTypingStop?.();
     await onSend(trimmed);
   }, [
@@ -415,7 +417,11 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
   const handleContentSizeChange = useCallback(
     (e: { nativeEvent: { contentSize: { height: number } } }) => {
-      setInputHeight(e.nativeEvent.contentSize.height);
+      const nextHeight = Math.min(
+        Math.max(e.nativeEvent.contentSize.height, DEFAULT_INPUT_HEIGHT),
+        MAX_INPUT_HEIGHT,
+      );
+      setInputHeight(nextHeight);
     },
     [],
   );
@@ -563,10 +569,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         <View style={s.pill}>
           <TextInput
             ref={inputRef}
-            style={[
-              s.input,
-              inputHeight > MAX_INPUT_HEIGHT ? { height: MAX_INPUT_HEIGHT } : undefined,
-            ]}
+            style={[s.input, { height: inputHeight }]}
             value={text}
             onChangeText={handleChangeText}
             onContentSizeChange={handleContentSizeChange}

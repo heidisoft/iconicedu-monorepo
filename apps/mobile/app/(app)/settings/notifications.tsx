@@ -97,7 +97,7 @@ export default function NotificationsScreen() {
       ? 'Push notifications are disabled in iPhone Settings. Tap here, then go to Notifications and turn on Allow Notifications.'
       : 'Push notifications are disabled in Android Settings. Tap here, then open Notifications for ICONIC Academy and turn them back on.';
 
-  // Local muted state for optimistic UI; '__push__' = master push toggle
+  // Local muted state for category-level preferences.
   const [mutedMap, setMutedMap] = useState<Record<string, boolean>>({});
 
   useEffect(() => {

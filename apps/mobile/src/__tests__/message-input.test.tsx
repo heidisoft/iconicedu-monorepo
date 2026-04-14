@@ -2,6 +2,14 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react-native';
 import { MessageInput } from '@/components/messages/message-input';
 
+function getInputHeightProp(input: ReturnType<typeof screen.getByLabelText>) {
+  const style = Array.isArray(input.props.style)
+    ? input.props.style
+    : [input.props.style];
+  return style.find((entry) => entry && typeof entry === 'object' && 'height' in entry)
+    ?.height;
+}
+
 describe('MessageInput', () => {
   it('renders input field', () => {
     render(<MessageInput onSend={jest.fn()} />);
@@ -33,6 +41,25 @@ describe('MessageInput', () => {
     fireEvent.press(screen.getByLabelText('Send message'));
 
     expect(input.props.value).toBe('');
+  });
+
+  it('resets the multiline input height after sending', () => {
+    const onSend = jest.fn();
+    render(<MessageInput onSend={onSend} />);
+
+    const input = screen.getByLabelText('Message input');
+
+    fireEvent.changeText(input, 'Hello\nworld\nagain');
+    fireEvent(input, 'contentSizeChange', {
+      nativeEvent: { contentSize: { height: 72 } },
+    });
+
+    expect(getInputHeightProp(input)).toBe(72);
+
+    fireEvent.press(screen.getByLabelText('Send message'));
+
+    expect(input.props.value).toBe('');
+    expect(getInputHeightProp(input)).toBe(20);
   });
 
   it('does not send empty messages', () => {
