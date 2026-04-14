@@ -174,7 +174,11 @@ jest.mock('react-native-pdf', () => {
   const React = require('react');
   const { View } = require('react-native');
   const MockPdf = ({ children, ...props }) =>
-    React.createElement(View, { ...props, testID: props.testID ?? 'mock-pdf-view' }, children);
+    React.createElement(
+      View,
+      { ...props, testID: props.testID ?? 'mock-pdf-view' },
+      children,
+    );
 
   return {
     __esModule: true,
