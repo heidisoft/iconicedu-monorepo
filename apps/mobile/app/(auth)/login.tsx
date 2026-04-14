@@ -465,9 +465,9 @@ export default function LoginScreen() {
             {"Don't have an account? Visit "}
             <Text
               style={s.noAcctLink}
-              onPress={() => Linking.openURL('https://www.iconicedu.lk')}
+              onPress={() => Linking.openURL('https://www.iconicedu.com')}
             >
-              www.iconicedu.lk
+              www.iconicedu.com
             </Text>
             {' to sign up.'}
           </Text>

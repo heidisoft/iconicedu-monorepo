@@ -12,12 +12,35 @@ const mockGetExpoPushToken = jest.fn();
 const mockStorePushToken = jest.fn();
 const mockRevokePushToken = jest.fn();
 const mockGetStoredPushToken = jest.fn();
+const mockMaybeSingle = jest.fn();
+const mockUpsert = jest.fn();
+
+const mockNotificationPreferencesQuery = {
+  select: jest.fn(() => mockNotificationPreferencesQuery),
+  eq: jest.fn(() => mockNotificationPreferencesQuery),
+  is: jest.fn(() => mockNotificationPreferencesQuery),
+  maybeSingle: (...args: unknown[]) => mockMaybeSingle(...args),
+};
 
 jest.mock('@/lib/notifications/push-token', () => ({
   getExpoPushToken: (...args: unknown[]) => mockGetExpoPushToken(...args),
   storePushToken: (...args: unknown[]) => mockStorePushToken(...args),
   revokePushToken: (...args: unknown[]) => mockRevokePushToken(...args),
   getStoredPushToken: (...args: unknown[]) => mockGetStoredPushToken(...args),
+}));
+
+jest.mock('@/lib/supabase/client', () => ({
+  supabase: {
+    from: (table: string) => {
+      if (table === 'notification_preferences') {
+        return {
+          select: mockNotificationPreferencesQuery.select,
+          upsert: (...args: unknown[]) => mockUpsert(...args),
+        };
+      }
+      throw new Error(`Unexpected table: ${table}`);
+    },
+  },
 }));
 
 jest.mock('@/hooks/use-account', () => ({
@@ -37,6 +60,8 @@ let removeSpy: jest.Mock;
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockMaybeSingle.mockResolvedValue({ data: null, error: null });
+  mockUpsert.mockResolvedValue({ error: null });
   appStateChangeListener = null;
   removeSpy = jest.fn();
   jest
@@ -95,6 +120,16 @@ describe('usePushToggle — initial state', () => {
 
     await waitFor(() => expect(result.current.isPushEnabled).toBe(true));
   });
+
+  it('isPushEnabled is false when OS grants permission but the master push pref is muted', async () => {
+    mockGetPermissionsAsync.mockResolvedValue({ status: 'granted' });
+    mockMaybeSingle.mockResolvedValue({ data: { muted: true }, error: null });
+
+    const { result } = renderHook(() => usePushToggle());
+
+    await waitFor(() => expect(result.current.isPushEnabled).toBe(false));
+    expect(result.current.isOsPermissionDenied).toBe(false);
+  });
 });
 
 describe('usePushToggle — toggle() turning OFF', () => {
@@ -114,6 +149,10 @@ describe('usePushToggle — toggle() turning OFF', () => {
 
     expect(mockGetStoredPushToken).toHaveBeenCalled();
     expect(mockRevokePushToken).toHaveBeenCalledWith('ExponentPushToken[abc123]');
+    expect(mockUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({ pref_key: '__push__', muted: true }),
+      { onConflict: 'org_id,profile_id,pref_key' },
+    );
   });
 
   it('skips revokePushToken when no stored token exists', async () => {
@@ -143,7 +182,8 @@ describe('usePushToggle — toggle() turning OFF', () => {
 
 describe('usePushToggle — toggle() turning ON', () => {
   beforeEach(() => {
-    mockGetPermissionsAsync.mockResolvedValue({ status: 'undetermined' });
+    mockGetPermissionsAsync.mockResolvedValue({ status: 'granted' });
+    mockMaybeSingle.mockResolvedValue({ data: { muted: true }, error: null });
     mockGetExpoPushToken.mockResolvedValue('ExponentPushToken[xyz789]');
     mockStorePushToken.mockResolvedValue(undefined);
   });
@@ -161,6 +201,10 @@ describe('usePushToggle — toggle() turning ON', () => {
       'org-1',
       'profile-1',
       'ExponentPushToken[xyz789]',
+    );
+    expect(mockUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({ pref_key: '__push__', muted: false }),
+      { onConflict: 'org_id,profile_id,pref_key' },
     );
   });
 
@@ -255,7 +299,8 @@ describe('usePushToggle — edge cases', () => {
   });
 
   it('reports an error when token registration throws', async () => {
-    mockGetPermissionsAsync.mockResolvedValue({ status: 'undetermined' });
+    mockGetPermissionsAsync.mockResolvedValue({ status: 'granted' });
+    mockMaybeSingle.mockResolvedValue({ data: { muted: true }, error: null });
     mockGetExpoPushToken.mockRejectedValue(new Error('token error'));
 
     const { result } = renderHook(() => usePushToggle());

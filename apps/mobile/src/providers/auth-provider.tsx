@@ -195,7 +195,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       ) {
         return {
           error:
-            'No account found with this email address. Visit www.iconicedu.lk to sign up before logging in to the app.',
+            'No account found with this email address. Visit www.iconicedu.com to sign up before logging in to the app.',
         };
       }
       return { error: error.message };
