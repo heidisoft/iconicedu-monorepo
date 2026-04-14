@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
 
 import { reportMobileObservedError } from '@/lib/analytics/report-error';
 import {
@@ -9,9 +10,7 @@ import {
 } from '@/lib/notifications/push-token';
 
 import { useAccount } from './use-account';
-import { useNotificationPrefs } from './use-notification-prefs';
 import { useProfile } from './use-profile';
-import { useUpdateNotificationPref } from './use-update-notification-pref';
 
 function getNotificationsModule() {
   // Function-scoped require avoids loading the native module in Expo Go / tests.
@@ -19,10 +18,8 @@ function getNotificationsModule() {
   return require('expo-notifications') as typeof import('expo-notifications');
 }
 
-const PUSH_PREF_KEY = '__push__';
-
 export type UsePushToggleResult = {
-  /** true when OS permission is granted AND the __push__ preference is not muted */
+  /** true when the device currently grants push notification permission */
   isPushEnabled: boolean;
   /** true when the OS has permanently denied push notification permission */
   isOsPermissionDenied: boolean;
@@ -35,10 +32,9 @@ export type UsePushToggleResult = {
  * Manages the master push notification toggle.
  *
  * Turning OFF: revokes the push token in the DB so the server stops delivering
- * pushes, and sets the __push__ preference to muted.
+ * pushes.
  *
- * Turning ON: re-registers the push token (re-sets revoked_at to null) and
- * un-mutes the __push__ preference.
+ * Turning ON: re-registers the push token (re-sets revoked_at to null).
  *
  * OS permission denial is surfaced via `isOsPermissionDenied` so the caller
  * can show a "open system Settings" affordance instead of the normal toggle.
@@ -49,8 +45,6 @@ export function usePushToggle(): UsePushToggleResult {
   >(null);
   const [isToggling, setIsToggling] = useState(false);
 
-  const { data: prefs = [] } = useNotificationPrefs();
-  const { mutateAsync: updatePref } = useUpdateNotificationPref();
   const { data: account } = useAccount();
   const { data: profile } = useProfile();
 
@@ -61,22 +55,31 @@ export function usePushToggle(): UsePushToggleResult {
     | string
     | undefined;
 
-  // Check OS permission once on mount.
-  useEffect(() => {
-    void getNotificationsModule()
-      .getPermissionsAsync()
-      .then(({ status }) => {
-        setOsPermission(status);
-      });
+  const refreshPermission = useCallback(async () => {
+    const { status } = await getNotificationsModule().getPermissionsAsync();
+    setOsPermission(status);
   }, []);
 
-  const pushPref = (prefs as Record<string, unknown>[]).find(
-    (p) => (p as { pref_key: string }).pref_key === PUSH_PREF_KEY,
-  );
-  const isPushMuted = (pushPref as { muted?: boolean } | undefined)?.muted ?? false;
+  // Refresh on mount and when returning from system settings.
+  useEffect(() => {
+    void refreshPermission();
+
+    const subscription = AppState.addEventListener(
+      'change',
+      (nextState: AppStateStatus) => {
+        if (nextState === 'active') {
+          void refreshPermission();
+        }
+      },
+    );
+
+    return () => {
+      subscription.remove();
+    };
+  }, [refreshPermission]);
 
   const isOsPermissionDenied = osPermission === 'denied';
-  const isPushEnabled = osPermission === 'granted' && !isPushMuted;
+  const isPushEnabled = osPermission === 'granted';
 
   const toggle = useCallback(async () => {
     if (isToggling) return;
@@ -90,17 +93,15 @@ export function usePushToggle(): UsePushToggleResult {
         if (token) {
           await revokePushToken(token);
         }
-        await updatePref({ prefKey: PUSH_PREF_KEY, muted: true });
       } else {
         // --- TURNING ON ---
         // requestPermissions: false — the initial OS prompt is usePushRegistration's job.
-        // Here we only re-register if OS already granted; otherwise just update the pref.
+        // Here we only re-register if OS already granted.
         const token = await getExpoPushToken({ requestPermissions: false });
         if (token && orgId && profileId) {
           // storePushToken sets revoked_at: null and persists to SecureStore
           await storePushToken(orgId, profileId, token);
         }
-        await updatePref({ prefKey: PUSH_PREF_KEY, muted: false });
       }
     } catch (error) {
       reportMobileObservedError({
@@ -111,9 +112,17 @@ export function usePushToggle(): UsePushToggleResult {
           : 'Failed to enable push notifications',
       });
     } finally {
+      void refreshPermission();
       setIsToggling(false);
     }
-  }, [isToggling, isOsPermissionDenied, isPushEnabled, orgId, profileId, updatePref]);
+  }, [
+    isToggling,
+    isOsPermissionDenied,
+    isPushEnabled,
+    orgId,
+    profileId,
+    refreshPermission,
+  ]);
 
   return { isPushEnabled, isOsPermissionDenied, isToggling, toggle };
 }

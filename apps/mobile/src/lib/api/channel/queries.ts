@@ -502,7 +502,9 @@ export async function fetchNotificationPreferences(orgId: string, profileId: str
     .eq('profile_id', profileId)
     .is('deleted_at', null);
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).filter(
+    (row) => (row as { pref_key?: string | null }).pref_key !== '__push__',
+  );
 }
 
 export async function fetchFamilyLinks(orgId: string, guardianAccountId: string) {
