@@ -7,6 +7,7 @@ import {
   Switch,
   TouchableOpacity,
   Linking,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Bell, BellOff } from 'lucide-react-native';
@@ -91,6 +92,10 @@ export default function NotificationsScreen() {
     toggle: togglePush,
   } = usePushToggle();
   const s = useMemo(() => makeStyles(colors), [colors]);
+  const osBlockedHint =
+    Platform.OS === 'ios'
+      ? 'Push notifications are disabled in iPhone Settings. Tap here, then go to Notifications and turn on Allow Notifications.'
+      : 'Push notifications are disabled in Android Settings. Tap here, then open Notifications for ICONIC Academy and turn them back on.';
 
   // Local muted state for optimistic UI; '__push__' = master push toggle
   const [mutedMap, setMutedMap] = useState<Record<string, boolean>>({});
@@ -177,11 +182,7 @@ export default function NotificationsScreen() {
             />
           )}
         </View>
-        {isOsPermissionDenied && (
-          <Text style={s.osBlockedHint}>
-            Push notifications are disabled in system Settings. Tap to open Settings.
-          </Text>
-        )}
+        {isOsPermissionDenied && <Text style={s.osBlockedHint}>{osBlockedHint}</Text>}
 
         {/* Per-category preferences */}
         {(prefs as Record<string, unknown>[]).length === 0 ? (

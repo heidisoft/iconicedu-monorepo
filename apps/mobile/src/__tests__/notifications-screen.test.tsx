@@ -1,5 +1,5 @@
 import React from 'react';
-import { Linking } from 'react-native';
+import { Linking, Platform } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import NotificationsScreen from '../../app/(app)/settings/notifications';
@@ -101,13 +101,22 @@ function pushToggleDenied() {
 let openSettingsSpy: jest.SpyInstance;
 
 beforeEach(() => {
+  jest.restoreAllMocks();
   jest.clearAllMocks();
+  setPlatformOS('ios');
   openSettingsSpy = jest.spyOn(Linking, 'openSettings').mockResolvedValue(undefined);
 });
 
 afterEach(() => {
   openSettingsSpy.mockRestore();
 });
+
+function setPlatformOS(value: 'ios' | 'android') {
+  Object.defineProperty(Platform, 'OS', {
+    value,
+    configurable: true,
+  });
+}
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
@@ -181,7 +190,35 @@ describe('NotificationsScreen — master push toggle (OS permission denied)', ()
     pushToggleDenied();
     render(<NotificationsScreen />);
     expect(
-      screen.getByText(/Push notifications are disabled in system Settings/i),
+      screen.getByText(
+        /Push notifications are disabled in iPhone Settings|Push notifications are disabled in Android Settings/i,
+      ),
+    ).toBeTruthy();
+  });
+
+  it('shows iOS-specific guidance on iOS', () => {
+    setPlatformOS('ios');
+    pushToggleDenied();
+
+    render(<NotificationsScreen />);
+
+    expect(
+      screen.getByText(
+        /iPhone Settings\. Tap here, then go to Notifications and turn on Allow Notifications\./i,
+      ),
+    ).toBeTruthy();
+  });
+
+  it('shows Android-specific guidance on Android', () => {
+    setPlatformOS('android');
+    pushToggleDenied();
+
+    render(<NotificationsScreen />);
+
+    expect(
+      screen.getByText(
+        /Android Settings\. Tap here, then open Notifications for ICONIC Academy and turn them back on\./i,
+      ),
     ).toBeTruthy();
   });
 

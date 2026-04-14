@@ -4,6 +4,7 @@ import {
   getStoredPushToken,
   revokePushToken,
   storePushToken,
+  supportsNativePushNotifications,
 } from './push-token';
 
 const mockSecureStoreSetItemAsync = jest.fn();
@@ -25,14 +26,25 @@ jest.mock('expo-notifications', () => ({
 }));
 
 jest.mock('expo-constants', () => ({
-  isDevice: true,
-  expoConfig: { extra: { eas: { projectId: 'test-project-id' } } },
-  easConfig: null,
+  __esModule: true,
+  default: {
+    appOwnership: null,
+    isDevice: true,
+    expoConfig: { extra: { eas: { projectId: 'test-project-id' } } },
+    easConfig: null,
+  },
 }));
 
 jest.mock('react-native', () => ({
   Platform: { OS: 'ios' },
 }));
+
+const mockConstants = jest.requireMock('expo-constants').default as {
+  appOwnership: string | null;
+  isDevice: boolean | undefined;
+  expoConfig: { extra: { eas: { projectId: string } } } | null;
+  easConfig: { projectId: string } | null;
+};
 
 const mockUpsert = jest.fn();
 const mockUpdate = jest.fn();
@@ -50,6 +62,8 @@ jest.mock('@/lib/supabase/client', () => ({
 describe('getExpoPushToken', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockConstants.appOwnership = null;
+    mockConstants.isDevice = true;
     mockGetPermissionsAsync.mockResolvedValue({ status: 'granted' });
     mockGetExpoPushTokenAsync.mockResolvedValue({
       data: 'ExponentPushToken[test-token]',
@@ -88,6 +102,41 @@ describe('getExpoPushToken', () => {
     expect(token).toBeNull();
     expect(mockRequestPermissionsAsync).not.toHaveBeenCalled();
     expect(mockGetExpoPushTokenAsync).not.toHaveBeenCalled();
+  });
+
+  it('continues in bare/dev runtimes when Constants.isDevice is undefined', async () => {
+    mockConstants.isDevice = undefined;
+
+    const token = await getExpoPushToken();
+
+    expect(token).toBe('ExponentPushToken[test-token]');
+    expect(mockGetExpoPushTokenAsync).toHaveBeenCalled();
+  });
+});
+
+describe('supportsNativePushNotifications', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockConstants.appOwnership = null;
+    mockConstants.isDevice = true;
+  });
+
+  it('returns false in Expo Go', () => {
+    mockConstants.appOwnership = 'expo';
+
+    expect(supportsNativePushNotifications()).toBe(false);
+  });
+
+  it('returns false when explicitly running on a non-device', () => {
+    mockConstants.isDevice = false;
+
+    expect(supportsNativePushNotifications()).toBe(false);
+  });
+
+  it('returns true when device detection is undefined outside Expo Go', () => {
+    mockConstants.isDevice = undefined;
+
+    expect(supportsNativePushNotifications()).toBe(true);
   });
 });
 

@@ -33,6 +33,26 @@ function getNotificationsModule() {
   return require('expo-notifications') as typeof import('expo-notifications');
 }
 
+export function supportsNativePushNotifications() {
+  if (Platform.OS === 'web') {
+    return false;
+  }
+
+  // Expo Go cannot receive remote push notifications, but dev clients,
+  // bare apps, and standalone builds can.
+  if (Constants.appOwnership === 'expo') {
+    return false;
+  }
+
+  // Some SDK 55 bare/dev runtimes report this as undefined. Treat that as
+  // "unknown" instead of unsupported so registration can proceed.
+  if (Constants.isDevice === false) {
+    return false;
+  }
+
+  return true;
+}
+
 /**
  * Requests push notification permissions and returns an Expo push token.
  * Returns null if the device is a simulator, permissions are denied, or token fetch fails.
@@ -48,15 +68,8 @@ export async function getExpoPushToken(options?: {
     isDevice: Constants.isDevice,
   });
 
-  // Remote push notifications are not supported in Expo Go on Android (SDK 53+)
-  if (Constants.appOwnership === 'expo') {
-    logPushDebug('skip_expo_go');
-    return null;
-  }
-
-  // Expo push tokens only work on physical devices
-  if (!Constants.isDevice) {
-    logPushDebug('skip_non_device');
+  if (!supportsNativePushNotifications()) {
+    logPushDebug('skip_unsupported_environment');
     return null;
   }
 

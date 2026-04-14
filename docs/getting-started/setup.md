@@ -385,7 +385,10 @@ This builds `shared-types`, `ui-web`, `ui-native`, and `utils` in dependency ord
 pnpm dev
 ```
 
-This starts web, API, shared package watchers, and mobile together. The mobile process uses the same direct Expo startup path as `pnpm dev:mobile`, so Expo terminal shortcuts like `i` and `a` still work.
+This starts web, API, shared package watchers, and mobile together. The mobile
+process starts Metro non-interactively (`expo start --dev-client`); the native
+dev client must already be installed on your simulator or device. Use
+`pnpm dev:mobile` for the guided first-time setup.
 
 ### Web only (recommended during web development)
 
@@ -408,11 +411,9 @@ pnpm dev:api
 pnpm dev:mobile
 ```
 
-Then in the Expo terminal:
-
-- Press `i` — open iOS Simulator (macOS only)
-- Press `a` — open Android Emulator
-- Scan QR code — open on physical device with Expo Go
+The interactive launcher asks whether to generate and build native projects,
+then starts Metro and displays a QR code. See [Mobile Setup](#mobile-setup)
+below for platform prerequisites.
 
 ### Log In To The Website Locally
 
@@ -450,6 +451,30 @@ supabase status --output json
 
 ## Mobile Setup
 
+This app uses local development builds, not Expo Go. You need to generate
+and build native projects at least once before running the dev client.
+
+### Start mobile development
+
+```bash
+pnpm dev:mobile
+```
+
+This interactive launcher:
+
+1. Detects whether native projects (`ios/`, `android/`) are already present.
+2. Asks whether to run `expo prebuild` and build the native app.
+3. Starts Metro and shows a QR code.
+
+**Always rebuild when:**
+
+- First run on a new machine or fresh clone
+- You added, removed, or updated an Expo plugin in `app.json`
+- You installed a package that includes native code
+- You are seeing native build errors or unexpected crashes
+
+**Skip the rebuild for normal JS work** — screens, logic, styling, routing.
+
 ### iOS Simulator (macOS only)
 
 1. Install Xcode from the App Store
@@ -458,7 +483,9 @@ supabase status --output json
 
 ```bash
 pnpm dev:mobile
-# then press 'i'
+# → Rebuild? y
+# → Platform: 1 (iOS)
+# → Simulator opens automatically with the dev client
 ```
 
 ### Android Emulator
@@ -469,12 +496,17 @@ pnpm dev:mobile
 
 ```bash
 pnpm dev:mobile
-# then press 'a'
+# → Rebuild? y
+# → Platform: 2 (Android)
+# → Emulator opens automatically with the dev client
 ```
 
 ### Physical device
 
-Install [Expo Go](https://expo.dev/client) on your device and scan the QR code shown in the terminal.
+After building the dev client (iOS or Android), open the installed
+**ICONIC Academy** app and scan the QR code shown in the Metro terminal.
+
+> Do not install Expo Go — this app requires a local development build.
 
 ### EAS builds (for distribution)
 
