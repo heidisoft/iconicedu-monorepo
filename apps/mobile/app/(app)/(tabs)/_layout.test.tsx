@@ -67,6 +67,10 @@ jest.mock('@/hooks/use-supervised-direct-messages', () => ({
   }),
 }));
 
+jest.mock('@/hooks/use-unread-sync', () => ({
+  useUnreadSync: jest.fn(),
+}));
+
 jest.mock('lucide-react-native', () => ({
   Home: () => null,
   MessageCircle: () => null,
