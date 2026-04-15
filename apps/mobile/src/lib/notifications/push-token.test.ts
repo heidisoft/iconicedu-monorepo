@@ -46,14 +46,14 @@ const mockConstants = jest.requireMock('expo-constants').default as {
   easConfig: { projectId: string } | null;
 };
 
-const mockUpsert = jest.fn();
+const mockRpc = jest.fn();
 const mockUpdate = jest.fn();
 const mockEq = jest.fn();
 
 jest.mock('@/lib/supabase/client', () => ({
   supabase: {
+    rpc: (...args: unknown[]) => mockRpc(...args),
     from: jest.fn(() => ({
-      upsert: mockUpsert,
       update: mockUpdate,
     })),
   },
@@ -143,21 +143,21 @@ describe('supportsNativePushNotifications', () => {
 describe('storePushToken', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUpsert.mockResolvedValue({ error: null });
+    mockRpc.mockResolvedValue({ error: null });
     mockSecureStoreSetItemAsync.mockResolvedValue(undefined);
   });
 
-  it('upserts the token with correct fields', async () => {
+  it('calls the push token upsert RPC with correct fields', async () => {
     await storePushToken('org-1', 'profile-1', 'ExponentPushToken[abc]');
-    expect(mockUpsert).toHaveBeenCalledWith(
+    expect(mockRpc).toHaveBeenCalledWith(
+      'upsert_push_token',
       expect.objectContaining({
-        org_id: 'org-1',
-        profile_id: 'profile-1',
-        token: 'ExponentPushToken[abc]',
-        platform: 'ios',
-        revoked_at: null,
+        _org_id: 'org-1',
+        _profile_id: 'profile-1',
+        _token: 'ExponentPushToken[abc]',
+        _platform: 'ios',
+        _now: expect.any(String),
       }),
-      { onConflict: 'token' },
     );
   });
 
@@ -170,7 +170,7 @@ describe('storePushToken', () => {
   });
 
   it('throws when supabase returns an error and does not call SecureStore', async () => {
-    mockUpsert.mockResolvedValue({ error: { message: 'DB error' } });
+    mockRpc.mockResolvedValue({ error: { message: 'DB error' } });
     await expect(storePushToken('org-1', 'profile-1', 'token')).rejects.toThrow(
       'DB error',
     );
