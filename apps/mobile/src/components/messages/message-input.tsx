@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
+  Animated,
   View,
   Text,
   TextInput,
@@ -20,7 +21,7 @@ import type { AppColors } from '@/lib/theme';
 import type { MessageVM } from '@iconicedu/shared-types';
 import { EmojiPicker } from './emoji-picker';
 import { AttachmentSheet, type AttachmentPayload } from './attachment-sheet';
-import { Smile, Plus, ArrowUp, X, FileText, Play, Pause } from 'lucide-react-native';
+import { ThumbsUp, Plus, ArrowUp, X, FileText, Play, Pause } from 'lucide-react-native';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -32,6 +33,12 @@ function getMessagePreviewText(message: MessageVM): string {
   if (type === 'audio-recording') return 'Voice message';
   if (type === 'file') return 'File';
   return 'Message';
+}
+
+function fmtFileSize(bytes?: number): string {
+  if (!bytes) return '';
+  if (bytes < 1_048_576) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / 1_048_576).toFixed(1)} MB`;
 }
 
 function fmtDuration(s: number): string {
@@ -147,24 +154,35 @@ function makeStyles(C: AppColors, bottomInset: number, keyboardVisible: boolean)
       justifyContent: 'center',
       borderRadius: 10,
     },
-    // File item
+    // File item — matches message-item file row style
     attachFileItem: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 8,
-      paddingHorizontal: 10,
-      paddingVertical: 8,
-      height: 64,
-      maxWidth: 180,
-      borderRadius: 10,
+      gap: 12,
+      padding: 12,
+      maxWidth: 260,
+      borderRadius: 12,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: C.border,
       backgroundColor: C.card,
     },
+    attachFileIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 8,
+      backgroundColor: C.tealBg,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     attachFileName: {
-      flex: 1,
-      fontSize: 12,
+      fontSize: 13,
+      fontWeight: '500' as const,
       color: C.text,
+    },
+    attachFileSize: {
+      fontSize: 11,
+      marginTop: 1,
+      color: C.textMuted,
     },
     // Audio item
     attachAudioItem: {
@@ -198,6 +216,17 @@ function makeStyles(C: AppColors, bottomInset: number, keyboardVisible: boolean)
       color: C.textMuted,
     },
 
+    // Progress bar — sits just above the hairline border while sending
+    progressBarWrap: {
+      height: 2,
+      backgroundColor: 'transparent',
+      overflow: 'hidden' as const,
+    },
+    progressBarFill: {
+      height: 2,
+      backgroundColor: C.teal,
+    },
+
     // Main input bar
     bar: {
       flexDirection: 'row',
@@ -227,14 +256,13 @@ function makeStyles(C: AppColors, bottomInset: number, keyboardVisible: boolean)
     pill: {
       flex: 1,
       flexDirection: 'row',
-      alignItems: 'flex-end',
+      alignItems: 'center',
       minHeight: 40,
       backgroundColor: C.inputBg,
       borderRadius: 20,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: C.border,
-      paddingLeft: 14,
-      paddingRight: 6,
+      paddingHorizontal: 14,
       paddingVertical: 6,
     },
     input: {
@@ -249,11 +277,14 @@ function makeStyles(C: AppColors, bottomInset: number, keyboardVisible: boolean)
       textAlignVertical: 'top',
     },
 
-    // Smiley inside pill — right side
+    // Emoji button — right of pill (replaces send when input is empty)
     emojiBtn: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: C.card,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: C.border,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -284,6 +315,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   onCancelReply,
 }) => {
   const [text, setText] = useState('');
+  const [inputKey, setInputKey] = useState(0);
+  const [sending, setSending] = useState(false);
+  const sendProgress = useRef(new Animated.Value(0)).current;
   const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
   const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState<AttachmentPayload[]>([]);
@@ -377,22 +411,60 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     [pendingAttachments, clearPendingAudio],
   );
 
+  // Bump this key to force-remount the native TextInput on iOS after a
+  // programmatic setText(''), which otherwise leaves the view at its expanded
+  // height (iOS UITextView doesn't re-measure on programmatic clear).
+  const resetIOSInput = useCallback(() => {
+    if (Platform.OS !== 'ios') return;
+    setInputKey((k) => k + 1);
+    // Re-focus after remount so the keyboard stays up
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }, []);
+
+  const runSendProgress = useCallback(
+    async (send: () => Promise<void>) => {
+      setSending(true);
+      sendProgress.setValue(0);
+      // Race to 85% while the send is in flight
+      Animated.timing(sendProgress, {
+        toValue: 0.85,
+        duration: 500,
+        useNativeDriver: false,
+      }).start();
+      try {
+        await send();
+      } finally {
+        // Complete to 100% then hide
+        Animated.timing(sendProgress, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: false,
+        }).start(() => setSending(false));
+      }
+    },
+    [sendProgress],
+  );
+
   const handleSend = useCallback(async () => {
     if (pendingAttachments.length > 0) {
       const attachments = pendingAttachments;
       const caption = text.trim() || undefined;
       setPendingAttachments([]);
       setText('');
+      resetIOSInput();
       onTypingStop?.();
       await clearPendingAudio();
-      await onSendAttachment?.(attachments, caption);
+      await runSendProgress(
+        () => onSendAttachment?.(attachments, caption) ?? Promise.resolve(),
+      );
       return;
     }
     const trimmed = text.trim();
     if (!trimmed) return;
     setText('');
+    resetIOSInput();
     onTypingStop?.();
-    await onSend(trimmed);
+    await runSendProgress(() => Promise.resolve(onSend(trimmed)));
   }, [
     text,
     pendingAttachments,
@@ -400,6 +472,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     onSendAttachment,
     onTypingStop,
     clearPendingAudio,
+    resetIOSInput,
+    runSendProgress,
   ]);
 
   const handleChangeText = useCallback(
@@ -414,10 +488,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     [onTypingChange, onTypingStop],
   );
 
-  const handleEmojiSelect = useCallback((emoji: string) => {
-    setText((prev) => prev + emoji);
-    inputRef.current?.focus();
-  }, []);
+  const handleEmojiSelect = useCallback(
+    (emoji: string) => {
+      setEmojiPickerVisible(false);
+      void onSend(emoji);
+    },
+    [onSend],
+  );
 
   const canSend = (text.trim().length > 0 || pendingAttachments.length > 0) && !disabled;
   const resolvedPlaceholder = truncatePlaceholder(placeholder);
@@ -520,10 +597,17 @@ export const MessageInput: React.FC<MessageInputProps> = ({
               // File
               return (
                 <View key={i} style={s.attachFileItem}>
-                  <FileText size={16} color={colors.teal} />
-                  <Text style={s.attachFileName} numberOfLines={2}>
-                    {a.name}
-                  </Text>
+                  <View style={s.attachFileIcon}>
+                    <FileText size={20} color={colors.teal} />
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={s.attachFileName} numberOfLines={1}>
+                      {a.name}
+                    </Text>
+                    {!!a.size && (
+                      <Text style={s.attachFileSize}>{fmtFileSize(a.size)}</Text>
+                    )}
+                  </View>
                   <TouchableOpacity
                     onPress={() => handleRemovePending(i)}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -534,6 +618,23 @@ export const MessageInput: React.FC<MessageInputProps> = ({
               );
             })}
           </ScrollView>
+        </View>
+      )}
+
+      {/* Progress bar — shown just above the hairline border while sending */}
+      {sending && (
+        <View style={s.progressBarWrap}>
+          <Animated.View
+            style={[
+              s.progressBarFill,
+              {
+                width: sendProgress.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['0%', '100%'],
+                }),
+              },
+            ]}
+          />
         </View>
       )}
 
@@ -553,9 +654,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           )}
         </TouchableOpacity>
 
-        {/* Pill: text input + smiley */}
+        {/* Pill: text input only */}
         <View style={s.pill}>
           <TextInput
+            key={Platform.OS === 'ios' ? inputKey : undefined}
             ref={inputRef}
             style={s.input}
             value={text}
@@ -567,19 +669,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             editable={!disabled}
             accessibilityLabel="Message input"
           />
-          <TouchableOpacity
-            style={s.emojiBtn}
-            disabled={disabled}
-            activeOpacity={0.7}
-            onPress={() => setEmojiPickerVisible(true)}
-            accessibilityLabel="Open emoji picker"
-          >
-            <Smile size={20} color={colors.textMuted} />
-          </TouchableOpacity>
         </View>
 
-        {/* Send button — appears when text is present or attachments are pending */}
-        {canSend && (
+        {/* Right action button — send when typing, emoji picker when idle */}
+        {canSend ? (
           <TouchableOpacity
             style={s.sendBtn}
             onPress={() => {
@@ -589,6 +682,16 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             accessibilityLabel="Send message"
           >
             <ArrowUp size={20} color={colors.tealFg} />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={s.emojiBtn}
+            disabled={disabled}
+            activeOpacity={0.7}
+            onPress={() => setEmojiPickerVisible(true)}
+            accessibilityLabel="Open emoji picker"
+          >
+            <ThumbsUp size={20} color={colors.teal} />
           </TouchableOpacity>
         )}
       </View>
