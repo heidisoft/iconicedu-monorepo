@@ -11,6 +11,7 @@ import { useProfile } from '@/hooks/use-profile';
 import { useDirectMessages } from '@/hooks/use-direct-messages';
 import { useLearningSpaceChannels } from '@/hooks/use-learning-space-channels';
 import { useSupervisedDirectMessages } from '@/hooks/use-supervised-direct-messages';
+import { useUnreadSync } from '@/hooks/use-unread-sync';
 
 // Fixed height for the icon + label content area.
 const TAB_CONTENT_HEIGHT = 57;
@@ -142,6 +143,11 @@ export default function TabsLayout() {
     accountId,
     profileId,
   );
+
+  // Keep channel list queries (and therefore the tab badge) up to date
+  // whenever channel_read_state changes for this account in realtime.
+  useUnreadSync({ orgId, profileId, accountId, profileKind });
+
   const inboxUnreadCount =
     feed?.sections.reduce(
       (total, section) =>

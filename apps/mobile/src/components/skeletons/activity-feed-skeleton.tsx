@@ -24,7 +24,7 @@ export function ActivityFeedSkeleton({ count = 4 }: Props) {
           <View key={sectionIdx}>
             {/* Section header */}
             <View style={s.sectionHeader}>
-              <PulseBox width={72} height={11} radius={4} />
+              <PulseBox width={72} height={13} radius={4} />
             </View>
 
             {/* Section items */}
@@ -54,8 +54,8 @@ export function ActivityFeedSkeleton({ count = 4 }: Props) {
                           )}
                         </View>
 
-                        {/* metaRow — "2 mins ago  •  Classes", fontSize 13 */}
-                        <PulseBox width={metaW} height={13} radius={4} />
+                        {/* metaRow — "2 mins ago  •  Classes", fontSize 13 lineHeight ~18 */}
+                        <PulseBox width={metaW} height={18} radius={4} />
                       </View>
 
                       {/* unreadDot — 9×9, right side, marginTop 8 */}
@@ -65,8 +65,8 @@ export function ActivityFeedSkeleton({ count = 4 }: Props) {
                     {/* previewCard aligns with content indent */}
                     {showPreview && (
                       <View style={s.previewCard}>
-                        <PulseBox width={220} height={13} radius={4} />
-                        <PulseBox width={170} height={13} radius={4} />
+                        <PulseBox width={220} height={22} radius={4} />
+                        <PulseBox width={170} height={22} radius={4} />
                       </View>
                     )}
                   </View>
@@ -106,6 +106,6 @@ const s = StyleSheet.create({
     marginTop: 10,
     marginLeft: 42,
     padding: 14,
-    gap: 8,
+    gap: 6,
   },
 });

@@ -201,7 +201,7 @@ function makeStyles(C: AppColors, bottomInset: number, keyboardVisible: boolean)
     // Main input bar
     bar: {
       flexDirection: 'row',
-      alignItems: 'center',
+      alignItems: 'flex-end',
       gap: 10,
       paddingHorizontal: 12,
       paddingTop: 8,
@@ -221,14 +221,13 @@ function makeStyles(C: AppColors, bottomInset: number, keyboardVisible: boolean)
       borderColor: C.border,
       alignItems: 'center',
       justifyContent: 'center',
-      marginBottom: 0,
     },
 
     // Pill input row
     pill: {
       flex: 1,
       flexDirection: 'row',
-      alignItems: 'center',
+      alignItems: 'flex-end',
       minHeight: 40,
       backgroundColor: C.inputBg,
       borderRadius: 20,
@@ -244,7 +243,10 @@ function makeStyles(C: AppColors, bottomInset: number, keyboardVisible: boolean)
       color: C.text,
       lineHeight: 20,
       paddingVertical: 0,
-      textAlignVertical: 'center',
+      minHeight: DEFAULT_INPUT_HEIGHT,
+      maxHeight: MAX_INPUT_HEIGHT,
+      // 'top' is correct for multiline; iOS ignores this but Android needs it
+      textAlignVertical: 'top',
     },
 
     // Smiley inside pill — right side
@@ -284,7 +286,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const [text, setText] = useState('');
   const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
   const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
-  const [inputHeight, setInputHeight] = useState(DEFAULT_INPUT_HEIGHT);
   const [pendingAttachments, setPendingAttachments] = useState<AttachmentPayload[]>([]);
   const [loadedImageUris, setLoadedImageUris] = useState<Set<string>>(new Set());
   const [audioPlaying, setAudioPlaying] = useState(false);
@@ -382,7 +383,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       const caption = text.trim() || undefined;
       setPendingAttachments([]);
       setText('');
-      setInputHeight(DEFAULT_INPUT_HEIGHT);
       onTypingStop?.();
       await clearPendingAudio();
       await onSendAttachment?.(attachments, caption);
@@ -391,7 +391,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     const trimmed = text.trim();
     if (!trimmed) return;
     setText('');
-    setInputHeight(DEFAULT_INPUT_HEIGHT);
     onTypingStop?.();
     await onSend(trimmed);
   }, [
@@ -413,17 +412,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       }
     },
     [onTypingChange, onTypingStop],
-  );
-
-  const handleContentSizeChange = useCallback(
-    (e: { nativeEvent: { contentSize: { height: number } } }) => {
-      const nextHeight = Math.min(
-        Math.max(e.nativeEvent.contentSize.height, DEFAULT_INPUT_HEIGHT),
-        MAX_INPUT_HEIGHT,
-      );
-      setInputHeight(nextHeight);
-    },
-    [],
   );
 
   const handleEmojiSelect = useCallback((emoji: string) => {
@@ -569,14 +557,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         <View style={s.pill}>
           <TextInput
             ref={inputRef}
-            style={[s.input, { height: inputHeight }]}
+            style={s.input}
             value={text}
             onChangeText={handleChangeText}
-            onContentSizeChange={handleContentSizeChange}
             placeholder={resolvedPlaceholder}
             placeholderTextColor={colors.textFaint}
             multiline
-            scrollEnabled={inputHeight > MAX_INPUT_HEIGHT}
+            scrollEnabled
             editable={!disabled}
             accessibilityLabel="Message input"
           />
