@@ -28,10 +28,11 @@ describe('MessageInput', () => {
     const onSend = jest.fn();
     render(<MessageInput onSend={onSend} />);
 
-    const input = screen.getByLabelText('Message input');
+    let input = screen.getByLabelText('Message input');
     fireEvent.changeText(input, 'Hello');
     fireEvent.press(screen.getByLabelText('Send message'));
 
+    input = screen.getByLabelText('Message input');
     expect(input.props.value).toBe('');
   });
 
