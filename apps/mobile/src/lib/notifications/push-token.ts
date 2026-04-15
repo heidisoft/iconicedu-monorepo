@@ -136,18 +136,13 @@ export async function storePushToken(
     Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'web';
   const now = new Date().toISOString();
 
-  const { error } = await supabase.from('push_tokens').upsert(
-    {
-      org_id: orgId,
-      profile_id: profileId,
-      token,
-      platform,
-      revoked_at: null,
-      created_at: now,
-      updated_at: now,
-    },
-    { onConflict: 'token' },
-  );
+  const { error } = await supabase.rpc('upsert_push_token', {
+    _org_id: orgId,
+    _profile_id: profileId,
+    _token: token,
+    _platform: platform,
+    _now: now,
+  });
 
   if (error) {
     reportMobileObservedError({
