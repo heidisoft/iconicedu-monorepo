@@ -295,26 +295,30 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
   // ── Image picker ──────────────────────────────────────────────────────────
 
   const handlePickImage = useCallback(async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert(
-        'Permission required',
-        'Please allow access to your photo library in Settings.',
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsMultipleSelection: true,
+        quality: 0.85,
+        base64: true,
+      });
+      if (result.canceled || !result.assets.length) return;
+      const payloads = await Promise.all(
+        result.assets.map((asset, i) => normalizePickedImage(asset, i)),
       );
-      return;
+      onClose();
+      onAttach(payloads);
+    } catch (error) {
+      reportMobileObservedError({
+        error,
+        source: 'mobile.messages.attachment_sheet.image_pick',
+        message: 'Failed to pick an image from the system photo picker',
+      });
+      Alert.alert(
+        'Unable to open photo picker',
+        'Please try again or choose a file instead.',
+      );
     }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsMultipleSelection: true,
-      quality: 0.85,
-      base64: true,
-    });
-    if (result.canceled || !result.assets.length) return;
-    const payloads = await Promise.all(
-      result.assets.map((asset, i) => normalizePickedImage(asset, i)),
-    );
-    onClose();
-    onAttach(payloads);
   }, [onClose, onAttach]);
 
   // ── Document picker ───────────────────────────────────────────────────────

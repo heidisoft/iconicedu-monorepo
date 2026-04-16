@@ -42,13 +42,6 @@
       "expo-secure-store",
       "expo-splash-screen",
       "expo-sharing",
-      [
-        "expo-media-library",
-        {
-          "photosPermission": "Allow ICONIC Academy to access your photos",
-          "savePhotosPermission": "Allow ICONIC Academy to save images to your photos"
-        }
-      ],
       "expo-web-browser",
       "expo-audio",
       [
