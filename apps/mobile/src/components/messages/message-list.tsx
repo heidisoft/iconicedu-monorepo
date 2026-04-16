@@ -3,6 +3,7 @@ import {
   View,
   Text,
   FlatList,
+  Animated,
   ActivityIndicator,
   StyleSheet,
   AppState,
@@ -196,6 +197,143 @@ const unreadStyles = StyleSheet.create({
   },
 });
 
+// ─── Skeleton loader ──────────────────────────────────────────────────────────
+
+// Matches the visual structure of MessageItem rows so the loading state
+// occupies the same space as real messages.
+const SKELETON_ROWS: ReadonlyArray<{
+  isOwn: boolean;
+  isGroupStart: boolean;
+  bubbleWidth: string; // % of content column
+  lines: number;
+  nameWidth?: number; // px — only for group-start other rows
+}> = [
+  // Group 1 — other (3 messages)
+  { isOwn: false, isGroupStart: true, bubbleWidth: '72%', lines: 1, nameWidth: 88 },
+  { isOwn: false, isGroupStart: false, bubbleWidth: '55%', lines: 1 },
+  { isOwn: false, isGroupStart: false, bubbleWidth: '78%', lines: 2 },
+  // Group 2 — own (2 messages)
+  { isOwn: true, isGroupStart: true, bubbleWidth: '42%', lines: 1 },
+  { isOwn: true, isGroupStart: false, bubbleWidth: '60%', lines: 1 },
+  // Group 3 — other (3 messages)
+  { isOwn: false, isGroupStart: true, bubbleWidth: '65%', lines: 1, nameWidth: 76 },
+  { isOwn: false, isGroupStart: false, bubbleWidth: '48%', lines: 1 },
+  { isOwn: false, isGroupStart: false, bubbleWidth: '50%', lines: 1 },
+  // Group 4 — own (1 message)
+  { isOwn: true, isGroupStart: true, bubbleWidth: '36%', lines: 1 },
+];
+
+// Single-line bubble height = paddingVertical × 2 + lineHeight = 10 + 10 + 22 = 42
+const BUBBLE_LINE_HEIGHT = 22;
+const BUBBLE_PADDING_VERTICAL = 10;
+
+function MessageListSkeleton({ colors }: { colors: AppColors }) {
+  const opacity = useRef(new Animated.Value(0.5)).current;
+
+  useEffect(() => {
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 650,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0.5,
+          duration: 650,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [opacity]);
+
+  const bg = colors.border;
+
+  return (
+    <View style={skelStyles.container}>
+      {SKELETON_ROWS.map((row, i) => {
+        const bubbleHeight = BUBBLE_PADDING_VERTICAL * 2 + BUBBLE_LINE_HEIGHT * row.lines;
+        return (
+          <View
+            key={i}
+            style={[
+              skelStyles.row,
+              row.isOwn && skelStyles.rowOwn,
+              row.isGroupStart && skelStyles.rowGroupStart,
+            ]}
+          >
+            {/* Avatar slot — always 36px wide to match MessageItem layout */}
+            <View style={skelStyles.avatarSlot}>
+              {row.isGroupStart && !row.isOwn && (
+                <Animated.View
+                  style={[skelStyles.avatar, { backgroundColor: bg, opacity }]}
+                />
+              )}
+            </View>
+
+            {/* Content column */}
+            <View style={[skelStyles.contentCol, row.isOwn && skelStyles.contentColOwn]}>
+              {/* Name bar — group-start incoming messages only */}
+              {row.isGroupStart && !row.isOwn && (
+                <Animated.View
+                  style={[
+                    skelStyles.nameBar,
+                    { backgroundColor: bg, opacity, width: row.nameWidth ?? 88 },
+                  ]}
+                />
+              )}
+
+              {/* Bubble placeholder */}
+              <Animated.View
+                style={[
+                  skelStyles.bubble,
+                  {
+                    backgroundColor: bg,
+                    opacity,
+                    width: row.bubbleWidth as `${number}%`,
+                    height: bubbleHeight,
+                  },
+                ]}
+              />
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+const skelStyles = StyleSheet.create({
+  // Flush to the bottom of the container — messages stack upward like the real list
+  container: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    paddingVertical: 8,
+  },
+  // Mirror MessageItem row styles exactly
+  row: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 3,
+    gap: 8,
+  },
+  rowOwn: { flexDirection: 'row-reverse' },
+  rowGroupStart: { paddingTop: 12 },
+  // Avatar slot: same 36px reserved width as in MessageItem
+  avatarSlot: { width: 36, flexShrink: 0, alignItems: 'center' },
+  avatar: { width: 36, height: 36, borderRadius: 18 },
+  // Content column mirrors MessageItem contentCol / contentColOwn
+  contentCol: { flex: 1, alignItems: 'flex-start', gap: 2 },
+  contentColOwn: { alignItems: 'flex-end' },
+  // Name bar: height matches senderName fontSize (14)
+  nameBar: { height: 14, borderRadius: 7, marginBottom: 0 },
+  // Bubble: borderRadius matches MessageItem bubble (18)
+  bubble: { borderRadius: 18 },
+});
+
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 type MessageListProps = {
@@ -222,6 +360,7 @@ type MessageListProps = {
   emptyIcon?: 'message-square' | 'life-buoy' | 'graduation-cap';
   lastReadMessageId?: string | null;
   unreadCount?: number;
+  onSendAnnotation?: (attachment: import('./attachment-sheet').AttachmentPayload) => void;
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -248,6 +387,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   emptyIcon,
   lastReadMessageId,
   unreadCount,
+  onSendAnnotation,
 }) => {
   const flatListRef = useRef<FlatList>(null);
   const { colors } = useTheme();
@@ -368,6 +508,7 @@ export const MessageList: React.FC<MessageListProps> = ({
           currentProfileId={currentProfileId}
           currentAccountId={currentAccountId}
           isReadOnly={isReadOnly}
+          onSendAnnotation={onSendAnnotation}
         />
       );
     },
@@ -381,6 +522,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       onThreadOpen,
       onProfilePress,
       isReadOnly,
+      onSendAnnotation,
     ],
   );
 
@@ -389,6 +531,9 @@ export const MessageList: React.FC<MessageListProps> = ({
     if (isUnreadSeparator(item)) return `unread-${item.count ?? 'marker'}`;
     return item.ids.id;
   }, []);
+
+  // Show skeleton on initial load (no messages yet), empty state otherwise
+  const isInitialLoading = loading && listData.length === 0;
 
   const isEmpty =
     !loading && listData.length === 0 && !(pendingUploads && pendingUploads.length);
@@ -401,6 +546,10 @@ export const MessageList: React.FC<MessageListProps> = ({
     ) : (
       <MessageSquare size={28} color={colors.teal} />
     );
+
+  if (isInitialLoading) {
+    return <MessageListSkeleton colors={colors} />;
+  }
 
   if (isEmpty) {
     return (

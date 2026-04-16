@@ -140,8 +140,12 @@ jest.mock('react-native-gesture-handler', () => {
   const { View } = require('react-native');
 
   const chainableGesture = {
+    runOnJS: jest.fn().mockReturnThis(),
+    minDistance: jest.fn().mockReturnThis(),
+    onBegin: jest.fn().mockReturnThis(),
     onUpdate: jest.fn().mockReturnThis(),
     onEnd: jest.fn().mockReturnThis(),
+    onFinalize: jest.fn().mockReturnThis(),
     onStart: jest.fn().mockReturnThis(),
     enabled: jest.fn().mockReturnThis(),
   };

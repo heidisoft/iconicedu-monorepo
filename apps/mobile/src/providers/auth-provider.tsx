@@ -12,7 +12,7 @@ import { type Session, type User } from '@supabase/supabase-js';
 import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '@/lib/supabase/client';
 import { activateAccount } from '@/lib/api/queries';
-import { getExpoPushToken, revokePushToken } from '@/lib/notifications/push-token';
+import { getStoredPushToken, revokePushToken } from '@/lib/notifications/push-token';
 import { useAnalytics } from '@/providers/analytics-provider';
 import {
   AnalyticsEvent,
@@ -302,7 +302,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     analytics.capture(AnalyticsEvent.SIGNED_OUT);
     analytics.reset();
     try {
-      const token = await getExpoPushToken({ requestPermissions: false });
+      const token = await getStoredPushToken();
       if (token) await revokePushToken(token);
     } catch {
       // Token revocation is best-effort; never block sign-out

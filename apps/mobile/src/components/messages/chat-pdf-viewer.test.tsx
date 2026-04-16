@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react-native';
 import { NativeModules } from 'react-native';
+import Constants from 'expo-constants';
 import { ChatPdfViewer } from './chat-pdf-viewer';
 import { lightColors as LIGHT } from '@/lib/theme';
 
@@ -88,6 +89,7 @@ describe('ChatPdfViewer', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     NativeModules.RNPDFPdfView = {};
+    Constants.executionEnvironment = 'bare';
     mockCreateSignedUrl.mockResolvedValue({
       data: { signedUrl: 'https://signed.example.com/files/worksheet.pdf' },
       error: null,
@@ -177,7 +179,7 @@ describe('ChatPdfViewer', () => {
   });
 
   it('falls back to the browser flow when the native PDF module is unavailable', async () => {
-    delete NativeModules.RNPDFPdfView;
+    Constants.executionEnvironment = 'storeClient';
 
     const onClose = jest.fn();
     render(
