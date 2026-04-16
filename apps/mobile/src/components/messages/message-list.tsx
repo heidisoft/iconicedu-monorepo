@@ -208,15 +208,19 @@ const SKELETON_ROWS: ReadonlyArray<{
   lines: number;
   nameWidth?: number; // px — only for group-start other rows
 }> = [
+  // Group 1 — other (3 messages)
   { isOwn: false, isGroupStart: true, bubbleWidth: '72%', lines: 1, nameWidth: 88 },
   { isOwn: false, isGroupStart: false, bubbleWidth: '55%', lines: 1 },
+  { isOwn: false, isGroupStart: false, bubbleWidth: '78%', lines: 2 },
+  // Group 2 — own (2 messages)
   { isOwn: true, isGroupStart: true, bubbleWidth: '42%', lines: 1 },
-  { isOwn: false, isGroupStart: true, bubbleWidth: '78%', lines: 2, nameWidth: 104 },
-  { isOwn: false, isGroupStart: false, bubbleWidth: '48%', lines: 1 },
   { isOwn: true, isGroupStart: false, bubbleWidth: '60%', lines: 1 },
-  { isOwn: true, isGroupStart: true, bubbleWidth: '36%', lines: 1 },
+  // Group 3 — other (3 messages)
   { isOwn: false, isGroupStart: true, bubbleWidth: '65%', lines: 1, nameWidth: 76 },
+  { isOwn: false, isGroupStart: false, bubbleWidth: '48%', lines: 1 },
   { isOwn: false, isGroupStart: false, bubbleWidth: '50%', lines: 1 },
+  // Group 4 — own (1 message)
+  { isOwn: true, isGroupStart: true, bubbleWidth: '36%', lines: 1 },
 ];
 
 // Single-line bubble height = paddingVertical × 2 + lineHeight = 10 + 10 + 22 = 42
@@ -317,7 +321,7 @@ const skelStyles = StyleSheet.create({
     gap: 8,
   },
   rowOwn: { flexDirection: 'row-reverse' },
-  rowGroupStart: { paddingTop: 10 },
+  rowGroupStart: { paddingTop: 12 },
   // Avatar slot: same 36px reserved width as in MessageItem
   avatarSlot: { width: 36, flexShrink: 0, alignItems: 'center' },
   avatar: { width: 36, height: 36, borderRadius: 18 },

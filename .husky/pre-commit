@@ -1,3 +1,2 @@
 pnpm lint-staged
-pnpm format:check:changed
 pnpm exec turbo run lint typecheck --affected
