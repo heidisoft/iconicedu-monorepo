@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   Modal,
   Pressable,
   StyleSheet,
@@ -20,17 +21,26 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
 } from 'react-native-reanimated';
+import Svg, { Image as SvgImage, Path } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Directory, File, Paths } from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
-import { Download, Share2, X } from 'lucide-react-native';
+import { Download, Pencil, RotateCcw, Send, Share2, X } from 'lucide-react-native';
 import type { AppColors } from '@/lib/theme';
 import { supabase } from '@/lib/supabase/client';
+import type { AttachmentPayload } from './attachment-sheet';
 
 const CHANNEL_FILES_BUCKET = 'channel-files';
 const MAX_ZOOM = 4;
 const IMAGE_CACHE_DIR = 'chat-image-viewer';
+const ANNOTATION_CACHE_DIR = 'annotations';
+
+const PEN_COLORS = ['#ef4444', '#f97316', '#facc15', '#22c55e', '#3b82f6', '#000000'];
+const PEN_WIDTH = 4;
+
+type AnnotationStroke = { d: string; color: string };
 
 export type ChatImageViewerItem = {
   key: string;
@@ -47,6 +57,7 @@ type ChatImageViewerProps = {
   initialIndex: number;
   colors: AppColors;
   onClose: () => void;
+  onSend?: (attachment: AttachmentPayload) => void;
 };
 
 function sanitizeFilename(
@@ -150,6 +161,7 @@ export function ChatImageViewer({
   initialIndex,
   colors,
   onClose,
+  onSend,
 }: ChatImageViewerProps) {
   const { width, height } = useWindowDimensions();
   const listRef = useRef<FlatList<ChatImageViewerItem>>(null);
@@ -160,13 +172,35 @@ export function ChatImageViewer({
   const [actionBusy, setActionBusy] = useState<'share' | 'save' | null>(null);
   const [mediaStageHeight, setMediaStageHeight] = useState(0);
 
+  // Annotation state
+  const [annotationMode, setAnnotationMode] = useState(false);
+  const [strokes, setStrokes] = useState<AnnotationStroke[]>([]);
+  const [currentPath, setCurrentPath] = useState('');
+  const [penColor, setPenColor] = useState(PEN_COLORS[0]!);
+  const [overlaySize, setOverlaySize] = useState({ width: 0, height: 0 });
+  const [sendAnnotationBusy, setSendAnnotationBusy] = useState(false);
+  const currentPathRef = useRef('');
+  const svgRef = useRef<Svg>(null);
+
   useEffect(() => {
     if (!visible) return;
     setCurrentIndex(initialIndex);
+    setAnnotationMode(false);
+    setStrokes([]);
+    setCurrentPath('');
+    currentPathRef.current = '';
     requestAnimationFrame(() => {
       listRef.current?.scrollToIndex({ animated: false, index: initialIndex });
     });
   }, [visible, initialIndex]);
+
+  // Exit annotation mode when swiping to a different image
+  useEffect(() => {
+    setAnnotationMode(false);
+    setStrokes([]);
+    setCurrentPath('');
+    currentPathRef.current = '';
+  }, [currentIndex]);
 
   const resolveItemUrl = useCallback(async (item: ChatImageViewerItem) => {
     setLoadingKeys((prev) => ({ ...prev, [item.key]: true }));
@@ -208,6 +242,7 @@ export function ChatImageViewer({
   const activeResolvedUrl = activeItem
     ? (resolvedUrls[activeItem.key] ?? activeItem.previewUrl ?? activeItem.originalUrl)
     : null;
+
   const ensureActiveLocalFile = useCallback(async () => {
     if (!activeItem || !activeResolvedUrl) throw new Error('No image selected');
     const filename = sanitizeFilename(
@@ -264,6 +299,95 @@ export function ChatImageViewer({
     void resolveItemUrl(activeItem);
   }, [activeItem, resolveItemUrl]);
 
+  // ── Annotation ────────────────────────────────────────────────────────────
+
+  const drawGesture = React.useMemo(
+    () =>
+      Gesture.Pan()
+        .runOnJS(true)
+        .minDistance(0)
+        .onBegin((e) => {
+          const p = `M${e.x.toFixed(1)},${e.y.toFixed(1)}`;
+          currentPathRef.current = p;
+          setCurrentPath(p);
+        })
+        .onUpdate((e) => {
+          const p = `${currentPathRef.current} L${e.x.toFixed(1)},${e.y.toFixed(1)}`;
+          currentPathRef.current = p;
+          setCurrentPath(p);
+        })
+        .onEnd(() => {
+          if (currentPathRef.current) {
+            const d = currentPathRef.current;
+            setStrokes((prev) => [...prev, { d, color: penColor }]);
+          }
+          currentPathRef.current = '';
+          setCurrentPath('');
+        })
+        .onFinalize(() => {
+          currentPathRef.current = '';
+          setCurrentPath('');
+        }),
+    [penColor],
+  );
+
+  const handleEnterAnnotation = useCallback(() => {
+    setAnnotationMode(true);
+  }, []);
+
+  const handleCancelAnnotation = useCallback(() => {
+    setAnnotationMode(false);
+    setStrokes([]);
+    setCurrentPath('');
+    currentPathRef.current = '';
+  }, []);
+
+  const handleUndo = useCallback(() => {
+    setStrokes((prev) => prev.slice(0, -1));
+  }, []);
+
+  const handleSendAnnotation = useCallback(async () => {
+    if (!svgRef.current || strokes.length === 0 || sendAnnotationBusy) return;
+    setSendAnnotationBusy(true);
+    try {
+      await new Promise<void>((resolve, reject) => {
+        (
+          svgRef.current as Svg & { toDataURL(cb: (b64: string) => void): void }
+        ).toDataURL((base64) => {
+          const annotFilename = `annotation-${Date.now()}.png`;
+          const dir = `${FileSystem.cacheDirectory ?? ''}${ANNOTATION_CACHE_DIR}/`;
+          void FileSystem.makeDirectoryAsync(dir, { intermediates: true })
+            .then(() =>
+              FileSystem.writeAsStringAsync(`${dir}${annotFilename}`, base64, {
+                encoding: FileSystem.EncodingType.Base64,
+              }),
+            )
+            .then(() => {
+              onSend?.({
+                uri: `${dir}${annotFilename}`,
+                name: annotFilename,
+                mimeType: 'image/png',
+              });
+              resolve();
+            })
+            .catch(reject);
+        });
+      });
+      setAnnotationMode(false);
+      setStrokes([]);
+      onClose();
+    } catch (err) {
+      Alert.alert(
+        'Unable to send',
+        err instanceof Error ? err.message : 'Please try again.',
+      );
+    } finally {
+      setSendAnnotationBusy(false);
+    }
+  }, [strokes.length, sendAnnotationBusy, onSend, onClose]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+
   const pageWidth = Math.max(width, 1);
   const viewerHorizontalPadding = 12;
   const mediaWidth = Math.max(pageWidth - viewerHorizontalPadding * 2, 1);
@@ -274,11 +398,42 @@ export function ChatImageViewer({
       visible={visible}
       animationType="fade"
       presentationStyle="fullScreen"
-      onRequestClose={onClose}
+      onRequestClose={annotationMode ? handleCancelAnnotation : onClose}
     >
       <GestureHandlerRootView style={styles.gestureRoot}>
         <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
           <View style={styles.backdrop}>
+            {/* Annotation toolbar */}
+            {annotationMode && (
+              <View style={styles.annotationToolbar}>
+                <View style={styles.colorRow}>
+                  {PEN_COLORS.map((color) => (
+                    <Pressable
+                      key={color}
+                      onPress={() => setPenColor(color)}
+                      style={[
+                        styles.colorDot,
+                        { backgroundColor: color },
+                        penColor === color && styles.colorDotActive,
+                      ]}
+                      accessibilityLabel={`Pen color ${color}`}
+                    />
+                  ))}
+                </View>
+                <Pressable
+                  onPress={handleUndo}
+                  disabled={strokes.length === 0}
+                  style={[
+                    styles.toolbarIconBtn,
+                    strokes.length === 0 && styles.buttonDisabled,
+                  ]}
+                  accessibilityLabel="Undo last stroke"
+                >
+                  <RotateCcw size={20} color="#fff" />
+                </Pressable>
+              </View>
+            )}
+
             <View
               style={styles.mediaStage}
               onLayout={(event) => {
@@ -292,6 +447,7 @@ export function ChatImageViewer({
                 keyExtractor={(item) => item.key}
                 horizontal
                 pagingEnabled
+                scrollEnabled={!annotationMode}
                 initialScrollIndex={initialIndex}
                 getItemLayout={(_, index) => ({
                   length: pageWidth,
@@ -310,6 +466,7 @@ export function ChatImageViewer({
                     resolvedUrls[item.key] ?? item.previewUrl ?? item.originalUrl;
                   const isLoading = !!loadingKeys[item.key] && !resolvedUrls[item.key];
                   const error = errorKeys[item.key];
+                  const isActive = item.key === activeItem?.key;
                   return (
                     <View style={[styles.page, { width: pageWidth, height: pageHeight }]}>
                       {error ? (
@@ -322,11 +479,78 @@ export function ChatImageViewer({
                         </View>
                       ) : (
                         <>
-                          <ZoomableImage
-                            uri={uri}
-                            width={mediaWidth}
-                            height={pageHeight}
-                          />
+                          {/* Normal view — disable zoom in annotation mode */}
+                          {annotationMode && isActive ? (
+                            <View
+                              style={{ width: mediaWidth, height: pageHeight }}
+                              onLayout={(e) =>
+                                setOverlaySize({
+                                  width: Math.round(e.nativeEvent.layout.width),
+                                  height: Math.round(e.nativeEvent.layout.height),
+                                })
+                              }
+                            >
+                              {/* Plain image (no zoom) under the SVG */}
+                              <Image
+                                source={{ uri }}
+                                style={{
+                                  width: mediaWidth,
+                                  height: pageHeight,
+                                  resizeMode: 'contain',
+                                }}
+                              />
+                              {/* Drawing overlay — SVG includes image as background for capture */}
+                              {overlaySize.width > 0 && (
+                                <GestureDetector gesture={drawGesture}>
+                                  <View style={StyleSheet.absoluteFill}>
+                                    <Svg
+                                      ref={svgRef}
+                                      width={overlaySize.width}
+                                      height={overlaySize.height}
+                                      style={StyleSheet.absoluteFill}
+                                    >
+                                      {/* Image background baked into the SVG capture */}
+                                      <SvgImage
+                                        x={0}
+                                        y={0}
+                                        width={overlaySize.width}
+                                        height={overlaySize.height}
+                                        href={{ uri }}
+                                        preserveAspectRatio="xMidYMid meet"
+                                      />
+                                      {strokes.map((stroke, i) => (
+                                        <Path
+                                          key={i}
+                                          d={stroke.d}
+                                          stroke={stroke.color}
+                                          strokeWidth={PEN_WIDTH}
+                                          fill="none"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                        />
+                                      ))}
+                                      {!!currentPath && (
+                                        <Path
+                                          d={currentPath}
+                                          stroke={penColor}
+                                          strokeWidth={PEN_WIDTH}
+                                          fill="none"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                        />
+                                      )}
+                                    </Svg>
+                                  </View>
+                                </GestureDetector>
+                              )}
+                            </View>
+                          ) : (
+                            <ZoomableImage
+                              uri={uri}
+                              width={mediaWidth}
+                              height={pageHeight}
+                            />
+                          )}
                           {isLoading && (
                             <View style={styles.loadingOverlay}>
                               <ActivityIndicator size="large" color="#fff" />
@@ -341,53 +565,115 @@ export function ChatImageViewer({
             </View>
 
             <View style={styles.bottomBar}>
-              <View style={styles.bottomBarTopRow}>
-                <Pressable
-                  onPress={onClose}
-                  style={styles.bottomBarButton}
-                  accessibilityLabel="Close image viewer"
-                >
-                  <X size={22} color="#fff" />
-                </Pressable>
-                <View style={styles.bottomBarPagination}>
-                  {items.length > 1 ? (
-                    <View style={styles.paginationDots}>
-                      {items.map((item, index) => {
-                        const isActive = index === currentIndex;
-                        return (
-                          <View
-                            key={item.key}
-                            style={[
-                              styles.paginationDot,
-                              isActive && styles.paginationDotActive,
-                            ]}
-                          />
-                        );
-                      })}
-                    </View>
-                  ) : (
-                    <View style={styles.paginationSpacer} />
-                  )}
-                </View>
-                <View style={styles.bottomBarActions}>
+              {annotationMode ? (
+                <View style={styles.bottomBarTopRow}>
                   <Pressable
-                    onPress={handleShare}
-                    disabled={!activeResolvedUrl || actionBusy !== null}
+                    onPress={handleCancelAnnotation}
                     style={styles.bottomBarButton}
-                    accessibilityLabel="Share image"
+                    accessibilityLabel="Cancel annotation"
                   >
-                    <Share2 size={20} color="#fff" />
+                    <X size={22} color="#fff" />
                   </Pressable>
+
+                  <View style={styles.bottomBarPagination}>
+                    <Text style={styles.annotationHint}>
+                      {strokes.length > 0
+                        ? `${strokes.length} stroke${strokes.length > 1 ? 's' : ''}`
+                        : 'Start drawing'}
+                    </Text>
+                  </View>
+
                   <Pressable
-                    onPress={handleSave}
-                    disabled={!activeResolvedUrl || actionBusy !== null}
-                    style={styles.bottomBarButton}
-                    accessibilityLabel="Save image"
+                    onPress={handleSendAnnotation}
+                    disabled={strokes.length === 0 || sendAnnotationBusy}
+                    style={[
+                      styles.sendButton,
+                      (strokes.length === 0 || sendAnnotationBusy) &&
+                        styles.buttonDisabled,
+                    ]}
+                    accessibilityLabel="Send annotation"
+                    accessibilityState={{
+                      disabled: strokes.length === 0 || sendAnnotationBusy,
+                    }}
                   >
-                    <Download size={20} color="#fff" />
+                    {sendAnnotationBusy ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Send size={20} color="#fff" />
+                    )}
                   </Pressable>
                 </View>
-              </View>
+              ) : (
+                <View style={styles.bottomBarTopRow}>
+                  <Pressable
+                    onPress={onClose}
+                    style={styles.bottomBarButton}
+                    accessibilityLabel="Close image viewer"
+                  >
+                    <X size={22} color="#fff" />
+                  </Pressable>
+                  <View style={styles.bottomBarPagination}>
+                    {items.length > 1 ? (
+                      <View style={styles.paginationDots}>
+                        {items.map((item, index) => {
+                          const isActive = index === currentIndex;
+                          return (
+                            <View
+                              key={item.key}
+                              style={[
+                                styles.paginationDot,
+                                isActive && styles.paginationDotActive,
+                              ]}
+                            />
+                          );
+                        })}
+                      </View>
+                    ) : (
+                      <View style={styles.paginationSpacer} />
+                    )}
+                  </View>
+                  <View style={styles.bottomBarActions}>
+                    {!!onSend && (
+                      <Pressable
+                        onPress={handleEnterAnnotation}
+                        disabled={!activeResolvedUrl}
+                        style={[
+                          styles.bottomBarButton,
+                          !activeResolvedUrl && styles.buttonDisabled,
+                        ]}
+                        accessibilityLabel="Annotate image"
+                        accessibilityState={{ disabled: !activeResolvedUrl }}
+                      >
+                        <Pencil size={20} color="#fff" />
+                      </Pressable>
+                    )}
+                    <Pressable
+                      onPress={handleShare}
+                      disabled={!activeResolvedUrl || actionBusy !== null}
+                      style={[
+                        styles.bottomBarButton,
+                        (!activeResolvedUrl || actionBusy !== null) &&
+                          styles.buttonDisabled,
+                      ]}
+                      accessibilityLabel="Share image"
+                    >
+                      <Share2 size={20} color="#fff" />
+                    </Pressable>
+                    <Pressable
+                      onPress={handleSave}
+                      disabled={!activeResolvedUrl || actionBusy !== null}
+                      style={[
+                        styles.bottomBarButton,
+                        (!activeResolvedUrl || actionBusy !== null) &&
+                          styles.buttonDisabled,
+                      ]}
+                      accessibilityLabel="Save image"
+                    >
+                      <Download size={20} color="#fff" />
+                    </Pressable>
+                  </View>
+                </View>
+              )}
 
               {actionBusy && (
                 <View style={styles.footerNotice}>
@@ -419,11 +705,48 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.96)',
   },
+  // Annotation toolbar
+  annotationToolbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: 12,
+    marginTop: 8,
+    marginBottom: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: 'rgba(10,14,20,0.86)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 20,
+  },
+  colorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  colorDot: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+  },
+  colorDotActive: {
+    borderWidth: 3,
+    borderColor: '#fff',
+  },
+  toolbarIconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
   mediaStage: {
     flex: 1,
     justifyContent: 'center',
-    paddingTop: 72,
-    paddingBottom: 72,
+    paddingTop: 8,
+    paddingBottom: 8,
   },
   page: {
     alignItems: 'center',
@@ -452,6 +775,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  annotationHint: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
   bottomBarActions: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -464,6 +792,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  sendButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#14b8a6',
+  },
+  buttonDisabled: {
+    opacity: 0.4,
   },
   paginationDots: {
     flexDirection: 'row',

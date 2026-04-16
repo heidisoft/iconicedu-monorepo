@@ -500,6 +500,9 @@ export default function ChannelConversationScreen() {
             onRetryUpload={handleRetryUpload}
             isReadOnly={isStaffReadOnly}
             onUnreadViewed={handleUnreadViewed}
+            onSendAnnotation={(attachment) => {
+              void handleSendAttachment([attachment]);
+            }}
             isScreenActive={isFocused && activeTab === 'messages'}
             emptyTitle={emptyStateCopy.title}
             emptyDescription={emptyStateCopy.description}

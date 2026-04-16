@@ -489,11 +489,11 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   );
 
   const handleEmojiSelect = useCallback(
-    (emoji: string) => {
+    async (emoji: string) => {
       setEmojiPickerVisible(false);
-      void onSend(emoji);
+      await runSendProgress(() => Promise.resolve(onSend(emoji)));
     },
-    [onSend],
+    [onSend, runSendProgress],
   );
 
   const canSend = (text.trim().length > 0 || pendingAttachments.length > 0) && !disabled;

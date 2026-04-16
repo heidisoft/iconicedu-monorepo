@@ -70,6 +70,7 @@ import { RoleAvatarBadge } from '@/components/profile/role-avatar-badge';
 import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
 import { ChatImageViewer, type ChatImageViewerItem } from './chat-image-viewer';
 import { ChatPdfViewer } from './chat-pdf-viewer';
+import type { AttachmentPayload } from './attachment-sheet';
 
 const CHANNEL_FILES_BUCKET = 'channel-files';
 
@@ -1712,6 +1713,7 @@ export type MessageItemProps = {
   currentAccountId?: string;
   isReadOnly?: boolean;
   isThreadMessage?: boolean;
+  onSendAnnotation?: (attachment: AttachmentPayload) => void;
 };
 
 export const MessageItem: React.FC<MessageItemProps> = ({
@@ -1727,6 +1729,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   currentAccountId,
   isReadOnly,
   isThreadMessage = false,
+  onSendAnnotation,
 }) => {
   const s = useMemo(() => makeStyles(colors), [colors]);
   const [threadExpanded, setThreadExpanded] = useState(false);
@@ -2728,6 +2731,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           initialIndex={imageViewerIndex}
           colors={colors}
           onClose={() => setImageViewerVisible(false)}
+          onSend={onSendAnnotation}
         />
       )}
       {!!pdfViewerDocument && (
@@ -2738,6 +2742,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           filename={pdfViewerDocument.filename}
           colors={colors}
           onClose={() => setPdfViewerDocument(null)}
+          onSend={onSendAnnotation}
         />
       )}
     </>
