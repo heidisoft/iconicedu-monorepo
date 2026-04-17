@@ -87,7 +87,8 @@ When an activity event is projected, `enqueueNotificationDispatchJobs()` is call
 | Category             | Examples                                                                                                                                          | Timing                                                                               |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
 | Critical — immediate | `class.session.scheduled/rescheduled/canceled`, `session.started`, `session.reminder.sent`, `payment.reminder`, `payment.failed`, `system.notice` | `immediate` (0s delay) — bypasses presence suppression                               |
-| Digest-eligible      | `message.posted`, `dm.posted`, `reaction.added`, `file.uploaded`                                                                                  | `digest` (30 min batch window) — delayed if presence active or channel recently read |
+| Near-real-time       | `dm.posted`, `dms.posted`                                                                                                                         | `near-real-time` (30s delay) — not digest eligible, low-latency routing              |
+| Digest-eligible      | `message.posted`, `reaction.added`, `file.uploaded`                                                                                               | `digest` (30 min batch window) — delayed if presence active or channel recently read |
 | Everything else      | All other event types                                                                                                                             | `delayed` (120s) — delayed if presence active                                        |
 
 **Suppression rules** (`buildNotificationDecision`):
@@ -100,7 +101,7 @@ When an activity event is projected, `enqueueNotificationDispatchJobs()` is call
 
 ### 4. Dispatch Pipeline
 
-**Cron trigger:** Supabase Edge Function `notifications-dispatch` runs every 5 minutes.
+**Cron trigger:** Supabase Edge Function `notifications-dispatch` should run every minute.
 
 It calls:
 

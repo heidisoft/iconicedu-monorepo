@@ -18,6 +18,15 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationConfig> = {
     label: 'New Messages',
     getRoute: () => '/(app)/(tabs)/inbox',
   },
+  'dm.posted': {
+    label: 'Direct Messages',
+    getRoute: ({ channelId, scopeId }) =>
+      channelId
+        ? `/(app)/dm/${channelId}`
+        : scopeId
+          ? `/(app)/dm/${scopeId}`
+          : '/(app)/(tabs)/messages',
+  },
   'homework.assigned': {
     label: 'Homework Assigned',
     getRoute: () => '/(app)/(tabs)/home',

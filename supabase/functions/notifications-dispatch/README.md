@@ -28,7 +28,7 @@ supabase functions deploy notifications-dispatch
 
 ## Example schedule (Supabase Dashboard)
 
-Use scheduled invocations to run every 5 minutes:
+Use scheduled invocations to run every minute and update the schedule in the Supabase Dashboard under Scheduled Functions:
 
 - Function: `notifications-dispatch`
-- Cron: `*/5 * * * *`
+- Cron: `*/1 * * * *`

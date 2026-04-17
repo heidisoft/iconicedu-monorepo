@@ -3,6 +3,38 @@ import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase/client';
 import { queryKeys } from '@/lib/api/queries';
 
+function getNotificationsModule() {
+  // Function-scoped require avoids loading the native module in Expo Go.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, no-undef
+  return require('expo-notifications') as typeof import('expo-notifications');
+}
+
+async function syncUnreadBadgeCount(orgId: string, accountId: string) {
+  try {
+    const Notifications = getNotificationsModule();
+    const { data, error } = await supabase
+      .from('channel_read_state')
+      .select('unread_count')
+      .eq('org_id', orgId)
+      .eq('account_id', accountId)
+      .is('deleted_at', null);
+
+    if (error || !Array.isArray(data)) {
+      return;
+    }
+
+    const unreadCount = data.reduce(
+      (total, row) =>
+        total + (typeof row?.unread_count === 'number' ? row.unread_count : 0),
+      0,
+    );
+
+    await Notifications.setBadgeCountAsync(unreadCount);
+  } catch {
+    // Ignore badge sync failures.
+  }
+}
+
 /**
  * Subscribes to realtime changes on `channel_read_state` for the current
  * account and invalidates the channel-list queries so that the Messages tab
@@ -53,7 +85,10 @@ export function useUnreadSync(params: {
       queryClient.invalidateQueries({
         queryKey: queryKeys.supervisedDirectMessages(o, accountId),
       });
+      void syncUnreadBadgeCount(o, accountId);
     };
+
+    void syncUnreadBadgeCount(orgId, accountId);
 
     const ch = supabase
       .channel(`unread-sync:${accountId}`)

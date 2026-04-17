@@ -66,6 +66,7 @@ export function useNotificationHandler() {
             })
           : DEFAULT_NOTIFICATION_ROUTE;
         router.push(route as Parameters<typeof router.push>[0]);
+        void Notifications.setBadgeCountAsync(0);
       });
     })();
 

@@ -22,23 +22,24 @@ const CRITICAL_PREF_KEYS = new Set<string>([
 const DIGEST_PREF_KEYS = new Set<string>([
   'message.posted',
   'messages.posted',
-  'dm.posted',
-  'dms.posted',
   'reaction.added',
   'reactions.added',
   'file.uploaded',
   'files.uploaded',
 ]);
 
+const NEAR_REAL_TIME_PREF_KEYS = new Set<string>(['dm.posted', 'dms.posted']);
+
 export function getNotificationPolicyConfig(prefKey: string): NotificationPolicyConfig {
   const critical = CRITICAL_PREF_KEYS.has(prefKey);
   const digestEligible = DIGEST_PREF_KEYS.has(prefKey);
+  const nearRealTime = NEAR_REAL_TIME_PREF_KEYS.has(prefKey);
 
   return {
     prefKey,
     critical,
     presenceAware: true,
     digestEligible: !critical && digestEligible,
-    defaultDelaySeconds: critical ? 0 : 120,
+    defaultDelaySeconds: critical ? 0 : nearRealTime ? 30 : 120,
   };
 }

@@ -54,6 +54,76 @@ function resolveChannelIdFromMetadata(metadata: Record<string, unknown> | undefi
   return undefined;
 }
 
+function resolveSenderNameFromMetadata(metadata: Record<string, unknown> | undefined) {
+  const root = asRecord(metadata);
+  const rawEventPayload = asRecord(root.rawEventPayload);
+  const senderNameCandidates = [
+    'senderName',
+    'sender_name',
+    'displayName',
+    'display_name',
+  ];
+
+  for (const key of senderNameCandidates) {
+    const value = rawEventPayload[key];
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value;
+    }
+  }
+
+  return undefined;
+}
+
+function resolveSenderAvatarUrlFromMetadata(
+  metadata: Record<string, unknown> | undefined,
+) {
+  const root = asRecord(metadata);
+  const rawEventPayload = asRecord(root.rawEventPayload);
+  const avatarCandidates = [
+    'senderAvatarUrl',
+    'sender_avatar_url',
+    'avatarUrl',
+    'avatar_url',
+  ];
+
+  for (const key of avatarCandidates) {
+    const value = rawEventPayload[key];
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value;
+    }
+  }
+
+  return undefined;
+}
+
+function resolvePreviewFromMetadata(
+  metadata: Record<string, unknown> | undefined,
+  summary?: string | null,
+) {
+  const root = asRecord(metadata);
+  const rawEventPayload = asRecord(root.rawEventPayload);
+
+  if (
+    typeof rawEventPayload.content === 'string' &&
+    rawEventPayload.content.trim().length > 0
+  ) {
+    return rawEventPayload.content.trim();
+  }
+
+  if (
+    typeof rawEventPayload.preview === 'string' &&
+    rawEventPayload.preview.trim().length > 0
+  ) {
+    return rawEventPayload.preview.trim();
+  }
+
+  if (typeof summary === 'string' && summary.trim().length > 0) {
+    return summary.trim();
+  }
+
+  return undefined;
+}
+
 export async function sendPushNotification(payload: PushNotificationPayload) {
   const supabase = createSupabaseServiceClient();
 
@@ -71,6 +141,9 @@ export async function sendPushNotification(payload: PushNotificationPayload) {
   if (!tokens?.length) return;
 
   const channelId = resolveChannelIdFromMetadata(payload.metadata);
+  const senderName = resolveSenderNameFromMetadata(payload.metadata);
+  const senderAvatarUrl = resolveSenderAvatarUrlFromMetadata(payload.metadata);
+  const preview = resolvePreviewFromMetadata(payload.metadata, payload.summary);
 
   // 2. Build Expo push messages
   const messages: ExpoPushMessage[] = tokens.map(({ token }) => ({
@@ -86,6 +159,9 @@ export async function sendPushNotification(payload: PushNotificationPayload) {
       scopeKind: payload.scopeKind,
       scopeId: payload.scopeId,
       channelId,
+      senderName,
+      senderAvatarUrl,
+      preview,
     },
     sound: 'default',
   }));

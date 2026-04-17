@@ -127,6 +127,105 @@ describe('sendPushNotification', () => {
     expect(body[0]?.data?.channelId).toBe('channel-42');
   });
 
+  it('includes senderName in push data for dm.posted when metadata provides senderName', async () => {
+    setupSelectChain({
+      data: [{ id: 'tok-1', token: 'ExponentPushToken[aaa]' }],
+      error: null,
+    });
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ status: 'ok' }] }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await sendPushNotification({
+      ...BASE_PAYLOAD,
+      prefKey: 'dm.posted',
+      metadata: {
+        rawEventPayload: {
+          channelId: 'channel-42',
+          senderName: 'Alice',
+        },
+      },
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as Array<{
+      data?: { senderName?: string };
+    }>;
+
+    expect(body[0]?.data?.senderName).toBe('Alice');
+  });
+
+  it('does not include senderName in push data for dm.posted when metadata lacks senderName', async () => {
+    setupSelectChain({
+      data: [{ id: 'tok-1', token: 'ExponentPushToken[aaa]' }],
+      error: null,
+    });
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ status: 'ok' }] }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await sendPushNotification({
+      ...BASE_PAYLOAD,
+      prefKey: 'dm.posted',
+      metadata: {
+        rawEventPayload: {
+          channelId: 'channel-42',
+        },
+      },
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as Array<{
+      data?: { senderName?: string };
+    }>;
+
+    expect(body[0]?.data?.senderName).toBeUndefined();
+  });
+
+  it('includes sender metadata and preview text in the Expo push data payload', async () => {
+    setupSelectChain({
+      data: [{ id: 'tok-1', token: 'ExponentPushToken[aaa]' }],
+      error: null,
+    });
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ status: 'ok' }] }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await sendPushNotification({
+      ...BASE_PAYLOAD,
+      metadata: {
+        rawEventPayload: {
+          channelId: 'channel-42',
+          senderName: 'Priya',
+          senderAvatarUrl: 'https://example.com/avatar.png',
+          content: 'Hey, are we still meeting tomorrow?',
+        },
+      },
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as Array<{
+      data?: {
+        senderName?: string;
+        senderAvatarUrl?: string;
+        preview?: string;
+      };
+    }>;
+
+    expect(body[0]?.data?.senderName).toBe('Priya');
+    expect(body[0]?.data?.senderAvatarUrl).toBe('https://example.com/avatar.png');
+    expect(body[0]?.data?.preview).toBe('Hey, are we still meeting tomorrow?');
+  });
+
   it('throws when the Expo API returns a non-ok status', async () => {
     setupSelectChain({
       data: [{ id: 'tok-1', token: 'ExponentPushToken[aaa]' }],
