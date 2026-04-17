@@ -5,6 +5,7 @@ import type {
 import type { SupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 
 import { buildNotificationDecision } from '@iconicedu/web/lib/notifications/decision-engine';
+import { buildPersonalizedSessionCopy } from '@iconicedu/web/lib/notifications/push-copy';
 import { sendEmailNotification } from '@iconicedu/web/lib/notifications/providers/email-provider';
 import { sendPushNotification } from '@iconicedu/web/lib/notifications/providers/push-provider';
 import { sendSmsNotification } from '@iconicedu/web/lib/notifications/providers/sms-provider';
@@ -120,16 +121,24 @@ async function sendNotificationViaChannel(input: {
 export async function enqueueNotificationDispatchJobs(input: EnqueueDispatchInput) {
   const upsertRows: Array<Record<string, unknown>> = [];
   const eventPayload = (input.event.payload ?? {}) as Record<string, unknown>;
-  const payloadTitle =
+  const baseTitle =
     typeof eventPayload.title === 'string' && eventPayload.title.trim().length > 0
       ? eventPayload.title
       : input.event.event_type;
-  const payloadSummary =
+  const baseSummary =
     typeof eventPayload.summary === 'string' && eventPayload.summary.trim().length > 0
       ? eventPayload.summary
       : null;
 
   for (const recipientProfileId of input.recipientProfileIds) {
+    const personalized = buildPersonalizedSessionCopy(
+      input.event.event_type,
+      eventPayload,
+      recipientProfileId,
+    );
+    const payloadTitle = personalized?.title ?? baseTitle;
+    const payloadSummary = personalized?.summary ?? baseSummary;
+
     const decision = await buildNotificationDecision({
       supabase: input.supabase,
       event: input.event,

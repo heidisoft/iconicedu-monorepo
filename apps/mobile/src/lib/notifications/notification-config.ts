@@ -51,6 +51,16 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationConfig> = {
     label: 'Session Cancelled',
     getRoute: () => '/(app)/(tabs)/schedule',
   },
+  'session.reminder.sent': {
+    label: 'Session Reminders',
+    getRoute: ({ channelId }) =>
+      channelId ? `/(app)/spaces/${channelId}` : '/(app)/(tabs)/schedule',
+  },
+  'session.feedback_request.sent': {
+    label: 'Session Feedback',
+    getRoute: ({ channelId }) =>
+      channelId ? `/(app)/spaces/${channelId}` : '/(app)/(tabs)/schedule',
+  },
   'class.created': {
     label: 'New Class',
     getRoute: () => '/(app)/(tabs)/home',

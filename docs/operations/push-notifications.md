@@ -28,7 +28,7 @@ Mobile device
 Activity event occurs (message, session, etc.)
   └─ projectActivityEvents()       ← enqueues notification_dispatch_jobs rows
 
-Supabase Edge Function (cron every 5 min)
+Supabase Edge Function (cron every 1 min)
   └─ notifications-dispatch        ← HTTP POST → web app internal endpoint
 
 Next.js web app
@@ -101,7 +101,7 @@ When an activity event is projected, `enqueueNotificationDispatchJobs()` is call
 
 ### 4. Dispatch Pipeline
 
-**Cron trigger:** Supabase Edge Function `notifications-dispatch` should run every minute.
+**Cron trigger:** Supabase Edge Function `notifications-dispatch` runs via `public.configure_edge_function_cron()` in `supabase/migrations/20260417000000_edge_function_cron.sql`.
 
 It calls:
 
