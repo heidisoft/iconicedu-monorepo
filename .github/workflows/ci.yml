@@ -544,6 +544,10 @@ jobs:
 
           DB_PASS_ENCODED=$(jq -nr --arg v "$DB_PASS" '$v|@uri')
           DIRECT_URL="postgresql://${DB_USER}:${DB_PASS_ENCODED}@${DB_HOST}:${DB_PORT}/postgres"
+          POOLER_DB_USER="$DB_USER"
+          if [[ "$POOLER_DB_USER" != *".${BRANCH_REF}" ]]; then
+            POOLER_DB_USER="${POOLER_DB_USER}.${BRANCH_REF}"
+          fi
 
           ANON_KEY=$(curl -sf \
             -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
@@ -602,6 +606,16 @@ jobs:
           if [[ -z "$ADMIN_DATABASE_URL" || "$ADMIN_DATABASE_URL" == "null" ]]; then
             ADMIN_DATABASE_URL=$(echo "$PGBOUNCER_CONFIG" | jq -r '.connectionString // .connection_string // empty')
           fi
+
+          # Branches use branch-specific DB passwords and a branch-qualified user
+          # when connecting through Supavisor / poolers.
+          if [[ -n "$DATABASE_URL" && "$DATABASE_URL" != "null" ]]; then
+            DATABASE_URL="postgresql://${POOLER_DB_USER}:${DB_PASS_ENCODED}@${DATABASE_URL#*@}"
+          fi
+          if [[ -n "$ADMIN_DATABASE_URL" && "$ADMIN_DATABASE_URL" != "null" ]]; then
+            ADMIN_DATABASE_URL="postgresql://${POOLER_DB_USER}:${DB_PASS_ENCODED}@${ADMIN_DATABASE_URL#*@}"
+          fi
+
           if [[ -z "$DATABASE_URL" || "$DATABASE_URL" == "null" || -z "$DIRECT_URL" || "$DIRECT_URL" == "null" || -z "$ADMIN_DATABASE_URL" || "$ADMIN_DATABASE_URL" == "null" ]]; then
             echo "::warning::Supabase pooler config payload: $(echo "$POOLER_CONFIG" | jq -c 'if type == "array" then map({pool_mode,db_host,db_port,has_connection:(has("connectionString") or has("connection_string"))}) else {type:(type),keys:(keys // [])} end' 2>/dev/null || echo unavailable)"
             echo "::warning::Supabase pgbouncer config payload: $(echo "$PGBOUNCER_CONFIG" | jq -c '{pool_mode,db_host,db_port,has_connection:(has("connectionString") or has("connection_string"))}' 2>/dev/null || echo unavailable)"
