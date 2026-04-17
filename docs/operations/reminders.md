@@ -70,22 +70,27 @@ If you deploy to a linked remote project, ensure `supabase link --project-ref <r
 
 Ensure your Railway service uses `apps/api` as the service root so this config is applied.
 
-## 4. Configure schedule (every minute)
+## 4. Configure cron jobs
 
-In Supabase Dashboard:
+Cron schedules are repo-managed by `public.configure_edge_function_cron()` from:
 
-1. Go to **Edge Functions**.
-2. Open `reminders-dispatch`.
-3. Add a **Schedule** with cron:
-   - `* * * * *`
-4. Save and enable.
+- `supabase/migrations/20260417000000_edge_function_cron.sql`
+
+Apply migrations to the target environment, then configure the jobs with that environment's own Supabase URL:
+
+```sql
+select public.configure_edge_function_cron('https://<project-ref>.supabase.co');
+```
+
+Preview branches created by `.github/workflows/ci.yml` run this automatically after branch migrations, function secrets, and function deployment.
 
 ## 5. Validate
 
 1. Invoke function manually once from dashboard.
-2. Verify API logs show requests to `/internal/reminders/dispatch`.
-3. Verify response payload has counters like `claimed/succeeded/failed`.
-4. Verify DB updates:
+2. Verify `cron.job` contains `edge-function-reminders-dispatch`.
+3. Verify API logs show requests to `/internal/reminders/dispatch`.
+4. Verify response payload has counters like `claimed/succeeded/failed`.
+5. Verify DB updates:
    - `reminder_jobs.status` transitions
    - `messages` + payload rows inserted
    - `activity_events` created and projected to `activity_feed_items`.

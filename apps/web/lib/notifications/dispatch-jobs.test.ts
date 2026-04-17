@@ -91,6 +91,193 @@ describe('enqueueNotificationDispatchJobs', () => {
     );
   });
 
+  it('stores personalized reminder titles per recipient', async () => {
+    const upsert = vi.fn(async () => ({ error: null }));
+    const supabase = { from: vi.fn(() => ({ upsert })) };
+
+    buildNotificationDecision.mockResolvedValue({
+      deliveryChannels: ['push'],
+      deliveryTiming: 'immediate',
+      runAt: '2026-03-11T12:00:00.000Z',
+      reasonCodes: ['global_preference'],
+      scopeKind: 'channel',
+      scopeId: 'channel-1',
+    });
+
+    await enqueueNotificationDispatchJobs({
+      supabase: supabase as never,
+      event: {
+        id: 'event-1',
+        org_id: 'org-1',
+        event_type: 'session.reminder.sent',
+        occurred_at: '2026-03-11T12:00:00.000Z',
+        source_kind: 'profile',
+        actor_profile_id: 'profile-actor',
+        scope: { kind: 'channel', channelId: 'channel-1' },
+        object_ref: null,
+        target_ref: null,
+        payload: {
+          title: 'Session reminder',
+          summary: 'Reminder',
+          reminderOffsetMinutes: 5,
+          members: [
+            { profileId: 'child-1', role: 'child', displayName: 'Ava' },
+            { profileId: 'educator-1', role: 'educator', displayName: 'Mr. Kim' },
+          ],
+        },
+        audience_rules: [],
+        dedupe_key: null,
+        projection_status: 'pending',
+        projection_attempts: 0,
+        created_at: '2026-03-11T12:00:00.000Z',
+        updated_at: '2026-03-11T12:00:00.000Z',
+      },
+      recipientProfileIds: ['child-1', 'educator-1'],
+    });
+
+    expect(upsert).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          recipient_profile_id: 'child-1',
+          payload: expect.objectContaining({
+            title: 'Your class with Mr. Kim starts in 5 min',
+          }),
+        }),
+        expect.objectContaining({
+          recipient_profile_id: 'educator-1',
+          payload: expect.objectContaining({
+            title: "Ava's class starts in 5 min",
+          }),
+        }),
+      ]),
+      expect.any(Object),
+    );
+  });
+
+  it('falls back to generic title when members are absent', async () => {
+    const upsert = vi.fn(async () => ({ error: null }));
+    const supabase = { from: vi.fn(() => ({ upsert })) };
+
+    buildNotificationDecision.mockResolvedValue({
+      deliveryChannels: ['push'],
+      deliveryTiming: 'immediate',
+      runAt: '2026-03-11T12:00:00.000Z',
+      reasonCodes: ['global_preference'],
+      scopeKind: 'channel',
+      scopeId: 'channel-1',
+    });
+
+    await enqueueNotificationDispatchJobs({
+      supabase: supabase as never,
+      event: {
+        id: 'event-1',
+        org_id: 'org-1',
+        event_type: 'session.reminder.sent',
+        occurred_at: '2026-03-11T12:00:00.000Z',
+        source_kind: 'profile',
+        actor_profile_id: 'profile-actor',
+        scope: { kind: 'channel', channelId: 'channel-1' },
+        object_ref: null,
+        target_ref: null,
+        payload: {
+          title: 'Session reminder',
+          summary: 'Reminder',
+          reminderOffsetMinutes: 5,
+        },
+        audience_rules: [],
+        dedupe_key: null,
+        projection_status: 'pending',
+        projection_attempts: 0,
+        created_at: '2026-03-11T12:00:00.000Z',
+        updated_at: '2026-03-11T12:00:00.000Z',
+      },
+      recipientProfileIds: ['child-1'],
+    });
+
+    expect(upsert).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          recipient_profile_id: 'child-1',
+          payload: expect.objectContaining({
+            title: 'Session reminder',
+            summary: 'Reminder',
+          }),
+        }),
+      ]),
+      expect.any(Object),
+    );
+  });
+
+  it('creates different titles for different roles in the same event', async () => {
+    const upsert = vi.fn(async () => ({ error: null }));
+    const supabase = { from: vi.fn(() => ({ upsert })) };
+
+    buildNotificationDecision.mockResolvedValue({
+      deliveryChannels: ['push'],
+      deliveryTiming: 'immediate',
+      runAt: '2026-03-11T12:00:00.000Z',
+      reasonCodes: ['global_preference'],
+      scopeKind: 'channel',
+      scopeId: 'channel-1',
+    });
+
+    await enqueueNotificationDispatchJobs({
+      supabase: supabase as never,
+      event: {
+        id: 'event-1',
+        org_id: 'org-1',
+        event_type: 'session.reminder.sent',
+        occurred_at: '2026-03-11T12:00:00.000Z',
+        source_kind: 'profile',
+        actor_profile_id: 'profile-actor',
+        scope: { kind: 'channel', channelId: 'channel-1' },
+        object_ref: null,
+        target_ref: null,
+        payload: {
+          title: 'Session reminder',
+          summary: 'Reminder',
+          reminderOffsetMinutes: 30,
+          members: [
+            { profileId: 'child-1', role: 'child', displayName: 'Ava' },
+            { profileId: 'educator-1', role: 'educator', displayName: 'Mr. Kim' },
+            { profileId: 'guardian-1', role: 'guardian', displayName: 'Parent' },
+          ],
+        },
+        audience_rules: [],
+        dedupe_key: null,
+        projection_status: 'pending',
+        projection_attempts: 0,
+        created_at: '2026-03-11T12:00:00.000Z',
+        updated_at: '2026-03-11T12:00:00.000Z',
+      },
+      recipientProfileIds: ['child-1', 'educator-1', 'guardian-1'],
+    });
+
+    const calls = upsert.mock.calls[0][0];
+    expect(calls).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          recipient_profile_id: 'child-1',
+          payload: expect.objectContaining({
+            title: 'Your class with Mr. Kim starts in 30 min',
+          }),
+        }),
+        expect.objectContaining({
+          recipient_profile_id: 'educator-1',
+          payload: expect.objectContaining({
+            title: "Ava's class starts in 30 min",
+          }),
+        }),
+        expect.objectContaining({
+          recipient_profile_id: 'guardian-1',
+          payload: expect.objectContaining({
+            title: "Ava's class with Mr. Kim starts in 30 min",
+          }),
+        }),
+      ]),
+    );
+  });
+
   it('keeps one row for duplicate event/channel/recipient by idempotency key semantics', async () => {
     const persisted = new Map<string, Record<string, unknown>>();
     const upsert = vi.fn(async (rows: Array<Record<string, unknown>>) => {
