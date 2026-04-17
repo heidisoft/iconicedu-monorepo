@@ -21,6 +21,7 @@ type NotificationData = {
   scopeKind?: 'channel' | 'learning_space';
   scopeId?: string;
   channelId?: string;
+  threadId?: string | null;
   orgId?: string;
 };
 
@@ -85,6 +86,7 @@ export function useNotificationHandler() {
               scopeKind: data.scopeKind,
               scopeId: data.scopeId,
               channelId: data.channelId,
+              threadId: data.threadId,
             })
           : DEFAULT_NOTIFICATION_ROUTE;
         router.push(route as Parameters<typeof router.push>[0]);

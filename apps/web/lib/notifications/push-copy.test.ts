@@ -367,6 +367,43 @@ describe('buildPersonalizedSessionCopy', () => {
     });
   });
 
+  it('personalizes message.posted thread replies with distinct copy', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'message.posted',
+      {
+        senderName: 'Jane',
+        content: 'I replied in the thread',
+        learningSpaceTitle: 'Algebra 1',
+        threadReply: true,
+      },
+      'child-1',
+    );
+
+    expect(copy).toEqual({
+      title: 'Jane replied to a thread in Algebra 1',
+      summary: 'I replied in the thread',
+    });
+  });
+
+  it('uses thread reply copy before mention copy for message.posted', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'message.posted',
+      {
+        senderName: 'Jane',
+        content: 'See my reply',
+        learningSpaceTitle: 'Algebra 1',
+        mentionedProfileId: 'child-1',
+        threadReply: true,
+      },
+      'child-1',
+    );
+
+    expect(copy).toEqual({
+      title: 'Jane replied to a thread in Algebra 1',
+      summary: 'See my reply',
+    });
+  });
+
   it('personalizes message.posted without a mention when context is present', () => {
     const copy = buildPersonalizedSessionCopy(
       'message.posted',

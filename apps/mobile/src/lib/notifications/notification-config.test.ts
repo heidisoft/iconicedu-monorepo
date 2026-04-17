@@ -13,9 +13,36 @@ describe('NOTIFICATION_REGISTRY', () => {
     expect(route).toBe('/(app)/(tabs)/messages');
   });
 
-  it('keeps message.posted routing to the Inbox tab', () => {
-    const route = NOTIFICATION_REGISTRY['message.posted'].getRoute({});
-    expect(route).toBe('/(app)/(tabs)/inbox');
+  it('routes message.posted to a channel screen', () => {
+    const route = NOTIFICATION_REGISTRY['message.posted'].getRoute({
+      scopeKind: 'channel',
+      channelId: 'channel-456',
+    });
+    expect(route).toBe('/(app)/channel/channel-456');
+  });
+
+  it('routes message.posted thread replies with a thread query param', () => {
+    const route = NOTIFICATION_REGISTRY['message.posted'].getRoute({
+      scopeKind: 'learning_space',
+      channelId: 'space-123',
+      threadId: 'thread-1',
+    });
+    expect(route).toBe('/(app)/spaces/space-123?threadId=thread-1');
+  });
+
+  it('routes reaction.added to the specific channel', () => {
+    const route = NOTIFICATION_REGISTRY['reaction.added'].getRoute({
+      scopeKind: 'channel',
+      channelId: 'channel-789',
+    });
+    expect(route).toBe('/(app)/channel/channel-789');
+  });
+
+  it('routes dm.reaction.added to the DM screen', () => {
+    const route = NOTIFICATION_REGISTRY['dm.reaction.added'].getRoute({
+      channelId: 'dm-123',
+    });
+    expect(route).toBe('/(app)/dm/dm-123');
   });
 
   it('routes session.reminder.sent with a channelId to the class space', () => {

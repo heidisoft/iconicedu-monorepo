@@ -125,6 +125,34 @@ describe('useNotificationHandler', () => {
     });
   });
 
+  it('passes threadId through to routing for threaded message notifications', async () => {
+    renderHook(() => useNotificationHandler());
+
+    await waitFor(() => {
+      expect(mockAddNotificationResponseReceivedListener).toHaveBeenCalled();
+    });
+
+    const listener = mockAddNotificationResponseReceivedListener.mock.calls[0][0];
+    listener({
+      notification: {
+        request: {
+          content: {
+            data: {
+              prefKey: 'message.posted',
+              scopeKind: 'learning_space',
+              channelId: 'space-1',
+              threadId: 'thread-99',
+            },
+          },
+        },
+      },
+    });
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith('/(app)/spaces/space-1?threadId=thread-99');
+    });
+  });
+
   it('does not register notification listeners when running in Expo Go', async () => {
     mockConstants.appOwnership = 'expo';
 

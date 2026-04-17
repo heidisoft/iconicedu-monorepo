@@ -126,6 +126,7 @@ async function sendNotificationViaChannel(input: {
       title,
       summary,
       activityFeedItemId,
+      threadId: typeof payload.threadId === 'string' ? payload.threadId : null,
       scopeKind: input.job.scope_kind ?? undefined,
       scopeId: input.job.scope_id ?? undefined,
       metadata: payload,
@@ -211,6 +212,8 @@ export async function enqueueNotificationDispatchJobs(input: EnqueueDispatchInpu
           occurredAt: input.event.occurred_at,
           title: payloadTitle,
           summary: payloadSummary,
+          threadId:
+            typeof eventPayload.threadId === 'string' ? eventPayload.threadId : null,
           rawEventPayload: eventPayload,
         },
         status: 'pending',

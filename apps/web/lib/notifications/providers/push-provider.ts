@@ -7,6 +7,7 @@ type PushNotificationPayload = {
   title: string;
   summary?: string | null;
   activityFeedItemId?: string | null;
+  threadId?: string | null;
   scopeKind?: 'channel' | 'learning_space';
   scopeId?: string;
   metadata?: Record<string, unknown>;
@@ -106,6 +107,30 @@ function resolveSenderAvatarUrlFromMetadata(
   return undefined;
 }
 
+function resolveThreadIdFromMetadata(
+  metadata: Record<string, unknown> | undefined,
+  explicitThreadId?: string | null,
+) {
+  if (typeof explicitThreadId === 'string' && explicitThreadId.trim().length > 0) {
+    return explicitThreadId;
+  }
+
+  const root = asRecord(metadata);
+  if (typeof root.threadId === 'string' && root.threadId.trim().length > 0) {
+    return root.threadId;
+  }
+
+  const rawEventPayload = asRecord(root.rawEventPayload);
+  if (
+    typeof rawEventPayload.threadId === 'string' &&
+    rawEventPayload.threadId.trim().length > 0
+  ) {
+    return rawEventPayload.threadId;
+  }
+
+  return undefined;
+}
+
 function resolvePreviewFromMetadata(
   metadata: Record<string, unknown> | undefined,
   summary?: string | null,
@@ -151,6 +176,7 @@ export async function sendPushNotification(payload: PushNotificationPayload) {
   if (!tokens?.length) return;
 
   const channelId = resolveChannelIdFromMetadata(payload.metadata);
+  const threadId = resolveThreadIdFromMetadata(payload.metadata, payload.threadId);
   const senderName = resolveSenderNameFromMetadata(payload.metadata);
   const senderAvatarUrl = resolveSenderAvatarUrlFromMetadata(payload.metadata);
   const preview = resolvePreviewFromMetadata(payload.metadata, payload.summary);
@@ -170,6 +196,7 @@ export async function sendPushNotification(payload: PushNotificationPayload) {
       scopeKind: payload.scopeKind,
       scopeId: payload.scopeId,
       channelId,
+      threadId: threadId ?? null,
       senderName,
       senderAvatarUrl,
       preview,

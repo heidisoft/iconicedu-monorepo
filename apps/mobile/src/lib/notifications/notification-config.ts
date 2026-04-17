@@ -10,13 +10,22 @@ export type NotificationConfig = {
     scopeKind?: string;
     scopeId?: string;
     channelId?: string;
+    threadId?: string | null;
   }) => string;
 };
 
 export const NOTIFICATION_REGISTRY: Record<string, NotificationConfig> = {
   'message.posted': {
     label: 'New Messages',
-    getRoute: () => '/(app)/(tabs)/inbox',
+    getRoute: ({ scopeKind, scopeId, channelId, threadId }) => {
+      const targetId = channelId ?? scopeId;
+      if (!targetId) return '/(app)/(tabs)/inbox';
+      const base =
+        scopeKind === 'learning_space'
+          ? `/(app)/spaces/${targetId}`
+          : `/(app)/channel/${targetId}`;
+      return threadId ? `${base}?threadId=${threadId}` : base;
+    },
   },
   'dm.posted': {
     label: 'Direct Messages',
@@ -81,6 +90,25 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationConfig> = {
         : scopeKind === 'learning_space' && channelId
           ? `/(app)/spaces/${channelId}`
           : '/(app)/(tabs)/inbox',
+  },
+  'reaction.added': {
+    label: 'Reactions',
+    getRoute: ({ scopeKind, scopeId, channelId }) => {
+      const targetId = channelId ?? scopeId;
+      if (!targetId) return '/(app)/(tabs)/inbox';
+      return scopeKind === 'learning_space'
+        ? `/(app)/spaces/${targetId}`
+        : `/(app)/channel/${targetId}`;
+    },
+  },
+  'dm.reaction.added': {
+    label: 'DM Reactions',
+    getRoute: ({ channelId, scopeId }) =>
+      channelId
+        ? `/(app)/dm/${channelId}`
+        : scopeId
+          ? `/(app)/dm/${scopeId}`
+          : '/(app)/(tabs)/messages',
   },
   'file.uploaded': {
     label: 'File Uploaded',

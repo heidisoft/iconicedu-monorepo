@@ -75,9 +75,18 @@ export function buildPersonalizedSessionCopy(
     const content = asString(payload.content).slice(0, 160);
     const contextTitle = getContextTitle(payload);
     const isMention = Boolean(asOptionalString(payload.mentionedProfileId));
+    const isThreadReply = payload.threadReply === true;
 
     let title: string;
-    if (senderName && isMention) {
+    if (isThreadReply) {
+      if (senderName && contextTitle) {
+        title = `${senderName} replied to a thread in ${contextTitle}`;
+      } else if (senderName) {
+        title = `${senderName} replied to a thread`;
+      } else {
+        title = 'New reply in a thread';
+      }
+    } else if (senderName && isMention) {
       title = contextTitle
         ? `${senderName} mentioned you in ${contextTitle}`
         : `${senderName} mentioned you`;
