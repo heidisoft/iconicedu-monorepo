@@ -562,13 +562,50 @@ jobs:
           POOLER_CONFIG=$(curl -sf \
             -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
             "https://api.supabase.com/v1/projects/${BRANCH_REF}/config/database/pooler")
-          DATABASE_URL=$(echo "$POOLER_CONFIG" | jq -r 'map(select((.pool_mode // "") == "transaction" or (.db_port // 0) == 6543))[0].connectionString // map(select((.pool_mode // "") == "transaction" or (.db_port // 0) == 6543))[0].connection_string // .[0].connectionString // .[0].connection_string // empty')
+          PGBOUNCER_CONFIG=$(curl -sf \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/${BRANCH_REF}/config/database/pgbouncer" \
+            || echo '{}')
+
+          DATABASE_URL=$(echo "$POOLER_CONFIG" | jq -r '
+            if type == "array" then
+              map(select((.pool_mode // "") == "transaction" or (.db_port // 0) == 6543))[0].connectionString
+              // map(select((.pool_mode // "") == "transaction" or (.db_port // 0) == 6543))[0].connection_string
+              // .[0].connectionString
+              // .[0].connection_string
+              // empty
+            elif type == "object" then
+              .connectionString // .connection_string // empty
+            else
+              empty
+            end')
+          if [[ -z "$DATABASE_URL" || "$DATABASE_URL" == "null" ]]; then
+            DATABASE_URL=$(echo "$PGBOUNCER_CONFIG" | jq -r '.connectionString // .connection_string // empty')
+          fi
           # Use session mode for administrative psql commands in CI. Direct branch
           # hosts are often IPv6-only, while GitHub runners reliably reach the IPv4
           # pooler endpoint on port 5432.
-          ADMIN_DATABASE_URL=$(echo "$POOLER_CONFIG" | jq -r 'map(select((.pool_mode // "") == "session" or (.db_port // 0) == 5432))[0].connectionString // map(select((.pool_mode // "") == "session" or (.db_port // 0) == 5432))[0].connection_string // empty')
+          ADMIN_DATABASE_URL=$(echo "$POOLER_CONFIG" | jq -r '
+            if type == "array" then
+              map(select((.pool_mode // "") == "session" or (.db_port // 0) == 5432))[0].connectionString
+              // map(select((.pool_mode // "") == "session" or (.db_port // 0) == 5432))[0].connection_string
+              // map(select((.pool_mode // "") == "transaction" or (.db_port // 0) == 6543))[0].connectionString
+              // map(select((.pool_mode // "") == "transaction" or (.db_port // 0) == 6543))[0].connection_string
+              // .[0].connectionString
+              // .[0].connection_string
+              // empty
+            elif type == "object" then
+              .connectionString // .connection_string // empty
+            else
+              empty
+            end')
+          if [[ -z "$ADMIN_DATABASE_URL" || "$ADMIN_DATABASE_URL" == "null" ]]; then
+            ADMIN_DATABASE_URL=$(echo "$PGBOUNCER_CONFIG" | jq -r '.connectionString // .connection_string // empty')
+          fi
           if [[ -z "$DATABASE_URL" || "$DATABASE_URL" == "null" || -z "$DIRECT_URL" || "$DIRECT_URL" == "null" || -z "$ADMIN_DATABASE_URL" || "$ADMIN_DATABASE_URL" == "null" ]]; then
-            echo "::error::Supabase pooler config did not include the required connection strings"
+            echo "::warning::Supabase pooler config payload: $(echo "$POOLER_CONFIG" | jq -c 'if type == "array" then map({pool_mode,db_host,db_port,has_connection:(has("connectionString") or has("connection_string"))}) else {type:(type),keys:(keys // [])} end' 2>/dev/null || echo unavailable)"
+            echo "::warning::Supabase pgbouncer config payload: $(echo "$PGBOUNCER_CONFIG" | jq -c '{pool_mode,db_host,db_port,has_connection:(has("connectionString") or has("connection_string"))}' 2>/dev/null || echo unavailable)"
+            echo "::error::Supabase database config did not include the required connection strings"
             exit 1
           fi
 
