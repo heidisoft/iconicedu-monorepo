@@ -722,17 +722,44 @@ jobs:
         env:
           BRANCH_API_URL: ${{ steps.branch-creds.outputs.branch_api_url }}
           BRANCH_PROJECT_REF: ${{ steps.supabase-branch.outputs.branch_ref }}
+          BRANCH_NAME: ${{ env.BRANCH_NAME }}
           INTERNAL_NOTIFICATIONS_TOKEN: ${{ secrets.INTERNAL_NOTIFICATIONS_TOKEN }}
           INTERNAL_REMINDERS_TOKEN: ${{ secrets.INTERNAL_REMINDERS_TOKEN }}
           RAILWAY_API_URL: ${{ steps.railway.outputs.railway_api_url }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ steps.branch-creds.outputs.service_role_key }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
         run: |
           set -euo pipefail
 
           if [[ -z "${RAILWAY_API_URL:-}" || "${RAILWAY_API_URL}" == "pending" ]]; then
             echo "::error::Railway preview API URL is unavailable, cannot configure Supabase function secrets."
             exit 1
+          fi
+
+          # Fetch the Vercel preview URL for notifications endpoint
+          # (apps/web has /api/internal/notifications/dispatch, not apps/api)
+          VERCEL_URL=""
+          if [[ -n "${VERCEL_TOKEN:-}" && -n "${VERCEL_PROJECT_ID:-}" ]]; then
+            TEAM_AMP=""
+            if [[ -n "${VERCEL_ORG_ID:-}" ]]; then
+              TEAM_AMP="&teamId=${VERCEL_ORG_ID}"
+            fi
+            LATEST_DEPLOYMENT=$(curl -sf \
+              -H "Authorization: Bearer $VERCEL_TOKEN" \
+              "https://api.vercel.com/v6/deployments?projectId=${VERCEL_PROJECT_ID}&target=preview&limit=1&meta-githubCommitRef=${BRANCH_NAME}${TEAM_AMP}" \
+              | jq -r '.deployments[0].url // ""')
+            if [[ -n "$LATEST_DEPLOYMENT" ]]; then
+              VERCEL_URL="https://${LATEST_DEPLOYMENT}"
+            fi
+          fi
+
+          if [[ -z "$VERCEL_URL" ]]; then
+            echo "::warning::Vercel preview URL not available, notifications-dispatch may fail in preview"
+            # Fallback to Railway URL — not ideal but allows workflow to continue
+            VERCEL_URL="${RAILWAY_API_URL}"
           fi
 
           ENV_FILE="$(mktemp)"
@@ -742,7 +769,7 @@ jobs:
           SUPABASE_URL=${BRANCH_API_URL}
           SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
           REMINDERS_DISPATCH_URL=${RAILWAY_API_URL}/internal/reminders/dispatch
-          NOTIFICATIONS_DISPATCH_URL=${RAILWAY_API_URL}/internal/notifications/dispatch
+          NOTIFICATIONS_DISPATCH_URL=${VERCEL_URL}/api/internal/notifications/dispatch
           INTERNAL_REMINDERS_TOKEN=${INTERNAL_REMINDERS_TOKEN}
           INTERNAL_NOTIFICATIONS_TOKEN=${INTERNAL_NOTIFICATIONS_TOKEN}
           EOF

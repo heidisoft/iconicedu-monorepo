@@ -25,6 +25,15 @@ type ExpoPushMessage = {
   sound: 'default';
 };
 
+// Maximum length for preview text to avoid oversized Expo payloads that get dropped.
+// Expo has strict payload size limits; keeping preview under 200 chars ensures safe delivery.
+const MAX_PREVIEW_LENGTH = 200;
+
+function truncateText(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength - 1) + '…';
+}
+
 function asRecord(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return {};
@@ -107,18 +116,18 @@ function resolvePreviewFromMetadata(
     typeof rawEventPayload.content === 'string' &&
     rawEventPayload.content.trim().length > 0
   ) {
-    return rawEventPayload.content.trim();
+    return truncateText(rawEventPayload.content.trim(), MAX_PREVIEW_LENGTH);
   }
 
   if (
     typeof rawEventPayload.preview === 'string' &&
     rawEventPayload.preview.trim().length > 0
   ) {
-    return rawEventPayload.preview.trim();
+    return truncateText(rawEventPayload.preview.trim(), MAX_PREVIEW_LENGTH);
   }
 
   if (typeof summary === 'string' && summary.trim().length > 0) {
-    return summary.trim();
+    return truncateText(summary.trim(), MAX_PREVIEW_LENGTH);
   }
 
   return undefined;
