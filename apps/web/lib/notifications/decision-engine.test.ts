@@ -5,27 +5,37 @@ import {
   buildNotificationDecision,
 } from '@iconicedu/web/lib/notifications/decision-engine';
 
+function buildEvent(input: {
+  eventType?: string;
+  payload?: Record<string, unknown>;
+  occurredAt?: string;
+}) {
+  const occurredAt = input.occurredAt ?? '2026-03-11T12:00:00.000Z';
+
+  return {
+    id: 'event-1',
+    org_id: 'org-1',
+    event_type: input.eventType ?? 'message.posted',
+    occurred_at: occurredAt,
+    source_kind: 'profile' as const,
+    actor_profile_id: 'profile-actor',
+    scope: { kind: 'channel', channelId: 'channel-1' },
+    object_ref: null,
+    target_ref: null,
+    payload: input.payload ?? {},
+    audience_rules: [],
+    dedupe_key: null,
+    projection_status: 'pending' as const,
+    projection_attempts: 0,
+    created_at: occurredAt,
+    updated_at: occurredAt,
+  };
+}
+
 describe('buildDeliveryPlan', () => {
   it('delays non-critical delivery when presence is active', () => {
     const decision = buildDeliveryPlan({
-      event: {
-        id: 'event-1',
-        org_id: 'org-1',
-        event_type: 'message.posted',
-        occurred_at: '2026-03-11T12:00:00.000Z',
-        source_kind: 'profile',
-        actor_profile_id: 'profile-actor',
-        scope: { kind: 'channel', channelId: 'channel-1' },
-        object_ref: null,
-        target_ref: null,
-        payload: {},
-        audience_rules: [],
-        dedupe_key: null,
-        projection_status: 'pending',
-        projection_attempts: 0,
-        created_at: '2026-03-11T12:00:00.000Z',
-        updated_at: '2026-03-11T12:00:00.000Z',
-      },
+      event: buildEvent({ eventType: 'message.posted' }),
       recipientProfileId: 'profile-target',
       channels: ['push'],
       reasonCodes: ['global_preference'],
@@ -38,6 +48,93 @@ describe('buildDeliveryPlan', () => {
     expect(decision.reasonCodes).toEqual(
       expect.arrayContaining(['global_preference', 'presence_active']),
     );
+  });
+
+  it('uses a 30 second delay for mentioned channel messages when presence is active', () => {
+    const decision = buildDeliveryPlan({
+      event: buildEvent({
+        eventType: 'message.posted',
+        payload: { mentionedProfileId: 'profile-target' },
+      }),
+      recipientProfileId: 'profile-target',
+      channels: ['push'],
+      reasonCodes: ['global_preference'],
+      context: {
+        now: new Date('2026-03-11T12:00:00.000Z'),
+        liveStatus: 'online',
+      },
+    });
+
+    expect(decision.deliveryTiming).toBe('delayed');
+    expect(decision.runAt).toBe('2026-03-11T12:00:30.000Z');
+    expect(decision.reasonCodes).toEqual(
+      expect.arrayContaining(['presence_active', 'mention_priority_override']),
+    );
+  });
+
+  it('uses a 60 second delay for non-mention channel messages when presence is active', () => {
+    const decision = buildDeliveryPlan({
+      event: buildEvent({ eventType: 'message.posted' }),
+      recipientProfileId: 'profile-target',
+      channels: ['push'],
+      reasonCodes: ['global_preference'],
+      context: {
+        now: new Date('2026-03-11T12:00:00.000Z'),
+        liveStatus: 'online',
+      },
+    });
+
+    expect(decision.deliveryTiming).toBe('delayed');
+    expect(decision.runAt).toBe('2026-03-11T12:01:00.000Z');
+    expect(decision.reasonCodes).not.toContain('mention_priority_override');
+  });
+
+  it('uses a 30 second delay for dm.reaction.added when presence is active', () => {
+    const decision = buildDeliveryPlan({
+      event: buildEvent({ eventType: 'dm.reaction.added' }),
+      recipientProfileId: 'profile-target',
+      channels: ['push'],
+      reasonCodes: ['global_preference'],
+      context: {
+        now: new Date('2026-03-11T12:00:00.000Z'),
+        liveStatus: 'online',
+      },
+    });
+
+    expect(decision.deliveryTiming).toBe('delayed');
+    expect(decision.runAt).toBe('2026-03-11T12:00:30.000Z');
+  });
+
+  it('uses a 60 second delay for reaction.added when presence is active', () => {
+    const decision = buildDeliveryPlan({
+      event: buildEvent({ eventType: 'reaction.added' }),
+      recipientProfileId: 'profile-target',
+      channels: ['push'],
+      reasonCodes: ['global_preference'],
+      context: {
+        now: new Date('2026-03-11T12:00:00.000Z'),
+        liveStatus: 'online',
+      },
+    });
+
+    expect(decision.deliveryTiming).toBe('delayed');
+    expect(decision.runAt).toBe('2026-03-11T12:01:00.000Z');
+  });
+
+  it('uses a 60 second delay for file.uploaded when presence is active', () => {
+    const decision = buildDeliveryPlan({
+      event: buildEvent({ eventType: 'file.uploaded' }),
+      recipientProfileId: 'profile-target',
+      channels: ['push'],
+      reasonCodes: ['global_preference'],
+      context: {
+        now: new Date('2026-03-11T12:00:00.000Z'),
+        liveStatus: 'online',
+      },
+    });
+
+    expect(decision.deliveryTiming).toBe('delayed');
+    expect(decision.runAt).toBe('2026-03-11T12:01:00.000Z');
   });
 });
 
@@ -122,24 +219,7 @@ describe('buildNotificationDecision', () => {
     const decision = await buildNotificationDecision({
       supabase: supabase as never,
       recipientProfileId: 'profile-target',
-      event: {
-        id: 'event-1',
-        org_id: 'org-1',
-        event_type: 'message.posted',
-        occurred_at: '2026-03-11T12:00:00.000Z',
-        source_kind: 'profile',
-        actor_profile_id: 'profile-actor',
-        scope: { kind: 'channel', channelId: 'channel-1' },
-        object_ref: null,
-        target_ref: null,
-        payload: {},
-        audience_rules: [],
-        dedupe_key: null,
-        projection_status: 'pending',
-        projection_attempts: 0,
-        created_at: '2026-03-11T12:00:00.000Z',
-        updated_at: '2026-03-11T12:00:00.000Z',
-      },
+      event: buildEvent({ eventType: 'message.posted' }),
     });
 
     expect(decision.deliveryChannels).toEqual(['sms']);

@@ -19,12 +19,36 @@ describe('getNotificationPolicyConfig', () => {
     expect(config.defaultDelaySeconds).toBe(30);
   });
 
-  it('keeps message.posted digest-eligible with a 120s delay', () => {
+  it('marks dm.reaction.added as near-real-time with a 30s delay', () => {
+    const config = getNotificationPolicyConfig('dm.reaction.added');
+
+    expect(config.critical).toBe(false);
+    expect(config.digestEligible).toBe(false);
+    expect(config.defaultDelaySeconds).toBe(30);
+  });
+
+  it('uses a standard 60s delay for message.posted', () => {
     const config = getNotificationPolicyConfig('message.posted');
 
     expect(config.critical).toBe(false);
-    expect(config.digestEligible).toBe(true);
-    expect(config.defaultDelaySeconds).toBe(120);
+    expect(config.digestEligible).toBe(false);
+    expect(config.defaultDelaySeconds).toBe(60);
+  });
+
+  it('uses a standard 60s delay for reaction.added', () => {
+    const config = getNotificationPolicyConfig('reaction.added');
+
+    expect(config.critical).toBe(false);
+    expect(config.digestEligible).toBe(false);
+    expect(config.defaultDelaySeconds).toBe(60);
+  });
+
+  it('uses a standard 60s delay for file.uploaded', () => {
+    const config = getNotificationPolicyConfig('file.uploaded');
+
+    expect(config.critical).toBe(false);
+    expect(config.digestEligible).toBe(false);
+    expect(config.defaultDelaySeconds).toBe(60);
   });
 
   it('keeps class.session.scheduled critical with immediate delivery', () => {

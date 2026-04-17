@@ -56,6 +56,15 @@ function isRecentlyRead(lastReadAt: string | null | undefined, eventOccurredAt: 
   return lastReadTime >= eventTime;
 }
 
+function isMentionEvent(event: ActivityEventRow): boolean {
+  const payload = asRecord(event.payload);
+  return (
+    event.event_type === 'message.posted' &&
+    typeof payload.mentionedProfileId === 'string' &&
+    payload.mentionedProfileId.length > 0
+  );
+}
+
 export function buildDeliveryPlan(input: {
   event: ActivityEventRow;
   recipientProfileId: string;
@@ -68,9 +77,14 @@ export function buildDeliveryPlan(input: {
   const reasons = [...input.reasonCodes];
   const activePresence = isPresenceActive(input.context.liveStatus);
   const recentlyRead = isRecentlyRead(input.context.lastReadAt, input.event.occurred_at);
+  const mentionPriorityOverride = isMentionEvent(input.event) && !policy.critical;
+  const effectiveDelaySeconds = mentionPriorityOverride ? 30 : policy.defaultDelaySeconds;
   const shouldDelay =
     policy.presenceAware && !policy.critical && (activePresence || recentlyRead);
 
+  if (mentionPriorityOverride) {
+    reasons.push('mention_priority_override');
+  }
   if (activePresence) {
     reasons.push('presence_active');
   }
@@ -90,9 +104,9 @@ export function buildDeliveryPlan(input: {
   const runAt = new Date(
     now.getTime() +
       (deliveryTiming === 'delayed'
-        ? policy.defaultDelaySeconds
+        ? effectiveDelaySeconds
         : deliveryTiming === 'digest'
-          ? Math.max(policy.defaultDelaySeconds, 30 * 60)
+          ? Math.max(effectiveDelaySeconds, 30 * 60)
           : 0) *
         1000,
   ).toISOString();

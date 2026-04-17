@@ -235,14 +235,423 @@ describe('buildPersonalizedSessionCopy', () => {
     });
   });
 
-  it('returns null for non-session event types', () => {
+  it('personalizes dm.posted without requiring members', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'dm.posted',
+      {
+        senderName: 'Jane',
+        content: 'Can you review the homework before class?',
+      },
+      'child-1',
+    );
+
+    expect(copy).toEqual({
+      title: 'Jane sent you a direct message',
+      summary: 'Can you review the homework before class?',
+    });
+  });
+
+  it('personalizes dm.posted for an image shared via DM', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'dm.posted',
+      {
+        senderName: 'Jane',
+        content: 'Vacation photo',
+        dmMessageKind: 'image',
+      },
+      'child-1',
+    );
+
+    expect(copy).toEqual({
+      title: 'Jane sent you an image',
+      summary: 'Vacation photo',
+    });
+  });
+
+  it('personalizes dm.posted for audio shared via DM', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'dm.posted',
+      {
+        senderName: 'Jane',
+        content: 'Listen to this',
+        dmMessageKind: 'audio',
+      },
+      'child-1',
+    );
+
+    expect(copy).toEqual({
+      title: 'Jane sent you a voice message',
+      summary: 'Listen to this',
+    });
+  });
+
+  it('personalizes dm.posted for a file shared via DM', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'dm.posted',
+      {
+        senderName: 'Jane',
+        content: 'See attachment',
+        dmMessageKind: 'file',
+      },
+      'child-1',
+    );
+
+    expect(copy).toEqual({
+      title: 'Jane sent you a file',
+      summary: 'See attachment',
+    });
+  });
+
+  it('falls back for dm.posted when sender name is missing', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'dm.posted',
+      {
+        content: 'Hello',
+      },
+      'child-1',
+    );
+
+    expect(copy).toEqual({
+      title: 'New direct message',
+      summary: 'Hello',
+    });
+  });
+
+  it('truncates dm.posted content to 160 characters', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'dm.posted',
+      {
+        senderName: 'Jane',
+        content: 'a'.repeat(161),
+      },
+      'child-1',
+    );
+
+    expect(copy).toEqual({
+      title: 'Jane sent you a direct message',
+      summary: 'a'.repeat(160),
+    });
+  });
+
+  it('uses the title as summary for dm.posted when content is empty', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'dm.posted',
+      {
+        senderName: 'Jane',
+        content: '',
+      },
+      'child-1',
+    );
+
+    expect(copy).toEqual({
+      title: 'Jane sent you a direct message',
+      summary: 'Jane sent you a direct message',
+    });
+  });
+
+  it('personalizes message.posted mentions with context title', () => {
     const copy = buildPersonalizedSessionCopy(
       'message.posted',
       {
+        senderName: 'Jane',
+        content: 'Please check question 4.',
+        learningSpaceTitle: 'Algebra 1',
+        mentionedProfileId: 'child-1',
+      },
+      'child-1',
+    );
+
+    expect(copy).toEqual({
+      title: 'Jane mentioned you in Algebra 1',
+      summary: 'Please check question 4.',
+    });
+  });
+
+  it('personalizes message.posted without a mention when context is present', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'message.posted',
+      {
+        senderName: 'Jane',
+        content: 'Class starts at 4',
+        learningSpaceTitle: 'Math',
+      },
+      'child-1',
+    );
+
+    expect(copy).toEqual({
+      title: 'Jane sent you a message in Math',
+      summary: 'Class starts at 4',
+    });
+  });
+
+  it('personalizes message.posted without a mention or context', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'message.posted',
+      {
+        senderName: 'Jane',
+        content: 'Class starts at 4',
+      },
+      'child-1',
+    );
+
+    expect(copy).toEqual({
+      title: 'Jane sent you a message',
+      summary: 'Class starts at 4',
+    });
+  });
+
+  it('falls back to channelTopic for message.posted context', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'message.posted',
+      {
+        senderName: 'Jane',
+        content: 'Welcome everyone',
+        channelTopic: 'General',
+      },
+      'child-1',
+    );
+
+    expect(copy).toEqual({
+      title: 'Jane sent you a message in General',
+      summary: 'Welcome everyone',
+    });
+  });
+
+  it('personalizes message.posted mentions without context', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'message.posted',
+      {
+        senderName: 'Jane',
+        content: 'Can you respond?',
+        mentionedProfileId: 'p-1',
+      },
+      'child-1',
+    );
+
+    expect(copy).toEqual({
+      title: 'Jane mentioned you',
+      summary: 'Can you respond?',
+    });
+  });
+
+  it('falls back for message.posted when sender name is missing', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'message.posted',
+      {
+        content: 'Hi',
+      },
+      'child-1',
+    );
+
+    expect(copy).toEqual({
+      title: 'New message',
+      summary: 'Hi',
+    });
+  });
+
+  it('personalizes file.uploaded with sender and file count', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'file.uploaded',
+      {
+        senderName: 'Jane',
+        name: 'lesson-plan.pdf',
+        fileCount: 3,
+      },
+      'child-1',
+    );
+
+    expect(copy).toEqual({
+      title: 'Jane shared 3 files',
+      summary: 'lesson-plan.pdf',
+    });
+  });
+
+  it('personalizes file.uploaded for a single image with context', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'file.uploaded',
+      {
+        senderName: 'Jane',
+        name: 'photo.png',
+        dmMessageKind: 'image',
+        learningSpaceTitle: 'Math',
+      },
+      'child-1',
+    );
+
+    expect(copy).toEqual({
+      title: 'Jane shared an image in Math',
+      summary: 'photo.png',
+    });
+  });
+
+  it('personalizes file.uploaded for a single audio file with context', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'file.uploaded',
+      {
+        senderName: 'Jane',
+        name: 'voice-note.m4a',
+        dmMessageKind: 'audio',
+        learningSpaceTitle: 'Math',
+      },
+      'child-1',
+    );
+
+    expect(copy).toEqual({
+      title: 'Jane shared an audio file in Math',
+      summary: 'voice-note.m4a',
+    });
+  });
+
+  it('personalizes file.uploaded for multiple files with context', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'file.uploaded',
+      {
+        senderName: 'Jane',
+        name: 'worksheet.pdf',
+        fileCount: 3,
+        learningSpaceTitle: 'Math',
+      },
+      'child-1',
+    );
+
+    expect(copy).toEqual({
+      title: 'Jane shared 3 files in Math',
+      summary: 'worksheet.pdf',
+    });
+  });
+
+  it('uses content over name for file.uploaded summary', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'file.uploaded',
+      {
+        senderName: 'Jane',
+        name: 'doc.pdf',
+        content: 'Worksheet 3',
+      },
+      'child-1',
+    );
+
+    expect(copy).toEqual({
+      title: 'Jane shared a file',
+      summary: 'Worksheet 3',
+    });
+  });
+
+  it('falls back for file.uploaded when sender name is missing', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'file.uploaded',
+      {
+        name: 'doc.pdf',
+      },
+      'child-1',
+    );
+
+    expect(copy).toEqual({
+      title: 'New file shared',
+      summary: 'doc.pdf',
+    });
+  });
+
+  it('personalizes dm.reaction.added with emoji', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'dm.reaction.added',
+      {
+        senderName: 'Jane',
+        emoji: '👍',
+      },
+      'child-1',
+    );
+
+    expect(copy).toEqual({
+      title: 'Jane reacted 👍 to your message',
+      summary: 'Jane reacted 👍 to your message',
+    });
+  });
+
+  it('personalizes dm.reaction.added without emoji', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'dm.reaction.added',
+      {
+        senderName: 'Jane',
+      },
+      'child-1',
+    );
+
+    expect(copy).toEqual({
+      title: 'Jane reacted to your message',
+      summary: 'Jane reacted to your message',
+    });
+  });
+
+  it('falls back for dm.reaction.added when sender name is missing', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'dm.reaction.added',
+      {
+        emoji: '👍',
+      },
+      'child-1',
+    );
+
+    expect(copy).toEqual({
+      title: 'New reaction to your message',
+      summary: 'New reaction to your message',
+    });
+  });
+
+  it('personalizes reaction.added with context', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'reaction.added',
+      {
+        senderName: 'Jane',
+        emoji: '❤️',
+        learningSpaceTitle: 'Math',
+      },
+      'child-1',
+    );
+
+    expect(copy).toEqual({
+      title: 'Jane reacted ❤️ to your message in Math',
+      summary: 'Jane reacted ❤️ to your message in Math',
+    });
+  });
+
+  it('personalizes reaction.added without context', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'reaction.added',
+      {
+        senderName: 'Jane',
+        emoji: '❤️',
+      },
+      'child-1',
+    );
+
+    expect(copy).toEqual({
+      title: 'Jane reacted ❤️ to your message',
+      summary: 'Jane reacted ❤️ to your message',
+    });
+  });
+
+  it('falls back for reaction.added when sender name is missing', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'reaction.added',
+      {
+        emoji: '❤️',
+      },
+      'child-1',
+    );
+
+    expect(copy).toEqual({
+      title: 'New reaction to your message',
+      summary: 'New reaction to your message',
+    });
+  });
+
+  it('returns null for unsupported non-session event types', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'announcement.posted',
+      {
         title: 'Message posted',
         summary: 'A new message arrived',
-        reminderOffsetMinutes: 5,
-        members: [{ profileId: 'child-1', role: 'child', displayName: 'Ava' }],
       },
       'child-1',
     );
