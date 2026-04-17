@@ -524,6 +524,24 @@ jobs:
           fi
           echo "Branch project ref: $BRANCH_REF"
 
+          BRANCH_CONFIG=$(curl -sf \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/branches/${BRANCH_REF}")
+
+          DB_HOST=$(echo "$BRANCH_CONFIG" | jq -r '.db_host')
+          DB_PORT=$(echo "$BRANCH_CONFIG" | jq -r '.db_port')
+          DB_USER=$(echo "$BRANCH_CONFIG" | jq -r '.db_user')
+          DB_PASS=$(echo "$BRANCH_CONFIG" | jq -r '.db_pass')
+          JWT_SECRET=$(echo "$BRANCH_CONFIG" | jq -r '.jwt_secret')
+
+          if [[ -z "$DB_HOST" || "$DB_HOST" == "null" || -z "$DB_PORT" || "$DB_PORT" == "null" || -z "$DB_USER" || "$DB_USER" == "null" || -z "$DB_PASS" || "$DB_PASS" == "null" ]]; then
+            echo "::error::Supabase branch config did not include database credentials"
+            exit 1
+          fi
+
+          DB_PASS_ENCODED=$(jq -nr --arg v "$DB_PASS" '$v|@uri')
+          DIRECT_URL="postgresql://${DB_USER}:${DB_PASS_ENCODED}@${DB_HOST}:${DB_PORT}/postgres"
+
           ANON_KEY=$(curl -sf \
             -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
             "https://api.supabase.com/v1/projects/${BRANCH_REF}/api-keys" \
@@ -538,20 +556,23 @@ jobs:
           echo "::add-mask::$SERVICE_ROLE_KEY"
           echo "service_role_key=$SERVICE_ROLE_KEY" >> "$GITHUB_OUTPUT"
 
-          REGION="ap-southeast-1"
-          DB_PASS="${{ secrets.SUPABASE_DB_PASSWORD }}"
+          POOLER_CONFIG=$(curl -sf \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/${BRANCH_REF}/config/database/pooler")
+          DATABASE_URL=$(echo "$POOLER_CONFIG" | jq -r '.[0].connectionString // .[0].connection_string // empty')
+          if [[ -z "$DATABASE_URL" || "$DATABASE_URL" == "null" ]]; then
+            echo "::error::Supabase pooler config did not include a connection string"
+            exit 1
+          fi
+
           echo "::add-mask::$DB_PASS"
-          DATABASE_URL="postgresql://postgres.${BRANCH_REF}:${DB_PASS}@aws-0-${REGION}.pooler.supabase.com:6543/postgres"
-          DIRECT_URL="postgresql://postgres:${DB_PASS}@db.${BRANCH_REF}.supabase.co:5432/postgres"
           echo "::add-mask::$DATABASE_URL"
           echo "::add-mask::$DIRECT_URL"
+          # Prefer the CLI's documented env var over --password so secrets do not
+          # show up in process args and can be reused by later Supabase CLI steps.
+          echo "SUPABASE_DB_PASSWORD=$DB_PASS" >> "$GITHUB_ENV"
           echo "database_url=$DATABASE_URL" >> "$GITHUB_OUTPUT"
           echo "direct_url=$DIRECT_URL" >> "$GITHUB_OUTPUT"
-
-          JWT_SECRET=$(curl -sf \
-            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
-            "https://api.supabase.com/v1/projects/${BRANCH_REF}/config/auth" \
-            | jq -r '.jwt_secret')
           echo "::add-mask::$JWT_SECRET"
           echo "jwt_secret=$JWT_SECRET" >> "$GITHUB_OUTPUT"
 
@@ -704,8 +725,7 @@ jobs:
         run: |
           set -euo pipefail
           supabase link \
-            --project-ref "${{ steps.supabase-branch.outputs.branch_ref }}" \
-            --password "${{ secrets.SUPABASE_DB_PASSWORD }}"
+            --project-ref "${{ steps.supabase-branch.outputs.branch_ref }}"
 
       # 5. Ensure preview branches receive repo migrations added in the PR.
       - name: Apply preview branch migrations
@@ -714,8 +734,7 @@ jobs:
         run: |
           set -euo pipefail
           supabase db push \
-            --linked \
-            --password "${{ secrets.SUPABASE_DB_PASSWORD }}"
+            --linked
 
       # 6. Set branch-specific Edge Function secrets so preview functions talk to preview services.
       - name: Configure Supabase preview function secrets
