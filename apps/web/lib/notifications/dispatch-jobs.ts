@@ -40,6 +40,41 @@ function buildAttemptBucket(input: { timing: string; runAt: string }) {
   return `${input.timing}:${rounded.toISOString().slice(0, 16)}`;
 }
 
+async function resolveActivityFeedItemId(input: {
+  supabase: SupabaseServiceClient;
+  orgId: string;
+  activityEventId: string;
+  recipientProfileId: string;
+}) {
+  const response = await input.supabase
+    .from('activity_feed_items')
+    .select('id')
+    .eq('org_id', input.orgId)
+    .eq('recipient_profile_id', input.recipientProfileId)
+    .eq('source_event_id', input.activityEventId)
+    .is('deleted_at', null)
+    .maybeSingle<{ id: string }>();
+
+  if (response.error) {
+    throw new Error(response.error.message);
+  }
+
+  return response.data?.id ?? null;
+}
+
+async function tryResolveActivityFeedItemId(input: {
+  supabase: SupabaseServiceClient;
+  orgId: string;
+  activityEventId: string;
+  recipientProfileId: string;
+}) {
+  try {
+    return await resolveActivityFeedItemId(input);
+  } catch {
+    return null;
+  }
+}
+
 async function logDispatch(input: {
   supabase: SupabaseServiceClient;
   orgId: string;
@@ -77,12 +112,20 @@ async function sendNotificationViaChannel(input: {
       : null;
 
   if (input.job.delivery_channel === 'push') {
+    const activityFeedItemId = await tryResolveActivityFeedItemId({
+      supabase: input.supabase,
+      orgId: input.job.org_id,
+      activityEventId: input.job.activity_event_id,
+      recipientProfileId: input.job.recipient_profile_id,
+    });
+
     await sendPushNotification({
       orgId: input.job.org_id,
       recipientProfileId: input.job.recipient_profile_id,
       prefKey: input.job.pref_key,
       title,
       summary,
+      activityFeedItemId,
       scopeKind: input.job.scope_kind ?? undefined,
       scopeId: input.job.scope_id ?? undefined,
       metadata: payload,

@@ -405,12 +405,6 @@ async function projectEvent(supabase: SupabaseServiceClient, event: ActivityEven
       profile.kind ?? null,
     ]),
   );
-
-  await enqueueNotificationDispatchJobs({
-    supabase,
-    event,
-    recipientProfileIds,
-  });
   const refs = {
     actor: null,
     object: event.object_ref ?? undefined,
@@ -525,6 +519,12 @@ async function projectEvent(supabase: SupabaseServiceClient, event: ActivityEven
       }
     }
   }
+
+  await enqueueNotificationDispatchJobs({
+    supabase,
+    event,
+    recipientProfileIds,
+  });
 }
 
 export async function projectActivityEvents(

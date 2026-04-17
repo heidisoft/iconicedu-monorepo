@@ -32,6 +32,7 @@ const BASE_PAYLOAD = {
   prefKey: 'message.posted',
   title: 'New message',
   summary: 'Hello!',
+  activityFeedItemId: null,
 };
 
 function setupSelectChain(result: { data: unknown[] | null; error: unknown }) {
@@ -125,6 +126,31 @@ describe('sendPushNotification', () => {
       data?: { channelId?: string };
     }>;
     expect(body[0]?.data?.channelId).toBe('channel-42');
+  });
+
+  it('includes activityFeedItemId in push data when provided', async () => {
+    setupSelectChain({
+      data: [{ id: 'tok-1', token: 'ExponentPushToken[aaa]' }],
+      error: null,
+    });
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ status: 'ok' }] }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await sendPushNotification({
+      ...BASE_PAYLOAD,
+      activityFeedItemId: 'feed-1',
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as Array<{
+      data?: { activityFeedItemId?: string | null };
+    }>;
+
+    expect(body[0]?.data?.activityFeedItemId).toBe('feed-1');
   });
 
   it('includes senderName in push data for dm.posted when metadata provides senderName', async () => {

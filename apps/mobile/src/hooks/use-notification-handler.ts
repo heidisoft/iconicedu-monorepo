@@ -6,6 +6,8 @@ import {
   NOTIFICATION_REGISTRY,
   DEFAULT_NOTIFICATION_ROUTE,
 } from '@/lib/notifications/notification-config';
+import { markActivityFeedRead } from '@/lib/api/queries';
+import { useFamilyView } from '@/providers/family-view-provider';
 
 function getNotificationsModule() {
   // Function-scoped require avoids loading the native module in Expo Go.
@@ -15,11 +17,28 @@ function getNotificationsModule() {
 
 type NotificationData = {
   prefKey?: string;
+  activityFeedItemId?: string | null;
   scopeKind?: 'channel' | 'learning_space';
   scopeId?: string;
   channelId?: string;
   orgId?: string;
 };
+
+async function markNotificationRead(input: {
+  activityFeedItemId: string;
+  orgId?: string;
+  profileId?: string;
+}) {
+  if (!input.orgId || !input.profileId || !input.activityFeedItemId) {
+    return;
+  }
+
+  try {
+    await markActivityFeedRead(input.orgId, input.profileId, [input.activityFeedItemId]);
+  } catch {
+    // Best-effort on notification tap. Navigation should not depend on read sync.
+  }
+}
 
 /**
  * Sets up a listener for notification taps and navigates to the relevant screen.
@@ -28,6 +47,9 @@ type NotificationData = {
  */
 export function useNotificationHandler() {
   const router = useRouter();
+  const familyView = useFamilyView();
+  const currentOrgId = (familyView.account?.org_id as string | undefined) ?? undefined;
+  const currentProfileId = (familyView.profile?.id as string | undefined) ?? undefined;
 
   useEffect(() => {
     if (Constants.appOwnership === 'expo') {
@@ -67,6 +89,14 @@ export function useNotificationHandler() {
           : DEFAULT_NOTIFICATION_ROUTE;
         router.push(route as Parameters<typeof router.push>[0]);
         void Notifications.setBadgeCountAsync(0);
+
+        if (data?.activityFeedItemId) {
+          void markNotificationRead({
+            activityFeedItemId: data.activityFeedItemId,
+            orgId: data.orgId ?? currentOrgId,
+            profileId: currentProfileId,
+          });
+        }
       });
     })();
 
@@ -74,5 +104,5 @@ export function useNotificationHandler() {
       isMounted = false;
       subscription?.remove();
     };
-  }, [router]);
+  }, [currentOrgId, currentProfileId, router]);
 }
