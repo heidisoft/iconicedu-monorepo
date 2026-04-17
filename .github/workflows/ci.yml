@@ -528,19 +528,14 @@ jobs:
             -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
             "https://api.supabase.com/v1/branches/${BRANCH_REF}")
 
-          DB_HOST=$(echo "$BRANCH_CONFIG" | jq -r '.db_host')
-          DB_PORT=$(echo "$BRANCH_CONFIG" | jq -r '.db_port')
           DB_USER=$(echo "$BRANCH_CONFIG" | jq -r '.db_user')
           DB_PASS=$(echo "$BRANCH_CONFIG" | jq -r '.db_pass')
           JWT_SECRET=$(echo "$BRANCH_CONFIG" | jq -r '.jwt_secret')
 
-          if [[ -z "$DB_HOST" || "$DB_HOST" == "null" || -z "$DB_PORT" || "$DB_PORT" == "null" || -z "$DB_USER" || "$DB_USER" == "null" || -z "$DB_PASS" || "$DB_PASS" == "null" ]]; then
+          if [[ -z "$DB_USER" || "$DB_USER" == "null" || -z "$DB_PASS" || "$DB_PASS" == "null" ]]; then
             echo "::error::Supabase branch config did not include database credentials"
             exit 1
           fi
-
-          DB_PASS_ENCODED=$(jq -nr --arg v "$DB_PASS" '$v|@uri')
-          DIRECT_URL="postgresql://${DB_USER}:${DB_PASS_ENCODED}@${DB_HOST}:${DB_PORT}/postgres"
 
           ANON_KEY=$(curl -sf \
             -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
@@ -559,9 +554,13 @@ jobs:
           POOLER_CONFIG=$(curl -sf \
             -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
             "https://api.supabase.com/v1/projects/${BRANCH_REF}/config/database/pooler")
-          DATABASE_URL=$(echo "$POOLER_CONFIG" | jq -r '.[0].connectionString // .[0].connection_string // empty')
-          if [[ -z "$DATABASE_URL" || "$DATABASE_URL" == "null" ]]; then
-            echo "::error::Supabase pooler config did not include a connection string"
+          DATABASE_URL=$(echo "$POOLER_CONFIG" | jq -r 'map(select((.pool_mode // "") == "transaction" or (.db_port // 0) == 6543))[0].connectionString // map(select((.pool_mode // "") == "transaction" or (.db_port // 0) == 6543))[0].connection_string // .[0].connectionString // .[0].connection_string // empty')
+          # Use session mode for administrative psql commands in CI. Direct branch
+          # hosts are often IPv6-only, while GitHub runners reliably reach the IPv4
+          # pooler endpoint on port 5432.
+          DIRECT_URL=$(echo "$POOLER_CONFIG" | jq -r 'map(select((.pool_mode // "") == "session" or (.db_port // 0) == 5432))[0].connectionString // map(select((.pool_mode // "") == "session" or (.db_port // 0) == 5432))[0].connection_string // empty')
+          if [[ -z "$DATABASE_URL" || "$DATABASE_URL" == "null" || -z "$DIRECT_URL" || "$DIRECT_URL" == "null" ]]; then
+            echo "::error::Supabase pooler config did not include the required connection strings"
             exit 1
           fi
 
