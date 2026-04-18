@@ -1,0 +1,441 @@
+name: Create Local Native Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Platform to build
+        required: true
+        type: choice
+        default: all
+        options:
+          - all
+          - android
+          - ios
+      profile:
+        description: EAS profile to build
+        required: true
+        type: choice
+        default: preview
+        options:
+          - development
+          - preview
+      pr_number:
+        description: Optional PR number for preview environment resolution
+        required: false
+        type: string
+
+env:
+  TURBO_TELEMETRY_DISABLED: 1
+  EXPO_NO_TELEMETRY: 1
+
+jobs:
+  build-android:
+    name: Build Android APK
+    if: ${{ inputs.platform == 'android' || inputs.platform == 'all' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared packages
+        run: pnpm build:packages
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Install Railway, Vercel, and EAS CLIs
+        run: npm install -g @railway/cli vercel eas-cli --silent
+
+      - name: Resolve preview env vars
+        id: env
+        env:
+          BRANCH_NAME: ${{ github.ref_name }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+          RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          FALLBACK_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          FALLBACK_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+          FALLBACK_API_URL: ${{ secrets.EXPO_PUBLIC_API_URL }}
+          FALLBACK_WEB_URL: ${{ secrets.EXPO_PUBLIC_WEB_URL }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${PR_NUMBER}" ]]; then
+            for required_var in \
+              FALLBACK_SUPABASE_URL \
+              FALLBACK_SUPABASE_ANON_KEY \
+              FALLBACK_API_URL \
+              FALLBACK_WEB_URL; do
+              if [[ -z "${!required_var}" ]]; then
+                echo "::error::Missing fallback secret '${required_var}'."
+                exit 1
+              fi
+            done
+
+            echo "::add-mask::${FALLBACK_SUPABASE_ANON_KEY}"
+            echo "supabase_url=${FALLBACK_SUPABASE_URL}" >> "$GITHUB_OUTPUT"
+            echo "anon_key=${FALLBACK_SUPABASE_ANON_KEY}" >> "$GITHUB_OUTPUT"
+            echo "api_url=${FALLBACK_API_URL}" >> "$GITHUB_OUTPUT"
+            echo "web_url=${FALLBACK_WEB_URL}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Resolving preview environment values for branch '${BRANCH_NAME}' and PR #${PR_NUMBER}."
+
+          BRANCH_DATA=$(supabase branches list \
+            --project-ref "${SUPABASE_PROJECT_ID}" \
+            --output json \
+            | jq --arg name "${BRANCH_NAME}" '.[] | select(.name==$name)')
+
+          if [[ -z "${BRANCH_DATA}" ]]; then
+            echo "::error::No Supabase branch found for '${BRANCH_NAME}'. Make sure the preview environment workflow has completed."
+            exit 1
+          fi
+
+          PROJECT_REF=$(echo "${BRANCH_DATA}" | jq -r '.project_ref // .ref // ""')
+          if [[ -z "${PROJECT_REF}" || "${PROJECT_REF}" == "null" ]]; then
+            echo "::error::Supabase branch '${BRANCH_NAME}' is missing project_ref in branches list output."
+            exit 1
+          fi
+
+          ANON_KEY=$(curl -sf \
+            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
+            "https://api.supabase.com/v1/projects/${PROJECT_REF}/api-keys" \
+            | jq -r '.[] | select(.name=="anon") | .api_key')
+
+          if [[ -z "${ANON_KEY}" || "${ANON_KEY}" == "null" ]]; then
+            echo "::error::Could not resolve anon API key for Supabase project ref '${PROJECT_REF}'."
+            exit 1
+          fi
+
+          echo "::add-mask::${ANON_KEY}"
+
+          REPO_NAME="${{ github.event.repository.name }}"
+          RAILWAY_SERVICE_NAME="${REPO_NAME}"
+          RAILWAY_ENVIRONMENT="${REPO_NAME}-pr-${PR_NUMBER}"
+
+          railway_tmp_dir="$(mktemp -d)"
+          trap 'rm -rf "$railway_tmp_dir"' EXIT
+
+          pushd "$railway_tmp_dir" > /dev/null
+          railway project link "${RAILWAY_PROJECT_ID}" > /dev/null
+          railway environment link "${RAILWAY_ENVIRONMENT}" > /dev/null
+          railway service link "${RAILWAY_SERVICE_NAME}" > /dev/null
+          RAILWAY_STATUS_JSON="$(railway status --json)"
+          popd > /dev/null
+
+          API_HOST="$(
+            printf '%s' "${RAILWAY_STATUS_JSON}" \
+              | jq -r '
+                  [
+                    .. | objects | .domain? // empty,
+                    .. | objects | .url? // empty
+                  ]
+                  | flatten
+                  | map(select(type == "string"))
+                  | map(gsub("^https?://"; ""))
+                  | map(sub("/.*$"; ""))
+                  | map(select(test("^[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")))
+                  | unique
+                  | .[]
+                ' \
+              | grep -E 'railway|\.app$' \
+              | head -n1 || true
+          )"
+
+          if [[ -z "${API_HOST}" ]]; then
+            echo "::error::Unable to resolve a Railway URL for environment '${RAILWAY_ENVIRONMENT}' and service '${RAILWAY_SERVICE_NAME}'."
+            exit 1
+          fi
+
+          pushd apps/web > /dev/null
+          VERCEL_LIST_OUTPUT="$(
+            vercel list \
+              --meta "githubCommitRef=${BRANCH_NAME}" \
+              --status READY \
+              --token "${VERCEL_TOKEN}" \
+              2>/dev/null || true
+          )"
+          popd > /dev/null
+
+          WEB_URL="$(
+            printf '%s\n' "${VERCEL_LIST_OUTPUT}" \
+              | grep -Eo 'https://[^[:space:]]+|[A-Za-z0-9.-]+\.vercel\.app' \
+              | head -n1 || true
+          )"
+
+          if [[ -z "${WEB_URL}" ]]; then
+            echo "::error::Unable to resolve a Vercel deployment URL for branch '${BRANCH_NAME}'."
+            exit 1
+          fi
+
+          if [[ "${WEB_URL}" != https://* ]]; then
+            WEB_URL="https://${WEB_URL}"
+          fi
+
+          echo "supabase_url=https://${PROJECT_REF}.supabase.co" >> "$GITHUB_OUTPUT"
+          echo "anon_key=${ANON_KEY}" >> "$GITHUB_OUTPUT"
+          echo "api_url=https://${API_HOST}" >> "$GITHUB_OUTPUT"
+          echo "web_url=${WEB_URL}" >> "$GITHUB_OUTPUT"
+
+      - name: Write .env.local for EAS local build
+        run: |
+          cat > apps/mobile/.env.local <<EOF
+          EXPO_PUBLIC_SUPABASE_URL=${{ steps.env.outputs.supabase_url }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY=${{ steps.env.outputs.anon_key }}
+          EXPO_PUBLIC_API_URL=${{ steps.env.outputs.api_url }}
+          EXPO_PUBLIC_WEB_URL=${{ steps.env.outputs.web_url }}
+          EXPO_PUBLIC_APP_ENV=${{ inputs.profile }}
+          EXPO_PUBLIC_POSTHOG_KEY=${{ secrets.POSTHOG_KEY }}
+          EXPO_PUBLIC_POSTHOG_HOST=${{ secrets.NEXT_PUBLIC_POSTHOG_HOST }}
+          EOF
+
+      - name: Build Android APK
+        working-directory: apps/mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          mkdir -p build
+          eas build \
+            --platform android \
+            --profile "${{ inputs.profile }}" \
+            --local \
+            --non-interactive \
+            --output ./build/app.apk
+
+      - name: Upload Android artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk-${{ github.run_number }}-${{ inputs.profile }}
+          path: apps/mobile/build/app.apk
+          retention-days: 14
+          if-no-files-found: error
+
+  build-ios:
+    name: Build iOS IPA
+    if: ${{ inputs.platform == 'ios' || inputs.platform == 'all' }}
+    runs-on: macos-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared packages
+        run: pnpm build:packages
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Install Railway, Vercel, and EAS CLIs
+        run: npm install -g @railway/cli vercel eas-cli --silent
+
+      - name: Resolve preview env vars
+        id: env
+        env:
+          BRANCH_NAME: ${{ github.ref_name }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+          RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          FALLBACK_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          FALLBACK_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+          FALLBACK_API_URL: ${{ secrets.EXPO_PUBLIC_API_URL }}
+          FALLBACK_WEB_URL: ${{ secrets.EXPO_PUBLIC_WEB_URL }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${PR_NUMBER}" ]]; then
+            for required_var in \
+              FALLBACK_SUPABASE_URL \
+              FALLBACK_SUPABASE_ANON_KEY \
+              FALLBACK_API_URL \
+              FALLBACK_WEB_URL; do
+              if [[ -z "${!required_var}" ]]; then
+                echo "::error::Missing fallback secret '${required_var}'."
+                exit 1
+              fi
+            done
+
+            echo "::add-mask::${FALLBACK_SUPABASE_ANON_KEY}"
+            echo "supabase_url=${FALLBACK_SUPABASE_URL}" >> "$GITHUB_OUTPUT"
+            echo "anon_key=${FALLBACK_SUPABASE_ANON_KEY}" >> "$GITHUB_OUTPUT"
+            echo "api_url=${FALLBACK_API_URL}" >> "$GITHUB_OUTPUT"
+            echo "web_url=${FALLBACK_WEB_URL}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Resolving preview environment values for branch '${BRANCH_NAME}' and PR #${PR_NUMBER}."
+
+          BRANCH_DATA=$(supabase branches list \
+            --project-ref "${SUPABASE_PROJECT_ID}" \
+            --output json \
+            | jq --arg name "${BRANCH_NAME}" '.[] | select(.name==$name)')
+
+          if [[ -z "${BRANCH_DATA}" ]]; then
+            echo "::error::No Supabase branch found for '${BRANCH_NAME}'. Make sure the preview environment workflow has completed."
+            exit 1
+          fi
+
+          PROJECT_REF=$(echo "${BRANCH_DATA}" | jq -r '.project_ref // .ref // ""')
+          if [[ -z "${PROJECT_REF}" || "${PROJECT_REF}" == "null" ]]; then
+            echo "::error::Supabase branch '${BRANCH_NAME}' is missing project_ref in branches list output."
+            exit 1
+          fi
+
+          ANON_KEY=$(curl -sf \
+            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
+            "https://api.supabase.com/v1/projects/${PROJECT_REF}/api-keys" \
+            | jq -r '.[] | select(.name=="anon") | .api_key')
+
+          if [[ -z "${ANON_KEY}" || "${ANON_KEY}" == "null" ]]; then
+            echo "::error::Could not resolve anon API key for Supabase project ref '${PROJECT_REF}'."
+            exit 1
+          fi
+
+          echo "::add-mask::${ANON_KEY}"
+
+          REPO_NAME="${{ github.event.repository.name }}"
+          RAILWAY_SERVICE_NAME="${REPO_NAME}"
+          RAILWAY_ENVIRONMENT="${REPO_NAME}-pr-${PR_NUMBER}"
+
+          railway_tmp_dir="$(mktemp -d)"
+          trap 'rm -rf "$railway_tmp_dir"' EXIT
+
+          pushd "$railway_tmp_dir" > /dev/null
+          railway project link "${RAILWAY_PROJECT_ID}" > /dev/null
+          railway environment link "${RAILWAY_ENVIRONMENT}" > /dev/null
+          railway service link "${RAILWAY_SERVICE_NAME}" > /dev/null
+          RAILWAY_STATUS_JSON="$(railway status --json)"
+          popd > /dev/null
+
+          API_HOST="$(
+            printf '%s' "${RAILWAY_STATUS_JSON}" \
+              | jq -r '
+                  [
+                    .. | objects | .domain? // empty,
+                    .. | objects | .url? // empty
+                  ]
+                  | flatten
+                  | map(select(type == "string"))
+                  | map(gsub("^https?://"; ""))
+                  | map(sub("/.*$"; ""))
+                  | map(select(test("^[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")))
+                  | unique
+                  | .[]
+                ' \
+              | grep -E 'railway|\.app$' \
+              | head -n1 || true
+          )"
+
+          if [[ -z "${API_HOST}" ]]; then
+            echo "::error::Unable to resolve a Railway URL for environment '${RAILWAY_ENVIRONMENT}' and service '${RAILWAY_SERVICE_NAME}'."
+            exit 1
+          fi
+
+          pushd apps/web > /dev/null
+          VERCEL_LIST_OUTPUT="$(
+            vercel list \
+              --meta "githubCommitRef=${BRANCH_NAME}" \
+              --status READY \
+              --token "${VERCEL_TOKEN}" \
+              2>/dev/null || true
+          )"
+          popd > /dev/null
+
+          WEB_URL="$(
+            printf '%s\n' "${VERCEL_LIST_OUTPUT}" \
+              | grep -Eo 'https://[^[:space:]]+|[A-Za-z0-9.-]+\.vercel\.app' \
+              | head -n1 || true
+          )"
+
+          if [[ -z "${WEB_URL}" ]]; then
+            echo "::error::Unable to resolve a Vercel deployment URL for branch '${BRANCH_NAME}'."
+            exit 1
+          fi
+
+          if [[ "${WEB_URL}" != https://* ]]; then
+            WEB_URL="https://${WEB_URL}"
+          fi
+
+          echo "supabase_url=https://${PROJECT_REF}.supabase.co" >> "$GITHUB_OUTPUT"
+          echo "anon_key=${ANON_KEY}" >> "$GITHUB_OUTPUT"
+          echo "api_url=https://${API_HOST}" >> "$GITHUB_OUTPUT"
+          echo "web_url=${WEB_URL}" >> "$GITHUB_OUTPUT"
+
+      - name: Write .env.local for EAS local build
+        run: |
+          cat > apps/mobile/.env.local <<EOF
+          EXPO_PUBLIC_SUPABASE_URL=${{ steps.env.outputs.supabase_url }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY=${{ steps.env.outputs.anon_key }}
+          EXPO_PUBLIC_API_URL=${{ steps.env.outputs.api_url }}
+          EXPO_PUBLIC_WEB_URL=${{ steps.env.outputs.web_url }}
+          EXPO_PUBLIC_APP_ENV=${{ inputs.profile }}
+          EXPO_PUBLIC_POSTHOG_KEY=${{ secrets.POSTHOG_KEY }}
+          EXPO_PUBLIC_POSTHOG_HOST=${{ secrets.NEXT_PUBLIC_POSTHOG_HOST }}
+          EOF
+
+      - name: Build iOS IPA
+        working-directory: apps/mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          mkdir -p build
+          eas build \
+            --platform ios \
+            --profile "${{ inputs.profile }}" \
+            --local \
+            --non-interactive \
+            --output ./build/app.ipa
+
+      - name: Upload iOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa-${{ github.run_number }}-${{ inputs.profile }}
+          path: apps/mobile/build/app.ipa
+          retention-days: 14
+          if-no-files-found: error
