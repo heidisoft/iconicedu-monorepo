@@ -132,16 +132,29 @@ GitHub Actions builds:
 
 ### Preview environment wiring
 
-PR-based preview EAS builds currently inject:
+PR-based preview EAS builds now inject:
 
 - `EXPO_PUBLIC_SUPABASE_URL`
 - `EXPO_PUBLIC_SUPABASE_ANON_KEY`
 - `EXPO_PUBLIC_APP_ENV=preview`
-
-If the build also needs to point at preview web or preview API hosts, provide these before the build:
-
-- `EXPO_PUBLIC_WEB_URL`
 - `EXPO_PUBLIC_API_URL`
+- `EXPO_PUBLIC_WEB_URL`
+
+For branch-based preview and development builds, the workflow resolves the web
+and API hosts from the existing `Preview Environment Ready` PR comment.
+
+Across all EAS profiles, the build now also selects the matching named EAS
+environment from `apps/mobile/eas.json`:
+
+- `development` profile → `development` EAS environment
+- `preview` profile → `preview` EAS environment
+- `production` profile → `production` EAS environment
+
+Make sure these EAS environments define any shared build-time values you expect,
+including:
+
+- `EXPO_PUBLIC_API_URL`
+- `EXPO_PUBLIC_WEB_URL`
 
 Use the PR preview comment as the source of truth for:
 

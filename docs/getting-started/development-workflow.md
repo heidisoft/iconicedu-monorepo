@@ -223,18 +223,20 @@ pnpm mobile:eas:build:preview
 
 ### Preview Mobile Environment Notes
 
-The preview EAS workflow currently injects these values automatically for PR-based builds:
+The preview EAS workflow now injects these values automatically for PR-based builds:
 
 - `EXPO_PUBLIC_SUPABASE_URL`
 - `EXPO_PUBLIC_SUPABASE_ANON_KEY`
 - `EXPO_PUBLIC_APP_ENV=preview`
-
-The preview web and API URLs are posted in the PR comment, but they are not currently auto-injected into the mobile EAS preview workflow as `EXPO_PUBLIC_WEB_URL` and `EXPO_PUBLIC_API_URL`.
-
-If a preview build must point at a specific preview API or preview web host, set these before triggering the build:
-
 - `EXPO_PUBLIC_API_URL`
 - `EXPO_PUBLIC_WEB_URL`
+
+For PR-based preview or development builds, the workflow reads the existing
+`Preview Environment Ready` comment and injects the preview Railway/Vercel URLs.
+
+All EAS build profiles also pin to their matching named EAS environment
+(`development`, `preview`, `production`) via `apps/mobile/eas.json`, so values
+like `EXPO_PUBLIC_API_URL` can be managed centrally in Expo for non-PR builds.
 
 Use:
 

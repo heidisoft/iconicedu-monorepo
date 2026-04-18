@@ -162,6 +162,74 @@ jobs:
       #       echo "railway_api_url=" >> "$GITHUB_OUTPUT"
       #     fi
 
+      - name: Resolve preview app URLs
+        id: preview-urls
+        if: steps.context.outputs.should_build == 'true'
+        uses: actions/github-script@v7
+        env:
+          BUILD_KIND: ${{ steps.context.outputs.build_kind }}
+          PR_NUMBER: ${{ steps.context.outputs.pr_number }}
+        with:
+          script: |
+            const buildKind = process.env.BUILD_KIND;
+            const prNumberRaw = process.env.PR_NUMBER;
+
+            if (buildKind !== 'preview' || !prNumberRaw) {
+              core.setOutput('api_url', '');
+              core.setOutput('web_url', '');
+              return;
+            }
+
+            const issue_number = Number(prNumberRaw);
+            const { owner, repo } = context.repo;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+
+            const previewComment = comments
+              .slice()
+              .reverse()
+              .find(
+                (comment) =>
+                  comment.user?.type === 'Bot' &&
+                  typeof comment.body === 'string' &&
+                  comment.body.includes('Preview Environment Ready'),
+              );
+
+            if (!previewComment?.body) {
+              core.setFailed(
+                `Could not find the "Preview Environment Ready" PR comment for #${issue_number}. Run the preview environment workflow before creating an EAS preview/development build.`,
+              );
+              return;
+            }
+
+            const extractTableUrl = (label) => {
+              const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              const pattern = new RegExp(
+                `\\|\\s*${escapedLabel}\\s*\\|\\s*(https?:\\/\\/[^\\s|]+)\\s*\\|`,
+                'i',
+              );
+              const match = previewComment.body.match(pattern);
+              return match?.[1] ?? '';
+            };
+
+            const apiHealthUrl = extractTableUrl('API (Railway)');
+            const webUrl = extractTableUrl('Web (Vercel)');
+            const apiUrl = apiHealthUrl.replace(/\/healthz\/?$/i, '');
+
+            if (!apiUrl) {
+              core.setFailed(
+                `Could not resolve EXPO_PUBLIC_API_URL from the PR preview comment for #${issue_number}.`,
+              );
+              return;
+            }
+
+            core.setOutput('api_url', apiUrl);
+            core.setOutput('web_url', webUrl);
+
       # 3. Trigger EAS build
       - name: Trigger EAS build
         id: eas-build
@@ -182,13 +250,19 @@ jobs:
             --arg anon_key "${{ steps.supabase-creds.outputs.anon_key }}" \
             --arg posthog_key "${{ secrets.POSTHOG_KEY }}" \
             --arg posthog_host "${{ secrets.NEXT_PUBLIC_POSTHOG_HOST }}" \
+            --arg api_url "${{ steps.preview-urls.outputs.api_url }}" \
+            --arg web_url "${{ steps.preview-urls.outputs.web_url }}" \
             '.build[$profile].env = ((.build[$profile].env // {}) + {
               EXPO_PUBLIC_SUPABASE_URL: $supabase_url,
               EXPO_PUBLIC_SUPABASE_ANON_KEY: $anon_key,
               EXPO_PUBLIC_APP_ENV: $app_env,
               EXPO_PUBLIC_POSTHOG_KEY: $posthog_key,
               EXPO_PUBLIC_POSTHOG_HOST: $posthog_host
-            })' \
+            } + (if ($api_url | length) > 0 then {
+              EXPO_PUBLIC_API_URL: $api_url
+            } else {} end) + (if ($web_url | length) > 0 then {
+              EXPO_PUBLIC_WEB_URL: $web_url
+            } else {} end))' \
             eas.json > "$tmp_eas_json"
           mv "$tmp_eas_json" eas.json
 
