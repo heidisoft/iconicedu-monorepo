@@ -141,7 +141,12 @@ PR-based preview EAS builds now inject:
 - `EXPO_PUBLIC_WEB_URL`
 
 For branch-based preview and development builds, the workflow resolves the web
-and API hosts from the existing `Preview Environment Ready` PR comment.
+and API hosts directly from Railway and Vercel using their CLIs:
+
+- Feature branches use the PR Railway environment plus the matching Vercel
+  branch deployment
+- `main` uses the Railway `production` environment plus the latest Vercel
+  deployment for `main`
 
 Across all EAS profiles, the build now also selects the matching named EAS
 environment from `apps/mobile/eas.json`:
@@ -156,11 +161,10 @@ including:
 - `EXPO_PUBLIC_API_URL`
 - `EXPO_PUBLIC_WEB_URL`
 
-Use the PR preview comment as the source of truth for:
-
-- Vercel preview web URL
-- Railway preview API URL
-- Supabase preview branch / Studio link
+Use the actual Railway/Vercel environments as the source of truth for mobile
+host resolution. The PR preview comment remains a human-friendly summary, and
+Supabase preview branch / Studio links still come from the preview environment
+workflow.
 
 ## Rebuild rules
 

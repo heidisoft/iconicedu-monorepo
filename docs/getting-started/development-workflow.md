@@ -231,8 +231,11 @@ The preview EAS workflow now injects these values automatically for PR-based bui
 - `EXPO_PUBLIC_API_URL`
 - `EXPO_PUBLIC_WEB_URL`
 
-For PR-based preview or development builds, the workflow reads the existing
-`Preview Environment Ready` comment and injects the preview Railway/Vercel URLs.
+For PR-based preview or development builds, the workflow resolves the Railway
+and Vercel URLs directly from their CLIs using the current branch:
+
+- Feature branches use the PR Railway environment and matching Vercel branch deployment
+- `main` uses the Railway `production` environment and the latest Vercel deployment for `main`
 
 All EAS build profiles also pin to their matching named EAS environment
 (`development`, `preview`, `production`) via `apps/mobile/eas.json`, so values
