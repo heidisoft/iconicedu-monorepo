@@ -408,3 +408,85 @@ jobs:
           path: apps/mobile/build/app.ipa
           retention-days: 14
           if-no-files-found: error
+
+  comment-artifacts:
+    name: Comment Build Artifacts on PR
+    if: ${{ always() && inputs.pr_number != '' && !cancelled() }}
+    needs:
+      - prepare-build-context
+      - build-android
+      - build-ios
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: Post artifact links to PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = parseInt('${{ inputs.pr_number }}', 10);
+            const profile = '${{ inputs.profile }}';
+            const platform = '${{ inputs.platform }}';
+            const runId = context.runId;
+            const runNumber = context.runNumber;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            const androidExpected = `android-apk-${runNumber}-${profile}`;
+            const iosExpected = `ios-ipa-${runNumber}-${profile}`;
+
+            const artifacts = await github.paginate(
+              github.rest.actions.listWorkflowRunArtifacts,
+              { owner, repo, run_id: runId, per_page: 100 }
+            );
+
+            const androidArtifact = artifacts.find((artifact) => artifact.name === androidExpected);
+            const iosArtifact = artifacts.find((artifact) => artifact.name === iosExpected);
+
+            const androidResult = '${{ needs.build-android.result }}';
+            const iosResult = '${{ needs.build-ios.result }}';
+
+            const lines = [
+              '### Local Native Build Artifacts',
+              '',
+              `**Profile:** \`${profile}\``,
+              `**Platform input:** \`${platform}\``,
+              '',
+            ];
+
+            if (androidResult === 'success' && androidArtifact) {
+              lines.push(`- Android APK: [Download artifact](https://github.com/${owner}/${repo}/actions/runs/${runId}/artifacts/${androidArtifact.id})`);
+            } else if (platform === 'android' || platform === 'all') {
+              lines.push(`- Android APK: build result \`${androidResult}\``);
+            }
+
+            if (iosResult === 'success' && iosArtifact) {
+              lines.push(`- iOS IPA: [Download artifact](https://github.com/${owner}/${repo}/actions/runs/${runId}/artifacts/${iosArtifact.id})`);
+            } else if (platform === 'ios' || platform === 'all') {
+              lines.push(`- iOS IPA: build result \`${iosResult}\``);
+            }
+
+            lines.push('');
+            lines.push(`Artifacts page: https://github.com/${owner}/${repo}/actions/runs/${runId}`);
+
+            try {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: prNumber,
+                body: lines.join('\n'),
+              });
+            } catch (error) {
+              if (error.status === 403) {
+                core.warning(
+                  `Skipping PR comment for #${prNumber}: GitHub Actions token cannot write issue comments in this run context.`
+                );
+                return;
+              }
+
+              throw error;
+            }
