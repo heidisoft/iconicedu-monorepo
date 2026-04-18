@@ -293,20 +293,6 @@ jobs:
           node-version: 20.19.0
           cache: pnpm
 
-      - name: Select Xcode 26
-        run: |
-          set -euo pipefail
-
-          XCODE_APP="$(find /Applications -maxdepth 1 -type d -name 'Xcode_26*.app' | sort -V | tail -n 1)"
-          if [[ -z "${XCODE_APP}" ]]; then
-            echo "::error::No Xcode 26 installation was found on this runner. Expo SDK 55 requires Xcode 26+."
-            ls -1 /Applications | grep '^Xcode' || true
-            exit 1
-          fi
-
-          sudo xcode-select -switch "${XCODE_APP}/Contents/Developer"
-          xcodebuild -version
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -369,6 +355,20 @@ jobs:
         with:
           node-version: 20.19.0
           cache: pnpm
+
+      - name: Select Xcode 26
+        run: |
+          set -euo pipefail
+
+          XCODE_APP="$(find /Applications -maxdepth 1 -type d -name 'Xcode_26*.app' | sort -V | tail -n 1)"
+          if [[ -z "${XCODE_APP}" ]]; then
+            echo "::error::No Xcode 26 installation was found on this runner. Expo SDK 55 requires Xcode 26+."
+            ls -1 /Applications | grep '^Xcode' || true
+            exit 1
+          fi
+
+          sudo xcode-select -switch "${XCODE_APP}/Contents/Developer"
+          xcodebuild -version
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
