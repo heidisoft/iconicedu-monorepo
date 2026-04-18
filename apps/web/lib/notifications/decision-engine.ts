@@ -13,8 +13,11 @@ import { resolveEffectivePreference } from '@iconicedu/web/lib/notifications/res
 type DeliveryContext = {
   now?: Date;
   liveStatus?: string | null;
+  lastSeenAt?: string | null;
   lastReadAt?: string | null;
 };
+
+const PRESENCE_STALE_MS = 5 * 60 * 1000;
 
 type ProfileAccountRow = {
   account_id: string;
@@ -43,6 +46,21 @@ function isPresenceActive(liveStatus: string | null | undefined) {
   );
 }
 
+function isPresenceActiveFresh(
+  liveStatus: string | null | undefined,
+  lastSeenAt: string | null | undefined,
+  now: Date,
+) {
+  if (!isPresenceActive(liveStatus) || !lastSeenAt) {
+    return false;
+  }
+  const lastSeenTime = new Date(lastSeenAt).getTime();
+  if (Number.isNaN(lastSeenTime)) {
+    return false;
+  }
+  return now.getTime() - lastSeenTime <= PRESENCE_STALE_MS;
+}
+
 function isRecentlyRead(lastReadAt: string | null | undefined, eventOccurredAt: string) {
   if (!lastReadAt) {
     return false;
@@ -56,6 +74,15 @@ function isRecentlyRead(lastReadAt: string | null | undefined, eventOccurredAt: 
   return lastReadTime >= eventTime;
 }
 
+function isMentionEvent(event: ActivityEventRow): boolean {
+  const payload = asRecord(event.payload);
+  return (
+    event.event_type === 'message.posted' &&
+    typeof payload.mentionedProfileId === 'string' &&
+    payload.mentionedProfileId.length > 0
+  );
+}
+
 export function buildDeliveryPlan(input: {
   event: ActivityEventRow;
   recipientProfileId: string;
@@ -66,11 +93,20 @@ export function buildDeliveryPlan(input: {
   const policy = getNotificationPolicyConfig(input.event.event_type);
   const now = input.context.now ?? new Date();
   const reasons = [...input.reasonCodes];
-  const activePresence = isPresenceActive(input.context.liveStatus);
+  const activePresence = isPresenceActiveFresh(
+    input.context.liveStatus,
+    input.context.lastSeenAt,
+    now,
+  );
   const recentlyRead = isRecentlyRead(input.context.lastReadAt, input.event.occurred_at);
+  const mentionPriorityOverride = isMentionEvent(input.event) && !policy.critical;
+  const effectiveDelaySeconds = mentionPriorityOverride ? 30 : policy.defaultDelaySeconds;
   const shouldDelay =
     policy.presenceAware && !policy.critical && (activePresence || recentlyRead);
 
+  if (mentionPriorityOverride) {
+    reasons.push('mention_priority_override');
+  }
   if (activePresence) {
     reasons.push('presence_active');
   }
@@ -90,9 +126,9 @@ export function buildDeliveryPlan(input: {
   const runAt = new Date(
     now.getTime() +
       (deliveryTiming === 'delayed'
-        ? policy.defaultDelaySeconds
+        ? effectiveDelaySeconds
         : deliveryTiming === 'digest'
-          ? Math.max(policy.defaultDelaySeconds, 30 * 60)
+          ? Math.max(effectiveDelaySeconds, 30 * 60)
           : 0) *
         1000,
   ).toISOString();
@@ -159,11 +195,11 @@ export async function buildNotificationDecision(input: {
   const [presenceResponse, readStateResponse] = await Promise.all([
     input.supabase
       .from('profile_presence')
-      .select('live_status')
+      .select('live_status, last_seen_at')
       .eq('org_id', input.event.org_id)
       .eq('profile_id', input.recipientProfileId)
       .is('deleted_at', null)
-      .maybeSingle<{ live_status?: string | null }>(),
+      .maybeSingle<{ live_status?: string | null; last_seen_at?: string | null }>(),
     channelId && profileResponse.data?.account_id
       ? input.supabase
           .from('channel_read_state')
@@ -190,6 +226,7 @@ export async function buildNotificationDecision(input: {
     reasonCodes,
     context: {
       liveStatus: presenceResponse.data?.live_status ?? null,
+      lastSeenAt: presenceResponse.data?.last_seen_at ?? null,
       lastReadAt: readStateResponse.data?.last_read_at ?? null,
     },
   });

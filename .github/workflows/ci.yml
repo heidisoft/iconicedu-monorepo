@@ -37,7 +37,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9.12.0
+          version: 10.33.0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -103,7 +103,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9.12.0
+          version: 10.33.0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -183,7 +183,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9.12.0
+          version: 10.33.0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -333,7 +333,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9.12.0
+          version: 10.33.0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -492,10 +492,13 @@ jobs:
 
             echo "  Status: ${STATUS:-(pending)}"
 
-            if [[ "$STATUS" == "MIGRATIONS_PASSED" || "$STATUS" == "FUNCTIONS_DEPLOYED" ]]; then
+            if [[ "$STATUS" == "MIGRATIONS_PASSED" || "$STATUS" == "FUNCTIONS_DEPLOYED" || "$STATUS" == "FUNCTIONS_FAILED" ]]; then
               echo "branch_id=$BRANCH_ID" >> "$GITHUB_OUTPUT"
               BRANCH_REF=$(echo "$BRANCH_DATA" | jq -r '.project_ref // .ref // ""')
               echo "branch_ref=$BRANCH_REF" >> "$GITHUB_OUTPUT"
+              if [[ "$STATUS" == "FUNCTIONS_FAILED" ]]; then
+                echo "::warning::Supabase branch reports FUNCTIONS_FAILED; continuing because this workflow reapplies secrets and redeploys functions later."
+              fi
               break
             elif [[ "$STATUS" == "MIGRATIONS_FAILED" ]]; then
               echo "::error::Supabase branch migrations failed"
@@ -524,6 +527,28 @@ jobs:
           fi
           echo "Branch project ref: $BRANCH_REF"
 
+          BRANCH_CONFIG=$(curl -sf \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/branches/${BRANCH_REF}")
+
+          DB_HOST=$(echo "$BRANCH_CONFIG" | jq -r '.db_host')
+          DB_PORT=$(echo "$BRANCH_CONFIG" | jq -r '.db_port')
+          DB_USER=$(echo "$BRANCH_CONFIG" | jq -r '.db_user')
+          DB_PASS=$(echo "$BRANCH_CONFIG" | jq -r '.db_pass')
+          JWT_SECRET=$(echo "$BRANCH_CONFIG" | jq -r '.jwt_secret')
+
+          if [[ -z "$DB_HOST" || "$DB_HOST" == "null" || -z "$DB_PORT" || "$DB_PORT" == "null" || -z "$DB_USER" || "$DB_USER" == "null" || -z "$DB_PASS" || "$DB_PASS" == "null" ]]; then
+            echo "::error::Supabase branch config did not include database credentials"
+            exit 1
+          fi
+
+          DB_PASS_ENCODED=$(jq -nr --arg v "$DB_PASS" '$v|@uri')
+          DIRECT_URL="postgresql://${DB_USER}:${DB_PASS_ENCODED}@${DB_HOST}:${DB_PORT}/postgres"
+          POOLER_DB_USER="$DB_USER"
+          if [[ "$POOLER_DB_USER" != *".${BRANCH_REF}" ]]; then
+            POOLER_DB_USER="${POOLER_DB_USER}.${BRANCH_REF}"
+          fi
+
           ANON_KEY=$(curl -sf \
             -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
             "https://api.supabase.com/v1/projects/${BRANCH_REF}/api-keys" \
@@ -538,20 +563,76 @@ jobs:
           echo "::add-mask::$SERVICE_ROLE_KEY"
           echo "service_role_key=$SERVICE_ROLE_KEY" >> "$GITHUB_OUTPUT"
 
-          REGION="ap-southeast-1"
-          DB_PASS="${{ secrets.SUPABASE_DB_PASSWORD }}"
+          POOLER_CONFIG=$(curl -sf \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/${BRANCH_REF}/config/database/pooler")
+          PGBOUNCER_CONFIG=$(curl -sf \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/${BRANCH_REF}/config/database/pgbouncer" \
+            || echo '{}')
+
+          DATABASE_URL=$(echo "$POOLER_CONFIG" | jq -r '
+            if type == "array" then
+              map(select((.pool_mode // "") == "transaction" or (.db_port // 0) == 6543))[0].connectionString
+              // map(select((.pool_mode // "") == "transaction" or (.db_port // 0) == 6543))[0].connection_string
+              // .[0].connectionString
+              // .[0].connection_string
+              // empty
+            elif type == "object" then
+              .connectionString // .connection_string // empty
+            else
+              empty
+            end')
+          if [[ -z "$DATABASE_URL" || "$DATABASE_URL" == "null" ]]; then
+            DATABASE_URL=$(echo "$PGBOUNCER_CONFIG" | jq -r '.connectionString // .connection_string // empty')
+          fi
+          # Use session mode for administrative psql commands in CI. Direct branch
+          # hosts are often IPv6-only, while GitHub runners reliably reach the IPv4
+          # pooler endpoint on port 5432.
+          ADMIN_DATABASE_URL=$(echo "$POOLER_CONFIG" | jq -r '
+            if type == "array" then
+              map(select((.pool_mode // "") == "session" or (.db_port // 0) == 5432))[0].connectionString
+              // map(select((.pool_mode // "") == "session" or (.db_port // 0) == 5432))[0].connection_string
+              // map(select((.pool_mode // "") == "transaction" or (.db_port // 0) == 6543))[0].connectionString
+              // map(select((.pool_mode // "") == "transaction" or (.db_port // 0) == 6543))[0].connection_string
+              // .[0].connectionString
+              // .[0].connection_string
+              // empty
+            elif type == "object" then
+              .connectionString // .connection_string // empty
+            else
+              empty
+            end')
+          if [[ -z "$ADMIN_DATABASE_URL" || "$ADMIN_DATABASE_URL" == "null" ]]; then
+            ADMIN_DATABASE_URL=$(echo "$PGBOUNCER_CONFIG" | jq -r '.connectionString // .connection_string // empty')
+          fi
+
+          # Branches use branch-specific DB passwords and a branch-qualified user
+          # when connecting through Supavisor / poolers.
+          if [[ -n "$DATABASE_URL" && "$DATABASE_URL" != "null" ]]; then
+            DATABASE_URL="postgresql://${POOLER_DB_USER}:${DB_PASS_ENCODED}@${DATABASE_URL#*@}"
+          fi
+          if [[ -n "$ADMIN_DATABASE_URL" && "$ADMIN_DATABASE_URL" != "null" ]]; then
+            ADMIN_DATABASE_URL="postgresql://${POOLER_DB_USER}:${DB_PASS_ENCODED}@${ADMIN_DATABASE_URL#*@}"
+          fi
+
+          if [[ -z "$DATABASE_URL" || "$DATABASE_URL" == "null" || -z "$DIRECT_URL" || "$DIRECT_URL" == "null" || -z "$ADMIN_DATABASE_URL" || "$ADMIN_DATABASE_URL" == "null" ]]; then
+            echo "::warning::Supabase pooler config payload: $(echo "$POOLER_CONFIG" | jq -c 'if type == "array" then map({pool_mode,db_host,db_port,has_connection:(has("connectionString") or has("connection_string"))}) else {type:(type),keys:(keys // [])} end' 2>/dev/null || echo unavailable)"
+            echo "::warning::Supabase pgbouncer config payload: $(echo "$PGBOUNCER_CONFIG" | jq -c '{pool_mode,db_host,db_port,has_connection:(has("connectionString") or has("connection_string"))}' 2>/dev/null || echo unavailable)"
+            echo "::error::Supabase database config did not include the required connection strings"
+            exit 1
+          fi
+
           echo "::add-mask::$DB_PASS"
-          DATABASE_URL="postgresql://postgres.${BRANCH_REF}:${DB_PASS}@aws-0-${REGION}.pooler.supabase.com:6543/postgres"
-          DIRECT_URL="postgresql://postgres:${DB_PASS}@db.${BRANCH_REF}.supabase.co:5432/postgres"
           echo "::add-mask::$DATABASE_URL"
           echo "::add-mask::$DIRECT_URL"
+          echo "::add-mask::$ADMIN_DATABASE_URL"
+          # Prefer the CLI's documented env var over --password so secrets do not
+          # show up in process args and can be reused by later Supabase CLI steps.
+          echo "SUPABASE_DB_PASSWORD=$DB_PASS" >> "$GITHUB_ENV"
           echo "database_url=$DATABASE_URL" >> "$GITHUB_OUTPUT"
           echo "direct_url=$DIRECT_URL" >> "$GITHUB_OUTPUT"
-
-          JWT_SECRET=$(curl -sf \
-            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
-            "https://api.supabase.com/v1/projects/${BRANCH_REF}/config/auth" \
-            | jq -r '.jwt_secret')
+          echo "admin_database_url=$ADMIN_DATABASE_URL" >> "$GITHUB_OUTPUT"
           echo "::add-mask::$JWT_SECRET"
           echo "jwt_secret=$JWT_SECRET" >> "$GITHUB_OUTPUT"
 
@@ -697,7 +778,26 @@ jobs:
               '{"state":"success","target_url":$url,"description":"Railway preview API","context":"railway/preview-api"}')" \
             || echo "::warning::Failed to post commit status (non-fatal)"
 
-      # 4. Configure Vercel preview env vars
+      # 4. Link the CLI to the preview branch so repo migrations can be applied there.
+      - name: Link Supabase preview branch
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          supabase link \
+            --project-ref "${{ steps.supabase-branch.outputs.branch_ref }}"
+
+      # 5. Ensure preview branches receive repo migrations added in the PR.
+      - name: Apply preview branch migrations
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          supabase db push \
+            --linked
+
+      # 6. Configure Vercel preview env vars before we capture its preview URL for
+      # branch-local Supabase function secrets.
       - name: Configure Vercel preview env vars
         id: vercel
         continue-on-error: true
@@ -768,7 +868,74 @@ jobs:
             echo "vercel_url=https://vercel.com/dashboard" >> "$GITHUB_OUTPUT"
           fi
 
-      # 7. Post / update the single unified PR comment
+      # 7. Set branch-specific Edge Function secrets so preview functions talk to preview services.
+      - name: Configure Supabase preview function secrets
+        env:
+          BRANCH_API_URL: ${{ steps.branch-creds.outputs.branch_api_url }}
+          BRANCH_PROJECT_REF: ${{ steps.supabase-branch.outputs.branch_ref }}
+          INTERNAL_NOTIFICATIONS_TOKEN: ${{ secrets.INTERNAL_NOTIFICATIONS_TOKEN }}
+          INTERNAL_REMINDERS_TOKEN: ${{ secrets.INTERNAL_REMINDERS_TOKEN }}
+          RAILWAY_API_URL: ${{ steps.railway.outputs.railway_api_url }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ steps.branch-creds.outputs.service_role_key }}
+          VERCEL_URL: ${{ steps.vercel.outputs.vercel_url }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${RAILWAY_API_URL:-}" || "${RAILWAY_API_URL}" == "pending" ]]; then
+            echo "::error::Railway preview API URL is unavailable, cannot configure Supabase function secrets."
+            exit 1
+          fi
+
+          if [[ -z "${VERCEL_URL:-}" || "${VERCEL_URL}" == "https://vercel.com/dashboard" ]]; then
+            echo "::warning::Vercel preview URL not available, notifications-dispatch may fail in preview"
+            # Fallback to Railway URL — not ideal but allows workflow to continue
+            VERCEL_URL="${RAILWAY_API_URL}"
+          fi
+
+          ENV_FILE="$(mktemp)"
+          trap 'rm -f "$ENV_FILE"' EXIT
+
+          cat <<EOF > "$ENV_FILE"
+          SUPABASE_URL=${BRANCH_API_URL}
+          SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+          REMINDERS_DISPATCH_URL=${RAILWAY_API_URL}/internal/reminders/dispatch
+          NOTIFICATIONS_DISPATCH_URL=${VERCEL_URL}/api/internal/notifications/dispatch
+          INTERNAL_REMINDERS_TOKEN=${INTERNAL_REMINDERS_TOKEN}
+          INTERNAL_NOTIFICATIONS_TOKEN=${INTERNAL_NOTIFICATIONS_TOKEN}
+          EOF
+
+          supabase secrets set \
+            --project-ref "${BRANCH_PROJECT_REF}" \
+            --env-file "$ENV_FILE"
+
+      # 8. Deploy preview branch Edge Functions after secrets are in place.
+      - name: Deploy Supabase preview Edge Functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          supabase functions deploy \
+            --project-ref "${{ steps.supabase-branch.outputs.branch_ref }}" \
+            --use-api
+
+      # 9. Create or refresh branch-local cron jobs with the preview branch URL.
+      - name: Configure Supabase preview cron jobs
+        env:
+          ADMIN_DATABASE_URL: ${{ steps.branch-creds.outputs.admin_database_url }}
+          BRANCH_API_URL: ${{ steps.branch-creds.outputs.branch_api_url }}
+        run: |
+          set -euo pipefail
+
+          PGSSLMODE=require psql "${ADMIN_DATABASE_URL}" \
+            -v ON_ERROR_STOP=1 \
+            -c "select public.configure_edge_function_cron('${BRANCH_API_URL}');"
+
+          PGSSLMODE=require psql "${ADMIN_DATABASE_URL}" \
+            -v ON_ERROR_STOP=1 \
+            -c "select jobname, schedule from cron.job where jobname like 'edge-function-%' order by jobname;"
+
+      # 10. Post / update the single unified PR comment
       - name: Post preview environment comment
         uses: actions/github-script@v7
         with:

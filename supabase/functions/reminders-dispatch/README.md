@@ -1,8 +1,8 @@
-# channel-read-state-repair (Supabase Edge Function)
+# reminders-dispatch (Supabase Edge Function)
 
-Runs nightly unread/read-cursor reconciliation for all orgs by calling:
+Calls the internal app endpoint:
 
-- `recompute_all_channel_unread_for_org(p_org_id)`
+- `POST /internal/reminders/dispatch`
 
 Scheduler source of truth:
 
@@ -11,13 +11,19 @@ Scheduler source of truth:
 
 ## Required environment variables
 
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
+- `REMINDERS_DISPATCH_URL`
+- `INTERNAL_REMINDERS_TOKEN`
+
+## Optional environment variables
+
+- `REMINDERS_DISPATCH_LIMIT` (default handled by API)
+- `REMINDERS_DISPATCH_LEASE_SECONDS` (default handled by API)
+- `REMINDERS_DISPATCH_LEASE_OWNER` (default: `supabase-edge-cron`)
 
 ## Deploy
 
 ```bash
-supabase functions deploy channel-read-state-repair
+supabase functions deploy reminders-dispatch
 ```
 
 ## Configure cron

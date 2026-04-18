@@ -208,7 +208,33 @@ describe('usePushToggle — toggle() turning ON', () => {
     );
   });
 
-  it('skips storePushToken when getExpoPushToken returns null', async () => {
+  it('requests OS permission from the toggle when status is undetermined', async () => {
+    mockGetPermissionsAsync
+      .mockResolvedValueOnce({ status: 'undetermined' })
+      .mockResolvedValueOnce({ status: 'granted' })
+      .mockResolvedValueOnce({ status: 'granted' });
+
+    const { result } = renderHook(() => usePushToggle());
+    const initialToggle = result.current.toggle;
+    await waitFor(() => expect(result.current.toggle).not.toBe(initialToggle));
+
+    await act(async () => {
+      await result.current.toggle();
+    });
+
+    expect(mockGetExpoPushToken).toHaveBeenCalledWith({ requestPermissions: true });
+    expect(mockStorePushToken).toHaveBeenCalledWith(
+      'org-1',
+      'profile-1',
+      'ExponentPushToken[xyz789]',
+    );
+    expect(mockUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({ pref_key: '__push__', muted: false }),
+      { onConflict: 'org_id,profile_id,pref_key' },
+    );
+  });
+
+  it('skips storePushToken when getExpoPushToken returns null but still unmutes after permission is granted', async () => {
     mockGetExpoPushToken.mockResolvedValue(null);
 
     const { result } = renderHook(() => usePushToggle());
@@ -219,6 +245,33 @@ describe('usePushToggle — toggle() turning ON', () => {
     });
 
     expect(mockStorePushToken).not.toHaveBeenCalled();
+    expect(mockUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({ pref_key: '__push__', muted: false }),
+      { onConflict: 'org_id,profile_id,pref_key' },
+    );
+  });
+
+  it('does not unmute when permission is still not granted after toggling on', async () => {
+    mockGetPermissionsAsync
+      .mockResolvedValueOnce({ status: 'undetermined' })
+      .mockResolvedValueOnce({ status: 'denied' })
+      .mockResolvedValueOnce({ status: 'denied' });
+    mockGetExpoPushToken.mockResolvedValue(null);
+
+    const { result } = renderHook(() => usePushToggle());
+    const initialToggle = result.current.toggle;
+    await waitFor(() => expect(result.current.toggle).not.toBe(initialToggle));
+
+    await act(async () => {
+      await result.current.toggle();
+    });
+
+    expect(mockGetExpoPushToken).toHaveBeenCalledWith({ requestPermissions: true });
+    expect(mockStorePushToken).not.toHaveBeenCalled();
+    expect(mockUpsert).not.toHaveBeenCalledWith(
+      expect.objectContaining({ pref_key: '__push__', muted: false }),
+      { onConflict: 'org_id,profile_id,pref_key' },
+    );
   });
 
   it('resets isToggling to false after completion', async () => {

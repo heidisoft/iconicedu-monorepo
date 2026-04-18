@@ -79,7 +79,7 @@ jobs:
       - uses: pnpm/action-setup@v4
         if: steps.context.outputs.should_build == 'true'
         with:
-          version: '9.12.0'
+          version: '10.33.0'
 
       - name: Install dependencies
         if: steps.context.outputs.should_build == 'true'
@@ -89,6 +89,10 @@ jobs:
         if: steps.context.outputs.should_build == 'true'
         with:
           version: latest
+
+      - name: Install Railway and Vercel CLIs
+        if: steps.context.outputs.should_build == 'true'
+        run: npm install -g @railway/cli vercel --silent
 
       # 1. Fetch Supabase credentials for the selected build target
       - name: Fetch Supabase credentials
@@ -162,6 +166,104 @@ jobs:
       #       echo "railway_api_url=" >> "$GITHUB_OUTPUT"
       #     fi
 
+      - name: Resolve app URLs from Railway and Vercel
+        id: preview-urls
+        if: steps.context.outputs.should_build == 'true'
+        env:
+          BUILD_KIND: ${{ steps.context.outputs.build_kind }}
+          BRANCH_NAME: ${{ steps.context.outputs.branch_name }}
+          PR_NUMBER: ${{ steps.context.outputs.pr_number }}
+          RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${BUILD_KIND}" != "preview" ]]; then
+            echo "api_url=" >> "$GITHUB_OUTPUT"
+            echo "web_url=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          REPO_NAME="${{ github.event.repository.name }}"
+          TARGET_BRANCH="${BRANCH_NAME}"
+          RAILWAY_SERVICE_NAME="${REPO_NAME}"
+
+          if [[ "${TARGET_BRANCH}" == "main" ]]; then
+            RAILWAY_ENVIRONMENT="production"
+          else
+            if [[ -z "${PR_NUMBER:-}" ]]; then
+              echo "::error::PR number is required to resolve preview Railway and Vercel URLs for branch '${TARGET_BRANCH}'."
+              exit 1
+            fi
+            RAILWAY_ENVIRONMENT="${REPO_NAME}-pr-${PR_NUMBER}"
+          fi
+
+          railway_tmp_dir="$(mktemp -d)"
+          trap 'rm -rf "$railway_tmp_dir"' EXIT
+
+          pushd "$railway_tmp_dir" > /dev/null
+          railway project link "${RAILWAY_PROJECT_ID}" > /dev/null
+          railway environment link "${RAILWAY_ENVIRONMENT}" > /dev/null
+          railway service link "${RAILWAY_SERVICE_NAME}" > /dev/null
+
+          RAILWAY_STATUS_JSON="$(railway status --json)"
+          popd > /dev/null
+
+          API_HOST="$(
+            printf '%s' "$RAILWAY_STATUS_JSON" \
+              | jq -r '
+                  [
+                    .. | objects | .domain? // empty,
+                    .. | objects | .url? // empty
+                  ]
+                  | flatten
+                  | map(select(type == "string"))
+                  | map(gsub("^https?://"; ""))
+                  | map(sub("/.*$"; ""))
+                  | map(select(test("^[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")))
+                  | unique
+                  | .[]
+                ' \
+              | grep -E 'railway|\.app$' \
+              | head -n1 || true
+          )"
+
+          if [[ -z "${API_HOST}" ]]; then
+            echo "::error::Unable to resolve a Railway URL for environment '${RAILWAY_ENVIRONMENT}' and service '${RAILWAY_SERVICE_NAME}'."
+            exit 1
+          fi
+
+          API_URL="https://${API_HOST}"
+
+          pushd apps/web > /dev/null
+          VERCEL_LIST_OUTPUT="$(
+            vercel list \
+              --meta "githubCommitRef=${TARGET_BRANCH}" \
+              --status READY \
+              --token "${VERCEL_TOKEN}" \
+              2>/dev/null || true
+          )"
+          popd > /dev/null
+
+          WEB_URL="$(
+            printf '%s\n' "$VERCEL_LIST_OUTPUT" \
+              | grep -Eo 'https://[^[:space:]]+|[A-Za-z0-9.-]+\.vercel\.app' \
+              | head -n1 || true
+          )"
+
+          if [[ -z "${WEB_URL}" ]]; then
+            echo "::error::Unable to resolve a Vercel deployment URL for branch '${TARGET_BRANCH}'."
+            exit 1
+          fi
+
+          if [[ "${WEB_URL}" != https://* ]]; then
+            WEB_URL="https://${WEB_URL}"
+          fi
+
+          echo "api_url=${API_URL}" >> "$GITHUB_OUTPUT"
+          echo "web_url=${WEB_URL}" >> "$GITHUB_OUTPUT"
+
       # 3. Trigger EAS build
       - name: Trigger EAS build
         id: eas-build
@@ -182,13 +284,19 @@ jobs:
             --arg anon_key "${{ steps.supabase-creds.outputs.anon_key }}" \
             --arg posthog_key "${{ secrets.POSTHOG_KEY }}" \
             --arg posthog_host "${{ secrets.NEXT_PUBLIC_POSTHOG_HOST }}" \
+            --arg api_url "${{ steps.preview-urls.outputs.api_url }}" \
+            --arg web_url "${{ steps.preview-urls.outputs.web_url }}" \
             '.build[$profile].env = ((.build[$profile].env // {}) + {
               EXPO_PUBLIC_SUPABASE_URL: $supabase_url,
               EXPO_PUBLIC_SUPABASE_ANON_KEY: $anon_key,
               EXPO_PUBLIC_APP_ENV: $app_env,
               EXPO_PUBLIC_POSTHOG_KEY: $posthog_key,
               EXPO_PUBLIC_POSTHOG_HOST: $posthog_host
-            })' \
+            } + (if ($api_url | length) > 0 then {
+              EXPO_PUBLIC_API_URL: $api_url
+            } else {} end) + (if ($web_url | length) > 0 then {
+              EXPO_PUBLIC_WEB_URL: $web_url
+            } else {} end))' \
             eas.json > "$tmp_eas_json"
           mv "$tmp_eas_json" eas.json
 

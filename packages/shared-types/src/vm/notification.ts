@@ -9,6 +9,7 @@ export type NotificationDecisionReason =
   | 'scoped_preference'
   | 'global_preference'
   | 'system_default'
+  | 'mention_priority_override'
   | 'presence_active'
   | 'channel_recently_read'
   | 'critical_override';

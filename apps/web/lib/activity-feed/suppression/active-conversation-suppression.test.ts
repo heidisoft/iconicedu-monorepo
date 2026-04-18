@@ -7,7 +7,11 @@ import {
 
 function createSupabaseMock(input: {
   profiles?: Array<{ id: string; account_id: string | null }>;
-  presence?: Array<{ profile_id: string; live_status: string | null }>;
+  presence?: Array<{
+    profile_id: string;
+    live_status: string | null;
+    last_seen_at: string | null;
+  }>;
   readStates?: Array<{ account_id: string; last_read_at: string | null }>;
 }) {
   return {
@@ -48,7 +52,13 @@ describe('resolveActiveConversationSuppressedRecipients', () => {
   it('suppresses recipients when presence is active and read state is recent', async () => {
     const supabase = createSupabaseMock({
       profiles: [{ id: 'profile-1', account_id: 'account-1' }],
-      presence: [{ profile_id: 'profile-1', live_status: 'online' }],
+      presence: [
+        {
+          profile_id: 'profile-1',
+          live_status: 'online',
+          last_seen_at: '2026-03-12T10:00:45.000Z',
+        },
+      ],
       readStates: [{ account_id: 'account-1', last_read_at: '2026-03-12T10:00:30.000Z' }],
     });
 
@@ -73,7 +83,13 @@ describe('resolveActiveConversationSuppressedRecipients', () => {
   it('does not suppress when only one active signal is present', async () => {
     const supabase = createSupabaseMock({
       profiles: [{ id: 'profile-1', account_id: 'account-1' }],
-      presence: [{ profile_id: 'profile-1', live_status: 'online' }],
+      presence: [
+        {
+          profile_id: 'profile-1',
+          live_status: 'online',
+          last_seen_at: '2026-03-12T10:00:45.000Z',
+        },
+      ],
       readStates: [{ account_id: 'account-1', last_read_at: null }],
     });
 
@@ -97,7 +113,13 @@ describe('resolveActiveConversationSuppressedRecipients', () => {
   it('does not suppress when channel id cannot be resolved', async () => {
     const supabase = createSupabaseMock({
       profiles: [{ id: 'profile-1', account_id: 'account-1' }],
-      presence: [{ profile_id: 'profile-1', live_status: 'online' }],
+      presence: [
+        {
+          profile_id: 'profile-1',
+          live_status: 'online',
+          last_seen_at: '2026-03-12T10:00:45.000Z',
+        },
+      ],
       readStates: [{ account_id: 'account-1', last_read_at: '2026-03-12T10:00:30.000Z' }],
     });
 
@@ -127,7 +149,13 @@ describe('resolveActiveConversationSuppressedRecipients', () => {
     ).toISOString();
     const supabase = createSupabaseMock({
       profiles: [{ id: 'profile-1', account_id: 'account-1' }],
-      presence: [{ profile_id: 'profile-1', live_status: 'teaching' }],
+      presence: [
+        {
+          profile_id: 'profile-1',
+          live_status: 'teaching',
+          last_seen_at: '2026-03-12T10:00:50.000Z',
+        },
+      ],
       readStates: [{ account_id: 'account-1', last_read_at: cutoff }],
     });
 
@@ -146,5 +174,35 @@ describe('resolveActiveConversationSuppressedRecipients', () => {
 
     expect(result.suppressedProfileIds).toEqual(['profile-1']);
     expect(result.recipientProfileIds).toEqual([]);
+  });
+
+  it('does not suppress when active presence is stale even if read state is recent', async () => {
+    const supabase = createSupabaseMock({
+      profiles: [{ id: 'profile-1', account_id: 'account-1' }],
+      presence: [
+        {
+          profile_id: 'profile-1',
+          live_status: 'in_class',
+          last_seen_at: '2026-03-12T09:54:59.000Z',
+        },
+      ],
+      readStates: [{ account_id: 'account-1', last_read_at: '2026-03-12T10:00:30.000Z' }],
+    });
+
+    const result = await resolveActiveConversationSuppressedRecipients({
+      supabase: supabase as never,
+      event: {
+        org_id: 'org-1',
+        event_type: 'dm.posted',
+        scope: { kind: 'channel', channelId: 'channel-1' },
+        payload: {},
+        occurred_at: '2026-03-12T10:01:00.000Z',
+      } as never,
+      recipientProfileIds: ['profile-1'],
+      now: '2026-03-12T10:01:00.000Z',
+    });
+
+    expect(result.suppressedProfileIds).toEqual([]);
+    expect(result.recipientProfileIds).toEqual(['profile-1']);
   });
 });

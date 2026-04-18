@@ -5,6 +5,7 @@ import type {
 import type { SupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 
 import { buildNotificationDecision } from '@iconicedu/web/lib/notifications/decision-engine';
+import { buildPersonalizedSessionCopy } from '@iconicedu/web/lib/notifications/push-copy';
 import { sendEmailNotification } from '@iconicedu/web/lib/notifications/providers/email-provider';
 import { sendPushNotification } from '@iconicedu/web/lib/notifications/providers/push-provider';
 import { sendSmsNotification } from '@iconicedu/web/lib/notifications/providers/sms-provider';
@@ -37,6 +38,41 @@ function buildAttemptBucket(input: { timing: string; runAt: string }) {
   const rounded = new Date(runDate);
   rounded.setSeconds(0, 0);
   return `${input.timing}:${rounded.toISOString().slice(0, 16)}`;
+}
+
+async function resolveActivityFeedItemId(input: {
+  supabase: SupabaseServiceClient;
+  orgId: string;
+  activityEventId: string;
+  recipientProfileId: string;
+}) {
+  const response = await input.supabase
+    .from('activity_feed_items')
+    .select('id')
+    .eq('org_id', input.orgId)
+    .eq('recipient_profile_id', input.recipientProfileId)
+    .eq('source_event_id', input.activityEventId)
+    .is('deleted_at', null)
+    .maybeSingle<{ id: string }>();
+
+  if (response.error) {
+    throw new Error(response.error.message);
+  }
+
+  return response.data?.id ?? null;
+}
+
+async function tryResolveActivityFeedItemId(input: {
+  supabase: SupabaseServiceClient;
+  orgId: string;
+  activityEventId: string;
+  recipientProfileId: string;
+}) {
+  try {
+    return await resolveActivityFeedItemId(input);
+  } catch {
+    return null;
+  }
 }
 
 async function logDispatch(input: {
@@ -76,16 +112,36 @@ async function sendNotificationViaChannel(input: {
       : null;
 
   if (input.job.delivery_channel === 'push') {
-    await sendPushNotification({
+    const activityFeedItemId = await tryResolveActivityFeedItemId({
+      supabase: input.supabase,
+      orgId: input.job.org_id,
+      activityEventId: input.job.activity_event_id,
+      recipientProfileId: input.job.recipient_profile_id,
+    });
+
+    const result = await sendPushNotification({
       orgId: input.job.org_id,
       recipientProfileId: input.job.recipient_profile_id,
       prefKey: input.job.pref_key,
       title,
       summary,
+      activityFeedItemId,
+      threadId: typeof payload.threadId === 'string' ? payload.threadId : null,
       scopeKind: input.job.scope_kind ?? undefined,
       scopeId: input.job.scope_id ?? undefined,
       metadata: payload,
     });
+    await logDispatch({
+      supabase: input.supabase,
+      orgId: input.job.org_id,
+      notificationDispatchJobId: input.job.id,
+      result: 'succeeded',
+      details: {
+        channel: input.job.delivery_channel,
+        prefKey: input.job.pref_key,
+      },
+    });
+    return result;
   } else if (input.job.delivery_channel === 'email') {
     await sendEmailNotification({
       orgId: input.job.org_id,
@@ -115,21 +171,31 @@ async function sendNotificationViaChannel(input: {
       prefKey: input.job.pref_key,
     },
   });
+
+  return undefined;
 }
 
 export async function enqueueNotificationDispatchJobs(input: EnqueueDispatchInput) {
   const upsertRows: Array<Record<string, unknown>> = [];
   const eventPayload = (input.event.payload ?? {}) as Record<string, unknown>;
-  const payloadTitle =
+  const baseTitle =
     typeof eventPayload.title === 'string' && eventPayload.title.trim().length > 0
       ? eventPayload.title
       : input.event.event_type;
-  const payloadSummary =
+  const baseSummary =
     typeof eventPayload.summary === 'string' && eventPayload.summary.trim().length > 0
       ? eventPayload.summary
       : null;
 
   for (const recipientProfileId of input.recipientProfileIds) {
+    const personalized = buildPersonalizedSessionCopy(
+      input.event.event_type,
+      eventPayload,
+      recipientProfileId,
+    );
+    const payloadTitle = personalized?.title ?? baseTitle;
+    const payloadSummary = personalized?.summary ?? baseSummary;
+
     const decision = await buildNotificationDecision({
       supabase: input.supabase,
       event: input.event,
@@ -159,6 +225,8 @@ export async function enqueueNotificationDispatchJobs(input: EnqueueDispatchInpu
           occurredAt: input.event.occurred_at,
           title: payloadTitle,
           summary: payloadSummary,
+          threadId:
+            typeof eventPayload.threadId === 'string' ? eventPayload.threadId : null,
           rawEventPayload: eventPayload,
         },
         status: 'pending',
@@ -278,7 +346,7 @@ export async function dispatchDueNotificationJobs(input: {
         continue;
       }
 
-      await sendNotificationViaChannel({
+      const sendResult = await sendNotificationViaChannel({
         supabase: input.supabase,
         job,
       });
@@ -288,6 +356,10 @@ export async function dispatchDueNotificationJobs(input: {
         .update({
           status: 'succeeded',
           dispatched_at: now,
+          payload: {
+            ...(job.payload ?? {}),
+            expoTicketIds: sendResult?.ticketIds ?? [],
+          },
           lease_owner: null,
           lease_until: null,
           updated_at: now,

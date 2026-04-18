@@ -6,8 +6,8 @@ Calls the internal app endpoint:
 
 Scheduler source of truth:
 
-- **Supabase Scheduled Functions only** for notifications dispatch.
-- No GitHub Actions cron workflow is used for notifications dispatch.
+- `public.configure_edge_function_cron('<project-url>')` in `supabase/migrations/20260417000000_edge_function_cron.sql`
+- Preview branches run this automatically from `.github/workflows/ci.yml`
 
 ## Required environment variables
 
@@ -26,9 +26,10 @@ Scheduler source of truth:
 supabase functions deploy notifications-dispatch
 ```
 
-## Example schedule (Supabase Dashboard)
+## Configure cron
 
-Use scheduled invocations to run every 5 minutes:
+After migrations are applied to an environment, configure its cron jobs with that environment's own project URL:
 
-- Function: `notifications-dispatch`
-- Cron: `*/5 * * * *`
+```sql
+select public.configure_edge_function_cron('https://<project-ref>.supabase.co');
+```

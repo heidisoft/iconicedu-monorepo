@@ -1,5 +1,13 @@
 import { File as ExpoFile } from 'expo-file-system';
-import type { MessageVM, ReactionVM, ThreadVM } from '@iconicedu/shared-types';
+import type {
+  MessageSendFileInput,
+  MessageSendFilesInput,
+  MessageSendTextInput,
+  MessageVM,
+  ReactionVM,
+  ThreadVM,
+} from '@iconicedu/shared-types';
+import { apiPost } from '@/lib/api/http-client';
 import { supabase } from '@/lib/supabase/client';
 import {
   mapRowToMessageVM,
@@ -30,19 +38,6 @@ const TYPE_TABLE: Record<string, string> = {
   'feedback-request': 'message_feedback_request',
 };
 
-function createClientUuid(): string {
-  const nativeRandomUuid = globalThis.crypto?.randomUUID;
-  if (typeof nativeRandomUuid === 'function') {
-    return nativeRandomUuid.call(globalThis.crypto);
-  }
-
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
-    const random = Math.floor(Math.random() * 16);
-    const value = char === 'x' ? random : (random & 0x3) | 0x8;
-    return value.toString(16);
-  });
-}
-
 type RawThreadRow = {
   id: string;
   org_id: string;
@@ -69,44 +64,12 @@ type RawThreadReadStateRow = {
   unread_count: number | null;
 };
 
-type ParentMessageLookupRow = {
-  id: string;
-  org_id: string;
-  channel_id: string;
-  sender_profile_id: string;
-  thread_id: string | null;
-  type: string;
-};
-
 type ThreadLookupRow = {
   id: string;
   parent_message_id: string | null;
   channel_id: string;
   org_id: string;
   message_count?: number | null;
-};
-
-type CurrentAccountLookupRow = {
-  id: string;
-  org_id: string | null;
-  active_profile_id: string | null;
-};
-
-type ProfileOwnershipLookupRow = {
-  id: string;
-  account_id: string;
-  org_id: string;
-};
-
-type ChannelKindLookupRow = {
-  id: string;
-  kind: string;
-  purpose?: string | null;
-};
-
-type SupportVisibilityFields = {
-  visibility_type: 'all' | 'specific-users';
-  visibility_user_ids?: string[];
 };
 
 export function filterVisibleMessageRows<T extends RawMessageRow>(
@@ -117,286 +80,6 @@ export function filterVisibleMessageRows<T extends RawMessageRow>(
     if (row.visibility_type !== 'specific-users') return true;
     if (!currentProfileId) return false;
     return (row.visibility_user_ids ?? []).includes(currentProfileId);
-  });
-}
-
-async function fetchChannelLookupRow(
-  orgId: string,
-  channelId: string,
-): Promise<ChannelKindLookupRow | null> {
-  const { data: channel, error: channelError } = await supabase
-    .from('channels')
-    .select('id, kind, purpose')
-    .eq('org_id', orgId)
-    .eq('id', channelId)
-    .is('deleted_at', null)
-    .maybeSingle<ChannelKindLookupRow>();
-
-  if (channelError) throw channelError;
-  return channel;
-}
-
-function isSupportChannel(channel: ChannelKindLookupRow | null) {
-  return channel?.kind === 'support' || channel?.purpose === 'support';
-}
-
-async function fetchCurrentAccountInOrg(orgId: string) {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user?.id) {
-    return null;
-  }
-
-  const { data: currentAccount, error: accountError } = await supabase
-    .from('accounts')
-    .select('id, org_id, active_profile_id')
-    .eq('auth_user_id', user.id)
-    .eq('org_id', orgId)
-    .is('deleted_at', null)
-    .maybeSingle<CurrentAccountLookupRow>();
-
-  if (accountError) throw accountError;
-  return currentAccount;
-}
-
-async function isStaffActorInOrg(
-  orgId: string,
-  senderProfileId: string,
-): Promise<boolean> {
-  const { data: senderProfile, error: senderProfileError } = await supabase
-    .from('profiles')
-    .select('id, kind')
-    .eq('org_id', orgId)
-    .eq('id', senderProfileId)
-    .is('deleted_at', null)
-    .maybeSingle<{ id: string; kind: string | null }>();
-
-  if (senderProfileError) throw senderProfileError;
-  if (senderProfile?.kind === 'staff') {
-    return true;
-  }
-
-  const currentAccount = await fetchCurrentAccountInOrg(orgId);
-  if (!currentAccount?.id) {
-    return false;
-  }
-
-  const { data: staffRole, error: staffRoleError } = await supabase
-    .from('user_roles')
-    .select('id')
-    .eq('org_id', orgId)
-    .eq('account_id', currentAccount.id)
-    .eq('role_key', 'staff')
-    .is('deleted_at', null)
-    .limit(1)
-    .maybeSingle<{ id: string }>();
-
-  if (staffRoleError) throw staffRoleError;
-  return Boolean(staffRole?.id);
-}
-
-async function listSupportPrivilegedProfileIds(orgId: string): Promise<string[]> {
-  const [
-    staffProfilesResponse,
-    privilegedRoleAccountsResponse,
-    privilegedPrimaryRoleAccountsResponse,
-  ] = await Promise.all([
-    supabase
-      .from('profiles')
-      .select('id')
-      .eq('org_id', orgId)
-      .eq('kind', 'staff')
-      .is('deleted_at', null),
-    supabase
-      .from('user_roles')
-      .select('account_id')
-      .eq('org_id', orgId)
-      .in('role_key', ['owner', 'admin', 'staff'])
-      .is('deleted_at', null),
-    supabase
-      .from('accounts')
-      .select('id')
-      .eq('org_id', orgId)
-      .in('primary_role', ['owner', 'admin', 'staff'])
-      .is('deleted_at', null),
-  ]);
-
-  if (staffProfilesResponse.error) throw staffProfilesResponse.error;
-  if (privilegedRoleAccountsResponse.error) throw privilegedRoleAccountsResponse.error;
-  if (privilegedPrimaryRoleAccountsResponse.error) {
-    throw privilegedPrimaryRoleAccountsResponse.error;
-  }
-
-  const privilegedAccountIds = Array.from(
-    new Set([
-      ...(privilegedRoleAccountsResponse.data ?? []).map((row) => row.account_id),
-      ...(privilegedPrimaryRoleAccountsResponse.data ?? []).map((row) => row.id),
-    ]),
-  );
-
-  const { data: privilegedProfiles, error: privilegedProfilesError } =
-    privilegedAccountIds.length > 0
-      ? await supabase
-          .from('profiles')
-          .select('id')
-          .eq('org_id', orgId)
-          .in('account_id', privilegedAccountIds)
-          .is('deleted_at', null)
-      : { data: [], error: null };
-
-  if (privilegedProfilesError) throw privilegedProfilesError;
-
-  return Array.from(
-    new Set([
-      ...(staffProfilesResponse.data ?? []).map((row) => row.id),
-      ...(privilegedProfiles ?? []).map((row) => row.id),
-    ]),
-  );
-}
-
-async function resolveSupportQuestionOwnerProfileId(input: {
-  orgId: string;
-  channelId: string;
-  threadParentId?: string | null;
-  threadId?: string | null;
-  parentSenderProfileId?: string | null;
-}): Promise<string | null> {
-  if (input.parentSenderProfileId) {
-    return input.parentSenderProfileId;
-  }
-
-  if (input.threadParentId) {
-    const { data: parentMessage, error: parentError } = await supabase
-      .from('messages')
-      .select('id, sender_profile_id, org_id, channel_id')
-      .eq('id', input.threadParentId)
-      .maybeSingle<{
-        id: string;
-        sender_profile_id: string;
-        org_id: string;
-        channel_id: string;
-      }>();
-
-    if (parentError) throw parentError;
-    if (!parentMessage) {
-      return null;
-    }
-    if (
-      parentMessage.org_id !== input.orgId ||
-      parentMessage.channel_id !== input.channelId
-    ) {
-      return null;
-    }
-    return parentMessage.sender_profile_id;
-  }
-
-  if (!input.threadId) {
-    return null;
-  }
-
-  const { data: thread, error: threadError } = await supabase
-    .from('threads')
-    .select('id, parent_message_id, channel_id, org_id')
-    .eq('id', input.threadId)
-    .maybeSingle<ThreadLookupRow>();
-
-  if (threadError) throw threadError;
-  if (!thread?.parent_message_id) {
-    return null;
-  }
-  if (thread.org_id !== input.orgId || thread.channel_id !== input.channelId) {
-    return null;
-  }
-
-  const { data: parentMessage, error: parentError } = await supabase
-    .from('messages')
-    .select('id, sender_profile_id')
-    .eq('id', thread.parent_message_id)
-    .maybeSingle<{ id: string; sender_profile_id: string }>();
-
-  if (parentError) throw parentError;
-  return parentMessage?.sender_profile_id ?? null;
-}
-
-function buildSupportVisibilityFields(input: {
-  isSupportChannel: boolean;
-  isStaffSender: boolean;
-  isThreadReply: boolean;
-  currentProfileId: string;
-  questionOwnerProfileId?: string | null;
-  privilegedProfileIds?: string[];
-}): SupportVisibilityFields {
-  if (!input.isSupportChannel) {
-    return { visibility_type: 'all' };
-  }
-
-  if (!input.isThreadReply) {
-    if (input.isStaffSender) {
-      throw new Error(
-        'Support staff must reply in a thread. Top-level support posts are not allowed.',
-      );
-    }
-
-    return {
-      visibility_type: 'specific-users',
-      visibility_user_ids: Array.from(
-        new Set([input.currentProfileId, ...(input.privilegedProfileIds ?? [])]),
-      ),
-    };
-  }
-
-  const ownerId = input.questionOwnerProfileId;
-  if (!ownerId) {
-    throw new Error('Unable to resolve support question owner for threaded reply.');
-  }
-  if (!input.isStaffSender && input.currentProfileId !== ownerId) {
-    throw new Error('Only support staff or the question owner can reply in this thread.');
-  }
-
-  return {
-    visibility_type: 'specific-users',
-    visibility_user_ids: Array.from(
-      new Set([ownerId, ...(input.privilegedProfileIds ?? [])]),
-    ),
-  };
-}
-
-async function resolveSupportVisibilityForSend(input: {
-  orgId: string;
-  channelId: string;
-  currentProfileId: string;
-  senderProfileId: string;
-  threadParentId?: string | null;
-  threadId?: string | null;
-  parentSenderProfileId?: string | null;
-}): Promise<SupportVisibilityFields> {
-  const channel = await fetchChannelLookupRow(input.orgId, input.channelId);
-  const supportChannel = isSupportChannel(channel);
-  if (!supportChannel) {
-    return { visibility_type: 'all' };
-  }
-
-  const staffSender = await isStaffActorInOrg(input.orgId, input.senderProfileId);
-  const questionOwnerProfileId =
-    input.threadParentId || input.threadId
-      ? await resolveSupportQuestionOwnerProfileId({
-          orgId: input.orgId,
-          channelId: input.channelId,
-          threadParentId: input.threadParentId,
-          threadId: input.threadId,
-          parentSenderProfileId: input.parentSenderProfileId,
-        })
-      : null;
-  const privilegedProfileIds = await listSupportPrivilegedProfileIds(input.orgId);
-
-  return buildSupportVisibilityFields({
-    isSupportChannel: true,
-    isStaffSender: staffSender,
-    isThreadReply: Boolean(input.threadParentId || input.threadId),
-    currentProfileId: input.currentProfileId,
-    questionOwnerProfileId,
-    privilegedProfileIds,
   });
 }
 
@@ -954,338 +637,6 @@ async function loadProfileDisplayName(profileId: string): Promise<string | null>
   return fallbackName || null;
 }
 
-async function resolveWritableSenderProfileId(
-  orgId: string,
-  requestedSenderProfileId: string,
-): Promise<string> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user?.id) return requestedSenderProfileId;
-
-  const { data: currentAccount, error: accountError } = await supabase
-    .from('accounts')
-    .select('id, org_id, active_profile_id')
-    .eq('auth_user_id', user.id)
-    .is('deleted_at', null)
-    .maybeSingle<CurrentAccountLookupRow>();
-
-  if (accountError) throw accountError;
-  if (!currentAccount?.id) return requestedSenderProfileId;
-
-  const { data: requestedProfile, error: requestedProfileError } = await supabase
-    .from('profiles')
-    .select('id, account_id, org_id')
-    .eq('id', requestedSenderProfileId)
-    .is('deleted_at', null)
-    .maybeSingle<ProfileOwnershipLookupRow>();
-
-  if (requestedProfileError) throw requestedProfileError;
-  if (!requestedProfile) return requestedSenderProfileId;
-
-  const ownsRequestedProfile =
-    requestedProfile.org_id === orgId &&
-    requestedProfile.account_id === currentAccount.id;
-  if (ownsRequestedProfile) return requestedSenderProfileId;
-
-  const { data: familyLink, error: familyLinkError } = await supabase
-    .from('family_links')
-    .select('id')
-    .eq('org_id', orgId)
-    .eq('guardian_account_id', currentAccount.id)
-    .eq('child_account_id', requestedProfile.account_id)
-    .is('deleted_at', null)
-    .maybeSingle<{ id: string }>();
-
-  if (familyLinkError) throw familyLinkError;
-  if (familyLink?.id) return requestedSenderProfileId;
-
-  let fallbackProfileId = currentAccount.active_profile_id;
-  if (fallbackProfileId) {
-    const { data: fallbackProfile, error: fallbackProfileError } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('id', fallbackProfileId)
-      .eq('account_id', currentAccount.id)
-      .eq('org_id', orgId)
-      .is('deleted_at', null)
-      .maybeSingle<{ id: string }>();
-
-    if (fallbackProfileError) throw fallbackProfileError;
-    if (fallbackProfile?.id) return fallbackProfile.id;
-  }
-
-  const { data: firstOwnedProfile, error: firstOwnedProfileError } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('account_id', currentAccount.id)
-    .eq('org_id', orgId)
-    .is('deleted_at', null)
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .maybeSingle<{ id: string }>();
-
-  if (firstOwnedProfileError) throw firstOwnedProfileError;
-  if (firstOwnedProfile?.id) return firstOwnedProfile.id;
-
-  return requestedSenderProfileId;
-}
-
-async function resolveDmSenderProfileId(
-  orgId: string,
-  channelId: string,
-  requestedSenderProfileId: string,
-  writableSenderProfileId: string,
-): Promise<string> {
-  const channel = await fetchChannelLookupRow(orgId, channelId);
-  if (!channel || channel.kind !== 'dm') return writableSenderProfileId;
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user?.id) return writableSenderProfileId;
-
-  const { data: currentAccount, error: accountError } = await supabase
-    .from('accounts')
-    .select('id, org_id, active_profile_id')
-    .eq('auth_user_id', user.id)
-    .is('deleted_at', null)
-    .maybeSingle<CurrentAccountLookupRow>();
-
-  if (accountError) throw accountError;
-  if (!currentAccount?.id) return writableSenderProfileId;
-
-  const { data: channelMembers, error: membersError } = await supabase
-    .from('channel_members')
-    .select('profile_id')
-    .eq('org_id', orgId)
-    .eq('channel_id', channelId)
-    .is('deleted_at', null);
-
-  if (membersError) throw membersError;
-
-  const memberProfileIds = Array.from(
-    new Set(
-      (channelMembers ?? [])
-        .map((member) => (member.profile_id as string | undefined) ?? '')
-        .filter(Boolean),
-    ),
-  );
-
-  if (!memberProfileIds.length) return writableSenderProfileId;
-  if (memberProfileIds.includes(writableSenderProfileId)) return writableSenderProfileId;
-
-  const { data: familyLinks, error: familyLinksError } = await supabase
-    .from('family_links')
-    .select('child_account_id')
-    .eq('org_id', orgId)
-    .eq('guardian_account_id', currentAccount.id)
-    .is('deleted_at', null);
-
-  if (familyLinksError) throw familyLinksError;
-
-  const candidateAccountIds = Array.from(
-    new Set([
-      currentAccount.id,
-      ...(familyLinks ?? [])
-        .map((link) => (link.child_account_id as string | undefined) ?? '')
-        .filter(Boolean),
-    ]),
-  );
-
-  const { data: writableMemberProfiles, error: writableProfilesError } = await supabase
-    .from('profiles')
-    .select('id, account_id, org_id')
-    .eq('org_id', orgId)
-    .in('id', memberProfileIds)
-    .in('account_id', candidateAccountIds)
-    .is('deleted_at', null);
-
-  if (writableProfilesError) throw writableProfilesError;
-
-  const typedProfiles = (writableMemberProfiles ?? []) as ProfileOwnershipLookupRow[];
-  if (!typedProfiles.length) return writableSenderProfileId;
-
-  const requestedWritableMember = typedProfiles.find(
-    (profile) => profile.id === requestedSenderProfileId,
-  );
-  if (requestedWritableMember) return requestedWritableMember.id;
-
-  if (currentAccount.active_profile_id) {
-    const activeWritableMember = typedProfiles.find(
-      (profile) => profile.id === currentAccount.active_profile_id,
-    );
-    if (activeWritableMember) return activeWritableMember.id;
-  }
-
-  const ownedWritableMember = typedProfiles.find(
-    (profile) => profile.account_id === currentAccount.id,
-  );
-  if (ownedWritableMember) return ownedWritableMember.id;
-
-  const linkedWritableMember = typedProfiles[0];
-  if (linkedWritableMember) return linkedWritableMember.id;
-
-  return writableSenderProfileId;
-}
-
-async function resolveThreadContextForSend(input: {
-  orgId: string;
-  channelId: string;
-  senderProfileId: string;
-  requestedThreadId?: string;
-  threadParentId?: string;
-  now: string;
-}): Promise<{
-  threadId: string | null;
-  threadCreated: boolean;
-  parentSenderProfileId: string | null;
-}> {
-  if (!input.threadParentId) {
-    return {
-      threadId: input.requestedThreadId ?? null,
-      threadCreated: false,
-      parentSenderProfileId: null,
-    };
-  }
-
-  let threadId = input.requestedThreadId ?? null;
-  let threadCreated = false;
-
-  const { data: parentMessage, error: parentError } = await supabase
-    .from('messages')
-    .select('id, org_id, channel_id, sender_profile_id, thread_id, type')
-    .eq('id', input.threadParentId)
-    .maybeSingle<ParentMessageLookupRow>();
-
-  if (parentError) throw parentError;
-  if (
-    !parentMessage ||
-    parentMessage.org_id !== input.orgId ||
-    parentMessage.channel_id !== input.channelId
-  ) {
-    throw new Error('Parent message not found');
-  }
-
-  if (parentMessage.thread_id) {
-    threadId = parentMessage.thread_id;
-  } else if (threadId) {
-    const { data: existingThread, error: threadLookupError } = await supabase
-      .from('threads')
-      .select('id, parent_message_id, channel_id, org_id')
-      .eq('id', threadId)
-      .maybeSingle<ThreadLookupRow>();
-
-    if (threadLookupError) throw threadLookupError;
-    if (
-      !existingThread ||
-      existingThread.parent_message_id !== parentMessage.id ||
-      existingThread.channel_id !== input.channelId ||
-      existingThread.org_id !== input.orgId
-    ) {
-      threadId = null;
-    }
-  }
-
-  if (!threadId) {
-    const [snippet, authorName] = await Promise.all([
-      loadMessageSnippet(parentMessage.id, parentMessage.type),
-      loadProfileDisplayName(parentMessage.sender_profile_id),
-    ]);
-
-    const { data: insertedThread, error: threadInsertError } = await supabase
-      .from('threads')
-      .insert({
-        org_id: input.orgId,
-        channel_id: input.channelId,
-        parent_message_id: parentMessage.id,
-        snippet: snippet.slice(0, 140),
-        author_id: parentMessage.sender_profile_id,
-        author_name: authorName,
-        message_count: 1,
-        last_reply_at: input.now,
-        created_at: input.now,
-        created_by: input.senderProfileId,
-        updated_at: input.now,
-        updated_by: input.senderProfileId,
-      })
-      .select('id')
-      .single<{ id: string }>();
-
-    if (threadInsertError || !insertedThread) {
-      throw threadInsertError ?? new Error('Unable to create thread.');
-    }
-
-    threadId = insertedThread.id;
-    threadCreated = true;
-
-    const { error: parentUpdateError } = await supabase
-      .from('messages')
-      .update({
-        thread_id: threadId,
-        updated_at: input.now,
-        updated_by: input.senderProfileId,
-      })
-      .eq('id', parentMessage.id);
-
-    if (parentUpdateError) throw parentUpdateError;
-  }
-
-  const participantRows = Array.from(
-    new Set([parentMessage.sender_profile_id, input.senderProfileId]),
-  ).map((profileId) => ({
-    org_id: input.orgId,
-    thread_id: threadId as string,
-    profile_id: profileId,
-    created_at: input.now,
-    created_by: input.senderProfileId,
-    updated_at: input.now,
-    updated_by: input.senderProfileId,
-  }));
-
-  const { error: participantsError } = await supabase
-    .from('thread_participants')
-    .upsert(participantRows, { onConflict: 'org_id,thread_id,profile_id' });
-
-  if (participantsError) throw participantsError;
-
-  return {
-    threadId,
-    threadCreated,
-    parentSenderProfileId: parentMessage.sender_profile_id,
-  };
-}
-
-async function bumpThreadReplyCount(input: {
-  threadId: string | null;
-  threadCreated: boolean;
-  now: string;
-  senderProfileId: string;
-}): Promise<void> {
-  if (!input.threadId || input.threadCreated) return;
-
-  const { data: threadRow, error: threadLookupError } = await supabase
-    .from('threads')
-    .select('id, message_count')
-    .eq('id', input.threadId)
-    .maybeSingle<ThreadLookupRow>();
-
-  if (threadLookupError) throw threadLookupError;
-  if (!threadRow) return;
-
-  const { error: threadUpdateError } = await supabase
-    .from('threads')
-    .update({
-      message_count: (threadRow.message_count ?? 0) + 1,
-      last_reply_at: input.now,
-      updated_at: input.now,
-      updated_by: input.senderProfileId,
-    })
-    .eq('id', input.threadId);
-
-  if (threadUpdateError) throw threadUpdateError;
-}
-
 export async function sendTextMessage(
   channelId: string,
   senderProfileId: string,
@@ -1296,68 +647,16 @@ export async function sendTextMessage(
 ) {
   const content = text.trim();
   if (!content) throw new Error('Message text is required');
-  const writableSenderProfileId = await resolveWritableSenderProfileId(
-    orgId,
-    senderProfileId,
-  );
-  const resolvedSenderProfileId = await resolveDmSenderProfileId(
+  const result = await apiPost<{ id: string }>('/messages/text', {
     orgId,
     channelId,
     senderProfileId,
-    writableSenderProfileId,
-  );
+    content,
+    threadParentId: threadParentId ?? null,
+    threadId: threadId ?? null,
+  } satisfies MessageSendTextInput);
 
-  const now = new Date().toISOString();
-  const messageId = createClientUuid();
-  const supportVisibility = await resolveSupportVisibilityForSend({
-    orgId,
-    channelId,
-    currentProfileId: resolvedSenderProfileId,
-    senderProfileId: resolvedSenderProfileId,
-    threadParentId,
-    threadId,
-  });
-  const { threadId: resolvedThreadId, threadCreated } = await resolveThreadContextForSend(
-    {
-      orgId,
-      channelId,
-      senderProfileId: resolvedSenderProfileId,
-      requestedThreadId: threadId,
-      threadParentId,
-      now,
-    },
-  );
-
-  const { error: msgError } = await supabase.from('messages').insert({
-    id: messageId,
-    channel_id: channelId,
-    sender_profile_id: resolvedSenderProfileId,
-    org_id: orgId,
-    type: 'text',
-    thread_parent_id: threadParentId ?? null,
-    visibility_type: supportVisibility.visibility_type,
-    ...(supportVisibility.visibility_user_ids
-      ? { visibility_user_ids: supportVisibility.visibility_user_ids }
-      : {}),
-    ...(resolvedThreadId ? { thread_id: resolvedThreadId } : {}),
-  });
-
-  if (msgError) throw msgError;
-
-  const { error: payloadError } = await supabase
-    .from('message_text')
-    .insert({ message_id: messageId, org_id: orgId, payload: { text: content } });
-
-  if (payloadError) throw payloadError;
-
-  await bumpThreadReplyCount({
-    threadId: resolvedThreadId,
-    threadCreated,
-    now,
-    senderProfileId: resolvedSenderProfileId,
-  });
-
-  return { id: messageId };
+  return { id: result.id };
 }
 
 const CHANNEL_FILES_BUCKET = 'channel-files';
@@ -1441,66 +740,21 @@ export async function sendFileMessage(
   threadParentId?: string,
   threadId?: string,
 ) {
-  const writableSenderProfileId = await resolveWritableSenderProfileId(
-    orgId,
-    senderProfileId,
-  );
-  const resolvedSenderProfileId = await resolveDmSenderProfileId(
+  const result = await apiPost<{ id: string }>('/messages/file', {
     orgId,
     channelId,
     senderProfileId,
-    writableSenderProfileId,
-  );
-  const supportVisibility = await resolveSupportVisibilityForSend({
-    orgId,
-    channelId,
-    currentProfileId: resolvedSenderProfileId,
-    senderProfileId: resolvedSenderProfileId,
-    threadParentId,
-    threadId,
-  });
-  const isImage = file.mimeType.startsWith('image/');
-  const isAudio = file.mimeType.startsWith('audio/');
-  const type = isImage ? 'image' : isAudio ? 'audio-recording' : 'file';
-  const messageId = createClientUuid();
-  const { error: msgError } = await supabase.from('messages').insert({
-    id: messageId,
-    channel_id: channelId,
-    sender_profile_id: resolvedSenderProfileId,
-    org_id: orgId,
-    type,
-    thread_parent_id: threadParentId ?? null,
-    visibility_type: supportVisibility.visibility_type,
-    ...(supportVisibility.visibility_user_ids
-      ? { visibility_user_ids: supportVisibility.visibility_user_ids }
-      : {}),
-    ...(threadId ? { thread_id: threadId } : {}),
-  });
-
-  if (msgError) throw msgError;
-
-  const payload: Record<string, unknown> = {
-    url: file.storagePath,
-    storagePath: file.storagePath,
     name: file.name,
-    ...(file.size !== undefined ? { size: file.size } : {}),
+    storagePath: file.storagePath,
     mimeType: file.mimeType,
-    ...(isAudio ? { durationSeconds: file.durationSeconds ?? 0 } : {}),
-    ...(content?.trim() ? { text: content.trim() } : {}),
-  };
+    size: file.size,
+    durationSeconds: file.durationSeconds,
+    content,
+    threadParentId: threadParentId ?? null,
+    threadId: threadId ?? null,
+  } satisfies MessageSendFileInput);
 
-  const table = isImage
-    ? 'message_image'
-    : isAudio
-      ? 'message_audio_recording'
-      : 'message_file';
-  const { error: payloadError } = await supabase
-    .from(table)
-    .insert({ message_id: messageId, org_id: orgId, payload });
-
-  if (payloadError) throw payloadError;
-
-  return { id: messageId };
+  return { id: result.id };
 }
 
 export async function sendFilesMessage(
@@ -1513,63 +767,20 @@ export async function sendFilesMessage(
   threadId?: string,
 ) {
   if (!files.length) throw new Error('No files provided');
-  const writableSenderProfileId = await resolveWritableSenderProfileId(
-    orgId,
-    senderProfileId,
-  );
-  const resolvedSenderProfileId = await resolveDmSenderProfileId(
+  const result = await apiPost<{ id: string }>('/messages/files', {
     orgId,
     channelId,
     senderProfileId,
-    writableSenderProfileId,
-  );
-  const supportVisibility = await resolveSupportVisibilityForSend({
-    orgId,
-    channelId,
-    currentProfileId: resolvedSenderProfileId,
-    senderProfileId: resolvedSenderProfileId,
-    threadParentId,
-    threadId,
-  });
-  const allImages = files.every((file) => file.mimeType.startsWith('image/'));
-  const type = allImages ? 'image' : 'file';
-  const messageId = createClientUuid();
-  const { error: msgError } = await supabase.from('messages').insert({
-    id: messageId,
-    channel_id: channelId,
-    sender_profile_id: resolvedSenderProfileId,
-    org_id: orgId,
-    type,
-    thread_parent_id: threadParentId ?? null,
-    visibility_type: supportVisibility.visibility_type,
-    ...(supportVisibility.visibility_user_ids
-      ? { visibility_user_ids: supportVisibility.visibility_user_ids }
-      : {}),
-    ...(threadId ? { thread_id: threadId } : {}),
-  });
+    assets: files.map((file) => ({
+      name: file.name,
+      storagePath: file.storagePath,
+      mimeType: file.mimeType,
+      size: file.size,
+    })),
+    content,
+    threadParentId: threadParentId ?? null,
+    threadId: threadId ?? null,
+  } satisfies MessageSendFilesInput);
 
-  if (msgError) throw msgError;
-
-  const attachmentsPayload = files.map((file) => ({
-    url: file.storagePath,
-    storagePath: file.storagePath,
-    name: file.name,
-    ...(file.size !== undefined ? { size: file.size } : {}),
-    mimeType: file.mimeType,
-  }));
-
-  const payload: Record<string, unknown> = {
-    ...attachmentsPayload[0],
-    attachments: attachmentsPayload,
-    ...(content?.trim() ? { text: content.trim() } : {}),
-  };
-
-  const table = allImages ? 'message_image' : 'message_file';
-  const { error: payloadError } = await supabase
-    .from(table)
-    .insert({ message_id: messageId, org_id: orgId, payload });
-
-  if (payloadError) throw payloadError;
-
-  return { id: messageId };
+  return { id: result.id };
 }
