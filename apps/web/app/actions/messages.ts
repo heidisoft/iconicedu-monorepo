@@ -28,6 +28,12 @@ import {
   extractFirstUrl,
   fetchLinkPreviewMetadata,
 } from '@iconicedu/web/lib/messages/link-preview';
+import {
+  publishChannelMessageActivity as publishSharedChannelMessageActivity,
+  publishFileUploadActivity as publishSharedFileUploadActivity,
+  publishMentionActivities as publishSharedMentionActivities,
+  publishThreadReplyActivities as publishSharedThreadReplyActivities,
+} from '@iconicedu/api/lib/messages/message-activity';
 import { publishActivityEvent } from '@iconicedu/web/lib/activity-feed/publisher/activity-publisher';
 import { filterDmRecipientsByLastReadRecency } from '@iconicedu/web/lib/activity-feed/dm-activity-suppression';
 import {
@@ -253,6 +259,7 @@ function deriveHomeworkMessageIntent(
 }
 
 async function createMentionNotifications(input: {
+  supabase: SupabaseServerClient;
   serviceSupabase: SupabaseServiceClient;
   orgId: string;
   channelId: string;
@@ -264,111 +271,20 @@ async function createMentionNotifications(input: {
   now: string;
   visibilityAllowedProfileIds?: Set<string> | null;
 }) {
-  const recipientIds = Array.from(
-    new Set(input.mentions.map((mention) => mention.profileId)),
-  ).filter((profileId) =>
-    input.visibilityAllowedProfileIds
-      ? input.visibilityAllowedProfileIds.has(profileId)
-      : true,
-  );
-  if (!recipientIds.length) {
-    return;
-  }
-
-  const preferencesResponse = await input.serviceSupabase
-    .from('notification_preferences')
-    .select('profile_id, channels, muted')
-    .eq('org_id', input.orgId)
-    .eq('pref_key', 'messages.mentions')
-    .in('profile_id', recipientIds)
-    .is('deleted_at', null)
-    .returns<
-      Array<{ profile_id: string; channels: string[] | null; muted?: boolean | null }>
-    >();
-
-  if (preferencesResponse.error) {
-    throw new Error(preferencesResponse.error.message);
-  }
-
-  const preferencesByProfileId = new Map(
-    (preferencesResponse.data ?? []).map((row) => [row.profile_id, row]),
-  );
-
-  const items = recipientIds.flatMap((recipientId) => {
-    const preference = preferencesByProfileId.get(recipientId);
-    if (!preference || preference.muted || !preference.channels?.length) {
-      return [];
-    }
-
-    return [
-      {
-        org_id: input.orgId,
-        kind: 'leaf',
-        occurred_at: input.now,
-        tab_key: 'all',
-        audience: {
-          scope: { kind: 'user', userId: recipientId },
-          visibility: 'direct',
-          audience: [{ kind: 'users_only', userIds: [recipientId] }],
-        },
-        verb: 'message.posted',
-        actor_profile_id: input.senderProfileId,
-        refs: {
-          object: { kind: 'message', id: input.messageId },
-        },
-        content: {
-          headline: {
-            primary: `${input.senderName} mentioned you`,
-          },
-          summary: input.content,
-          preview: { text: input.content.slice(0, 160) },
-        },
-        summary: `${input.senderName} mentioned you`,
-        importance: 'normal',
-        is_read: false,
-        metadata: {
-          notificationKey: 'messages.mentions',
-          notificationChannels: preference.channels,
-          channelId: input.channelId,
-          messageId: input.messageId,
-          mentionedProfileId: recipientId,
-        },
-        created_at: input.now,
-        created_by: input.senderProfileId,
-        updated_at: input.now,
-        updated_by: input.senderProfileId,
-      },
-    ];
+  await publishSharedMentionActivities({
+    supabase: input.serviceSupabase,
+    readSupabase: input.supabase,
+    publishActivity: publishActivityEvent,
+    orgId: input.orgId,
+    channelId: input.channelId,
+    senderProfileId: input.senderProfileId,
+    senderName: input.senderName,
+    messageId: input.messageId,
+    content: input.content,
+    mentions: input.mentions,
+    now: input.now,
+    visibilityAllowedProfileIds: input.visibilityAllowedProfileIds,
   });
-
-  if (!items.length) {
-    return;
-  }
-
-  for (const item of items) {
-    await publishActivityEvent({
-      supabase: input.serviceSupabase,
-      orgId: input.orgId,
-      eventType: 'message.posted',
-      occurredAt: input.now,
-      sourceKind: 'profile',
-      actorProfileId: input.senderProfileId,
-      scope: (item.audience as { scope: { kind: 'user'; userId: string } }).scope,
-      objectRef: { kind: 'message', id: input.messageId },
-      audienceRules: (item.audience as { audience?: AudienceRuleVM[] }).audience,
-      payload: {
-        channelId: input.channelId,
-        messageId: input.messageId,
-        mentionedProfileId: (item.metadata as { mentionedProfileId: string })
-          .mentionedProfileId,
-        senderName: input.senderName,
-        content: input.content,
-        threadReply: false,
-      },
-      dedupeKey: `message.mention:${input.messageId}:${(item.metadata as { mentionedProfileId: string }).mentionedProfileId}`,
-      createdBy: input.senderProfileId,
-    });
-  }
 }
 
 async function createChannelMessageActivity(input: {
@@ -387,60 +303,22 @@ async function createChannelMessageActivity(input: {
   visibilityAudienceRules?: AudienceRuleVM[];
   visibilityAllowedProfileIds?: Set<string> | null;
 }) {
-  const isDmRoute = input.activityContext.channelRouteKind === 'dm';
-  const eventType = isDmRoute ? 'dm.posted' : 'message.posted';
-  const dedupePrefix = isDmRoute ? 'dm.posted' : 'message.posted';
-  const dmRecipients = isDmRoute
-    ? await resolveDmActivityRecipientProfileIds({
-        supabase: input.supabase,
-        orgId: input.orgId,
-        channelId: input.channelId,
-        senderProfileId: input.senderProfileId,
-        now: input.now,
-        eventType: 'dm.posted',
-      })
-    : null;
-
-  const scopedDmRecipients = isDmRoute
-    ? (dmRecipients ?? []).filter((profileId) =>
-        input.visibilityAllowedProfileIds
-          ? input.visibilityAllowedProfileIds.has(profileId)
-          : true,
-      )
-    : null;
-
-  if (isDmRoute && (!scopedDmRecipients || scopedDmRecipients.length === 0)) {
-    return;
-  }
-
-  await publishActivityEvent({
+  await publishSharedChannelMessageActivity({
     supabase: input.serviceSupabase,
+    readSupabase: input.supabase,
+    publishActivity: publishActivityEvent,
     orgId: input.orgId,
-    eventType,
-    occurredAt: input.now,
-    sourceKind: 'profile',
-    actorProfileId: input.senderProfileId,
-    scope: input.activityContext.scope,
-    objectRef: { kind: 'message', id: input.messageId },
-    targetRef: input.activityContext.targetRef,
-    audienceRules:
-      isDmRoute && scopedDmRecipients
-        ? [{ kind: 'users_only', userIds: scopedDmRecipients }]
-        : input.visibilityAudienceRules,
-    payload: {
-      channelId: input.channelId,
-      messageId: input.messageId,
-      senderName: input.senderName,
-      content: input.content,
-      threadId: input.threadId ?? null,
-      threadReply: input.threadReply ?? false,
-      learningSpaceId: input.activityContext.learningSpaceId ?? null,
-      learningSpaceTitle: input.activityContext.learningSpaceTitle ?? null,
-      channelTopic: input.activityContext.channelTopic ?? null,
-      channelRouteKind: input.activityContext.channelRouteKind,
-    },
-    dedupeKey: `${dedupePrefix}:${input.messageId}`,
-    createdBy: input.senderProfileId,
+    channelId: input.channelId,
+    senderProfileId: input.senderProfileId,
+    senderName: input.senderName,
+    messageId: input.messageId,
+    content: input.content,
+    threadId: input.threadId ?? null,
+    threadReply: input.threadReply ?? false,
+    activityContext: input.activityContext,
+    now: input.now,
+    visibilityAudienceRules: input.visibilityAudienceRules,
+    visibilityAllowedProfileIds: input.visibilityAllowedProfileIds,
   });
 }
 
@@ -459,59 +337,22 @@ async function createThreadReplyNotifications(input: {
   now: string;
   visibilityAllowedProfileIds?: Set<string> | null;
 }) {
-  const participantsResponse = await input.supabase
-    .from('thread_participants')
-    .select('profile_id')
-    .eq('org_id', input.orgId)
-    .eq('thread_id', input.threadId)
-    .is('deleted_at', null)
-    .returns<Array<{ profile_id: string }>>();
-
-  if (participantsResponse.error) {
-    throw new Error(participantsResponse.error.message);
-  }
-
-  const exclude = new Set([input.senderProfileId, ...(input.excludeProfileIds ?? [])]);
-  const recipientIds = Array.from(
-    new Set(
-      (participantsResponse.data ?? [])
-        .map((row) => row.profile_id)
-        .filter((profileId) => profileId && !exclude.has(profileId)),
-    ),
-  ).filter((profileId) =>
-    input.visibilityAllowedProfileIds
-      ? input.visibilityAllowedProfileIds.has(profileId)
-      : true,
-  );
-
-  for (const recipientId of recipientIds) {
-    await publishActivityEvent({
-      supabase: input.serviceSupabase,
-      orgId: input.orgId,
-      eventType: 'message.posted',
-      occurredAt: input.now,
-      sourceKind: 'profile',
-      actorProfileId: input.senderProfileId,
-      scope: { kind: 'user', userId: recipientId },
-      objectRef: { kind: 'message', id: input.messageId },
-      targetRef: input.activityContext.targetRef,
-      audienceRules: [{ kind: 'users_only', userIds: [recipientId] }],
-      payload: {
-        channelId: input.channelId,
-        messageId: input.messageId,
-        senderName: input.senderName,
-        content: input.content,
-        threadId: input.threadId,
-        threadReply: true,
-        learningSpaceId: input.activityContext.learningSpaceId ?? null,
-        learningSpaceTitle: input.activityContext.learningSpaceTitle ?? null,
-        channelTopic: input.activityContext.channelTopic ?? null,
-        channelRouteKind: input.activityContext.channelRouteKind,
-      },
-      dedupeKey: `message.thread-reply:${input.messageId}:${recipientId}`,
-      createdBy: input.senderProfileId,
-    });
-  }
+  await publishSharedThreadReplyActivities({
+    supabase: input.serviceSupabase,
+    readSupabase: input.supabase,
+    publishActivity: publishActivityEvent,
+    orgId: input.orgId,
+    threadId: input.threadId,
+    channelId: input.channelId,
+    senderProfileId: input.senderProfileId,
+    senderName: input.senderName,
+    messageId: input.messageId,
+    content: input.content,
+    activityContext: input.activityContext,
+    now: input.now,
+    excludeProfileIds: input.excludeProfileIds,
+    visibilityAllowedProfileIds: input.visibilityAllowedProfileIds,
+  });
 }
 
 async function createFileUploadActivity(input: {
@@ -532,70 +373,24 @@ async function createFileUploadActivity(input: {
   visibilityAudienceRules?: AudienceRuleVM[];
   visibilityAllowedProfileIds?: Set<string> | null;
 }) {
-  const isDmRoute = input.activityContext.channelRouteKind === 'dm';
-  const eventType = isDmRoute ? 'dm.posted' : 'file.uploaded';
-  const dedupePrefix = isDmRoute ? 'dm.posted' : 'file.uploaded';
-  const activityContent = input.content?.trim() || input.name;
-  const dmMessageKind =
-    typeof input.mimeType === 'string' && input.mimeType.startsWith('image/')
-      ? 'image'
-      : typeof input.mimeType === 'string' && input.mimeType.startsWith('audio/')
-        ? 'audio'
-        : 'file';
-  const dmRecipients = isDmRoute
-    ? await resolveDmActivityRecipientProfileIds({
-        supabase: input.supabase,
-        orgId: input.orgId,
-        channelId: input.channelId,
-        senderProfileId: input.senderProfileId,
-        now: input.now,
-        eventType: 'dm.posted',
-      })
-    : null;
-
-  const scopedDmRecipients = isDmRoute
-    ? (dmRecipients ?? []).filter((profileId) =>
-        input.visibilityAllowedProfileIds
-          ? input.visibilityAllowedProfileIds.has(profileId)
-          : true,
-      )
-    : null;
-
-  if (isDmRoute && (!scopedDmRecipients || scopedDmRecipients.length === 0)) {
-    return;
-  }
-
-  await publishActivityEvent({
+  await publishSharedFileUploadActivity({
     supabase: input.serviceSupabase,
+    readSupabase: input.supabase,
+    publishActivity: publishActivityEvent,
     orgId: input.orgId,
-    eventType,
-    occurredAt: input.now,
-    sourceKind: 'profile',
-    actorProfileId: input.senderProfileId,
-    scope: input.activityContext.scope,
-    objectRef: { kind: 'message', id: input.messageId },
-    targetRef: input.activityContext.targetRef,
-    audienceRules:
-      isDmRoute && scopedDmRecipients
-        ? [{ kind: 'users_only', userIds: scopedDmRecipients }]
-        : input.visibilityAudienceRules,
-    payload: {
-      channelId: input.channelId,
-      messageId: input.messageId,
-      senderName: input.senderName,
-      content: activityContent,
-      name: input.name,
-      mimeType: input.mimeType ?? null,
-      storagePath: input.storagePath ?? null,
-      fileCount: input.fileCount ?? 1,
-      dmMessageKind,
-      learningSpaceId: input.activityContext.learningSpaceId ?? null,
-      learningSpaceTitle: input.activityContext.learningSpaceTitle ?? null,
-      channelTopic: input.activityContext.channelTopic ?? null,
-      channelRouteKind: input.activityContext.channelRouteKind,
-    },
-    dedupeKey: `${dedupePrefix}:${input.messageId}`,
-    createdBy: input.senderProfileId,
+    channelId: input.channelId,
+    senderProfileId: input.senderProfileId,
+    senderName: input.senderName,
+    messageId: input.messageId,
+    name: input.name,
+    content: input.content,
+    mimeType: input.mimeType,
+    storagePath: input.storagePath,
+    fileCount: input.fileCount,
+    activityContext: input.activityContext,
+    now: input.now,
+    visibilityAudienceRules: input.visibilityAudienceRules,
+    visibilityAllowedProfileIds: input.visibilityAllowedProfileIds,
   });
 }
 
@@ -1440,6 +1235,7 @@ export async function sendTextMessageWithSupabase(
 
   if (sanitizedMentions.length) {
     await createMentionNotifications({
+      supabase,
       serviceSupabase,
       orgId: accountOrgId,
       channelId: input.channelId,

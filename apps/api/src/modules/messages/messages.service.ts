@@ -8,12 +8,17 @@ import {
 } from '@nestjs/common';
 import type {
   MessageVM,
+  MessageMentionVM,
   MessageSendFileInput,
   MessageSendFilesInput,
   MessageSendTextInput,
   ReactionVM,
   ThreadVM,
 } from '@iconicedu/shared-types';
+import {
+  publishFileMessagePostSendActivity,
+  publishTextMessagePostSendActivities,
+} from '@iconicedu/api/lib/messages/message-activity';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
 import {
@@ -83,6 +88,20 @@ type WritableProfileRow = {
   avatar_seed: string | null;
   kind: string | null;
 };
+
+function buildWritableProfileDisplayName(profile: WritableProfileRow) {
+  const displayName = profile.display_name?.trim();
+  if (displayName) {
+    return displayName;
+  }
+
+  const fullName = [profile.first_name?.trim(), profile.last_name?.trim()]
+    .filter((value): value is string => Boolean(value))
+    .join(' ')
+    .trim();
+
+  return fullName || 'Someone';
+}
 
 @Injectable()
 export class MessagesService {
@@ -677,6 +696,20 @@ export class MessagesService {
         currentProfileId: actor.profile.id,
       });
 
+      await publishTextMessagePostSendActivities({
+        supabase: serviceSupabase,
+        orgId: input.orgId,
+        channelId: input.channelId,
+        senderProfileId: actor.profile.id,
+        senderName: buildWritableProfileDisplayName(actor.profile),
+        messageId: messageInsert.data.id,
+        content,
+        mentions: (input.mentions ?? []) as MessageMentionVM[],
+        threadId,
+        threadReply: Boolean(threadId && input.threadParentId),
+        now,
+      });
+
       return { id: messageInsert.data.id };
     } catch (error) {
       this.logger.error('sendTextMessage failed', {
@@ -822,6 +855,21 @@ export class MessagesService {
         currentProfileId: actor.profile.id,
       });
 
+      await publishFileMessagePostSendActivity({
+        supabase: serviceSupabase,
+        orgId: input.orgId,
+        channelId: input.channelId,
+        senderProfileId: actor.profile.id,
+        senderName: buildWritableProfileDisplayName(actor.profile),
+        messageId: messageInsert.data.id,
+        name: input.name,
+        content: input.content?.trim() ?? null,
+        mimeType: input.mimeType ?? null,
+        storagePath: input.storagePath,
+        fileCount: 1,
+        now,
+      });
+
       return { id: messageInsert.data.id };
     } catch (error) {
       this.logger.error('sendFileMessage failed', {
@@ -957,6 +1005,24 @@ export class MessagesService {
         threadCreated,
         now,
         currentProfileId: actor.profile.id,
+      });
+
+      await publishFileMessagePostSendActivity({
+        supabase: serviceSupabase,
+        orgId: input.orgId,
+        channelId: input.channelId,
+        senderProfileId: actor.profile.id,
+        senderName: buildWritableProfileDisplayName(actor.profile),
+        messageId: messageInsert.data.id,
+        name:
+          input.assets.length > 1
+            ? `${input.assets[0]?.name ?? 'File'} +${input.assets.length - 1} more`
+            : (input.assets[0]?.name ?? 'File'),
+        content: input.content?.trim() ?? null,
+        mimeType: allImages ? 'image/*' : (input.assets[0]?.mimeType ?? null),
+        storagePath: input.assets[0]?.storagePath ?? null,
+        fileCount: input.assets.length,
+        now,
       });
 
       return { id: messageInsert.data.id };
