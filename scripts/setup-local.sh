@@ -25,6 +25,9 @@ RESET='\033[0m'
 WEB_ENV_FILE="apps/web/.env.local"
 MOBILE_ENV_FILE="apps/mobile/.env"
 API_ENV_FILE="apps/api/.env"
+WEB_ENV_EXAMPLE_FILE="apps/web/.env.local.example"
+MOBILE_ENV_EXAMPLE_FILE="apps/mobile/.env.example"
+API_ENV_EXAMPLE_FILE="apps/api/.env.example"
 LOCAL_WEB_APP_URL="http://127.0.0.1:3000"
 LOCAL_MOBILE_SUPABASE_URL="http://127.0.0.1:54321"
 
@@ -102,6 +105,68 @@ ensure_env_file() {
   [[ -f "$file" ]] || : > "$file"
 }
 
+sync_missing_env_vars_from_example() {
+  local example="$1" target="$2"
+
+  if [[ ! -f "$example" ]]; then
+    warn "No example found at $example — skipping missing var sync"
+    return 0
+  fi
+
+  ensure_env_file "$target"
+
+  node - "$example" "$target" <<'NODE'
+const fs = require('node:fs');
+const [exampleFile, targetFile] = process.argv.slice(2);
+
+const readLines = (file) =>
+  fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split(/\r?\n/) : [];
+
+const parseKeys = (lines) => {
+  const keys = new Set();
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const idx = line.indexOf('=');
+    if (idx <= 0) continue;
+    keys.add(line.slice(0, idx).trim());
+  }
+  return keys;
+};
+
+const exampleLines = readLines(exampleFile);
+const targetRaw = fs.existsSync(targetFile) ? fs.readFileSync(targetFile, 'utf8') : '';
+const targetLines = targetRaw === '' ? [] : targetRaw.split(/\r?\n/);
+const targetKeys = parseKeys(targetLines);
+const newline = targetRaw.includes('\r\n') ? '\r\n' : '\n';
+
+const additions = [];
+for (const line of exampleLines) {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.startsWith('#')) continue;
+  const idx = line.indexOf('=');
+  if (idx <= 0) continue;
+  const key = line.slice(0, idx).trim();
+  if (targetKeys.has(key)) continue;
+  additions.push(line);
+  targetKeys.add(key);
+}
+
+if (additions.length === 0) process.exit(0);
+
+while (targetLines.length > 0 && targetLines[targetLines.length - 1] === '') {
+  targetLines.pop();
+}
+
+if (targetLines.length > 0) {
+  targetLines.push('');
+}
+targetLines.push(...additions);
+
+fs.writeFileSync(targetFile, `${targetLines.join(newline)}${newline}`);
+NODE
+}
+
 extract_status_json() {
   local raw="$1"
   STATUS_JSON=$(
@@ -113,7 +178,46 @@ extract_status_json() {
         console.error('Supabase status output did not contain JSON.');
         process.exit(1);
       }
-      const parsed = JSON.parse(raw.slice(start));
+      let depth = 0;
+      let inString = false;
+      let escaping = false;
+      let end = -1;
+
+      for (let i = start; i < raw.length; i += 1) {
+        const ch = raw[i];
+
+        if (inString) {
+          if (escaping) {
+            escaping = false;
+          } else if (ch === '\\\\') {
+            escaping = true;
+          } else if (ch === '\"') {
+            inString = false;
+          }
+          continue;
+        }
+
+        if (ch === '\"') {
+          inString = true;
+          continue;
+        }
+
+        if (ch === '{') depth += 1;
+        if (ch === '}') {
+          depth -= 1;
+          if (depth === 0) {
+            end = i + 1;
+            break;
+          }
+        }
+      }
+
+      if (end === -1) {
+        console.error('Supabase status output did not contain a complete JSON object.');
+        process.exit(1);
+      }
+
+      const parsed = JSON.parse(raw.slice(start, end));
       process.stdout.write(JSON.stringify(parsed));
     "
   )
@@ -263,14 +367,15 @@ ensure_env_var() {
 sync_env_files() {
   info "Syncing local env files in place..."
 
-  ensure_env_file "$API_ENV_FILE"
-  ensure_env_file "$WEB_ENV_FILE"
-  ensure_env_file "$MOBILE_ENV_FILE"
+  sync_missing_env_vars_from_example "$API_ENV_EXAMPLE_FILE" "$API_ENV_FILE"
+  sync_missing_env_vars_from_example "$WEB_ENV_EXAMPLE_FILE" "$WEB_ENV_FILE"
+  sync_missing_env_vars_from_example "$MOBILE_ENV_EXAMPLE_FILE" "$MOBILE_ENV_FILE"
 
   set_env_var "$API_ENV_FILE" "DATABASE_URL" "$DB_URL"
   set_env_var "$API_ENV_FILE" "DIRECT_URL" "$DB_URL"
   set_env_var "$API_ENV_FILE" "SUPABASE_URL" "$API_URL"
   set_env_var "$API_ENV_FILE" "SUPABASE_SERVICE_ROLE_KEY" "$SERVICE_ROLE_KEY"
+  set_env_var "$API_ENV_FILE" "SUPABASE_ANON_KEY" "$ANON_KEY"
   set_env_var "$API_ENV_FILE" "JWT_SECRET" "$JWT_SECRET"
 
   local reminders_token

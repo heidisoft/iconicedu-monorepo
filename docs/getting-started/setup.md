@@ -270,12 +270,13 @@ pnpm env:sync:local
 This command:
 
 - reads the running local Supabase credentials from `supabase status --output json`
+- seeds missing env vars from the corresponding example file when available
 - updates only the supported keys in `apps/web/.env.local`, `apps/mobile/.env`, and `apps/api/.env`
 - preserves unrelated comments and env vars already in those files
 - auto-generates local internal reminder/activity tokens if they are missing
 - leaves optional integrations like PostHog and Daily unchanged, then reports what is still unset
 
-If the env files do not exist yet, create them first from the examples below, then run `pnpm env:sync:local`.
+If an env file does not exist yet, `pnpm env:sync:local` now creates it and seeds it from the matching example file before applying local Supabase values.
 
 ### apps/web/.env.local
 
@@ -324,6 +325,7 @@ When synced from local Supabase, the command writes:
 
 - `EXPO_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321`
 - `EXPO_PUBLIC_SUPABASE_ANON_KEY=<ANON_KEY>`
+- any missing defaults from `apps/mobile/.env.example` such as `EXPO_PUBLIC_APP_ENV`, `EXPO_PUBLIC_API_URL`, and `EXPO_PUBLIC_WEB_URL`
 
 > **Note:** Mobile reads env via `Constants.expoConfig?.extra`, not `process.env`. The `app.config.js` bridges these at build time.
 >
@@ -361,6 +363,7 @@ When synced from local Supabase, the command writes:
 - `DIRECT_URL=<DB_URL>`
 - `SUPABASE_URL=<API_URL>`
 - `SUPABASE_SERVICE_ROLE_KEY=<SERVICE_ROLE_KEY>`
+- `SUPABASE_ANON_KEY=<ANON_KEY>`
 - `JWT_SECRET=<JWT_SECRET>`
 - `INTERNAL_REMINDERS_TOKEN_API` if missing
 

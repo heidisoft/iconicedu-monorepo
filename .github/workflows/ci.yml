@@ -990,6 +990,7 @@ jobs:
             }
 
             const easPreviewWorkflowUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/workflows/eas-preview-build.yml`;
+            const localNativeBuildWorkflowUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/workflows/native-preview-build.yml`;
 
             // ── Assemble comment ───────────────────────────────────────────────
             const body = [
@@ -1002,6 +1003,7 @@ jobs:
               `| Supabase Studio | ${studioUrl} |`,
               '',
               `**Mobile build** — [Actions → EAS Preview Build](${easPreviewWorkflowUrl}) → PR number: \`${prNumber}\``,
+              `**Local native build** — [Actions → Create Local Native Build](${localNativeBuildWorkflowUrl}) → PR number: \`${prNumber}\``,
               bundleSection,
             ].join('\n');
 
