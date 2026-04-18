@@ -718,13 +718,14 @@ jobs:
             --arg dir   "${{ steps.branch-creds.outputs.direct_url }}" \
             --arg surl  "${{ steps.branch-creds.outputs.branch_api_url }}" \
             --arg srkey "${{ steps.branch-creds.outputs.service_role_key }}" \
+            --arg anon  "${{ steps.branch-creds.outputs.anon_key }}" \
             --arg jwt   "${{ steps.branch-creds.outputs.jwt_secret }}" \
             --arg rem   "${{ secrets.INTERNAL_REMINDERS_TOKEN }}" \
             --arg not   "${{ secrets.INTERNAL_NOTIFICATIONS_TOKEN }}" \
             --arg phk   "${{ secrets.POSTHOG_KEY }}" \
             --arg phh   "${{ secrets.NEXT_PUBLIC_POSTHOG_HOST }}" \
             '{DATABASE_URL:$db, DIRECT_URL:$dir, SUPABASE_URL:$surl,
-              SUPABASE_SERVICE_ROLE_KEY:$srkey, JWT_SECRET:$jwt,
+              SUPABASE_SERVICE_ROLE_KEY:$srkey, SUPABASE_ANON_KEY:$anon, JWT_SECRET:$jwt,
               INTERNAL_REMINDERS_TOKEN_API:$rem, INTERNAL_NOTIFICATIONS_TOKEN:$not,
               NODE_ENV:"production", NEXT_PUBLIC_APP_ENV:"preview",
               POSTHOG_KEY:$phk, POSTHOG_HOST:$phh}')
