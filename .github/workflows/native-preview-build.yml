@@ -77,6 +77,8 @@ jobs:
           RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
           RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           FALLBACK_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
           FALLBACK_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
           FALLBACK_API_URL: ${{ secrets.EXPO_PUBLIC_API_URL }}
@@ -85,6 +87,11 @@ jobs:
           set -euo pipefail
 
           if [[ -z "${PR_NUMBER}" ]]; then
+            if [[ "${BRANCH_NAME}" != "main" ]]; then
+              echo "::error::PR number is required when building a branch other than main."
+              exit 1
+            fi
+
             for required_var in \
               FALLBACK_SUPABASE_URL \
               FALLBACK_SUPABASE_ANON_KEY \
@@ -172,21 +179,45 @@ jobs:
             exit 1
           fi
 
-          pushd apps/web > /dev/null
-          VERCEL_LIST_OUTPUT="$(
-            vercel list \
-              --meta "githubCommitRef=${BRANCH_NAME}" \
-              --status READY \
-              --token "${VERCEL_TOKEN}" \
-              2>/dev/null || true
-          )"
-          popd > /dev/null
+          PROJECT_ID="${VERCEL_PROJECT_ID:-}"
+          ORG_ID="${VERCEL_ORG_ID:-}"
+          TEAM_AMP=""
+          TEAM_Q=""
 
-          WEB_URL="$(
-            printf '%s\n' "${VERCEL_LIST_OUTPUT}" \
-              | grep -Eo 'https://[^[:space:]]+|[A-Za-z0-9.-]+\.vercel\.app' \
-              | head -n1 || true
-          )"
+          if [[ -z "${PROJECT_ID}" ]]; then
+            echo "::error::Missing VERCEL_PROJECT_ID."
+            exit 1
+          fi
+
+          if [[ -z "${ORG_ID}" ]]; then
+            echo "::error::Missing VERCEL_ORG_ID."
+            exit 1
+          fi
+
+          case "${ORG_ID}" in
+            team_*)
+              TEAM_AMP="&teamId=${ORG_ID}"
+              TEAM_Q="?teamId=${ORG_ID}"
+              ;;
+            user_*) ;;
+            *)
+              echo "::error::VERCEL_ORG_ID must start with team_ or user_."
+              exit 1
+              ;;
+          esac
+
+          PROJECT_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${VERCEL_TOKEN}" \
+            "https://api.vercel.com/v9/projects/${PROJECT_ID}${TEAM_Q}")
+          if [[ "${PROJECT_STATUS}" != "200" ]]; then
+            echo "::error::Vercel project preflight failed (HTTP ${PROJECT_STATUS})."
+            exit 1
+          fi
+
+          WEB_URL=$(curl -sf \
+            -H "Authorization: Bearer ${VERCEL_TOKEN}" \
+            "https://api.vercel.com/v6/deployments?projectId=${PROJECT_ID}&target=preview&limit=1&meta-githubCommitRef=${BRANCH_NAME}${TEAM_AMP}" \
+            | jq -r '.deployments[0].url // ""')
 
           if [[ -z "${WEB_URL}" ]]; then
             echo "::error::Unable to resolve a Vercel deployment URL for branch '${BRANCH_NAME}'."
@@ -282,6 +313,8 @@ jobs:
           RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
           RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           FALLBACK_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
           FALLBACK_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
           FALLBACK_API_URL: ${{ secrets.EXPO_PUBLIC_API_URL }}
@@ -290,6 +323,11 @@ jobs:
           set -euo pipefail
 
           if [[ -z "${PR_NUMBER}" ]]; then
+            if [[ "${BRANCH_NAME}" != "main" ]]; then
+              echo "::error::PR number is required when building a branch other than main."
+              exit 1
+            fi
+
             for required_var in \
               FALLBACK_SUPABASE_URL \
               FALLBACK_SUPABASE_ANON_KEY \
@@ -377,21 +415,45 @@ jobs:
             exit 1
           fi
 
-          pushd apps/web > /dev/null
-          VERCEL_LIST_OUTPUT="$(
-            vercel list \
-              --meta "githubCommitRef=${BRANCH_NAME}" \
-              --status READY \
-              --token "${VERCEL_TOKEN}" \
-              2>/dev/null || true
-          )"
-          popd > /dev/null
+          PROJECT_ID="${VERCEL_PROJECT_ID:-}"
+          ORG_ID="${VERCEL_ORG_ID:-}"
+          TEAM_AMP=""
+          TEAM_Q=""
 
-          WEB_URL="$(
-            printf '%s\n' "${VERCEL_LIST_OUTPUT}" \
-              | grep -Eo 'https://[^[:space:]]+|[A-Za-z0-9.-]+\.vercel\.app' \
-              | head -n1 || true
-          )"
+          if [[ -z "${PROJECT_ID}" ]]; then
+            echo "::error::Missing VERCEL_PROJECT_ID."
+            exit 1
+          fi
+
+          if [[ -z "${ORG_ID}" ]]; then
+            echo "::error::Missing VERCEL_ORG_ID."
+            exit 1
+          fi
+
+          case "${ORG_ID}" in
+            team_*)
+              TEAM_AMP="&teamId=${ORG_ID}"
+              TEAM_Q="?teamId=${ORG_ID}"
+              ;;
+            user_*) ;;
+            *)
+              echo "::error::VERCEL_ORG_ID must start with team_ or user_."
+              exit 1
+              ;;
+          esac
+
+          PROJECT_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${VERCEL_TOKEN}" \
+            "https://api.vercel.com/v9/projects/${PROJECT_ID}${TEAM_Q}")
+          if [[ "${PROJECT_STATUS}" != "200" ]]; then
+            echo "::error::Vercel project preflight failed (HTTP ${PROJECT_STATUS})."
+            exit 1
+          fi
+
+          WEB_URL=$(curl -sf \
+            -H "Authorization: Bearer ${VERCEL_TOKEN}" \
+            "https://api.vercel.com/v6/deployments?projectId=${PROJECT_ID}&target=preview&limit=1&meta-githubCommitRef=${BRANCH_NAME}${TEAM_AMP}" \
+            | jq -r '.deployments[0].url // ""')
 
           if [[ -z "${WEB_URL}" ]]; then
             echo "::error::Unable to resolve a Vercel deployment URL for branch '${BRANCH_NAME}'."

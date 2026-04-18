@@ -176,6 +176,8 @@ jobs:
           RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
           RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
         run: |
           set -euo pipefail
 
@@ -235,22 +237,45 @@ jobs:
           fi
 
           API_URL="https://${API_HOST}"
+          PROJECT_ID="${VERCEL_PROJECT_ID:-}"
+          ORG_ID="${VERCEL_ORG_ID:-}"
+          TEAM_AMP=""
+          TEAM_Q=""
 
-          pushd apps/web > /dev/null
-          VERCEL_LIST_OUTPUT="$(
-            vercel list \
-              --meta "githubCommitRef=${TARGET_BRANCH}" \
-              --status READY \
-              --token "${VERCEL_TOKEN}" \
-              2>/dev/null || true
-          )"
-          popd > /dev/null
+          if [[ -z "${PROJECT_ID}" ]]; then
+            echo "::error::Missing VERCEL_PROJECT_ID."
+            exit 1
+          fi
 
-          WEB_URL="$(
-            printf '%s\n' "$VERCEL_LIST_OUTPUT" \
-              | grep -Eo 'https://[^[:space:]]+|[A-Za-z0-9.-]+\.vercel\.app' \
-              | head -n1 || true
-          )"
+          if [[ -z "${ORG_ID}" ]]; then
+            echo "::error::Missing VERCEL_ORG_ID."
+            exit 1
+          fi
+
+          case "${ORG_ID}" in
+            team_*)
+              TEAM_AMP="&teamId=${ORG_ID}"
+              TEAM_Q="?teamId=${ORG_ID}"
+              ;;
+            user_*) ;;
+            *)
+              echo "::error::VERCEL_ORG_ID must start with team_ or user_."
+              exit 1
+              ;;
+          esac
+
+          PROJECT_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${VERCEL_TOKEN}" \
+            "https://api.vercel.com/v9/projects/${PROJECT_ID}${TEAM_Q}")
+          if [[ "${PROJECT_STATUS}" != "200" ]]; then
+            echo "::error::Vercel project preflight failed (HTTP ${PROJECT_STATUS})."
+            exit 1
+          fi
+
+          WEB_URL=$(curl -sf \
+            -H "Authorization: Bearer ${VERCEL_TOKEN}" \
+            "https://api.vercel.com/v6/deployments?projectId=${PROJECT_ID}&target=preview&limit=1&meta-githubCommitRef=${TARGET_BRANCH}${TEAM_AMP}" \
+            | jq -r '.deployments[0].url // ""')
 
           if [[ -z "${WEB_URL}" ]]; then
             echo "::error::Unable to resolve a Vercel deployment URL for branch '${TARGET_BRANCH}'."
