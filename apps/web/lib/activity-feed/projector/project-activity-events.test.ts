@@ -279,8 +279,16 @@ function createSupabaseMock(input?: { events?: Array<Record<string, unknown>> })
           is: vi.fn(() => chain),
           returns: vi.fn(async () => ({
             data: [
-              { profile_id: 'child-profile-1', live_status: 'away' },
-              { profile_id: 'guardian-profile-1', live_status: 'away' },
+              {
+                profile_id: 'child-profile-1',
+                live_status: 'away',
+                last_seen_at: '2026-03-03T11:04:00.000Z',
+              },
+              {
+                profile_id: 'guardian-profile-1',
+                live_status: 'away',
+                last_seen_at: '2026-03-03T11:04:00.000Z',
+              },
             ],
             error: null,
           })),
@@ -516,8 +524,16 @@ describe('projectActivityEvents', () => {
           is: vi.fn(() => chain),
           returns: vi.fn(async () => ({
             data: [
-              { profile_id: 'child-profile-1', live_status: 'away' },
-              { profile_id: 'guardian-profile-1', live_status: 'away' },
+              {
+                profile_id: 'child-profile-1',
+                live_status: 'away',
+                last_seen_at: '2026-03-03T11:04:00.000Z',
+              },
+              {
+                profile_id: 'guardian-profile-1',
+                live_status: 'away',
+                last_seen_at: '2026-03-03T11:04:00.000Z',
+              },
             ],
             error: null,
           })),
@@ -901,8 +917,16 @@ describe('projectActivityEvents', () => {
             is: vi.fn(() => chain),
             returns: vi.fn(async () => ({
               data: [
-                { profile_id: 'profile-1', live_status: 'online' },
-                { profile_id: 'profile-2', live_status: 'away' },
+                {
+                  profile_id: 'profile-1',
+                  live_status: 'online',
+                  last_seen_at: '2026-03-12T10:00:45.000Z',
+                },
+                {
+                  profile_id: 'profile-2',
+                  live_status: 'away',
+                  last_seen_at: '2026-03-12T09:40:00.000Z',
+                },
               ],
               error: null,
             })),
@@ -1139,8 +1163,16 @@ describe('projectActivityEvents', () => {
             is: vi.fn(() => chain),
             returns: vi.fn(async () => ({
               data: [
-                { profile_id: 'child-profile-1', live_status: 'away' },
-                { profile_id: 'guardian-profile-1', live_status: 'away' },
+                {
+                  profile_id: 'child-profile-1',
+                  live_status: 'away',
+                  last_seen_at: '2026-03-03T11:04:00.000Z',
+                },
+                {
+                  profile_id: 'guardian-profile-1',
+                  live_status: 'away',
+                  last_seen_at: '2026-03-03T11:04:00.000Z',
+                },
               ],
               error: null,
             })),
@@ -1370,8 +1402,16 @@ describe('projectActivityEvents', () => {
             is: vi.fn(() => chain),
             returns: vi.fn(async () => ({
               data: [
-                { profile_id: 'child-profile-1', live_status: 'away' },
-                { profile_id: 'guardian-profile-1', live_status: 'away' },
+                {
+                  profile_id: 'child-profile-1',
+                  live_status: 'away',
+                  last_seen_at: '2026-03-03T11:04:00.000Z',
+                },
+                {
+                  profile_id: 'guardian-profile-1',
+                  live_status: 'away',
+                  last_seen_at: '2026-03-03T11:04:00.000Z',
+                },
               ],
               error: null,
             })),

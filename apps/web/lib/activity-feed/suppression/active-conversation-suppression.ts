@@ -19,6 +19,7 @@ const CONVERSATIONAL_EVENT_TYPES = new Set([
 ]);
 
 export const ACTIVE_CONVERSATION_SUPPRESSION_WINDOW_MS = 120_000;
+const PRESENCE_STALE_MS = 5 * 60 * 1000;
 
 type SuppressionClient = Pick<SupabaseServiceClient, 'from'>;
 
@@ -39,6 +40,7 @@ type ProfileAccountRow = {
 type PresenceRow = {
   profile_id: string;
   live_status: string | null;
+  last_seen_at: string | null;
 };
 
 type ReadStateRow = {
@@ -89,6 +91,17 @@ function isRecentlyRead(lastReadAt: string | null | undefined, cutoffTime: numbe
     return false;
   }
   return readTime >= cutoffTime;
+}
+
+function isPresenceFresh(lastSeenAt: string | null | undefined, nowTime: number) {
+  if (!lastSeenAt) {
+    return false;
+  }
+  const lastSeenTime = new Date(lastSeenAt).getTime();
+  if (Number.isNaN(lastSeenTime)) {
+    return false;
+  }
+  return nowTime - lastSeenTime <= PRESENCE_STALE_MS;
 }
 
 export async function resolveActiveConversationSuppressedRecipients(input: {
@@ -144,7 +157,7 @@ export async function resolveActiveConversationSuppressedRecipients(input: {
 
   const presenceResponse = await input.supabase
     .from('profile_presence')
-    .select('profile_id, live_status')
+    .select('profile_id, live_status, last_seen_at')
     .eq('org_id', input.event.org_id)
     .in('profile_id', recipientProfileIds)
     .is('deleted_at', null)
@@ -154,8 +167,8 @@ export async function resolveActiveConversationSuppressedRecipients(input: {
     throw new Error(presenceResponse.error.message);
   }
 
-  const liveStatusByProfileId = new Map(
-    (presenceResponse.data ?? []).map((row) => [row.profile_id, row.live_status]),
+  const presenceByProfileId = new Map(
+    (presenceResponse.data ?? []).map((row) => [row.profile_id, row]),
   );
 
   const accountIds = unique(
@@ -195,13 +208,16 @@ export async function resolveActiveConversationSuppressedRecipients(input: {
 
   for (const profileId of recipientProfileIds) {
     const accountId = accountIdByProfileId.get(profileId);
-    const liveStatus = liveStatusByProfileId.get(profileId);
+    const presence = presenceByProfileId.get(profileId);
+    const liveStatus = presence?.live_status;
     const lastReadAt =
       typeof accountId === 'string' ? lastReadAtByAccountId.get(accountId) : null;
+    const presenceFresh = isPresenceFresh(presence?.last_seen_at, nowTime);
 
     const suppress =
       !Number.isNaN(cutoffTime) &&
       isActivePresence(liveStatus) &&
+      presenceFresh &&
       isRecentlyRead(lastReadAt, cutoffTime);
 
     if (suppress) {

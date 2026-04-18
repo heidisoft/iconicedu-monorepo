@@ -119,7 +119,7 @@ async function sendNotificationViaChannel(input: {
       recipientProfileId: input.job.recipient_profile_id,
     });
 
-    await sendPushNotification({
+    const result = await sendPushNotification({
       orgId: input.job.org_id,
       recipientProfileId: input.job.recipient_profile_id,
       prefKey: input.job.pref_key,
@@ -131,6 +131,17 @@ async function sendNotificationViaChannel(input: {
       scopeId: input.job.scope_id ?? undefined,
       metadata: payload,
     });
+    await logDispatch({
+      supabase: input.supabase,
+      orgId: input.job.org_id,
+      notificationDispatchJobId: input.job.id,
+      result: 'succeeded',
+      details: {
+        channel: input.job.delivery_channel,
+        prefKey: input.job.pref_key,
+      },
+    });
+    return result;
   } else if (input.job.delivery_channel === 'email') {
     await sendEmailNotification({
       orgId: input.job.org_id,
@@ -160,6 +171,8 @@ async function sendNotificationViaChannel(input: {
       prefKey: input.job.pref_key,
     },
   });
+
+  return undefined;
 }
 
 export async function enqueueNotificationDispatchJobs(input: EnqueueDispatchInput) {
@@ -333,7 +346,7 @@ export async function dispatchDueNotificationJobs(input: {
         continue;
       }
 
-      await sendNotificationViaChannel({
+      const sendResult = await sendNotificationViaChannel({
         supabase: input.supabase,
         job,
       });
@@ -343,6 +356,10 @@ export async function dispatchDueNotificationJobs(input: {
         .update({
           status: 'succeeded',
           dispatched_at: now,
+          payload: {
+            ...(job.payload ?? {}),
+            expoTicketIds: sendResult?.ticketIds ?? [],
+          },
           lease_owner: null,
           lease_until: null,
           updated_at: now,

@@ -96,18 +96,24 @@ export function PresenceTracker() {
       disposed = true;
       clearInterval(heartbeat);
       subscription.remove();
-      void supabase.from('profile_presence').upsert(
-        {
-          org_id: orgId,
-          profile_id: profileId,
-          live_status: 'offline',
-          display_status: 'offline',
-          last_seen_at: new Date().toISOString(),
-          presence_loaded: true,
-          deleted_at: null,
-        },
-        { onConflict: 'org_id,profile_id' },
-      );
+      supabase
+        .from('profile_presence')
+        .upsert(
+          {
+            org_id: orgId,
+            profile_id: profileId,
+            live_status: 'offline',
+            display_status: 'offline',
+            last_seen_at: new Date().toISOString(),
+            presence_loaded: true,
+            deleted_at: null,
+          },
+          { onConflict: 'org_id,profile_id' },
+        )
+        .then(
+          () => {},
+          () => {},
+        );
     };
   }, [orgId, profileId]);
 

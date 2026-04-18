@@ -40,7 +40,9 @@ describe('buildDeliveryPlan', () => {
       channels: ['push'],
       reasonCodes: ['global_preference'],
       context: {
+        now: new Date('2026-03-11T12:00:00.000Z'),
         liveStatus: 'online',
+        lastSeenAt: '2026-03-11T11:59:45.000Z',
       },
     });
 
@@ -62,6 +64,7 @@ describe('buildDeliveryPlan', () => {
       context: {
         now: new Date('2026-03-11T12:00:00.000Z'),
         liveStatus: 'online',
+        lastSeenAt: '2026-03-11T11:59:45.000Z',
       },
     });
 
@@ -81,6 +84,7 @@ describe('buildDeliveryPlan', () => {
       context: {
         now: new Date('2026-03-11T12:00:00.000Z'),
         liveStatus: 'online',
+        lastSeenAt: '2026-03-11T11:59:45.000Z',
       },
     });
 
@@ -98,6 +102,7 @@ describe('buildDeliveryPlan', () => {
       context: {
         now: new Date('2026-03-11T12:00:00.000Z'),
         liveStatus: 'online',
+        lastSeenAt: '2026-03-11T11:59:45.000Z',
       },
     });
 
@@ -114,6 +119,7 @@ describe('buildDeliveryPlan', () => {
       context: {
         now: new Date('2026-03-11T12:00:00.000Z'),
         liveStatus: 'online',
+        lastSeenAt: '2026-03-11T11:59:45.000Z',
       },
     });
 
@@ -130,11 +136,29 @@ describe('buildDeliveryPlan', () => {
       context: {
         now: new Date('2026-03-11T12:00:00.000Z'),
         liveStatus: 'online',
+        lastSeenAt: '2026-03-11T11:59:45.000Z',
       },
     });
 
     expect(decision.deliveryTiming).toBe('delayed');
     expect(decision.runAt).toBe('2026-03-11T12:01:00.000Z');
+  });
+
+  it('does not delay when presence is active but stale', () => {
+    const decision = buildDeliveryPlan({
+      event: buildEvent({ eventType: 'message.posted' }),
+      recipientProfileId: 'profile-target',
+      channels: ['push'],
+      reasonCodes: ['global_preference'],
+      context: {
+        now: new Date('2026-03-11T12:00:00.000Z'),
+        liveStatus: 'in_class',
+        lastSeenAt: '2026-03-11T11:54:59.000Z',
+      },
+    });
+
+    expect(decision.deliveryTiming).toBe('immediate');
+    expect(decision.reasonCodes).not.toContain('presence_active');
   });
 });
 
@@ -189,7 +213,10 @@ describe('buildNotificationDecision', () => {
             eq: vi.fn(() => chain),
             is: vi.fn(() => chain),
             maybeSingle: vi.fn(async () => ({
-              data: { live_status: 'offline' },
+              data: {
+                live_status: 'offline',
+                last_seen_at: '2026-03-11T11:59:30.000Z',
+              },
               error: null,
             })),
           };

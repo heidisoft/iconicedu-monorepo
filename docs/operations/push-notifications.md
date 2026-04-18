@@ -6,7 +6,7 @@ End-to-end reference for Expo push notifications: how tokens are managed on devi
 
 ## Last Updated
 
-2026-04-16
+2026-04-17
 
 ## Related Docs
 
@@ -34,8 +34,9 @@ Supabase Edge Function (cron every 1 min)
 Next.js web app
   └─ POST /api/internal/notifications/dispatch
       └─ dispatchDueNotificationJobs()
-          └─ buildNotificationDecision()    ← checks preferences, presence, digest policy
-          └─ sendPushNotification()         ← looks up push_tokens, calls Expo Push API
+          └─ buildNotificationDecision()    ← checks preferences, presence, delay policy
+          └─ sendPushNotification()         ← looks up push_tokens, calls authenticated Expo Push API
+              └─ pollExpoPushReceipts()     ← confirms downstream delivery / credential errors
               └─ Expo Push API → APNs / FCM → device
 ```
 
@@ -84,12 +85,12 @@ When an activity event is projected, `enqueueNotificationDispatchJobs()` is call
 
 **Delivery timing logic** (`apps/web/lib/notifications/policy-config.ts`):
 
-| Category             | Examples                                                                                                                                          | Timing                                                                               |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| Critical — immediate | `class.session.scheduled/rescheduled/canceled`, `session.started`, `session.reminder.sent`, `payment.reminder`, `payment.failed`, `system.notice` | `immediate` (0s delay) — bypasses presence suppression                               |
-| Near-real-time       | `dm.posted`, `dms.posted`                                                                                                                         | `near-real-time` (30s delay) — not digest eligible, low-latency routing              |
-| Digest-eligible      | `message.posted`, `reaction.added`, `file.uploaded`                                                                                               | `digest` (30 min batch window) — delayed if presence active or channel recently read |
-| Everything else      | All other event types                                                                                                                             | `delayed` (120s) — delayed if presence active                                        |
+| Category             | Examples                                                                                                                                          | Timing                                                   |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Critical — immediate | `class.session.scheduled/rescheduled/canceled`, `session.started`, `session.reminder.sent`, `payment.reminder`, `payment.failed`, `system.notice` | `immediate` (0s delay) — bypasses presence suppression   |
+| Near-real-time       | `dm.posted`, `dms.posted`, `dm.reaction.added`, `dm.reaction.removed`                                                                             | `delayed` (30s) when presence-aware suppression applies  |
+| Standard delay       | `message.posted`, `reaction.added`, `file.uploaded`                                                                                               | `delayed` (60s) when presence-aware suppression applies  |
+| Everything else      | All other event types                                                                                                                             | `delayed` (120s) when presence-aware suppression applies |
 
 **Suppression rules** (`buildNotificationDecision`):
 
@@ -116,8 +117,9 @@ Calls `dispatchDueNotificationJobs()` which:
 
 1. Claims `N` due jobs from `notification_dispatch_jobs` via `claim_due_notification_dispatch_jobs()` RPC (lease-based, idempotent — safe for overlapping ticks)
 2. Re-evaluates each job's `buildNotificationDecision()` at dispatch time (preferences may have changed since enqueue)
-3. For push jobs: `sendPushNotification()` → queries `push_tokens` by `profile_id` → calls Expo Push API in batch
-4. Marks jobs `succeeded`, `failed` (retryable with exponential backoff), or `dead_letter` (after max 8 attempts or non-retryable error)
+3. For push jobs: `sendPushNotification()` → queries `push_tokens` by `profile_id` → calls Expo Push API in batch with optional `EXPO_ACCESS_TOKEN`
+4. Successful Expo ticket IDs are persisted back onto `notification_dispatch_jobs.payload.expoTicketIds` for follow-up receipt polling
+5. Marks jobs `succeeded`, `failed` (retryable with exponential backoff), or `dead_letter` (after max 8 attempts or non-retryable error)
 
 **Retry schedule:** 15s, 30s, 60s, 120s, 240s, 480s, 600s, 600s (capped at 10 min).
 
@@ -129,6 +131,7 @@ Calls `dispatchDueNotificationJobs()` which:
 
 ```bash
 INTERNAL_NOTIFICATIONS_TOKEN=<long-random-secret>
+EXPO_ACCESS_TOKEN=<expo-personal-access-token>
 ```
 
 **Supabase Edge Function secrets:**

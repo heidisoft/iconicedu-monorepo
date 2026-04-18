@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { sendPushNotification } from '@iconicedu/web/lib/notifications/providers/push-provider';
+import {
+  pollExpoPushReceipts,
+  sendPushNotification,
+} from '@iconicedu/web/lib/notifications/providers/push-provider';
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
@@ -52,6 +55,7 @@ function setupUpdateChain(result: { error: unknown } = { error: null }) {
 describe('sendPushNotification', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllEnvs();
     setupUpdateChain();
   });
 
@@ -97,6 +101,27 @@ describe('sendPushNotification', () => {
       body: 'Hello!',
       channelId: 'default',
     });
+  });
+
+  it('adds the Expo authorization header when EXPO_ACCESS_TOKEN is configured', async () => {
+    setupSelectChain({
+      data: [{ id: 'tok-1', token: 'ExponentPushToken[aaa]' }],
+      error: null,
+    });
+    vi.stubEnv('EXPO_ACCESS_TOKEN', 'expo-token-123');
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ status: 'ok', id: 'ticket-1' }] }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await sendPushNotification(BASE_PAYLOAD);
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect((init.headers as Record<string, string>).Authorization).toBe(
+      'Bearer expo-token-123',
+    );
   });
 
   it('includes channelId in push data when metadata has a channel id', async () => {
@@ -296,6 +321,47 @@ describe('sendPushNotification', () => {
     );
   });
 
+  it('throws for InvalidCredentials ticket errors', async () => {
+    setupSelectChain({
+      data: [{ id: 'tok-1', token: 'ExponentPushToken[aaa]' }],
+      error: null,
+    });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          data: [{ status: 'error', details: { error: 'InvalidCredentials' } }],
+        }),
+      }),
+    );
+
+    await expect(sendPushNotification(BASE_PAYLOAD)).rejects.toThrow(
+      'Expo push InvalidCredentials - check EAS project push credentials',
+    );
+  });
+
+  it('returns ticket ids for successful sends', async () => {
+    setupSelectChain({
+      data: [{ id: 'tok-1', token: 'ExponentPushToken[aaa]' }],
+      error: null,
+    });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ data: [{ status: 'ok', id: 'ticket-1' }] }),
+      }),
+    );
+
+    await expect(sendPushNotification(BASE_PAYLOAD)).resolves.toEqual({
+      ticketIds: ['ticket-1'],
+      revokedTokenIds: [],
+    });
+  });
+
   it('revokes DeviceNotRegistered tokens after sending', async () => {
     setupSelectChain({
       data: [
@@ -343,5 +409,40 @@ describe('sendPushNotification', () => {
     await sendPushNotification(BASE_PAYLOAD);
 
     expect(mockUpdate).not.toHaveBeenCalled();
+  });
+});
+
+describe('pollExpoPushReceipts', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it('returns early with an empty receipt map when no ids are provided', async () => {
+    await expect(pollExpoPushReceipts([])).resolves.toEqual({});
+  });
+
+  it('calls the Expo receipts endpoint with auth when configured', async () => {
+    vi.stubEnv('EXPO_ACCESS_TOKEN', 'expo-token-456');
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: {
+          'ticket-1': { status: 'ok' },
+        },
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(pollExpoPushReceipts(['ticket-1'])).resolves.toEqual({
+      'ticket-1': { status: 'ok' },
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://exp.host/--/api/v2/push/getReceipts');
+    expect(init.body).toBe(JSON.stringify({ ids: ['ticket-1'] }));
+    expect((init.headers as Record<string, string>).Authorization).toBe(
+      'Bearer expo-token-456',
+    );
   });
 });

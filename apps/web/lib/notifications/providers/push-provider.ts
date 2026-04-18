@@ -15,7 +15,19 @@ type PushNotificationPayload = {
 
 type ExpoTicket = {
   status: 'ok' | 'error';
+  id?: string;
   details?: { error?: string };
+};
+
+type ExpoReceipt = {
+  status: 'ok' | 'error';
+  details?: { error?: string };
+  message?: string;
+};
+
+export type SendPushResult = {
+  ticketIds: string[];
+  revokedTokenIds: string[];
 };
 
 type ExpoPushMessage = {
@@ -41,6 +53,17 @@ function asRecord(value: unknown): Record<string, unknown> {
     return {};
   }
   return value as Record<string, unknown>;
+}
+
+function buildExpoHeaders() {
+  const expoAccessToken = process.env.EXPO_ACCESS_TOKEN;
+
+  return {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+    'Accept-Encoding': 'gzip, deflate',
+    ...(expoAccessToken ? { Authorization: `Bearer ${expoAccessToken}` } : {}),
+  };
 }
 
 function resolveChannelIdFromMetadata(metadata: Record<string, unknown> | undefined) {
@@ -173,7 +196,9 @@ export async function sendPushNotification(payload: PushNotificationPayload) {
     throw new Error(error.message);
   }
 
-  if (!tokens?.length) return;
+  if (!tokens?.length) {
+    return { ticketIds: [], revokedTokenIds: [] } satisfies SendPushResult;
+  }
 
   const channelId = resolveChannelIdFromMetadata(payload.metadata);
   const threadId = resolveThreadIdFromMetadata(payload.metadata, payload.threadId);
@@ -207,11 +232,7 @@ export async function sendPushNotification(payload: PushNotificationPayload) {
   // 3. Send via Expo Push API
   const res = await fetch('https://exp.host/--/api/v2/push/send', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      'Accept-Encoding': 'gzip, deflate',
-    },
+    headers: buildExpoHeaders(),
     body: JSON.stringify(messages),
   });
 
@@ -222,12 +243,34 @@ export async function sendPushNotification(payload: PushNotificationPayload) {
   const json = (await res.json()) as { data?: ExpoTicket[] };
   const tickets = Array.isArray(json.data) ? json.data : [];
 
-  // 4. Revoke tokens that the Expo service reports as unregistered
+  // 4. Inspect ticket results and revoke tokens that Expo reports as unregistered
   const revokeIds: string[] = [];
+  const ticketIds: string[] = [];
   for (let i = 0; i < tickets.length; i++) {
-    if (tickets[i]?.details?.error === 'DeviceNotRegistered') {
-      const tokenId = tokens[i]?.id;
-      if (tokenId) revokeIds.push(tokenId);
+    const ticket = tickets[i];
+    const tokenId = tokens[i]?.id;
+    if (!ticket) continue;
+
+    if (ticket.status === 'ok') {
+      if (typeof ticket.id === 'string' && ticket.id.length > 0) {
+        ticketIds.push(ticket.id);
+      }
+      continue;
+    }
+
+    const errCode = ticket.details?.error;
+    if (errCode === 'DeviceNotRegistered' && tokenId) {
+      revokeIds.push(tokenId);
+    } else if (errCode === 'InvalidCredentials') {
+      throw new Error(
+        'Expo push InvalidCredentials - check EAS project push credentials',
+      );
+    } else if (errCode === 'MessageTooBig') {
+      continue;
+    } else if (errCode === 'MessageRateExceeded') {
+      throw new Error('Expo push rate exceeded - back off and retry');
+    } else if (errCode) {
+      continue;
     }
   }
 
@@ -240,4 +283,28 @@ export async function sendPushNotification(payload: PushNotificationPayload) {
       })
       .in('id', revokeIds);
   }
+
+  return {
+    ticketIds,
+    revokedTokenIds: revokeIds,
+  } satisfies SendPushResult;
+}
+
+export async function pollExpoPushReceipts(receiptIds: string[]) {
+  if (!receiptIds.length) {
+    return {} as Record<string, ExpoReceipt>;
+  }
+
+  const res = await fetch('https://exp.host/--/api/v2/push/getReceipts', {
+    method: 'POST',
+    headers: buildExpoHeaders(),
+    body: JSON.stringify({ ids: receiptIds }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Expo Push receipts API returned ${res.status}`);
+  }
+
+  const json = (await res.json()) as { data?: Record<string, ExpoReceipt> };
+  return json.data ?? {};
 }

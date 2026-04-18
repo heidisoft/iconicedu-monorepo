@@ -479,6 +479,7 @@ describe('dispatchDueNotificationJobs', () => {
   });
 
   it('still sends push when activity feed item lookup fails', async () => {
+    sendPushNotification.mockResolvedValue({ ticketIds: ['ticket-1'] });
     const claimRows = [
       {
         id: 'job-1',
@@ -580,6 +581,105 @@ describe('dispatchDueNotificationJobs', () => {
       expect.objectContaining({
         prefKey: 'dm.posted',
         activityFeedItemId: null,
+      }),
+    );
+  });
+
+  it('stores expo ticket ids back onto the dispatch job payload after push send', async () => {
+    sendPushNotification.mockResolvedValue({ ticketIds: ['ticket-1', 'ticket-2'] });
+
+    const claimRows = [
+      {
+        id: 'job-1',
+        org_id: 'org-1',
+        activity_event_id: 'event-1',
+        recipient_profile_id: 'profile-1',
+        pref_key: 'message.posted',
+        delivery_channel: 'push',
+        delivery_timing: 'immediate',
+        attempt_bucket: 'immediate:2026-03-11T12:00',
+        run_at: '2026-03-11T12:00:00.000Z',
+        payload: { title: 'Message posted', summary: 'A new message arrived' },
+        status: 'leased',
+        attempt_count: 0,
+        max_attempts: 8,
+      },
+    ];
+
+    const update = vi.fn(() => ({
+      eq: vi.fn(() => ({
+        eq: vi.fn(async () => ({ error: null })),
+      })),
+    }));
+
+    const supabase = {
+      rpc: vi.fn(async () => ({ data: claimRows, error: null })),
+      from: vi.fn((table: string) => {
+        if (table === 'activity_feed_items') {
+          const chain = {
+            eq: vi.fn(() => chain),
+            is: vi.fn(() => chain),
+            maybeSingle: vi.fn(async () => ({
+              data: { id: 'feed-1' },
+              error: null,
+            })),
+          };
+          return { select: vi.fn(() => chain) };
+        }
+
+        if (table === 'activity_events') {
+          const chain = {
+            eq: vi.fn(() => chain),
+            is: vi.fn(() => chain),
+            maybeSingle: vi.fn(async () => ({
+              data: {
+                id: 'event-1',
+                org_id: 'org-1',
+                event_type: 'message.posted',
+                occurred_at: '2026-03-11T12:00:00.000Z',
+                source_kind: 'profile',
+                actor_profile_id: 'profile-actor',
+                scope: { kind: 'channel', channelId: 'channel-1' },
+                object_ref: null,
+                target_ref: null,
+                payload: {},
+                audience_rules: [],
+                dedupe_key: null,
+                projection_status: 'projected',
+                projection_attempts: 1,
+                created_at: '2026-03-11T12:00:00.000Z',
+                updated_at: '2026-03-11T12:00:00.000Z',
+              },
+              error: null,
+            })),
+          };
+          return { select: vi.fn(() => chain) };
+        }
+
+        if (table === 'notification_dispatch_jobs') {
+          return { update };
+        }
+
+        if (table === 'notification_dispatch_logs') {
+          return {
+            insert: vi.fn(async () => ({ error: null })),
+          };
+        }
+
+        throw new Error(`Unexpected table ${table}`);
+      }),
+    };
+
+    await dispatchDueNotificationJobs({
+      supabase: supabase as never,
+      leaseOwner: 'worker-1',
+    });
+
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          expoTicketIds: ['ticket-1', 'ticket-2'],
+        }),
       }),
     );
   });
