@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import {
+  Alert,
   View,
   Text,
   TouchableOpacity,
@@ -181,29 +182,47 @@ export default function SpaceDetailScreen() {
   );
 
   // ── Delete message ──
-  const handleDelete = useCallback(async (messageId: string) => {
-    await deleteMessage(messageId);
-  }, []);
+  const handleDelete = useCallback(
+    async (messageId: string) => {
+      await deleteMessage(messageId, orgId, profileId);
+    },
+    [orgId, profileId],
+  );
 
   const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
 
   const handleSend = useCallback(
     async (text: string) => {
       if (!channelId || !profileId || !orgId) return;
-      if (threadReplyTarget) {
-        const threadId = threadReplyTarget.social?.thread?.ids.id;
-        await sendTextMessage(
-          channelId,
-          profileId,
-          orgId,
-          text,
-          threadReplyTarget.ids.id,
-          threadId,
+      try {
+        if (threadReplyTarget) {
+          const threadId = threadReplyTarget.social?.thread?.ids.id;
+          await sendTextMessage(
+            channelId,
+            profileId,
+            orgId,
+            text,
+            threadReplyTarget.ids.id,
+            threadId,
+          );
+          setThreadReplyTarget(null);
+          void refetch();
+        } else {
+          await sendTextMessage(channelId, profileId, orgId, text);
+        }
+      } catch (error) {
+        reportMobileObservedError({
+          error,
+          source: 'mobile.messages.spaces.send_text',
+          message: 'Failed to send space message',
+          context: { channelId, orgId, profileId },
+        });
+        Alert.alert(
+          'Failed to send',
+          error instanceof Error
+            ? error.message
+            : 'Something went wrong. Please try again.',
         );
-        setThreadReplyTarget(null);
-        void refetch();
-      } else {
-        await sendTextMessage(channelId, profileId, orgId, text);
       }
     },
     [channelId, profileId, orgId, threadReplyTarget, refetch],

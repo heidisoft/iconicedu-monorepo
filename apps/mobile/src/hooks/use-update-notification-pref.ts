@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiGet, apiPut } from '@/lib/api/http-client';
 import { queryKeys } from '@/lib/api/queries';
-import { supabase } from '@/lib/supabase/client';
 import { useAccount } from './use-account';
 import { useProfile } from './use-profile';
 
@@ -10,37 +10,23 @@ async function upsertNotificationPreference(
   prefKey: string,
   muted: boolean,
 ) {
-  const now = new Date().toISOString();
-
-  const existingPref = await supabase
-    .from('notification_preferences')
-    .select('channels')
-    .eq('org_id', orgId)
-    .eq('profile_id', profileId)
-    .eq('pref_key', prefKey)
-    .is('deleted_at', null)
-    .maybeSingle<{ channels: string[] | null }>();
-
-  if (existingPref.error) throw new Error(existingPref.error.message);
-
+  const existing = await apiGet<Array<{ channels?: string[] | null }>>(
+    '/notification-preferences',
+    { orgId, profileId, prefKey },
+  );
+  const existingPref = existing[0];
   const channels =
-    Array.isArray(existingPref.data?.channels) && existingPref.data.channels.length > 0
-      ? existingPref.data.channels
+    Array.isArray(existingPref?.channels) && existingPref.channels.length > 0
+      ? existingPref.channels
       : ['push'];
 
-  const { error } = await supabase.from('notification_preferences').upsert(
-    {
-      org_id: orgId,
-      profile_id: profileId,
-      pref_key: prefKey,
-      channels,
-      muted,
-      updated_at: now,
-      updated_by: profileId,
-    },
-    { onConflict: 'org_id,profile_id,pref_key' },
-  );
-  if (error) throw new Error(error.message);
+  await apiPut('/notification-preferences', {
+    orgId,
+    profileId,
+    prefKey,
+    channels,
+    muted,
+  });
 }
 
 export function useUpdateNotificationPref() {

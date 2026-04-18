@@ -1959,6 +1959,8 @@ export const MessageItem: React.FC<MessageItemProps> = ({
       setThreadLoading(true);
       try {
         const replies = await fetchThreadMessages(
+          message.ids.orgId,
+          thread.readState?.channelId ?? '',
           thread.ids.id,
           message.ids.id,
           currentProfileId ?? '',

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
-import { supabase } from '@/lib/supabase/client';
+import { apiPost } from '@/lib/api/http-client';
 import { useAccount } from '@/hooks/use-account';
 import { useProfile } from '@/hooks/use-profile';
 
@@ -55,18 +55,12 @@ export function PresenceTracker() {
         lastHeartbeatAtRef.current = now;
       }
 
-      await supabase.from('profile_presence').upsert(
-        {
-          org_id: orgId,
-          profile_id: profileId,
-          live_status: mapConnectionStatusToLiveStatus(status),
-          display_status: mapConnectionStatusToDisplayStatus(status),
-          last_seen_at: new Date().toISOString(),
-          presence_loaded: true,
-          deleted_at: null,
-        },
-        { onConflict: 'org_id,profile_id' },
-      );
+      await apiPost('/presence', {
+        orgId,
+        profileId,
+        status: mapConnectionStatusToDisplayStatus(status),
+        liveStatus: mapConnectionStatusToLiveStatus(status),
+      });
     };
 
     const publishForAppState = (state: AppStateStatus, force = false) => {
@@ -96,24 +90,14 @@ export function PresenceTracker() {
       disposed = true;
       clearInterval(heartbeat);
       subscription.remove();
-      supabase
-        .from('profile_presence')
-        .upsert(
-          {
-            org_id: orgId,
-            profile_id: profileId,
-            live_status: 'offline',
-            display_status: 'offline',
-            last_seen_at: new Date().toISOString(),
-            presence_loaded: true,
-            deleted_at: null,
-          },
-          { onConflict: 'org_id,profile_id' },
-        )
-        .then(
-          () => {},
-          () => {},
-        );
+      apiPost('/presence', {
+        orgId,
+        profileId,
+        status: 'offline',
+      }).then(
+        () => {},
+        () => {},
+      );
     };
   }, [orgId, profileId]);
 

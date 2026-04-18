@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { reportMobileObservedError } from '@/lib/analytics/report-error';
 import {
   Alert,
   View,
@@ -204,21 +205,36 @@ export default function DmConversationScreen() {
   const handleSend = useCallback(
     async (text: string) => {
       if (!channelId || !profileId || !orgId) return;
-      if (threadReplyTarget) {
-        const threadId = threadReplyTarget.social?.thread?.ids.id;
-        await sendTextMessage(
-          channelId,
-          profileId,
-          orgId,
-          text,
-          threadReplyTarget.ids.id,
-          threadId,
+      try {
+        if (threadReplyTarget) {
+          const threadId = threadReplyTarget.social?.thread?.ids.id;
+          await sendTextMessage(
+            channelId,
+            profileId,
+            orgId,
+            text,
+            threadReplyTarget.ids.id,
+            threadId,
+          );
+          setThreadReplyTarget(null);
+          // Refresh so the parent message's thread stats (reply count) update
+          void refetch();
+        } else {
+          await sendTextMessage(channelId, profileId, orgId, text);
+        }
+      } catch (error) {
+        reportMobileObservedError({
+          error,
+          source: 'mobile.messages.dm.send_text',
+          message: 'Failed to send DM',
+          context: { channelId, orgId, profileId },
+        });
+        Alert.alert(
+          'Failed to send',
+          error instanceof Error
+            ? error.message
+            : 'Something went wrong. Please try again.',
         );
-        setThreadReplyTarget(null);
-        // Refresh so the parent message's thread stats (reply count) update
-        void refetch();
-      } else {
-        await sendTextMessage(channelId, profileId, orgId, text);
       }
     },
     [channelId, profileId, orgId, threadReplyTarget, refetch],
@@ -397,9 +413,12 @@ export default function DmConversationScreen() {
   );
 
   // ── Delete message ──
-  const handleDelete = useCallback(async (messageId: string) => {
-    await deleteMessage(messageId);
-  }, []);
+  const handleDelete = useCallback(
+    async (messageId: string) => {
+      await deleteMessage(messageId, orgId, profileId);
+    },
+    [orgId, profileId],
+  );
 
   // ── Reaction toggle ──
   const handleReactionToggle = useCallback(

@@ -3,7 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
 import { reportMobileObservedError } from '@/lib/analytics/report-error';
-import { supabase } from '@/lib/supabase/client';
+import { apiPost } from '@/lib/api/http-client';
 
 export const PUSH_TOKEN_STORE_KEY = 'expo_push_token';
 
@@ -134,17 +134,14 @@ export async function storePushToken(
 ): Promise<void> {
   const platform =
     Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'web';
-  const now = new Date().toISOString();
-
-  const { error } = await supabase.rpc('upsert_push_token', {
-    _org_id: orgId,
-    _profile_id: profileId,
-    _token: token,
-    _platform: platform,
-    _now: now,
-  });
-
-  if (error) {
+  try {
+    await apiPost('/push-tokens/register', {
+      orgId,
+      profileId,
+      token,
+      platform,
+    });
+  } catch (error) {
     reportMobileObservedError({
       error,
       source: 'mobile.notifications.store_push_token',
@@ -156,7 +153,7 @@ export async function storePushToken(
         tokenPreview: token.slice(0, 24),
       },
     });
-    throw new Error(error.message);
+    throw error;
   }
 
   logPushDebug('token_stored', {
@@ -173,12 +170,5 @@ export async function storePushToken(
  * Marks the token as revoked in the database, e.g. on logout.
  */
 export async function revokePushToken(token: string): Promise<void> {
-  const { error } = await supabase
-    .from('push_tokens')
-    .update({ revoked_at: new Date().toISOString() })
-    .eq('token', token);
-
-  if (error) {
-    throw new Error(error.message);
-  }
+  await apiPost('/push-tokens/revoke', { token });
 }

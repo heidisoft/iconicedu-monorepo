@@ -118,6 +118,8 @@ export const ThreadSheet: React.FC<ThreadSheetProps> = ({
     try {
       // Pass both threadId (preferred, threads table FK) and parentMessageId (fallback)
       const data = await fetchThreadMessages(
+        parentMessage.ids.orgId,
+        parentMessage.social.thread?.readState?.channelId ?? '',
         threadId ?? parentMessage.ids.id, // threadId when available
         parentMessage.ids.id, // always the parent message id
         currentProfileId,

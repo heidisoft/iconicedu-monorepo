@@ -49,14 +49,10 @@ const mockConstants = jest.requireMock('expo-constants').default as {
 const mockRpc = jest.fn();
 const mockUpdate = jest.fn();
 const mockEq = jest.fn();
+const mockApiPost = jest.fn();
 
-jest.mock('@/lib/supabase/client', () => ({
-  supabase: {
-    rpc: (...args: unknown[]) => mockRpc(...args),
-    from: jest.fn(() => ({
-      update: mockUpdate,
-    })),
-  },
+jest.mock('@/lib/api/http-client', () => ({
+  apiPost: (...args: unknown[]) => mockApiPost(...args),
 }));
 
 describe('getExpoPushToken', () => {
@@ -143,20 +139,19 @@ describe('supportsNativePushNotifications', () => {
 describe('storePushToken', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockRpc.mockResolvedValue({ error: null });
+    mockApiPost.mockResolvedValue({ success: true });
     mockSecureStoreSetItemAsync.mockResolvedValue(undefined);
   });
 
-  it('calls the push token upsert RPC with correct fields', async () => {
+  it('calls the push token register endpoint with correct fields', async () => {
     await storePushToken('org-1', 'profile-1', 'ExponentPushToken[abc]');
-    expect(mockRpc).toHaveBeenCalledWith(
-      'upsert_push_token',
+    expect(mockApiPost).toHaveBeenCalledWith(
+      '/push-tokens/register',
       expect.objectContaining({
-        _org_id: 'org-1',
-        _profile_id: 'profile-1',
-        _token: 'ExponentPushToken[abc]',
-        _platform: 'ios',
-        _now: expect.any(String),
+        orgId: 'org-1',
+        profileId: 'profile-1',
+        token: 'ExponentPushToken[abc]',
+        platform: 'ios',
       }),
     );
   });
@@ -169,8 +164,8 @@ describe('storePushToken', () => {
     );
   });
 
-  it('throws when supabase returns an error and does not call SecureStore', async () => {
-    mockRpc.mockResolvedValue({ error: { message: 'DB error' } });
+  it('throws when the API request fails and does not call SecureStore', async () => {
+    mockApiPost.mockRejectedValue(new Error('DB error'));
     await expect(storePushToken('org-1', 'profile-1', 'token')).rejects.toThrow(
       'DB error',
     );
@@ -200,20 +195,18 @@ describe('getStoredPushToken', () => {
 describe('revokePushToken', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockEq.mockResolvedValue({ error: null });
-    mockUpdate.mockReturnValue({ eq: mockEq });
+    mockApiPost.mockResolvedValue({ success: true });
   });
 
-  it('sets revoked_at on the matching token', async () => {
+  it('calls the revoke endpoint with the matching token', async () => {
     await revokePushToken('ExponentPushToken[abc]');
-    expect(mockUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ revoked_at: expect.any(String) }),
-    );
-    expect(mockEq).toHaveBeenCalledWith('token', 'ExponentPushToken[abc]');
+    expect(mockApiPost).toHaveBeenCalledWith('/push-tokens/revoke', {
+      token: 'ExponentPushToken[abc]',
+    });
   });
 
-  it('throws when supabase returns an error', async () => {
-    mockEq.mockResolvedValue({ error: { message: 'revoke error' } });
+  it('throws when the revoke request fails', async () => {
+    mockApiPost.mockRejectedValue(new Error('revoke error'));
     await expect(revokePushToken('bad-token')).rejects.toThrow('revoke error');
   });
 });

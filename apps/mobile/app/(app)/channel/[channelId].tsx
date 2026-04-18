@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import {
+  Alert,
   View,
   Text,
   TouchableOpacity,
@@ -166,22 +167,37 @@ export default function ChannelConversationScreen() {
   const handleSend = useCallback(
     async (text: string) => {
       if (!channelId || !profileId || !orgId) return;
-      if (threadReplyTarget) {
-        const threadId = threadReplyTarget.social?.thread?.ids.id;
-        await sendTextMessage(
-          channelId,
-          profileId,
-          orgId,
-          text,
-          threadReplyTarget.ids.id,
-          threadId,
+      try {
+        if (threadReplyTarget) {
+          const threadId = threadReplyTarget.social?.thread?.ids.id;
+          await sendTextMessage(
+            channelId,
+            profileId,
+            orgId,
+            text,
+            threadReplyTarget.ids.id,
+            threadId,
+          );
+          setThreadReplyTarget(null);
+          // Thread reply count lives in the threads table — refetch to update the pill.
+          void refetch();
+        } else {
+          await sendTextMessage(channelId, profileId, orgId, text);
+          // Realtime subscription handles cache invalidation for non-thread messages.
+        }
+      } catch (error) {
+        reportMobileObservedError({
+          error,
+          source: 'mobile.messages.channel.send_text',
+          message: 'Failed to send channel message',
+          context: { channelId, orgId, profileId },
+        });
+        Alert.alert(
+          'Failed to send',
+          error instanceof Error
+            ? error.message
+            : 'Something went wrong. Please try again.',
         );
-        setThreadReplyTarget(null);
-        // Thread reply count lives in the threads table — refetch to update the pill.
-        void refetch();
-      } else {
-        await sendTextMessage(channelId, profileId, orgId, text);
-        // Realtime subscription handles cache invalidation for non-thread messages.
       }
     },
     [channelId, profileId, orgId, threadReplyTarget, refetch],
@@ -279,9 +295,12 @@ export default function ChannelConversationScreen() {
   );
 
   // ── Delete message ──
-  const handleDelete = useCallback(async (messageId: string) => {
-    await deleteMessage(messageId);
-  }, []);
+  const handleDelete = useCallback(
+    async (messageId: string) => {
+      await deleteMessage(messageId, orgId, profileId);
+    },
+    [orgId, profileId],
+  );
 
   // ── Retry a failed upload ──
   const handleRetryUpload = useCallback(

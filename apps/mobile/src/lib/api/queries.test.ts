@@ -30,9 +30,13 @@ jest.mock('@/lib/supabase/client', () => ({
 }));
 
 const mockApiPost = jest.fn();
+const mockApiGet = jest.fn();
+const mockApiDelete = jest.fn();
 
 jest.mock('@/lib/api/http-client', () => ({
   apiPost: (...args: unknown[]) => mockApiPost(...args),
+  apiGet: (...args: unknown[]) => mockApiGet(...args),
+  apiDelete: (...args: unknown[]) => mockApiDelete(...args),
 }));
 
 // Build a chainable Supabase query mock that resolves at .order()
@@ -759,42 +763,6 @@ describe('fetchActivityFeed', () => {
 
 // ─── toggleReaction ────────────────────────────────────────────────────────────
 
-function createMaybeSingleChain(resolvedValue: { data: unknown; error: unknown }) {
-  const chain: Record<string, jest.Mock> = {};
-  const returnChain = () => chain;
-  chain.select = jest.fn(returnChain);
-  chain.eq = jest.fn(returnChain);
-  chain.is = jest.fn(returnChain);
-  chain.maybeSingle = jest.fn().mockResolvedValue(resolvedValue);
-  return chain;
-}
-
-// Thenable chain: all builder methods return self; awaiting the chain resolves
-// with resolvedValue. Handles DML operations (insert/update/delete) with any
-// number of chained .eq() calls.
-function createThenableChain(resolvedValue: { error: unknown } = { error: null }) {
-  type ThenableChain = {
-    delete: jest.Mock<ThenableChain, []>;
-    insert: jest.Mock<ThenableChain, []>;
-    update: jest.Mock<ThenableChain, []>;
-    eq: jest.Mock<ThenableChain, []>;
-    is: jest.Mock<ThenableChain, []>;
-    then: PromiseLike<{ error: unknown }>['then'];
-  };
-  const chain = {} as ThenableChain;
-  const returnChain = () => chain;
-  chain.delete = jest.fn(returnChain);
-  chain.insert = jest.fn(returnChain);
-  chain.update = jest.fn(returnChain);
-  chain.eq = jest.fn(returnChain);
-  chain.is = jest.fn(returnChain);
-  chain.then = (
-    resolve: (value: unknown) => unknown,
-    reject?: (reason: unknown) => unknown,
-  ) => Promise.resolve(resolvedValue).then(resolve, reject);
-  return chain;
-}
-
 const MSG_ID = 'msg-1';
 const ACCOUNT_ID = 'acct-1';
 const EMOJI = '👍';
@@ -803,111 +771,32 @@ const ORG = 'org-1';
 describe('toggleReaction', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockApiPost.mockResolvedValue(undefined);
+    mockApiDelete.mockResolvedValue(undefined);
   });
 
-  it('adds a reaction and inserts a new count row when no count row exists', async () => {
-    const noExistingReaction = createMaybeSingleChain({ data: null, error: null });
-    const noExistingCount = createMaybeSingleChain({ data: null, error: null });
+  it('calls apiPost /reactions when reactedByMe is false', async () => {
+    await toggleReaction(MSG_ID, ACCOUNT_ID, EMOJI, ORG, false);
 
-    const insertReactionChain = createThenableChain();
-    const insertCountChain = createThenableChain();
-
-    mockFrom
-      .mockReturnValueOnce(noExistingReaction) // message_reactions select
-      .mockReturnValueOnce(noExistingCount) // message_reaction_counts select
-      .mockReturnValueOnce(insertReactionChain) // message_reactions insert
-      .mockReturnValueOnce(insertCountChain); // message_reaction_counts insert
-
-    await toggleReaction(MSG_ID, ACCOUNT_ID, EMOJI, ORG);
-
-    expect(insertReactionChain.insert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        message_id: MSG_ID,
-        account_id: ACCOUNT_ID,
-        emoji: EMOJI,
-        org_id: ORG,
-      }),
-    );
-    expect(insertCountChain.insert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        message_id: MSG_ID,
-        emoji: EMOJI,
-        org_id: ORG,
-        count: 1,
-      }),
-    );
+    expect(mockApiPost).toHaveBeenCalledWith('/reactions', {
+      orgId: ORG,
+      messageId: MSG_ID,
+      emoji: EMOJI,
+      accountId: ACCOUNT_ID,
+    });
+    expect(mockApiDelete).not.toHaveBeenCalled();
   });
 
-  it('adds a reaction and increments an existing count row', async () => {
-    const noExistingReaction = createMaybeSingleChain({ data: null, error: null });
-    const existingCount = createMaybeSingleChain({
-      data: { id: 'cnt-1', count: 3 },
-      error: null,
+  it('calls apiDelete /reactions when reactedByMe is true', async () => {
+    await toggleReaction(MSG_ID, ACCOUNT_ID, EMOJI, ORG, true);
+
+    expect(mockApiDelete).toHaveBeenCalledWith('/reactions', {
+      orgId: ORG,
+      messageId: MSG_ID,
+      emoji: EMOJI,
+      accountId: ACCOUNT_ID,
     });
-
-    const insertReactionChain = createThenableChain();
-    const updateCountChain = createThenableChain();
-
-    mockFrom
-      .mockReturnValueOnce(noExistingReaction)
-      .mockReturnValueOnce(existingCount)
-      .mockReturnValueOnce(insertReactionChain)
-      .mockReturnValueOnce(updateCountChain);
-
-    await toggleReaction(MSG_ID, ACCOUNT_ID, EMOJI, ORG);
-
-    expect(insertReactionChain.insert).toHaveBeenCalled();
-    expect(updateCountChain.update).toHaveBeenCalledWith({ count: 4 });
-  });
-
-  it('removes a reaction and decrements the count row', async () => {
-    const existingReaction = createMaybeSingleChain({
-      data: { id: 'rxn-1' },
-      error: null,
-    });
-    const existingCount = createMaybeSingleChain({
-      data: { id: 'cnt-1', count: 3 },
-      error: null,
-    });
-
-    const deleteReactionChain = createThenableChain();
-    const updateCountChain = createThenableChain();
-
-    mockFrom
-      .mockReturnValueOnce(existingReaction)
-      .mockReturnValueOnce(existingCount)
-      .mockReturnValueOnce(deleteReactionChain)
-      .mockReturnValueOnce(updateCountChain);
-
-    await toggleReaction(MSG_ID, ACCOUNT_ID, EMOJI, ORG);
-
-    expect(deleteReactionChain.delete).toHaveBeenCalled();
-    expect(updateCountChain.update).toHaveBeenCalledWith({ count: 2 });
-  });
-
-  it('removes a reaction and deletes the count row when count is 1', async () => {
-    const existingReaction = createMaybeSingleChain({
-      data: { id: 'rxn-1' },
-      error: null,
-    });
-    const existingCount = createMaybeSingleChain({
-      data: { id: 'cnt-1', count: 1 },
-      error: null,
-    });
-
-    const deleteReactionChain = createThenableChain();
-    const deleteCountChain = createThenableChain();
-
-    mockFrom
-      .mockReturnValueOnce(existingReaction)
-      .mockReturnValueOnce(existingCount)
-      .mockReturnValueOnce(deleteReactionChain)
-      .mockReturnValueOnce(deleteCountChain);
-
-    await toggleReaction(MSG_ID, ACCOUNT_ID, EMOJI, ORG);
-
-    expect(deleteReactionChain.delete).toHaveBeenCalled();
-    expect(deleteCountChain.delete).toHaveBeenCalled();
+    expect(mockApiPost).not.toHaveBeenCalled();
   });
 });
 

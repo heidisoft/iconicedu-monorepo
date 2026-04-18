@@ -1,9 +1,21 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
-import { useColorScheme, Appearance } from 'react-native';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+} from 'react';
+import { Appearance } from 'react-native';
+import { colorScheme as nwColorScheme } from 'react-native-css-interop';
 import * as SecureStore from 'expo-secure-store';
 import { lightColors, darkColors, type AppColors, type ThemeMode } from '@/lib/theme';
 
 const STORAGE_KEY = 'app_theme_mode';
+
+function readSystemColorScheme(): 'light' | 'dark' {
+  return Appearance.getColorScheme() === 'dark' ? 'dark' : 'light';
+}
 
 type ThemeContextType = {
   mode: ThemeMode;
@@ -22,14 +34,20 @@ const ThemeContext = createContext<ThemeContextType>({
 });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  // useColorScheme() returns null on Android before the first render on some
-  // OS versions — fall back to Appearance.getColorScheme() which reads the
-  // Android UiMode directly and is always non-null.
-  const rnScheme = useColorScheme();
-  const systemScheme: 'light' | 'dark' = (rnScheme ??
-    Appearance.getColorScheme() ??
-    'light') as 'light' | 'dark';
   const [mode, setModeState] = useState<ThemeMode>('system');
+  const [systemScheme, setSystemScheme] = useState<'light' | 'dark'>(() =>
+    readSystemColorScheme(),
+  );
+
+  useEffect(() => {
+    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
+      setSystemScheme(colorScheme === 'dark' ? 'dark' : 'light');
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   // Load persisted preference on mount. We render immediately with 'system'
   // mode (the default) so the native window background is never exposed as a
@@ -48,15 +66,18 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const isDark = colorScheme === 'dark';
   const colors = isDark ? darkColors : lightColors;
 
-  function setMode(newMode: ThemeMode) {
+  useEffect(() => {
+    nwColorScheme.set(colorScheme);
+  }, [colorScheme]);
+
+  const setMode = useCallback((newMode: ThemeMode) => {
     setModeState(newMode);
     SecureStore.setItemAsync(STORAGE_KEY, newMode).catch(() => {});
-  }
+  }, []);
 
   const value = useMemo(
     () => ({ mode, setMode, colorScheme, colors, isDark }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [mode, colorScheme, isDark],
+    [mode, setMode, colorScheme, colors, isDark],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

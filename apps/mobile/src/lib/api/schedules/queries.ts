@@ -11,6 +11,7 @@ import type {
   ClassSchedulePatchVM,
   ThemeKey,
 } from '@iconicedu/shared-types';
+import { apiGet, apiPost } from '@/lib/api/http-client';
 import { supabase } from '@/lib/supabase/client';
 
 export type CancelRecurringSessionOccurrenceInput = {
@@ -138,47 +139,30 @@ export async function fetchSpaceSchedulesByChannelId(
   channelId: string,
   orgId: string,
 ): Promise<ClassScheduleVM[]> {
-  const { data, error } = await supabase
-    .from('class_schedules')
-    .select(CLASS_SCHEDULE_SELECT)
-    .eq('org_id', orgId)
-    .eq('source_kind', 'class_session')
-    .eq('source_channel_id', channelId)
-    .is('deleted_at', null)
-    .order('start_at', { ascending: true });
-
-  if (error) throw error;
-  return (data ?? []).map((row) => mapClassScheduleRow(row as Record<string, unknown>));
+  const data = await apiGet<Record<string, unknown>[]>('/schedules', {
+    orgId,
+    channelId,
+  });
+  return (data ?? []).map((row) => mapClassScheduleRow(row));
 }
 
 export async function fetchOrgSessions(orgId: string): Promise<ClassScheduleVM[]> {
-  const { data, error } = await supabase
-    .from('class_schedules')
-    .select(CLASS_SCHEDULE_SELECT)
-    .eq('org_id', orgId)
-    .eq('source_kind', 'class_session')
-    .is('deleted_at', null)
-    .order('start_at', { ascending: true });
-
-  if (error) throw error;
-  return (data ?? []).map((row) => mapClassScheduleRow(row as Record<string, unknown>));
+  const data = await apiGet<Record<string, unknown>[]>('/schedules', { orgId });
+  return (data ?? []).map((row) => mapClassScheduleRow(row));
 }
 
 export async function cancelRecurringSessionOccurrence(
   input: CancelRecurringSessionOccurrenceInput,
 ): Promise<CancelRecurringSessionOccurrenceResult> {
-  const { data, error } = await supabase
-    .from('class_schedule_recurrence_exceptions')
-    .insert({
-      org_id: input.orgId,
-      recurrence_id: input.recurrenceId,
-      occurrence_key: input.occurrenceKey,
-      reason: input.reason?.trim() || null,
-    })
-    .select('occurrence_key, reason')
-    .single();
-
-  if (error) throw error;
+  const data = await apiPost<{ occurrence_key?: string; reason?: string | null }>(
+    '/schedules/exceptions',
+    {
+      orgId: input.orgId,
+      scheduleId: input.recurrenceId,
+      date: input.occurrenceKey,
+      reason: input.reason,
+    },
+  );
 
   return {
     occurrenceKey: (data?.occurrence_key as string) ?? input.occurrenceKey,

@@ -8,7 +8,7 @@ import {
   revokePushToken,
   getStoredPushToken,
 } from '@/lib/notifications/push-token';
-import { supabase } from '@/lib/supabase/client';
+import { apiGet, apiPut } from '@/lib/api/http-client';
 
 import { useAccount } from './use-account';
 import { useProfile } from './use-profile';
@@ -70,43 +70,28 @@ export function usePushToggle(): UsePushToggleResult {
       return;
     }
 
-    const { data, error } = await supabase
-      .from('notification_preferences')
-      .select('muted')
-      .eq('org_id', orgId)
-      .eq('profile_id', profileId)
-      .eq('pref_key', MASTER_PUSH_PREF_KEY)
-      .is('deleted_at', null)
-      .maybeSingle<{ muted: boolean | null }>();
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    setIsPushMuted(Boolean(data?.muted));
+    const rows = await apiGet<Array<{ muted?: boolean | null }>>(
+      '/notification-preferences',
+      {
+        orgId,
+        profileId,
+        prefKey: MASTER_PUSH_PREF_KEY,
+      },
+    );
+    setIsPushMuted(Boolean(rows[0]?.muted));
   }, [orgId, profileId]);
 
   const setMasterPushMuted = useCallback(
     async (muted: boolean) => {
       if (!orgId || !profileId) return;
 
-      const now = new Date().toISOString();
-      const { error } = await supabase.from('notification_preferences').upsert(
-        {
-          org_id: orgId,
-          profile_id: profileId,
-          pref_key: MASTER_PUSH_PREF_KEY,
-          channels: ['push'],
-          muted,
-          updated_at: now,
-          updated_by: profileId,
-        },
-        { onConflict: 'org_id,profile_id,pref_key' },
-      );
-
-      if (error) {
-        throw new Error(error.message);
-      }
+      await apiPut('/notification-preferences', {
+        orgId,
+        profileId,
+        prefKey: MASTER_PUSH_PREF_KEY,
+        channels: ['push'],
+        muted,
+      });
 
       setIsPushMuted(muted);
     },

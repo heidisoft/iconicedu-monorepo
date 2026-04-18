@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import type { FeedScopeVM, ReminderJobRow } from '@iconicedu/shared-types';
-import { publishActivityEvent } from '@iconicedu/web/lib/activity-feed/publisher/activity-publisher';
 import { randomUUID } from 'crypto';
 
+import { publishActivityEvent } from '@iconicedu/api/lib/activity-feed/activity-publisher';
 import {
   createSupabaseServiceClient,
   type SupabaseServiceClient,
