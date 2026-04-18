@@ -308,6 +308,38 @@ describe('sendPushNotification', () => {
     expect(body[0]?.data?.preview).toBe('Hey, are we still meeting tomorrow?');
   });
 
+  it('uses preview text as the notification body when summary is missing', async () => {
+    setupSelectChain({
+      data: [{ id: 'tok-1', token: 'ExponentPushToken[aaa]' }],
+      error: null,
+    });
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ status: 'ok' }] }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await sendPushNotification({
+      ...BASE_PAYLOAD,
+      summary: null,
+      metadata: {
+        rawEventPayload: {
+          content: 'This is the actual DM body',
+        },
+      },
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as Array<{
+      body?: string;
+      data?: { preview?: string };
+    }>;
+
+    expect(body[0]?.body).toBe('This is the actual DM body');
+    expect(body[0]?.data?.preview).toBe('This is the actual DM body');
+  });
+
   it('throws when the Expo API returns a non-ok status', async () => {
     setupSelectChain({
       data: [{ id: 'tok-1', token: 'ExponentPushToken[aaa]' }],

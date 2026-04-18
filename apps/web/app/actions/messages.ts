@@ -1600,14 +1600,18 @@ export async function sendTextMessageAction(
   });
 }
 
-export async function sendFileMessageAction(
+export async function sendFileMessageWithSupabase(
   input: MessageSendFileInput,
+  deps: {
+    supabase: SupabaseClient;
+    serviceSupabase: SupabaseServiceClient;
+    authUserId: string;
+  },
 ): Promise<MessageVM> {
-  const supabase = await createSupabaseServerClient();
-  const authUser = await requireAuthedUser(supabase);
+  const supabase = deps.supabase;
   const actor = await resolveEffectiveMessageActor({
     supabase,
-    authUserId: authUser.id,
+    authUserId: deps.authUserId,
     orgId: input.orgId,
   });
   if (input.senderProfileId !== actor.profile.id) {
@@ -1632,7 +1636,7 @@ export async function sendFileMessageAction(
 
   const now = new Date().toISOString();
   const currentProfileId = actor.profile.id;
-  const serviceSupabase = createSupabaseServiceClient();
+  const serviceSupabase = deps.serviceSupabase;
   const activityContext = await resolveActivityChannelContext({
     supabase,
     orgId: input.orgId,
@@ -1899,14 +1903,32 @@ export async function sendFileMessageAction(
   });
 }
 
-export async function sendFilesMessageAction(
-  input: MessageSendFilesInput,
+export async function sendFileMessageAction(
+  input: MessageSendFileInput,
 ): Promise<MessageVM> {
   const supabase = await createSupabaseServerClient();
   const authUser = await requireAuthedUser(supabase);
+  const serviceSupabase = createSupabaseServiceClient();
+
+  return sendFileMessageWithSupabase(input, {
+    supabase,
+    serviceSupabase,
+    authUserId: authUser.id,
+  });
+}
+
+export async function sendFilesMessageWithSupabase(
+  input: MessageSendFilesInput,
+  deps: {
+    supabase: SupabaseClient;
+    serviceSupabase: SupabaseServiceClient;
+    authUserId: string;
+  },
+): Promise<MessageVM> {
+  const supabase = deps.supabase;
   const actor = await resolveEffectiveMessageActor({
     supabase,
-    authUserId: authUser.id,
+    authUserId: deps.authUserId,
     orgId: input.orgId,
   });
   if (input.senderProfileId !== actor.profile.id) {
@@ -1948,7 +1970,7 @@ export async function sendFilesMessageAction(
   }
 
   const now = new Date().toISOString();
-  const serviceSupabase = createSupabaseServiceClient();
+  const serviceSupabase = deps.serviceSupabase;
   const activityContext = await resolveActivityChannelContext({
     supabase,
     orgId: input.orgId,
@@ -2213,6 +2235,20 @@ export async function sendFilesMessageAction(
     },
     reactions: [],
     thread: thread ?? undefined,
+  });
+}
+
+export async function sendFilesMessageAction(
+  input: MessageSendFilesInput,
+): Promise<MessageVM> {
+  const supabase = await createSupabaseServerClient();
+  const authUser = await requireAuthedUser(supabase);
+  const serviceSupabase = createSupabaseServiceClient();
+
+  return sendFilesMessageWithSupabase(input, {
+    supabase,
+    serviceSupabase,
+    authUserId: authUser.id,
   });
 }
 

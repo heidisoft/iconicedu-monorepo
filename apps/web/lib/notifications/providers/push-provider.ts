@@ -210,7 +210,7 @@ export async function sendPushNotification(payload: PushNotificationPayload) {
   const messages: ExpoPushMessage[] = tokens.map(({ token }) => ({
     to: token,
     title: payload.title,
-    body: payload.summary ?? undefined,
+    body: payload.summary ?? preview ?? undefined,
     // Required for Android 8+ to route the notification to the correct channel.
     // Must match the channel created by ensureAndroidChannel() in use-push-registration.ts.
     channelId: 'default',

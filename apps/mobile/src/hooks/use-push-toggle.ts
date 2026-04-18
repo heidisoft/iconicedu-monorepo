@@ -149,13 +149,21 @@ export function usePushToggle(): UsePushToggleResult {
         await setMasterPushMuted(true);
       } else {
         // --- TURNING ON ---
-        // requestPermissions: false — the initial OS prompt is usePushRegistration's job.
-        // Here we only re-register if OS already granted.
-        const token = await getExpoPushToken({ requestPermissions: false });
-        if (token && orgId && profileId) {
-          // storePushToken sets revoked_at: null and persists to SecureStore
-          await storePushToken(orgId, profileId, token);
-          await setMasterPushMuted(false);
+        // The user explicitly tapped the toggle, so we can recover by prompting
+        // when Android permission is still undetermined.
+        const requestPermissions = osPermission === 'undetermined';
+        const token = await getExpoPushToken({ requestPermissions });
+        const { status } = await getNotificationsModule().getPermissionsAsync();
+
+        if (orgId && profileId) {
+          if (token) {
+            // storePushToken sets revoked_at: null and persists to SecureStore
+            await storePushToken(orgId, profileId, token);
+          }
+
+          if (status === 'granted') {
+            await setMasterPushMuted(false);
+          }
         }
       }
     } catch (error) {
@@ -174,6 +182,7 @@ export function usePushToggle(): UsePushToggleResult {
     isToggling,
     isOsPermissionDenied,
     isPushEnabled,
+    osPermission,
     orgId,
     profileId,
     refreshPermission,
