@@ -201,35 +201,60 @@ jobs:
             RAILWAY_ENVIRONMENT="${REPO_NAME}-pr-${PR_NUMBER}"
           fi
 
-          railway_tmp_dir="$(mktemp -d)"
-          trap 'rm -rf "$railway_tmp_dir"' EXIT
+          RAILWAY_GQL="https://backboard.railway.app/graphql/v2"
 
-          pushd "$railway_tmp_dir" > /dev/null
-          railway project link "${RAILWAY_PROJECT_ID}" > /dev/null
-          railway environment link "${RAILWAY_ENVIRONMENT}" > /dev/null
-          railway service link "${RAILWAY_SERVICE_NAME}" > /dev/null
+          railway_api() {
+            local body="$1"
+            local resp
+            resp=$(curl -sf \
+              -H "Authorization: Bearer ${RAILWAY_API_TOKEN}" \
+              -H "Content-Type: application/json" \
+              "${RAILWAY_GQL}" \
+              -d "${body}") || {
+              echo "::error::Railway API HTTP request failed."
+              exit 1
+            }
+            local errs
+            errs=$(echo "${resp}" | jq -r 'if .errors then .errors | map(.message) | join(", ") else empty end')
+            if [[ -n "${errs}" ]]; then
+              echo "::error::Railway GQL error: ${errs}"
+              exit 1
+            fi
+            echo "${resp}"
+          }
 
-          RAILWAY_STATUS_JSON="$(railway status --json)"
-          popd > /dev/null
+          ENV_RESP=$(railway_api "$(jq -n --arg pid "${RAILWAY_PROJECT_ID}" \
+            '{query:"query environments($projectId: String!) { environments(projectId: $projectId) { edges { node { id name } } } }", variables:{projectId:$pid}}')")
+          ENV_ID=$(echo "${ENV_RESP}" | jq -r --arg name "${RAILWAY_ENVIRONMENT}" \
+            '.data.environments.edges[]? | select(.node.name==$name) | .node.id // empty')
 
-          API_HOST="$(
-            printf '%s' "$RAILWAY_STATUS_JSON" \
-              | jq -r '
-                  [
-                    .. | objects | .domain? // empty,
-                    .. | objects | .url? // empty
-                  ]
-                  | flatten
-                  | map(select(type == "string"))
-                  | map(gsub("^https?://"; ""))
-                  | map(sub("/.*$"; ""))
-                  | map(select(test("^[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")))
-                  | unique
-                  | .[]
-                ' \
-              | grep -E 'railway|\.app$' \
-              | head -n1 || true
-          )"
+          if [[ -z "${ENV_ID}" ]]; then
+            echo "::error::Railway environment '${RAILWAY_ENVIRONMENT}' not found."
+            exit 1
+          fi
+
+          PROJECT_RESP=$(railway_api "$(jq -n --arg pid "${RAILWAY_PROJECT_ID}" \
+            '{query:"query project($id: String!) { project(id: $id) { services { edges { node { id name } } } } }", variables:{id:$pid}}')")
+          SERVICE_ID=$(echo "${PROJECT_RESP}" | jq -r --arg name "${RAILWAY_SERVICE_NAME}" \
+            '.data.project.services.edges[]? | select(.node.name==$name) | .node.id // empty')
+
+          if [[ -z "${SERVICE_ID}" ]]; then
+            echo "::error::Railway service '${RAILWAY_SERVICE_NAME}' not found in project."
+            exit 1
+          fi
+
+          DOMAIN_RESP=$(railway_api "$(jq -n \
+            --arg pid "${RAILWAY_PROJECT_ID}" \
+            --arg eid "${ENV_ID}" \
+            --arg sid "${SERVICE_ID}" \
+            '{query:"query domains($projectId: String!, $environmentId: String!, $serviceId: String!) { domains(projectId: $projectId, environmentId: $environmentId, serviceId: $serviceId) { serviceDomains { domain } customDomains { domain } } }", variables:{projectId:$pid, environmentId:$eid, serviceId:$sid}}')")
+          API_HOST=$(echo "${DOMAIN_RESP}" | jq -r '
+            [
+              .data.domains.serviceDomains[]?.domain,
+              .data.domains.customDomains[]?.domain
+            ]
+            | map(select(type == "string" and length > 0))
+            | .[0] // empty')
 
           if [[ -z "${API_HOST}" ]]; then
             echo "::error::Unable to resolve a Railway URL for environment '${RAILWAY_ENVIRONMENT}' and service '${RAILWAY_SERVICE_NAME}'."
