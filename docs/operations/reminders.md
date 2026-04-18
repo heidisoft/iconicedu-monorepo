@@ -10,7 +10,7 @@ Engineers operating or debugging scheduled reminder delivery.
 
 ## Last Updated
 
-2026-03-23
+2026-04-18
 
 ## Related Docs
 
@@ -19,7 +19,7 @@ Engineers operating or debugging scheduled reminder delivery.
 
 This sets up a Supabase scheduled Edge Function that calls:
 
-- `POST /internal/reminders/dispatch` on the API service (Railway).
+- `POST /internal/reminders/dispatch` on the API service.
 
 The API endpoint performs lease-based due-job claiming and dispatching.
 
@@ -45,7 +45,7 @@ In your API deployment, set:
 
 Set these Supabase secrets for the `reminders-dispatch` function:
 
-- `REMINDERS_DISPATCH_URL=https://<your-railway-api-domain>/internal/reminders/dispatch`
+- `REMINDERS_DISPATCH_URL=https://<your-api-domain>/internal/reminders/dispatch`
 - `INTERNAL_REMINDERS_TOKEN=<same-value-as-INTERNAL_REMINDERS_TOKEN_API>`
 
 Optional:
@@ -62,7 +62,7 @@ supabase functions deploy reminders-dispatch
 
 If you deploy to a linked remote project, ensure `supabase link --project-ref <ref>` is already done.
 
-## API service health checks (Railway)
+## API service health checks
 
 `apps/api/railway.toml` configures Railway deployment health checks to hit:
 
@@ -103,7 +103,11 @@ Preview branches created by `.github/workflows/ci.yml` run this automatically af
 - Because jobs are lease-claimed and idempotent, overlapping ticks are safe.
 - 1-minute cron cadence is expected so 30m/5m reminders and +15m feedback fire on time.
 
-## 7. Transitional fallback
+## 7. Dispatch URL Sanity Check
 
-The legacy web endpoint (`/api/internal/reminders/dispatch`) has been removed. Supabase edge dispatch should target the API service endpoint only.
-If needed, point `REMINDERS_DISPATCH_URL` back to web while investigating API issues.
+After the API-owned migration, reminders and notifications should both target `apps/api`:
+
+- `REMINDERS_DISPATCH_URL=https://<your-api-domain>/internal/reminders/dispatch`
+- `NOTIFICATIONS_DISPATCH_URL=https://<your-api-domain>/internal/notifications/dispatch`
+
+The legacy web endpoint (`/api/internal/reminders/dispatch`) should not be used anymore.

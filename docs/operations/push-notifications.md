@@ -193,6 +193,12 @@ NOTIFICATIONS_DISPATCH_LEASE_SECONDS=120
 NOTIFICATIONS_DISPATCH_LEASE_OWNER=supabase-edge-cron
 ```
 
+**Dispatch URL sanity check after the API migration:**
+
+- `NOTIFICATIONS_DISPATCH_URL` must target `https://<your-api-domain>/internal/notifications/dispatch`
+- `REMINDERS_DISPATCH_URL` must target `https://<your-api-domain>/internal/reminders/dispatch`
+- neither secret should point at `apps/web` or `/api/internal/...`
+
 ---
 
 ## Testing Locally

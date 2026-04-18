@@ -307,7 +307,6 @@ When synced from local Supabase, the command writes:
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY=<ANON_KEY>` only if that key already exists or publishable key is absent
 - `SUPABASE_SERVICE_ROLE_KEY=<SERVICE_ROLE_KEY>`
 - `NEXT_PUBLIC_APP_URL=http://127.0.0.1:3000` if missing
-- `INTERNAL_REMINDERS_TOKEN` and `INTERNAL_ACTIVITY_FEED_TOKEN` if missing
 
 ### apps/mobile/.env
 
@@ -366,6 +365,8 @@ When synced from local Supabase, the command writes:
 - `SUPABASE_ANON_KEY=<ANON_KEY>`
 - `JWT_SECRET=<JWT_SECRET>`
 - `INTERNAL_REMINDERS_TOKEN_API` if missing
+- `INTERNAL_ACTIVITY_FEED_TOKEN` if missing
+- `INTERNAL_NOTIFICATIONS_TOKEN_API` if missing
 
 For push notification projection and dispatch in API, also set:
 

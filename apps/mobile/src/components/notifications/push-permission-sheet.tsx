@@ -71,7 +71,14 @@ export function PushPermissionSheet({ visible, onEnable, onDismiss }: Props) {
   const s = useMemo(() => makeStyles(colors, insets.bottom), [colors, insets.bottom]);
 
   return (
-    <BottomSheet visible={visible} onClose={onDismiss} partialHeight={380}>
+    <BottomSheet
+      visible={visible}
+      onClose={onDismiss}
+      partialHeight={380}
+      backdropColor={colors.modalOverlay}
+      sheetStyle={{ backgroundColor: colors.inputBg }}
+      dragHandleStyle={{ backgroundColor: colors.border }}
+    >
       <View style={s.content}>
         <View style={s.iconWrap}>
           <Bell size={32} color={colors.teal} />

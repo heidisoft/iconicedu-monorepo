@@ -378,8 +378,9 @@ sync_env_files() {
   set_env_var "$API_ENV_FILE" "SUPABASE_ANON_KEY" "$ANON_KEY"
   set_env_var "$API_ENV_FILE" "JWT_SECRET" "$JWT_SECRET"
 
-  local reminders_token
-  reminders_token=$(ensure_env_var "$API_ENV_FILE" "INTERNAL_REMINDERS_TOKEN_API" "$(generate_secret)")
+  ensure_env_var "$API_ENV_FILE" "INTERNAL_REMINDERS_TOKEN_API" "$(generate_secret)" >/dev/null
+  ensure_env_var "$API_ENV_FILE" "INTERNAL_ACTIVITY_FEED_TOKEN" "$(generate_secret)" >/dev/null
+  ensure_env_var "$API_ENV_FILE" "INTERNAL_NOTIFICATIONS_TOKEN_API" "$(generate_secret)" >/dev/null
 
   set_env_var "$WEB_ENV_FILE" "NEXT_PUBLIC_SUPABASE_URL" "$API_URL"
   set_env_var "$WEB_ENV_FILE" "SUPABASE_URL" "$API_URL"
@@ -389,8 +390,6 @@ sync_env_files() {
   fi
   set_env_var "$WEB_ENV_FILE" "SUPABASE_SERVICE_ROLE_KEY" "$SERVICE_ROLE_KEY"
   ensure_env_var "$WEB_ENV_FILE" "NEXT_PUBLIC_APP_URL" "$LOCAL_WEB_APP_URL" >/dev/null
-  ensure_env_var "$WEB_ENV_FILE" "INTERNAL_REMINDERS_TOKEN" "$reminders_token" >/dev/null
-  ensure_env_var "$WEB_ENV_FILE" "INTERNAL_ACTIVITY_FEED_TOKEN" "$(generate_secret)" >/dev/null
 
   set_env_var "$MOBILE_ENV_FILE" "EXPO_PUBLIC_SUPABASE_URL" "$LOCAL_MOBILE_SUPABASE_URL"
   set_env_var "$MOBILE_ENV_FILE" "EXPO_PUBLIC_SUPABASE_ANON_KEY" "$ANON_KEY"
@@ -430,7 +429,10 @@ print_missing_optional_vars() {
 const fs = require('node:fs');
 const [apiFile, webFile, mobileFile] = process.argv.slice(2);
 const groups = [
-  { file: apiFile, keys: ['POSTHOG_KEY', 'POSTHOG_HOST'] },
+  {
+    file: apiFile,
+    keys: ['POSTHOG_KEY', 'POSTHOG_HOST', 'EXPO_ACCESS_TOKEN'],
+  },
   {
     file: webFile,
     keys: [
@@ -439,7 +441,6 @@ const groups = [
       'DAILY_WEBHOOK_SECRET',
       'NEXT_PUBLIC_POSTHOG_KEY',
       'NEXT_PUBLIC_POSTHOG_HOST',
-      'INTERNAL_NOTIFICATIONS_TOKEN',
     ],
   },
   {
