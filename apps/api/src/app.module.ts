@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { PrismaModule } from '@iconicedu/api/prisma/prisma.module';
 import { AuthModule } from '@iconicedu/api/modules/auth/auth.module';
 import { UsersModule } from '@iconicedu/api/modules/users/users.module';
@@ -15,9 +16,12 @@ import { ThreadsModule } from '@iconicedu/api/modules/threads/threads.module';
 import { ProfilesModule } from '@iconicedu/api/modules/profiles/profiles.module';
 import { AccountsModule } from '@iconicedu/api/modules/accounts/accounts.module';
 import { NotificationPreferencesModule } from '@iconicedu/api/modules/notification-preferences/notification-preferences.module';
+import { NotificationEngineModule } from '@iconicedu/api/modules/notification-engine/notification-engine.module';
 import { PresenceModule } from '@iconicedu/api/modules/presence/presence.module';
 import { SpacesModule } from '@iconicedu/api/modules/spaces/spaces.module';
 import { SchedulesModule } from '@iconicedu/api/modules/schedules/schedules.module';
+import { GlobalExceptionFilter } from '@iconicedu/api/observability/global-exception.filter';
+import { RequestLoggingInterceptor } from '@iconicedu/api/observability/request-logging.interceptor';
 
 @Module({
   imports: [
@@ -37,9 +41,20 @@ import { SchedulesModule } from '@iconicedu/api/modules/schedules/schedules.modu
     ProfilesModule,
     AccountsModule,
     NotificationPreferencesModule,
+    NotificationEngineModule,
     PresenceModule,
     SpacesModule,
     SchedulesModule,
+  ],
+  providers: [
+    {
+      provide: APP_FILTER,
+      useClass: GlobalExceptionFilter,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: RequestLoggingInterceptor,
+    },
   ],
 })
 export class AppModule {}

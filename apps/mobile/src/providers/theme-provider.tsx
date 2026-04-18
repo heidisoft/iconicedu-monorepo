@@ -6,7 +6,7 @@ import React, {
   useMemo,
   useCallback,
 } from 'react';
-import { Appearance } from 'react-native';
+import { Appearance, AppState } from 'react-native';
 import { colorScheme as nwColorScheme } from 'react-native-css-interop';
 import * as SecureStore from 'expo-secure-store';
 import { lightColors, darkColors, type AppColors, type ThemeMode } from '@/lib/theme';
@@ -47,6 +47,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return () => {
       subscription.remove();
     };
+  }, []);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        setSystemScheme(readSystemColorScheme());
+      }
+    });
+    return () => sub.remove();
   }, []);
 
   // Load persisted preference on mount. We render immediately with 'system'

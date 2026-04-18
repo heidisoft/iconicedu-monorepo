@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { FeedScopeVM, ReminderJobRow } from '@iconicedu/shared-types';
 import { randomUUID } from 'crypto';
 
+import { AnalyticsService } from '@iconicedu/api/analytics/analytics.service';
 import { publishActivityEvent } from '@iconicedu/api/lib/activity-feed/activity-publisher';
 import {
   createSupabaseServiceClient,
@@ -41,6 +42,8 @@ type ReminderJobPayload = {
 
 @Injectable()
 export class RemindersService {
+  constructor(private readonly analytics: AnalyticsService) {}
+
   /**
    * Keep Supabase env validation out of Nest bootstrap so the API can expose
    * health and startup errors cleanly before reminder jobs are invoked.
@@ -78,6 +81,14 @@ export class RemindersService {
         await this.processReminderJob(job, supabase);
         succeeded += 1;
       } catch (error) {
+        this.analytics.capture('api reminder job failed', {
+          jobId: job.id,
+          orgId: job.org_id,
+          jobType: job.job_type,
+          attemptCount: job.attempt_count + 1,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        });
+
         const now = new Date();
         const nextAttemptAt = new Date(
           now.getTime() + this.resolveRetryDelayMs(job.attempt_count + 1),
@@ -126,6 +137,15 @@ export class RemindersService {
     }
 
     const durationMs = Date.now() - startedAt;
+
+    this.analytics.capture('api reminders dispatch completed', {
+      runId,
+      claimed: claimed.length,
+      succeeded,
+      failed,
+      deadLettered,
+      durationMs,
+    });
 
     return {
       runId,

@@ -6,6 +6,7 @@ import type {
   FeedScopeVM,
 } from '@iconicedu/shared-types';
 
+import { projectActivityEvents } from '@iconicedu/api/lib/activity-feed/projector/project-activity-events';
 import { resolveActivityVerbSuppressionDecision } from '@iconicedu/api/lib/activity-feed/activity-verb-suppression';
 import type { SupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 
@@ -111,10 +112,30 @@ export async function publishActivityEvent<TPayload extends object>(
         throw new Error(existingResponse.error.message);
       }
 
+      if (existingResponse.data) {
+        try {
+          await projectActivityEvents(input.supabase, {
+            eventIds: [existingResponse.data.id],
+            limit: 1,
+          });
+        } catch {
+          // Keep the event durable even if immediate projection fails.
+        }
+      }
+
       return existingResponse.data ?? null;
     }
 
     throw new Error(insertResponse.error.message);
+  }
+
+  try {
+    await projectActivityEvents(input.supabase, {
+      eventIds: [insertResponse.data.id],
+      limit: 1,
+    });
+  } catch {
+    // Keep the event durable even if immediate projection fails.
   }
 
   return insertResponse.data;

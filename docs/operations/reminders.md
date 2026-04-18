@@ -105,5 +105,5 @@ Preview branches created by `.github/workflows/ci.yml` run this automatically af
 
 ## 7. Transitional fallback
 
-The existing web endpoint (`/api/internal/reminders/dispatch`) can remain temporarily during rollout.
+The legacy web endpoint (`/api/internal/reminders/dispatch`) has been removed. Supabase edge dispatch should target the API service endpoint only.
 If needed, point `REMINDERS_DISPATCH_URL` back to web while investigating API issues.
