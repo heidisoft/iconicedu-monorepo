@@ -314,16 +314,21 @@ export class ActivityFeedQueryService {
     const now = new Date();
     const startOfToday = new Date(now);
     startOfToday.setHours(0, 0, 0, 0);
+    const startOfYesterday = new Date(startOfToday);
+    startOfYesterday.setDate(startOfYesterday.getDate() - 1);
     const startOfWeek = new Date(startOfToday);
     startOfWeek.setDate(startOfWeek.getDate() - 7);
 
     const today: ActivityFeedItemVM[] = [];
+    const yesterday: ActivityFeedItemVM[] = [];
     const thisWeek: ActivityFeedItemVM[] = [];
     const older: ActivityFeedItemVM[] = [];
     items.forEach((item) => {
       const occurredAt = new Date(item.timestamps.occurredAt);
       if (occurredAt >= startOfToday) {
         today.push(item);
+      } else if (occurredAt >= startOfYesterday) {
+        yesterday.push(item);
       } else if (occurredAt >= startOfWeek) {
         thisWeek.push(item);
       } else {
@@ -333,6 +338,7 @@ export class ActivityFeedQueryService {
 
     const sections: ActivityFeedSectionVM[] = [];
     if (today.length) sections.push({ label: 'Today', items: today });
+    if (yesterday.length) sections.push({ label: 'Yesterday', items: yesterday });
     if (thisWeek.length) sections.push({ label: 'This week', items: thisWeek });
     if (older.length) sections.push({ label: 'Earlier', items: older });
     return sections;
