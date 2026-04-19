@@ -14,7 +14,20 @@ import {
   Share,
   type LayoutChangeEvent,
 } from 'react-native';
-import { ChevronLeft, Video, MoreVertical, Share2, X } from 'lucide-react-native';
+import {
+  ChevronLeft,
+  Video,
+  MoreVertical,
+  Share2,
+  X,
+  Clock3,
+  Sunrise,
+  Sun,
+  Sunset,
+  MoonStar,
+  CircleOff,
+} from 'lucide-react-native';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@iconicedu/ui-native';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 import { ChannelTopicIconBadge } from '@/lib/learning-space-icons';
@@ -96,8 +109,16 @@ export type ConversationHeaderProps = {
   title: string;
   subtitle?: string | null;
   studentProfiles?: Array<{ name: string; themeKey?: string | null }> | null;
-  onSubtitlePress?: (() => void) | null;
   localTimeLabel?: string | null;
+  localTimeTooltipLabel?: string | null;
+  localTimeIcon?:
+    | 'clock'
+    | 'morning'
+    | 'day'
+    | 'evening'
+    | 'off-hours'
+    | 'offline'
+    | null;
   kind: 'dm' | 'channel' | 'space';
   avatarSeed?: string | null;
   avatarUrl?: string | null;
@@ -118,9 +139,9 @@ export type ConversationHeaderProps = {
 
 type AutoScrollingInlineTextProps = {
   children: React.ReactNode;
-  style: object;
   viewportStyle: object;
   trackStyle: object;
+  contentStyle?: object;
   testIDPrefix?: string;
 };
 
@@ -227,9 +248,25 @@ function makeStyles(C: AppColors) {
       flexShrink: 1,
       minWidth: 0,
     },
-    subtitleText: { fontSize: 12, color: C.textMuted },
-    subtitleSeparator: { fontSize: 12, color: C.textMuted },
-    localTimeText: { fontSize: 12, color: C.textMuted },
+    subtitleText: { fontSize: 12, lineHeight: 16, color: C.textMuted },
+    subtitleSeparator: { fontSize: 12, lineHeight: 16, color: C.textMuted },
+    localTimeText: { fontSize: 12, lineHeight: 16, color: C.textMuted },
+    localTimeWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      alignSelf: 'center',
+    },
+    subtitleInlineContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+    },
+    tooltipText: {
+      fontSize: 12,
+      lineHeight: 18,
+      color: '#f8fafc',
+    },
     subtitleButton: { alignSelf: 'stretch', minWidth: 0 },
     subtitleViewport: {
       overflow: 'hidden',
@@ -382,9 +419,9 @@ function themeTextColor(themeKey: string | null | undefined, fallback: string): 
 
 function AutoScrollingInlineText({
   children,
-  style,
   viewportStyle,
   trackStyle,
+  contentStyle,
   testIDPrefix,
 }: AutoScrollingInlineTextProps) {
   const translateX = useRef(new Animated.Value(0)).current;
@@ -450,7 +487,7 @@ function AutoScrollingInlineText({
         style={[trackStyle, { transform: [{ translateX }] }]}
         onLayout={handleTrackLayout}
       >
-        <Text style={style}>{children}</Text>
+        <View style={contentStyle}>{children}</View>
       </Animated.View>
     </View>
   );
@@ -460,8 +497,9 @@ export function ConversationHeader({
   title,
   subtitle,
   studentProfiles,
-  onSubtitlePress,
   localTimeLabel,
+  localTimeTooltipLabel,
+  localTimeIcon,
   kind,
   avatarSeed,
   avatarUrl,
@@ -513,6 +551,24 @@ export function ConversationHeader({
   const hasSubtitleStudents = subtitleStudents.length > 0;
   const hasSubtitleMeta = Boolean(subtitle || hasSubtitleStudents || localTimeLabel);
 
+  const LocalTimeIcon = useMemo(() => {
+    switch (localTimeIcon) {
+      case 'morning':
+        return Sunrise;
+      case 'day':
+        return Sun;
+      case 'evening':
+        return Sunset;
+      case 'off-hours':
+        return MoonStar;
+      case 'offline':
+        return CircleOff;
+      case 'clock':
+      default:
+        return Clock3;
+    }
+  }, [localTimeIcon]);
+
   const handleOpenJoinHref = useCallback((joinHref: string) => {
     Linking.openURL(joinHref).catch(() => null);
   }, []);
@@ -543,9 +599,9 @@ export function ConversationHeader({
   const subtitleContent = (
     <View style={s.subtitleRow}>
       <AutoScrollingInlineText
-        style={s.subtitleText}
         viewportStyle={s.subtitleViewport}
         trackStyle={s.subtitleTrack}
+        contentStyle={s.subtitleInlineContent}
         testIDPrefix="conversation-subtitle"
       >
         {!!subtitle && <Text style={s.subtitleText}>{subtitle}</Text>}
@@ -567,7 +623,12 @@ export function ConversationHeader({
         {!!(subtitle || hasSubtitleStudents) && !!localTimeLabel && (
           <Text style={s.subtitleSeparator}>{' \u00b7 '}</Text>
         )}
-        {!!localTimeLabel && <Text style={s.localTimeText}>{localTimeLabel}</Text>}
+        {!!localTimeLabel && (
+          <View style={s.localTimeWrap}>
+            <LocalTimeIcon size={12} color={colors.textMuted} strokeWidth={2} />
+            <Text style={s.localTimeText}>{localTimeLabel}</Text>
+          </View>
+        )}
       </AutoScrollingInlineText>
     </View>
   );
@@ -640,16 +701,23 @@ export function ConversationHeader({
                 numberOfLines={1}
               />
               {hasSubtitleMeta &&
-                (onSubtitlePress ? (
-                  <TouchableOpacity
-                    style={s.subtitleButton}
-                    onPress={onSubtitlePress}
-                    activeOpacity={0.7}
-                    accessibilityRole="button"
-                    accessibilityLabel="Explain local time"
-                  >
-                    {subtitleContent}
-                  </TouchableOpacity>
+                (localTimeTooltipLabel ? (
+                  <Tooltip delayDuration={0}>
+                    <TooltipTrigger
+                      accessibilityRole="button"
+                      accessibilityLabel="Show local time details"
+                      hitSlop={8}
+                    >
+                      <View style={s.subtitleButton}>{subtitleContent}</View>
+                    </TooltipTrigger>
+                    <TooltipContent
+                      testID="conversation-local-time-tooltip"
+                      sideOffset={6}
+                      className="rounded-2xl px-3 py-2"
+                    >
+                      <Text style={s.tooltipText}>{localTimeTooltipLabel}</Text>
+                    </TooltipContent>
+                  </Tooltip>
                 ) : (
                   subtitleContent
                 ))}

@@ -43,6 +43,41 @@ import { MessageBubblesSkeleton } from '@/components/skeletons';
 import { buildMobileChannelEmptyStateCopy } from '@/lib/message-empty-state';
 import type { AttachmentPayload } from '@/components/messages/attachment-sheet';
 import type { PendingUpload } from '@/components/messages/pending-message-row';
+import type { PresenceDisplayStatus } from '@/hooks/use-online-profile-ids';
+
+const COUNTRY_LABELS: Record<string, string> = {
+  LK: 'Sri Lanka',
+  IN: 'India',
+  AU: 'Australia',
+  GB: 'United Kingdom',
+  US: 'United States',
+  CA: 'Canada',
+  NZ: 'New Zealand',
+  SG: 'Singapore',
+  AE: 'UAE',
+  SA: 'Saudi Arabia',
+  PK: 'Pakistan',
+  BD: 'Bangladesh',
+  MY: 'Malaysia',
+  KE: 'Kenya',
+  NG: 'Nigeria',
+  ZA: 'South Africa',
+  FR: 'France',
+  DE: 'Germany',
+  TR: 'Turkey',
+  BR: 'Brazil',
+  JP: 'Japan',
+  CN: 'China',
+  PH: 'Philippines',
+  OM: 'Oman',
+  QA: 'Qatar',
+};
+
+type LocalTimeContext = {
+  icon: 'clock' | 'morning' | 'day' | 'evening' | 'off-hours' | 'offline';
+  descriptor: string | null;
+  tooltipLabel: string | null;
+};
 
 export default function DmConversationScreen() {
   const {
@@ -53,6 +88,9 @@ export default function DmConversationScreen() {
     avatarUrl,
     avatarRole,
     avatarTimezone,
+    avatarCity,
+    avatarCountryCode,
+    avatarCountryName,
     subtitle,
     isSupervisedReadOnly,
     supervisedChildName,
@@ -65,6 +103,9 @@ export default function DmConversationScreen() {
     avatarUrl?: string;
     avatarRole?: string;
     avatarTimezone?: string;
+    avatarCity?: string;
+    avatarCountryCode?: string;
+    avatarCountryName?: string;
     subtitle?: string;
     isSupervisedReadOnly?: string;
     supervisedChildName?: string;
@@ -129,6 +170,83 @@ export default function DmConversationScreen() {
     }
   }, []);
 
+  const buildLocalTimeContext = useCallback(
+    (
+      timezone: string | undefined,
+      city: string | undefined,
+      countryCode: string | undefined,
+      countryName: string | undefined,
+      presenceStatus: PresenceDisplayStatus | null,
+    ): LocalTimeContext | null => {
+      const timeText = localTimeText(timezone);
+      if (!timeText) return null;
+
+      const tz = timezone?.trim();
+      let hour: number | null = null;
+      if (tz) {
+        try {
+          const hourText = new Intl.DateTimeFormat('en-US', {
+            hour: 'numeric',
+            hour12: false,
+            timeZone: tz,
+          }).format(new Date());
+          const parsedHour = Number.parseInt(hourText, 10);
+          hour = Number.isFinite(parsedHour) ? parsedHour : null;
+        } catch {
+          hour = null;
+        }
+      }
+
+      const normalizedCity = city?.trim() ?? '';
+      const normalizedCountryName = countryName?.trim() ?? '';
+      const normalizedCountryCode = countryCode?.trim().toUpperCase() ?? '';
+      const normalizedCountry =
+        normalizedCountryName ||
+        (normalizedCountryCode ? (COUNTRY_LABELS[normalizedCountryCode] ?? '') : '');
+      const locationLabel =
+        normalizedCity && normalizedCountry
+          ? `${normalizedCity}, ${normalizedCountry}`
+          : normalizedCity || normalizedCountry || null;
+
+      let icon: LocalTimeContext['icon'] = 'clock';
+      let descriptor: string | null = null;
+
+      if (presenceStatus === 'offline') {
+        icon = 'offline';
+        descriptor = 'They may be offline right now';
+      } else if (hour !== null) {
+        if (hour >= 5 && hour < 9) {
+          icon = 'morning';
+          descriptor = 'It is morning there';
+        } else if (hour >= 9 && hour < 18) {
+          icon = 'day';
+          descriptor = 'It is daytime there';
+        } else if (hour >= 18 && hour < 21) {
+          icon = 'evening';
+          descriptor = 'It is evening there';
+        } else {
+          icon = 'off-hours';
+          descriptor = 'It may be off hours there';
+        }
+      }
+
+      const tooltipLines = [`Current time: ${timeText}`];
+      if (locationLabel) {
+        tooltipLines.push(`Location: ${locationLabel}`);
+      }
+      if (descriptor) {
+        tooltipLines.push(descriptor);
+      }
+
+      return {
+        icon,
+        descriptor,
+        tooltipLabel: tooltipLines.join('\n'),
+      };
+    },
+    [localTimeText],
+  );
+
   const headerSubtitle = isSupervised
     ? supervisedChildName
       ? `Supervising ${supervisedChildName}'s conversation`
@@ -147,17 +265,20 @@ export default function DmConversationScreen() {
     ? null
     : (() => {
         const timeText = localTimeText(avatarTimezone);
-        return timeText ? `${timeText} (Local time)` : null;
+        return timeText ? timeText : null;
       })();
-
-  const handleSubtitlePress = useCallback(() => {
-    const tz = avatarTimezone?.trim();
-    if (!tz || isSupervised) return;
-    Alert.alert(
-      'Local time',
-      'You are seeing their current local time here, based on the timezone saved on their profile.',
-    );
-  }, [avatarTimezone, isSupervised]);
+  const headerLocalTimeContext = isSupervised
+    ? null
+    : buildLocalTimeContext(
+        avatarTimezone,
+        avatarCity,
+        avatarCountryCode,
+        avatarCountryName,
+        headerPresenceStatus ?? headerPresenceSummary.status,
+      );
+  const headerLocalTimeTooltip = isSupervised
+    ? null
+    : (headerLocalTimeContext?.tooltipLabel ?? null);
 
   const {
     data: messages,
@@ -468,8 +589,9 @@ export default function DmConversationScreen() {
       <ConversationHeader
         title={topic ?? 'Direct Message'}
         subtitle={headerSubtitle}
-        onSubtitlePress={headerLocalTime ? handleSubtitlePress : null}
         localTimeLabel={headerLocalTime}
+        localTimeTooltipLabel={headerLocalTimeTooltip}
+        localTimeIcon={headerLocalTimeContext?.icon ?? 'clock'}
         kind="dm"
         avatarSeed={avatarSeed}
         avatarUrl={avatarUrl || undefined}

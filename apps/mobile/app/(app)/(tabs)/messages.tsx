@@ -948,6 +948,9 @@ export default function MessagesScreen() {
       const avatarUrl = isDm ? (participants[0]?.avatar_url ?? '') : '';
       const avatarRole = isDm ? (participants[0]?.kind ?? '') : '';
       const avatarTimezone = isDm ? (participants[0]?.timezone ?? '') : '';
+      const avatarCity = isDm ? (participants[0]?.city ?? '') : '';
+      const avatarCountryCode = isDm ? (participants[0]?.country_code ?? '') : '';
+      const avatarCountryName = isDm ? (participants[0]?.country_name ?? '') : '';
       const iconKey = !isDm ? (channel.icon_key ?? '') : '';
       const themeKey = !isDm ? (channel.themeKey ?? '') : '';
       const subtitle = isDm ? 'Direct Message' : (channel.description ?? '');
@@ -975,6 +978,9 @@ export default function MessagesScreen() {
                 avatarUrl,
                 avatarRole,
                 avatarTimezone,
+                avatarCity,
+                avatarCountryCode,
+                avatarCountryName,
                 iconKey,
                 themeKey,
                 subtitle,

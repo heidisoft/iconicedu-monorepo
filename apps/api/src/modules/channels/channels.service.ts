@@ -11,6 +11,9 @@ type DmParticipant = {
   avatar_url: string | null;
   avatar_seed: string | null;
   timezone?: string | null;
+  city?: string | null;
+  country_code?: string | null;
+  country_name?: string | null;
   kind?: string | null;
 };
 
@@ -172,7 +175,7 @@ export class ChannelsService {
       supabase
         .from('channel_members')
         .select(
-          'channel_id, profile_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed, timezone, kind)',
+          'channel_id, profile_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed, timezone, city, country_code, country_name, kind)',
         )
         .in('channel_id', channelIds)
         .is('deleted_at', null),
@@ -305,7 +308,7 @@ export class ChannelsService {
         supabase
           .from('channel_members')
           .select(
-            'channel_id, profile_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed, timezone, kind)',
+            'channel_id, profile_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed, timezone, city, country_code, country_name, kind)',
           )
           .in('channel_id', channelIds)
           .is('deleted_at', null),
@@ -415,7 +418,7 @@ export class ChannelsService {
       supabase
         .from('profiles')
         .select(
-          'id, display_name, first_name, last_name, avatar_url, avatar_seed, timezone, kind',
+          'id, display_name, first_name, last_name, avatar_url, avatar_seed, timezone, city, country_code, country_name, kind',
         )
         .eq('id', input.otherProfileId)
         .is('deleted_at', null)
@@ -440,6 +443,9 @@ export class ChannelsService {
       avatarUrl: (targetProfile.avatar_url as string | null) ?? null,
       avatarRole: (targetProfile.kind as string | null) ?? null,
       avatarTimezone: (targetProfile.timezone as string | null) ?? null,
+      avatarCity: (targetProfile.city as string | null) ?? null,
+      avatarCountryCode: (targetProfile.country_code as string | null) ?? null,
+      avatarCountryName: (targetProfile.country_name as string | null) ?? null,
     };
   }
 

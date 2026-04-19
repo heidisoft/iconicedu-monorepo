@@ -37,6 +37,9 @@ export async function findDirectMessageChannelForProfiles(
   avatarUrl: string | null;
   avatarRole: string | null;
   avatarTimezone: string | null;
+  avatarCity: string | null;
+  avatarCountryCode: string | null;
+  avatarCountryName: string | null;
 } | null> {
   if (
     !orgId ||

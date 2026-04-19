@@ -6,6 +6,9 @@ export type DmParticipant = {
   avatar_url: string | null;
   avatar_seed: string | null;
   timezone?: string | null;
+  city?: string | null;
+  country_code?: string | null;
+  country_name?: string | null;
   kind?: string | null;
 };
 

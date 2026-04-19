@@ -7,6 +7,11 @@ const mockUseLocalSearchParams = jest.fn();
 const mockUseRouter = jest.fn(() => ({ back: jest.fn() }));
 const mockUseIsFocused = jest.fn(() => true);
 const mockUseQuery = jest.fn();
+const mockUseOnlineProfileIds = jest.fn(() => new Map());
+const mockUseProfilePresenceSummary = jest.fn(() => ({
+  status: 'offline',
+  lastSeenAt: null,
+}));
 
 jest.mock('expo-router', () => ({
   useLocalSearchParams: (...args: unknown[]) => mockUseLocalSearchParams(...args),
@@ -90,6 +95,12 @@ jest.mock('@/providers/theme-provider', () => ({
   }),
 }));
 
+jest.mock('@/hooks/use-online-profile-ids', () => ({
+  useOnlineProfileIds: (...args: unknown[]) => mockUseOnlineProfileIds(...args),
+  useProfilePresenceSummary: (...args: unknown[]) =>
+    mockUseProfilePresenceSummary(...args),
+}));
+
 jest.mock('@/components/messages/message-list', () => ({
   MessageList: () => null,
 }));
@@ -134,6 +145,11 @@ function renderScreen() {
 describe('DmConversationScreen — supervised read-only mode', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseOnlineProfileIds.mockReturnValue(new Map());
+    mockUseProfilePresenceSummary.mockReturnValue({
+      status: 'offline',
+      lastSeenAt: null,
+    });
     mockUseQuery.mockReturnValue({
       data: {
         lastReadMessageId: null,
@@ -243,6 +259,68 @@ describe('DmConversationScreen — supervised read-only mode', () => {
 
     expect(mockConversationHeader).toHaveBeenCalledWith(
       expect.objectContaining({ secondaryAvatarSeed: 'Senya' }),
+    );
+  });
+
+  it('passes the local time tooltip label with city and country when available', () => {
+    mockUseLocalSearchParams.mockReturnValue({
+      channelId: 'ch-1',
+      topic: 'Alice',
+      avatarTimezone: 'Asia/Colombo',
+      avatarCity: 'Colombo',
+      avatarCountryName: 'Sri Lanka',
+    });
+
+    renderScreen();
+
+    expect(mockConversationHeader).toHaveBeenCalledWith(
+      expect.objectContaining({
+        localTimeLabel: expect.stringMatching(/^.+$/),
+        localTimeIcon: expect.any(String),
+        localTimeTooltipLabel: expect.stringMatching(
+          /^Current time: .+\nLocation: Colombo, Sri Lanka(?:\n.+)?$/,
+        ),
+      }),
+    );
+  });
+
+  it('passes the local time tooltip label with just country when city is missing', () => {
+    mockUseLocalSearchParams.mockReturnValue({
+      channelId: 'ch-1',
+      topic: 'Alice',
+      avatarTimezone: 'Asia/Colombo',
+      avatarCountryCode: 'LK',
+    });
+
+    renderScreen();
+
+    expect(mockConversationHeader).toHaveBeenCalledWith(
+      expect.objectContaining({
+        localTimeTooltipLabel: expect.stringMatching(
+          /^Current time: .+\nLocation: Sri Lanka(?:\n.+)?$/,
+        ),
+      }),
+    );
+  });
+
+  it('uses the offline local-time context when presence is offline', () => {
+    mockUseLocalSearchParams.mockReturnValue({
+      channelId: 'ch-1',
+      topic: 'Alice',
+      avatarTimezone: 'Asia/Colombo',
+    });
+    mockUseProfilePresenceSummary.mockReturnValue({
+      status: 'offline',
+      lastSeenAt: null,
+    });
+
+    renderScreen();
+
+    expect(mockConversationHeader).toHaveBeenCalledWith(
+      expect.objectContaining({
+        localTimeIcon: 'offline',
+        localTimeTooltipLabel: expect.stringMatching(/They may be offline right now$/),
+      }),
     );
   });
 
