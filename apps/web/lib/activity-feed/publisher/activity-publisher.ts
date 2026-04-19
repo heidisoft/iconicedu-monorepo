@@ -4,13 +4,8 @@ import type {
   FeedScopeVM,
   SystemNoticeActivityEventPayload,
 } from '@iconicedu/shared-types';
-import type { EntityRefVM } from '@iconicedu/shared-types';
-import type { ActivityEventRow } from '@iconicedu/shared-types';
+import type { ActivityEventRow, EntityRefVM } from '@iconicedu/shared-types';
 import type { SupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
-
-import { projectActivityEvents } from '@iconicedu/web/lib/activity-feed/projector/project-activity-events';
-import { getOrgById } from '@iconicedu/web/lib/org/queries/org.query';
-import { resolveActivityVerbSuppressionDecision } from '@iconicedu/web/lib/activity-feed/suppression/activity-verb-suppression';
 
 type PublishActivityEventInput<TPayload extends object = Record<string, unknown>> = {
   supabase: SupabaseServiceClient;
@@ -29,109 +24,68 @@ type PublishActivityEventInput<TPayload extends object = Record<string, unknown>
   createdBy?: string | null;
 };
 
-const orgSlugCache = new Map<string, string | null>();
+function resolveInternalApiUrl() {
+  return (process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? '').replace(
+    /\/+$/,
+    '',
+  );
+}
 
-async function resolveActivityOrgSlug(
-  supabase: SupabaseServiceClient,
-  orgId: string,
-): Promise<string | null> {
-  if (orgSlugCache.has(orgId)) {
-    return orgSlugCache.get(orgId) ?? null;
+function resolveInternalActivityFeedToken() {
+  return process.env.INTERNAL_ACTIVITY_FEED_TOKEN?.trim() || '';
+}
+
+async function parseInternalResponse<T>(response: Response): Promise<T> {
+  if (!response.ok) {
+    const errorBody = (await response.json().catch(() => null)) as {
+      message?: string;
+    } | null;
+    throw new Error(errorBody?.message ?? `API error ${response.status}`);
   }
 
-  const response = await getOrgById(supabase, orgId);
-  if (response.error) {
-    throw new Error(response.error.message);
-  }
-
-  const slug = response.data?.slug ?? null;
-  orgSlugCache.set(orgId, slug);
-  return slug;
+  return response.json() as Promise<T>;
 }
 
 export async function publishActivityEvent<TPayload extends object>(
   input: PublishActivityEventInput<TPayload>,
 ) {
-  const suppressionDecision = await resolveActivityVerbSuppressionDecision({
-    supabase: input.supabase,
-    orgId: input.orgId,
-    eventType: input.eventType,
-    actorProfileId: input.actorProfileId ?? null,
+  void input.supabase;
+
+  const internalApiUrl = resolveInternalApiUrl();
+
+  if (!internalApiUrl) {
+    throw new Error('API_URL or NEXT_PUBLIC_API_URL is required for activity publishing');
+  }
+
+  const token = resolveInternalActivityFeedToken();
+  if (!token) {
+    throw new Error('INTERNAL_ACTIVITY_FEED_TOKEN is required for activity publishing');
+  }
+
+  const response = await fetch(`${internalApiUrl}/internal/activity-feed/publish`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      orgId: input.orgId,
+      eventType: input.eventType,
+      emitterLabel: input.emitterLabel,
+      occurredAt: input.occurredAt,
+      sourceKind: input.sourceKind,
+      actorProfileId: input.actorProfileId ?? null,
+      scope: input.scope,
+      objectRef: input.objectRef ?? null,
+      targetRef: input.targetRef ?? null,
+      audienceRules: input.audienceRules ?? [],
+      payload: input.payload,
+      dedupeKey: input.dedupeKey ?? null,
+      createdBy: input.createdBy ?? input.actorProfileId ?? null,
+    }),
   });
 
-  if (!suppressionDecision.shouldPublish) {
-    return null;
-  }
-
-  const now = new Date().toISOString();
-  const orgSlug = await resolveActivityOrgSlug(input.supabase, input.orgId);
-  const payload = {
-    ...(input.payload as Record<string, unknown>),
-    ...(orgSlug ? { orgSlug } : {}),
-  } as TPayload;
-  const insertResponse = await input.supabase
-    .from('activity_events')
-    .insert({
-      org_id: input.orgId,
-      event_type: input.eventType,
-      occurred_at: input.occurredAt ?? now,
-      source_kind: input.sourceKind,
-      actor_profile_id: input.actorProfileId ?? null,
-      scope: input.scope,
-      object_ref: input.objectRef ?? null,
-      target_ref: input.targetRef ?? null,
-      payload,
-      audience_rules: input.audienceRules ?? [],
-      dedupe_key: input.dedupeKey ?? null,
-      projection_status: 'pending',
-      projection_attempts: 0,
-      created_at: now,
-      updated_at: now,
-      created_by: input.createdBy ?? input.actorProfileId ?? null,
-      updated_by: input.createdBy ?? input.actorProfileId ?? null,
-    })
-    .select('*')
-    .single<ActivityEventRow>();
-
-  if (insertResponse.error) {
-    if (input.dedupeKey && insertResponse.error.code === '23505') {
-      const existingResponse = await input.supabase
-        .from('activity_events')
-        .select('*')
-        .eq('org_id', input.orgId)
-        .eq('dedupe_key', input.dedupeKey)
-        .is('deleted_at', null)
-        .maybeSingle<ActivityEventRow>();
-
-      if (existingResponse.error) {
-        throw new Error(existingResponse.error.message);
-      }
-
-      if (existingResponse.data) {
-        try {
-          await projectActivityEvents(input.supabase, {
-            eventIds: [existingResponse.data.id],
-            limit: 1,
-          });
-        } catch {
-          // Keep the event durable even if immediate projection fails.
-        }
-        return existingResponse.data;
-      }
-    }
-
-    throw new Error(insertResponse.error.message);
-  }
-
-  try {
-    await projectActivityEvents(input.supabase, {
-      eventIds: [insertResponse.data.id],
-      limit: 1,
-    });
-  } catch {
-    // Keep the event durable even if immediate projection fails.
-  }
-  return insertResponse.data;
+  return parseInternalResponse<ActivityEventRow | null>(response);
 }
 
 export async function publishSystemNoticeActivity(input: {
@@ -141,7 +95,6 @@ export async function publishSystemNoticeActivity(input: {
   audienceRules: NonNullable<
     PublishActivityEventInput<SystemNoticeActivityEventPayload>['audienceRules']
   >;
-
   payload: SystemNoticeActivityEventPayload;
   dedupeKey?: string | null;
 }) {

@@ -439,6 +439,77 @@ export async function publishChannelMessageActivity(input: {
   });
 }
 
+export async function publishReactionAddedActivity(input: {
+  supabase: SupabaseServiceClient;
+  readSupabase?: SupabaseQueryClient;
+  publishActivity?: PublishActivityFn;
+  orgId: string;
+  channelId: string;
+  senderProfileId: string;
+  senderName?: string;
+  messageId: string;
+  messageSenderProfileId: string;
+  emoji: string;
+  now: string;
+}) {
+  const readSupabase = input.readSupabase ?? input.supabase;
+  const activityContext = await resolveActivityChannelContext({
+    supabase: readSupabase,
+    orgId: input.orgId,
+    channelId: input.channelId,
+  });
+  const senderName =
+    input.senderName ??
+    (await resolveSenderDisplayName({
+      supabase: readSupabase,
+      orgId: input.orgId,
+      senderProfileId: input.senderProfileId,
+    }));
+  const isDmRoute = activityContext.channelRouteKind === 'dm';
+  const recipientIds = isDmRoute
+    ? await resolveDmActivityRecipientProfileIds({
+        supabase: readSupabase,
+        orgId: input.orgId,
+        channelId: input.channelId,
+        senderProfileId: input.senderProfileId,
+        now: input.now,
+      })
+    : input.messageSenderProfileId !== input.senderProfileId
+      ? [input.messageSenderProfileId]
+      : [];
+  const publishActivity = input.publishActivity ?? publishActivityEvent;
+
+  if (!recipientIds.length) {
+    return;
+  }
+
+  await publishActivity({
+    supabase: input.supabase,
+    orgId: input.orgId,
+    eventType: isDmRoute ? 'dm.reaction.added' : 'reaction.added',
+    occurredAt: input.now,
+    sourceKind: 'profile',
+    actorProfileId: input.senderProfileId,
+    scope: isDmRoute
+      ? activityContext.scope
+      : { kind: 'user', userId: input.messageSenderProfileId },
+    objectRef: { kind: 'message', id: input.messageId },
+    targetRef: activityContext.targetRef,
+    audienceRules: [{ kind: 'users_only', userIds: recipientIds }],
+    payload: {
+      channelId: input.channelId,
+      messageId: input.messageId,
+      senderName,
+      emoji: input.emoji,
+      channelTopic: activityContext.channelTopic ?? null,
+      channelRouteKind: activityContext.channelRouteKind,
+      learningSpaceId: activityContext.learningSpaceId ?? null,
+      learningSpaceTitle: activityContext.learningSpaceTitle ?? null,
+    },
+    createdBy: input.senderProfileId,
+  });
+}
+
 export async function publishThreadReplyActivities(input: {
   supabase: SupabaseServiceClient;
   readSupabase?: SupabaseQueryClient;

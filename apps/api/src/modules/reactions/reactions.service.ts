@@ -1,13 +1,72 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
+import { publishReactionAddedActivity } from '@iconicedu/api/lib/messages/message-activity';
+import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
 
 @Injectable()
 export class ReactionsService {
   async add(
     accessToken: string,
-    body: { orgId: string; messageId: string; emoji: string; accountId: string },
+    body: {
+      orgId: string;
+      messageId: string;
+      emoji: string;
+      accountId: string;
+      profileId: string;
+    },
   ) {
     const supabase = createSupabaseSessionClient(accessToken);
+    const serviceSupabase = createSupabaseServiceClient();
+    const profileResponse = await serviceSupabase
+      .from('profiles')
+      .select('id, org_id, account_id')
+      .eq('id', body.profileId)
+      .eq('org_id', body.orgId)
+      .is('deleted_at', null)
+      .maybeSingle<{ id: string; org_id: string; account_id: string }>();
+    if (profileResponse.error)
+      throw new InternalServerErrorException(profileResponse.error.message);
+    if (!profileResponse.data) throw new NotFoundException('Profile not found');
+    if (profileResponse.data.account_id !== body.accountId) {
+      const familyLinkResponse = await serviceSupabase
+        .from('family_links')
+        .select('id')
+        .eq('org_id', body.orgId)
+        .eq('guardian_account_id', body.accountId)
+        .eq('child_account_id', profileResponse.data.account_id)
+        .is('deleted_at', null)
+        .maybeSingle<{ id: string }>();
+      if (familyLinkResponse.error) {
+        throw new InternalServerErrorException(familyLinkResponse.error.message);
+      }
+      if (!familyLinkResponse.data) {
+        throw new ForbiddenException('Profile is not available to this account');
+      }
+    }
+
+    const messageResponse = await serviceSupabase
+      .from('messages')
+      .select('id, channel_id, sender_profile_id')
+      .eq('org_id', body.orgId)
+      .eq('id', body.messageId)
+      .is('deleted_at', null)
+      .maybeSingle<{
+        id: string;
+        channel_id: string | null;
+        sender_profile_id: string | null;
+      }>();
+    if (messageResponse.error)
+      throw new InternalServerErrorException(messageResponse.error.message);
+    if (!messageResponse.data) throw new NotFoundException('Message not found');
+    if (!messageResponse.data.channel_id) {
+      throw new NotFoundException('Message channel not found');
+    }
+
     const { data: existing, error: selectError } = await supabase
       .from('message_reactions')
       .select('id')
@@ -59,12 +118,29 @@ export class ReactionsService {
         throw new InternalServerErrorException(insertCountError.message);
     }
 
+    await publishReactionAddedActivity({
+      supabase: serviceSupabase,
+      orgId: body.orgId,
+      channelId: messageResponse.data.channel_id,
+      senderProfileId: body.profileId,
+      messageId: body.messageId,
+      messageSenderProfileId: messageResponse.data.sender_profile_id ?? '',
+      emoji: body.emoji,
+      now: new Date().toISOString(),
+    });
+
     return { success: true };
   }
 
   async remove(
     accessToken: string,
-    body: { orgId: string; messageId: string; emoji: string; accountId: string },
+    body: {
+      orgId: string;
+      messageId: string;
+      emoji: string;
+      accountId: string;
+      profileId: string;
+    },
   ) {
     const supabase = createSupabaseSessionClient(accessToken);
     const { data: countRow, error: countSelectError } = await supabase

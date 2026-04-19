@@ -37,7 +37,6 @@ import {
   publishThreadReplyActivities as publishSharedThreadReplyActivities,
 } from '@iconicedu/api/lib/messages/message-activity';
 import { publishActivityEvent } from '@iconicedu/web/lib/activity-feed/publisher/activity-publisher';
-import { filterDmRecipientsByLastReadRecency } from '@iconicedu/web/lib/activity-feed/dm-activity-suppression';
 import {
   buildSupportVisibilityFields,
   isStaffActorInOrg,
@@ -842,172 +841,6 @@ async function recallMessageActivities(input: {
       throw new Error(updateGroupCountResponse.error.message);
     }
   }
-}
-
-async function emitReactionActivity(input: {
-  supabase: SupabaseServerClient;
-  serviceSupabase: SupabaseServiceClient;
-  orgId: string;
-  messageId: string;
-  channelId?: string | null;
-  senderProfileId: string;
-  messageSenderProfileId: string;
-  emoji: string;
-  eventType: 'dm.reaction.added' | 'reaction.added';
-  now: string;
-}) {
-  if (!input.channelId) {
-    return;
-  }
-
-  const activityContext = await resolveActivityChannelContext({
-    supabase: input.supabase,
-    orgId: input.orgId,
-    channelId: input.channelId,
-  });
-
-  const isDmRoute = activityContext.channelRouteKind === 'dm';
-  const recipientIds = isDmRoute
-    ? await resolveDmActivityRecipientProfileIds({
-        supabase: input.supabase,
-        orgId: input.orgId,
-        channelId: input.channelId,
-        senderProfileId: input.senderProfileId,
-        now: input.now,
-        eventType: 'dm.reaction.added',
-      })
-    : input.messageSenderProfileId !== input.senderProfileId
-      ? [input.messageSenderProfileId]
-      : [];
-
-  if (!recipientIds.length) {
-    return;
-  }
-
-  const sender = await buildUserProfileById(input.supabase, input.senderProfileId);
-  const senderName =
-    ('profile' in (sender ?? {}) &&
-    sender?.profile &&
-    typeof sender.profile === 'object' &&
-    'displayName' in sender.profile &&
-    typeof sender.profile.displayName === 'string'
-      ? sender.profile.displayName
-      : undefined) ?? 'Someone';
-
-  await publishActivityEvent({
-    supabase: input.serviceSupabase,
-    orgId: input.orgId,
-    eventType: input.eventType,
-    occurredAt: input.now,
-    sourceKind: 'profile',
-    actorProfileId: input.senderProfileId,
-    scope: isDmRoute
-      ? activityContext.scope
-      : { kind: 'user', userId: input.messageSenderProfileId },
-    objectRef: { kind: 'message', id: input.messageId },
-    targetRef: activityContext.targetRef,
-    audienceRules: [{ kind: 'users_only', userIds: recipientIds }],
-    payload: {
-      channelId: input.channelId,
-      messageId: input.messageId,
-      senderName,
-      emoji: input.emoji,
-      channelTopic: activityContext.channelTopic ?? null,
-      channelRouteKind: activityContext.channelRouteKind,
-      learningSpaceId: activityContext.learningSpaceId ?? null,
-      learningSpaceTitle: activityContext.learningSpaceTitle ?? null,
-    },
-    createdBy: input.senderProfileId,
-  });
-}
-
-async function resolveDmActivityRecipientProfileIds(input: {
-  supabase: SupabaseServerClient;
-  orgId: string;
-  channelId: string;
-  senderProfileId: string;
-  now: string;
-  eventType: 'dm.posted' | 'dm.reaction.added';
-}) {
-  const membersResponse = await input.supabase
-    .from('channel_members')
-    .select('profile_id')
-    .eq('org_id', input.orgId)
-    .eq('channel_id', input.channelId)
-    .is('deleted_at', null)
-    .returns<Array<{ profile_id: string }>>();
-
-  if (membersResponse.error) {
-    throw new Error(membersResponse.error.message);
-  }
-
-  const candidateProfileIds = Array.from(
-    new Set(
-      (membersResponse.data ?? [])
-        .map((row) => row.profile_id)
-        .filter((id) => id && id !== input.senderProfileId),
-    ),
-  );
-
-  if (!candidateProfileIds.length) {
-    return [];
-  }
-
-  const profilesResponse = await input.supabase
-    .from('profiles')
-    .select('id, account_id')
-    .eq('org_id', input.orgId)
-    .in('id', candidateProfileIds)
-    .is('deleted_at', null)
-    .returns<Array<{ id: string; account_id: string | null }>>();
-
-  if (profilesResponse.error) {
-    throw new Error(profilesResponse.error.message);
-  }
-
-  const accountIdByProfileId = new Map(
-    (profilesResponse.data ?? [])
-      .filter((row) => row.id && row.account_id)
-      .map((row) => [row.id, row.account_id as string]),
-  );
-
-  const accountIds = Array.from(new Set(Array.from(accountIdByProfileId.values())));
-  if (!accountIds.length) {
-    return candidateProfileIds;
-  }
-
-  const readStatesResponse = await input.supabase
-    .from('channel_read_state')
-    .select('account_id,last_read_at')
-    .eq('org_id', input.orgId)
-    .eq('channel_id', input.channelId)
-    .in('account_id', accountIds)
-    .is('deleted_at', null)
-    .returns<Array<{ account_id: string; last_read_at: string | null }>>();
-
-  if (readStatesResponse.error) {
-    throw new Error(readStatesResponse.error.message);
-  }
-
-  const lastReadAtByAccountId = new Map(
-    (readStatesResponse.data ?? []).map((row) => [row.account_id, row.last_read_at]),
-  );
-  const profileLastReadAtById = new Map<string, string | null | undefined>();
-  for (const profileId of candidateProfileIds) {
-    const accountId = accountIdByProfileId.get(profileId);
-    profileLastReadAtById.set(
-      profileId,
-      accountId ? lastReadAtByAccountId.get(accountId) : undefined,
-    );
-  }
-
-  const decision = filterDmRecipientsByLastReadRecency({
-    candidateProfileIds,
-    profileLastReadAtById,
-    now: input.now,
-  });
-
-  return decision.emittedProfileIds;
 }
 
 export async function sendTextMessageWithSupabase(
@@ -2153,7 +1986,6 @@ export async function toggleMessageReactionAction(
   input: MessageToggleReactionInput,
 ): Promise<void> {
   const supabase = await createSupabaseServerClient();
-  const serviceSupabase = createSupabaseServiceClient();
   const authUser = await requireAuthedUser(supabase);
   const actor = await resolveEffectiveMessageActor({
     supabase,
@@ -2165,21 +1997,7 @@ export async function toggleMessageReactionAction(
     throw new Error('Emoji is required');
   }
 
-  const messageResponse = await supabase
-    .from('messages')
-    .select('id, org_id, channel_id, sender_profile_id')
-    .eq('id', input.messageId)
-    .maybeSingle<{
-      id: string;
-      org_id: string;
-      channel_id?: string | null;
-      sender_profile_id?: string | null;
-    }>();
-
-  if (!messageResponse.data || messageResponse.data.org_id !== input.orgId) {
-    throw new Error('Message not found');
-  }
-
+  const api = createApiClient(supabase);
   const reactionResponse = await supabase
     .from('message_reactions')
     .select('id')
@@ -2190,137 +2008,23 @@ export async function toggleMessageReactionAction(
     .is('deleted_at', null)
     .maybeSingle<{ id: string }>();
 
-  const countResponse = await supabase
-    .from('message_reaction_counts')
-    .select('id, count')
-    .eq('org_id', input.orgId)
-    .eq('message_id', input.messageId)
-    .eq('emoji', input.emoji)
-    .is('deleted_at', null)
-    .maybeSingle<{ id: string; count: number }>();
-
   if (reactionResponse.data?.id) {
-    const deleteReaction = await supabase
-      .from('message_reactions')
-      .delete()
-      .eq('id', reactionResponse.data.id);
-
-    if (deleteReaction.error) {
-      throw new Error(deleteReaction.error.message);
-    }
-
-    if (countResponse.data) {
-      if (countResponse.data.count <= 1) {
-        const deleteCount = await supabase
-          .from('message_reaction_counts')
-          .delete()
-          .eq('id', countResponse.data.id);
-        if (deleteCount.error) {
-          throw new Error(deleteCount.error.message);
-        }
-      } else {
-        const updateCount = await supabase
-          .from('message_reaction_counts')
-          .update({ count: countResponse.data.count - 1 })
-          .eq('id', countResponse.data.id);
-        if (updateCount.error) {
-          throw new Error(updateCount.error.message);
-        }
-      }
-    }
-
-    const isDmRoute =
-      (
-        await resolveActivityChannelContext({
-          supabase,
-          orgId: input.orgId,
-          channelId: messageResponse.data.channel_id ?? '',
-        })
-      ).channelRouteKind === 'dm';
-
-    return;
-  }
-
-  const now = new Date().toISOString();
-  const insertReaction = await supabase.from('message_reactions').insert({
-    org_id: input.orgId,
-    message_id: input.messageId,
-    account_id: actor.account.id,
-    emoji: input.emoji,
-    created_at: now,
-    updated_at: now,
-  });
-
-  if (insertReaction.error) {
-    throw new Error(insertReaction.error.message);
-  }
-
-  if (countResponse.data) {
-    const updateCount = await supabase
-      .from('message_reaction_counts')
-      .update({ count: countResponse.data.count + 1 })
-      .eq('id', countResponse.data.id);
-    if (updateCount.error) {
-      throw new Error(updateCount.error.message);
-    }
-
-    const isDmRoute =
-      (
-        await resolveActivityChannelContext({
-          supabase,
-          orgId: input.orgId,
-          channelId: messageResponse.data.channel_id ?? '',
-        })
-      ).channelRouteKind === 'dm';
-
-    await emitReactionActivity({
-      supabase,
-      serviceSupabase,
+    await api.delete('/reactions', {
       orgId: input.orgId,
       messageId: input.messageId,
-      channelId: messageResponse.data.channel_id ?? null,
-      senderProfileId: actor.profile.id,
-      messageSenderProfileId: messageResponse.data.sender_profile_id ?? '',
       emoji: input.emoji,
-      eventType: isDmRoute ? 'dm.reaction.added' : 'reaction.added',
-      now,
+      accountId: actor.account.id,
+      profileId: actor.profile.id,
     });
     return;
   }
 
-  const insertCount = await supabase.from('message_reaction_counts').insert({
-    org_id: input.orgId,
-    message_id: input.messageId,
-    emoji: input.emoji,
-    count: 1,
-    created_at: now,
-    updated_at: now,
-  });
-
-  if (insertCount.error) {
-    throw new Error(insertCount.error.message);
-  }
-
-  const isDmRoute =
-    (
-      await resolveActivityChannelContext({
-        supabase,
-        orgId: input.orgId,
-        channelId: messageResponse.data.channel_id ?? '',
-      })
-    ).channelRouteKind === 'dm';
-
-  await emitReactionActivity({
-    supabase,
-    serviceSupabase,
+  await api.post('/reactions', {
     orgId: input.orgId,
     messageId: input.messageId,
-    channelId: messageResponse.data.channel_id ?? null,
-    senderProfileId: actor.profile.id,
-    messageSenderProfileId: messageResponse.data.sender_profile_id ?? '',
     emoji: input.emoji,
-    eventType: isDmRoute ? 'dm.reaction.added' : 'reaction.added',
-    now,
+    accountId: actor.account.id,
+    profileId: actor.profile.id,
   });
 }
 

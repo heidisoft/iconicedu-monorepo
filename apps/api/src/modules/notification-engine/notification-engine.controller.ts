@@ -1,4 +1,11 @@
 import { Body, Controller, Headers, Post, UnauthorizedException } from '@nestjs/common';
+import type {
+  ActivityEventRow,
+  ActivityEventTypeVM,
+  AudienceRuleVM,
+  EntityRefVM,
+  FeedScopeVM,
+} from '@iconicedu/shared-types';
 
 import { NotificationEngineService } from '@iconicedu/api/modules/notification-engine/notification-engine.service';
 
@@ -17,6 +24,62 @@ function resolveExpectedNotificationsToken() {
 @Controller()
 export class NotificationEngineController {
   constructor(private readonly notificationEngineService: NotificationEngineService) {}
+
+  @Post('internal/activity-feed/publish')
+  async publishActivityFeedEvent(
+    @Headers('authorization') authorization: string | undefined,
+    @Body()
+    body: {
+      orgId: string;
+      eventType: ActivityEventTypeVM;
+      emitterLabel?: string;
+      occurredAt?: string;
+      sourceKind: ActivityEventRow['source_kind'];
+      actorProfileId?: string | null;
+      scope: FeedScopeVM;
+      objectRef?: EntityRefVM | null;
+      targetRef?: EntityRefVM | null;
+      audienceRules?: AudienceRuleVM[];
+      payload: Record<string, unknown>;
+      dedupeKey?: string | null;
+      createdBy?: string | null;
+    } | null,
+  ) {
+    const expectedToken = resolveExpectedActivityFeedToken();
+    if (!expectedToken || authorization !== `Bearer ${expectedToken}`) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+
+    if (
+      !body ||
+      typeof body.orgId !== 'string' ||
+      typeof body.eventType !== 'string' ||
+      typeof body.sourceKind !== 'string' ||
+      !body.scope ||
+      typeof body.scope !== 'object' ||
+      !body.payload ||
+      typeof body.payload !== 'object' ||
+      Array.isArray(body.payload)
+    ) {
+      throw new UnauthorizedException('Invalid activity publish payload');
+    }
+
+    return this.notificationEngineService.publishActivityEvent({
+      orgId: body.orgId,
+      eventType: body.eventType,
+      emitterLabel: body.emitterLabel,
+      occurredAt: body.occurredAt,
+      sourceKind: body.sourceKind,
+      actorProfileId: body.actorProfileId ?? null,
+      scope: body.scope,
+      objectRef: body.objectRef ?? null,
+      targetRef: body.targetRef ?? null,
+      audienceRules: Array.isArray(body.audienceRules) ? body.audienceRules : undefined,
+      payload: body.payload,
+      dedupeKey: body.dedupeKey ?? null,
+      createdBy: body.createdBy ?? null,
+    });
+  }
 
   @Post('internal/activity-feed/project')
   async projectActivityFeed(

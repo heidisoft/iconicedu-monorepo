@@ -3,17 +3,37 @@ import { NextResponse } from 'next/server';
 import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
 import { getAccountByAuthUserIdInOrg } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { getUserRoles } from '@iconicedu/web/lib/profile/queries/roles.query';
-import { projectActivityEvents } from '@iconicedu/web/lib/activity-feed/projector/project-activity-events';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
-import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 
 type RetryActivityEventRequest = {
   eventId?: string;
   orgId?: string;
 };
 
+function resolveInternalApiUrl() {
+  return (process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? '').replace(
+    /\/+$/,
+    '',
+  );
+}
+
+function resolveInternalActivityFeedToken() {
+  return process.env.INTERNAL_ACTIVITY_FEED_TOKEN?.trim() || '';
+}
+
 function isAllowedAdminRole(roleKey: string | null | undefined) {
   return roleKey === 'owner' || roleKey === 'admin';
+}
+
+async function parseInternalResponse<T>(response: Response): Promise<T> {
+  if (!response.ok) {
+    const errorBody = (await response.json().catch(() => null)) as {
+      message?: string;
+    } | null;
+    throw new Error(errorBody?.message ?? `API error ${response.status}`);
+  }
+
+  return response.json() as Promise<T>;
 }
 
 export async function POST(request: Request) {
@@ -38,6 +58,7 @@ export async function POST(request: Request) {
   }
 
   try {
+    const internalApiUrl = resolveInternalApiUrl();
     const supabase = await createSupabaseServerClient();
     const authUser = await requireAuthedUser(supabase);
     const accountResponse = await getAccountByAuthUserIdInOrg(
@@ -94,11 +115,26 @@ export async function POST(request: Request) {
       );
     }
 
-    const serviceSupabase = createSupabaseServiceClient();
-    const result = await projectActivityEvents(serviceSupabase, {
-      eventIds: [eventId],
-      limit: 1,
-    });
+    const token = resolveInternalActivityFeedToken();
+    if (!internalApiUrl || !token) {
+      throw new Error(
+        'API_URL/NEXT_PUBLIC_API_URL and INTERNAL_ACTIVITY_FEED_TOKEN are required',
+      );
+    }
+
+    const result = await parseInternalResponse<{ processed: number }>(
+      await fetch(`${internalApiUrl}/internal/activity-feed/project`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          eventIds: [eventId],
+          limit: 1,
+        }),
+      }),
+    );
 
     if (!result.processed) {
       return NextResponse.json(

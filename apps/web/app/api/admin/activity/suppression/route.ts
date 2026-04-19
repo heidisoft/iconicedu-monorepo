@@ -6,7 +6,7 @@ import type {
   DeleteActivityVerbSuppressionRuleInput,
   UpsertActivityVerbSuppressionRuleInput,
 } from '@iconicedu/shared-types';
-import { listActivityEventDefinitionTypes } from '@iconicedu/web/lib/activity-feed/definitions/activity-definitions';
+import { listActivityEventDefinitionTypes } from '@iconicedu/api/lib/activity-feed/definitions/activity-definitions';
 import { requireAdminOrgContext } from '@iconicedu/web/lib/admin/require-admin-org-context';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 

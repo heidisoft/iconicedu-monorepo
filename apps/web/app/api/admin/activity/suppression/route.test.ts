@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { GET, POST } from '@iconicedu/web/app/api/admin/activity/suppression/route';
+import { GET, POST } from './route';
 
 const requireAdminOrgContext = vi.fn();
 const createSupabaseServiceClient = vi.fn();
@@ -15,7 +15,7 @@ vi.mock('@iconicedu/web/lib/supabase/service', () => ({
     createSupabaseServiceClient(...args),
 }));
 
-vi.mock('@iconicedu/web/lib/activity-feed/definitions/activity-definitions', () => ({
+vi.mock('@iconicedu/api/lib/activity-feed/definitions/activity-definitions', () => ({
   listActivityEventDefinitionTypes: (...args: unknown[]) =>
     listActivityEventDefinitionTypes(...args),
 }));

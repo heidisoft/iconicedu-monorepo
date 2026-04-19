@@ -14,7 +14,14 @@ export class ReactionsController {
   @UseGuards(AuthGuard)
   add(
     @Req() req: AuthenticatedRequest,
-    @Body() body: { orgId: string; messageId: string; emoji: string; accountId: string },
+    @Body()
+    body: {
+      orgId: string;
+      messageId: string;
+      emoji: string;
+      accountId: string;
+      profileId: string;
+    },
   ) {
     return this.reactionsService.add(extractBearerToken(req.headers.authorization), body);
   }
@@ -23,7 +30,14 @@ export class ReactionsController {
   @UseGuards(AuthGuard)
   remove(
     @Req() req: AuthenticatedRequest,
-    @Body() body: { orgId: string; messageId: string; emoji: string; accountId: string },
+    @Body()
+    body: {
+      orgId: string;
+      messageId: string;
+      emoji: string;
+      accountId: string;
+      profileId: string;
+    },
   ) {
     return this.reactionsService.remove(
       extractBearerToken(req.headers.authorization),

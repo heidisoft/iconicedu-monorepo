@@ -1,70 +1,39 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { publishActivityEvent } from '@iconicedu/web/lib/activity-feed/publisher/activity-publisher';
-
-const projectActivityEvents = vi.fn();
-const resolveActivityVerbSuppressionDecision = vi.fn();
-
-vi.mock('@iconicedu/web/lib/activity-feed/projector/project-activity-events', () => ({
-  projectActivityEvents: (...args: unknown[]) => projectActivityEvents(...args),
-}));
-
-vi.mock('@iconicedu/web/lib/activity-feed/suppression/activity-verb-suppression', () => ({
-  resolveActivityVerbSuppressionDecision: (...args: unknown[]) =>
-    resolveActivityVerbSuppressionDecision(...args),
-  isActivityVerbSuppressionDebugEnabled: () => false,
-}));
+import { publishActivityEvent } from './activity-publisher';
 
 describe('publishActivityEvent', () => {
+  const originalApiUrl = process.env.API_URL;
+  const originalToken = process.env.INTERNAL_ACTIVITY_FEED_TOKEN;
+  const fetchMock = vi.fn();
+
   beforeEach(() => {
     vi.clearAllMocks();
-    resolveActivityVerbSuppressionDecision.mockResolvedValue({
-      shouldPublish: true,
-      source: 'default',
-    });
+    process.env.API_URL = 'http://127.0.0.1:54321';
+    process.env.INTERNAL_ACTIVITY_FEED_TOKEN = 'secret-token';
+    vi.stubGlobal('fetch', fetchMock);
   });
 
-  it('inserts event and immediately attempts projection', async () => {
-    const insertSingle = vi.fn(async () => ({
-      data: {
-        id: 'event-1',
-        org_id: 'org-1',
-        dedupe_key: 'dedupe-1',
-      },
-      error: null,
-    }));
-    const insert = vi.fn(() => ({
-      select: vi.fn(() => ({
-        single: insertSingle,
-      })),
-    }));
+  afterEach(() => {
+    process.env.API_URL = originalApiUrl;
+    process.env.INTERNAL_ACTIVITY_FEED_TOKEN = originalToken;
+    vi.unstubAllGlobals();
+  });
 
-    const supabase = {
-      from: vi.fn((table: string) => {
-        if (table === 'orgs') {
-          return {
-            select: vi.fn(() => ({
-              eq: vi.fn(() => ({
-                is: vi.fn(() => ({
-                  maybeSingle: vi.fn(async () => ({
-                    data: { id: 'org-1', slug: 'iconic-academy' },
-                    error: null,
-                  })),
-                })),
-              })),
-            })),
-          };
-        }
-        return {
-          insert,
-        };
-      }),
-    };
-
-    projectActivityEvents.mockResolvedValue({ processed: 1 });
+  it('delegates publishing to the internal API', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          id: 'event-1',
+          org_id: 'org-1',
+          dedupe_key: 'dedupe-1',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
 
     const result = await publishActivityEvent({
-      supabase: supabase as never,
+      supabase: {} as never,
       orgId: 'org-1',
       eventType: 'message.posted',
       sourceKind: 'profile',
@@ -75,61 +44,42 @@ describe('publishActivityEvent', () => {
     });
 
     expect(result?.id).toBe('event-1');
-    expect(insert).toHaveBeenCalledWith(
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:54321/internal/activity-feed/publish',
       expect.objectContaining({
-        payload: expect.objectContaining({
-          messageId: 'message-1',
-          orgSlug: 'iconic-academy',
+        method: 'POST',
+        headers: expect.objectContaining({
+          Authorization: 'Bearer secret-token',
+        }),
+        body: JSON.stringify({
+          orgId: 'org-1',
+          eventType: 'message.posted',
+          emitterLabel: undefined,
+          occurredAt: undefined,
+          sourceKind: 'profile',
+          actorProfileId: 'profile-1',
+          scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+          objectRef: null,
+          targetRef: null,
+          audienceRules: [],
+          payload: { messageId: 'message-1' },
+          dedupeKey: 'dedupe-1',
+          createdBy: 'profile-1',
         }),
       }),
     );
-    expect(projectActivityEvents).toHaveBeenCalledWith(supabase, {
-      eventIds: ['event-1'],
-      limit: 1,
-    });
   });
 
-  it('returns inserted event even when immediate projection fails', async () => {
-    const insertSingle = vi.fn(async () => ({
-      data: {
-        id: 'event-2',
-        org_id: 'org-1',
-        dedupe_key: 'dedupe-2',
-      },
-      error: null,
-    }));
-    const insert = vi.fn(() => ({
-      select: vi.fn(() => ({
-        single: insertSingle,
-      })),
-    }));
-
-    const supabase = {
-      from: vi.fn((table: string) => {
-        if (table === 'orgs') {
-          return {
-            select: vi.fn(() => ({
-              eq: vi.fn(() => ({
-                is: vi.fn(() => ({
-                  maybeSingle: vi.fn(async () => ({
-                    data: { id: 'org-1', slug: 'iconic-academy' },
-                    error: null,
-                  })),
-                })),
-              })),
-            })),
-          };
-        }
-        return {
-          insert,
-        };
+  it('returns null when the API suppresses the event', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response('null', {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
       }),
-    };
-
-    projectActivityEvents.mockRejectedValue(new Error('projection failed'));
+    );
 
     const result = await publishActivityEvent({
-      supabase: supabase as never,
+      supabase: {} as never,
       orgId: 'org-1',
       eventType: 'message.posted',
       sourceKind: 'profile',
@@ -139,102 +89,27 @@ describe('publishActivityEvent', () => {
       dedupeKey: 'dedupe-2',
     });
 
-    expect(result?.id).toBe('event-2');
-  });
-
-  it('returns existing event on dedupe conflict and reprojects it', async () => {
-    const supabase = {
-      from: vi.fn((table: string) => {
-        if (table === 'orgs') {
-          return {
-            select: vi.fn(() => ({
-              eq: vi.fn(() => ({
-                is: vi.fn(() => ({
-                  maybeSingle: vi.fn(async () => ({
-                    data: { id: 'org-1', slug: 'iconic-academy' },
-                    error: null,
-                  })),
-                })),
-              })),
-            })),
-          };
-        }
-
-        if (table !== 'activity_events') {
-          throw new Error(`Unexpected table ${table}`);
-        }
-
-        return {
-          insert: vi.fn(() => ({
-            select: vi.fn(() => ({
-              single: vi.fn(async () => ({
-                data: null,
-                error: { code: '23505', message: 'duplicate key value' },
-              })),
-            })),
-          })),
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              eq: vi.fn(() => ({
-                is: vi.fn(() => ({
-                  maybeSingle: vi.fn(async () => ({
-                    data: {
-                      id: 'event-existing',
-                      org_id: 'org-1',
-                      dedupe_key: 'dedupe-existing',
-                    },
-                    error: null,
-                  })),
-                })),
-              })),
-            })),
-          })),
-        };
-      }),
-    };
-
-    const result = await publishActivityEvent({
-      supabase: supabase as never,
-      orgId: 'org-1',
-      eventType: 'message.posted',
-      sourceKind: 'profile',
-      actorProfileId: 'profile-1',
-      scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
-      payload: { messageId: 'message-3' },
-      dedupeKey: 'dedupe-existing',
-    });
-
-    expect(result?.id).toBe('event-existing');
-    expect(projectActivityEvents).toHaveBeenCalledWith(supabase, {
-      eventIds: ['event-existing'],
-      limit: 1,
-    });
-  });
-
-  it('returns null and skips insert when event type is suppressed', async () => {
-    resolveActivityVerbSuppressionDecision.mockResolvedValueOnce({
-      shouldPublish: false,
-      source: 'org',
-      rule: { id: 'rule-1', is_enabled: false },
-    });
-
-    const supabase = {
-      from: vi.fn(),
-    };
-
-    const result = await publishActivityEvent({
-      supabase: supabase as never,
-      orgId: 'org-1',
-      eventType: 'message.posted',
-      sourceKind: 'profile',
-      actorProfileId: 'profile-1',
-      scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
-      payload: { messageId: 'message-4' },
-      dedupeKey: 'dedupe-4',
-    });
-
     expect(result).toBeNull();
-    expect(supabase.from).not.toHaveBeenCalled();
-    expect(projectActivityEvents).not.toHaveBeenCalled();
+  });
+
+  it('throws the API error message when publishing fails', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ message: 'Unauthorized' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    await expect(
+      publishActivityEvent({
+        supabase: {} as never,
+        orgId: 'org-1',
+        eventType: 'message.posted',
+        sourceKind: 'profile',
+        actorProfileId: 'profile-1',
+        scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+        payload: { messageId: 'message-3' },
+      }),
+    ).rejects.toThrow('Unauthorized');
   });
 });
