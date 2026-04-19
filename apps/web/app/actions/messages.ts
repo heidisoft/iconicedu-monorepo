@@ -853,11 +853,7 @@ async function emitReactionActivity(input: {
   senderProfileId: string;
   messageSenderProfileId: string;
   emoji: string;
-  eventType:
-    | 'dm.reaction.added'
-    | 'dm.reaction.removed'
-    | 'reaction.added'
-    | 'reaction.removed';
+  eventType: 'dm.reaction.added' | 'reaction.added';
   now: string;
 }) {
   if (!input.channelId) {
@@ -878,10 +874,7 @@ async function emitReactionActivity(input: {
         channelId: input.channelId,
         senderProfileId: input.senderProfileId,
         now: input.now,
-        eventType:
-          input.eventType === 'dm.reaction.removed'
-            ? 'dm.reaction.removed'
-            : 'dm.reaction.added',
+        eventType: 'dm.reaction.added',
       })
     : input.messageSenderProfileId !== input.senderProfileId
       ? [input.messageSenderProfileId]
@@ -934,7 +927,7 @@ async function resolveDmActivityRecipientProfileIds(input: {
   channelId: string;
   senderProfileId: string;
   now: string;
-  eventType: 'dm.posted' | 'dm.reaction.added' | 'dm.reaction.removed';
+  eventType: 'dm.posted' | 'dm.reaction.added';
 }) {
   const membersResponse = await input.supabase
     .from('channel_members')
@@ -2244,19 +2237,6 @@ export async function toggleMessageReactionAction(
           channelId: messageResponse.data.channel_id ?? '',
         })
       ).channelRouteKind === 'dm';
-
-    await emitReactionActivity({
-      supabase,
-      serviceSupabase,
-      orgId: input.orgId,
-      messageId: input.messageId,
-      channelId: messageResponse.data.channel_id ?? null,
-      senderProfileId: actor.profile.id,
-      messageSenderProfileId: messageResponse.data.sender_profile_id ?? '',
-      emoji: input.emoji,
-      eventType: isDmRoute ? 'dm.reaction.removed' : 'reaction.removed',
-      now: new Date().toISOString(),
-    });
 
     return;
   }

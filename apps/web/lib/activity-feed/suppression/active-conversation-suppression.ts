@@ -13,9 +13,7 @@ const CONVERSATIONAL_EVENT_TYPES = new Set([
   'message.posted',
   'file.uploaded',
   'dm.reaction.added',
-  'dm.reaction.removed',
   'reaction.added',
-  'reaction.removed',
 ]);
 
 export const ACTIVE_CONVERSATION_SUPPRESSION_WINDOW_MS = 120_000;

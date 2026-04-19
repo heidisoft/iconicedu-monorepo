@@ -1,5 +1,4 @@
 import { requireAdminAuthContext } from '@iconicedu/web/lib/admin/_auth-context';
-import { publishActivityEvent } from '@iconicedu/web/lib/activity-feed/publisher/activity-publisher';
 import { ensureSystemProfileId } from '@iconicedu/web/lib/automation/system-profile';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 
@@ -56,23 +55,5 @@ export async function archiveLearningSpace(learningSpaceId: string) {
   }
 
   const serviceSupabase = createSupabaseServiceClient();
-  const systemProfileId = await ensureSystemProfileId(serviceSupabase, orgId);
-  await publishActivityEvent({
-    supabase: serviceSupabase,
-    orgId,
-    eventType: 'class.archived',
-    occurredAt: now,
-    sourceKind: 'system',
-    actorProfileId: systemProfileId,
-    scope: { kind: 'learning_space', learningSpaceId },
-    targetRef: { kind: 'learning_space', id: learningSpaceId },
-    payload: {
-      learningSpaceId,
-      channelId: channelResponse.data?.channel_id ?? null,
-      title: learningSpaceResponse.data.title,
-      archivedAt: now,
-    },
-    dedupeKey: `class.archived:${learningSpaceId}:${now}`,
-    createdBy: systemProfileId,
-  });
+  await ensureSystemProfileId(serviceSupabase, orgId);
 }

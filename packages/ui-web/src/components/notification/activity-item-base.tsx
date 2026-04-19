@@ -132,7 +132,6 @@ const getDefaultIconKey = (activity: ActivityFeedItemVM): InboxIconKeyVM => {
     case 'message.deleted':
       return 'MessageSquare';
     case 'reaction.added':
-    case 'reaction.removed':
       return 'Bell';
     case 'class.session.scheduled':
       return 'CalendarDays';
@@ -147,12 +146,9 @@ const getDefaultIconKey = (activity: ActivityFeedItemVM): InboxIconKeyVM => {
     case 'members.invited':
       return 'UserRoundPlus';
     case 'member.removed':
-    case 'members.removed':
       return 'UserRoundMinus';
     case 'member.joined':
       return 'Mic';
-    case 'role.changed':
-      return 'PhoneOutgoing';
     default:
       return 'Bell';
   }

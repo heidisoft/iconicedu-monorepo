@@ -233,10 +233,12 @@ describe('buildLearningSpaceScheduleDiffPlan', () => {
     });
 
     expect(activity).not.toBeNull();
-    expect(activity?.eventType).toBe('members.removed');
+    expect(activity?.eventType).toBe('member.removed');
     expect(activity?.payload.memberCount).toBe(2);
     expect(activity?.payload.members).toHaveLength(2);
-    expect(activity?.dedupeKey).toBe('members.removed:space-1:2026-03-08T10:00:00.000Z');
+    expect(activity?.dedupeKey).toBe(
+      'member.removed:space-1:profile-1:2026-03-08T10:00:00.000Z',
+    );
   });
 
   it('builds one singular removal activity payload when one participant is removed', () => {

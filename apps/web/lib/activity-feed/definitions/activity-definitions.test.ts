@@ -621,16 +621,16 @@ describe('activity event definitions', () => {
     expect(rendered.actionButton).toBeUndefined();
   });
 
-  it('renders members removed with plural verb and summary', () => {
-    const definition = getActivityEventDefinition('members.removed');
+  it('renders member removed with multi-member summary', () => {
+    const definition = getActivityEventDefinition('member.removed');
     if (!definition) {
-      throw new Error('Missing members.removed definition');
+      throw new Error('Missing member.removed definition');
     }
 
     const rendered = definition.render({
       id: 'event-members-removed-1',
       org_id: 'org-1',
-      event_type: 'members.removed',
+      event_type: 'member.removed',
       occurred_at: '2026-03-03T12:00:00.000Z',
       source_kind: 'profile',
       actor_profile_id: 'profile-1',
@@ -648,14 +648,14 @@ describe('activity event definitions', () => {
         ],
       },
       audience_rules: [],
-      dedupe_key: 'members.removed:space-1:batch',
+      dedupe_key: 'member.removed:space-1:p-1:batch',
       projection_status: 'pending',
       projection_attempts: 0,
       created_at: '2026-03-03T12:00:00.000Z',
       updated_at: '2026-03-03T12:00:00.000Z',
     });
 
-    expect(rendered.verb).toBe('members.removed');
+    expect(rendered.verb).toBe('member.removed');
     expect(rendered.headline).toEqual({
       primary: '2 participants removed',
     });

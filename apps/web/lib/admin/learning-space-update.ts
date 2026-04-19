@@ -131,7 +131,7 @@ type RemovedParticipantSnapshot = {
 };
 
 type RemovedMembersActivity = {
-  eventType: 'member.removed' | 'members.removed';
+  eventType: 'member.removed';
   dedupeKey: string;
   payload: {
     learningSpaceId: string;
@@ -413,13 +413,9 @@ export function buildRemovedMembersActivity(input: {
     themeKey: participant.snapshot?.themeKey ?? null,
   }));
   const firstMember = members[0];
-  const isPlural = members.length > 1;
-
   return {
-    eventType: isPlural ? 'members.removed' : 'member.removed',
-    dedupeKey: isPlural
-      ? `members.removed:${input.learningSpaceId}:${input.occurredAt}`
-      : `member.removed:${input.learningSpaceId}:${firstMember?.profileId ?? 'unknown'}:${input.occurredAt}`,
+    eventType: 'member.removed',
+    dedupeKey: `member.removed:${input.learningSpaceId}:${firstMember?.profileId ?? 'unknown'}:${input.occurredAt}`,
     payload: {
       learningSpaceId: input.learningSpaceId,
       channelId: input.channelId,

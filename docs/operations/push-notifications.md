@@ -135,7 +135,7 @@ When an activity event is projected, `enqueueNotificationDispatchJobs()` is call
 | Category             | Examples                                                                                                                                          | Timing                                                   |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
 | Critical — immediate | `class.session.scheduled/rescheduled/canceled`, `session.started`, `session.reminder.sent`, `payment.reminder`, `payment.failed`, `system.notice` | `immediate` (0s delay) — bypasses presence suppression   |
-| Near-real-time       | `dm.posted`, `dms.posted`, `dm.reaction.added`, `dm.reaction.removed`                                                                             | `delayed` (30s) when presence-aware suppression applies  |
+| Near-real-time       | `dm.posted`, `dms.posted`, `dm.reaction.added`                                                                                                    | `delayed` (30s) when presence-aware suppression applies  |
 | Standard delay       | `message.posted`, `reaction.added`, `file.uploaded`                                                                                               | `delayed` (60s) when presence-aware suppression applies  |
 | Everything else      | All other event types                                                                                                                             | `delayed` (120s) when presence-aware suppression applies |
 

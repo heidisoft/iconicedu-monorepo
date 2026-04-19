@@ -110,14 +110,6 @@ function formatShortDate(value: unknown, timezone?: unknown) {
   return formatDate(value, resolveDisplayTimezone(timezone), 'short');
 }
 
-function formatNaturalDate(value: unknown, timezone?: unknown) {
-  if (typeof value !== 'string' || !value) {
-    return undefined;
-  }
-
-  return formatDate(value, resolveDisplayTimezone(timezone), 'natural');
-}
-
 function formatNaturalDateTime(value: unknown, timezone: unknown) {
   if (typeof value !== 'string' || !value) {
     return undefined;
@@ -1220,58 +1212,6 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       };
     },
   },
-  'dm.reaction.removed': {
-    eventType: 'dm.reaction.removed',
-    tabKey: 'all',
-    importance: 'normal',
-    group: {
-      groupType: 'message',
-      collapseByDefault: true,
-      buildGroupKey: (event) => {
-        const payload = asRecord(event.payload);
-        return buildHourlyChannelGroupKey('dm-posted', event, payload);
-      },
-      renderGroup: (event) => {
-        const payload = asRecord(event.payload);
-        const senderName = asString(payload.senderName, 'Someone');
-        return {
-          verb: 'dms.reactions.removed',
-          leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'neutral' },
-          headline: {
-            primary: `${senderName} removed reactions from your direct messages`,
-            secondary: getContextTitle(payload),
-          },
-          summary: undefined,
-          metadata: {
-            channelId: payload.channelId,
-            messageId: payload.messageId,
-            dmReactionGroup: 'removed',
-          },
-        };
-      },
-    },
-    resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) => {
-      const payload = asRecord(event.payload);
-      const senderName = asString(payload.senderName, 'Someone');
-      const emoji = asString(payload.emoji, '😀');
-      return {
-        verb: 'dm.reaction.removed',
-        leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'neutral' },
-        headline: {
-          primary: `${senderName} removed ${emoji} from your direct message`,
-          secondary: getContextTitle(payload),
-        },
-        summary: undefined,
-        actionButton: undefined,
-        metadata: {
-          channelId: payload.channelId,
-          messageId: payload.messageId,
-          emoji,
-        },
-      };
-    },
-  },
   'reaction.added': {
     eventType: 'reaction.added',
     tabKey: 'all',
@@ -1312,58 +1252,6 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
         leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'info' },
         headline: {
           primary: `${senderName} reacted ${emoji} to your message in`,
-          secondary: getContextTitle(payload),
-        },
-        summary: undefined,
-        actionButton: sourceAction(event, payload),
-        metadata: {
-          channelId: payload.channelId,
-          messageId: payload.messageId,
-          emoji,
-        },
-      };
-    },
-  },
-  'reaction.removed': {
-    eventType: 'reaction.removed',
-    tabKey: 'all',
-    importance: 'normal',
-    group: {
-      groupType: 'message',
-      collapseByDefault: true,
-      buildGroupKey: (event) => {
-        const payload = asRecord(event.payload);
-        return buildHourlyChannelGroupKey('message-posted', event, payload);
-      },
-      renderGroup: (event) => {
-        const payload = asRecord(event.payload);
-        const senderName = asString(payload.senderName, 'Someone');
-        return {
-          verb: 'reactions.removed',
-          leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'neutral' },
-          headline: {
-            primary: `${senderName} removed reactions from your messages`,
-            secondary: getContextTitle(payload),
-          },
-          summary: undefined,
-          metadata: {
-            channelId: payload.channelId,
-            messageId: payload.messageId,
-            reactionGroup: 'removed',
-          },
-        };
-      },
-    },
-    resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) => {
-      const payload = asRecord(event.payload);
-      const senderName = asString(payload.senderName, 'Someone');
-      const emoji = asString(payload.emoji, '😀');
-      return {
-        verb: 'reaction.removed',
-        leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'neutral' },
-        headline: {
-          primary: `${senderName} removed ${emoji} from your message in`,
           secondary: getContextTitle(payload),
         },
         summary: undefined,
@@ -1582,25 +1470,6 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       };
     },
   },
-  'class.archived': {
-    eventType: 'class.archived',
-    tabKey: 'classes',
-    importance: 'important',
-    group: null,
-    resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) => {
-      const payload = asRecord(event.payload);
-      const archivedOn = formatNaturalDate(event.occurred_at);
-      return {
-        verb: 'class.archived',
-        leading: buildSystemLeadingAvatar(),
-        headline: { primary: 'Class archived', secondary: className(payload) },
-        summary: archivedOn
-          ? `${className(payload)} was archived on ${archivedOn}.`
-          : undefined,
-      };
-    },
-  },
   'member.invited': {
     eventType: 'member.invited',
     tabKey: 'classes',
@@ -1722,60 +1591,6 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       };
     },
   },
-  'members.removed': {
-    eventType: 'members.removed',
-    tabKey: 'classes',
-    importance: 'important',
-    group: {
-      groupType: 'class',
-      collapseByDefault: true,
-      buildGroupKey: (event) => buildClassLifecycleGroupKey(event),
-      renderGroup: (event) => {
-        const payload = asRecord(event.payload);
-        if (asOptionalString(payload.activityPhase) === 'created') {
-          return renderClassCreatedGroup(event);
-        }
-        return renderLearningSpaceUpdatedGroup(event);
-      },
-    },
-    resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) => {
-      const payload = asRecord(event.payload);
-      if (isSessionRosterEvent(payload)) {
-        const leftAt =
-          formatNaturalDateTime(payload.leftAt ?? event.occurred_at, payload) ??
-          formatNaturalDateTime(event.occurred_at, payload);
-        return {
-          verb: 'members.removed',
-          leading: buildMembersLeading(payload),
-          headline: {
-            primary: `${asString(payload.memberDisplayName, 'Participant')} left the session`,
-          },
-          summary: leftAt ? `Left at ${leftAt}` : undefined,
-        };
-      }
-      const members = extractActivityMembers(payload);
-      const memberCountRaw = payload.memberCount;
-      const memberCount =
-        typeof memberCountRaw === 'number' && Number.isFinite(memberCountRaw)
-          ? memberCountRaw
-          : members.length;
-      const memberName =
-        members[0]?.name ?? asString(payload.memberDisplayName, 'Member');
-      const membersSummary = buildMembersSummary('Removed', payload);
-      return {
-        verb: 'members.removed',
-        leading: buildMembersLeading(payload),
-        headline: {
-          primary:
-            memberCount > 1
-              ? `${memberCount} participants removed`
-              : `${memberName} removed`,
-        },
-        summary: `${membersSummary ? `${membersSummary} ` : ''}Removed from ${className(payload)}.`,
-      };
-    },
-  },
   'member.removed': {
     eventType: 'member.removed',
     tabKey: 'classes',
@@ -1831,26 +1646,6 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
               : `${memberName} removed`,
         },
         summary: `${membersSummary ? `${membersSummary} ` : ''}Removed from ${className(payload)}.`,
-      };
-    },
-  },
-  'role.changed': {
-    eventType: 'role.changed',
-    tabKey: 'classes',
-    importance: 'normal',
-    group: null,
-    resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) => {
-      const payload = asRecord(event.payload);
-      return {
-        verb: 'role.changed',
-        leading: { kind: 'icon', iconKey: 'CheckCircle2', tone: 'info' },
-        headline: {
-          primary: 'Role changed',
-          secondary: asString(payload.memberDisplayName, 'Member'),
-        },
-        summary: asOptionalString(payload.role),
-        actionButton: sourceAction(event, payload),
       };
     },
   },

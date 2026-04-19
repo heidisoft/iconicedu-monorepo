@@ -26,8 +26,6 @@ const NEAR_REAL_TIME_PREF_KEYS = new Set<string>([
   'dms.posted',
   'dm.reaction.added',
   'dms.reaction.added',
-  'dm.reaction.removed',
-  'dms.reaction.removed',
 ]);
 
 const STANDARD_DELAY_PREF_KEYS = new Set<string>([

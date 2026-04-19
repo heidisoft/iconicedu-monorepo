@@ -244,7 +244,6 @@ export class RemindersService {
     const response = await input.supabase.from('reminder_dispatch_logs').insert({
       org_id: input.orgId,
       reminder_job_id: input.jobId,
-      message_id: null,
       activity_event_id: input.activityEventId ?? null,
       result: input.result,
       details: input.details ?? {},
