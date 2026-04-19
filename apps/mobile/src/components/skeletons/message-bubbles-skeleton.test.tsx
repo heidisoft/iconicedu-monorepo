@@ -19,9 +19,9 @@ describe('MessageBubblesSkeleton', () => {
   it('matches the message list skeleton structure with separators and grouped rows', () => {
     render(<MessageBubblesSkeleton />);
 
-    expect(screen.getAllByTestId('message-skeleton-separator')).toHaveLength(2);
-    expect(screen.getAllByTestId('message-skeleton-row-other')).toHaveLength(3);
+    expect(screen.getAllByTestId('message-skeleton-separator')).toHaveLength(1);
+    expect(screen.getAllByTestId('message-skeleton-row-other')).toHaveLength(2);
     expect(screen.getAllByTestId('message-skeleton-row-own')).toHaveLength(2);
-    expect(screen.getAllByLabelText('Loading')).toHaveLength(24);
+    expect(screen.getAllByLabelText('Loading')).toHaveLength(32);
   });
 });
