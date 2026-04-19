@@ -15,10 +15,12 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
+import { createApiClient } from '../../lib/api/http-client';
 import { resolveEffectiveProfileForAuthUserInOrg } from '@iconicedu/web/lib/family-view/effective-profile';
 import { buildUserProfileById } from '@iconicedu/web/lib/profile/builders/user-profile.builder';
 import { mapMessageRowToVM } from '@iconicedu/web/lib/messages/mappers/message.mapper';
 import { buildThreadById } from '@iconicedu/web/lib/messages/builders/thread.builder';
+import { buildMessageById } from '@iconicedu/web/lib/messages/builders/message.builder';
 import {
   CHANNEL_FILE_BUCKET,
   createSignedChannelFileUrl,
@@ -85,6 +87,10 @@ type VisibilityAudienceResolution = {
   audienceRules?: AudienceRuleVM[];
   allowedProfileIds: Set<string> | null;
 };
+
+function hasConfiguredApiUrl() {
+  return Boolean(process.env.API_URL?.trim() || process.env.NEXT_PUBLIC_API_URL?.trim());
+}
 
 async function resolveEffectiveMessageActor(input: {
   supabase: SupabaseClient;
@@ -1389,11 +1395,45 @@ export async function sendTextMessageAction(
   const authUser = await requireAuthedUser(supabase);
   const serviceSupabase = createSupabaseServiceClient();
 
-  return sendTextMessageWithSupabase(input, {
+  if (!hasConfiguredApiUrl()) {
+    return sendTextMessageWithSupabase(input, {
+      supabase,
+      serviceSupabase,
+      authUserId: authUser.id,
+    });
+  }
+
+  const actor = await resolveEffectiveMessageActor({
     supabase,
-    serviceSupabase,
     authUserId: authUser.id,
+    orgId: input.orgId,
   });
+  const api = createApiClient(supabase);
+  const created = await api.post<{ id: string } | MessageVM>('/messages/text', input);
+  const createdMessageId =
+    typeof (created as { id?: unknown })?.id === 'string'
+      ? ((created as { id: string }).id as string)
+      : (created as MessageVM).ids?.id;
+
+  if (!createdMessageId) {
+    throw new Error('API did not return a message id');
+  }
+
+  const message = await buildMessageById(
+    supabase,
+    actor.account.org_id,
+    createdMessageId,
+    {
+      accountId: actor.account.id,
+      profileId: actor.profile.id,
+    },
+  );
+
+  if (!message) {
+    throw new Error('Message created but could not be loaded');
+  }
+
+  return message;
 }
 
 export async function sendFileMessageWithSupabase(
@@ -1706,11 +1746,45 @@ export async function sendFileMessageAction(
   const authUser = await requireAuthedUser(supabase);
   const serviceSupabase = createSupabaseServiceClient();
 
-  return sendFileMessageWithSupabase(input, {
+  if (!hasConfiguredApiUrl()) {
+    return sendFileMessageWithSupabase(input, {
+      supabase,
+      serviceSupabase,
+      authUserId: authUser.id,
+    });
+  }
+
+  const actor = await resolveEffectiveMessageActor({
     supabase,
-    serviceSupabase,
     authUserId: authUser.id,
+    orgId: input.orgId,
   });
+  const api = createApiClient(supabase);
+  const created = await api.post<{ id: string } | MessageVM>('/messages/file', input);
+  const createdMessageId =
+    typeof (created as { id?: unknown })?.id === 'string'
+      ? ((created as { id: string }).id as string)
+      : (created as MessageVM).ids?.id;
+
+  if (!createdMessageId) {
+    throw new Error('API did not return a message id');
+  }
+
+  const message = await buildMessageById(
+    supabase,
+    actor.account.org_id,
+    createdMessageId,
+    {
+      accountId: actor.account.id,
+      profileId: actor.profile.id,
+    },
+  );
+
+  if (!message) {
+    throw new Error('Message created but could not be loaded');
+  }
+
+  return message;
 }
 
 export async function sendFilesMessageWithSupabase(
@@ -2041,11 +2115,45 @@ export async function sendFilesMessageAction(
   const authUser = await requireAuthedUser(supabase);
   const serviceSupabase = createSupabaseServiceClient();
 
-  return sendFilesMessageWithSupabase(input, {
+  if (!hasConfiguredApiUrl()) {
+    return sendFilesMessageWithSupabase(input, {
+      supabase,
+      serviceSupabase,
+      authUserId: authUser.id,
+    });
+  }
+
+  const actor = await resolveEffectiveMessageActor({
     supabase,
-    serviceSupabase,
     authUserId: authUser.id,
+    orgId: input.orgId,
   });
+  const api = createApiClient(supabase);
+  const created = await api.post<{ id: string } | MessageVM>('/messages/files', input);
+  const createdMessageId =
+    typeof (created as { id?: unknown })?.id === 'string'
+      ? ((created as { id: string }).id as string)
+      : (created as MessageVM).ids?.id;
+
+  if (!createdMessageId) {
+    throw new Error('API did not return a message id');
+  }
+
+  const message = await buildMessageById(
+    supabase,
+    actor.account.org_id,
+    createdMessageId,
+    {
+      accountId: actor.account.id,
+      profileId: actor.profile.id,
+    },
+  );
+
+  if (!message) {
+    throw new Error('Message created but could not be loaded');
+  }
+
+  return message;
 }
 
 export async function toggleMessageReactionAction(

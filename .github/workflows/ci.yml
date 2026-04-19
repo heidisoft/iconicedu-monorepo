@@ -255,12 +255,15 @@ jobs:
       - name: Set base build env vars
         if: steps.cache-restore.outputs.cache-hit != 'true'
         run: |
+          echo "API_URL=${_API_URL:-https://placeholder-api.iconicedu.test}" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_API_URL=${_API_URL:-https://placeholder-api.iconicedu.test}" >> "$GITHUB_ENV"
           echo "NEXT_PUBLIC_SUPABASE_URL=${_URL:-https://placeholder.supabase.co}" >> "$GITHUB_ENV"
           echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=${_ANON:-placeholder-anon-key}" >> "$GITHUB_ENV"
           echo "SUPABASE_SERVICE_ROLE_KEY=${_SRK:-placeholder-service-role-key}" >> "$GITHUB_ENV"
           echo "EXPO_PUBLIC_SUPABASE_URL=${_URL:-https://placeholder.supabase.co}" >> "$GITHUB_ENV"
           echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=${_ANON:-placeholder-anon-key}" >> "$GITHUB_ENV"
         env:
+          _API_URL: ${{ secrets.API_URL }}
           _URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           _ANON: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           _SRK: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -401,6 +404,8 @@ jobs:
           (cd apps/mobile && npx expo export --platform android --output-dir .expo/dist)
           pnpm --filter api build
         env:
+          API_URL: ${{ secrets.API_URL || 'https://placeholder-api.iconicedu.test' }}
+          NEXT_PUBLIC_API_URL: ${{ secrets.API_URL || 'https://placeholder-api.iconicedu.test' }}
           EXPO_NO_TELEMETRY: 1
           TURBO_TELEMETRY_DISABLED: 1
 
@@ -860,6 +865,7 @@ jobs:
             fi
           }
 
+          set_vercel_env "API_URL" "${{ steps.railway.outputs.railway_api_url }}"
           set_vercel_env "NEXT_PUBLIC_API_URL" "${{ steps.railway.outputs.railway_api_url }}"
           set_vercel_env "NEXT_PUBLIC_APP_ENV" "preview"
 

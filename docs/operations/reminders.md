@@ -111,3 +111,5 @@ After the API-owned migration, reminders and notifications should both target `a
 - `NOTIFICATIONS_DISPATCH_URL=https://<your-api-domain>/internal/notifications/dispatch`
 
 The legacy web endpoint (`/api/internal/reminders/dispatch`) should not be used anymore.
+
+Notification-producing reminder flows are API-owned. Web and mobile may choose the acting profile context for a user, but only `apps/api` authorizes that profile selection before reminder activity and downstream notification dispatch proceed.

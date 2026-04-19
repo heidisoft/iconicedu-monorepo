@@ -7,6 +7,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type {
+  AudienceRuleVM,
+  FeedScopeVM,
   MessageVM,
   MessageMentionVM,
   MessageSendFileInput,
@@ -16,9 +18,11 @@ import type {
   ThreadVM,
 } from '@iconicedu/shared-types';
 import {
-  publishFileMessagePostSendActivity,
+  publishFileUploadActivity,
   publishTextMessagePostSendActivities,
+  resolveActivityChannelContext,
 } from '@iconicedu/api/lib/messages/message-activity';
+import { publishActivityEvent } from '@iconicedu/api/lib/activity-feed/activity-publisher';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
 import {
@@ -89,6 +93,23 @@ type WritableProfileRow = {
   kind: string | null;
 };
 
+type ActivityChannelContext = Awaited<ReturnType<typeof resolveActivityChannelContext>>;
+
+type HomeworkMessageIntent = {
+  kind: 'homework' | 'lesson';
+  cleanedContent: string;
+  description: string;
+  title: string;
+  dueAt: string;
+  subject: string;
+};
+
+type VisibilityAudienceResolution = {
+  suppressActivity: boolean;
+  audienceRules?: AudienceRuleVM[];
+  allowedProfileIds: Set<string> | null;
+};
+
 function buildWritableProfileDisplayName(profile: WritableProfileRow) {
   const displayName = profile.display_name?.trim();
   if (displayName) {
@@ -101,6 +122,639 @@ function buildWritableProfileDisplayName(profile: WritableProfileRow) {
     .trim();
 
   return fullName || 'Someone';
+}
+
+const URL_PATTERN = /(https?:\/\/[^\s]+)/i;
+const PRIVATE_HOST_PATTERN =
+  /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.)/i;
+
+function decodeHtml(value: string) {
+  return value
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>');
+}
+
+function extractMetaContent(html: string, property: string) {
+  const patterns = [
+    new RegExp(
+      `<meta[^>]+property=["']${property}["'][^>]+content=["']([^"']+)["'][^>]*>`,
+      'i',
+    ),
+    new RegExp(
+      `<meta[^>]+content=["']([^"']+)["'][^>]+property=["']${property}["'][^>]*>`,
+      'i',
+    ),
+    new RegExp(
+      `<meta[^>]+name=["']${property}["'][^>]+content=["']([^"']+)["'][^>]*>`,
+      'i',
+    ),
+    new RegExp(
+      `<meta[^>]+content=["']([^"']+)["'][^>]+name=["']${property}["'][^>]*>`,
+      'i',
+    ),
+  ];
+
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match?.[1]) {
+      return decodeHtml(match[1].trim());
+    }
+  }
+
+  return undefined;
+}
+
+function extractTitle(html: string) {
+  const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+  return titleMatch?.[1] ? decodeHtml(titleMatch[1].trim()) : undefined;
+}
+
+function resolveRelativeUrl(baseUrl: string, candidate?: string) {
+  if (!candidate) return undefined;
+
+  try {
+    return new globalThis.URL(candidate, baseUrl).toString();
+  } catch {
+    return undefined;
+  }
+}
+
+function extractFirstUrl(text: string) {
+  return text.match(URL_PATTERN)?.[1] ?? null;
+}
+
+function isSafeLinkPreviewUrl(url: string): boolean {
+  try {
+    const parsed = new globalThis.URL(url);
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return false;
+    }
+    return !PRIVATE_HOST_PATTERN.test(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
+async function fetchLinkPreviewMetadata(url: string) {
+  if (!isSafeLinkPreviewUrl(url)) {
+    throw new Error('Unsafe URL for link preview');
+  }
+
+  const normalizedUrl = new globalThis.URL(url).toString();
+  const fallbackHost = new globalThis.URL(normalizedUrl).hostname.replace(/^www\./, '');
+
+  try {
+    const response = await fetch(normalizedUrl, {
+      redirect: 'follow',
+      headers: {
+        'user-agent': 'ICONICEDULinkPreviewBot/1.0',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch link preview: ${response.status}`);
+    }
+
+    const html = await response.text();
+    const ogTitle = extractMetaContent(html, 'og:title');
+    const ogDescription = extractMetaContent(html, 'og:description');
+    const ogImage = extractMetaContent(html, 'og:image');
+    const ogSiteName = extractMetaContent(html, 'og:site_name');
+    const metaDescription = extractMetaContent(html, 'description');
+    const title = ogTitle ?? extractTitle(html) ?? fallbackHost;
+    const faviconHref =
+      html.match(
+        /<link[^>]+rel=["'][^"']*icon[^"']*["'][^>]+href=["']([^"']+)["'][^>]*>/i,
+      )?.[1] ?? '/favicon.ico';
+
+    return {
+      url: normalizedUrl,
+      title,
+      description: ogDescription ?? metaDescription,
+      imageUrl: resolveRelativeUrl(normalizedUrl, ogImage),
+      siteName: ogSiteName ?? fallbackHost,
+      favicon: resolveRelativeUrl(normalizedUrl, faviconHref),
+    };
+  } catch {
+    return {
+      url: normalizedUrl,
+      title: fallbackHost,
+      siteName: fallbackHost,
+      favicon: resolveRelativeUrl(normalizedUrl, '/favicon.ico'),
+    };
+  }
+}
+
+function sanitizeMentions(
+  content: string,
+  mentions: MessageMentionVM[] | undefined,
+  allowedProfileIds: Set<string>,
+  currentProfileId: string,
+): MessageMentionVM[] {
+  if (!mentions?.length) {
+    return [];
+  }
+
+  const seen = new Set<string>();
+
+  return mentions.filter((mention) => {
+    if (!mention?.profileId || mention.profileId === currentProfileId) {
+      return false;
+    }
+    if (!allowedProfileIds.has(mention.profileId)) {
+      return false;
+    }
+    if (
+      typeof mention.displayName !== 'string' ||
+      typeof mention.start !== 'number' ||
+      typeof mention.end !== 'number'
+    ) {
+      return false;
+    }
+    if (
+      mention.start < 0 ||
+      mention.end <= mention.start ||
+      mention.end > content.length
+    ) {
+      return false;
+    }
+    if (content.slice(mention.start, mention.end) !== `@${mention.displayName}`) {
+      return false;
+    }
+
+    const key = `${mention.profileId}:${mention.start}:${mention.end}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
+function deriveHomeworkMessageIntent(
+  content: string,
+  activityContext: ActivityChannelContext,
+  explicitHomework?: MessageSendTextInput['homework'],
+): HomeworkMessageIntent | null {
+  if (!explicitHomework) {
+    return null;
+  }
+
+  return {
+    kind: explicitHomework.kind === 'lesson' ? 'lesson' : 'homework',
+    cleanedContent: content.trim(),
+    description:
+      explicitHomework.description?.trim() ||
+      content.trim() ||
+      'Open the class to review the new assignment.',
+    title: explicitHomework.title.trim() || 'Homework assignment',
+    dueAt: explicitHomework.dueAt,
+    subject:
+      explicitHomework.subject?.trim() ||
+      activityContext.learningSpaceTitle ||
+      activityContext.channelTopic ||
+      'Homework',
+  };
+}
+
+function resolveVisibilityAudienceFromMessageRow(input: {
+  visibilityType?: string | null;
+  visibilityUserIds?: string[] | null;
+}): VisibilityAudienceResolution {
+  const visibilityType = input.visibilityType ?? 'all';
+  if (visibilityType === 'sender-only') {
+    return { suppressActivity: true, allowedProfileIds: new Set() };
+  }
+
+  if (visibilityType === 'specific-users') {
+    const userIds = Array.from(new Set(input.visibilityUserIds ?? []));
+    return {
+      suppressActivity: userIds.length === 0,
+      audienceRules: userIds.length ? [{ kind: 'users_only', userIds }] : undefined,
+      allowedProfileIds: new Set(userIds),
+    };
+  }
+
+  return {
+    suppressActivity: false,
+    allowedProfileIds: null,
+  };
+}
+
+function isValidMessageAssetPath(input: {
+  storagePath: string;
+  orgId: string;
+  channelId: string;
+  profileId: string;
+}) {
+  const segments = input.storagePath.split('/');
+  if (segments.length < 5) {
+    return false;
+  }
+
+  const [orgId, channelId, assetKind, profileId] = segments;
+  const allowedAssetKinds = new Set(['files', 'images', 'audio']);
+
+  return (
+    orgId === input.orgId &&
+    channelId === input.channelId &&
+    allowedAssetKinds.has(assetKind) &&
+    profileId === input.profileId
+  );
+}
+
+async function isStaffActorInOrg(input: {
+  supabase: ReturnType<typeof createSupabaseServiceClient>;
+  orgId: string;
+  accountId: string;
+  profileKind?: string | null;
+}): Promise<boolean> {
+  if (input.profileKind === 'staff') {
+    return true;
+  }
+
+  const roleResponse = await input.supabase
+    .from('user_roles')
+    .select('id')
+    .eq('org_id', input.orgId)
+    .eq('account_id', input.accountId)
+    .eq('role_key', 'staff')
+    .is('deleted_at', null)
+    .limit(1)
+    .maybeSingle<{ id: string }>();
+
+  if (roleResponse.error) {
+    throw new Error(roleResponse.error.message);
+  }
+
+  return Boolean(roleResponse.data?.id);
+}
+
+async function listSupportPrivilegedProfileIds(
+  supabase: ReturnType<typeof createSupabaseServiceClient>,
+  orgId: string,
+): Promise<string[]> {
+  const [
+    staffProfilesResponse,
+    privilegedRoleAccountsResponse,
+    privilegedPrimaryRoleAccountsResponse,
+  ] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('kind', 'staff')
+      .is('deleted_at', null)
+      .returns<Array<{ id: string }>>(),
+    supabase
+      .from('user_roles')
+      .select('account_id')
+      .eq('org_id', orgId)
+      .in('role_key', ['owner', 'admin', 'staff'])
+      .is('deleted_at', null)
+      .returns<Array<{ account_id: string }>>(),
+    supabase
+      .from('accounts')
+      .select('id')
+      .eq('org_id', orgId)
+      .in('primary_role', ['owner', 'admin', 'staff'])
+      .is('deleted_at', null)
+      .returns<Array<{ id: string }>>(),
+  ]);
+
+  if (staffProfilesResponse.error) {
+    throw new Error(staffProfilesResponse.error.message);
+  }
+  if (privilegedRoleAccountsResponse.error) {
+    throw new Error(privilegedRoleAccountsResponse.error.message);
+  }
+  if (privilegedPrimaryRoleAccountsResponse.error) {
+    throw new Error(privilegedPrimaryRoleAccountsResponse.error.message);
+  }
+
+  const privilegedAccountIds = Array.from(
+    new Set([
+      ...(privilegedRoleAccountsResponse.data ?? []).map((row) => row.account_id),
+      ...(privilegedPrimaryRoleAccountsResponse.data ?? []).map((row) => row.id),
+    ]),
+  );
+
+  const privilegedProfilesByRoleResponse = privilegedAccountIds.length
+    ? await supabase
+        .from('profiles')
+        .select('id')
+        .eq('org_id', orgId)
+        .in('account_id', privilegedAccountIds)
+        .is('deleted_at', null)
+        .returns<Array<{ id: string }>>()
+    : { data: [] as Array<{ id: string }>, error: null };
+
+  if (
+    'error' in privilegedProfilesByRoleResponse &&
+    privilegedProfilesByRoleResponse.error
+  ) {
+    throw new Error(privilegedProfilesByRoleResponse.error.message);
+  }
+
+  return Array.from(
+    new Set([
+      ...(staffProfilesResponse.data ?? []).map((row) => row.id),
+      ...(privilegedProfilesByRoleResponse.data ?? []).map((row) => row.id),
+    ]),
+  );
+}
+
+async function resolveSupportQuestionOwnerProfileId(input: {
+  supabase: ReturnType<typeof createSupabaseServiceClient>;
+  orgId: string;
+  channelId: string;
+  threadParentId?: string | null;
+  threadId?: string | null;
+}): Promise<string | null> {
+  if (input.threadParentId) {
+    const parentResponse = await input.supabase
+      .from('messages')
+      .select('id, sender_profile_id, org_id, channel_id')
+      .eq('id', input.threadParentId)
+      .maybeSingle<{
+        id: string;
+        sender_profile_id: string;
+        org_id: string;
+        channel_id: string;
+      }>();
+
+    if (parentResponse.error) {
+      throw new Error(parentResponse.error.message);
+    }
+
+    if (!parentResponse.data) {
+      return null;
+    }
+
+    if (
+      parentResponse.data.org_id !== input.orgId ||
+      parentResponse.data.channel_id !== input.channelId
+    ) {
+      return null;
+    }
+
+    return parentResponse.data.sender_profile_id;
+  }
+
+  if (!input.threadId) {
+    return null;
+  }
+
+  const threadResponse = await input.supabase
+    .from('threads')
+    .select('id, parent_message_id, org_id, channel_id')
+    .eq('id', input.threadId)
+    .maybeSingle<{
+      id: string;
+      parent_message_id: string | null;
+      org_id: string;
+      channel_id: string;
+    }>();
+
+  if (threadResponse.error) {
+    throw new Error(threadResponse.error.message);
+  }
+  if (!threadResponse.data?.parent_message_id) {
+    return null;
+  }
+  if (
+    threadResponse.data.org_id !== input.orgId ||
+    threadResponse.data.channel_id !== input.channelId
+  ) {
+    return null;
+  }
+
+  const parentResponse = await input.supabase
+    .from('messages')
+    .select('id, sender_profile_id')
+    .eq('id', threadResponse.data.parent_message_id)
+    .maybeSingle<{ id: string; sender_profile_id: string }>();
+
+  if (parentResponse.error) {
+    throw new Error(parentResponse.error.message);
+  }
+
+  return parentResponse.data?.sender_profile_id ?? null;
+}
+
+function buildSupportVisibilityFields(input: {
+  isSupportChannel: boolean;
+  isStaffSender: boolean;
+  isThreadReply: boolean;
+  currentProfileId: string;
+  questionOwnerProfileId?: string | null;
+  privilegedProfileIds?: string[];
+}) {
+  if (!input.isSupportChannel) {
+    return { visibility_type: 'all' as const };
+  }
+
+  if (!input.isThreadReply) {
+    if (input.isStaffSender) {
+      throw new Error(
+        'Support staff must reply in a thread. Top-level support posts are not allowed.',
+      );
+    }
+    const visibleProfileIds = Array.from(
+      new Set([input.currentProfileId, ...(input.privilegedProfileIds ?? [])]),
+    );
+    return {
+      visibility_type: 'specific-users' as const,
+      visibility_user_ids: visibleProfileIds,
+    };
+  }
+
+  const ownerId = input.questionOwnerProfileId;
+  if (!ownerId) {
+    throw new Error('Unable to resolve support question owner for threaded reply.');
+  }
+
+  if (!input.isStaffSender && input.currentProfileId !== ownerId) {
+    throw new Error('Only support staff or the question owner can reply in this thread.');
+  }
+
+  return {
+    visibility_type: 'specific-users' as const,
+    visibility_user_ids: Array.from(
+      new Set([ownerId, ...(input.privilegedProfileIds ?? [])]),
+    ),
+  };
+}
+
+async function ensureChannelMembershipForMessageWrite(input: {
+  serviceSupabase: ReturnType<typeof createSupabaseServiceClient>;
+  shouldEnsureMembership: boolean;
+  orgId: string;
+  channelId: string;
+  profileId: string;
+  now: string;
+}) {
+  if (!input.shouldEnsureMembership) {
+    return;
+  }
+
+  const upsertResponse = await input.serviceSupabase.from('channel_members').upsert(
+    {
+      org_id: input.orgId,
+      channel_id: input.channelId,
+      profile_id: input.profileId,
+      joined_at: input.now,
+      created_at: input.now,
+      created_by: input.profileId,
+      updated_at: input.now,
+      updated_by: input.profileId,
+      deleted_at: null,
+      deleted_by: null,
+    },
+    { onConflict: 'org_id,channel_id,profile_id', ignoreDuplicates: false },
+  );
+
+  if (upsertResponse.error) {
+    throw new Error(upsertResponse.error.message);
+  }
+}
+
+async function listActiveSupportStaffProfileIds(
+  supabase: ReturnType<typeof createSupabaseServiceClient>,
+  orgId: string,
+): Promise<string[]> {
+  const [staffProfilesResponse, staffRoleAccountsResponse] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('id, account_id')
+      .eq('org_id', orgId)
+      .eq('kind', 'staff')
+      .is('deleted_at', null)
+      .returns<Array<{ id: string; account_id: string }>>(),
+    supabase
+      .from('user_roles')
+      .select('account_id')
+      .eq('org_id', orgId)
+      .eq('role_key', 'staff')
+      .is('deleted_at', null)
+      .returns<Array<{ account_id: string }>>(),
+  ]);
+
+  if (staffProfilesResponse.error) {
+    throw new Error(staffProfilesResponse.error.message);
+  }
+  if (staffRoleAccountsResponse.error) {
+    throw new Error(staffRoleAccountsResponse.error.message);
+  }
+
+  const staffAccountIds = Array.from(
+    new Set((staffRoleAccountsResponse.data ?? []).map((row) => row.account_id)),
+  );
+
+  const roleStaffProfilesResponse = staffAccountIds.length
+    ? await supabase
+        .from('profiles')
+        .select('id')
+        .eq('org_id', orgId)
+        .in('account_id', staffAccountIds)
+        .is('deleted_at', null)
+        .returns<Array<{ id: string }>>()
+    : { data: [] as Array<{ id: string }>, error: null };
+
+  if ('error' in roleStaffProfilesResponse && roleStaffProfilesResponse.error) {
+    throw new Error(roleStaffProfilesResponse.error.message);
+  }
+
+  return Array.from(
+    new Set([
+      ...(staffProfilesResponse.data ?? []).map((row) => row.id),
+      ...(roleStaffProfilesResponse.data ?? []).map((row) => row.id),
+    ]),
+  );
+}
+
+async function upsertSupportThreadAssignments(input: {
+  supabase: ReturnType<typeof createSupabaseServiceClient>;
+  orgId: string;
+  threadId: string;
+  staffProfileIds: string[];
+  assignmentKind: 'required' | 'optional';
+  assignedByProfileId: string;
+  now: string;
+}) {
+  if (!input.staffProfileIds.length) {
+    return;
+  }
+
+  const rows = input.staffProfileIds.map((staffProfileId) => ({
+    org_id: input.orgId,
+    thread_id: input.threadId,
+    staff_profile_id: staffProfileId,
+    assignment_kind: input.assignmentKind,
+    assigned_by_profile_id: input.assignedByProfileId,
+    created_at: input.now,
+    created_by: input.assignedByProfileId,
+    updated_at: input.now,
+    updated_by: input.assignedByProfileId,
+    deleted_at: null,
+    deleted_by: null,
+  }));
+
+  const upsertResponse = await input.supabase
+    .from('support_thread_assignments')
+    .upsert(rows, {
+      onConflict: 'org_id,thread_id,staff_profile_id',
+      ignoreDuplicates: true,
+    });
+
+  if (upsertResponse.error) {
+    throw new Error(upsertResponse.error.message);
+  }
+}
+
+async function seedRequiredSupportThreadAssignments(input: {
+  supabase: ReturnType<typeof createSupabaseServiceClient>;
+  orgId: string;
+  threadId: string;
+  assignedByProfileId: string;
+  now: string;
+}) {
+  const staffProfileIds = await listActiveSupportStaffProfileIds(
+    input.supabase,
+    input.orgId,
+  );
+
+  await upsertSupportThreadAssignments({
+    supabase: input.supabase,
+    orgId: input.orgId,
+    threadId: input.threadId,
+    staffProfileIds,
+    assignmentKind: 'required',
+    assignedByProfileId: input.assignedByProfileId,
+    now: input.now,
+  });
+}
+
+async function markSupportStaffVolunteerAssignment(input: {
+  supabase: ReturnType<typeof createSupabaseServiceClient>;
+  orgId: string;
+  threadId: string;
+  staffProfileId: string;
+  assignedByProfileId: string;
+  now: string;
+}) {
+  await upsertSupportThreadAssignments({
+    supabase: input.supabase,
+    orgId: input.orgId,
+    threadId: input.threadId,
+    staffProfileIds: [input.staffProfileId],
+    assignmentKind: 'optional',
+    assignedByProfileId: input.assignedByProfileId,
+    now: input.now,
+  });
 }
 
 @Injectable()
@@ -291,7 +945,7 @@ export class MessagesService {
     orgId: string;
     senderProfileId: string;
   }) {
-    const supabase = createSupabaseSessionClient(input.accessToken);
+    const supabase = createSupabaseServiceClient();
 
     const { data: account, error: accountError } = await supabase
       .from('accounts')
@@ -639,7 +1293,41 @@ export class MessagesService {
         senderProfileId: input.senderProfileId,
       });
       const serviceSupabase = createSupabaseServiceClient();
+      let sanitizedMentions: MessageMentionVM[] = [];
+      if (input.mentions?.length) {
+        const channelMembersResponse = await serviceSupabase
+          .from('channel_members')
+          .select('profile_id')
+          .eq('org_id', input.orgId)
+          .eq('channel_id', input.channelId)
+          .is('deleted_at', null)
+          .returns<Array<{ profile_id: string }>>();
+
+        if (channelMembersResponse.error) {
+          throw new InternalServerErrorException(channelMembersResponse.error.message);
+        }
+
+        sanitizedMentions = sanitizeMentions(
+          content,
+          input.mentions,
+          new Set((channelMembersResponse.data ?? []).map((member) => member.profile_id)),
+          actor.profile.id,
+        );
+      }
+
       const now = new Date().toISOString();
+      const activityContext = await resolveActivityChannelContext({
+        supabase: serviceSupabase,
+        orgId: input.orgId,
+        channelId: input.channelId,
+      });
+      const homeworkIntent = deriveHomeworkMessageIntent(
+        content,
+        activityContext,
+        input.homework ?? null,
+      );
+      const firstUrl = homeworkIntent ? null : extractFirstUrl(content);
+      const previewMetadata = firstUrl ? await fetchLinkPreviewMetadata(firstUrl) : null;
       const { threadId, threadCreated } = await this.resolveThreadContext({
         accessToken,
         orgId: input.orgId,
@@ -650,13 +1338,58 @@ export class MessagesService {
         now,
       });
 
+      const isSupportChannel = activityContext.channelPurpose === 'support';
+      const isSupportThreadReply = Boolean(input.threadParentId);
+      const staffSender = await isStaffActorInOrg({
+        supabase: serviceSupabase,
+        orgId: input.orgId,
+        accountId: actor.accountId,
+        profileKind: actor.profile.kind,
+      });
+      const supportQuestionOwnerProfileId =
+        isSupportChannel && isSupportThreadReply
+          ? await resolveSupportQuestionOwnerProfileId({
+              supabase: serviceSupabase,
+              orgId: input.orgId,
+              channelId: input.channelId,
+              threadParentId: input.threadParentId ?? null,
+              threadId: threadId ?? input.threadId ?? null,
+            })
+          : null;
+      const supportPrivilegedProfileIds = isSupportChannel
+        ? await listSupportPrivilegedProfileIds(serviceSupabase, input.orgId)
+        : [];
+      const supportVisibility = buildSupportVisibilityFields({
+        isSupportChannel,
+        isStaffSender: staffSender,
+        isThreadReply: isSupportThreadReply,
+        currentProfileId: actor.profile.id,
+        questionOwnerProfileId: supportQuestionOwnerProfileId,
+        privilegedProfileIds: supportPrivilegedProfileIds,
+      });
+      await ensureChannelMembershipForMessageWrite({
+        serviceSupabase,
+        shouldEnsureMembership:
+          isSupportChannel || activityContext.channelVisibility === 'public',
+        orgId: input.orgId,
+        channelId: input.channelId,
+        profileId: actor.profile.id,
+        now,
+      });
+
       const messageInsert = await serviceSupabase
         .from('messages')
         .insert({
           org_id: input.orgId,
           channel_id: input.channelId,
           sender_profile_id: actor.profile.id,
-          type: 'text',
+          type: homeworkIntent
+            ? 'lesson-assignment'
+            : previewMetadata
+              ? 'link-preview'
+              : 'text',
+          visibility_type: supportVisibility.visibility_type,
+          visibility_user_ids: supportVisibility.visibility_user_ids ?? null,
           thread_id: threadId,
           thread_parent_id: input.threadParentId ?? null,
           created_at: now,
@@ -672,18 +1405,55 @@ export class MessagesService {
         );
       }
 
-      const payloadInsert = await serviceSupabase.from('message_text').insert({
-        message_id: messageInsert.data.id,
-        org_id: input.orgId,
-        payload: {
-          text: content,
-          ...(input.mentions?.length ? { mentions: input.mentions } : {}),
-        },
-        created_at: now,
-        created_by: actor.profile.id,
-        updated_at: now,
-        updated_by: actor.profile.id,
+      const visibilityAudience = resolveVisibilityAudienceFromMessageRow({
+        visibilityType:
+          (messageInsert.data as { visibility_type?: string | null }).visibility_type ??
+          null,
+        visibilityUserIds:
+          (messageInsert.data as { visibility_user_ids?: string[] | null })
+            .visibility_user_ids ?? null,
       });
+
+      const payloadInsert = await serviceSupabase
+        .from(
+          homeworkIntent
+            ? 'message_lesson_assignment'
+            : previewMetadata
+              ? 'message_link_preview'
+              : 'message_text',
+        )
+        .insert({
+          message_id: messageInsert.data.id,
+          org_id: input.orgId,
+          payload: homeworkIntent
+            ? {
+                kind: homeworkIntent.kind,
+                text: homeworkIntent.cleanedContent,
+                title: homeworkIntent.title,
+                description: homeworkIntent.description,
+                dueAt: homeworkIntent.dueAt,
+                subject: homeworkIntent.subject,
+              }
+            : previewMetadata
+              ? {
+                  ...(content ? { text: content } : {}),
+                  ...(sanitizedMentions.length ? { mentions: sanitizedMentions } : {}),
+                  url: previewMetadata.url,
+                  title: previewMetadata.title,
+                  description: previewMetadata.description,
+                  imageUrl: previewMetadata.imageUrl,
+                  siteName: previewMetadata.siteName,
+                  favicon: previewMetadata.favicon,
+                }
+              : {
+                  text: content,
+                  ...(sanitizedMentions.length ? { mentions: sanitizedMentions } : {}),
+                },
+          created_at: now,
+          created_by: actor.profile.id,
+          updated_at: now,
+          updated_by: actor.profile.id,
+        });
       if (payloadInsert.error) {
         throw new InternalServerErrorException(payloadInsert.error.message);
       }
@@ -696,19 +1466,75 @@ export class MessagesService {
         currentProfileId: actor.profile.id,
       });
 
-      await publishTextMessagePostSendActivities({
-        supabase: serviceSupabase,
-        orgId: input.orgId,
-        channelId: input.channelId,
-        senderProfileId: actor.profile.id,
-        senderName: buildWritableProfileDisplayName(actor.profile),
-        messageId: messageInsert.data.id,
-        content,
-        mentions: (input.mentions ?? []) as MessageMentionVM[],
-        threadId,
-        threadReply: Boolean(threadId && input.threadParentId),
-        now,
-      });
+      if (isSupportChannel && threadCreated && threadId) {
+        await seedRequiredSupportThreadAssignments({
+          supabase: serviceSupabase,
+          orgId: input.orgId,
+          threadId,
+          assignedByProfileId: actor.profile.id,
+          now,
+        });
+      }
+
+      if (isSupportChannel && isSupportThreadReply && staffSender && threadId) {
+        await markSupportStaffVolunteerAssignment({
+          supabase: serviceSupabase,
+          orgId: input.orgId,
+          threadId,
+          staffProfileId: actor.profile.id,
+          assignedByProfileId: actor.profile.id,
+          now,
+        });
+      }
+
+      const senderName = buildWritableProfileDisplayName(actor.profile);
+
+      if (homeworkIntent && activityContext.scope.kind === 'learning_space') {
+        if (!visibilityAudience.suppressActivity) {
+          await publishActivityEvent({
+            supabase: serviceSupabase,
+            orgId: input.orgId,
+            eventType: 'homework.assigned',
+            occurredAt: now,
+            sourceKind: 'profile',
+            actorProfileId: actor.profile.id,
+            scope: activityContext.scope as FeedScopeVM,
+            objectRef: { kind: 'message', id: messageInsert.data.id },
+            targetRef: activityContext.targetRef,
+            audienceRules: visibilityAudience.audienceRules,
+            payload: {
+              channelId: input.channelId,
+              messageId: messageInsert.data.id,
+              title: homeworkIntent.title,
+              description: homeworkIntent.description,
+              dueAt: homeworkIntent.dueAt,
+              subject: homeworkIntent.subject,
+              learningSpaceId: activityContext.learningSpaceId ?? null,
+              learningSpaceTitle: activityContext.learningSpaceTitle ?? null,
+              channelTopic: activityContext.channelTopic ?? null,
+              channelRouteKind: activityContext.channelRouteKind,
+            },
+            dedupeKey: `homework.assigned:${messageInsert.data.id}`,
+            createdBy: actor.profile.id,
+          });
+        }
+      } else if (!homeworkIntent) {
+        await publishTextMessagePostSendActivities({
+          supabase: serviceSupabase,
+          orgId: input.orgId,
+          channelId: input.channelId,
+          senderProfileId: actor.profile.id,
+          senderName,
+          messageId: messageInsert.data.id,
+          content,
+          mentions: sanitizedMentions,
+          threadId,
+          threadReply: Boolean(threadId && input.threadParentId),
+          now,
+          activityContext,
+          visibilityAudience,
+        });
+      }
 
       return { id: messageInsert.data.id };
     } catch (error) {
@@ -740,7 +1566,22 @@ export class MessagesService {
         senderProfileId: input.senderProfileId,
       });
       const serviceSupabase = createSupabaseServiceClient();
+      if (
+        !isValidMessageAssetPath({
+          storagePath: input.storagePath,
+          orgId: input.orgId,
+          channelId: input.channelId,
+          profileId: actor.profile.id,
+        })
+      ) {
+        throw new BadRequestException('Invalid file storage path');
+      }
       const now = new Date().toISOString();
+      const activityContext = await resolveActivityChannelContext({
+        supabase: serviceSupabase,
+        orgId: input.orgId,
+        channelId: input.channelId,
+      });
       const { threadId, threadCreated } = await this.resolveThreadContext({
         accessToken,
         orgId: input.orgId,
@@ -748,6 +1589,44 @@ export class MessagesService {
         currentProfile: actor.profile,
         requestedThreadId: input.threadId,
         threadParentId: input.threadParentId,
+        now,
+      });
+      const isSupportChannel = activityContext.channelPurpose === 'support';
+      const isSupportThreadReply = Boolean(input.threadParentId);
+      const staffSender = await isStaffActorInOrg({
+        supabase: serviceSupabase,
+        orgId: input.orgId,
+        accountId: actor.accountId,
+        profileKind: actor.profile.kind,
+      });
+      const supportQuestionOwnerProfileId =
+        isSupportChannel && isSupportThreadReply
+          ? await resolveSupportQuestionOwnerProfileId({
+              supabase: serviceSupabase,
+              orgId: input.orgId,
+              channelId: input.channelId,
+              threadParentId: input.threadParentId ?? null,
+              threadId: threadId ?? input.threadId ?? null,
+            })
+          : null;
+      const supportPrivilegedProfileIds = isSupportChannel
+        ? await listSupportPrivilegedProfileIds(serviceSupabase, input.orgId)
+        : [];
+      const supportVisibility = buildSupportVisibilityFields({
+        isSupportChannel,
+        isStaffSender: staffSender,
+        isThreadReply: isSupportThreadReply,
+        currentProfileId: actor.profile.id,
+        questionOwnerProfileId: supportQuestionOwnerProfileId,
+        privilegedProfileIds: supportPrivilegedProfileIds,
+      });
+      await ensureChannelMembershipForMessageWrite({
+        serviceSupabase,
+        shouldEnsureMembership:
+          isSupportChannel || activityContext.channelVisibility === 'public',
+        orgId: input.orgId,
+        channelId: input.channelId,
+        profileId: actor.profile.id,
         now,
       });
 
@@ -766,6 +1645,8 @@ export class MessagesService {
           channel_id: input.channelId,
           sender_profile_id: actor.profile.id,
           type: messageType,
+          visibility_type: supportVisibility.visibility_type,
+          visibility_user_ids: supportVisibility.visibility_user_ids ?? null,
           thread_id: threadId,
           thread_parent_id: input.threadParentId ?? null,
           created_at: now,
@@ -847,6 +1728,15 @@ export class MessagesService {
         }
       }
 
+      const visibilityAudience = resolveVisibilityAudienceFromMessageRow({
+        visibilityType:
+          (messageInsert.data as { visibility_type?: string | null }).visibility_type ??
+          null,
+        visibilityUserIds:
+          (messageInsert.data as { visibility_user_ids?: string[] | null })
+            .visibility_user_ids ?? null,
+      });
+
       await this.bumpThreadReplyCount({
         accessToken,
         threadId,
@@ -855,20 +1745,46 @@ export class MessagesService {
         currentProfileId: actor.profile.id,
       });
 
-      await publishFileMessagePostSendActivity({
-        supabase: serviceSupabase,
-        orgId: input.orgId,
-        channelId: input.channelId,
-        senderProfileId: actor.profile.id,
-        senderName: buildWritableProfileDisplayName(actor.profile),
-        messageId: messageInsert.data.id,
-        name: input.name,
-        content: input.content?.trim() ?? null,
-        mimeType: input.mimeType ?? null,
-        storagePath: input.storagePath,
-        fileCount: 1,
-        now,
-      });
+      if (isSupportChannel && threadCreated && threadId) {
+        await seedRequiredSupportThreadAssignments({
+          supabase: serviceSupabase,
+          orgId: input.orgId,
+          threadId,
+          assignedByProfileId: actor.profile.id,
+          now,
+        });
+      }
+
+      if (isSupportChannel && isSupportThreadReply && staffSender && threadId) {
+        await markSupportStaffVolunteerAssignment({
+          supabase: serviceSupabase,
+          orgId: input.orgId,
+          threadId,
+          staffProfileId: actor.profile.id,
+          assignedByProfileId: actor.profile.id,
+          now,
+        });
+      }
+
+      if (!visibilityAudience.suppressActivity) {
+        await publishFileUploadActivity({
+          supabase: serviceSupabase,
+          orgId: input.orgId,
+          channelId: input.channelId,
+          senderProfileId: actor.profile.id,
+          senderName: buildWritableProfileDisplayName(actor.profile),
+          messageId: messageInsert.data.id,
+          name: input.name,
+          content: input.content?.trim() ?? null,
+          mimeType: input.mimeType ?? null,
+          storagePath: input.storagePath,
+          fileCount: 1,
+          activityContext,
+          now,
+          visibilityAudienceRules: visibilityAudience.audienceRules,
+          visibilityAllowedProfileIds: visibilityAudience.allowedProfileIds,
+        });
+      }
 
       return { id: messageInsert.data.id };
     } catch (error) {
@@ -899,7 +1815,30 @@ export class MessagesService {
         senderProfileId: input.senderProfileId,
       });
       const serviceSupabase = createSupabaseServiceClient();
+      for (const asset of input.assets) {
+        if (!asset.name?.trim()) {
+          throw new BadRequestException('File name is required');
+        }
+        if (!asset.storagePath?.trim()) {
+          throw new BadRequestException('File storage path is required');
+        }
+        if (
+          !isValidMessageAssetPath({
+            storagePath: asset.storagePath,
+            orgId: input.orgId,
+            channelId: input.channelId,
+            profileId: actor.profile.id,
+          })
+        ) {
+          throw new BadRequestException('Invalid file storage path');
+        }
+      }
       const now = new Date().toISOString();
+      const activityContext = await resolveActivityChannelContext({
+        supabase: serviceSupabase,
+        orgId: input.orgId,
+        channelId: input.channelId,
+      });
       const { threadId, threadCreated } = await this.resolveThreadContext({
         accessToken,
         orgId: input.orgId,
@@ -909,10 +1848,60 @@ export class MessagesService {
         threadParentId: input.threadParentId,
         now,
       });
+      const isSupportChannel = activityContext.channelPurpose === 'support';
+      const isSupportThreadReply = Boolean(input.threadParentId);
+      const staffSender = await isStaffActorInOrg({
+        supabase: serviceSupabase,
+        orgId: input.orgId,
+        accountId: actor.accountId,
+        profileKind: actor.profile.kind,
+      });
+      const supportQuestionOwnerProfileId =
+        isSupportChannel && isSupportThreadReply
+          ? await resolveSupportQuestionOwnerProfileId({
+              supabase: serviceSupabase,
+              orgId: input.orgId,
+              channelId: input.channelId,
+              threadParentId: input.threadParentId ?? null,
+              threadId: threadId ?? input.threadId ?? null,
+            })
+          : null;
+      const supportPrivilegedProfileIds = isSupportChannel
+        ? await listSupportPrivilegedProfileIds(serviceSupabase, input.orgId)
+        : [];
+      const supportVisibility = buildSupportVisibilityFields({
+        isSupportChannel,
+        isStaffSender: staffSender,
+        isThreadReply: isSupportThreadReply,
+        currentProfileId: actor.profile.id,
+        questionOwnerProfileId: supportQuestionOwnerProfileId,
+        privilegedProfileIds: supportPrivilegedProfileIds,
+      });
+      await ensureChannelMembershipForMessageWrite({
+        serviceSupabase,
+        shouldEnsureMembership:
+          isSupportChannel || activityContext.channelVisibility === 'public',
+        orgId: input.orgId,
+        channelId: input.channelId,
+        profileId: actor.profile.id,
+        now,
+      });
 
       const allImages = input.assets.every((asset) =>
         asset.mimeType?.startsWith('image/'),
       );
+      const anyImages = input.assets.some((asset) =>
+        asset.mimeType?.startsWith('image/'),
+      );
+      const anyAudio = input.assets.some((asset) => asset.mimeType?.startsWith('audio/'));
+      if (anyAudio) {
+        throw new BadRequestException('Audio recordings must be sent individually');
+      }
+      if (anyImages && !allImages) {
+        throw new BadRequestException(
+          'Mixed file and image uploads must be sent separately',
+        );
+      }
       const messageType = allImages ? 'image' : 'file';
       const messageInsert = await serviceSupabase
         .from('messages')
@@ -921,6 +1910,8 @@ export class MessagesService {
           channel_id: input.channelId,
           sender_profile_id: actor.profile.id,
           type: messageType,
+          visibility_type: supportVisibility.visibility_type,
+          visibility_user_ids: supportVisibility.visibility_user_ids ?? null,
           thread_id: threadId,
           thread_parent_id: input.threadParentId ?? null,
           created_at: now,
@@ -999,6 +1990,15 @@ export class MessagesService {
         throw new InternalServerErrorException(assetInsert.error.message);
       }
 
+      const visibilityAudience = resolveVisibilityAudienceFromMessageRow({
+        visibilityType:
+          (messageInsert.data as { visibility_type?: string | null }).visibility_type ??
+          null,
+        visibilityUserIds:
+          (messageInsert.data as { visibility_user_ids?: string[] | null })
+            .visibility_user_ids ?? null,
+      });
+
       await this.bumpThreadReplyCount({
         accessToken,
         threadId,
@@ -1007,23 +2007,49 @@ export class MessagesService {
         currentProfileId: actor.profile.id,
       });
 
-      await publishFileMessagePostSendActivity({
-        supabase: serviceSupabase,
-        orgId: input.orgId,
-        channelId: input.channelId,
-        senderProfileId: actor.profile.id,
-        senderName: buildWritableProfileDisplayName(actor.profile),
-        messageId: messageInsert.data.id,
-        name:
-          input.assets.length > 1
-            ? `${input.assets[0]?.name ?? 'File'} +${input.assets.length - 1} more`
-            : (input.assets[0]?.name ?? 'File'),
-        content: input.content?.trim() ?? null,
-        mimeType: allImages ? 'image/*' : (input.assets[0]?.mimeType ?? null),
-        storagePath: input.assets[0]?.storagePath ?? null,
-        fileCount: input.assets.length,
-        now,
-      });
+      if (isSupportChannel && threadCreated && threadId) {
+        await seedRequiredSupportThreadAssignments({
+          supabase: serviceSupabase,
+          orgId: input.orgId,
+          threadId,
+          assignedByProfileId: actor.profile.id,
+          now,
+        });
+      }
+
+      if (isSupportChannel && isSupportThreadReply && staffSender && threadId) {
+        await markSupportStaffVolunteerAssignment({
+          supabase: serviceSupabase,
+          orgId: input.orgId,
+          threadId,
+          staffProfileId: actor.profile.id,
+          assignedByProfileId: actor.profile.id,
+          now,
+        });
+      }
+
+      if (!visibilityAudience.suppressActivity) {
+        await publishFileUploadActivity({
+          supabase: serviceSupabase,
+          orgId: input.orgId,
+          channelId: input.channelId,
+          senderProfileId: actor.profile.id,
+          senderName: buildWritableProfileDisplayName(actor.profile),
+          messageId: messageInsert.data.id,
+          name:
+            input.assets.length > 1
+              ? `${input.assets[0]?.name ?? 'File'} +${input.assets.length - 1} more`
+              : (input.assets[0]?.name ?? 'File'),
+          content: input.content?.trim() ?? null,
+          mimeType: allImages ? 'image/*' : (input.assets[0]?.mimeType ?? null),
+          storagePath: input.assets[0]?.storagePath ?? null,
+          fileCount: input.assets.length,
+          activityContext,
+          now,
+          visibilityAudienceRules: visibilityAudience.audienceRules,
+          visibilityAllowedProfileIds: visibilityAudience.allowedProfileIds,
+        });
+      }
 
       return { id: messageInsert.data.id };
     } catch (error) {

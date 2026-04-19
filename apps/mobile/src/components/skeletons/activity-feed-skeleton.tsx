@@ -1,14 +1,12 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
+import { useTheme } from '@/providers/theme-provider';
 import { PulseBox } from './pulse-box';
 
 type Props = { count?: number };
 
-// Widths vary per row so the skeleton looks like real varied content
-const HEADLINE_WIDTHS = [200, 170, 220, 185, 160, 210];
-const META_WIDTHS = [100, 130, 90, 115, 140, 95];
-
 export function ActivityFeedSkeleton({ count = 4 }: Props) {
+  const { colors } = useTheme();
   const itemsPerSection = Math.ceil(count / 2);
 
   return (
@@ -30,14 +28,20 @@ export function ActivityFeedSkeleton({ count = 4 }: Props) {
             {/* Section items */}
             {Array.from({ length: sectionCount }).map((_, i) => {
               const itemIdx = startIdx + i;
-              const showPreview = itemIdx % 3 === 1;
-              const headlineW = HEADLINE_WIDTHS[itemIdx % HEADLINE_WIDTHS.length]!;
-              const metaW = META_WIDTHS[itemIdx % META_WIDTHS.length]!;
 
               return (
                 <View key={itemIdx} style={s.itemOuter}>
-                  {/* itemRow mirrors activity-item layout */}
-                  <View style={[s.card, s.cardContent]}>
+                  <View
+                    style={[
+                      s.card,
+                      {
+                        backgroundColor: colors.card,
+                        borderRadius: 14,
+                        borderWidth: StyleSheet.hairlineWidth,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                  >
                     <View style={s.itemRow}>
                       <View style={s.avatarWrap}>
                         <PulseBox width={28} height={28} radius={14} />
@@ -45,28 +49,35 @@ export function ActivityFeedSkeleton({ count = 4 }: Props) {
 
                       {/* content — flex: 1 */}
                       <View style={s.content}>
-                        {/* headlineRow — fontSize 15 lineHeight 22; some items also have a badge pill */}
+                        {/* headlineRow — two lines for multi-line wrapping */}
                         <View style={s.headlineRow}>
-                          <PulseBox width={headlineW} height={22} radius={4} />
-                          {itemIdx % 2 === 0 && (
-                            /* emphasis badge — paddingH 8, paddingV 3, borderRadius 8, ~24px tall */
-                            <PulseBox width={72} height={24} radius={8} />
-                          )}
+                          <PulseBox width={240} height={18} radius={4} />
+                          <PulseBox width={160} height={18} radius={4} />
                         </View>
 
-                        {/* metaRow — "2 mins ago  •  Classes", fontSize 13 lineHeight ~18 */}
-                        <PulseBox width={metaW} height={18} radius={4} />
+                        {/* metaRow — "48 mins ago · 1 items" */}
+                        <PulseBox width={120} height={18} radius={4} />
                       </View>
-
-                      {/* unreadDot — 9×9, right side, marginTop 8 */}
-                      <PulseBox width={9} height={9} radius={5} />
                     </View>
 
-                    {/* previewCard aligns with content indent */}
-                    {showPreview && (
-                      <View style={s.previewCard}>
-                        <PulseBox width={220} height={22} radius={4} />
-                        <PulseBox width={170} height={22} radius={4} />
+                    {/* previewCard — always show */}
+                    <View
+                      style={[
+                        s.previewCard,
+                        {
+                          borderRadius: 12,
+                          borderWidth: StyleSheet.hairlineWidth,
+                          borderColor: colors.border,
+                        },
+                      ]}
+                    >
+                      <PulseBox width={220} height={22} radius={4} />
+                    </View>
+
+                    {/* action button — on every other item */}
+                    {itemIdx % 2 === 0 && (
+                      <View style={s.actionButton}>
+                        <PulseBox width={96} height={34} radius={17} />
                       </View>
                     )}
                   </View>
@@ -91,15 +102,13 @@ const s = StyleSheet.create({
     minHeight: 80,
     gap: 0,
   },
-  cardContent: {},
   itemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   avatarWrap: { width: 28, height: 28, flexShrink: 0, marginTop: 2 },
   content: { flex: 1 },
   headlineRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: 5,
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 4,
     marginBottom: 5,
   },
   previewCard: {
@@ -107,5 +116,9 @@ const s = StyleSheet.create({
     marginLeft: 42,
     padding: 14,
     gap: 6,
+  },
+  actionButton: {
+    marginTop: 10,
+    marginLeft: 42,
   },
 });

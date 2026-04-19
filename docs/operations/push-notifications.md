@@ -76,6 +76,8 @@ Expected runtime flow:
 4. cron later calls the internal dispatch endpoint
 5. API sends the push notification through Expo
 
+For guardian switch-user flows, the frontend still sends the selected acting profile id, but `apps/api` is the authority that validates whether the authenticated account may act as that profile before any message, activity, or notification work is performed.
+
 The internal endpoints below are intended for:
 
 - cron / Supabase edge functions

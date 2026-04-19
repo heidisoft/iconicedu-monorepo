@@ -11,45 +11,44 @@ type SkeletonItem =
       groupStart: boolean;
       bubbleWidth: number;
       lineWidths: number[];
+      reactions?: number; // number of reaction pills to show (1 or 2)
+      replyCount?: boolean; // show thread reply row
     };
 
 const ITEMS: SkeletonItem[] = [
-  { type: 'separator', labelWidth: 64 },
+  // index 0 = bottom of screen (most recent)
   {
     type: 'message',
     own: false,
     groupStart: true,
-    bubbleWidth: 236,
-    lineWidths: [190, 128],
+    bubbleWidth: 252,
+    lineWidths: [220, 240, 210, 180],
   },
-  {
-    type: 'message',
-    own: false,
-    groupStart: false,
-    bubbleWidth: 184,
-    lineWidths: [154],
-  },
+  { type: 'separator', labelWidth: 52 },
   {
     type: 'message',
     own: true,
     groupStart: true,
-    bubbleWidth: 198,
-    lineWidths: [142, 106],
+    bubbleWidth: 80,
+    lineWidths: [52],
+    reactions: 1,
+  },
+  {
+    type: 'message',
+    own: false,
+    groupStart: true,
+    bubbleWidth: 244,
+    lineWidths: [220, 200, 160],
+    reactions: 1,
   },
   {
     type: 'message',
     own: true,
-    groupStart: false,
-    bubbleWidth: 152,
-    lineWidths: [118],
-  },
-  { type: 'separator', labelWidth: 82 },
-  {
-    type: 'message',
-    own: false,
     groupStart: true,
     bubbleWidth: 248,
-    lineWidths: [204, 172, 116],
+    lineWidths: [228, 240, 210, 180],
+    reactions: 1,
+    replyCount: true,
   },
 ];
 
@@ -68,7 +67,11 @@ function MessageBubbleSkeleton({
   groupStart,
   bubbleWidth,
   lineWidths,
+  reactions,
+  replyCount,
 }: Extract<SkeletonItem, { type: 'message' }>) {
+  const { colors } = useTheme();
+
   return (
     <View
       style={[s.row, own && s.rowOwn, groupStart && s.rowGroupStart]}
@@ -93,7 +96,14 @@ function MessageBubbleSkeleton({
             )}
           </View>
         ) : null}
-        <View style={[s.bubbleShell, { width: bubbleWidth }, own && s.bubbleShellOwn]}>
+        <View
+          style={[
+            s.bubbleShell,
+            { width: bubbleWidth },
+            own && s.bubbleShellOwn,
+            { backgroundColor: colors.border },
+          ]}
+        >
           {lineWidths.map((lineWidth, index) => (
             <PulseBox
               key={`${bubbleWidth}-${lineWidth}-${index}`}
@@ -102,6 +112,20 @@ function MessageBubbleSkeleton({
             />
           ))}
         </View>
+        {reactions ? (
+          <View style={[s.reactionsRow, own && s.reactionsRowOwn]}>
+            {Array.from({ length: reactions }, (_, i) => (
+              <PulseBox key={`reaction-${i}`} width={60} height={28} radius={14} />
+            ))}
+          </View>
+        ) : null}
+        {replyCount ? (
+          <View style={[s.replyRow, own && s.replyRowOwn]}>
+            <PulseBox width={20} height={20} radius={10} />
+            <PulseBox width={20} height={20} radius={10} />
+            <PulseBox width={72} height={14} radius={5} />
+          </View>
+        ) : null}
       </View>
     </View>
   );
@@ -186,5 +210,23 @@ const s = StyleSheet.create({
   },
   bubbleShellOwn: {
     alignItems: 'flex-end',
+  },
+  reactionsRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 4,
+    alignItems: 'flex-start',
+  },
+  reactionsRowOwn: {
+    justifyContent: 'flex-end',
+  },
+  replyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  replyRowOwn: {
+    justifyContent: 'flex-end',
   },
 });
