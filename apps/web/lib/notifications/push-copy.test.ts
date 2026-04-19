@@ -10,6 +10,8 @@ describe('buildPersonalizedSessionCopy', () => {
         title: 'English class',
         summary: 'Reminder',
         reminderOffsetMinutes: 5,
+        occurrenceStart: '2026-04-22T19:30:00.000Z',
+        viewerTimezone: 'America/New_York',
         members: [
           { profileId: 'child-1', role: 'child', displayName: 'Ava' },
           { profileId: 'educator-1', role: 'educator', displayName: 'Mr. Kim' },
@@ -19,8 +21,8 @@ describe('buildPersonalizedSessionCopy', () => {
     );
 
     expect(copy).toEqual({
-      title: 'Your class with Mr. Kim starts in 5 min',
-      summary: 'English class with Mr. Kim',
+      title: 'English class with Mr. Kim starts in 5 min',
+      summary: 'Apr 22 at 3:30 PM',
     });
   });
 
@@ -31,6 +33,8 @@ describe('buildPersonalizedSessionCopy', () => {
         title: 'English class',
         summary: 'Reminder',
         reminderOffsetMinutes: 30,
+        occurrenceStart: '2026-04-22T19:30:00.000Z',
+        viewerTimezone: 'America/New_York',
         members: [
           { profileId: 'child-1', role: 'child', displayName: 'Ava' },
           { profileId: 'educator-1', role: 'educator', displayName: 'Mr. Kim' },
@@ -40,8 +44,8 @@ describe('buildPersonalizedSessionCopy', () => {
     );
 
     expect(copy).toEqual({
-      title: "Ava's class starts in 30 min",
-      summary: 'English class with Ava',
+      title: 'English class with Ava starts in 30 min',
+      summary: 'Apr 22 at 3:30 PM',
     });
   });
 
@@ -52,6 +56,8 @@ describe('buildPersonalizedSessionCopy', () => {
         title: 'English class',
         summary: 'Reminder',
         reminderOffsetMinutes: 5,
+        occurrenceStart: '2026-04-22T19:30:00.000Z',
+        viewerTimezone: 'America/New_York',
         members: [
           { profileId: 'child-1', role: 'child', displayName: 'Ava' },
           { profileId: 'educator-1', role: 'educator', displayName: 'Mr. Kim' },
@@ -62,8 +68,8 @@ describe('buildPersonalizedSessionCopy', () => {
     );
 
     expect(copy).toEqual({
-      title: "Ava's class with Mr. Kim starts in 5 min",
-      summary: 'English class',
+      title: 'English class for Ava with Mr. Kim starts in 5 min',
+      summary: 'Apr 22 at 3:30 PM',
     });
   });
 
@@ -74,6 +80,8 @@ describe('buildPersonalizedSessionCopy', () => {
         title: 'English class',
         summary: 'Reminder',
         reminderOffsetMinutes: 30,
+        occurrenceStart: '2026-04-22T19:30:00.000Z',
+        viewerTimezone: 'America/New_York',
         members: [
           { profileId: 'child-1', role: 'child', displayName: 'Ava' },
           { profileId: 'educator-1', role: 'educator', displayName: 'Mr. Kim' },
@@ -84,8 +92,8 @@ describe('buildPersonalizedSessionCopy', () => {
     );
 
     expect(copy).toEqual({
-      title: "Ava's class with Mr. Kim starts in 30 min",
-      summary: 'English class',
+      title: 'English class for Ava with Mr. Kim starts in 30 min',
+      summary: 'Apr 22 at 3:30 PM',
     });
   });
 
@@ -102,7 +110,7 @@ describe('buildPersonalizedSessionCopy', () => {
     );
 
     expect(copy).toEqual({
-      title: 'Class starts in 5 minutes',
+      title: 'English class starts in 5 min',
       summary: 'English class',
     });
   });
@@ -123,7 +131,7 @@ describe('buildPersonalizedSessionCopy', () => {
     );
 
     expect(copy).toEqual({
-      title: 'Class starts in 5 minutes',
+      title: 'English class starts in 5 min',
       summary: 'English class',
     });
   });
@@ -144,7 +152,7 @@ describe('buildPersonalizedSessionCopy', () => {
     );
 
     expect(copy).toEqual({
-      title: 'Class starts in 30 minutes',
+      title: 'English class starts in 30 min',
       summary: 'English class',
     });
   });
@@ -190,7 +198,7 @@ describe('buildPersonalizedSessionCopy', () => {
 
     expect(copy).toEqual({
       title: 'How was your class with Mr. Kim?',
-      summary: "Rate today's English class session",
+      summary: "Rate today's English class with Mr. Kim session",
     });
   });
 
@@ -209,8 +217,8 @@ describe('buildPersonalizedSessionCopy', () => {
     );
 
     expect(copy).toEqual({
-      title: 'How did Ava do?',
-      summary: "Rate today's English class session",
+      title: 'How did Ava do in English class?',
+      summary: "Rate today's English class with Ava session",
     });
   });
 
@@ -230,8 +238,8 @@ describe('buildPersonalizedSessionCopy', () => {
     );
 
     expect(copy).toEqual({
-      title: "How was Ava's class with Mr. Kim?",
-      summary: "Rate today's English class session",
+      title: 'How was English class for Ava with Mr. Kim?',
+      summary: "Rate today's English class for Ava with Mr. Kim session",
     });
   });
 
@@ -683,6 +691,126 @@ describe('buildPersonalizedSessionCopy', () => {
     });
   });
 
+  it('builds class.session.scheduled copy from class title and payload summary', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'class.session.scheduled',
+      {
+        title: 'Algebra 1',
+        startAt: '2026-04-22T19:30:00.000Z',
+        viewerTimezone: 'America/New_York',
+        members: [
+          { profileId: 'child-1', role: 'child', displayName: 'Ava' },
+          { profileId: 'educator-1', role: 'educator', displayName: 'Mr. Kim' },
+          { profileId: 'guardian-1', role: 'guardian', displayName: 'Parent' },
+        ],
+      },
+      'guardian-1',
+    );
+
+    expect(copy).toEqual({
+      title: 'Algebra 1 for Ava with Mr. Kim scheduled',
+      summary:
+        'Every Wednesday at 3:30 PM New York time. First session Apr 22 at 3:30 PM.',
+    });
+  });
+
+  it('builds class.session.rescheduled copy for guardians with local time and reason', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'class.session.rescheduled',
+      {
+        title: 'Algebra 1',
+        viewerTimezone: 'America/New_York',
+        rescheduledFromStartAt: '2026-04-21T18:00:00.000Z',
+        rescheduledToStartAt: '2026-04-22T19:30:00.000Z',
+        reason: 'Teacher unavailable',
+        members: [
+          { profileId: 'child-1', role: 'child', displayName: 'Ava' },
+          { profileId: 'educator-1', role: 'educator', displayName: 'Mr. Kim' },
+          { profileId: 'guardian-1', role: 'guardian', displayName: 'Parent' },
+        ],
+      },
+      'guardian-1',
+    );
+
+    expect(copy).toEqual({
+      title: 'Algebra 1 for Ava with Mr. Kim rescheduled',
+      summary:
+        'Moved from Apr 21 at 2:00 PM to Apr 22 at 3:30 PM. Reason: Teacher unavailable.',
+    });
+  });
+
+  it('builds class.session.canceled copy for educators with local time and reason', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'class.session.canceled',
+      {
+        title: 'Algebra 1',
+        recipientTimezone: 'America/Los_Angeles',
+        canceledStartAt: '2026-04-22T19:30:00.000Z',
+        canceledReason: 'Student sick',
+        members: [
+          { profileId: 'child-1', role: 'child', displayName: 'Ava' },
+          { profileId: 'educator-1', role: 'educator', displayName: 'Mr. Kim' },
+        ],
+      },
+      'educator-1',
+    );
+
+    expect(copy).toEqual({
+      title: 'Algebra 1 with Ava cancelled',
+      summary: 'Canceled for Apr 22 at 12:30 PM. Reason: Student sick.',
+    });
+  });
+
+  it('builds session.started live-now copy for students with teacher details', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'session.started',
+      {
+        title: 'Science Lab',
+        members: [
+          { profileId: 'child-1', role: 'child', displayName: 'Ava' },
+          { profileId: 'educator-1', role: 'educator', displayName: 'Ms. Ray' },
+        ],
+      },
+      'child-1',
+    );
+
+    expect(copy).toEqual({
+      title: 'Science Lab with Ms. Ray is live now',
+      summary: 'Tap to join the live session.',
+    });
+  });
+
+  it('builds payment.failed copy from payload description', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'payment.failed',
+      {
+        description: 'We could not process invoice #1234.',
+      },
+      'guardian-1',
+    );
+
+    expect(copy).toEqual({
+      title: 'Payment failed',
+      summary: 'We could not process invoice #1234.',
+    });
+  });
+
+  it('builds system.notice copy from title and message', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'system.notice',
+      {
+        title: 'Scheduled maintenance',
+        message: 'ICONIC will be unavailable tonight from 11 PM to 11:30 PM.',
+      },
+      'guardian-1',
+    );
+
+    expect(copy).toEqual({
+      title: 'Scheduled maintenance',
+      summary: 'ICONIC will be unavailable tonight from 11 PM to 11:30 PM.',
+    });
+  });
+
   it('returns null for unsupported non-session event types', () => {
     const copy = buildPersonalizedSessionCopy(
       'announcement.posted',
@@ -696,17 +824,20 @@ describe('buildPersonalizedSessionCopy', () => {
     expect(copy).toBeNull();
   });
 
-  it('returns null for supported event types not in session copy set', () => {
+  it('builds session.started copy when a live session begins', () => {
     const copy = buildPersonalizedSessionCopy(
       'session.started',
       {
-        title: 'Session started',
+        title: 'Algebra 1',
         summary: 'Session began',
         members: [{ profileId: 'child-1', role: 'child', displayName: 'Ava' }],
       },
       'child-1',
     );
 
-    expect(copy).toBeNull();
+    expect(copy).toEqual({
+      title: 'Algebra 1 is live now',
+      summary: 'Session began',
+    });
   });
 });

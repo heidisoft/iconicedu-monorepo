@@ -140,13 +140,13 @@ describe('enqueueNotificationDispatchJobs', () => {
         expect.objectContaining({
           recipient_profile_id: 'child-1',
           payload: expect.objectContaining({
-            title: 'Your class with Mr. Kim starts in 5 min',
+            title: 'Session reminder with Mr. Kim starts in 5 min',
           }),
         }),
         expect.objectContaining({
           recipient_profile_id: 'educator-1',
           payload: expect.objectContaining({
-            title: "Ava's class starts in 5 min",
+            title: 'Session reminder with Ava starts in 5 min',
           }),
         }),
       ]),
@@ -259,19 +259,19 @@ describe('enqueueNotificationDispatchJobs', () => {
         expect.objectContaining({
           recipient_profile_id: 'child-1',
           payload: expect.objectContaining({
-            title: 'Your class with Mr. Kim starts in 30 min',
+            title: 'Session reminder with Mr. Kim starts in 30 min',
           }),
         }),
         expect.objectContaining({
           recipient_profile_id: 'educator-1',
           payload: expect.objectContaining({
-            title: "Ava's class starts in 30 min",
+            title: 'Session reminder with Ava starts in 30 min',
           }),
         }),
         expect.objectContaining({
           recipient_profile_id: 'guardian-1',
           payload: expect.objectContaining({
-            title: "Ava's class with Mr. Kim starts in 30 min",
+            title: 'Session reminder for Ava with Mr. Kim starts in 30 min',
           }),
         }),
       ]),

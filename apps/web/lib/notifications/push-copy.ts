@@ -1,3 +1,5 @@
+import { formatDateTime, formatTime, resolveViewerTimezone } from '@iconicedu/utils';
+
 type SessionMember = Record<string, unknown> & {
   profileId?: string;
   role?: string;
@@ -25,10 +27,233 @@ function asOptionalString(value: unknown): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
 
+function firstDefinedString(...values: Array<unknown>): string | undefined {
+  for (const value of values) {
+    const normalized = asOptionalString(value);
+    if (normalized) {
+      return normalized;
+    }
+  }
+  return undefined;
+}
+
 function getContextTitle(payload: Record<string, unknown>) {
   return (
     asOptionalString(payload.learningSpaceTitle) ?? asOptionalString(payload.channelTopic)
   );
+}
+
+function getClassTitle(payload: Record<string, unknown>, fallback = 'Class') {
+  return (
+    firstDefinedString(
+      payload.title,
+      payload.learningSpaceTitle,
+      payload.channelTopic,
+      payload.description,
+    ) ?? fallback
+  );
+}
+
+function getEventSummary(
+  payload: Record<string, unknown>,
+  fallback: string,
+  maxLength = 160,
+) {
+  const summary = firstDefinedString(
+    payload.summary,
+    payload.message,
+    payload.description,
+    payload.content,
+    payload.startAt,
+    payload.occurrenceStart,
+  );
+  return (summary ?? fallback).slice(0, maxLength);
+}
+
+function extractDisplayTimezone(payload: Record<string, unknown>) {
+  return firstDefinedString(
+    payload.viewerTimezone,
+    payload.recipientTimezone,
+    payload.timezone,
+    payload.firstSessionTimezone,
+  );
+}
+
+function formatSessionDateTime(value: unknown, payload: Record<string, unknown>) {
+  if (typeof value !== 'string' || value.length === 0) {
+    return undefined;
+  }
+
+  return formatDateTime(
+    value,
+    resolveViewerTimezone(extractDisplayTimezone(payload)),
+    'natural',
+  );
+}
+
+function formatSessionWeekday(value: unknown, payload: Record<string, unknown>) {
+  if (typeof value !== 'string' || value.length === 0) {
+    return undefined;
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return undefined;
+  }
+
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: resolveViewerTimezone(extractDisplayTimezone(payload)),
+    weekday: 'long',
+  }).format(date);
+}
+
+function formatSessionWeeklyRecurrence(value: unknown, payload: Record<string, unknown>) {
+  if (typeof value !== 'string' || value.length === 0) {
+    return undefined;
+  }
+
+  const weekday = formatSessionWeekday(value, payload);
+  if (!weekday) {
+    return undefined;
+  }
+
+  const timeLabel = formatTime(
+    value,
+    resolveViewerTimezone(extractDisplayTimezone(payload)),
+    'withZone',
+  );
+  if (!timeLabel) {
+    return undefined;
+  }
+
+  return `Every ${weekday} at ${timeLabel}`;
+}
+
+function appendReason(summary: string | undefined, reason: string | undefined) {
+  if (!summary) {
+    return undefined;
+  }
+
+  if (!reason) {
+    return summary;
+  }
+
+  return `${summary} Reason: ${reason}.`;
+}
+
+function formatNamesList(names: string[]) {
+  if (!names.length) {
+    return undefined;
+  }
+
+  if (names.length === 1) {
+    return names[0];
+  }
+
+  if (names.length === 2) {
+    return `${names[0]} and ${names[1]}`;
+  }
+
+  return `${names[0]}, ${names[1]} +${names.length - 2} more`;
+}
+
+function getRoleLabel(member: SessionMember | undefined) {
+  return asString(member?.role);
+}
+
+function buildSessionAudienceLabel(input: {
+  classTitle: string;
+  teacherName?: string;
+  studentLabel?: string;
+  recipientRole?: string;
+}) {
+  const { classTitle, teacherName, studentLabel, recipientRole } = input;
+
+  if (recipientRole === 'guardian' || recipientRole === 'staff') {
+    if (studentLabel && teacherName) {
+      return `${classTitle} for ${studentLabel} with ${teacherName}`;
+    }
+    if (studentLabel) {
+      return `${classTitle} for ${studentLabel}`;
+    }
+  }
+
+  if (recipientRole === 'educator') {
+    if (studentLabel) {
+      return `${classTitle} with ${studentLabel}`;
+    }
+    return classTitle;
+  }
+
+  if (recipientRole === 'child') {
+    if (teacherName) {
+      return `${classTitle} with ${teacherName}`;
+    }
+  }
+
+  if (teacherName) {
+    return `${classTitle} with ${teacherName}`;
+  }
+
+  return classTitle;
+}
+
+function getScheduledSessionSummary(payload: Record<string, unknown>) {
+  const startAt = firstDefinedString(payload.startAt, payload.firstSessionStartAt);
+  const recurringLabel = formatSessionWeeklyRecurrence(startAt, payload);
+  const exactLabel = formatSessionDateTime(startAt, payload);
+
+  if (recurringLabel && exactLabel) {
+    return `${recurringLabel}. First session ${exactLabel}.`;
+  }
+
+  if (exactLabel) {
+    return `Scheduled for ${exactLabel}.`;
+  }
+
+  return undefined;
+}
+
+function getRescheduledSessionSummary(payload: Record<string, unknown>) {
+  const nextStartAt = firstDefinedString(
+    payload.rescheduledToStartAt,
+    payload.newStartAt,
+    payload.startAt,
+    payload.firstSessionStartAt,
+  );
+  const previousStartAt = firstDefinedString(
+    payload.rescheduledFromStartAt,
+    payload.previousStartAt,
+  );
+  const reason = firstDefinedString(payload.rescheduledReason, payload.reason);
+  const nextLabel = formatSessionDateTime(nextStartAt, payload);
+  const previousLabel = formatSessionDateTime(previousStartAt, payload);
+
+  if (nextLabel && previousLabel) {
+    return appendReason(`Moved from ${previousLabel} to ${nextLabel}.`, reason);
+  }
+
+  if (nextLabel) {
+    return appendReason(`Now scheduled for ${nextLabel}.`, reason);
+  }
+
+  return undefined;
+}
+
+function getCanceledSessionSummary(payload: Record<string, unknown>) {
+  const canceledAt = firstDefinedString(
+    payload.canceledStartAt,
+    payload.startAt,
+    payload.firstSessionStartAt,
+  );
+  const reason = firstDefinedString(payload.canceledReason, payload.reason);
+  const canceledLabel = formatSessionDateTime(canceledAt, payload);
+
+  if (canceledLabel) {
+    return appendReason(`Canceled for ${canceledLabel}.`, reason);
+  }
+
+  return undefined;
 }
 
 function normalizeMembers(value: unknown): SessionMember[] {
@@ -48,6 +273,26 @@ export function buildPersonalizedSessionCopy(
   recipientProfileId: string,
 ): PersonalizedCopy | null {
   const payload = asRecord(eventPayload);
+  const members = normalizeMembers(payload.members);
+  const recipient = members.find(
+    (member) => asString(member.profileId) === recipientProfileId,
+  );
+  const educators = members.filter((member) => asString(member.role) === 'educator');
+  const students = members.filter((member) => asString(member.role) === 'child');
+  const teacherName = asOptionalString(educators[0]?.displayName);
+  const studentLabel = formatNamesList(
+    students
+      .map((member) => asOptionalString(member.displayName))
+      .filter((value): value is string => Boolean(value)),
+  );
+  const recipientRole = getRoleLabel(recipient);
+  const classTitle = getClassTitle(payload, 'Class');
+  const sessionAudienceLabel = buildSessionAudienceLabel({
+    classTitle,
+    teacherName,
+    studentLabel,
+    recipientRole,
+  });
 
   if (eventType === 'dm.posted') {
     const senderName = asString(payload.senderName);
@@ -165,23 +410,127 @@ export function buildPersonalizedSessionCopy(
     return { title, summary: title };
   }
 
-  const members = normalizeMembers(payload.members);
+  if (eventType === 'class.session.scheduled') {
+    const fallback = `${classTitle} session scheduled`;
+    return {
+      title: recipient ? `${sessionAudienceLabel} scheduled` : fallback,
+      summary:
+        getScheduledSessionSummary(payload) ??
+        getEventSummary(payload, 'A class session has been scheduled.'),
+    };
+  }
+
+  if (eventType === 'class.sessions.scheduled') {
+    const fallback = `${classTitle} sessions scheduled`;
+    return {
+      title: recipient ? `${sessionAudienceLabel} scheduled` : fallback,
+      summary:
+        getScheduledSessionSummary(payload) ??
+        getEventSummary(payload, 'Class sessions have been scheduled.'),
+    };
+  }
+
+  if (eventType === 'class.session.rescheduled') {
+    const fallback = `${classTitle} session rescheduled`;
+    return {
+      title: recipient ? `${sessionAudienceLabel} rescheduled` : fallback,
+      summary:
+        getRescheduledSessionSummary(payload) ??
+        getEventSummary(payload, 'A class session has been rescheduled.'),
+    };
+  }
+
+  if (eventType === 'class.sessions.rescheduled') {
+    const fallback = `${classTitle} sessions rescheduled`;
+    return {
+      title: recipient ? `${sessionAudienceLabel} rescheduled` : fallback,
+      summary:
+        getRescheduledSessionSummary(payload) ??
+        getEventSummary(payload, 'Class sessions have been rescheduled.'),
+    };
+  }
+
+  if (eventType === 'class.session.canceled') {
+    const fallback = `${classTitle} session cancelled`;
+    return {
+      title: recipient ? `${sessionAudienceLabel} cancelled` : fallback,
+      summary:
+        getCanceledSessionSummary(payload) ??
+        getEventSummary(payload, 'A class session has been cancelled.'),
+    };
+  }
+
+  if (eventType === 'class.sessions.canceled') {
+    const fallback = `${classTitle} sessions cancelled`;
+    return {
+      title: recipient ? `${sessionAudienceLabel} cancelled` : fallback,
+      summary:
+        getCanceledSessionSummary(payload) ??
+        getEventSummary(payload, 'Class sessions have been cancelled.'),
+    };
+  }
+
+  if (eventType === 'session.started') {
+    const fallback = `${classTitle} is live now`;
+    return {
+      title: recipient ? `${sessionAudienceLabel} is live now` : fallback,
+      summary: getEventSummary(payload, 'Tap to join the live session.'),
+    };
+  }
+
+  if (eventType === 'session.ended') {
+    const fallback = `${classTitle} has ended`;
+    return {
+      title: recipient ? `${sessionAudienceLabel} has ended` : fallback,
+      summary: getEventSummary(payload, 'Your live session has ended.'),
+    };
+  }
+
+  if (eventType === 'session.completed') {
+    const fallback = `${classTitle} is complete`;
+    return {
+      title: recipient ? `${sessionAudienceLabel} is complete` : fallback,
+      summary: getEventSummary(payload, 'Your class session is complete.'),
+    };
+  }
+
+  if (eventType === 'payment.reminder' || eventType === 'payment.reminder.sent') {
+    const title = firstDefinedString(payload.title) ?? 'Payment reminder';
+    return {
+      title,
+      summary: getEventSummary(payload, 'A payment is due soon.'),
+    };
+  }
+
+  if (eventType === 'payment.received') {
+    return {
+      title: firstDefinedString(payload.title) ?? 'Payment received',
+      summary: getEventSummary(payload, 'Your payment was received successfully.'),
+    };
+  }
+
+  if (eventType === 'payment.failed') {
+    return {
+      title: firstDefinedString(payload.title) ?? 'Payment failed',
+      summary: getEventSummary(payload, 'There was a problem processing your payment.'),
+    };
+  }
+
+  if (eventType === 'system.notice') {
+    const title = firstDefinedString(payload.title) ?? 'System notice';
+    return {
+      title,
+      summary: getEventSummary(payload, title),
+    };
+  }
+
   if (!members.length) {
     return null;
   }
 
-  const recipient = members.find(
-    (member) => asString(member.profileId) === recipientProfileId,
-  );
   if (!recipient) {
     return null;
   }
-
-  const educator = members.find((member) => asString(member.role) === 'educator');
-  const child = members.find((member) => asString(member.role) === 'child');
-  const teacherName = asOptionalString(educator?.displayName);
-  const studentName = asOptionalString(child?.displayName);
-  const classTitle = asString(payload.title, 'class');
 
   if (eventType === 'session.reminder.sent') {
     const explicitOffset = payload.reminderOffsetMinutes;
@@ -195,45 +544,28 @@ export function buildPersonalizedSessionCopy(
     }
 
     const titleSuffix = `${offsetMinutes} min`;
-    const fallbackTitle = `Class starts in ${offsetMinutes} minutes`;
-    const fallbackSummary = classTitle;
+    const reminderSummary =
+      formatSessionDateTime(
+        firstDefinedString(
+          payload.occurrenceStart,
+          payload.scheduledStartAt,
+          payload.startAt,
+          payload.firstSessionStartAt,
+        ),
+        payload,
+      ) ?? classTitle;
 
-    switch (asString(recipient.role)) {
-      case 'child':
-        if (teacherName) {
-          return {
-            title: `Your class with ${teacherName} starts in ${titleSuffix}`,
-            summary: `${classTitle} with ${teacherName}`,
-          };
-        }
-        return { title: fallbackTitle, summary: fallbackSummary };
-      case 'educator':
-        if (studentName) {
-          return {
-            title: `${studentName}'s class starts in ${titleSuffix}`,
-            summary: `${classTitle} with ${studentName}`,
-          };
-        }
-        return { title: fallbackTitle, summary: fallbackSummary };
-      case 'guardian':
-      case 'staff':
-        if (teacherName && studentName) {
-          return {
-            title: `${studentName}'s class with ${teacherName} starts in ${titleSuffix}`,
-            summary: classTitle,
-          };
-        }
-        return { title: fallbackTitle, summary: fallbackSummary };
-      default:
-        return { title: fallbackTitle, summary: fallbackSummary };
-    }
+    return {
+      title: `${sessionAudienceLabel} starts in ${titleSuffix}`,
+      summary: reminderSummary,
+    };
   }
 
   if (eventType === 'session.feedback_request.sent') {
     const fallbackTitle = `How was today's class?`;
-    const summary = `Rate today's ${classTitle} session`;
+    const summary = `Rate today's ${sessionAudienceLabel} session`;
 
-    switch (asString(recipient.role)) {
+    switch (recipientRole) {
       case 'child':
         if (teacherName) {
           return {
@@ -243,18 +575,18 @@ export function buildPersonalizedSessionCopy(
         }
         return { title: fallbackTitle, summary };
       case 'educator':
-        if (studentName) {
+        if (studentLabel) {
           return {
-            title: `How did ${studentName} do?`,
+            title: `How did ${studentLabel} do in ${classTitle}?`,
             summary,
           };
         }
         return { title: fallbackTitle, summary };
       case 'guardian':
       case 'staff':
-        if (teacherName && studentName) {
+        if (teacherName && studentLabel) {
           return {
-            title: `How was ${studentName}'s class with ${teacherName}?`,
+            title: `How was ${classTitle} for ${studentLabel} with ${teacherName}?`,
             summary,
           };
         }

@@ -15,6 +15,36 @@ export type NotificationConfig = {
 };
 
 export const NOTIFICATION_REGISTRY: Record<string, NotificationConfig> = {
+  'class.session.scheduled': {
+    label: 'Session Scheduled',
+    getRoute: ({ channelId }) =>
+      channelId ? `/(app)/spaces/${channelId}` : '/(app)/(tabs)/schedule',
+  },
+  'class.sessions.scheduled': {
+    label: 'Sessions Scheduled',
+    getRoute: ({ channelId }) =>
+      channelId ? `/(app)/spaces/${channelId}` : '/(app)/(tabs)/schedule',
+  },
+  'class.session.rescheduled': {
+    label: 'Session Rescheduled',
+    getRoute: ({ channelId }) =>
+      channelId ? `/(app)/spaces/${channelId}?tab=sessions` : '/(app)/(tabs)/schedule',
+  },
+  'class.sessions.rescheduled': {
+    label: 'Sessions Rescheduled',
+    getRoute: ({ channelId }) =>
+      channelId ? `/(app)/spaces/${channelId}?tab=sessions` : '/(app)/(tabs)/schedule',
+  },
+  'class.session.canceled': {
+    label: 'Session Cancelled',
+    getRoute: ({ channelId }) =>
+      channelId ? `/(app)/spaces/${channelId}?tab=sessions` : '/(app)/(tabs)/schedule',
+  },
+  'class.sessions.canceled': {
+    label: 'Sessions Cancelled',
+    getRoute: ({ channelId }) =>
+      channelId ? `/(app)/spaces/${channelId}?tab=sessions` : '/(app)/(tabs)/schedule',
+  },
   'message.posted': {
     label: 'New Messages',
     getRoute: ({ scopeKind, scopeId, channelId, threadId }) => {
@@ -48,17 +78,10 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationConfig> = {
     label: 'Homework Reviewed',
     getRoute: () => '/(app)/(tabs)/home',
   },
-  'class.session.scheduled': {
-    label: 'Session Scheduled',
-    getRoute: () => '/(app)/(tabs)/schedule',
-  },
-  'class.session.rescheduled': {
-    label: 'Session Rescheduled',
-    getRoute: () => '/(app)/(tabs)/schedule',
-  },
-  'class.session.canceled': {
-    label: 'Session Cancelled',
-    getRoute: () => '/(app)/(tabs)/schedule',
+  'session.started': {
+    label: 'Session Started',
+    getRoute: ({ channelId }) =>
+      channelId ? `/(app)/spaces/${channelId}` : '/(app)/(tabs)/schedule',
   },
   'session.reminder.sent': {
     label: 'Session Reminders',
@@ -118,6 +141,26 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationConfig> = {
         : scopeKind === 'learning_space' && channelId
           ? `/(app)/spaces/${channelId}`
           : '/(app)/(tabs)/inbox',
+  },
+  'payment.reminder': {
+    label: 'Payment Reminder',
+    getRoute: () => '/(app)/(tabs)/inbox',
+  },
+  'payment.reminder.sent': {
+    label: 'Payment Reminder',
+    getRoute: () => '/(app)/(tabs)/inbox',
+  },
+  'payment.received': {
+    label: 'Payment Received',
+    getRoute: () => '/(app)/(tabs)/inbox',
+  },
+  'payment.failed': {
+    label: 'Payment Failed',
+    getRoute: () => '/(app)/(tabs)/inbox',
+  },
+  'system.notice': {
+    label: 'System Notice',
+    getRoute: () => '/(app)/(tabs)/inbox',
   },
 };
 

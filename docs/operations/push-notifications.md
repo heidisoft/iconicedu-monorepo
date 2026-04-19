@@ -147,6 +147,41 @@ When an activity event is projected, `enqueueNotificationDispatchJobs()` is call
 
 ---
 
+## Push Template Catalog
+
+The API now treats the following event types as the canonical push template surface. Each job carries a title/body pair plus deep-link metadata that mobile resolves from `prefKey`, `scopeKind`, `scopeId`, `channelId`, and `threadId`.
+
+| Event type                      | Push title pattern                                                     | Push body pattern                      | Mobile deep link                                                  |
+| ------------------------------- | ---------------------------------------------------------------------- | -------------------------------------- | ----------------------------------------------------------------- |
+| `dm.posted`                     | `{sender} sent you a direct message` / image / voice / file variants   | message preview or title fallback      | `/(app)/dm/:channelId` or Messages tab fallback                   |
+| `dm.reaction.added`             | `{sender} reacted {emoji} to your message`                             | mirrors title                          | `/(app)/dm/:channelId` or Messages tab fallback                   |
+| `message.posted`                | mention / thread-reply / channel-message variants                      | message preview                        | `/(app)/channel/:id` or `/(app)/spaces/:id`, preserves `threadId` |
+| `reaction.added`                | `{sender} reacted {emoji} to your message` with optional context title | mirrors title                          | channel or space route from scope metadata                        |
+| `file.uploaded`                 | shared file / image / audio / multiple files variants                  | content preview or file name           | channel or space route from scope metadata                        |
+| `class.session.scheduled`       | `{classTitle} session scheduled`                                       | payload summary or schedule fallback   | class space when `channelId` exists, else Schedule tab            |
+| `class.sessions.scheduled`      | `{classTitle} sessions scheduled`                                      | payload summary or schedule fallback   | class space when `channelId` exists, else Schedule tab            |
+| `class.session.rescheduled`     | `{classTitle} session rescheduled`                                     | payload summary or reschedule fallback | class space when `channelId` exists, else Schedule tab            |
+| `class.sessions.rescheduled`    | `{classTitle} sessions rescheduled`                                    | payload summary or reschedule fallback | class space when `channelId` exists, else Schedule tab            |
+| `class.session.canceled`        | `{classTitle} session cancelled`                                       | payload summary or cancel fallback     | class space when `channelId` exists, else Schedule tab            |
+| `class.sessions.canceled`       | `{classTitle} sessions cancelled`                                      | payload summary or cancel fallback     | class space when `channelId` exists, else Schedule tab            |
+| `session.started`               | `{classTitle} is live now`                                             | join-now fallback or payload summary   | class space when `channelId` exists, else Schedule tab            |
+| `session.reminder.sent`         | personalized reminder by role when members are present                 | personalized class/session summary     | class space when `channelId` exists, else Schedule tab            |
+| `session.feedback_request.sent` | personalized feedback request by role when members are present         | feedback prompt summary                | class space when `channelId` exists, else Schedule tab            |
+| `payment.reminder`              | payload title or `Payment reminder`                                    | payload description / summary          | Inbox fallback                                                    |
+| `payment.reminder.sent`         | payload title or `Payment reminder`                                    | payload description / summary          | Inbox fallback                                                    |
+| `payment.received`              | payload title or `Payment received`                                    | payload description / summary          | Inbox fallback                                                    |
+| `payment.failed`                | payload title or `Payment failed`                                      | payload description / summary          | Inbox fallback                                                    |
+| `system.notice`                 | payload title or `System notice`                                       | payload message / summary              | Inbox fallback                                                    |
+
+Notes:
+
+- Deep-link routing is finalized in `apps/mobile/src/lib/notifications/notification-config.ts`.
+- Push body text is capped by Expo payload constraints; previews are truncated before send.
+- For conversational pushes, `activityFeedItemId` is included so the notification can be marked read on tap.
+- `threadId` is preserved for thread reply notifications so mobile opens the correct thread context.
+
+---
+
 ### 4. Dispatch Pipeline
 
 **Cron trigger:** Supabase Edge Function `notifications-dispatch` runs via `public.configure_edge_function_cron()` in `supabase/migrations/20260417000000_edge_function_cron.sql`.

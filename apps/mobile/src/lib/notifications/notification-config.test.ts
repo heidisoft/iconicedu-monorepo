@@ -57,6 +57,39 @@ describe('NOTIFICATION_REGISTRY', () => {
     expect(route).toBe('/(app)/(tabs)/schedule');
   });
 
+  it('routes class.sessions.scheduled with a channelId to the class space', () => {
+    const route = NOTIFICATION_REGISTRY['class.sessions.scheduled'].getRoute({
+      channelId: 'ch-2',
+    });
+    expect(route).toBe('/(app)/spaces/ch-2');
+  });
+
+  it('routes class.sessions.rescheduled without a channelId to the schedule tab', () => {
+    const route = NOTIFICATION_REGISTRY['class.sessions.rescheduled'].getRoute({});
+    expect(route).toBe('/(app)/(tabs)/schedule');
+  });
+
+  it('routes class.session.rescheduled with a channelId to the classroom sessions tab', () => {
+    const route = NOTIFICATION_REGISTRY['class.session.rescheduled'].getRoute({
+      channelId: 'ch-2',
+    });
+    expect(route).toBe('/(app)/spaces/ch-2?tab=sessions');
+  });
+
+  it('routes class.session.canceled with a channelId to the classroom sessions tab', () => {
+    const route = NOTIFICATION_REGISTRY['class.session.canceled'].getRoute({
+      channelId: 'ch-3',
+    });
+    expect(route).toBe('/(app)/spaces/ch-3?tab=sessions');
+  });
+
+  it('routes session.started with a channelId to the class space', () => {
+    const route = NOTIFICATION_REGISTRY['session.started'].getRoute({
+      channelId: 'ch-live',
+    });
+    expect(route).toBe('/(app)/spaces/ch-live');
+  });
+
   it('routes session.feedback_request.sent with a channelId to the class space', () => {
     const route = NOTIFICATION_REGISTRY['session.feedback_request.sent'].getRoute({
       channelId: 'ch-1',
@@ -67,6 +100,16 @@ describe('NOTIFICATION_REGISTRY', () => {
   it('routes session.feedback_request.sent without a channelId to the schedule tab', () => {
     const route = NOTIFICATION_REGISTRY['session.feedback_request.sent'].getRoute({});
     expect(route).toBe('/(app)/(tabs)/schedule');
+  });
+
+  it('routes payment.failed to inbox', () => {
+    const route = NOTIFICATION_REGISTRY['payment.failed'].getRoute({});
+    expect(route).toBe('/(app)/(tabs)/inbox');
+  });
+
+  it('routes system.notice to inbox', () => {
+    const route = NOTIFICATION_REGISTRY['system.notice'].getRoute({});
+    expect(route).toBe('/(app)/(tabs)/inbox');
   });
 
   it('falls back to DEFAULT_NOTIFICATION_ROUTE for unknown prefKeys', () => {
