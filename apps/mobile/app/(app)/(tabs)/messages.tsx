@@ -23,6 +23,7 @@ import {
   type PresenceDisplayStatus,
 } from '@/hooks/use-online-profile-ids';
 import { useSupervisedDirectMessages } from '@/hooks/use-supervised-direct-messages';
+import { useFamilyView } from '@/providers/family-view-provider';
 import { useTheme } from '@/providers/theme-provider';
 import { ChannelTopicIconBadge } from '@/lib/learning-space-icons';
 import type { AppColors } from '@/lib/theme';
@@ -698,6 +699,7 @@ export default function MessagesScreen() {
 
   const { data: account, isPending: accountLoading } = useAccount();
   const { data: profile } = useProfile();
+  const { guardianAccountId, guardianProfileId } = useFamilyView();
   const { colors } = useTheme();
   const router = useRouter();
   const s = useMemo(() => makeStyles(colors), [colors]);
@@ -726,7 +728,7 @@ export default function MessagesScreen() {
     data: supervisedDms,
     isPending: supervisedLoading,
     refetch: refetchSupervised,
-  } = useSupervisedDirectMessages(orgId, accountId, myProfileId);
+  } = useSupervisedDirectMessages(orgId, guardianAccountId, guardianProfileId);
 
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(async () => {

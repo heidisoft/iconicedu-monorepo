@@ -71,6 +71,13 @@ jest.mock('@/hooks/use-unread-sync', () => ({
   useUnreadSync: jest.fn(),
 }));
 
+jest.mock('@/providers/family-view-provider', () => ({
+  useFamilyView: () => ({
+    guardianAccountId: 'acct-1',
+    guardianProfileId: 'profile-1',
+  }),
+}));
+
 jest.mock('lucide-react-native', () => ({
   Home: () => null,
   MessageCircle: () => null,

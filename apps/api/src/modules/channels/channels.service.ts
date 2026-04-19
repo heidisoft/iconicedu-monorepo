@@ -547,6 +547,7 @@ export class ChannelsService {
     const sessionSupabase = createSupabaseSessionClient(accessToken);
     const serviceSupabase = createSupabaseServiceClient();
 
+    // Step 1: Try session-level membership check (works for direct profile owners).
     const membershipLookup = await sessionSupabase
       .from('channel_members')
       .select('id')
@@ -559,9 +560,63 @@ export class ChannelsService {
       throw new InternalServerErrorException(membershipLookup.error.message);
     }
 
+    // Step 2: If session can't see the membership (guardian acting as child via RLS),
+    // verify authorization via family_links using the service client.
+    if (!membershipLookup.data) {
+      const { data: authUser, error: authError } = await sessionSupabase.auth.getUser();
+      if (authError || !authUser?.user?.id) {
+        return { unreadCount: 0 };
+      }
+      const authUserId = authUser.user.id;
+
+      const { data: guardianAccount, error: guardianErr } = await serviceSupabase
+        .from('accounts')
+        .select('id')
+        .eq('auth_user_id', authUserId)
+        .eq('org_id', input.orgId)
+        .is('deleted_at', null)
+        .maybeSingle<{ id: string }>();
+      if (guardianErr) throw new InternalServerErrorException(guardianErr.message);
+      if (!guardianAccount) return { unreadCount: 0 };
+
+      const { data: childProfile, error: profileErr } = await serviceSupabase
+        .from('profiles')
+        .select('account_id')
+        .eq('id', input.profileId)
+        .eq('org_id', input.orgId)
+        .is('deleted_at', null)
+        .maybeSingle<{ account_id: string }>();
+      if (profileErr) throw new InternalServerErrorException(profileErr.message);
+      if (!childProfile) return { unreadCount: 0 };
+
+      const { data: familyLink, error: familyLinkErr } = await serviceSupabase
+        .from('family_links')
+        .select('id')
+        .eq('org_id', input.orgId)
+        .eq('guardian_account_id', guardianAccount.id)
+        .eq('child_account_id', childProfile.account_id)
+        .is('deleted_at', null)
+        .maybeSingle<{ id: string }>();
+      if (familyLinkErr) throw new InternalServerErrorException(familyLinkErr.message);
+      if (!familyLink) return { unreadCount: 0 };
+
+      // Confirm child is actually a member of the channel via service client.
+      const { data: serviceMembership, error: svcMemberErr } = await serviceSupabase
+        .from('channel_members')
+        .select('id')
+        .eq('org_id', input.orgId)
+        .eq('channel_id', input.channelId)
+        .eq('profile_id', input.profileId)
+        .is('deleted_at', null)
+        .maybeSingle<{ id: string }>();
+      if (svcMemberErr) throw new InternalServerErrorException(svcMemberErr.message);
+      if (!serviceMembership) return { unreadCount: 0 };
+    }
+
+    // Use service client for message lookups — guardian's session is RLS-blocked from child's messages.
     let resolvedMessageId = input.lastReadMessageId;
     if (resolvedMessageId) {
-      const messageLookup = await sessionSupabase
+      const messageLookup = await serviceSupabase
         .from('messages')
         .select('id')
         .eq('org_id', input.orgId)
@@ -573,7 +628,7 @@ export class ChannelsService {
         throw new InternalServerErrorException(messageLookup.error.message);
       }
     } else {
-      const latestLookup = await sessionSupabase
+      const latestLookup = await serviceSupabase
         .from('messages')
         .select('id')
         .eq('org_id', input.orgId)
