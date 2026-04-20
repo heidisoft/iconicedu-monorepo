@@ -416,11 +416,12 @@ describe('resolveUnreadIdsForTab', () => {
 
     expect(resolveUnreadIdsForTab(sections, 'classes')).toEqual([
       'leaf-classes',
+      'leaf-payment',
       'sub-unread',
       'backing-id-1',
       'backing-id-2',
     ]);
-    expect(resolveUnreadIdsForTab(sections, 'payment')).toEqual(['leaf-payment']);
+    expect(resolveUnreadIdsForTab(sections, 'payment')).toEqual([]);
     expect(resolveUnreadIdsForTab(sections, 'all')).toEqual([
       'leaf-classes',
       'leaf-payment',

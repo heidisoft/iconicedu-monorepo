@@ -45,7 +45,7 @@ describe('shared message activity helper', () => {
     publishActivityEventMock.mockReset();
   });
 
-  it('publishes dm.posted for direct messages', async () => {
+  it('publishes message.posted for direct messages', async () => {
     const supabase = createSupabaseMock({
       channel_members: [
         {
@@ -87,7 +87,7 @@ describe('shared message activity helper', () => {
     expect(publishActivityEventMock).toHaveBeenCalledTimes(1);
     expect(publishActivityEventMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        eventType: 'dm.posted',
+        eventType: 'message.posted',
         audienceRules: [{ kind: 'users_only', userIds: ['recipient-1'] }],
         payload: expect.objectContaining({
           channelId: 'channel-1',

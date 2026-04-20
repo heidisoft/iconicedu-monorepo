@@ -390,9 +390,15 @@ describe('buildActivityFeedForProfile', () => {
             scope: { kind: 'channel', channelId: 'channel-dm-1' },
             visibility: 'scope_only',
           },
-          verb: 'dms.posted',
+          verb: 'messages.posted',
           actor_profile_id: 'actor-1',
-          refs: {},
+          refs: {
+            actor: {
+              profile: {
+                displayName: 'Educator',
+              },
+            },
+          },
           group_key: 'dm-posted:channel-dm-1:2026-03-07T16',
           group_type: 'message',
           content: {
@@ -416,9 +422,15 @@ describe('buildActivityFeedForProfile', () => {
             scope: { kind: 'channel', channelId: 'channel-dm-1' },
             visibility: 'scope_only',
           },
-          verb: 'dm.posted',
+          verb: 'message.posted',
           actor_profile_id: 'actor-1',
-          refs: {},
+          refs: {
+            actor: {
+              profile: {
+                displayName: 'Educator',
+              },
+            },
+          },
           content: {
             headline: {
               primary: 'Sender sent you a direct message',
@@ -439,9 +451,15 @@ describe('buildActivityFeedForProfile', () => {
             scope: { kind: 'channel', channelId: 'channel-dm-1' },
             visibility: 'scope_only',
           },
-          verb: 'dm.posted',
+          verb: 'message.posted',
           actor_profile_id: 'actor-1',
-          refs: {},
+          refs: {
+            actor: {
+              profile: {
+                displayName: 'Educator',
+              },
+            },
+          },
           content: {
             headline: {
               primary: 'Sender sent you a direct message',
@@ -465,13 +483,11 @@ describe('buildActivityFeedForProfile', () => {
       throw new Error('Expected grouped item');
     }
 
-    expect(group.content.headline.primary).toBe(
-      'Educator sent you multiple direct messages in',
-    );
+    expect(group.content.headline.primary).toBe('Educator sent you multiple messages in');
     expect(group.content.headline.secondary).toBe('Priya + Riley');
   });
 
-  it('keeps DM parent count based on dm.posted leaves when reaction leaves are present', async () => {
+  it('keeps DM parent count based on message.posted leaves when reaction leaves are present', async () => {
     getActivityFeedItemsByOrg.mockResolvedValue({
       data: [
         {
@@ -486,9 +502,15 @@ describe('buildActivityFeedForProfile', () => {
             scope: { kind: 'channel', channelId: 'channel-dm-1' },
             visibility: 'scope_only',
           },
-          verb: 'dms.posted',
+          verb: 'messages.posted',
           actor_profile_id: 'actor-1',
-          refs: {},
+          refs: {
+            actor: {
+              profile: {
+                displayName: 'Educator',
+              },
+            },
+          },
           group_key: 'dm-posted:channel-dm-1:2026-03-07T16',
           group_type: 'message',
           content: {
@@ -512,9 +534,15 @@ describe('buildActivityFeedForProfile', () => {
             scope: { kind: 'channel', channelId: 'channel-dm-1' },
             visibility: 'scope_only',
           },
-          verb: 'dm.posted',
+          verb: 'message.posted',
           actor_profile_id: 'actor-1',
-          refs: {},
+          refs: {
+            actor: {
+              profile: {
+                displayName: 'Educator',
+              },
+            },
+          },
           content: {
             headline: {
               primary: 'Sender sent you a direct message',
@@ -535,9 +563,15 @@ describe('buildActivityFeedForProfile', () => {
             scope: { kind: 'channel', channelId: 'channel-dm-1' },
             visibility: 'scope_only',
           },
-          verb: 'dm.posted',
+          verb: 'message.posted',
           actor_profile_id: 'actor-1',
-          refs: {},
+          refs: {
+            actor: {
+              profile: {
+                displayName: 'Educator',
+              },
+            },
+          },
           content: {
             headline: {
               primary: 'Sender sent you a direct message',
@@ -585,9 +619,7 @@ describe('buildActivityFeedForProfile', () => {
       throw new Error('Expected grouped item');
     }
 
-    expect(group.content.headline.primary).toBe(
-      'Educator sent you multiple direct messages in',
-    );
+    expect(group.content.headline.primary).toBe('Educator sent you multiple messages in');
   });
 
   it('normalizes grouped channel-message parents for a single sender', async () => {

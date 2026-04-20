@@ -48,7 +48,7 @@ describe('useNotificationHandler', () => {
     mockMarkActivityFeedRead.mockResolvedValue(undefined);
   });
 
-  it('routes dm.posted taps to the DM screen and clears the badge', async () => {
+  it('routes message.posted direct-message taps to the DM screen and clears the badge', async () => {
     renderHook(() => useNotificationHandler());
 
     await waitFor(() => {
@@ -60,7 +60,11 @@ describe('useNotificationHandler', () => {
       notification: {
         request: {
           content: {
-            data: { prefKey: 'dm.posted', channelId: 'ch-1' },
+            data: {
+              prefKey: 'message.posted',
+              channelId: 'ch-1',
+              channelRouteKind: 'dm',
+            },
           },
         },
       },

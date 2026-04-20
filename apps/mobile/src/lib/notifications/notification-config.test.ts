@@ -1,15 +1,16 @@
 import { DEFAULT_NOTIFICATION_ROUTE, NOTIFICATION_REGISTRY } from './notification-config';
 
 describe('NOTIFICATION_REGISTRY', () => {
-  it('routes dm.posted with a channelId to the DM screen', () => {
-    const route = NOTIFICATION_REGISTRY['dm.posted'].getRoute({
+  it('routes message.posted with a DM route kind to the DM screen', () => {
+    const route = NOTIFICATION_REGISTRY['message.posted'].getRoute({
       channelId: 'channel-123',
+      channelRouteKind: 'dm',
     });
     expect(route).toBe('/(app)/dm/channel-123');
   });
 
-  it('routes dm.posted without a channelId to the Messages tab', () => {
-    const route = NOTIFICATION_REGISTRY['dm.posted'].getRoute({});
+  it('routes message.posted without a channelId to the Messages tab', () => {
+    const route = NOTIFICATION_REGISTRY['message.posted'].getRoute({});
     expect(route).toBe('/(app)/(tabs)/messages');
   });
 
