@@ -138,10 +138,11 @@ describe('ConversationHeader', () => {
     expect(screen.getByTestId('circleoff-icon')).toBeTruthy();
   });
 
-  it('renders themed student names after the subtitle', () => {
+  it('renders compact themed student metadata for non-DM conversations', () => {
     render(
       <ConversationHeader
         {...baseProps}
+        kind="space"
         subtitle="Mathematics"
         studentProfiles={[
           { name: 'Ava Lee', themeKey: 'blue' },
@@ -151,7 +152,8 @@ describe('ConversationHeader', () => {
     );
     expect(screen.getByText('Mathematics')).toBeTruthy();
     expect(screen.getByText('Ava Lee')).toBeTruthy();
-    expect(screen.getByText(/Noah Cruz/)).toBeTruthy();
+    expect(screen.getByText('+1 more')).toBeTruthy();
+    expect(screen.queryByText(/Noah Cruz/)).toBeNull();
   });
 
   it('renders supervised subtitle when isReadOnly is true', () => {

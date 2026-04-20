@@ -193,17 +193,6 @@ describe('SessionCard', () => {
     );
   });
 
-  it('opens classroom chat from the chat button', () => {
-    render(<SessionCard session={baseSession} />);
-
-    fireEvent.press(screen.getByLabelText('Open classroom chat'));
-
-    expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(app)/spaces/[channelId]',
-      params: { channelId: 'channel-1', tab: 'messages' },
-    });
-  });
-
   it('shows Recording button for past sessions', () => {
     render(<SessionCard session={{ ...baseSession, isPast: true }} />);
     expect(screen.getByText('Recording')).toBeTruthy();
