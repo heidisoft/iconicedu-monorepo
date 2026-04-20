@@ -5,24 +5,13 @@ import { useEffect, useRef } from 'react';
 import {
   Bell,
   CalendarCheck,
-  CalendarDays,
   CalendarX,
   Check,
   CheckCheck,
-  CheckCircle2,
   ChevronDown,
-  ClipboardCheck,
   CreditCard,
-  FileText,
   GraduationCap,
-  Mic,
   MessageSquare,
-  Paperclip,
-  PhoneOutgoing,
-  Sparkles,
-  UserRoundMinus,
-  UserRoundPlus,
-  Video,
 } from 'lucide-react';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
 import { Button } from '@iconicedu/ui-web/ui/button';
@@ -58,21 +47,10 @@ const INBOX_ICON_MAP: Record<
 > = {
   Bell,
   CalendarCheck,
-  CalendarDays,
   CalendarX,
-  CheckCircle2,
-  ClipboardCheck,
   CreditCard,
-  FileText,
   GraduationCap,
-  Mic,
   MessageSquare,
-  Paperclip,
-  PhoneOutgoing,
-  Sparkles,
-  UserRoundMinus,
-  UserRoundPlus,
-  Video,
 };
 
 const TONE_CLASSNAMES = {
@@ -85,29 +63,11 @@ const TONE_CLASSNAMES = {
 
 const getDefaultIconKey = (activity: ActivityFeedItemVM): InboxIconKeyVM => {
   if (activity.kind === 'group') {
-    if (activity.verb === 'session.started') {
-      return 'Video';
-    }
-    if (activity.verb === 'member.joined') {
-      return 'Mic';
-    }
     switch (activity.grouping?.groupType) {
       case 'payment':
         return 'CreditCard';
-      case 'survey':
-        return 'ClipboardCheck';
-      case 'complete-class':
-        return 'CheckCircle2';
       case 'reminder':
         return 'Bell';
-      case 'recording':
-        return 'Video';
-      case 'notes':
-        return 'FileText';
-      case 'ai-summary':
-        return 'Sparkles';
-      case 'homework':
-        return 'Paperclip';
       case 'message':
         return 'MessageSquare';
       case 'class':
@@ -118,37 +78,24 @@ const getDefaultIconKey = (activity: ActivityFeedItemVM): InboxIconKeyVM => {
   }
 
   switch (activity.verb) {
-    case 'homework.assigned':
-    case 'homework.submitted':
-    case 'homework.reviewed':
-      return 'Paperclip';
-    case 'summary.posted':
-      return 'Sparkles';
-    case 'file.uploaded':
-    case 'file.deleted':
-      return 'FileText';
     case 'message.posted':
-    case 'message.edited':
-    case 'message.deleted':
+    case 'messages.posted':
+    case 'dm.posted':
+    case 'dms.posted':
       return 'MessageSquare';
     case 'reaction.added':
+    case 'reactions.added':
       return 'Bell';
-    case 'class.session.scheduled':
-      return 'CalendarDays';
     case 'class.session.rescheduled':
+    case 'class.sessions.rescheduled':
       return 'CalendarCheck';
     case 'class.session.canceled':
+    case 'class.sessions.canceled':
       return 'CalendarX';
-    case 'class.created':
-    case 'class.updated':
-      return 'GraduationCap';
-    case 'member.invited':
-    case 'members.invited':
-      return 'UserRoundPlus';
-    case 'member.removed':
-      return 'UserRoundMinus';
-    case 'member.joined':
-      return 'Mic';
+
+    case 'payment.reminder.sent':
+    case 'payments.reminder.sent':
+      return 'CreditCard';
     default:
       return 'Bell';
   }

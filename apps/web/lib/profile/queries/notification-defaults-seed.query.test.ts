@@ -18,15 +18,8 @@ describe('seedSignupDefaultNotificationPreferences', () => {
         expect.objectContaining({
           org_id: 'org-1',
           profile_id: 'profile-1',
-          pref_key: 'payment.reminder',
+          pref_key: 'payment.reminder.sent',
           channels: ['push', 'email'],
-          muted: false,
-        }),
-        expect.objectContaining({
-          org_id: 'org-1',
-          profile_id: 'profile-1',
-          pref_key: 'system.notice',
-          channels: ['push', 'email', 'sms'],
           muted: false,
         }),
       ]),
@@ -34,9 +27,14 @@ describe('seedSignupDefaultNotificationPreferences', () => {
     );
 
     const rows = upsert.mock.calls[0]?.[0] as Array<{ pref_key: string }>;
-    expect(rows).toHaveLength(12);
+    expect(rows).toHaveLength(7);
     expect(rows.map((row) => row.pref_key)).toEqual(
-      expect.arrayContaining(['reaction.added', 'session.reminder.sent', 'dm.posted']),
+      expect.arrayContaining([
+        'payment.reminder.sent',
+        'reaction.added',
+        'session.reminder.sent',
+        'dm.posted',
+      ]),
     );
   });
 });

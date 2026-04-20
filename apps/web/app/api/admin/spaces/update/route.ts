@@ -11,7 +11,6 @@ import type { LearningSpaceCreatePayload } from '@iconicedu/shared-types';
 type UpdateLearningSpaceRequest = {
   learningSpaceId?: string;
   payload?: LearningSpaceCreatePayload;
-  sendActivityNotifications?: boolean;
 };
 
 function isValidPayload(payload?: LearningSpaceCreatePayload) {
@@ -24,7 +23,7 @@ function isValidPayload(payload?: LearningSpaceCreatePayload) {
 }
 
 export async function POST(request: Request) {
-  const { learningSpaceId, payload, sendActivityNotifications } =
+  const { learningSpaceId, payload } =
     (await request.json()) as UpdateLearningSpaceRequest;
 
   if (!learningSpaceId || !isValidPayload(payload)) {
@@ -49,17 +48,10 @@ export async function POST(request: Request) {
 
     const actor = await requireParentActorContext(supabase);
 
-    await updateLearningSpaceFromPayload(
-      learningSpaceId,
-      payload!,
-      {
-        orgId: actor.account.org_id,
-        actorProfileId: actor.profile.id,
-      },
-      {
-        sendActivityNotifications,
-      },
-    );
+    await updateLearningSpaceFromPayload(learningSpaceId, payload!, {
+      orgId: actor.account.org_id,
+      actorProfileId: actor.profile.id,
+    });
     return NextResponse.json({ success: true });
   } catch (error) {
     if (error instanceof ParentModeRequiredError) {

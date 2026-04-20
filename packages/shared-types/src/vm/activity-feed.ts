@@ -8,79 +8,25 @@ import type {
   UUID,
 } from '@iconicedu/shared-types/shared/shared';
 
-export type ActivityGroupKeyVM =
-  | 'homework'
-  | 'message'
-  | 'class'
-  | 'reminder'
-  | 'recording'
-  | 'notes'
-  | 'ai-summary'
-  | 'payment'
-  | 'survey'
-  | 'complete-class';
+export type ActivityGroupKeyVM = 'message' | 'class' | 'payment' | 'reminder';
 
 export type ActivityVerbVM =
-  | 'class.created'
-  | 'classes.created'
-  | 'class.updated'
-  | 'channel.updated'
-  | 'classes.updated'
-  | 'class.session.scheduled'
-  | 'class.sessions.scheduled'
   | 'class.session.rescheduled'
   | 'class.sessions.rescheduled'
   | 'class.session.canceled'
   | 'class.sessions.canceled'
-  | 'session.started'
-  | 'sessions.started'
-  | 'session.ended'
-  | 'sessions.ended'
   | 'dm.posted'
   | 'dms.posted'
-  | 'dm.edited'
-  | 'dms.edited'
-  | 'dm.deleted'
-  | 'dms.deleted'
   | 'message.posted'
   | 'messages.posted'
-  | 'message.edited'
-  | 'messages.edited'
-  | 'message.deleted'
-  | 'messages.deleted'
   | 'reaction.added'
   | 'reactions.added'
-  | 'homework.assigned'
-  | 'homeworks.assigned'
-  | 'homework.submitted'
-  | 'homeworks.submitted'
-  | 'homework.reviewed'
-  | 'homeworks.reviewed'
-  | 'summary.posted'
-  | 'summaries.posted'
-  | 'file.uploaded'
-  | 'files.uploaded'
-  | 'file.deleted'
-  | 'files.deleted'
-  | 'member.invited'
-  | 'members.invited'
-  | 'members.joined'
-  | 'member.joined'
-  | 'member.removed'
-  | 'payment.reminder'
-  | 'payments.reminder'
   | 'payment.reminder.sent'
   | 'payments.reminder.sent'
-  | 'payment.received'
-  | 'payments.received'
-  | 'payment.failed'
-  | 'payments.failed'
   | 'session.reminder.sent'
   | 'sessions.reminder.sent'
   | 'session.feedback_request.sent'
-  | 'sessions.feedback_request.sent'
-  | 'system.notice'
-  | 'systems.notice';
+  | 'sessions.feedback_request.sent';
 
 export type ActivitySourceKindVM =
   | 'profile'
@@ -109,23 +55,12 @@ export type ActivityActorVM = UserProfileVM;
 export type InboxTabKeyVM = 'all' | 'classes' | 'payment' | 'system';
 
 export type InboxIconKeyVM =
-  | 'Bell'
   | 'CalendarCheck'
-  | 'CalendarDays'
   | 'CalendarX'
-  | 'CheckCircle2'
-  | 'ClipboardCheck'
   | 'CreditCard'
-  | 'FileText'
   | 'GraduationCap'
   | 'MessageSquare'
-  | 'Mic'
-  | 'Paperclip'
-  | 'PhoneOutgoing'
-  | 'Sparkles'
-  | 'UserRoundMinus'
-  | 'UserRoundPlus'
-  | 'Video';
+  | 'Bell';
 
 export type InboxLeadingVM =
   | {

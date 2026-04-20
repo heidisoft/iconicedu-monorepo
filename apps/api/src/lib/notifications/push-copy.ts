@@ -346,42 +346,6 @@ export function buildPersonalizedSessionCopy(
     return { title, summary: content || title };
   }
 
-  if (eventType === 'file.uploaded') {
-    const senderName = asString(payload.senderName);
-    const name = asString(payload.name, 'File');
-    const content = asOptionalString(payload.content);
-    const contextTitle = getContextTitle(payload);
-    const dmMessageKind = asString(payload.dmMessageKind);
-    const fileCount =
-      typeof payload.fileCount === 'number' && Number.isFinite(payload.fileCount)
-        ? payload.fileCount
-        : 1;
-
-    let title: string;
-    if (!senderName) {
-      title = fileCount > 1 ? 'New files shared' : 'New file shared';
-    } else if (fileCount > 1) {
-      title = contextTitle
-        ? `${senderName} shared ${fileCount} files in ${contextTitle}`
-        : `${senderName} shared ${fileCount} files`;
-    } else if (dmMessageKind === 'image') {
-      title = contextTitle
-        ? `${senderName} shared an image in ${contextTitle}`
-        : `${senderName} shared an image`;
-    } else if (dmMessageKind === 'audio') {
-      title = contextTitle
-        ? `${senderName} shared an audio file in ${contextTitle}`
-        : `${senderName} shared an audio file`;
-    } else {
-      title = contextTitle
-        ? `${senderName} shared a file in ${contextTitle}`
-        : `${senderName} shared a file`;
-    }
-
-    const summary = (content ?? name).slice(0, 160);
-    return { title, summary };
-  }
-
   if (eventType === 'reaction.added') {
     const senderName = asString(payload.senderName);
     const emoji = asString(payload.emoji);
@@ -397,26 +361,6 @@ export function buildPersonalizedSessionCopy(
       title = 'New reaction to your message';
     }
     return { title, summary: title };
-  }
-
-  if (eventType === 'class.session.scheduled') {
-    const fallback = `${classTitle} session scheduled`;
-    return {
-      title: recipient ? `${sessionAudienceLabel} scheduled` : fallback,
-      summary:
-        getScheduledSessionSummary(payload) ??
-        getEventSummary(payload, 'A class session has been scheduled.'),
-    };
-  }
-
-  if (eventType === 'class.sessions.scheduled') {
-    const fallback = `${classTitle} sessions scheduled`;
-    return {
-      title: recipient ? `${sessionAudienceLabel} scheduled` : fallback,
-      summary:
-        getScheduledSessionSummary(payload) ??
-        getEventSummary(payload, 'Class sessions have been scheduled.'),
-    };
   }
 
   if (eventType === 'class.session.rescheduled') {
@@ -459,22 +403,6 @@ export function buildPersonalizedSessionCopy(
     };
   }
 
-  if (eventType === 'session.started') {
-    const fallback = `${classTitle} is live now`;
-    return {
-      title: recipient ? `${sessionAudienceLabel} is live now` : fallback,
-      summary: getEventSummary(payload, 'Tap to join the live session.'),
-    };
-  }
-
-  if (eventType === 'session.ended') {
-    const fallback = `${classTitle} has ended`;
-    return {
-      title: recipient ? `${sessionAudienceLabel} has ended` : fallback,
-      summary: getEventSummary(payload, 'Your live session has ended.'),
-    };
-  }
-
   if (eventType === 'session.completed') {
     const fallback = `${classTitle} is complete`;
     return {
@@ -483,33 +411,11 @@ export function buildPersonalizedSessionCopy(
     };
   }
 
-  if (eventType === 'payment.reminder' || eventType === 'payment.reminder.sent') {
+  if (eventType === 'payment.reminder.sent') {
     const title = firstDefinedString(payload.title) ?? 'Payment reminder';
     return {
       title,
       summary: getEventSummary(payload, 'A payment is due soon.'),
-    };
-  }
-
-  if (eventType === 'payment.received') {
-    return {
-      title: firstDefinedString(payload.title) ?? 'Payment received',
-      summary: getEventSummary(payload, 'Your payment was received successfully.'),
-    };
-  }
-
-  if (eventType === 'payment.failed') {
-    return {
-      title: firstDefinedString(payload.title) ?? 'Payment failed',
-      summary: getEventSummary(payload, 'There was a problem processing your payment.'),
-    };
-  }
-
-  if (eventType === 'system.notice') {
-    const title = firstDefinedString(payload.title) ?? 'System notice';
-    return {
-      title,
-      summary: getEventSummary(payload, title),
     };
   }
 

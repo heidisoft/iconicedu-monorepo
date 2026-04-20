@@ -47,65 +47,22 @@ type ScopedNotificationPreference = {
 const defineNotificationItems = <T extends NotificationSectionItem[]>(items: T) => items;
 
 const ACTIVITY_SCOPED_VERB_KEYS: ActivityVerbVM[] = [
-  'class.created',
-  'classes.created',
-  'class.updated',
-  'classes.updated',
-  'class.session.scheduled',
-  'class.sessions.scheduled',
   'class.session.rescheduled',
   'class.sessions.rescheduled',
   'class.session.canceled',
   'class.sessions.canceled',
-  'session.started',
-  'sessions.started',
-  'session.ended',
-  'sessions.ended',
   'dm.posted',
   'dms.posted',
-  'dm.edited',
-  'dms.edited',
-  'dm.deleted',
-  'dms.deleted',
   'message.posted',
   'messages.posted',
-  'message.edited',
-  'messages.edited',
-  'message.deleted',
-  'messages.deleted',
   'reaction.added',
   'reactions.added',
-  'homework.assigned',
-  'homeworks.assigned',
-  'homework.submitted',
-  'homeworks.submitted',
-  'homework.reviewed',
-  'homeworks.reviewed',
-  'summary.posted',
-  'summaries.posted',
-  'file.uploaded',
-  'files.uploaded',
-  'file.deleted',
-  'files.deleted',
-  'member.invited',
-  'members.invited',
-  'members.joined',
-  'member.joined',
-  'member.removed',
-  'payment.reminder',
-  'payments.reminder',
   'payment.reminder.sent',
   'payments.reminder.sent',
-  'payment.received',
-  'payments.received',
-  'payment.failed',
-  'payments.failed',
   'session.reminder.sent',
   'sessions.reminder.sent',
   'session.feedback_request.sent',
   'sessions.feedback_request.sent',
-  'system.notice',
-  'systems.notice',
 ];
 
 const ACTIVITY_VERB_CONTEXT_ORDER = [
@@ -141,32 +98,8 @@ function resolveActivityVerbContext(
   ) {
     return 'Channel Message';
   }
-  if (verb.startsWith('homework.') || verb.startsWith('homeworks.')) {
-    return 'Homework';
-  }
-  if (verb.startsWith('summary.') || verb.startsWith('summaries.')) {
-    return 'Session';
-  }
-  if (
-    verb.startsWith('file.') ||
-    verb.startsWith('files.') ||
-    verb.startsWith('notes.')
-  ) {
-    return 'Files & Notes';
-  }
-  if (
-    verb.startsWith('member.') ||
-    verb.startsWith('members.') ||
-    verb.startsWith('role.') ||
-    verb.startsWith('roles.')
-  ) {
-    return 'Membership';
-  }
   if (verb.startsWith('payment.') || verb.startsWith('payments.')) {
     return 'Billing';
-  }
-  if (verb.startsWith('system.') || verb.startsWith('systems.')) {
-    return 'System';
   }
   return 'Other';
 }
@@ -301,19 +234,11 @@ export function NotificationsTab({
             title: 'Billing & Payments',
             icon: Wallet,
             items: defineNotificationItems([
-              { key: 'payment.reminder', label: 'Payment reminder' },
-              { key: 'payment.received', label: 'Payment received' },
-              { key: 'payment.failed', label: 'Payment failed' },
+              { key: 'payment.reminder.sent', label: 'Payment reminder sent' },
             ]),
           },
         ]
       : []),
-    {
-      key: 'system',
-      title: 'System Verb Notifications',
-      icon: Megaphone,
-      items: defineNotificationItems([{ key: 'system.notice', label: 'System notices' }]),
-    },
   ] satisfies NotificationSection[];
 
   const notificationKeys = React.useMemo(
@@ -386,18 +311,9 @@ export function NotificationsTab({
             group.context !== 'Direct Message' &&
             group.context !== 'Class' &&
             group.context !== 'Session' &&
-            group.context !== 'Homework' &&
             group.context !== 'Billing' &&
             group.context !== 'System',
         )
-        .map((group) => ({
-          ...group,
-          verbs: group.verbs.filter(
-            (verbFamily) =>
-              !verbFamily.keys.includes('summary.posted') &&
-              !verbFamily.keys.includes('summaries.posted'),
-          ),
-        }))
         .filter((group) => group.verbs.length > 0),
     [scopedVerbGroups],
   );
@@ -426,27 +342,8 @@ export function NotificationsTab({
     [availableAlertChannels],
   );
   const directMessageAlertVerbGroups = React.useMemo(() => {
-    const directMessageGroups = scopedVerbGroups.filter(
-      (group) => group.context === 'Direct Message',
-    );
-    const dmFileVerbFamilies = scopedVerbFamilies.filter(
-      (verbFamily) =>
-        verbFamily.keys.includes('file.uploaded') ||
-        verbFamily.keys.includes('files.uploaded') ||
-        verbFamily.keys.includes('file.deleted') ||
-        verbFamily.keys.includes('files.deleted'),
-    );
-    if (!dmFileVerbFamilies.length) {
-      return directMessageGroups;
-    }
-    return [
-      ...directMessageGroups,
-      {
-        context: 'Files & Notes' as const,
-        verbs: dmFileVerbFamilies,
-      },
-    ];
-  }, [scopedVerbFamilies, scopedVerbGroups]);
+    return scopedVerbGroups.filter((group) => group.context === 'Direct Message');
+  }, [scopedVerbGroups]);
 
   const [selectedScopedChannelId, setSelectedScopedChannelId] =
     React.useState<string>(GLOBAL_ALERT_SCOPE_ID);

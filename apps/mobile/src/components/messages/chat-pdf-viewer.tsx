@@ -14,7 +14,7 @@ import {
   GestureHandlerRootView,
 } from 'react-native-gesture-handler';
 import Svg, { Path } from 'react-native-svg';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
 import { Directory, File, Paths } from 'expo-file-system';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -119,6 +119,7 @@ export function ChatPdfViewer({
   onClose,
   onSend,
 }: ChatPdfViewerProps) {
+  const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState<'share' | null>(null);
@@ -335,7 +336,12 @@ export function ChatPdfViewer({
       onRequestClose={annotationMode ? handleCancelAnnotation : onClose}
     >
       <GestureHandlerRootView style={styles.gestureRoot}>
-        <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+        <View
+          style={[
+            styles.safeArea,
+            { paddingTop: insets.top, paddingBottom: insets.bottom },
+          ]}
+        >
           <View style={styles.backdrop}>
             {/* Annotation toolbar — slides in above the PDF */}
             {annotationMode && (
@@ -604,7 +610,7 @@ export function ChatPdfViewer({
               )}
             </View>
           </View>
-        </SafeAreaView>
+        </View>
       </GestureHandlerRootView>
     </Modal>
   );

@@ -1,6 +1,5 @@
 export type CancelSessionActionInput = {
   reason?: string | null;
-  sendActivityNotifications: boolean;
 };
 
 export type EditSessionActionInput = {
@@ -9,5 +8,4 @@ export type EditSessionActionInput = {
   endTime: string;
   timezone: string;
   reason?: string | null;
-  sendActivityNotifications: boolean;
 };

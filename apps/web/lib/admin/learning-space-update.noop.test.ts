@@ -486,12 +486,7 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
     await updateLearningSpaceFromPayload('space-1', payload);
 
     expect(compileLearningSpaceReminderJobsMock).not.toHaveBeenCalled();
-    expect(publishActivityEventMock).toHaveBeenCalledTimes(1);
-    expect(publishActivityEventMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        eventType: 'class.updated',
-      }),
-    );
+    expect(publishActivityEventMock).not.toHaveBeenCalled();
   });
 
   it('emits class.updated and class.session.rescheduled for schedule override edits', async () => {
@@ -680,32 +675,7 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
         learningSpaceId: 'space-1',
       }),
     );
-    expect(publishActivityEventMock).toHaveBeenCalledTimes(2);
-    expect(publishActivityEventMock.mock.calls.map(([input]) => input.eventType)).toEqual(
-      ['class.updated', 'class.session.rescheduled'],
-    );
-    expect(publishActivityEventMock).toHaveBeenNthCalledWith(
-      1,
-      expect.objectContaining({
-        eventType: 'class.updated',
-        payload: expect.objectContaining({
-          changeSummary: expect.stringContaining('Class schedule has been updated'),
-        }),
-      }),
-    );
-    expect(publishActivityEventMock).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({
-        eventType: 'class.session.rescheduled',
-        payload: expect.objectContaining({
-          title: 'Math Foundations',
-          invitedMembers: [],
-          rescheduledFromStartAt: '2026-03-21',
-          rescheduledToStartAt: '2026-03-21T15:00:00.000Z',
-          rescheduledReason: 'Rescheduled',
-        }),
-      }),
-    );
+    expect(publishActivityEventMock).not.toHaveBeenCalled();
 
     expect(logSpy).not.toHaveBeenCalled();
   });
@@ -1045,12 +1015,7 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
 
     await updateLearningSpaceFromPayload('space-1', payload);
 
-    const eventTypes = publishActivityEventMock.mock.calls.map(
-      ([input]) => input.eventType,
-    );
-    expect(eventTypes).toContain('class.updated');
-    expect(eventTypes).toContain('class.session.rescheduled');
-    expect(eventTypes).toContain('class.session.canceled');
+    expect(publishActivityEventMock).not.toHaveBeenCalled();
   });
 
   it('emits plural class.sessions.rescheduled when multiple schedules are rescheduled', async () => {
@@ -1245,14 +1210,7 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
 
     await updateLearningSpaceFromPayload('space-1', payload);
 
-    const eventTypes = publishActivityEventMock.mock.calls.map(
-      ([input]) => input.eventType,
-    );
-    expect(eventTypes).toContain('class.updated');
-    expect(eventTypes).not.toContain('class.session.rescheduled');
-    expect(
-      eventTypes.filter((eventType) => eventType === 'class.sessions.rescheduled'),
-    ).toHaveLength(2);
+    expect(publishActivityEventMock).not.toHaveBeenCalled();
   });
 
   it('does not emit schedule activity for unchanged timezone-backed exceptions and overrides', async () => {

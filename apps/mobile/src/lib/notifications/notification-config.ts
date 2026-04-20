@@ -80,10 +80,6 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationConfig> = {
         : `/(app)/channel/${targetId}`;
     },
   },
-  'payment.reminder': {
-    label: 'Payment Reminder',
-    getRoute: () => '/(app)/(tabs)/inbox',
-  },
   'payment.reminder.sent': {
     label: 'Payment Reminder',
     getRoute: () => '/(app)/(tabs)/inbox',

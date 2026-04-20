@@ -110,9 +110,9 @@ describe('buildDeliveryPlan', () => {
     expect(decision.runAt).toBe('2026-03-11T12:01:00.000Z');
   });
 
-  it('uses a 60 second delay for file.uploaded when presence is active', () => {
+  it('uses the default 120 second delay for uncategorized events when presence is active', () => {
     const decision = buildDeliveryPlan({
-      event: buildEvent({ eventType: 'file.uploaded' }),
+      event: buildEvent({ eventType: 'custom.event' }),
       recipientProfileId: 'profile-target',
       channels: ['push'],
       reasonCodes: ['global_preference'],
@@ -124,7 +124,7 @@ describe('buildDeliveryPlan', () => {
     });
 
     expect(decision.deliveryTiming).toBe('delayed');
-    expect(decision.runAt).toBe('2026-03-11T12:01:00.000Z');
+    expect(decision.runAt).toBe('2026-03-11T12:02:00.000Z');
   });
 
   it('does not delay when presence is active but stale', () => {

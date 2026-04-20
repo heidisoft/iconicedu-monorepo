@@ -4,13 +4,11 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { compileLearningSpaceReminderJobs } from '@iconicedu/web/lib/automation/reminder-jobs';
-import { ensureSystemProfileId } from '@iconicedu/web/lib/automation/system-profile';
 import { requireParentActorContext } from '@iconicedu/web/lib/family-view/actor-context';
 import { toStoredLiveSessionConfig } from '@iconicedu/web/lib/admin/live-session-config';
 import { withInfoPanelDisabled } from '@iconicedu/web/lib/channels/ui-defaults';
 import {
   addMinutesToIso,
-  buildLearningSpaceSchedulesHashKeyFromPayload,
   buildRRuleFields,
   buildScheduleStart as sharedBuildScheduleStart,
   type RRuleFields,
@@ -130,7 +128,6 @@ export async function createLearningSpaceFromPayload(
   });
 
   const serviceClient = createSupabaseServiceClient();
-  const systemProfileId = await ensureSystemProfileId(serviceClient, orgId);
   await compileLearningSpaceReminderJobs({
     supabase: serviceClient,
     orgId,
@@ -358,12 +355,6 @@ type ClassScheduleInsertPayload = {
   themeKey?: string | null;
   participants: LearningSpaceParticipantPayload[];
   schedules: LearningSpaceSchedulePayload[];
-};
-
-type ExpandedSchedule = {
-  startAt: string;
-  endAt: string;
-  time: string;
 };
 
 export const buildScheduleStart = sharedBuildScheduleStart;

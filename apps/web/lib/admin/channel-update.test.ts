@@ -87,7 +87,7 @@ describe('updateChannelFromPayload', () => {
     });
   });
 
-  it('publishes channel.updated by default for changed channels', async () => {
+  it('updates changed channels without publishing legacy activity events', async () => {
     const payload: ChannelCreatePayload = {
       basics: {
         kind: 'channel',
@@ -156,23 +156,12 @@ describe('updateChannelFromPayload', () => {
 
     createSupabaseServerClientMock.mockResolvedValue(supabase);
     createSupabaseServiceClientMock.mockReturnValue({ from: vi.fn() });
-    ensureSystemProfileIdMock.mockResolvedValue('system-profile-1');
-    publishActivityEventMock.mockResolvedValue({ id: 'activity-1' });
-
     await updateChannelFromPayload('channel-1', payload);
 
-    expect(publishActivityEventMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        eventType: 'channel.updated',
-        payload: expect.objectContaining({
-          channelId: 'channel-1',
-          channelTopic: 'Updated channel',
-        }),
-      }),
-    );
+    expect(publishActivityEventMock).not.toHaveBeenCalled();
   });
 
-  it('does not publish channel.updated when notifications are opted out', async () => {
+  it('does not publish legacy channel.updated events', async () => {
     const payload: ChannelCreatePayload = {
       basics: {
         kind: 'channel',

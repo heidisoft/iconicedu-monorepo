@@ -61,14 +61,9 @@ function unique(values: string[]) {
   return Array.from(new Set(values.filter(Boolean)));
 }
 
-const CHANNEL_SCOPED_LIVE_SESSION_EVENTS = new Set([
-  'session.started',
-  'member.joined',
-  'member.removed',
-  'session.ended',
-]);
+const CHANNEL_SCOPED_LIVE_SESSION_EVENTS = new Set<string>();
 
-const INCLUDE_ACTOR_LIVE_SESSION_EVENTS = new Set(['session.started', 'member.joined']);
+const INCLUDE_ACTOR_LIVE_SESSION_EVENTS = new Set<string>();
 
 type UsersOnlyAudienceRule = {
   kind: 'users_only';

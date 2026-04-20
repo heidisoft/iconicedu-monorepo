@@ -3,16 +3,9 @@ import { View, Text, Pressable, TouchableOpacity, StyleSheet } from 'react-nativ
 import {
   Bell,
   CheckCircle,
-  ClipboardCheck,
   CreditCard,
-  FileText,
   GraduationCap,
   MessageSquare,
-  Mic,
-  Paperclip,
-  PhoneOutgoing,
-  Sparkles,
-  Video,
 } from 'lucide-react-native';
 import type { AppColors } from '@/lib/theme';
 import type {
@@ -36,21 +29,10 @@ export const ACTIVITY_ICON_MAP: Record<
 > = {
   Bell,
   CalendarCheck: Bell,
-  CalendarDays: Bell,
   CalendarX: Bell,
-  CheckCircle2: CheckCircle,
-  ClipboardCheck,
   CreditCard,
-  FileText,
   GraduationCap,
   MessageSquare,
-  Mic,
-  Paperclip,
-  PhoneOutgoing,
-  Sparkles,
-  UserRoundMinus: Bell,
-  UserRoundPlus: Bell,
-  Video,
 };
 
 export const TAB_LABELS: Record<string, string> = {
@@ -96,34 +78,25 @@ export function getIconKey(item: ActivityFeedItemVM): InboxIconKeyVM {
     const t = (item as ActivityFeedGroupItemVM).grouping?.groupType;
     if (t === 'payment') return 'CreditCard';
     if (t === 'class') return 'GraduationCap';
-    if (t === 'homework') return 'Paperclip';
     if (t === 'message') return 'MessageSquare';
-    if (t === 'recording') return 'Video';
-    if (t === 'notes') return 'FileText';
-    if (t === 'ai-summary') return 'Sparkles';
-    if (t === 'complete-class') return 'CheckCircle2';
     return 'Bell';
   }
   switch (item.verb) {
-    case 'homework.assigned':
-    case 'homework.submitted':
-    case 'homework.reviewed':
-      return 'Paperclip';
-    case 'summary.posted':
-      return 'Sparkles';
-    case 'file.uploaded':
-      return 'FileText';
     case 'message.posted':
-    case 'message.edited':
+    case 'messages.posted':
+    case 'dm.posted':
+    case 'dms.posted':
+    case 'reaction.added':
+    case 'reactions.added':
       return 'MessageSquare';
-    case 'class.session.scheduled':
     case 'class.session.rescheduled':
+    case 'class.sessions.rescheduled':
     case 'class.session.canceled':
-    case 'class.created':
+    case 'class.sessions.canceled':
       return 'GraduationCap';
-    case 'member.joined':
-    case 'member.invited':
-      return 'CheckCircle2';
+    case 'payment.reminder.sent':
+    case 'payments.reminder.sent':
+      return 'CreditCard';
     default:
       return 'Bell';
   }

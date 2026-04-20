@@ -463,42 +463,7 @@ describe('createOrJoinLiveSession', () => {
       countRejoins: true,
       source: 'hybrid',
     });
-    expect(vi.mocked(publishActivityEvent).mock.calls).toEqual(
-      expect.arrayContaining([
-        [
-          expect.objectContaining({
-            eventType: 'session.started',
-            scope: { kind: 'channel', channelId: 'channel-1' },
-            payload: expect.objectContaining({
-              title: 'Math',
-              occurrenceStart: '2026-03-02T10:00:00.000Z',
-              startedByDisplayName: 'Taylor Reed',
-              mode: 'video',
-              participants: [
-                expect.objectContaining({
-                  profileId: 'profile-1',
-                  displayName: 'Taylor Reed',
-                }),
-              ],
-            }),
-          }),
-        ],
-        [
-          expect.objectContaining({
-            eventType: 'member.joined',
-            dedupeKey: expect.stringContaining('member.joined:live-session-1:profile-1:'),
-            scope: { kind: 'channel', channelId: 'channel-1' },
-            payload: expect.objectContaining({
-              title: 'Math',
-              occurrenceStart: '2026-03-02T10:00:00.000Z',
-              memberDisplayName: 'Taylor Reed',
-              mode: 'video',
-              joinedAt: expect.any(String),
-            }),
-          }),
-        ],
-      ]),
-    );
+    expect(vi.mocked(publishActivityEvent)).not.toHaveBeenCalled();
     expect(serviceSupabase.state.liveSessionRow?.app_metadata).toMatchObject({
       mode: 'video',
     });
@@ -543,20 +508,7 @@ describe('createOrJoinLiveSession', () => {
       created: false,
       provider: 'daily',
     });
-    expect(vi.mocked(publishActivityEvent)).toHaveBeenCalledWith(
-      expect.objectContaining({
-        eventType: 'member.joined',
-        dedupeKey: expect.stringContaining(
-          'member.joined:live-session-existing:profile-1:',
-        ),
-        scope: { kind: 'channel', channelId: 'channel-1' },
-        payload: expect.objectContaining({
-          liveSessionId: 'live-session-existing',
-          memberDisplayName: 'Taylor Reed',
-          mode: 'video',
-        }),
-      }),
-    );
+    expect(vi.mocked(publishActivityEvent)).not.toHaveBeenCalled();
   });
 
   it('publishes session.started before member.joined when reusing an outside-schedule huddle session', async () => {
@@ -601,16 +553,7 @@ describe('createOrJoinLiveSession', () => {
     });
     await scheduler.flush();
 
-    const eventTypes = vi
-      .mocked(publishActivityEvent)
-      .mock.calls.map(([call]) => call.eventType);
-
-    expect(eventTypes).toEqual(
-      expect.arrayContaining(['session.started', 'member.joined']),
-    );
-    expect(eventTypes.indexOf('session.started')).toBeLessThan(
-      eventTypes.indexOf('member.joined'),
-    );
+    expect(vi.mocked(publishActivityEvent)).not.toHaveBeenCalled();
   });
 
   it('returns the integrated join path immediately and still queues activity side effects', async () => {
@@ -641,9 +584,7 @@ describe('createOrJoinLiveSession', () => {
 
     await scheduler.flush();
 
-    expect(
-      vi.mocked(publishActivityEvent).mock.calls.map(([call]) => call.eventType),
-    ).toEqual(expect.arrayContaining(['session.started', 'member.joined']));
+    expect(vi.mocked(publishActivityEvent)).not.toHaveBeenCalled();
   });
 
   it('allows guardians to join when a linked child is a channel member', async () => {
@@ -776,26 +717,7 @@ describe('createOrJoinLiveSession', () => {
 
     await scheduler.flush();
 
-    expect(vi.mocked(publishActivityEvent)).toHaveBeenCalledWith(
-      expect.objectContaining({
-        eventType: 'session.started',
-        payload: expect.objectContaining({
-          learningSpaceId: 'space-derived',
-          scheduleId: 'schedule-1',
-          occurrenceStart: '2026-03-02T10:00:00.000Z',
-        }),
-      }),
-    );
-    expect(vi.mocked(publishActivityEvent)).toHaveBeenCalledWith(
-      expect.objectContaining({
-        eventType: 'member.joined',
-        payload: expect.objectContaining({
-          learningSpaceId: 'space-derived',
-          scheduleId: 'schedule-1',
-          occurrenceStart: '2026-03-02T10:00:00.000Z',
-        }),
-      }),
-    );
+    expect(vi.mocked(publishActivityEvent)).not.toHaveBeenCalled();
     expect(serviceSupabase.state.liveSessionRow?.app_metadata).toMatchObject({
       learningSpaceId: 'space-derived',
       scheduleId: 'schedule-1',
@@ -818,11 +740,7 @@ describe('createOrJoinLiveSession', () => {
 
     await scheduler.flush();
 
-    const eventTypes = vi
-      .mocked(publishActivityEvent)
-      .mock.calls.map(([call]) => call.eventType);
-    expect(eventTypes).not.toContain('session.started');
-    expect(eventTypes).toContain('member.joined');
+    expect(vi.mocked(publishActivityEvent)).not.toHaveBeenCalled();
   });
 
   it('returns successfully even when activity publishing fails without logging', async () => {

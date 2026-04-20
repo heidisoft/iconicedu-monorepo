@@ -7,8 +7,8 @@ const CRITICAL_PREF_KEYS = new Set<string>([
   'class.sessions.canceled',
   'session.reminder.sent',
   'sessions.reminder.sent',
-  'payment.reminder',
-  'payments.reminder',
+  'payment.reminder.sent',
+  'payments.reminder.sent',
 ]);
 
 const DIGEST_PREF_KEYS = new Set<string>([]);

@@ -6,7 +6,7 @@ type SignupDefaultPreference = {
 };
 
 const SIGNUP_DEFAULT_NOTIFICATION_PREFERENCES: SignupDefaultPreference[] = [
-  { prefKey: 'payment.reminder', channels: ['push', 'email'] },
+  { prefKey: 'payment.reminder.sent', channels: ['push', 'email'] },
   { prefKey: 'message.posted', channels: ['push', 'email'] },
   { prefKey: 'reaction.added', channels: ['push', 'email'] },
   { prefKey: 'dm.posted', channels: ['push', 'email'] },

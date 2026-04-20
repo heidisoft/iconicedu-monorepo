@@ -168,7 +168,7 @@ describe('shared message activity helper', () => {
     );
   });
 
-  it('publishes file.uploaded for channel file sends', async () => {
+  it('publishes message.posted for channel file sends', async () => {
     const supabase = createSupabaseMock({});
     const activityContext: ActivityChannelContext = {
       scope: { kind: 'channel', channelId: 'channel-1' },
@@ -195,7 +195,7 @@ describe('shared message activity helper', () => {
     expect(publishActivityEventMock).toHaveBeenCalledTimes(1);
     expect(publishActivityEventMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        eventType: 'file.uploaded',
+        eventType: 'message.posted',
         payload: expect.objectContaining({
           name: 'Worksheet.pdf',
           fileCount: 2,

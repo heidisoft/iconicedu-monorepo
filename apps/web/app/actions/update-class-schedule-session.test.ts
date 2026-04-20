@@ -212,9 +212,7 @@ describe('updateClassScheduleSessionAction', () => {
       orgId: 'org-1',
       actorProfileId: 'profile-1',
     });
-    expect(recurringCall?.[3]).toEqual({
-      sendActivityNotifications: false,
-    });
+    expect(recurringCall?.[3]).toBeUndefined();
     const recurringPayload = recurringCall?.[1];
     expect(recurringPayload?.schedules).toHaveLength(1);
     expect(recurringPayload?.schedules[0]).toEqual(
@@ -276,9 +274,7 @@ describe('updateClassScheduleSessionAction', () => {
       orgId: 'org-1',
       actorProfileId: 'profile-1',
     });
-    expect(singleCall?.[3]).toEqual({
-      sendActivityNotifications: true,
-    });
+    expect(singleCall?.[3]).toBeUndefined();
     const singlePayload = singleCall?.[1];
     expect(singlePayload?.schedules).toHaveLength(1);
     expect(singlePayload?.schedules[0]).toEqual(

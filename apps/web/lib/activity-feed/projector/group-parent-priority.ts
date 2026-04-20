@@ -10,9 +10,6 @@ const GROUP_PARENT_PRIORITY: Array<{
 }> = [
   { prefix: 'dm-posted:', preferredVerb: 'dms.posted' },
   { prefix: 'message-posted:', preferredVerb: 'messages.posted' },
-  { prefix: 'class-created:', preferredVerb: 'class.created' },
-  { prefix: 'class-updated:', preferredVerb: 'class.updated' },
-  { prefix: 'live-session:', preferredVerb: 'session.started' },
 ];
 
 function getPreferredVerb(groupKey: string) {

@@ -3,76 +3,22 @@ import { describe, expect, it } from 'vitest';
 import { shouldReplaceGroupParent } from '@iconicedu/web/lib/activity-feed/projector/group-parent-priority';
 
 describe('shouldReplaceGroupParent', () => {
-  it('prefers class.created as the parent for class-created groups', () => {
+  it('prefers dms.posted as the parent for grouped direct messages', () => {
     expect(
       shouldReplaceGroupParent({
-        groupKey: 'class-created:space-1',
-        existingVerb: 'class.created',
-        nextVerb: 'members.invited',
+        groupKey: 'dm-posted:channel-dm-1:2026-03-08T12',
+        existingVerb: 'dms.posted',
+        nextVerb: 'dm.posted',
       }),
     ).toBe(false);
   });
 
-  it('allows class.created to replace a child-owned class-created parent', () => {
+  it('allows dms.posted to replace a child-owned dm parent', () => {
     expect(
       shouldReplaceGroupParent({
-        groupKey: 'class-created:space-1',
-        existingVerb: 'members.invited',
-        nextVerb: 'class.created',
-      }),
-    ).toBe(true);
-  });
-
-  it('prefers class.updated as the parent for class-updated groups', () => {
-    expect(
-      shouldReplaceGroupParent({
-        groupKey: 'class-updated:space-1:2026-03-08',
-        existingVerb: 'members.invited',
-        nextVerb: 'member.removed',
-      }),
-    ).toBe(false);
-  });
-
-  it('keeps class.updated as the parent when plural class session updates arrive', () => {
-    expect(
-      shouldReplaceGroupParent({
-        groupKey: 'class-updated:space-1:2026-03-08',
-        existingVerb: 'class.updated',
-        nextVerb: 'class.sessions.rescheduled',
-      }),
-    ).toBe(false);
-    expect(
-      shouldReplaceGroupParent({
-        groupKey: 'class-updated:space-1:2026-03-08',
-        existingVerb: 'class.updated',
-        nextVerb: 'class.sessions.canceled',
-      }),
-    ).toBe(false);
-  });
-
-  it('falls back to replacing for unrelated group keys', () => {
-    expect(
-      shouldReplaceGroupParent({
-        groupKey: 'files:space-1:2026-03-08T12',
-        existingVerb: 'file.uploaded',
-        nextVerb: 'files.uploaded',
-      }),
-    ).toBe(true);
-  });
-
-  it('prefers session.started as the parent for live-session groups', () => {
-    expect(
-      shouldReplaceGroupParent({
-        groupKey: 'live-session:channel:channel-1:session-1',
-        existingVerb: 'member.joined',
-        nextVerb: 'member.removed',
-      }),
-    ).toBe(false);
-    expect(
-      shouldReplaceGroupParent({
-        groupKey: 'live-session:channel:channel-1:session-1',
-        existingVerb: 'member.joined',
-        nextVerb: 'session.started',
+        groupKey: 'dm-posted:channel-dm-1:2026-03-08T12',
+        existingVerb: 'dm.posted',
+        nextVerb: 'dms.posted',
       }),
     ).toBe(true);
   });
@@ -81,16 +27,26 @@ describe('shouldReplaceGroupParent', () => {
     expect(
       shouldReplaceGroupParent({
         groupKey: 'message-posted:channel-1:2026-03-08T12',
-        existingVerb: 'message.posted',
-        nextVerb: 'messages.posted',
-      }),
-    ).toBe(true);
-    expect(
-      shouldReplaceGroupParent({
-        groupKey: 'message-posted:channel-1:2026-03-08T12',
         existingVerb: 'messages.posted',
         nextVerb: 'message.posted',
       }),
     ).toBe(false);
+    expect(
+      shouldReplaceGroupParent({
+        groupKey: 'message-posted:channel-1:2026-03-08T12',
+        existingVerb: 'message.posted',
+        nextVerb: 'messages.posted',
+      }),
+    ).toBe(true);
+  });
+
+  it('falls back to replacing for unrelated group keys', () => {
+    expect(
+      shouldReplaceGroupParent({
+        groupKey: 'class-updated:space-1:2026-03-08',
+        existingVerb: 'class.session.canceled',
+        nextVerb: 'class.sessions.canceled',
+      }),
+    ).toBe(true);
   });
 });

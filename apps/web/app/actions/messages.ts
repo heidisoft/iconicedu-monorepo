@@ -1,7 +1,6 @@
 'use server';
 
 import type {
-  AudienceRuleVM,
   MessageMentionVM,
   MessageSendFileInput,
   MessageSendFilesInput,

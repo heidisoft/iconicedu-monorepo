@@ -35,16 +35,16 @@ describe('getNotificationPolicyConfig', () => {
     expect(config.defaultDelaySeconds).toBe(60);
   });
 
-  it('uses a standard 60s delay for file.uploaded', () => {
+  it('uses the default 120s delay for removed/unknown legacy keys', () => {
     const config = getNotificationPolicyConfig('file.uploaded');
 
     expect(config.critical).toBe(false);
     expect(config.digestEligible).toBe(false);
-    expect(config.defaultDelaySeconds).toBe(60);
+    expect(config.defaultDelaySeconds).toBe(120);
   });
 
-  it('keeps class.session.scheduled critical with immediate delivery', () => {
-    const config = getNotificationPolicyConfig('class.session.scheduled');
+  it('keeps class.session.canceled critical with immediate delivery', () => {
+    const config = getNotificationPolicyConfig('class.session.canceled');
 
     expect(config.critical).toBe(true);
     expect(config.digestEligible).toBe(false);
