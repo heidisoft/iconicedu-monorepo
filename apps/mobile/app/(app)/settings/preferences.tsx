@@ -9,7 +9,15 @@ import {
   Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, Check, Sun, Clock, Globe, Languages } from 'lucide-react-native';
+import {
+  ChevronLeft,
+  Check,
+  Sun,
+  Moon,
+  Clock,
+  Globe,
+  Languages,
+} from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { SettingsRow } from '@iconicedu/ui-native';
 import { useProfile } from '@/hooks/use-profile';
@@ -101,13 +109,18 @@ function makeStyles(C: AppColors) {
 
 export default function PreferencesScreen() {
   const router = useRouter();
-  const { colors, mode, setMode } = useTheme();
+  const { colors, mode, setMode, colorScheme } = useTheme();
   const { data: profile } = useProfile();
   const s = useMemo(() => makeStyles(colors), [colors]);
   const [showAppearance, setShowAppearance] = useState(false);
 
   const prof = profile as Record<string, unknown> | undefined;
   const modeLabel = MODE_OPTIONS.find((o) => o.value === mode)?.label ?? 'System';
+  const appearanceLabel =
+    mode === 'system'
+      ? `System · ${colorScheme === 'dark' ? 'Dark' : 'Light'}`
+      : modeLabel;
+  const ThemeIcon = colorScheme === 'dark' ? Moon : Sun;
   const langs = prof?.languages_spoken as string[] | null;
 
   return (
@@ -124,12 +137,12 @@ export default function PreferencesScreen() {
         <Text style={s.sectionLabel}>Appearance</Text>
         <View style={s.card}>
           <SettingsRow
-            icon={<Sun size={20} color={colors.textMuted} />}
+            icon={<ThemeIcon size={20} color={colors.textMuted} />}
             label="Theme"
             labelColor={colors.text}
             chevronColor={colors.textFaint}
             onPress={() => setShowAppearance(true)}
-            trailing={<Text style={s.valueText}>{modeLabel}</Text>}
+            trailing={<Text style={s.valueText}>{appearanceLabel}</Text>}
           />
         </View>
 

@@ -6,16 +6,12 @@ import React, {
   useMemo,
   useCallback,
 } from 'react';
-import { Appearance, AppState } from 'react-native';
+import { useColorScheme } from 'react-native';
 import { colorScheme as nwColorScheme } from 'react-native-css-interop';
 import * as SecureStore from 'expo-secure-store';
 import { lightColors, darkColors, type AppColors, type ThemeMode } from '@/lib/theme';
 
 const STORAGE_KEY = 'app_theme_mode';
-
-function readSystemColorScheme(): 'light' | 'dark' {
-  return Appearance.getColorScheme() === 'dark' ? 'dark' : 'light';
-}
 
 type ThemeContextType = {
   mode: ThemeMode;
@@ -35,28 +31,7 @@ const ThemeContext = createContext<ThemeContextType>({
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [mode, setModeState] = useState<ThemeMode>('system');
-  const [systemScheme, setSystemScheme] = useState<'light' | 'dark'>(() =>
-    readSystemColorScheme(),
-  );
-
-  useEffect(() => {
-    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
-      setSystemScheme(colorScheme === 'dark' ? 'dark' : 'light');
-    });
-
-    return () => {
-      subscription.remove();
-    };
-  }, []);
-
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') {
-        setSystemScheme(readSystemColorScheme());
-      }
-    });
-    return () => sub.remove();
-  }, []);
+  const systemScheme: 'light' | 'dark' = useColorScheme() === 'dark' ? 'dark' : 'light';
 
   // Load persisted preference on mount. We render immediately with 'system'
   // mode (the default) so the native window background is never exposed as a
@@ -75,9 +50,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const isDark = colorScheme === 'dark';
   const colors = isDark ? darkColors : lightColors;
 
+  // Pass 'system' when in system mode so NativeWind doesn't call
+  // Appearance.setColorScheme() with a fixed value — that override blocks
+  // OS-level trait-change notifications and breaks useColorScheme() live updates.
   useEffect(() => {
-    nwColorScheme.set(colorScheme);
-  }, [colorScheme]);
+    nwColorScheme.set(mode === 'system' ? 'system' : mode);
+  }, [mode]);
 
   const setMode = useCallback((newMode: ThemeMode) => {
     setModeState(newMode);
