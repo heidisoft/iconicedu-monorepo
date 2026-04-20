@@ -1183,9 +1183,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
           verb: 'reactions.added',
           leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'info' },
           headline: {
-            primary: isDirect
-              ? `${senderName} reacted to your direct messages`
-              : `${senderName} reacted to your messages`,
+            primary: `${senderName} reacted to your messages`,
             secondary: getContextTitle(payload),
           },
           summary: undefined,
