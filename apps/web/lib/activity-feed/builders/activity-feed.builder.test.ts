@@ -1025,7 +1025,7 @@ describe('buildActivityFeedForProfile', () => {
             scope: { kind: 'channel', channelId: 'channel-dm-1' },
             visibility: 'scope_only',
           },
-          verb: 'dm.reaction.added',
+          verb: 'reaction.added',
           actor_profile_id: 'actor-1',
           refs: {},
           content: {

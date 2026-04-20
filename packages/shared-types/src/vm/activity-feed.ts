@@ -42,8 +42,6 @@ export type ActivityVerbVM =
   | 'dms.edited'
   | 'dm.deleted'
   | 'dms.deleted'
-  | 'dm.reaction.added'
-  | 'dms.reactions.added'
   | 'message.posted'
   | 'messages.posted'
   | 'message.edited'

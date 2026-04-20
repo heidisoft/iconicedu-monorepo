@@ -67,8 +67,6 @@ const ACTIVITY_SCOPED_VERB_KEYS: ActivityVerbVM[] = [
   'dms.edited',
   'dm.deleted',
   'dms.deleted',
-  'dm.reaction.added',
-  'dms.reactions.added',
   'message.posted',
   'messages.posted',
   'message.edited',

@@ -12,7 +12,6 @@ const CONVERSATIONAL_EVENT_TYPES = new Set([
   'dm.posted',
   'message.posted',
   'file.uploaded',
-  'dm.reaction.added',
   'reaction.added',
 ]);
 

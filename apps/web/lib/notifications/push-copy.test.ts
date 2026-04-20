@@ -597,52 +597,6 @@ describe('buildPersonalizedSessionCopy', () => {
     });
   });
 
-  it('personalizes dm.reaction.added with emoji', () => {
-    const copy = buildPersonalizedSessionCopy(
-      'dm.reaction.added',
-      {
-        senderName: 'Jane',
-        emoji: '👍',
-      },
-      'child-1',
-    );
-
-    expect(copy).toEqual({
-      title: 'Jane reacted 👍 to your message',
-      summary: 'Jane reacted 👍 to your message',
-    });
-  });
-
-  it('personalizes dm.reaction.added without emoji', () => {
-    const copy = buildPersonalizedSessionCopy(
-      'dm.reaction.added',
-      {
-        senderName: 'Jane',
-      },
-      'child-1',
-    );
-
-    expect(copy).toEqual({
-      title: 'Jane reacted to your message',
-      summary: 'Jane reacted to your message',
-    });
-  });
-
-  it('falls back for dm.reaction.added when sender name is missing', () => {
-    const copy = buildPersonalizedSessionCopy(
-      'dm.reaction.added',
-      {
-        emoji: '👍',
-      },
-      'child-1',
-    );
-
-    expect(copy).toEqual({
-      title: 'New reaction to your message',
-      summary: 'New reaction to your message',
-    });
-  });
-
   it('personalizes reaction.added with context', () => {
     const copy = buildPersonalizedSessionCopy(
       'reaction.added',

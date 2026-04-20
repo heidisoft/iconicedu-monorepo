@@ -382,17 +382,6 @@ export function buildPersonalizedSessionCopy(
     return { title, summary };
   }
 
-  if (eventType === 'dm.reaction.added') {
-    const senderName = asString(payload.senderName);
-    const emoji = asString(payload.emoji);
-    const emojiPart = emoji ? ` ${emoji}` : '';
-
-    const title = senderName
-      ? `${senderName} reacted${emojiPart} to your message`
-      : 'New reaction to your message';
-    return { title, summary: title };
-  }
-
   if (eventType === 'reaction.added') {
     const senderName = asString(payload.senderName);
     const emoji = asString(payload.emoji);

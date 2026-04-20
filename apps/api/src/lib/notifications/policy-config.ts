@@ -21,12 +21,7 @@ const CRITICAL_PREF_KEYS = new Set<string>([
 
 const DIGEST_PREF_KEYS = new Set<string>([]);
 
-const NEAR_REAL_TIME_PREF_KEYS = new Set<string>([
-  'dm.posted',
-  'dms.posted',
-  'dm.reaction.added',
-  'dms.reaction.added',
-]);
+const NEAR_REAL_TIME_PREF_KEYS = new Set<string>(['dm.posted', 'dms.posted']);
 
 const STANDARD_DELAY_PREF_KEYS = new Set<string>([
   'message.posted',

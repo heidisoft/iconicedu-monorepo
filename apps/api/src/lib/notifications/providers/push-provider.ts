@@ -10,6 +10,7 @@ type PushNotificationPayload = {
   threadId?: string | null;
   scopeKind?: 'channel' | 'learning_space';
   scopeId?: string;
+  channelRouteKind?: 'space' | 'dm' | 'channel';
   metadata?: Record<string, unknown>;
 };
 
@@ -154,6 +155,35 @@ function resolveThreadIdFromMetadata(
   return undefined;
 }
 
+function resolveChannelRouteKindFromMetadata(
+  metadata: Record<string, unknown> | undefined,
+  explicitChannelRouteKind?: 'space' | 'dm' | 'channel',
+) {
+  if (explicitChannelRouteKind) {
+    return explicitChannelRouteKind;
+  }
+
+  const root = asRecord(metadata);
+  if (
+    root.channelRouteKind === 'space' ||
+    root.channelRouteKind === 'dm' ||
+    root.channelRouteKind === 'channel'
+  ) {
+    return root.channelRouteKind;
+  }
+
+  const rawEventPayload = asRecord(root.rawEventPayload);
+  if (
+    rawEventPayload.channelRouteKind === 'space' ||
+    rawEventPayload.channelRouteKind === 'dm' ||
+    rawEventPayload.channelRouteKind === 'channel'
+  ) {
+    return rawEventPayload.channelRouteKind;
+  }
+
+  return undefined;
+}
+
 function resolvePreviewFromMetadata(
   metadata: Record<string, unknown> | undefined,
   summary?: string | null,
@@ -202,6 +232,10 @@ export async function sendPushNotification(payload: PushNotificationPayload) {
 
   const channelId = resolveChannelIdFromMetadata(payload.metadata);
   const threadId = resolveThreadIdFromMetadata(payload.metadata, payload.threadId);
+  const channelRouteKind = resolveChannelRouteKindFromMetadata(
+    payload.metadata,
+    payload.channelRouteKind,
+  );
   const senderName = resolveSenderNameFromMetadata(payload.metadata);
   const senderAvatarUrl = resolveSenderAvatarUrlFromMetadata(payload.metadata);
   const preview = resolvePreviewFromMetadata(payload.metadata, payload.summary);
@@ -222,6 +256,7 @@ export async function sendPushNotification(payload: PushNotificationPayload) {
       scopeId: payload.scopeId,
       channelId,
       threadId: threadId ?? null,
+      channelRouteKind,
       senderName,
       senderAvatarUrl,
       preview,

@@ -80,15 +80,15 @@ describe('activity event definitions', () => {
   });
 
   it('renders direct message reaction added activity', () => {
-    const definition = getActivityEventDefinition('dm.reaction.added');
+    const definition = getActivityEventDefinition('reaction.added');
     if (!definition) {
-      throw new Error('Missing dm.reaction.added definition');
+      throw new Error('Missing reaction.added definition');
     }
 
     const rendered = definition.render({
       id: 'event-dm-reaction-1',
       org_id: 'org-1',
-      event_type: 'dm.reaction.added',
+      event_type: 'reaction.added',
       occurred_at: '2026-03-03T12:00:00.000Z',
       source_kind: 'profile',
       actor_profile_id: 'profile-1',
@@ -115,15 +115,15 @@ describe('activity event definitions', () => {
   });
 
   it('groups direct message reactions into the dm posted hourly group key', () => {
-    const definition = getActivityEventDefinition('dm.reaction.added');
+    const definition = getActivityEventDefinition('reaction.added');
     if (!definition || !definition.group) {
-      throw new Error('Missing dm.reaction.added grouping');
+      throw new Error('Missing reaction.added grouping');
     }
 
     const key = definition.group.buildGroupKey({
       id: 'event-dm-reaction-2',
       org_id: 'org-1',
-      event_type: 'dm.reaction.added',
+      event_type: 'reaction.added',
       occurred_at: '2026-03-03T12:25:00.000Z',
       source_kind: 'profile',
       actor_profile_id: 'profile-1',

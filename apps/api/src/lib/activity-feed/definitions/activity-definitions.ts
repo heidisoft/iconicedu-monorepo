@@ -1160,58 +1160,6 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       };
     },
   },
-  'dm.reaction.added': {
-    eventType: 'dm.reaction.added',
-    tabKey: 'all',
-    importance: 'normal',
-    group: {
-      groupType: 'message',
-      collapseByDefault: true,
-      buildGroupKey: (event) => {
-        const payload = asRecord(event.payload);
-        return buildHourlyChannelGroupKey('dm-posted', event, payload);
-      },
-      renderGroup: (event) => {
-        const payload = asRecord(event.payload);
-        const senderName = asString(payload.senderName, 'Someone');
-        return {
-          verb: 'dms.reactions.added',
-          leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'info' },
-          headline: {
-            primary: `${senderName} reacted to your direct messages`,
-            secondary: getContextTitle(payload),
-          },
-          summary: undefined,
-          metadata: {
-            channelId: payload.channelId,
-            messageId: payload.messageId,
-            dmReactionGroup: 'added',
-          },
-        };
-      },
-    },
-    resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) => {
-      const payload = asRecord(event.payload);
-      const senderName = asString(payload.senderName, 'Someone');
-      const emoji = asString(payload.emoji, '😀');
-      return {
-        verb: 'dm.reaction.added',
-        leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'info' },
-        headline: {
-          primary: `${senderName} reacted ${emoji} to your direct message`,
-          secondary: getContextTitle(payload),
-        },
-        summary: undefined,
-        actionButton: undefined,
-        metadata: {
-          channelId: payload.channelId,
-          messageId: payload.messageId,
-          emoji,
-        },
-      };
-    },
-  },
   'reaction.added': {
     eventType: 'reaction.added',
     tabKey: 'all',
@@ -1221,23 +1169,30 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       collapseByDefault: true,
       buildGroupKey: (event) => {
         const payload = asRecord(event.payload);
-        return buildHourlyChannelGroupKey('message-posted', event, payload);
+        return buildHourlyChannelGroupKey(
+          payload.channelRouteKind === 'dm' ? 'dm-posted' : 'message-posted',
+          event,
+          payload,
+        );
       },
       renderGroup: (event) => {
         const payload = asRecord(event.payload);
         const senderName = asString(payload.senderName, 'Someone');
+        const isDirect = payload.channelRouteKind === 'dm';
         return {
           verb: 'reactions.added',
           leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'info' },
           headline: {
-            primary: `${senderName} reacted to your messages`,
+            primary: isDirect
+              ? `${senderName} reacted to your direct messages`
+              : `${senderName} reacted to your messages`,
             secondary: getContextTitle(payload),
           },
           summary: undefined,
           metadata: {
             channelId: payload.channelId,
             messageId: payload.messageId,
-            reactionGroup: 'added',
+            reactionGroup: isDirect ? 'dm-added' : 'added',
           },
         };
       },
@@ -1247,15 +1202,18 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       const payload = asRecord(event.payload);
       const senderName = asString(payload.senderName, 'Someone');
       const emoji = asString(payload.emoji, '😀');
+      const isDirect = payload.channelRouteKind === 'dm';
       return {
         verb: 'reaction.added',
         leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'info' },
         headline: {
-          primary: `${senderName} reacted ${emoji} to your message in`,
+          primary: isDirect
+            ? `${senderName} reacted ${emoji} to your direct message`
+            : `${senderName} reacted ${emoji} to your message in`,
           secondary: getContextTitle(payload),
         },
         summary: undefined,
-        actionButton: sourceAction(event, payload),
+        actionButton: isDirect ? undefined : sourceAction(event, payload),
         metadata: {
           channelId: payload.channelId,
           messageId: payload.messageId,

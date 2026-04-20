@@ -120,7 +120,6 @@ export type NotificationKey =
   | 'dm.posted'
   | 'dm.edited'
   | 'dm.deleted'
-  | 'dm.reaction.added'
   | 'message.posted'
   | 'file.uploaded'
   | 'class.created'

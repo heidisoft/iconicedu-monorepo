@@ -486,7 +486,7 @@ export async function publishReactionAddedActivity(input: {
   await publishActivity({
     supabase: input.supabase,
     orgId: input.orgId,
-    eventType: isDmRoute ? 'dm.reaction.added' : 'reaction.added',
+    eventType: 'reaction.added',
     occurredAt: input.now,
     sourceKind: 'profile',
     actorProfileId: input.senderProfileId,

@@ -38,9 +38,10 @@ describe('NOTIFICATION_REGISTRY', () => {
     expect(route).toBe('/(app)/channel/channel-789');
   });
 
-  it('routes dm.reaction.added to the DM screen', () => {
-    const route = NOTIFICATION_REGISTRY['dm.reaction.added'].getRoute({
+  it('routes reaction.added to the DM screen when the payload marks it as a DM', () => {
+    const route = NOTIFICATION_REGISTRY['reaction.added'].getRoute({
       channelId: 'dm-123',
+      channelRouteKind: 'dm',
     });
     expect(route).toBe('/(app)/dm/dm-123');
   });

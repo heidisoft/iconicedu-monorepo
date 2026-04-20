@@ -93,23 +93,6 @@ describe('buildDeliveryPlan', () => {
     expect(decision.reasonCodes).not.toContain('mention_priority_override');
   });
 
-  it('uses a 30 second delay for dm.reaction.added when presence is active', () => {
-    const decision = buildDeliveryPlan({
-      event: buildEvent({ eventType: 'dm.reaction.added' }),
-      recipientProfileId: 'profile-target',
-      channels: ['push'],
-      reasonCodes: ['global_preference'],
-      context: {
-        now: new Date('2026-03-11T12:00:00.000Z'),
-        liveStatus: 'online',
-        lastSeenAt: '2026-03-11T11:59:45.000Z',
-      },
-    });
-
-    expect(decision.deliveryTiming).toBe('delayed');
-    expect(decision.runAt).toBe('2026-03-11T12:00:30.000Z');
-  });
-
   it('uses a 60 second delay for reaction.added when presence is active', () => {
     const decision = buildDeliveryPlan({
       event: buildEvent({ eventType: 'reaction.added' }),

@@ -129,6 +129,12 @@ async function sendNotificationViaChannel(input: {
       threadId: typeof payload.threadId === 'string' ? payload.threadId : null,
       scopeKind: input.job.scope_kind ?? undefined,
       scopeId: input.job.scope_id ?? undefined,
+      channelRouteKind:
+        payload.channelRouteKind === 'space' ||
+        payload.channelRouteKind === 'dm' ||
+        payload.channelRouteKind === 'channel'
+          ? payload.channelRouteKind
+          : undefined,
       metadata: payload,
     });
     await logDispatch({

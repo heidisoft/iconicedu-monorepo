@@ -135,7 +135,7 @@ When an activity event is projected, `enqueueNotificationDispatchJobs()` is call
 | Category             | Examples                                                                                                                                          | Timing                                                   |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
 | Critical — immediate | `class.session.scheduled/rescheduled/canceled`, `session.started`, `session.reminder.sent`, `payment.reminder`, `payment.failed`, `system.notice` | `immediate` (0s delay) — bypasses presence suppression   |
-| Near-real-time       | `dm.posted`, `dms.posted`, `dm.reaction.added`                                                                                                    | `delayed` (30s) when presence-aware suppression applies  |
+| Near-real-time       | `dm.posted`, `dms.posted`                                                                                                                         | `delayed` (30s) when presence-aware suppression applies  |
 | Standard delay       | `message.posted`, `reaction.added`, `file.uploaded`                                                                                               | `delayed` (60s) when presence-aware suppression applies  |
 | Everything else      | All other event types                                                                                                                             | `delayed` (120s) when presence-aware suppression applies |
 
@@ -153,27 +153,26 @@ When an activity event is projected, `enqueueNotificationDispatchJobs()` is call
 
 The API now treats the following event types as the canonical push template surface. Each job carries a title/body pair plus deep-link metadata that mobile resolves from `prefKey`, `scopeKind`, `scopeId`, `channelId`, and `threadId`.
 
-| Event type                      | Push title pattern                                                     | Push body pattern                      | Mobile deep link                                                  |
-| ------------------------------- | ---------------------------------------------------------------------- | -------------------------------------- | ----------------------------------------------------------------- |
-| `dm.posted`                     | `{sender} sent you a direct message` / image / voice / file variants   | message preview or title fallback      | `/(app)/dm/:channelId` or Messages tab fallback                   |
-| `dm.reaction.added`             | `{sender} reacted {emoji} to your message`                             | mirrors title                          | `/(app)/dm/:channelId` or Messages tab fallback                   |
-| `message.posted`                | mention / thread-reply / channel-message variants                      | message preview                        | `/(app)/channel/:id` or `/(app)/spaces/:id`, preserves `threadId` |
-| `reaction.added`                | `{sender} reacted {emoji} to your message` with optional context title | mirrors title                          | channel or space route from scope metadata                        |
-| `file.uploaded`                 | shared file / image / audio / multiple files variants                  | content preview or file name           | channel or space route from scope metadata                        |
-| `class.session.scheduled`       | `{classTitle} session scheduled`                                       | payload summary or schedule fallback   | class space when `channelId` exists, else Schedule tab            |
-| `class.sessions.scheduled`      | `{classTitle} sessions scheduled`                                      | payload summary or schedule fallback   | class space when `channelId` exists, else Schedule tab            |
-| `class.session.rescheduled`     | `{classTitle} session rescheduled`                                     | payload summary or reschedule fallback | class space when `channelId` exists, else Schedule tab            |
-| `class.sessions.rescheduled`    | `{classTitle} sessions rescheduled`                                    | payload summary or reschedule fallback | class space when `channelId` exists, else Schedule tab            |
-| `class.session.canceled`        | `{classTitle} session cancelled`                                       | payload summary or cancel fallback     | class space when `channelId` exists, else Schedule tab            |
-| `class.sessions.canceled`       | `{classTitle} sessions cancelled`                                      | payload summary or cancel fallback     | class space when `channelId` exists, else Schedule tab            |
-| `session.started`               | `{classTitle} is live now`                                             | join-now fallback or payload summary   | class space when `channelId` exists, else Schedule tab            |
-| `session.reminder.sent`         | personalized reminder by role when members are present                 | personalized class/session summary     | class space when `channelId` exists, else Schedule tab            |
-| `session.feedback_request.sent` | personalized feedback request by role when members are present         | feedback prompt summary                | class space when `channelId` exists, else Schedule tab            |
-| `payment.reminder`              | payload title or `Payment reminder`                                    | payload description / summary          | Inbox fallback                                                    |
-| `payment.reminder.sent`         | payload title or `Payment reminder`                                    | payload description / summary          | Inbox fallback                                                    |
-| `payment.received`              | payload title or `Payment received`                                    | payload description / summary          | Inbox fallback                                                    |
-| `payment.failed`                | payload title or `Payment failed`                                      | payload description / summary          | Inbox fallback                                                    |
-| `system.notice`                 | payload title or `System notice`                                       | payload message / summary              | Inbox fallback                                                    |
+| Event type                      | Push title pattern                                                     | Push body pattern                      | Mobile deep link                                                       |
+| ------------------------------- | ---------------------------------------------------------------------- | -------------------------------------- | ---------------------------------------------------------------------- |
+| `dm.posted`                     | `{sender} sent you a direct message` / image / voice / file variants   | message preview or title fallback      | `/(app)/dm/:channelId` or Messages tab fallback                        |
+| `message.posted`                | mention / thread-reply / channel-message variants                      | message preview                        | `/(app)/channel/:id` or `/(app)/spaces/:id`, preserves `threadId`      |
+| `reaction.added`                | `{sender} reacted {emoji} to your message` with optional context title | mirrors title                          | channel, class, or DM route from scope and `channelRouteKind` metadata |
+| `file.uploaded`                 | shared file / image / audio / multiple files variants                  | content preview or file name           | channel or space route from scope metadata                             |
+| `class.session.scheduled`       | `{classTitle} session scheduled`                                       | payload summary or schedule fallback   | class space when `channelId` exists, else Schedule tab                 |
+| `class.sessions.scheduled`      | `{classTitle} sessions scheduled`                                      | payload summary or schedule fallback   | class space when `channelId` exists, else Schedule tab                 |
+| `class.session.rescheduled`     | `{classTitle} session rescheduled`                                     | payload summary or reschedule fallback | class space when `channelId` exists, else Schedule tab                 |
+| `class.sessions.rescheduled`    | `{classTitle} sessions rescheduled`                                    | payload summary or reschedule fallback | class space when `channelId` exists, else Schedule tab                 |
+| `class.session.canceled`        | `{classTitle} session cancelled`                                       | payload summary or cancel fallback     | class space when `channelId` exists, else Schedule tab                 |
+| `class.sessions.canceled`       | `{classTitle} sessions cancelled`                                      | payload summary or cancel fallback     | class space when `channelId` exists, else Schedule tab                 |
+| `session.started`               | `{classTitle} is live now`                                             | join-now fallback or payload summary   | class space when `channelId` exists, else Schedule tab                 |
+| `session.reminder.sent`         | personalized reminder by role when members are present                 | personalized class/session summary     | class space when `channelId` exists, else Schedule tab                 |
+| `session.feedback_request.sent` | personalized feedback request by role when members are present         | feedback prompt summary                | class space when `channelId` exists, else Schedule tab                 |
+| `payment.reminder`              | payload title or `Payment reminder`                                    | payload description / summary          | Inbox fallback                                                         |
+| `payment.reminder.sent`         | payload title or `Payment reminder`                                    | payload description / summary          | Inbox fallback                                                         |
+| `payment.received`              | payload title or `Payment received`                                    | payload description / summary          | Inbox fallback                                                         |
+| `payment.failed`                | payload title or `Payment failed`                                      | payload description / summary          | Inbox fallback                                                         |
+| `system.notice`                 | payload title or `System notice`                                       | payload message / summary              | Inbox fallback                                                         |
 
 Notes:
 

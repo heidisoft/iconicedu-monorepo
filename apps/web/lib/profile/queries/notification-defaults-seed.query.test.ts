@@ -34,7 +34,7 @@ describe('seedSignupDefaultNotificationPreferences', () => {
     );
 
     const rows = upsert.mock.calls[0]?.[0] as Array<{ pref_key: string }>;
-    expect(rows).toHaveLength(13);
+    expect(rows).toHaveLength(12);
     expect(rows.map((row) => row.pref_key)).toEqual(
       expect.arrayContaining(['reaction.added', 'session.reminder.sent', 'dm.posted']),
     );

@@ -19,14 +19,6 @@ describe('getNotificationPolicyConfig', () => {
     expect(config.defaultDelaySeconds).toBe(30);
   });
 
-  it('marks dm.reaction.added as near-real-time with a 30s delay', () => {
-    const config = getNotificationPolicyConfig('dm.reaction.added');
-
-    expect(config.critical).toBe(false);
-    expect(config.digestEligible).toBe(false);
-    expect(config.defaultDelaySeconds).toBe(30);
-  });
-
   it('uses a standard 60s delay for message.posted', () => {
     const config = getNotificationPolicyConfig('message.posted');
 

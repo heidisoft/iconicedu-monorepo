@@ -11,6 +11,7 @@ export type NotificationConfig = {
     scopeId?: string;
     channelId?: string;
     threadId?: string | null;
+    channelRouteKind?: string;
   }) => string;
 };
 
@@ -116,22 +117,16 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationConfig> = {
   },
   'reaction.added': {
     label: 'Reactions',
-    getRoute: ({ scopeKind, scopeId, channelId }) => {
+    getRoute: ({ scopeKind, scopeId, channelId, channelRouteKind }) => {
       const targetId = channelId ?? scopeId;
       if (!targetId) return '/(app)/(tabs)/inbox';
+      if (channelRouteKind === 'dm') {
+        return `/(app)/dm/${targetId}`;
+      }
       return scopeKind === 'learning_space'
         ? `/(app)/spaces/${targetId}`
         : `/(app)/channel/${targetId}`;
     },
-  },
-  'dm.reaction.added': {
-    label: 'DM Reactions',
-    getRoute: ({ channelId, scopeId }) =>
-      channelId
-        ? `/(app)/dm/${channelId}`
-        : scopeId
-          ? `/(app)/dm/${scopeId}`
-          : '/(app)/(tabs)/messages',
   },
   'file.uploaded': {
     label: 'File Uploaded',
