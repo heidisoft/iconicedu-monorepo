@@ -2870,6 +2870,12 @@ describe('sendTextMessageAction', () => {
 });
 
 describe('toggleMessageReactionAction', () => {
+  beforeEach(() => {
+    apiPost.mockReset();
+    apiDelete.mockReset();
+    publishActivityEvent.mockReset();
+  });
+
   it('adds a reaction via the API when none exists', async () => {
     const supabase = {
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
