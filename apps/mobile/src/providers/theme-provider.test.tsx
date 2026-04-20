@@ -1,4 +1,5 @@
 import React from 'react';
+import * as ReactNative from 'react-native';
 import { Appearance, Text } from 'react-native';
 import { act, render, screen, waitFor } from '@testing-library/react-native';
 
@@ -7,6 +8,7 @@ const mockAppearanceRemove = jest.fn();
 const mockSetItemAsync = jest.fn();
 const mockGetItemAsync = jest.fn();
 const mockNativeWindSet = jest.fn();
+const mockUseColorScheme = jest.fn();
 let appearanceChangeListener:
   | ((event: { colorScheme: 'light' | 'dark' | null }) => void)
   | null = null;
@@ -45,9 +47,13 @@ describe('ThemeProvider', () => {
       appearanceChangeListener = listener;
       return { remove: mockAppearanceRemove };
     });
+    jest
+      .spyOn(ReactNative, 'useColorScheme')
+      .mockImplementation(() => mockUseColorScheme());
     mockGetItemAsync.mockResolvedValue(null);
     mockSetItemAsync.mockResolvedValue(undefined);
     mockAppearanceGetColorScheme.mockReturnValue('dark');
+    mockUseColorScheme.mockReturnValue('dark');
   });
 
   it('uses the device dark scheme in system mode and syncs NativeWind', async () => {
@@ -63,13 +69,14 @@ describe('ThemeProvider', () => {
       expect(screen.getByTestId('is-dark').props.children).toBe('true');
     });
 
-    expect(mockNativeWindSet).toHaveBeenCalledWith('dark');
+    expect(mockNativeWindSet).toHaveBeenCalledWith('system');
   });
 
   it('updates when the OS appearance changes while following system mode', async () => {
     mockAppearanceGetColorScheme.mockReturnValue('light');
+    mockUseColorScheme.mockReturnValue('light');
 
-    render(
+    const view = render(
       <ThemeProvider>
         <Consumer />
       </ThemeProvider>,
@@ -81,15 +88,22 @@ describe('ThemeProvider', () => {
     });
 
     act(() => {
+      mockUseColorScheme.mockReturnValue('dark');
       appearanceChangeListener?.({ colorScheme: 'dark' });
     });
+
+    view.rerender(
+      <ThemeProvider>
+        <Consumer />
+      </ThemeProvider>,
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId('scheme').props.children).toBe('dark');
       expect(screen.getByTestId('is-dark').props.children).toBe('true');
     });
 
-    expect(mockNativeWindSet).toHaveBeenLastCalledWith('dark');
+    expect(mockNativeWindSet).toHaveBeenLastCalledWith('system');
   });
 
   it('prefers a stored explicit theme over the device scheme', async () => {
