@@ -109,27 +109,6 @@ const FEED_ITEMS: ActivityFeedItemVM[] = [
     },
     state: { importance: 'important', isRead: false },
   } satisfies ActivityFeedLeafItemVM,
-  {
-    kind: 'leaf',
-    ids: { id: 'activity-payment-reminder-1', orgId: DEMO_ORG_ID },
-    timestamps: ts('2026-03-07T17:00:00.000Z'),
-    tabKey: 'payment',
-    audience: {
-      scope: { kind: 'global' },
-      visibility: 'direct',
-    },
-    verb: 'payment.reminder.sent',
-    refs: { actor: SYSTEM_PROFILE },
-    content: {
-      leading: { kind: 'icon', iconKey: 'CreditCard', tone: 'warning' },
-      headline: {
-        primary: 'Payment reminder',
-        secondary: 'March tutoring invoice',
-      },
-      summary: '$480 due on Mar 12.',
-    },
-    state: { importance: 'important', isRead: true },
-  } satisfies ActivityFeedLeafItemVM,
 ];
 
 export const DEMO_ACTIVITY_FEED: ActivityFeedVM = {

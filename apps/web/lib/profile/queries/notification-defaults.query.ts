@@ -1,19 +1,17 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { NotificationPreferenceRow } from '@iconicedu/shared-types';
-
-import { NOTIFICATION_DEFAULTS_SELECT } from '@iconicedu/web/lib/profile/constants/selects';
+import { createApiClient } from '@iconicedu/web/lib/api/http-client';
 
 export async function getNotificationDefaults(
   supabase: SupabaseClient,
   orgId: string,
   profileId: string,
 ) {
-  return supabase
-    .from('notification_preferences')
-    .select(NOTIFICATION_DEFAULTS_SELECT)
-    .eq('org_id', orgId)
-    .eq('profile_id', profileId)
-    .is('deleted_at', null)
-    .returns<NotificationPreferenceRow[]>();
+  const api = createApiClient(supabase);
+  const data = await api.get<NotificationPreferenceRow[]>('/notification-preferences', {
+    orgId,
+    profileId,
+  });
+  return { data, error: null };
 }

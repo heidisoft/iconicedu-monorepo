@@ -263,11 +263,9 @@ export class RemindersService {
     const systemProfileId = await this.ensureSystemProfileId(supabase, job.org_id);
 
     const eventType =
-      job.job_type === 'payment.reminder'
-        ? 'payment.reminder.sent'
-        : job.job_type === 'session.feedback_request'
-          ? 'session.feedback_request.sent'
-          : 'session.reminder.sent';
+      job.job_type === 'session.feedback_request'
+        ? 'session.feedback_request.sent'
+        : 'session.reminder.sent';
 
     const scope: FeedScopeVM = payload.learningSpaceId
       ? { kind: 'learning_space', learningSpaceId: payload.learningSpaceId }

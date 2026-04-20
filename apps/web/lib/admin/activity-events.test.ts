@@ -50,7 +50,7 @@ describe('getAdminActivityEventRows', () => {
                       {
                         id: 'event-2',
                         org_id: 'org-1',
-                        event_type: 'system.notice',
+                        event_type: 'legacy.removed',
                         occurred_at: '2026-03-03T09:00:00.000Z',
                         source_kind: 'system',
                         actor_profile_id: null,

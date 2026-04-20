@@ -80,8 +80,6 @@ const getDefaultIconKey = (activity: ActivityFeedItemVM): InboxIconKeyVM => {
   switch (activity.verb) {
     case 'message.posted':
     case 'messages.posted':
-    case 'dm.posted':
-    case 'dms.posted':
       return 'MessageSquare';
     case 'reaction.added':
     case 'reactions.added':
@@ -93,9 +91,6 @@ const getDefaultIconKey = (activity: ActivityFeedItemVM): InboxIconKeyVM => {
     case 'class.sessions.canceled':
       return 'CalendarX';
 
-    case 'payment.reminder.sent':
-    case 'payments.reminder.sent':
-      return 'CreditCard';
     default:
       return 'Bell';
   }

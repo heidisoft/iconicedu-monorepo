@@ -84,8 +84,6 @@ export function getIconKey(item: ActivityFeedItemVM): InboxIconKeyVM {
   switch (item.verb) {
     case 'message.posted':
     case 'messages.posted':
-    case 'dm.posted':
-    case 'dms.posted':
     case 'reaction.added':
     case 'reactions.added':
       return 'MessageSquare';
@@ -94,9 +92,6 @@ export function getIconKey(item: ActivityFeedItemVM): InboxIconKeyVM {
     case 'class.session.canceled':
     case 'class.sessions.canceled':
       return 'GraduationCap';
-    case 'payment.reminder.sent':
-    case 'payments.reminder.sent':
-      return 'CreditCard';
     default:
       return 'Bell';
   }

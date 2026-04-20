@@ -256,17 +256,17 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       renderGroup: (event) => {
         const payload = asRecord(event.payload);
         return {
-          verb: 'dms.posted',
+          verb: 'messages.posted',
           leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'info' },
           headline: {
-            primary: 'New direct messages',
+            primary: 'New messages',
             secondary: getContextTitle(payload),
           },
         };
       },
     },
     resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) => renderMessageItem(event, 'dm.posted', true),
+    render: (event) => renderMessageItem(event, 'message.posted', true),
   },
   'message.posted': {
     eventType: 'message.posted',
@@ -514,70 +514,6 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
           asOptionalString(payload.summary) ??
           'Share feedback about your recent sessions.',
         actionButton: sourceAction(event, payload, 'outline', 'Open class'),
-      };
-    },
-  },
-  'payment.reminder.sent': {
-    eventType: 'payment.reminder.sent',
-    tabKey: 'payment',
-    importance: 'important',
-    group: {
-      groupType: 'payment',
-      collapseByDefault: true,
-      buildGroupKey: (event) => {
-        const payload = asRecord(event.payload);
-        return (
-          asOptionalString(payload.invoiceId) ??
-          asOptionalString(payload.messageId) ??
-          null
-        );
-      },
-    },
-    resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) => {
-      const payload = asRecord(event.payload);
-      return {
-        verb: 'payment.reminder.sent',
-        leading: { kind: 'icon', iconKey: 'CreditCard', tone: 'warning' },
-        headline: {
-          primary: 'Payment reminder',
-          secondary: asOptionalString(payload.title),
-        },
-        summary:
-          asOptionalString(payload.summary) ?? asOptionalString(payload.description),
-        actionButton: sourceAction(event, payload, 'default', 'View payment'),
-      };
-    },
-  },
-  'payments.reminder.sent': {
-    eventType: 'payments.reminder.sent',
-    tabKey: 'payment',
-    importance: 'important',
-    group: {
-      groupType: 'payment',
-      collapseByDefault: true,
-      buildGroupKey: (event) => {
-        const payload = asRecord(event.payload);
-        return (
-          asOptionalString(payload.invoiceId) ??
-          asOptionalString(payload.messageId) ??
-          null
-        );
-      },
-    },
-    resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) => {
-      const payload = asRecord(event.payload);
-      return {
-        verb: 'payments.reminder.sent',
-        leading: { kind: 'icon', iconKey: 'CreditCard', tone: 'warning' },
-        headline: {
-          primary: 'Payment reminders',
-          secondary: asOptionalString(payload.title),
-        },
-        summary:
-          asOptionalString(payload.summary) ?? asOptionalString(payload.description),
-        actionButton: sourceAction(event, payload, 'default', 'View payment'),
       };
     },
   },

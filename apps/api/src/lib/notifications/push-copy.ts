@@ -294,33 +294,13 @@ export function buildPersonalizedSessionCopy(
     recipientRole,
   });
 
-  if (eventType === 'dm.posted') {
-    const senderName = asString(payload.senderName);
-    const content = asString(payload.content).slice(0, 160);
-    const dmMessageKind = asString(payload.dmMessageKind);
-
-    let title: string;
-    if (!senderName) {
-      title = 'New direct message';
-    } else if (dmMessageKind === 'image') {
-      title = `${senderName} sent you an image`;
-    } else if (dmMessageKind === 'audio') {
-      title = `${senderName} sent you a voice message`;
-    } else if (dmMessageKind === 'file') {
-      title = `${senderName} sent you a file`;
-    } else {
-      title = `${senderName} sent you a direct message`;
-    }
-
-    return { title, summary: content || title };
-  }
-
   if (eventType === 'message.posted') {
     const senderName = asString(payload.senderName);
     const content = asString(payload.content).slice(0, 160);
     const contextTitle = getContextTitle(payload);
     const isMention = Boolean(asOptionalString(payload.mentionedProfileId));
     const isThreadReply = payload.threadReply === true;
+    const dmMessageKind = asString(payload.dmMessageKind);
 
     let title: string;
     if (isThreadReply) {
@@ -336,9 +316,17 @@ export function buildPersonalizedSessionCopy(
         ? `${senderName} mentioned you in ${contextTitle}`
         : `${senderName} mentioned you`;
     } else if (senderName) {
+      const messageLabel =
+        dmMessageKind === 'image'
+          ? 'an image'
+          : dmMessageKind === 'audio'
+            ? 'a voice message'
+            : dmMessageKind === 'file'
+              ? 'a file'
+              : 'a message';
       title = contextTitle
-        ? `${senderName} sent you a message in ${contextTitle}`
-        : `${senderName} sent you a message`;
+        ? `${senderName} sent you ${messageLabel} in ${contextTitle}`
+        : `${senderName} sent you ${messageLabel}`;
     } else {
       title = 'New message';
     }
@@ -408,14 +396,6 @@ export function buildPersonalizedSessionCopy(
     return {
       title: recipient ? `${sessionAudienceLabel} is complete` : fallback,
       summary: getEventSummary(payload, 'Your class session is complete.'),
-    };
-  }
-
-  if (eventType === 'payment.reminder.sent') {
-    const title = firstDefinedString(payload.title) ?? 'Payment reminder';
-    return {
-      title,
-      summary: getEventSummary(payload, 'A payment is due soon.'),
     };
   }
 

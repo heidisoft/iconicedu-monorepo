@@ -164,10 +164,25 @@ function renderClassUpdateGroup(
   };
 }
 
-function renderMessageHeadline(payload: Record<string, unknown>, isDirect: boolean) {
+function resolveMessageNoun(payload: Record<string, unknown>) {
+  const dmMessageKind = asOptionalString(payload.dmMessageKind);
+  if (dmMessageKind === 'image') {
+    return 'an image';
+  }
+  if (dmMessageKind === 'audio') {
+    return 'a voice message';
+  }
+  if (dmMessageKind === 'file') {
+    return 'a file';
+  }
+  return 'a message';
+}
+
+function renderMessageHeadline(payload: Record<string, unknown>) {
   const senderName = asString(payload.senderName, 'Someone');
   const contextTitle = getContextTitle(payload);
   const mention = asOptionalString(payload.mentionedProfileId);
+  const messageNoun = resolveMessageNoun(payload);
 
   if (mention) {
     return {
@@ -178,33 +193,24 @@ function renderMessageHeadline(payload: Record<string, unknown>, isDirect: boole
 
   if (contextTitle) {
     return {
-      primary: `${senderName} sent you ${isDirect ? 'a direct message in' : 'a message in'}`,
+      primary: `${senderName} sent you ${messageNoun} in`,
       secondary: contextTitle,
     };
   }
 
   return {
-    primary: `${senderName} sent you ${isDirect ? 'a direct message' : 'a message'}`,
+    primary: `${senderName} sent you ${messageNoun}`,
   };
 }
 
-function renderMessageItem(
-  event: ActivityEventRow,
-  verb: ActivityVerbVM,
-  isDirect: boolean,
-) {
+function renderMessageItem(event: ActivityEventRow, verb: ActivityVerbVM) {
   const payload = asRecord(event.payload);
   return {
     verb,
     leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'info' },
-    headline: renderMessageHeadline(payload, isDirect),
+    headline: renderMessageHeadline(payload),
     expandedContent: asOptionalString(payload.content),
-    actionButton: sourceAction(
-      event,
-      payload,
-      'outline',
-      isDirect ? 'Open conversation' : 'Open messages',
-    ),
+    actionButton: sourceAction(event, payload, 'outline', 'Open messages'),
     metadata: {
       channelId: asOptionalString(payload.channelId),
       messageId: asOptionalString(payload.messageId),
@@ -244,30 +250,6 @@ const DEFAULT_RECIPIENTS: ActivityEventDefinition['resolveRecipients'] = async (
 ) => resolveRecipientsForActivityEvent(supabase, event);
 
 export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition> = {
-  'dm.posted': {
-    eventType: 'dm.posted',
-    tabKey: 'all',
-    importance: 'normal',
-    group: {
-      groupType: 'message',
-      collapseByDefault: true,
-      buildGroupKey: (event) =>
-        buildHourlyChannelGroupKey('dm-posted', event, asRecord(event.payload)),
-      renderGroup: (event) => {
-        const payload = asRecord(event.payload);
-        return {
-          verb: 'dms.posted',
-          leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'info' },
-          headline: {
-            primary: 'New direct messages',
-            secondary: getContextTitle(payload),
-          },
-        };
-      },
-    },
-    resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) => renderMessageItem(event, 'dm.posted', true),
-  },
   'message.posted': {
     eventType: 'message.posted',
     tabKey: 'all',
@@ -295,7 +277,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       },
     },
     resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) => renderMessageItem(event, 'message.posted', false),
+    render: (event) => renderMessageItem(event, 'message.posted'),
   },
   'reaction.added': {
     eventType: 'reaction.added',
@@ -514,70 +496,6 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
           asOptionalString(payload.summary) ??
           'Share feedback about your recent sessions.',
         actionButton: sourceAction(event, payload, 'outline', 'Open class'),
-      };
-    },
-  },
-  'payment.reminder.sent': {
-    eventType: 'payment.reminder.sent',
-    tabKey: 'payment',
-    importance: 'important',
-    group: {
-      groupType: 'payment',
-      collapseByDefault: true,
-      buildGroupKey: (event) => {
-        const payload = asRecord(event.payload);
-        return (
-          asOptionalString(payload.invoiceId) ??
-          asOptionalString(payload.messageId) ??
-          null
-        );
-      },
-    },
-    resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) => {
-      const payload = asRecord(event.payload);
-      return {
-        verb: 'payment.reminder.sent',
-        leading: { kind: 'icon', iconKey: 'CreditCard', tone: 'warning' },
-        headline: {
-          primary: 'Payment reminder',
-          secondary: asOptionalString(payload.title),
-        },
-        summary:
-          asOptionalString(payload.summary) ?? asOptionalString(payload.description),
-        actionButton: sourceAction(event, payload, 'default', 'View payment'),
-      };
-    },
-  },
-  'payments.reminder.sent': {
-    eventType: 'payments.reminder.sent',
-    tabKey: 'payment',
-    importance: 'important',
-    group: {
-      groupType: 'payment',
-      collapseByDefault: true,
-      buildGroupKey: (event) => {
-        const payload = asRecord(event.payload);
-        return (
-          asOptionalString(payload.invoiceId) ??
-          asOptionalString(payload.messageId) ??
-          null
-        );
-      },
-    },
-    resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) => {
-      const payload = asRecord(event.payload);
-      return {
-        verb: 'payments.reminder.sent',
-        leading: { kind: 'icon', iconKey: 'CreditCard', tone: 'warning' },
-        headline: {
-          primary: 'Payment reminders',
-          secondary: asOptionalString(payload.title),
-        },
-        summary:
-          asOptionalString(payload.summary) ?? asOptionalString(payload.description),
-        actionButton: sourceAction(event, payload, 'default', 'View payment'),
       };
     },
   },

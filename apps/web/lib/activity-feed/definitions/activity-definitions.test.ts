@@ -14,8 +14,6 @@ describe('activity event definitions', () => {
       'class.sessions.rescheduled',
       'dm.posted',
       'message.posted',
-      'payment.reminder.sent',
-      'payments.reminder.sent',
       'reaction.added',
       'session.feedback_request.sent',
       'session.reminder.sent',
@@ -25,8 +23,8 @@ describe('activity event definitions', () => {
 
     expect(getActivityEventDefinition('class.created')).toBeUndefined();
     expect(getActivityEventDefinition('member.removed')).toBeUndefined();
-    expect(getActivityEventDefinition('session.started')).toBeUndefined();
-    expect(getActivityEventDefinition('file.uploaded')).toBeUndefined();
+    expect(getActivityEventDefinition('legacy.started.removed')).toBeUndefined();
+    expect(getActivityEventDefinition('legacy.removed')).toBeUndefined();
   });
 
   it('renders direct message activities with an open conversation button', () => {
@@ -228,41 +226,8 @@ describe('activity event definitions', () => {
     });
   });
 
-  it('renders payment reminder activities with the payment CTA', () => {
-    const definition = getActivityEventDefinition('payment.reminder.sent');
-    if (!definition) {
-      throw new Error('Missing payment.reminder.sent definition');
-    }
-
-    const rendered = definition.render({
-      id: 'event-payment-1',
-      org_id: 'org-1',
-      event_type: 'payment.reminder.sent',
-      occurred_at: '2026-03-03T12:00:00.000Z',
-      source_kind: 'system',
-      actor_profile_id: null,
-      scope: { kind: 'global' },
-      object_ref: null,
-      target_ref: null,
-      payload: {
-        title: 'Invoice overdue',
-        summary: 'Please pay by March 10.',
-        href: '/iconic-academy/billing/invoice-1',
-      },
-      audience_rules: [],
-      dedupe_key: 'payment.reminder.sent:invoice-1',
-      projection_status: 'pending',
-      projection_attempts: 0,
-      created_at: '2026-03-03T12:00:00.000Z',
-      updated_at: '2026-03-03T12:00:00.000Z',
-    });
-
-    expect(rendered.headline.primary).toBe('Payment reminder');
-    expect(rendered.headline.secondary).toBe('Invoice overdue');
-    expect(rendered.actionButton).toEqual({
-      label: 'View payment',
-      variant: 'default',
-      href: '/iconic-academy/billing/invoice-1',
-    });
+  it('does not expose removed payment reminder definitions', () => {
+    expect(getActivityEventDefinition('legacy.payment.removed')).toBeUndefined();
+    expect(getActivityEventDefinition('legacy.payments.removed')).toBeUndefined();
   });
 });

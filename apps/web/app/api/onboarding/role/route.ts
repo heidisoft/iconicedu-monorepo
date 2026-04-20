@@ -188,17 +188,11 @@ export async function POST(request: Request) {
   }
 
   if (profileId) {
-    const seedResponse = await seedSignupDefaultNotificationPreferences(
+    await seedSignupDefaultNotificationPreferences(
       serviceSupabase,
       account.org_id,
       profileId,
     );
-    if (seedResponse.error) {
-      return NextResponse.json(
-        { success: false, message: seedResponse.error.message },
-        { status: 500 },
-      );
-    }
   }
 
   if (roleStatus === 'active') {

@@ -6,7 +6,7 @@ End-to-end reference for Expo push notifications: how tokens are managed on devi
 
 ## Last Updated
 
-2026-04-18
+2026-04-20
 
 ## Related Docs
 
@@ -132,12 +132,12 @@ When an activity event is projected, `enqueueNotificationDispatchJobs()` is call
 
 **Delivery timing logic** (`apps/api/src/lib/notifications/policy-config.ts`):
 
-| Category             | Examples                                                                                                                                          | Timing                                                   |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| Critical — immediate | `class.session.scheduled/rescheduled/canceled`, `session.started`, `session.reminder.sent`, `payment.reminder`, `payment.failed`, `system.notice` | `immediate` (0s delay) — bypasses presence suppression   |
-| Near-real-time       | `dm.posted`, `dms.posted`                                                                                                                         | `delayed` (30s) when presence-aware suppression applies  |
-| Standard delay       | `message.posted`, `reaction.added`, `file.uploaded`                                                                                               | `delayed` (60s) when presence-aware suppression applies  |
-| Everything else      | All other event types                                                                                                                             | `delayed` (120s) when presence-aware suppression applies |
+| Category             | Examples                                                                                                                                                       | Timing                                                   |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Critical — immediate | `class.session.scheduled/rescheduled/canceled`, `session.started`, `session.reminder.sent`, `payment.reminder.sent`, `payments.reminder.sent`, `system.notice` | `immediate` (0s delay) — bypasses presence suppression   |
+| Near-real-time       | `dm.posted`, `dms.posted`                                                                                                                                      | `delayed` (30s) when presence-aware suppression applies  |
+| Standard delay       | `message.posted`, `reaction.added`, `file.uploaded`                                                                                                            | `delayed` (60s) when presence-aware suppression applies  |
+| Everything else      | All other event types                                                                                                                                          | `delayed` (120s) when presence-aware suppression applies |
 
 **Suppression rules** (`buildNotificationDecision`):
 
@@ -168,10 +168,8 @@ The API now treats the following event types as the canonical push template surf
 | `session.started`               | `{classTitle} is live now`                                             | join-now fallback or payload summary   | class space when `channelId` exists, else Schedule tab                 |
 | `session.reminder.sent`         | personalized reminder by role when members are present                 | personalized class/session summary     | class space when `channelId` exists, else Schedule tab                 |
 | `session.feedback_request.sent` | personalized feedback request by role when members are present         | feedback prompt summary                | class space when `channelId` exists, else Schedule tab                 |
-| `payment.reminder`              | payload title or `Payment reminder`                                    | payload description / summary          | Inbox fallback                                                         |
 | `payment.reminder.sent`         | payload title or `Payment reminder`                                    | payload description / summary          | Inbox fallback                                                         |
-| `payment.received`              | payload title or `Payment received`                                    | payload description / summary          | Inbox fallback                                                         |
-| `payment.failed`                | payload title or `Payment failed`                                      | payload description / summary          | Inbox fallback                                                         |
+| `payments.reminder.sent`        | payload title or `Payment reminders`                                   | payload description / summary          | Inbox fallback                                                         |
 | `system.notice`                 | payload title or `System notice`                                       | payload message / summary              | Inbox fallback                                                         |
 
 Notes:

@@ -4,6 +4,7 @@ const createSupabaseServerClientMock = vi.fn();
 const createSupabaseServiceClientMock = vi.fn();
 const buildOrgBySlugMock = vi.fn();
 const getAccountByAuthUserIdInOrgMock = vi.fn();
+const getProfileByAccountIdMock = vi.fn();
 const revalidatePathMock = vi.fn();
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
@@ -23,6 +24,10 @@ vi.mock('@iconicedu/web/lib/org/builders/org.builder', () => ({
 vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
   getAccountByAuthUserIdInOrg: (...args: unknown[]) =>
     getAccountByAuthUserIdInOrgMock(...args),
+}));
+
+vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
+  getProfileByAccountId: (...args: unknown[]) => getProfileByAccountIdMock(...args),
 }));
 
 vi.mock('next/cache', () => ({
@@ -201,6 +206,9 @@ describe('cancelClassScheduleSessionAction', () => {
     getAccountByAuthUserIdInOrgMock.mockResolvedValue({
       data: { id: 'account-1', org_id: 'org-1', primary_role: 'owner' },
     });
+    getProfileByAccountIdMock.mockResolvedValue({
+      data: { id: 'profile-1' },
+    });
   });
 
   it('creates a recurrence exception and removes any matching override for recurring sessions', async () => {
@@ -224,8 +232,8 @@ describe('cancelClassScheduleSessionAction', () => {
         recurrence_id: 'recurrence-1',
         occurrence_key: '2026-03-21T10:00:00.000Z',
         reason: 'Tutor unavailable',
-        created_by: 'account-1',
-        updated_by: 'account-1',
+        created_by: 'profile-1',
+        updated_by: 'profile-1',
       }),
     );
     expect(revalidatePathMock).toHaveBeenCalledWith('/iconic-academy/class-schedule');
@@ -256,20 +264,6 @@ describe('cancelClassScheduleSessionAction', () => {
       reason: null,
       mode: 'single',
     });
-  });
-
-  it('still updates schedules when the legacy notifications flag is disabled', async () => {
-    const serviceSupabase = createSingleServiceSupabase();
-    createSupabaseServiceClientMock.mockReturnValue(serviceSupabase);
-
-    await cancelClassScheduleSessionAction({
-      orgSlug: 'iconic-academy',
-      scheduleId: 'schedule-1',
-      occurrenceKey: '2026-03-21T10:00:00.000Z',
-      sendActivityNotifications: false,
-    });
-
-    expect(serviceSupabase.updateSchedule).toHaveBeenCalled();
   });
 
   it('rejects non-staff non-owner profiles', async () => {

@@ -94,11 +94,6 @@ describe('NOTIFICATION_REGISTRY', () => {
     expect(route).toBe('/(app)/(tabs)/schedule');
   });
 
-  it('routes payment.reminder.sent to inbox', () => {
-    const route = NOTIFICATION_REGISTRY['payment.reminder.sent'].getRoute({});
-    expect(route).toBe('/(app)/(tabs)/inbox');
-  });
-
   it('falls back to DEFAULT_NOTIFICATION_ROUTE for unknown prefKeys', () => {
     expect(DEFAULT_NOTIFICATION_ROUTE).toBe('/(app)/(tabs)/inbox');
   });

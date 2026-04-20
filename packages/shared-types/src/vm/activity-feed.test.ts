@@ -7,9 +7,8 @@ import type {
 
 describe('ActivityVerbVM', () => {
   it('accepts singular and plural activity verbs', () => {
-    expectTypeOf<'dm.posted'>().toMatchTypeOf<ActivityVerbVM>();
-    expectTypeOf<'dms.posted'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'message.posted'>().toMatchTypeOf<ActivityVerbVM>();
+    expectTypeOf<'messages.posted'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'class.session.rescheduled'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'class.sessions.canceled'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'session.feedback_request.sent'>().toMatchTypeOf<ActivityVerbVM>();

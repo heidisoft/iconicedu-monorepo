@@ -421,8 +421,8 @@ export async function publishChannelMessageActivity(input: {
       senderProfileId: input.senderProfileId,
     }));
   const isDmRoute = activityContext.channelRouteKind === 'dm';
-  const eventType = isDmRoute ? 'dm.posted' : 'message.posted';
-  const dedupePrefix = isDmRoute ? 'dm.posted' : 'message.posted';
+  const eventType = 'message.posted';
+  const dedupePrefix = 'message.posted';
   const dmRecipients = isDmRoute
     ? await resolveDmActivityRecipientProfileIds({
         supabase: readSupabase,
@@ -669,8 +669,8 @@ export async function publishFileUploadActivity(input: {
       senderProfileId: input.senderProfileId,
     }));
   const isDmRoute = activityContext.channelRouteKind === 'dm';
-  const eventType = isDmRoute ? 'dm.posted' : 'message.posted';
-  const dedupePrefix = isDmRoute ? 'dm.posted' : 'message.posted';
+  const eventType = 'message.posted';
+  const dedupePrefix = 'message.posted';
   const activityContent = input.content?.trim() || input.name;
   const dmMessageKind =
     typeof input.mimeType === 'string' && input.mimeType.startsWith('image/')

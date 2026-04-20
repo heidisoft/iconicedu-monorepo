@@ -38,24 +38,17 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationConfig> = {
   },
   'message.posted': {
     label: 'New Messages',
-    getRoute: ({ scopeKind, scopeId, channelId, threadId }) => {
+    getRoute: ({ scopeKind, scopeId, channelId, threadId, channelRouteKind }) => {
       const targetId = channelId ?? scopeId;
-      if (!targetId) return '/(app)/(tabs)/inbox';
+      if (!targetId) return '/(app)/(tabs)/messages';
       const base =
-        scopeKind === 'learning_space'
-          ? `/(app)/spaces/${targetId}`
-          : `/(app)/channel/${targetId}`;
+        channelRouteKind === 'dm'
+          ? `/(app)/dm/${targetId}`
+          : scopeKind === 'learning_space'
+            ? `/(app)/spaces/${targetId}`
+            : `/(app)/channel/${targetId}`;
       return threadId ? `${base}?threadId=${threadId}` : base;
     },
-  },
-  'dm.posted': {
-    label: 'Direct Messages',
-    getRoute: ({ channelId, scopeId }) =>
-      channelId
-        ? `/(app)/dm/${channelId}`
-        : scopeId
-          ? `/(app)/dm/${scopeId}`
-          : '/(app)/(tabs)/messages',
   },
   'session.reminder.sent': {
     label: 'Session Reminders',
@@ -79,10 +72,6 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationConfig> = {
         ? `/(app)/spaces/${targetId}`
         : `/(app)/channel/${targetId}`;
     },
-  },
-  'payment.reminder.sent': {
-    label: 'Payment Reminder',
-    getRoute: () => '/(app)/(tabs)/inbox',
   },
 };
 

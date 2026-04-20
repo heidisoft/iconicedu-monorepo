@@ -511,7 +511,7 @@ describe('createOrJoinLiveSession', () => {
     expect(vi.mocked(publishActivityEvent)).not.toHaveBeenCalled();
   });
 
-  it('publishes session.started before member.joined when reusing an outside-schedule huddle session', async () => {
+  it('does not publish removed session start activity when reusing an outside-schedule huddle session', async () => {
     vi.mocked(resolveChannelLiveSessionScope).mockResolvedValueOnce({
       scopeKey: 'channel:channel-1',
       occurrenceKey: null,
@@ -724,7 +724,7 @@ describe('createOrJoinLiveSession', () => {
     });
   });
 
-  it('skips publishing session.started when a scheduled learning-space start already exists', async () => {
+  it('does not publish removed session start activity when a scheduled learning-space start already exists', async () => {
     const serviceSupabase = createServiceSupabaseStub({
       existingSessionStartedActivity: true,
     });

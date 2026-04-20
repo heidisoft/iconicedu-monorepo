@@ -10,7 +10,7 @@ Engineers operating or debugging scheduled reminder delivery.
 
 ## Last Updated
 
-2026-04-18
+2026-04-20
 
 ## Related Docs
 
@@ -34,6 +34,7 @@ Current class-session timing behavior:
 In your API deployment, set:
 
 - `INTERNAL_REMINDERS_TOKEN_API=<long-random-secret>`
+  (API also accepts legacy `INTERNAL_REMINDERS_TOKEN` when `INTERNAL_REMINDERS_TOKEN_API` is not set)
 - `SUPABASE_URL=<https://<project-ref>.supabase.co>`
 - `SUPABASE_SERVICE_ROLE_KEY=<service-role-key>`
 - `POSTHOG_API_KEY=<optional-posthog-key>`

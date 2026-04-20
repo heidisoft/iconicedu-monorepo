@@ -100,24 +100,6 @@ const TODAY_ITEMS: ActivityFeedItemVM[] = [
     },
     state: { isRead: false, importance: 'important' },
   } satisfies ActivityFeedLeafItemVM,
-  {
-    kind: 'leaf',
-    ids: { id: 'af-payment-1', orgId: ORG },
-    timestamps: { occurredAt: hoursAgo(6), createdAt: hoursAgo(6) },
-    tabKey: 'payment',
-    audience: { scope: { kind: 'global' }, visibility: 'public' },
-    verb: 'payment.reminder.sent',
-    refs: { actor: SYSTEM },
-    content: {
-      leading: { kind: 'icon', iconKey: 'CreditCard', tone: 'warning' },
-      headline: {
-        primary: 'Payment reminder',
-        secondary: 'March tutoring invoice',
-      },
-      summary: '$480 due this week.',
-    },
-    state: { isRead: true, importance: 'important' },
-  } satisfies ActivityFeedLeafItemVM,
 ];
 
 export const DEMO_ACTIVITY_FEED: ActivityFeedVM = {

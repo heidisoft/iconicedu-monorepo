@@ -325,7 +325,7 @@ function normalizeDmGroupedParent(
   parent: Extract<ActivityFeedItemVM, { kind: 'group' }>,
   members: ActivityFeedLeafItemVM[],
 ): Extract<ActivityFeedItemVM, { kind: 'group' }> {
-  if (parent.verb !== 'dms.posted' || !members.length) {
+  if (parent.verb !== 'messages.posted' || !members.length) {
     return parent;
   }
 

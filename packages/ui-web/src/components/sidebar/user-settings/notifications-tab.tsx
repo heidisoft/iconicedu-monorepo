@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Bell, ChevronDown, Megaphone, Wallet } from 'lucide-react';
+import { Bell, ChevronDown, Megaphone } from 'lucide-react';
 import { reportObservedError } from '@iconicedu/utils';
 
 import { Button } from '@iconicedu/ui-web/ui/button';
@@ -51,14 +51,10 @@ const ACTIVITY_SCOPED_VERB_KEYS: ActivityVerbVM[] = [
   'class.sessions.rescheduled',
   'class.session.canceled',
   'class.sessions.canceled',
-  'dm.posted',
-  'dms.posted',
   'message.posted',
   'messages.posted',
   'reaction.added',
   'reactions.added',
-  'payment.reminder.sent',
-  'payments.reminder.sent',
   'session.reminder.sent',
   'sessions.reminder.sent',
   'session.feedback_request.sent',
@@ -68,8 +64,7 @@ const ACTIVITY_SCOPED_VERB_KEYS: ActivityVerbVM[] = [
 const ACTIVITY_VERB_CONTEXT_ORDER = [
   'Class',
   'Session',
-  'Direct Message',
-  'Channel Message',
+  'Messages',
   'Homework',
   'Files & Notes',
   'Membership',
@@ -87,19 +82,13 @@ function resolveActivityVerbContext(
   if (verb.startsWith('session.') || verb.startsWith('sessions.')) {
     return 'Session';
   }
-  if (verb.startsWith('dm.') || verb.startsWith('dms.')) {
-    return 'Direct Message';
-  }
   if (
     verb.startsWith('message.') ||
     verb.startsWith('messages.') ||
     verb.startsWith('reaction.') ||
     verb.startsWith('reactions.')
   ) {
-    return 'Channel Message';
-  }
-  if (verb.startsWith('payment.') || verb.startsWith('payments.')) {
-    return 'Billing';
+    return 'Messages';
   }
   return 'Other';
 }
@@ -227,18 +216,6 @@ export function NotificationsTab({
         },
       ]),
     },
-    ...(isGuardianOrAdmin
-      ? [
-          {
-            key: 'billing',
-            title: 'Billing & Payments',
-            icon: Wallet,
-            items: defineNotificationItems([
-              { key: 'payment.reminder.sent', label: 'Payment reminder sent' },
-            ]),
-          },
-        ]
-      : []),
   ] satisfies NotificationSection[];
 
   const notificationKeys = React.useMemo(
@@ -308,7 +285,6 @@ export function NotificationsTab({
       scopedVerbGroups
         .filter(
           (group) =>
-            group.context !== 'Direct Message' &&
             group.context !== 'Class' &&
             group.context !== 'Session' &&
             group.context !== 'Billing' &&
@@ -320,10 +296,7 @@ export function NotificationsTab({
   const classroomAlertVerbGroups = React.useMemo(
     () =>
       scopedVerbGroups.filter(
-        (group) =>
-          group.context !== 'Direct Message' &&
-          group.context !== 'Billing' &&
-          group.context !== 'System',
+        (group) => group.context !== 'Billing' && group.context !== 'System',
       ),
     [scopedVerbGroups],
   );
@@ -342,7 +315,7 @@ export function NotificationsTab({
     [availableAlertChannels],
   );
   const directMessageAlertVerbGroups = React.useMemo(() => {
-    return scopedVerbGroups.filter((group) => group.context === 'Direct Message');
+    return scopedVerbGroups.filter((group) => group.context === 'Messages');
   }, [scopedVerbGroups]);
 
   const [selectedScopedChannelId, setSelectedScopedChannelId] =

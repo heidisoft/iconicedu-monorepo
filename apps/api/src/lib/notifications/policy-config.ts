@@ -7,13 +7,9 @@ const CRITICAL_PREF_KEYS = new Set<string>([
   'class.sessions.canceled',
   'session.reminder.sent',
   'sessions.reminder.sent',
-  'payment.reminder.sent',
-  'payments.reminder.sent',
 ]);
 
 const DIGEST_PREF_KEYS = new Set<string>([]);
-
-const NEAR_REAL_TIME_PREF_KEYS = new Set<string>(['dm.posted', 'dms.posted']);
 
 const STANDARD_DELAY_PREF_KEYS = new Set<string>([
   'message.posted',
@@ -24,10 +20,9 @@ const STANDARD_DELAY_PREF_KEYS = new Set<string>([
 
 export function getNotificationPolicyConfig(prefKey: string): NotificationPolicyConfig {
   const critical = CRITICAL_PREF_KEYS.has(prefKey);
-  const nearRealTime = NEAR_REAL_TIME_PREF_KEYS.has(prefKey);
   const standardDelay = STANDARD_DELAY_PREF_KEYS.has(prefKey);
   const digestEligible = DIGEST_PREF_KEYS.has(prefKey);
-  const defaultDelaySeconds = critical ? 0 : nearRealTime ? 30 : standardDelay ? 60 : 120;
+  const defaultDelaySeconds = critical ? 0 : standardDelay ? 60 : 120;
 
   return {
     prefKey,

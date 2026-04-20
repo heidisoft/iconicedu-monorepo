@@ -1,9 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type {
-  ActivitySourceJobRow,
-  FeedScopeVM,
-  MessageMentionVM,
-} from '@iconicedu/shared-types';
+import type { ActivitySourceJobRow, MessageMentionVM } from '@iconicedu/shared-types';
 import { randomUUID } from 'crypto';
 
 import { AnalyticsService } from '@iconicedu/api/analytics/analytics.service';
@@ -362,6 +358,11 @@ export class ActivityWorkerService {
       orgId: job.org_id,
       recurrenceId: exception.recurrence_id,
     });
+    const actorProfileId = await this.resolveScheduleActorProfileId({
+      supabase,
+      orgId: job.org_id,
+      actorRef: exception.created_by,
+    });
 
     await publishActivityEvent({
       supabase,
@@ -369,7 +370,7 @@ export class ActivityWorkerService {
       eventType: 'class.session.canceled',
       occurredAt: new Date().toISOString(),
       sourceKind: 'system',
-      actorProfileId: exception.created_by,
+      actorProfileId,
       scope: { kind: 'learning_space', learningSpaceId: context.learningSpaceId },
       targetRef: { kind: 'learning_space', id: context.learningSpaceId },
       payload: {
@@ -387,7 +388,7 @@ export class ActivityWorkerService {
         timezone: context.timezone ?? 'UTC',
       },
       dedupeKey: `session.canceled:${job.exception_id}`,
-      createdBy: exception.created_by,
+      createdBy: actorProfileId,
     });
   }
 
@@ -428,6 +429,11 @@ export class ActivityWorkerService {
       orgId: job.org_id,
       recurrenceId: override.recurrence_id,
     });
+    const actorProfileId = await this.resolveScheduleActorProfileId({
+      supabase,
+      orgId: job.org_id,
+      actorRef: override.created_by,
+    });
 
     await publishActivityEvent({
       supabase,
@@ -435,7 +441,7 @@ export class ActivityWorkerService {
       eventType: 'class.session.rescheduled',
       occurredAt: new Date().toISOString(),
       sourceKind: 'system',
-      actorProfileId: override.created_by,
+      actorProfileId,
       scope: { kind: 'learning_space', learningSpaceId: context.learningSpaceId },
       targetRef: { kind: 'learning_space', id: context.learningSpaceId },
       payload: {
@@ -460,7 +466,7 @@ export class ActivityWorkerService {
         timezone: context.timezone ?? 'UTC',
       },
       dedupeKey: `session.rescheduled:${job.override_id}`,
-      createdBy: override.created_by,
+      createdBy: actorProfileId,
     });
   }
 
@@ -496,6 +502,47 @@ export class ActivityWorkerService {
     }
 
     return profileResponse.data.id;
+  }
+
+  private async resolveScheduleActorProfileId(input: {
+    supabase: SupabaseServiceClient;
+    orgId: string;
+    actorRef: string | null;
+  }) {
+    if (!input.actorRef) {
+      return null;
+    }
+
+    const profileByIdResponse = await input.supabase
+      .from('profiles')
+      .select('id')
+      .eq('org_id', input.orgId)
+      .eq('id', input.actorRef)
+      .is('deleted_at', null)
+      .maybeSingle<{ id: string }>();
+
+    if (profileByIdResponse.error) {
+      throw new Error(profileByIdResponse.error.message);
+    }
+    if (profileByIdResponse.data?.id) {
+      return profileByIdResponse.data.id;
+    }
+
+    const profileByAccountResponse = await input.supabase
+      .from('profiles')
+      .select('id')
+      .eq('org_id', input.orgId)
+      .eq('account_id', input.actorRef)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle<{ id: string }>();
+
+    if (profileByAccountResponse.error) {
+      throw new Error(profileByAccountResponse.error.message);
+    }
+
+    return profileByAccountResponse.data?.id ?? null;
   }
 
   private async resolveLearningSpaceContextFromRecurrence(input: {

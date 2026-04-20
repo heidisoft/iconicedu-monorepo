@@ -22,6 +22,7 @@ import type {
 } from '@iconicedu/shared-types';
 import { SidebarLeft, SidebarInset } from '@iconicedu/ui-web';
 import { toast } from '@iconicedu/ui-web';
+import { createApiClient } from '@iconicedu/web/lib/api/http-client';
 import { createSupabaseBrowserClient } from '@iconicedu/web/lib/supabase/client';
 import { initPostHog, posthog } from '@iconicedu/web/lib/analytics/posthog-browser';
 import {
@@ -2057,22 +2058,11 @@ export function SidebarShell({
     }) => {
       try {
         const channels = normalizeNotificationChannels(input.channels);
+        const api = createApiClient(supabase);
         const isScoped = Boolean(input.scopeKind && input.scopeId);
 
         if (isScoped) {
-          const response = await fetch('/api/notification-preference-scopes', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              orgId: input.orgId,
-              profileId: input.profileId,
-              prefKey: input.prefKey,
-              channels,
-              scopeKind: input.scopeKind,
-              scopeId: input.scopeId,
-            }),
-          });
-          const payload = (await response.json()) as {
+          const payload = await api.post<{
             success?: boolean;
             message?: string;
             data?: {
@@ -2082,8 +2072,15 @@ export function SidebarShell({
               channels: NotificationChannelVM[];
               muted?: boolean | null;
             };
-          };
-          if (!response.ok || !payload.success || !payload.data) {
+          }>('/notification-preferences/scopes', {
+            orgId: input.orgId,
+            profileId: input.profileId,
+            prefKey: input.prefKey,
+            channels,
+            scopeKind: input.scopeKind,
+            scopeId: input.scopeId,
+          });
+          if (!payload.success || !payload.data) {
             throw new Error(
               payload.message ?? 'Unable to update scoped notification preferences',
             );
@@ -2121,20 +2118,13 @@ export function SidebarShell({
           return;
         }
 
-        const { error } = await supabase.from('notification_preferences').upsert(
-          {
-            org_id: input.orgId,
-            profile_id: input.profileId,
-            pref_key: input.prefKey,
-            channels,
-            muted: null,
-          },
-          { onConflict: 'org_id,profile_id,pref_key' },
-        );
-
-        if (error) {
-          throw error;
-        }
+        await api.put('/notification-preferences', {
+          orgId: input.orgId,
+          profileId: input.profileId,
+          prefKey: input.prefKey,
+          channels,
+          muted: null,
+        });
 
         setSidebarData((prev) => {
           const currentDefaults = prev.user.profile.prefs.notificationDefaults ?? {};
@@ -2177,16 +2167,12 @@ export function SidebarShell({
       scopeId: string;
     }) => {
       try {
-        const response = await fetch('/api/notification-preference-scopes', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(input),
-        });
-        const payload = (await response.json()) as {
+        const api = createApiClient(supabase);
+        const payload = await api.delete<{
           success?: boolean;
           message?: string;
-        };
-        if (!response.ok || !payload.success) {
+        }>('/notification-preferences/scopes', input);
+        if (!payload.success) {
           throw new Error(
             payload.message ?? 'Unable to remove scoped notification preference',
           );
@@ -2219,7 +2205,7 @@ export function SidebarShell({
         throw error;
       }
     },
-    [],
+    [supabase],
   );
 
   const handleLocationUpdate = React.useCallback(
