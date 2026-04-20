@@ -448,6 +448,129 @@ describe('MessagesContainer', () => {
     });
   });
 
+  it('marks a thread read when unread replies exist even if thread message count is stale', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes('/api/messages/thread?')) {
+          return {
+            ok: true,
+            json: async () => ({
+              success: true,
+              messages: [
+                {
+                  ids: { id: 'parent-1', orgId: 'org-1' },
+                  core: {
+                    type: 'text',
+                    createdAt: '2026-03-18T09:00:00.000Z',
+                    visibility: { type: 'all' },
+                    sender: makeParticipant('profile-1', 'guardian'),
+                  },
+                  social: { reactions: [] },
+                  content: { text: 'parent' },
+                },
+                {
+                  ids: { id: 'reply-1', orgId: 'org-1' },
+                  core: {
+                    type: 'text',
+                    createdAt: '2026-03-18T09:10:00.000Z',
+                    visibility: { type: 'all' },
+                    sender: makeParticipant('profile-1', 'guardian'),
+                  },
+                  social: {
+                    reactions: [],
+                    thread: {
+                      ids: { id: 'thread-1', orgId: 'org-1' },
+                      parent: { messageId: 'parent-1' },
+                      stats: { messageCount: 2, lastReplyAt: '2026-03-18T09:10:00.000Z' },
+                      participants: [],
+                    },
+                  },
+                  content: { text: 'reply' },
+                },
+              ],
+            }),
+          };
+        }
+        if (url.includes('/api/messages/thread-read-state')) {
+          return {
+            ok: true,
+            json: async () => ({
+              success: true,
+              unreadCount: 0,
+              lastReadAt: '2026-03-18T09:10:00.000Z',
+              lastReadMessageId: 'reply-1',
+            }),
+          };
+        }
+        return {
+          ok: true,
+          json: async () => ({ success: true, files: [] }),
+        };
+      }),
+    );
+
+    const channelWithStaleThreadCount = {
+      ...channel,
+      collections: {
+        ...channel.collections,
+        messages: {
+          items: [
+            {
+              ids: { id: 'parent-1', orgId: 'org-1' },
+              core: {
+                type: 'text',
+                createdAt: '2026-03-18T09:00:00.000Z',
+                visibility: { type: 'all' },
+                sender: makeParticipant('profile-2', 'educator'),
+              },
+              social: {
+                reactions: [],
+                thread: {
+                  ids: { id: 'thread-1', orgId: 'org-1' },
+                  parent: { messageId: 'parent-1' },
+                  stats: { messageCount: 1, lastReplyAt: '2026-03-18T09:10:00.000Z' },
+                  participants: [],
+                  readState: { threadId: 'thread-1', unreadCount: 1 },
+                },
+              },
+              content: { text: 'parent' },
+            },
+          ],
+          total: 1,
+        },
+      },
+    } as unknown as ChannelVM;
+
+    render(
+      <MessagesContainer
+        channel={channelWithStaleThreadCount}
+        currentUserId="profile-2"
+      />,
+    );
+
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: 'open-thread' }));
+    });
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/messages/thread?'),
+      );
+    });
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/messages/thread-read-state',
+        expect.objectContaining({
+          method: 'POST',
+          body: expect.stringContaining('"threadId":"thread-1"'),
+        }),
+      );
+    });
+  });
+
   it('renders read-only notice for supervised conversations', () => {
     render(<MessagesContainer channel={channel} currentUserId="profile-2" readOnly />);
     expect(screen.getByText('Read-only supervised conversation')).toBeInTheDocument();

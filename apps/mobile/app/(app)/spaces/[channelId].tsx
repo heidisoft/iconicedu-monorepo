@@ -502,6 +502,7 @@ export default function SpaceDetailScreen() {
         >
           <MessageList
             messages={messages ?? []}
+            channelId={channelId ?? ''}
             currentProfileId={profileId}
             currentAccountId={accountId}
             lastReadMessageId={channelReadState?.lastReadMessageId ?? null}

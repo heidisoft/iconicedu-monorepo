@@ -1,16 +1,23 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { MessageItem } from '@/components/messages/message-item';
 import type { MessageVM } from '@iconicedu/shared-types';
 import { lightColors as LIGHT } from '@/lib/theme';
 
 const mockOpenBrowserAsync = jest.fn();
+const mockFetchThreadMessages = jest.fn();
+const mockMarkThreadReadState = jest.fn();
 
 jest.mock('expo-web-browser', () => ({
   openBrowserAsync: (...args: unknown[]) => mockOpenBrowserAsync(...args),
   WebBrowserPresentationStyle: {
     PAGE_SHEET: 'pageSheet',
   },
+}));
+
+jest.mock('@/lib/api/queries', () => ({
+  fetchThreadMessages: (...args: unknown[]) => mockFetchThreadMessages(...args),
+  markThreadReadState: (...args: unknown[]) => mockMarkThreadReadState(...args),
 }));
 
 jest.mock('@/components/messages/chat-pdf-viewer', () => {
@@ -144,6 +151,17 @@ const pdfFileMessage: MessageVM = {
 describe('MessageItem', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockFetchThreadMessages.mockResolvedValue([
+      {
+        ...baseMessage,
+        ids: { id: 'reply-1', orgId: 'org-1' },
+        core: {
+          ...baseMessage.core,
+          createdAt: '2025-01-15T11:00:00Z',
+        },
+      } as MessageVM,
+    ]);
+    mockMarkThreadReadState.mockResolvedValue(0);
   });
 
   it('renders text message content', () => {
@@ -210,6 +228,44 @@ describe('MessageItem', () => {
     expect(screen.getByTestId('thread-unread-new-badge')).toBeTruthy();
     expect(screen.getByTestId('thread-unread-count-badge')).toBeTruthy();
     expect(screen.getByText('2')).toBeTruthy();
+  });
+
+  it('marks a thread as read using the screen channel id fallback when thread read state omits channelId', async () => {
+    render(
+      <MessageItem
+        message={threadedUnreadMessage}
+        channelId="channel-1"
+        isOwn={false}
+        isGroupStart
+        colors={colors}
+        currentProfileId="user-1"
+        currentAccountId="acc-1"
+      />,
+    );
+
+    fireEvent.press(screen.getByText('3 replies'));
+
+    await waitFor(() => {
+      expect(mockFetchThreadMessages).toHaveBeenCalledWith(
+        'org-1',
+        'channel-1',
+        'thread-1',
+        'msg-1',
+        'user-1',
+        'acc-1',
+      );
+    });
+
+    await waitFor(() => {
+      expect(mockMarkThreadReadState).toHaveBeenCalledWith({
+        orgId: 'org-1',
+        accountId: 'acc-1',
+        profileId: 'user-1',
+        channelId: 'channel-1',
+        threadId: 'thread-1',
+        lastReadMessageId: 'reply-1',
+      });
+    });
   });
 
   it('renders the visibility badge for sender-only messages', () => {

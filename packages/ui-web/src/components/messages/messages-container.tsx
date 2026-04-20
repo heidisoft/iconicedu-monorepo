@@ -649,7 +649,11 @@ export function MessagesContainer({
         (message) => message.ids.id !== parentMessage.ids.id,
       );
       const expectedReplies = Math.max(0, (thread.stats?.messageCount ?? 1) - 1);
-      const needsFetch = expectedReplies > localReplyItems.length;
+      const unreadRepliesNeedHydration =
+        Math.max(0, thread.readState?.unreadCount ?? 0) > 0 &&
+        localReplyItems.length === 0;
+      const needsFetch =
+        expectedReplies > localReplyItems.length || unreadRepliesNeedHydration;
 
       let resolvedReplies = localReplyItems;
       if (needsFetch) {

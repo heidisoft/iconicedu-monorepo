@@ -629,6 +629,7 @@ export default function DmConversationScreen() {
         ) : (
           <MessageList
             messages={messages ?? []}
+            channelId={channelId ?? ''}
             currentProfileId={profileId}
             currentAccountId={accountId}
             pendingUploads={pendingUploads}
