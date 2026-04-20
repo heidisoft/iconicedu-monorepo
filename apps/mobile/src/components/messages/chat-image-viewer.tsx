@@ -22,7 +22,7 @@ import Animated, {
   useSharedValue,
 } from 'react-native-reanimated';
 import Svg, { Image as SvgImage, Path } from 'react-native-svg';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Directory, File, Paths } from 'expo-file-system';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -162,6 +162,7 @@ export function ChatImageViewer({
   onClose,
   onSend,
 }: ChatImageViewerProps) {
+  const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const listRef = useRef<FlatList<ChatImageViewerItem>>(null);
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
@@ -404,7 +405,12 @@ export function ChatImageViewer({
       onRequestClose={annotationMode ? handleCancelAnnotation : onClose}
     >
       <GestureHandlerRootView style={styles.gestureRoot}>
-        <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+        <View
+          style={[
+            styles.safeArea,
+            { paddingTop: insets.top, paddingBottom: insets.bottom },
+          ]}
+        >
           <View style={styles.backdrop}>
             {/* Annotation toolbar */}
             {annotationMode && (
@@ -690,7 +696,7 @@ export function ChatImageViewer({
               )}
             </View>
           </View>
-        </SafeAreaView>
+        </View>
       </GestureHandlerRootView>
     </Modal>
   );

@@ -80,7 +80,6 @@ export function ClassScheduleClient({
         scheduleId: getBaseScheduleId(event.ids.id),
         occurrenceKey: getEventOccurrenceKey(event),
         reason: input.reason,
-        sendActivityNotifications: input.sendActivityNotifications,
       });
 
       setScheduleEvents((currentEvents) =>
@@ -110,7 +109,6 @@ export function ClassScheduleClient({
         endTime: input.endTime,
         timezone: input.timezone,
         reason: input.reason,
-        sendActivityNotifications: input.sendActivityNotifications,
       });
 
       setScheduleEvents((currentEvents) =>

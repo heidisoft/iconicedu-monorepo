@@ -296,7 +296,6 @@ export const GUARDIAN_RILEY_PROFILE: UserProfileVM = {
       'schedule.canceled': { channels: ['email', 'sms'] },
       'schedule.no_show': { channels: ['sms'] },
       'schedule.makeup': { channels: ['email'] },
-      'homework.assigned': { channels: ['email'] },
       'homework.due_reminder': { channels: ['push'] },
       'homework.feedback': { channels: ['email'] },
       'homework.new_resource': { channels: ['email'] },
@@ -523,7 +522,6 @@ export const EDUCATOR_LUCAS_PROFILE: UserProfileVM = {
     languagesSpoken: ['English', 'Korean'],
     notificationDefaults: {
       'schedule.starting_soon': { channels: ['sms'] },
-      'homework.assigned': { channels: ['email'] },
     },
   },
   presence: {

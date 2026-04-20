@@ -15,13 +15,14 @@ import type { MessageVM } from '@iconicedu/shared-types';
 import { reportMobileObservedError } from '@/lib/analytics/report-error';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
-import { fetchThreadMessages } from '@/lib/api/queries';
+import { fetchThreadMessages, markThreadReadState } from '@/lib/api/queries';
 import { MessageItem } from './message-item';
 import { MessageInput } from './message-input';
 
 type ThreadSheetProps = {
   visible: boolean;
   parentMessage: MessageVM | null;
+  channelId: string;
   currentProfileId: string;
   currentAccountId: string;
   onClose: () => void;
@@ -98,6 +99,7 @@ function makeStyles(C: AppColors) {
 export const ThreadSheet: React.FC<ThreadSheetProps> = ({
   visible,
   parentMessage,
+  channelId,
   currentProfileId,
   currentAccountId,
   onClose,
@@ -111,19 +113,48 @@ export const ThreadSheet: React.FC<ThreadSheetProps> = ({
 
   // threads.id from the loaded ThreadVM — used as the preferred fetch key
   const threadId = parentMessage?.social?.thread?.ids.id;
+  const resolvedChannelId =
+    channelId || parentMessage?.social?.thread?.readState?.channelId || '';
 
   const loadReplies = useCallback(async () => {
-    if (!parentMessage) return;
+    if (!parentMessage || !resolvedChannelId) return;
     setLoading(true);
     try {
       // Pass both threadId (preferred, threads table FK) and parentMessageId (fallback)
       const data = await fetchThreadMessages(
+        parentMessage.ids.orgId,
+        resolvedChannelId,
         threadId ?? parentMessage.ids.id, // threadId when available
         parentMessage.ids.id, // always the parent message id
         currentProfileId,
         currentAccountId,
       );
       setReplies(data);
+
+      const lastReplyId = data[data.length - 1]?.ids.id ?? null;
+      if (resolvedChannelId && threadId && currentProfileId && currentAccountId) {
+        try {
+          await markThreadReadState({
+            orgId: parentMessage.ids.orgId,
+            accountId: currentAccountId,
+            profileId: currentProfileId,
+            channelId: resolvedChannelId,
+            threadId,
+            lastReadMessageId: lastReplyId,
+          });
+        } catch (error) {
+          reportMobileObservedError({
+            error,
+            source: 'mobile.messages.thread_sheet.thread_read_state',
+            message: 'Failed to sync thread read state in thread sheet',
+            context: {
+              channelId: resolvedChannelId,
+              threadId,
+              parentMessageId: parentMessage.ids.id,
+            },
+          });
+        }
+      }
     } catch (error) {
       reportMobileObservedError({
         error,
@@ -137,7 +168,7 @@ export const ThreadSheet: React.FC<ThreadSheetProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [parentMessage, threadId, currentProfileId, currentAccountId]);
+  }, [parentMessage, resolvedChannelId, threadId, currentProfileId, currentAccountId]);
 
   useEffect(() => {
     if (visible && parentMessage) {
@@ -152,7 +183,14 @@ export const ThreadSheet: React.FC<ThreadSheetProps> = ({
       if (!parentMessage) return;
       // Pass threadId so sendTextMessage can set messages.thread_id correctly
       await onSend(text, parentMessage.ids.id, threadId);
-      loadReplies();
+      await loadReplies();
+      if (!threadId) {
+        // When the first reply creates the thread row, a follow-up fetch helps the sheet
+        // pick up the new thread-backed replies immediately even before parent props refresh.
+        setTimeout(() => {
+          void loadReplies();
+        }, 250);
+      }
     },
     [parentMessage, threadId, onSend, loadReplies],
   );

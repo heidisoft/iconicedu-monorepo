@@ -405,41 +405,6 @@ export function applyScheduleActivityLocalTime(
     return activity;
   }
 
-  if (activity.verb === 'class.session.scheduled') {
-    const startAt = typeof metadata.startAt === 'string' ? metadata.startAt : undefined;
-    const scheduleTimezone =
-      typeof metadata.timezone === 'string' ? metadata.timezone : undefined;
-    const firstSessionStartAt =
-      typeof metadata.firstSessionStartAt === 'string'
-        ? metadata.firstSessionStartAt
-        : undefined;
-    const localStart = startAt
-      ? formatLocalDateTimeLabel(startAt, timezone, scheduleTimezone)
-      : null;
-    const localFirst = formatLocalDateTimeLabel(
-      firstSessionStartAt ?? startAt ?? '',
-      timezone,
-      scheduleTimezone,
-    );
-    const weeklyLocalTime = startAt
-      ? formatLocalTimeLabel(startAt, timezone, scheduleTimezone)
-      : null;
-    const isUpdated = metadata.activityPhase === 'updated';
-    return {
-      ...activity,
-      content: {
-        ...activity.content,
-        summary: isUpdated
-          ? localStart
-            ? `Session scheduled ${localStart}.`
-            : activity.content.summary
-          : localFirst && weeklyLocalTime
-            ? `First session: ${localFirst}, then weekly ${weeklyLocalTime}`
-            : activity.content.summary,
-      },
-    };
-  }
-
   if (activity.verb === 'class.session.rescheduled') {
     const title =
       typeof metadata.title === 'string'

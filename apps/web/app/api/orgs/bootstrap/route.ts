@@ -152,17 +152,11 @@ export async function POST(request: Request) {
     creatorProfile = insertProfileResponse.data;
   }
 
-  const seedResponse = await seedSignupDefaultNotificationPreferences(
+  await seedSignupDefaultNotificationPreferences(
     serviceSupabase,
     org.id,
     creatorProfile.id,
   );
-  if (seedResponse.error) {
-    return NextResponse.json(
-      { success: false, message: seedResponse.error.message },
-      { status: 500 },
-    );
-  }
 
   const subjectSeedResponse = await seedDefaultOrgSubjectCatalog({
     supabase: serviceSupabase,

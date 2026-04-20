@@ -4,37 +4,23 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { requireParentActorContext } from '@iconicedu/web/lib/family-view/actor-context';
-import {
-  insertClassSchedules,
-  publishParticipantInviteActivities,
-} from '@iconicedu/web/lib/admin/learning-space-create';
+import { insertClassSchedules } from '@iconicedu/web/lib/admin/learning-space-create';
 import {
   type CanonicalLearningSpaceSchedule,
   buildCanonicalLearningSpaceSchedulesFromExisting,
   buildCanonicalLearningSpaceSchedulesFromPayload,
-  getDateFromISOInTimezone,
-  getTimeFromISOInTimezone,
   buildLearningSpaceScheduleHashBundleFromCanonical,
   buildLearningSpaceSchedulesHashKeyFromExisting,
   buildLearningSpaceSchedulesHashKeyFromPayload,
 } from '@iconicedu/web/lib/admin/learning-space-schedule-hash';
 import { toStoredLiveSessionConfig } from '@iconicedu/web/lib/admin/live-session-config';
-import { publishActivityEvent } from '@iconicedu/web/lib/activity-feed/publisher/activity-publisher';
 import { compileLearningSpaceReminderJobs } from '@iconicedu/web/lib/automation/reminder-jobs';
-import { ensureSystemProfileId } from '@iconicedu/web/lib/automation/system-profile';
 import type {
   ChannelUiDefaultsVM,
   LearningSpaceCreatePayload,
   LearningSpaceParticipantPayload,
   LearningSpaceSchedulePayload,
 } from '@iconicedu/shared-types';
-
-type ParticipantProfileSnapshotRow = {
-  id: string;
-  display_name?: string | null;
-  avatar_url?: string | null;
-  ui_theme_key?: string | null;
-};
 
 type ExistingScheduleSnapshot = {
   id: string;
@@ -121,80 +107,6 @@ export type LearningSpaceScheduleDiffPlan = {
   }>;
 };
 
-type RemovedParticipantSnapshot = {
-  profileId: string;
-  snapshot?: {
-    name: string;
-    avatarUrl?: string | null;
-    themeKey?: string | null;
-  };
-};
-
-type RemovedMembersActivity = {
-  eventType: 'member.removed' | 'members.removed';
-  dedupeKey: string;
-  payload: {
-    learningSpaceId: string;
-    channelId: string;
-    title: string;
-    memberProfileId: string | null;
-    memberDisplayName: string | null;
-    memberAvatarUrl: string | null;
-    memberThemeKey: string | null;
-    memberCount: number;
-    members: Array<{
-      profileId: string;
-      displayName: string | null;
-      avatarUrl: string | null;
-      themeKey: string | null;
-    }>;
-    invitedCount: number;
-    invitedMembers: Array<{
-      profileId: string;
-      name: string;
-      avatarUrl?: string | null;
-      themeKey?: string | null;
-    }>;
-    activityPhase: 'updated';
-  };
-};
-
-type ScheduleChangeActivity = {
-  eventType:
-    | 'class.session.scheduled'
-    | 'class.sessions.scheduled'
-    | 'class.session.canceled'
-    | 'class.sessions.canceled'
-    | 'class.session.rescheduled'
-    | 'class.sessions.rescheduled';
-  dedupeKey: string;
-  payload: {
-    learningSpaceId: string;
-    channelId: string;
-    scheduleId: string;
-    title: string;
-    activityPhase: 'updated';
-    invitedCount: number;
-    invitedMembers: Array<{
-      profileId: string;
-      name: string;
-      avatarUrl?: string | null;
-      themeKey?: string | null;
-    }>;
-    firstSessionStartAt?: string | null;
-    firstSessionTimezone?: string | null;
-    startAt?: string | null;
-    timezone?: string | null;
-    canceledStartAt?: string | null;
-    canceledReason?: string | null;
-    rescheduledFromStartAt?: string | null;
-    rescheduledToStartAt?: string | null;
-    rescheduledReason?: string | null;
-  };
-};
-
-type ScheduleChangeCategory = 'scheduled' | 'canceled' | 'rescheduled';
-
 type SchedulePairingReason =
   | 'exact_structural'
   | 'fallback_nearest_same_timezone'
@@ -209,49 +121,6 @@ type SchedulePairingResult = {
   unpairedPrevious: NormalizedExistingSchedule[];
   unpairedNext: NormalizedIncomingSchedule[];
 };
-
-function isScheduledEventType(eventType: ScheduleChangeActivity['eventType']) {
-  return (
-    eventType === 'class.session.scheduled' || eventType === 'class.sessions.scheduled'
-  );
-}
-
-function isCanceledEventType(eventType: ScheduleChangeActivity['eventType']) {
-  return (
-    eventType === 'class.session.canceled' || eventType === 'class.sessions.canceled'
-  );
-}
-
-function isRescheduledEventType(eventType: ScheduleChangeActivity['eventType']) {
-  return (
-    eventType === 'class.session.rescheduled' ||
-    eventType === 'class.sessions.rescheduled'
-  );
-}
-
-function getScheduleChangeCategory(
-  eventType: ScheduleChangeActivity['eventType'],
-): ScheduleChangeCategory {
-  if (isScheduledEventType(eventType)) return 'scheduled';
-  if (isCanceledEventType(eventType)) return 'canceled';
-  return 'rescheduled';
-}
-
-function getPluralizedScheduleEventType(
-  category: ScheduleChangeCategory,
-): ScheduleChangeActivity['eventType'] {
-  if (category === 'scheduled') return 'class.sessions.scheduled';
-  if (category === 'canceled') return 'class.sessions.canceled';
-  return 'class.sessions.rescheduled';
-}
-
-function getSingularScheduleEventType(
-  category: ScheduleChangeCategory,
-): ScheduleChangeActivity['eventType'] {
-  if (category === 'scheduled') return 'class.session.scheduled';
-  if (category === 'canceled') return 'class.session.canceled';
-  return 'class.session.rescheduled';
-}
 
 function durationMinutesBetween(startAt: string, endAt: string) {
   const start = new Date(startAt).getTime();
@@ -275,69 +144,6 @@ function buildStructuralSignature(
 function toTimeOrZero(value: string) {
   const parsed = new Date(value).getTime();
   return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function toTimestamp(value: string | null | undefined) {
-  if (!value) return null;
-  const time = new Date(value).getTime();
-  return Number.isFinite(time) ? time : null;
-}
-
-function shouldPublishScheduleChangeActivity(
-  activity: ScheduleChangeActivity,
-  nowIso: string,
-) {
-  const nowTime = toTimestamp(nowIso);
-  if (nowTime === null) {
-    debugScheduleDiff('schedule-change-publish-decision', {
-      eventType: activity.eventType,
-      nowIso,
-      nowTime,
-      referenceAt: null,
-      referenceTime: null,
-      decision: 'publish',
-      reason: 'invalid_now',
-    });
-    return true;
-  }
-
-  const payload = activity.payload;
-  const referenceAt = isCanceledEventType(activity.eventType)
-    ? (payload.canceledStartAt ?? payload.startAt ?? payload.firstSessionStartAt ?? null)
-    : isRescheduledEventType(activity.eventType)
-      ? (payload.rescheduledToStartAt ??
-        payload.rescheduledFromStartAt ??
-        payload.startAt ??
-        payload.firstSessionStartAt ??
-        null)
-      : (payload.startAt ?? payload.firstSessionStartAt ?? null);
-
-  const referenceTime = toTimestamp(referenceAt);
-  if (referenceTime === null) {
-    debugScheduleDiff('schedule-change-publish-decision', {
-      eventType: activity.eventType,
-      nowIso,
-      nowTime,
-      referenceAt,
-      referenceTime,
-      decision: 'publish',
-      reason: 'missing_reference_time',
-    });
-    return true;
-  }
-
-  const shouldPublish = referenceTime >= nowTime;
-  debugScheduleDiff('schedule-change-publish-decision', {
-    eventType: activity.eventType,
-    nowIso,
-    nowTime,
-    referenceAt,
-    referenceTime,
-    decision: shouldPublish ? 'publish' : 'skip',
-    reason: shouldPublish ? 'future_or_now_reference_time' : 'past_reference_time',
-  });
-
-  return shouldPublish;
 }
 
 function canonicalJson(value: unknown) {
@@ -369,16 +175,6 @@ function normalizeParticipantIds(ids: string[]) {
   return [...ids].sort();
 }
 
-function joinNaturalList(values: string[]) {
-  if (values.length <= 1) {
-    return values[0] ?? '';
-  }
-  if (values.length === 2) {
-    return `${values[0]} and ${values[1]}`;
-  }
-  return `${values.slice(0, -1).join(', ')}, and ${values[values.length - 1]}`;
-}
-
 function isScheduleDiffDebugEnabled() {
   return process.env.DEBUG_LEARNING_SPACE_SCHEDULE_DIFF === '1';
 }
@@ -387,565 +183,6 @@ function debugScheduleDiff(_stage: string, _details: Record<string, unknown>) {
   if (!isScheduleDiffDebugEnabled()) {
     return;
   }
-}
-
-export function buildRemovedMembersActivity(input: {
-  learningSpaceId: string;
-  channelId: string;
-  title: string;
-  occurredAt: string;
-  removedParticipants: RemovedParticipantSnapshot[];
-  invitedMembers: Array<{
-    profileId: string;
-    name: string;
-    avatarUrl?: string | null;
-    themeKey?: string | null;
-  }>;
-}): RemovedMembersActivity | null {
-  if (!input.removedParticipants.length) {
-    return null;
-  }
-
-  const members = input.removedParticipants.map((participant) => ({
-    profileId: participant.profileId,
-    displayName: participant.snapshot?.name ?? null,
-    avatarUrl: participant.snapshot?.avatarUrl ?? null,
-    themeKey: participant.snapshot?.themeKey ?? null,
-  }));
-  const firstMember = members[0];
-  const isPlural = members.length > 1;
-
-  return {
-    eventType: isPlural ? 'members.removed' : 'member.removed',
-    dedupeKey: isPlural
-      ? `members.removed:${input.learningSpaceId}:${input.occurredAt}`
-      : `member.removed:${input.learningSpaceId}:${firstMember?.profileId ?? 'unknown'}:${input.occurredAt}`,
-    payload: {
-      learningSpaceId: input.learningSpaceId,
-      channelId: input.channelId,
-      title: input.title,
-      memberProfileId: firstMember?.profileId ?? null,
-      memberDisplayName: firstMember?.displayName ?? null,
-      memberAvatarUrl: firstMember?.avatarUrl ?? null,
-      memberThemeKey: firstMember?.themeKey ?? null,
-      memberCount: members.length,
-      members,
-      invitedCount: input.invitedMembers.length,
-      invitedMembers: input.invitedMembers,
-      activityPhase: 'updated',
-    },
-  };
-}
-
-export function buildExceptionAndOverrideScheduleChangeActivities(input: {
-  learningSpaceId: string;
-  channelId: string;
-  title: string;
-  occurredAt: string;
-  invitedMembers: Array<{
-    profileId: string;
-    name: string;
-    avatarUrl?: string | null;
-    themeKey?: string | null;
-  }>;
-  pairs: Array<{
-    scheduleId: string;
-    timezone: string | null;
-    previousFullHash?: string;
-    nextFullHash?: string;
-    previous: {
-      exceptions: Array<{ occurrenceKey: string; reason: string | null }>;
-      overrides: Array<{
-        occurrenceKey: string;
-        startAt: string | null;
-        endAt: string | null;
-        reason: string | null;
-      }>;
-    };
-    next: {
-      exceptions: Array<{ occurrenceKey: string; reason: string | null }>;
-      overrides: Array<{
-        occurrenceKey: string;
-        startAt: string | null;
-        endAt: string | null;
-        reason: string | null;
-      }>;
-    };
-  }>;
-  nextSessionStartAt?: string | null;
-}): ScheduleChangeActivity[] {
-  const activities: ScheduleChangeActivity[] = [];
-
-  input.pairs.forEach((pair, pairIndex) => {
-    if (
-      pair.previousFullHash &&
-      pair.nextFullHash &&
-      pair.previousFullHash === pair.nextFullHash
-    ) {
-      debugScheduleDiff('pair-diff-skip-full-hash-equal', {
-        learningSpaceId: input.learningSpaceId,
-        scheduleId: pair.scheduleId,
-        pairIndex,
-      });
-      return;
-    }
-
-    const timezone = pair.timezone ?? 'UTC';
-    const normalizeReason = (value: string | null | undefined) => {
-      if (typeof value !== 'string') return null;
-      const trimmed = value.trim();
-      return trimmed.length ? trimmed : null;
-    };
-    const toOccurrenceDate = (occurrenceKey: string) =>
-      getDateFromISOInTimezone(occurrenceKey, timezone) ?? occurrenceKey;
-
-    const previousExceptions = new Map(
-      pair.previous.exceptions.map((entry) => [
-        toOccurrenceDate(entry.occurrenceKey),
-        entry,
-      ]),
-    );
-    const nextExceptions = new Map(
-      pair.next.exceptions.map((entry) => [toOccurrenceDate(entry.occurrenceKey), entry]),
-    );
-
-    const toOverrideSemantic = (entry: {
-      occurrenceKey: string;
-      startAt: string | null;
-      endAt: string | null;
-      reason: string | null;
-    }) => {
-      const occurrenceDate = toOccurrenceDate(entry.occurrenceKey);
-      const newDate = entry.startAt
-        ? getDateFromISOInTimezone(entry.startAt, timezone)
-        : null;
-      const newTime = entry.startAt
-        ? getTimeFromISOInTimezone(entry.startAt, timezone)
-        : null;
-      const durationMinutes =
-        entry.startAt && entry.endAt
-          ? Math.max(
-              1,
-              Math.round(
-                (new Date(entry.endAt).getTime() - new Date(entry.startAt).getTime()) /
-                  60000,
-              ),
-            )
-          : null;
-      return {
-        occurrenceDate,
-        newDate,
-        newTime,
-        durationMinutes,
-        reason: normalizeReason(entry.reason),
-        raw: entry,
-      };
-    };
-
-    const previousOverrides = new Map(
-      pair.previous.overrides.map((entry) => {
-        const semantic = toOverrideSemantic(entry);
-        return [semantic.occurrenceDate, semantic] as const;
-      }),
-    );
-    const nextOverrides = new Map(
-      pair.next.overrides.map((entry) => {
-        const semantic = toOverrideSemantic(entry);
-        return [semantic.occurrenceDate, semantic] as const;
-      }),
-    );
-    const changedKeys = new Set([
-      ...previousExceptions.keys(),
-      ...nextExceptions.keys(),
-      ...previousOverrides.keys(),
-      ...nextOverrides.keys(),
-    ]);
-
-    const pairDiffs: Array<{
-      occurrenceKey: string;
-      transition: string;
-      eventType: ScheduleChangeActivity['eventType'];
-    }> = [];
-
-    for (const occurrenceKey of changedKeys) {
-      const previousOverrideSemantic = previousOverrides.get(occurrenceKey) ?? null;
-      const nextOverrideSemantic = nextOverrides.get(occurrenceKey) ?? null;
-      const previousOverride = previousOverrideSemantic?.raw ?? null;
-      const nextOverride = nextOverrideSemantic?.raw ?? null;
-      const previousException = previousExceptions.get(occurrenceKey) ?? null;
-      const nextException = nextExceptions.get(occurrenceKey) ?? null;
-      const previousState = previousException
-        ? 'exception'
-        : previousOverride
-          ? 'override'
-          : 'scheduled';
-      const nextState = nextException
-        ? 'exception'
-        : nextOverride
-          ? 'override'
-          : 'scheduled';
-
-      if (
-        previousState === nextState &&
-        previousState === 'exception' &&
-        normalizeReason(previousException?.reason) ===
-          normalizeReason(nextException?.reason)
-      ) {
-        continue;
-      }
-      if (
-        previousState === nextState &&
-        previousState === 'override' &&
-        previousOverrideSemantic?.newDate === nextOverrideSemantic?.newDate &&
-        previousOverrideSemantic?.newTime === nextOverrideSemantic?.newTime &&
-        previousOverrideSemantic?.durationMinutes ===
-          nextOverrideSemantic?.durationMinutes &&
-        previousOverrideSemantic?.reason === nextOverrideSemantic?.reason
-      ) {
-        continue;
-      }
-      if (previousState === nextState && previousState === 'scheduled') {
-        continue;
-      }
-
-      if (nextState === 'scheduled') {
-        const scheduledStartAt =
-          previousOverride?.occurrenceKey ??
-          previousException?.occurrenceKey ??
-          occurrenceKey;
-        pairDiffs.push({
-          occurrenceKey,
-          transition: `${previousState}->scheduled`,
-          eventType: 'class.session.scheduled',
-        });
-        const activity: ScheduleChangeActivity = {
-          eventType: 'class.session.scheduled',
-          dedupeKey: `schedule.unscheduled-change:${input.learningSpaceId}:${pair.scheduleId}:${pairIndex}:${occurrenceKey}:${input.occurredAt}`,
-          payload: {
-            learningSpaceId: input.learningSpaceId,
-            channelId: input.channelId,
-            scheduleId: pair.scheduleId,
-            title: input.title,
-            activityPhase: 'updated',
-            invitedCount: input.invitedMembers.length,
-            invitedMembers: input.invitedMembers,
-            firstSessionStartAt: input.nextSessionStartAt ?? scheduledStartAt,
-            firstSessionTimezone: pair.timezone,
-            startAt: scheduledStartAt,
-            timezone: pair.timezone,
-          },
-        };
-        if (shouldPublishScheduleChangeActivity(activity, input.occurredAt)) {
-          activities.push(activity);
-        }
-        continue;
-      }
-
-      if (nextState === 'exception') {
-        pairDiffs.push({
-          occurrenceKey,
-          transition: `${previousState}->exception`,
-          eventType: 'class.session.canceled',
-        });
-        const activity: ScheduleChangeActivity = {
-          eventType: 'class.session.canceled',
-          dedupeKey: `schedule.exception:${input.learningSpaceId}:${pair.scheduleId}:${pairIndex}:${occurrenceKey}:${input.occurredAt}`,
-          payload: {
-            learningSpaceId: input.learningSpaceId,
-            channelId: input.channelId,
-            scheduleId: pair.scheduleId,
-            title: input.title,
-            activityPhase: 'updated',
-            invitedCount: input.invitedMembers.length,
-            invitedMembers: input.invitedMembers,
-            firstSessionStartAt: input.nextSessionStartAt ?? occurrenceKey,
-            firstSessionTimezone: pair.timezone,
-            canceledStartAt: nextException?.occurrenceKey ?? occurrenceKey,
-            canceledReason: nextException?.reason ?? null,
-            timezone: pair.timezone,
-          },
-        };
-        if (shouldPublishScheduleChangeActivity(activity, input.occurredAt)) {
-          activities.push(activity);
-        }
-        continue;
-      }
-
-      const fromStartAt =
-        previousState === 'override'
-          ? (previousOverride?.startAt ??
-            previousOverride?.occurrenceKey ??
-            previousException?.occurrenceKey ??
-            occurrenceKey)
-          : (previousException?.occurrenceKey ??
-            previousOverride?.startAt ??
-            previousOverride?.occurrenceKey ??
-            occurrenceKey);
-      const toStartAt =
-        nextOverride?.startAt ??
-        nextOverride?.occurrenceKey ??
-        nextException?.occurrenceKey ??
-        occurrenceKey;
-      pairDiffs.push({
-        occurrenceKey,
-        transition: `${previousState}->override`,
-        eventType: 'class.session.rescheduled',
-      });
-      const activity: ScheduleChangeActivity = {
-        eventType: 'class.session.rescheduled',
-        dedupeKey: `schedule.override:${input.learningSpaceId}:${pair.scheduleId}:${pairIndex}:${occurrenceKey}:${input.occurredAt}`,
-        payload: {
-          learningSpaceId: input.learningSpaceId,
-          channelId: input.channelId,
-          scheduleId: pair.scheduleId,
-          title: input.title,
-          activityPhase: 'updated',
-          invitedCount: input.invitedMembers.length,
-          invitedMembers: input.invitedMembers,
-          firstSessionStartAt: input.nextSessionStartAt ?? toStartAt,
-          firstSessionTimezone: pair.timezone,
-          rescheduledFromStartAt: fromStartAt,
-          rescheduledToStartAt: toStartAt,
-          rescheduledReason: nextOverride?.reason ?? null,
-          timezone: pair.timezone,
-        },
-      };
-      if (shouldPublishScheduleChangeActivity(activity, input.occurredAt)) {
-        activities.push(activity);
-      }
-    }
-
-    if (pairDiffs.length) {
-      debugScheduleDiff('pair-diff', {
-        learningSpaceId: input.learningSpaceId,
-        scheduleId: pair.scheduleId,
-        pairIndex,
-        diffCount: pairDiffs.length,
-        pairDiffs,
-      });
-    }
-    debugScheduleDiff('pair-semantic-compare', {
-      learningSpaceId: input.learningSpaceId,
-      scheduleId: pair.scheduleId,
-      pairIndex,
-      timezone,
-      previousExceptionDates: [...previousExceptions.keys()],
-      nextExceptionDates: [...nextExceptions.keys()],
-      previousOverrideDates: [...previousOverrides.keys()],
-      nextOverrideDates: [...nextOverrides.keys()],
-    });
-  });
-
-  return activities;
-}
-
-function buildBaseScheduleChangeActivities(input: {
-  learningSpaceId: string;
-  channelId: string;
-  title: string;
-  occurredAt: string;
-  invitedMembers: Array<{
-    profileId: string;
-    name: string;
-    avatarUrl?: string | null;
-    themeKey?: string | null;
-  }>;
-  nextSessionStartAt?: string | null;
-  scheduleDiffPlan: LearningSpaceScheduleDiffPlan;
-}): ScheduleChangeActivity[] {
-  const activities: ScheduleChangeActivity[] = [];
-
-  input.scheduleDiffPlan.added.forEach((schedule, index) => {
-    const activity: ScheduleChangeActivity = {
-      eventType: 'class.session.scheduled',
-      dedupeKey: `schedule.base-added:${input.learningSpaceId}:${index}:${schedule.startAt}:${input.occurredAt}`,
-      payload: {
-        learningSpaceId: input.learningSpaceId,
-        channelId: input.channelId,
-        scheduleId: `incoming:${index}`,
-        title: input.title,
-        activityPhase: 'updated',
-        invitedCount: input.invitedMembers.length,
-        invitedMembers: input.invitedMembers,
-        firstSessionStartAt: input.nextSessionStartAt ?? schedule.startAt,
-        firstSessionTimezone: schedule.timezone,
-        startAt: schedule.startAt,
-        timezone: schedule.timezone,
-      },
-    };
-    if (shouldPublishScheduleChangeActivity(activity, input.occurredAt)) {
-      activities.push(activity);
-    }
-  });
-
-  input.scheduleDiffPlan.removed.forEach((schedule, index) => {
-    const activity: ScheduleChangeActivity = {
-      eventType: 'class.session.canceled',
-      dedupeKey: `schedule.base-removed:${input.learningSpaceId}:${schedule.id}:${index}:${schedule.startAt}:${input.occurredAt}`,
-      payload: {
-        learningSpaceId: input.learningSpaceId,
-        channelId: input.channelId,
-        scheduleId: schedule.id,
-        title: input.title,
-        activityPhase: 'updated',
-        invitedCount: input.invitedMembers.length,
-        invitedMembers: input.invitedMembers,
-        firstSessionStartAt: input.nextSessionStartAt ?? schedule.startAt,
-        firstSessionTimezone: schedule.timezone,
-        canceledStartAt: schedule.startAt,
-        timezone: schedule.timezone,
-      },
-    };
-    if (shouldPublishScheduleChangeActivity(activity, input.occurredAt)) {
-      activities.push(activity);
-    }
-  });
-
-  input.scheduleDiffPlan.rescheduled.forEach((entry, index) => {
-    const activity: ScheduleChangeActivity = {
-      eventType: 'class.session.rescheduled',
-      dedupeKey: `schedule.base-rescheduled:${input.learningSpaceId}:${entry.previous.id}:${index}:${input.occurredAt}`,
-      payload: {
-        learningSpaceId: input.learningSpaceId,
-        channelId: input.channelId,
-        scheduleId: entry.previous.id,
-        title: input.title,
-        activityPhase: 'updated',
-        invitedCount: input.invitedMembers.length,
-        invitedMembers: input.invitedMembers,
-        firstSessionStartAt: input.nextSessionStartAt ?? entry.next.startAt,
-        firstSessionTimezone: entry.next.timezone ?? entry.previous.timezone,
-        rescheduledFromStartAt: entry.previous.startAt,
-        rescheduledToStartAt: entry.next.startAt,
-        timezone: entry.next.timezone ?? entry.previous.timezone,
-      },
-    };
-    if (shouldPublishScheduleChangeActivity(activity, input.occurredAt)) {
-      activities.push(activity);
-    }
-  });
-
-  return activities;
-}
-
-function normalizeScheduleChangeVerbPlurality(
-  activities: ScheduleChangeActivity[],
-): ScheduleChangeActivity[] {
-  const counts = activities.reduce<Record<ScheduleChangeCategory, number>>(
-    (acc, activity) => {
-      const category = getScheduleChangeCategory(activity.eventType);
-      acc[category] += 1;
-      return acc;
-    },
-    { scheduled: 0, canceled: 0, rescheduled: 0 },
-  );
-
-  return activities.map((activity) => {
-    const category = getScheduleChangeCategory(activity.eventType);
-    const normalizedEventType =
-      counts[category] > 1
-        ? getPluralizedScheduleEventType(category)
-        : getSingularScheduleEventType(category);
-
-    if (activity.eventType === normalizedEventType) {
-      return activity;
-    }
-
-    return {
-      ...activity,
-      eventType: normalizedEventType,
-    };
-  });
-}
-
-function resolveNextSessionStartAtFromIncomingSchedules(input: {
-  schedules: NormalizedIncomingSchedule[];
-  nowIso: string;
-}) {
-  const nowTime = new Date(input.nowIso).getTime();
-  const candidates = input.schedules.flatMap((schedule) => {
-    const exceptionKeys = new Set(
-      schedule.canonical.exceptions.map((entry) => entry.occurrenceKey),
-    );
-    const base = exceptionKeys.has(schedule.startAt) ? [] : [schedule.startAt];
-    const overrides = schedule.canonical.overrides
-      .map((entry) => entry.startAt ?? entry.occurrenceKey)
-      .filter((value): value is string => Boolean(value));
-    return [...base, ...overrides];
-  });
-  const normalized = [...new Set(candidates)]
-    .map((value) => ({ value, time: new Date(value).getTime() }))
-    .filter((entry) => Number.isFinite(entry.time))
-    .sort((a, b) => a.time - b.time);
-
-  return (
-    normalized.find((entry) => entry.time >= nowTime)?.value ??
-    normalized[0]?.value ??
-    null
-  );
-}
-
-async function loadLearningSpaceParticipantSnapshot(input: {
-  supabase: SupabaseClient;
-  orgId: string;
-  learningSpaceId: string;
-}) {
-  const participantsResponse = await input.supabase
-    .from('learning_space_participants')
-    .select('profile_id')
-    .eq('org_id', input.orgId)
-    .eq('learning_space_id', input.learningSpaceId)
-    .is('deleted_at', null)
-    .returns<Array<{ profile_id: string }>>();
-
-  if (participantsResponse.error) {
-    throw new Error(participantsResponse.error.message);
-  }
-
-  const participantIds = (participantsResponse.data ?? []).map((row) => row.profile_id);
-  if (!participantIds.length) {
-    return [];
-  }
-
-  return loadProfileSnapshotsByIds({
-    supabase: input.supabase,
-    orgId: input.orgId,
-    profileIds: participantIds,
-  });
-}
-
-async function loadProfileSnapshotsByIds(input: {
-  supabase: SupabaseClient;
-  orgId: string;
-  profileIds: string[];
-}) {
-  const participantIds = input.profileIds.filter(Boolean);
-  if (!participantIds.length) {
-    return [];
-  }
-
-  const profilesResponse = await input.supabase
-    .from('profiles')
-    .select('id, display_name, avatar_url, ui_theme_key')
-    .eq('org_id', input.orgId)
-    .in('id', participantIds)
-    .is('deleted_at', null)
-    .returns<ParticipantProfileSnapshotRow[]>();
-
-  if (profilesResponse.error) {
-    throw new Error(profilesResponse.error.message);
-  }
-
-  const profileById = new Map((profilesResponse.data ?? []).map((row) => [row.id, row]));
-  return participantIds.map((profileId) => {
-    const profile = profileById.get(profileId);
-    return {
-      profileId,
-      name: profile?.display_name ?? 'Participant',
-      avatarUrl: profile?.avatar_url ?? null,
-      themeKey: profile?.ui_theme_key ?? null,
-    };
-  });
 }
 
 function normalizeExistingSchedulesForCompare(
@@ -1189,9 +426,6 @@ export async function updateLearningSpaceFromPayload(
     orgId: string;
     actorProfileId: string;
   },
-  options?: {
-    sendActivityNotifications?: boolean;
-  },
 ) {
   const supabase = await createSupabaseServerClient();
   let orgId: string;
@@ -1213,7 +447,6 @@ export async function updateLearningSpaceFromPayload(
     actorProfileId = actor.profile.id;
   }
   const now = new Date().toISOString();
-  const shouldSendActivityNotifications = options?.sendActivityNotifications ?? true;
   const nextParticipantsSnapshot = payload.participants ?? [];
 
   const { data: learningSpace, error: learningSpaceError } = await supabase
@@ -1331,17 +564,6 @@ export async function updateLearningSpaceFromPayload(
   const existingParticipantIdList = normalizeParticipantIds(
     (existingParticipantsResponse.data ?? []).map((row) => row.profile_id),
   );
-  const existingParticipantSnapshots = await loadProfileSnapshotsByIds({
-    supabase: serviceClient,
-    orgId,
-    profileIds: existingParticipantIdList,
-  });
-  const existingParticipantById = new Map(
-    existingParticipantSnapshots.map((participant) => [
-      participant.profileId,
-      participant,
-    ]),
-  );
   const incomingParticipantIds = normalizeParticipantIds(
     nextParticipantsSnapshot.map((participant) => participant.profileId),
   );
@@ -1419,98 +641,6 @@ export async function updateLearningSpaceFromPayload(
     exceptionsByScheduleId: previousExceptionsByScheduleId,
     overridesByScheduleId: previousOverridesByScheduleId,
   });
-  const normalizedPreviousSchedules = normalizeExistingSchedulesForCompare(
-    previousScheduleCompareInputs,
-  );
-  const normalizedIncomingSchedules = normalizeIncomingSchedulesForCompare(
-    payload.schedules ?? [],
-  );
-  const nextSessionStartAt = resolveNextSessionStartAtFromIncomingSchedules({
-    schedules: normalizedIncomingSchedules,
-    nowIso: now,
-  });
-  const pairing = pairSchedulesForCompare(
-    normalizedPreviousSchedules,
-    normalizedIncomingSchedules,
-  );
-  const exceptionOverrideActivities = buildExceptionAndOverrideScheduleChangeActivities({
-    learningSpaceId,
-    channelId,
-    title: payload.basics.title,
-    occurredAt: now,
-    invitedMembers: [],
-    nextSessionStartAt,
-    pairs: pairing.pairs.map((pair) => ({
-      scheduleId: pair.previous.id,
-      timezone: pair.previous.timezone ?? pair.next.timezone ?? null,
-      previousFullHash: pair.previous.fullHash,
-      nextFullHash: pair.next.fullHash,
-      previous: {
-        exceptions: pair.previous.canonical.exceptions.map((entry) => ({
-          occurrenceKey: entry.occurrenceKey,
-          reason: entry.reason ?? null,
-        })),
-        overrides: pair.previous.canonical.overrides.map((entry) => ({
-          occurrenceKey: entry.occurrenceKey,
-          startAt: entry.startAt ?? null,
-          endAt: entry.endAt ?? null,
-          reason: entry.reason ?? null,
-        })),
-      },
-      next: {
-        exceptions: pair.next.canonical.exceptions.map((entry) => ({
-          occurrenceKey: entry.occurrenceKey,
-          reason: entry.reason ?? null,
-        })),
-        overrides: pair.next.canonical.overrides.map((entry) => ({
-          occurrenceKey: entry.occurrenceKey,
-          startAt: entry.startAt ?? null,
-          endAt: entry.endAt ?? null,
-          reason: entry.reason ?? null,
-        })),
-      },
-    })),
-  });
-  const baseScheduleActivities = buildBaseScheduleChangeActivities({
-    learningSpaceId,
-    channelId,
-    title: payload.basics.title,
-    occurredAt: now,
-    invitedMembers: [],
-    nextSessionStartAt,
-    scheduleDiffPlan,
-  });
-  const scheduleChangeActivities = normalizeScheduleChangeVerbPlurality([
-    ...exceptionOverrideActivities,
-    ...baseScheduleActivities,
-  ]);
-  const scheduleChangeCounts = scheduleChangeActivities.reduce(
-    (acc, activity) => {
-      if (isScheduledEventType(activity.eventType)) {
-        acc.scheduled += 1;
-      } else if (isRescheduledEventType(activity.eventType)) {
-        acc.rescheduled += 1;
-      } else if (isCanceledEventType(activity.eventType)) {
-        acc.canceled += 1;
-      }
-      return acc;
-    },
-    { scheduled: 0, rescheduled: 0, canceled: 0 },
-  );
-  debugScheduleDiff('schedule-change-activities-built', {
-    exceptionOverrideActivityCount: exceptionOverrideActivities.length,
-    baseScheduleActivityCount: baseScheduleActivities.length,
-    totalScheduleChangeActivityCount: scheduleChangeActivities.length,
-    ...scheduleChangeCounts,
-    sampleActivities: scheduleChangeActivities.slice(0, 5).map((activity) => ({
-      eventType: activity.eventType,
-      dedupeKey: activity.dedupeKey,
-      startAt: activity.payload.startAt ?? null,
-      canceledStartAt: activity.payload.canceledStartAt ?? null,
-      rescheduledFromStartAt: activity.payload.rescheduledFromStartAt ?? null,
-      rescheduledToStartAt: activity.payload.rescheduledToStartAt ?? null,
-    })),
-  });
   const previousSchedulesHashKey = buildLearningSpaceSchedulesHashKeyFromExisting(
     previousScheduleCompareInputs,
   );
@@ -1524,32 +654,11 @@ export async function updateLearningSpaceFromPayload(
     previousScheduleCount: previousScheduleCompareInputs.length,
     nextScheduleCount: (payload.schedules ?? []).length,
   });
-  debugScheduleDiff('paired-compare', {
-    pairedCount: pairing.pairs.length,
-    unpairedPreviousCount: pairing.unpairedPrevious.length,
-    unpairedNextCount: pairing.unpairedNext.length,
-    pairDiffs: pairing.pairs.map((pair) => ({
-      scheduleId: pair.previous.id,
-      matchReason: pair.reason,
-      baseHashEqual: pair.previous.baseHash === pair.next.baseHash,
-      fullHashEqual: pair.previous.fullHash === pair.next.fullHash,
-      previousBaseHash: pair.previous.baseHash,
-      nextBaseHash: pair.next.baseHash,
-      previousFullHash: pair.previous.fullHash,
-      nextFullHash: pair.next.fullHash,
-      previousExceptions: pair.previous.canonical.exceptions.length,
-      nextExceptions: pair.next.canonical.exceptions.length,
-      previousOverrides: pair.previous.canonical.overrides.length,
-      nextOverrides: pair.next.canonical.overrides.length,
-    })),
-  });
-  const hasSemanticScheduleChanges =
-    hasScheduleHashChanges || scheduleChangeActivities.length > 0;
+  const hasSemanticScheduleChanges = hasScheduleHashChanges;
   debugScheduleDiff('change-decision', {
     hasScheduleChanges: hasSemanticScheduleChanges,
     hasSemanticScheduleChanges,
     hasScheduleHashChanges,
-    scheduleChangeActivityCount: scheduleChangeActivities.length,
     addedCount: scheduleDiffPlan.added.length,
     removedCount: scheduleDiffPlan.removed.length,
     rescheduledCount: scheduleDiffPlan.rescheduled.length,
@@ -1560,7 +669,6 @@ export async function updateLearningSpaceFromPayload(
     hasChannelSettingsChanges ||
     hasParticipantChanges ||
     hasSemanticScheduleChanges;
-  const hasInfoChanges = hasBasicsChanges || hasChannelSettingsChanges;
 
   if (!hasAnyChanges) {
     return;
@@ -1630,13 +738,6 @@ export async function updateLearningSpaceFromPayload(
     });
   }
 
-  const invitedMembersSnapshot = await loadLearningSpaceParticipantSnapshot({
-    supabase: serviceClient,
-    orgId,
-    learningSpaceId,
-  });
-  const systemProfileId = await ensureSystemProfileId(serviceClient, orgId);
-
   const infoChangeSummaryParts: string[] = [];
   if ((learningSpace.title ?? null) !== (payload.basics.title ?? null)) {
     infoChangeSummaryParts.push(`Renamed class to ${payload.basics.title}`);
@@ -1673,129 +774,8 @@ export async function updateLearningSpaceFromPayload(
   ) {
     infoChangeSummaryParts.push('Updated live session settings');
   }
-  if (scheduleChangeActivities.length > 0) {
+  if (hasSemanticScheduleChanges) {
     infoChangeSummaryParts.push('Class schedule has been updated');
-  }
-
-  if (shouldSendActivityNotifications && (hasInfoChanges || hasSemanticScheduleChanges)) {
-    await publishActivityEvent({
-      supabase: serviceClient,
-      orgId,
-      eventType: 'class.updated',
-      occurredAt: now,
-      sourceKind: 'system',
-      actorProfileId: systemProfileId,
-      scope: { kind: 'learning_space', learningSpaceId },
-      targetRef: { kind: 'learning_space', id: learningSpaceId },
-      payload: {
-        learningSpaceId,
-        channelId,
-        title: payload.basics.title,
-        kind: payload.basics.kind,
-        subject: payload.basics.subject ?? null,
-        changeSummary: joinNaturalList(infoChangeSummaryParts) || 'Updated class details',
-        activityPhase: 'updated',
-        invitedCount: invitedMembersSnapshot.length,
-        invitedMembers: invitedMembersSnapshot,
-      },
-      dedupeKey: `class.updated:${learningSpaceId}:${now}`,
-      createdBy: systemProfileId,
-    });
-  }
-
-  for (const activity of shouldSendActivityNotifications
-    ? scheduleChangeActivities
-    : []) {
-    debugScheduleDiff('schedule-change-publish-attempt', {
-      eventType: activity.eventType,
-      dedupeKey: activity.dedupeKey,
-      startAt: activity.payload.startAt ?? null,
-      canceledStartAt: activity.payload.canceledStartAt ?? null,
-      rescheduledFromStartAt: activity.payload.rescheduledFromStartAt ?? null,
-      rescheduledToStartAt: activity.payload.rescheduledToStartAt ?? null,
-    });
-
-    const published = await publishActivityEvent({
-      supabase: serviceClient,
-      orgId,
-      eventType: activity.eventType,
-      occurredAt: now,
-      sourceKind: 'system',
-      actorProfileId: systemProfileId,
-      scope: { kind: 'learning_space', learningSpaceId },
-      targetRef: { kind: 'learning_space', id: learningSpaceId },
-      payload: activity.payload,
-      dedupeKey: activity.dedupeKey,
-      createdBy: systemProfileId,
-    });
-
-    const publishedId =
-      published && typeof published === 'object' && 'id' in published
-        ? (published as { id?: unknown }).id
-        : null;
-    debugScheduleDiff('schedule-change-publish-success', {
-      eventType: activity.eventType,
-      dedupeKey: activity.dedupeKey,
-      activityEventId: typeof publishedId === 'string' ? publishedId : null,
-    });
-  }
-
-  const existingParticipantIds = new Set(existingParticipantIdList);
-  const nextParticipantIds = new Set(
-    nextParticipantsSnapshot.map((participant) => participant.profileId),
-  );
-
-  const addedParticipants = nextParticipantsSnapshot.filter(
-    (participant) => !existingParticipantIds.has(participant.profileId),
-  );
-  if (shouldSendActivityNotifications) {
-    await publishParticipantInviteActivities({
-      supabase: serviceClient,
-      orgId,
-      actorProfileId: systemProfileId,
-      learningSpaceId,
-      channelId,
-      title: payload.basics.title,
-      participants: addedParticipants,
-      invitedMembers: invitedMembersSnapshot,
-      occurredAt: now,
-      activityPhase: 'updated',
-      dedupeKey:
-        addedParticipants.length > 1
-          ? `members.invited:${learningSpaceId}:${now}`
-          : `member.invited:${learningSpaceId}:${addedParticipants[0]?.profileId ?? 'unknown'}:${now}`,
-    });
-  }
-
-  const removedParticipants = [...existingParticipantIds]
-    .filter((profileId) => !nextParticipantIds.has(profileId))
-    .map((profileId) => ({
-      profileId,
-      snapshot: existingParticipantById.get(profileId),
-    }));
-
-  const removedMembersActivity = buildRemovedMembersActivity({
-    learningSpaceId,
-    channelId,
-    title: payload.basics.title,
-    occurredAt: now,
-    removedParticipants,
-    invitedMembers: invitedMembersSnapshot,
-  });
-  if (shouldSendActivityNotifications && removedMembersActivity) {
-    await publishActivityEvent({
-      supabase: serviceClient,
-      orgId,
-      eventType: removedMembersActivity.eventType,
-      occurredAt: now,
-      sourceKind: 'system',
-      actorProfileId: systemProfileId,
-      scope: { kind: 'learning_space', learningSpaceId },
-      targetRef: { kind: 'learning_space', id: learningSpaceId },
-      payload: removedMembersActivity.payload,
-      dedupeKey: removedMembersActivity.dedupeKey,
-      createdBy: systemProfileId,
-    });
   }
 }
 

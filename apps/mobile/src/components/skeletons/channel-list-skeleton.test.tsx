@@ -16,14 +16,14 @@ describe('ChannelListSkeleton', () => {
     expect(screen.getAllByLabelText('Loading').length).toBeGreaterThan(0);
   });
 
-  it('renders default 5 rows — 23 PulseBox + 1 root = 24 loading nodes', () => {
+  it('renders default 6 rows — 26 PulseBox + 1 root = 27 loading nodes', () => {
     render(<ChannelListSkeleton />);
-    expect(screen.getAllByLabelText('Loading').length).toBe(24);
+    expect(screen.getAllByLabelText('Loading').length).toBe(27);
   });
 
   it('renders custom count of rows', () => {
     render(<ChannelListSkeleton count={3} />);
-    // i=0: 5, i=1: 4, i=2: 5 -> 14 PulseBox + 1 root = 15
-    expect(screen.getAllByLabelText('Loading').length).toBe(15);
+    // i=0: 5, i=1: 4, i=2: 4 -> 13 PulseBox + 1 root = 14
+    expect(screen.getAllByLabelText('Loading').length).toBe(14);
   });
 });

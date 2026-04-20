@@ -4,7 +4,7 @@ const createSupabaseServerClientMock = vi.fn();
 const createSupabaseServiceClientMock = vi.fn();
 const buildOrgBySlugMock = vi.fn();
 const getAccountByAuthUserIdInOrgMock = vi.fn();
-const publishCancelledClassSessionActivityMock = vi.fn();
+const getProfileByAccountIdMock = vi.fn();
 const revalidatePathMock = vi.fn();
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
@@ -26,9 +26,8 @@ vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
     getAccountByAuthUserIdInOrgMock(...args),
 }));
 
-vi.mock('@iconicedu/web/lib/class-schedule/session-activities', () => ({
-  publishCancelledClassSessionActivity: (...args: unknown[]) =>
-    publishCancelledClassSessionActivityMock(...args),
+vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
+  getProfileByAccountId: (...args: unknown[]) => getProfileByAccountIdMock(...args),
 }));
 
 vi.mock('next/cache', () => ({
@@ -200,13 +199,15 @@ describe('cancelClassScheduleSessionAction', () => {
     createSupabaseServiceClientMock.mockReset();
     buildOrgBySlugMock.mockReset();
     getAccountByAuthUserIdInOrgMock.mockReset();
-    publishCancelledClassSessionActivityMock.mockReset();
     revalidatePathMock.mockReset();
 
     createSupabaseServerClientMock.mockResolvedValue(createServerSupabase());
     buildOrgBySlugMock.mockResolvedValue({ id: 'org-1', slug: 'iconic-academy' });
     getAccountByAuthUserIdInOrgMock.mockResolvedValue({
       data: { id: 'account-1', org_id: 'org-1', primary_role: 'owner' },
+    });
+    getProfileByAccountIdMock.mockResolvedValue({
+      data: { id: 'profile-1' },
     });
   });
 
@@ -231,19 +232,8 @@ describe('cancelClassScheduleSessionAction', () => {
         recurrence_id: 'recurrence-1',
         occurrence_key: '2026-03-21T10:00:00.000Z',
         reason: 'Tutor unavailable',
-        created_by: 'account-1',
-        updated_by: 'account-1',
-      }),
-    );
-    expect(publishCancelledClassSessionActivityMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        supabase: serviceSupabase,
-        orgId: 'org-1',
-        learningSpaceId: 'space-1',
-        channelId: 'channel-1',
-        scheduleId: 'schedule-1',
-        canceledStartAt: '2026-03-21T10:00:00.000Z',
-        canceledReason: 'Tutor unavailable',
+        created_by: 'profile-1',
+        updated_by: 'profile-1',
       }),
     );
     expect(revalidatePathMock).toHaveBeenCalledWith('/iconic-academy/class-schedule');
@@ -267,17 +257,6 @@ describe('cancelClassScheduleSessionAction', () => {
     });
 
     expect(serviceSupabase.updateSchedule).toHaveBeenCalled();
-    expect(publishCancelledClassSessionActivityMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        supabase: serviceSupabase,
-        orgId: 'org-1',
-        learningSpaceId: 'space-1',
-        channelId: 'channel-1',
-        scheduleId: 'schedule-1',
-        canceledStartAt: '2026-03-21T10:00:00.000Z',
-        canceledReason: null,
-      }),
-    );
     expect(revalidatePathMock).toHaveBeenCalledWith('/iconic-academy/class-schedule');
     expect(result).toEqual({
       scheduleId: 'schedule-1',
@@ -285,21 +264,6 @@ describe('cancelClassScheduleSessionAction', () => {
       reason: null,
       mode: 'single',
     });
-  });
-
-  it('skips activity publishing when notifications are disabled', async () => {
-    const serviceSupabase = createSingleServiceSupabase();
-    createSupabaseServiceClientMock.mockReturnValue(serviceSupabase);
-
-    await cancelClassScheduleSessionAction({
-      orgSlug: 'iconic-academy',
-      scheduleId: 'schedule-1',
-      occurrenceKey: '2026-03-21T10:00:00.000Z',
-      sendActivityNotifications: false,
-    });
-
-    expect(serviceSupabase.updateSchedule).toHaveBeenCalled();
-    expect(publishCancelledClassSessionActivityMock).not.toHaveBeenCalled();
   });
 
   it('rejects non-staff non-owner profiles', async () => {

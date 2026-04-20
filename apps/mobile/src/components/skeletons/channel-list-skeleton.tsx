@@ -4,24 +4,37 @@ import { PulseBox } from './pulse-box';
 
 type Props = { count?: number };
 
-export function ChannelListSkeleton({ count = 5 }: Props) {
+const ITEMS = [
+  { nameWidth: 110, previewWidth: 200, hasBadge: true },
+  { nameWidth: 220, previewWidth: 42, hasBadge: false },
+  { nameWidth: 72, previewWidth: 180, hasBadge: false },
+  { nameWidth: 170, previewWidth: 152, hasBadge: true },
+  { nameWidth: 170, previewWidth: 152, hasBadge: false },
+  { nameWidth: 164, previewWidth: 42, hasBadge: false },
+  { nameWidth: 164, previewWidth: 42, hasBadge: false },
+  { nameWidth: 88, previewWidth: 260, hasBadge: false },
+];
+
+export function ChannelListSkeleton({ count = 6 }: Props) {
+  const items = ITEMS.slice(0, count);
+
   return (
     <View accessibilityLabel="Loading" style={s.wrap}>
-      {Array.from({ length: count }).map((_, i) => (
+      {items.map((item, i) => (
         <View key={i} style={s.itemOuter}>
           <View style={s.row}>
             <PulseBox width={44} height={44} radius={22} />
 
             <View style={s.content}>
               <View style={s.topRow}>
-                <PulseBox width={i % 2 === 0 ? 140 : 120} height={18} radius={4} />
+                <PulseBox width={item.nameWidth} height={20} radius={4} />
               </View>
-              <PulseBox width={i % 3 === 0 ? 220 : 190} height={18} radius={4} />
+              <PulseBox width={item.previewWidth} height={14} radius={4} />
             </View>
 
             <View style={s.rowTail}>
               <PulseBox width={36} height={14} radius={4} />
-              {i % 2 === 0 ? <PulseBox width={20} height={20} radius={10} /> : <View />}
+              {item.hasBadge ? <PulseBox width={20} height={20} radius={10} /> : <View />}
             </View>
           </View>
         </View>
@@ -31,7 +44,7 @@ export function ChannelListSkeleton({ count = 5 }: Props) {
 }
 
 const s = StyleSheet.create({
-  wrap: { paddingBottom: 24 },
+  wrap: { paddingTop: 16, paddingBottom: 24 },
   itemOuter: { marginHorizontal: 16, marginBottom: 16 },
   row: {
     flexDirection: 'row',

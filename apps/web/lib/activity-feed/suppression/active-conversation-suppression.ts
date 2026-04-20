@@ -11,11 +11,7 @@ const ACTIVE_LIVE_STATUSES = new Set([
 const CONVERSATIONAL_EVENT_TYPES = new Set([
   'dm.posted',
   'message.posted',
-  'file.uploaded',
-  'dm.reaction.added',
-  'dm.reaction.removed',
   'reaction.added',
-  'reaction.removed',
 ]);
 
 export const ACTIVE_CONVERSATION_SUPPRESSION_WINDOW_MS = 120_000;

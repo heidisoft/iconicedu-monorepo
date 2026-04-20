@@ -14,6 +14,11 @@ Scheduler source of truth:
 - `REMINDERS_DISPATCH_URL`
 - `INTERNAL_REMINDERS_TOKEN`
 
+Recommended values for the API-owned pipeline:
+
+- `REMINDERS_DISPATCH_URL=https://<your-api-domain>/internal/reminders/dispatch`
+- `INTERNAL_REMINDERS_TOKEN=<same-value-as-INTERNAL_REMINDERS_TOKEN_API in apps/api>`
+
 ## Optional environment variables
 
 - `REMINDERS_DISPATCH_LIMIT` (default handled by API)

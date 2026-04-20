@@ -6,13 +6,35 @@ End-to-end reference for Expo push notifications: how tokens are managed on devi
 
 ## Last Updated
 
-2026-04-17
+2026-04-20
 
 ## Related Docs
 
 - [Reminders Cron Ops](reminders.md)
 - [Activity Feed Architecture](../architecture/activity-feed.md)
 - [Documentation Hub](../README.md)
+
+---
+
+## Current Status
+
+The API-owned push notification pipeline is now implemented in the repo.
+
+That means:
+
+- mobile push token registration/revocation goes through `apps/api`
+- activity event projection into `notification_dispatch_jobs` exists in `apps/api`
+- notification dispatch to Expo exists in `apps/api`
+- internal API endpoints exist for projection and dispatch
+
+What still must be true in the running environment for push to work end to end:
+
+- all real event-producing flows that should notify users must publish through `apps/api`
+- the deployed `notifications-dispatch` cron / edge function must call the API endpoint, not the legacy web endpoint
+- `INTERNAL_NOTIFICATIONS_TOKEN_API` and `EXPO_ACCESS_TOKEN` must be configured in the deployed API environment
+- at least one real device flow should be verified end to end
+
+Until those runtime checks are confirmed, treat this document as the intended and implemented backend architecture, but not as proof that every deployed environment is already using it.
 
 ---
 
@@ -29,16 +51,41 @@ Activity event occurs (message, session, etc.)
   └─ projectActivityEvents()       ← enqueues notification_dispatch_jobs rows
 
 Supabase Edge Function (cron every 1 min)
-  └─ notifications-dispatch        ← HTTP POST → web app internal endpoint
+  └─ notifications-dispatch        ← HTTP POST → API internal endpoint
 
-Next.js web app
-  └─ POST /api/internal/notifications/dispatch
+API app
+  └─ POST /internal/notifications/dispatch
       └─ dispatchDueNotificationJobs()
           └─ buildNotificationDecision()    ← checks preferences, presence, delay policy
           └─ sendPushNotification()         ← looks up push_tokens, calls authenticated Expo Push API
               └─ pollExpoPushReceipts()     ← confirms downstream delivery / credential errors
               └─ Expo Push API → APNs / FCM → device
 ```
+
+---
+
+### Normal App Flow vs Internal Endpoints
+
+For normal product usage, clients should not call the internal projection or dispatch endpoints directly.
+
+Expected runtime flow:
+
+1. Mobile or web creates a message / reaction / session event through `apps/api`
+2. `apps/api` writes the `activity_events` row
+3. `apps/api` projects that event into `notification_dispatch_jobs`
+4. cron later calls the internal dispatch endpoint
+5. API sends the push notification through Expo
+
+For guardian switch-user flows, the frontend still sends the selected acting profile id, but `apps/api` is the authority that validates whether the authenticated account may act as that profile before any message, activity, or notification work is performed.
+
+The internal endpoints below are intended for:
+
+- cron / Supabase edge functions
+- manual testing
+- replay / retry operations
+- operational debugging
+
+They are not part of the normal mobile app or web app request flow.
 
 ---
 
@@ -76,27 +123,61 @@ Runs once per session after the user is authenticated and profile data is loaded
 
 ### 3. Notification Events and Queuing
 
-**Entry point:** `apps/web/lib/activity-feed/projector/project-activity-events.ts`
+**Entry point:** `apps/api/src/lib/activity-feed/projector/project-activity-events.ts`
 
 When an activity event is projected, `enqueueNotificationDispatchJobs()` is called. For each recipient profile:
 
 1. `buildNotificationDecision()` runs the preference + policy check
 2. Eligible channels (`push`, `email`, `sms`) are written as rows into `notification_dispatch_jobs` with `status = 'pending'`
 
-**Delivery timing logic** (`apps/web/lib/notifications/policy-config.ts`):
+**Delivery timing logic** (`apps/api/src/lib/notifications/policy-config.ts`):
 
-| Category             | Examples                                                                                                                                          | Timing                                                   |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| Critical — immediate | `class.session.scheduled/rescheduled/canceled`, `session.started`, `session.reminder.sent`, `payment.reminder`, `payment.failed`, `system.notice` | `immediate` (0s delay) — bypasses presence suppression   |
-| Near-real-time       | `dm.posted`, `dms.posted`, `dm.reaction.added`, `dm.reaction.removed`                                                                             | `delayed` (30s) when presence-aware suppression applies  |
-| Standard delay       | `message.posted`, `reaction.added`, `file.uploaded`                                                                                               | `delayed` (60s) when presence-aware suppression applies  |
-| Everything else      | All other event types                                                                                                                             | `delayed` (120s) when presence-aware suppression applies |
+| Category             | Examples                                                                                                                                                       | Timing                                                   |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Critical — immediate | `class.session.scheduled/rescheduled/canceled`, `session.started`, `session.reminder.sent`, `payment.reminder.sent`, `payments.reminder.sent`, `system.notice` | `immediate` (0s delay) — bypasses presence suppression   |
+| Near-real-time       | `dm.posted`, `dms.posted`                                                                                                                                      | `delayed` (30s) when presence-aware suppression applies  |
+| Standard delay       | `message.posted`, `reaction.added`, `file.uploaded`                                                                                                            | `delayed` (60s) when presence-aware suppression applies  |
+| Everything else      | All other event types                                                                                                                                          | `delayed` (120s) when presence-aware suppression applies |
 
 **Suppression rules** (`buildNotificationDecision`):
 
 - Profile is online / in-class / teaching → non-critical notifications delayed
 - Channel recently read (read timestamp ≥ event timestamp) → notification delayed
 - `notification_preferences.muted = true` for the pref key or master `__push__` key → suppressed entirely
+
+**Important:** the presence of this projector in `apps/api` does not by itself guarantee every app flow uses it yet. Push only works for flows that actually publish activity events through the API-owned path.
+
+---
+
+## Push Template Catalog
+
+The API now treats the following event types as the canonical push template surface. Each job carries a title/body pair plus deep-link metadata that mobile resolves from `prefKey`, `scopeKind`, `scopeId`, `channelId`, and `threadId`.
+
+| Event type                      | Push title pattern                                                     | Push body pattern                      | Mobile deep link                                                       |
+| ------------------------------- | ---------------------------------------------------------------------- | -------------------------------------- | ---------------------------------------------------------------------- |
+| `dm.posted`                     | `{sender} sent you a direct message` / image / voice / file variants   | message preview or title fallback      | `/(app)/dm/:channelId` or Messages tab fallback                        |
+| `message.posted`                | mention / thread-reply / channel-message variants                      | message preview                        | `/(app)/channel/:id` or `/(app)/spaces/:id`, preserves `threadId`      |
+| `reaction.added`                | `{sender} reacted {emoji} to your message` with optional context title | mirrors title                          | channel, class, or DM route from scope and `channelRouteKind` metadata |
+| `file.uploaded`                 | shared file / image / audio / multiple files variants                  | content preview or file name           | channel or space route from scope metadata                             |
+| `class.session.scheduled`       | `{classTitle} session scheduled`                                       | payload summary or schedule fallback   | class space when `channelId` exists, else Schedule tab                 |
+| `class.sessions.scheduled`      | `{classTitle} sessions scheduled`                                      | payload summary or schedule fallback   | class space when `channelId` exists, else Schedule tab                 |
+| `class.session.rescheduled`     | `{classTitle} session rescheduled`                                     | payload summary or reschedule fallback | class space when `channelId` exists, else Schedule tab                 |
+| `class.sessions.rescheduled`    | `{classTitle} sessions rescheduled`                                    | payload summary or reschedule fallback | class space when `channelId` exists, else Schedule tab                 |
+| `class.session.canceled`        | `{classTitle} session cancelled`                                       | payload summary or cancel fallback     | class space when `channelId` exists, else Schedule tab                 |
+| `class.sessions.canceled`       | `{classTitle} sessions cancelled`                                      | payload summary or cancel fallback     | class space when `channelId` exists, else Schedule tab                 |
+| `session.started`               | `{classTitle} is live now`                                             | join-now fallback or payload summary   | class space when `channelId` exists, else Schedule tab                 |
+| `session.reminder.sent`         | personalized reminder by role when members are present                 | personalized class/session summary     | class space when `channelId` exists, else Schedule tab                 |
+| `session.feedback_request.sent` | personalized feedback request by role when members are present         | feedback prompt summary                | class space when `channelId` exists, else Schedule tab                 |
+| `payment.reminder.sent`         | payload title or `Payment reminder`                                    | payload description / summary          | Inbox fallback                                                         |
+| `payments.reminder.sent`        | payload title or `Payment reminders`                                   | payload description / summary          | Inbox fallback                                                         |
+| `system.notice`                 | payload title or `System notice`                                       | payload message / summary              | Inbox fallback                                                         |
+
+Notes:
+
+- Deep-link routing is finalized in `apps/mobile/src/lib/notifications/notification-config.ts`.
+- Push body text is capped by Expo payload constraints; previews are truncated before send.
+- For conversational pushes, `activityFeedItemId` is included so the notification can be marked read on tap.
+- `threadId` is preserved for thread reply notifications so mobile opens the correct thread context.
 
 ---
 
@@ -107,11 +188,11 @@ When an activity event is projected, `enqueueNotificationDispatchJobs()` is call
 It calls:
 
 ```
-POST /api/internal/notifications/dispatch
-Authorization: Bearer <INTERNAL_NOTIFICATIONS_TOKEN>
+POST /internal/notifications/dispatch
+Authorization: Bearer <INTERNAL_NOTIFICATIONS_TOKEN_API>
 ```
 
-**Web app handler:** `apps/web/app/api/internal/notifications/dispatch/route.ts`
+**API handler:** `apps/api/src/modules/notification-engine/notification-engine.controller.ts`
 
 Calls `dispatchDueNotificationJobs()` which:
 
@@ -127,23 +208,30 @@ Calls `dispatchDueNotificationJobs()` which:
 
 ### 5. Environment Variables
 
-**Web app (`apps/web`):**
+**API app (`apps/api`):**
 
 ```bash
-INTERNAL_NOTIFICATIONS_TOKEN=<long-random-secret>
+INTERNAL_ACTIVITY_FEED_TOKEN=<long-random-secret>
+INTERNAL_NOTIFICATIONS_TOKEN_API=<long-random-secret>
 EXPO_ACCESS_TOKEN=<expo-personal-access-token>
 ```
 
 **Supabase Edge Function secrets:**
 
 ```bash
-NOTIFICATIONS_DISPATCH_URL=https://<your-web-domain>/api/internal/notifications/dispatch
-INTERNAL_NOTIFICATIONS_TOKEN=<same-value-as-above>
+NOTIFICATIONS_DISPATCH_URL=https://<your-api-domain>/internal/notifications/dispatch
+INTERNAL_NOTIFICATIONS_TOKEN=<same-value-as-INTERNAL_NOTIFICATIONS_TOKEN_API>
 # optional:
 NOTIFICATIONS_DISPATCH_LIMIT=100
 NOTIFICATIONS_DISPATCH_LEASE_SECONDS=120
 NOTIFICATIONS_DISPATCH_LEASE_OWNER=supabase-edge-cron
 ```
+
+**Dispatch URL sanity check after the API migration:**
+
+- `NOTIFICATIONS_DISPATCH_URL` must target `https://<your-api-domain>/internal/notifications/dispatch`
+- `REMINDERS_DISPATCH_URL` must target `https://<your-api-domain>/internal/reminders/dispatch`
+- neither secret should point at `apps/web` or `/api/internal/...`
 
 ---
 
@@ -153,9 +241,10 @@ The edge function is not needed for local testing. You can drive the entire pipe
 
 ### Prerequisites
 
-- `pnpm dev:web` running (Next.js on `http://localhost:3000`)
-- `INTERNAL_NOTIFICATIONS_TOKEN` set in `apps/web/.env.local`
+- `pnpm dev:api` running (Nest on `http://localhost:3001`)
+- `INTERNAL_ACTIVITY_FEED_TOKEN` and `INTERNAL_NOTIFICATIONS_TOKEN_API` set in `apps/api/.env`
 - Supabase connected (remote or local)
+- a real Expo push token from a physical device if you want to validate actual delivery
 
 ---
 
@@ -183,11 +272,11 @@ To get a real token from a dev build: add a `console.log` in `storePushToken` te
 Insert an activity event that matches a supported `event_type`. The projector picks it up via the internal API:
 
 ```bash
-curl -X POST http://localhost:3000/api/internal/activity-feed/project \
+curl -X POST http://localhost:3001/internal/activity-feed/project \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <INTERNAL_ACTIVITY_FEED_TOKEN>" \
   -d '{
-    "eventId": "<activity-event-id>"
+    "eventIds": ["<activity-event-id>"]
   }'
 ```
 
@@ -224,12 +313,12 @@ INSERT INTO notification_dispatch_jobs (
 
 ### Step 3 — Trigger dispatch manually
 
-No need to invoke the edge function. Call the web app endpoint directly:
+No need to invoke the edge function. Call the API endpoint directly:
 
 ```bash
-curl -X POST http://localhost:3000/api/internal/notifications/dispatch \
+curl -X POST http://localhost:3001/internal/notifications/dispatch \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <INTERNAL_NOTIFICATIONS_TOKEN>" \
+  -H "Authorization: Bearer <INTERNAL_NOTIFICATIONS_TOKEN_API>" \
   -d '{"leaseOwner": "local-test"}'
 ```
 
@@ -261,11 +350,27 @@ LIMIT 10;
 
 **On device:** If you used a real Expo push token from a physical device running a dev build, the notification should arrive within a few seconds of the dispatch call.
 
+**Implementation verification checklist:**
+
+```sql
+-- 1. activity event exists
+SELECT id, event_type, projection_status, last_projection_error, occurred_at
+FROM activity_events
+WHERE id = '<activity-event-id>';
+
+-- 2. projection created one or more notification jobs
+SELECT id, recipient_profile_id, delivery_channel, status, run_at, last_error
+FROM notification_dispatch_jobs
+WHERE activity_event_id = '<activity-event-id>'
+ORDER BY created_at ASC;
+```
+
 **If the notification doesn't arrive:**
 
 - `status = suppressed` → check `notification_preferences` for the profile/pref_key, or check if the profile has active presence
 - `status = failed` / `dead_letter` → check `last_error` column
 - `status = succeeded` but no notification → the Expo token is invalid or the device has notifications disabled at OS level; check if `DeviceNotRegistered` would have been returned (Expo's response is logged in the push-provider but not persisted — add a `console.log` in `push-provider.ts` to inspect tickets)
+- no `notification_dispatch_jobs` rows created → the event was not projected; check whether the producing code path is using the API-owned activity publisher
 
 ---
 

@@ -10,12 +10,7 @@ import type {
   UUID,
 } from '@iconicedu/shared-types/shared/shared';
 
-export type ActivityEventTypeVM =
-  | ActivityVerbVM
-  | 'session.ended'
-  | 'payment.received'
-  | 'payment.failed'
-  | 'system.notice';
+export type ActivityEventTypeVM = ActivityVerbVM;
 
 export interface ActivityEventIdsVM {
   id: UUID;
@@ -138,13 +133,6 @@ export interface PaymentReminderSentActivityEventPayload {
   channelRouteKind?: 'space' | 'dm' | 'channel' | null;
 }
 
-export interface SystemNoticeActivityEventPayload {
-  title: string;
-  message?: string | null;
-  href?: string | null;
-  actionLabel?: string | null;
-}
-
 export interface MessageActivityEventPayload {
   channelId: UUID;
   messageId: UUID;
@@ -157,17 +145,4 @@ export interface MessageActivityEventPayload {
   channelRouteKind?: 'space' | 'dm' | 'channel' | null;
   threadId?: UUID | null;
   threadReply?: boolean | null;
-}
-
-export interface HomeworkActivityEventPayload {
-  channelId: UUID;
-  messageId: UUID;
-  learningSpaceId?: UUID | null;
-  learningSpaceTitle?: string | null;
-  channelTopic?: string | null;
-  channelRouteKind?: 'space' | 'dm' | 'channel' | null;
-  title: string;
-  description: string;
-  dueAt: ISODateTime;
-  subject?: string | null;
 }

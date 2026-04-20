@@ -35,8 +35,9 @@ export function useMessages(
 
   const query = useQuery({
     queryKey: queryKeys.messages(channelId, currentProfileId),
-    queryFn: () => fetchChannelMessages(channelId, currentProfileId, currentAccountId),
-    enabled: !!channelId,
+    queryFn: () =>
+      fetchChannelMessages(orgId, channelId, currentProfileId, currentAccountId),
+    enabled: !!channelId && !!orgId,
   });
 
   // ── Typing state ──────────────────────────────────────────────────────────
@@ -267,6 +268,7 @@ export function useMessages(
     if (!oldest) return;
 
     const olderMessages = await fetchChannelMessages(
+      orgId,
       channelId,
       currentProfileId,
       currentAccountId,
@@ -278,7 +280,7 @@ export function useMessages(
       queryKeys.messages(channelId, currentProfileId),
       (prev: typeof messages) => [...olderMessages, ...(prev ?? [])],
     );
-  }, [channelId, currentProfileId, currentAccountId, messages, queryClient]);
+  }, [channelId, currentProfileId, currentAccountId, messages, orgId, queryClient]);
 
   // ── Reaction toggle ───────────────────────────────────────────────────────
 
@@ -293,6 +295,13 @@ export function useMessages(
       // Snapshot for rollback
       const previous = queryClient.getQueryData<MessageVM[]>(key);
 
+      // Determine current reaction state before optimistic update
+      const currentMsg = previous?.find((m) => m.ids.id === messageId);
+      const existing = (currentMsg?.social?.reactions ?? []).find(
+        (r) => r.emoji === emoji,
+      );
+      const reactedByMe = existing?.reactedByMe ?? false;
+
       // Optimistic update
       queryClient.setQueryData<MessageVM[]>(key, (msgs) => {
         if (!msgs) return msgs;
@@ -300,20 +309,20 @@ export function useMessages(
           if (msg.ids.id !== messageId) return msg;
 
           const reactions: ReactionVM[] = msg.social?.reactions ?? [];
-          const existing = reactions.find((r) => r.emoji === emoji);
+          const existingReaction = reactions.find((r) => r.emoji === emoji);
 
           let nextReactions: ReactionVM[];
-          if (existing?.reactedByMe) {
+          if (existingReaction?.reactedByMe) {
             // Remove my reaction
             nextReactions =
-              existing.count <= 1
+              existingReaction.count <= 1
                 ? reactions.filter((r) => r.emoji !== emoji)
                 : reactions.map((r) =>
                     r.emoji === emoji
                       ? { ...r, count: r.count - 1, reactedByMe: false }
                       : r,
                   );
-          } else if (existing) {
+          } else if (existingReaction) {
             // Add my reaction to an existing emoji group (others reacted, I haven't yet)
             nextReactions = reactions.map((r) =>
               r.emoji === emoji ? { ...r, count: r.count + 1, reactedByMe: true } : r,
@@ -331,8 +340,14 @@ export function useMessages(
       });
 
       try {
-        // org_id is required (NOT NULL constraint) — must be passed alongside account_id
-        await apiToggleReaction(messageId, currentAccountId, emoji, orgId);
+        await apiToggleReaction(
+          messageId,
+          currentAccountId,
+          currentProfileId,
+          emoji,
+          orgId,
+          reactedByMe,
+        );
       } catch {
         // Roll back on error
         queryClient.setQueryData(key, previous);

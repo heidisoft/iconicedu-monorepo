@@ -7,6 +7,16 @@ const mockUseLocalSearchParams = jest.fn();
 const mockUseRouter = jest.fn(() => ({ back: jest.fn() }));
 const mockUseIsFocused = jest.fn(() => true);
 const mockUseQuery = jest.fn();
+const mockRefetch = jest.fn();
+const mockQueryClient = {
+  setQueryData: jest.fn(),
+  invalidateQueries: jest.fn(),
+};
+const mockUseOnlineProfileIds = jest.fn(() => new Map());
+const mockUseProfilePresenceSummary = jest.fn(() => ({
+  status: 'offline',
+  lastSeenAt: null,
+}));
 
 jest.mock('expo-router', () => ({
   useLocalSearchParams: (...args: unknown[]) => mockUseLocalSearchParams(...args),
@@ -20,6 +30,7 @@ jest.mock('@react-navigation/native', () => ({
 
 jest.mock('@tanstack/react-query', () => ({
   useQuery: (...args: unknown[]) => mockUseQuery(...args),
+  useQueryClient: () => mockQueryClient,
 }));
 
 jest.mock('@/hooks/use-account', () => ({
@@ -47,7 +58,7 @@ jest.mock('@/hooks/use-messages', () => ({
     data: [],
     isLoading: false,
     isRefetching: false,
-    refetch: jest.fn(),
+    refetch: mockRefetch,
     loadMore: jest.fn(),
     toggleReaction: jest.fn(),
     typingUsers: [],
@@ -88,6 +99,12 @@ jest.mock('@/providers/theme-provider', () => ({
       card: '#ffffff',
     },
   }),
+}));
+
+jest.mock('@/hooks/use-online-profile-ids', () => ({
+  useOnlineProfileIds: (...args: unknown[]) => mockUseOnlineProfileIds(...args),
+  useProfilePresenceSummary: (...args: unknown[]) =>
+    mockUseProfilePresenceSummary(...args),
 }));
 
 jest.mock('@/components/messages/message-list', () => ({
@@ -134,6 +151,11 @@ function renderScreen() {
 describe('DmConversationScreen — supervised read-only mode', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseOnlineProfileIds.mockReturnValue(new Map());
+    mockUseProfilePresenceSummary.mockReturnValue({
+      status: 'offline',
+      lastSeenAt: null,
+    });
     mockUseQuery.mockReturnValue({
       data: {
         lastReadMessageId: null,
@@ -153,6 +175,18 @@ describe('DmConversationScreen — supervised read-only mode', () => {
 
     expect(screen.getByText('MessageInput')).toBeTruthy();
     expect(screen.queryByText(/read-only mode/i)).toBeNull();
+  });
+
+  it('refetches messages when the screen is focused', () => {
+    mockUseLocalSearchParams.mockReturnValue({
+      channelId: 'ch-1',
+      topic: 'Alice',
+    });
+    mockUseIsFocused.mockReturnValue(true);
+
+    renderScreen();
+
+    expect(mockRefetch).toHaveBeenCalled();
   });
 
   it('renders read-only notice instead of MessageInput when isSupervisedReadOnly=1', () => {
@@ -243,6 +277,68 @@ describe('DmConversationScreen — supervised read-only mode', () => {
 
     expect(mockConversationHeader).toHaveBeenCalledWith(
       expect.objectContaining({ secondaryAvatarSeed: 'Senya' }),
+    );
+  });
+
+  it('passes the local time tooltip label with city and country when available', () => {
+    mockUseLocalSearchParams.mockReturnValue({
+      channelId: 'ch-1',
+      topic: 'Alice',
+      avatarTimezone: 'Asia/Colombo',
+      avatarCity: 'Colombo',
+      avatarCountryName: 'Sri Lanka',
+    });
+
+    renderScreen();
+
+    expect(mockConversationHeader).toHaveBeenCalledWith(
+      expect.objectContaining({
+        localTimeLabel: expect.stringMatching(/^.+$/),
+        localTimeIcon: expect.any(String),
+        localTimeTooltipLabel: expect.stringMatching(
+          /^Current time: .+\nLocation: Colombo, Sri Lanka(?:\n.+)?$/,
+        ),
+      }),
+    );
+  });
+
+  it('passes the local time tooltip label with just country when city is missing', () => {
+    mockUseLocalSearchParams.mockReturnValue({
+      channelId: 'ch-1',
+      topic: 'Alice',
+      avatarTimezone: 'Asia/Colombo',
+      avatarCountryCode: 'LK',
+    });
+
+    renderScreen();
+
+    expect(mockConversationHeader).toHaveBeenCalledWith(
+      expect.objectContaining({
+        localTimeTooltipLabel: expect.stringMatching(
+          /^Current time: .+\nLocation: Sri Lanka(?:\n.+)?$/,
+        ),
+      }),
+    );
+  });
+
+  it('uses the offline local-time context when presence is offline', () => {
+    mockUseLocalSearchParams.mockReturnValue({
+      channelId: 'ch-1',
+      topic: 'Alice',
+      avatarTimezone: 'Asia/Colombo',
+    });
+    mockUseProfilePresenceSummary.mockReturnValue({
+      status: 'offline',
+      lastSeenAt: null,
+    });
+
+    renderScreen();
+
+    expect(mockConversationHeader).toHaveBeenCalledWith(
+      expect.objectContaining({
+        localTimeIcon: 'offline',
+        localTimeTooltipLabel: expect.stringMatching(/They may be offline right now$/),
+      }),
     );
   });
 

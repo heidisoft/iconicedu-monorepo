@@ -31,6 +31,7 @@ export type BottomSheetProps = {
   bottomInset?: number;
   backdropColor?: string;
   sheetStyle?: StyleProp<ViewStyle>;
+  dragHandleStyle?: StyleProp<ViewStyle>;
   testID?: string;
 };
 
@@ -77,6 +78,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   bottomInset = 0,
   backdropColor = 'rgba(0,0,0,0.45)',
   sheetStyle,
+  dragHandleStyle,
   testID,
 }) => {
   const resolvedPartialHeight =
@@ -265,7 +267,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
         ]}
       >
         <View style={styles.dragArea} {...panResponder.panHandlers}>
-          <View style={styles.dragHandle} />
+          <View style={[styles.dragHandle, dragHandleStyle]} />
         </View>
         {renderedChildren}
         {enablePartialOverlay && !isExpanded ? (

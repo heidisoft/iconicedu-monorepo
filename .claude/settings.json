@@ -38,7 +38,8 @@
       "Bash(pnpm --filter web lint)",
       "Bash(pnpm --filter ui-web typecheck)",
       "Bash(pnpm --filter ui-web test -- packages/ui-web/src/lib/schedule-display-timezone.test.ts)",
-      "Bash(pnpm --filter web test -- apps/web/lib/dashboard/home-infographic-metrics.test.ts)"
+      "Bash(pnpm --filter web test -- apps/web/lib/dashboard/home-infographic-metrics.test.ts)",
+      "Bash(git diff *)"
     ],
     "additionalDirectories": [
       "/Users/hwanigasooriya/Workspace/hobby/iconicedu-monorepo/supabase/migrations"

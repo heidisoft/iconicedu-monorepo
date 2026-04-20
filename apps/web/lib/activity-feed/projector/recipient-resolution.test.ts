@@ -153,13 +153,13 @@ describe('resolveRecipientsForActivityEvent', () => {
     expect(recipients).toEqual([]);
   });
 
-  it('uses channel recipients for live-session timeline events even when scope is learning_space', async () => {
+  it('uses learning-space recipients for learning-space scoped events', async () => {
     const recipients = await resolveRecipientsForActivityEvent(
       createSupabaseMock() as never,
       {
         id: 'event-4',
         org_id: 'org-1',
-        event_type: 'session.started',
+        event_type: 'class.session.canceled',
         occurred_at: '2026-03-09T10:00:00.000Z',
         source_kind: 'profile',
         actor_profile_id: 'profile-actor',
@@ -178,26 +178,24 @@ describe('resolveRecipientsForActivityEvent', () => {
       },
     );
 
-    expect(recipients).toEqual(['profile-target', 'profile-actor']);
+    expect(recipients).toEqual(['profile-space']);
   });
 
-  it('includes actor for member.joined events', async () => {
+  it('excludes the actor for channel-scoped reaction events', async () => {
     const recipients = await resolveRecipientsForActivityEvent(
       createSupabaseMock() as never,
       {
         id: 'event-5',
         org_id: 'org-1',
-        event_type: 'member.joined',
+        event_type: 'reaction.added',
         occurred_at: '2026-03-09T10:00:00.000Z',
         source_kind: 'profile',
         actor_profile_id: 'profile-actor',
         scope: { kind: 'channel', channelId: 'channel-1' },
-        object_ref: { kind: 'session', id: 'session-1' },
+        object_ref: { kind: 'message', id: 'message-1' },
         target_ref: null,
         payload: {
           channelId: 'channel-1',
-          liveSessionId: 'session-1',
-          memberProfileId: 'profile-actor',
         },
         audience_rules: [],
         projection_status: 'pending',
@@ -207,7 +205,7 @@ describe('resolveRecipientsForActivityEvent', () => {
       },
     );
 
-    expect(recipients).toEqual(['profile-target', 'profile-actor']);
+    expect(recipients).toEqual(['profile-target']);
   });
 
   it('still excludes actor for non-live-session events', async () => {

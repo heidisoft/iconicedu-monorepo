@@ -87,11 +87,6 @@ describe('EventActions', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Cancel session' }));
-    expect(
-      screen.getByRole('checkbox', {
-        name: /Send activity notifications for this update/i,
-      }),
-    ).toBeChecked();
     fireEvent.change(screen.getByLabelText('Reason (optional)'), {
       target: { value: 'Tutor unavailable' },
     });
@@ -102,7 +97,6 @@ describe('EventActions', () => {
         expect.objectContaining({ ids: expect.objectContaining({ id: 'schedule-1' }) }),
         {
           reason: 'Tutor unavailable',
-          sendActivityNotifications: true,
         },
       );
     });
@@ -111,7 +105,7 @@ describe('EventActions', () => {
     });
   });
 
-  it('shows an edit schedule action and submits the notification flag with the update', async () => {
+  it('shows an edit schedule action and submits the updated timing', async () => {
     const onEditSession = vi.fn(async () => undefined);
     const onClose = vi.fn();
 
@@ -126,11 +120,6 @@ describe('EventActions', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit schedule' }));
     const dialog = screen.getByRole('dialog', { name: 'Edit this session' });
-    expect(
-      within(dialog).getByRole('checkbox', {
-        name: /Send activity notifications for this update/i,
-      }),
-    ).toBeChecked();
     fireEvent.change(within(dialog).getByLabelText('Date'), {
       target: { value: '2026-03-22' },
     });
@@ -154,7 +143,6 @@ describe('EventActions', () => {
           endTime: '12:30',
           timezone: 'America/New_York',
           reason: 'Family requested a change',
-          sendActivityNotifications: true,
         },
       );
     });

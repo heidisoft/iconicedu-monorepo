@@ -9,7 +9,7 @@ function resolveApiBaseUrl(): string {
   return configured.replace(/\/+$/g, '');
 }
 
-export async function apiPost<T>(path: string, body: unknown): Promise<T> {
+async function getAuthHeaders(): Promise<Record<string, string>> {
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -19,15 +19,13 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
     throw new Error('Not authenticated');
   }
 
-  const response = await fetch(`${resolveApiBaseUrl()}${path}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(body),
-  });
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${token}`,
+  };
+}
 
+async function parseResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const errorBody = (await response.json().catch(() => null)) as {
       message?: string;
@@ -35,5 +33,58 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
     throw new Error(errorBody?.message ?? `API error ${response.status}`);
   }
 
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
   return response.json() as Promise<T>;
+}
+
+export async function apiPost<T>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(`${resolveApiBaseUrl()}${path}`, {
+    method: 'POST',
+    headers: await getAuthHeaders(),
+    body: JSON.stringify(body),
+  });
+
+  return parseResponse<T>(response);
+}
+
+export async function apiPut<T>(path: string, body?: unknown): Promise<T> {
+  const response = await fetch(`${resolveApiBaseUrl()}${path}`, {
+    method: 'PUT',
+    headers: await getAuthHeaders(),
+    body: JSON.stringify(body ?? {}),
+  });
+
+  return parseResponse<T>(response);
+}
+
+export async function apiDelete<T>(path: string, body?: unknown): Promise<T> {
+  const response = await fetch(`${resolveApiBaseUrl()}${path}`, {
+    method: 'DELETE',
+    headers: await getAuthHeaders(),
+    body: JSON.stringify(body ?? {}),
+  });
+
+  return parseResponse<T>(response);
+}
+
+export async function apiGet<T>(
+  path: string,
+  params?: Record<string, string | number | boolean | null | undefined>,
+): Promise<T> {
+  const query = new URLSearchParams();
+  Object.entries(params ?? {}).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === '') return;
+    query.set(key, String(value));
+  });
+
+  const url = `${resolveApiBaseUrl()}${path}${query.size ? `?${query.toString()}` : ''}`;
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: await getAuthHeaders(),
+  });
+
+  return parseResponse<T>(response);
 }

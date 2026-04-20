@@ -13,6 +13,8 @@ import {
 const mapMessageRowToVM = vi.fn();
 const buildUserProfileById = vi.fn();
 const publishActivityEvent = vi.fn();
+const apiPost = vi.fn();
+const apiDelete = vi.fn();
 const resolveActiveProfileForAccountInOrg = vi.fn();
 const buildThreadById = vi.fn(async () => ({ ids: { id: 'thread-1', orgId: 'org-1' } }));
 
@@ -82,6 +84,12 @@ vi.mock('@iconicedu/web/lib/messages/mappers/message.mapper', () => ({
 }));
 vi.mock('@iconicedu/web/lib/activity-feed/publisher/activity-publisher', () => ({
   publishActivityEvent: (...args: unknown[]) => publishActivityEvent(...args),
+}));
+vi.mock('../../lib/api/http-client', () => ({
+  createApiClient: vi.fn(() => ({
+    post: (...args: unknown[]) => apiPost(...args),
+    delete: (...args: unknown[]) => apiDelete(...args),
+  })),
 }));
 
 vi.mock('@iconicedu/web/lib/messages/builders/thread.builder', () => ({
@@ -171,6 +179,8 @@ describe('sendTextMessageAction', () => {
     mapMessageRowToVM.mockReset();
     buildUserProfileById.mockReset();
     publishActivityEvent.mockReset();
+    apiPost.mockReset();
+    apiDelete.mockReset();
     resolveActiveProfileForAccountInOrg.mockReset();
     buildThreadById.mockReset();
     buildThreadById.mockResolvedValue({ ids: { id: 'thread-1', orgId: 'org-1' } });
@@ -283,18 +293,7 @@ describe('sendTextMessageAction', () => {
         payload: { text: 'Hello world' },
       }),
     );
-    expect(publishActivityEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        eventType: 'message.posted',
-        dedupeKey: 'message.posted:message-1',
-        payload: expect.objectContaining({
-          channelId: 'channel-1',
-          channelRouteKind: 'channel',
-          channelTopic: 'Class Requests · Riley Morgan',
-          content: 'Hello world',
-        }),
-      }),
-    );
+    expect(publishActivityEvent).not.toHaveBeenCalled();
     expect(result).toEqual({ ids: { id: 'message-1', orgId: 'org-1' } });
   });
 
@@ -678,16 +677,7 @@ describe('sendTextMessageAction', () => {
       content: 'Hello in DM',
     });
 
-    expect(publishActivityEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        eventType: 'dm.posted',
-        dedupeKey: 'dm.posted:message-dm-1',
-        payload: expect.objectContaining({
-          channelRouteKind: 'dm',
-          channelTopic: 'Priya + Riley',
-        }),
-      }),
-    );
+    expect(publishActivityEvent).not.toHaveBeenCalled();
   });
 
   it('suppresses dm.posted activity when recipient is actively reading the DM', async () => {
@@ -867,12 +857,7 @@ describe('sendTextMessageAction', () => {
       content: 'Hello group DM',
     });
 
-    expect(publishActivityEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        eventType: 'dm.posted',
-        audienceRules: [{ kind: 'users_only', userIds: ['profile-3'] }],
-      }),
-    );
+    expect(publishActivityEvent).not.toHaveBeenCalled();
   });
 
   it('stores explicit assignment metadata as lesson assignments and emits homework activity for class channels', async () => {
@@ -964,18 +949,7 @@ describe('sendTextMessageAction', () => {
     expect(insertLessonAssignment.mock.calls[0]?.[0]?.payload).toMatchObject({
       text: 'Please complete before Thursday.',
     });
-    expect(publishActivityEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        eventType: 'homework.assigned',
-        dedupeKey: 'homework.assigned:message-homework-1',
-        payload: expect.objectContaining({
-          messageId: 'message-homework-1',
-          title: 'Fractions Practice Set',
-          learningSpaceId: 'space-1',
-          channelRouteKind: 'space',
-        }),
-      }),
-    );
+    expect(publishActivityEvent).not.toHaveBeenCalled();
   });
 
   it('supports explicit lesson assignment metadata from the composer prompt', async () => {
@@ -1260,19 +1234,7 @@ describe('sendTextMessageAction', () => {
         name: 'brief.pdf',
       }),
     );
-    expect(publishActivityEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        eventType: 'file.uploaded',
-        dedupeKey: 'file.uploaded:file-message-1',
-        payload: expect.objectContaining({
-          messageId: 'file-message-1',
-          name: 'brief.pdf',
-          storagePath: 'org-1/channel-1/files/profile-1/brief.pdf',
-          channelRouteKind: 'space',
-          learningSpaceId: 'space-1',
-        }),
-      }),
-    );
+    expect(publishActivityEvent).not.toHaveBeenCalled();
     expect(buildThreadById).toHaveBeenCalledWith(
       expect.anything(),
       'org-1',
@@ -1383,17 +1345,7 @@ describe('sendTextMessageAction', () => {
         name: 'photo.png',
       }),
     );
-    expect(publishActivityEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        eventType: 'file.uploaded',
-        dedupeKey: 'file.uploaded:image-message-1',
-        payload: expect.objectContaining({
-          messageId: 'image-message-1',
-          name: 'photo.png',
-          mimeType: 'image/png',
-        }),
-      }),
-    );
+    expect(publishActivityEvent).not.toHaveBeenCalled();
     expect(result).toEqual({ ids: { id: 'image-message-1', orgId: 'org-1' } });
   });
 
@@ -1500,19 +1452,7 @@ describe('sendTextMessageAction', () => {
         size: 55,
       }),
     );
-    expect(publishActivityEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        eventType: 'file.uploaded',
-        dedupeKey: 'file.uploaded:audio-message-1',
-        payload: expect.objectContaining({
-          dmMessageKind: 'audio',
-          mimeType: 'audio/webm',
-          name: 'voice-message.webm',
-          channelId: 'channel-1',
-          messageId: 'audio-message-1',
-        }),
-      }),
-    );
+    expect(publishActivityEvent).not.toHaveBeenCalled();
     expect(result).toEqual({ ids: { id: 'audio-message-1', orgId: 'org-1' } });
   });
 
@@ -1619,17 +1559,7 @@ describe('sendTextMessageAction', () => {
       content: 'See attached',
     });
 
-    expect(publishActivityEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        eventType: 'dm.posted',
-        dedupeKey: 'dm.posted:file-message-dm-1',
-        payload: expect.objectContaining({
-          channelRouteKind: 'dm',
-          dmMessageKind: 'file',
-          senderName: 'Priya',
-        }),
-      }),
-    );
+    expect(publishActivityEvent).not.toHaveBeenCalled();
   });
 
   it('emits dm.posted for direct-message audio uploads', async () => {
@@ -1736,17 +1666,7 @@ describe('sendTextMessageAction', () => {
       content: 'Voice note',
     });
 
-    expect(publishActivityEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        eventType: 'dm.posted',
-        dedupeKey: 'dm.posted:audio-message-dm-1',
-        payload: expect.objectContaining({
-          channelRouteKind: 'dm',
-          dmMessageKind: 'audio',
-          senderName: 'Priya',
-        }),
-      }),
-    );
+    expect(publishActivityEvent).not.toHaveBeenCalled();
   });
 
   it('stores grouped file uploads as one file message with multiple attachments', async () => {
@@ -1881,16 +1801,7 @@ describe('sendTextMessageAction', () => {
         }),
       ]),
     );
-    expect(publishActivityEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        eventType: 'file.uploaded',
-        dedupeKey: 'file.uploaded:file-message-group-1',
-        payload: expect.objectContaining({
-          messageId: 'file-message-group-1',
-          fileCount: 3,
-        }),
-      }),
-    );
+    expect(publishActivityEvent).not.toHaveBeenCalled();
     expect(buildThreadById).toHaveBeenCalledWith(
       expect.anything(),
       'org-1',
@@ -2013,17 +1924,7 @@ describe('sendTextMessageAction', () => {
         }),
       ]),
     );
-    expect(publishActivityEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        eventType: 'file.uploaded',
-        dedupeKey: 'file.uploaded:image-message-group-1',
-        payload: expect.objectContaining({
-          messageId: 'image-message-group-1',
-          fileCount: 2,
-          mimeType: 'image/*',
-        }),
-      }),
-    );
+    expect(publishActivityEvent).not.toHaveBeenCalled();
     expect(result).toEqual({ ids: { id: 'image-message-group-1', orgId: 'org-1' } });
   });
 
@@ -2129,33 +2030,7 @@ describe('sendTextMessageAction', () => {
         },
       }),
     );
-    expect(publishActivityEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        orgId: 'org-1',
-        eventType: 'message.posted',
-        actorProfileId: 'profile-1',
-        dedupeKey: 'message.mention:message-mention-1:profile-2',
-        payload: expect.objectContaining({
-          mentionedProfileId: 'profile-2',
-          senderName: 'Sender Name',
-        }),
-      }),
-    );
-    expect(publishActivityEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        orgId: 'org-1',
-        eventType: 'message.posted',
-        actorProfileId: 'profile-1',
-        dedupeKey: 'message.posted:message-mention-1',
-        payload: expect.objectContaining({
-          channelId: 'channel-1',
-          senderName: 'Sender Name',
-          content: 'Hello @Taylor Reed',
-          channelRouteKind: 'channel',
-        }),
-      }),
-    );
-    expect(publishActivityEvent).toHaveBeenCalledTimes(2);
+    expect(publishActivityEvent).not.toHaveBeenCalled();
   });
 
   it('creates a thread for a reply when needed', async () => {
@@ -2287,13 +2162,7 @@ describe('sendTextMessageAction', () => {
     expect(createdThreadParticipants).not.toEqual(
       expect.arrayContaining([expect.objectContaining({ profile_id: 'profile-2' })]),
     );
-    expect(publishActivityEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        dedupeKey: 'message.thread-reply:message-2:profile-parent',
-        scope: { kind: 'user', userId: 'profile-parent' },
-        payload: expect.objectContaining({ threadReply: true }),
-      }),
-    );
+    expect(publishActivityEvent).not.toHaveBeenCalled();
     expect(buildThreadById).toHaveBeenCalledWith(expect.anything(), 'org-1', 'thread-1', {
       accountId: 'account-1',
     });
@@ -2435,12 +2304,7 @@ describe('sendTextMessageAction', () => {
     expect(messageInsert).toHaveBeenCalledWith(
       expect.objectContaining({ thread_id: 'thread-2', thread_parent_id: 'parent-2' }),
     );
-    expect(publishActivityEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        dedupeKey: 'message.thread-reply:message-3:profile-parent',
-        scope: { kind: 'user', userId: 'profile-parent' },
-      }),
-    );
+    expect(publishActivityEvent).not.toHaveBeenCalled();
     expect(buildThreadById).toHaveBeenCalledWith(expect.anything(), 'org-1', 'thread-2', {
       accountId: 'account-1',
     });
@@ -2559,12 +2423,7 @@ describe('sendTextMessageAction', () => {
       { onConflict: 'org_id,thread_id,profile_id' },
     );
     expect(updateThread).toHaveBeenCalled();
-    expect(publishActivityEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        dedupeKey: 'message.thread-reply:message-4:profile-parent',
-        scope: { kind: 'user', userId: 'profile-parent' },
-      }),
-    );
+    expect(publishActivityEvent).not.toHaveBeenCalled();
     expect(result).toEqual({ ids: { id: 'message-4', orgId: 'org-1' } });
   });
 
@@ -2655,16 +2514,7 @@ describe('sendTextMessageAction', () => {
         visibility_user_ids: expect.arrayContaining(['profile-1', 'staff-profile-1']),
       }),
     );
-    expect(publishActivityEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        audienceRules: [
-          {
-            kind: 'users_only',
-            userIds: expect.arrayContaining(['profile-1', 'staff-profile-1']),
-          },
-        ],
-      }),
-    );
+    expect(publishActivityEvent).not.toHaveBeenCalled();
   });
 
   it('rejects staff top-level support posts', async () => {
@@ -2860,7 +2710,13 @@ describe('sendTextMessageAction', () => {
 });
 
 describe('toggleMessageReactionAction', () => {
-  it('adds a reaction when none exists', async () => {
+  beforeEach(() => {
+    apiPost.mockReset();
+    apiDelete.mockReset();
+    publishActivityEvent.mockReset();
+  });
+
+  it('adds a reaction via the API when none exists', async () => {
     const supabase = {
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
       from: vi.fn(),
@@ -2879,40 +2735,11 @@ describe('toggleMessageReactionAction', () => {
       return chain;
     };
 
-    const selectMessage = vi.fn().mockReturnValue(
-      makeSelectChain({
-        data: {
-          id: 'message-1',
-          org_id: 'org-1',
-          channel_id: 'channel-1',
-          sender_profile_id: 'profile-2',
-        },
-      }),
-    );
     const selectReaction = vi.fn().mockReturnValue(makeSelectChain({ data: null }));
-    const selectCount = vi.fn().mockReturnValue(makeSelectChain({ data: null }));
-    const insertReaction = vi.fn().mockResolvedValue({ error: null });
-    const insertCount = vi.fn().mockResolvedValue({ error: null });
-    const channelLookup = createChannelLookupChain({
-      id: 'channel-1',
-      kind: 'channel',
-      topic: 'Support',
-      primary_entity_kind: null,
-      primary_entity_id: null,
-    });
 
     supabase.from.mockImplementation((table: string) => {
-      if (table === 'messages') {
-        return { select: selectMessage };
-      }
       if (table === 'message_reactions') {
-        return { select: selectReaction, insert: insertReaction };
-      }
-      if (table === 'message_reaction_counts') {
-        return { select: selectCount, insert: insertCount };
-      }
-      if (table === 'channels') {
-        return { select: () => channelLookup };
+        return { select: selectReaction };
       }
       return {};
     });
@@ -2925,11 +2752,17 @@ describe('toggleMessageReactionAction', () => {
       emoji: '👍',
     });
 
-    expect(insertReaction).toHaveBeenCalled();
-    expect(insertCount).toHaveBeenCalled();
+    expect(apiPost).toHaveBeenCalledWith('/reactions', {
+      orgId: 'org-1',
+      messageId: 'message-1',
+      emoji: '👍',
+      accountId: 'account-1',
+      profileId: 'profile-1',
+    });
+    expect(apiDelete).not.toHaveBeenCalled();
   });
 
-  it('removes a reaction when it already exists', async () => {
+  it('removes a reaction via the API when it already exists', async () => {
     const supabase = {
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
       from: vi.fn(),
@@ -2948,44 +2781,13 @@ describe('toggleMessageReactionAction', () => {
       return chain;
     };
 
-    const selectMessage = vi.fn().mockReturnValue(
-      makeSelectChain({
-        data: {
-          id: 'message-1',
-          org_id: 'org-1',
-          channel_id: 'channel-1',
-          sender_profile_id: 'profile-2',
-        },
-      }),
-    );
     const selectReaction = vi
       .fn()
       .mockReturnValue(makeSelectChain({ data: { id: 'reaction-1' } }));
-    const selectCount = vi
-      .fn()
-      .mockReturnValue(makeSelectChain({ data: { id: 'count-1', count: 1 } }));
-    const deleteReaction = vi.fn().mockResolvedValue({ error: null });
-    const deleteCount = vi.fn().mockResolvedValue({ error: null });
-    const channelLookup = createChannelLookupChain({
-      id: 'channel-1',
-      kind: 'channel',
-      topic: 'Support',
-      primary_entity_kind: null,
-      primary_entity_id: null,
-    });
 
     supabase.from.mockImplementation((table: string) => {
-      if (table === 'messages') {
-        return { select: selectMessage };
-      }
       if (table === 'message_reactions') {
-        return { select: selectReaction, delete: () => ({ eq: deleteReaction }) };
-      }
-      if (table === 'message_reaction_counts') {
-        return { select: selectCount, delete: () => ({ eq: deleteCount }) };
-      }
-      if (table === 'channels') {
-        return { select: () => channelLookup };
+        return { select: selectReaction };
       }
       return {};
     });
@@ -2998,11 +2800,17 @@ describe('toggleMessageReactionAction', () => {
       emoji: '👍',
     });
 
-    expect(deleteReaction).toHaveBeenCalled();
-    expect(deleteCount).toHaveBeenCalled();
+    expect(apiDelete).toHaveBeenCalledWith('/reactions', {
+      orgId: 'org-1',
+      messageId: 'message-1',
+      emoji: '👍',
+      accountId: 'account-1',
+      profileId: 'profile-1',
+    });
+    expect(apiPost).not.toHaveBeenCalled();
   });
 
-  it('publishes dm.reaction.added for direct-message reactions', async () => {
+  it('delegates direct-message reaction adds to the API instead of publishing locally', async () => {
     const supabase = {
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
       from: vi.fn(),
@@ -3022,61 +2830,11 @@ describe('toggleMessageReactionAction', () => {
       return chain;
     };
 
-    const selectMessage = vi.fn().mockReturnValue(
-      makeSelectChain({
-        data: { id: 'message-1', org_id: 'org-1', channel_id: 'channel-dm-1' },
-      }),
-    );
     const selectReaction = vi.fn().mockReturnValue(makeSelectChain({ data: null }));
-    const selectCount = vi.fn().mockReturnValue(makeSelectChain({ data: null }));
-    const insertReaction = vi.fn().mockResolvedValue({ error: null });
-    const insertCount = vi.fn().mockResolvedValue({ error: null });
-    const channelLookup = createChannelLookupChain({
-      id: 'channel-dm-1',
-      kind: 'dm',
-      topic: 'Priya + Riley',
-      primary_entity_kind: null,
-      primary_entity_id: null,
-    });
-    const channelMembersChain: any = {};
-    channelMembersChain.eq = vi.fn(() => channelMembersChain);
-    channelMembersChain.is = vi.fn(() => channelMembersChain);
-    channelMembersChain.returns = vi.fn(async () => ({
-      data: [{ profile_id: 'profile-1' }, { profile_id: 'profile-2' }],
-      error: null,
-    }));
-    const profilesChain: any = {};
-    profilesChain.eq = vi.fn(() => profilesChain);
-    profilesChain.in = vi.fn(() => profilesChain);
-    profilesChain.is = vi.fn(() => profilesChain);
-    profilesChain.returns = vi.fn(async () => ({
-      data: [{ id: 'profile-2', account_id: 'account-2' }],
-      error: null,
-    }));
-    const readStateChain: any = {};
-    readStateChain.eq = vi.fn(() => readStateChain);
-    readStateChain.in = vi.fn(() => readStateChain);
-    readStateChain.is = vi.fn(() => readStateChain);
-    readStateChain.returns = vi.fn(async () => ({
-      data: [{ account_id: 'account-2', last_read_at: '2026-03-09T09:55:00.000Z' }],
-      error: null,
-    }));
 
     supabase.from.mockImplementation((table: string) => {
-      if (table === 'messages') return { select: selectMessage };
-      if (table === 'message_reactions')
-        return { select: selectReaction, insert: insertReaction };
-      if (table === 'message_reaction_counts')
-        return { select: selectCount, insert: insertCount };
-      if (table === 'channels') return { select: () => channelLookup };
-      if (table === 'channel_members') return { select: () => channelMembersChain };
-      if (table === 'profiles') return { select: () => profilesChain };
-      if (table === 'channel_read_state') return { select: () => readStateChain };
+      if (table === 'message_reactions') return { select: selectReaction };
       return {};
-    });
-    buildUserProfileById.mockResolvedValueOnce({
-      ids: { id: 'profile-1', orgId: 'org-1' },
-      profile: { displayName: 'Priya' },
     });
 
     const { toggleMessageReactionAction } =
@@ -3087,124 +2845,20 @@ describe('toggleMessageReactionAction', () => {
       emoji: '👍',
     });
 
-    expect(publishActivityEvent).toHaveBeenCalledWith(
+    expect(apiPost).toHaveBeenCalledWith(
+      '/reactions',
       expect.objectContaining({
-        eventType: 'dm.reaction.added',
-        payload: expect.objectContaining({
-          messageId: 'message-1',
-          channelId: 'channel-dm-1',
-          senderName: 'Priya',
-          emoji: '👍',
-        }),
-        audienceRules: [{ kind: 'users_only', userIds: ['profile-2'] }],
+        orgId: 'org-1',
+        messageId: 'message-1',
+        emoji: '👍',
+        accountId: 'account-1',
+        profileId: 'profile-1',
       }),
     );
+    expect(publishActivityEvent).not.toHaveBeenCalled();
   });
 
-  it('publishes dm.reaction.removed for direct-message reaction removals', async () => {
-    const supabase = {
-      auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
-      from: vi.fn(),
-    };
-    const { createSupabaseServerClient } =
-      await import('@iconicedu/web/lib/supabase/server');
-    (
-      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
-    ).mockReturnValue(supabase);
-
-    const makeSelectChain = (response: { data: any }) => {
-      const chain: any = {};
-      chain.eq = vi.fn(() => chain);
-      chain.is = vi.fn(() => chain);
-      chain.maybeSingle = vi.fn(async () => response);
-      chain.returns = vi.fn(async () => response);
-      return chain;
-    };
-
-    const selectMessage = vi.fn().mockReturnValue(
-      makeSelectChain({
-        data: { id: 'message-1', org_id: 'org-1', channel_id: 'channel-dm-1' },
-      }),
-    );
-    const selectReaction = vi
-      .fn()
-      .mockReturnValue(makeSelectChain({ data: { id: 'reaction-1' } }));
-    const selectCount = vi
-      .fn()
-      .mockReturnValue(makeSelectChain({ data: { id: 'count-1', count: 1 } }));
-    const deleteReaction = vi.fn().mockResolvedValue({ error: null });
-    const deleteCount = vi.fn().mockResolvedValue({ error: null });
-    const channelLookup = createChannelLookupChain({
-      id: 'channel-dm-1',
-      kind: 'dm',
-      topic: 'Priya + Riley',
-      primary_entity_kind: null,
-      primary_entity_id: null,
-    });
-    const channelMembersChain: any = {};
-    channelMembersChain.eq = vi.fn(() => channelMembersChain);
-    channelMembersChain.is = vi.fn(() => channelMembersChain);
-    channelMembersChain.returns = vi.fn(async () => ({
-      data: [{ profile_id: 'profile-1' }, { profile_id: 'profile-2' }],
-      error: null,
-    }));
-    const profilesChain: any = {};
-    profilesChain.eq = vi.fn(() => profilesChain);
-    profilesChain.in = vi.fn(() => profilesChain);
-    profilesChain.is = vi.fn(() => profilesChain);
-    profilesChain.returns = vi.fn(async () => ({
-      data: [{ id: 'profile-2', account_id: 'account-2' }],
-      error: null,
-    }));
-    const readStateChain: any = {};
-    readStateChain.eq = vi.fn(() => readStateChain);
-    readStateChain.in = vi.fn(() => readStateChain);
-    readStateChain.is = vi.fn(() => readStateChain);
-    readStateChain.returns = vi.fn(async () => ({
-      data: [{ account_id: 'account-2', last_read_at: '2026-03-09T09:55:00.000Z' }],
-      error: null,
-    }));
-
-    supabase.from.mockImplementation((table: string) => {
-      if (table === 'messages') return { select: selectMessage };
-      if (table === 'message_reactions')
-        return { select: selectReaction, delete: () => ({ eq: deleteReaction }) };
-      if (table === 'message_reaction_counts')
-        return { select: selectCount, delete: () => ({ eq: deleteCount }) };
-      if (table === 'channels') return { select: () => channelLookup };
-      if (table === 'channel_members') return { select: () => channelMembersChain };
-      if (table === 'profiles') return { select: () => profilesChain };
-      if (table === 'channel_read_state') return { select: () => readStateChain };
-      return {};
-    });
-    buildUserProfileById.mockResolvedValueOnce({
-      ids: { id: 'profile-1', orgId: 'org-1' },
-      profile: { displayName: 'Priya' },
-    });
-
-    const { toggleMessageReactionAction } =
-      await import('@iconicedu/web/app/actions/messages');
-    await toggleMessageReactionAction({
-      orgId: 'org-1',
-      messageId: 'message-1',
-      emoji: '👍',
-    });
-
-    expect(publishActivityEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        eventType: 'dm.reaction.removed',
-        payload: expect.objectContaining({
-          messageId: 'message-1',
-          channelId: 'channel-dm-1',
-          senderName: 'Priya',
-          emoji: '👍',
-        }),
-        audienceRules: [{ kind: 'users_only', userIds: ['profile-2'] }],
-      }),
-    );
-  });
-
-  it('publishes reaction.added for channel reactions to another user message', async () => {
+  it('delegates channel reaction adds to the API instead of publishing locally', async () => {
     const supabase = {
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
       from: vi.fn(),
@@ -3223,39 +2877,10 @@ describe('toggleMessageReactionAction', () => {
       return chain;
     };
 
-    const selectMessage = vi.fn().mockReturnValue(
-      makeSelectChain({
-        data: {
-          id: 'message-1',
-          org_id: 'org-1',
-          channel_id: 'channel-1',
-          sender_profile_id: 'profile-2',
-        },
-      }),
-    );
     const selectReaction = vi.fn().mockReturnValue(makeSelectChain({ data: null }));
-    const selectCount = vi.fn().mockReturnValue(makeSelectChain({ data: null }));
-    const insertReaction = vi.fn().mockResolvedValue({ error: null });
-    const insertCount = vi.fn().mockResolvedValue({ error: null });
-    const channelLookup = createChannelLookupChain({
-      id: 'channel-1',
-      kind: 'channel',
-      topic: 'Support',
-      primary_entity_kind: null,
-      primary_entity_id: null,
-    });
-    buildUserProfileById.mockResolvedValueOnce({
-      ids: { id: 'profile-1', orgId: 'org-1' },
-      profile: { displayName: 'Priya' },
-    });
 
     supabase.from.mockImplementation((table: string) => {
-      if (table === 'messages') return { select: selectMessage };
-      if (table === 'message_reactions')
-        return { select: selectReaction, insert: insertReaction };
-      if (table === 'message_reaction_counts')
-        return { select: selectCount, insert: insertCount };
-      if (table === 'channels') return { select: () => channelLookup };
+      if (table === 'message_reactions') return { select: selectReaction };
       return {};
     });
 
@@ -3267,99 +2892,17 @@ describe('toggleMessageReactionAction', () => {
       emoji: '👍',
     });
 
-    expect(publishActivityEvent).toHaveBeenCalledWith(
+    expect(apiPost).toHaveBeenCalledWith(
+      '/reactions',
       expect.objectContaining({
-        eventType: 'reaction.added',
-        payload: expect.objectContaining({
-          messageId: 'message-1',
-          channelId: 'channel-1',
-          senderName: 'Priya',
-          emoji: '👍',
-        }),
-        audienceRules: [{ kind: 'users_only', userIds: ['profile-2'] }],
+        orgId: 'org-1',
+        messageId: 'message-1',
+        emoji: '👍',
+        accountId: 'account-1',
+        profileId: 'profile-1',
       }),
     );
-  });
-
-  it('publishes reaction.removed for channel reaction removals', async () => {
-    const supabase = {
-      auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
-      from: vi.fn(),
-    };
-    const { createSupabaseServerClient } =
-      await import('@iconicedu/web/lib/supabase/server');
-    (
-      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
-    ).mockReturnValue(supabase);
-
-    const makeSelectChain = (response: { data: any }) => {
-      const chain: any = {};
-      chain.eq = vi.fn(() => chain);
-      chain.is = vi.fn(() => chain);
-      chain.maybeSingle = vi.fn(async () => response);
-      return chain;
-    };
-
-    const selectMessage = vi.fn().mockReturnValue(
-      makeSelectChain({
-        data: {
-          id: 'message-1',
-          org_id: 'org-1',
-          channel_id: 'channel-1',
-          sender_profile_id: 'profile-2',
-        },
-      }),
-    );
-    const selectReaction = vi
-      .fn()
-      .mockReturnValue(makeSelectChain({ data: { id: 'reaction-1' } }));
-    const selectCount = vi
-      .fn()
-      .mockReturnValue(makeSelectChain({ data: { id: 'count-1', count: 1 } }));
-    const deleteReaction = vi.fn().mockResolvedValue({ error: null });
-    const deleteCount = vi.fn().mockResolvedValue({ error: null });
-    const channelLookup = createChannelLookupChain({
-      id: 'channel-1',
-      kind: 'channel',
-      topic: 'Support',
-      primary_entity_kind: null,
-      primary_entity_id: null,
-    });
-    buildUserProfileById.mockResolvedValueOnce({
-      ids: { id: 'profile-1', orgId: 'org-1' },
-      profile: { displayName: 'Priya' },
-    });
-
-    supabase.from.mockImplementation((table: string) => {
-      if (table === 'messages') return { select: selectMessage };
-      if (table === 'message_reactions')
-        return { select: selectReaction, delete: () => ({ eq: deleteReaction }) };
-      if (table === 'message_reaction_counts')
-        return { select: selectCount, delete: () => ({ eq: deleteCount }) };
-      if (table === 'channels') return { select: () => channelLookup };
-      return {};
-    });
-
-    const { toggleMessageReactionAction } =
-      await import('@iconicedu/web/app/actions/messages');
-    await toggleMessageReactionAction({
-      orgId: 'org-1',
-      messageId: 'message-1',
-      emoji: '👍',
-    });
-
-    expect(publishActivityEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        eventType: 'reaction.removed',
-        payload: expect.objectContaining({
-          messageId: 'message-1',
-          channelId: 'channel-1',
-          senderName: 'Priya',
-          emoji: '👍',
-        }),
-        audienceRules: [{ kind: 'users_only', userIds: ['profile-2'] }],
-      }),
-    );
+    expect(publishActivityEvent).not.toHaveBeenCalled();
   });
 });
 

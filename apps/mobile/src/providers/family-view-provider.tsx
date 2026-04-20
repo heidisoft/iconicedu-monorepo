@@ -41,6 +41,8 @@ type FamilySwitchOption = {
 type FamilyViewContextValue = {
   account: Record<string, unknown> | null;
   profile: Record<string, unknown> | null;
+  guardianAccountId: string;
+  guardianProfileId: string;
   familySwitchOptions: FamilySwitchOption[];
   isViewingAsChild: boolean;
   viewingAsProfileId: string | null;
@@ -364,10 +366,14 @@ export function FamilyViewProvider({ children }: { children: React.ReactNode }) 
     [baseAccountId, guardianProfile, linkedChildProfiles, orgId, queryClient],
   );
 
+  const guardianProfileId = (guardianProfile?.id as string | undefined) ?? '';
+
   const value = useMemo<FamilyViewContextValue>(
     () => ({
       account: effectiveAccount,
       profile: effectiveProfile,
+      guardianAccountId: baseAccountId,
+      guardianProfileId,
       familySwitchOptions,
       isViewingAsChild,
       viewingAsProfileId,
@@ -380,12 +386,14 @@ export function FamilyViewProvider({ children }: { children: React.ReactNode }) 
       refresh,
     }),
     [
+      baseAccountId,
       baseAccountQuery.isPending,
       baseProfilesQuery.isPending,
       effectiveAccount,
       effectiveProfile,
       effectiveProfileQuery.isPending,
       familySwitchOptions,
+      guardianProfileId,
       isViewingAsChild,
       refresh,
       selectionHydrated,

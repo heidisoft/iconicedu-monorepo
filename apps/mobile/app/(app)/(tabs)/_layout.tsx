@@ -12,6 +12,7 @@ import { useDirectMessages } from '@/hooks/use-direct-messages';
 import { useLearningSpaceChannels } from '@/hooks/use-learning-space-channels';
 import { useSupervisedDirectMessages } from '@/hooks/use-supervised-direct-messages';
 import { useUnreadSync } from '@/hooks/use-unread-sync';
+import { useFamilyView } from '@/providers/family-view-provider';
 
 // Fixed height for the icon + label content area.
 const TAB_CONTENT_HEIGHT = 57;
@@ -123,6 +124,7 @@ export default function TabsLayout() {
   const { data: account } = useAccount();
   const { data: profile } = useProfile();
   const { data: feed } = useActivityFeed();
+  const { guardianAccountId, guardianProfileId } = useFamilyView();
   const orgId = account?.org_id ?? '';
   const accountId =
     ((account as Record<string, unknown> | undefined)?.id as string) ?? '';
@@ -140,13 +142,13 @@ export default function TabsLayout() {
   );
   const { data: supervisedDms } = useSupervisedDirectMessages(
     orgId,
-    accountId,
-    profileId,
+    guardianAccountId,
+    guardianProfileId,
   );
 
   // Keep channel list queries (and therefore the tab badge) up to date
   // whenever channel_read_state changes for this account in realtime.
-  useUnreadSync({ orgId, profileId, accountId, profileKind });
+  useUnreadSync({ orgId, profileId, accountId, profileKind, guardianAccountId });
 
   const inboxUnreadCount =
     feed?.sections.reduce(

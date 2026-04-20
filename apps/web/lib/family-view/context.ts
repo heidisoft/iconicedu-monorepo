@@ -77,8 +77,22 @@ function parseSignedCookieValue(value: string): FamilyViewCookiePayload | null {
   }
 }
 
+function isMissingRequestScopeError(error: unknown): boolean {
+  const message =
+    error instanceof Error ? error.message : typeof error === 'string' ? error : '';
+  return message.includes('outside a request scope');
+}
+
 export async function getFamilyViewCookieSelection() {
-  const cookieStore = await cookies();
+  let cookieStore: Awaited<ReturnType<typeof cookies>>;
+  try {
+    cookieStore = await cookies();
+  } catch (error) {
+    if (isMissingRequestScopeError(error)) {
+      return null;
+    }
+    throw error;
+  }
   const value = cookieStore.get(FAMILY_VIEW_COOKIE_NAME)?.value ?? null;
   if (!value) {
     return null;
@@ -91,7 +105,15 @@ export async function setFamilyViewCookie(input: {
   guardianAccountId: string;
   childProfileId: string;
 }) {
-  const cookieStore = await cookies();
+  let cookieStore: Awaited<ReturnType<typeof cookies>>;
+  try {
+    cookieStore = await cookies();
+  } catch (error) {
+    if (isMissingRequestScopeError(error)) {
+      return;
+    }
+    throw error;
+  }
   cookieStore.set({
     name: FAMILY_VIEW_COOKIE_NAME,
     value: createSignedCookieValue({
@@ -108,7 +130,15 @@ export async function setFamilyViewCookie(input: {
 }
 
 export async function clearFamilyViewCookie() {
-  const cookieStore = await cookies();
+  let cookieStore: Awaited<ReturnType<typeof cookies>>;
+  try {
+    cookieStore = await cookies();
+  } catch (error) {
+    if (isMissingRequestScopeError(error)) {
+      return;
+    }
+    throw error;
+  }
   cookieStore.set({
     name: FAMILY_VIEW_COOKIE_NAME,
     value: '',

@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import type { FeedScopeVM, ReminderJobRow } from '@iconicedu/shared-types';
-import { publishActivityEvent } from '@iconicedu/web/lib/activity-feed/publisher/activity-publisher';
 import { randomUUID } from 'crypto';
 
+import { AnalyticsService } from '@iconicedu/api/analytics/analytics.service';
+import { publishActivityEvent } from '@iconicedu/api/lib/activity-feed/activity-publisher';
 import {
   createSupabaseServiceClient,
   type SupabaseServiceClient,
@@ -41,6 +42,8 @@ type ReminderJobPayload = {
 
 @Injectable()
 export class RemindersService {
+  constructor(private readonly analytics: AnalyticsService) {}
+
   /**
    * Keep Supabase env validation out of Nest bootstrap so the API can expose
    * health and startup errors cleanly before reminder jobs are invoked.
@@ -78,6 +81,14 @@ export class RemindersService {
         await this.processReminderJob(job, supabase);
         succeeded += 1;
       } catch (error) {
+        this.analytics.capture('api reminder job failed', {
+          jobId: job.id,
+          orgId: job.org_id,
+          jobType: job.job_type,
+          attemptCount: job.attempt_count + 1,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        });
+
         const now = new Date();
         const nextAttemptAt = new Date(
           now.getTime() + this.resolveRetryDelayMs(job.attempt_count + 1),
@@ -127,6 +138,15 @@ export class RemindersService {
 
     const durationMs = Date.now() - startedAt;
 
+    this.analytics.capture('api reminders dispatch completed', {
+      runId,
+      claimed: claimed.length,
+      succeeded,
+      failed,
+      deadLettered,
+      durationMs,
+    });
+
     return {
       runId,
       claimed: claimed.length,
@@ -136,34 +156,6 @@ export class RemindersService {
       deadLettered,
       durationMs,
     };
-  }
-
-  private buildReminderText(payload: ReminderJobPayload) {
-    if (payload.summary?.trim()) {
-      return payload.summary.trim();
-    }
-    return `${payload.title} is starting soon.`;
-  }
-
-  private buildFeedbackPrompt(payload: ReminderJobPayload) {
-    if (payload.summary?.trim()) {
-      return payload.summary.trim();
-    }
-    return `How was "${payload.title}"?`;
-  }
-
-  private buildPaymentText(payload: ReminderJobPayload) {
-    const amount =
-      typeof payload.amount === 'number'
-        ? `${payload.currency ?? 'USD'} ${payload.amount.toFixed(2)}`
-        : null;
-    if (amount && payload.dueAt) {
-      return `Payment reminder: ${amount} due ${new Date(payload.dueAt).toLocaleString('en-US')}.`;
-    }
-    if (amount) {
-      return `Payment reminder: ${amount} is due.`;
-    }
-    return payload.summary?.trim() || 'Payment reminder';
   }
 
   private resolveRetryDelayMs(attemptCount: number) {
@@ -244,7 +236,6 @@ export class RemindersService {
     supabase: SupabaseServiceClient;
     orgId: string;
     jobId: string;
-    messageId?: string | null;
     activityEventId?: string | null;
     result: 'succeeded' | 'idempotent_hit' | 'retryable_failure' | 'fatal_failure';
     details?: Record<string, unknown>;
@@ -253,7 +244,6 @@ export class RemindersService {
     const response = await input.supabase.from('reminder_dispatch_logs').insert({
       org_id: input.orgId,
       reminder_job_id: input.jobId,
-      message_id: input.messageId ?? null,
       activity_event_id: input.activityEventId ?? null,
       result: input.result,
       details: input.details ?? {},
@@ -271,92 +261,11 @@ export class RemindersService {
     const now = new Date().toISOString();
 
     const systemProfileId = await this.ensureSystemProfileId(supabase, job.org_id);
-    const messageType =
-      job.job_type === 'payment.reminder'
-        ? 'payment-reminder'
-        : job.job_type === 'session.feedback_request'
-          ? 'feedback-request'
-          : 'event-reminder';
-
-    const messageInsert = await supabase
-      .from('messages')
-      .insert({
-        org_id: job.org_id,
-        channel_id: job.target_id,
-        sender_profile_id: systemProfileId,
-        type: messageType,
-        visibility_type: 'all',
-        created_at: now,
-        updated_at: now,
-        created_by: systemProfileId,
-        updated_by: systemProfileId,
-      })
-      .select('id')
-      .single<{ id: string }>();
-
-    if (messageInsert.error) {
-      throw new Error(messageInsert.error.message);
-    }
-
-    const messageId = messageInsert.data.id;
-    const payloadTable =
-      job.job_type === 'payment.reminder'
-        ? 'message_payment_reminder'
-        : job.job_type === 'session.feedback_request'
-          ? 'message_feedback_request'
-          : 'message_event_reminder';
-
-    const payloadBody =
-      job.job_type === 'session.feedback_request'
-        ? {
-            prompt: this.buildFeedbackPrompt(payload),
-            text: this.buildFeedbackPrompt(payload),
-            sessionTitle: payload.title,
-            scheduleId: payload.scheduleId ?? null,
-            learningSpaceId: payload.learningSpaceId ?? null,
-            channelId: payload.channelId,
-            occurrenceStart: payload.occurrenceStart ?? payload.startAt ?? now,
-          }
-        : job.job_type === 'payment.reminder'
-          ? {
-              text: this.buildPaymentText(payload),
-              amount: payload.amount ?? null,
-              currency: payload.currency ?? 'USD',
-              dueAt: payload.dueAt ?? null,
-              status: 'pending',
-              invoiceId: payload.invoiceId ?? null,
-              description: payload.summary ?? null,
-            }
-          : {
-              text: this.buildReminderText(payload),
-              status: 'scheduled',
-              title: payload.title,
-              startAt: payload.startAt ?? payload.occurrenceStart ?? now,
-              endAt: payload.endAt ?? null,
-              location: payload.location ?? null,
-              meetingLink: payload.meetingLink ?? null,
-            };
-
-    const payloadInsert = await supabase.from(payloadTable).insert({
-      message_id: messageId,
-      org_id: job.org_id,
-      payload: payloadBody,
-      created_at: now,
-      updated_at: now,
-      created_by: systemProfileId,
-      updated_by: systemProfileId,
-    });
-
-    if (payloadInsert.error) {
-      throw new Error(payloadInsert.error.message);
-    }
 
     const eventType =
-      job.job_type === 'payment.reminder'
-        ? 'payment.reminder.sent'
-        : job.job_type === 'session.feedback_request'
-          ? 'session.feedback_request.sent'
-          : 'session.reminder.sent';
+      job.job_type === 'session.feedback_request'
+        ? 'session.feedback_request.sent'
+        : 'session.reminder.sent';
 
     const scope: FeedScopeVM = payload.learningSpaceId
       ? { kind: 'learning_space', learningSpaceId: payload.learningSpaceId }
@@ -371,13 +280,11 @@ export class RemindersService {
       sourceKind: 'system',
       actorProfileId: systemProfileId,
       scope,
-      objectRef: { kind: 'message', id: messageId },
       targetRef: payload.learningSpaceId
         ? { kind: 'learning_space', id: payload.learningSpaceId }
         : undefined,
       payload: {
         channelId: payload.channelId,
-        messageId,
         learningSpaceId: payload.learningSpaceId ?? null,
         scheduleId: payload.scheduleId ?? null,
         occurrenceStart: payload.occurrenceStart ?? payload.startAt ?? now,
@@ -410,13 +317,9 @@ export class RemindersService {
       supabase,
       orgId: job.org_id,
       jobId: job.id,
-      messageId,
       activityEventId: activityEvent?.id ?? null,
       result: 'succeeded',
-      details: {
-        event_type: eventType,
-        payload_table: payloadTable,
-      },
+      details: { event_type: eventType },
     });
   }
 }

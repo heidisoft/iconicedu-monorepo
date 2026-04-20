@@ -1,15 +1,16 @@
 import { DEFAULT_NOTIFICATION_ROUTE, NOTIFICATION_REGISTRY } from './notification-config';
 
 describe('NOTIFICATION_REGISTRY', () => {
-  it('routes dm.posted with a channelId to the DM screen', () => {
-    const route = NOTIFICATION_REGISTRY['dm.posted'].getRoute({
+  it('routes message.posted with a DM route kind to the DM screen', () => {
+    const route = NOTIFICATION_REGISTRY['message.posted'].getRoute({
       channelId: 'channel-123',
+      channelRouteKind: 'dm',
     });
     expect(route).toBe('/(app)/dm/channel-123');
   });
 
-  it('routes dm.posted without a channelId to the Messages tab', () => {
-    const route = NOTIFICATION_REGISTRY['dm.posted'].getRoute({});
+  it('routes message.posted without a channelId to the Messages tab', () => {
+    const route = NOTIFICATION_REGISTRY['message.posted'].getRoute({});
     expect(route).toBe('/(app)/(tabs)/messages');
   });
 
@@ -38,9 +39,10 @@ describe('NOTIFICATION_REGISTRY', () => {
     expect(route).toBe('/(app)/channel/channel-789');
   });
 
-  it('routes dm.reaction.added to the DM screen', () => {
-    const route = NOTIFICATION_REGISTRY['dm.reaction.added'].getRoute({
+  it('routes reaction.added to the DM screen when the payload marks it as a DM', () => {
+    const route = NOTIFICATION_REGISTRY['reaction.added'].getRoute({
       channelId: 'dm-123',
+      channelRouteKind: 'dm',
     });
     expect(route).toBe('/(app)/dm/dm-123');
   });
@@ -54,6 +56,30 @@ describe('NOTIFICATION_REGISTRY', () => {
 
   it('routes session.reminder.sent without a channelId to the schedule tab', () => {
     const route = NOTIFICATION_REGISTRY['session.reminder.sent'].getRoute({});
+    expect(route).toBe('/(app)/(tabs)/schedule');
+  });
+
+  it('routes class.sessions.rescheduled without a channelId to the schedule tab', () => {
+    const route = NOTIFICATION_REGISTRY['class.sessions.rescheduled'].getRoute({});
+    expect(route).toBe('/(app)/(tabs)/schedule');
+  });
+
+  it('routes class.session.rescheduled with a channelId to the classroom sessions tab', () => {
+    const route = NOTIFICATION_REGISTRY['class.session.rescheduled'].getRoute({
+      channelId: 'ch-2',
+    });
+    expect(route).toBe('/(app)/spaces/ch-2?tab=sessions');
+  });
+
+  it('routes class.session.canceled with a channelId to the classroom sessions tab', () => {
+    const route = NOTIFICATION_REGISTRY['class.session.canceled'].getRoute({
+      channelId: 'ch-3',
+    });
+    expect(route).toBe('/(app)/spaces/ch-3?tab=sessions');
+  });
+
+  it('routes class.sessions.canceled without a channelId to the schedule tab', () => {
+    const route = NOTIFICATION_REGISTRY['class.sessions.canceled'].getRoute({});
     expect(route).toBe('/(app)/(tabs)/schedule');
   });
 

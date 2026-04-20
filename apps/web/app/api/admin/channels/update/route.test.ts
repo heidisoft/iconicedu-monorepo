@@ -59,14 +59,11 @@ describe('POST /api/admin/channels/update', () => {
         body: JSON.stringify({
           channelId: 'channel-1',
           payload,
-          sendActivityNotifications: false,
         }),
       }),
     );
 
-    expect(updateChannelFromPayload).toHaveBeenCalledWith('channel-1', payload, {
-      sendActivityNotifications: false,
-    });
+    expect(updateChannelFromPayload).toHaveBeenCalledWith('channel-1', payload);
     expect(response.status).toBe(200);
     const responsePayload = await response.json();
     expect(responsePayload).toEqual({ success: true });

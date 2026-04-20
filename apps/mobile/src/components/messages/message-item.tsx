@@ -1846,6 +1846,77 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     setThreadUnreadCount(thread?.readState?.unreadCount ?? 0);
   }, [thread?.ids.id, thread?.readState?.unreadCount]);
 
+  const loadThreadReplies = useCallback(async () => {
+    if (!thread) {
+      return;
+    }
+
+    setThreadLoading(true);
+    try {
+      const replies = await fetchThreadMessages(
+        message.ids.orgId,
+        thread.readState?.channelId ?? '',
+        thread.ids.id,
+        message.ids.id,
+        currentProfileId ?? '',
+        currentAccountId ?? '',
+      );
+      setThreadReplies(replies);
+      const channelId = thread.readState?.channelId;
+      const lastReplyId = replies[replies.length - 1]?.ids.id ?? null;
+      if (channelId && currentProfileId && currentAccountId) {
+        try {
+          const unreadCount = await markThreadReadState({
+            orgId: message.ids.orgId,
+            accountId: currentAccountId,
+            profileId: currentProfileId,
+            channelId,
+            threadId: thread.ids.id,
+            lastReadMessageId: lastReplyId,
+          });
+          setThreadUnreadCount(unreadCount);
+        } catch (error) {
+          reportMobileObservedError({
+            error,
+            source: 'mobile.messages.message_item.thread_read_state',
+            message: 'Failed to sync thread read state',
+            context: {
+              channelId,
+              threadId: thread.ids.id,
+              messageId: message.ids.id,
+            },
+          });
+        }
+      }
+    } catch (error) {
+      reportMobileObservedError({
+        error,
+        source: 'mobile.messages.message_item.thread_expand',
+        message: 'Failed to load thread replies',
+        context: {
+          threadId: thread?.ids.id,
+          messageId: message.ids.id,
+        },
+      });
+    } finally {
+      setThreadLoading(false);
+    }
+  }, [thread, message.ids.id, message.ids.orgId, currentProfileId, currentAccountId]);
+
+  useEffect(() => {
+    if (!threadExpanded || !thread) {
+      return;
+    }
+
+    void loadThreadReplies();
+  }, [
+    threadExpanded,
+    thread?.ids.id,
+    thread?.stats.messageCount,
+    thread?.stats.lastReplyAt,
+    loadThreadReplies,
+  ]);
+
   const handleAudioPress = useCallback(
     async (url: string) => {
       if (soundRef.current) {
@@ -1954,58 +2025,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     }
     const next = !threadExpanded;
     setThreadExpanded(next);
-    if (next) {
-      // Always re-fetch on expand so new replies appear immediately
-      setThreadLoading(true);
-      try {
-        const replies = await fetchThreadMessages(
-          thread.ids.id,
-          message.ids.id,
-          currentProfileId ?? '',
-          currentAccountId ?? '',
-        );
-        setThreadReplies(replies);
-        const channelId = thread.readState?.channelId;
-        const lastReplyId = replies[replies.length - 1]?.ids.id ?? null;
-        if (channelId && currentProfileId && currentAccountId) {
-          try {
-            const unreadCount = await markThreadReadState({
-              orgId: message.ids.orgId,
-              accountId: currentAccountId,
-              profileId: currentProfileId,
-              channelId,
-              threadId: thread.ids.id,
-              lastReadMessageId: lastReplyId,
-            });
-            setThreadUnreadCount(unreadCount);
-          } catch (error) {
-            reportMobileObservedError({
-              error,
-              source: 'mobile.messages.message_item.thread_read_state',
-              message: 'Failed to sync thread read state',
-              context: {
-                channelId,
-                threadId: thread.ids.id,
-                messageId: message.ids.id,
-              },
-            });
-          }
-        }
-      } catch (error) {
-        reportMobileObservedError({
-          error,
-          source: 'mobile.messages.message_item.thread_expand',
-          message: 'Failed to load thread replies',
-          context: {
-            threadId: thread?.ids.id,
-            messageId: message.ids.id,
-          },
-        });
-      } finally {
-        setThreadLoading(false);
-      }
-    }
-  }, [thread, threadExpanded, message, onThreadOpen, currentProfileId, currentAccountId]);
+  }, [thread, threadExpanded, message, onThreadOpen]);
 
   const handleThreadReplyPress = useCallback(() => {
     onThreadOpen?.(message);

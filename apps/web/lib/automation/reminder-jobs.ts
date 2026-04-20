@@ -314,55 +314,6 @@ export async function compileLearningSpaceReminderJobs(input: {
   };
 }
 
-export async function enqueuePaymentReminderJobs(input: {
-  supabase: SupabaseServiceClient;
-  orgId: string;
-  rows: Array<{
-    dedupeKey: string;
-    channelId: string;
-    invoiceId?: string | null;
-    dueAt?: string | null;
-    title: string;
-    summary?: string | null;
-    learningSpaceId?: string | null;
-    amount?: number | null;
-    currency?: string | null;
-    runAt: string;
-  }>;
-}) {
-  const now = new Date().toISOString();
-  const upsertRows = input.rows.map((row) => ({
-    org_id: input.orgId,
-    job_type: 'payment.reminder',
-    target_kind: 'channel',
-    target_id: row.channelId,
-    source_learning_space_id: row.learningSpaceId ?? null,
-    source_invoice_id: row.invoiceId ?? null,
-    occurrence_start_at: null,
-    run_at: row.runAt,
-    timezone: 'UTC',
-    payload: {
-      title: row.title,
-      summary: row.summary ?? null,
-      channelId: row.channelId,
-      learningSpaceId: row.learningSpaceId ?? null,
-      invoiceId: row.invoiceId ?? null,
-      dueAt: row.dueAt ?? null,
-      amount: row.amount ?? null,
-      currency: row.currency ?? 'USD',
-      channelRouteKind: row.learningSpaceId ? 'space' : 'channel',
-    } satisfies ReminderJobPayload,
-    dedupe_key: row.dedupeKey,
-    status: 'pending',
-    max_attempts: DEFAULT_MAX_ATTEMPTS,
-    created_at: now,
-    updated_at: now,
-  }));
-
-  await upsertReminderJobs(input.supabase, upsertRows);
-  return { enqueuedCount: upsertRows.length };
-}
-
 export async function cancelLearningSpaceReminderJobs(input: {
   supabase: SupabaseServiceClient;
   orgId: string;
@@ -417,11 +368,9 @@ async function processReminderJob(supabase: SupabaseServiceClient, job: Reminder
   const systemProfileId = await ensureSystemProfileId(supabase, job.org_id);
 
   const eventType =
-    job.job_type === 'payment.reminder'
-      ? 'payment.reminder.sent'
-      : job.job_type === 'session.feedback_request'
-        ? 'session.feedback_request.sent'
-        : 'session.reminder.sent';
+    job.job_type === 'session.feedback_request'
+      ? 'session.feedback_request.sent'
+      : 'session.reminder.sent';
   const activityEvent = await publishActivityEvent({
     supabase,
     orgId: job.org_id,

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import { apiGet } from '@/lib/api/http-client';
 import { supabase } from '@/lib/supabase/client';
 
 const PRESENCE_AWAY_AFTER_MS = 10 * 60 * 1000;
@@ -190,29 +191,26 @@ export function useOnlineProfileIds(
       });
     };
 
-    void supabase
-      .from('profile_presence')
-      .select('profile_id, live_status, display_status, last_seen_at, deleted_at')
-      .eq('org_id', orgId)
-      .in('profile_id', stableProfileIds)
-      .is('deleted_at', null)
-      .then(({ data, error }) => {
-        if (cancelled || error) return;
-        dbStatusesRef.current = new Map(
-          (data ?? [])
-            .map(
-              (row) =>
-                [
-                  row.profile_id as string,
-                  getPresenceDisplayStatus(row as PresenceRow),
-                ] as const,
-            )
-            .filter(
-              (entry): entry is readonly [string, PresenceDisplayStatus] => !!entry[1],
-            ),
-        );
-        syncState();
-      });
+    void apiGet<PresenceRow[]>('/presence', {
+      orgId,
+      profileIds: stableProfileIds.join(','),
+    }).then((data) => {
+      if (cancelled) return;
+      dbStatusesRef.current = new Map(
+        (data ?? [])
+          .map(
+            (row) =>
+              [
+                row.profile_id as string,
+                getPresenceDisplayStatus(row as PresenceRow),
+              ] as const,
+          )
+          .filter(
+            (entry): entry is readonly [string, PresenceDisplayStatus] => !!entry[1],
+          ),
+      );
+      syncState();
+    });
 
     const unsubscribeRealtimePresence = subscribeToOrgRealtimePresence(
       orgId,

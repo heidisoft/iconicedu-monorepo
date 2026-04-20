@@ -48,8 +48,9 @@ export function useUnreadSync(params: {
   profileId: string;
   accountId: string;
   profileKind?: string | null;
+  guardianAccountId?: string;
 }) {
-  const { orgId, profileId, accountId, profileKind } = params;
+  const { orgId, profileId, accountId, profileKind, guardianAccountId } = params;
   const queryClient = useQueryClient();
 
   // Keep stable refs so the effect closure always has current values without
@@ -83,7 +84,7 @@ export function useUnreadSync(params: {
         queryKey: ['learningSpaceChannels', o, p, pk ?? null],
       });
       queryClient.invalidateQueries({
-        queryKey: queryKeys.supervisedDirectMessages(o, accountId),
+        queryKey: queryKeys.supervisedDirectMessages(o, guardianAccountId ?? accountId),
       });
       void syncUnreadBadgeCount(o, accountId);
     };

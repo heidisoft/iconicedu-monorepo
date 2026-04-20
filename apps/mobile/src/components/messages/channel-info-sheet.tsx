@@ -1121,6 +1121,9 @@ export function ChannelInfoSheet({
             avatarUrl: dm.avatarUrl ?? '',
             avatarRole: dm.avatarRole ?? '',
             avatarTimezone: dm.avatarTimezone ?? '',
+            avatarCity: dm.avatarCity ?? '',
+            avatarCountryCode: dm.avatarCountryCode ?? '',
+            avatarCountryName: dm.avatarCountryName ?? '',
           },
         } as never);
       } catch {

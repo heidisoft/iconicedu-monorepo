@@ -351,11 +351,11 @@ describe('resolveUnreadIdsForTab', () => {
               occurredAt: '2026-03-04T12:00:00.000Z',
               createdAt: '2026-03-04T12:00:00.000Z',
             },
-            tabKey: 'payment',
+            tabKey: 'classes',
             audience: { scope: { kind: 'global' }, visibility: 'public' },
-            verb: 'payment.reminder.sent',
+            verb: 'class.session.canceled',
             refs: { actor: {} as never },
-            content: { headline: { primary: 'Payment item' } },
+            content: { headline: { primary: 'Canceled class item' } },
             state: { isRead: false },
           },
           {
@@ -416,11 +416,12 @@ describe('resolveUnreadIdsForTab', () => {
 
     expect(resolveUnreadIdsForTab(sections, 'classes')).toEqual([
       'leaf-classes',
+      'leaf-payment',
       'sub-unread',
       'backing-id-1',
       'backing-id-2',
     ]);
-    expect(resolveUnreadIdsForTab(sections, 'payment')).toEqual(['leaf-payment']);
+    expect(resolveUnreadIdsForTab(sections, 'payment')).toEqual([]);
     expect(resolveUnreadIdsForTab(sections, 'all')).toEqual([
       'leaf-classes',
       'leaf-payment',
@@ -528,30 +529,6 @@ describe('InboxContainer rendering behavior', () => {
   });
 
   it('formats schedule and reschedule/cancel activity labels using local time metadata', () => {
-    const scheduled = applyScheduleActivityLocalTime({
-      kind: 'leaf',
-      ids: { id: 'leaf-scheduled', orgId: 'org-1' },
-      timestamps: {
-        occurredAt: '2026-03-04T12:00:00.000Z',
-        createdAt: '2026-03-04T12:00:00.000Z',
-      },
-      tabKey: 'classes',
-      audience: { scope: { kind: 'global' }, visibility: 'public' },
-      verb: 'class.session.scheduled',
-      refs: { actor: {} as never },
-      content: {
-        headline: { primary: 'Class session scheduled', secondary: 'Math Foundations' },
-        summary: 'Session scheduled 2026-03-04T12:40:00.000Z.',
-      },
-      metadata: {
-        sessionLocalTime: true,
-        activityPhase: 'updated',
-        startAt: '2026-03-04T12:40:00.000Z',
-        title: 'Math Foundations',
-        timezone: 'America/Los_Angeles',
-      },
-    });
-
     const rescheduled = applyScheduleActivityLocalTime({
       kind: 'leaf',
       ids: { id: 'leaf-rescheduled', orgId: 'org-1' },
@@ -627,8 +604,6 @@ describe('InboxContainer rendering behavior', () => {
       },
     });
 
-    expect(scheduled.content.summary).toContain('Session scheduled ');
-    expect(scheduled.content.summary).not.toContain('2026-03-04T12:40:00.000Z');
     expect(rescheduled.content.headline.primary).toBe('Class session rescheduled');
     expect(rescheduled.content.summary).toBe(
       'Session: Math Foundations weekly session (Wed, Mar 4) moved from 4:40 AM to 5:10 AM Los Angeles time',

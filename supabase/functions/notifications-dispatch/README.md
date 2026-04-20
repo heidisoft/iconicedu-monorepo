@@ -2,7 +2,7 @@
 
 Calls the internal app endpoint:
 
-- `POST /api/internal/notifications/dispatch`
+- `POST /internal/notifications/dispatch`
 
 Scheduler source of truth:
 
@@ -13,6 +13,11 @@ Scheduler source of truth:
 
 - `NOTIFICATIONS_DISPATCH_URL`
 - `INTERNAL_NOTIFICATIONS_TOKEN`
+
+Recommended values for the API-owned pipeline:
+
+- `NOTIFICATIONS_DISPATCH_URL=https://<your-api-domain>/internal/notifications/dispatch`
+- `INTERNAL_NOTIFICATIONS_TOKEN=<same-value-as-INTERNAL_NOTIFICATIONS_TOKEN_API in apps/api>`
 
 ## Optional environment variables
 

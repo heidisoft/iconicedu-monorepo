@@ -153,22 +153,6 @@ async function seedDefaultNotificationsIfMissing(input: {
   orgId: string;
   profileId: string;
 }) {
-  const existingResponse = await input.serviceClient
-    .from('notification_preferences')
-    .select('id')
-    .eq('org_id', input.orgId)
-    .eq('profile_id', input.profileId)
-    .is('deleted_at', null)
-    .limit(1);
-
-  if (existingResponse.error) {
-    throw existingResponse.error;
-  }
-
-  if ((existingResponse.data ?? []).length > 0) {
-    return;
-  }
-
   const seedResponse = await seedSignupDefaultNotificationPreferences(
     input.serviceClient,
     input.orgId,

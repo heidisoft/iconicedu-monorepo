@@ -299,24 +299,16 @@ async function attachGroupMembers(
         const bTime = new Date(b.timestamps.occurredAt).getTime();
         return bTime - aTime;
       });
-    const normalized = normalizeGroupedParent(item, members);
-    const aggregatedMembers = aggregateGroupedSubActivities(
-      normalized.parent,
-      normalized.members,
-    );
+    const aggregatedMembers = members;
     const nextParent = normalizeChannelGroupedParent(
-      normalizeDmGroupedParent(normalized.parent, aggregatedMembers),
-      aggregatedMembers,
-    );
-    const normalizedLiveSessionParent = normalizeSessionStartedGroupedParent(
-      nextParent,
+      normalizeDmGroupedParent(item, aggregatedMembers),
       aggregatedMembers,
     );
 
     memberIds.forEach((memberId) => groupedMemberIds.add(memberId));
 
     return {
-      ...normalizedLiveSessionParent,
+      ...nextParent,
       subActivities: {
         items: aggregatedMembers,
       },
@@ -329,141 +321,11 @@ async function attachGroupMembers(
   );
 }
 
-function normalizeGroupedParent(
-  parent: Extract<ActivityFeedItemVM, { kind: 'group' }>,
-  members: ActivityFeedLeafItemVM[],
-): {
-  parent: Extract<ActivityFeedItemVM, { kind: 'group' }>;
-  members: ActivityFeedLeafItemVM[];
-} {
-  if (parent.grouping?.groupKey?.startsWith('class-created:') !== true) {
-    return { parent, members };
-  }
-
-  if (parent.verb === 'class.created') {
-    return { parent, members };
-  }
-
-  const classCreatedChild = members.find((member) => member.verb === 'class.created');
-  if (!classCreatedChild) {
-    return { parent, members };
-  }
-
-  const parentAsInviteChild =
-    parent.verb === 'member.invited' || parent.verb === 'members.invited'
-      ? ({
-          kind: 'leaf',
-          ids: {
-            ...parent.ids,
-            id: `${parent.ids.id}:original-parent`,
-          },
-          timestamps: parent.timestamps,
-          tabKey: parent.tabKey,
-          audience: parent.audience,
-          verb: parent.verb,
-          refs: parent.refs,
-          content: parent.content,
-          state: parent.state,
-          metadata: {
-            ...(parent.metadata ?? {}),
-            readItemIds: [parent.ids.id],
-          },
-        } as ActivityFeedLeafItemVM)
-      : null;
-
-  return {
-    parent: {
-      ...parent,
-      verb: 'class.created',
-      content: classCreatedChild.content,
-      refs: classCreatedChild.refs,
-      timestamps: {
-        ...parent.timestamps,
-        occurredAt: classCreatedChild.timestamps.occurredAt,
-      },
-    },
-    members: [
-      ...(parentAsInviteChild ? [parentAsInviteChild] : []),
-      ...members.filter((member) => member.ids.id !== classCreatedChild.ids.id),
-    ],
-  };
-}
-
-function aggregateGroupedSubActivities(
-  parent: Extract<ActivityFeedItemVM, { kind: 'group' }>,
-  members: ActivityFeedLeafItemVM[],
-) {
-  if (!members.length || parent.verb !== 'class.created') {
-    return members;
-  }
-
-  const invitedChildren = members.filter(
-    (member) => member.verb === 'member.invited' || member.verb === 'members.invited',
-  );
-  if (!invitedChildren.length) {
-    return members;
-  }
-
-  const aggregatedAvatars = collectUniqueAvatars([
-    ...invitedChildren.map((member) => member.content.leading),
-  ]);
-  const inviteCount = Math.max(aggregatedAvatars.length, invitedChildren.length);
-
-  const listedNames = aggregatedAvatars
-    .map((avatar) => avatar.name)
-    .filter(Boolean)
-    .slice(0, 3)
-    .join(', ');
-  const remainingCount = aggregatedAvatars.length - 3;
-  const secondary =
-    parent.content.headline.secondary ?? invitedChildren[0]?.content.headline.secondary;
-  const summaryPrefix = listedNames
-    ? `Added: ${listedNames}${remainingCount > 0 ? ` +${remainingCount} more` : ''}.`
-    : undefined;
-  const representative = invitedChildren[0] ?? members[0];
-  const readItemIds = collectActivityReadItemIds(invitedChildren, parent.ids.id);
-
-  const aggregatedInvite: ActivityFeedLeafItemVM = {
-    ...representative,
-    ids: {
-      ...representative.ids,
-      id: `${parent.ids.id}:members-invited`,
-    },
-    verb: 'members.invited',
-    content: {
-      ...representative.content,
-      leading:
-        aggregatedAvatars.length > 0
-          ? ({
-              kind: 'avatars',
-              avatars: aggregatedAvatars.slice(0, 3),
-              overflowCount: Math.max(0, aggregatedAvatars.length - 3),
-            } satisfies InboxLeadingVM)
-          : representative.content.leading,
-      headline: {
-        primary: `${inviteCount} participants added`,
-      },
-      summary:
-        `${summaryPrefix ?? ''}${secondary ? ` Added to ${secondary}.` : ''}`.trim(),
-    },
-    metadata: {
-      ...(representative.metadata ?? {}),
-      readItemIds,
-    },
-  };
-
-  const nonInviteMembers = members.filter(
-    (member) => member.verb !== 'member.invited' && member.verb !== 'members.invited',
-  );
-
-  return [aggregatedInvite, ...nonInviteMembers];
-}
-
 function normalizeDmGroupedParent(
   parent: Extract<ActivityFeedItemVM, { kind: 'group' }>,
   members: ActivityFeedLeafItemVM[],
 ): Extract<ActivityFeedItemVM, { kind: 'group' }> {
-  if (parent.verb !== 'dms.posted' || !members.length) {
+  if (parent.verb !== 'messages.posted' || !members.length) {
     return parent;
   }
 
@@ -560,162 +422,6 @@ function normalizeChannelGroupedParent(
       summary: messageCount > 1 ? `${messageCount} new messages` : parent.content.summary,
     },
   };
-}
-
-function resolveSessionTimelineLabelFromParent(
-  parent: Extract<ActivityFeedItemVM, { kind: 'group' }>,
-) {
-  const primary = parent.content.headline.primary ?? '';
-  if (primary.startsWith('Class session ')) {
-    return primary.slice('Class session '.length).trim();
-  }
-
-  if (primary === 'Class session') {
-    return undefined;
-  }
-
-  return undefined;
-}
-
-function parseReminderMinutesFromSummaryLeaf(leaf: ActivityFeedLeafItemVM) {
-  const reminderText = `${leaf.content.headline.primary ?? ''} ${leaf.content.summary ?? ''}`;
-  const match = reminderText.match(/(\d+)\s*(mins?|minutes?)\b/i);
-  if (!match) {
-    return undefined;
-  }
-
-  const parsed = Number.parseInt(match[1] ?? '', 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
-}
-
-function resolveJoinedParticipantName(leaf: ActivityFeedLeafItemVM) {
-  const lead = leaf.content.leading;
-  if (lead?.kind === 'avatars' && lead.avatars[0]?.name) {
-    return lead.avatars[0].name;
-  }
-
-  const actorName = leaf.refs.actor?.profile?.displayName;
-  if (actorName) {
-    return actorName;
-  }
-
-  const headline = leaf.content.headline.primary ?? '';
-  const match = headline.match(/^(.+?)\s+joined/i);
-  return match?.[1]?.trim() || undefined;
-}
-
-function normalizeSessionStartedGroupedParent(
-  parent: Extract<ActivityFeedItemVM, { kind: 'group' }>,
-  members: ActivityFeedLeafItemVM[],
-): Extract<ActivityFeedItemVM, { kind: 'group' }> {
-  if (
-    parent.verb !== 'session.started' ||
-    parent.grouping?.groupKey?.startsWith('live-session:') !== true ||
-    !members.length
-  ) {
-    return parent;
-  }
-
-  const joinedLeaves = members.filter((member) => member.verb === 'member.joined');
-  const joinedAvatars = collectUniqueAvatars(
-    joinedLeaves.map((leaf) => leaf.content.leading),
-  );
-  const leading =
-    joinedAvatars.length > 0
-      ? ({
-          kind: 'avatars',
-          avatars: joinedAvatars.slice(0, 3),
-          overflowCount: Math.max(0, joinedAvatars.length - 3),
-        } satisfies InboxLeadingVM)
-      : parent.content.leading;
-
-  const feedbackLeaf = members.find(
-    (member) => member.verb === 'session.feedback_request.sent',
-  );
-  if (feedbackLeaf) {
-    return {
-      ...parent,
-      content: {
-        ...parent.content,
-        leading,
-        summary: "How was today's class, class session feedback is requested",
-      },
-    };
-  }
-
-  if (joinedLeaves.length > 0) {
-    const joinedNames = Array.from(
-      new Set(
-        joinedLeaves
-          .map((leaf) => resolveJoinedParticipantName(leaf))
-          .filter((name): name is string => Boolean(name)),
-      ),
-    );
-
-    const latestJoinedName = joinedNames[0] ?? 'Participant';
-    const summary =
-      joinedNames.length > 1
-        ? `Class session is live ${latestJoinedName} and ${joinedNames.length - 1} of people joined`
-        : `Class session is live ${latestJoinedName} joined`;
-
-    return {
-      ...parent,
-      content: {
-        ...parent.content,
-        leading,
-        summary,
-      },
-    };
-  }
-
-  const reminderLeaf = members.find((member) => member.verb === 'session.reminder.sent');
-  if (reminderLeaf) {
-    const minutes = parseReminderMinutesFromSummaryLeaf(reminderLeaf);
-    const timelineLabel = resolveSessionTimelineLabelFromParent(parent);
-    if (minutes && timelineLabel) {
-      return {
-        ...parent,
-        content: {
-          ...parent.content,
-          leading,
-          summary: `Class session ${timelineLabel} will start in ${minutes} mins`,
-        },
-      };
-    }
-  }
-
-  if (leading !== parent.content.leading) {
-    return {
-      ...parent,
-      content: {
-        ...parent.content,
-        leading,
-      },
-    };
-  }
-
-  return parent;
-}
-
-function collectActivityReadItemIds(items: ActivityFeedLeafItemVM[], fallbackId: string) {
-  const ids = new Set<string>();
-  for (const item of items) {
-    const metadataReadIds = Array.isArray(item.metadata?.readItemIds)
-      ? item.metadata.readItemIds
-      : [];
-    for (const id of metadataReadIds) {
-      if (typeof id === 'string' && id.length > 0) {
-        ids.add(id);
-      }
-    }
-    ids.add(item.ids.id);
-  }
-
-  if (!ids.size) {
-    ids.add(fallbackId);
-  }
-
-  return Array.from(ids);
 }
 
 function collectUniqueAvatars(leads: Array<ActivityFeedItemVM['content']['leading']>) {

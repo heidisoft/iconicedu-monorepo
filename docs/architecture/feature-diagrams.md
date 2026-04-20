@@ -1237,7 +1237,7 @@ flowchart TD
         SCHED_SVC["Scheduler / Reminder Worker\n(class events, feedback requests)"]
         SESSION_SVC["Live Session Service\n(session.started, session.ended)"]
         WEBHOOK["Provider Webhooks\n(payment, video provider)"]
-        SYSTEM["System Events\n(member.joined, role.changed)"]
+        SYSTEM["System Events\n(member.joined)"]
     end
 
     subgraph PIPELINE["Event Pipeline"]

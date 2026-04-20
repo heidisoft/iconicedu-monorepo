@@ -7,28 +7,12 @@ import type {
 
 describe('ActivityVerbVM', () => {
   it('accepts singular and plural activity verbs', () => {
-    expectTypeOf<'member.invited'>().toMatchTypeOf<ActivityVerbVM>();
-    expectTypeOf<'members.invited'>().toMatchTypeOf<ActivityVerbVM>();
-    expectTypeOf<'class.created'>().toMatchTypeOf<ActivityVerbVM>();
-    expectTypeOf<'classes.created'>().toMatchTypeOf<ActivityVerbVM>();
-    expectTypeOf<'dm.posted'>().toMatchTypeOf<ActivityVerbVM>();
-    expectTypeOf<'dms.posted'>().toMatchTypeOf<ActivityVerbVM>();
-    expectTypeOf<'dm.edited'>().toMatchTypeOf<ActivityVerbVM>();
-    expectTypeOf<'dms.edited'>().toMatchTypeOf<ActivityVerbVM>();
-    expectTypeOf<'dm.deleted'>().toMatchTypeOf<ActivityVerbVM>();
-    expectTypeOf<'dms.deleted'>().toMatchTypeOf<ActivityVerbVM>();
-    expectTypeOf<'dm.reaction.added'>().toMatchTypeOf<ActivityVerbVM>();
-    expectTypeOf<'dms.reactions.added'>().toMatchTypeOf<ActivityVerbVM>();
-    expectTypeOf<'dm.reaction.removed'>().toMatchTypeOf<ActivityVerbVM>();
-    expectTypeOf<'dms.reactions.removed'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'message.posted'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'messages.posted'>().toMatchTypeOf<ActivityVerbVM>();
-    expectTypeOf<'summary.posted'>().toMatchTypeOf<ActivityVerbVM>();
-    expectTypeOf<'summaries.posted'>().toMatchTypeOf<ActivityVerbVM>();
+    expectTypeOf<'class.session.rescheduled'>().toMatchTypeOf<ActivityVerbVM>();
+    expectTypeOf<'class.sessions.canceled'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'session.feedback_request.sent'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'sessions.feedback_request.sent'>().toMatchTypeOf<ActivityVerbVM>();
-    expectTypeOf<'system.notice'>().toMatchTypeOf<ActivityVerbVM>();
-    expectTypeOf<'systems.notice'>().toMatchTypeOf<ActivityVerbVM>();
   });
 
   it('supports activity suppression rule types', () => {

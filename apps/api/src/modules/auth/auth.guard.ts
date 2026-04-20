@@ -5,6 +5,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { AuthService } from '@iconicedu/api/modules/auth/auth.service';
+import { updateRequestContext } from '@iconicedu/api/observability/request-context';
 import type { JwtPayload } from 'jsonwebtoken';
 
 type SupabaseJwtPayload = JwtPayload & {
@@ -37,6 +38,10 @@ export class AuthGuard implements CanActivate {
       id: decoded.sub,
       role: decoded.user_metadata?.app_role ?? 'guardian',
     };
+    updateRequestContext({
+      authUserId: decoded.sub,
+      userRole: decoded.user_metadata?.app_role ?? 'guardian',
+    });
 
     return true;
   }

@@ -30,9 +30,15 @@ jest.mock('@/lib/supabase/client', () => ({
 }));
 
 const mockApiPost = jest.fn();
+const mockApiGet = jest.fn();
+const mockApiDelete = jest.fn();
+const mockApiPut = jest.fn();
 
 jest.mock('@/lib/api/http-client', () => ({
   apiPost: (...args: unknown[]) => mockApiPost(...args),
+  apiGet: (...args: unknown[]) => mockApiGet(...args),
+  apiDelete: (...args: unknown[]) => mockApiDelete(...args),
+  apiPut: (...args: unknown[]) => mockApiPut(...args),
 }));
 
 // Build a chainable Supabase query mock that resolves at .order()
@@ -128,33 +134,19 @@ describe('fetchSpaceSchedulesByChannelId', () => {
     jest.clearAllMocks();
   });
 
-  it('queries class_schedules table with correct filters', async () => {
-    const chain = createQueryChain({ data: [], error: null });
-    mockFrom.mockReturnValue(chain);
+  it('calls the schedules API with channel and org filters', async () => {
+    mockApiGet.mockResolvedValue([]);
 
     await fetchSpaceSchedulesByChannelId(CHANNEL_ID, ORG_ID);
 
-    expect(mockFrom).toHaveBeenCalledWith('class_schedules');
-    expect(chain.eq).toHaveBeenCalledWith('org_id', ORG_ID);
-    expect(chain.eq).toHaveBeenCalledWith('source_kind', 'class_session');
-    expect(chain.eq).toHaveBeenCalledWith('source_channel_id', CHANNEL_ID);
-    expect(chain.is).toHaveBeenCalledWith('deleted_at', null);
-    expect(chain.order).toHaveBeenCalledWith('start_at', { ascending: true });
-  });
-
-  it('never queries learning_space_channels table', async () => {
-    const chain = createQueryChain({ data: [], error: null });
-    mockFrom.mockReturnValue(chain);
-
-    await fetchSpaceSchedulesByChannelId(CHANNEL_ID, ORG_ID);
-
-    const queriedTables = mockFrom.mock.calls.map(([t]: [string]) => t);
-    expect(queriedTables).not.toContain('learning_space_channels');
+    expect(mockApiGet).toHaveBeenCalledWith('/schedules', {
+      orgId: ORG_ID,
+      channelId: CHANNEL_ID,
+    });
   });
 
   it('returns empty array when there are no matching schedules', async () => {
-    const chain = createQueryChain({ data: [], error: null });
-    mockFrom.mockReturnValue(chain);
+    mockApiGet.mockResolvedValue([]);
 
     const result = await fetchSpaceSchedulesByChannelId(CHANNEL_ID, ORG_ID);
 
@@ -162,8 +154,7 @@ describe('fetchSpaceSchedulesByChannelId', () => {
   });
 
   it('maps a schedule row to ClassScheduleVM', async () => {
-    const chain = createQueryChain({ data: [minimalRow], error: null });
-    mockFrom.mockReturnValue(chain);
+    mockApiGet.mockResolvedValue([minimalRow]);
 
     const result = await fetchSpaceSchedulesByChannelId(CHANNEL_ID, ORG_ID);
 
@@ -206,8 +197,7 @@ describe('fetchSpaceSchedulesByChannelId', () => {
         },
       ],
     };
-    const chain = createQueryChain({ data: [rowWithRecurrence], error: null });
-    mockFrom.mockReturnValue(chain);
+    mockApiGet.mockResolvedValue([rowWithRecurrence]);
 
     const result = await fetchSpaceSchedulesByChannelId(CHANNEL_ID, ORG_ID);
 
@@ -250,8 +240,7 @@ describe('fetchSpaceSchedulesByChannelId', () => {
         },
       ],
     };
-    const chain = createQueryChain({ data: [rowWithParticipants], error: null });
-    mockFrom.mockReturnValue(chain);
+    mockApiGet.mockResolvedValue([rowWithParticipants]);
 
     const result = await fetchSpaceSchedulesByChannelId(CHANNEL_ID, ORG_ID);
 
@@ -270,18 +259,15 @@ describe('fetchSpaceSchedulesByChannelId', () => {
   });
 
   it('handles null data gracefully', async () => {
-    const chain = createQueryChain({ data: null, error: null });
-    mockFrom.mockReturnValue(chain);
+    mockApiGet.mockResolvedValue(null);
 
     const result = await fetchSpaceSchedulesByChannelId(CHANNEL_ID, ORG_ID);
 
     expect(result).toEqual([]);
   });
 
-  it('throws when supabase returns an error', async () => {
-    const dbError = new Error('Connection refused');
-    const chain = createQueryChain({ data: null, error: dbError });
-    mockFrom.mockReturnValue(chain);
+  it('throws when the schedules API returns an error', async () => {
+    mockApiGet.mockRejectedValue(new Error('Connection refused'));
 
     await expect(fetchSpaceSchedulesByChannelId(CHANNEL_ID, ORG_ID)).rejects.toThrow(
       'Connection refused',
@@ -294,15 +280,11 @@ describe('cancelRecurringSessionOccurrence', () => {
     jest.clearAllMocks();
   });
 
-  it('inserts a recurrence exception row and returns the inserted occurrence info', async () => {
-    const chain = createInsertSingleChain({
-      data: {
-        occurrence_key: '2026-03-10T14:30:00.000Z',
-        reason: 'Staffing conflict',
-      },
-      error: null,
+  it('posts a recurrence exception through the API and returns the inserted occurrence info', async () => {
+    mockApiPost.mockResolvedValue({
+      occurrence_key: '2026-03-10T14:30:00.000Z',
+      reason: 'Staffing conflict',
     });
-    mockFrom.mockReturnValue(chain);
 
     const result = await cancelRecurringSessionOccurrence({
       orgId: ORG_ID,
@@ -311,11 +293,10 @@ describe('cancelRecurringSessionOccurrence', () => {
       reason: 'Staffing conflict',
     });
 
-    expect(mockFrom).toHaveBeenCalledWith('class_schedule_recurrence_exceptions');
-    expect(chain.insert).toHaveBeenCalledWith({
-      org_id: ORG_ID,
-      recurrence_id: 'rec-1',
-      occurrence_key: '2026-03-10T14:30:00.000Z',
+    expect(mockApiPost).toHaveBeenCalledWith('/schedules/exceptions', {
+      orgId: ORG_ID,
+      scheduleId: 'rec-1',
+      date: '2026-03-10T14:30:00.000Z',
       reason: 'Staffing conflict',
     });
     expect(result).toEqual({
@@ -470,19 +451,6 @@ describe('sendFilesMessage', () => {
 
 // ─── fetchActivityFeed ─────────────────────────────────────────────────────────
 
-// Chain mock that resolves at .returns() (used by fetchActivityFeed)
-function createReturnsChain(resolvedValue: { data: unknown; error: unknown }) {
-  const chain: Record<string, jest.Mock> = {};
-  const returnChain = () => chain;
-  chain.select = jest.fn(returnChain);
-  chain.eq = jest.fn(returnChain);
-  chain.is = jest.fn(returnChain);
-  chain.order = jest.fn(returnChain);
-  chain.in = jest.fn(returnChain);
-  chain.returns = jest.fn().mockResolvedValue(resolvedValue);
-  return chain;
-}
-
 const ORG_ID_FEED = 'org-feed-1';
 const PROFILE_ID = 'profile-1';
 
@@ -517,241 +485,79 @@ const leafRow = {
   deleted_at: null,
 };
 
-const groupRow = {
-  ...leafRow,
-  id: 'item-2',
-  kind: 'group',
-  tab_key: 'classes',
-  verb: 'class.session.scheduled',
-  group_key: 'sessions-week',
-  group_type: 'class',
-  sub_activity_count: 2,
-  is_collapsed: true,
-  content: { headline: { primary: '2 Scheduled Sessions' } },
-};
-
-const memberRow1 = {
-  id: 'mem-1',
-  org_id: ORG_ID_FEED,
-  group_id: 'item-2',
-  item_id: 'item-1',
-  updated_at: new Date().toISOString(),
-  deleted_at: null,
-};
-
 describe('fetchActivityFeed', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it('queries activity_feed_items with org and profile filters', async () => {
-    const itemsChain = createReturnsChain({ data: [], error: null });
-    mockFrom.mockReturnValue(itemsChain);
+  it('calls the activity-feed API with org and profile filters', async () => {
+    mockApiGet.mockResolvedValue({
+      sections: [],
+      unreadCount: 0,
+      activeTab: 'all',
+      tabs: [],
+    });
 
     await fetchActivityFeed(ORG_ID_FEED, PROFILE_ID);
 
-    expect(mockFrom).toHaveBeenCalledWith('activity_feed_items');
-    expect(itemsChain.eq).toHaveBeenCalledWith('org_id', ORG_ID_FEED);
-    expect(itemsChain.eq).toHaveBeenCalledWith('recipient_profile_id', PROFILE_ID);
-    expect(itemsChain.is).toHaveBeenCalledWith('deleted_at', null);
-    expect(itemsChain.order).toHaveBeenCalledWith('occurred_at', { ascending: false });
+    expect(mockApiGet).toHaveBeenCalledWith('/activity-feed', {
+      orgId: ORG_ID_FEED,
+      profileId: PROFILE_ID,
+    });
   });
 
-  it('returns empty sections and zero unreadCount when there are no items', async () => {
-    const chain = createReturnsChain({ data: [], error: null });
-    mockFrom.mockReturnValue(chain);
+  it('returns the API payload unchanged for empty feeds', async () => {
+    mockApiGet.mockResolvedValue({
+      sections: [],
+      unreadCount: 0,
+      activeTab: 'all',
+      tabs: [
+        { key: 'all', label: 'All', badgeCount: 0 },
+        { key: 'classes', label: 'Classes', badgeCount: 0 },
+      ],
+    });
 
     const result = await fetchActivityFeed(ORG_ID_FEED, PROFILE_ID);
 
     expect(result.sections).toEqual([]);
     expect(result.unreadCount).toBe(0);
     expect(result.activeTab).toBe('all');
-    expect(result.tabs).toHaveLength(4);
+    expect(result.tabs).toHaveLength(2);
   });
 
-  it('maps a leaf item into the correct section', async () => {
-    const chain = createReturnsChain({ data: [leafRow], error: null });
-    mockFrom.mockReturnValue(chain);
+  it('returns hydrated feed payloads from the API unchanged', async () => {
+    mockApiGet.mockResolvedValue({
+      sections: [
+        {
+          id: 'today',
+          label: 'Today',
+          items: [
+            {
+              ...leafRow,
+              ids: { id: 'item-1', orgId: ORG_ID_FEED },
+              state: { isRead: false },
+            },
+          ],
+        },
+      ],
+      unreadCount: 1,
+      activeTab: 'all',
+      tabs: [
+        { key: 'all', label: 'All', badgeCount: 1 },
+        { key: 'classes', label: 'Classes', badgeCount: 1 },
+      ],
+    });
 
     const result = await fetchActivityFeed(ORG_ID_FEED, PROFILE_ID);
 
     expect(result.sections).toHaveLength(1);
-    expect(result.sections[0]!.label).toBe('Today');
-    expect(result.sections[0]!.items).toHaveLength(1);
-    expect(result.sections[0]!.items[0]).toMatchObject({
-      kind: 'leaf',
-      ids: { id: 'item-1', orgId: ORG_ID_FEED },
-      tabKey: 'classes',
-      verb: 'summary.posted',
-      content: { headline: { primary: 'Priya posted a session summary' } },
-      state: { isRead: false },
-    });
-  });
-
-  it('preserves activity metadata used by the mobile inbox renderer', async () => {
-    const chain = createReturnsChain({
-      data: [
-        {
-          ...groupRow,
-          metadata: {
-            sessionGroupLocalTime: true,
-            occurrenceStart: '2026-03-19T22:00:00.000Z',
-            timezone: 'America/New_York',
-          },
-        },
-      ],
-      error: null,
-    });
-    mockFrom.mockReturnValue(chain);
-
-    const result = await fetchActivityFeed(ORG_ID_FEED, PROFILE_ID);
-    const item = result.sections[0]?.items[0];
-
-    expect(item?.metadata).toMatchObject({
-      sessionGroupLocalTime: true,
-      occurrenceStart: '2026-03-19T22:00:00.000Z',
-      timezone: 'America/New_York',
-    });
-  });
-
-  it('hydrates saved feedback into feedback request activity metadata on load', async () => {
-    const feedbackActivityRow = {
-      ...leafRow,
-      verb: 'session.feedback_request.sent',
-      source_event_id: '11111111-1111-4111-8111-111111111111',
-      metadata: {
-        sourceEventId: '11111111-1111-4111-8111-111111111111',
-        classSessionId: '33333333-3333-4333-8333-333333333333',
-        classroomId: '44444444-4444-4444-8444-444444444444',
-        channelId: '55555555-5555-4555-8555-555555555555',
-        occurrenceStart: '2026-03-16T10:00:00.000Z',
-      },
-    };
-    const itemsChain = createReturnsChain({ data: [feedbackActivityRow], error: null });
-    const feedbackBySessionChain = createReturnsChain({
-      data: [
-        {
-          class_session_id: '33333333-3333-4333-8333-333333333333',
-          source_event_id: '11111111-1111-4111-8111-111111111111',
-          message_id: '22222222-2222-4222-8222-222222222222',
-          rating: 4,
-          comment: 'Helpful session.',
-          submitted_at: '2026-03-16T10:05:00.000Z',
-        },
-      ],
-      error: null,
-    });
-    const feedbackByEventChain = createReturnsChain({ data: [], error: null });
-
-    mockFrom
-      .mockReturnValueOnce(itemsChain)
-      .mockReturnValueOnce(feedbackBySessionChain)
-      .mockReturnValueOnce(feedbackByEventChain);
-
-    const result = await fetchActivityFeed(ORG_ID_FEED, PROFILE_ID);
-    const item = result.sections[0]?.items[0];
-
-    expect(mockFrom).toHaveBeenNthCalledWith(2, 'class_session_feedback');
-    expect(mockFrom).toHaveBeenNthCalledWith(3, 'class_session_feedback');
-    expect(item?.metadata).toMatchObject({
-      feedbackResponse: {
-        sourceEventId: '11111111-1111-4111-8111-111111111111',
-        classSessionId: '33333333-3333-4333-8333-333333333333',
-        messageId: '22222222-2222-4222-8222-222222222222',
-        rating: 4,
-        comment: 'Helpful session.',
-        submittedAt: '2026-03-16T10:05:00.000Z',
-      },
-    });
-  });
-
-  it('hydrates refs.actor from actor_profile_id when profile data is available', async () => {
-    const actorRow = {
-      ...leafRow,
-      actor_profile_id: 'actor-1',
-      refs: {},
-    };
-    const itemsChain = createReturnsChain({ data: [actorRow], error: null });
-    const profilesChain = createReturnsChain({
-      data: [
-        {
-          id: 'actor-1',
-          display_name: 'Denise Richards',
-          first_name: 'Denise',
-          last_name: 'Richards',
-          avatar_url: null,
-          avatar_seed: 'seed-denise',
-          kind: 'educator',
-        },
-      ],
-      error: null,
-    });
-    mockFrom.mockReturnValueOnce(itemsChain).mockReturnValueOnce(profilesChain);
-
-    const result = await fetchActivityFeed(ORG_ID_FEED, PROFILE_ID);
-    const item = result.sections[0]?.items[0];
-
-    expect(mockFrom).toHaveBeenNthCalledWith(1, 'activity_feed_items');
-    expect(mockFrom).toHaveBeenNthCalledWith(2, 'profiles');
-    expect(profilesChain.eq).toHaveBeenCalledWith('org_id', ORG_ID_FEED);
-    expect(profilesChain.in).toHaveBeenCalledWith('id', ['actor-1']);
-    expect(profilesChain.is).toHaveBeenCalledWith('deleted_at', null);
-    expect(item?.refs.actor).toMatchObject({
-      ids: { id: 'actor-1', orgId: ORG_ID_FEED },
-      kind: 'educator',
-      profile: {
-        displayName: 'Denise Richards',
-        avatar: { source: 'seed', seed: 'seed-denise' },
-      },
-    });
-  });
-
-  it('counts unread items correctly', async () => {
-    const chain = createReturnsChain({ data: [leafRow], error: null });
-    mockFrom.mockReturnValue(chain);
-
-    const result = await fetchActivityFeed(ORG_ID_FEED, PROFILE_ID);
-
+    expect(result.sections[0]?.label).toBe('Today');
     expect(result.unreadCount).toBe(1);
-    const classesTab = result.tabs.find((t) => t.key === 'classes');
-    expect(classesTab?.badgeCount).toBe(1);
-    const allTab = result.tabs.find((t) => t.key === 'all');
-    expect(allTab?.badgeCount).toBe(1);
+    expect(result.tabs.find((tab) => tab.key === 'classes')?.badgeCount).toBe(1);
   });
 
-  it('does not query group_members when there are no group items', async () => {
-    const chain = createReturnsChain({ data: [leafRow], error: null });
-    mockFrom.mockReturnValue(chain);
-
-    await fetchActivityFeed(ORG_ID_FEED, PROFILE_ID);
-
-    const queriedTables = mockFrom.mock.calls.map(([t]: [string]) => t);
-    expect(queriedTables).not.toContain('activity_feed_group_members');
-  });
-
-  it('attaches sub-activities to group items and removes them from top level', async () => {
-    const itemsChain = createReturnsChain({ data: [leafRow, groupRow], error: null });
-    const membersChain = createReturnsChain({ data: [memberRow1], error: null });
-    mockFrom
-      .mockReturnValueOnce(itemsChain) // activity_feed_items
-      .mockReturnValueOnce(membersChain); // activity_feed_group_members
-
-    const result = await fetchActivityFeed(ORG_ID_FEED, PROFILE_ID);
-
-    const topLevelItems = result.sections.flatMap((s) => s.items);
-    // leaf (item-1) is a member of group (item-2), so only the group appears at top level
-    expect(topLevelItems).toHaveLength(1);
-    expect(topLevelItems[0]!.kind).toBe('group');
-    expect(topLevelItems[0]!.ids.id).toBe('item-2');
-
-    const groupItem = topLevelItems[0] as { subActivities?: { items: unknown[] } };
-    expect(groupItem.subActivities?.items).toHaveLength(1);
-  });
-
-  it('throws when activity_feed_items query returns an error', async () => {
-    const dbError = new Error('DB error');
-    const chain = createReturnsChain({ data: null, error: dbError });
-    mockFrom.mockReturnValue(chain);
+  it('throws when the activity-feed API returns an error', async () => {
+    mockApiGet.mockRejectedValue(new Error('DB error'));
 
     await expect(fetchActivityFeed(ORG_ID_FEED, PROFILE_ID)).rejects.toThrow('DB error');
   });
@@ -759,371 +565,96 @@ describe('fetchActivityFeed', () => {
 
 // ─── toggleReaction ────────────────────────────────────────────────────────────
 
-function createMaybeSingleChain(resolvedValue: { data: unknown; error: unknown }) {
-  const chain: Record<string, jest.Mock> = {};
-  const returnChain = () => chain;
-  chain.select = jest.fn(returnChain);
-  chain.eq = jest.fn(returnChain);
-  chain.is = jest.fn(returnChain);
-  chain.maybeSingle = jest.fn().mockResolvedValue(resolvedValue);
-  return chain;
-}
-
-// Thenable chain: all builder methods return self; awaiting the chain resolves
-// with resolvedValue. Handles DML operations (insert/update/delete) with any
-// number of chained .eq() calls.
-function createThenableChain(resolvedValue: { error: unknown } = { error: null }) {
-  type ThenableChain = {
-    delete: jest.Mock<ThenableChain, []>;
-    insert: jest.Mock<ThenableChain, []>;
-    update: jest.Mock<ThenableChain, []>;
-    eq: jest.Mock<ThenableChain, []>;
-    is: jest.Mock<ThenableChain, []>;
-    then: PromiseLike<{ error: unknown }>['then'];
-  };
-  const chain = {} as ThenableChain;
-  const returnChain = () => chain;
-  chain.delete = jest.fn(returnChain);
-  chain.insert = jest.fn(returnChain);
-  chain.update = jest.fn(returnChain);
-  chain.eq = jest.fn(returnChain);
-  chain.is = jest.fn(returnChain);
-  chain.then = (
-    resolve: (value: unknown) => unknown,
-    reject?: (reason: unknown) => unknown,
-  ) => Promise.resolve(resolvedValue).then(resolve, reject);
-  return chain;
-}
-
 const MSG_ID = 'msg-1';
 const ACCOUNT_ID = 'acct-1';
+const REACTION_PROFILE_ID = 'profile-1';
 const EMOJI = '👍';
 const ORG = 'org-1';
 
 describe('toggleReaction', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockApiPost.mockResolvedValue(undefined);
+    mockApiDelete.mockResolvedValue(undefined);
   });
 
-  it('adds a reaction and inserts a new count row when no count row exists', async () => {
-    const noExistingReaction = createMaybeSingleChain({ data: null, error: null });
-    const noExistingCount = createMaybeSingleChain({ data: null, error: null });
+  it('calls apiPost /reactions when reactedByMe is false', async () => {
+    await toggleReaction(MSG_ID, ACCOUNT_ID, REACTION_PROFILE_ID, EMOJI, ORG, false);
 
-    const insertReactionChain = createThenableChain();
-    const insertCountChain = createThenableChain();
-
-    mockFrom
-      .mockReturnValueOnce(noExistingReaction) // message_reactions select
-      .mockReturnValueOnce(noExistingCount) // message_reaction_counts select
-      .mockReturnValueOnce(insertReactionChain) // message_reactions insert
-      .mockReturnValueOnce(insertCountChain); // message_reaction_counts insert
-
-    await toggleReaction(MSG_ID, ACCOUNT_ID, EMOJI, ORG);
-
-    expect(insertReactionChain.insert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        message_id: MSG_ID,
-        account_id: ACCOUNT_ID,
-        emoji: EMOJI,
-        org_id: ORG,
-      }),
-    );
-    expect(insertCountChain.insert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        message_id: MSG_ID,
-        emoji: EMOJI,
-        org_id: ORG,
-        count: 1,
-      }),
-    );
+    expect(mockApiPost).toHaveBeenCalledWith('/reactions', {
+      orgId: ORG,
+      messageId: MSG_ID,
+      emoji: EMOJI,
+      accountId: ACCOUNT_ID,
+      profileId: REACTION_PROFILE_ID,
+    });
+    expect(mockApiDelete).not.toHaveBeenCalled();
   });
 
-  it('adds a reaction and increments an existing count row', async () => {
-    const noExistingReaction = createMaybeSingleChain({ data: null, error: null });
-    const existingCount = createMaybeSingleChain({
-      data: { id: 'cnt-1', count: 3 },
-      error: null,
+  it('calls apiDelete /reactions when reactedByMe is true', async () => {
+    await toggleReaction(MSG_ID, ACCOUNT_ID, REACTION_PROFILE_ID, EMOJI, ORG, true);
+
+    expect(mockApiDelete).toHaveBeenCalledWith('/reactions', {
+      orgId: ORG,
+      messageId: MSG_ID,
+      emoji: EMOJI,
+      accountId: ACCOUNT_ID,
+      profileId: REACTION_PROFILE_ID,
     });
-
-    const insertReactionChain = createThenableChain();
-    const updateCountChain = createThenableChain();
-
-    mockFrom
-      .mockReturnValueOnce(noExistingReaction)
-      .mockReturnValueOnce(existingCount)
-      .mockReturnValueOnce(insertReactionChain)
-      .mockReturnValueOnce(updateCountChain);
-
-    await toggleReaction(MSG_ID, ACCOUNT_ID, EMOJI, ORG);
-
-    expect(insertReactionChain.insert).toHaveBeenCalled();
-    expect(updateCountChain.update).toHaveBeenCalledWith({ count: 4 });
-  });
-
-  it('removes a reaction and decrements the count row', async () => {
-    const existingReaction = createMaybeSingleChain({
-      data: { id: 'rxn-1' },
-      error: null,
-    });
-    const existingCount = createMaybeSingleChain({
-      data: { id: 'cnt-1', count: 3 },
-      error: null,
-    });
-
-    const deleteReactionChain = createThenableChain();
-    const updateCountChain = createThenableChain();
-
-    mockFrom
-      .mockReturnValueOnce(existingReaction)
-      .mockReturnValueOnce(existingCount)
-      .mockReturnValueOnce(deleteReactionChain)
-      .mockReturnValueOnce(updateCountChain);
-
-    await toggleReaction(MSG_ID, ACCOUNT_ID, EMOJI, ORG);
-
-    expect(deleteReactionChain.delete).toHaveBeenCalled();
-    expect(updateCountChain.update).toHaveBeenCalledWith({ count: 2 });
-  });
-
-  it('removes a reaction and deletes the count row when count is 1', async () => {
-    const existingReaction = createMaybeSingleChain({
-      data: { id: 'rxn-1' },
-      error: null,
-    });
-    const existingCount = createMaybeSingleChain({
-      data: { id: 'cnt-1', count: 1 },
-      error: null,
-    });
-
-    const deleteReactionChain = createThenableChain();
-    const deleteCountChain = createThenableChain();
-
-    mockFrom
-      .mockReturnValueOnce(existingReaction)
-      .mockReturnValueOnce(existingCount)
-      .mockReturnValueOnce(deleteReactionChain)
-      .mockReturnValueOnce(deleteCountChain);
-
-    await toggleReaction(MSG_ID, ACCOUNT_ID, EMOJI, ORG);
-
-    expect(deleteReactionChain.delete).toHaveBeenCalled();
-    expect(deleteCountChain.delete).toHaveBeenCalled();
+    expect(mockApiPost).not.toHaveBeenCalled();
   });
 });
 
 // ─── fetchSupervisedDirectMessages ─────────────────────────────────────────────
 
-// Chain that terminates at .is() (used by most supervised query steps)
-function createIsChain(resolvedValue: { data: unknown; error: unknown }) {
-  const chain: Record<string, jest.Mock> = {};
-  const returnChain = () => chain;
-  chain.select = jest.fn(returnChain);
-  chain.eq = jest.fn(returnChain);
-  chain.in = jest.fn(returnChain);
-  chain.order = jest.fn(returnChain);
-  chain.is = jest.fn().mockResolvedValue(resolvedValue);
-  return chain;
-}
-
-// Chain that terminates at .order() with .in() support (used by channels query)
-function createOrderChainWithIn(resolvedValue: { data: unknown; error: unknown }) {
-  const chain: Record<string, jest.Mock> = {};
-  const returnChain = () => chain;
-  chain.select = jest.fn(returnChain);
-  chain.eq = jest.fn(returnChain);
-  chain.in = jest.fn(returnChain);
-  chain.is = jest.fn(returnChain);
-  chain.order = jest.fn().mockResolvedValue(resolvedValue);
-  return chain;
-}
-
 const SUP_ORG = 'org-sup-1';
 const GUARDIAN_ACCOUNT_ID = 'acct-guardian-1';
 const GUARDIAN_PROFILE_ID = 'prof-guardian-1';
-const CHILD_ACCOUNT_ID = 'acct-child-1';
-const CHILD_PROFILE_ID = 'prof-child-1';
 
 describe('fetchSupervisedDirectMessages', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it('returns [] when family_links has no rows', async () => {
-    // Step 1: family_links → empty
-    mockFrom.mockReturnValueOnce(createIsChain({ data: [], error: null }));
+  it('calls the supervised DM API with guardian context', async () => {
+    mockApiGet.mockResolvedValue([]);
 
-    const result = await fetchSupervisedDirectMessages(
+    await fetchSupervisedDirectMessages(
       SUP_ORG,
       GUARDIAN_ACCOUNT_ID,
       GUARDIAN_PROFILE_ID,
     );
-    expect(result).toEqual([]);
+
+    expect(mockApiGet).toHaveBeenCalledWith('/channels/supervised-dms', {
+      orgId: SUP_ORG,
+      guardianAccountId: GUARDIAN_ACCOUNT_ID,
+      guardianProfileId: GUARDIAN_PROFILE_ID,
+    });
   });
 
-  it('returns [] when any required param is empty', async () => {
-    const result = await fetchSupervisedDirectMessages(
-      '',
-      GUARDIAN_ACCOUNT_ID,
-      GUARDIAN_PROFILE_ID,
-    );
-    expect(result).toEqual([]);
-    expect(mockFrom).not.toHaveBeenCalled();
+  it('does not short-circuit empty params and leaves validation to the API', async () => {
+    mockApiGet.mockResolvedValue([]);
+
+    await fetchSupervisedDirectMessages('', GUARDIAN_ACCOUNT_ID, GUARDIAN_PROFILE_ID);
+
+    expect(mockApiGet).toHaveBeenCalledWith('/channels/supervised-dms', {
+      orgId: '',
+      guardianAccountId: GUARDIAN_ACCOUNT_ID,
+      guardianProfileId: GUARDIAN_PROFILE_ID,
+    });
   });
 
-  it('returns [] when child has no DM channels', async () => {
-    // family_links
-    mockFrom.mockReturnValueOnce(
-      createIsChain({ data: [{ child_account_id: CHILD_ACCOUNT_ID }], error: null }),
-    );
-    // child profiles
-    mockFrom.mockReturnValueOnce(
-      createIsChain({
-        data: [
-          {
-            id: CHILD_PROFILE_ID,
-            display_name: 'Alice',
-            first_name: null,
-            last_name: null,
-            account_id: CHILD_ACCOUNT_ID,
-          },
-        ],
-        error: null,
-      }),
-    );
-    // guardian memberships
-    mockFrom.mockReturnValueOnce(createIsChain({ data: [], error: null }));
-    // child memberships → no channels
-    mockFrom.mockReturnValueOnce(createIsChain({ data: [], error: null }));
-
-    const result = await fetchSupervisedDirectMessages(
-      SUP_ORG,
-      GUARDIAN_ACCOUNT_ID,
-      GUARDIAN_PROFILE_ID,
-    );
-    expect(result).toEqual([]);
-  });
-
-  it('excludes channels where guardian is already a member', async () => {
-    const SHARED_CH = 'ch-shared';
-    // family_links
-    mockFrom.mockReturnValueOnce(
-      createIsChain({ data: [{ child_account_id: CHILD_ACCOUNT_ID }], error: null }),
-    );
-    // child profiles
-    mockFrom.mockReturnValueOnce(
-      createIsChain({
-        data: [
-          {
-            id: CHILD_PROFILE_ID,
-            display_name: 'Alice',
-            first_name: null,
-            last_name: null,
-            account_id: CHILD_ACCOUNT_ID,
-          },
-        ],
-        error: null,
-      }),
-    );
-    // guardian memberships — guardian is already in SHARED_CH
-    mockFrom.mockReturnValueOnce(
-      createIsChain({ data: [{ channel_id: SHARED_CH }], error: null }),
-    );
-    // child memberships — only the shared channel
-    mockFrom.mockReturnValueOnce(
-      createIsChain({ data: [{ channel_id: SHARED_CH }], error: null }),
-    );
-    // childOnlyChannelIds would be empty after exclusion → no more calls
-
-    const result = await fetchSupervisedDirectMessages(
-      SUP_ORG,
-      GUARDIAN_ACCOUNT_ID,
-      GUARDIAN_PROFILE_ID,
-    );
-    expect(result).toEqual([]);
-  });
-
-  it('returns supervised channel with is_supervised=true and supervised_child_name', async () => {
-    const SUPERVISED_CH = 'ch-supervised-1';
-    // family_links
-    mockFrom.mockReturnValueOnce(
-      createIsChain({ data: [{ child_account_id: CHILD_ACCOUNT_ID }], error: null }),
-    );
-    // child profiles
-    mockFrom.mockReturnValueOnce(
-      createIsChain({
-        data: [
-          {
-            id: CHILD_PROFILE_ID,
-            display_name: 'Alice',
-            first_name: null,
-            last_name: null,
-            account_id: CHILD_ACCOUNT_ID,
-          },
-        ],
-        error: null,
-      }),
-    );
-    // guardian memberships — guardian is NOT in supervised channel
-    mockFrom.mockReturnValueOnce(createIsChain({ data: [], error: null }));
-    // child memberships
-    mockFrom.mockReturnValueOnce(
-      createIsChain({ data: [{ channel_id: SUPERVISED_CH }], error: null }),
-    );
-    // channels fetch — terminates at .order()
-    mockFrom.mockReturnValueOnce(
-      createOrderChainWithIn({
-        data: [
-          {
-            id: SUPERVISED_CH,
-            org_id: SUP_ORG,
-            topic: null,
-            description: null,
-            kind: 'dm',
-            updated_at: '2026-01-01T00:00:00Z',
-          },
-        ],
-        error: null,
-      }),
-    );
-    // child read state
-    mockFrom.mockReturnValueOnce(
-      createIsChain({
-        data: [{ channel_id: SUPERVISED_CH, unread_count: 0 }],
-        error: null,
-      }),
-    );
-    // member rows for participant display
-    mockFrom.mockReturnValueOnce(
-      createIsChain({
-        data: [
-          {
-            channel_id: SUPERVISED_CH,
-            profile_id: 'prof-teacher-1',
-            profile: {
-              id: 'prof-teacher-1',
-              display_name: 'Ms Smith',
-              first_name: null,
-              last_name: null,
-              avatar_url: null,
-              avatar_seed: null,
-            },
-          },
-          {
-            channel_id: SUPERVISED_CH,
-            profile_id: CHILD_PROFILE_ID,
-            profile: {
-              id: CHILD_PROFILE_ID,
-              display_name: 'Alice',
-              first_name: null,
-              last_name: null,
-              avatar_url: null,
-              avatar_seed: null,
-            },
-          },
-        ],
-        error: null,
-      }),
-    );
+  it('returns the API payload as channel list items', async () => {
+    mockApiGet.mockResolvedValue([
+      {
+        id: 'ch-supervised-1',
+        org_id: SUP_ORG,
+        kind: 'dm',
+        is_supervised: true,
+        supervised_child_name: 'Alice',
+        participants: [{ id: 'prof-teacher-1', display_name: 'Ms Smith' }],
+      },
+    ]);
 
     const result = await fetchSupervisedDirectMessages(
       SUP_ORG,
@@ -1132,108 +663,19 @@ describe('fetchSupervisedDirectMessages', () => {
     );
 
     expect(result).toHaveLength(1);
-    expect(result[0]!.id).toBe(SUPERVISED_CH);
+    expect(result[0]!.id).toBe('ch-supervised-1');
     expect(result[0]!.is_supervised).toBe(true);
     expect(result[0]!.supervised_child_name).toBe('Alice');
-    // Child's own profile excluded from participants; only the teacher remains
     expect(result[0]!.participants).toHaveLength(1);
     expect(result[0]!.participants![0]!.id).toBe('prof-teacher-1');
   });
 
-  it('deduplicates when two children share a supervised channel', async () => {
-    const SUPERVISED_CH = 'ch-shared-children';
-    const CHILD_2_ACCOUNT_ID = 'acct-child-2';
-    const CHILD_2_PROFILE_ID = 'prof-child-2';
+  it('surfaces API failures', async () => {
+    mockApiGet.mockRejectedValue(new Error('Forbidden'));
 
-    // family_links — two children
-    mockFrom.mockReturnValueOnce(
-      createIsChain({
-        data: [
-          { child_account_id: CHILD_ACCOUNT_ID },
-          { child_account_id: CHILD_2_ACCOUNT_ID },
-        ],
-        error: null,
-      }),
-    );
-    // child profiles — both children
-    mockFrom.mockReturnValueOnce(
-      createIsChain({
-        data: [
-          {
-            id: CHILD_PROFILE_ID,
-            display_name: 'Alice',
-            first_name: null,
-            last_name: null,
-            account_id: CHILD_ACCOUNT_ID,
-          },
-          {
-            id: CHILD_2_PROFILE_ID,
-            display_name: 'Bob',
-            first_name: null,
-            last_name: null,
-            account_id: CHILD_2_ACCOUNT_ID,
-          },
-        ],
-        error: null,
-      }),
-    );
-    // guardian memberships — not in supervised channel
-    mockFrom.mockReturnValueOnce(createIsChain({ data: [], error: null }));
-
-    // Child 1 memberships
-    mockFrom.mockReturnValueOnce(
-      createIsChain({ data: [{ channel_id: SUPERVISED_CH }], error: null }),
-    );
-    // channels fetch for child 1
-    mockFrom.mockReturnValueOnce(
-      createOrderChainWithIn({
-        data: [
-          {
-            id: SUPERVISED_CH,
-            org_id: SUP_ORG,
-            topic: null,
-            description: null,
-            kind: 'dm',
-            updated_at: '2026-01-01T00:00:00Z',
-          },
-        ],
-        error: null,
-      }),
-    );
-    // member rows for child 1
-    mockFrom.mockReturnValueOnce(createIsChain({ data: [], error: null }));
-
-    // Child 2 memberships — same channel
-    mockFrom.mockReturnValueOnce(
-      createIsChain({ data: [{ channel_id: SUPERVISED_CH }], error: null }),
-    );
-    // channels fetch for child 2
-    mockFrom.mockReturnValueOnce(
-      createOrderChainWithIn({
-        data: [
-          {
-            id: SUPERVISED_CH,
-            org_id: SUP_ORG,
-            topic: null,
-            description: null,
-            kind: 'dm',
-            updated_at: '2026-01-01T00:00:00Z',
-          },
-        ],
-        error: null,
-      }),
-    );
-    // member rows for child 2
-    mockFrom.mockReturnValueOnce(createIsChain({ data: [], error: null }));
-
-    const result = await fetchSupervisedDirectMessages(
-      SUP_ORG,
-      GUARDIAN_ACCOUNT_ID,
-      GUARDIAN_PROFILE_ID,
-    );
-    // Should appear only once despite being found via two children
-    expect(result).toHaveLength(1);
-    expect(result[0]!.id).toBe(SUPERVISED_CH);
+    await expect(
+      fetchSupervisedDirectMessages(SUP_ORG, GUARDIAN_ACCOUNT_ID, GUARDIAN_PROFILE_ID),
+    ).rejects.toThrow('Forbidden');
   });
 });
 

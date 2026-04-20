@@ -16,8 +16,9 @@ import type {
   ClassSessionFeedbackRow,
   UserProfileVM,
 } from '@iconicedu/shared-types';
-import { supabase } from '@/lib/supabase/client';
+import { apiGet, apiPost } from '@/lib/api/http-client';
 import { buildSenderProfile } from '@/lib/api/map-row-to-vm';
+import { supabase } from '@/lib/supabase/client';
 
 const ACTIVITY_FEED_ITEM_SELECT = [
   'id',
@@ -149,7 +150,10 @@ async function loadActivityFeedActors(
   if (error) throw error;
 
   return new Map(
-    (data ?? []).map((profile) => [profile.id, buildSenderProfile(profile, orgId)]),
+    (data ?? []).map((profile: RawActivityActorProfile) => [
+      profile.id,
+      buildSenderProfile(profile, orgId),
+    ]),
   );
 }
 
@@ -319,10 +323,13 @@ function buildFeedSections(items: ActivityFeedItemVM[]): ActivityFeedSectionVM[]
   const now = new Date();
   const startOfToday = new Date(now);
   startOfToday.setHours(0, 0, 0, 0);
+  const startOfYesterday = new Date(startOfToday);
+  startOfYesterday.setDate(startOfYesterday.getDate() - 1);
   const startOfWeek = new Date(startOfToday);
   startOfWeek.setDate(startOfWeek.getDate() - 7);
 
   const today: ActivityFeedItemVM[] = [];
+  const yesterday: ActivityFeedItemVM[] = [];
   const thisWeek: ActivityFeedItemVM[] = [];
   const older: ActivityFeedItemVM[] = [];
 
@@ -330,6 +337,10 @@ function buildFeedSections(items: ActivityFeedItemVM[]): ActivityFeedSectionVM[]
     const occurredAt = new Date(item.timestamps.occurredAt);
     if (occurredAt >= startOfToday) {
       today.push(item);
+      return;
+    }
+    if (occurredAt >= startOfYesterday) {
+      yesterday.push(item);
       return;
     }
     if (occurredAt >= startOfWeek) {
@@ -341,6 +352,7 @@ function buildFeedSections(items: ActivityFeedItemVM[]): ActivityFeedSectionVM[]
 
   const sections: ActivityFeedSectionVM[] = [];
   if (today.length) sections.push({ label: 'Today', items: today });
+  if (yesterday.length) sections.push({ label: 'Yesterday', items: yesterday });
   if (thisWeek.length) sections.push({ label: 'This week', items: thisWeek });
   if (older.length) sections.push({ label: 'Earlier', items: older });
   return sections;
@@ -376,61 +388,7 @@ export async function fetchActivityFeed(
   orgId: string,
   profileId: string,
 ): Promise<ActivityFeedVM> {
-  const { data: itemRows, error: itemsError } = await supabase
-    .from('activity_feed_items')
-    .select(ACTIVITY_FEED_ITEM_SELECT)
-    .eq('org_id', orgId)
-    .eq('recipient_profile_id', profileId)
-    .is('deleted_at', null)
-    .order('occurred_at', { ascending: false })
-    .returns<ActivityFeedItemRow[]>();
-
-  if (itemsError) throw itemsError;
-  const rows = itemRows ?? [];
-  const actorProfiles = await loadActivityFeedActors(orgId, rows);
-
-  const groupIds = rows.filter((row) => row.kind === 'group').map((row) => row.id);
-  let groupMembers: ActivityFeedGroupMemberRow[] = [];
-  if (groupIds.length) {
-    const { data: members, error: membersError } = await supabase
-      .from('activity_feed_group_members')
-      .select(ACTIVITY_FEED_GROUP_MEMBER_SELECT)
-      .eq('org_id', orgId)
-      .in('group_id', groupIds)
-      .is('deleted_at', null)
-      .returns<ActivityFeedGroupMemberRow[]>();
-    if (membersError) throw membersError;
-    groupMembers = members ?? [];
-  }
-
-  const mappedItems = rows.map((row) => {
-    const item = mapFeedRow(row);
-    const hydratedActor = row.actor_profile_id
-      ? actorProfiles.get(row.actor_profile_id)
-      : null;
-    if (!hydratedActor) return item;
-
-    return {
-      ...item,
-      refs: {
-        ...item.refs,
-        actor: hydratedActor,
-      },
-    } as ActivityFeedItemVM;
-  });
-  const feedbackItems = await attachFeedbackResponses(orgId, profileId, mappedItems);
-  const groupedItems = attachFeedGroupMembers(feedbackItems, groupMembers);
-  const sections = buildFeedSections(groupedItems);
-  const tabs = buildFeedTabs(feedbackItems);
-  const unreadCount = feedbackItems.filter((item) => !item.state?.isRead).length;
-
-  return {
-    activeTab: 'all',
-    tabs,
-    sections,
-    nextCursor: null,
-    unreadCount,
-  };
+  return apiGet('/activity-feed', { orgId, profileId });
 }
 
 export async function markActivityFeedRead(
@@ -439,25 +397,5 @@ export async function markActivityFeedRead(
   ids: string[],
 ): Promise<void> {
   if (!ids.length) return;
-
-  const { data: members } = await supabase
-    .from('activity_feed_group_members')
-    .select('item_id')
-    .eq('org_id', orgId)
-    .in('group_id', ids);
-
-  const childIds = (members ?? []).map((member) => member.item_id as string);
-  const allIds = [...new Set([...ids, ...childIds])];
-
-  await supabase
-    .from('activity_feed_items')
-    .update({
-      is_read: true,
-      read_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      updated_by: profileId,
-    })
-    .eq('org_id', orgId)
-    .eq('recipient_profile_id', profileId)
-    .in('id', allIds);
+  await apiPost('/activity-feed/read', { orgId, profileId, ids });
 }

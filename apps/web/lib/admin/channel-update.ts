@@ -2,19 +2,13 @@ import { randomUUID } from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { ChannelCreatePayload, ChannelCapabilityVM } from '@iconicedu/shared-types';
-import { publishActivityEvent } from '@iconicedu/web/lib/activity-feed/publisher/activity-publisher';
-import { ensureSystemProfileId } from '@iconicedu/web/lib/automation/system-profile';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
-import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { requireParentActorContext } from '@iconicedu/web/lib/family-view/actor-context';
 import { toStoredLiveSessionConfig } from '@iconicedu/web/lib/admin/live-session-config';
 
 export async function updateChannelFromPayload(
   channelId: string,
   payload: ChannelCreatePayload,
-  options?: {
-    sendActivityNotifications?: boolean;
-  },
 ) {
   const supabase = await createSupabaseServerClient();
   const {
@@ -29,7 +23,6 @@ export async function updateChannelFromPayload(
 
   const orgId = actor.account.org_id;
   const now = new Date().toISOString();
-  const shouldSendActivityNotifications = options?.sendActivityNotifications ?? true;
   const { data: existingChannel, error: existingChannelError } = await supabase
     .from('channels')
     .select(
@@ -203,29 +196,6 @@ export async function updateChannelFromPayload(
     createdAt: now,
     capabilities: payload.capabilities ?? [],
   });
-
-  if (shouldSendActivityNotifications && changeSummaryParts.length > 0) {
-    const serviceClient = createSupabaseServiceClient();
-    const systemProfileId = await ensureSystemProfileId(serviceClient, orgId);
-
-    await publishActivityEvent({
-      supabase: serviceClient,
-      orgId,
-      eventType: 'channel.updated',
-      occurredAt: now,
-      sourceKind: 'system',
-      actorProfileId: systemProfileId,
-      scope: { kind: 'channel', channelId },
-      payload: {
-        channelId,
-        channelTopic: payload.basics.topic,
-        channelRouteKind: 'channel',
-        changeSummary: changeSummaryParts.join(', '),
-      },
-      dedupeKey: `channel.updated:${channelId}:${now}`,
-      createdBy: systemProfileId,
-    });
-  }
 }
 
 type UpdateChannelPayload = {

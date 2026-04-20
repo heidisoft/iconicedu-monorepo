@@ -6,14 +6,13 @@ import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
 import { getAccountByAuthUserIdInOrg } from '@iconicedu/web/lib/accounts/queries/accounts.query';
-import { publishCancelledClassSessionActivity } from '@iconicedu/web/lib/class-schedule/session-activities';
+import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
 
 export type CancelClassScheduleSessionActionInput = {
   orgSlug: string;
   scheduleId: string;
   occurrenceKey: string;
   reason?: string | null;
-  sendActivityNotifications?: boolean;
 };
 
 export type CancelClassScheduleSessionActionResult = {
@@ -50,6 +49,12 @@ export async function cancelClassScheduleSessionAction(
     account.primary_role === 'staff' || account.primary_role === 'owner';
   if (!canManageSessions) {
     throw new Error('Only staff or owner users can cancel sessions.');
+  }
+
+  const profileResponse = await getProfileByAccountId(supabase, account.id);
+  const actorProfile = profileResponse.data;
+  if (!actorProfile) {
+    throw new Error('Profile record not found');
   }
 
   const serviceSupabase = createSupabaseServiceClient();
@@ -100,7 +105,7 @@ export async function cancelClassScheduleSessionAction(
       .update({
         status: 'cancelled',
         updated_at: timestamp,
-        updated_by: account.id,
+        updated_by: actorProfile.id,
       })
       .eq('id', input.scheduleId)
       .eq('org_id', org.id)
@@ -108,25 +113,6 @@ export async function cancelClassScheduleSessionAction(
 
     if (updateError) {
       throw new Error(updateError.message);
-    }
-
-    if (
-      input.sendActivityNotifications !== false &&
-      scheduleRow.source_learning_space_id &&
-      scheduleRow.source_channel_id
-    ) {
-      await publishCancelledClassSessionActivity({
-        supabase: serviceSupabase,
-        orgId: org.id,
-        learningSpaceId: scheduleRow.source_learning_space_id,
-        channelId: scheduleRow.source_channel_id,
-        scheduleId: input.scheduleId,
-        title: scheduleRow.title,
-        canceledStartAt: scheduleRow.start_at,
-        timezone: scheduleRow.timezone,
-        canceledReason: reason,
-        occurredAt: timestamp,
-      });
     }
 
     revalidatePath(`/${input.orgSlug}/class-schedule`);
@@ -168,7 +154,7 @@ export async function cancelClassScheduleSessionAction(
       .update({
         reason,
         updated_at: timestamp,
-        updated_by: account.id,
+        updated_by: actorProfile.id,
       })
       .eq('id', existingException.id)
       .eq('org_id', org.id);
@@ -186,33 +172,14 @@ export async function cancelClassScheduleSessionAction(
         occurrence_key: input.occurrenceKey,
         reason,
         created_at: timestamp,
-        created_by: account.id,
+        created_by: actorProfile.id,
         updated_at: timestamp,
-        updated_by: account.id,
+        updated_by: actorProfile.id,
       });
 
     if (insertExceptionError) {
       throw new Error(insertExceptionError.message);
     }
-  }
-
-  if (
-    input.sendActivityNotifications !== false &&
-    scheduleRow.source_learning_space_id &&
-    scheduleRow.source_channel_id
-  ) {
-    await publishCancelledClassSessionActivity({
-      supabase: serviceSupabase,
-      orgId: org.id,
-      learningSpaceId: scheduleRow.source_learning_space_id,
-      channelId: scheduleRow.source_channel_id,
-      scheduleId: input.scheduleId,
-      title: scheduleRow.title,
-      canceledStartAt: input.occurrenceKey,
-      timezone: scheduleRow.timezone,
-      canceledReason: reason,
-      occurredAt: timestamp,
-    });
   }
 
   revalidatePath(`/${input.orgSlug}/class-schedule`);

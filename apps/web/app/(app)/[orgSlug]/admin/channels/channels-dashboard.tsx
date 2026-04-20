@@ -22,11 +22,11 @@ import {
   FieldSeparator,
   Input,
   Label,
+  Checkbox,
   Textarea,
   Plus,
   ParticipantSelector,
   RotateCw,
-  Checkbox,
   Select,
   SelectContent,
   SelectGroup,
@@ -79,7 +79,6 @@ type CreateChannelFormState = {
   postingPolicyKind: ChannelPostingPolicyVM['kind'];
   allowThreads: boolean;
   allowReactions: boolean;
-  sendActivityNotifications: boolean;
   participants: UserProfileVM[];
   capabilities: ChannelCapabilityVM[];
 };
@@ -118,7 +117,6 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
     postingPolicyKind: 'members-only',
     allowThreads: true,
     allowReactions: true,
-    sendActivityNotifications: true,
     participants: [],
     capabilities: [],
   });
@@ -203,7 +201,6 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
       postingPolicyKind: 'members-only',
       allowThreads: true,
       allowReactions: true,
-      sendActivityNotifications: true,
       participants: [],
       capabilities: [],
     });
@@ -230,7 +227,6 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
       postingPolicyKind: detail.postingPolicy.kind,
       allowThreads: detail.postingPolicy.allowThreads ?? true,
       allowReactions: detail.postingPolicy.allowReactions ?? true,
-      sendActivityNotifications: true,
       participants: detail.participants ?? [],
       capabilities: detail.capabilities ?? [],
     });
@@ -305,7 +301,6 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
           ? JSON.stringify({
               channelId: editingId,
               payload: createPayload,
-              sendActivityNotifications: formState.sendActivityNotifications,
             })
           : JSON.stringify(createPayload);
       const response = await fetch(endpoint, {
@@ -647,33 +642,6 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
                     })
                   }
                 />
-                {dialogMode === 'edit' && (
-                  <>
-                    <FieldSeparator />
-                    <FieldSet>
-                      <FieldLegend>Notifications</FieldLegend>
-                      <FieldGroup>
-                        <Label className="flex items-start gap-3 text-sm">
-                          <Checkbox
-                            checked={formState.sendActivityNotifications}
-                            onCheckedChange={(checked) =>
-                              updateFormState({
-                                sendActivityNotifications: checked === true,
-                              })
-                            }
-                          />
-                          <div className="space-y-1">
-                            <span>Send activity notifications for this update</span>
-                            <FieldDescription>
-                              Leave this on to notify channel members about the changes.
-                              Turn it off to update the channel silently.
-                            </FieldDescription>
-                          </div>
-                        </Label>
-                      </FieldGroup>
-                    </FieldSet>
-                  </>
-                )}
                 {createError ? (
                   <p className="text-sm text-destructive">{createError}</p>
                 ) : null}

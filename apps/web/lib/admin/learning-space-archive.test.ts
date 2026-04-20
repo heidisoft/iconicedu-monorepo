@@ -93,21 +93,10 @@ describe('archiveLearningSpace', () => {
     ensureSystemProfileIdMock.mockResolvedValue('system-profile-1');
   });
 
-  it('archives the class and publishes a system archive activity', async () => {
+  it('archives the class without publishing an archive activity', async () => {
     await archiveLearningSpace('space-1');
 
     expect(ensureSystemProfileIdMock).toHaveBeenCalled();
-    expect(publishActivityEventMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        eventType: 'class.archived',
-        sourceKind: 'system',
-        actorProfileId: 'system-profile-1',
-        payload: expect.objectContaining({
-          title: 'Math Foundations',
-          channelId: 'channel-1',
-          archivedAt: '2026-03-08T14:00:00.000Z',
-        }),
-      }),
-    );
+    expect(publishActivityEventMock).not.toHaveBeenCalled();
   });
 });

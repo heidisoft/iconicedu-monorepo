@@ -8,7 +8,7 @@ import React, {
   useState,
 } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/providers/theme-provider';
 
 type ToastVariant = 'success' | 'error';
@@ -69,6 +69,7 @@ const styles = StyleSheet.create({
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const [toasts, setToasts] = useState<ToastState[]>([]);
   const nextIdRef = useRef(1);
   const timeoutsRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
@@ -111,7 +112,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={value}>
       <View style={styles.root}>
         {children}
-        <SafeAreaView pointerEvents="box-none" style={styles.overlay} edges={['top']}>
+        <View
+          pointerEvents="box-none"
+          style={[styles.overlay, { paddingTop: insets.top }]}
+        >
           <View style={styles.stack}>
             {toasts.map((toast) => {
               const isError = toast.variant === 'error';
@@ -140,7 +144,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               );
             })}
           </View>
-        </SafeAreaView>
+        </View>
       </View>
     </ToastContext.Provider>
   );

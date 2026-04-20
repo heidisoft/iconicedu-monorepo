@@ -3,9 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   createSupabaseServerClientMock,
   createSupabaseServiceClientMock,
-  publishActivityEventMock,
   compileLearningSpaceReminderJobsMock,
-  ensureSystemProfileIdMock,
   requireParentActorContextMock,
   getAccountByAuthUserIdMock,
   getProfileByAccountIdMock,
@@ -13,9 +11,7 @@ const {
 } = vi.hoisted(() => ({
   createSupabaseServerClientMock: vi.fn(),
   createSupabaseServiceClientMock: vi.fn(),
-  publishActivityEventMock: vi.fn(),
   compileLearningSpaceReminderJobsMock: vi.fn(),
-  ensureSystemProfileIdMock: vi.fn(),
   requireParentActorContextMock: vi.fn(),
   getAccountByAuthUserIdMock: vi.fn(),
   getProfileByAccountIdMock: vi.fn(),
@@ -30,16 +26,8 @@ vi.mock('@iconicedu/web/lib/supabase/service', () => ({
   createSupabaseServiceClient: createSupabaseServiceClientMock,
 }));
 
-vi.mock('@iconicedu/web/lib/activity-feed/publisher/activity-publisher', () => ({
-  publishActivityEvent: publishActivityEventMock,
-}));
-
 vi.mock('@iconicedu/web/lib/automation/reminder-jobs', () => ({
   compileLearningSpaceReminderJobs: compileLearningSpaceReminderJobsMock,
-}));
-
-vi.mock('@iconicedu/web/lib/automation/system-profile', () => ({
-  ensureSystemProfileId: ensureSystemProfileIdMock,
 }));
 
 vi.mock('@iconicedu/web/lib/family-view/actor-context', () => ({
@@ -65,10 +53,7 @@ vi.mock('@iconicedu/web/lib/admin/learning-space-create', async () => {
   };
 });
 
-import {
-  createLearningSpaceFromPayload,
-  publishParticipantInviteActivities,
-} from '@iconicedu/web/lib/admin/learning-space-create';
+import { createLearningSpaceFromPayload } from '@iconicedu/web/lib/admin/learning-space-create';
 
 describe('createLearningSpaceFromPayload', () => {
   beforeEach(() => {
@@ -92,7 +77,6 @@ describe('createLearningSpaceFromPayload', () => {
       error: null,
     });
     insertClassSchedulesMock.mockResolvedValue(['schedule-1']);
-    ensureSystemProfileIdMock.mockResolvedValue('system-profile-1');
     requireParentActorContextMock.mockResolvedValue({
       account: { id: 'account-1', org_id: 'org-1' },
       profile: { id: 'profile-1', account_id: 'account-1', org_id: 'org-1' },
@@ -100,7 +84,7 @@ describe('createLearningSpaceFromPayload', () => {
     });
   });
 
-  it('publishes class creation and one plural participant activity without initial session activity items', async () => {
+  it('creates a learning space and compiles reminder jobs without publishing legacy activities', async () => {
     await createLearningSpaceFromPayload({
       basics: {
         title: 'Math Foundations',
@@ -122,13 +106,6 @@ describe('createLearningSpaceFromPayload', () => {
           avatarUrl: null,
           themeKey: null,
         },
-        {
-          profileId: 'guardian-1',
-          kind: 'guardian',
-          displayName: 'Riley Morgan',
-          avatarUrl: null,
-          themeKey: 'emerald',
-        },
       ],
       schedules: [
         {
@@ -146,107 +123,41 @@ describe('createLearningSpaceFromPayload', () => {
     });
 
     expect(compileLearningSpaceReminderJobsMock).toHaveBeenCalled();
-    expect(publishActivityEventMock).toHaveBeenCalledTimes(2);
-    expect(publishActivityEventMock.mock.calls.map(([input]) => input.eventType)).toEqual(
-      ['class.created', 'members.invited'],
-    );
-    expect(publishActivityEventMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        sourceKind: 'system',
-        actorProfileId: 'system-profile-1',
-      }),
-    );
-    expect(publishActivityEventMock).not.toHaveBeenCalledWith(
-      expect.objectContaining({ eventType: 'class.session.scheduled' }),
-    );
   });
 
-  it('publishes singular and plural invite events based on participant count', async () => {
-    await publishParticipantInviteActivities({
-      supabase: {} as never,
-      orgId: 'org-1',
-      actorProfileId: 'profile-1',
-      learningSpaceId: 'space-1',
-      channelId: 'channel-1',
-      title: 'Math Foundations',
-      participants: [
-        {
-          profileId: 'student-1',
-          kind: 'child',
-          displayName: 'Tehara Morgan',
-          avatarUrl: null,
-          themeKey: null,
+  it('supports creating a learning space with multiple participants under the pruned activity model', async () => {
+    await expect(
+      createLearningSpaceFromPayload({
+        basics: {
+          title: 'Math Foundations',
+          kind: 'small_group',
+          iconKey: 'book-open',
+          subject: 'Math',
+          description: 'Weekly math fundamentals',
         },
-      ],
-      invitedMembers: [
-        {
-          profileId: 'student-1',
-          name: 'Tehara Morgan',
-          avatarUrl: null,
-          themeKey: null,
+        settings: {
+          themeKey: 'teal',
+          uiDefaults: null,
         },
-      ],
-      occurredAt: '2026-03-01T00:00:00.000Z',
-      activityPhase: 'updated',
-      dedupeKey: 'member.invited:space-1:student-1',
-    });
-
-    await publishParticipantInviteActivities({
-      supabase: {} as never,
-      orgId: 'org-1',
-      actorProfileId: 'profile-1',
-      learningSpaceId: 'space-1',
-      channelId: 'channel-1',
-      title: 'Math Foundations',
-      participants: [
-        {
-          profileId: 'student-1',
-          kind: 'child',
-          displayName: 'Tehara Morgan',
-          avatarUrl: null,
-          themeKey: null,
-        },
-        {
-          profileId: 'guardian-1',
-          kind: 'guardian',
-          displayName: 'Riley Morgan',
-          avatarUrl: null,
-          themeKey: 'emerald',
-        },
-      ],
-      invitedMembers: [
-        {
-          profileId: 'student-1',
-          name: 'Tehara Morgan',
-          avatarUrl: null,
-          themeKey: null,
-        },
-        {
-          profileId: 'guardian-1',
-          name: 'Riley Morgan',
-          avatarUrl: null,
-          themeKey: 'emerald',
-        },
-      ],
-      occurredAt: '2026-03-01T00:00:00.000Z',
-      activityPhase: 'updated',
-      dedupeKey: 'members.invited:space-1:batch',
-    });
-
-    expect(publishActivityEventMock.mock.calls.map(([input]) => input.eventType)).toEqual(
-      ['member.invited', 'members.invited'],
-    );
-    expect(publishActivityEventMock.mock.calls[1]?.[0]).toEqual(
-      expect.objectContaining({
-        eventType: 'members.invited',
-        payload: expect.objectContaining({
-          memberCount: 2,
-          members: [
-            expect.objectContaining({ profileId: 'student-1' }),
-            expect.objectContaining({ profileId: 'guardian-1' }),
-          ],
-        }),
+        liveSession: null,
+        participants: [
+          {
+            profileId: 'student-1',
+            kind: 'child',
+            displayName: 'Tehara Morgan',
+            avatarUrl: null,
+            themeKey: null,
+          },
+          {
+            profileId: 'guardian-1',
+            kind: 'guardian',
+            displayName: 'Riley Morgan',
+            avatarUrl: null,
+            themeKey: 'emerald',
+          },
+        ],
+        schedules: [],
       }),
-    );
+    ).resolves.toBeTruthy();
   });
 });

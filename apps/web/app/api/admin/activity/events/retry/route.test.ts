@@ -1,13 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { POST } from '@iconicedu/web/app/api/admin/activity/events/retry/route';
+import { POST } from './route';
 
 const requireAuthedUser = vi.fn();
 const createSupabaseServerClient = vi.fn();
-const createSupabaseServiceClient = vi.fn();
 const getAccountByAuthUserIdInOrg = vi.fn();
 const getUserRoles = vi.fn();
-const projectActivityEvents = vi.fn();
 
 vi.mock('@iconicedu/web/lib/auth/requireAuthedUser', () => ({
   requireAuthedUser: (...args: unknown[]) => requireAuthedUser(...args),
@@ -17,11 +15,6 @@ vi.mock('@iconicedu/web/lib/supabase/server', () => ({
   createSupabaseServerClient: (...args: unknown[]) => createSupabaseServerClient(...args),
 }));
 
-vi.mock('@iconicedu/web/lib/supabase/service', () => ({
-  createSupabaseServiceClient: (...args: unknown[]) =>
-    createSupabaseServiceClient(...args),
-}));
-
 vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
   getAccountByAuthUserIdInOrg: (...args: unknown[]) =>
     getAccountByAuthUserIdInOrg(...args),
@@ -29,10 +22,6 @@ vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
 
 vi.mock('@iconicedu/web/lib/profile/queries/roles.query', () => ({
   getUserRoles: (...args: unknown[]) => getUserRoles(...args),
-}));
-
-vi.mock('@iconicedu/web/lib/activity-feed/projector/project-activity-events', () => ({
-  projectActivityEvents: (...args: unknown[]) => projectActivityEvents(...args),
 }));
 
 function createEventLookupSupabase(eventExists = true) {
@@ -61,8 +50,15 @@ function createEventLookupSupabase(eventExists = true) {
 }
 
 describe('POST /api/admin/activity/events/retry', () => {
+  const originalApiUrl = process.env.API_URL;
+  const originalToken = process.env.INTERNAL_ACTIVITY_FEED_TOKEN;
+  const fetchMock = vi.fn();
+
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env.API_URL = 'http://127.0.0.1:54321';
+    process.env.INTERNAL_ACTIVITY_FEED_TOKEN = 'secret-token';
+    vi.stubGlobal('fetch', fetchMock);
     requireAuthedUser.mockResolvedValue({ id: 'auth-user-1' });
     getAccountByAuthUserIdInOrg.mockResolvedValue({
       data: { id: 'account-1', org_id: 'org-1' },
@@ -72,8 +68,18 @@ describe('POST /api/admin/activity/events/retry', () => {
       error: null,
     });
     createSupabaseServerClient.mockResolvedValue(createEventLookupSupabase(true));
-    createSupabaseServiceClient.mockReturnValue({ from: vi.fn() });
-    projectActivityEvents.mockResolvedValue({ processed: 1 });
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ processed: 1 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+  });
+
+  afterEach(() => {
+    process.env.API_URL = originalApiUrl;
+    process.env.INTERNAL_ACTIVITY_FEED_TOKEN = originalToken;
+    vi.unstubAllGlobals();
   });
 
   it('returns 400 when eventId is missing', async () => {
@@ -105,13 +111,10 @@ describe('POST /api/admin/activity/events/retry', () => {
     );
 
     expect(response.status).toBe(403);
-    expect(projectActivityEvents).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('retries the event projection', async () => {
-    const serviceClient = { from: vi.fn() };
-    createSupabaseServiceClient.mockReturnValueOnce(serviceClient);
-
+  it('retries the event projection through the API', async () => {
     const response = await POST(
       new Request('http://localhost/api/admin/activity/events/retry', {
         method: 'POST',
@@ -120,15 +123,29 @@ describe('POST /api/admin/activity/events/retry', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(projectActivityEvents).toHaveBeenCalledWith(serviceClient, {
-      eventIds: ['event-1'],
-      limit: 1,
-    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:54321/internal/activity-feed/project',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          Authorization: 'Bearer secret-token',
+        }),
+        body: JSON.stringify({
+          eventIds: ['event-1'],
+          limit: 1,
+        }),
+      }),
+    );
     expect(await response.json()).toEqual({ success: true, processed: 1 });
   });
 
   it('returns 409 when the retry is not processed', async () => {
-    projectActivityEvents.mockResolvedValueOnce({ processed: 0 });
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ processed: 0 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
 
     const response = await POST(
       new Request('http://localhost/api/admin/activity/events/retry', {

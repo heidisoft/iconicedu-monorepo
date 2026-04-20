@@ -10,7 +10,7 @@ AI coding agents and engineers maintaining agent-facing repo guidance.
 
 ## Last Updated
 
-2026-03-23
+2026-04-18
 
 ## Related Docs
 
@@ -47,15 +47,56 @@ AI coding agents and engineers maintaining agent-facing repo guidance.
 
 ## 4. Data Access & Security Rules
 
-- Server-side business logic, validation, and privileged writes must go through `apps/api`.
+### 4.1 Hard Boundary — FE Apps Are Read/Write Forbidden at the DB Layer
+
+`apps/web` and `apps/mobile` are **frontend-only**. They must not query database tables directly.
+
+**Permitted direct Supabase usage from FE apps:**
+| Operation | Allowed | Reason |
+|---|---|---|
+| `supabase.auth.*` | ✅ Yes | Auth SDK is the only correct way to manage sessions |
+| `supabase.channel(...)` Realtime | ✅ Yes | Supabase-specific; RLS must be enforced on the channel |
+| `supabase.storage.*` uploads/downloads | ✅ Yes | No server-side logic needed; RLS governs access |
+| `supabase.from('table').select/insert/update/delete` | ❌ No | Belongs in `apps/api` |
+| Service-role key usage | ❌ Never in FE | Only `apps/api` may hold service-role credentials |
+
+**Any `supabase.from(...)` call in `apps/web` or `apps/mobile` is a violation.** Move it to an `apps/api` endpoint.
+
+### 4.2 API-First Pattern for New Features
+
+When adding a new data-driven feature, follow this sequence:
+
+1. **Define the types** — add VM and/or payload types to `packages/shared-types`
+2. **Add the API endpoint** — implement controller + service in `apps/api`
+3. **Wire the FE** — call the endpoint using the app's typed HTTP client (see §4.3)
+
+Never skip step 2 to "speed things up" with a direct Supabase call.
+
+### 4.3 HTTP Clients
+
+Both FE apps have a typed HTTP client. Use it — do not add raw `fetch` calls pointing at the API.
+
+- **Web**: `createApiClient(supabase)` from `apps/web/lib/api/http-client.ts`
+  ```ts
+  // Server action / server component
+  const supabase = await createSupabaseServerClient();
+  const api = createApiClient(supabase);
+  const data = await api.get<ProfileVM>('/profiles/me');
+  ```
+- **Mobile**: `apiGet / apiPost / apiPut / apiDelete` from `apps/mobile/src/lib/api/http-client.ts`
+
+### 4.4 App Isolation
+
+- `apps/mobile` must not call `apps/web` routes or import `apps/web` internals
+- `apps/web` must not call `apps/mobile` internals or depend on mobile packages
+- Neither app imports directly from the other — shared code lives in `packages/*`
+
+### 4.5 Additional Data Rules
+
 - Supabase RLS must remain enabled for all tables.
-- Never use service role keys in client apps.
-- Realtime is allowed only via Supabase channels with RLS policies in place.
-- Prefer direct Supabase SDK access in mobile only when the operation is RLS-safe, does not require service-role access, and does not depend on shared server-side business logic. Otherwise use `apps/api`.
-- When data must be fetched or mutated during onboarding or user settings flows, prefer server actions (e.g., `app/actions/*`) so the browser never talks directly to Supabase and we keep auth/cleanup logic centralized.
-- All user/auth-related interactions—retrieval, invites, role/status changes, MFA factors, OAuth client administration, etc.—should first be routed through the shared admin actions under `apps/web/lib/auth/admin-actions.ts`. Review that file before adding new user-facing mutations and only branch outside it when the existing helpers cannot be reused.
-- Admin pages should rely on curated `apps/web/lib/<domain>` helpers for data fetching, mapping and status normalization instead of embedding Supabase queries directly inside layouts. This keeps the UI layer agnostic of Supabase and lets future data source changes (e.g., migrating from Supabase to another provider) happen inside the shared lib boundary.
-- When adding DB queries for any entity, follow the `apps/web/lib/user` structure: `queries/` for raw DB access, `mappers/` for row-to-VM translation, `builders/` for composition/aggregation, `constants/` for shared select lists, and `derive.ts` for computed fields. Create a matching `apps/web/lib/<entity>` folder with the same layout and place admin-only helpers in `apps/web/lib/admin/<entity>.ts` (or `apps/web/lib/admin/<entity>/` if it grows).
+- All user/auth-related mutations (invites, role changes, MFA, OAuth admin) go through `apps/web/lib/auth/admin-actions.ts`. Review it before adding new helpers.
+- Admin pages use `apps/web/lib/<domain>` helpers (not inline Supabase queries) so the UI stays DB-agnostic.
+- When adding DB access for a new entity in `apps/api`, mirror the `lib/user` structure: `queries/`, `mappers/`, `builders/`, `constants/`, `derive.ts`.
 
 ## 5. TypeScript & API Design Rules
 

@@ -16,15 +16,15 @@ describe('ActivityFeedSkeleton', () => {
     expect(screen.getAllByLabelText('Loading').length).toBeGreaterThan(0);
   });
 
-  it('renders default 4 rows with 2 section headers — 22 PulseBox + 1 root = 23 loading nodes', () => {
+  it('renders default 4 rows with 2 section headers — 24 PulseBox + 1 root = 25 loading nodes', () => {
     render(<ActivityFeedSkeleton />);
-    // 2 sections × 1 header + items (i=0 → 5, i=1 → 6, i=2 → 5, i=3 → 4 = 20) = 22 + root
-    expect(screen.getAllByLabelText('Loading').length).toBe(23);
+    // 2 sections × 1 header + items (i=0 → 6, i=1 → 5, i=2 → 6, i=3 → 5 = 22) = 24 + root
+    expect(screen.getAllByLabelText('Loading').length).toBe(25);
   });
 
   it('renders custom count with multi-section structure', () => {
     render(<ActivityFeedSkeleton count={2} />);
-    // 2 sections × 1 header + items (i=0 section1 → 5, i=1 section2 → 6 = 11) = 13 + root
+    // 2 sections × 1 header + items (i=0 section1 → 6, i=1 section2 → 5 = 11) = 13 + root
     expect(screen.getAllByLabelText('Loading').length).toBe(14);
   });
 });

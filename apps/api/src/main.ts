@@ -2,10 +2,12 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from '@iconicedu/api/app.module';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { requestContextMiddleware } from '@iconicedu/api/observability/request-context.middleware';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create(AppModule, { cors: true });
+  app.use(requestContextMiddleware);
 
   app.useGlobalPipes(
     new ValidationPipe({

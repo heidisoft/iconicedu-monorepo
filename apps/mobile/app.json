@@ -7,6 +7,7 @@
     "icon": "./assets/icon.png",
     "orientation": "default",
     "scheme": "iconicedu",
+    "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -19,7 +20,8 @@
     "ios": {
       "supportsTablet": true,
       "buildNumber": "1",
-      "bundleIdentifier": "com.heidisoft.iconicedu"
+      "bundleIdentifier": "com.heidisoft.iconicedu",
+      "userInterfaceStyle": "automatic"
     },
     "android": {
       "adaptiveIcon": {

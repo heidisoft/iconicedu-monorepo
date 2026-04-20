@@ -3,7 +3,6 @@
 import { useMemo, useState } from 'react';
 import { getLocalDate, getLocalTime, getTimezoneOptions } from '@iconicedu/utils';
 import { Button } from '@iconicedu/ui-web/ui/button';
-import { Checkbox } from '@iconicedu/ui-web/ui/checkbox';
 import { Input } from '@iconicedu/ui-web/ui/input';
 import { Label } from '@iconicedu/ui-web/ui/label';
 import {
@@ -77,7 +76,6 @@ export function EventActions({
   const isRecurringSession = event.ids.id.includes('__');
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
-  const [cancelSendNotifications, setCancelSendNotifications] = useState(true);
   const [isCancelling, setIsCancelling] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editDate, setEditDate] = useState('');
@@ -85,7 +83,6 @@ export function EventActions({
   const [editEndTime, setEditEndTime] = useState('');
   const [editTimezone, setEditTimezone] = useState(scheduleTimezone);
   const [editReason, setEditReason] = useState('');
-  const [editSendNotifications, setEditSendNotifications] = useState(true);
   const [isEditingSession, setIsEditingSession] = useState(false);
   const scheduleTabLink =
     event.source.kind === 'class_session' && event.source.channelId
@@ -109,7 +106,6 @@ export function EventActions({
 
   const resetCancelForm = () => {
     setCancelReason('');
-    setCancelSendNotifications(true);
   };
 
   const openEditDialog = () => {
@@ -119,7 +115,6 @@ export function EventActions({
     setEditEndTime(defaults.endTime);
     setEditTimezone(defaults.timezone);
     setEditReason(defaults.reason);
-    setEditSendNotifications(true);
     setEditDialogOpen(true);
   };
 
@@ -130,7 +125,6 @@ export function EventActions({
     setEditEndTime(defaults.endTime);
     setEditTimezone(defaults.timezone);
     setEditReason(defaults.reason);
-    setEditSendNotifications(true);
   };
 
   const handleConfirmCancel = async () => {
@@ -142,7 +136,6 @@ export function EventActions({
     try {
       await onCancelSession(event, {
         reason: cancelReason,
-        sendActivityNotifications: cancelSendNotifications,
       });
       setCancelDialogOpen(false);
       resetCancelForm();
@@ -171,7 +164,6 @@ export function EventActions({
         endTime: editEndTime,
         timezone: isRecurringSession ? scheduleTimezone : editTimezone,
         reason: editReason,
-        sendActivityNotifications: editSendNotifications,
       });
       setEditDialogOpen(false);
       resetEditForm();
@@ -251,19 +243,6 @@ export function EventActions({
               disabled={isCancelling}
             />
           </div>
-          <Label className="flex items-start gap-3 text-sm">
-            <Checkbox
-              checked={cancelSendNotifications}
-              onCheckedChange={(checked) => setCancelSendNotifications(checked === true)}
-              disabled={isCancelling}
-            />
-            <div className="space-y-1">
-              <span>Send activity notifications for this update</span>
-              <p className="text-xs text-muted-foreground">
-                Leave this on to notify participants about the cancellation.
-              </p>
-            </div>
-          </Label>
           <DialogFooter>
             <Button
               variant="outline"
@@ -409,19 +388,6 @@ export function EventActions({
               disabled={isEditingSession}
             />
           </div>
-          <Label className="flex items-start gap-3 text-sm">
-            <Checkbox
-              checked={editSendNotifications}
-              onCheckedChange={(checked) => setEditSendNotifications(checked === true)}
-              disabled={isEditingSession}
-            />
-            <div className="space-y-1">
-              <span>Send activity notifications for this update</span>
-              <p className="text-xs text-muted-foreground">
-                Leave this on to notify participants about the session update.
-              </p>
-            </div>
-          </Label>
           <DialogFooter>
             <Button
               variant="outline"

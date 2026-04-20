@@ -95,22 +95,14 @@ describe('POST /api/admin/spaces/update', () => {
         body: JSON.stringify({
           learningSpaceId: 'space-1',
           payload,
-          sendActivityNotifications: false,
         }),
       }),
     );
 
     expect(response.status).toBe(200);
-    expect(updateLearningSpaceFromPayloadMock).toHaveBeenCalledWith(
-      'space-1',
-      payload,
-      {
-        orgId: 'org-1',
-        actorProfileId: 'profile-actor-1',
-      },
-      {
-        sendActivityNotifications: false,
-      },
-    );
+    expect(updateLearningSpaceFromPayloadMock).toHaveBeenCalledWith('space-1', payload, {
+      orgId: 'org-1',
+      actorProfileId: 'profile-actor-1',
+    });
   });
 });

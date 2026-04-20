@@ -1,8 +1,8 @@
 import type {
-  ActivityFeedVM,
+  ActivityFeedGroupItemVM,
   ActivityFeedItemVM,
   ActivityFeedLeafItemVM,
-  ActivityFeedGroupItemVM,
+  ActivityFeedVM,
   UserProfileVM,
 } from '@iconicedu/shared-types';
 
@@ -21,214 +21,85 @@ function mkActor(id: string, name: string): UserProfileVM {
   } as unknown as UserProfileVM;
 }
 
-// Dynamic dates so sections (Today / This week / Earlier) stay correct at runtime
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
-const daysAgo = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString();
 
 const PRIYA = mkActor('priya-001', 'Priya S.');
-const TEVIN = mkActor('tevin-001', 'Tevin T.');
-const RILEY = mkActor('riley-001', 'Riley T.');
 const SYSTEM = mkActor('system-001', 'ICONIC System');
 
-const TODAY_ITEMS: ActivityFeedItemVM[] = [
-  // --- session summary posted ---
+const MESSAGE_ITEMS: ActivityFeedLeafItemVM[] = [
   {
     kind: 'leaf',
-    ids: { id: 'af-1', orgId: ORG },
+    ids: { id: 'af-msg-1', orgId: ORG },
     timestamps: { occurredAt: hoursAgo(1), createdAt: hoursAgo(1) },
-    tabKey: 'classes',
-    audience: { scope: { kind: 'global' }, visibility: 'public' },
-    verb: 'summary.posted',
-    refs: { actor: PRIYA },
-    content: {
-      leading: { kind: 'icon', iconKey: 'Sparkles', tone: 'success' },
-      headline: {
-        primary: 'Priya S.',
-        secondary: 'posted a session summary for',
-        emphasis: 'Math Foundations',
-      },
-      summary: 'Reviewed equivalent fractions and number line placement.',
-      expandedContent:
-        'Tevin made great progress on fractions this week. He correctly identified equivalent fractions and placed them on a number line. Next steps: mixed numbers and word problems.',
-    },
-    state: { isRead: false, importance: 'normal' },
-  } as ActivityFeedLeafItemVM,
-
-  // --- homework submitted ---
-  {
-    kind: 'leaf',
-    ids: { id: 'af-2', orgId: ORG },
-    timestamps: { occurredAt: hoursAgo(3), createdAt: hoursAgo(3) },
-    tabKey: 'classes',
-    audience: { scope: { kind: 'global' }, visibility: 'public' },
-    verb: 'homework.submitted',
-    refs: { actor: TEVIN },
-    content: {
-      leading: { kind: 'icon', iconKey: 'Paperclip', tone: 'info' },
-      headline: {
-        primary: 'Tevin T.',
-        secondary: 'submitted homework for',
-        emphasis: 'Fractions Practice Set',
-      },
-      summary: '1 image attached',
-    },
-    state: { isRead: false, importance: 'normal' },
-  } as ActivityFeedLeafItemVM,
-
-  // --- new message ---
-  {
-    kind: 'leaf',
-    ids: { id: 'af-3', orgId: ORG },
-    timestamps: { occurredAt: hoursAgo(5), createdAt: hoursAgo(5) },
-    tabKey: 'classes',
+    tabKey: 'all',
     audience: { scope: { kind: 'global' }, visibility: 'public' },
     verb: 'message.posted',
     refs: { actor: PRIYA },
     content: {
-      leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'neutral' },
+      leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'info' },
       headline: {
-        primary: 'Priya S.',
-        secondary: 'sent a message in',
-        emphasis: 'Math Foundations',
+        primary: 'Priya S. sent you a message in',
+        secondary: 'Math Foundations',
       },
-      summary: '"Please complete the worksheet before our next session."',
+      summary: 'Please complete the worksheet before tomorrow.',
     },
     state: { isRead: false, importance: 'normal' },
-  } as ActivityFeedLeafItemVM,
-];
-
-const SUB_ITEMS: ActivityFeedLeafItemVM[] = [
-  {
-    kind: 'leaf',
-    ids: { id: 'af-5a', orgId: ORG },
-    timestamps: { occurredAt: daysAgo(3), createdAt: daysAgo(3) },
-    tabKey: 'classes',
-    audience: { scope: { kind: 'global' }, visibility: 'public' },
-    verb: 'class.session.scheduled',
-    refs: { actor: PRIYA },
-    content: {
-      headline: { primary: 'Math Foundations', secondary: '— Wed Dec 25, 5:00 PM' },
-    },
-    state: { isRead: true },
   },
   {
     kind: 'leaf',
-    ids: { id: 'af-5b', orgId: ORG },
-    timestamps: { occurredAt: daysAgo(3), createdAt: daysAgo(3) },
-    tabKey: 'classes',
+    ids: { id: 'af-msg-2', orgId: ORG },
+    timestamps: { occurredAt: hoursAgo(2), createdAt: hoursAgo(2) },
+    tabKey: 'all',
     audience: { scope: { kind: 'global' }, visibility: 'public' },
-    verb: 'class.session.scheduled',
+    verb: 'reaction.added',
     refs: { actor: PRIYA },
     content: {
-      headline: { primary: 'Writing Workshop', secondary: '— Thu Dec 26, 4:00 PM' },
-    },
-    state: { isRead: true },
-  },
-  {
-    kind: 'leaf',
-    ids: { id: 'af-5c', orgId: ORG },
-    timestamps: { occurredAt: daysAgo(3), createdAt: daysAgo(3) },
-    tabKey: 'classes',
-    audience: { scope: { kind: 'global' }, visibility: 'public' },
-    verb: 'class.session.scheduled',
-    refs: { actor: PRIYA },
-    content: {
-      headline: { primary: 'Chess Strategy Lab', secondary: '— Fri Dec 27, 4:30 PM' },
-    },
-    state: { isRead: true },
-  },
-];
-
-const THIS_WEEK_ITEMS: ActivityFeedItemVM[] = [
-  // --- payment reminder ---
-  {
-    kind: 'leaf',
-    ids: { id: 'af-4', orgId: ORG },
-    timestamps: { occurredAt: daysAgo(2), createdAt: daysAgo(2) },
-    tabKey: 'payment',
-    audience: { scope: { kind: 'global' }, visibility: 'public' },
-    verb: 'class.created',
-    refs: { actor: SYSTEM },
-    content: {
-      leading: { kind: 'icon', iconKey: 'CreditCard', tone: 'warning' },
+      leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'info' },
       headline: {
-        primary: 'Payment due',
-        secondary: 'for',
-        emphasis: 'December tutoring sessions',
-      },
-      summary: '$480.00 due by Dec 31',
-      actionButton: {
-        label: 'View Invoice',
-        variant: 'outline',
-        href: null,
-        actionKey: null,
-        payload: null,
+        primary: 'Priya S. reacted 😀 to your message in',
+        secondary: 'Math Foundations',
       },
     },
-    state: { isRead: false, importance: 'important' },
-  } as ActivityFeedLeafItemVM,
+    state: { isRead: true, importance: 'normal' },
+  },
+];
 
-  // --- group: 3 sessions scheduled ---
+const TODAY_ITEMS: ActivityFeedItemVM[] = [
   {
     kind: 'group',
-    ids: { id: 'af-5', orgId: ORG },
-    timestamps: { occurredAt: daysAgo(3), createdAt: daysAgo(3) },
+    ids: { id: 'af-group-1', orgId: ORG },
+    timestamps: { occurredAt: hoursAgo(1), createdAt: hoursAgo(1) },
+    tabKey: 'all',
+    audience: { scope: { kind: 'global' }, visibility: 'public' },
+    verb: 'messages.posted',
+    refs: { actor: PRIYA },
+    grouping: { groupType: 'message', groupKey: 'message-group-1' },
+    subActivityCount: MESSAGE_ITEMS.length,
+    subActivities: { items: MESSAGE_ITEMS },
+    content: {
+      leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'info' },
+      headline: { primary: 'New messages', secondary: 'Math Foundations' },
+    },
+    state: { isRead: false, importance: 'normal' },
+  } satisfies ActivityFeedGroupItemVM,
+  {
+    kind: 'leaf',
+    ids: { id: 'af-reschedule-1', orgId: ORG },
+    timestamps: { occurredAt: hoursAgo(4), createdAt: hoursAgo(4) },
     tabKey: 'classes',
     audience: { scope: { kind: 'global' }, visibility: 'public' },
-    verb: 'class.session.scheduled',
-    refs: { actor: PRIYA },
-    grouping: { groupType: 'class', groupKey: 'sessions-week-group' },
-    subActivityCount: 3,
-    subActivities: { items: SUB_ITEMS },
-    content: {
-      leading: { kind: 'icon', iconKey: 'GraduationCap', tone: 'info' },
-      headline: {
-        primary: 'Priya S.',
-        secondary: 'scheduled',
-        emphasis: '3 sessions next week',
-      },
-    },
-    state: { isRead: true, importance: 'normal' },
-  } as ActivityFeedGroupItemVM,
-];
-
-const EARLIER_ITEMS: ActivityFeedItemVM[] = [
-  // --- member joined ---
-  {
-    kind: 'leaf',
-    ids: { id: 'af-6', orgId: ORG },
-    timestamps: { occurredAt: daysAgo(10), createdAt: daysAgo(10) },
-    tabKey: 'system',
-    audience: { scope: { kind: 'global' }, visibility: 'public' },
-    verb: 'member.joined',
-    refs: { actor: RILEY },
-    content: {
-      leading: { kind: 'icon', iconKey: 'CheckCircle2', tone: 'success' },
-      headline: { primary: 'Riley T.', secondary: 'joined the organization' },
-    },
-    state: { isRead: true, importance: 'normal' },
-  } as ActivityFeedLeafItemVM,
-
-  // --- payment received ---
-  {
-    kind: 'leaf',
-    ids: { id: 'af-7', orgId: ORG },
-    timestamps: { occurredAt: daysAgo(14), createdAt: daysAgo(14) },
-    tabKey: 'payment',
-    audience: { scope: { kind: 'global' }, visibility: 'public' },
-    verb: 'class.updated',
+    verb: 'class.session.rescheduled',
     refs: { actor: SYSTEM },
     content: {
-      leading: { kind: 'icon', iconKey: 'CreditCard', tone: 'success' },
+      leading: { kind: 'icon', iconKey: 'CalendarCheck', tone: 'info' },
       headline: {
-        primary: 'Payment received',
-        secondary: 'for',
-        emphasis: 'November tutoring sessions',
+        primary: 'Class session rescheduled',
+        secondary: 'Math Foundations',
       },
-      summary: '$480.00 paid on Nov 30',
+      summary: 'Moved to Tuesday at 4:00 PM PT.',
     },
-    state: { isRead: true, importance: 'normal' },
-  } as ActivityFeedLeafItemVM,
+    state: { isRead: false, importance: 'important' },
+  } satisfies ActivityFeedLeafItemVM,
 ];
 
 export const DEMO_ACTIVITY_FEED: ActivityFeedVM = {
@@ -239,10 +110,6 @@ export const DEMO_ACTIVITY_FEED: ActivityFeedVM = {
     { key: 'payment', label: 'Payment' },
     { key: 'system', label: 'System' },
   ],
-  sections: [
-    { label: 'Today', items: TODAY_ITEMS },
-    { label: 'This week', items: THIS_WEEK_ITEMS },
-    { label: 'Earlier', items: EARLIER_ITEMS },
-  ],
-  unreadCount: 4,
+  sections: [{ label: 'Today', items: TODAY_ITEMS }],
+  unreadCount: 2,
 };

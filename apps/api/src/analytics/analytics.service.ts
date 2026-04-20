@@ -1,7 +1,8 @@
-import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PostHog } from 'posthog-node';
 import type { AnalyticsClient } from '@iconicedu/utils';
+import { setGlobalErrorReporter } from '@iconicedu/utils';
 
 /**
  * Server-side analytics service backed by PostHog Node SDK.
@@ -9,7 +10,7 @@ import type { AnalyticsClient } from '@iconicedu/utils';
  * don't import PostHog directly — swap the provider here without touching consumers.
  */
 @Injectable()
-export class AnalyticsService implements AnalyticsClient, OnModuleDestroy {
+export class AnalyticsService implements AnalyticsClient, OnModuleInit, OnModuleDestroy {
   private readonly client: PostHog | null;
 
   constructor(private readonly config: ConfigService) {
@@ -59,7 +60,14 @@ export class AnalyticsService implements AnalyticsClient, OnModuleDestroy {
     // No-op on server; identity resets happen per-request in stateless APIs.
   }
 
+  onModuleInit(): void {
+    setGlobalErrorReporter((event, properties) => {
+      this.capture(event, properties);
+    });
+  }
+
   async onModuleDestroy(): Promise<void> {
+    setGlobalErrorReporter(null);
     await this.client?.shutdown();
   }
 }
