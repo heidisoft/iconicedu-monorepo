@@ -108,6 +108,8 @@ export type ConversationHeaderProps = {
   title: string;
   subtitle?: string | null;
   studentProfiles?: Array<{ name: string; themeKey?: string | null }> | null;
+  currentProfileName?: string | null;
+  currentProfileKind?: string | null;
   localTimeLabel?: string | null;
   localTimeIcon?:
     | 'clock'
@@ -142,6 +144,33 @@ type AutoScrollingInlineTextProps = {
   contentStyle?: object;
   testIDPrefix?: string;
 };
+
+function normalizeDisplayName(name?: string | null): string {
+  return (name ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function buildCompactStudentMeta(input: {
+  studentProfiles?: Array<{ name: string; themeKey?: string | null }> | null;
+  currentProfileName?: string | null;
+  currentProfileKind?: string | null;
+}) {
+  const currentProfileName = normalizeDisplayName(input.currentProfileName);
+  const visibleStudents =
+    input.studentProfiles?.filter((student) => {
+      const studentName = normalizeDisplayName(student.name);
+      if (!studentName) return false;
+      if (input.currentProfileKind === 'child' && studentName === currentProfileName) {
+        return false;
+      }
+      return true;
+    }) ?? [];
+
+  return {
+    leadStudent: visibleStudents[0] ?? null,
+    remainingCount: Math.max(0, visibleStudents.length - 1),
+    hasVisibleStudents: visibleStudents.length > 0,
+  };
+}
 
 function makeStyles(C: AppColors) {
   return StyleSheet.create({
@@ -293,6 +322,8 @@ function makeStyles(C: AppColors) {
       paddingVertical: 7,
       borderRadius: 20,
       backgroundColor: C.tealBg,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: C.teal,
     },
     joinPillTxt: { fontSize: 13, fontWeight: '700', color: C.teal },
     modalBackdrop: {
@@ -495,6 +526,8 @@ export function ConversationHeader({
   title,
   subtitle,
   studentProfiles,
+  currentProfileName,
+  currentProfileKind,
   localTimeLabel,
   localTimeIcon,
   kind,
@@ -543,9 +576,12 @@ export function ConversationHeader({
     return <View style={[s.statusBadge, { backgroundColor: '#4b5563' }]} />;
   }, [isReadOnly, presenceStatus, s]);
 
-  const subtitleStudents =
-    studentProfiles?.filter((student) => student.name.trim().length > 0) ?? [];
-  const hasSubtitleStudents = subtitleStudents.length > 0;
+  const compactStudentMeta = buildCompactStudentMeta({
+    studentProfiles,
+    currentProfileName,
+    currentProfileKind,
+  });
+  const hasSubtitleStudents = !isDm && compactStudentMeta.hasVisibleStudents;
   const hasSubtitleMeta = Boolean(subtitle || hasSubtitleStudents || localTimeLabel);
 
   const LocalTimeIcon = useMemo(() => {
@@ -601,22 +637,32 @@ export function ConversationHeader({
         contentStyle={s.subtitleInlineContent}
         testIDPrefix="conversation-subtitle"
       >
-        {!!subtitle && <Text style={s.subtitleText}>{subtitle}</Text>}
+        {hasSubtitleStudents ? (
+          <>
+            <Text
+              style={[
+                s.subtitleText,
+                {
+                  color: themeTextColor(
+                    compactStudentMeta.leadStudent?.themeKey,
+                    colors.textMuted,
+                  ),
+                },
+              ]}
+            >
+              {compactStudentMeta.leadStudent?.name}
+            </Text>
+            {compactStudentMeta.remainingCount > 0 ? (
+              <Text
+                style={s.subtitleText}
+              >{` +${compactStudentMeta.remainingCount} more`}</Text>
+            ) : null}
+          </>
+        ) : null}
         {!!subtitle && hasSubtitleStudents && (
           <Text style={s.subtitleSeparator}>{' \u00b7 '}</Text>
         )}
-        {hasSubtitleStudents &&
-          subtitleStudents.map((student, index) => (
-            <Text
-              key={`${student.name}-${index}`}
-              style={{
-                color: themeTextColor(student.themeKey, colors.textMuted),
-              }}
-            >
-              {index > 0 ? ', ' : ''}
-              {student.name}
-            </Text>
-          ))}
+        {!!subtitle && <Text style={s.subtitleText}>{subtitle}</Text>}
         {!!(subtitle || hasSubtitleStudents) && !!localTimeLabel && (
           <Text style={s.subtitleSeparator}>{' \u00b7 '}</Text>
         )}

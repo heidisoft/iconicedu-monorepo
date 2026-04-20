@@ -81,6 +81,18 @@ export default function SpaceDetailScreen() {
     ((account as Record<string, unknown> | undefined)?.id as string) ?? '';
   const profileId =
     ((profile as Record<string, unknown> | undefined)?.id as string) ?? '';
+  const currentProfileName =
+    (
+      (profile as Record<string, unknown> | undefined)?.display_name as string | undefined
+    )?.trim() ||
+    [
+      (profile as Record<string, unknown> | undefined)?.first_name as string | undefined,
+      (profile as Record<string, unknown> | undefined)?.last_name as string | undefined,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .trim() ||
+    null;
   const profileKind =
     ((profile as Record<string, unknown> | undefined)?.kind as string | undefined) ??
     null;
@@ -459,6 +471,8 @@ export default function SpaceDetailScreen() {
         kind="space"
         subtitle={resolvedSubtitle}
         studentProfiles={resolvedStudentProfiles}
+        currentProfileName={currentProfileName}
+        currentProfileKind={profileKind}
         iconKey={resolvedIconKey}
         themeKey={resolvedThemeKey}
         isReadOnly={isStaffReadOnly}

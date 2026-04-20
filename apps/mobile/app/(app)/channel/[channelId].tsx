@@ -89,6 +89,16 @@ export default function ChannelConversationScreen() {
     (profileRecord?.display_name as string | undefined)?.trim() ||
     (profileRecord?.first_name as string | undefined)?.trim() ||
     'Me';
+  const currentProfileName =
+    (profileRecord?.display_name as string | undefined)?.trim() ||
+    [
+      profileRecord?.first_name as string | undefined,
+      profileRecord?.last_name as string | undefined,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .trim() ||
+    null;
   const profileKind = (profileRecord?.kind as string | undefined) ?? null;
   const shouldCheckStaffReadOnly =
     profileKind === 'staff' &&
@@ -468,6 +478,8 @@ export default function ChannelConversationScreen() {
         title={topic ?? 'Channel'}
         subtitle={resolvedSubtitle}
         studentProfiles={headerStudentProfiles}
+        currentProfileName={currentProfileName}
+        currentProfileKind={profileKind}
         kind={isSpaceChannel ? 'space' : 'channel'}
         iconKey={resolvedIconKey}
         themeKey={themeKey ?? null}

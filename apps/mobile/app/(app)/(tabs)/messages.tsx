@@ -159,6 +159,37 @@ function themeAvatarColor(
   );
 }
 
+function normalizeDisplayName(name?: string | null): string {
+  return (name ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function buildChannelStudentTitle(input: {
+  channelTitle: string;
+  studentProfiles: Array<{ name: string; themeKey?: string | null }>;
+  currentProfileName?: string | null;
+  currentProfileKind?: string | null;
+}) {
+  const currentProfileName = normalizeDisplayName(input.currentProfileName);
+  const visibleStudents = input.studentProfiles.filter((student) => {
+    const studentName = normalizeDisplayName(student.name);
+    if (!studentName) return false;
+    if (input.currentProfileKind === 'child' && studentName === currentProfileName) {
+      return false;
+    }
+    return true;
+  });
+
+  const leadStudent = visibleStudents[0] ?? null;
+  const remainingCount = Math.max(0, visibleStudents.length - 1);
+
+  return {
+    leadStudent,
+    remainingCount,
+    hasVisibleStudents: visibleStudents.length > 0,
+    channelTitle: input.channelTitle,
+  };
+}
+
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 function makeStyles(C: AppColors) {
@@ -333,6 +364,7 @@ function makeStyles(C: AppColors) {
     rowNameWrap: { flex: 1, minWidth: 0 },
     rowName: { fontSize: 15, fontWeight: '700', color: C.text },
     rowNameUnread: { fontWeight: '800' },
+    rowNameStudentNames: { fontWeight: '600' },
     rowTail: {
       width: 64,
       alignItems: 'flex-end',
@@ -521,12 +553,16 @@ function ChannelRow({
   item,
   onPress,
   presenceByProfileId,
+  currentProfileName,
+  currentProfileKind,
   s,
   colors,
 }: {
   item: ChannelListItem;
   onPress: () => void;
   presenceByProfileId: Map<string, PresenceDisplayStatus>;
+  currentProfileName?: string | null;
+  currentProfileKind?: string | null;
   s: ReturnType<typeof makeStyles>;
   colors: AppColors;
 }) {
@@ -583,8 +619,13 @@ function ChannelRow({
   const studentProfiles = !isDm ? (item.student_profiles ?? []) : [];
   const classThemeKey = !isDm ? (item.themeKey ?? null) : null;
   const classAvatarColors = themeAvatarColor(classThemeKey, colors.inputBg, colors.text);
-  const hasChannelMeta =
-    !isDm && (Boolean(item.description) || studentProfiles.length > 0);
+  const hasChannelMeta = !isDm && Boolean(item.description);
+  const channelStudentTitle = buildChannelStudentTitle({
+    channelTitle: name,
+    studentProfiles,
+    currentProfileName,
+    currentProfileKind,
+  });
   const dmPreviewText =
     item.is_supervised && item.supervised_child_name
       ? `Viewing ${item.supervised_child_name}'s conversation`
@@ -628,14 +669,25 @@ function ChannelRow({
           {/* Content */}
           <View style={s.content}>
             <View style={s.topRow}>
-              <RoleNameIndicator
-                name={name}
-                role={displayRole}
-                containerStyle={s.rowNameWrap}
-                textStyle={[s.rowName, hasUnread && s.rowNameUnread]}
-                numberOfLines={1}
-                iconSize={13}
-              />
+              {isDm ? (
+                <RoleNameIndicator
+                  name={name}
+                  role={displayRole}
+                  containerStyle={s.rowNameWrap}
+                  textStyle={[s.rowName, hasUnread && s.rowNameUnread]}
+                  numberOfLines={1}
+                  iconSize={13}
+                />
+              ) : (
+                <View style={s.rowNameWrap}>
+                  <Text
+                    style={[s.rowName, hasUnread && s.rowNameUnread]}
+                    numberOfLines={1}
+                  >
+                    {channelStudentTitle.channelTitle}
+                  </Text>
+                </View>
+              )}
               {item.is_supervised && (
                 <View style={s.supervisedBadge}>
                   <Text style={s.supervisedBadgeTxt}>Supervised</Text>
@@ -644,20 +696,30 @@ function ChannelRow({
             </View>
             {!isDm && hasChannelMeta ? (
               <Text style={s.rowMeta} numberOfLines={1}>
+                {channelStudentTitle.hasVisibleStudents ? (
+                  <>
+                    <Text
+                      style={[
+                        s.rowMetaName,
+                        {
+                          color: themeTextColor(
+                            channelStudentTitle.leadStudent?.themeKey,
+                            colors.textMuted,
+                          ),
+                        },
+                      ]}
+                    >
+                      {channelStudentTitle.leadStudent?.name}
+                    </Text>
+                    {channelStudentTitle.remainingCount > 0 ? (
+                      <Text style={s.rowMetaName}>
+                        {` +${channelStudentTitle.remainingCount} more`}
+                      </Text>
+                    ) : null}
+                    <Text style={s.rowMeta}>{' · '}</Text>
+                  </>
+                ) : null}
                 {item.description ?? ''}
-                {item.description && studentProfiles.length > 0 ? ' · ' : ''}
-                {studentProfiles.map((student, index) => (
-                  <Text
-                    key={`${item.id}-student-${student.name}-${index}`}
-                    style={[
-                      s.rowMetaName,
-                      { color: themeTextColor(student.themeKey, colors.textMuted) },
-                    ]}
-                  >
-                    {index > 0 ? ', ' : ''}
-                    {student.name}
-                  </Text>
-                ))}
               </Text>
             ) : null}
             {isDm && dmPreviewText ? (
@@ -709,9 +771,22 @@ export default function MessagesScreen() {
     ((account as Record<string, unknown> | undefined)?.id as string) ?? '';
   const myProfileId =
     ((profile as Record<string, unknown> | undefined)?.id as string | undefined) ?? '';
+  const currentProfileName =
+    (
+      (profile as Record<string, unknown> | undefined)?.display_name as string | undefined
+    )?.trim() ||
+    [
+      (profile as Record<string, unknown> | undefined)?.first_name as string | undefined,
+      (profile as Record<string, unknown> | undefined)?.last_name as string | undefined,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .trim() ||
+    null;
   const profileKind =
     ((profile as Record<string, unknown> | undefined)?.kind as string | undefined) ??
     null;
+  const isParentView = profileKind === 'guardian';
   const isStudentView = profileKind === 'child';
 
   const {
@@ -774,7 +849,7 @@ export default function MessagesScreen() {
   const presenceByProfileId = useOnlineProfileIds(orgId, myProfileId, dmParticipantIds);
 
   React.useEffect(() => {
-    if (activeTab !== 'channels' || isStudentView) {
+    if (activeTab !== 'channels' || !isParentView) {
       setActiveStudentTab('all');
       return;
     }
@@ -785,7 +860,7 @@ export default function MessagesScreen() {
     ) {
       setActiveStudentTab('all');
     }
-  }, [activeStudentTab, activeTab, classroomStudentTabs, isStudentView]);
+  }, [activeStudentTab, activeTab, classroomStudentTabs, isParentView]);
 
   const allItems = useMemo(
     () =>
@@ -965,6 +1040,8 @@ export default function MessagesScreen() {
         <ChannelRow
           item={channel}
           presenceByProfileId={presenceByProfileId}
+          currentProfileName={currentProfileName}
+          currentProfileKind={profileKind}
           s={s}
           colors={colors}
           onPress={() => {
@@ -1048,7 +1125,7 @@ export default function MessagesScreen() {
         })}
       </View>
 
-      {activeTab === 'channels' && !isStudentView && hasClassroomStudentTabs ? (
+      {activeTab === 'channels' && isParentView && hasClassroomStudentTabs ? (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
