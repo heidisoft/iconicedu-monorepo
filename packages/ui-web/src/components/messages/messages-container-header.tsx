@@ -5,11 +5,16 @@ import type { ReactNode } from 'react';
 import {
   Bookmark,
   BriefcaseBusiness,
-  Clock,
+  CircleOff,
+  Clock3,
   ClipboardCheck,
   FileText,
+  MoonStar,
   Presentation,
   Sparkles,
+  Sun,
+  Sunrise,
+  Sunset,
   ShieldUser,
   User,
   type LucideIcon,
@@ -30,7 +35,11 @@ import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
 import { getChannelTopicIcon } from '@iconicedu/ui-web/lib/icons';
 import { RoleNameIndicator } from '@iconicedu/ui-web/components/shared/role-name-indicator';
 import { ThemedIconBadge } from '@iconicedu/ui-web/components/shared/themed-icon';
-import type { ChannelVM, UserProfileVM } from '@iconicedu/shared-types';
+import type {
+  ChannelVM,
+  PresenceDisplayStatusVM,
+  UserProfileVM,
+} from '@iconicedu/shared-types';
 import { useMessagesState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
 
 interface HeaderSubtitleEntry {
@@ -158,8 +167,8 @@ const HeaderSubtitleRow = memo(function HeaderSubtitleRow({
 
 const HEADER_ICON_MAP: Record<string, LucideIcon> = {
   saved: Bookmark,
-  'next-session': Clock,
-  'last-seen': Clock,
+  'next-session': Clock3,
+  'last-seen': Clock3,
   homework: ClipboardCheck,
   'session-summary': FileText,
 };
@@ -268,6 +277,51 @@ function formatLocalTime(timezone: string | null | undefined): string | null {
   } catch {
     return null;
   }
+}
+
+function getDmLocalTimeContext(
+  timezone: string | null | undefined,
+  presenceStatus: PresenceDisplayStatusVM | null | undefined,
+): { icon: LucideIcon; label: string } | null {
+  const label = formatLocalTime(timezone);
+  if (!label) return null;
+
+  if (presenceStatus === 'offline') {
+    return { icon: CircleOff, label };
+  }
+
+  const tz = timezone?.trim();
+  let hour: number | null = null;
+
+  if (tz) {
+    try {
+      const hourText = new Intl.DateTimeFormat('en-US', {
+        hour: 'numeric',
+        hour12: false,
+        timeZone: tz,
+      }).format(new Date());
+      const parsedHour = Number.parseInt(hourText, 10);
+      hour = Number.isFinite(parsedHour) ? parsedHour : null;
+    } catch {
+      hour = null;
+    }
+  }
+
+  if (hour === null) {
+    return { icon: Clock3, label };
+  }
+
+  if (hour >= 5 && hour < 9) {
+    return { icon: Sunrise, label };
+  }
+  if (hour >= 9 && hour < 18) {
+    return { icon: Sun, label };
+  }
+  if (hour >= 18 && hour < 21) {
+    return { icon: Sunset, label };
+  }
+
+  return { icon: MoonStar, label };
 }
 
 export const MessagesContainerHeader = memo(function MessagesContainerHeader({
@@ -386,11 +440,33 @@ export const MessagesContainerHeader = memo(function MessagesContainerHeader({
               );
               return relative ? `Last seen ${relative}` : null;
             })();
-      const localTime = formatLocalTime(otherParticipant?.prefs?.timezone);
-      if (summary && localTime) {
-        return `${summary} · ${localTime} (Local time)`;
+      const localTimeContext = getDmLocalTimeContext(
+        otherParticipant?.prefs?.timezone,
+        otherParticipant?.presence?.displayStatus,
+      );
+
+      if (!summary && !localTimeContext) {
+        return null;
       }
-      return summary ?? (localTime ? `${localTime} (Local time)` : null);
+
+      return (
+        <span className="inline-flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
+          {summary ? <span>{summary}</span> : null}
+          {summary && localTimeContext ? (
+            <span className="text-muted-foreground">{'·'}</span>
+          ) : null}
+          {localTimeContext ? (
+            <span className="inline-flex items-center gap-1">
+              <localTimeContext.icon
+                className="h-3.5 w-3.5 shrink-0"
+                aria-hidden="true"
+                data-testid="dm-header-local-time-icon"
+              />
+              <span>{localTimeContext.label}</span>
+            </span>
+          ) : null}
+        </span>
+      );
     }
 
     if (channel.basics.purpose === 'learning-space') {

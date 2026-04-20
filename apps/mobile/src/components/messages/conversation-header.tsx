@@ -27,7 +27,6 @@ import {
   MoonStar,
   CircleOff,
 } from 'lucide-react-native';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@iconicedu/ui-native';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 import { ChannelTopicIconBadge } from '@/lib/learning-space-icons';
@@ -110,7 +109,6 @@ export type ConversationHeaderProps = {
   subtitle?: string | null;
   studentProfiles?: Array<{ name: string; themeKey?: string | null }> | null;
   localTimeLabel?: string | null;
-  localTimeTooltipLabel?: string | null;
   localTimeIcon?:
     | 'clock'
     | 'morning'
@@ -498,7 +496,6 @@ export function ConversationHeader({
   subtitle,
   studentProfiles,
   localTimeLabel,
-  localTimeTooltipLabel,
   localTimeIcon,
   kind,
   avatarSeed,
@@ -700,27 +697,7 @@ export function ConversationHeader({
                 textStyle={s.title}
                 numberOfLines={1}
               />
-              {hasSubtitleMeta &&
-                (localTimeTooltipLabel ? (
-                  <Tooltip delayDuration={0}>
-                    <TooltipTrigger
-                      accessibilityRole="button"
-                      accessibilityLabel="Show local time details"
-                      hitSlop={8}
-                    >
-                      <View style={s.subtitleButton}>{subtitleContent}</View>
-                    </TooltipTrigger>
-                    <TooltipContent
-                      testID="conversation-local-time-tooltip"
-                      sideOffset={6}
-                      className="rounded-2xl px-3 py-2"
-                    >
-                      <Text style={s.tooltipText}>{localTimeTooltipLabel}</Text>
-                    </TooltipContent>
-                  </Tooltip>
-                ) : (
-                  subtitleContent
-                ))}
+              {hasSubtitleMeta && subtitleContent}
             </>
           )}
         </View>

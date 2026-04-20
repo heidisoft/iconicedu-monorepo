@@ -77,57 +77,6 @@ jest.mock('@/lib/learning-space-icons', () => ({
   },
 }));
 
-jest.mock('@iconicedu/ui-native', () => {
-  const React = require('react');
-  const { Pressable, View } = require('react-native');
-  const TooltipContext = React.createContext<{
-    visible: boolean;
-    setVisible: (value: boolean) => void;
-  } | null>(null);
-
-  return {
-    Tooltip: ({ children }: { children: React.ReactNode }) => {
-      const [visible, setVisible] = React.useState(false);
-      return (
-        <TooltipContext.Provider value={{ visible, setVisible }}>
-          {children}
-        </TooltipContext.Provider>
-      );
-    },
-    TooltipTrigger: ({
-      children,
-      accessibilityLabel,
-      accessibilityRole,
-    }: {
-      children: React.ReactNode;
-      accessibilityLabel?: string;
-      accessibilityRole?: string;
-    }) => {
-      const context = React.useContext(TooltipContext);
-      return (
-        <Pressable
-          accessibilityLabel={accessibilityLabel}
-          accessibilityRole={accessibilityRole}
-          onPress={() => context?.setVisible(true)}
-        >
-          {children}
-        </Pressable>
-      );
-    },
-    TooltipContent: ({
-      children,
-      testID,
-    }: {
-      children: React.ReactNode;
-      testID?: string;
-    }) => {
-      const context = React.useContext(TooltipContext);
-      if (!context?.visible) return null;
-      return <View testID={testID}>{children}</View>;
-    },
-  };
-});
-
 // ─── Tests ──────────────────────────────────────────────────────────────────────
 
 describe('ConversationHeader', () => {
@@ -159,24 +108,21 @@ describe('ConversationHeader', () => {
     expect(screen.getByText('Direct Message')).toBeTruthy();
   });
 
-  it('shows a tooltip with local time details when pressed', () => {
+  it('shows local time inline without opening a tooltip when pressed', () => {
     render(
       <ConversationHeader
         {...baseProps}
         subtitle="Available"
         localTimeLabel="9:41 AM"
         localTimeIcon="day"
-        localTimeTooltipLabel={'Current time: 9:41 AM\nLocation: Colombo, Sri Lanka'}
       />,
     );
 
     expect(screen.getByTestId('sun-icon')).toBeTruthy();
-    fireEvent.press(screen.getByLabelText('Show local time details'));
-
-    expect(screen.getByTestId('conversation-local-time-tooltip')).toBeTruthy();
-    expect(
-      screen.getByText('Current time: 9:41 AM\nLocation: Colombo, Sri Lanka'),
-    ).toBeTruthy();
+    expect(screen.getByText('9:41 AM')).toBeTruthy();
+    expect(screen.queryByLabelText('Show local time details')).toBeNull();
+    fireEvent.press(screen.getByText('9:41 AM'));
+    expect(screen.queryByTestId('conversation-local-time-tooltip')).toBeNull();
   });
 
   it('renders the offline icon when local time context is offline', () => {
@@ -186,7 +132,6 @@ describe('ConversationHeader', () => {
         subtitle="Last seen 2h ago"
         localTimeLabel="11:41 PM"
         localTimeIcon="offline"
-        localTimeTooltipLabel={'Current time: 11:41 PM\nThey may be offline right now'}
       />,
     );
 

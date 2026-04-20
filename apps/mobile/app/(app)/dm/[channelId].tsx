@@ -278,9 +278,6 @@ export default function DmConversationScreen() {
         avatarCountryName,
         headerPresenceStatus ?? headerPresenceSummary.status,
       );
-  const headerLocalTimeTooltip = isSupervised
-    ? null
-    : (headerLocalTimeContext?.tooltipLabel ?? null);
 
   const {
     data: messages,
@@ -608,7 +605,6 @@ export default function DmConversationScreen() {
         title={topic ?? 'Direct Message'}
         subtitle={headerSubtitle}
         localTimeLabel={headerLocalTime}
-        localTimeTooltipLabel={headerLocalTimeTooltip}
         localTimeIcon={headerLocalTimeContext?.icon ?? 'clock'}
         kind="dm"
         avatarSeed={avatarSeed}
