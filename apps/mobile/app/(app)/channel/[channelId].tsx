@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   Alert,
   View,
@@ -12,7 +12,7 @@ import { MessageCircle, CalendarDays } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { MessageVM, UserProfileVM } from '@iconicedu/shared-types';
 import { useAccount } from '@/hooks/use-account';
 import { useProfile } from '@/hooks/use-profile';
@@ -45,6 +45,7 @@ import { SpaceSessionsTab } from '@/components/messages/space-sessions-tab';
 import { resolveChannelTopicIconKey } from '@/lib/learning-space-icons';
 import { buildMobileChannelEmptyStateCopy } from '@/lib/message-empty-state';
 import { reportMobileObservedError } from '@/lib/analytics/report-error';
+import { applyOptimisticChannelReadState } from '@/lib/messages/apply-optimistic-channel-read-state';
 
 type ChannelTab = 'messages' | 'sessions';
 
@@ -74,6 +75,7 @@ export default function ChannelConversationScreen() {
   }>();
   const router = useRouter();
   const isFocused = useIsFocused();
+  const queryClient = useQueryClient();
   const { data: account } = useAccount();
   const { data: profile } = useProfile();
   const { colors } = useTheme();
@@ -126,6 +128,10 @@ export default function ChannelConversationScreen() {
     initialData: initialStaffReadOnly ? false : undefined,
     staleTime: 30_000,
   });
+  useEffect(() => {
+    if (!isFocused || !channelId || !orgId) return;
+    void refetch();
+  }, [channelId, isFocused, orgId, refetch]);
   const isStaffReadOnly =
     profileKind === 'staff' &&
     purpose !== 'support' &&
@@ -393,6 +399,15 @@ export default function ChannelConversationScreen() {
         return;
       }
       lastMarkedReadIdRef.current = lastReadMessageId;
+      applyOptimisticChannelReadState({
+        queryClient,
+        orgId,
+        profileId,
+        accountId,
+        channelId,
+        lastReadMessageId,
+        profileKind,
+      });
       try {
         await markChannelReadState({
           orgId,
@@ -402,10 +417,12 @@ export default function ChannelConversationScreen() {
           lastReadMessageId,
         });
       } catch {
-        // best effort read-state sync
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.channelReadState(channelId, accountId),
+        });
       }
     },
-    [accountId, channelId, orgId, profileId],
+    [accountId, channelId, orgId, profileId, profileKind, queryClient],
   );
   const headerStudentProfiles = useMemo(() => {
     if (!studentProfiles) return [] as HeaderStudentProfile[];

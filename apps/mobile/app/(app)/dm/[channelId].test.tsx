@@ -7,6 +7,11 @@ const mockUseLocalSearchParams = jest.fn();
 const mockUseRouter = jest.fn(() => ({ back: jest.fn() }));
 const mockUseIsFocused = jest.fn(() => true);
 const mockUseQuery = jest.fn();
+const mockRefetch = jest.fn();
+const mockQueryClient = {
+  setQueryData: jest.fn(),
+  invalidateQueries: jest.fn(),
+};
 const mockUseOnlineProfileIds = jest.fn(() => new Map());
 const mockUseProfilePresenceSummary = jest.fn(() => ({
   status: 'offline',
@@ -25,6 +30,7 @@ jest.mock('@react-navigation/native', () => ({
 
 jest.mock('@tanstack/react-query', () => ({
   useQuery: (...args: unknown[]) => mockUseQuery(...args),
+  useQueryClient: () => mockQueryClient,
 }));
 
 jest.mock('@/hooks/use-account', () => ({
@@ -52,7 +58,7 @@ jest.mock('@/hooks/use-messages', () => ({
     data: [],
     isLoading: false,
     isRefetching: false,
-    refetch: jest.fn(),
+    refetch: mockRefetch,
     loadMore: jest.fn(),
     toggleReaction: jest.fn(),
     typingUsers: [],
@@ -169,6 +175,18 @@ describe('DmConversationScreen — supervised read-only mode', () => {
 
     expect(screen.getByText('MessageInput')).toBeTruthy();
     expect(screen.queryByText(/read-only mode/i)).toBeNull();
+  });
+
+  it('refetches messages when the screen is focused', () => {
+    mockUseLocalSearchParams.mockReturnValue({
+      channelId: 'ch-1',
+      topic: 'Alice',
+    });
+    mockUseIsFocused.mockReturnValue(true);
+
+    renderScreen();
+
+    expect(mockRefetch).toHaveBeenCalled();
   });
 
   it('renders read-only notice instead of MessageInput when isSupervisedReadOnly=1', () => {

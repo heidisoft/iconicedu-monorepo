@@ -7,6 +7,11 @@ const mockUseIsFocused = jest.fn(() => true);
 const mockFetchIsChannelMember = jest.fn();
 const mockConversationHeader = jest.fn(() => null);
 const mockUseQuery = jest.fn();
+const mockRefetch = jest.fn();
+const mockQueryClient = {
+  setQueryData: jest.fn(),
+  invalidateQueries: jest.fn(),
+};
 
 jest.mock('expo-router', () => ({
   useLocalSearchParams: (...args: unknown[]) => mockUseLocalSearchParams(...args),
@@ -20,6 +25,7 @@ jest.mock('@react-navigation/native', () => ({
 
 jest.mock('@tanstack/react-query', () => ({
   useQuery: (...args: unknown[]) => mockUseQuery(...args),
+  useQueryClient: () => mockQueryClient,
 }));
 
 jest.mock('@/hooks/use-account', () => ({
@@ -46,7 +52,13 @@ jest.mock('@/hooks/use-messages', () => ({
   useMessages: () => ({
     data: [],
     isLoading: false,
+    isRefetching: false,
+    refetch: mockRefetch,
     loadMore: jest.fn(),
+    toggleReaction: jest.fn(),
+    typingUsers: [],
+    broadcastTyping: jest.fn(),
+    broadcastTypingStop: jest.fn(),
   }),
 }));
 
@@ -200,5 +212,18 @@ describe('SpaceDetailScreen', () => {
     expect(mockConversationHeader).toHaveBeenCalledWith(
       expect.objectContaining({ isReadOnly: false }),
     );
+  });
+
+  it('refetches messages when the screen is focused', () => {
+    mockUseLocalSearchParams.mockReturnValue({
+      channelId: 'channel-1',
+      topic: 'Biology',
+    });
+    mockFetchIsChannelMember.mockReturnValue(true);
+    mockUseIsFocused.mockReturnValue(true);
+
+    renderScreen();
+
+    expect(mockRefetch).toHaveBeenCalled();
   });
 });

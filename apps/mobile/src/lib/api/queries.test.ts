@@ -567,6 +567,7 @@ describe('fetchActivityFeed', () => {
 
 const MSG_ID = 'msg-1';
 const ACCOUNT_ID = 'acct-1';
+const REACTION_PROFILE_ID = 'profile-1';
 const EMOJI = '👍';
 const ORG = 'org-1';
 
@@ -578,25 +579,27 @@ describe('toggleReaction', () => {
   });
 
   it('calls apiPost /reactions when reactedByMe is false', async () => {
-    await toggleReaction(MSG_ID, ACCOUNT_ID, EMOJI, ORG, false);
+    await toggleReaction(MSG_ID, ACCOUNT_ID, REACTION_PROFILE_ID, EMOJI, ORG, false);
 
     expect(mockApiPost).toHaveBeenCalledWith('/reactions', {
       orgId: ORG,
       messageId: MSG_ID,
       emoji: EMOJI,
       accountId: ACCOUNT_ID,
+      profileId: REACTION_PROFILE_ID,
     });
     expect(mockApiDelete).not.toHaveBeenCalled();
   });
 
   it('calls apiDelete /reactions when reactedByMe is true', async () => {
-    await toggleReaction(MSG_ID, ACCOUNT_ID, EMOJI, ORG, true);
+    await toggleReaction(MSG_ID, ACCOUNT_ID, REACTION_PROFILE_ID, EMOJI, ORG, true);
 
     expect(mockApiDelete).toHaveBeenCalledWith('/reactions', {
       orgId: ORG,
       messageId: MSG_ID,
       emoji: EMOJI,
       accountId: ACCOUNT_ID,
+      profileId: REACTION_PROFILE_ID,
     });
     expect(mockApiPost).not.toHaveBeenCalled();
   });

@@ -4,7 +4,6 @@ const {
   createSupabaseServerClientMock,
   createSupabaseServiceClientMock,
   compileLearningSpaceReminderJobsMock,
-  ensureSystemProfileIdMock,
   requireParentActorContextMock,
   getAccountByAuthUserIdMock,
   getProfileByAccountIdMock,
@@ -13,7 +12,6 @@ const {
   createSupabaseServerClientMock: vi.fn(),
   createSupabaseServiceClientMock: vi.fn(),
   compileLearningSpaceReminderJobsMock: vi.fn(),
-  ensureSystemProfileIdMock: vi.fn(),
   requireParentActorContextMock: vi.fn(),
   getAccountByAuthUserIdMock: vi.fn(),
   getProfileByAccountIdMock: vi.fn(),
@@ -30,10 +28,6 @@ vi.mock('@iconicedu/web/lib/supabase/service', () => ({
 
 vi.mock('@iconicedu/web/lib/automation/reminder-jobs', () => ({
   compileLearningSpaceReminderJobs: compileLearningSpaceReminderJobsMock,
-}));
-
-vi.mock('@iconicedu/web/lib/automation/system-profile', () => ({
-  ensureSystemProfileId: ensureSystemProfileIdMock,
 }));
 
 vi.mock('@iconicedu/web/lib/family-view/actor-context', () => ({
@@ -83,7 +77,6 @@ describe('createLearningSpaceFromPayload', () => {
       error: null,
     });
     insertClassSchedulesMock.mockResolvedValue(['schedule-1']);
-    ensureSystemProfileIdMock.mockResolvedValue('system-profile-1');
     requireParentActorContextMock.mockResolvedValue({
       account: { id: 'account-1', org_id: 'org-1' },
       profile: { id: 'profile-1', account_id: 'account-1', org_id: 'org-1' },
@@ -130,7 +123,6 @@ describe('createLearningSpaceFromPayload', () => {
     });
 
     expect(compileLearningSpaceReminderJobsMock).toHaveBeenCalled();
-    expect(ensureSystemProfileIdMock).toHaveBeenCalled();
   });
 
   it('supports creating a learning space with multiple participants under the pruned activity model', async () => {

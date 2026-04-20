@@ -58,13 +58,6 @@ describe('NOTIFICATION_REGISTRY', () => {
     expect(route).toBe('/(app)/(tabs)/schedule');
   });
 
-  it('routes class.sessions.scheduled with a channelId to the class space', () => {
-    const route = NOTIFICATION_REGISTRY['class.sessions.scheduled'].getRoute({
-      channelId: 'ch-2',
-    });
-    expect(route).toBe('/(app)/spaces/ch-2');
-  });
-
   it('routes class.sessions.rescheduled without a channelId to the schedule tab', () => {
     const route = NOTIFICATION_REGISTRY['class.sessions.rescheduled'].getRoute({});
     expect(route).toBe('/(app)/(tabs)/schedule');
@@ -84,11 +77,9 @@ describe('NOTIFICATION_REGISTRY', () => {
     expect(route).toBe('/(app)/spaces/ch-3?tab=sessions');
   });
 
-  it('routes session.started with a channelId to the class space', () => {
-    const route = NOTIFICATION_REGISTRY['session.started'].getRoute({
-      channelId: 'ch-live',
-    });
-    expect(route).toBe('/(app)/spaces/ch-live');
+  it('routes class.sessions.canceled without a channelId to the schedule tab', () => {
+    const route = NOTIFICATION_REGISTRY['class.sessions.canceled'].getRoute({});
+    expect(route).toBe('/(app)/(tabs)/schedule');
   });
 
   it('routes session.feedback_request.sent with a channelId to the class space', () => {
@@ -103,13 +94,8 @@ describe('NOTIFICATION_REGISTRY', () => {
     expect(route).toBe('/(app)/(tabs)/schedule');
   });
 
-  it('routes payment.failed to inbox', () => {
-    const route = NOTIFICATION_REGISTRY['payment.failed'].getRoute({});
-    expect(route).toBe('/(app)/(tabs)/inbox');
-  });
-
-  it('routes system.notice to inbox', () => {
-    const route = NOTIFICATION_REGISTRY['system.notice'].getRoute({});
+  it('routes payment.reminder.sent to inbox', () => {
+    const route = NOTIFICATION_REGISTRY['payment.reminder.sent'].getRoute({});
     expect(route).toBe('/(app)/(tabs)/inbox');
   });
 

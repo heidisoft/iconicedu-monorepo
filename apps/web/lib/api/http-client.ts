@@ -1,9 +1,24 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-const API_URL = (process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? '').replace(
-  /\/+$/,
-  '',
-);
+const DEFAULT_LOCAL_API_URL = 'http://localhost:3001';
+
+function resolveApiUrl(): string {
+  const configuredUrl = (
+    process.env.API_URL ??
+    process.env.NEXT_PUBLIC_API_URL ??
+    ''
+  ).trim();
+
+  if (configuredUrl) {
+    return configuredUrl.replace(/\/+$/, '');
+  }
+
+  if (process.env.NODE_ENV !== 'production') {
+    return DEFAULT_LOCAL_API_URL;
+  }
+
+  throw new Error('API_URL or NEXT_PUBLIC_API_URL is required');
+}
 
 type QueryParams = Record<string, string | number | boolean | null | undefined>;
 
@@ -39,6 +54,8 @@ async function parseResponse<T>(response: Response): Promise<T> {
 }
 
 export function createApiClient(supabase: SupabaseClient) {
+  const apiUrl = resolveApiUrl();
+
   async function get<T>(path: string, params?: QueryParams): Promise<T> {
     const query = new URLSearchParams();
     Object.entries(params ?? {}).forEach(([key, value]) => {
@@ -46,7 +63,7 @@ export function createApiClient(supabase: SupabaseClient) {
       query.set(key, String(value));
     });
 
-    const url = `${API_URL}${path}${query.size ? `?${query.toString()}` : ''}`;
+    const url = `${apiUrl}${path}${query.size ? `?${query.toString()}` : ''}`;
     const response = await fetch(url, {
       method: 'GET',
       headers: await getAuthHeaders(supabase),
@@ -56,7 +73,7 @@ export function createApiClient(supabase: SupabaseClient) {
   }
 
   async function post<T>(path: string, body: unknown): Promise<T> {
-    const response = await fetch(`${API_URL}${path}`, {
+    const response = await fetch(`${apiUrl}${path}`, {
       method: 'POST',
       headers: await getAuthHeaders(supabase),
       body: JSON.stringify(body),
@@ -66,7 +83,7 @@ export function createApiClient(supabase: SupabaseClient) {
   }
 
   async function put<T>(path: string, body?: unknown): Promise<T> {
-    const response = await fetch(`${API_URL}${path}`, {
+    const response = await fetch(`${apiUrl}${path}`, {
       method: 'PUT',
       headers: await getAuthHeaders(supabase),
       body: JSON.stringify(body ?? {}),
@@ -76,7 +93,7 @@ export function createApiClient(supabase: SupabaseClient) {
   }
 
   async function del<T>(path: string, body?: unknown): Promise<T> {
-    const response = await fetch(`${API_URL}${path}`, {
+    const response = await fetch(`${apiUrl}${path}`, {
       method: 'DELETE',
       headers: await getAuthHeaders(supabase),
       body: JSON.stringify(body ?? {}),

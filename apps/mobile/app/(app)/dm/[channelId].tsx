@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { reportMobileObservedError } from '@/lib/analytics/report-error';
 import {
   Alert,
@@ -11,7 +11,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { MessageVM, UserProfileVM } from '@iconicedu/shared-types';
 import { useAccount } from '@/hooks/use-account';
 import { useProfile } from '@/hooks/use-profile';
@@ -44,6 +44,7 @@ import { buildMobileChannelEmptyStateCopy } from '@/lib/message-empty-state';
 import type { AttachmentPayload } from '@/components/messages/attachment-sheet';
 import type { PendingUpload } from '@/components/messages/pending-message-row';
 import type { PresenceDisplayStatus } from '@/hooks/use-online-profile-ids';
+import { applyOptimisticChannelReadState } from '@/lib/messages/apply-optimistic-channel-read-state';
 
 const COUNTRY_LABELS: Record<string, string> = {
   LK: 'Sri Lanka',
@@ -115,6 +116,7 @@ export default function DmConversationScreen() {
   const isSupervised = isSupervisedReadOnly === '1';
   const router = useRouter();
   const isFocused = useIsFocused();
+  const queryClient = useQueryClient();
   const { data: account } = useAccount();
   const { data: profile } = useProfile();
   const { colors } = useTheme();
@@ -297,6 +299,11 @@ export default function DmConversationScreen() {
     enabled: !!channelId && !!accountId,
     staleTime: 30_000,
   });
+
+  useEffect(() => {
+    if (!isFocused || !channelId || !orgId) return;
+    void refetch();
+  }, [channelId, isFocused, orgId, refetch]);
 
   // ── Info sheet state ──
   const [infoVisible, setInfoVisible] = useState(false);
@@ -559,6 +566,15 @@ export default function DmConversationScreen() {
         return;
       }
       lastMarkedReadIdRef.current = lastReadMessageId;
+      applyOptimisticChannelReadState({
+        queryClient,
+        orgId,
+        profileId,
+        accountId,
+        channelId,
+        lastReadMessageId,
+        profileKind: (profileRecord?.kind as string | null | undefined) ?? null,
+      });
       try {
         await markChannelReadState({
           orgId,
@@ -568,10 +584,12 @@ export default function DmConversationScreen() {
           lastReadMessageId,
         });
       } catch {
-        // best effort read-state sync
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.channelReadState(channelId, accountId),
+        });
       }
     },
-    [accountId, channelId, orgId, profileId],
+    [accountId, channelId, orgId, profileId, profileRecord?.kind, queryClient],
   );
   if (!channelId) return null;
 

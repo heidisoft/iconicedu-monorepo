@@ -340,7 +340,14 @@ export function useMessages(
       });
 
       try {
-        await apiToggleReaction(messageId, currentAccountId, emoji, orgId, reactedByMe);
+        await apiToggleReaction(
+          messageId,
+          currentAccountId,
+          currentProfileId,
+          emoji,
+          orgId,
+          reactedByMe,
+        );
       } catch {
         // Roll back on error
         queryClient.setQueryData(key, previous);

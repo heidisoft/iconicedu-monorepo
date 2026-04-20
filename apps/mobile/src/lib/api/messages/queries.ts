@@ -59,15 +59,16 @@ export async function fetchThreadMessages(
 export async function toggleReaction(
   messageId: string,
   accountId: string,
+  profileId: string,
   emoji: string,
   orgId: string,
   reactedByMe: boolean,
 ): Promise<void> {
   if (reactedByMe) {
-    await apiDelete('/reactions', { orgId, messageId, emoji, accountId });
+    await apiDelete('/reactions', { orgId, messageId, emoji, accountId, profileId });
     return;
   }
-  await apiPost('/reactions', { orgId, messageId, emoji, accountId });
+  await apiPost('/reactions', { orgId, messageId, emoji, accountId, profileId });
 }
 
 export async function deleteMessage(
