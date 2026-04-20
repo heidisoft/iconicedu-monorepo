@@ -26,6 +26,43 @@ export type VisibilityAudienceResolution = {
   allowedProfileIds?: Set<string> | null;
 };
 
+export function resolveVisibilityAudienceFromMessageRow(input: {
+  visibilityType?: string | null;
+  visibilityUserId?: string | null;
+  visibilityUserIds?: string[] | null;
+}): VisibilityAudienceResolution {
+  const visibilityType = input.visibilityType ?? 'all';
+  if (visibilityType === 'sender-only') {
+    return {
+      suppressActivity: true,
+      allowedProfileIds: new Set(),
+    };
+  }
+
+  if (visibilityType === 'recipient-only') {
+    const userIds = input.visibilityUserId ? [input.visibilityUserId] : [];
+    return {
+      suppressActivity: userIds.length === 0,
+      audienceRules: userIds.length ? [{ kind: 'users_only', userIds }] : undefined,
+      allowedProfileIds: new Set(userIds),
+    };
+  }
+
+  if (visibilityType === 'specific-users') {
+    const userIds = Array.from(new Set(input.visibilityUserIds ?? []));
+    return {
+      suppressActivity: userIds.length === 0,
+      audienceRules: userIds.length ? [{ kind: 'users_only', userIds }] : undefined,
+      allowedProfileIds: new Set(userIds),
+    };
+  }
+
+  return {
+    suppressActivity: false,
+    allowedProfileIds: null,
+  };
+}
+
 function filterDmRecipientsByLastReadRecency(input: {
   candidateProfileIds: string[];
   profileLastReadAtById: Map<string, string | null | undefined>;
@@ -632,8 +669,8 @@ export async function publishFileUploadActivity(input: {
       senderProfileId: input.senderProfileId,
     }));
   const isDmRoute = activityContext.channelRouteKind === 'dm';
-  const eventType = isDmRoute ? 'dm.posted' : 'file.uploaded';
-  const dedupePrefix = isDmRoute ? 'dm.posted' : 'file.uploaded';
+  const eventType = isDmRoute ? 'dm.posted' : 'message.posted';
+  const dedupePrefix = isDmRoute ? 'dm.posted' : 'message.posted';
   const activityContent = input.content?.trim() || input.name;
   const dmMessageKind =
     typeof input.mimeType === 'string' && input.mimeType.startsWith('image/')

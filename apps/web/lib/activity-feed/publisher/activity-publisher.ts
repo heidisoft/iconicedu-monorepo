@@ -2,7 +2,6 @@ import type {
   ActivityEventTypeVM,
   AudienceRuleVM,
   FeedScopeVM,
-  SystemNoticeActivityEventPayload,
 } from '@iconicedu/shared-types';
 import type { ActivityEventRow, EntityRefVM } from '@iconicedu/shared-types';
 import type { SupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
@@ -86,27 +85,4 @@ export async function publishActivityEvent<TPayload extends object>(
   });
 
   return parseInternalResponse<ActivityEventRow | null>(response);
-}
-
-export async function publishSystemNoticeActivity(input: {
-  supabase: SupabaseServiceClient;
-  orgId: string;
-  actorProfileId?: string | null;
-  audienceRules: NonNullable<
-    PublishActivityEventInput<SystemNoticeActivityEventPayload>['audienceRules']
-  >;
-  payload: SystemNoticeActivityEventPayload;
-  dedupeKey?: string | null;
-}) {
-  return publishActivityEvent<SystemNoticeActivityEventPayload>({
-    supabase: input.supabase,
-    orgId: input.orgId,
-    eventType: 'system.notice',
-    sourceKind: input.actorProfileId ? 'profile' : 'system',
-    actorProfileId: input.actorProfileId ?? null,
-    scope: { kind: 'global' },
-    audienceRules: input.audienceRules,
-    payload: input.payload,
-    dedupeKey: input.dedupeKey,
-  });
 }

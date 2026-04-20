@@ -4,7 +4,6 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
-import { publishReactionAddedActivity } from '@iconicedu/api/lib/messages/message-activity';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
 
@@ -117,17 +116,6 @@ export class ReactionsService {
       if (insertCountError)
         throw new InternalServerErrorException(insertCountError.message);
     }
-
-    await publishReactionAddedActivity({
-      supabase: serviceSupabase,
-      orgId: body.orgId,
-      channelId: messageResponse.data.channel_id,
-      senderProfileId: body.profileId,
-      messageId: body.messageId,
-      messageSenderProfileId: messageResponse.data.sender_profile_id ?? '',
-      emoji: body.emoji,
-      now: new Date().toISOString(),
-    });
 
     return { success: true };
   }

@@ -16,16 +16,6 @@ export type NotificationConfig = {
 };
 
 export const NOTIFICATION_REGISTRY: Record<string, NotificationConfig> = {
-  'class.session.scheduled': {
-    label: 'Session Scheduled',
-    getRoute: ({ channelId }) =>
-      channelId ? `/(app)/spaces/${channelId}` : '/(app)/(tabs)/schedule',
-  },
-  'class.sessions.scheduled': {
-    label: 'Sessions Scheduled',
-    getRoute: ({ channelId }) =>
-      channelId ? `/(app)/spaces/${channelId}` : '/(app)/(tabs)/schedule',
-  },
   'class.session.rescheduled': {
     label: 'Session Rescheduled',
     getRoute: ({ channelId }) =>
@@ -67,23 +57,6 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationConfig> = {
           ? `/(app)/dm/${scopeId}`
           : '/(app)/(tabs)/messages',
   },
-  'homework.assigned': {
-    label: 'Homework Assigned',
-    getRoute: () => '/(app)/(tabs)/home',
-  },
-  'homework.submitted': {
-    label: 'Homework Submitted',
-    getRoute: () => '/(app)/(tabs)/home',
-  },
-  'homework.reviewed': {
-    label: 'Homework Reviewed',
-    getRoute: () => '/(app)/(tabs)/home',
-  },
-  'session.started': {
-    label: 'Session Started',
-    getRoute: ({ channelId }) =>
-      channelId ? `/(app)/spaces/${channelId}` : '/(app)/(tabs)/schedule',
-  },
   'session.reminder.sent': {
     label: 'Session Reminders',
     getRoute: ({ channelId }) =>
@@ -93,27 +66,6 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationConfig> = {
     label: 'Session Feedback',
     getRoute: ({ channelId }) =>
       channelId ? `/(app)/spaces/${channelId}` : '/(app)/(tabs)/schedule',
-  },
-  'class.created': {
-    label: 'New Class',
-    getRoute: () => '/(app)/(tabs)/home',
-  },
-  'member.joined': {
-    label: 'Member Joined',
-    getRoute: () => '/(app)/(tabs)/inbox',
-  },
-  'member.invited': {
-    label: 'Invitations',
-    getRoute: () => '/(app)/(tabs)/inbox',
-  },
-  'summary.posted': {
-    label: 'AI Summary',
-    getRoute: ({ scopeKind, scopeId, channelId }) =>
-      scopeKind === 'channel' && scopeId
-        ? `/(app)/spaces/${scopeId}`
-        : scopeKind === 'learning_space' && channelId
-          ? `/(app)/spaces/${channelId}`
-          : '/(app)/(tabs)/inbox',
   },
   'reaction.added': {
     label: 'Reactions',
@@ -128,33 +80,12 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationConfig> = {
         : `/(app)/channel/${targetId}`;
     },
   },
-  'file.uploaded': {
-    label: 'File Uploaded',
-    getRoute: ({ scopeKind, scopeId, channelId }) =>
-      scopeKind === 'channel' && scopeId
-        ? `/(app)/spaces/${scopeId}`
-        : scopeKind === 'learning_space' && channelId
-          ? `/(app)/spaces/${channelId}`
-          : '/(app)/(tabs)/inbox',
-  },
   'payment.reminder': {
     label: 'Payment Reminder',
     getRoute: () => '/(app)/(tabs)/inbox',
   },
   'payment.reminder.sent': {
     label: 'Payment Reminder',
-    getRoute: () => '/(app)/(tabs)/inbox',
-  },
-  'payment.received': {
-    label: 'Payment Received',
-    getRoute: () => '/(app)/(tabs)/inbox',
-  },
-  'payment.failed': {
-    label: 'Payment Failed',
-    getRoute: () => '/(app)/(tabs)/inbox',
-  },
-  'system.notice': {
-    label: 'System Notice',
     getRoute: () => '/(app)/(tabs)/inbox',
   },
 };

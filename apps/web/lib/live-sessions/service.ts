@@ -394,46 +394,7 @@ async function publishSessionStartedActivity(input: {
   joinPath: string;
   occurredAt: string;
 }) {
-  const learningSpaceId = resolveSessionActivityLearningSpaceId(input.context);
-  const scheduleId = resolveSessionActivityScheduleId(input.context);
-  const title = resolveSessionActivityTitle(input.context);
-  const mode = resolveSessionActivityMode(input.context);
-
-  await publishActivityEvent({
-    supabase: input.supabase,
-    orgId: input.context.session.org_id,
-    eventType: 'session.started',
-    occurredAt: input.occurredAt,
-    sourceKind: 'profile',
-    actorProfileId: input.actorProfileId,
-    scope: buildLiveSessionTimelineScope(input.context.session.channel_id),
-    objectRef: { kind: 'session', id: input.context.session.id },
-    targetRef: learningSpaceId
-      ? { kind: 'learning_space', id: learningSpaceId }
-      : undefined,
-    payload: {
-      liveSessionId: input.context.session.id,
-      channelId: input.context.session.channel_id,
-      learningSpaceId,
-      scheduleId,
-      title,
-      joinPath: input.joinPath,
-      mode,
-      startedAt: input.occurredAt,
-      isScheduledSessionWindow: input.context.scope.isScheduledSessionWindow === true,
-      startedByDisplayName: input.startedByDisplayName,
-      occurrenceStart:
-        input.context.scope.occurrenceKey ?? input.context.session.occurrence_key ?? null,
-      occurrenceLabel:
-        input.context.scope.occurrenceLabel ??
-        (typeof input.context.session.app_metadata?.occurrenceLabel === 'string'
-          ? input.context.session.app_metadata.occurrenceLabel
-          : null),
-      participants: input.participants ?? [],
-    },
-    dedupeKey: `session.started:${input.context.session.id}`,
-    createdBy: input.actorProfileId,
-  });
+  void input;
 }
 
 async function publishMemberJoinedActivity(input: {
@@ -444,76 +405,7 @@ async function publishMemberJoinedActivity(input: {
   occurredAt: string;
   sourceKind: 'profile' | 'provider_webhook';
 }) {
-  const learningSpaceId = resolveSessionActivityLearningSpaceId(input.context);
-  const scheduleId = resolveSessionActivityScheduleId(input.context);
-  const title = resolveSessionActivityTitle(input.context);
-  const mode = resolveSessionActivityMode(input.context);
-  const memberProfileId = input.member?.profileId ?? input.actorProfileId;
-
-  if (input.sourceKind === 'provider_webhook') {
-    const recentlyPublishedByApp = await hasRecentAppMemberJoinedActivity({
-      supabase: input.supabase,
-      orgId: input.context.session.org_id,
-      channelId: input.context.session.channel_id,
-      sessionId: input.context.session.id,
-      memberProfileId,
-      occurredAt: input.occurredAt,
-    });
-    if (recentlyPublishedByApp) {
-      return;
-    }
-  }
-
-  await publishActivityEvent({
-    supabase: input.supabase,
-    orgId: input.context.session.org_id,
-    eventType: 'member.joined',
-    occurredAt: input.occurredAt,
-    sourceKind: input.sourceKind,
-    actorProfileId: input.sourceKind === 'profile' ? input.actorProfileId : null,
-    scope: buildLiveSessionTimelineScope(input.context.session.channel_id),
-    objectRef: { kind: 'session', id: input.context.session.id },
-    targetRef: learningSpaceId
-      ? { kind: 'learning_space', id: learningSpaceId }
-      : undefined,
-    payload: {
-      liveSessionId: input.context.session.id,
-      channelId: input.context.session.channel_id,
-      learningSpaceId,
-      scheduleId,
-      title,
-      mode,
-      isScheduledSessionWindow: input.context.scope.isScheduledSessionWindow === true,
-      occurrenceStart:
-        input.context.scope.occurrenceKey ?? input.context.session.occurrence_key ?? null,
-      occurrenceLabel:
-        input.context.scope.occurrenceLabel ??
-        (typeof input.context.session.app_metadata?.occurrenceLabel === 'string'
-          ? input.context.session.app_metadata.occurrenceLabel
-          : null),
-      memberProfileId,
-      memberDisplayName: input.member?.displayName ?? 'Participant',
-      memberAvatarUrl: input.member?.avatarUrl ?? null,
-      memberThemeKey: input.member?.themeKey ?? null,
-      members: input.member
-        ? [
-            {
-              profileId: input.member.profileId,
-              displayName: input.member.displayName,
-              avatarUrl: input.member.avatarUrl,
-              themeKey: input.member.themeKey,
-            },
-          ]
-        : undefined,
-      joinedAt: input.occurredAt,
-    },
-    dedupeKey: buildMemberJoinedActivityDedupeKey(
-      input.context.session.id,
-      memberProfileId,
-      input.occurredAt,
-    ),
-    createdBy: input.sourceKind === 'profile' ? input.actorProfileId : null,
-  });
+  void input;
 }
 
 async function hasScheduledSessionStartedActivity(input: {
@@ -1194,41 +1086,7 @@ export async function createOrJoinLiveSession(input: {
             },
             normalizedEventVersion: 'v1',
           });
-          if (shouldPublishSessionStarted) {
-            await publishActivityEvent({
-              supabase: input.serviceSupabase,
-              orgId: session.org_id,
-              eventType: 'session.started',
-              occurredAt: now,
-              sourceKind: 'profile',
-              actorProfileId: profile.id,
-              scope: buildLiveSessionTimelineScope(session.channel_id),
-              objectRef: { kind: 'session', id: session.id },
-              targetRef: learningSpaceId
-                ? { kind: 'learning_space', id: learningSpaceId }
-                : undefined,
-              payload: {
-                liveSessionId: session.id,
-                channelId: session.channel_id,
-                learningSpaceId,
-                scheduleId,
-                title: sessionTitle,
-                joinPath,
-                mode: liveSessionConfig.mode ?? 'video',
-                startedAt: now,
-                isScheduledSessionWindow: scope.isScheduledSessionWindow === true,
-                startedByDisplayName:
-                  profile.display_name ??
-                  ([profile.first_name, profile.last_name].filter(Boolean).join(' ') ||
-                    'User'),
-                occurrenceStart,
-                occurrenceLabel: scope.occurrenceLabel ?? null,
-                participants: sessionActivityParticipants,
-              },
-              dedupeKey: `session.started:${session.id}`,
-              createdBy: profile.id,
-            });
-          }
+          void shouldPublishSessionStarted;
           await publishMemberJoinedActivity({
             supabase: input.serviceSupabase,
             context: {
@@ -1333,41 +1191,7 @@ export async function createOrJoinLiveSession(input: {
           payload: {},
           normalizedEventVersion: 'v1',
         });
-        if (shouldPublishSessionStarted) {
-          await publishActivityEvent({
-            supabase: input.serviceSupabase,
-            orgId: session.org_id,
-            eventType: 'session.started',
-            occurredAt: now,
-            sourceKind: 'profile',
-            actorProfileId: profile.id,
-            scope: buildLiveSessionTimelineScope(session.channel_id),
-            objectRef: { kind: 'session', id: session.id },
-            targetRef: learningSpaceId
-              ? { kind: 'learning_space', id: learningSpaceId }
-              : undefined,
-            payload: {
-              liveSessionId: session.id,
-              channelId: session.channel_id,
-              learningSpaceId,
-              scheduleId,
-              title: sessionTitle,
-              joinPath: resolvedJoinPath,
-              mode: liveSessionConfig.mode ?? 'video',
-              startedAt: now,
-              isScheduledSessionWindow: scope.isScheduledSessionWindow === true,
-              startedByDisplayName:
-                profile.display_name ??
-                ([profile.first_name, profile.last_name].filter(Boolean).join(' ') ||
-                  'User'),
-              occurrenceStart,
-              occurrenceLabel: scope.occurrenceLabel ?? null,
-              participants: sessionActivityParticipants,
-            },
-            dedupeKey: `session.started:${session.id}`,
-            createdBy: profile.id,
-          });
-        }
+        void shouldPublishSessionStarted;
         await publishMemberJoinedActivity({
           supabase: input.serviceSupabase,
           context: {
@@ -1620,63 +1444,6 @@ export async function processLiveSessionProviderWebhook(input: {
             occurredAt: event.occurredAt,
             sourceKind: 'provider_webhook',
           });
-        } else {
-          const learningSpaceId = resolveSessionLearningSpaceIdFromMetadata(session);
-          const scheduleId = resolveSessionScheduleIdFromMetadata(session);
-          await publishActivityEvent({
-            supabase: input.supabase,
-            orgId: session.org_id,
-            eventType: 'member.removed',
-            occurredAt: event.occurredAt,
-            sourceKind: 'provider_webhook',
-            actorProfileId: null,
-            scope: buildLiveSessionTimelineScope(session.channel_id),
-            objectRef: { kind: 'session', id: session.id },
-            targetRef: learningSpaceId
-              ? { kind: 'learning_space', id: learningSpaceId }
-              : undefined,
-            payload: {
-              liveSessionId: session.id,
-              channelId: session.channel_id,
-              learningSpaceId,
-              scheduleId,
-              title:
-                typeof session.app_metadata?.scheduleTitle === 'string'
-                  ? session.app_metadata.scheduleTitle
-                  : 'Class',
-              occurrenceStart:
-                typeof session.occurrence_key === 'string'
-                  ? session.occurrence_key
-                  : null,
-              occurrenceLabel:
-                typeof session.app_metadata?.occurrenceLabel === 'string'
-                  ? session.app_metadata.occurrenceLabel
-                  : null,
-              mode:
-                typeof session.app_metadata?.mode === 'string' &&
-                (session.app_metadata.mode === 'audio' ||
-                  session.app_metadata.mode === 'video')
-                  ? session.app_metadata.mode
-                  : 'video',
-              memberProfileId: participant?.profileId ?? event.profileId,
-              memberDisplayName:
-                participant?.displayName ?? event.participantDisplayName ?? 'Participant',
-              memberAvatarUrl: participant?.avatarUrl ?? null,
-              memberThemeKey: participant?.themeKey ?? null,
-              members: participant
-                ? [
-                    {
-                      profileId: participant.profileId,
-                      displayName: participant.displayName,
-                      avatarUrl: participant.avatarUrl,
-                      themeKey: participant.themeKey,
-                    },
-                  ]
-                : undefined,
-              leftAt: event.occurredAt,
-            },
-            dedupeKey: `${event.eventType}:${session.id}:${event.profileId}:${event.occurredAt}`,
-          });
         }
       }
 
@@ -1739,46 +1506,7 @@ export async function processLiveSessionProviderWebhook(input: {
         orgId: session.org_id,
       });
 
-      const learningSpaceId = resolveSessionLearningSpaceIdFromMetadata(session);
-      const scheduleId = resolveSessionScheduleIdFromMetadata(session);
-      await publishActivityEvent({
-        supabase: input.supabase,
-        orgId: session.org_id,
-        eventType: 'session.ended',
-        occurredAt: event.occurredAt,
-        sourceKind: 'provider_webhook',
-        actorProfileId: null,
-        scope: buildLiveSessionTimelineScope(session.channel_id),
-        objectRef: { kind: 'session', id: session.id },
-        targetRef: learningSpaceId
-          ? { kind: 'learning_space', id: learningSpaceId }
-          : undefined,
-        payload: {
-          liveSessionId: session.id,
-          channelId: session.channel_id,
-          learningSpaceId,
-          scheduleId,
-          title:
-            typeof session.app_metadata?.scheduleTitle === 'string'
-              ? session.app_metadata.scheduleTitle
-              : 'Live session',
-          mode:
-            typeof session.app_metadata?.mode === 'string' &&
-            (session.app_metadata.mode === 'audio' ||
-              session.app_metadata.mode === 'video')
-              ? session.app_metadata.mode
-              : 'video',
-          occurrenceStart:
-            typeof session.occurrence_key === 'string' ? session.occurrence_key : null,
-          occurrenceLabel:
-            typeof session.app_metadata?.occurrenceLabel === 'string'
-              ? session.app_metadata.occurrenceLabel
-              : null,
-          endedAt: event.occurredAt,
-          participants: sessionParticipants,
-        },
-        dedupeKey: `session.ended:${session.id}`,
-      });
+      void sessionParticipants;
     }
   }
 

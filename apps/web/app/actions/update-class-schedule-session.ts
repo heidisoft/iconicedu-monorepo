@@ -25,7 +25,6 @@ export type UpdateClassScheduleSessionActionInput = {
   endTime: string;
   timezone: string;
   reason?: string | null;
-  sendActivityNotifications?: boolean;
 };
 
 export type UpdateClassScheduleSessionActionResult = {
@@ -213,17 +212,10 @@ export async function updateClassScheduleSessionAction(
     schedules: mapSchedulesToPayload(updatedSchedules),
   };
 
-  await updateLearningSpaceFromPayload(
-    scheduleRow.source_learning_space_id,
-    payload,
-    {
-      orgId: org.id,
-      actorProfileId: actorProfile.id,
-    },
-    {
-      sendActivityNotifications: input.sendActivityNotifications ?? true,
-    },
-  );
+  await updateLearningSpaceFromPayload(scheduleRow.source_learning_space_id, payload, {
+    orgId: org.id,
+    actorProfileId: actorProfile.id,
+  });
 
   revalidatePath(`/${input.orgSlug}/class-schedule`);
   if (scheduleRow.source_channel_id) {

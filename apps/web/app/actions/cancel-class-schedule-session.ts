@@ -6,14 +6,12 @@ import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
 import { getAccountByAuthUserIdInOrg } from '@iconicedu/web/lib/accounts/queries/accounts.query';
-import { publishCancelledClassSessionActivity } from '@iconicedu/web/lib/class-schedule/session-activities';
 
 export type CancelClassScheduleSessionActionInput = {
   orgSlug: string;
   scheduleId: string;
   occurrenceKey: string;
   reason?: string | null;
-  sendActivityNotifications?: boolean;
 };
 
 export type CancelClassScheduleSessionActionResult = {
@@ -110,25 +108,6 @@ export async function cancelClassScheduleSessionAction(
       throw new Error(updateError.message);
     }
 
-    if (
-      input.sendActivityNotifications !== false &&
-      scheduleRow.source_learning_space_id &&
-      scheduleRow.source_channel_id
-    ) {
-      await publishCancelledClassSessionActivity({
-        supabase: serviceSupabase,
-        orgId: org.id,
-        learningSpaceId: scheduleRow.source_learning_space_id,
-        channelId: scheduleRow.source_channel_id,
-        scheduleId: input.scheduleId,
-        title: scheduleRow.title,
-        canceledStartAt: scheduleRow.start_at,
-        timezone: scheduleRow.timezone,
-        canceledReason: reason,
-        occurredAt: timestamp,
-      });
-    }
-
     revalidatePath(`/${input.orgSlug}/class-schedule`);
 
     return {
@@ -194,25 +173,6 @@ export async function cancelClassScheduleSessionAction(
     if (insertExceptionError) {
       throw new Error(insertExceptionError.message);
     }
-  }
-
-  if (
-    input.sendActivityNotifications !== false &&
-    scheduleRow.source_learning_space_id &&
-    scheduleRow.source_channel_id
-  ) {
-    await publishCancelledClassSessionActivity({
-      supabase: serviceSupabase,
-      orgId: org.id,
-      learningSpaceId: scheduleRow.source_learning_space_id,
-      channelId: scheduleRow.source_channel_id,
-      scheduleId: input.scheduleId,
-      title: scheduleRow.title,
-      canceledStartAt: input.occurrenceKey,
-      timezone: scheduleRow.timezone,
-      canceledReason: reason,
-      occurredAt: timestamp,
-    });
   }
 
   revalidatePath(`/${input.orgSlug}/class-schedule`);

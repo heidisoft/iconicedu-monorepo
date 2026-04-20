@@ -2,7 +2,6 @@ import { randomUUID } from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { ChannelCreatePayload, ChannelCapabilityVM } from '@iconicedu/shared-types';
-import { publishActivityEvent } from '@iconicedu/web/lib/activity-feed/publisher/activity-publisher';
 import { ensureSystemProfileId } from '@iconicedu/web/lib/automation/system-profile';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
@@ -203,29 +202,6 @@ export async function updateChannelFromPayload(
     createdAt: now,
     capabilities: payload.capabilities ?? [],
   });
-
-  if (shouldSendActivityNotifications && changeSummaryParts.length > 0) {
-    const serviceClient = createSupabaseServiceClient();
-    const systemProfileId = await ensureSystemProfileId(serviceClient, orgId);
-
-    await publishActivityEvent({
-      supabase: serviceClient,
-      orgId,
-      eventType: 'channel.updated',
-      occurredAt: now,
-      sourceKind: 'system',
-      actorProfileId: systemProfileId,
-      scope: { kind: 'channel', channelId },
-      payload: {
-        channelId,
-        channelTopic: payload.basics.topic,
-        channelRouteKind: 'channel',
-        changeSummary: changeSummaryParts.join(', '),
-      },
-      dedupeKey: `channel.updated:${channelId}:${now}`,
-      createdBy: systemProfileId,
-    });
-  }
 }
 
 type UpdateChannelPayload = {

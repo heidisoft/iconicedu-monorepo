@@ -31,13 +31,6 @@ import {
   fetchLinkPreviewMetadata,
 } from '@iconicedu/web/lib/messages/link-preview';
 import {
-  publishChannelMessageActivity as publishSharedChannelMessageActivity,
-  publishFileUploadActivity as publishSharedFileUploadActivity,
-  publishMentionActivities as publishSharedMentionActivities,
-  publishThreadReplyActivities as publishSharedThreadReplyActivities,
-} from '@iconicedu/api/lib/messages/message-activity';
-import { publishActivityEvent } from '@iconicedu/web/lib/activity-feed/publisher/activity-publisher';
-import {
   buildSupportVisibilityFields,
   isStaffActorInOrg,
   listSupportPrivilegedProfileIds,
@@ -81,12 +74,6 @@ type HomeworkMessageIntent = {
   subject: string;
 };
 
-type VisibilityAudienceResolution = {
-  suppressActivity: boolean;
-  audienceRules?: AudienceRuleVM[];
-  allowedProfileIds: Set<string> | null;
-};
-
 function hasConfiguredApiUrl() {
   return Boolean(process.env.API_URL?.trim() || process.env.NEXT_PUBLIC_API_URL?.trim());
 }
@@ -104,43 +91,6 @@ async function resolveEffectiveMessageActor(input: {
   return {
     account: resolution.account,
     profile: resolution.effectiveProfile,
-  };
-}
-
-function resolveVisibilityAudienceFromMessageRow(input: {
-  visibilityType?: string | null;
-  visibilityUserId?: string | null;
-  visibilityUserIds?: string[] | null;
-}): VisibilityAudienceResolution {
-  const visibilityType = input.visibilityType ?? 'all';
-  if (visibilityType === 'sender-only') {
-    return {
-      suppressActivity: true,
-      allowedProfileIds: new Set(),
-    };
-  }
-
-  if (visibilityType === 'recipient-only') {
-    const userIds = input.visibilityUserId ? [input.visibilityUserId] : [];
-    return {
-      suppressActivity: userIds.length === 0,
-      audienceRules: userIds.length ? [{ kind: 'users_only', userIds }] : undefined,
-      allowedProfileIds: new Set(userIds),
-    };
-  }
-
-  if (visibilityType === 'specific-users') {
-    const userIds = Array.from(new Set(input.visibilityUserIds ?? []));
-    return {
-      suppressActivity: userIds.length === 0,
-      audienceRules: userIds.length ? [{ kind: 'users_only', userIds }] : undefined,
-      allowedProfileIds: new Set(userIds),
-    };
-  }
-
-  return {
-    suppressActivity: false,
-    allowedProfileIds: null,
   };
 }
 
@@ -261,142 +211,6 @@ function deriveHomeworkMessageIntent(
       activityContext.channelTopic ||
       'Homework',
   };
-}
-
-async function createMentionNotifications(input: {
-  supabase: SupabaseServerClient;
-  serviceSupabase: SupabaseServiceClient;
-  orgId: string;
-  channelId: string;
-  senderProfileId: string;
-  senderName: string;
-  messageId: string;
-  content: string;
-  mentions: MessageMentionVM[];
-  now: string;
-  visibilityAllowedProfileIds?: Set<string> | null;
-}) {
-  await publishSharedMentionActivities({
-    supabase: input.serviceSupabase,
-    readSupabase: input.supabase,
-    publishActivity: publishActivityEvent,
-    orgId: input.orgId,
-    channelId: input.channelId,
-    senderProfileId: input.senderProfileId,
-    senderName: input.senderName,
-    messageId: input.messageId,
-    content: input.content,
-    mentions: input.mentions,
-    now: input.now,
-    visibilityAllowedProfileIds: input.visibilityAllowedProfileIds,
-  });
-}
-
-async function createChannelMessageActivity(input: {
-  supabase: SupabaseServerClient;
-  serviceSupabase: SupabaseServiceClient;
-  orgId: string;
-  channelId: string;
-  senderProfileId: string;
-  senderName: string;
-  messageId: string;
-  content: string;
-  threadId?: string | null;
-  threadReply?: boolean;
-  activityContext: ActivityChannelContext;
-  now: string;
-  visibilityAudienceRules?: AudienceRuleVM[];
-  visibilityAllowedProfileIds?: Set<string> | null;
-}) {
-  await publishSharedChannelMessageActivity({
-    supabase: input.serviceSupabase,
-    readSupabase: input.supabase,
-    publishActivity: publishActivityEvent,
-    orgId: input.orgId,
-    channelId: input.channelId,
-    senderProfileId: input.senderProfileId,
-    senderName: input.senderName,
-    messageId: input.messageId,
-    content: input.content,
-    threadId: input.threadId ?? null,
-    threadReply: input.threadReply ?? false,
-    activityContext: input.activityContext,
-    now: input.now,
-    visibilityAudienceRules: input.visibilityAudienceRules,
-    visibilityAllowedProfileIds: input.visibilityAllowedProfileIds,
-  });
-}
-
-async function createThreadReplyNotifications(input: {
-  supabase: SupabaseServerClient;
-  serviceSupabase: SupabaseServiceClient;
-  orgId: string;
-  threadId: string;
-  channelId: string;
-  senderProfileId: string;
-  senderName: string;
-  messageId: string;
-  content: string;
-  activityContext: ActivityChannelContext;
-  excludeProfileIds?: string[];
-  now: string;
-  visibilityAllowedProfileIds?: Set<string> | null;
-}) {
-  await publishSharedThreadReplyActivities({
-    supabase: input.serviceSupabase,
-    readSupabase: input.supabase,
-    publishActivity: publishActivityEvent,
-    orgId: input.orgId,
-    threadId: input.threadId,
-    channelId: input.channelId,
-    senderProfileId: input.senderProfileId,
-    senderName: input.senderName,
-    messageId: input.messageId,
-    content: input.content,
-    activityContext: input.activityContext,
-    now: input.now,
-    excludeProfileIds: input.excludeProfileIds,
-    visibilityAllowedProfileIds: input.visibilityAllowedProfileIds,
-  });
-}
-
-async function createFileUploadActivity(input: {
-  supabase: SupabaseServerClient;
-  serviceSupabase: SupabaseServiceClient;
-  orgId: string;
-  channelId: string;
-  senderProfileId: string;
-  senderName: string;
-  messageId: string;
-  name: string;
-  content?: string | null;
-  mimeType?: string | null;
-  storagePath?: string | null;
-  fileCount?: number;
-  activityContext: ActivityChannelContext;
-  now: string;
-  visibilityAudienceRules?: AudienceRuleVM[];
-  visibilityAllowedProfileIds?: Set<string> | null;
-}) {
-  await publishSharedFileUploadActivity({
-    supabase: input.serviceSupabase,
-    readSupabase: input.supabase,
-    publishActivity: publishActivityEvent,
-    orgId: input.orgId,
-    channelId: input.channelId,
-    senderProfileId: input.senderProfileId,
-    senderName: input.senderName,
-    messageId: input.messageId,
-    name: input.name,
-    content: input.content,
-    mimeType: input.mimeType,
-    storagePath: input.storagePath,
-    fileCount: input.fileCount,
-    activityContext: input.activityContext,
-    now: input.now,
-    visibilityAudienceRules: input.visibilityAudienceRules,
-    visibilityAllowedProfileIds: input.visibilityAllowedProfileIds,
-  });
 }
 
 async function resolveActivityChannelContext(input: {
@@ -979,12 +793,6 @@ export async function sendTextMessageWithSupabase(
   if (messageInsert.error || !messageInsert.data) {
     throw new Error(messageInsert.error?.message ?? 'Unable to create message.');
   }
-  const visibilityAudience = resolveVisibilityAudienceFromMessageRow({
-    visibilityType: messageInsert.data.visibility_type,
-    visibilityUserId: messageInsert.data.visibility_user_id,
-    visibilityUserIds: messageInsert.data.visibility_user_ids,
-  });
-
   const payloadInsert = await supabase
     .from(
       homeworkIntent
@@ -1063,118 +871,6 @@ export async function sendTextMessageWithSupabase(
   const sender = await buildUserProfileById(supabase, currentProfileId);
   if (!sender) {
     throw new Error('Sender not found');
-  }
-
-  if (sanitizedMentions.length) {
-    await createMentionNotifications({
-      supabase,
-      serviceSupabase,
-      orgId: accountOrgId,
-      channelId: input.channelId,
-      senderProfileId: currentProfileId,
-      senderName: sender.profile.displayName ?? 'Someone',
-      messageId: messageInsert.data.id,
-      content: homeworkIntent?.cleanedContent ?? input.content,
-      mentions: sanitizedMentions,
-      now,
-      visibilityAllowedProfileIds: visibilityAudience.allowedProfileIds,
-    });
-  }
-
-  const senderDisplayName =
-    ('profile' in sender &&
-    sender.profile &&
-    typeof sender.profile === 'object' &&
-    'displayName' in sender.profile &&
-    typeof sender.profile.displayName === 'string'
-      ? sender.profile.displayName
-      : undefined) ?? 'Someone';
-
-  if (homeworkIntent && activityContext.scope.kind === 'learning_space') {
-    if (!visibilityAudience.suppressActivity) {
-      await publishActivityEvent({
-        supabase: serviceSupabase,
-        orgId: accountOrgId,
-        eventType: 'homework.assigned',
-        occurredAt: now,
-        sourceKind: 'profile',
-        actorProfileId: currentProfileId,
-        scope: activityContext.scope,
-        objectRef: { kind: 'message', id: messageInsert.data.id },
-        targetRef: activityContext.targetRef,
-        audienceRules: visibilityAudience.audienceRules,
-        payload: {
-          channelId: input.channelId,
-          messageId: messageInsert.data.id,
-          title: homeworkIntent.title,
-          description: homeworkIntent.description,
-          dueAt: homeworkIntent.dueAt,
-          subject: homeworkIntent.subject,
-          learningSpaceId: activityContext.learningSpaceId ?? null,
-          learningSpaceTitle: activityContext.learningSpaceTitle ?? null,
-          channelTopic: activityContext.channelTopic ?? null,
-          channelRouteKind: activityContext.channelRouteKind,
-        },
-        dedupeKey: `homework.assigned:${messageInsert.data.id}`,
-        createdBy: currentProfileId,
-      });
-    }
-  } else if (activityContext.channelRouteKind === 'dm') {
-    if (!visibilityAudience.suppressActivity) {
-      await createChannelMessageActivity({
-        supabase,
-        serviceSupabase,
-        orgId: accountOrgId,
-        channelId: input.channelId,
-        senderProfileId: currentProfileId,
-        senderName: senderDisplayName,
-        messageId: messageInsert.data.id,
-        content: homeworkIntent?.cleanedContent ?? input.content,
-        threadId,
-        threadReply: Boolean(threadId && input.threadParentId),
-        activityContext,
-        now,
-        visibilityAudienceRules: visibilityAudience.audienceRules,
-        visibilityAllowedProfileIds: visibilityAudience.allowedProfileIds,
-      });
-    }
-  } else if (threadId && input.threadParentId) {
-    if (!visibilityAudience.suppressActivity) {
-      await createThreadReplyNotifications({
-        supabase,
-        serviceSupabase,
-        orgId: accountOrgId,
-        threadId,
-        channelId: input.channelId,
-        senderProfileId: currentProfileId,
-        senderName: senderDisplayName,
-        messageId: messageInsert.data.id,
-        content: input.content,
-        activityContext,
-        excludeProfileIds: sanitizedMentions.map((mention) => mention.profileId),
-        now,
-        visibilityAllowedProfileIds: visibilityAudience.allowedProfileIds,
-      });
-    }
-  } else {
-    if (!visibilityAudience.suppressActivity) {
-      await createChannelMessageActivity({
-        supabase,
-        serviceSupabase,
-        orgId: accountOrgId,
-        channelId: input.channelId,
-        senderProfileId: currentProfileId,
-        senderName: senderDisplayName,
-        messageId: messageInsert.data.id,
-        content: homeworkIntent?.cleanedContent ?? input.content,
-        threadId,
-        threadReply: false,
-        activityContext,
-        now,
-        visibilityAudienceRules: visibilityAudience.audienceRules,
-        visibilityAllowedProfileIds: visibilityAudience.allowedProfileIds,
-      });
-    }
   }
 
   const thread = threadId
@@ -1388,12 +1084,6 @@ export async function sendFileMessageWithSupabase(
   if (messageInsert.error || !messageInsert.data) {
     throw new Error(messageInsert.error?.message ?? 'Unable to create message.');
   }
-  const visibilityAudience = resolveVisibilityAudienceFromMessageRow({
-    visibilityType: messageInsert.data.visibility_type,
-    visibilityUserId: messageInsert.data.visibility_user_id,
-    visibilityUserIds: messageInsert.data.visibility_user_ids,
-  });
-
   const payload = {
     url: input.storagePath,
     storagePath: input.storagePath,
@@ -1519,40 +1209,12 @@ export async function sendFileMessageWithSupabase(
   if (!sender) {
     throw new Error('Sender not found');
   }
-  const senderDisplayName =
-    ('profile' in sender &&
-    sender.profile &&
-    typeof sender.profile === 'object' &&
-    'displayName' in sender.profile &&
-    typeof sender.profile.displayName === 'string'
-      ? sender.profile.displayName
-      : undefined) ?? 'Someone';
 
   const thread = threadId
     ? await buildThreadById(supabase, actor.account.org_id, threadId, {
         accountId: actor.account.id,
       })
     : null;
-
-  if (!visibilityAudience.suppressActivity) {
-    await createFileUploadActivity({
-      supabase,
-      serviceSupabase,
-      orgId: input.orgId,
-      channelId: input.channelId,
-      senderProfileId: currentProfileId,
-      senderName: senderDisplayName,
-      messageId: messageInsert.data.id,
-      name: input.name,
-      content: input.content?.trim() ?? null,
-      mimeType: input.mimeType ?? null,
-      storagePath: input.storagePath,
-      activityContext,
-      now,
-      visibilityAudienceRules: visibilityAudience.audienceRules,
-      visibilityAllowedProfileIds: visibilityAudience.allowedProfileIds,
-    });
-  }
 
   return mapMessageRowToVM(messageInsert.data, {
     sender,
@@ -1749,12 +1411,6 @@ export async function sendFilesMessageWithSupabase(
   if (messageInsert.error || !messageInsert.data) {
     throw new Error(messageInsert.error?.message ?? 'Unable to create message.');
   }
-  const visibilityAudience = resolveVisibilityAudienceFromMessageRow({
-    visibilityType: messageInsert.data.visibility_type,
-    visibilityUserId: messageInsert.data.visibility_user_id,
-    visibilityUserIds: messageInsert.data.visibility_user_ids,
-  });
-
   const signedAssets = await Promise.all(
     input.assets.map(async (asset) => ({
       ...asset,
@@ -1876,44 +1532,12 @@ export async function sendFilesMessageWithSupabase(
   if (!sender) {
     throw new Error('Sender not found');
   }
-  const senderDisplayName =
-    ('profile' in sender &&
-    sender.profile &&
-    typeof sender.profile === 'object' &&
-    'displayName' in sender.profile &&
-    typeof sender.profile.displayName === 'string'
-      ? sender.profile.displayName
-      : undefined) ?? 'Someone';
 
   const thread = threadId
     ? await buildThreadById(supabase, actor.account.org_id, threadId, {
         accountId: actor.account.id,
       })
     : null;
-
-  if (!visibilityAudience.suppressActivity) {
-    await createFileUploadActivity({
-      supabase,
-      serviceSupabase,
-      orgId: input.orgId,
-      channelId: input.channelId,
-      senderProfileId: currentProfileId,
-      senderName: senderDisplayName,
-      messageId: messageInsert.data.id,
-      name:
-        input.assets.length > 1
-          ? `${input.assets[0]?.name ?? 'File'} +${input.assets.length - 1} more`
-          : (input.assets[0]?.name ?? 'File'),
-      content: input.content?.trim() ?? null,
-      mimeType: allImages ? 'image/*' : (input.assets[0]?.mimeType ?? null),
-      storagePath: input.assets[0]?.storagePath ?? null,
-      fileCount: input.assets.length,
-      activityContext,
-      now,
-      visibilityAudienceRules: visibilityAudience.audienceRules,
-      visibilityAllowedProfileIds: visibilityAudience.allowedProfileIds,
-    });
-  }
 
   return mapMessageRowToVM(messageInsert.data, {
     sender,

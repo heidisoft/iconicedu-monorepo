@@ -4,10 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { requireParentActorContext } from '@iconicedu/web/lib/family-view/actor-context';
-import {
-  insertClassSchedules,
-  publishParticipantInviteActivities,
-} from '@iconicedu/web/lib/admin/learning-space-create';
+import { insertClassSchedules } from '@iconicedu/web/lib/admin/learning-space-create';
 import {
   type CanonicalLearningSpaceSchedule,
   buildCanonicalLearningSpaceSchedulesFromExisting,
@@ -1673,69 +1670,6 @@ export async function updateLearningSpaceFromPayload(
     infoChangeSummaryParts.push('Class schedule has been updated');
   }
 
-  if (shouldSendActivityNotifications && (hasInfoChanges || hasSemanticScheduleChanges)) {
-    await publishActivityEvent({
-      supabase: serviceClient,
-      orgId,
-      eventType: 'class.updated',
-      occurredAt: now,
-      sourceKind: 'system',
-      actorProfileId: systemProfileId,
-      scope: { kind: 'learning_space', learningSpaceId },
-      targetRef: { kind: 'learning_space', id: learningSpaceId },
-      payload: {
-        learningSpaceId,
-        channelId,
-        title: payload.basics.title,
-        kind: payload.basics.kind,
-        subject: payload.basics.subject ?? null,
-        changeSummary: joinNaturalList(infoChangeSummaryParts) || 'Updated class details',
-        activityPhase: 'updated',
-        invitedCount: invitedMembersSnapshot.length,
-        invitedMembers: invitedMembersSnapshot,
-      },
-      dedupeKey: `class.updated:${learningSpaceId}:${now}`,
-      createdBy: systemProfileId,
-    });
-  }
-
-  for (const activity of shouldSendActivityNotifications
-    ? scheduleChangeActivities
-    : []) {
-    debugScheduleDiff('schedule-change-publish-attempt', {
-      eventType: activity.eventType,
-      dedupeKey: activity.dedupeKey,
-      startAt: activity.payload.startAt ?? null,
-      canceledStartAt: activity.payload.canceledStartAt ?? null,
-      rescheduledFromStartAt: activity.payload.rescheduledFromStartAt ?? null,
-      rescheduledToStartAt: activity.payload.rescheduledToStartAt ?? null,
-    });
-
-    const published = await publishActivityEvent({
-      supabase: serviceClient,
-      orgId,
-      eventType: activity.eventType,
-      occurredAt: now,
-      sourceKind: 'system',
-      actorProfileId: systemProfileId,
-      scope: { kind: 'learning_space', learningSpaceId },
-      targetRef: { kind: 'learning_space', id: learningSpaceId },
-      payload: activity.payload,
-      dedupeKey: activity.dedupeKey,
-      createdBy: systemProfileId,
-    });
-
-    const publishedId =
-      published && typeof published === 'object' && 'id' in published
-        ? (published as { id?: unknown }).id
-        : null;
-    debugScheduleDiff('schedule-change-publish-success', {
-      eventType: activity.eventType,
-      dedupeKey: activity.dedupeKey,
-      activityEventId: typeof publishedId === 'string' ? publishedId : null,
-    });
-  }
-
   const existingParticipantIds = new Set(existingParticipantIdList);
   const nextParticipantIds = new Set(
     nextParticipantsSnapshot.map((participant) => participant.profileId),
@@ -1744,55 +1678,12 @@ export async function updateLearningSpaceFromPayload(
   const addedParticipants = nextParticipantsSnapshot.filter(
     (participant) => !existingParticipantIds.has(participant.profileId),
   );
-  if (shouldSendActivityNotifications) {
-    await publishParticipantInviteActivities({
-      supabase: serviceClient,
-      orgId,
-      actorProfileId: systemProfileId,
-      learningSpaceId,
-      channelId,
-      title: payload.basics.title,
-      participants: addedParticipants,
-      invitedMembers: invitedMembersSnapshot,
-      occurredAt: now,
-      activityPhase: 'updated',
-      dedupeKey:
-        addedParticipants.length > 1
-          ? `members.invited:${learningSpaceId}:${now}`
-          : `member.invited:${learningSpaceId}:${addedParticipants[0]?.profileId ?? 'unknown'}:${now}`,
-    });
-  }
-
   const removedParticipants = [...existingParticipantIds]
     .filter((profileId) => !nextParticipantIds.has(profileId))
     .map((profileId) => ({
       profileId,
       snapshot: existingParticipantById.get(profileId),
     }));
-
-  const removedMembersActivity = buildRemovedMembersActivity({
-    learningSpaceId,
-    channelId,
-    title: payload.basics.title,
-    occurredAt: now,
-    removedParticipants,
-    invitedMembers: invitedMembersSnapshot,
-  });
-  if (shouldSendActivityNotifications && removedMembersActivity) {
-    await publishActivityEvent({
-      supabase: serviceClient,
-      orgId,
-      eventType: removedMembersActivity.eventType,
-      occurredAt: now,
-      sourceKind: 'system',
-      actorProfileId: systemProfileId,
-      scope: { kind: 'learning_space', learningSpaceId },
-      targetRef: { kind: 'learning_space', id: learningSpaceId },
-      payload: removedMembersActivity.payload,
-      dedupeKey: removedMembersActivity.dedupeKey,
-      createdBy: systemProfileId,
-    });
-  }
 }
 
 type UpdateLearningSpacePayload = {

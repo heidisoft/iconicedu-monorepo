@@ -18,11 +18,9 @@ import type {
   ThreadVM,
 } from '@iconicedu/shared-types';
 import {
-  publishFileUploadActivity,
-  publishTextMessagePostSendActivities,
   resolveActivityChannelContext,
+  resolveVisibilityAudienceFromMessageRow,
 } from '@iconicedu/api/lib/messages/message-activity';
-import { publishActivityEvent } from '@iconicedu/api/lib/activity-feed/activity-publisher';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
 import {
@@ -102,12 +100,6 @@ type HomeworkMessageIntent = {
   title: string;
   dueAt: string;
   subject: string;
-};
-
-type VisibilityAudienceResolution = {
-  suppressActivity: boolean;
-  audienceRules?: AudienceRuleVM[];
-  allowedProfileIds: Set<string> | null;
 };
 
 function buildWritableProfileDisplayName(profile: WritableProfileRow) {
@@ -317,30 +309,6 @@ function deriveHomeworkMessageIntent(
       activityContext.learningSpaceTitle ||
       activityContext.channelTopic ||
       'Homework',
-  };
-}
-
-function resolveVisibilityAudienceFromMessageRow(input: {
-  visibilityType?: string | null;
-  visibilityUserIds?: string[] | null;
-}): VisibilityAudienceResolution {
-  const visibilityType = input.visibilityType ?? 'all';
-  if (visibilityType === 'sender-only') {
-    return { suppressActivity: true, allowedProfileIds: new Set() };
-  }
-
-  if (visibilityType === 'specific-users') {
-    const userIds = Array.from(new Set(input.visibilityUserIds ?? []));
-    return {
-      suppressActivity: userIds.length === 0,
-      audienceRules: userIds.length ? [{ kind: 'users_only', userIds }] : undefined,
-      allowedProfileIds: new Set(userIds),
-    };
-  }
-
-  return {
-    suppressActivity: false,
-    allowedProfileIds: null,
   };
 }
 
@@ -1487,55 +1455,6 @@ export class MessagesService {
         });
       }
 
-      const senderName = buildWritableProfileDisplayName(actor.profile);
-
-      if (homeworkIntent && activityContext.scope.kind === 'learning_space') {
-        if (!visibilityAudience.suppressActivity) {
-          await publishActivityEvent({
-            supabase: serviceSupabase,
-            orgId: input.orgId,
-            eventType: 'homework.assigned',
-            occurredAt: now,
-            sourceKind: 'profile',
-            actorProfileId: actor.profile.id,
-            scope: activityContext.scope as FeedScopeVM,
-            objectRef: { kind: 'message', id: messageInsert.data.id },
-            targetRef: activityContext.targetRef,
-            audienceRules: visibilityAudience.audienceRules,
-            payload: {
-              channelId: input.channelId,
-              messageId: messageInsert.data.id,
-              title: homeworkIntent.title,
-              description: homeworkIntent.description,
-              dueAt: homeworkIntent.dueAt,
-              subject: homeworkIntent.subject,
-              learningSpaceId: activityContext.learningSpaceId ?? null,
-              learningSpaceTitle: activityContext.learningSpaceTitle ?? null,
-              channelTopic: activityContext.channelTopic ?? null,
-              channelRouteKind: activityContext.channelRouteKind,
-            },
-            dedupeKey: `homework.assigned:${messageInsert.data.id}`,
-            createdBy: actor.profile.id,
-          });
-        }
-      } else if (!homeworkIntent) {
-        await publishTextMessagePostSendActivities({
-          supabase: serviceSupabase,
-          orgId: input.orgId,
-          channelId: input.channelId,
-          senderProfileId: actor.profile.id,
-          senderName,
-          messageId: messageInsert.data.id,
-          content,
-          mentions: sanitizedMentions,
-          threadId,
-          threadReply: Boolean(threadId && input.threadParentId),
-          now,
-          activityContext,
-          visibilityAudience,
-        });
-      }
-
       return { id: messageInsert.data.id };
     } catch (error) {
       this.logger.error('sendTextMessage failed', {
@@ -1763,26 +1682,6 @@ export class MessagesService {
           staffProfileId: actor.profile.id,
           assignedByProfileId: actor.profile.id,
           now,
-        });
-      }
-
-      if (!visibilityAudience.suppressActivity) {
-        await publishFileUploadActivity({
-          supabase: serviceSupabase,
-          orgId: input.orgId,
-          channelId: input.channelId,
-          senderProfileId: actor.profile.id,
-          senderName: buildWritableProfileDisplayName(actor.profile),
-          messageId: messageInsert.data.id,
-          name: input.name,
-          content: input.content?.trim() ?? null,
-          mimeType: input.mimeType ?? null,
-          storagePath: input.storagePath,
-          fileCount: 1,
-          activityContext,
-          now,
-          visibilityAudienceRules: visibilityAudience.audienceRules,
-          visibilityAllowedProfileIds: visibilityAudience.allowedProfileIds,
         });
       }
 
@@ -2025,29 +1924,6 @@ export class MessagesService {
           staffProfileId: actor.profile.id,
           assignedByProfileId: actor.profile.id,
           now,
-        });
-      }
-
-      if (!visibilityAudience.suppressActivity) {
-        await publishFileUploadActivity({
-          supabase: serviceSupabase,
-          orgId: input.orgId,
-          channelId: input.channelId,
-          senderProfileId: actor.profile.id,
-          senderName: buildWritableProfileDisplayName(actor.profile),
-          messageId: messageInsert.data.id,
-          name:
-            input.assets.length > 1
-              ? `${input.assets[0]?.name ?? 'File'} +${input.assets.length - 1} more`
-              : (input.assets[0]?.name ?? 'File'),
-          content: input.content?.trim() ?? null,
-          mimeType: allImages ? 'image/*' : (input.assets[0]?.mimeType ?? null),
-          storagePath: input.assets[0]?.storagePath ?? null,
-          fileCount: input.assets.length,
-          activityContext,
-          now,
-          visibilityAudienceRules: visibilityAudience.audienceRules,
-          visibilityAllowedProfileIds: visibilityAudience.allowedProfileIds,
         });
       }
 

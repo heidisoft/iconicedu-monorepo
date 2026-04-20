@@ -3,7 +3,6 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
-import { publishActivityEvent } from '@iconicedu/web/lib/activity-feed/publisher/activity-publisher';
 import { compileLearningSpaceReminderJobs } from '@iconicedu/web/lib/automation/reminder-jobs';
 import { ensureSystemProfileId } from '@iconicedu/web/lib/automation/system-profile';
 import { requireParentActorContext } from '@iconicedu/web/lib/family-view/actor-context';
@@ -38,82 +37,6 @@ type CreateLearningSpaceResult = {
   channelId: string;
   scheduleIds: string[];
 };
-
-type PublishParticipantInviteActivitiesInput = {
-  supabase: ReturnType<typeof createSupabaseServiceClient>;
-  orgId: string;
-  actorProfileId: string;
-  learningSpaceId: string;
-  channelId: string;
-  title: string;
-  participants: Array<{
-    profileId: string;
-    kind: string;
-    displayName?: string | null;
-    avatarUrl?: string | null;
-    themeKey?: string | null;
-  }>;
-  invitedMembers: Array<{
-    profileId: string;
-    name: string;
-    avatarUrl?: string | null;
-    themeKey?: string | null;
-  }>;
-  occurredAt: string;
-  activityPhase: 'created' | 'updated';
-  dedupeKey: string;
-  firstSessionStartAt?: string | null;
-  firstSessionTimezone?: string | null;
-};
-
-export async function publishParticipantInviteActivities(
-  input: PublishParticipantInviteActivitiesInput,
-) {
-  if (!input.participants.length) {
-    return;
-  }
-
-  const members = input.participants.map((participant) => ({
-    profileId: participant.profileId,
-    displayName: participant.displayName ?? null,
-    avatarUrl: participant.avatarUrl ?? null,
-    themeKey: participant.themeKey ?? null,
-    role: participant.kind,
-  }));
-
-  const isPlural = members.length > 1;
-  const firstParticipant = input.participants[0];
-
-  await publishActivityEvent({
-    supabase: input.supabase,
-    orgId: input.orgId,
-    eventType: isPlural ? 'members.invited' : 'member.invited',
-    occurredAt: input.occurredAt,
-    sourceKind: 'system',
-    actorProfileId: input.actorProfileId,
-    scope: { kind: 'learning_space', learningSpaceId: input.learningSpaceId },
-    targetRef: { kind: 'learning_space', id: input.learningSpaceId },
-    payload: {
-      learningSpaceId: input.learningSpaceId,
-      channelId: input.channelId,
-      title: input.title,
-      memberProfileId: firstParticipant?.profileId ?? null,
-      memberDisplayName: firstParticipant?.displayName ?? null,
-      memberAvatarUrl: firstParticipant?.avatarUrl ?? null,
-      memberThemeKey: firstParticipant?.themeKey ?? null,
-      role: firstParticipant?.kind ?? null,
-      memberCount: members.length,
-      members,
-      activityPhase: input.activityPhase,
-      invitedCount: input.invitedMembers.length,
-      invitedMembers: input.invitedMembers,
-      firstSessionStartAt: input.firstSessionStartAt ?? null,
-      firstSessionTimezone: input.firstSessionTimezone ?? null,
-    },
-    dedupeKey: input.dedupeKey,
-    createdBy: input.actorProfileId,
-  });
-}
 
 export async function createLearningSpaceFromPayload(
   payload: LearningSpaceCreatePayload,
@@ -212,75 +135,6 @@ export async function createLearningSpaceFromPayload(
     supabase: serviceClient,
     orgId,
     learningSpaceId,
-  });
-
-  const schedulesWithExpanded = (payload.schedules ?? []).map((schedule) => ({
-    schedule,
-    expanded: buildScheduleStart(schedule),
-  }));
-  const invitedMembers = payload.participants.map((participant) => ({
-    profileId: participant.profileId,
-    name: participant.displayName ?? 'Participant',
-    avatarUrl: participant.avatarUrl ?? null,
-    themeKey: participant.themeKey ?? null,
-  }));
-  const firstScheduled = schedulesWithExpanded.reduce<{
-    schedule: LearningSpaceSchedulePayload;
-    expanded: ExpandedSchedule;
-  } | null>((earliest, current) => {
-    if (!earliest) {
-      return current;
-    }
-    return current.expanded.startAt < earliest.expanded.startAt ? current : earliest;
-  }, null);
-  const scheduleHashKey = buildLearningSpaceSchedulesHashKeyFromPayload(
-    payload.schedules ?? [],
-  );
-
-  await publishActivityEvent({
-    supabase: serviceClient,
-    orgId,
-    eventType: 'class.created',
-    occurredAt: now,
-    sourceKind: 'system',
-    actorProfileId: systemProfileId,
-    scope: { kind: 'learning_space', learningSpaceId },
-    targetRef: { kind: 'learning_space', id: learningSpaceId },
-    payload: {
-      learningSpaceId,
-      channelId,
-      title: payload.basics.title,
-      kind: payload.basics.kind,
-      subject: payload.basics.subject ?? null,
-      status: 'active',
-      activityPhase: 'created',
-      invitedCount: payload.participants.length,
-      invitedMembers,
-      firstSessionStartAt: firstScheduled?.expanded.startAt ?? null,
-      firstSessionTimezone: firstScheduled?.schedule.timezone ?? null,
-      scheduleHashKey,
-    },
-    dedupeKey: `class.created:${learningSpaceId}`,
-    createdBy: systemProfileId,
-  });
-
-  await publishParticipantInviteActivities({
-    supabase: serviceClient,
-    orgId,
-    actorProfileId: systemProfileId,
-    learningSpaceId,
-    channelId,
-    title: payload.basics.title,
-    participants: payload.participants,
-    invitedMembers,
-    occurredAt: now,
-    activityPhase: 'created',
-    dedupeKey:
-      payload.participants.length > 1
-        ? `members.invited:${learningSpaceId}:${now}`
-        : `member.invited:${learningSpaceId}:${payload.participants[0]?.profileId ?? 'unknown'}`,
-    firstSessionStartAt: firstScheduled?.expanded.startAt ?? null,
-    firstSessionTimezone: firstScheduled?.schedule.timezone ?? null,
   });
 
   return { learningSpaceId, channelId, scheduleIds };

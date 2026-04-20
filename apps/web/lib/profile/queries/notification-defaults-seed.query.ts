@@ -7,16 +7,11 @@ type SignupDefaultPreference = {
 
 const SIGNUP_DEFAULT_NOTIFICATION_PREFERENCES: SignupDefaultPreference[] = [
   { prefKey: 'payment.reminder', channels: ['push', 'email'] },
-  { prefKey: 'system.notice', channels: ['push', 'email', 'sms'] },
   { prefKey: 'message.posted', channels: ['push', 'email'] },
   { prefKey: 'reaction.added', channels: ['push', 'email'] },
-  { prefKey: 'file.uploaded', channels: ['push', 'email'] },
   { prefKey: 'dm.posted', channels: ['push', 'email'] },
-  { prefKey: 'class.created', channels: ['push', 'email'] },
-  { prefKey: 'class.session.scheduled', channels: ['push', 'email'] },
   { prefKey: 'class.session.rescheduled', channels: ['push', 'email'] },
   { prefKey: 'class.session.canceled', channels: ['push', 'email'] },
-  { prefKey: 'session.started', channels: ['push', 'email'] },
   { prefKey: 'session.reminder.sent', channels: ['push', 'email'] },
 ];
 
