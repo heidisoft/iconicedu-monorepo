@@ -1,10 +1,8 @@
 import React from 'react';
 import * as ReactNative from 'react-native';
-import { Appearance, Text } from 'react-native';
+import { Appearance, Text, useColorScheme } from 'react-native';
 import { act, render, screen, waitFor } from '@testing-library/react-native';
 
-const mockAppearanceGetColorScheme = jest.fn();
-const mockAppearanceRemove = jest.fn();
 const mockSetItemAsync = jest.fn();
 const mockGetItemAsync = jest.fn();
 const mockNativeWindSet = jest.fn();
@@ -18,6 +16,13 @@ jest.mock('expo-secure-store', () => ({
   setItemAsync: (...args: unknown[]) => mockSetItemAsync(...args),
 }));
 
+jest.mock('react-native', () => {
+  const actual = jest.requireActual('react-native');
+  return Object.defineProperty(actual, 'useColorScheme', {
+    value: jest.fn(),
+  });
+});
+
 jest.mock('react-native-css-interop', () => ({
   colorScheme: {
     set: (...args: unknown[]) => mockNativeWindSet(...args),
@@ -25,6 +30,8 @@ jest.mock('react-native-css-interop', () => ({
 }));
 
 import { ThemeProvider, useTheme } from './theme-provider';
+
+const mockUseColorScheme = jest.mocked(useColorScheme);
 
 function Consumer() {
   const { mode, colorScheme, isDark } = useTheme();
@@ -91,6 +98,12 @@ describe('ThemeProvider', () => {
       mockUseColorScheme.mockReturnValue('dark');
       appearanceChangeListener?.({ colorScheme: 'dark' });
     });
+    mockUseColorScheme.mockReturnValue('dark');
+    view.rerender(
+      <ThemeProvider>
+        <Consumer />
+      </ThemeProvider>,
+    );
 
     view.rerender(
       <ThemeProvider>
@@ -125,7 +138,6 @@ describe('ThemeProvider', () => {
   });
 
   afterEach(() => {
-    appearanceChangeListener = null;
     jest.restoreAllMocks();
   });
 });

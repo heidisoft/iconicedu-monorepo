@@ -41,6 +41,7 @@
     "----------- CI / CD -----------": "",
     "ci": "pnpm format:check && pnpm guard:activity-feed-writes && pnpm guard:feature-flags && pnpm exec turbo run lint typecheck test build",
     "ci:affected": "pnpm guard:activity-feed-writes && pnpm guard:feature-flags && pnpm exec turbo run lint typecheck test build --affected",
+    "prepush:check": "pnpm guard:activity-feed-writes && pnpm guard:feature-flags && pnpm exec turbo run lint typecheck test --affected",
     "check": "pnpm run ci",
     "ci:web": "turbo run lint typecheck test build --filter=web...",
     "ci:mobile": "turbo run lint typecheck test build --filter=mobile...",
