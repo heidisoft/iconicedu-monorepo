@@ -257,15 +257,21 @@ jobs:
         run: |
           echo "API_URL=${_API_URL:-https://placeholder-api.iconicedu.test}" >> "$GITHUB_ENV"
           echo "NEXT_PUBLIC_API_URL=${_API_URL:-https://placeholder-api.iconicedu.test}" >> "$GITHUB_ENV"
+          echo "EXPO_PUBLIC_API_URL=${_API_URL:-https://placeholder-api.iconicedu.test}" >> "$GITHUB_ENV"
+          echo "SUPABASE_URL=${_URL:-https://placeholder.supabase.co}" >> "$GITHUB_ENV"
           echo "NEXT_PUBLIC_SUPABASE_URL=${_URL:-https://placeholder.supabase.co}" >> "$GITHUB_ENV"
-          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=${_ANON:-placeholder-anon-key}" >> "$GITHUB_ENV"
-          echo "SUPABASE_SERVICE_ROLE_KEY=${_SRK:-placeholder-service-role-key}" >> "$GITHUB_ENV"
           echo "EXPO_PUBLIC_SUPABASE_URL=${_URL:-https://placeholder.supabase.co}" >> "$GITHUB_ENV"
-          echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=${_ANON:-placeholder-anon-key}" >> "$GITHUB_ENV"
+          echo "SUPABASE_PUBLISHABLE_KEY=${_PUBLISHABLE:-placeholder-publishable-key}" >> "$GITHUB_ENV"
+          echo "SUPABASE_ANON_KEY=${_PUBLISHABLE:-placeholder-publishable-key}" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${_PUBLISHABLE:-placeholder-publishable-key}" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=${_PUBLISHABLE:-placeholder-publishable-key}" >> "$GITHUB_ENV"
+          echo "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${_PUBLISHABLE:-placeholder-publishable-key}" >> "$GITHUB_ENV"
+          echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=${_PUBLISHABLE:-placeholder-publishable-key}" >> "$GITHUB_ENV"
+          echo "SUPABASE_SERVICE_ROLE_KEY=${_SRK:-placeholder-service-role-key}" >> "$GITHUB_ENV"
         env:
           _API_URL: ${{ secrets.API_URL }}
           _URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          _ANON: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          _PUBLISHABLE: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           _SRK: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
       # continue-on-error: base may differ enough to fail a sub-build;
@@ -352,14 +358,19 @@ jobs:
 
       - name: Set build env vars
         run: |
+          echo "SUPABASE_URL=${_URL:-https://placeholder.supabase.co}" >> "$GITHUB_ENV"
           echo "NEXT_PUBLIC_SUPABASE_URL=${_URL:-https://placeholder.supabase.co}" >> "$GITHUB_ENV"
-          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=${_ANON:-placeholder-anon-key}" >> "$GITHUB_ENV"
-          echo "SUPABASE_SERVICE_ROLE_KEY=${_SRK:-placeholder-service-role-key}" >> "$GITHUB_ENV"
           echo "EXPO_PUBLIC_SUPABASE_URL=${_URL:-https://placeholder.supabase.co}" >> "$GITHUB_ENV"
-          echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=${_ANON:-placeholder-anon-key}" >> "$GITHUB_ENV"
+          echo "SUPABASE_PUBLISHABLE_KEY=${_PUBLISHABLE:-placeholder-publishable-key}" >> "$GITHUB_ENV"
+          echo "SUPABASE_ANON_KEY=${_PUBLISHABLE:-placeholder-publishable-key}" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${_PUBLISHABLE:-placeholder-publishable-key}" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=${_PUBLISHABLE:-placeholder-publishable-key}" >> "$GITHUB_ENV"
+          echo "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${_PUBLISHABLE:-placeholder-publishable-key}" >> "$GITHUB_ENV"
+          echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=${_PUBLISHABLE:-placeholder-publishable-key}" >> "$GITHUB_ENV"
+          echo "SUPABASE_SERVICE_ROLE_KEY=${_SRK:-placeholder-service-role-key}" >> "$GITHUB_ENV"
         env:
           _URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          _ANON: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          _PUBLISHABLE: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           _SRK: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
       - name: Write measurement script
@@ -406,6 +417,7 @@ jobs:
         env:
           API_URL: ${{ secrets.API_URL || 'https://placeholder-api.iconicedu.test' }}
           NEXT_PUBLIC_API_URL: ${{ secrets.API_URL || 'https://placeholder-api.iconicedu.test' }}
+          EXPO_PUBLIC_API_URL: ${{ secrets.API_URL || 'https://placeholder-api.iconicedu.test' }}
           EXPO_NO_TELEMETRY: 1
           TURBO_TELEMETRY_DISABLED: 1
 
@@ -869,15 +881,32 @@ jobs:
 
           set_vercel_env "API_URL" "${{ steps.railway.outputs.railway_api_url }}"
           set_vercel_env "NEXT_PUBLIC_API_URL" "${{ steps.railway.outputs.railway_api_url }}"
+          set_vercel_env "EXPO_PUBLIC_API_URL" "${{ steps.railway.outputs.railway_api_url }}"
           set_vercel_env "NEXT_PUBLIC_APP_ENV" "preview"
 
-          LATEST_DEPLOYMENT=$(curl -sf \
+          LATEST_DEPLOYMENT_JSON=$(curl -sf \
             -H "Authorization: Bearer $VERCEL_TOKEN" \
             "https://api.vercel.com/v6/deployments?projectId=${PROJECT_ID}&target=preview&limit=1&meta-githubCommitRef=${BRANCH}${TEAM_AMP}" \
-            | jq -r '.deployments[0].url // ""')
+          )
+          LATEST_DEPLOYMENT_ID=$(echo "$LATEST_DEPLOYMENT_JSON" | jq -r '.deployments[0].uid // ""')
+          LATEST_DEPLOYMENT_URL=$(echo "$LATEST_DEPLOYMENT_JSON" | jq -r '.deployments[0].url // ""')
 
-          if [[ -n "$LATEST_DEPLOYMENT" ]]; then
-            echo "vercel_url=https://${LATEST_DEPLOYMENT}" >> "$GITHUB_OUTPUT"
+          if [[ -n "$LATEST_DEPLOYMENT_ID" ]]; then
+            REDEPLOY_URL=$(curl -sf -X POST \
+              -H "Authorization: Bearer $VERCEL_TOKEN" \
+              -H "Content-Type: application/json" \
+              "https://api.vercel.com/v13/deployments${TEAM_Q}" \
+              -d "$(jq -n --arg deploymentId "$LATEST_DEPLOYMENT_ID" \
+                '{"deploymentId":$deploymentId,"target":"preview","withLatestCommit":true}')" \
+              | jq -r '.url // ""')
+          else
+            REDEPLOY_URL=""
+          fi
+
+          if [[ -n "$REDEPLOY_URL" ]]; then
+            echo "vercel_url=https://${REDEPLOY_URL}" >> "$GITHUB_OUTPUT"
+          elif [[ -n "$LATEST_DEPLOYMENT_URL" ]]; then
+            echo "vercel_url=https://${LATEST_DEPLOYMENT_URL}" >> "$GITHUB_OUTPUT"
           else
             echo "vercel_url=https://vercel.com/dashboard" >> "$GITHUB_OUTPUT"
           fi

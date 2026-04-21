@@ -48,7 +48,10 @@ function resolveSupabaseUrl(): string {
 
 const SUPABASE_URL = resolveSupabaseUrl();
 
-const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? 'test-anon-key';
+const SUPABASE_ANON_KEY =
+  process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ??
+  'test-anon-key';
 
 const secureStoreAdapter = {
   getItem: (key: string) => SecureStore.getItemAsync(key),
