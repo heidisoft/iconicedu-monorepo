@@ -635,6 +635,7 @@ export default function DmConversationScreen() {
             pendingUploads={pendingUploads}
             onRetryUpload={handleRetryUpload}
             lastReadMessageId={channelReadState?.lastReadMessageId ?? null}
+            lastReadAt={channelReadState?.lastReadAt ?? null}
             unreadCount={channelReadState?.unreadCount ?? 0}
             onLoadMore={loadMore}
             loading={false}

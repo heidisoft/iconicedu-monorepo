@@ -522,6 +522,7 @@ export default function SpaceDetailScreen() {
             currentProfileId={profileId}
             currentAccountId={accountId}
             lastReadMessageId={channelReadState?.lastReadMessageId ?? null}
+            lastReadAt={channelReadState?.lastReadAt ?? null}
             unreadCount={channelReadState?.unreadCount ?? 0}
             onLoadMore={loadMore}
             loading={isLoading}

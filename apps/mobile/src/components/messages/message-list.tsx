@@ -48,10 +48,12 @@ type MessageListItem = MessageVM | DateSeparatorItem | UnreadSeparatorItem;
 function findUnreadStartMessageId(input: {
   messages: MessageVM[];
   lastReadMessageId?: string | null;
+  lastReadAt?: string | null;
   unreadCount?: number;
   currentProfileId?: string;
 }): string | null {
-  const { messages, lastReadMessageId, unreadCount, currentProfileId } = input;
+  const { messages, lastReadMessageId, lastReadAt, unreadCount, currentProfileId } =
+    input;
   const normalizedUnreadCount = Math.max(0, unreadCount ?? 0);
   if (messages.length === 0) return null;
 
@@ -74,9 +76,52 @@ function findUnreadStartMessageId(input: {
     }
   }
 
+  if (lastReadAt) {
+    const lastReadAtTime = new Date(lastReadAt).getTime();
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const createdAtTime = new Date(messages[index].core.createdAt).getTime();
+      if (createdAtTime <= lastReadAtTime) {
+        return findIncomingId(index + 1);
+      }
+    }
+    return findIncomingId(0);
+  }
+
   if (normalizedUnreadCount <= 0) return null;
   const fallbackStartIndex = Math.max(0, messages.length - normalizedUnreadCount);
   return findIncomingId(fallbackStartIndex);
+}
+
+export function findLatestUnreadIncomingMessageId(input: {
+  messages: MessageVM[];
+  lastReadMessageId?: string | null;
+  lastReadAt?: string | null;
+  unreadCount?: number;
+  currentProfileId?: string;
+}): string | null {
+  const unreadStartMessageId = findUnreadStartMessageId(input);
+  if (!unreadStartMessageId) {
+    return null;
+  }
+
+  const unreadStartIndex = input.messages.findIndex(
+    (message) => message.ids.id === unreadStartMessageId,
+  );
+  if (unreadStartIndex < 0) {
+    return null;
+  }
+
+  for (let index = input.messages.length - 1; index >= unreadStartIndex; index -= 1) {
+    const message = input.messages[index];
+    if (
+      !input.currentProfileId ||
+      message.core.sender.ids.id !== input.currentProfileId
+    ) {
+      return message.ids.id;
+    }
+  }
+
+  return null;
 }
 
 export function buildListData(
@@ -360,6 +405,7 @@ type MessageListProps = {
   emptyDescription?: string;
   emptyIcon?: 'message-square' | 'life-buoy' | 'graduation-cap';
   lastReadMessageId?: string | null;
+  lastReadAt?: string | null;
   unreadCount?: number;
   onSendAnnotation?: (attachment: import('./attachment-sheet').AttachmentPayload) => void;
 };
@@ -388,6 +434,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   emptyDescription,
   emptyIcon,
   lastReadMessageId,
+  lastReadAt,
   unreadCount,
   onSendAnnotation,
 }) => {
@@ -402,10 +449,11 @@ export const MessageList: React.FC<MessageListProps> = ({
       findUnreadStartMessageId({
         messages,
         lastReadMessageId,
+        lastReadAt,
         unreadCount,
         currentProfileId,
       }),
-    [messages, lastReadMessageId, unreadCount, currentProfileId],
+    [messages, lastReadMessageId, lastReadAt, unreadCount, currentProfileId],
   );
   const listData = useMemo(
     () =>
@@ -417,15 +465,17 @@ export const MessageList: React.FC<MessageListProps> = ({
       ].reverse(),
     [messages, unreadAnchorMessageId, unreadCount],
   );
-  const latestIncomingMessageId = useMemo(() => {
-    for (let index = messages.length - 1; index >= 0; index -= 1) {
-      const message = messages[index];
-      if (message.core.sender.ids.id !== currentProfileId) {
-        return message.ids.id;
-      }
-    }
-    return null;
-  }, [messages, currentProfileId]);
+  const latestIncomingMessageId = useMemo(
+    () =>
+      findLatestUnreadIncomingMessageId({
+        messages,
+        lastReadMessageId,
+        lastReadAt,
+        unreadCount,
+        currentProfileId,
+      }),
+    [messages, lastReadMessageId, lastReadAt, unreadCount, currentProfileId],
+  );
 
   const maybeMarkUnreadAsViewed = useCallback(() => {
     if (!onUnreadViewed || !latestIncomingMessageId || !isScreenActive || isReadOnly) {

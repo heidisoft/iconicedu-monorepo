@@ -26,11 +26,13 @@ export class ThreadsController {
     @Query('orgId') orgId: string,
     @Query('channelId') channelId: string,
     @Query('threadId') threadId: string,
+    @Query('accountId') accountId?: string,
   ) {
     return this.threadsService.get(extractBearerToken(req.headers.authorization), {
       orgId,
       channelId,
       threadId,
+      accountId,
     });
   }
 
