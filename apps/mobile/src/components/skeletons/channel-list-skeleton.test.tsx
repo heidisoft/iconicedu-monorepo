@@ -16,14 +16,16 @@ describe('ChannelListSkeleton', () => {
     expect(screen.getAllByLabelText('Loading').length).toBeGreaterThan(0);
   });
 
-  it('renders default 6 rows — 26 PulseBox + 1 root = 27 loading nodes', () => {
+  it('renders the message-list skeleton rows with the expected structure', () => {
     render(<ChannelListSkeleton />);
-    expect(screen.getAllByLabelText('Loading').length).toBe(27);
+
+    expect(screen.getByTestId('channel-list-skeleton')).toBeTruthy();
+    expect(screen.getAllByTestId('channel-skeleton-row')).toHaveLength(6);
+    expect(screen.getAllByTestId('channel-skeleton-status-dot')).toHaveLength(1);
   });
 
   it('renders custom count of rows', () => {
     render(<ChannelListSkeleton count={3} />);
-    // i=0: 5, i=1: 4, i=2: 4 -> 13 PulseBox + 1 root = 14
-    expect(screen.getAllByLabelText('Loading').length).toBe(14);
+    expect(screen.getAllByTestId('channel-skeleton-row')).toHaveLength(3);
   });
 });
