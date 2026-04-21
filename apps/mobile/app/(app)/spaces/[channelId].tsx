@@ -449,6 +449,7 @@ export default function SpaceDetailScreen() {
   const resolvedTitle = spaceMeta?.title ?? topic ?? 'Class';
   const resolvedSubtitle = (spaceMeta?.subtitle ?? subtitle ?? '').trim() || null;
   const resolvedStudentProfiles = spaceMeta?.studentProfiles ?? [];
+  const resolvedParticipantProfiles = spaceMeta?.participantProfiles ?? [];
   const resolvedIconKey = spaceMeta?.iconKey ?? iconKey ?? null;
   const resolvedThemeKey = spaceMeta?.themeKey ?? themeKey ?? null;
   const resolvedLiveJoinUrl =
@@ -471,6 +472,7 @@ export default function SpaceDetailScreen() {
         kind="space"
         subtitle={resolvedSubtitle}
         studentProfiles={resolvedStudentProfiles}
+        participantProfiles={resolvedParticipantProfiles}
         currentProfileName={currentProfileName}
         currentProfileKind={profileKind}
         iconKey={resolvedIconKey}

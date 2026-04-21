@@ -13,7 +13,15 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { BookOpenCheck, MessageSquare } from 'lucide-react-native';
+import {
+  BookOpenCheck,
+  MessageSquare,
+  Presentation,
+  ShieldUser,
+  User,
+  BriefcaseBusiness,
+  Sparkles,
+} from 'lucide-react-native';
 import { useAccount } from '@/hooks/use-account';
 import { useProfile } from '@/hooks/use-profile';
 import { useDirectMessages } from '@/hooks/use-direct-messages';
@@ -188,6 +196,67 @@ function buildChannelStudentTitle(input: {
     hasVisibleStudents: visibleStudents.length > 0,
     channelTitle: input.channelTitle,
   };
+}
+
+type ClassroomParticipantProfile = {
+  name: string;
+  kind: 'educator' | 'guardian' | 'child' | 'staff' | 'system';
+  themeKey?: string | null;
+};
+
+const CLASSROOM_PARTICIPANT_GROUP_ORDER: ClassroomParticipantProfile['kind'][] = [
+  'educator',
+  'guardian',
+  'child',
+  'staff',
+  'system',
+];
+
+const CLASSROOM_PARTICIPANT_ICON_MAP: Record<
+  ClassroomParticipantProfile['kind'],
+  typeof Presentation
+> = {
+  educator: Presentation,
+  guardian: ShieldUser,
+  child: User,
+  staff: BriefcaseBusiness,
+  system: Sparkles,
+};
+
+function buildVisibleClassroomParticipantGroups(input: {
+  participantProfiles: ClassroomParticipantProfile[];
+  currentProfileName?: string | null;
+  currentProfileKind?: string | null;
+}) {
+  const currentProfileName = normalizeDisplayName(input.currentProfileName);
+  const visibleParticipants = input.participantProfiles.filter((participant) => {
+    const participantName = normalizeDisplayName(participant.name);
+    if (!participantName) return false;
+    if (
+      input.currentProfileKind === participant.kind &&
+      participantName === currentProfileName
+    ) {
+      return false;
+    }
+    return true;
+  });
+
+  return CLASSROOM_PARTICIPANT_GROUP_ORDER.map((kind) => ({
+    kind,
+    participants: visibleParticipants.filter((participant) => participant.kind === kind),
+  })).filter((group) => group.participants.length > 0);
+}
+
+function buildFallbackParticipantProfilesFromStudents(
+  studentProfiles: Array<{ name: string; themeKey?: string | null }>,
+): ClassroomParticipantProfile[] {
+  return studentProfiles
+    .filter((student) => student.name.trim().length > 0)
+    .map((student) => ({
+      name: student.name,
+      kind: 'child' as const,
+      themeKey: student.themeKey ?? null,
+    }));
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
@@ -376,6 +445,25 @@ function makeStyles(C: AppColors) {
     rowTime: { fontSize: 12, color: C.textMuted, fontWeight: '500' },
     rowMeta: { fontSize: 12, color: C.textMuted, lineHeight: 18 },
     rowMetaName: { fontWeight: '600' },
+    rowMetaWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: 8,
+      minWidth: 0,
+    },
+    rowMetaGroup: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      minWidth: 0,
+    },
+    rowMetaGroupNames: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexShrink: 1,
+      minWidth: 0,
+    },
     rowPreview: { fontSize: 12, color: C.textMuted, lineHeight: 18 },
     badge: {
       minWidth: 20,
@@ -617,9 +705,19 @@ function ChannelRow({
   const unread = item.unread_count ?? 0;
   const hasUnread = unread > 0;
   const studentProfiles = !isDm ? (item.student_profiles ?? []) : [];
+  const participantProfiles = !isDm ? (item.participant_profiles ?? []) : [];
   const classThemeKey = !isDm ? (item.themeKey ?? null) : null;
   const classAvatarColors = themeAvatarColor(classThemeKey, colors.inputBg, colors.text);
-  const hasChannelMeta = !isDm && Boolean(item.description);
+  const classroomParticipantSource =
+    participantProfiles.length > 0
+      ? participantProfiles
+      : buildFallbackParticipantProfilesFromStudents(studentProfiles);
+  const classroomParticipantGroups = buildVisibleClassroomParticipantGroups({
+    participantProfiles: classroomParticipantSource,
+    currentProfileName,
+    currentProfileKind,
+  });
+  const hasClassroomMeta = !isDm && classroomParticipantGroups.length > 0;
   const channelStudentTitle = buildChannelStudentTitle({
     channelTitle: name,
     studentProfiles,
@@ -694,33 +792,42 @@ function ChannelRow({
                 </View>
               )}
             </View>
-            {!isDm && hasChannelMeta ? (
-              <Text style={s.rowMeta} numberOfLines={1}>
-                {channelStudentTitle.hasVisibleStudents ? (
-                  <>
-                    <Text
-                      style={[
-                        s.rowMetaName,
-                        {
-                          color: themeTextColor(
-                            channelStudentTitle.leadStudent?.themeKey,
-                            colors.textMuted,
-                          ),
-                        },
-                      ]}
-                    >
-                      {channelStudentTitle.leadStudent?.name}
-                    </Text>
-                    {channelStudentTitle.remainingCount > 0 ? (
-                      <Text style={s.rowMetaName}>
-                        {` +${channelStudentTitle.remainingCount} more`}
-                      </Text>
-                    ) : null}
-                    <Text style={s.rowMeta}>{' · '}</Text>
-                  </>
-                ) : null}
-                {item.description ?? ''}
-              </Text>
+            {!isDm && hasClassroomMeta ? (
+              <View style={s.rowMetaWrap}>
+                {classroomParticipantGroups.map((group) => {
+                  const GroupIcon = CLASSROOM_PARTICIPANT_ICON_MAP[group.kind];
+
+                  return (
+                    <View key={group.kind} style={s.rowMetaGroup}>
+                      <GroupIcon size={12} color={colors.textMuted} strokeWidth={2} />
+                      <View style={s.rowMetaGroupNames}>
+                        {group.participants.map((participant, index) => (
+                          <React.Fragment key={`${participant.kind}-${participant.name}`}>
+                            {index > 0 ? <Text style={s.rowMeta}>{', '}</Text> : null}
+                            <Text
+                              style={[
+                                s.rowMeta,
+                                s.rowMetaName,
+                                participant.kind === 'child'
+                                  ? {
+                                      color: themeTextColor(
+                                        participant.themeKey,
+                                        colors.textMuted,
+                                      ),
+                                    }
+                                  : null,
+                              ]}
+                              numberOfLines={1}
+                            >
+                              {participant.name}
+                            </Text>
+                          </React.Fragment>
+                        ))}
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
             ) : null}
             {isDm && dmPreviewText ? (
               <Text style={s.rowPreview} numberOfLines={1}>
@@ -1030,6 +1137,9 @@ export default function MessagesScreen() {
       const themeKey = !isDm ? (channel.themeKey ?? '') : '';
       const subtitle = isDm ? 'Direct Message' : (channel.description ?? '');
       const studentProfiles = !isDm ? JSON.stringify(channel.student_profiles ?? []) : '';
+      const participantProfiles = !isDm
+        ? JSON.stringify(channel.participant_profiles ?? [])
+        : '';
       const isLearningSpace = !isDm && !channel.is_support ? '1' : '0';
       const pathname = isDm
         ? '/(app)/dm/[channelId]'
@@ -1062,6 +1172,7 @@ export default function MessagesScreen() {
                 themeKey,
                 subtitle,
                 studentProfiles,
+                participantProfiles,
                 isLearningSpace,
                 purpose: channel.is_support ? 'support' : '',
                 ...(channel.is_supervised

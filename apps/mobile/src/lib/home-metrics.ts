@@ -155,20 +155,28 @@ function getParticipantLabel(input: {
 function getRelevantParticipants(input: {
   schedule: ScopedDisplaySchedule;
   profileKind?: string | null;
-}): { name: string; themeKey?: string | null }[] {
+}): Array<{
+  name: string;
+  kind: Extract<ParticipantRoleVM, 'educator' | 'guardian' | 'child' | 'staff'>;
+  themeKey?: string | null;
+}> {
   const targetRoles: Set<ParticipantRoleVM> | null =
     input.profileKind === 'guardian'
       ? new Set<ParticipantRoleVM>(['child', 'educator'])
       : input.profileKind === 'educator'
-        ? new Set<ParticipantRoleVM>(['child'])
+        ? new Set<ParticipantRoleVM>(['child', 'educator'])
         : input.profileKind === 'child'
-          ? new Set<ParticipantRoleVM>(['educator'])
+          ? new Set<ParticipantRoleVM>(['child', 'educator'])
           : input.profileKind === 'staff' || input.profileKind === 'system'
             ? null
             : null;
 
   const seen = new Set<string>();
-  const participants: { name: string; themeKey?: string | null }[] = [];
+  const participants: Array<{
+    name: string;
+    kind: Extract<ParticipantRoleVM, 'educator' | 'guardian' | 'child' | 'staff'>;
+    themeKey?: string | null;
+  }> = [];
 
   input.schedule.participants.forEach((participant) => {
     if (targetRoles && !targetRoles.has(participant.role)) {
@@ -180,8 +188,21 @@ function getRelevantParticipants(input: {
       return;
     }
 
+    if (
+      participant.role !== 'educator' &&
+      participant.role !== 'guardian' &&
+      participant.role !== 'child' &&
+      participant.role !== 'staff'
+    ) {
+      return;
+    }
+
     seen.add(name);
-    participants.push({ name, themeKey: participant.themeKey ?? null });
+    participants.push({
+      name,
+      kind: participant.role,
+      themeKey: participant.themeKey ?? null,
+    });
   });
 
   return participants;

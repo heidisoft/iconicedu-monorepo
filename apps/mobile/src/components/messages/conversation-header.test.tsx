@@ -64,6 +64,26 @@ jest.mock('lucide-react-native', () => ({
     const { View } = require('react-native');
     return <View testID={testID ?? 'circleoff-icon'} />;
   },
+  Presentation: ({ testID }: { testID?: string }) => {
+    const { View } = require('react-native');
+    return <View testID={testID ?? 'presentation-icon'} />;
+  },
+  ShieldUser: ({ testID }: { testID?: string }) => {
+    const { View } = require('react-native');
+    return <View testID={testID ?? 'shielduser-icon'} />;
+  },
+  User: ({ testID }: { testID?: string }) => {
+    const { View } = require('react-native');
+    return <View testID={testID ?? 'user-icon'} />;
+  },
+  BriefcaseBusiness: ({ testID }: { testID?: string }) => {
+    const { View } = require('react-native');
+    return <View testID={testID ?? 'briefcasebusiness-icon'} />;
+  },
+  Sparkles: ({ testID }: { testID?: string }) => {
+    const { View } = require('react-native');
+    return <View testID={testID ?? 'sparkles-icon'} />;
+  },
   IdCardLanyard: ({ testID }: { testID?: string }) => {
     const { View } = require('react-native');
     return <View testID={testID ?? 'staff-name-indicator'} />;
@@ -154,6 +174,28 @@ describe('ConversationHeader', () => {
     expect(screen.getByText('Ava Lee')).toBeTruthy();
     expect(screen.getByText('+1 more')).toBeTruthy();
     expect(screen.queryByText(/Noah Cruz/)).toBeNull();
+  });
+
+  it('renders grouped classroom participants like web headers when provided', () => {
+    render(
+      <ConversationHeader
+        {...baseProps}
+        kind="space"
+        subtitle="Mathematics"
+        currentProfileName="Ava Lee"
+        currentProfileKind="child"
+        participantProfiles={[
+          { name: 'Priya Patel', kind: 'educator' },
+          { name: 'Ava Lee', kind: 'child', themeKey: 'blue' },
+          { name: 'Noah Cruz', kind: 'child', themeKey: 'green' },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('Priya Patel')).toBeTruthy();
+    expect(screen.getByText('Noah Cruz')).toBeTruthy();
+    expect(screen.queryByText('Ava Lee')).toBeNull();
+    expect(screen.queryByText('Mathematics')).toBeNull();
   });
 
   it('renders supervised subtitle when isReadOnly is true', () => {
