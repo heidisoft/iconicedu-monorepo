@@ -267,3 +267,55 @@ describe('buildHomeMetricSummary', () => {
     expect(result[0]?.isToday).toBe(true);
   });
 });
+
+describe('buildHomeUpcomingSessions', () => {
+  it('includes both tutor and student names for child homepage session tiles', () => {
+    const result = buildHomeUpcomingSessions({
+      schedules: [
+        makeSchedule({
+          id: 'child-session',
+          learningSpaceId: 'space-math',
+          startAt: '2026-03-24T14:00:00Z',
+          endAt: '2026-03-24T15:00:00Z',
+          participants: [
+            { id: 'child-1', role: 'child' },
+            { id: 'teacher-1', role: 'educator' },
+          ],
+        }),
+      ],
+      profileKind: 'child',
+      profileId: 'child-1',
+      now: BASE_NOW,
+    });
+
+    expect(result[0]?.participants?.map((participant) => participant.name)).toEqual([
+      'child-1',
+      'teacher-1',
+    ]);
+  });
+
+  it('includes both tutor and student names for educator homepage session tiles', () => {
+    const result = buildHomeUpcomingSessions({
+      schedules: [
+        makeSchedule({
+          id: 'educator-session',
+          learningSpaceId: 'space-math',
+          startAt: '2026-03-24T14:00:00Z',
+          endAt: '2026-03-24T15:00:00Z',
+          participants: [
+            { id: 'child-1', role: 'child' },
+            { id: 'teacher-1', role: 'educator' },
+          ],
+        }),
+      ],
+      profileKind: 'educator',
+      profileId: 'teacher-1',
+      now: BASE_NOW,
+    });
+
+    expect(result[0]?.participants?.map((participant) => participant.name)).toEqual([
+      'child-1',
+      'teacher-1',
+    ]);
+  });
+});

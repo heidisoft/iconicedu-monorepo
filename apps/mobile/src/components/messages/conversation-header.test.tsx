@@ -64,6 +64,26 @@ jest.mock('lucide-react-native', () => ({
     const { View } = require('react-native');
     return <View testID={testID ?? 'circleoff-icon'} />;
   },
+  Presentation: ({ testID }: { testID?: string }) => {
+    const { View } = require('react-native');
+    return <View testID={testID ?? 'presentation-icon'} />;
+  },
+  ShieldUser: ({ testID }: { testID?: string }) => {
+    const { View } = require('react-native');
+    return <View testID={testID ?? 'shielduser-icon'} />;
+  },
+  User: ({ testID }: { testID?: string }) => {
+    const { View } = require('react-native');
+    return <View testID={testID ?? 'user-icon'} />;
+  },
+  BriefcaseBusiness: ({ testID }: { testID?: string }) => {
+    const { View } = require('react-native');
+    return <View testID={testID ?? 'briefcasebusiness-icon'} />;
+  },
+  Sparkles: ({ testID }: { testID?: string }) => {
+    const { View } = require('react-native');
+    return <View testID={testID ?? 'sparkles-icon'} />;
+  },
   IdCardLanyard: ({ testID }: { testID?: string }) => {
     const { View } = require('react-native');
     return <View testID={testID ?? 'staff-name-indicator'} />;
@@ -76,57 +96,6 @@ jest.mock('@/lib/learning-space-icons', () => ({
     return <View testID={testID ?? 'learning-space-icon-badge'} />;
   },
 }));
-
-jest.mock('@iconicedu/ui-native', () => {
-  const React = require('react');
-  const { Pressable, View } = require('react-native');
-  const TooltipContext = React.createContext<{
-    visible: boolean;
-    setVisible: (value: boolean) => void;
-  } | null>(null);
-
-  return {
-    Tooltip: ({ children }: { children: React.ReactNode }) => {
-      const [visible, setVisible] = React.useState(false);
-      return (
-        <TooltipContext.Provider value={{ visible, setVisible }}>
-          {children}
-        </TooltipContext.Provider>
-      );
-    },
-    TooltipTrigger: ({
-      children,
-      accessibilityLabel,
-      accessibilityRole,
-    }: {
-      children: React.ReactNode;
-      accessibilityLabel?: string;
-      accessibilityRole?: string;
-    }) => {
-      const context = React.useContext(TooltipContext);
-      return (
-        <Pressable
-          accessibilityLabel={accessibilityLabel}
-          accessibilityRole={accessibilityRole}
-          onPress={() => context?.setVisible(true)}
-        >
-          {children}
-        </Pressable>
-      );
-    },
-    TooltipContent: ({
-      children,
-      testID,
-    }: {
-      children: React.ReactNode;
-      testID?: string;
-    }) => {
-      const context = React.useContext(TooltipContext);
-      if (!context?.visible) return null;
-      return <View testID={testID}>{children}</View>;
-    },
-  };
-});
 
 // ─── Tests ──────────────────────────────────────────────────────────────────────
 
@@ -159,24 +128,21 @@ describe('ConversationHeader', () => {
     expect(screen.getByText('Direct Message')).toBeTruthy();
   });
 
-  it('shows a tooltip with local time details when pressed', () => {
+  it('shows local time inline without opening a tooltip when pressed', () => {
     render(
       <ConversationHeader
         {...baseProps}
         subtitle="Available"
         localTimeLabel="9:41 AM"
         localTimeIcon="day"
-        localTimeTooltipLabel={'Current time: 9:41 AM\nLocation: Colombo, Sri Lanka'}
       />,
     );
 
     expect(screen.getByTestId('sun-icon')).toBeTruthy();
-    fireEvent.press(screen.getByLabelText('Show local time details'));
-
-    expect(screen.getByTestId('conversation-local-time-tooltip')).toBeTruthy();
-    expect(
-      screen.getByText('Current time: 9:41 AM\nLocation: Colombo, Sri Lanka'),
-    ).toBeTruthy();
+    expect(screen.getByText('9:41 AM')).toBeTruthy();
+    expect(screen.queryByLabelText('Show local time details')).toBeNull();
+    fireEvent.press(screen.getByText('9:41 AM'));
+    expect(screen.queryByTestId('conversation-local-time-tooltip')).toBeNull();
   });
 
   it('renders the offline icon when local time context is offline', () => {
@@ -186,17 +152,17 @@ describe('ConversationHeader', () => {
         subtitle="Last seen 2h ago"
         localTimeLabel="11:41 PM"
         localTimeIcon="offline"
-        localTimeTooltipLabel={'Current time: 11:41 PM\nThey may be offline right now'}
       />,
     );
 
     expect(screen.getByTestId('circleoff-icon')).toBeTruthy();
   });
 
-  it('renders themed student names after the subtitle', () => {
+  it('renders compact themed student metadata for non-DM conversations', () => {
     render(
       <ConversationHeader
         {...baseProps}
+        kind="space"
         subtitle="Mathematics"
         studentProfiles={[
           { name: 'Ava Lee', themeKey: 'blue' },
@@ -206,7 +172,30 @@ describe('ConversationHeader', () => {
     );
     expect(screen.getByText('Mathematics')).toBeTruthy();
     expect(screen.getByText('Ava Lee')).toBeTruthy();
-    expect(screen.getByText(/Noah Cruz/)).toBeTruthy();
+    expect(screen.getByText('+1 more')).toBeTruthy();
+    expect(screen.queryByText(/Noah Cruz/)).toBeNull();
+  });
+
+  it('renders grouped classroom participants like web headers when provided', () => {
+    render(
+      <ConversationHeader
+        {...baseProps}
+        kind="space"
+        subtitle="Mathematics"
+        currentProfileName="Ava Lee"
+        currentProfileKind="child"
+        participantProfiles={[
+          { name: 'Priya Patel', kind: 'educator' },
+          { name: 'Ava Lee', kind: 'child', themeKey: 'blue' },
+          { name: 'Noah Cruz', kind: 'child', themeKey: 'green' },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('Priya Patel')).toBeTruthy();
+    expect(screen.getByText('Noah Cruz')).toBeTruthy();
+    expect(screen.queryByText('Ava Lee')).toBeNull();
+    expect(screen.queryByText('Mathematics')).toBeNull();
   });
 
   it('renders supervised subtitle when isReadOnly is true', () => {

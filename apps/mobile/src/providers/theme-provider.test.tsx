@@ -1,10 +1,16 @@
 import React from 'react';
-import { Text, useColorScheme } from 'react-native';
-import { render, screen, waitFor } from '@testing-library/react-native';
+import * as ReactNative from 'react-native';
+import { Appearance, Text, useColorScheme } from 'react-native';
+import { act, render, screen, waitFor } from '@testing-library/react-native';
 
 const mockSetItemAsync = jest.fn();
 const mockGetItemAsync = jest.fn();
 const mockNativeWindSet = jest.fn();
+const mockAppearanceGetColorScheme = jest.fn<'light' | 'dark' | null, []>();
+const mockAppearanceRemove = jest.fn();
+let appearanceChangeListener:
+  | ((event: { colorScheme: 'light' | 'dark' | null }) => void)
+  | null = null;
 
 jest.mock('expo-secure-store', () => ({
   getItemAsync: (...args: unknown[]) => mockGetItemAsync(...args),
@@ -42,8 +48,19 @@ function Consumer() {
 describe('ThemeProvider', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest
+      .spyOn(Appearance, 'getColorScheme')
+      .mockImplementation(() => mockAppearanceGetColorScheme());
+    jest.spyOn(Appearance, 'addChangeListener').mockImplementation((listener) => {
+      appearanceChangeListener = listener;
+      return { remove: mockAppearanceRemove };
+    });
+    jest
+      .spyOn(ReactNative, 'useColorScheme')
+      .mockImplementation(() => mockUseColorScheme());
     mockGetItemAsync.mockResolvedValue(null);
     mockSetItemAsync.mockResolvedValue(undefined);
+    mockAppearanceGetColorScheme.mockReturnValue('dark');
     mockUseColorScheme.mockReturnValue('dark');
   });
 
@@ -64,6 +81,7 @@ describe('ThemeProvider', () => {
   });
 
   it('updates when the OS appearance changes while following system mode', async () => {
+    mockAppearanceGetColorScheme.mockReturnValue('light');
     mockUseColorScheme.mockReturnValue('light');
 
     const view = render(
@@ -77,7 +95,17 @@ describe('ThemeProvider', () => {
       expect(screen.getByTestId('is-dark').props.children).toBe('false');
     });
 
+    act(() => {
+      mockUseColorScheme.mockReturnValue('dark');
+      appearanceChangeListener?.({ colorScheme: 'dark' });
+    });
     mockUseColorScheme.mockReturnValue('dark');
+    view.rerender(
+      <ThemeProvider>
+        <Consumer />
+      </ThemeProvider>,
+    );
+
     view.rerender(
       <ThemeProvider>
         <Consumer />
@@ -89,7 +117,7 @@ describe('ThemeProvider', () => {
       expect(screen.getByTestId('is-dark').props.children).toBe('true');
     });
 
-    expect(mockNativeWindSet).toHaveBeenCalledWith('system');
+    expect(mockNativeWindSet).toHaveBeenLastCalledWith('system');
   });
 
   it('prefers a stored explicit theme over the device scheme', async () => {

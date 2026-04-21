@@ -108,6 +108,11 @@ export function AvatarWithStatus({
   sizeClassName,
   statusClassName,
   fallbackClassName,
+  roleLabel,
+  email,
+  timezone,
+  locationLabel,
+  about,
   messageHref,
   onMessageClick,
   enableProfilePreview = true,
@@ -209,12 +214,12 @@ export function AvatarWithStatus({
     : safeName;
   const resolvedPreviewRoleLabel = resolvedPreviewProfile
     ? getAvatarRoleLabel(resolvedPreviewProfile.kind)
-    : null;
+    : (roleLabel ?? null);
   const resolvedPreviewLocationLabel = resolvedPreviewProfile
     ? getAvatarLocationLabel(resolvedPreviewProfile.location)
-    : null;
+    : (locationLabel ?? null);
   const resolvedPreviewLocalTimeLabel = getLocalTimeLabel(
-    resolvedPreviewProfile?.prefs.timezone,
+    resolvedPreviewProfile?.prefs.timezone ?? timezone,
   );
   const resolvedPreviewStatusText =
     resolvedPreviewProfile?.presence?.state?.text?.trim() ?? statusText;
@@ -233,10 +238,14 @@ export function AvatarWithStatus({
     displayStatus: resolvedPreviewPresenceTone,
   });
   const resolvedPreviewAbout =
-    resolvedPreviewProfile?.profile.bio?.trim() || resolvedPreviewStatusText || null;
+    resolvedPreviewProfile?.profile.bio?.trim() ||
+    about?.trim() ||
+    resolvedPreviewStatusText ||
+    null;
   const resolvedPreviewEmail =
     previewPayload?.account?.contacts?.email ??
     resolvedPreviewProfile?.accountEmail ??
+    email ??
     null;
   const formattedLastSeen = resolvedPreviewProfile?.presence?.lastSeenAt
     ? formatLastSeen(resolvedPreviewProfile.presence.lastSeenAt)
@@ -244,6 +253,14 @@ export function AvatarWithStatus({
   const resolvedPreviewLastSeenLabel = formattedLastSeen
     ? `Last seen ${formattedLastSeen}`
     : null;
+  const hasPreviewFallbackContent = Boolean(
+    resolvedPreviewName ||
+    resolvedPreviewRoleLabel ||
+    resolvedPreviewLocationLabel ||
+    resolvedPreviewLocalTimeLabel ||
+    resolvedPreviewAbout ||
+    resolvedPreviewEmail,
+  );
   const shouldShowPreviewLoading =
     Boolean(previewRequestKey) && !previewPayload && !previewError;
 
@@ -349,7 +366,7 @@ export function AvatarWithStatus({
         avatarNode={previewAvatarNode}
         canMessage={canMessage}
         email={resolvedPreviewEmail}
-        error={previewError}
+        error={hasPreviewFallbackContent ? null : previewError}
         lastSeenLabel={resolvedPreviewLastSeenLabel}
         loading={previewLoading || shouldShowPreviewLoading}
         localTimeLabel={resolvedPreviewLocalTimeLabel}

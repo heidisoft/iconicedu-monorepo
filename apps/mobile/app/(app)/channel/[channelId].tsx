@@ -50,6 +50,11 @@ import { applyOptimisticChannelReadState } from '@/lib/messages/apply-optimistic
 type ChannelTab = 'messages' | 'sessions';
 
 type HeaderStudentProfile = { name: string; themeKey?: string | null };
+type HeaderParticipantProfile = {
+  name: string;
+  kind: 'educator' | 'guardian' | 'child' | 'staff' | 'system';
+  themeKey?: string | null;
+};
 
 export default function ChannelConversationScreen() {
   const {
@@ -59,6 +64,7 @@ export default function ChannelConversationScreen() {
     themeKey,
     subtitle,
     studentProfiles,
+    participantProfiles,
     isLearningSpace,
     purpose,
     isStaffObserverReadOnly,
@@ -69,6 +75,7 @@ export default function ChannelConversationScreen() {
     themeKey?: string;
     subtitle?: string;
     studentProfiles?: string;
+    participantProfiles?: string;
     isLearningSpace?: string;
     purpose?: string;
     isStaffObserverReadOnly?: string;
@@ -89,6 +96,16 @@ export default function ChannelConversationScreen() {
     (profileRecord?.display_name as string | undefined)?.trim() ||
     (profileRecord?.first_name as string | undefined)?.trim() ||
     'Me';
+  const currentProfileName =
+    (profileRecord?.display_name as string | undefined)?.trim() ||
+    [
+      profileRecord?.first_name as string | undefined,
+      profileRecord?.last_name as string | undefined,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .trim() ||
+    null;
   const profileKind = (profileRecord?.kind as string | undefined) ?? null;
   const shouldCheckStaffReadOnly =
     profileKind === 'staff' &&
@@ -443,6 +460,44 @@ export default function ChannelConversationScreen() {
       return [];
     }
   }, [studentProfiles]);
+  const headerParticipantProfiles = useMemo(() => {
+    if (!participantProfiles) return [] as HeaderParticipantProfile[];
+    try {
+      const parsed = JSON.parse(participantProfiles) as unknown;
+      if (!Array.isArray(parsed)) return [] as HeaderParticipantProfile[];
+      return parsed.flatMap((value) => {
+        if (!value || typeof value !== 'object') return [];
+        const name =
+          typeof (value as { name?: unknown }).name === 'string'
+            ? (value as { name: string }).name.trim()
+            : '';
+        const candidateKind = (value as { kind?: unknown }).kind;
+        if (
+          !name ||
+          (candidateKind !== 'educator' &&
+            candidateKind !== 'guardian' &&
+            candidateKind !== 'child' &&
+            candidateKind !== 'staff' &&
+            candidateKind !== 'system')
+        ) {
+          return [];
+        }
+        const kind: HeaderParticipantProfile['kind'] = candidateKind;
+        return [
+          {
+            name,
+            kind,
+            themeKey:
+              typeof (value as { themeKey?: unknown }).themeKey === 'string'
+                ? ((value as { themeKey: string }).themeKey ?? null)
+                : null,
+          },
+        ];
+      });
+    } catch {
+      return [] as HeaderParticipantProfile[];
+    }
+  }, [participantProfiles]);
   const resolvedSubtitle = subtitle?.trim() || null;
   const isSpaceChannel = isLearningSpace === '1';
   const resolvedIconKey =
@@ -468,6 +523,9 @@ export default function ChannelConversationScreen() {
         title={topic ?? 'Channel'}
         subtitle={resolvedSubtitle}
         studentProfiles={headerStudentProfiles}
+        participantProfiles={headerParticipantProfiles}
+        currentProfileName={currentProfileName}
+        currentProfileKind={profileKind}
         kind={isSpaceChannel ? 'space' : 'channel'}
         iconKey={resolvedIconKey}
         themeKey={themeKey ?? null}
@@ -520,6 +578,7 @@ export default function ChannelConversationScreen() {
         >
           <MessageList
             messages={messages ?? []}
+            channelId={channelId ?? ''}
             currentProfileId={profileId}
             currentAccountId={accountId}
             lastReadMessageId={channelReadState?.lastReadMessageId ?? null}

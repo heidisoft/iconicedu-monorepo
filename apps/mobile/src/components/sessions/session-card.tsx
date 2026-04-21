@@ -10,11 +10,20 @@ import {
   Share,
   type ViewStyle,
 } from 'react-native';
-import { Video, Clock3, MessageSquare, Share2, X } from 'lucide-react-native';
+import {
+  Video,
+  Clock3,
+  Share2,
+  X,
+  Presentation,
+  ShieldUser,
+  User,
+  BriefcaseBusiness,
+} from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/providers/theme-provider';
 import { fetchSpaceChannelMetaByChannelId } from '@/lib/api/queries';
-import type { ClassScheduleVM } from '@iconicedu/shared-types';
+import type { ClassScheduleVM, ParticipantRoleVM } from '@iconicedu/shared-types';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -27,7 +36,11 @@ export type ClassSession = {
   label: string;
   time: string;
   participantLabel?: string | null;
-  participants?: { name: string; themeKey?: string | null }[];
+  participants?: Array<{
+    name: string;
+    kind: Extract<ParticipantRoleVM, 'educator' | 'guardian' | 'child' | 'staff'>;
+    themeKey?: string | null;
+  }>;
   dayName: string;
   dayNum: string;
   isToday: boolean;
@@ -107,8 +120,34 @@ const THEME_COLORS: Record<string, string> = {
   rose: '#e11d48',
 };
 
+const SESSION_PARTICIPANT_GROUP_ORDER: Array<
+  Extract<ParticipantRoleVM, 'educator' | 'guardian' | 'child' | 'staff'>
+> = ['educator', 'guardian', 'child', 'staff'];
+
+const SESSION_PARTICIPANT_ICON_MAP: Record<
+  Extract<ParticipantRoleVM, 'educator' | 'guardian' | 'child' | 'staff'>,
+  typeof Presentation
+> = {
+  educator: Presentation,
+  guardian: ShieldUser,
+  child: User,
+  staff: BriefcaseBusiness,
+};
+
 function themeKeyColor(themeKey?: string | null, fallback?: string): string {
   return (themeKey && THEME_COLORS[themeKey]) || fallback || '#64748b';
+}
+
+function buildParticipantGroups(
+  participants: NonNullable<ClassSession['participants']>,
+): Array<{
+  kind: Extract<ParticipantRoleVM, 'educator' | 'guardian' | 'child' | 'staff'>;
+  participants: NonNullable<ClassSession['participants']>;
+}> {
+  return SESSION_PARTICIPANT_GROUP_ORDER.map((kind) => ({
+    kind,
+    participants: participants.filter((participant) => participant.kind === kind),
+  })).filter((group) => group.participants.length > 0);
 }
 
 function isExternalJoinHref(joinHref?: string | null): boolean {
@@ -184,8 +223,10 @@ export function SessionCard({
   const { isLive, isPast } = session;
   const isDisabled = session.disabled;
   const participantLabel = session.participantLabel?.trim() || null;
+  const students = session.students?.filter((student) => student.name.trim()) ?? [];
   const participants =
     session.participants?.filter((participant) => participant.name.trim()) ?? [];
+  const participantGroups = buildParticipantGroups(participants);
 
   const badgeBg = isLive ? colors.teal : colors.pageBg;
   const badgeTxt = isLive
@@ -207,13 +248,6 @@ export function SessionCard({
             params: { channelId: session.channelId!, tab: pressTarget },
           } as never)
       : undefined;
-  const handleOpenChat = session.channelId
-    ? () =>
-        router.push({
-          pathname: '/(app)/spaces/[channelId]',
-          params: { channelId: session.channelId!, tab: 'messages' },
-        } as never)
-    : undefined;
   const handleOpenJoinHref = useCallback((joinHref: string) => {
     void Linking.openURL(resolveJoinHrefForMobile(joinHref));
   }, []);
@@ -283,8 +317,6 @@ export function SessionCard({
   const canJoin =
     !isPast && !isDisabled && (!!session.meetingLink || !!session.channelId);
   const joinIsActive = canJoin && joinEnabled && !isResolvingJoin;
-  const canChat = !!session.channelId;
-
   return (
     <>
       <TouchableOpacity
@@ -364,19 +396,67 @@ export function SessionCard({
             <Text style={[s.sessionTimeTxt, { color: colors.textMuted }]}>
               {session.time}
             </Text>
-            {participants.length > 0 ? (
+            {participantGroups.length > 0 ? (
+              <>
+                <Text style={[s.sessionTimeTxt, { color: colors.textFaint }]}>·</Text>
+                <View style={s.sessionParticipantWrap}>
+                  {participantGroups.map((group) => {
+                    const GroupIcon = SESSION_PARTICIPANT_ICON_MAP[group.kind];
+
+                    return (
+                      <View key={group.kind} style={s.sessionParticipantGroup}>
+                        <GroupIcon size={12} color={colors.textMuted} strokeWidth={2} />
+                        <View style={s.sessionParticipantNames}>
+                          {group.participants.map((participant, index) => (
+                            <React.Fragment
+                              key={`${participant.kind}-${participant.name}`}
+                            >
+                              {index > 0 ? (
+                                <Text
+                                  style={[
+                                    s.sessionParticipantName,
+                                    { color: colors.textFaint },
+                                  ]}
+                                >
+                                  {', '}
+                                </Text>
+                              ) : null}
+                              <Text
+                                style={[
+                                  s.sessionParticipantName,
+                                  participant.kind === 'child'
+                                    ? {
+                                        color: themeKeyColor(
+                                          participant.themeKey,
+                                          colors.textMuted,
+                                        ),
+                                      }
+                                    : null,
+                                ]}
+                              >
+                                {participant.name}
+                              </Text>
+                            </React.Fragment>
+                          ))}
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              </>
+            ) : students.length > 0 ? (
               <>
                 <Text style={[s.sessionTimeTxt, { color: colors.textFaint }]}>·</Text>
                 <Text style={s.sessionTimeTxt} numberOfLines={1}>
-                  {participants.map((participant, i) => (
-                    <Text key={participant.name + i}>
+                  {students.map((student, i) => (
+                    <Text key={student.name + i}>
                       {i > 0 && <Text style={{ color: colors.textFaint }}>, </Text>}
                       <Text
                         style={{
-                          color: themeKeyColor(participant.themeKey, colors.textMuted),
+                          color: themeKeyColor(student.themeKey, colors.textMuted),
                         }}
                       >
-                        {participant.name}
+                        {student.name}
                       </Text>
                     </Text>
                   ))}
@@ -390,24 +470,6 @@ export function SessionCard({
                   numberOfLines={1}
                 >
                   {participantLabel}
-                </Text>
-              </>
-            ) : session.students && session.students.length > 0 ? (
-              <>
-                <Text style={[s.sessionTimeTxt, { color: colors.textFaint }]}>·</Text>
-                <Text style={s.sessionTimeTxt} numberOfLines={1}>
-                  {session.students.map((student, i) => (
-                    <Text key={student.name + i}>
-                      {i > 0 && <Text style={{ color: colors.textFaint }}>, </Text>}
-                      <Text
-                        style={{
-                          color: themeKeyColor(student.themeKey, colors.textMuted),
-                        }}
-                      >
-                        {student.name}
-                      </Text>
-                    </Text>
-                  ))}
                 </Text>
               </>
             ) : null}
@@ -439,6 +501,7 @@ export function SessionCard({
                       ? colors.teal
                       : colors.tealBg
                     : colors.inputBg,
+                  borderColor: joinIsActive ? colors.teal : colors.border,
                   opacity: joinIsActive ? 1 : 0.6,
                 },
               ]}
@@ -467,33 +530,29 @@ export function SessionCard({
               </Text>
             </TouchableOpacity>
           ) : showJoinButton && isDisabled ? (
-            <View style={[s.joinBtn, { backgroundColor: colors.inputBg, opacity: 0.5 }]}>
+            <View
+              style={[
+                s.joinBtn,
+                {
+                  backgroundColor: colors.inputBg,
+                  borderColor: colors.border,
+                  opacity: 0.5,
+                },
+              ]}
+            >
               <Video size={11} color={colors.textMuted} />
               <Text style={[s.joinBtnTxt, { color: colors.textMuted }]}>Unavailable</Text>
             </View>
           ) : showJoinButton ? (
             <TouchableOpacity
-              style={[s.joinBtn, { backgroundColor: colors.inputBg }]}
+              style={[
+                s.joinBtn,
+                { backgroundColor: colors.inputBg, borderColor: colors.border },
+              ]}
               activeOpacity={0.7}
             >
               <Video size={11} color={colors.textMuted} />
               <Text style={[s.joinBtnTxt, { color: colors.textMuted }]}>Recording</Text>
-            </TouchableOpacity>
-          ) : null}
-          {canChat ? (
-            <TouchableOpacity
-              style={[
-                s.iconBtn,
-                {
-                  backgroundColor: colors.card,
-                  borderColor: colors.border,
-                },
-              ]}
-              onPress={handleOpenChat}
-              activeOpacity={0.7}
-              accessibilityLabel="Open classroom chat"
-            >
-              <MessageSquare size={13} color={colors.textMuted} />
             </TouchableOpacity>
           ) : null}
           {cancelAction ? (
@@ -664,11 +723,38 @@ const s = StyleSheet.create({
   },
   sessionTimeRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    flexWrap: 'wrap',
     gap: 3,
   },
   sessionTimeTxt: {
     fontSize: 11,
+  },
+  sessionParticipantWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  sessionParticipantGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    minWidth: 0,
+  },
+  sessionParticipantNames: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  sessionParticipantName: {
+    fontSize: 11,
+    lineHeight: 16,
+    color: '#64748b',
+    fontWeight: '600',
   },
   sessionOriginalTimeTxt: {
     fontSize: 11,
@@ -737,6 +823,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 5,
     borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   joinBtnTxt: {
     fontSize: 11,

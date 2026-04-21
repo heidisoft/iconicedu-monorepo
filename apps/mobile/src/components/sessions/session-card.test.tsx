@@ -27,6 +27,44 @@ jest.mock('@/lib/api/queries', () => ({
   fetchSpaceChannelMetaByChannelId: (...args: unknown[]) =>
     mockFetchSpaceChannelMetaByChannelId(...args),
 }));
+jest.mock('lucide-react-native', () => ({
+  Video: ({ testID }: { testID?: string }) => {
+    const { View } = require('react-native');
+    return <View testID={testID ?? 'video-icon'} />;
+  },
+  Clock3: ({ testID }: { testID?: string }) => {
+    const { View } = require('react-native');
+    return <View testID={testID ?? 'clock-icon'} />;
+  },
+  Share2: ({ testID }: { testID?: string }) => {
+    const { View } = require('react-native');
+    return <View testID={testID ?? 'share-icon'} />;
+  },
+  X: ({ testID }: { testID?: string }) => {
+    const { View } = require('react-native');
+    return <View testID={testID ?? 'close-icon'} />;
+  },
+  Presentation: ({ testID }: { testID?: string }) => {
+    const { View } = require('react-native');
+    return <View testID={testID ?? 'presentation-icon'} />;
+  },
+  ShieldUser: ({ testID }: { testID?: string }) => {
+    const { View } = require('react-native');
+    return <View testID={testID ?? 'shielduser-icon'} />;
+  },
+  User: ({ testID }: { testID?: string }) => {
+    const { View } = require('react-native');
+    return <View testID={testID ?? 'user-icon'} />;
+  },
+  BriefcaseBusiness: ({ testID }: { testID?: string }) => {
+    const { View } = require('react-native');
+    return <View testID={testID ?? 'briefcasebusiness-icon'} />;
+  },
+  Sparkles: ({ testID }: { testID?: string }) => {
+    const { View } = require('react-native');
+    return <View testID={testID ?? 'sparkles-icon'} />;
+  },
+}));
 jest.spyOn(Linking, 'openURL').mockImplementation(mockOpenURL);
 jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' } as never);
 
@@ -69,6 +107,25 @@ describe('SessionCard', () => {
     render(<SessionCard session={baseSession} />);
     expect(screen.getByText('Mar · Week 2')).toBeTruthy();
     expect(screen.getByText('2:30 PM')).toBeTruthy();
+  });
+
+  it('renders grouped educator and student names with icons', () => {
+    render(
+      <SessionCard
+        session={{
+          ...baseSession,
+          participants: [
+            { name: 'Priya Patel', kind: 'educator' },
+            { name: 'Ava Lee', kind: 'child', themeKey: 'blue' },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByText('Priya Patel')).toBeTruthy();
+    expect(screen.getByText('Ava Lee')).toBeTruthy();
+    expect(screen.getByTestId('presentation-icon')).toBeTruthy();
+    expect(screen.getByTestId('user-icon')).toBeTruthy();
   });
 
   it('shows LIVE badge when isLive', () => {
@@ -193,17 +250,6 @@ describe('SessionCard', () => {
     );
   });
 
-  it('opens classroom chat from the chat button', () => {
-    render(<SessionCard session={baseSession} />);
-
-    fireEvent.press(screen.getByLabelText('Open classroom chat'));
-
-    expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(app)/spaces/[channelId]',
-      params: { channelId: 'channel-1', tab: 'messages' },
-    });
-  });
-
   it('shows Recording button for past sessions', () => {
     render(<SessionCard session={{ ...baseSession, isPast: true }} />);
     expect(screen.getByText('Recording')).toBeTruthy();
@@ -279,8 +325,8 @@ describe('SessionCard', () => {
         session={{
           ...baseSession,
           participants: [
-            { name: 'Alice', themeKey: 'blue' },
-            { name: 'Mr. Chen', themeKey: 'teal' },
+            { name: 'Alice', kind: 'child', themeKey: 'blue' },
+            { name: 'Mr. Chen', kind: 'educator', themeKey: 'teal' },
           ],
         }}
       />,

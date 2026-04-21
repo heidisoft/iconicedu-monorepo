@@ -53,6 +53,25 @@ export class SpacesService {
       .is('deleted_at', null);
     if (error) throw new InternalServerErrorException(error.message);
 
+    const learningSpaceIds = (data ?? [])
+      .map((row) => (row.space as { id?: string | null } | null)?.id ?? null)
+      .filter(Boolean) as string[];
+    const { data: participantRows, error: participantError } = learningSpaceIds.length
+      ? await supabase
+          .from('learning_space_participants')
+          .select(
+            `
+            learning_space_id,
+            profile:profiles!profile_id(display_name, first_name, last_name, kind, ui_theme_key)
+            `,
+          )
+          .in('learning_space_id', learningSpaceIds)
+          .eq('org_id', orgId)
+          .is('deleted_at', null)
+      : { data: [], error: null };
+    if (participantError)
+      throw new InternalServerErrorException(participantError.message);
+
     const channelIds = (data ?? [])
       .map((row) => (row.channel as { id?: string | null } | null)?.id ?? null)
       .filter(Boolean) as string[];
@@ -72,9 +91,69 @@ export class SpacesService {
         row.unread_count ?? 0,
       ]),
     );
+    const studentProfilesBySpaceId = new Map<
+      string,
+      Array<{ name: string; themeKey?: string | null }>
+    >();
+    const participantProfilesBySpaceId = new Map<
+      string,
+      Array<{
+        name: string;
+        kind: 'educator' | 'guardian' | 'child' | 'staff' | 'system';
+        themeKey?: string | null;
+      }>
+    >();
+    for (const row of participantRows ?? []) {
+      const spaceId = row.learning_space_id as string | null;
+      const profile = Array.isArray(row.profile) ? row.profile[0] : row.profile;
+      if (
+        !spaceId ||
+        !profile ||
+        (profile.kind !== 'educator' &&
+          profile.kind !== 'guardian' &&
+          profile.kind !== 'child' &&
+          profile.kind !== 'staff' &&
+          profile.kind !== 'system')
+      ) {
+        continue;
+      }
+
+      const displayName =
+        profile.display_name?.trim() ||
+        [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim();
+      if (!displayName) continue;
+
+      const existingParticipants = participantProfilesBySpaceId.get(spaceId) ?? [];
+      if (
+        !existingParticipants.some(
+          (participant) =>
+            participant.name === displayName && participant.kind === profile.kind,
+        )
+      ) {
+        existingParticipants.push({
+          name: displayName,
+          kind: profile.kind,
+          themeKey: profile.ui_theme_key ?? null,
+        });
+        participantProfilesBySpaceId.set(spaceId, existingParticipants);
+      }
+
+      if (profile.kind !== 'child') continue;
+
+      const existing = studentProfilesBySpaceId.get(spaceId) ?? [];
+      if (existing.some((student) => student.name === displayName)) continue;
+
+      existing.push({
+        name: displayName,
+        themeKey: profile.ui_theme_key ?? null,
+      });
+      studentProfilesBySpaceId.set(spaceId, existing);
+    }
+
     return (data ?? [])
       .filter((row) => {
         const space = row.space as {
+          id?: string | null;
           status?: string | null;
           deleted_at?: string | null;
         } | null;
@@ -86,6 +165,7 @@ export class SpacesService {
       })
       .map((row) => {
         const space = row.space as {
+          id?: string | null;
           title?: string | null;
           icon_key?: string | null;
           subject?: string | null;
@@ -109,6 +189,12 @@ export class SpacesService {
           last_message_sender: null,
           icon_key: space.icon_key ?? null,
           themeKey: channel.ui_theme_key ?? null,
+          student_profiles: space.id
+            ? (studentProfilesBySpaceId.get(space.id) ?? [])
+            : [],
+          participant_profiles: space.id
+            ? (participantProfilesBySpaceId.get(space.id) ?? [])
+            : [],
         };
       });
   }

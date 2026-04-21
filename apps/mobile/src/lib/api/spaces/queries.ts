@@ -19,6 +19,11 @@ export async function fetchSpaceChannelMetaByChannelId(channelId: string): Promi
     joinUrl: string | null;
   } | null;
   studentProfiles: Array<{ name: string; themeKey?: string | null }>;
+  participantProfiles: Array<{
+    name: string;
+    kind: 'educator' | 'guardian' | 'child' | 'staff' | 'system';
+    themeKey?: string | null;
+  }>;
 } | null> {
   if (!channelId) return null;
 
@@ -75,13 +80,44 @@ export async function fetchSpaceChannelMetaByChannelId(channelId: string): Promi
   if (participantError) throw participantError;
 
   const studentProfiles: Array<{ name: string; themeKey?: string | null }> = [];
+  const participantProfiles: Array<{
+    name: string;
+    kind: 'educator' | 'guardian' | 'child' | 'staff' | 'system';
+    themeKey?: string | null;
+  }> = [];
   for (const row of participantRows ?? []) {
     const profile = Array.isArray(row.profile) ? row.profile[0] : row.profile;
-    if (!profile || profile.kind !== 'child') continue;
+    if (
+      !profile ||
+      (profile.kind !== 'educator' &&
+        profile.kind !== 'guardian' &&
+        profile.kind !== 'child' &&
+        profile.kind !== 'staff' &&
+        profile.kind !== 'system')
+    ) {
+      continue;
+    }
     const displayName =
       profile.display_name?.trim() ||
       [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim();
-    if (displayName && !studentProfiles.some((student) => student.name === displayName)) {
+    if (
+      displayName &&
+      !participantProfiles.some(
+        (participant) =>
+          participant.name === displayName && participant.kind === profile.kind,
+      )
+    ) {
+      participantProfiles.push({
+        name: displayName,
+        kind: profile.kind,
+        themeKey: profile.ui_theme_key ?? null,
+      });
+    }
+    if (
+      profile.kind === 'child' &&
+      displayName &&
+      !studentProfiles.some((student) => student.name === displayName)
+    ) {
       studentProfiles.push({
         name: displayName,
         themeKey: profile.ui_theme_key ?? null,
@@ -128,6 +164,7 @@ export async function fetchSpaceChannelMetaByChannelId(channelId: string): Promi
     description: space.description ?? null,
     liveSession: liveSessionConfig,
     studentProfiles,
+    participantProfiles,
   };
 }
 
@@ -173,6 +210,7 @@ export async function fetchLearningSpaceChannels(
   const spaceItems = items.map((item) => ({
     ...item,
     student_profiles: item.student_profiles ?? [],
+    participant_profiles: item.participant_profiles ?? [],
   }));
   if (myProfileKind === 'child') return spaceItems;
 
@@ -196,6 +234,7 @@ export async function fetchLearningSpaceChannels(
       themeKey: supportChannel.themeKey ?? null,
       student_name: null,
       student_profiles: [],
+      participant_profiles: [],
       is_support: true,
     },
   ];

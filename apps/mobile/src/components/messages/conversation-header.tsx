@@ -26,8 +26,12 @@ import {
   Sunset,
   MoonStar,
   CircleOff,
+  Presentation,
+  ShieldUser,
+  User,
+  BriefcaseBusiness,
+  Sparkles,
 } from 'lucide-react-native';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@iconicedu/ui-native';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 import { ChannelTopicIconBadge } from '@/lib/learning-space-icons';
@@ -109,8 +113,14 @@ export type ConversationHeaderProps = {
   title: string;
   subtitle?: string | null;
   studentProfiles?: Array<{ name: string; themeKey?: string | null }> | null;
+  participantProfiles?: Array<{
+    name: string;
+    kind: 'educator' | 'guardian' | 'child' | 'staff' | 'system';
+    themeKey?: string | null;
+  }> | null;
+  currentProfileName?: string | null;
+  currentProfileKind?: string | null;
   localTimeLabel?: string | null;
-  localTimeTooltipLabel?: string | null;
   localTimeIcon?:
     | 'clock'
     | 'morning'
@@ -144,6 +154,81 @@ type AutoScrollingInlineTextProps = {
   contentStyle?: object;
   testIDPrefix?: string;
 };
+
+type HeaderParticipantProfile = NonNullable<
+  ConversationHeaderProps['participantProfiles']
+>[number];
+
+type ParticipantGroupKind = HeaderParticipantProfile['kind'];
+
+function normalizeDisplayName(name?: string | null): string {
+  return (name ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function buildCompactStudentMeta(input: {
+  studentProfiles?: Array<{ name: string; themeKey?: string | null }> | null;
+  currentProfileName?: string | null;
+  currentProfileKind?: string | null;
+}) {
+  const currentProfileName = normalizeDisplayName(input.currentProfileName);
+  const visibleStudents =
+    input.studentProfiles?.filter((student) => {
+      const studentName = normalizeDisplayName(student.name);
+      if (!studentName) return false;
+      if (input.currentProfileKind === 'child' && studentName === currentProfileName) {
+        return false;
+      }
+      return true;
+    }) ?? [];
+
+  return {
+    leadStudent: visibleStudents[0] ?? null,
+    remainingCount: Math.max(0, visibleStudents.length - 1),
+    hasVisibleStudents: visibleStudents.length > 0,
+  };
+}
+
+const CLASSROOM_PARTICIPANT_GROUP_ORDER: ParticipantGroupKind[] = [
+  'educator',
+  'guardian',
+  'child',
+  'staff',
+  'system',
+];
+
+const CLASSROOM_PARTICIPANT_ICON_MAP: Record<ParticipantGroupKind, typeof Presentation> =
+  {
+    educator: Presentation,
+    guardian: ShieldUser,
+    child: User,
+    staff: BriefcaseBusiness,
+    system: Sparkles,
+  };
+
+function buildClassroomParticipantGroups(input: {
+  participantProfiles?: ConversationHeaderProps['participantProfiles'];
+  currentProfileName?: string | null;
+  currentProfileKind?: string | null;
+}) {
+  const currentProfileName = normalizeDisplayName(input.currentProfileName);
+  const visibleParticipants =
+    input.participantProfiles?.filter((participant) => {
+      const participantName = normalizeDisplayName(participant.name);
+      if (!participantName) return false;
+      if (
+        input.currentProfileKind === participant.kind &&
+        participantName === currentProfileName
+      ) {
+        return false;
+      }
+      return true;
+    }) ?? [];
+
+  return CLASSROOM_PARTICIPANT_GROUP_ORDER.map((kind) => ({
+    kind,
+    participants: visibleParticipants.filter((participant) => participant.kind === kind),
+  })).filter((group) => group.participants.length > 0);
+}
 
 function makeStyles(C: AppColors) {
   return StyleSheet.create({
@@ -250,6 +335,23 @@ function makeStyles(C: AppColors) {
     },
     subtitleText: { fontSize: 12, lineHeight: 16, color: C.textMuted },
     subtitleSeparator: { fontSize: 12, lineHeight: 16, color: C.textMuted },
+    subtitleGroup: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      marginRight: 10,
+    },
+    subtitleGroupNames: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexShrink: 1,
+    },
+    subtitleGroupName: {
+      fontSize: 12,
+      lineHeight: 16,
+      color: C.textMuted,
+      flexShrink: 1,
+    },
     localTimeText: { fontSize: 12, lineHeight: 16, color: C.textMuted },
     localTimeWrap: {
       flexDirection: 'row',
@@ -295,6 +397,8 @@ function makeStyles(C: AppColors) {
       paddingVertical: 7,
       borderRadius: 20,
       backgroundColor: C.tealBg,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: C.teal,
     },
     joinPillTxt: { fontSize: 13, fontWeight: '700', color: C.teal },
     modalBackdrop: {
@@ -497,8 +601,10 @@ export function ConversationHeader({
   title,
   subtitle,
   studentProfiles,
+  participantProfiles,
+  currentProfileName,
+  currentProfileKind,
   localTimeLabel,
-  localTimeTooltipLabel,
   localTimeIcon,
   kind,
   avatarSeed,
@@ -546,10 +652,21 @@ export function ConversationHeader({
     return <View style={[s.statusBadge, { backgroundColor: '#4b5563' }]} />;
   }, [isReadOnly, presenceStatus, s]);
 
-  const subtitleStudents =
-    studentProfiles?.filter((student) => student.name.trim().length > 0) ?? [];
-  const hasSubtitleStudents = subtitleStudents.length > 0;
-  const hasSubtitleMeta = Boolean(subtitle || hasSubtitleStudents || localTimeLabel);
+  const compactStudentMeta = buildCompactStudentMeta({
+    studentProfiles,
+    currentProfileName,
+    currentProfileKind,
+  });
+  const classroomParticipantGroups = buildClassroomParticipantGroups({
+    participantProfiles,
+    currentProfileName,
+    currentProfileKind,
+  });
+  const hasClassroomParticipantGroups = !isDm && classroomParticipantGroups.length > 0;
+  const hasSubtitleStudents = !isDm && compactStudentMeta.hasVisibleStudents;
+  const hasSubtitleMeta = Boolean(
+    subtitle || hasSubtitleStudents || localTimeLabel || hasClassroomParticipantGroups,
+  );
 
   const LocalTimeIcon = useMemo(() => {
     switch (localTimeIcon) {
@@ -604,25 +721,75 @@ export function ConversationHeader({
         contentStyle={s.subtitleInlineContent}
         testIDPrefix="conversation-subtitle"
       >
-        {!!subtitle && <Text style={s.subtitleText}>{subtitle}</Text>}
-        {!!subtitle && hasSubtitleStudents && (
-          <Text style={s.subtitleSeparator}>{' \u00b7 '}</Text>
-        )}
-        {hasSubtitleStudents &&
-          subtitleStudents.map((student, index) => (
+        {hasClassroomParticipantGroups
+          ? classroomParticipantGroups.map((group) => {
+              const GroupIcon = CLASSROOM_PARTICIPANT_ICON_MAP[group.kind];
+
+              return (
+                <View key={group.kind} style={s.subtitleGroup}>
+                  <GroupIcon size={12} color={colors.textMuted} strokeWidth={2} />
+                  <View style={s.subtitleGroupNames}>
+                    {group.participants.map((participant, index) => (
+                      <React.Fragment key={`${participant.kind}-${participant.name}`}>
+                        {index > 0 ? (
+                          <Text style={s.subtitleGroupName}>{', '}</Text>
+                        ) : null}
+                        <RoleNameIndicator
+                          name={participant.name}
+                          role={participant.kind}
+                          textStyle={[
+                            s.subtitleGroupName,
+                            participant.kind === 'child'
+                              ? {
+                                  color: themeTextColor(
+                                    participant.themeKey,
+                                    colors.textMuted,
+                                  ),
+                                }
+                              : null,
+                          ]}
+                          iconSize={12}
+                          numberOfLines={1}
+                        />
+                      </React.Fragment>
+                    ))}
+                  </View>
+                </View>
+              );
+            })
+          : null}
+        {!hasClassroomParticipantGroups && hasSubtitleStudents ? (
+          <>
             <Text
-              key={`${student.name}-${index}`}
-              style={{
-                color: themeTextColor(student.themeKey, colors.textMuted),
-              }}
+              style={[
+                s.subtitleText,
+                {
+                  color: themeTextColor(
+                    compactStudentMeta.leadStudent?.themeKey,
+                    colors.textMuted,
+                  ),
+                },
+              ]}
             >
-              {index > 0 ? ', ' : ''}
-              {student.name}
+              {compactStudentMeta.leadStudent?.name}
             </Text>
-          ))}
-        {!!(subtitle || hasSubtitleStudents) && !!localTimeLabel && (
+            {compactStudentMeta.remainingCount > 0 ? (
+              <Text
+                style={s.subtitleText}
+              >{` +${compactStudentMeta.remainingCount} more`}</Text>
+            ) : null}
+          </>
+        ) : null}
+        {!!subtitle && (hasSubtitleStudents || hasClassroomParticipantGroups) && (
           <Text style={s.subtitleSeparator}>{' \u00b7 '}</Text>
         )}
+        {!!subtitle && !hasClassroomParticipantGroups ? (
+          <Text style={s.subtitleText}>{subtitle}</Text>
+        ) : null}
+        {!!(subtitle || hasSubtitleStudents || hasClassroomParticipantGroups) &&
+        !!localTimeLabel ? (
+          <Text style={s.subtitleSeparator}>{' \u00b7 '}</Text>
+        ) : null}
         {!!localTimeLabel && (
           <View style={s.localTimeWrap}>
             <LocalTimeIcon size={12} color={colors.textMuted} strokeWidth={2} />
@@ -700,27 +867,7 @@ export function ConversationHeader({
                 textStyle={s.title}
                 numberOfLines={1}
               />
-              {hasSubtitleMeta &&
-                (localTimeTooltipLabel ? (
-                  <Tooltip delayDuration={0}>
-                    <TooltipTrigger
-                      accessibilityRole="button"
-                      accessibilityLabel="Show local time details"
-                      hitSlop={8}
-                    >
-                      <View style={s.subtitleButton}>{subtitleContent}</View>
-                    </TooltipTrigger>
-                    <TooltipContent
-                      testID="conversation-local-time-tooltip"
-                      sideOffset={6}
-                      className="rounded-2xl px-3 py-2"
-                    >
-                      <Text style={s.tooltipText}>{localTimeTooltipLabel}</Text>
-                    </TooltipContent>
-                  </Tooltip>
-                ) : (
-                  subtitleContent
-                ))}
+              {hasSubtitleMeta && subtitleContent}
             </>
           )}
         </View>

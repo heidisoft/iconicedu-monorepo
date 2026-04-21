@@ -1702,6 +1702,7 @@ const CARD_TYPES = new Set([
 
 export type MessageItemProps = {
   message: MessageVM;
+  channelId?: string;
   isOwn: boolean;
   isGroupStart: boolean;
   colors: AppColors;
@@ -1718,6 +1719,7 @@ export type MessageItemProps = {
 
 export const MessageItem: React.FC<MessageItemProps> = ({
   message,
+  channelId,
   isOwn,
   isGroupStart,
   colors,
@@ -1853,24 +1855,24 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 
     setThreadLoading(true);
     try {
+      const resolvedChannelId = thread.readState?.channelId ?? channelId ?? '';
       const replies = await fetchThreadMessages(
         message.ids.orgId,
-        thread.readState?.channelId ?? '',
+        resolvedChannelId,
         thread.ids.id,
         message.ids.id,
         currentProfileId ?? '',
         currentAccountId ?? '',
       );
       setThreadReplies(replies);
-      const channelId = thread.readState?.channelId;
       const lastReplyId = replies[replies.length - 1]?.ids.id ?? null;
-      if (channelId && currentProfileId && currentAccountId) {
+      if (resolvedChannelId && currentProfileId && currentAccountId) {
         try {
           const unreadCount = await markThreadReadState({
             orgId: message.ids.orgId,
             accountId: currentAccountId,
             profileId: currentProfileId,
-            channelId,
+            channelId: resolvedChannelId,
             threadId: thread.ids.id,
             lastReadMessageId: lastReplyId,
           });
@@ -1881,7 +1883,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             source: 'mobile.messages.message_item.thread_read_state',
             message: 'Failed to sync thread read state',
             context: {
-              channelId,
+              channelId: resolvedChannelId,
               threadId: thread.ids.id,
               messageId: message.ids.id,
             },
@@ -1901,7 +1903,14 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     } finally {
       setThreadLoading(false);
     }
-  }, [thread, message.ids.id, message.ids.orgId, currentProfileId, currentAccountId]);
+  }, [
+    thread,
+    channelId,
+    message.ids.id,
+    message.ids.orgId,
+    currentProfileId,
+    currentAccountId,
+  ]);
 
   useEffect(() => {
     if (!threadExpanded || !thread) {

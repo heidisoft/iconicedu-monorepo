@@ -280,7 +280,7 @@ describe('DmConversationScreen — supervised read-only mode', () => {
     );
   });
 
-  it('passes the local time tooltip label with city and country when available', () => {
+  it('passes local time and icon context when city and country are available', () => {
     mockUseLocalSearchParams.mockReturnValue({
       channelId: 'ch-1',
       topic: 'Alice',
@@ -295,14 +295,11 @@ describe('DmConversationScreen — supervised read-only mode', () => {
       expect.objectContaining({
         localTimeLabel: expect.stringMatching(/^.+$/),
         localTimeIcon: expect.any(String),
-        localTimeTooltipLabel: expect.stringMatching(
-          /^Current time: .+\nLocation: Colombo, Sri Lanka(?:\n.+)?$/,
-        ),
       }),
     );
   });
 
-  it('passes the local time tooltip label with just country when city is missing', () => {
+  it('passes local time and icon context with just country when city is missing', () => {
     mockUseLocalSearchParams.mockReturnValue({
       channelId: 'ch-1',
       topic: 'Alice',
@@ -314,9 +311,8 @@ describe('DmConversationScreen — supervised read-only mode', () => {
 
     expect(mockConversationHeader).toHaveBeenCalledWith(
       expect.objectContaining({
-        localTimeTooltipLabel: expect.stringMatching(
-          /^Current time: .+\nLocation: Sri Lanka(?:\n.+)?$/,
-        ),
+        localTimeLabel: expect.stringMatching(/^.+$/),
+        localTimeIcon: expect.any(String),
       }),
     );
   });
@@ -337,7 +333,7 @@ describe('DmConversationScreen — supervised read-only mode', () => {
     expect(mockConversationHeader).toHaveBeenCalledWith(
       expect.objectContaining({
         localTimeIcon: 'offline',
-        localTimeTooltipLabel: expect.stringMatching(/They may be offline right now$/),
+        localTimeLabel: expect.stringMatching(/^.+$/),
       }),
     );
   });

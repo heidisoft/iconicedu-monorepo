@@ -27,6 +27,11 @@ export type ChannelListItem = {
   themeKey?: string | null;
   student_name?: string | null;
   student_profiles?: Array<{ name: string; themeKey?: string | null }>;
+  participant_profiles?: Array<{
+    name: string;
+    kind: 'educator' | 'guardian' | 'child' | 'staff' | 'system';
+    themeKey?: string | null;
+  }>;
   participants?: DmParticipant[];
   is_supervised?: boolean;
   supervised_child_name?: string | null;

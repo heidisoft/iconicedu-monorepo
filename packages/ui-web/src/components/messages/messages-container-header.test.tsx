@@ -117,7 +117,7 @@ describe('MessagesContainerHeader', () => {
     );
   });
 
-  it('shows last seen and local time directly under the header name for offline DMs', () => {
+  it('shows last seen and mobile-style local time under the header name for non-online DMs', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-25T14:41:00.000Z'));
 
@@ -146,12 +146,12 @@ describe('MessagesContainerHeader', () => {
       />,
     );
 
-    const statusText = screen.getByText('Last seen 1m ago · 10:41 AM (Local time)');
-    expect(statusText).toBeInTheDocument();
-    expect(statusText).toHaveClass('text-xs');
+    expect(screen.getByText('Last seen 1m ago')).toBeInTheDocument();
+    expect(screen.getByText('10:41 AM')).toBeInTheDocument();
+    expect(screen.getByTestId('dm-header-local-time-icon')).toBeInTheDocument();
   });
 
-  it('shows available and local time for online DMs', () => {
+  it('shows available and mobile-style local time for online DMs', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-25T14:41:00.000Z'));
 
@@ -179,9 +179,43 @@ describe('MessagesContainerHeader', () => {
       />,
     );
 
-    const statusText = screen.getByText('Available · 10:41 AM (Local time)');
-    expect(statusText).toBeInTheDocument();
-    expect(statusText).toHaveClass('text-xs');
+    expect(screen.getByText('Available')).toBeInTheDocument();
+    expect(screen.getByText('10:41 AM')).toBeInTheDocument();
+    expect(screen.getByTestId('dm-header-local-time-icon')).toBeInTheDocument();
+  });
+
+  it('uses the offline local-time icon when the DM participant is offline', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-25T14:41:00.000Z'));
+
+    render(
+      <MessagesContainerHeader
+        channel={
+          {
+            basics: { kind: 'dm', topic: 'DM' },
+            collections: {
+              participants: [
+                makeParticipant('profile-self'),
+                makeParticipant('profile-other', {
+                  prefs: { timezone: 'America/New_York' },
+                  presence: {
+                    liveStatus: 'offline',
+                    displayStatus: 'offline',
+                    state: {},
+                    lastSeenAt: '2026-03-25T12:41:00.000Z',
+                  },
+                }),
+              ],
+            },
+            ui: { headerQuickMetaActions: [] },
+          } as any
+        }
+      />,
+    );
+
+    expect(screen.getByText('Last seen 2h ago')).toBeInTheDocument();
+    expect(screen.getByText('10:41 AM')).toBeInTheDocument();
+    expect(screen.getByTestId('dm-header-local-time-icon')).toBeInTheDocument();
   });
 
   it('shows all non-viewer classroom participants under the header title', () => {

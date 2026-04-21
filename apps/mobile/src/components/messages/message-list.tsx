@@ -338,6 +338,7 @@ const skelStyles = StyleSheet.create({
 
 type MessageListProps = {
   messages: MessageVM[];
+  channelId?: string;
   currentProfileId: string;
   currentAccountId?: string;
   onLoadMore?: () => void;
@@ -367,6 +368,7 @@ type MessageListProps = {
 
 export const MessageList: React.FC<MessageListProps> = ({
   messages,
+  channelId,
   currentProfileId,
   currentAccountId,
   onLoadMore,
@@ -498,6 +500,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       return (
         <MessageItem
           message={item}
+          channelId={channelId}
           isOwn={isOwn}
           isGroupStart={isGroupStart}
           colors={colors}
@@ -515,6 +518,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     [
       currentProfileId,
       currentAccountId,
+      channelId,
       listData,
       colors,
       onMessageLongPress,

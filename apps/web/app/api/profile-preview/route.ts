@@ -5,7 +5,6 @@ import {
   getAccountByAuthUserId,
   getAccountById,
 } from '@iconicedu/web/lib/accounts/queries/accounts.query';
-import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
 import {
   buildUserProfileByAccountId,
   buildUserProfileById,
@@ -27,7 +26,17 @@ export async function GET(request: Request) {
 
   try {
     const sessionSupabase = await createSupabaseServerClient();
-    const authUser = await requireAuthedUser(sessionSupabase);
+    const {
+      data: { user: authUser },
+    } = await sessionSupabase.auth.getUser();
+
+    if (!authUser) {
+      return NextResponse.json(
+        { success: false, message: 'Unauthorized' },
+        { status: 401 },
+      );
+    }
+
     const actorAccountResponse = await getAccountByAuthUserId(
       sessionSupabase,
       authUser.id,
