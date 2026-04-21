@@ -1,9 +1,14 @@
 import { supabase } from '@/lib/supabase/client';
 
 function resolveApiBaseUrl(): string {
-  const configured = process.env.EXPO_PUBLIC_API_URL?.trim();
+  const configured = (
+    process.env.EXPO_PUBLIC_API_URL ??
+    process.env.NEXT_PUBLIC_API_URL ??
+    process.env.API_URL ??
+    ''
+  ).trim();
   if (!configured) {
-    throw new Error('EXPO_PUBLIC_API_URL is not configured');
+    throw new Error('Missing required environment variable: API_URL');
   }
 
   return configured.replace(/\/+$/g, '');
