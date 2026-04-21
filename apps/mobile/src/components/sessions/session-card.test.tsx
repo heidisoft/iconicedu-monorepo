@@ -325,8 +325,8 @@ describe('SessionCard', () => {
         session={{
           ...baseSession,
           participants: [
-            { name: 'Alice', themeKey: 'blue' },
-            { name: 'Mr. Chen', themeKey: 'teal' },
+            { name: 'Alice', kind: 'child', themeKey: 'blue' },
+            { name: 'Mr. Chen', kind: 'educator', themeKey: 'teal' },
           ],
         }}
       />,

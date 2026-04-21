@@ -6,6 +6,8 @@ import { act, render, screen, waitFor } from '@testing-library/react-native';
 const mockSetItemAsync = jest.fn();
 const mockGetItemAsync = jest.fn();
 const mockNativeWindSet = jest.fn();
+const mockAppearanceGetColorScheme = jest.fn<'light' | 'dark' | null, []>();
+const mockAppearanceRemove = jest.fn();
 let appearanceChangeListener:
   | ((event: { colorScheme: 'light' | 'dark' | null }) => void)
   | null = null;
