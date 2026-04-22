@@ -75,15 +75,32 @@ export class SpacesService {
     const channelIds = (data ?? [])
       .map((row) => (row.channel as { id?: string | null } | null)?.id ?? null)
       .filter(Boolean) as string[];
-    const { data: readStateRows, error: readError } = channelIds.length
-      ? await supabase
-          .from('channel_read_state')
-          .select('channel_id, unread_count')
-          .eq('account_id', accountId)
-          .in('channel_id', channelIds)
-          .is('deleted_at', null)
-      : { data: [], error: null };
+    const [
+      { data: readStateRows, error: readError },
+      { data: threadReadStateRows, error: threadReadError },
+    ] = channelIds.length
+      ? await Promise.all([
+          supabase
+            .from('channel_read_state')
+            .select('channel_id, unread_count')
+            .eq('account_id', accountId)
+            .in('channel_id', channelIds)
+            .is('thread_id', null)
+            .is('deleted_at', null),
+          supabase
+            .from('channel_read_state')
+            .select('channel_id, unread_count')
+            .eq('account_id', accountId)
+            .in('channel_id', channelIds)
+            .not('thread_id', 'is', null)
+            .is('deleted_at', null),
+        ])
+      : [
+          { data: [], error: null },
+          { data: [], error: null },
+        ];
     if (readError) throw new InternalServerErrorException(readError.message);
+    if (threadReadError) throw new InternalServerErrorException(threadReadError.message);
 
     const readStateByChannelId = new Map(
       (readStateRows ?? []).map((row) => [
@@ -91,6 +108,15 @@ export class SpacesService {
         row.unread_count ?? 0,
       ]),
     );
+    const threadUnreadByChannelId = new Map<string, number>();
+    for (const row of threadReadStateRows ?? []) {
+      const channelId = row.channel_id as string;
+      const unreadCount = Math.max(0, row.unread_count ?? 0);
+      threadUnreadByChannelId.set(
+        channelId,
+        (threadUnreadByChannelId.get(channelId) ?? 0) + unreadCount,
+      );
+    }
     const studentProfilesBySpaceId = new Map<
       string,
       Array<{ name: string; themeKey?: string | null }>
@@ -184,6 +210,7 @@ export class SpacesService {
           kind: 'channel',
           updated_at: channel.updated_at,
           unread_count: Math.max(0, readStateByChannelId.get(channel.id) ?? 0),
+          thread_unread_count: Math.max(0, threadUnreadByChannelId.get(channel.id) ?? 0),
           last_message_text: null,
           last_message_at: null,
           last_message_sender: null,

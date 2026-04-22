@@ -131,6 +131,17 @@ export default function SpaceDetailScreen() {
     enabled: !!channelId && !!accountId,
     staleTime: 30_000,
   });
+  const refreshConversation = useCallback(async () => {
+    await Promise.all([
+      refetch(),
+      channelId && accountId
+        ? queryClient.refetchQueries({
+            queryKey: queryKeys.channelReadState(channelId, accountId),
+            exact: true,
+          })
+        : Promise.resolve(),
+    ]);
+  }, [accountId, channelId, queryClient, refetch]);
   const { data: isChannelMember = true } = useQuery({
     queryKey: queryKeys.channelMembership(orgId, channelId ?? '', profileId),
     queryFn: () => fetchIsChannelMember(orgId, channelId ?? '', profileId),
@@ -140,8 +151,8 @@ export default function SpaceDetailScreen() {
   });
   useEffect(() => {
     if (!isFocused || !channelId || !orgId) return;
-    void refetch();
-  }, [channelId, isFocused, orgId, refetch]);
+    void refreshConversation();
+  }, [channelId, isFocused, orgId, refreshConversation]);
   const isStaffReadOnly =
     profileKind === 'staff' && (initialStaffReadOnly || !isChannelMember);
 
@@ -427,12 +438,18 @@ export default function SpaceDetailScreen() {
         profileKind,
       });
       try {
-        await markChannelReadState({
+        const unreadCount = await markChannelReadState({
           orgId,
           accountId,
           profileId,
           channelId,
           lastReadMessageId,
+        });
+        queryClient.setQueryData(queryKeys.channelReadState(channelId, accountId), {
+          channelId,
+          lastReadMessageId,
+          lastReadAt: new Date().toISOString(),
+          unreadCount,
         });
       } catch {
         void queryClient.invalidateQueries({
@@ -527,7 +544,7 @@ export default function SpaceDetailScreen() {
             onLoadMore={loadMore}
             loading={isLoading}
             refreshing={isRefetching}
-            onRefresh={refetch}
+            onRefresh={refreshConversation}
             onMessageLongPress={isStaffReadOnly ? undefined : handleLongPress}
             onReactionToggle={isStaffReadOnly ? undefined : handleReactionToggle}
             onThreadOpen={isStaffReadOnly ? undefined : handleThreadOpen}

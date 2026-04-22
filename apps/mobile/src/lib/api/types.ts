@@ -20,6 +20,7 @@ export type ChannelListItem = {
   kind: string;
   updated_at: string;
   unread_count: number;
+  thread_unread_count?: number;
   last_message_text: string | null;
   last_message_at: string | null;
   last_message_sender: string | null;

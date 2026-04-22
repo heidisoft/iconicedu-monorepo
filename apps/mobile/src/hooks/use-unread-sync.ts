@@ -3,6 +3,26 @@ import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase/client';
 import { queryKeys } from '@/lib/api/queries';
 
+const BADGE_SYNC_DEBOUNCE_MS = 400;
+let badgeSyncTimerId: ReturnType<typeof setTimeout> | null = null;
+
+type ReadStateRealtimePayload = {
+  new?: { thread_id?: string | null; channel_id?: string | null } | null;
+  old?: { thread_id?: string | null; channel_id?: string | null } | null;
+};
+
+export function shouldSyncChannelListsForReadStatePayload(
+  payload: ReadStateRealtimePayload,
+) {
+  const threadId = payload.new?.thread_id ?? payload.old?.thread_id ?? null;
+  return threadId == null;
+}
+
+export function resolveChannelIdFromPayload(payload: ReadStateRealtimePayload) {
+  const channelId = payload.new?.channel_id ?? payload.old?.channel_id ?? null;
+  return typeof channelId === 'string' && channelId.length > 0 ? channelId : null;
+}
+
 function getNotificationsModule() {
   // Function-scoped require avoids loading the native module in Expo Go.
   // eslint-disable-next-line @typescript-eslint/no-require-imports, no-undef
@@ -34,6 +54,17 @@ async function syncUnreadBadgeCount(orgId: string, accountId: string) {
   } catch {
     // Ignore badge sync failures.
   }
+}
+
+function scheduleUnreadBadgeCountSync(orgId: string, accountId: string) {
+  if (badgeSyncTimerId) {
+    clearTimeout(badgeSyncTimerId);
+  }
+
+  badgeSyncTimerId = setTimeout(() => {
+    badgeSyncTimerId = null;
+    void syncUnreadBadgeCount(orgId, accountId);
+  }, BADGE_SYNC_DEBOUNCE_MS);
 }
 
 /**
@@ -73,7 +104,30 @@ export function useUnreadSync(params: {
   useEffect(() => {
     if (!accountId || !orgId || !profileId) return;
 
-    const invalidateChannelLists = () => {
+    const handleReadStateChange = (payload?: ReadStateRealtimePayload) => {
+      if (payload && !shouldSyncChannelListsForReadStatePayload(payload)) {
+        const channelId = resolveChannelIdFromPayload(payload);
+        const o = orgIdRef.current;
+        const p = profileIdRef.current;
+        const pk = profileKindRef.current;
+        if (channelId && p) {
+          void queryClient.invalidateQueries({
+            queryKey: queryKeys.messages(channelId, p),
+            exact: true,
+          });
+        }
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.directMessages(o, p),
+        });
+        queryClient.invalidateQueries({
+          queryKey: ['learningSpaceChannels', o, p, pk ?? null],
+        });
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.supervisedDirectMessages(o, guardianAccountId ?? accountId),
+        });
+        return;
+      }
+
       const o = orgIdRef.current;
       const p = profileIdRef.current;
       const pk = profileKindRef.current;
@@ -87,7 +141,7 @@ export function useUnreadSync(params: {
       queryClient.invalidateQueries({
         queryKey: queryKeys.supervisedDirectMessages(o, guardianAccountId ?? accountId),
       });
-      void syncUnreadBadgeCount(o, accountId);
+      scheduleUnreadBadgeCountSync(o, accountId);
     };
 
     void syncUnreadBadgeCount(orgId, accountId);
@@ -105,7 +159,7 @@ export function useUnreadSync(params: {
           table: 'channel_read_state',
           filter: `account_id=eq.${accountId}`,
         },
-        invalidateChannelLists,
+        handleReadStateChange,
       )
       .on(
         'postgres_changes',
@@ -115,7 +169,7 @@ export function useUnreadSync(params: {
           table: 'channel_read_state',
           filter: `account_id=eq.${accountId}`,
         },
-        invalidateChannelLists,
+        handleReadStateChange,
       )
       .subscribe();
 

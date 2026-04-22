@@ -252,6 +252,7 @@ async function resolveDmActivityRecipientProfileIds(input: {
     .eq('org_id', input.orgId)
     .eq('channel_id', input.channelId)
     .in('account_id', accountIds)
+    .is('thread_id', null)
     .is('deleted_at', null)
     .returns<Array<{ account_id: string; last_read_at: string | null }>>();
 

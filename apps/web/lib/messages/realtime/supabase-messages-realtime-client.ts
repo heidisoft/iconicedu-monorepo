@@ -168,6 +168,44 @@ export function createSupabaseMessagesRealtimeClient(): MessagesRealtimeClient {
         );
       });
 
+      channel.on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'channel_read_state',
+          filter: `channel_id=eq.${channelId}`,
+        },
+        (payload) => {
+          const readState =
+            (payload.new as {
+              thread_id?: string | null;
+              unread_count?: number | null;
+              last_read_message_id?: string | null;
+              last_read_at?: string | null;
+            } | null) ??
+            (payload.old as {
+              thread_id?: string | null;
+              unread_count?: number | null;
+              last_read_message_id?: string | null;
+              last_read_at?: string | null;
+            } | null);
+
+          const threadId = readState?.thread_id;
+          if (!threadId) {
+            return;
+          }
+
+          onEvent({
+            type: 'thread_read_state_updated',
+            threadId,
+            unreadCount: Math.max(0, readState?.unread_count ?? 0),
+            lastReadMessageId: readState?.last_read_message_id ?? null,
+            lastReadAt: readState?.last_read_at ?? null,
+          });
+        },
+      );
+
       channel.on('broadcast', { event: 'typing' }, (payload) => {
         const data = payload.payload as
           | { profileId?: string; isTyping?: boolean }

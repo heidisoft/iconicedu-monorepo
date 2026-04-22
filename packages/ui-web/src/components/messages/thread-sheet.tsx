@@ -1,4 +1,4 @@
-import { useRef, useEffect, useMemo } from 'react';
+import { useRef, useEffect, useMemo, useCallback } from 'react';
 import { MessageInput } from '@iconicedu/ui-web/components/messages/message-input';
 import type {
   ConnectionVM,
@@ -63,19 +63,44 @@ export function ThreadSheet({
     () => (parentMessage ? [parentMessage, ...replies.items] : replies.items),
     [parentMessage, replies.items],
   );
+  const scrollAreaRootRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const messageCountRef = useRef(messages.length);
 
+  const scrollThreadPanelToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    window.requestAnimationFrame(() => {
+      const scrollViewport = scrollAreaRootRef.current?.querySelector(
+        '[data-slot="scroll-area-viewport"]',
+      ) as HTMLDivElement | null;
+
+      if (!scrollViewport) {
+        bottomRef.current?.scrollIntoView({ behavior });
+        return;
+      }
+
+      const nextTop = scrollViewport.scrollHeight;
+      if (typeof scrollViewport.scrollTo === 'function') {
+        scrollViewport.scrollTo({
+          top: nextTop,
+          behavior,
+        });
+        return;
+      }
+
+      scrollViewport.scrollTop = nextTop;
+    });
+  }, []);
+
   useEffect(() => {
     if (messages.length > messageCountRef.current) {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+      scrollThreadPanelToBottom('smooth');
     }
     messageCountRef.current = messages.length;
-  }, [messages]);
+  }, [messages, scrollThreadPanelToBottom]);
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-      <ScrollArea className="flex-1 min-h-0 px-2 py-4">
+      <ScrollArea ref={scrollAreaRootRef} className="flex-1 min-h-0 px-2 py-4">
         <ThreadMessageList
           messages={messages}
           onProfileClick={onProfileClick}

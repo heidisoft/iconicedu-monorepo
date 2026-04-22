@@ -173,6 +173,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
     const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
     const isNearBottomRef = useRef(false);
     const lastNotifiedReadIdRef = useRef<UUID | null>(null);
+    const pendingInlineReplyScrollParentRef = useRef<UUID | null>(null);
     const [expandedThreadsByParent, setExpandedThreadsByParent] = useState<
       Record<UUID, boolean>
     >({});
@@ -408,6 +409,68 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
       [sortedThreadSourceMessages],
     );
 
+    const ensureExpandedThreadVisible = useCallback((parentId: UUID) => {
+      window.requestAnimationFrame(() => {
+        const messageElement = messageRefs.current.get(parentId);
+        const scrollViewport = scrollAreaRootRef.current?.querySelector(
+          '[data-slot="scroll-area-viewport"]',
+        ) as HTMLDivElement | null;
+
+        if (!messageElement || !scrollViewport) {
+          return;
+        }
+
+        const messageRect = messageElement.getBoundingClientRect();
+        const viewportRect = scrollViewport.getBoundingClientRect();
+        const composerClearancePx = 120;
+        const visibleBottom = viewportRect.bottom - composerClearancePx;
+        const overflowPx = messageRect.bottom - visibleBottom;
+
+        if (overflowPx <= 0) {
+          return;
+        }
+
+        const nextTop = scrollViewport.scrollTop + overflowPx + 16;
+        if (typeof scrollViewport.scrollTo === 'function') {
+          scrollViewport.scrollTo({
+            top: nextTop,
+            behavior: 'smooth',
+          });
+          return;
+        }
+
+        scrollViewport.scrollTop = nextTop;
+      });
+    }, []);
+
+    const scrollExpandedThreadToTop = useCallback((parentId: UUID) => {
+      window.requestAnimationFrame(() => {
+        const messageElement = messageRefs.current.get(parentId);
+        const scrollViewport = scrollAreaRootRef.current?.querySelector(
+          '[data-slot="scroll-area-viewport"]',
+        ) as HTMLDivElement | null;
+
+        if (!messageElement || !scrollViewport) {
+          return;
+        }
+
+        const messageRect = messageElement.getBoundingClientRect();
+        const viewportRect = scrollViewport.getBoundingClientRect();
+        const offsetTop = messageRect.top - viewportRect.top - 16;
+        const nextTop = Math.max(0, scrollViewport.scrollTop + offsetTop);
+
+        if (typeof scrollViewport.scrollTo === 'function') {
+          scrollViewport.scrollTo({
+            top: nextTop,
+            behavior: 'smooth',
+          });
+          return;
+        }
+
+        scrollViewport.scrollTop = nextTop;
+      });
+    }, []);
+
     const handleThreadIndicatorClick = useCallback(
       async (thread: ThreadVM, parentMessage: MessageVM) => {
         const parentId = thread.parent.messageId ?? parentMessage.ids.id;
@@ -423,14 +486,16 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
           ...prev,
           [parentId]: true,
         }));
+        ensureExpandedThreadVisible(parentId);
         setLoadingThreadsByParent((prev) => ({ ...prev, [parentId]: true }));
         try {
           await onOpenThread(thread, parentMessage);
         } finally {
           setLoadingThreadsByParent((prev) => ({ ...prev, [parentId]: false }));
+          ensureExpandedThreadVisible(parentId);
         }
       },
-      [expandedThreadsByParent, onOpenThread],
+      [ensureExpandedThreadVisible, expandedThreadsByParent, onOpenThread],
     );
 
     const handleThreadDraftChange = useCallback((parentId: UUID, value: string) => {
@@ -446,12 +511,23 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
         try {
           await onSendThreadReply?.(parentMessage, thread, content);
           setDraftByParent((prev) => ({ ...prev, [parentId]: '' }));
+          pendingInlineReplyScrollParentRef.current = parentId;
         } finally {
           setSendingReplyByParent((prev) => ({ ...prev, [parentId]: false }));
         }
       },
       [draftByParent, onSendThreadReply],
     );
+
+    useEffect(() => {
+      const pendingParentId = pendingInlineReplyScrollParentRef.current;
+      if (!pendingParentId || !expandedThreadsByParent[pendingParentId]) {
+        return;
+      }
+
+      pendingInlineReplyScrollParentRef.current = null;
+      scrollExpandedThreadToTop(pendingParentId);
+    }, [expandedThreadsByParent, scrollExpandedThreadToTop, sortedThreadSourceMessages]);
 
     return (
       <ScrollArea ref={scrollAreaRootRef} className="flex-1 min-h-0">

@@ -7,6 +7,15 @@ import { lightColors as LIGHT } from '@/lib/theme';
 const mockOpenBrowserAsync = jest.fn();
 const mockFetchThreadMessages = jest.fn();
 const mockMarkThreadReadState = jest.fn();
+const mockInvalidateQueries = jest.fn();
+const mockSetQueryData = jest.fn();
+
+jest.mock('@tanstack/react-query', () => ({
+  useQueryClient: () => ({
+    invalidateQueries: (...args: unknown[]) => mockInvalidateQueries(...args),
+    setQueryData: (...args: unknown[]) => mockSetQueryData(...args),
+  }),
+}));
 
 jest.mock('expo-web-browser', () => ({
   openBrowserAsync: (...args: unknown[]) => mockOpenBrowserAsync(...args),
@@ -18,6 +27,13 @@ jest.mock('expo-web-browser', () => ({
 jest.mock('@/lib/api/queries', () => ({
   fetchThreadMessages: (...args: unknown[]) => mockFetchThreadMessages(...args),
   markThreadReadState: (...args: unknown[]) => mockMarkThreadReadState(...args),
+  queryKeys: {
+    messages: (channelId: string, profileId = '') => ['messages', channelId, profileId],
+  },
+}));
+
+jest.mock('@/lib/messages/apply-optimistic-channel-read-state', () => ({
+  applyOptimisticThreadReadState: jest.fn(),
 }));
 
 jest.mock('@/components/messages/chat-pdf-viewer', () => {

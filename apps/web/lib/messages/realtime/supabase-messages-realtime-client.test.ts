@@ -131,6 +131,38 @@ describe('createSupabaseMessagesRealtimeClient', () => {
     });
   });
 
+  it('emits thread_read_state_updated for thread-level channel_read_state rows', () => {
+    const client = createSupabaseMessagesRealtimeClient();
+    const onEvent = vi.fn();
+
+    client.subscribe({ orgId: 'org-1', channelId: 'channel-1', onEvent });
+
+    const readStateHandler = channelOn.mock.calls.find(
+      (call) => call[0] === 'postgres_changes' && call[1]?.table === 'channel_read_state',
+    )?.[2] as ((payload: any) => void) | undefined;
+
+    expect(readStateHandler).toBeTypeOf('function');
+
+    readStateHandler?.({
+      eventType: 'UPDATE',
+      new: {
+        thread_id: 'thread-1',
+        unread_count: 3,
+        last_read_message_id: 'reply-1',
+        last_read_at: '2026-04-22T12:00:00.000Z',
+      },
+      old: null,
+    });
+
+    expect(onEvent).toHaveBeenCalledWith({
+      type: 'thread_read_state_updated',
+      threadId: 'thread-1',
+      unreadCount: 3,
+      lastReadMessageId: 'reply-1',
+      lastReadAt: '2026-04-22T12:00:00.000Z',
+    });
+  });
+
   it('refetches a message if another event arrives while the first fetch is pending', async () => {
     let resolveFirstFetch: ((value: unknown) => void) | null = null;
     const firstFetchPromise = new Promise((resolve) => {

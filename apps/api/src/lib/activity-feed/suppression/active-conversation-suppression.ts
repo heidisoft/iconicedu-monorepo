@@ -26,6 +26,7 @@ type EventScope = {
 
 type EventPayload = {
   channelId?: string;
+  threadId?: string;
 };
 
 type ProfileAccountRow = {
@@ -68,6 +69,11 @@ function resolveEventChannelId(event: ActivityEventRow) {
   }
   const payload = asRecord<EventPayload>(event.payload);
   return typeof payload.channelId === 'string' ? payload.channelId : null;
+}
+
+export function resolveEventThreadId(event: ActivityEventRow) {
+  const payload = asRecord<EventPayload>(event.payload);
+  return typeof payload.threadId === 'string' ? payload.threadId : null;
 }
 
 function isConversationalEventType(eventType: string) {
@@ -125,6 +131,7 @@ export async function resolveActiveConversationSuppressedRecipients(input: {
   }
 
   const channelId = resolveEventChannelId(input.event);
+  const threadId = resolveEventThreadId(input.event);
   if (!channelId) {
     return {
       recipientProfileIds,
@@ -175,12 +182,18 @@ export async function resolveActiveConversationSuppressedRecipients(input: {
 
   const lastReadAtByAccountId = new Map<string, string | null>();
   if (accountIds.length) {
-    const readStateResponse = await input.supabase
+    let readStateQuery = input.supabase
       .from('channel_read_state')
       .select('account_id, last_read_at')
       .eq('org_id', input.event.org_id)
       .eq('channel_id', channelId)
-      .in('account_id', accountIds)
+      .in('account_id', accountIds);
+
+    readStateQuery = threadId
+      ? readStateQuery.eq('thread_id', threadId)
+      : readStateQuery.is('thread_id', null);
+
+    const readStateResponse = await readStateQuery
       .is('deleted_at', null)
       .returns<ReadStateRow[]>();
 

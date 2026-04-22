@@ -23,6 +23,11 @@ type ProfileAccountRow = {
   account_id: string;
 };
 
+type EventPayload = {
+  mentionedProfileId?: string;
+  threadId?: string;
+};
+
 function asRecord(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return {};
@@ -75,12 +80,40 @@ function isRecentlyRead(lastReadAt: string | null | undefined, eventOccurredAt: 
 }
 
 function isMentionEvent(event: ActivityEventRow): boolean {
-  const payload = asRecord(event.payload);
+  const payload = asRecord(event.payload) as EventPayload;
   return (
     event.event_type === 'message.posted' &&
     typeof payload.mentionedProfileId === 'string' &&
     payload.mentionedProfileId.length > 0
   );
+}
+
+export function resolveThreadIdFromPayload(event: ActivityEventRow): string | null {
+  const payload = asRecord(event.payload) as EventPayload;
+  return typeof payload.threadId === 'string' && payload.threadId.length > 0
+    ? payload.threadId
+    : null;
+}
+
+function resolveEffectiveLastReadAt(values: Array<string | null | undefined>) {
+  let latest: string | null = null;
+  let latestTime = Number.NEGATIVE_INFINITY;
+
+  for (const value of values) {
+    if (!value) {
+      continue;
+    }
+
+    const currentTime = new Date(value).getTime();
+    if (Number.isNaN(currentTime) || currentTime <= latestTime) {
+      continue;
+    }
+
+    latest = value;
+    latestTime = currentTime;
+  }
+
+  return latest;
 }
 
 export function buildDeliveryPlan(input: {
@@ -191,32 +224,49 @@ export async function buildNotificationDecision(input: {
   }
 
   const channelId = resolveChannelIdFromScope(input.event);
+  const threadId = resolveThreadIdFromPayload(input.event);
 
-  const [presenceResponse, readStateResponse] = await Promise.all([
-    input.supabase
-      .from('profile_presence')
-      .select('live_status, last_seen_at')
-      .eq('org_id', input.event.org_id)
-      .eq('profile_id', input.recipientProfileId)
-      .is('deleted_at', null)
-      .maybeSingle<{ live_status?: string | null; last_seen_at?: string | null }>(),
-    channelId && profileResponse.data?.account_id
-      ? input.supabase
-          .from('channel_read_state')
-          .select('last_read_at')
-          .eq('org_id', input.event.org_id)
-          .eq('channel_id', channelId)
-          .eq('account_id', profileResponse.data.account_id)
-          .is('deleted_at', null)
-          .maybeSingle<{ last_read_at?: string | null }>()
-      : Promise.resolve({ data: null, error: null }),
-  ]);
+  const [presenceResponse, readStateResponse, threadReadStateResponse] =
+    await Promise.all([
+      input.supabase
+        .from('profile_presence')
+        .select('live_status, last_seen_at')
+        .eq('org_id', input.event.org_id)
+        .eq('profile_id', input.recipientProfileId)
+        .is('deleted_at', null)
+        .maybeSingle<{ live_status?: string | null; last_seen_at?: string | null }>(),
+      channelId && profileResponse.data?.account_id
+        ? input.supabase
+            .from('channel_read_state')
+            .select('last_read_at')
+            .eq('org_id', input.event.org_id)
+            .eq('channel_id', channelId)
+            .eq('account_id', profileResponse.data.account_id)
+            .is('thread_id', null)
+            .is('deleted_at', null)
+            .maybeSingle<{ last_read_at?: string | null }>()
+        : Promise.resolve({ data: null, error: null }),
+      channelId && threadId && profileResponse.data?.account_id
+        ? input.supabase
+            .from('channel_read_state')
+            .select('last_read_at')
+            .eq('org_id', input.event.org_id)
+            .eq('channel_id', channelId)
+            .eq('account_id', profileResponse.data.account_id)
+            .eq('thread_id', threadId)
+            .is('deleted_at', null)
+            .maybeSingle<{ last_read_at?: string | null }>()
+        : Promise.resolve({ data: null, error: null }),
+    ]);
 
   if (presenceResponse.error) {
     throw new Error(presenceResponse.error.message);
   }
   if (readStateResponse.error) {
     throw new Error(readStateResponse.error.message);
+  }
+  if (threadReadStateResponse.error) {
+    throw new Error(threadReadStateResponse.error.message);
   }
 
   const decision = buildDeliveryPlan({
@@ -227,7 +277,10 @@ export async function buildNotificationDecision(input: {
     context: {
       liveStatus: presenceResponse.data?.live_status ?? null,
       lastSeenAt: presenceResponse.data?.last_seen_at ?? null,
-      lastReadAt: readStateResponse.data?.last_read_at ?? null,
+      lastReadAt: resolveEffectiveLastReadAt([
+        readStateResponse.data?.last_read_at ?? null,
+        threadReadStateResponse.data?.last_read_at ?? null,
+      ]),
     },
   });
 

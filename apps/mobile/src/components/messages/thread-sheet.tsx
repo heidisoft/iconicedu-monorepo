@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Modal,
   View,
@@ -16,6 +17,7 @@ import { reportMobileObservedError } from '@/lib/analytics/report-error';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 import { fetchThreadMessages, markThreadReadState } from '@/lib/api/queries';
+import { applyOptimisticThreadReadState } from '@/lib/messages/apply-optimistic-channel-read-state';
 import { MessageItem } from './message-item';
 import { MessageInput } from './message-input';
 
@@ -106,6 +108,7 @@ export const ThreadSheet: React.FC<ThreadSheetProps> = ({
   onSend,
   onReactionToggle,
 }) => {
+  const queryClient = useQueryClient();
   const { colors } = useTheme();
   const s = React.useMemo(() => makeStyles(colors), [colors]);
   const [replies, setReplies] = useState<MessageVM[]>([]);
@@ -134,6 +137,19 @@ export const ThreadSheet: React.FC<ThreadSheetProps> = ({
       const lastReplyId = data[data.length - 1]?.ids.id ?? null;
       if (resolvedChannelId && threadId && currentProfileId && currentAccountId) {
         try {
+          const alreadyUpToDate =
+            (parentMessage.social?.thread?.readState?.unreadCount ?? 0) === 0 &&
+            lastReplyId === parentMessage.social?.thread?.readState?.lastReadMessageId;
+          if (alreadyUpToDate) {
+            return;
+          }
+
+          applyOptimisticThreadReadState({
+            queryClient,
+            channelId: resolvedChannelId,
+            profileId: currentProfileId,
+            parentMessageId: parentMessage.ids.id,
+          });
           await markThreadReadState({
             orgId: parentMessage.ids.orgId,
             accountId: currentAccountId,
@@ -143,6 +159,10 @@ export const ThreadSheet: React.FC<ThreadSheetProps> = ({
             lastReadMessageId: lastReplyId,
           });
         } catch (error) {
+          void queryClient.invalidateQueries({
+            queryKey: ['messages', resolvedChannelId, currentProfileId],
+            exact: true,
+          });
           reportMobileObservedError({
             error,
             source: 'mobile.messages.thread_sheet.thread_read_state',
@@ -168,7 +188,14 @@ export const ThreadSheet: React.FC<ThreadSheetProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [parentMessage, resolvedChannelId, threadId, currentProfileId, currentAccountId]);
+  }, [
+    currentAccountId,
+    currentProfileId,
+    parentMessage,
+    queryClient,
+    resolvedChannelId,
+    threadId,
+  ]);
 
   useEffect(() => {
     if (visible && parentMessage) {

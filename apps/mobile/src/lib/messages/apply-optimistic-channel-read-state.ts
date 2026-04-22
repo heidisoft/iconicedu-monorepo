@@ -1,4 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
+import type { MessageVM } from '@iconicedu/shared-types';
 import { queryKeys } from '@/lib/api/queries';
 import type { ChannelListItem } from '@/lib/api/types';
 
@@ -54,11 +55,11 @@ export function applyOptimisticChannelReadState(input: {
   queryClient.setQueryData<ChannelReadState>(
     queryKeys.channelReadState(channelId, accountId),
     (current) => ({
+      ...(current ?? {}),
       channelId,
       lastReadMessageId,
       lastReadAt,
       unreadCount: 0,
-      ...(current ?? {}),
     }),
   );
 
@@ -75,5 +76,53 @@ export function applyOptimisticChannelReadState(input: {
   queryClient.setQueryData<ChannelListItem[]>(
     queryKeys.supervisedDirectMessages(orgId, accountId),
     (current) => updateChannelListUnreadCount(current, channelId),
+  );
+}
+
+export function applyOptimisticThreadReadState(input: {
+  queryClient: QueryClient;
+  channelId: string;
+  profileId: string;
+  parentMessageId: string;
+}): void {
+  const { queryClient, channelId, profileId, parentMessageId } = input;
+
+  queryClient.setQueryData<MessageVM[]>(
+    queryKeys.messages(channelId, profileId),
+    (current) => {
+      if (!Array.isArray(current) || current.length === 0) {
+        return current;
+      }
+
+      let didChange = false;
+      const nextMessages = current.map((message) => {
+        if (message.ids.id !== parentMessageId) {
+          return message;
+        }
+
+        const thread = message.social?.thread;
+        const unreadCount = thread?.readState?.unreadCount ?? 0;
+        if (!thread || unreadCount === 0) {
+          return message;
+        }
+
+        didChange = true;
+        return {
+          ...message,
+          social: {
+            ...message.social,
+            thread: {
+              ...thread,
+              readState: {
+                ...thread.readState,
+                unreadCount: 0,
+              },
+            },
+          },
+        } as MessageVM;
+      });
+
+      return didChange ? nextMessages : current;
+    },
   );
 }

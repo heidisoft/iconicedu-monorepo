@@ -697,6 +697,9 @@ export function MessagesContainer({
           new Date(a.core.createdAt).getTime() - new Date(b.core.createdAt).getTime(),
       )[resolvedReplies.length - 1];
       if (latestReply?.ids.id) {
+        const alreadyUpToDate =
+          (thread.readState?.unreadCount ?? 0) === 0 &&
+          latestReply.ids.id === thread.readState?.lastReadMessageId;
         const optimisticReadAt = new Date().toISOString();
         const optimisticThread = {
           ...thread,
@@ -727,63 +730,65 @@ export function MessagesContainer({
           } as MessageVM['social'],
         });
 
-        try {
-          const response = await runWithNetworkActivity(() =>
-            window.fetch('/api/messages/thread-read-state', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                channelId: channel.ids.id,
-                threadId: thread.ids.id,
-                lastReadMessageId: latestReply.ids.id,
-              }),
-            }),
-          );
-
-          if (response.ok) {
-            const payload = (await response.json().catch(() => null)) as {
-              success?: boolean;
-              unreadCount?: number;
-              lastReadAt?: string;
-              lastReadMessageId?: string;
-            } | null;
-
-            if (payload?.success) {
-              const reconciledThread = {
-                ...optimisticThread,
-                readState: {
-                  threadId: thread.ids.id,
+        if (!alreadyUpToDate) {
+          try {
+            const response = await runWithNetworkActivity(() =>
+              window.fetch('/api/messages/thread-read-state', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
                   channelId: channel.ids.id,
-                  lastReadMessageId:
-                    payload.lastReadMessageId ??
-                    optimisticThread.readState?.lastReadMessageId,
-                  lastReadAt:
-                    payload.lastReadAt ?? optimisticThread.readState?.lastReadAt,
-                  unreadCount: Math.max(0, payload.unreadCount ?? 0),
-                },
-              } as ThreadVM;
+                  threadId: thread.ids.id,
+                  lastReadMessageId: latestReply.ids.id,
+                }),
+              }),
+            );
 
-              setThreadData(reconciledThread, {
-                replies: {
-                  items: resolvedReplies,
-                  total:
-                    typeof reconciledThread.stats?.messageCount === 'number'
-                      ? Math.max(0, reconciledThread.stats.messageCount - 1)
-                      : resolvedReplies.length,
-                },
-                parentMessage,
-              });
+            if (response.ok) {
+              const payload = (await response.json().catch(() => null)) as {
+                success?: boolean;
+                unreadCount?: number;
+                lastReadAt?: string;
+                lastReadMessageId?: string;
+              } | null;
 
-              updateMessage(parentMessage.ids.id, {
-                social: {
-                  ...(parentMessage.social ?? { reactions: [] }),
-                  thread: reconciledThread,
-                } as MessageVM['social'],
-              });
+              if (payload?.success) {
+                const reconciledThread = {
+                  ...optimisticThread,
+                  readState: {
+                    threadId: thread.ids.id,
+                    channelId: channel.ids.id,
+                    lastReadMessageId:
+                      payload.lastReadMessageId ??
+                      optimisticThread.readState?.lastReadMessageId,
+                    lastReadAt:
+                      payload.lastReadAt ?? optimisticThread.readState?.lastReadAt,
+                    unreadCount: Math.max(0, payload.unreadCount ?? 0),
+                  },
+                } as ThreadVM;
+
+                setThreadData(reconciledThread, {
+                  replies: {
+                    items: resolvedReplies,
+                    total:
+                      typeof reconciledThread.stats?.messageCount === 'number'
+                        ? Math.max(0, reconciledThread.stats.messageCount - 1)
+                        : resolvedReplies.length,
+                  },
+                  parentMessage,
+                });
+
+                updateMessage(parentMessage.ids.id, {
+                  social: {
+                    ...(parentMessage.social ?? { reactions: [] }),
+                    thread: reconciledThread,
+                  } as MessageVM['social'],
+                });
+              }
             }
+          } catch {
+            // Best effort thread read-state sync.
           }
-        } catch {
-          // Best effort thread read-state sync.
         }
       }
 
@@ -1418,6 +1423,32 @@ export function MessagesContainer({
           }
           if (event.type === 'message-deleted') {
             deleteMessage(event.messageId);
+          }
+          if (event.type === 'thread_read_state_updated') {
+            const parentMessage = messagesRef.current.find(
+              (message) => message.social.thread?.ids.id === event.threadId,
+            );
+            const thread = parentMessage?.social.thread;
+            if (!parentMessage || !thread) {
+              return;
+            }
+
+            updateMessage(parentMessage.ids.id, {
+              social: {
+                ...(parentMessage.social ?? { reactions: [] }),
+                thread: {
+                  ...thread,
+                  readState: {
+                    ...thread.readState,
+                    threadId: thread.ids.id,
+                    channelId: thread.readState?.channelId ?? channel.ids.id,
+                    unreadCount: event.unreadCount,
+                    lastReadMessageId: event.lastReadMessageId,
+                    lastReadAt: event.lastReadAt,
+                  },
+                },
+              } as MessageVM['social'],
+            });
           }
           if (event.type === 'typing-start') {
             if (event.profileId === currentUserId) return;

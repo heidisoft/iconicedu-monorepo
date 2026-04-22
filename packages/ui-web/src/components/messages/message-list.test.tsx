@@ -87,6 +87,10 @@ describe('MessageList', () => {
     vi.restoreAllMocks();
     Element.prototype.scrollIntoView = vi.fn();
     vi.spyOn(document, 'hasFocus').mockReturnValue(true);
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      callback(0);
+      return 0;
+    });
   });
 
   it('scrolls to bottom when new messages are added', () => {
@@ -119,6 +123,77 @@ describe('MessageList', () => {
     });
 
     expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+  });
+
+  it('scrolls expanded inline thread into view when it would be hidden by the composer area', async () => {
+    const thread = {
+      ids: { id: 'thread-1', orgId: 'org-1' },
+      parent: { messageId: 'message-1' },
+      stats: { messageCount: 3, lastReplyAt: '2026-02-16T10:00:00.000Z' },
+      participants: [],
+      readState: { unreadCount: 1 },
+    } as unknown as ThreadVM;
+
+    const { container } = render(
+      <MessageList
+        messages={[createMessage({ id: 'message-1', thread })]}
+        onOpenThread={vi.fn(async () => undefined)}
+        onProfileClick={vi.fn()}
+      />,
+    );
+
+    const viewport = container.querySelector(
+      '[data-slot="scroll-area-viewport"]',
+    ) as HTMLDivElement;
+    const scrollToSpy = vi.fn();
+    Object.defineProperty(viewport, 'scrollTop', {
+      configurable: true,
+      value: 240,
+      writable: true,
+    });
+    Object.defineProperty(viewport, 'scrollTo', {
+      configurable: true,
+      value: scrollToSpy,
+      writable: true,
+    });
+    viewport.getBoundingClientRect = vi.fn(() => ({
+      x: 0,
+      y: 0,
+      top: 0,
+      left: 0,
+      right: 800,
+      bottom: 600,
+      width: 800,
+      height: 600,
+      toJSON: () => ({}),
+    }));
+
+    const trigger = screen.getByTestId('open-thread-message-1');
+    const messageWrapper = trigger.closest(
+      '.transition-all.duration-300',
+    ) as HTMLDivElement;
+    messageWrapper.getBoundingClientRect = vi.fn(() => ({
+      x: 0,
+      y: 420,
+      top: 420,
+      left: 0,
+      right: 800,
+      bottom: 560,
+      width: 800,
+      height: 140,
+      toJSON: () => ({}),
+    }));
+
+    fireEvent.click(trigger);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(scrollToSpy).toHaveBeenCalledWith({
+      top: 336,
+      behavior: 'smooth',
+    });
   });
 
   it('renders unread divider at the first message after last read across date sections', () => {
