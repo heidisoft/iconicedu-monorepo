@@ -1,4 +1,7 @@
-import { buildListData } from '@/components/messages/message-list';
+import {
+  buildListData,
+  findLatestUnreadIncomingMessageId,
+} from '@/components/messages/message-list';
 import type { MessageVM } from '@iconicedu/shared-types';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -216,5 +219,56 @@ describe('isGroupStart logic', () => {
       makeMsg('b', 'owner', '2025-12-17T10:01:00Z'),
     ];
     expect(computeIsGroupStart(msgs, 0)).toBe(true);
+  });
+});
+
+describe('findLatestUnreadIncomingMessageId', () => {
+  it('returns null when there is no unread boundary', () => {
+    const msgs = [
+      makeMsg('a', 'u1', '2025-12-17T10:00:00Z'),
+      makeMsg('b', 'u2', '2025-12-17T10:05:00Z'),
+    ];
+
+    expect(
+      findLatestUnreadIncomingMessageId({
+        messages: msgs,
+        currentProfileId: 'u1',
+        unreadCount: 0,
+      }),
+    ).toBeNull();
+  });
+
+  it('returns the latest unread incoming message after lastReadMessageId', () => {
+    const msgs = [
+      makeMsg('a', 'u1', '2025-12-17T10:00:00Z'),
+      makeMsg('b', 'u2', '2025-12-17T10:05:00Z'),
+      makeMsg('c', 'u1', '2025-12-17T10:06:00Z'),
+      makeMsg('d', 'u2', '2025-12-17T10:07:00Z'),
+    ];
+
+    expect(
+      findLatestUnreadIncomingMessageId({
+        messages: msgs,
+        currentProfileId: 'u1',
+        lastReadMessageId: 'a',
+        unreadCount: 3,
+      }),
+    ).toBe('d');
+  });
+
+  it('uses lastReadAt when lastReadMessageId is missing', () => {
+    const msgs = [
+      makeMsg('a', 'u1', '2025-12-17T10:00:00Z'),
+      makeMsg('b', 'u2', '2025-12-17T10:05:00Z'),
+      makeMsg('c', 'u2', '2025-12-17T10:07:00Z'),
+    ];
+
+    expect(
+      findLatestUnreadIncomingMessageId({
+        messages: msgs,
+        currentProfileId: 'u1',
+        lastReadAt: '2025-12-17T10:04:00Z',
+      }),
+    ).toBe('c');
   });
 });

@@ -4,6 +4,7 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { Slot } from 'expo-router';
 import { PortalHost } from '@rn-primitives/portal';
 import { SystemBars } from 'react-native-edge-to-edge';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppProviders } from '@/providers/app-providers';
 import { useTheme } from '@/providers/theme-provider';
 import { useAuth } from '@/providers/auth-provider';
@@ -55,8 +56,10 @@ function RootContent() {
 
 export default function RootLayout() {
   return (
-    <AppProviders>
-      <RootContent />
-    </AppProviders>
+    <SafeAreaProvider>
+      <AppProviders>
+        <RootContent />
+      </AppProviders>
+    </SafeAreaProvider>
   );
 }

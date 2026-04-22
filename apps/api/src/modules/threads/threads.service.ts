@@ -6,7 +6,7 @@ import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session
 export class ThreadsService {
   async get(
     accessToken: string,
-    input: { orgId: string; channelId: string; threadId: string },
+    input: { orgId: string; channelId: string; threadId: string; accountId?: string },
   ) {
     const supabase = createSupabaseSessionClient(accessToken);
     const [
@@ -34,7 +34,10 @@ export class ThreadsService {
       supabase
         .from('thread_read_state')
         .select('thread_id, channel_id, last_read_message_id, last_read_at, unread_count')
+        .eq('org_id', input.orgId)
+        .eq('channel_id', input.channelId)
         .eq('thread_id', input.threadId)
+        .eq('account_id', input.accountId ?? '')
         .is('deleted_at', null),
     ]);
     if (threadError) throw new InternalServerErrorException(threadError.message);
@@ -72,6 +75,9 @@ export class ThreadsService {
       .maybeSingle<{ id: string }>();
     if (threadLookup.error)
       throw new InternalServerErrorException(threadLookup.error.message);
+    if (!threadLookup.data) {
+      return { unreadCount: 0 };
+    }
 
     const participantLookup = await sessionSupabase
       .from('thread_participants')
@@ -83,6 +89,28 @@ export class ThreadsService {
       .maybeSingle<{ id: string }>();
     if (participantLookup.error) {
       throw new InternalServerErrorException(participantLookup.error.message);
+    }
+    if (!participantLookup.data) {
+      return { unreadCount: 0 };
+    }
+
+    if (input.lastReadMessageId) {
+      const messageLookup = await serviceSupabase
+        .from('messages')
+        .select('id')
+        .eq('org_id', input.orgId)
+        .eq('channel_id', input.channelId)
+        .eq('thread_id', input.threadId)
+        .eq('id', input.lastReadMessageId)
+        .is('deleted_at', null)
+        .maybeSingle<{ id: string }>();
+
+      if (messageLookup.error) {
+        throw new InternalServerErrorException(messageLookup.error.message);
+      }
+      if (!messageLookup.data) {
+        return { unreadCount: 0 };
+      }
     }
 
     const { data, error } = await serviceSupabase.rpc(

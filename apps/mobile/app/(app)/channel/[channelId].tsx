@@ -582,6 +582,7 @@ export default function ChannelConversationScreen() {
             currentProfileId={profileId}
             currentAccountId={accountId}
             lastReadMessageId={channelReadState?.lastReadMessageId ?? null}
+            lastReadAt={channelReadState?.lastReadAt ?? null}
             unreadCount={channelReadState?.unreadCount ?? 0}
             onLoadMore={loadMore}
             loading={isLoading}
