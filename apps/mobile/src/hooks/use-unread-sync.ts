@@ -17,6 +17,7 @@ async function syncUnreadBadgeCount(orgId: string, accountId: string) {
       .select('unread_count')
       .eq('org_id', orgId)
       .eq('account_id', accountId)
+      .is('thread_id', null)
       .is('deleted_at', null);
 
     if (error || !Array.isArray(data)) {

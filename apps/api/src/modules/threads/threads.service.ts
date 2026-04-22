@@ -32,10 +32,9 @@ export class ThreadsService {
         .eq('thread_id', input.threadId)
         .is('deleted_at', null),
       supabase
-        .from('thread_read_state')
+        .from('channel_read_state')
         .select('thread_id, channel_id, last_read_message_id, last_read_at, unread_count')
         .eq('org_id', input.orgId)
-        .eq('channel_id', input.channelId)
         .eq('thread_id', input.threadId)
         .eq('account_id', input.accountId ?? '')
         .is('deleted_at', null),

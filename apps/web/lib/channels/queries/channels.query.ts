@@ -97,5 +97,6 @@ export async function getChannelReadStatesByAccountId(
     .select(CHANNEL_READ_STATE_SELECT)
     .eq('org_id', orgId)
     .eq('account_id', accountId)
+    .is('thread_id', null)
     .returns<ChannelReadStateRow[]>();
 }

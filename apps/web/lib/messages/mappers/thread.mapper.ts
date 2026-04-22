@@ -1,5 +1,5 @@
 import type {
-  ThreadReadStateRow,
+  ChannelReadStateRow,
   ThreadRow,
   ThreadVM,
   ThreadReadStateVM,
@@ -8,12 +8,12 @@ import type {
 
 type ThreadMapperInput = {
   participants: UserProfileVM[];
-  readState?: ThreadReadStateRow | null;
+  readState?: ChannelReadStateRow | null;
 };
 
-export function mapThreadReadStateRow(row: ThreadReadStateRow): ThreadReadStateVM {
+export function mapThreadReadStateRow(row: ChannelReadStateRow): ThreadReadStateVM {
   return {
-    threadId: row.thread_id,
+    threadId: row.thread_id!,
     channelId: row.channel_id ?? undefined,
     lastReadMessageId: row.last_read_message_id ?? undefined,
     lastReadAt: row.last_read_at ?? undefined,

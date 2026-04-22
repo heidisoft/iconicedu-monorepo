@@ -51,17 +51,6 @@ export interface ThreadParticipantRow extends AuditRow {
   profile_id: UUID;
 }
 
-export interface ThreadReadStateRow extends AuditRow {
-  id: UUID;
-  org_id: UUID;
-  thread_id: UUID;
-  channel_id?: UUID | null;
-  account_id: UUID;
-  last_read_message_id?: UUID | null;
-  last_read_at?: ISODateTime | null;
-  unread_count?: number | null;
-}
-
 export type MessageTextRow = MessagePayloadRow;
 export type MessageImageRow = MessagePayloadRow;
 export type MessageFileRow = MessagePayloadRow;

@@ -844,7 +844,7 @@ export class MessagesService {
         .is('deleted_at', null),
       currentAccountId
         ? supabase
-            .from('thread_read_state')
+            .from('channel_read_state')
             .select(
               'thread_id, channel_id, last_read_message_id, last_read_at, unread_count',
             )

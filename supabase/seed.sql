@@ -1808,13 +1808,6 @@ ON CONFLICT DO NOTHING;
 
 
 --
--- Data for Name: thread_read_state; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-
-
-
---
 -- Data for Name: user_onboarding_status; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 

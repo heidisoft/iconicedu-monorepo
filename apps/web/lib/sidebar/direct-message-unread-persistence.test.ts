@@ -22,9 +22,10 @@ describe('persistDirectMessageUnreadCount', () => {
         org_id: 'org-1',
         account_id: 'account-1',
         channel_id: 'dm-1',
+        thread_id: null,
         unread_count: 3,
       }),
-      { onConflict: 'org_id,channel_id,account_id' },
+      { onConflict: 'org_id,channel_id,account_id,thread_id' },
     );
   });
 
@@ -43,10 +44,11 @@ describe('persistDirectMessageUnreadCount', () => {
 
     expect(upsert).toHaveBeenCalledWith(
       expect.objectContaining({
+        thread_id: null,
         unread_count: 0,
         last_read_at: expect.any(String),
       }),
-      { onConflict: 'org_id,channel_id,account_id' },
+      { onConflict: 'org_id,channel_id,account_id,thread_id' },
     );
   });
 
@@ -67,10 +69,11 @@ describe('persistDirectMessageUnreadCount', () => {
 
     expect(upsert).toHaveBeenCalledWith(
       expect.objectContaining({
+        thread_id: null,
         last_read_message_id: 'message-99',
         last_read_at: '2026-02-15T00:00:00.000Z',
       }),
-      { onConflict: 'org_id,channel_id,account_id' },
+      { onConflict: 'org_id,channel_id,account_id,thread_id' },
     );
   });
 });
