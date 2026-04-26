@@ -274,6 +274,7 @@ export function mapChannelReadStateRow(row: ChannelReadStateRow): ChannelReadSta
     lastReadMessageId: row.last_read_message_id ?? undefined,
     lastReadAt: row.last_read_at ?? undefined,
     unreadCount: Math.max(0, row.unread_count ?? 0),
+    threadUnreadCount: Math.max(0, row.thread_unread_count ?? 0),
   };
 }
 

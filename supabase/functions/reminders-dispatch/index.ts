@@ -1,7 +1,11 @@
 /* global Deno, Response, crypto */
 
 // Supabase Edge Function: reminders-dispatch
-// Triggers the app's internal reminder dispatcher endpoint.
+// Triggers the API-owned reminder dispatcher endpoint.
+//
+// This function must stay a thin HTTP bridge. Reminder jobs are compiled when
+// schedules change; the per-minute cron should only ask apps/api to claim due
+// rows from reminder_jobs. Do not read class_schedules from this function.
 
 const jsonHeaders = { 'Content-Type': 'application/json' };
 
@@ -39,11 +43,24 @@ function parseJsonOrRaw(body: string) {
   }
 }
 
+function requireApiDispatchUrl(): string {
+  const dispatchUrl = requireEnv('REMINDERS_DISPATCH_URL');
+  const url = new URL(dispatchUrl);
+
+  if (url.pathname !== '/internal/reminders/dispatch') {
+    throw new Error(
+      'REMINDERS_DISPATCH_URL must target apps/api /internal/reminders/dispatch',
+    );
+  }
+
+  return url.toString();
+}
+
 Deno.serve(async () => {
   const runId = crypto.randomUUID();
   const startedAt = Date.now();
   try {
-    const dispatchUrl = requireEnv('REMINDERS_DISPATCH_URL');
+    const dispatchUrl = requireApiDispatchUrl();
     const internalToken = requireEnv('INTERNAL_REMINDERS_TOKEN');
     const limit = asOptionalInt('REMINDERS_DISPATCH_LIMIT');
     const leaseSeconds = asOptionalInt('REMINDERS_DISPATCH_LEASE_SECONDS');

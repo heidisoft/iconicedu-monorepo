@@ -330,6 +330,85 @@ describe('MessagesContainer', () => {
     );
   });
 
+  it('updates parent thread read state when a realtime thread read-state event is received', async () => {
+    const onEventHandlers: Array<(event: any) => void> = [];
+    const realtimeClient = {
+      subscribe: ({ onEvent }: { onEvent: (event: any) => void }) => {
+        onEventHandlers.push(onEvent);
+        return { unsubscribe: () => void 0 };
+      },
+      sendTyping: vi.fn(),
+    };
+
+    const channelWithThread = {
+      ...channel,
+      collections: {
+        ...channel.collections,
+        messages: {
+          items: [
+            {
+              ids: { id: 'parent-1', orgId: 'org-1' },
+              core: {
+                type: 'text',
+                createdAt: '2026-03-18T09:00:00.000Z',
+                visibility: { type: 'all' },
+                sender: makeParticipant('profile-2', 'educator'),
+              },
+              social: {
+                reactions: [],
+                thread: {
+                  ids: { id: 'thread-1', orgId: 'org-1' },
+                  parent: { messageId: 'parent-1' },
+                  stats: { messageCount: 2, lastReplyAt: '2026-03-18T09:10:00.000Z' },
+                  participants: [],
+                  readState: { threadId: 'thread-1', unreadCount: 1 },
+                },
+              },
+              content: { text: 'parent' },
+            },
+          ],
+          total: 1,
+        },
+      },
+    } as unknown as ChannelVM;
+
+    render(
+      <MessagesContainer
+        channel={channelWithThread}
+        currentUserId="profile-2"
+        realtimeClient={realtimeClient as any}
+      />,
+    );
+
+    act(() => {
+      onEventHandlers.forEach((handler) =>
+        handler({
+          type: 'thread_read_state_updated',
+          threadId: 'thread-1',
+          unreadCount: 4,
+          lastReadMessageId: 'reply-4',
+          lastReadAt: '2026-04-22T12:00:00.000Z',
+        }),
+      );
+    });
+
+    expect(updateMessage).toHaveBeenCalledWith(
+      'parent-1',
+      expect.objectContaining({
+        social: expect.objectContaining({
+          thread: expect.objectContaining({
+            ids: expect.objectContaining({ id: 'thread-1' }),
+            readState: expect.objectContaining({
+              unreadCount: 4,
+              lastReadMessageId: 'reply-4',
+              lastReadAt: '2026-04-22T12:00:00.000Z',
+            }),
+          }),
+        }),
+      }),
+    );
+  });
+
   it('marks a thread read when opened and persists thread read-state', async () => {
     vi.stubGlobal(
       'fetch',
@@ -375,7 +454,7 @@ describe('MessagesContainer', () => {
             }),
           };
         }
-        if (url.includes('/api/messages/thread-read-state')) {
+        if (url.includes('/api/messages/read-state')) {
           return {
             ok: true,
             json: async () => ({
@@ -439,13 +518,119 @@ describe('MessagesContainer', () => {
 
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
-        '/api/messages/thread-read-state',
+        '/api/messages/read-state',
         expect.objectContaining({
           method: 'POST',
           body: expect.stringContaining('"threadId":"thread-1"'),
         }),
       );
     });
+  });
+
+  it('skips thread read-state POST when the thread is already up to date', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/messages/thread?')) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            messages: [
+              {
+                ids: { id: 'parent-1', orgId: 'org-1' },
+                core: {
+                  type: 'text',
+                  createdAt: '2026-03-18T09:00:00.000Z',
+                  visibility: { type: 'all' },
+                  sender: makeParticipant('profile-1', 'guardian'),
+                },
+                social: { reactions: [] },
+                content: { text: 'parent' },
+              },
+              {
+                ids: { id: 'reply-1', orgId: 'org-1' },
+                core: {
+                  type: 'text',
+                  createdAt: '2026-03-18T09:10:00.000Z',
+                  visibility: { type: 'all' },
+                  sender: makeParticipant('profile-1', 'guardian'),
+                },
+                social: {
+                  reactions: [],
+                  thread: {
+                    ids: { id: 'thread-1', orgId: 'org-1' },
+                    parent: { messageId: 'parent-1' },
+                    stats: { messageCount: 2, lastReplyAt: '2026-03-18T09:10:00.000Z' },
+                    participants: [],
+                  },
+                },
+                content: { text: 'reply' },
+              },
+            ],
+          }),
+        };
+      }
+
+      return {
+        ok: true,
+        json: async () => ({ success: true, files: [] }),
+      };
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const channelWithThread = {
+      ...channel,
+      collections: {
+        ...channel.collections,
+        messages: {
+          items: [
+            {
+              ids: { id: 'parent-1', orgId: 'org-1' },
+              core: {
+                type: 'text',
+                createdAt: '2026-03-18T09:00:00.000Z',
+                visibility: { type: 'all' },
+                sender: makeParticipant('profile-2', 'educator'),
+              },
+              social: {
+                reactions: [],
+                thread: {
+                  ids: { id: 'thread-1', orgId: 'org-1' },
+                  parent: { messageId: 'parent-1' },
+                  stats: { messageCount: 2, lastReplyAt: '2026-03-18T09:10:00.000Z' },
+                  participants: [],
+                  readState: {
+                    threadId: 'thread-1',
+                    unreadCount: 0,
+                    lastReadMessageId: 'reply-1',
+                  },
+                },
+              },
+              content: { text: 'parent' },
+            },
+          ],
+          total: 1,
+        },
+      },
+    } as unknown as ChannelVM;
+
+    render(<MessagesContainer channel={channelWithThread} currentUserId="profile-2" />);
+
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: 'open-thread' }));
+    });
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('/api/messages/thread?'),
+      );
+    });
+
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      '/api/messages/read-state',
+      expect.anything(),
+    );
   });
 
   it('marks a thread read when unread replies exist even if thread message count is stale', async () => {
@@ -493,7 +678,7 @@ describe('MessagesContainer', () => {
             }),
           };
         }
-        if (url.includes('/api/messages/thread-read-state')) {
+        if (url.includes('/api/messages/read-state')) {
           return {
             ok: true,
             json: async () => ({
@@ -562,7 +747,7 @@ describe('MessagesContainer', () => {
 
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
-        '/api/messages/thread-read-state',
+        '/api/messages/read-state',
         expect.objectContaining({
           method: 'POST',
           body: expect.stringContaining('"threadId":"thread-1"'),

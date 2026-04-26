@@ -18,6 +18,8 @@ type ReminderJobPayload = {
   title: string;
   summary?: string | null;
   description?: string | null;
+  reminderOffsetMinutes?: number | null;
+  timezone?: string | null;
   channelId: string;
   learningSpaceId?: string | null;
   scheduleId?: string | null;
@@ -288,6 +290,8 @@ export class RemindersService {
         learningSpaceId: payload.learningSpaceId ?? null,
         scheduleId: payload.scheduleId ?? null,
         occurrenceStart: payload.occurrenceStart ?? payload.startAt ?? now,
+        reminderOffsetMinutes: payload.reminderOffsetMinutes ?? null,
+        timezone: payload.timezone ?? job.timezone ?? 'UTC',
         invoiceId: payload.invoiceId ?? null,
         dueAt: payload.dueAt ?? null,
         title: payload.title,
@@ -297,6 +301,7 @@ export class RemindersService {
         members: payload.members ?? null,
       },
       dedupeKey: `${job.dedupe_key}:activity`,
+      createdBy: systemProfileId,
     });
 
     await supabase

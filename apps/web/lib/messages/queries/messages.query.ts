@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
+  ChannelReadStateRow,
   MessageRow,
   ThreadRow,
   MessageReactionRow,
@@ -8,7 +9,6 @@ import type {
   ChannelFileRow,
   ChannelMediaRow,
   ThreadParticipantRow,
-  ThreadReadStateRow,
   MessageTextRow,
   MessageImageRow,
   MessageFileRow,
@@ -32,7 +32,6 @@ import {
   MESSAGE_SELECT,
   THREAD_SELECT,
   THREAD_PARTICIPANT_SELECT,
-  THREAD_READ_STATE_SELECT,
   MESSAGE_REACTION_SELECT,
   MESSAGE_REACTION_COUNT_SELECT,
   MESSAGE_SAVE_SELECT,
@@ -55,6 +54,7 @@ import {
   CHANNEL_FILE_SELECT,
   CHANNEL_MEDIA_SELECT,
 } from '@iconicedu/web/lib/messages/constants/selects';
+import { CHANNEL_READ_STATE_SELECT } from '@iconicedu/web/lib/channels/constants/selects';
 
 export async function getMessagesByChannelId(
   supabase: SupabaseClient,
@@ -217,12 +217,13 @@ export async function getThreadReadStatesByAccountId(
   accountId: string,
 ) {
   return supabase
-    .from('thread_read_state')
-    .select(THREAD_READ_STATE_SELECT)
+    .from('channel_read_state')
+    .select(CHANNEL_READ_STATE_SELECT)
     .eq('org_id', orgId)
     .eq('account_id', accountId)
+    .not('thread_id', 'is', null)
     .is('deleted_at', null)
-    .returns<ThreadReadStateRow[]>();
+    .returns<ChannelReadStateRow[]>();
 }
 
 export async function getMessageReactionsByMessageIds(

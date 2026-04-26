@@ -61,10 +61,12 @@ export interface ChannelReadStateRow {
   id: UUID;
   org_id: UUID;
   channel_id: UUID;
+  thread_id?: UUID | null;
   account_id: UUID;
   last_read_message_id?: UUID | null;
   last_read_at?: ISODateTime | null;
   unread_count?: number | null;
+  thread_unread_count?: number | null;
   created_at: ISODateTime;
   created_by?: UUID | null;
   updated_at: ISODateTime;

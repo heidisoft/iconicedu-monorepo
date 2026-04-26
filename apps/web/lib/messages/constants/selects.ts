@@ -52,23 +52,6 @@ export const THREAD_PARTICIPANT_SELECT = [
   'deleted_by',
 ].join(',');
 
-export const THREAD_READ_STATE_SELECT = [
-  'id',
-  'org_id',
-  'thread_id',
-  'channel_id',
-  'account_id',
-  'last_read_message_id',
-  'last_read_at',
-  'unread_count',
-  'created_at',
-  'created_by',
-  'updated_at',
-  'updated_by',
-  'deleted_at',
-  'deleted_by',
-].join(',');
-
 export const MESSAGE_REACTION_SELECT = [
   'id',
   'org_id',

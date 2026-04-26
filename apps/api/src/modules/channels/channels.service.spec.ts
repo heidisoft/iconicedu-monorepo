@@ -1,5 +1,6 @@
 import { InternalServerErrorException } from '@nestjs/common';
 import { ChannelsService } from './channels.service';
+import { ThreadsService } from '@iconicedu/api/modules/threads/threads.service';
 
 // ─── Supabase client mocks ────────────────────────────────────────────────────
 
@@ -52,8 +53,8 @@ const BASE_INPUT = {
 };
 
 function makeService() {
-  // ChannelsService constructor only receives PrismaService which is unused in markRead.
-  return new ChannelsService({} as never);
+  // PrismaService is unused in these read-state tests.
+  return new ChannelsService({} as never, new ThreadsService());
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -216,5 +217,71 @@ describe('ChannelsService.markRead', () => {
       expect(result).toEqual({ unreadCount: 0 });
       expect(mockRpc).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('ChannelsService.markReadState', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    const sessionMethods = ['from', 'select', 'eq', 'is', 'order', 'limit'];
+    for (const m of sessionMethods) {
+      (mockSessionClient as Record<string, jest.Mock>)[m].mockReturnValue(
+        mockSessionClient,
+      );
+    }
+    const serviceMethods = ['from', 'select', 'eq', 'is', 'order', 'limit'];
+    for (const m of serviceMethods) {
+      (mockServiceClient as Record<string, jest.Mock>)[m].mockReturnValue(
+        mockServiceClient,
+      );
+    }
+    mockServiceClient.rpc.mockReturnValue(mockServiceClient);
+  });
+
+  it('uses the channel unread recompute path when threadId is absent', async () => {
+    mockMaybeSingle
+      .mockResolvedValueOnce({ data: { id: 'member-1' }, error: null })
+      .mockResolvedValueOnce({ data: { id: 'msg-1' }, error: null });
+    mockRpc.mockResolvedValueOnce({ data: 0, error: null });
+
+    const svc = makeService();
+    const result = await svc.markReadState('token', {
+      ...BASE_INPUT,
+      lastReadMessageId: 'msg-1',
+    });
+
+    expect(result).toEqual({ unreadCount: 0 });
+    expect(mockRpc).toHaveBeenCalledWith(
+      'recompute_unread_for_account_channel',
+      expect.objectContaining({
+        p_channel_id: BASE_INPUT.channelId,
+        p_last_read_message_id: 'msg-1',
+      }),
+    );
+  });
+
+  it('uses the thread unread recompute path when threadId is present', async () => {
+    mockMaybeSingle
+      .mockResolvedValueOnce({ data: { id: 'thread-1' }, error: null })
+      .mockResolvedValueOnce({ data: { id: 'participant-1' }, error: null })
+      .mockResolvedValueOnce({ data: { id: 'reply-1' }, error: null });
+    mockRpc.mockResolvedValueOnce({ data: 0, error: null });
+
+    const svc = makeService();
+    const result = await svc.markReadState('token', {
+      ...BASE_INPUT,
+      threadId: 'thread-1',
+      lastReadMessageId: 'reply-1',
+    });
+
+    expect(result).toEqual({ unreadCount: 0 });
+    expect(mockRpc).toHaveBeenCalledWith(
+      'recompute_unread_for_account_thread',
+      expect.objectContaining({
+        p_channel_id: BASE_INPUT.channelId,
+        p_thread_id: 'thread-1',
+        p_last_read_message_id: 'reply-1',
+      }),
+    );
   });
 });

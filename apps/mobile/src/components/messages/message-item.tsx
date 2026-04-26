@@ -36,7 +36,8 @@ import type {
 } from '@iconicedu/shared-types';
 import type { AppColors } from '@/lib/theme';
 import { reportMobileObservedError } from '@/lib/analytics/report-error';
-import { fetchThreadMessages, markThreadReadState } from '@/lib/api/queries';
+import { fetchThreadMessages } from '@/lib/api/queries';
+import { useMarkRead } from '@/hooks/use-mark-read';
 import { EmojiPicker } from './emoji-picker';
 import {
   SmilePlus,
@@ -1733,6 +1734,12 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   isThreadMessage = false,
   onSendAnnotation,
 }) => {
+  const { markThreadRead } = useMarkRead({
+    orgId: message.ids.orgId,
+    profileId: currentProfileId ?? '',
+    accountId: currentAccountId ?? '',
+    channelId: channelId ?? '',
+  });
   const s = useMemo(() => makeStyles(colors), [colors]);
   const [threadExpanded, setThreadExpanded] = useState(false);
   const [threadReplies, setThreadReplies] = useState<MessageVM[]>([]);
@@ -1867,26 +1874,15 @@ export const MessageItem: React.FC<MessageItemProps> = ({
       setThreadReplies(replies);
       const lastReplyId = replies[replies.length - 1]?.ids.id ?? null;
       if (resolvedChannelId && currentProfileId && currentAccountId) {
-        try {
-          const unreadCount = await markThreadReadState({
+        const alreadyUpToDate =
+          threadUnreadCount === 0 && lastReplyId === thread.readState?.lastReadMessageId;
+        if (!alreadyUpToDate) {
+          await markThreadRead({
             orgId: message.ids.orgId,
-            accountId: currentAccountId,
-            profileId: currentProfileId,
             channelId: resolvedChannelId,
+            parentMessageId: message.ids.id,
             threadId: thread.ids.id,
             lastReadMessageId: lastReplyId,
-          });
-          setThreadUnreadCount(unreadCount);
-        } catch (error) {
-          reportMobileObservedError({
-            error,
-            source: 'mobile.messages.message_item.thread_read_state',
-            message: 'Failed to sync thread read state',
-            context: {
-              channelId: resolvedChannelId,
-              threadId: thread.ids.id,
-              messageId: message.ids.id,
-            },
           });
         }
       }
@@ -1910,6 +1906,8 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     message.ids.orgId,
     currentProfileId,
     currentAccountId,
+    threadUnreadCount,
+    markThreadRead,
   ]);
 
   useEffect(() => {

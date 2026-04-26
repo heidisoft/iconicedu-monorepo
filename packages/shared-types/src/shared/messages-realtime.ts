@@ -5,6 +5,13 @@ export type MessageRealtimeEvent =
   | { type: 'message-added'; message: MessageVM }
   | { type: 'message-updated'; message: MessageVM }
   | { type: 'message-deleted'; messageId: string }
+  | {
+      type: 'thread_read_state_updated';
+      threadId: string;
+      unreadCount: number;
+      lastReadMessageId: string | null;
+      lastReadAt: string | null;
+    }
   | { type: 'typing-start'; profileId: string }
   | { type: 'typing-stop'; profileId: string };
 

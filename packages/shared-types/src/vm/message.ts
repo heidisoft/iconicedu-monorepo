@@ -19,6 +19,7 @@ export interface ChannelReadStateVM {
   lastReadMessageId?: UUID;
   lastReadAt?: ISODateTime;
   unreadCount: number;
+  threadUnreadCount?: number;
 }
 
 export interface ThreadReadStateVM {

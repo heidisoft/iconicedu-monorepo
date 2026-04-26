@@ -138,8 +138,13 @@ function buildUnreadClearedChannel(
   input?: { lastReadMessageId?: UUID | null; lastReadAt?: ISODateTime | null },
 ) {
   const currentUnread = Math.max(0, channel.collections.readState?.unreadCount ?? 0);
+  const currentThreadUnread = Math.max(
+    0,
+    channel.collections.readState?.threadUnreadCount ?? 0,
+  );
   if (
     currentUnread === 0 &&
+    currentThreadUnread === 0 &&
     input?.lastReadMessageId === undefined &&
     input?.lastReadAt === undefined
   ) {
@@ -157,6 +162,7 @@ function buildUnreadClearedChannel(
           input?.lastReadMessageId ?? channel.collections.readState?.lastReadMessageId,
         lastReadAt: input?.lastReadAt ?? channel.collections.readState?.lastReadAt,
         unreadCount: 0,
+        threadUnreadCount: 0,
       },
     },
   };

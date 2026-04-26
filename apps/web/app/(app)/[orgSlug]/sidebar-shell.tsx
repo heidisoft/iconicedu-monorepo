@@ -557,14 +557,95 @@ export function SidebarShell({
       return;
     }
 
+    const optimisticallyClearedThreadIds = new Set<string>();
+
+    const applyThreadUnreadDelta = (channelId: string, delta: number) => {
+      if (!channelId || delta === 0) {
+        return;
+      }
+
+      setSidebarData((prev) => {
+        let changed = false;
+        const applyDeltaToChannel = <
+          T extends SidebarLeftDataVM['collections']['directMessages'][number],
+        >(
+          channel: T,
+        ): T => {
+          if (channel.ids.id !== channelId) {
+            return channel;
+          }
+
+          const currentThreadUnreadCount = Math.max(
+            0,
+            channel.collections.readState?.threadUnreadCount ?? 0,
+          );
+          const nextThreadUnreadCount = Math.max(0, currentThreadUnreadCount + delta);
+          if (nextThreadUnreadCount === currentThreadUnreadCount) {
+            return channel;
+          }
+
+          changed = true;
+          return {
+            ...channel,
+            collections: {
+              ...channel.collections,
+              readState: {
+                ...channel.collections.readState,
+                channelId,
+                threadUnreadCount: nextThreadUnreadCount,
+              },
+            },
+          };
+        };
+
+        const nextDirectMessages =
+          prev.collections.directMessages.map(applyDeltaToChannel);
+        const nextLearningSpaces = prev.collections.learningSpaces.map((space) => {
+          const related = space.channels.relatedChannels ?? [];
+          return {
+            ...space,
+            channels: {
+              ...space.channels,
+              primaryChannel: applyDeltaToChannel(space.channels.primaryChannel),
+              relatedChannels: related.map(applyDeltaToChannel),
+            },
+          };
+        });
+        const nextClassRequestChannels = (
+          prev.collections.classRequestChannels ?? []
+        ).map(applyDeltaToChannel);
+
+        if (!changed) {
+          return prev;
+        }
+
+        return syncClassRequestUnreadCount({
+          ...prev,
+          collections: {
+            ...prev.collections,
+            directMessages: nextDirectMessages,
+            learningSpaces: nextLearningSpaces,
+            classRequestChannels: nextClassRequestChannels,
+          },
+        });
+      });
+    };
+
     const applyChannelReadState = (
       row: {
         channel_id?: string | null;
+        thread_id?: string | null;
         unread_count?: number | null;
         last_read_at?: string | null;
         last_read_message_id?: string | null;
       } | null,
+      oldRow?: {
+        channel_id?: string | null;
+        thread_id?: string | null;
+        unread_count?: number | null;
+      } | null,
     ) => {
+      type SidebarChannel = SidebarLeftDataVM['collections']['directMessages'][number];
       const channelId = row?.channel_id;
       if (!channelId) {
         return;
@@ -573,59 +654,83 @@ export function SidebarShell({
       setSidebarData((prev) => {
         let changed = false;
         const unreadCount = Math.max(0, row?.unread_count ?? 0);
-        const patch = {
-          channelId,
-          unreadCount,
-          lastReadAt: row?.last_read_at ?? undefined,
-          lastReadMessageId: row?.last_read_message_id ?? undefined,
-        };
+        const isThreadReadState = Boolean(row?.thread_id);
+        if (
+          isThreadReadState &&
+          row?.thread_id &&
+          unreadCount === 0 &&
+          optimisticallyClearedThreadIds.has(row.thread_id)
+        ) {
+          optimisticallyClearedThreadIds.delete(row.thread_id);
+          return prev;
+        }
+        const threadUnreadDelta = isThreadReadState
+          ? unreadCount - Math.max(0, oldRow?.unread_count ?? 0)
+          : 0;
+        const patch = isThreadReadState
+          ? null
+          : {
+              channelId,
+              unreadCount,
+              lastReadAt: row?.last_read_at ?? undefined,
+              lastReadMessageId: row?.last_read_message_id ?? undefined,
+            };
 
-        const nextDirectMessages = prev.collections.directMessages.map((channel) => {
-          if (channel.ids.id !== channelId) {
+        const applyPatchToChannel = <T extends SidebarChannel>(channel: T): T => {
+          if (patch) {
+            return {
+              ...channel,
+              collections: {
+                ...channel.collections,
+                readState: {
+                  ...channel.collections.readState,
+                  ...patch,
+                },
+              },
+            };
+          }
+
+          const currentThreadUnreadCount = Math.max(
+            0,
+            channel.collections.readState?.threadUnreadCount ?? 0,
+          );
+          const nextThreadUnreadCount = Math.max(
+            0,
+            currentThreadUnreadCount + threadUnreadDelta,
+          );
+          if (nextThreadUnreadCount === currentThreadUnreadCount) {
             return channel;
           }
-          changed = true;
+
           return {
             ...channel,
             collections: {
               ...channel.collections,
               readState: {
                 ...channel.collections.readState,
-                ...patch,
+                channelId,
+                threadUnreadCount: nextThreadUnreadCount,
               },
             },
           };
+        };
+
+        const nextDirectMessages = prev.collections.directMessages.map((channel) => {
+          if (channel.ids.id !== channelId) {
+            return channel;
+          }
+          const nextChannel = applyPatchToChannel(channel);
+          changed = changed || nextChannel !== channel;
+          return nextChannel;
         });
 
         const nextLearningSpaces = prev.collections.learningSpaces.map((space) => {
           const primary = space.channels.primaryChannel;
           const related = space.channels.relatedChannels ?? [];
           const nextPrimary =
-            primary.ids.id === channelId
-              ? {
-                  ...primary,
-                  collections: {
-                    ...primary.collections,
-                    readState: {
-                      ...primary.collections.readState,
-                      ...patch,
-                    },
-                  },
-                }
-              : primary;
+            primary.ids.id === channelId ? applyPatchToChannel(primary) : primary;
           const nextRelated = related.map((channel) =>
-            channel.ids.id === channelId
-              ? {
-                  ...channel,
-                  collections: {
-                    ...channel.collections,
-                    readState: {
-                      ...channel.collections.readState,
-                      ...patch,
-                    },
-                  },
-                }
-              : channel,
+            channel.ids.id === channelId ? applyPatchToChannel(channel) : channel,
           );
 
           const matched =
@@ -657,18 +762,7 @@ export function SidebarShell({
             learningSpaces: nextLearningSpaces,
             classRequestChannels: (prev.collections.classRequestChannels ?? []).map(
               (channel) =>
-                channel.ids.id === channelId
-                  ? {
-                      ...channel,
-                      collections: {
-                        ...channel.collections,
-                        readState: {
-                          ...channel.collections.readState,
-                          ...patch,
-                        },
-                      },
-                    }
-                  : channel,
+                channel.ids.id === channelId ? applyPatchToChannel(channel) : channel,
             ),
           },
         });
@@ -687,26 +781,69 @@ export function SidebarShell({
         filter: `account_id=eq.${sidebarAccountId}`,
       },
       (payload) => {
+        const oldRow = payload.old as
+          | {
+              channel_id?: string | null;
+              thread_id?: string | null;
+              unread_count?: number | null;
+            }
+          | null
+          | undefined;
         const row =
           payload.eventType === 'DELETE'
-            ? ((payload.old as {
+            ? ({
+                ...(oldRow ?? {}),
+                unread_count: 0,
+              } as {
                 channel_id?: string | null;
+                thread_id?: string | null;
                 unread_count?: number | null;
                 last_read_at?: string | null;
                 last_read_message_id?: string | null;
-              }) ?? null)
+              })
             : ((payload.new as {
                 channel_id?: string | null;
+                thread_id?: string | null;
                 unread_count?: number | null;
                 last_read_at?: string | null;
                 last_read_message_id?: string | null;
               }) ?? null);
-        applyChannelReadState(row);
+        applyChannelReadState(row, oldRow ?? null);
       },
     );
     channel.subscribe();
 
+    const handleOptimisticThreadReadState = (event: Event) => {
+      const detail = (event as CustomEvent).detail as
+        | {
+            channelId?: string | null;
+            threadId?: string | null;
+            clearedUnreadCount?: number | null;
+          }
+        | null
+        | undefined;
+      const channelId = detail?.channelId;
+      const threadId = detail?.threadId;
+      const clearedUnreadCount = Math.max(0, detail?.clearedUnreadCount ?? 0);
+      if (!channelId || clearedUnreadCount <= 0) {
+        return;
+      }
+      if (threadId) {
+        optimisticallyClearedThreadIds.add(threadId);
+      }
+      applyThreadUnreadDelta(channelId, -clearedUnreadCount);
+    };
+
+    window.addEventListener(
+      'iconicedu:thread-read-state-optimistic',
+      handleOptimisticThreadReadState,
+    );
+
     return () => {
+      window.removeEventListener(
+        'iconicedu:thread-read-state-optimistic',
+        handleOptimisticThreadReadState,
+      );
       void channel.unsubscribe();
     };
   }, [sidebarAccountId, sidebarProfile.ids?.orgId, supabase]);

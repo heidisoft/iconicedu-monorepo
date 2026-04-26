@@ -13,6 +13,10 @@ describe('MessagesShell', () => {
     );
   });
 
+  it('seeds the state provider with the current user id before the header renders', () => {
+    expect(source).toContain('currentUserId={props.currentUserId}');
+  });
+
   it('passes container props through to MessagesContainer', () => {
     expect(source).toContain('<MessagesContainer {...props} />');
   });

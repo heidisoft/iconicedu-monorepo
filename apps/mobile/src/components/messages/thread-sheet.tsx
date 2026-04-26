@@ -15,7 +15,8 @@ import type { MessageVM } from '@iconicedu/shared-types';
 import { reportMobileObservedError } from '@/lib/analytics/report-error';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
-import { fetchThreadMessages, markThreadReadState } from '@/lib/api/queries';
+import { fetchThreadMessages } from '@/lib/api/queries';
+import { useMarkRead } from '@/hooks/use-mark-read';
 import { MessageItem } from './message-item';
 import { MessageInput } from './message-input';
 
@@ -116,6 +117,13 @@ export const ThreadSheet: React.FC<ThreadSheetProps> = ({
   const resolvedChannelId =
     channelId || parentMessage?.social?.thread?.readState?.channelId || '';
 
+  const { markThreadRead } = useMarkRead({
+    orgId: parentMessage?.ids.orgId ?? '',
+    profileId: currentProfileId,
+    accountId: currentAccountId,
+    channelId: resolvedChannelId,
+  });
+
   const loadReplies = useCallback(async () => {
     if (!parentMessage || !resolvedChannelId) return;
     setLoading(true);
@@ -133,25 +141,16 @@ export const ThreadSheet: React.FC<ThreadSheetProps> = ({
 
       const lastReplyId = data[data.length - 1]?.ids.id ?? null;
       if (resolvedChannelId && threadId && currentProfileId && currentAccountId) {
-        try {
-          await markThreadReadState({
+        const alreadyUpToDate =
+          (parentMessage.social?.thread?.readState?.unreadCount ?? 0) === 0 &&
+          lastReplyId === parentMessage.social?.thread?.readState?.lastReadMessageId;
+        if (!alreadyUpToDate) {
+          await markThreadRead({
             orgId: parentMessage.ids.orgId,
-            accountId: currentAccountId,
-            profileId: currentProfileId,
             channelId: resolvedChannelId,
+            parentMessageId: parentMessage.ids.id,
             threadId,
             lastReadMessageId: lastReplyId,
-          });
-        } catch (error) {
-          reportMobileObservedError({
-            error,
-            source: 'mobile.messages.thread_sheet.thread_read_state',
-            message: 'Failed to sync thread read state in thread sheet',
-            context: {
-              channelId: resolvedChannelId,
-              threadId,
-              parentMessageId: parentMessage.ids.id,
-            },
           });
         }
       }
@@ -168,7 +167,14 @@ export const ThreadSheet: React.FC<ThreadSheetProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [parentMessage, resolvedChannelId, threadId, currentProfileId, currentAccountId]);
+  }, [
+    currentAccountId,
+    currentProfileId,
+    markThreadRead,
+    parentMessage,
+    resolvedChannelId,
+    threadId,
+  ]);
 
   useEffect(() => {
     if (visible && parentMessage) {

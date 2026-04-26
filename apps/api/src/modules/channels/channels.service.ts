@@ -2,6 +2,7 @@ import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '@iconicedu/api/prisma/prisma.service';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
+import { ThreadsService } from '@iconicedu/api/modules/threads/threads.service';
 
 type DmParticipant = {
   id: string;
@@ -25,6 +26,7 @@ type ChannelListItem = {
   kind: string;
   updated_at: string;
   unread_count: number;
+  thread_unread_count: number;
   last_message_text: string | null;
   last_message_at: string | null;
   last_message_sender: string | null;
@@ -54,7 +56,10 @@ const PREVIEW_LABELS: Record<string, string> = {
 
 @Injectable()
 export class ChannelsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly threadsService: ThreadsService,
+  ) {}
 
   private async fetchLastMessages(
     accessToken: string,
@@ -170,6 +175,7 @@ export class ChannelsService {
     const [
       { data: memberRows, error: memberError },
       { data: readStateRows, error: readStateError },
+      { data: threadReadStateRows, error: threadReadStateError },
       lastMessages,
     ] = await Promise.all([
       supabase
@@ -184,11 +190,21 @@ export class ChannelsService {
         .select('channel_id, unread_count')
         .eq('account_id', input.accountId)
         .in('channel_id', channelIds)
+        .is('thread_id', null)
+        .is('deleted_at', null),
+      supabase
+        .from('channel_read_state')
+        .select('channel_id, unread_count')
+        .eq('account_id', input.accountId)
+        .in('channel_id', channelIds)
+        .not('thread_id', 'is', null)
         .is('deleted_at', null),
       this.fetchLastMessages(accessToken, channelIds),
     ]);
     if (memberError) throw new InternalServerErrorException(memberError.message);
     if (readStateError) throw new InternalServerErrorException(readStateError.message);
+    if (threadReadStateError)
+      throw new InternalServerErrorException(threadReadStateError.message);
 
     const readStateByChannelId = new Map(
       (readStateRows ?? []).map((row) => [
@@ -196,6 +212,15 @@ export class ChannelsService {
         row.unread_count ?? 0,
       ]),
     );
+    const threadUnreadByChannelId = new Map<string, number>();
+    for (const row of threadReadStateRows ?? []) {
+      const channelId = row.channel_id as string;
+      const unreadCount = Math.max(0, row.unread_count ?? 0);
+      threadUnreadByChannelId.set(
+        channelId,
+        (threadUnreadByChannelId.get(channelId) ?? 0) + unreadCount,
+      );
+    }
     const participantMap = new Map<string, DmParticipant[]>();
     for (const member of memberRows ?? []) {
       const profile = member.profile as unknown as DmParticipant | null;
@@ -215,6 +240,7 @@ export class ChannelsService {
         kind: channel.kind,
         updated_at: channel.updated_at,
         unread_count: Math.max(0, readStateByChannelId.get(channel.id) ?? 0),
+        thread_unread_count: Math.max(0, threadUnreadByChannelId.get(channel.id) ?? 0),
         last_message_text: last?.text ?? null,
         last_message_at: last?.at ?? null,
         last_message_sender: last?.sender ?? null,
@@ -297,6 +323,7 @@ export class ChannelsService {
       const channelIds = chRows.map((channel) => channel.id);
       const [
         { data: readStateRows, error: readError },
+        { data: threadReadStateRows, error: threadReadError },
         { data: memberRows, error: memberError },
       ] = await Promise.all([
         supabase
@@ -304,6 +331,14 @@ export class ChannelsService {
           .select('channel_id, unread_count')
           .eq('account_id', child.account_id as string)
           .in('channel_id', channelIds)
+          .is('thread_id', null)
+          .is('deleted_at', null),
+        supabase
+          .from('channel_read_state')
+          .select('channel_id, unread_count')
+          .eq('account_id', child.account_id as string)
+          .in('channel_id', channelIds)
+          .not('thread_id', 'is', null)
           .is('deleted_at', null),
         supabase
           .from('channel_members')
@@ -314,6 +349,8 @@ export class ChannelsService {
           .is('deleted_at', null),
       ]);
       if (readError) throw new InternalServerErrorException(readError.message);
+      if (threadReadError)
+        throw new InternalServerErrorException(threadReadError.message);
       if (memberError) throw new InternalServerErrorException(memberError.message);
 
       const readStateByChannelId = new Map(
@@ -322,6 +359,15 @@ export class ChannelsService {
           row.unread_count ?? 0,
         ]),
       );
+      const threadUnreadByChannelId = new Map<string, number>();
+      for (const row of threadReadStateRows ?? []) {
+        const channelId = row.channel_id as string;
+        const unreadCount = Math.max(0, row.unread_count ?? 0);
+        threadUnreadByChannelId.set(
+          channelId,
+          (threadUnreadByChannelId.get(channelId) ?? 0) + unreadCount,
+        );
+      }
       const participantsMap = new Map<string, DmParticipant[]>();
       for (const member of memberRows ?? []) {
         const profile = Array.isArray(member.profile)
@@ -342,6 +388,7 @@ export class ChannelsService {
           kind: channel.kind,
           updated_at: channel.updated_at,
           unread_count: Math.max(0, readStateByChannelId.get(channel.id) ?? 0),
+          thread_unread_count: Math.max(0, threadUnreadByChannelId.get(channel.id) ?? 0),
           last_message_text: null,
           last_message_at: null,
           last_message_sender: null,
@@ -467,6 +514,7 @@ export class ChannelsService {
       .eq('status', 'active')
       .is('deleted_at', null)
       .eq('channel_read_state.account_id', input.accountId)
+      .is('channel_read_state.thread_id', null)
       .order('updated_at', { ascending: false });
     if (error) throw new InternalServerErrorException(error.message);
     if (!data?.length) return [];
@@ -489,6 +537,7 @@ export class ChannelsService {
         kind: channel.kind,
         updated_at: channel.updated_at,
         unread_count: readState?.unread_count ?? 0,
+        thread_unread_count: 0,
         last_message_text: last?.text ?? null,
         last_message_at: last?.at ?? null,
         last_message_sender: last?.sender ?? null,
@@ -515,29 +564,59 @@ export class ChannelsService {
 
   async getReadState(
     accessToken: string,
-    input: { channelId: string; accountId: string },
+    input: { channelId: string; accountId: string; threadId?: string | null },
   ) {
     const supabase = createSupabaseSessionClient(accessToken);
-    const { data, error } = await supabase
+    let query = supabase
       .from('channel_read_state')
-      .select('channel_id, last_read_message_id, last_read_at, unread_count')
+      .select('channel_id, thread_id, last_read_message_id, last_read_at, unread_count')
       .eq('channel_id', input.channelId)
       .eq('account_id', input.accountId)
-      .is('deleted_at', null)
-      .maybeSingle<{
-        channel_id: string;
-        last_read_message_id: string | null;
-        last_read_at: string | null;
-        unread_count: number | null;
-      }>();
+      .is('deleted_at', null);
+    query = input.threadId
+      ? query.eq('thread_id', input.threadId)
+      : query.is('thread_id', null);
+
+    const { data, error } = await query.maybeSingle<{
+      channel_id: string;
+      thread_id: string | null;
+      last_read_message_id: string | null;
+      last_read_at: string | null;
+      unread_count: number | null;
+    }>();
     if (error) throw new InternalServerErrorException(error.message);
     if (!data) return null;
     return {
       channelId: data.channel_id,
+      threadId: data.thread_id ?? null,
       lastReadMessageId: data.last_read_message_id ?? null,
       lastReadAt: data.last_read_at ?? null,
       unreadCount: data.unread_count ?? 0,
     };
+  }
+
+  async markReadState(
+    accessToken: string,
+    input: {
+      orgId: string;
+      accountId: string;
+      profileId: string;
+      channelId: string;
+      threadId?: string | null;
+      lastReadMessageId?: string | null;
+    },
+  ) {
+    if (input.threadId) {
+      return this.threadsService.markRead(accessToken, {
+        ...input,
+        threadId: input.threadId,
+      });
+    }
+
+    return this.markRead(accessToken, {
+      ...input,
+      lastReadMessageId: input.lastReadMessageId ?? undefined,
+    });
   }
 
   async markRead(

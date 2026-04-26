@@ -20,6 +20,7 @@ export async function persistDirectMessageUnreadCount(
     org_id: UUID;
     account_id: UUID;
     channel_id: UUID;
+    thread_id: UUID | null;
     unread_count: number;
     last_read_message_id?: UUID | null;
     last_read_at?: ISODateTime | null;
@@ -27,6 +28,7 @@ export async function persistDirectMessageUnreadCount(
     org_id: input.orgId,
     account_id: input.accountId,
     channel_id: input.channelId,
+    thread_id: null,
     unread_count: unreadCount,
   };
 
@@ -41,6 +43,6 @@ export async function persistDirectMessageUnreadCount(
   }
 
   return supabase.from('channel_read_state').upsert(payload, {
-    onConflict: 'org_id,channel_id,account_id',
+    onConflict: 'org_id,channel_id,account_id,thread_id',
   });
 }

@@ -55,6 +55,12 @@ Optional:
 - `REMINDERS_DISPATCH_LEASE_SECONDS=120`
 - `REMINDERS_DISPATCH_LEASE_OWNER=supabase-edge-cron`
 
+The Edge Function is intentionally a thin HTTP bridge. It must not read
+`class_schedules` or expand recurrence on the minute cron. Schedule reads happen when
+learning-space schedules are created or updated, where the app compiles future rows into
+`reminder_jobs`. The cron path only calls the API dispatcher, which claims due rows via
+`claim_due_reminder_jobs`.
+
 ## 3. Deploy the Edge Function
 
 ```bash

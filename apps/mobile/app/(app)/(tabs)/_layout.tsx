@@ -157,9 +157,18 @@ export default function TabsLayout() {
       0,
     ) ?? 0;
   const messagesUnreadCount =
-    (dms?.reduce((total, item) => total + (item.unread_count ?? 0), 0) ?? 0) +
-    (channels?.reduce((total, item) => total + (item.unread_count ?? 0), 0) ?? 0) +
-    (supervisedDms?.reduce((total, item) => total + (item.unread_count ?? 0), 0) ?? 0);
+    (dms?.reduce(
+      (total, item) => total + (item.unread_count ?? 0) + (item.thread_unread_count ?? 0),
+      0,
+    ) ?? 0) +
+    (channels?.reduce(
+      (total, item) => total + (item.unread_count ?? 0) + (item.thread_unread_count ?? 0),
+      0,
+    ) ?? 0) +
+    (supervisedDms?.reduce(
+      (total, item) => total + (item.unread_count ?? 0) + (item.thread_unread_count ?? 0),
+      0,
+    ) ?? 0);
 
   // insets.bottom accounts for the navigation type automatically:
   //   Gesture navigation → gesture hint height  (~28–34 dp)

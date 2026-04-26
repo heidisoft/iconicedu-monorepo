@@ -21,6 +21,15 @@ describe('getDirectMessageUnreadCount', () => {
     expect(total).toBe(5);
   });
 
+  it('includes unread thread replies in direct message totals', () => {
+    const total = getDirectMessageUnreadCount([
+      { collections: { readState: { unreadCount: 2, threadUnreadCount: 4 } } },
+      { collections: { readState: { unreadCount: 0, threadUnreadCount: 3 } } },
+    ] as unknown as ChannelVM[]);
+
+    expect(total).toBe(9);
+  });
+
   it('ignores negative unread counts', () => {
     const total = getDirectMessageUnreadCount([
       { collections: { readState: { unreadCount: -10 } } },
@@ -94,6 +103,23 @@ describe('class unread helpers', () => {
     ] as unknown as LearningSpaceVM[]);
 
     expect(total).toBe(5);
+  });
+
+  it('includes unread thread replies across class channels', () => {
+    const total = getLearningSpaceUnreadCount([
+      {
+        channels: {
+          primaryChannel: {
+            collections: { readState: { unreadCount: 2, threadUnreadCount: 1 } },
+          },
+          relatedChannels: [
+            { collections: { readState: { unreadCount: 0, threadUnreadCount: 3 } } },
+          ],
+        },
+      },
+    ] as unknown as LearningSpaceVM[]);
+
+    expect(total).toBe(6);
   });
 
   it('ignores negative unread counts for classes', () => {

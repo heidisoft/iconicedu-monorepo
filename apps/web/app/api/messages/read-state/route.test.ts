@@ -3,42 +3,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { POST } from '@iconicedu/web/app/api/messages/read-state/route';
 import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
 
-const rpc = vi.fn();
+const apiPost = vi.fn();
 const requireEffectiveActorContext = vi.fn();
-const channelMaybeSingle = vi.fn();
-const messageMaybeSingle = vi.fn();
-const memberMaybeSingle = vi.fn();
 const APP_URL = resolveAppUrl();
 
-const buildSelectChain = (maybeSingleMock: ReturnType<typeof vi.fn>) => ({
-  eq: vi.fn(() => buildSelectChain(maybeSingleMock)),
-  is: vi.fn(() => ({
-    maybeSingle: maybeSingleMock,
-  })),
-});
-
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
-  createSupabaseServerClient: vi.fn(() => ({
-    rpc,
-    from: (table: string) => {
-      if (table === 'channels') {
-        return {
-          select: vi.fn(() => buildSelectChain(channelMaybeSingle)),
-        };
-      }
-      if (table === 'channel_members') {
-        return {
-          select: vi.fn(() => buildSelectChain(memberMaybeSingle)),
-        };
-      }
-      if (table === 'messages') {
-        return {
-          select: vi.fn(() => buildSelectChain(messageMaybeSingle)),
-        };
-      }
-      throw new Error(`Unexpected table: ${table}`);
-    },
-  })),
+  createSupabaseServerClient: vi.fn(() => ({})),
+}));
+
+vi.mock('@iconicedu/web/lib/api/http-client', () => ({
+  createApiClient: vi.fn(() => ({ post: apiPost })),
 }));
 
 vi.mock('@iconicedu/web/lib/family-view/actor-context', () => ({
@@ -53,6 +27,7 @@ describe('POST /api/messages/read-state', () => {
       account: { id: 'account-1', org_id: 'org-1' },
       profile: { id: 'profile-1' },
     });
+    apiPost.mockResolvedValue({ unreadCount: 0 });
   });
 
   it('returns 400 when channelId is missing', async () => {
@@ -70,12 +45,7 @@ describe('POST /api/messages/read-state', () => {
     });
   });
 
-  it('recomputes unread from source of truth for channel read-state', async () => {
-    channelMaybeSingle.mockResolvedValueOnce({ data: { id: 'channel-1' }, error: null });
-    memberMaybeSingle.mockResolvedValueOnce({ data: { id: 'member-1' }, error: null });
-    messageMaybeSingle.mockResolvedValueOnce({ data: { id: 'message-1' }, error: null });
-    rpc.mockResolvedValueOnce({ data: 0, error: null });
-
+  it('proxies channel reads to the unified API read-state endpoint', async () => {
     const response = await POST(
       new Request(`${APP_URL}/api/messages/read-state`, {
         method: 'POST',
@@ -86,62 +56,50 @@ describe('POST /api/messages/read-state', () => {
       }),
     );
 
-    expect(rpc).toHaveBeenCalledWith('recompute_unread_for_account_channel', {
-      p_org_id: 'org-1',
-      p_channel_id: 'channel-1',
-      p_account_id: 'account-1',
-      p_last_read_message_id: 'message-1',
-      p_last_read_at: expect.any(String),
-      p_actor_profile_id: 'profile-1',
+    expect(apiPost).toHaveBeenCalledWith('/channels/channel-1/read-state', {
+      orgId: 'org-1',
+      channelId: 'channel-1',
+      threadId: null,
+      accountId: 'account-1',
+      profileId: 'profile-1',
+      lastReadMessageId: 'message-1',
     });
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ success: true, unreadCount: 0 });
+    expect(await response.json()).toEqual(
+      expect.objectContaining({
+        success: true,
+        unreadCount: 0,
+        lastReadAt: expect.any(String),
+        lastReadMessageId: 'message-1',
+      }),
+    );
   });
 
-  it('returns 403 when channel is not accessible', async () => {
-    channelMaybeSingle.mockResolvedValueOnce({ data: null, error: null });
-
+  it('proxies thread reads through the same API read-state endpoint', async () => {
     const response = await POST(
       new Request(`${APP_URL}/api/messages/read-state`, {
         method: 'POST',
         body: JSON.stringify({
           channelId: 'channel-1',
+          threadId: 'thread-1',
+          lastReadMessageId: 'reply-1',
         }),
       }),
     );
 
-    expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({
-      success: false,
-      message: 'Channel not found or access denied',
+    expect(apiPost).toHaveBeenCalledWith('/channels/channel-1/read-state', {
+      orgId: 'org-1',
+      channelId: 'channel-1',
+      threadId: 'thread-1',
+      accountId: 'account-1',
+      profileId: 'profile-1',
+      lastReadMessageId: 'reply-1',
     });
+    expect(response.status).toBe(200);
   });
 
-  it('returns 400 when lastReadMessageId is not in channel', async () => {
-    channelMaybeSingle.mockResolvedValueOnce({ data: { id: 'channel-1' }, error: null });
-    memberMaybeSingle.mockResolvedValueOnce({ data: { id: 'member-1' }, error: null });
-    messageMaybeSingle.mockResolvedValueOnce({ data: null, error: null });
-
-    const response = await POST(
-      new Request(`${APP_URL}/api/messages/read-state`, {
-        method: 'POST',
-        body: JSON.stringify({
-          channelId: 'channel-1',
-          lastReadMessageId: 'message-x',
-        }),
-      }),
-    );
-
-    expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({
-      success: false,
-      message: 'Invalid lastReadMessageId for channel',
-    });
-  });
-
-  it('returns 403 when account profile is not an active channel member', async () => {
-    channelMaybeSingle.mockResolvedValueOnce({ data: { id: 'channel-1' }, error: null });
-    memberMaybeSingle.mockResolvedValueOnce({ data: null, error: null });
+  it('returns API errors as an unsuccessful response', async () => {
+    apiPost.mockRejectedValueOnce(new Error('Channel not found or access denied'));
 
     const response = await POST(
       new Request(`${APP_URL}/api/messages/read-state`, {
@@ -152,7 +110,7 @@ describe('POST /api/messages/read-state', () => {
       }),
     );
 
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(500);
     expect(await response.json()).toEqual({
       success: false,
       message: 'Channel not found or access denied',

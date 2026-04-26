@@ -702,7 +702,7 @@ function ChannelRow({
   const text = item.last_message_text;
   const sender = item.last_message_sender;
   const time = formatListTime(item.last_message_at ?? item.updated_at);
-  const unread = item.unread_count ?? 0;
+  const unread = (item.unread_count ?? 0) + (item.thread_unread_count ?? 0);
   const hasUnread = unread > 0;
   const studentProfiles = !isDm ? (item.student_profiles ?? []) : [];
   const participantProfiles = !isDm ? (item.participant_profiles ?? []) : [];
@@ -1016,15 +1016,27 @@ export default function MessagesScreen() {
         : filteredClassroomChannels;
 
   const unreadAll = useMemo(
-    () => allItems.reduce((n, i) => n + (i.unread_count ?? 0), 0),
+    () =>
+      allItems.reduce(
+        (n, i) => n + (i.unread_count ?? 0) + (i.thread_unread_count ?? 0),
+        0,
+      ),
     [allItems],
   );
   const unreadDms = useMemo(
-    () => [...allDms, ...allSupervisedDms].reduce((n, i) => n + (i.unread_count ?? 0), 0),
+    () =>
+      [...allDms, ...allSupervisedDms].reduce(
+        (n, i) => n + (i.unread_count ?? 0) + (i.thread_unread_count ?? 0),
+        0,
+      ),
     [allDms, allSupervisedDms],
   );
   const unreadChannels = useMemo(
-    () => classroomChannels.reduce((n, i) => n + (i.unread_count ?? 0), 0),
+    () =>
+      classroomChannels.reduce(
+        (n, i) => n + (i.unread_count ?? 0) + (i.thread_unread_count ?? 0),
+        0,
+      ),
     [classroomChannels],
   );
 
@@ -1040,7 +1052,7 @@ export default function MessagesScreen() {
     () =>
       data
         .filter((item): item is ChannelListItem => !('_type' in item))
-        .filter((item) => (item.unread_count ?? 0) > 0)
+        .filter((item) => (item.unread_count ?? 0) + (item.thread_unread_count ?? 0) > 0)
         .map((item) => item.id),
     [data],
   );
