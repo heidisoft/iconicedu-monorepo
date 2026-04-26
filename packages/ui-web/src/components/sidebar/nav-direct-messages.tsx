@@ -68,8 +68,8 @@ export function NavDirectMessages({
     return dms
       .map((channel, index) => ({ channel, index }))
       .sort((a, b) => {
-        const aUnread = (a.channel.collections.readState?.unreadCount ?? 0) > 0;
-        const bUnread = (b.channel.collections.readState?.unreadCount ?? 0) > 0;
+        const aUnread = getDirectMessageItemUnreadCount(a.channel, currentUserId) > 0;
+        const bUnread = getDirectMessageItemUnreadCount(b.channel, currentUserId) > 0;
         if (aUnread !== bUnread) {
           return aUnread ? -1 : 1;
         }
@@ -88,7 +88,7 @@ export function NavDirectMessages({
         return bActivity - aActivity;
       })
       .map(({ channel }) => channel);
-  }, [dms]);
+  }, [currentUserId, dms]);
   const [shouldAnimateUnread, setShouldAnimateUnread] = React.useState(false);
   const previousUnreadCountRef = React.useRef(totalUnreadCount);
   const hasInitializedRef = React.useRef(false);

@@ -18,11 +18,18 @@ function getLearningSpaceChannels(space: LearningSpaceVM): ChannelVM[] {
   return [space.channels.primaryChannel, ...related];
 }
 
+function getChannelUnreadCount(channel: ChannelVM): number {
+  return (
+    Math.max(0, channel.collections.readState?.unreadCount ?? 0) +
+    Math.max(0, channel.collections.readState?.threadUnreadCount ?? 0)
+  );
+}
+
 export function getDirectMessageItemUnreadCount(
   channel: ChannelVM,
   currentUserId?: string,
 ): number {
-  const persistedUnread = Math.max(0, channel.collections.readState?.unreadCount ?? 0);
+  const persistedUnread = getChannelUnreadCount(channel);
   if (persistedUnread > 0) {
     return persistedUnread;
   }
@@ -62,7 +69,7 @@ export function getDirectMessageUnreadCount(
 
 export function getLearningSpaceItemUnreadCount(space: LearningSpaceVM): number {
   return getLearningSpaceChannels(space).reduce((total, channel) => {
-    return total + Math.max(0, channel.collections.readState?.unreadCount ?? 0);
+    return total + getChannelUnreadCount(channel);
   }, 0);
 }
 
@@ -72,7 +79,7 @@ export function getLearningSpaceItemUnreadCountForUser(
 ): number {
   const channels = getLearningSpaceChannels(space);
   const persistedUnread = channels.reduce((total, channel) => {
-    return total + Math.max(0, channel.collections.readState?.unreadCount ?? 0);
+    return total + getChannelUnreadCount(channel);
   }, 0);
   if (persistedUnread > 0) {
     return persistedUnread;

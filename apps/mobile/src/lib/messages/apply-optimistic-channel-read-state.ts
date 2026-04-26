@@ -31,6 +31,40 @@ function updateChannelListUnreadCount(
   return didChange ? nextItems : items;
 }
 
+function updateChannelListThreadUnreadCount(
+  items: ChannelListItem[] | undefined,
+  channelId: string,
+  clearedUnreadCount: number,
+): ChannelListItem[] | undefined {
+  if (!Array.isArray(items) || items.length === 0 || clearedUnreadCount <= 0) {
+    return items;
+  }
+
+  let didChange = false;
+  const nextItems = items.map((item) => {
+    if (item.id !== channelId) {
+      return item;
+    }
+
+    const currentThreadUnreadCount = item.thread_unread_count ?? 0;
+    const nextThreadUnreadCount = Math.max(
+      0,
+      currentThreadUnreadCount - clearedUnreadCount,
+    );
+    if (nextThreadUnreadCount === currentThreadUnreadCount) {
+      return item;
+    }
+
+    didChange = true;
+    return {
+      ...item,
+      thread_unread_count: nextThreadUnreadCount,
+    };
+  });
+
+  return didChange ? nextItems : items;
+}
+
 export function applyOptimisticChannelReadState(input: {
   queryClient: QueryClient;
   orgId: string;
@@ -81,11 +115,24 @@ export function applyOptimisticChannelReadState(input: {
 
 export function applyOptimisticThreadReadState(input: {
   queryClient: QueryClient;
+  orgId: string;
   channelId: string;
   profileId: string;
+  accountId: string;
   parentMessageId: string;
+  lastReadMessageId?: string | null;
 }): void {
-  const { queryClient, channelId, profileId, parentMessageId } = input;
+  const {
+    queryClient,
+    orgId,
+    channelId,
+    profileId,
+    accountId,
+    parentMessageId,
+    lastReadMessageId,
+  } = input;
+  const lastReadAt = new Date().toISOString();
+  let clearedUnreadCount = 0;
 
   queryClient.setQueryData<MessageVM[]>(
     queryKeys.messages(channelId, profileId),
@@ -102,10 +149,13 @@ export function applyOptimisticThreadReadState(input: {
 
         const thread = message.social?.thread;
         const unreadCount = thread?.readState?.unreadCount ?? 0;
-        if (!thread || unreadCount === 0) {
+        if (!thread) {
           return message;
         }
 
+        if (unreadCount > 0) {
+          clearedUnreadCount = unreadCount;
+        }
         didChange = true;
         return {
           ...message,
@@ -115,6 +165,11 @@ export function applyOptimisticThreadReadState(input: {
               ...thread,
               readState: {
                 ...thread.readState,
+                threadId: thread.ids.id,
+                channelId: thread.readState?.channelId ?? channelId,
+                lastReadMessageId:
+                  lastReadMessageId ?? thread.readState?.lastReadMessageId,
+                lastReadAt,
                 unreadCount: 0,
               },
             },
@@ -124,5 +179,29 @@ export function applyOptimisticThreadReadState(input: {
 
       return didChange ? nextMessages : current;
     },
+  );
+
+  if (clearedUnreadCount <= 0) {
+    return;
+  }
+
+  queryClient.setQueryData<ChannelListItem[]>(
+    queryKeys.directMessages(orgId, profileId),
+    (current) =>
+      updateChannelListThreadUnreadCount(current, channelId, clearedUnreadCount),
+  );
+
+  queryClient.setQueriesData<ChannelListItem[]>(
+    {
+      queryKey: ['learningSpaceChannels', orgId, profileId],
+    },
+    (current) =>
+      updateChannelListThreadUnreadCount(current, channelId, clearedUnreadCount),
+  );
+
+  queryClient.setQueryData<ChannelListItem[]>(
+    queryKeys.supervisedDirectMessages(orgId, accountId),
+    (current) =>
+      updateChannelListThreadUnreadCount(current, channelId, clearedUnreadCount),
   );
 }

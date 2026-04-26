@@ -11,6 +11,7 @@ const mockRefetch = jest.fn();
 const mockQueryClient = {
   setQueryData: jest.fn(),
   invalidateQueries: jest.fn(),
+  refetchQueries: jest.fn(),
 };
 const mockUseOnlineProfileIds = jest.fn(() => new Map());
 const mockUseProfilePresenceSummary = jest.fn(() => ({

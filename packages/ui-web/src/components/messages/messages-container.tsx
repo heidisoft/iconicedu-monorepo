@@ -697,6 +697,7 @@ export function MessagesContainer({
           new Date(a.core.createdAt).getTime() - new Date(b.core.createdAt).getTime(),
       )[resolvedReplies.length - 1];
       if (latestReply?.ids.id) {
+        const clearedThreadUnreadCount = Math.max(0, thread.readState?.unreadCount ?? 0);
         const alreadyUpToDate =
           (thread.readState?.unreadCount ?? 0) === 0 &&
           latestReply.ids.id === thread.readState?.lastReadMessageId;
@@ -729,6 +730,18 @@ export function MessagesContainer({
             thread: optimisticThread,
           } as MessageVM['social'],
         });
+
+        if (clearedThreadUnreadCount > 0) {
+          window.dispatchEvent(
+            new CustomEvent('iconicedu:thread-read-state-optimistic', {
+              detail: {
+                channelId: channel.ids.id,
+                threadId: thread.ids.id,
+                clearedUnreadCount: clearedThreadUnreadCount,
+              },
+            }),
+          );
+        }
 
         if (!alreadyUpToDate) {
           try {

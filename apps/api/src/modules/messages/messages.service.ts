@@ -71,7 +71,7 @@ type RawThreadParticipantRow = {
   profile: RawSenderProfile | null;
 };
 
-type RawThreadReadStateRow = {
+type RawReadStateByThreadRow = {
   thread_id: string;
   channel_id: string | null;
   last_read_message_id: string | null;
@@ -361,76 +361,78 @@ async function isStaffActorInOrg(input: {
   return Boolean(roleResponse.data?.id);
 }
 
-async function listSupportPrivilegedProfileIds(
+async function listSupportStaffProfileIds(
   supabase: ReturnType<typeof createSupabaseServiceClient>,
   orgId: string,
+  options?: { includeAdmins?: boolean },
 ): Promise<string[]> {
-  const [
-    staffProfilesResponse,
-    privilegedRoleAccountsResponse,
-    privilegedPrimaryRoleAccountsResponse,
-  ] = await Promise.all([
-    supabase
-      .from('profiles')
-      .select('id')
-      .eq('org_id', orgId)
-      .eq('kind', 'staff')
-      .is('deleted_at', null)
-      .returns<Array<{ id: string }>>(),
-    supabase
-      .from('user_roles')
-      .select('account_id')
-      .eq('org_id', orgId)
-      .in('role_key', ['owner', 'admin', 'staff'])
-      .is('deleted_at', null)
-      .returns<Array<{ account_id: string }>>(),
-    supabase
-      .from('accounts')
-      .select('id')
-      .eq('org_id', orgId)
-      .in('primary_role', ['owner', 'admin', 'staff'])
-      .is('deleted_at', null)
-      .returns<Array<{ id: string }>>(),
-  ]);
+  const includeAdmins = options?.includeAdmins ?? false;
+  const roleKeys = includeAdmins ? ['owner', 'admin', 'staff'] : ['staff'];
+
+  const staffProfilesQuery = supabase
+    .from('profiles')
+    .select('id')
+    .eq('org_id', orgId)
+    .eq('kind', 'staff')
+    .is('deleted_at', null)
+    .returns<Array<{ id: string }>>();
+
+  const roleAccountsQuery = supabase
+    .from('user_roles')
+    .select('account_id')
+    .eq('org_id', orgId)
+    .in('role_key', roleKeys)
+    .is('deleted_at', null)
+    .returns<Array<{ account_id: string }>>();
+
+  const primaryRoleAccountsQuery = includeAdmins
+    ? supabase
+        .from('accounts')
+        .select('id')
+        .eq('org_id', orgId)
+        .in('primary_role', roleKeys)
+        .is('deleted_at', null)
+        .returns<Array<{ id: string }>>()
+    : Promise.resolve({ data: [] as Array<{ id: string }>, error: null });
+
+  const [staffProfilesResponse, roleAccountsResponse, primaryRoleAccountsResponse] =
+    await Promise.all([staffProfilesQuery, roleAccountsQuery, primaryRoleAccountsQuery]);
 
   if (staffProfilesResponse.error) {
     throw new Error(staffProfilesResponse.error.message);
   }
-  if (privilegedRoleAccountsResponse.error) {
-    throw new Error(privilegedRoleAccountsResponse.error.message);
+  if (roleAccountsResponse.error) {
+    throw new Error(roleAccountsResponse.error.message);
   }
-  if (privilegedPrimaryRoleAccountsResponse.error) {
-    throw new Error(privilegedPrimaryRoleAccountsResponse.error.message);
+  if (primaryRoleAccountsResponse.error) {
+    throw new Error(primaryRoleAccountsResponse.error.message);
   }
 
-  const privilegedAccountIds = Array.from(
+  const roleAccountIds = Array.from(
     new Set([
-      ...(privilegedRoleAccountsResponse.data ?? []).map((row) => row.account_id),
-      ...(privilegedPrimaryRoleAccountsResponse.data ?? []).map((row) => row.id),
+      ...(roleAccountsResponse.data ?? []).map((row) => row.account_id),
+      ...(primaryRoleAccountsResponse.data ?? []).map((row) => row.id),
     ]),
   );
 
-  const privilegedProfilesByRoleResponse = privilegedAccountIds.length
+  const profilesByRoleResponse = roleAccountIds.length
     ? await supabase
         .from('profiles')
         .select('id')
         .eq('org_id', orgId)
-        .in('account_id', privilegedAccountIds)
+        .in('account_id', roleAccountIds)
         .is('deleted_at', null)
         .returns<Array<{ id: string }>>()
     : { data: [] as Array<{ id: string }>, error: null };
 
-  if (
-    'error' in privilegedProfilesByRoleResponse &&
-    privilegedProfilesByRoleResponse.error
-  ) {
-    throw new Error(privilegedProfilesByRoleResponse.error.message);
+  if ('error' in profilesByRoleResponse && profilesByRoleResponse.error) {
+    throw new Error(profilesByRoleResponse.error.message);
   }
 
   return Array.from(
     new Set([
       ...(staffProfilesResponse.data ?? []).map((row) => row.id),
-      ...(privilegedProfilesByRoleResponse.data ?? []).map((row) => row.id),
+      ...(profilesByRoleResponse.data ?? []).map((row) => row.id),
     ]),
   );
 }
@@ -590,60 +592,6 @@ async function ensureChannelMembershipForMessageWrite(input: {
   }
 }
 
-async function listActiveSupportStaffProfileIds(
-  supabase: ReturnType<typeof createSupabaseServiceClient>,
-  orgId: string,
-): Promise<string[]> {
-  const [staffProfilesResponse, staffRoleAccountsResponse] = await Promise.all([
-    supabase
-      .from('profiles')
-      .select('id, account_id')
-      .eq('org_id', orgId)
-      .eq('kind', 'staff')
-      .is('deleted_at', null)
-      .returns<Array<{ id: string; account_id: string }>>(),
-    supabase
-      .from('user_roles')
-      .select('account_id')
-      .eq('org_id', orgId)
-      .eq('role_key', 'staff')
-      .is('deleted_at', null)
-      .returns<Array<{ account_id: string }>>(),
-  ]);
-
-  if (staffProfilesResponse.error) {
-    throw new Error(staffProfilesResponse.error.message);
-  }
-  if (staffRoleAccountsResponse.error) {
-    throw new Error(staffRoleAccountsResponse.error.message);
-  }
-
-  const staffAccountIds = Array.from(
-    new Set((staffRoleAccountsResponse.data ?? []).map((row) => row.account_id)),
-  );
-
-  const roleStaffProfilesResponse = staffAccountIds.length
-    ? await supabase
-        .from('profiles')
-        .select('id')
-        .eq('org_id', orgId)
-        .in('account_id', staffAccountIds)
-        .is('deleted_at', null)
-        .returns<Array<{ id: string }>>()
-    : { data: [] as Array<{ id: string }>, error: null };
-
-  if ('error' in roleStaffProfilesResponse && roleStaffProfilesResponse.error) {
-    throw new Error(roleStaffProfilesResponse.error.message);
-  }
-
-  return Array.from(
-    new Set([
-      ...(staffProfilesResponse.data ?? []).map((row) => row.id),
-      ...(roleStaffProfilesResponse.data ?? []).map((row) => row.id),
-    ]),
-  );
-}
-
 async function upsertSupportThreadAssignments(input: {
   supabase: ReturnType<typeof createSupabaseServiceClient>;
   orgId: string;
@@ -690,10 +638,7 @@ async function seedRequiredSupportThreadAssignments(input: {
   assignedByProfileId: string;
   now: string;
 }) {
-  const staffProfileIds = await listActiveSupportStaffProfileIds(
-    input.supabase,
-    input.orgId,
-  );
+  const staffProfileIds = await listSupportStaffProfileIds(input.supabase, input.orgId);
 
   await upsertSupportThreadAssignments({
     supabase: input.supabase,
@@ -851,7 +796,7 @@ export class MessagesService {
             .eq('account_id', currentAccountId)
             .in('thread_id', threadIds)
             .is('deleted_at', null)
-        : Promise.resolve({ data: [] as RawThreadReadStateRow[], error: null }),
+        : Promise.resolve({ data: [] as RawReadStateByThreadRow[], error: null }),
     ]);
     if (participantError) throw participantError;
     if (readStateError) throw readStateError;
@@ -866,7 +811,7 @@ export class MessagesService {
     }
 
     const readStateByThread = new Map(
-      ((readStateRows ?? []) as RawThreadReadStateRow[]).map((row) => [
+      ((readStateRows ?? []) as RawReadStateByThreadRow[]).map((row) => [
         row.thread_id,
         {
           threadId: row.thread_id,
@@ -1325,7 +1270,9 @@ export class MessagesService {
             })
           : null;
       const supportPrivilegedProfileIds = isSupportChannel
-        ? await listSupportPrivilegedProfileIds(serviceSupabase, input.orgId)
+        ? await listSupportStaffProfileIds(serviceSupabase, input.orgId, {
+            includeAdmins: true,
+          })
         : [];
       const supportVisibility = buildSupportVisibilityFields({
         isSupportChannel,
@@ -1529,7 +1476,9 @@ export class MessagesService {
             })
           : null;
       const supportPrivilegedProfileIds = isSupportChannel
-        ? await listSupportPrivilegedProfileIds(serviceSupabase, input.orgId)
+        ? await listSupportStaffProfileIds(serviceSupabase, input.orgId, {
+            includeAdmins: true,
+          })
         : [];
       const supportVisibility = buildSupportVisibilityFields({
         isSupportChannel,
@@ -1766,7 +1715,9 @@ export class MessagesService {
             })
           : null;
       const supportPrivilegedProfileIds = isSupportChannel
-        ? await listSupportPrivilegedProfileIds(serviceSupabase, input.orgId)
+        ? await listSupportStaffProfileIds(serviceSupabase, input.orgId, {
+            includeAdmins: true,
+          })
         : [];
       const supportVisibility = buildSupportVisibilityFields({
         isSupportChannel,

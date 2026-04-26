@@ -95,7 +95,11 @@ export function markDirectMessageChannelRead(
       return channel;
     }
     const unreadCount = Math.max(0, channel.collections.readState?.unreadCount ?? 0);
-    if (unreadCount === 0) {
+    const threadUnreadCount = Math.max(
+      0,
+      channel.collections.readState?.threadUnreadCount ?? 0,
+    );
+    if (unreadCount === 0 && threadUnreadCount === 0) {
       return channel;
     }
 
@@ -111,6 +115,7 @@ export function markDirectMessageChannelRead(
             input?.lastReadMessageId ?? channel.collections.readState?.lastReadMessageId,
           lastReadAt: input?.lastReadAt ?? channel.collections.readState?.lastReadAt,
           unreadCount: 0,
+          threadUnreadCount: 0,
         },
       },
     };

@@ -34,11 +34,10 @@ import type {
   MessageMentionVM,
   ReactionVM,
 } from '@iconicedu/shared-types';
-import { useQueryClient } from '@tanstack/react-query';
 import type { AppColors } from '@/lib/theme';
 import { reportMobileObservedError } from '@/lib/analytics/report-error';
-import { fetchThreadMessages, markThreadReadState } from '@/lib/api/queries';
-import { applyOptimisticThreadReadState } from '@/lib/messages/apply-optimistic-channel-read-state';
+import { fetchThreadMessages } from '@/lib/api/queries';
+import { useMarkRead } from '@/hooks/use-mark-read';
 import { EmojiPicker } from './emoji-picker';
 import {
   SmilePlus,
@@ -1735,7 +1734,12 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   isThreadMessage = false,
   onSendAnnotation,
 }) => {
-  const queryClient = useQueryClient();
+  const { markThreadRead } = useMarkRead({
+    orgId: message.ids.orgId,
+    profileId: currentProfileId ?? '',
+    accountId: currentAccountId ?? '',
+    channelId: channelId ?? '',
+  });
   const s = useMemo(() => makeStyles(colors), [colors]);
   const [threadExpanded, setThreadExpanded] = useState(false);
   const [threadReplies, setThreadReplies] = useState<MessageVM[]>([]);
@@ -1870,43 +1874,15 @@ export const MessageItem: React.FC<MessageItemProps> = ({
       setThreadReplies(replies);
       const lastReplyId = replies[replies.length - 1]?.ids.id ?? null;
       if (resolvedChannelId && currentProfileId && currentAccountId) {
-        try {
-          const alreadyUpToDate =
-            threadUnreadCount === 0 &&
-            lastReplyId === thread.readState?.lastReadMessageId;
-          if (alreadyUpToDate) {
-            return;
-          }
-
-          applyOptimisticThreadReadState({
-            queryClient,
-            channelId: resolvedChannelId,
-            profileId: currentProfileId,
-            parentMessageId: message.ids.id,
-          });
-          const unreadCount = await markThreadReadState({
+        const alreadyUpToDate =
+          threadUnreadCount === 0 && lastReplyId === thread.readState?.lastReadMessageId;
+        if (!alreadyUpToDate) {
+          await markThreadRead({
             orgId: message.ids.orgId,
-            accountId: currentAccountId,
-            profileId: currentProfileId,
             channelId: resolvedChannelId,
+            parentMessageId: message.ids.id,
             threadId: thread.ids.id,
             lastReadMessageId: lastReplyId,
-          });
-          setThreadUnreadCount(unreadCount);
-        } catch (error) {
-          void queryClient.invalidateQueries({
-            queryKey: ['messages', resolvedChannelId, currentProfileId],
-            exact: true,
-          });
-          reportMobileObservedError({
-            error,
-            source: 'mobile.messages.message_item.thread_read_state',
-            message: 'Failed to sync thread read state',
-            context: {
-              channelId: resolvedChannelId,
-              threadId: thread.ids.id,
-              messageId: message.ids.id,
-            },
           });
         }
       }
@@ -1931,7 +1907,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     currentProfileId,
     currentAccountId,
     threadUnreadCount,
-    queryClient,
+    markThreadRead,
   ]);
 
   useEffect(() => {

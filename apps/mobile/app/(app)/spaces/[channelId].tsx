@@ -23,7 +23,6 @@ import {
   sendFilesMessage,
   uploadChannelFile,
   buildMessageStoragePath,
-  markChannelReadState,
   fetchIsChannelMember,
   fetchSpaceChannelMetaByChannelId,
   fetchChannelReadState,
@@ -44,7 +43,7 @@ import type { AttachmentPayload } from '@/components/messages/attachment-sheet';
 import { buildMobileChannelEmptyStateCopy } from '@/lib/message-empty-state';
 import { reportMobileObservedError } from '@/lib/analytics/report-error';
 import type { MessageVM, UserProfileVM } from '@iconicedu/shared-types';
-import { applyOptimisticChannelReadState } from '@/lib/messages/apply-optimistic-channel-read-state';
+import { useMarkRead } from '@/hooks/use-mark-read';
 
 type PendingUpload = {
   id: string;
@@ -130,6 +129,13 @@ export default function SpaceDetailScreen() {
     queryFn: () => fetchChannelReadState(channelId ?? '', accountId),
     enabled: !!channelId && !!accountId,
     staleTime: 30_000,
+  });
+  const { markChannelRead } = useMarkRead({
+    orgId,
+    profileId,
+    accountId,
+    channelId: channelId ?? '',
+    profileKind,
   });
   const refreshConversation = useCallback(async () => {
     await Promise.all([
@@ -418,47 +424,7 @@ export default function SpaceDetailScreen() {
 
   const s = useMemo(() => makeStyles(colors), [colors]);
 
-  const lastMarkedReadIdRef = React.useRef<string | null>(null);
-  const handleUnreadViewed = useCallback(
-    async (lastReadMessageId: string) => {
-      if (!channelId || !orgId || !accountId || !profileId || !lastReadMessageId) {
-        return;
-      }
-      if (lastMarkedReadIdRef.current === lastReadMessageId) {
-        return;
-      }
-      lastMarkedReadIdRef.current = lastReadMessageId;
-      applyOptimisticChannelReadState({
-        queryClient,
-        orgId,
-        profileId,
-        accountId,
-        channelId,
-        lastReadMessageId,
-        profileKind,
-      });
-      try {
-        const unreadCount = await markChannelReadState({
-          orgId,
-          accountId,
-          profileId,
-          channelId,
-          lastReadMessageId,
-        });
-        queryClient.setQueryData(queryKeys.channelReadState(channelId, accountId), {
-          channelId,
-          lastReadMessageId,
-          lastReadAt: new Date().toISOString(),
-          unreadCount,
-        });
-      } catch {
-        void queryClient.invalidateQueries({
-          queryKey: queryKeys.channelReadState(channelId, accountId),
-        });
-      }
-    },
-    [accountId, channelId, orgId, profileId, profileKind, queryClient],
-  );
+  const handleUnreadViewed = markChannelRead;
   if (!channelId) return null;
 
   const isOwnMessage = (msg: MessageVM) => msg.core.sender.ids.id === profileId;

@@ -168,6 +168,10 @@ async function buildChannelsFromRows(
         accountId: options.accountId ?? undefined,
       });
       const threadsById = new Map(threads.map((thread) => [thread.ids.id, thread]));
+      const threadUnreadCount = threads.reduce(
+        (total, thread) => total + Math.max(0, thread.readState?.unreadCount ?? 0),
+        0,
+      );
       const messages = await buildChannelMessages(supabase, orgId, row.id, {
         threadsById,
         limit: options.messagesLimit,
@@ -187,8 +191,10 @@ async function buildChannelsFromRows(
         media,
         files,
         capabilities: capabilities.length ? capabilities : undefined,
-        readState:
-          readStateByChannel.get(row.id) ?? createDefaultChannelReadState(row.id),
+        readState: {
+          ...(readStateByChannel.get(row.id) ?? createDefaultChannelReadState(row.id)),
+          threadUnreadCount,
+        },
       });
     }),
   );
@@ -219,6 +225,10 @@ async function buildChannelFromRow(
     accountId: options.accountId ?? undefined,
   });
   const threadsById = new Map(threads.map((thread) => [thread.ids.id, thread]));
+  const threadUnreadCount = threads.reduce(
+    (total, thread) => total + Math.max(0, thread.readState?.unreadCount ?? 0),
+    0,
+  );
   const messages = await buildChannelMessages(supabase, orgId, row.id, {
     threadsById,
     limit: options.messagesLimit,
@@ -240,8 +250,8 @@ async function buildChannelFromRow(
     files,
     capabilities: capabilities.length ? capabilities : undefined,
     readState: readStateRow
-      ? mapChannelReadStateRow(readStateRow)
-      : createDefaultChannelReadState(row.id),
+      ? { ...mapChannelReadStateRow(readStateRow), threadUnreadCount }
+      : { ...createDefaultChannelReadState(row.id), threadUnreadCount },
   });
 }
 

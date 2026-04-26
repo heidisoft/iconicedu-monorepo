@@ -1,5 +1,4 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import {
   Modal,
   View,
@@ -16,8 +15,8 @@ import type { MessageVM } from '@iconicedu/shared-types';
 import { reportMobileObservedError } from '@/lib/analytics/report-error';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
-import { fetchThreadMessages, markThreadReadState } from '@/lib/api/queries';
-import { applyOptimisticThreadReadState } from '@/lib/messages/apply-optimistic-channel-read-state';
+import { fetchThreadMessages } from '@/lib/api/queries';
+import { useMarkRead } from '@/hooks/use-mark-read';
 import { MessageItem } from './message-item';
 import { MessageInput } from './message-input';
 
@@ -108,7 +107,6 @@ export const ThreadSheet: React.FC<ThreadSheetProps> = ({
   onSend,
   onReactionToggle,
 }) => {
-  const queryClient = useQueryClient();
   const { colors } = useTheme();
   const s = React.useMemo(() => makeStyles(colors), [colors]);
   const [replies, setReplies] = useState<MessageVM[]>([]);
@@ -118,6 +116,13 @@ export const ThreadSheet: React.FC<ThreadSheetProps> = ({
   const threadId = parentMessage?.social?.thread?.ids.id;
   const resolvedChannelId =
     channelId || parentMessage?.social?.thread?.readState?.channelId || '';
+
+  const { markThreadRead } = useMarkRead({
+    orgId: parentMessage?.ids.orgId ?? '',
+    profileId: currentProfileId,
+    accountId: currentAccountId,
+    channelId: resolvedChannelId,
+  });
 
   const loadReplies = useCallback(async () => {
     if (!parentMessage || !resolvedChannelId) return;
@@ -136,42 +141,16 @@ export const ThreadSheet: React.FC<ThreadSheetProps> = ({
 
       const lastReplyId = data[data.length - 1]?.ids.id ?? null;
       if (resolvedChannelId && threadId && currentProfileId && currentAccountId) {
-        try {
-          const alreadyUpToDate =
-            (parentMessage.social?.thread?.readState?.unreadCount ?? 0) === 0 &&
-            lastReplyId === parentMessage.social?.thread?.readState?.lastReadMessageId;
-          if (alreadyUpToDate) {
-            return;
-          }
-
-          applyOptimisticThreadReadState({
-            queryClient,
-            channelId: resolvedChannelId,
-            profileId: currentProfileId,
-            parentMessageId: parentMessage.ids.id,
-          });
-          await markThreadReadState({
+        const alreadyUpToDate =
+          (parentMessage.social?.thread?.readState?.unreadCount ?? 0) === 0 &&
+          lastReplyId === parentMessage.social?.thread?.readState?.lastReadMessageId;
+        if (!alreadyUpToDate) {
+          await markThreadRead({
             orgId: parentMessage.ids.orgId,
-            accountId: currentAccountId,
-            profileId: currentProfileId,
             channelId: resolvedChannelId,
+            parentMessageId: parentMessage.ids.id,
             threadId,
             lastReadMessageId: lastReplyId,
-          });
-        } catch (error) {
-          void queryClient.invalidateQueries({
-            queryKey: ['messages', resolvedChannelId, currentProfileId],
-            exact: true,
-          });
-          reportMobileObservedError({
-            error,
-            source: 'mobile.messages.thread_sheet.thread_read_state',
-            message: 'Failed to sync thread read state in thread sheet',
-            context: {
-              channelId: resolvedChannelId,
-              threadId,
-              parentMessageId: parentMessage.ids.id,
-            },
           });
         }
       }
@@ -191,8 +170,8 @@ export const ThreadSheet: React.FC<ThreadSheetProps> = ({
   }, [
     currentAccountId,
     currentProfileId,
+    markThreadRead,
     parentMessage,
-    queryClient,
     resolvedChannelId,
     threadId,
   ]);

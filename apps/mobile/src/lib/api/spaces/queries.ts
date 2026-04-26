@@ -227,6 +227,7 @@ export async function fetchLearningSpaceChannels(
       kind: 'channel',
       updated_at: supportChannel.updated_at ?? new Date(0).toISOString(),
       unread_count: 0,
+      thread_unread_count: 0,
       last_message_text: null,
       last_message_at: null,
       last_message_sender: null,

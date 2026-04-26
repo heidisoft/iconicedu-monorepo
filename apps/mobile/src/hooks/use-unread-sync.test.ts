@@ -1,11 +1,8 @@
 import { act, renderHook } from '@testing-library/react-native';
-import {
-  resolveChannelIdFromPayload,
-  shouldSyncChannelListsForReadStatePayload,
-  useUnreadSync,
-} from './use-unread-sync';
+import { resolveChannelIdFromPayload, useUnreadSync } from './use-unread-sync';
 
 const mockInvalidateQueries = jest.fn();
+const mockGetQueryData = jest.fn().mockReturnValue(undefined);
 const mockSetBadgeCountAsync = jest.fn();
 const mockSelect = jest.fn();
 const mockEq = jest.fn();
@@ -25,6 +22,7 @@ const realtimeCallbacks = new Map<string, RealtimeCallback>();
 jest.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({
     invalidateQueries: (...args: unknown[]) => mockInvalidateQueries(...args),
+    getQueryData: (...args: unknown[]) => mockGetQueryData(...args),
   }),
 }));
 
@@ -61,6 +59,7 @@ jest.mock('expo-notifications', () => ({
 describe('use-unread-sync', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetQueryData.mockReturnValue(undefined);
     realtimeCallbacks.clear();
 
     mockIs.mockResolvedValue({ data: [], error: null });
@@ -79,30 +78,6 @@ describe('use-unread-sync', () => {
 
   afterEach(() => {
     jest.useRealTimers();
-  });
-
-  it('returns true for channel-level rows', () => {
-    expect(
-      shouldSyncChannelListsForReadStatePayload({
-        new: { thread_id: null },
-      }),
-    ).toBe(true);
-  });
-
-  it('returns false for thread-level rows', () => {
-    expect(
-      shouldSyncChannelListsForReadStatePayload({
-        new: { thread_id: 'thread-1' },
-      }),
-    ).toBe(false);
-  });
-
-  it('falls back to old row values for updates', () => {
-    expect(
-      shouldSyncChannelListsForReadStatePayload({
-        old: { thread_id: 'thread-1' },
-      }),
-    ).toBe(false);
   });
 
   it('resolves channel_id from new or old realtime payload rows', () => {

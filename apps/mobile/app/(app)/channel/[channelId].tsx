@@ -25,7 +25,6 @@ import {
   uploadChannelFile,
   buildMessageStoragePath,
   deleteMessage,
-  markChannelReadState,
   fetchChannelReadState,
   fetchIsChannelMember,
   queryKeys,
@@ -45,7 +44,7 @@ import { SpaceSessionsTab } from '@/components/messages/space-sessions-tab';
 import { resolveChannelTopicIconKey } from '@/lib/learning-space-icons';
 import { buildMobileChannelEmptyStateCopy } from '@/lib/message-empty-state';
 import { reportMobileObservedError } from '@/lib/analytics/report-error';
-import { applyOptimisticChannelReadState } from '@/lib/messages/apply-optimistic-channel-read-state';
+import { useMarkRead } from '@/hooks/use-mark-read';
 
 type ChannelTab = 'messages' | 'sessions';
 
@@ -137,6 +136,13 @@ export default function ChannelConversationScreen() {
     queryFn: () => fetchChannelReadState(channelId ?? '', accountId),
     enabled: !!channelId && !!accountId,
     staleTime: 30_000,
+  });
+  const { markChannelRead } = useMarkRead({
+    orgId,
+    profileId,
+    accountId,
+    channelId: channelId ?? '',
+    profileKind,
   });
   const refreshConversation = useCallback(async () => {
     await Promise.all([
@@ -417,47 +423,7 @@ export default function ChannelConversationScreen() {
     [toggleReaction],
   );
 
-  const lastMarkedReadIdRef = React.useRef<string | null>(null);
-  const handleUnreadViewed = useCallback(
-    async (lastReadMessageId: string) => {
-      if (!channelId || !orgId || !accountId || !profileId || !lastReadMessageId) {
-        return;
-      }
-      if (lastMarkedReadIdRef.current === lastReadMessageId) {
-        return;
-      }
-      lastMarkedReadIdRef.current = lastReadMessageId;
-      applyOptimisticChannelReadState({
-        queryClient,
-        orgId,
-        profileId,
-        accountId,
-        channelId,
-        lastReadMessageId,
-        profileKind,
-      });
-      try {
-        const unreadCount = await markChannelReadState({
-          orgId,
-          accountId,
-          profileId,
-          channelId,
-          lastReadMessageId,
-        });
-        queryClient.setQueryData(queryKeys.channelReadState(channelId, accountId), {
-          channelId,
-          lastReadMessageId,
-          lastReadAt: new Date().toISOString(),
-          unreadCount,
-        });
-      } catch {
-        void queryClient.invalidateQueries({
-          queryKey: queryKeys.channelReadState(channelId, accountId),
-        });
-      }
-    },
-    [accountId, channelId, orgId, profileId, profileKind, queryClient],
-  );
+  const handleUnreadViewed = markChannelRead;
   const headerStudentProfiles = useMemo(() => {
     if (!studentProfiles) return [] as HeaderStudentProfile[];
     try {
