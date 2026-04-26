@@ -454,7 +454,7 @@ describe('MessagesContainer', () => {
             }),
           };
         }
-        if (url.includes('/api/messages/thread-read-state')) {
+        if (url.includes('/api/messages/read-state')) {
           return {
             ok: true,
             json: async () => ({
@@ -518,7 +518,7 @@ describe('MessagesContainer', () => {
 
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
-        '/api/messages/thread-read-state',
+        '/api/messages/read-state',
         expect.objectContaining({
           method: 'POST',
           body: expect.stringContaining('"threadId":"thread-1"'),
@@ -628,7 +628,7 @@ describe('MessagesContainer', () => {
     });
 
     expect(fetchMock).not.toHaveBeenCalledWith(
-      '/api/messages/thread-read-state',
+      '/api/messages/read-state',
       expect.anything(),
     );
   });
@@ -678,7 +678,7 @@ describe('MessagesContainer', () => {
             }),
           };
         }
-        if (url.includes('/api/messages/thread-read-state')) {
+        if (url.includes('/api/messages/read-state')) {
           return {
             ok: true,
             json: async () => ({
@@ -747,7 +747,7 @@ describe('MessagesContainer', () => {
 
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
-        '/api/messages/thread-read-state',
+        '/api/messages/read-state',
         expect.objectContaining({
           method: 'POST',
           body: expect.stringContaining('"threadId":"thread-1"'),

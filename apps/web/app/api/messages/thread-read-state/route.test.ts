@@ -65,7 +65,7 @@ describe('POST /api/messages/thread-read-state', () => {
     });
   });
 
-  it('proxies to the API thread read endpoint and returns read-state response', async () => {
+  it('proxies to the unified API read-state endpoint and returns read-state response', async () => {
     const response = await POST(
       new Request(`${APP_URL}/api/messages/thread-read-state`, {
         method: 'POST',
@@ -77,9 +77,10 @@ describe('POST /api/messages/thread-read-state', () => {
       }),
     );
 
-    expect(apiPost).toHaveBeenCalledWith('/threads/thread-1/read', {
+    expect(apiPost).toHaveBeenCalledWith('/channels/channel-1/read-state', {
       orgId: 'org-1',
       channelId: 'channel-1',
+      threadId: 'thread-1',
       accountId: 'account-1',
       profileId: 'profile-1',
       lastReadMessageId: 'message-2',

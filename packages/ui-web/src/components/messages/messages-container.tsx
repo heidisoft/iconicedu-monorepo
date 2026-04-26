@@ -746,7 +746,7 @@ export function MessagesContainer({
         if (!alreadyUpToDate) {
           try {
             const response = await runWithNetworkActivity(() =>
-              window.fetch('/api/messages/thread-read-state', {
+              window.fetch('/api/messages/read-state', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

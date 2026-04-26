@@ -55,10 +55,11 @@ export async function POST(request: Request) {
   try {
     const api = createApiClient(supabase);
     const response = await api.post<{ unreadCount?: number }>(
-      `/threads/${threadId}/read`,
+      `/channels/${channelId}/read-state`,
       {
         orgId: actor.account.org_id,
         channelId,
+        threadId,
         accountId: actor.account.id,
         profileId: actor.profile.id,
         lastReadMessageId: requestedLastReadMessageId,

@@ -2,6 +2,7 @@ import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '@iconicedu/api/prisma/prisma.service';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
+import { ThreadsService } from '@iconicedu/api/modules/threads/threads.service';
 
 type DmParticipant = {
   id: string;
@@ -55,7 +56,10 @@ const PREVIEW_LABELS: Record<string, string> = {
 
 @Injectable()
 export class ChannelsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly threadsService: ThreadsService,
+  ) {}
 
   private async fetchLastMessages(
     accessToken: string,
@@ -560,30 +564,59 @@ export class ChannelsService {
 
   async getReadState(
     accessToken: string,
-    input: { channelId: string; accountId: string },
+    input: { channelId: string; accountId: string; threadId?: string | null },
   ) {
     const supabase = createSupabaseSessionClient(accessToken);
-    const { data, error } = await supabase
+    let query = supabase
       .from('channel_read_state')
-      .select('channel_id, last_read_message_id, last_read_at, unread_count')
+      .select('channel_id, thread_id, last_read_message_id, last_read_at, unread_count')
       .eq('channel_id', input.channelId)
       .eq('account_id', input.accountId)
-      .is('thread_id', null)
-      .is('deleted_at', null)
-      .maybeSingle<{
-        channel_id: string;
-        last_read_message_id: string | null;
-        last_read_at: string | null;
-        unread_count: number | null;
-      }>();
+      .is('deleted_at', null);
+    query = input.threadId
+      ? query.eq('thread_id', input.threadId)
+      : query.is('thread_id', null);
+
+    const { data, error } = await query.maybeSingle<{
+      channel_id: string;
+      thread_id: string | null;
+      last_read_message_id: string | null;
+      last_read_at: string | null;
+      unread_count: number | null;
+    }>();
     if (error) throw new InternalServerErrorException(error.message);
     if (!data) return null;
     return {
       channelId: data.channel_id,
+      threadId: data.thread_id ?? null,
       lastReadMessageId: data.last_read_message_id ?? null,
       lastReadAt: data.last_read_at ?? null,
       unreadCount: data.unread_count ?? 0,
     };
+  }
+
+  async markReadState(
+    accessToken: string,
+    input: {
+      orgId: string;
+      accountId: string;
+      profileId: string;
+      channelId: string;
+      threadId?: string | null;
+      lastReadMessageId?: string | null;
+    },
+  ) {
+    if (input.threadId) {
+      return this.threadsService.markRead(accessToken, {
+        ...input,
+        threadId: input.threadId,
+      });
+    }
+
+    return this.markRead(accessToken, {
+      ...input,
+      lastReadMessageId: input.lastReadMessageId ?? undefined,
+    });
   }
 
   async markRead(

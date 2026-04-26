@@ -7,5 +7,6 @@ import { ThreadsService } from '@iconicedu/api/modules/threads/threads.service';
   imports: [AuthModule],
   controllers: [ThreadsController],
   providers: [ThreadsService],
+  exports: [ThreadsService],
 })
 export class ThreadsModule {}

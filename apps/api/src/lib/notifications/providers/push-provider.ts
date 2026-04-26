@@ -35,6 +35,7 @@ type ExpoPushMessage = {
   to: string;
   title: string;
   body?: string;
+  badge?: number;
   channelId?: string;
   data?: Record<string, unknown>;
   sound: 'default';
@@ -230,6 +231,37 @@ export async function sendPushNotification(payload: PushNotificationPayload) {
     return { ticketIds: [], revokedTokenIds: [] } satisfies SendPushResult;
   }
 
+  // Resolve badge count from the account's total unread across all channels.
+  // Failures are swallowed — badge is best-effort and must not block delivery.
+  let badgeCount: number | undefined;
+  try {
+    const profileRow = await supabase
+      .from('profiles')
+      .select('account_id')
+      .eq('id', payload.recipientProfileId)
+      .single();
+
+    const accountId = profileRow.data?.account_id;
+    if (accountId) {
+      const { data: unreadRows } = await supabase
+        .from('channel_read_state')
+        .select('unread_count')
+        .eq('org_id', payload.orgId)
+        .eq('account_id', accountId)
+        .is('thread_id', null)
+        .is('deleted_at', null);
+
+      if (Array.isArray(unreadRows)) {
+        badgeCount = unreadRows.reduce(
+          (total, row) => total + Math.max(0, row.unread_count ?? 0),
+          0,
+        );
+      }
+    }
+  } catch {
+    // Badge sync failure is non-critical — continue without badge.
+  }
+
   const channelId = resolveChannelIdFromMetadata(payload.metadata);
   const threadId = resolveThreadIdFromMetadata(payload.metadata, payload.threadId);
   const channelRouteKind = resolveChannelRouteKindFromMetadata(
@@ -245,6 +277,7 @@ export async function sendPushNotification(payload: PushNotificationPayload) {
     to: token,
     title: payload.title,
     body: payload.summary ?? preview ?? undefined,
+    ...(badgeCount !== undefined ? { badge: badgeCount } : {}),
     // Required for Android 8+ to route the notification to the correct channel.
     // Must match the channel created by ensureAndroidChannel() in use-push-registration.ts.
     channelId: 'default',

@@ -83,6 +83,7 @@ export async function fetchChannelReadState(channelId: string, accountId: string
   if (!channelId || !accountId) return null;
   return apiGet<{
     channelId: string;
+    threadId?: string | null;
     lastReadMessageId: string | null;
     lastReadAt: string | null;
     unreadCount: number;
@@ -97,7 +98,7 @@ export async function markChannelReadState(input: {
   lastReadMessageId?: string;
 }): Promise<number> {
   const response = await apiPost<{ unreadCount?: number }>(
-    `/channels/${input.channelId}/read`,
+    `/channels/${input.channelId}/read-state`,
     input,
   );
   return response.unreadCount ?? 0;
@@ -133,7 +134,7 @@ export async function markThreadReadState(input: {
   lastReadMessageId?: string | null;
 }): Promise<number> {
   const response = await apiPost<{ unreadCount?: number }>(
-    `/threads/${input.threadId}/read`,
+    `/channels/${input.channelId}/read-state`,
     input,
   );
   return response.unreadCount ?? 0;

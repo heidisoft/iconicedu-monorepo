@@ -100,10 +100,34 @@ export class ChannelsController {
     @Req() req: AuthenticatedRequest,
     @Param('channelId') channelId: string,
     @Query('accountId') accountId: string,
+    @Query('threadId') threadId?: string,
   ) {
     return this.channelsService.getReadState(
       extractBearerToken(req.headers.authorization),
-      { channelId, accountId },
+      { channelId, accountId, threadId },
+    );
+  }
+
+  @Post(':channelId/read-state')
+  @UseGuards(AuthGuard)
+  markReadState(
+    @Req() req: AuthenticatedRequest,
+    @Param('channelId') channelId: string,
+    @Body()
+    body: {
+      orgId: string;
+      accountId: string;
+      profileId: string;
+      threadId?: string | null;
+      lastReadMessageId?: string | null;
+    },
+  ) {
+    return this.channelsService.markReadState(
+      extractBearerToken(req.headers.authorization),
+      {
+        ...body,
+        channelId,
+      },
     );
   }
 
