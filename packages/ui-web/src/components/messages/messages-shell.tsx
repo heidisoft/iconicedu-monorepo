@@ -56,6 +56,7 @@ export const MessagesShell = memo(function MessagesShell(props: MessagesShellPro
   return (
     <MessagesStateProvider
       channel={channel}
+      currentUserId={props.currentUserId}
       isReadOnly={props.readOnly}
       showCreateMessageTypeButton={props.showCreateMessageTypeButton}
     >

@@ -138,11 +138,13 @@ const isSameIntent = (
 
 export function MessagesStateProvider({
   channel,
+  currentUserId: initialCurrentUserId = '',
   isReadOnly = false,
   showCreateMessageTypeButton = true,
   children,
 }: {
   channel: ChannelVM;
+  currentUserId?: string;
   isReadOnly?: boolean;
   showCreateMessageTypeButton?: boolean;
   children: React.ReactNode;
@@ -151,7 +153,7 @@ export function MessagesStateProvider({
     isOpen: false,
     intent: null,
   });
-  const [currentUserId, setCurrentUserId] = useState('');
+  const [currentUserId, setCurrentUserId] = useState(initialCurrentUserId);
   const [savedCount, setSavedCount] = useState(0);
   const [homeworkCount, setHomeworkCount] = useState(0);
   const [sessionSummaryCount, setSessionSummaryCount] = useState(0);

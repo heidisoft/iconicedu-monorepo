@@ -35,6 +35,7 @@ import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
 import { getChannelTopicIcon } from '@iconicedu/ui-web/lib/icons';
 import { RoleNameIndicator } from '@iconicedu/ui-web/components/shared/role-name-indicator';
 import { ThemedIconBadge } from '@iconicedu/ui-web/components/shared/themed-icon';
+import { Skeleton } from '@iconicedu/ui-web/ui/skeleton';
 import type {
   ChannelVM,
   PresenceDisplayStatusVM,
@@ -52,6 +53,7 @@ interface HeaderSubtitleEntry {
 
 interface MessagesContainerHeaderProps {
   channel: ChannelVM;
+  isLoading?: boolean;
 }
 
 const HeaderSubtitleItem = memo(function HeaderSubtitleItem({
@@ -176,6 +178,48 @@ const HEADER_ICON_MAP: Record<string, LucideIcon> = {
 const getOtherParticipant = (participants: UserProfileVM[], currentUserId: string) =>
   participants.find((participant) => participant.ids.id !== currentUserId) ??
   participants[0];
+
+function isHeaderDataReady(channel: ChannelVM, currentUserId: string) {
+  const topic = channel.basics.topic?.trim();
+  const participants = channel.collections?.participants ?? [];
+
+  if (channel.basics.kind === 'dm') {
+    if (!currentUserId) return false;
+    return participants.some((participant) => participant.ids.id !== currentUserId);
+  }
+
+  if (channel.basics.purpose === 'learning-space') {
+    return Boolean(topic) && participants.length > 0;
+  }
+
+  return Boolean(topic);
+}
+
+export function MessagesContainerHeaderSkeleton({
+  kind = 'channel',
+}: {
+  kind?: ChannelVM['basics']['kind'];
+}) {
+  return (
+    <div
+      className="flex min-w-0 items-center gap-3"
+      aria-label="Loading conversation header"
+      aria-busy="true"
+      data-testid="messages-container-header-skeleton"
+    >
+      <Skeleton
+        className={cn('h-8 w-8 shrink-0', kind === 'dm' ? 'rounded-full' : 'rounded-lg')}
+      />
+      <div className="flex min-w-0 flex-col gap-2">
+        <Skeleton className="h-4 w-36 rounded-md sm:w-44" />
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-3 w-20 rounded-md" />
+          <Skeleton className="h-3 w-16 rounded-md" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const PARTICIPANT_ROLE_ICON_MAP: Record<UserProfileVM['kind'], LucideIcon> = {
   educator: Presentation,
@@ -326,16 +370,19 @@ function getDmLocalTimeContext(
 
 export const MessagesContainerHeader = memo(function MessagesContainerHeader({
   channel,
+  isLoading = false,
 }: MessagesContainerHeaderProps) {
   const { savedCount, currentUserId, toggle, messageFilter, toggleMessageFilter } =
     useMessagesState();
+  const participants = channel.collections?.participants ?? [];
+  const shouldShowSkeleton = isLoading || !isHeaderDataReady(channel, currentUserId);
 
   const otherParticipant = useMemo(
     () =>
       channel.basics.kind === 'dm'
-        ? getOtherParticipant(channel.collections.participants, currentUserId)
+        ? getOtherParticipant(participants, currentUserId)
         : null,
-    [channel.basics.kind, channel.collections.participants, currentUserId],
+    [channel.basics.kind, participants, currentUserId],
   );
 
   const otherParticipantName =
@@ -470,22 +517,23 @@ export const MessagesContainerHeader = memo(function MessagesContainerHeader({
     }
 
     if (channel.basics.purpose === 'learning-space') {
-      return buildClassroomParticipantSubtitle(
-        channel.collections.participants,
-        currentUserId,
-      );
+      return buildClassroomParticipantSubtitle(participants, currentUserId);
     }
 
     return null;
   }, [
     channel.basics.kind,
     channel.basics.purpose,
-    channel.collections.participants,
+    participants,
     currentUserId,
     otherParticipant?.presence?.displayStatus,
     otherParticipant?.presence?.lastSeenAt,
     otherParticipant?.prefs?.timezone,
   ]);
+
+  if (shouldShowSkeleton) {
+    return <MessagesContainerHeaderSkeleton kind={channel.basics.kind} />;
+  }
 
   return (
     <div className="flex min-w-0 flex-col">

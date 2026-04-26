@@ -7,12 +7,16 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MessagesContainerHeader } from './messages-container-header';
 import { MessagesTopSurface } from './messages-top-surface';
 
+const mockMessagesState = vi.hoisted(() => ({
+  currentUserId: 'profile-self',
+}));
+
 vi.mock('./context/messages-state-provider', () => ({
   useMessagesState: () => ({
     savedCount: 0,
     homeworkCount: 0,
     sessionSummaryCount: 0,
-    currentUserId: 'profile-self',
+    currentUserId: mockMessagesState.currentUserId,
     toggle: vi.fn(),
     messageFilter: null,
     toggleMessageFilter: vi.fn(),
@@ -31,6 +35,106 @@ const makeParticipant = (id: string, overrides?: Record<string, unknown>) =>
 describe('MessagesContainerHeader', () => {
   afterEach(() => {
     vi.useRealTimers();
+    mockMessagesState.currentUserId = 'profile-self';
+  });
+
+  it('renders a skeleton when the header is explicitly loading', () => {
+    render(
+      <MessagesContainerHeader
+        isLoading
+        channel={
+          {
+            basics: { kind: 'channel', topic: 'Science', purpose: 'general' },
+            collections: { participants: [] },
+            ui: { headerQuickMetaActions: [] },
+          } as any
+        }
+      />,
+    );
+
+    expect(screen.getByTestId('messages-container-header-skeleton')).toBeInTheDocument();
+    expect(screen.queryByText('Science')).not.toBeInTheDocument();
+  });
+
+  it('renders a skeleton for DMs until the other participant is ready', () => {
+    render(
+      <MessagesContainerHeader
+        channel={
+          {
+            basics: { kind: 'dm', topic: 'DM' },
+            collections: {
+              participants: [makeParticipant('profile-self')],
+            },
+            ui: { headerQuickMetaActions: [] },
+          } as any
+        }
+      />,
+    );
+
+    expect(screen.getByTestId('messages-container-header-skeleton')).toBeInTheDocument();
+    expect(screen.queryByText('DM')).not.toBeInTheDocument();
+  });
+
+  it('renders a skeleton for DMs until the current user id is ready', () => {
+    mockMessagesState.currentUserId = '';
+
+    render(
+      <MessagesContainerHeader
+        channel={
+          {
+            basics: { kind: 'dm', topic: 'DM' },
+            collections: {
+              participants: [
+                makeParticipant('profile-self'),
+                makeParticipant('profile-other'),
+              ],
+            },
+            ui: { headerQuickMetaActions: [] },
+          } as any
+        }
+      />,
+    );
+
+    expect(screen.getByTestId('messages-container-header-skeleton')).toBeInTheDocument();
+    expect(screen.queryByText('User profile-self')).not.toBeInTheDocument();
+    expect(screen.queryByText('User profile-other')).not.toBeInTheDocument();
+  });
+
+  it('renders a skeleton for classrooms until participant metadata is ready', () => {
+    render(
+      <MessagesContainerHeader
+        channel={
+          {
+            basics: {
+              kind: 'channel',
+              topic: 'Math Foundations',
+              purpose: 'learning-space',
+            },
+            collections: { participants: [] },
+            ui: { headerQuickMetaActions: [] },
+          } as any
+        }
+      />,
+    );
+
+    expect(screen.getByTestId('messages-container-header-skeleton')).toBeInTheDocument();
+    expect(screen.queryByText('Math Foundations')).not.toBeInTheDocument();
+  });
+
+  it('renders a skeleton for channels until the topic is ready', () => {
+    render(
+      <MessagesContainerHeader
+        channel={
+          {
+            basics: { kind: 'channel', topic: '', purpose: 'general' },
+            collections: { participants: [] },
+            ui: { headerQuickMetaActions: [] },
+          } as any
+        }
+      />,
+    );
+
+    expect(screen.getByTestId('messages-container-header-skeleton')).toBeInTheDocument();
   });
 
   it('shows online status indicator for DM profile avatar', () => {
